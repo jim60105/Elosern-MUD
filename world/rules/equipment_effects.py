@@ -598,6 +598,30 @@ def reload_equipment_effect_rules(path: Path | None = None) -> None:
     global EQUIPMENT_EFFECT_RULES
     EQUIPMENT_EFFECT_RULES = load_equipment_effect_rules(path)
 
+def equipment_modifier_layers(modifier_key: Any) -> Mapping[str, tuple[str, int]] | None:
+    """Break one modifier key into per-stat named-layer contributions.
+
+    The sanctioned single-source surface for the stat-breakdown read model:
+    returns ``stat_key -> (kind, amount)`` for one loaded rule — ``flat`` for
+    authored integer adjustments and gauge caps, ``pct`` for authored agility
+    percent strings — or ``None`` when the modifier key has no rulebook
+    entry. Zero contributions are omitted. Pure and read-only.
+    """
+    rule = EQUIPMENT_EFFECT_RULES.get(modifier_key)
+    if rule is None:
+        return None
+    layers: dict[str, tuple[str, int]] = {}
+    for stat_key, value in rule.adjustments.items():
+        if isinstance(value, str):
+            layers[stat_key] = ("pct", int(value[:-1]))
+        elif isinstance(value, int) and value:
+            layers[stat_key] = ("flat", value)
+    for stat_key, cap in rule.gauge_caps.items():
+        if cap:
+            layers[stat_key] = ("flat", cap)
+    return MappingProxyType(layers)
+
+
 def worn_item_keys(entity: Any) -> frozenset[str]:
     """Pure fail-closed read of the currently worn item keys.
 

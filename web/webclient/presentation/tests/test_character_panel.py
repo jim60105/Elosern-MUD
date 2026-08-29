@@ -5,6 +5,9 @@ grouped ``actives``/``passives``), true-vs-disguised values, the empty
 displayed list when undisguised, read-only guarantees, and the
 status-vs-character parity proving both panels share the same canonical trait
 source.
+Version 5 (expose-stat-breakdown-read-model) adds the breakdown trait rows
+(``base``/``effective``/``layers``) and the equipment ``adjustment`` summary;
+the retained v4 branch is pinned by dedicated legacy-fixture tests.
 """
 
 from tools.spec_traceability import covers_requirement
@@ -19,12 +22,14 @@ from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from typeclasses.characters import PlayerCharacter
 from web.webclient.presentation.character import (
     CHARACTER_SCHEMA_VERSION,
+    CHARACTER_LEGACY_SCHEMA_VERSION,
     MAX_ACTIVE_ROWS,
     MAX_CATEGORY_GROUPS,
     MAX_DISPLAYED_ROWS,
     MAX_EQUIPMENT_ROWS,
     MAX_KEY_CODE_POINTS,
     MAX_LABEL_CODE_POINTS,
+    MAX_LAYERS_PER_STAT,
     MAX_PASSIVE_ROWS,
     MAX_SLOT_CODE_POINTS,
     MAX_TRAIT_ROWS,
@@ -53,8 +58,66 @@ def _context(actor):
     return PresentationContext(actor=actor, protocol_version=1)
 
 
-def _trait(**overrides):
+def _trait_v4(**overrides):
     value = {"key": "hp", "label": "生命", "current": 10, "max": 10}
+    value.update(overrides)
+    return value
+
+
+def _trait(**overrides):
+    value = {
+        "key": "hp",
+        "label": "生命",
+        "base": 10,
+        "current": 10,
+        "max": 10,
+        "effective": 10,
+        "layers": [],
+    }
+    value.update(overrides)
+    return value
+
+
+def _layer(**overrides):
+    value = {"source": "equipment", "name": "騎士全套板甲", "kind": "flat", "amount": 15}
+    value.update(overrides)
+    return value
+
+
+def _equipment_row(**overrides):
+    value = {
+        "slot": "weapon_main",
+        "item_key": "plain_sword",
+        "display_name": "鐵劍",
+        "adjustment": "",
+    }
+    value.update(overrides)
+    return value
+
+
+def _valid_panel_v4(**overrides):
+    """A byte-identical v4 payload (the retained legacy validator branch)."""
+    value = {
+        "schema_version": CHARACTER_LEGACY_SCHEMA_VERSION,
+        "available": True,
+        "kind": "character",
+        "traits": [
+            _trait_v4(),
+            _trait_v4(key="atk_phys", label="攻擊", current=5, max=None),
+        ],
+        "actives": _skill_categories(["fire_ball"]),
+        "passives": _skill_categories(
+            ["defense_instinct"], category="enhancement", label="強化"
+        ),
+        "equipment": [
+            {"slot": "weapon_main", "item_key": "plain_sword", "display_name": "鐵劍"}
+        ],
+        "disguise": {"active": False, "description": "", "displayed": []},
+        "guild": {"rank": None, "merit": 0},
+        "wallet": 100,
+        "persona": {"background": None},
+        "intimate": None,
+    }
     value.update(overrides)
     return value
 
@@ -122,15 +185,15 @@ def _skill_categories_enriched(keys, category="elemental_magic", label="元素�
 
 def _valid_panel(**overrides):
     value = {
-        "schema_version": 4,
+        "schema_version": CHARACTER_SCHEMA_VERSION,
         "available": True,
         "kind": "character",
-        "traits": [_trait(), _trait(key="atk_phys", label="攻擊", current=5, max=None)],
+        "traits": [_trait(), _trait(key="atk_phys", label="攻擊", base=5, current=5, max=None, effective=5)],
         "actives": _skill_categories(["fire_ball"]),
         "passives": _skill_categories(
             ["defense_instinct"], category="enhancement", label="強化"
         ),
-        "equipment": [{"slot": "weapon_main", "item_key": "plain_sword", "display_name": "鐵劍"}],
+        "equipment": [_equipment_row()],
         "disguise": {
             "active": False,
             "description": "",
@@ -151,6 +214,93 @@ class CharacterSchemaTests(unittest.TestCase):
         self.assertEqual(normalized["schema_version"], CHARACTER_SCHEMA_VERSION)
         self.assertTrue(normalized["available"])
         self.assertEqual(normalized["kind"], "character")
+
+    @covers_requirement("webclient-exploration-menu::the-legacy-client-tolerates-the-version-5-character-payload")
+    def test_legacy_v4_panel_still_validates_exactly(self):
+        normalized = validate_character(_valid_panel_v4())
+        self.assertEqual(normalized["schema_version"], CHARACTER_LEGACY_SCHEMA_VERSION)
+        self.assertEqual(
+            set(normalized["traits"][0]), {"key", "label", "current", "max"}
+        )
+        # A v4 row at schema version 5 is rejected by the v5 exact-shape rules.
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(
+                _valid_panel(traits=[_trait_v4()])
+            )
+        # A v5 row under v4 is likewise rejected.
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(_valid_panel_v4(traits=[_trait()]))
+
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
+    def test_v5_trait_layer_validation_is_exact(self):
+        normalized = validate_character(
+            _valid_panel(traits=[_trait(layers=[_layer()])])
+        )
+        self.assertEqual(normalized["traits"][0]["layers"], [_layer()])
+        for bad in (
+            _layer(source="innate"),
+            _layer(kind="percent"),
+            _layer(amount=0),
+            _layer(amount="15"),
+            _layer(amount=float("nan")),
+            _layer(amount=float("inf")),
+            _layer(amount=True),
+            _layer(name=" "),
+            {k: v for k, v in _layer().items() if k != "kind"},
+            {**_layer(), "extra": 1},
+        ):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_character(_valid_panel(traits=[_trait(layers=[bad])]))
+        with self.assertRaises(CharacterPanelError):
+            validate_character(
+                _valid_panel(
+                    traits=[
+                        _trait(layers=[_layer() for _ in range(MAX_LAYERS_PER_STAT + 1)])
+                    ]
+                )
+            )
+        # Fractional scaled-grant amounts ride as floats; negative signed too.
+        normalized = validate_character(
+            _valid_panel(
+                traits=[
+                    _trait(
+                        key="defense",
+                        label="防禦",
+                        base=5,
+                        current=7.5,
+                        max=None,
+                        effective=7.5,
+                        layers=[_layer(kind="flat", amount=-2.5, source="condition", name="剧毒")],
+                    )
+                ]
+            )
+        )
+        self.assertEqual(normalized["traits"][0]["layers"][0]["amount"], -2.5)
+        # The defining row contract: statics expose effective through
+        # current; gauges carry effective == max. Contradictions reject.
+        for contradiction in (
+            _trait(key="atk_phys", label="攻擊", base=10, current=10, max=None, effective=15),
+            _trait(key="hp", base=100, current=40, max=115, effective=100),
+        ):
+            with self.subTest(row=contradiction["key"]):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_character(_valid_panel(traits=[contradiction]))
+
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
+    def test_v5_equipment_rows_require_the_adjustment_summary(self):
+        normalized = validate_character(
+            _valid_panel(equipment=[_equipment_row(adjustment="攻擊 −2｜防禦 ＋8")])
+        )
+        self.assertEqual(
+            normalized["equipment"][0]["adjustment"], "攻擊 −2｜防禦 ＋8"
+        )
+        row = _equipment_row()
+        del row["adjustment"]
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(_valid_panel(equipment=[row]))
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(_valid_panel(equipment=[_equipment_row(adjustment=None)]))
 
     def test_rejects_unknown_and_missing_fields(self):
         with self.assertRaises(ProtocolValidationError):
@@ -204,6 +354,7 @@ class CharacterSchemaTests(unittest.TestCase):
                 key=f"trait_{i}",
                 label="很長的屬性名稱" * 3,
                 current=1000,
+                effective=1000,
                 max=None if i % 2 else 1000,
             )
             for i in range(MAX_TRAIT_ROWS)
@@ -247,6 +398,7 @@ class CharacterSchemaTests(unittest.TestCase):
                 "slot": "weapon_main",
                 "item_key": f"item_{i}",
                 "display_name": "很長的裝備名稱" * 3,
+                "adjustment": "",
             }
             for i in range(MAX_EQUIPMENT_ROWS)
         ]
@@ -364,6 +516,10 @@ class CharacterSchemaTests(unittest.TestCase):
         with self.assertRaises(CharacterPanelError):
             validate_character(_valid_panel(schema_version=3))
         with self.assertRaises(CharacterPanelError):
+            validate_character(_valid_panel(schema_version=6))
+        with self.assertRaises(CharacterPanelError):
+            validate_character(_valid_panel(schema_version="4"))
+        with self.assertRaises(CharacterPanelError):
             validate_character(_valid_panel(available=False))
         with self.assertRaises(CharacterPanelError):
             validate_character(_valid_panel(kind="services"))
@@ -394,7 +550,7 @@ class CharacterSchemaTests(unittest.TestCase):
                 )
             )
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
     def test_intimate_field_validation(self):
         # ``intimate: None`` is valid — the section is omitted when the actor has
         # no sexual-state record.
@@ -540,7 +696,12 @@ class CharacterSchemaTests(unittest.TestCase):
                 }
             ],
             equipment=[
-                {"slot": "weapon_main", "item_key": f"i{i}", "display_name": wide}
+                {
+                    "slot": "weapon_main",
+                    "item_key": f"i{i}",
+                    "display_name": wide,
+                    "adjustment": "",
+                }
                 for i in range(MAX_EQUIPMENT_ROWS)
             ],
             disguise={
@@ -665,7 +826,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
     def _render(self):
         return self._registry().render("character", _context(self.player))
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
     def test_character_renders_true_values_without_mutation(self):
         before_traits = dict(self.player.attributes.get("traits", category="traits"))
         before_wallet = self.player.db.wallet
@@ -673,12 +834,23 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         payload = self._render()
         self.assertTrue(payload["available"])
         self.assertEqual(payload["kind"], "character")
+        self.assertEqual(payload["schema_version"], CHARACTER_SCHEMA_VERSION)
         hp = next(row for row in payload["traits"] if row["key"] == "hp")
         self.assertEqual(hp["max"], self.player.traits.hp.max)
         self.assertEqual(hp["current"], self.player.traits.hp.current)
+        self.assertEqual(hp["effective"], self.player.traits.hp.max)
+        self.assertEqual(hp["base"], before_traits["hp"].get("base"))
+        self.assertEqual(hp["layers"], [])
         atk = next(row for row in payload["traits"] if row["key"] == "atk_phys")
-        self.assertEqual(atk["current"], self.player.traits.atk_phys.base)
+        # v5: the plain_sword's +2 flat rides as a named equipment layer and
+        # the total-display current equals the authoritative effective.
+        from world.rules.combat import _adjusted_attack
+
+        self.assertEqual(atk["base"], self.player.traits.atk_phys.base)
+        self.assertEqual(atk["effective"], _adjusted_attack(self.player, "atk_phys"))
+        self.assertEqual(atk["current"], atk["effective"])
         self.assertIsNone(atk["max"])
+        self.assertEqual([layer["source"] for layer in atk["layers"]], ["equipment"])
         self.assertEqual(
             _flattened_keys(payload["actives"]),
             [
@@ -706,9 +878,9 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(self.player.db.wallet, before_wallet)
         self.assertEqual(self.player.db.equipment, before_equipment)
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
     @covers_requirement(
-        "webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel",
+        "webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel",
         "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel",
     )
     def test_innate_active_skills_are_visible_for_the_first_time(self):
@@ -746,7 +918,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             ["flee"],
         )
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
     def test_expanded_state_shows_true_values_and_an_honest_disguise(self):
         self.player.db.disguised_stats = {"atk_phys": 12, "agility": 10}
         payload = self._render()
@@ -755,11 +927,14 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         displayed = {row["key"]: row["value"] for row in payload["disguise"]["displayed"]}
         self.assertEqual(displayed, {"atk_phys": 12, "agility": 10})
         atk = next(row for row in payload["traits"] if row["key"] == "atk_phys")
-        self.assertEqual(atk["current"], self.player.traits.atk_phys.base)
+        # True values: the literal base is never the disguised value, and the
+        # total-display current tracks the true effective, not 12.
+        self.assertEqual(atk["base"], self.player.traits.atk_phys.base)
+        self.assertNotEqual(atk["base"], 12)
         self.assertNotEqual(atk["current"], 12)
-        self.assertEqual(self.player.traits.atk_phys.base, atk["current"])
+        self.assertEqual(atk["current"], atk["effective"])
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
     def test_undisguised_actor_has_empty_displayed_list(self):
         payload = self._render()
         self.assertFalse(payload["disguise"]["active"])
@@ -782,7 +957,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(payload["guild"]["rank"], "F")
         self.assertEqual(payload["guild"]["merit"], 60)
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-4-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
     def test_status_character_parity_on_shared_values(self):
         status = self._registry().render("status", _context(self.player))
         character = self._render()

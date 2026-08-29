@@ -54,6 +54,10 @@ _ALLOWLIST = frozenset(
         Path("commands/items.py"),
         Path("typeclasses/objects.py"),
         Path("web/webclient/actions/service_actions.py"),
+        # P6 (expose-stat-breakdown-read-model): the character panel's
+        # equipment rows carry the P3 adjustment summary, so the presenter
+        # consumes the display-text accessor like the other prose surfaces.
+        Path("web/webclient/presentation/character.py"),
     }
 )
 _MODULE = "world.rules.equipment_effects"

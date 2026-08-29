@@ -7,11 +7,13 @@ record, and interprets them in memory. It never constructs ``entity.traits``,
 ``entity.buffs``, or ``entity.sexual`` and never writes to storage.
 """
 
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from world.lore.elements import ELEMENT_REGISTRY
+from world.lore.items import ITEM_REGISTRY
 from world.lore.sexual_vocab import (
     AROUSAL_LEVELS,
     CLIMAX_PHASE_LEVELS,
@@ -20,8 +22,18 @@ from world.lore.sexual_vocab import (
     WETNESS_LEVELS,
 )
 from world.rules.buffs import BUFF_DEFINITIONS
-from world.rules.combat_modifiers import matched_combat_modifiers
-from world.rules.equipment_effects import effective_exposure
+from world.rules.combat_modifiers import (
+    _merge_adjustments,
+    _PERCENT_RE,
+    matched_combat_modifiers,
+)
+from world.rules.equipment_effects import (
+    effective_exposure,
+    equipment_adjustments,
+    equipment_modifier_layers,
+    worn_item_keys,
+)
+from world.skills.effects import StatMultiplyEffect
 from world.rules.sexual_state import PLEASURE_CONFIG, _LIFETIME_COUNTER_KEYS
 from world.rules.status_display import display_for
 from world.rules.stored_sexual_reads import StoredLevel
@@ -52,6 +64,60 @@ _EQUIPMENT_SLOTS = ("weapon_main", "weapon_off", "armor")
 _BUFF_CACHE_KEY = "buffs"
 _SEXUAL_TRAITS_KEY = "sexual_traits"
 _SEXUAL_TRAITS_CATEGORY = "traits"
+
+# Breakdown vocabulary (expose-stat-breakdown-read-model D1): the eight panel
+# rows in display order and the closed layer alphabets/bounds mirrored by the
+# wire validators.
+_BREAKDOWN_ROW_ORDER = (
+    "hp",
+    "mp",
+    "sp",
+    "atk_phys",
+    "agility",
+    "defense",
+    "magic_level",
+    "guild_merit",
+)
+_LAYER_SOURCES = ("skill", "condition", "equipment")
+_LAYER_KINDS = ("mult", "flat", "pct")
+MAX_BREAKDOWN_ROWS = 32
+MAX_LAYERS_PER_STAT = 16
+
+
+@dataclass(frozen=True)
+class StatLayer:
+    """One named contribution to a stat, from a closed source/kind alphabet.
+
+    ``amount`` is signed and non-zero: ``mult`` carries the multiplier factor
+    itself (e.g. ``1.1``), ``flat`` the additive amount (int, or the exact
+    fractional float a scaled rule-table grant produces), ``pct`` the signed
+    percentage number (e.g. ``-10`` for ``-10%``).
+    """
+
+    source: str
+    name: str
+    kind: str
+    amount: int | float
+
+
+@dataclass(frozen=True)
+class StatBreakdownRow:
+    """One breakdown row: literal base, accounting-complete layers, effective.
+
+    ``effective`` is composed FROM the layers' sources replaying the shipped
+    authoritative operations bit-for-bit (see the breakdown section at the end
+    of this module). For gauges the layers decompose the ``maximum`` and
+    ``effective`` equals that maximum; gauge ``current`` is persisted resource
+    state and carries no layers. On every row ``current`` mirrors the
+    displayed total.
+    """
+
+    key: str
+    base: int
+    current: int | float
+    effective: int | float
+    layers: tuple[StatLayer, ...]
+
 
 # Stable Traditional Chinese labels for the skill-category taxonomy, shared by
 # the out-of-combat character listing. The combat panel's equivalent mapping
@@ -203,7 +269,7 @@ class IntimateView:
 
 @dataclass(frozen=True)
 class CharacterReadModel:
-    """The complete read-only inputs of the version-4 ``character`` panel.
+    """The complete read-only inputs of the version-5 ``character`` panel.
 
     Shares the same canonical trait storage the compact ``status`` panel reads,
     so the two panels cannot drift apart: gauges go through the same strict
@@ -222,6 +288,7 @@ class CharacterReadModel:
     guild_merit: int
     wallet: int
     intimate: IntimateView | None
+    breakdown: tuple[StatBreakdownRow, ...]
 
 
 def _read_attribute(entity: Any, key: str, default=None, category: str | None = None) -> Any:
@@ -258,6 +325,21 @@ def _require_gauge(data: dict[str, Any], key: str) -> GaugeValue:
     return GaugeValue(current=current, maximum=maximum)
 
 
+def _require_gauge_record(
+    data: dict[str, Any], key: str
+) -> tuple[GaugeValue, Any, Any]:
+    """Return ``_require_gauge``'s value plus the raw ``mod``/``mult`` fields.
+
+    The breakdown section needs the stored modifiers to prove the layer
+    decomposition accounts for them exactly; validation is shared with the
+    shipped reader so the two can never drift.
+    """
+    raw = data.get(key)
+    if not isinstance(raw, Mapping):
+        raise StatusQueryError(f"missing gauge trait {key!r}")
+    return _require_gauge(data, key), raw.get("mod", 0), raw.get("mult", 1)
+
+
 def _read_buff_cache(entity: Any) -> dict[str, Any]:
     """Return the persisted buff cache dict without creating a handler."""
     cache = _read_attribute(entity, _BUFF_CACHE_KEY, default={})
@@ -285,6 +367,35 @@ def _active_buff_entries(entity: Any) -> list[tuple[str, dict[str, Any]]]:
             continue
         entries.append((buff_key, cache))
     return entries
+
+
+_BUFF_RULE_CLASSIFICATION: tuple[Any, frozenset[str]] | None = None
+
+
+def _buff_active_rule_ids() -> frozenset[str]:
+    """Return the rule ids whose ``when`` is a bare ``buff_active`` check.
+
+    Pure rule-table data, classified once per load (the module-level ``_RULES``
+    tuple is replaced wholesale on reload, so object identity is the cache
+    key). The classification only orders condition layers deterministically
+    (``buff`` before ``rule``); buff cache entries themselves never feed stat
+    layers directly — a buff reaches a stat row exclusively through such a
+    rule-table row.
+    """
+    global _BUFF_RULE_CLASSIFICATION
+    from world.rules.combat_modifiers import _RULES
+
+    cached = _BUFF_RULE_CLASSIFICATION
+    if cached is not None and cached[0] is _RULES:
+        return cached[1]
+    ids = frozenset(
+        rule.id
+        for rule in _RULES
+        if set(rule.when) == {"buff_active"}
+        and isinstance(rule.when.get("buff_active"), str)
+    )
+    _BUFF_RULE_CLASSIFICATION = (_RULES, ids)
+    return ids
 
 
 def _sexual_level(entity: Any, field: str) -> Any:
@@ -498,8 +609,16 @@ def _sexual_condition_context(entity: Any) -> dict[str, Any]:
     exposure = effective_exposure(entity)
     if isinstance(exposure, StoredLevel) and exposure.levels == EXPOSURE_LEVELS:
         context["exposure"] = _LevelRef(exposure.value, EXPOSURE_LEVELS)
-    context["entity"] = entity
-    context["dual_wielding"] = dual_wielding_from_storage(entity)
+    # Neither read model may materialize ``entity.skills``: every
+    # condition-evaluation consumer reads skills through the positional
+    # subject or ``context["entity"]``, and both are always the pure
+    # stored-snapshot facade (expose-stat-breakdown-read-model D4). The two
+    # pre-set equipment facts keep ``matched_combat_modifiers``' setdefaults
+    # away from the real entity as well.
+    facade = _StoredSkillsFacade(entity)
+    context["entity"] = facade
+    context["dual_wielding"] = dual_wielding_from_storage(facade)
+    context["worn_item_keys"] = worn_item_keys(facade)
     return context
 
 
@@ -526,16 +645,9 @@ def build_status_read_model(entity: Any) -> StatusReadModel:
     missing or malformed also fails closed so the presenter shows unavailable
     rather than fabricating values.
     """
-    traits_data = _read_attribute(
-        entity, "traits", default=None, category="traits"
-    )
-    if not isinstance(traits_data, Mapping):
-        raise StatusQueryError("trait storage is unavailable")
-    traits_data = dict(traits_data)
-    resources = {key: _require_gauge(traits_data, key) for key in _GAUGE_KEYS}
-
+    assembly = _assemble(entity)
     conditions: list[ConditionValue] = []
-    for buff_key, cache in _active_buff_entries(entity):
+    for buff_key, cache in assembly.buff_entries:
         definition_key = cache.get("definition_key")
         if not isinstance(definition_key, str) or definition_key not in BUFF_DEFINITIONS:
             raise StatusQueryError(f"buff {buff_key!r} has an unknown definition")
@@ -550,9 +662,9 @@ def build_status_read_model(entity: Any) -> StatusReadModel:
             )
         )
 
-    # Deterministic combat-modifier matches, read-only.
-    context = _sexual_condition_context(entity)
-    for rule_id, adjustments in matched_combat_modifiers(entity, context=context):
+    # Deterministic combat-modifier matches — the SAME matches the breakdown
+    # composes from (D3: one assembly per read, no second evaluation path).
+    for rule_id, adjustments in assembly.matches:
         display = display_for(rule_id)
         conditions.append(
             ConditionValue(
@@ -564,7 +676,7 @@ def build_status_read_model(entity: Any) -> StatusReadModel:
             )
         )
 
-    combat = _read_combat(entity)
+    combat = assembly.combat
     identity = str(entity.pk)
     location = getattr(entity, "location", None)
     return StatusReadModel(
@@ -572,7 +684,7 @@ def build_status_read_model(entity: Any) -> StatusReadModel:
         actor_identity=identity,
         location_label=None if location is None else str(location.key),
         location_identity=None if location is None else str(location.pk),
-        resources=resources,
+        resources={key: assembly.gauges[key] for key in _GAUGE_KEYS},
         conditions=tuple(conditions),
         disguise_active=bool(_read_attribute(entity, "disguised_stats", default=None)),
         combat_mode=None if combat is None else combat[0],
@@ -684,6 +796,578 @@ def _is_list_like(value: Any) -> bool:
     from collections.abc import Sequence
 
     return isinstance(value, Sequence) and not isinstance(value, (str, bytes))
+
+
+# ---------------------------------------------------------------------------
+# Stat breakdown (expose-stat-breakdown-read-model)
+#
+# This section composes each panel stat FROM its named layers while replaying
+# the shipped authoritative operations bit-for-bit:
+# ``SkillHandler.effective_value`` (stored-list skill fold + single final
+# ``round``), ``combat._adjusted_attack``/``_adjusted_defense`` (skill
+# effective value + merged rule-table flats), ``combat_modifiers``' agility
+# pipeline (percent merge through ``_merge_adjustments``, then percent, then
+# flat, floored at 0 — the ``adjusted_agility`` shape), and the gauge-ceiling
+# reader ``_require_gauge``. ``_merge_adjustments`` and ``_PERCENT_RE`` are
+# imported from their shipped homes as the parity anchors — never a parallel
+# reimplementation.
+# ---------------------------------------------------------------------------
+
+
+class _StoredSkillsFacade:
+    """Pure ``skills``-view facade over stored snapshots (design D4).
+
+    Exposes exactly the ``owned_keys()``/``conferred_grants()`` surface
+    ``matched_combat_modifiers``, ``_conferred_rule_scale`` and
+    ``evaluate_condition`` consume, computed from ``entity.db`` and the
+    registries with the same no-create discipline as
+    ``_split_active_passive_keys``. ``db`` delegates to the real entity so the
+    pure storage readers (``dual_wielding_from_storage``, ``worn_item_keys``)
+    keep working on the facade. Never mounts ``entity.skills`` (or any other
+    handler) and never writes.
+    """
+
+    __slots__ = ("entity",)
+
+    def __init__(self, entity: Any):
+        self.entity = entity
+
+    @property
+    def db(self) -> Any:
+        return self.entity.db
+
+    @property
+    def skills(self) -> "_StoredSkillsFacade":
+        return self
+
+    def _stored_list(self, field: str) -> tuple[str, ...]:
+        raw = self.entity.db.skills
+        if not isinstance(raw, Mapping):
+            return ()
+        value = raw.get(field)
+        if not _is_list_like(value):
+            return ()
+        return tuple(key for key in value if isinstance(key, str) and key)
+
+    def base_owned_keys(self) -> list[str]:
+        """Stored active+passive keys plus innate grants, in stored order."""
+        return [*self._stored_list("active"), *self._stored_list("passive"), *INNATE_SKILL_ORDER]
+
+    def _counter_values(self) -> dict[str, int]:
+        """Lifetime counters from storage, or empty when unmaterialized.
+
+        Mirrors ``_split_active_passive_keys`` exactly: a materialized
+        ``sexual_traits`` record supplies ``climax_today`` and the lifetime
+        counters (``current`` wins over ``base``); a present-but-malformed
+        entry fails closed; no record means every counter is zero, which is
+        what the shipped handler assumes for an unmaterialized state.
+        """
+        traits = _read_attribute(
+            self.entity, _SEXUAL_TRAITS_KEY, default=None, category=_SEXUAL_TRAITS_CATEGORY
+        )
+        counters: dict[str, int] = {}
+        if isinstance(traits, Mapping):
+            for field in ("climax_today", *_LIFETIME_COUNTER_KEYS):
+                entry = traits.get(field)
+                if entry is None:
+                    continue
+                if not isinstance(entry, Mapping):
+                    raise StatusQueryError(f"sexual counter {field!r} is malformed")
+                value = entry.get("current", entry.get("base"))
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    raise StatusQueryError(f"sexual counter {field!r} is malformed")
+                counters[field] = value
+        return counters
+
+    def owned_keys(self) -> list[str]:
+        """Base keys plus unlocked acts — the materialization-aware handler rule.
+
+        The shipped ``SkillHandler.owned_keys`` derives unlocked acts from a
+        zero-counter baseline while ``sexual`` is unmaterialized and from the
+        live handler afterwards; the live handler's counters are exactly the
+        materialized record, so reading every counter from storage reproduces
+        both branches without mounting one.
+        """
+        base = self.base_owned_keys()
+        return [*base, *sorted(unlocked_act_keys_for(base, self._counter_values()))]
+
+    def conferred_grants(self) -> list[Any]:
+        """Stored grants verbatim (``list(entity.db.skill_grants or [])``)."""
+        return list(self.entity.db.skill_grants or [])
+
+
+def _stored_skill_fold(entity: Any) -> tuple[str, ...]:
+    """Stored ownership keys in the shipped fold order (``effective_value``).
+
+    Deliberately the raw ``db.skills`` lists only — NOT ``owned_keys()`` and
+    NOT the innate keys: the shipped skill fold iterates ``dict.fromkeys``
+    over the stored active+passive lists alone, so the replay can never drift
+    even if an unlocked act or innate key were to carry a stat multiplier.
+    """
+    raw = entity.db.skills
+    if not isinstance(raw, Mapping):
+        raw = {}
+    active = raw.get("active")
+    passive = raw.get("passive")
+    if not _is_list_like(active):
+        active = ()
+    if not _is_list_like(passive):
+        passive = ()
+    return tuple(dict.fromkeys((*active, *passive)))
+
+
+def _matching_stat_multiplier(skill: SkillDef, stat_key: str) -> float | None:
+    """The skill's single matching stat multiplier, fail-loud on duplicates.
+
+    The ``StatusQueryError`` wrapper over the shipped handler's ``ValueError``
+    keeps the duplicate-definition failure on the panel's fail-closed path.
+    """
+    multipliers = [
+        effect.multiplier
+        for effect in skill.parsed_effects
+        if isinstance(effect, StatMultiplyEffect) and effect.trait == stat_key
+    ]
+    if not multipliers:
+        return None
+    if len(multipliers) > 1:
+        raise StatusQueryError(
+            f"skill {skill.key!r} defines duplicate stat multipliers for trait {stat_key!r}"
+        )
+    return multipliers[0]
+
+
+def _grant_fields(grant: Any) -> tuple[str, str, float] | None:
+    """Read one grant's ``(source_key, skill_key, scale)`` from dataclass or mapping.
+
+    The shipped writer stores ``ConferredSkillGrant`` dataclasses; mapping
+    fixtures ride the same fields. A malformed grant returns ``None`` so the
+    fold skips it exactly as the shipped fold skips an unknown skill key.
+    """
+    source_key = getattr(grant, "source_key", None)
+    skill_key = getattr(grant, "skill_key", None)
+    scale = getattr(grant, "scale", None)
+    if isinstance(grant, Mapping):
+        source_key = grant.get("source_key", source_key)
+        skill_key = grant.get("skill_key", skill_key)
+        scale = grant.get("scale", scale)
+    if not isinstance(source_key, str) or not isinstance(skill_key, str):
+        return None
+    if isinstance(scale, bool) or not isinstance(scale, (int, float)):
+        return None
+    return source_key, skill_key, float(scale)
+
+
+@dataclass(frozen=True)
+class _Assembly:
+    """One read's shared, fully validated inputs (design D3: assembled once)."""
+
+    entity: Any
+    traits_data: dict[str, Any]
+    gauges: dict[str, GaugeValue]
+    gauge_records: dict[str, tuple[Any, Any]]
+    trait_values: dict[str, int]
+    buff_entries: tuple[tuple[str, dict[str, Any]], ...]
+    matches: tuple[tuple[str, dict[str, Any]], ...]
+    equipment: tuple[CharacterEquipmentView, ...]
+    combat: tuple[str, int] | None
+
+
+def _assemble(entity: Any) -> _Assembly:
+    """Parse every read-model input once, fail-closed, with no handler mounted."""
+    traits_data = _read_attribute(entity, "traits", default=None, category="traits")
+    if not isinstance(traits_data, Mapping):
+        raise StatusQueryError("trait storage is unavailable")
+    traits_data = dict(traits_data)
+    gauges: dict[str, GaugeValue] = {}
+    gauge_records: dict[str, tuple[Any, Any]] = {}
+    for key in _GAUGE_KEYS:
+        gauges[key], mod, mult = _require_gauge_record(traits_data, key)
+        gauge_records[key] = (mod, mult)
+    trait_values = {
+        key: _require_static_trait(traits_data, key) for key in _STATIC_KEYS + _COUNTER_KEYS
+    }
+    buff_entries = tuple(_active_buff_entries(entity))
+    # The positional subject must be the facade too: ``matched_combat_modifiers``
+    # reads ``entity.skills.owned_keys()`` directly for the ``skill_owned``
+    # grant fallback, in addition to ``context["entity"]``.
+    context = _sexual_condition_context(entity)
+    matches = matched_combat_modifiers(context["entity"], context=context)
+    return _Assembly(
+        entity=entity,
+        traits_data=traits_data,
+        gauges=gauges,
+        gauge_records=gauge_records,
+        trait_values=trait_values,
+        buff_entries=buff_entries,
+        matches=matches,
+        equipment=_read_equipment(entity),
+        combat=_read_combat(entity),
+    )
+
+
+def _merged_bundle(assembly: _Assembly) -> dict[str, Any]:
+    """Merge matched rule bundles then the equipment bundle, shipped order.
+
+    Byte-identical to ``combat_modifiers.evaluate_combat_modifiers`` for the
+    same storage: ``_merge_adjustments`` (the shipped merge) over
+    ``assembly.matches`` (the shipped matches) plus
+    ``equipment_adjustments`` (the shipped pure gear read).
+    """
+    merged: dict[str, Any] = {}
+    for _, adjustments in assembly.matches:
+        merged = _merge_adjustments(merged, dict(adjustments))
+    return _merge_adjustments(merged, dict(equipment_adjustments(assembly.entity)))
+
+
+def _skill_layers(entity: Any, stat_key: str) -> tuple[list[StatLayer], float]:
+    """Replay the shipped ``effective_value`` fold as named layers.
+
+    Factors multiply into the running product in the shipped fold order; the
+    returned DISPLAY list is sorted by ``(skill_key, source_key)`` (design D2)
+    after the product is complete, which never moves a factor across the
+    single final ``round``. A grant's layer carries ``（scale）`` so two grants
+    of one skill stay distinct and non-zero-summing.
+    """
+    product = 1.0
+    keyed: list[tuple[str, str, StatLayer]] = []
+    for skill_key in _stored_skill_fold(entity):
+        skill = SKILL_REGISTRY.get(skill_key)
+        if skill is None:
+            continue
+        multiplier = _matching_stat_multiplier(skill, stat_key)
+        if multiplier is not None:
+            product *= multiplier
+            keyed.append(
+                (skill_key, "", StatLayer("skill", skill.label, "mult", multiplier))
+            )
+    for grant in entity.db.skill_grants or []:
+        fields = _grant_fields(grant)
+        if fields is None:
+            continue
+        source_key, skill_key, scale = fields
+        source_skill = SKILL_REGISTRY.get(skill_key)
+        if source_skill is None:
+            continue
+        source_multiplier = _matching_stat_multiplier(source_skill, stat_key)
+        if source_multiplier is None:
+            continue
+        factor = source_multiplier * scale
+        product *= factor
+        name = f"{source_skill.label}（{scale:g}）"
+        keyed.append(
+            (skill_key, source_key, StatLayer("skill", name, "mult", factor))
+        )
+    keyed.sort(key=lambda entry: (entry[0], entry[1]))
+    return [layer for _, _, layer in keyed], product
+
+
+def _condition_layers(
+    assembly: _Assembly, stat_key: str
+) -> list[StatLayer]:
+    """Per-rule named layers for one stat's matched rule-table contributions.
+
+    Buff cache entries never feed stat layers directly (buff modifiers are
+    rate/bounds/decay only); a buff reaches a stat row exclusively through a
+    ``buff_active`` rule-table row, whose id classifies the layer's source
+    kind as ``buff`` (sorted before ``rule``). Amounts ride exactly as the
+    bundle holds them — already grant-scaled by ``matched_combat_modifiers``.
+    """
+    buff_rules = _buff_active_rule_ids()
+    if stat_key == "agility":
+        fields: tuple[str, ...] = ("agility", "agility_flat")
+    elif stat_key in ("atk_phys", "defense", "magic_level"):
+        fields = (stat_key,)
+    else:
+        return []
+    entries: list[tuple[str, str, int | float, str]] = []
+    for rule_id, adjustments in assembly.matches:
+        for field in fields:
+            value = adjustments.get(field)
+            if value is None:
+                continue
+            kind = "pct" if isinstance(value, str) else "flat"
+            entries.append(
+                (
+                    "buff" if rule_id in buff_rules else "rule",
+                    rule_id,
+                    float(value[:-1]) if kind == "pct" else value,
+                    kind,
+                )
+            )
+    entries.sort()
+    layers: list[StatLayer] = []
+    for _source_kind, rule_id, amount, kind in entries:
+        try:
+            label = display_for(rule_id).label
+        except ValueError as error:
+            # MissingDisplayMetadataError is a ValueError subclass; an
+            # unresolvable label makes the row not accounting-complete.
+            raise StatusQueryError(
+                f"combat modifier rule {rule_id!r} has no display label"
+            ) from error
+        layers.append(StatLayer("condition", label, kind, amount))
+    return layers
+
+
+def _worn_gear(assembly: _Assembly) -> list[tuple[int, str, Any, Any]]:
+    """Resolved ``(slot-order index, item_key, definition, layers)`` for worn gear.
+
+    Mirrors the shipped fold's source exactly (``_worn_rules``): the pure
+    ``normalized_equipment`` read, whose malformed-storage branch reads as
+    "nothing worn" — the same zero contribution the combat bundle takes, so
+    layers and effective can never disagree. Normalization also guarantees
+    registry membership and slot fit; a missing definition or effect rule
+    past that guard is an invariant break and fails closed. Per-item effect
+    data comes exclusively through the capability's
+    ``equipment_modifier_layers`` accessor (single-source guard). Rows sort
+    by ``(slot order, item key)`` for display.
+    """
+    from world.rules.equipment import normalized_equipment
+
+    equipment = normalized_equipment(assembly.entity)
+    if equipment is None:
+        return []
+    worn: list[tuple[str, str]] = [
+        (slot, equipment[slot])
+        for slot in _EQUIPMENT_SLOTS
+        if equipment[slot] is not None
+    ]
+    worn.extend(("accessory", key) for key in equipment["accessories"])
+    resolved: list[tuple[int, str, Any, Mapping[str, tuple[str, int]]]] = []
+    slot_index = {slot: index for index, slot in enumerate((*_EQUIPMENT_SLOTS, "accessory"))}
+    for slot, item_key in worn:
+        definition = ITEM_REGISTRY.get(item_key)
+        if definition is None:
+            raise StatusQueryError(f"worn equipment {item_key!r} is not registry-declared")
+        if not definition.display_name_zh:
+            raise StatusQueryError(f"equipment {item_key!r} has no display name")
+        modifier_key = definition.modifier_key
+        if modifier_key is None:
+            continue
+        layers = equipment_modifier_layers(modifier_key)
+        if layers is None:  # pragma: no cover - loader/registry cross invariant
+            raise StatusQueryError(
+                f"equipment {item_key!r} effect rule {modifier_key!r} is missing"
+            )
+        resolved.append((slot_index[slot], item_key, definition, layers))
+    resolved.sort(key=lambda entry: (entry[0], entry[1]))
+    return resolved
+
+
+def _equipment_layers(assembly: _Assembly, stat_key: str) -> list[StatLayer]:
+    """Named layers for one stat's worn-equipment contributions (slot order)."""
+    layers: list[StatLayer] = []
+    for _index, _item_key, definition, item_layers in _worn_gear(assembly):
+        contribution = item_layers.get(stat_key)
+        if contribution is not None:
+            kind, amount = contribution
+            layers.append(StatLayer("equipment", definition.display_name_zh, kind, amount))
+    return layers
+
+
+def _require_number(value: Any, label: str) -> None:
+    """Fail closed on a non-finite or zero numeric layer amount."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise StatusQueryError(f"{label} amount is not numeric")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise StatusQueryError(f"{label} amount is not finite")
+    if value == 0:
+        raise StatusQueryError(f"{label} amount must be non-zero")
+
+
+def _validated_row(row: StatBreakdownRow) -> StatBreakdownRow:
+    """Enforce the closed alphabets and per-stat bound, fail-closed."""
+    for layer in row.layers:
+        if layer.source not in _LAYER_SOURCES:  # pragma: no cover - builder invariant
+            raise StatusQueryError(f"breakdown layer source {layer.source!r} is invalid")
+        if layer.kind not in _LAYER_KINDS:  # pragma: no cover - builder invariant
+            raise StatusQueryError(f"breakdown layer kind {layer.kind!r} is invalid")
+        if not isinstance(layer.name, str) or not layer.name:
+            raise StatusQueryError("breakdown layer name is missing")
+        _require_number(layer.amount, f"breakdown layer {layer.name!r}")
+    if len(row.layers) > MAX_LAYERS_PER_STAT:
+        raise StatusQueryError(
+            f"stat {row.key!r} exceeds the {MAX_LAYERS_PER_STAT}-layer bound"
+        )
+    return row
+
+
+def _stored_literal(traits_data: dict[str, Any], key: str, fallback: int) -> int:
+    """The literal stored ``base`` when valid, else the reader's value.
+
+    The breakdown ``base`` is the never-skill-baked import value; every
+    shipped writer leaves the static/counter ``base`` key intact, so the
+    fallback only matters for hand-forced fixtures.
+    """
+    raw = traits_data.get(key)
+    if isinstance(raw, Mapping):
+        base = raw.get("base")
+        if not isinstance(base, bool) and isinstance(base, int):
+            return base
+    return fallback
+
+
+def _require_untouched_modifiers(traits_data: dict[str, Any], key: str) -> None:
+    """Fail closed when a static/counter carries unattributable modifiers.
+
+    No shipped writer sets ``mod``/``mult`` on a static or counter trait
+    (the gauge sync owns gauge ``mod`` alone), and no consumer of these two
+    read models folds them in — so a nonzero value is storage drift the panel
+    must not silently display as if it were the effective value.
+    """
+    raw = traits_data[key]
+    if raw.get("mod", 0) != 0 or raw.get("mult", 1) != 1:
+        raise StatusQueryError(f"trait {key!r} carries unattributable storage modifiers")
+
+
+def _gauge_breakdown(assembly: _Assembly, key: str) -> StatBreakdownRow:
+    """Decompose one gauge maximum; the ceiling reader stays authoritative.
+
+    Skill layers are structurally impossible for gauges (stat multipliers
+    exist only on body traits — ``world/skills/registry._BODY_TRAITS``), and
+    ``sync_equipment_gauge_limits`` is the sole writer of gauge ``mod``, so
+    the equipment flats must explain it exactly. Anything else is unexplained
+    storage and fails closed, keeping the panel maximum identical to the
+    heal-clamp ceiling the shipped reader computes.
+    """
+    gauge = assembly.gauges[key]
+    mod, mult = assembly.gauge_records[key]
+    base = _stored_literal(assembly.traits_data, key, gauge.maximum)
+    if mult != 1:
+        raise StatusQueryError(
+            f"gauge {key!r} multiplier is not attributable to any named layer"
+        )
+    layers = _equipment_layers(assembly, key)
+    equipment_total = sum(layer.amount for layer in layers)
+    if equipment_total != mod:
+        raise StatusQueryError(
+            f"gauge {key!r} stored modifier is not explained by worn equipment caps"
+        )
+    if round(base + equipment_total) != gauge.maximum:
+        raise StatusQueryError(
+            f"gauge {key!r} maximum decomposition disagrees with the ceiling reader"
+        )
+    return StatBreakdownRow(
+        key=key,
+        base=base,
+        current=gauge.current,
+        effective=gauge.maximum,
+        layers=tuple(layers),
+    )
+
+
+def _flat_stat_breakdown(assembly: _Assembly, stat_key: str) -> StatBreakdownRow:
+    """attack/defense/magic_level: shipped skill fold, then merged flats.
+
+    Parity anchor ``combat._adjusted_attack``/``_adjusted_defense``:
+    ``float(effective_value(key)) + merged flat``, where the merged flat is
+    the shipped merge of matched rule-table amounts and the equipment bucket
+    — the exact merged-bundle read, so associativity cannot drift either. A
+    percentage-shaped bundle for these stats has no shipped consumer and
+    fails closed.
+    """
+    base = assembly.trait_values[stat_key]
+    _require_untouched_modifiers(assembly.traits_data, stat_key)
+    base_literal = _stored_literal(assembly.traits_data, stat_key, base)
+    skill_layers, product = _skill_layers(assembly.entity, stat_key)
+    after_skill = round(base * product)
+    condition_layers = _condition_layers(assembly, stat_key)
+    equipment_layers = _equipment_layers(assembly, stat_key)
+    merged_flat = _merged_bundle(assembly).get(stat_key, 0)
+    if isinstance(merged_flat, str):
+        raise StatusQueryError(
+            f"bundle percentage for {stat_key!r} has no shipped consumer"
+        )
+    if merged_flat != sum(layer.amount for layer in condition_layers) + sum(
+        layer.amount for layer in equipment_layers
+    ):  # pragma: no cover - per-source layering is exhaustive by construction
+        raise StatusQueryError(
+            f"stat {stat_key!r} flat amounts are not accounting-complete"
+        )
+    effective = float(after_skill) + merged_flat
+    return StatBreakdownRow(
+        key=stat_key,
+        base=base_literal,
+        current=effective,
+        effective=effective,
+        layers=(*skill_layers, *condition_layers, *equipment_layers),
+    )
+
+
+def _agility_breakdown(assembly: _Assembly) -> StatBreakdownRow:
+    """Agility replays the shipped pipeline exactly, floor at zero included.
+
+    ``combat_modifiers.adjusted_agility`` shape: percent first (the merged
+    ``+g`` percent string — rule-table matches merged in ``_RULES`` order,
+    then the gear bucket's ``:+d%`` rendering, all through the shipped
+    ``_merge_adjustments``), then the flat addend, then ``max(0.0, …)``.
+    """
+    base = assembly.trait_values["agility"]
+    _require_untouched_modifiers(assembly.traits_data, "agility")
+    base_literal = _stored_literal(assembly.traits_data, "agility", base)
+    skill_layers, product = _skill_layers(assembly.entity, "agility")
+    after_skill = round(base * product)
+    bundle = _merged_bundle(assembly)
+    agility = float(after_skill)
+    percent = bundle.get("agility")
+    if percent is not None:
+        if not isinstance(percent, str) or _PERCENT_RE.fullmatch(percent) is None:
+            raise StatusQueryError(f"invalid agility percentage {percent!r}")
+        agility *= 1 + float(percent[:-1]) / 100
+    agility += float(bundle.get("agility_flat", 0))
+    effective = max(0.0, agility)
+    condition_layers = _condition_layers(assembly, "agility")
+    equipment_layers = _equipment_layers(assembly, "agility")
+    return StatBreakdownRow(
+        key="agility",
+        base=base_literal,
+        current=round(effective),
+        effective=effective,
+        layers=(*skill_layers, *condition_layers, *equipment_layers),
+    )
+
+
+def _merit_breakdown(assembly: _Assembly) -> StatBreakdownRow:
+    """guild_merit: an integer counter with no shipped modifier source at all."""
+    merit = _read_guild_merit(assembly.traits_data)
+    _require_untouched_modifiers(assembly.traits_data, "guild_merit")
+    return StatBreakdownRow(
+        key="guild_merit",
+        base=_stored_literal(assembly.traits_data, "guild_merit", merit),
+        current=merit,
+        effective=merit,
+        layers=(),
+    )
+
+
+def build_stat_breakdown(
+    entity: Any, assembly: _Assembly | None = None
+) -> tuple[StatBreakdownRow, ...]:
+    """Return the eight breakdown rows composed from named sources (tasks 1.1–1.4).
+
+    Composition replays the shipped operations exactly (design D1): gauges
+    decompose the ceiling reader's ``(base + mod) × mult`` form; skill stats
+    fold ``round(base × Π mults)`` in shipped order; attack/defense and
+    magic_level add merged rule-table flats after the skill fold; agility
+    replays the percent-then-flat pipeline floored at zero. Every accounting
+    amount that cannot be attributed to a named, registry-labelled layer
+    fails the whole read closed.
+    """
+    if assembly is None:
+        assembly = _assemble(entity)
+    rows: list[StatBreakdownRow] = []
+    for key in _BREAKDOWN_ROW_ORDER:
+        if key in _GAUGE_KEYS:
+            rows.append(_gauge_breakdown(assembly, key))
+        elif key == "agility":
+            rows.append(_agility_breakdown(assembly))
+        elif key in ("atk_phys", "defense", "magic_level"):
+            rows.append(_flat_stat_breakdown(assembly, key))
+        else:
+            rows.append(_merit_breakdown(assembly))
+    if len(rows) > MAX_BREAKDOWN_ROWS:  # pragma: no cover - closed 8-key vocabulary
+        raise StatusQueryError("breakdown exceeds the row bound")
+    return tuple(_validated_row(row) for row in rows)
 
 
 def group_skill_keys(keys: Sequence[str]) -> tuple[CharacterCategoryGroupView, ...]:
@@ -816,19 +1500,13 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
     strictly and fail closed when malformed; no handler is materialized and
     nothing is written.
     """
-    traits_data = _read_attribute(
-        entity, "traits", default=None, category="traits"
-    )
-    if not isinstance(traits_data, Mapping):
-        raise StatusQueryError("trait storage is unavailable")
-    traits_data = dict(traits_data)
-
+    assembly = _assemble(entity)
     traits: list[CharacterTraitView] = []
     for key in _GAUGE_KEYS:
-        gauge = _require_gauge(traits_data, key)
+        gauge = assembly.gauges[key]
         traits.append(CharacterTraitView(key, gauge.current, gauge.maximum))
     for key in _STATIC_KEYS + _COUNTER_KEYS:
-        traits.append(CharacterTraitView(key, _require_static_trait(traits_data, key), None))
+        traits.append(CharacterTraitView(key, assembly.trait_values[key], None))
 
     disguise_active, disguise_displayed = _read_disguise(entity)
     # The intimate view is read before the skill path so a corrupted (partial)
@@ -840,11 +1518,12 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
         traits=tuple(traits),
         active_keys=active_keys,
         passive_keys=passive_keys,
-        equipment=_read_equipment(entity),
+        equipment=assembly.equipment,
         disguise_active=disguise_active,
         disguise_displayed=disguise_displayed,
         guild_rank=getattr(entity, "guild_rank", None),
-        guild_merit=_read_guild_merit(traits_data),
+        guild_merit=_read_guild_merit(assembly.traits_data),
         wallet=_read_wallet(entity),
         intimate=intimate,
+        breakdown=build_stat_breakdown(entity, assembly),
     )

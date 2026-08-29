@@ -11,7 +11,7 @@
 | [`進入`](/game/command-reference?id=進入) | 進入任務場景。 |
 | [`前往`](/game/command-reference?id=前往) | 沿最短路徑自動移動。 |
 | [`地圖`](/game/command-reference?id=地圖) | 檢視地圖。 |
-| [`看`](/game/command-reference?id=看) | 觀察所在位置或對象；查看對象時顯示對方當前所見的戰鬥數值。 |
+| [`看`](/game/command-reference?id=看) | 觀察所在位置或對象；查看對象時顯示對方當前所見的戰鬥數值，查看自己時顯示含來源明細的完整數值構成。 |
 | [`回家`](/game/command-reference?id=回家) | 返回重生點。 |
 
 ## 說明與幫助
@@ -81,7 +81,7 @@
 | [`shop stock`](/game/command-reference?id=shop-stock) | 查看商店庫存。 |
 | [`buy`](/game/command-reference?id=buy) | 購買物品。 |
 | [`sell`](/game/command-reference?id=sell) | 販賣物品。 |
-| [`inventory`](/game/command-reference?id=inventory) | 查看錢包與背包。 |
+| [`inventory`](/game/command-reference?id=inventory) | 查看錢包、背包與角色數值構成（與角色面板同源）。 |
 | [`使用`](/game/command-reference?id=使用) | 使用一件持有物品；戰鬥中佔用一個回合。 |
 | [`裝備`](/game/command-reference?id=裝備) | 裝備或卸下裝備；免費動作，飾品上限 5 件。 |
 | [`拿`](/game/command-reference?id=拿) | 撿起地上的物品，登錄物品會同步計入背包清單。 |
