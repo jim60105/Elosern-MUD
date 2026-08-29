@@ -99,3 +99,25 @@ Depends on P6 (v5 payload + P3 adjustment text on the wire).
   authorized by this change's REMOVED delta for
   「The legacy client tolerates the version-5 character payload」, closing
   the tolerance window on every wire at once (design.md D3).
+
+## Rubber-Duck run 2 adjudication (post-implementation)
+
+- BLOCKING 1 accepted: `mult` amounts render as SIGNED factors
+  (`×−1.2` with the U+2212 minus) — both wire validators accept negative
+  non-zero factors and `world/rules/status_text.py` keeps the sign, so an
+  absolute-value render corrupted a valid payload explanation. Component
+  test extended with a negative-factor case.
+- BLOCKING 2 accepted: the neutral 「其他」 classification keys on
+  `source` AND `kind` — a layer with an unrecognised `kind` (even under a
+  known source) renders the neutral class and label suffix, matching D1;
+  the direct-render test previously asserted the contrary and now requires
+  the neutral chip for both unknown enums.
+- Observation 1 accepted: the rendering evidence test now executes BOTH
+  `breakdown_rendering.test.js` and `character_status_drawer.test.js` so
+  the effective-exposure pin runs inside the evidence boundary.
+- Observation 2 accepted: a duplicate-`item_key` inventory test pins the
+  first-row-wins join policy.
+- Observation 3 declined (out of scope): the showcase spec's pre-existing
+  「status, character, and skill surfaces」 requirement still narrates v3/v4
+  character fixtures; that prose belongs to its own requirement's next
+  maintenance delta, not to this change's sync.

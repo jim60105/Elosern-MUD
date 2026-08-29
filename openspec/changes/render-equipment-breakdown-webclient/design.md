@@ -41,8 +41,10 @@ attach to the maximum, whose decomposed value IS the payload `max`) and
 one chip per layer IN PAYLOAD ORDER — ALL layers rendered, wrapping freely
 (≤ 16 by payload bound; NO truncation or `+n` collapse concept exists),
 source-tinted (skill／狀況／裝備 palette from existing design tokens),
-label = layer `name` verbatim, formatted amount by `kind` (`mult` → `×1.2`
-with trailing zeros stripped, `flat` → `+4`/`−2`, `pct` → `−10%`/`+15%`,
+label = layer `name` verbatim, formatted amount by `kind` (`mult` → a
+SIGNED factor `×1.2`/`×−1.2` — the wire accepts negative non-zero factors
+and the server prose keeps the sign — with trailing zeros stripped,
+`flat` → `+4`/`−2`, `pct` → `−10%`/`+15%`,
 server amounts re-signed only for display, never recomputed). No sorting,
 no grouping arithmetic, no client-side totals. Rows without layers keep
 the existing value text and render NO breakdown elements (no chip
@@ -50,7 +52,9 @@ containers, no wrappers). Unknown `source`/`kind` values are a
 DEFENSE-IN-DEPTH for direct component rendering only: the wire contract
 (Python + legacy JS exact validators) still REJECTS unknown enums, and a
 component-level Vitest renders an unknown-enum props object directly to
-prove the neutral 其他 chip never corrupts the value line — no wire
+prove the neutral 其他 chip — classified neutral when EITHER `source` is
+unregistered OR `kind` is unrecognised (rubber-duck run 2) — never
+corrupts the value line; no wire
 relaxation anywhere. Accessibility: chips are text-bearing (never
 color-alone) per the existing WCAG baseline.
 

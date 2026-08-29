@@ -52,17 +52,21 @@ const resources = computed(() => props.status?.resources ?? null);
 // --- Breakdown layer chips (render-equipment-breakdown-webclient D1) -----
 // A chip is a pure projection of one payload layer: the verbatim registry
 // `name` plus an amount formatted ONLY by `kind` (the raw amount is
-// re-signed for display, never recomputed): mult → `×1.2` with trailing
-// zeros stripped, flat → `+4`/`−2` (U+2212), pct → `−10%`/`+15%`. An
-// unknown kind renders the signed verbatim number (direct-render defense;
-// the wire validators reject unknown enums).
+// re-signed for display, never recomputed): mult → a SIGNED factor `×1.2`
+// / `×−1.2` (the wire accepts negative non-zero factors) with trailing
+// zeros stripped, flat → `+4`/`−2`, pct → `−10%`/`+15%`; U+2212 minus
+// throughout. An unknown kind renders the signed verbatim number on a
+// neutral chip (direct-render defense; the wire validators reject unknown
+// enums).
 function formatLayerAmount(kind, amount) {
   const n = Number(amount);
   const magnitude = Math.abs(n);
-  if (kind === "mult") {
-    return `×${String(magnitude)}`;
-  }
   const sign = n < 0 ? "−" : "+";
+  if (kind === "mult") {
+    // A negative factor stays visible: the wire validator accepts signed
+    // non-zero mult amounts and the server prose keeps the factor sign.
+    return `×${n < 0 ? "−" : ""}${String(magnitude)}`;
+  }
   const digits = String(magnitude);
   if (kind === "pct") {
     return `${sign}${digits}%`;
@@ -74,18 +78,23 @@ function formatLayerAmount(kind, amount) {
 }
 
 // Source tints reuse the existing design tokens (skill = buff-green,
-// condition = warn-amber, equipment = gold). An unknown source gets the
-// neutral 其他 class AND label suffix — text-bearing, never colour-alone
-// (WCAG baseline). The wire never carries unknown enums; this fallback only
-// guards a direct component render with hand-built props.
+// condition = warn-amber, equipment = gold). An unknown `source` OR an
+// unknown `kind` gets the neutral 其他 class AND label suffix — an
+// unrecognised formatting rule is not a trusted skill/condition/equipment
+// chip (text-bearing, never colour-alone, WCAG baseline). The wire never
+// carries unknown enums; this fallback only guards a direct component
+// render with hand-built props.
 const LAYER_TINTS = { skill: "skill", condition: "condition", equipment: "equipment" };
+const LAYER_KINDS = new Set(["mult", "flat", "pct"]);
 
-function layerTint(source) {
-  return LAYER_TINTS[source] ?? "other";
+function layerTint(layer) {
+  return Object.hasOwn(LAYER_TINTS, layer?.source ?? "") && LAYER_KINDS.has(layer?.kind)
+    ? LAYER_TINTS[layer.source]
+    : "other";
 }
 
 function layerLabel(layer) {
-  return layerTint(layer.source) === "other"
+  return layerTint(layer) === "other"
     ? `${layer.name}（其他）`
     : layer.name;
 }
@@ -261,7 +270,7 @@ const INTIMATE_ROWS = [
               v-for="(layer, index) in gaugeLayers(v.key)"
               :key="index"
               class="character-status-drawer__layer"
-              :class="`character-status-drawer__layer--${layerTint(layer.source)}`"
+              :class="`character-status-drawer__layer--${layerTint(layer)}`"
               :data-source="layer.source"
               :data-testid="`character-status-drawer__layer--${v.key}--${index}`"
             >
@@ -316,7 +325,7 @@ const INTIMATE_ROWS = [
               v-for="(layer, index) in row.layers"
               :key="index"
               class="character-status-drawer__layer"
-              :class="`character-status-drawer__layer--${layerTint(layer.source)}`"
+              :class="`character-status-drawer__layer--${layerTint(layer)}`"
               :data-source="layer.source"
               :data-testid="`character-status-drawer__layer--${row.key}--${index}`"
             >

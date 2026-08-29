@@ -99,18 +99,25 @@ class VueBreakdownEvidenceTest(unittest.TestCase):
     def test_vitest_breakdown_suite_passes(self):
         """The breakdown contract renders under Vitest.
 
-        The targeted file is exactly the P7 suite
+        The targeted files are exactly the P7 suites
         (``web/webclient-app/tests/data/breakdown_rendering.test.js``):
         payload-ordered verbatim chips with kind-formatted signed amounts,
         all 16 layers at the bound, no breakdown element for layer-free
         rows, the guarded gauge-max attachment, the verbatim doll
-        adjustments, the inventory item_key join with the bag-only and
-        empty-string absences, the effective-exposure pin with the stored
-        base asserted absent, the direct-render unknown-enum 其他 defense,
-        and the store-path v5-accept / v4-reject wire claim.
+        adjustments, the inventory item_key join with the bag-only,
+        empty-string and duplicate-key cases, the direct-render
+        unknown-enum 其他 defense, and the store-path v5-accept /
+        v4-reject wire claim — plus the drawer suite
+        (``character_status_drawer.test.js``), which carries the
+        effective-exposure pin with the stored base asserted absent.
         """
         result = run_npm(
-            ["test", "--", "web/webclient-app/tests/data/breakdown_rendering.test.js"],
+            [
+                "test",
+                "--",
+                "web/webclient-app/tests/data/breakdown_rendering.test.js",
+                "web/webclient-app/tests/data/character_status_drawer.test.js",
+            ],
             timeout=600,
         )
         self.assertEqual(

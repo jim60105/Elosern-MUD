@@ -93,6 +93,9 @@ describe("CharacterStatusDrawer breakdown chips", () => {
             { source: "skill", name: "巨型化", kind: "mult", amount: 2.5 },
             { source: "condition", name: "高露出", kind: "pct", amount: -15 },
             { source: "skill", name: "硬皮", kind: "mult", amount: 1.0 },
+            // The wire accepts signed non-zero mult factors; the factor
+            // sign is projection, not recomputation (server prose keeps it).
+            { source: "skill", name: "腐蝕", kind: "mult", amount: -1.2 },
           ],
         }),
       ]),
@@ -101,6 +104,7 @@ describe("CharacterStatusDrawer breakdown chips", () => {
     expect(chips[0].text()).toBe("巨型化×2.5");
     expect(chips[1].text()).toBe("高露出−15%");
     expect(chips[2].text()).toBe("硬皮×1");
+    expect(chips[3].text()).toBe("腐蝕×−1.2");
   });
 
   it("renders ALL 16 layers at the payload bound with no truncation", () => {
@@ -203,7 +207,8 @@ describe("CharacterStatusDrawer breakdown chips", () => {
   it("renders a neutral 其他 chip for unknown enums while the value line stays correct", () => {
     // Direct-render defense ONLY (task 1.4): the wire validators reject an
     // unknown source/kind; a hand-built props object must still render a
-    // text-bearing neutral chip and an untouched value line.
+    // text-bearing neutral chip and an untouched value line — for an
+    // unknown source OR an unknown kind (design D1).
     wrapper = mountDrawer({
       character: characterWith([
         trait({
@@ -219,8 +224,10 @@ describe("CharacterStatusDrawer breakdown chips", () => {
     // Unknown source → 其他 marker text (never colour alone).
     expect(chips[0].text()).toContain("（其他）");
     expect(chips[0].classes().join(" ")).toContain("character-status-drawer__layer--other");
-    // Unknown kind → signed verbatim amount, source tint kept.
-    expect(chips[1].text()).toBe("未知形態+7");
+    // Unknown kind → neutral 其他 chip too (an unrecognised formatting
+    // rule is not a trusted skill chip) with the signed verbatim amount.
+    expect(chips[1].text()).toBe("未知形態（其他）+7");
+    expect(chips[1].classes().join(" ")).toContain("character-status-drawer__layer--other");
     // The value line is untouched.
     expect(wrapper.get('[data-testid="character-status-drawer__trait--defense"]').text()).toContain("12");
   });
@@ -359,6 +366,47 @@ describe("InventoryPanel joined adjustment", () => {
     });
     await hover("knight_platemail");
     expect(wrapper.find('[data-testid="inventory-panel__inspector-adjustment"]').exists()).toBe(false);
+  });
+
+  it("keeps the FIRST character row's adjustment for a duplicate item_key", async () => {
+    // Ambiguity policy: first row wins (never last-row-wins).
+    const duplicate = characterWith(
+      CHARACTER_PANEL_SAMPLE.traits,
+      [
+        {
+          slot: "body",
+          item_key: "knight_platemail",
+          display_name: "騎士全套板甲",
+          quantity: 1,
+          category_label: "鎧甲",
+          condition_label: "良好",
+          adjustment: "第一條",
+        },
+        {
+          slot: "cloak",
+          item_key: "knight_platemail",
+          display_name: "騎士全套板甲",
+          quantity: 1,
+          category_label: "鎧甲",
+          condition_label: "良好",
+          adjustment: "第二條",
+        },
+      ],
+    );
+    const services = {
+      ...SERVICES_PANEL_SAMPLE,
+      inventory: {
+        ...SERVICES_PANEL_SAMPLE.inventory,
+        rows: [
+          { item_key: "knight_platemail", display_name: "騎士全套板甲", held: 1, equipped: true, presentation: null, action: null },
+        ],
+      },
+    };
+    mountPanel({ services, character: duplicate });
+    await hover("knight_platemail");
+    expect(
+      wrapper.get('[data-testid="inventory-panel__inspector-adjustment"]').text(),
+    ).toBe("第一條");
   });
 });
 
