@@ -59,8 +59,15 @@ class HolyWaterCleanseTests(EvenniaTest):
         self.assertIsNotNone(result.event_log)
         (entry,) = result.event_log.entries
         self.assertEqual(entry.kind, "item_used")
+        # The per-family payload contract: cleanse entries carry item_key /
+        # effect_key / consumable / count and never an amount.
+        self.assertEqual(
+            set(entry.data),
+            {"item_key", "effect_key", "consumable", "count"},
+        )
         self.assertEqual(entry.data["effect_key"], "blessed_cleansing")
         self.assertEqual(entry.data["count"], 2)
+        self.assertNotIn("amount", entry.data)
         self.assertIn("淨化", entry.text_template)
 
     def test_cleanse_keeps_buff_polarity_buffs(self):

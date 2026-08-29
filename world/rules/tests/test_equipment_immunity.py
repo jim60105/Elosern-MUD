@@ -154,6 +154,7 @@ class EquipmentImmunityStagingTests(EvenniaTestCase):
     def test_immune_target_stages_non_mutating_neutralization(self):
         entity = _entity()
         _wear(entity, "purified_pendant")
+        before = entity.attributes.get("buffs", default={})
         effects = _handle_buff_apply(
             entity, [entity], "buff_apply:poisoned", {}, 1.0
         )
@@ -165,6 +166,7 @@ class EquipmentImmunityStagingTests(EvenniaTestCase):
         self.assertEqual(effects[0].surfaces, frozenset())
         effects[0].apply()
         self.assertEqual(entity_active_buffs(entity), set())
+        self.assertEqual(entity.attributes.get("buffs", default={}), before)
         (entry,) = _entries_from_effect(str(entity.key), effects[0])
         self.assertEqual(entry.kind, "equipment_immune")
         self.assertEqual(entry.data, {"buff_key": "poisoned"})
@@ -189,6 +191,8 @@ class EquipmentImmunityStagingTests(EvenniaTestCase):
     def test_three_casts_produce_three_events_and_no_storage_change(self):
         entity = _entity()
         _wear(entity, "purified_pendant")
+        before = entity.attributes.get("buffs", default={})
+        staged: list = []
         for _ in range(3):
             effects = _handle_buff_apply(
                 entity, [entity], "buff_apply:poisoned", {}, 1.0
@@ -197,7 +201,20 @@ class EquipmentImmunityStagingTests(EvenniaTestCase):
                 [effect.description for effect in effects],
                 [f"equipment_immune|{entity.key}|poisoned"],
             )
+            staged.extend(effects)
+        # Commit every staged effect: storage stays byte-identical and each
+        # attempt produced its own convertable neutralization entry.
+        for effect in staged:
+            effect.apply()
+        self.assertEqual(entity.attributes.get("buffs", default={}), before)
         self.assertEqual(entity_active_buffs(entity), set())
+        entries = [
+            _entries_from_effect(str(entity.key), effect) for effect in staged
+        ]
+        self.assertEqual(
+            [entry[0].kind for entry in entries],
+            ["equipment_immune"] * 3,
+        )
 
     def test_buff_polarity_grant_has_no_neutralization_event(self):
         entity = _entity()

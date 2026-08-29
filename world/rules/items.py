@@ -9,15 +9,11 @@ out-of-combat facade that composes the item plan with the canonical
 command-source clock advance inside one outer transaction and rollback
 journal (mirroring ``cast_settlement``).
 
-The rules engine never trusts a presented descriptor: every mutating entry
-repeats preflight against current canonical state and commits trait,
-inventory, quest-progress, and contained-mirror writes atomically. On any
-rejection or settlement failure all durable rows and every in-process cache
-the plan touched (traits, attributes, idmapper, contents) are restored.
-
-A successful use emits exactly one ``item_used`` EventLog entry whose data
-contains exactly ``item_key``, ``effect_key``, ``consumable``, and ``amount``
-(the actual bounded restoration, never the configured maximum).
+A successful use emits exactly one ``item_used`` EventLog entry carrying
+``item_key``, ``effect_key``, and ``consumable`` plus the per-family payload:
+gauge-restoring effects add ``amount`` (the actual bounded restoration, never
+the configured maximum), and the ``blessed_cleansing`` effect adds ``count``
+(the number of debuff-polarity buffs actually removed).
 """
 
 from collections.abc import Mapping, Sequence

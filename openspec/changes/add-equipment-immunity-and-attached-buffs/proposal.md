@@ -80,9 +80,11 @@ capabilities.)
   removal path, `ItemTouchedJournal.buffs` surface, and the `no_debuffs`
   `ItemUseReason` with its renderers/consumers (`service_messages`,
   out-of-combat command/web responses).
-- `world/rules/player_messages.py` / event renderers: neutralization and
-  adjustment prose (Traditional Chinese); `docs/game/commands.md` untouched
-  (no command-surface change) with `tests/test_command_docs.py` kept green.
+- `world/rules/action.py` event template map and `world/rules/items.py`
+  event renderers: neutralization and adjustment prose (Traditional
+  Chinese); `world/rules/service_messages.py`: the `no_debuffs` reason text;
+  `docs/game/commands.md` untouched (no command-surface change) with
+  `tests/test_command_docs.py` kept green.
 - Tests: immunity blocks grant + event, non-debuff unaffected, attached-buff
   apply/remove/rollback/no-accumulation, regen tick through existing engine,
   holy-water cleanse consumption, formatter unit tests, prose snapshots on
