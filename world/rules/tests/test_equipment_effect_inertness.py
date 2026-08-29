@@ -20,6 +20,8 @@
     each test first proves the two copies genuinely load differently.
 """
 
+from tools.spec_traceability import covers_requirement
+
 import ast
 import tempfile
 import unittest
@@ -98,6 +100,9 @@ def _imports_rulebook(tree: ast.AST, package: tuple[str, ...] = ()) -> bool:
 
 
 class EquipmentRulebookImportInertnessTests(unittest.TestCase):
+    @covers_requirement(
+        "equipment-effects::rulebook-fields-stay-inert-until-their-owning-change-lands"
+    )
     def test_no_production_module_imports_the_rulebook(self):
         offenders: list[str] = []
         for root in _PRODUCTION_ROOTS:
@@ -206,6 +211,9 @@ class EquipmentRulebookDormancyTests(EvenniaTestCase):
         self.addCleanup(reload_equipment_effect_rules)
         return self._gameplay_observations(armor)
 
+    @covers_requirement(
+        "equipment-effects::rulebook-fields-stay-inert-until-their-owning-change-lands"
+    )
     def test_dormant_pleasure_value_never_leaks_from_worn_armor(self):
         def deviate_a(document):
             document["effects"]["black_maid_dress"]["adjustments"][
@@ -228,6 +236,9 @@ class EquipmentRulebookDormancyTests(EvenniaTestCase):
         )
         self.assertEqual(first, second)
 
+    @covers_requirement(
+        "equipment-effects::rulebook-fields-stay-inert-until-their-owning-change-lands"
+    )
     def test_dormant_heal_value_never_leaks_from_worn_vestments(self):
         def deviate_a(document):
             document["effects"]["sister_vestments"]["adjustments"][
@@ -250,6 +261,9 @@ class EquipmentRulebookDormancyTests(EvenniaTestCase):
         )
         self.assertEqual(first, second)
 
+    @covers_requirement(
+        "equipment-effects::rulebook-fields-stay-inert-until-their-owning-change-lands"
+    )
     def test_dormant_immune_and_attached_values_never_leak(self):
         def deviate_a(document):
             document["effects"]["fearless_brooch"] = {}

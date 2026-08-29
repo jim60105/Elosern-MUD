@@ -9,6 +9,8 @@ because the production dict cannot produce them: every modifier key value
 equals its item key.
 """
 
+from tools.spec_traceability import covers_requirement
+
 import tempfile
 import unittest
 from dataclasses import replace
@@ -57,6 +59,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
 
     # --- canonical data -------------------------------------------------------
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_canonical_rulebook_loads_the_full_roster(self):
         loaded = load_equipment_effect_rules()
         self.assertEqual(len(loaded), 45)
@@ -70,12 +75,18 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         )
         self.assertEqual(dict(EQUIPMENT_EFFECT_RULES), loaded)
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_reload_is_idempotent(self):
         before = dict(EQUIPMENT_EFFECT_RULES)
         reload_equipment_effect_rules()
         reload_equipment_effect_rules()
         self.assertEqual(dict(EQUIPMENT_EFFECT_RULES), before)
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_valid_override_path_loads(self):
         document = _canonical_document()
         document["effects"]["wooden_club"]["adjustments"]["atk_phys"] = 4
@@ -84,6 +95,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             loaded[EquipmentModifierKey.WOODEN_CLUB].adjustments["atk_phys"], 4
         )
 
+    @covers_requirement(
+        "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
+    )
     def test_storage_pouch_is_explicitly_empty(self):
         rule = EQUIPMENT_EFFECT_RULES[EquipmentModifierKey.STORAGE_POUCH]
         self.assertEqual(dict(rule.adjustments), {})
@@ -94,33 +108,54 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
 
     # --- closed vocabularies ---------------------------------------------------
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_unknown_top_level_key_is_rejected(self):
         self._expect_rejection(lambda d: d.update({"stray": 1}))
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_missing_top_level_key_is_rejected(self):
         self._expect_rejection(lambda d: d.pop("budgets"))
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_non_mapping_root_is_rejected(self):
         with self.assertRaises(EquipmentEffectsRulebookError):
             load_equipment_effect_rules(
                 _write_rulebook({"budgets": [], "effects": {}})
             )
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_unknown_entry_field_is_rejected(self):
         self._expect_rejection(
             lambda d: d["effects"]["wooden_club"].update({"damage_aura": 9})
         )
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_unknown_adjustment_field_is_rejected(self):
         self._expect_rejection(
             lambda d: d["effects"]["wooden_club"]["adjustments"].update({"luck": 4})
         )
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_entry_that_is_not_a_mapping_is_rejected(self):
         self._expect_rejection(lambda d: d["effects"].update({"wooden_club": 7}))
 
     # --- percent/flat kinds ------------------------------------------------------
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_flat_int_on_percent_field_is_rejected(self):
         self._expect_rejection(
             lambda d: d["effects"]["knight_platemail"]["adjustments"].update(
@@ -128,6 +163,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_percent_string_on_flat_field_is_rejected(self):
         self._expect_rejection(
             lambda d: d["effects"]["plain_sword"]["adjustments"].update(
@@ -135,6 +173,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_malformed_percent_strings_are_rejected(self):
         # "+١%" is an Arabic-Indic digit: the grammar is ASCII-only because
         # int() would otherwise silently accept it.
@@ -146,6 +187,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
                     ].update({"agility": value})
                 )
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_bool_on_flat_field_is_rejected(self):
         self._expect_rejection(
             lambda d: d["effects"]["wooden_club"]["adjustments"].update(
@@ -153,6 +197,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_bool_on_exposure_bias_is_rejected(self):
         self._expect_rejection(
             lambda d: d["effects"]["black_maid_dress"].update({"exposure_bias": True})
@@ -166,6 +213,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         handle.close()
         return Path(handle.name)
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_duplicate_keys_at_every_nesting_level_are_rejected(self):
         # PyYAML's default loader silently keeps the LAST duplicate, so the
         # reviewed file and the loaded data could disagree. Fail-loud
@@ -190,6 +240,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
 
     # --- budgets ------------------------------------------------------------------
 
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+    )
     def test_flat_budget_overflow_is_rejected(self):
         # wooden_club is common (flat ceiling 4).
         self._expect_rejection(
@@ -198,6 +251,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+    )
     def test_flat_negative_budget_overflow_is_rejected(self):
         self._expect_rejection(
             lambda d: d["effects"]["wooden_club"]["adjustments"].update(
@@ -205,6 +261,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+    )
     def test_percent_budget_overflow_is_rejected(self):
         # knight_platemail is rare (percent ceiling 10).
         self._expect_rejection(
@@ -213,6 +272,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+    )
     def test_soft_percent_budget_overflow_is_rejected(self):
         # pilgrim_medallion is uncommon (soft_percent ceiling 15).
         self._expect_rejection(
@@ -221,24 +283,36 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+    )
     def test_bias_budget_overflow_is_rejected(self):
         # black_maid_dress is uncommon (bias ceiling 1).
         self._expect_rejection(
             lambda d: d["effects"]["black_maid_dress"].update({"exposure_bias": 2})
         )
 
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+    )
     def test_negative_bias_budget_overflow_is_rejected(self):
         # abs() counts against the uncommon bias ceiling of 1.
         self._expect_rejection(
             lambda d: d["effects"]["black_maid_dress"].update({"exposure_bias": -2})
         )
 
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+    )
     def test_gauge_budget_overflow_is_rejected(self):
         # knight_platemail is rare (gauge ceiling 15).
         self._expect_rejection(
             lambda d: d["effects"]["knight_platemail"]["gauge_caps"].update({"hp": 16})
         )
 
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+    )
     def test_non_positive_or_malformed_gauge_cap_is_rejected(self):
         for cap in (-5, 0, True, "10", 25.5):
             with self.subTest(cap=cap):
@@ -248,6 +322,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
                     ].update({"hp": cap})
                 )
 
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
     def test_unknown_gauge_target_is_rejected(self):
         self._expect_rejection(
             lambda d: d["effects"]["knight_platemail"]["gauge_caps"].update(
@@ -255,6 +332,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+    )
     def test_budgets_table_malformations_are_rejected(self):
         def rename_rarity(d):
             d["budgets"]["mythic"] = d["budgets"].pop("legendary")
@@ -284,6 +364,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
 
     # --- buff references ------------------------------------------------------------
 
+    @covers_requirement(
+        "equipment-effects::state-effect-references-resolve-against-the-buff-rulebook"
+    )
     def test_unknown_buff_reference_is_rejected(self):
         for field in ("immune", "attached_buffs"):
             with self.subTest(field=field):
@@ -293,6 +376,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
                     )
                 )
 
+    @covers_requirement(
+        "equipment-effects::state-effect-references-resolve-against-the-buff-rulebook"
+    )
     def test_self_contradictory_entry_is_rejected(self):
         self._expect_rejection(
             lambda d: d["effects"]["purified_pendant"].update(
@@ -300,6 +386,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "equipment-effects::state-effect-references-resolve-against-the-buff-rulebook"
+    )
     def test_duplicate_buff_list_members_are_rejected(self):
         self._expect_rejection(
             lambda d: d["effects"]["purified_pendant"].update(
@@ -307,6 +396,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement(
+        "equipment-effects::state-effect-references-resolve-against-the-buff-rulebook"
+    )
     def test_malformed_buff_list_members_are_rejected(self):
         for member in (True, 1, {"a": 1}):
             with self.subTest(member=member):
@@ -316,6 +408,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
                     )
                 )
 
+    @covers_requirement(
+        "equipment-effects::state-effect-references-resolve-against-the-buff-rulebook"
+    )
     def test_buff_reference_as_bare_string_is_rejected(self):
         self._expect_rejection(
             lambda d: d["effects"]["purified_pendant"].update({"immune": "poisoned"})
@@ -349,6 +444,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             document, registry, frozenset(BUFF_DEFINITIONS)
         )
 
+    @covers_requirement(
+        "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
+    )
     def test_injectable_registry_happy_path_loads(self):
         registry, document = self._two_entry_setup()
         rules = self._validate(registry, document)
@@ -357,18 +455,27 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             {EquipmentModifierKey.WOODEN_CLUB, EquipmentModifierKey.KNIGHT_PLATEMAIL},
         )
 
+    @covers_requirement(
+        "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
+    )
     def test_orphan_entry_is_rejected(self):
         registry, document = self._two_entry_setup()
         del registry["knight_platemail"]
         with self.assertRaises(EquipmentEffectsRulebookError):
             self._validate(registry, document)
 
+    @covers_requirement(
+        "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
+    )
     def test_unbound_equipment_key_is_rejected(self):
         registry, document = self._two_entry_setup()
         registry["chainmail"] = ITEM_REGISTRY["chainmail"]
         with self.assertRaises(EquipmentEffectsRulebookError):
             self._validate(registry, document)
 
+    @covers_requirement(
+        "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
+    )
     def test_duplicate_modifier_binding_is_rejected(self):
         # Borrowing another item's binding is the hijack this guards: the
         # load-time identity rule (value must equal the item's own key)
@@ -383,6 +490,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         with self.assertRaises(EquipmentEffectsRulebookError):
             self._validate(registry, document)
 
+    @covers_requirement(
+        "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
+    )
     def test_non_equipment_with_modifier_key_is_rejected(self):
         # Construction validation normally bars this shape; the loader
         # re-checks defensively. A frozen dataclass cannot be replaced into
@@ -392,6 +502,9 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         with self.assertRaises(EquipmentEffectsRulebookError):
             self._validate(registry, document)
 
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+    )
     def test_override_cannot_redefine_registry_rarity(self):
         # Budget lookup follows the REAL registry rarity: the untouched
         # budgets table still rejects a common club exceeding flat 4.
@@ -418,6 +531,9 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
         "saintess_vestments",
     )
 
+    @covers_requirement(
+        "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
+    )
     def test_enum_registry_and_rulebook_are_triple_bijective(self):
         equipment_keys = {
             definition.key
@@ -434,6 +550,9 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
             if definition.equipment_slot is not None:
                 self.assertEqual(definition.modifier_key.value, definition.key)
 
+    @covers_requirement(
+        "equipment-effects::the-new-equipment-roster-is-registered-and-tradeable"
+    )
     def test_new_items_are_registered_offered_and_price_resolvable(self):
         shop = SHOP_REGISTRY["altoria_general_store"]
         for key in self.NEW_ITEM_KEYS:
@@ -446,6 +565,9 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
                 self.assertIn(key, shop.offered_item_keys)
                 self.assertIn(definition.modifier_key, EQUIPMENT_EFFECT_RULES)
 
+    @covers_requirement(
+        "equipment-effects::the-new-equipment-roster-is-registered-and-tradeable"
+    )
     def test_every_equipment_price_table_key_resolves(self):
         for key, definition in ITEM_REGISTRY.items():
             with self.subTest(item=key):
@@ -494,6 +616,9 @@ class ChurchDoctrineTests(unittest.TestCase):
         rules[EquipmentModifierKey(key)] = rule
         return rules
 
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
     def test_named_church_set_satisfies_doctrine(self):
         check_church_doctrine(EQUIPMENT_EFFECT_RULES)
 
@@ -503,6 +628,9 @@ class ChurchDoctrineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_church_doctrine(self._with_rule(key, deviant))
 
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
     def test_negative_pleasure_gain_violates_doctrine(self):
         self._expect_violation(
             "sister_vestments",
@@ -513,11 +641,17 @@ class ChurchDoctrineTests(unittest.TestCase):
             },
         )
 
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
     def test_negative_bias_violates_doctrine(self):
         self._expect_violation(
             "radiant_holy_emblem", lambda rule: {"exposure_bias": -1}
         )
 
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
     def test_negative_heal_gain_violates_doctrine(self):
         self._expect_violation(
             "sister_vestments",
@@ -528,6 +662,9 @@ class ChurchDoctrineTests(unittest.TestCase):
             },
         )
 
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
     def test_church_item_without_heal_or_immunity_violates_doctrine(self):
         self._expect_violation(
             "pilgrim_medallion",
