@@ -370,9 +370,15 @@ class GuildExamJourney(ServicesBrowserTest):
         )
         self.assertEqual(payload, {"target_rank": "E"})
         self.assertEqual(self._dock_mode(page), "combat")
+        # services v3 keeps the personal surfaces available through combat
+        # and forces host/guild/shop null: the exam's remote service dock is
+        # gone even though the bag drawer stays usable for item actions.
         services = self._services_panel(page)
-        self.assertFalse(services["available"])
-        self.assertNotIn("guild", services)
+        self.assertTrue(services["available"])
+        self.assertIsNone(services["host"])
+        self.assertIsNone(services["guild"])
+        self.assertIsNone(services["shop"])
+        self.assertIsNotNone(services["player"])
 
     def _wait_combat_mode(self, page, timeout=30000):
         def _combat_ready(state):
@@ -461,7 +467,14 @@ class ShopJourneys(ServicesBrowserTest):
         panel = self._wait_services_available(page)
         rows = {row["item_key"]: row for row in panel["inventory"]["rows"]}
         self.assertEqual(rows["meal"]["held"], 2)
-        self.assertNotIn("action", panel["inventory"]["rows"][0])
+        # services v3 ships a server-authored action on every inventory row;
+        # the full-HP store fixture refuses the potion with the stable
+        # hp_full reason.
+        self.assertEqual(rows["healing_potion"]["action"]["action_id"], "inventory.use")
+        self.assertFalse(rows["healing_potion"]["action"]["enabled"])
+        self.assertEqual(
+            rows["healing_potion"]["action"]["disabled_reason"]["code"], "hp_full"
+        )
 
         # The merchant is at its meal stock cap, so the sellable row is the
         # held healing_potion (stock 3/5, sellable and offered).
