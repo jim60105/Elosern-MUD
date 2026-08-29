@@ -15,6 +15,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from world.lore.items import (
     ITEM_REGISTRY,
+    EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
     ItemKind,
@@ -45,6 +46,7 @@ def _fixture_definition(key: str, slot: EquipmentSlot) -> ItemDefinition:
         sellable=False,
         presentation=_PRESENTATION,
         equipment_slot=slot,
+        modifier_key=EquipmentModifierKey.PLAIN_SWORD,
     )
 
 

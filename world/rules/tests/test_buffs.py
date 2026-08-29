@@ -525,6 +525,28 @@ class BuffIntegrationTests(EvenniaTestCase):
         self.assertEqual((buff.source_key, buff.scale), ("elosia", 0.5))
         self.assertEqual(growth_rate_multiplier(entity), 0.5)
 
+    def test_buff_item_regen_light(self):
+        definition = BUFF_DEFINITIONS["item_regen_light"]
+        self.assertIsNone(definition.duration)
+        self.assertEqual(definition.tick_interval, 10)
+        self.assertEqual(definition.stacking, "unique_per_source")
+        self.assertEqual(definition.polarity, "buff")
+        entity = self._entity()
+        _add_buff(
+            entity,
+            "item_regen_light",
+            instance_key="item_regen_light:apothecary_beads",
+            source_key="apothecary_beads",
+        )
+        self.assertIn("item_regen_light:apothecary_beads", entity.buffs.all)
+        entity.traits.hp.current = entity.traits.hp.value - 10
+        before = entity.traits.hp.value
+        self.assertEqual(tick_buffs(entity), ())
+        self.assertEqual(entity.traits.hp.value, before + 3)
+        entity.traits.hp.current = entity.traits.hp.max
+        tick_buffs(entity)
+        self.assertEqual(entity.traits.hp.value, entity.traits.hp.max)
+
     @covers_requirement("buff-handler-integration::the-conferred-growth-rate-buff-s-tick-is-a-documented-no-op-consumed-by-pull-rather")
     def test_conferred_growth_rate_tick_is_a_no_op(self):
         entity = self._entity()

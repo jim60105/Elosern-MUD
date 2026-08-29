@@ -142,3 +142,12 @@
   stacking: unique_per_source
   modifiers:
     rate: {target: magic_level_growth, scale_from_source: true}
+# Passive equipment regen (add-equipment-effect-rulebook D5): dormant data
+# until P3's equipping attaches it from apothecary_beads. Gentle positive hp
+# rate; trait.current clamps growth at maximum.
+- key: item_regen_light
+  duration: null
+  tick_interval: 10
+  stacking: unique_per_source
+  modifiers:
+    rate: {target: hp, delta: 3}

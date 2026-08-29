@@ -11,6 +11,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from world.lore.items import (
     ITEM_REGISTRY,
+    EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
     ItemKind,
@@ -40,6 +41,7 @@ def _fixture_definition(key: str, slot: EquipmentSlot) -> ItemDefinition:
         sellable=False,
         presentation=replace(_PRESENTATION, kind=ItemKind.WEAPON if slot is EquipmentSlot.WEAPON_MAIN else _PRESENTATION.kind),
         equipment_slot=slot,
+        modifier_key=EquipmentModifierKey.PLAIN_SWORD,
     )
 
 

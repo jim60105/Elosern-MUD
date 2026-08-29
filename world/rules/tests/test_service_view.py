@@ -1197,6 +1197,7 @@ class InventoryRowActionTests(ServiceRegistryIsolation):
 
     def test_sixth_accessory_disabled_and_equipped_rows_stay_enabled(self):
         from world.lore.items import (
+            EquipmentModifierKey,
             ItemDefinition,
             ItemIconKey,
             ItemKind,
@@ -1218,6 +1219,7 @@ class InventoryRowActionTests(ServiceRegistryIsolation):
                     summary_zh="測試用的飾品。",
                 ),
                 equipment_slot=EquipmentSlot.ACCESSORY,
+                modifier_key=EquipmentModifierKey.PROTECTIVE_RING,
             )
         player = actor(
             location=FakeRoom(),

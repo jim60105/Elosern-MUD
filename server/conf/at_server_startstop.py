@@ -196,6 +196,11 @@ def at_server_start():
     # Deterministic startup owns the world-clock singleton; presentation reads
     # only through read_world_clock() and must never create it.
     get_world_clock()
+    # Fail-loud equipment-effect rulebook validation (add-equipment-effect-
+    # rulebook D4): the only sanctioned startup consumer of the loader. The
+    # module import itself validates the canonical rulebook; a malformed
+    # roster aborts boot before any world sync can persist partial state.
+    import world.rules.equipment_effects  # noqa: F401
     sync_all()
     sync_limbo()
     sync_grid()

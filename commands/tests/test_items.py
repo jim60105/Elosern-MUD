@@ -18,6 +18,7 @@ from evennia.utils.test_resources import EvenniaCommandTest, EvenniaTest
 from commands.items import CmdToggleEquip, CmdUseItem
 from world.lore.items import (
     ITEM_REGISTRY,
+    EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
     ItemKind,
@@ -46,6 +47,7 @@ def _weapon_fixture(key: str, display_name_zh: str) -> ItemDefinition:
             summary_zh="測試用武器。",
         ),
         equipment_slot=EquipmentSlot.WEAPON_MAIN,
+        modifier_key=EquipmentModifierKey.PLAIN_SWORD,
     )
 
 
@@ -62,6 +64,7 @@ def _accessory_fixture(key: str) -> ItemDefinition:
             summary_zh="測試用飾品。",
         ),
         equipment_slot=EquipmentSlot.ACCESSORY,
+        modifier_key=EquipmentModifierKey.PROTECTIVE_RING,
     )
 
 
