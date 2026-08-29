@@ -13,7 +13,8 @@ is ever committed.
 - [ ] 1.2 Create `world/rules/equipment_effects.py`: frozen dataclasses,
       `load_equipment_effect_rules(path=None)`, `reload_equipment_effect_rules()`
       (idempotent), `EquipmentEffectsRulebookError`; closed vocabularies,
-      percent-string format, signedness, gauge-target keys, five-column rarity
+      percent-string format, signedness, positive-only `gauge_caps`,
+      gauge-target keys, five-column rarity
       budget checks per design D3, `immune`/`attached_buffs` resolution
       against `BUFF_DEFINITIONS` with the no-entry-attaches-and-immunises-the-
       same-key guard, and the equipment-key ↔ modifier-key ↔ rulebook-entry

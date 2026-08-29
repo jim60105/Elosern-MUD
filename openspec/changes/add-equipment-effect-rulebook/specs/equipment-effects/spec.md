@@ -47,7 +47,7 @@ entry SHALL contain only the closed vocabulary: `adjustments` restricted to
 `atk_phys`, `defense`, `magic_level`, `agility` (signed integer or signed
 percent string), `mp_cost` and `sp_cost` (signed percent strings only),
 `pleasure_gain` and `heal_gain` (signed percent strings only); plus
-`gauge_caps` (signed integers over `hp`/`mp`/`sp`), `immune` and
+`gauge_caps` (positive integers over `hp`/`mp`/`sp`), `immune` and
 `attached_buffs` (lists of buff keys), and `exposure_bias` (signed integer).
 Malformed entries SHALL fail the load with a named error; the loader SHALL
 NOT repair, clamp, or silently drop deviating data.
@@ -70,7 +70,9 @@ NOT repair, clamp, or silently drop deviating data.
 The rulebook SHALL carry a budgets table keyed by the item's registered
 rarity with separate ceilings for flat values, combat percents
 (`agility`, `mp_cost`, `sp_cost`), soft percents (`pleasure_gain`,
-`heal_gain`), `exposure_bias`, and `gauge_caps`. The loader SHALL reject any
+`heal_gain`), `exposure_bias`, and positive-only `gauge_caps` (a negative
+gauge cap is rejected regardless of budget, because gauge ceilings must
+never retroactively clamp stored currents). The loader SHALL reject any
 entry whose value exceeds the ceiling of its rarity's corresponding column
 (in absolute value). Rarity SHALL be consulted only at load time and SHALL
 NOT be read by any runtime resolution path.

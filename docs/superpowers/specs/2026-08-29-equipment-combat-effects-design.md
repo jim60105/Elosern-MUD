@@ -132,8 +132,8 @@ Field vocabularies are closed and validated by a loader in
 - `adjustments`: `atk_phys`, `defense`, `magic_level` (signed flat ints);
   `agility` (flat int or signed percent string); `mp_cost`, `sp_cost`
   (signed percent only); `pleasure_gain`, `heal_gain` (signed percent only).
-- `gauge_caps`: `hp`/`mp`/`sp` signed ints; effective gauge maximum is
-  clamped to ≥ 1.
+- `gauge_caps`: positive integers over `hp`/`mp`/`sp` (negative caps are
+  rejected — see §6 gauge sync); the effective gauge maximum clamps to ≥ 1.
 - `immune`: buff keys that must exist in `buffs.yaml`.
 - `attached_buffs`: buff keys that must exist in `buffs.yaml`; an entry may
   not attach a buff key it also claims immunity for (loader guard).
@@ -179,13 +179,17 @@ effective = round( ( stored_base × skill_multiplier ) × (1 + percent_sum/100) 
 - New clamp: adjusted `agility ≥ 0` (prevents a heavy-gear negative percent
   from inverting the to-hit formula).
 
-Gauge ceilings: new bundle keys `hp_max`, `mp_max`, `sp_max` carry the summed
-`gauge_caps` contributions. They are read-time additions to gauge maximum
-everywhere maximums are reported or enforced (panels, combat view, heal
-clamp, resource checks). Unequipping does not retroactively rewrite stored
-currents — a current above the shrunken maximum persists and heals clamp to
-the effective maximum, matching the read-time semantics of buff bounds
-(`water_shield`).
+Gauge ceilings: the summed `gauge_caps` contributions are authored as
+positive integers only (negative caps are rejected by the loader, because
+Evennia's `GaugeTrait` re-clamps `current` whenever its ceiling drops, and a
+silent retroactive clamp would violate the no-retroactive-rewrite rule).
+`toggle_equipment()` — already the sole equipment writer — recomputes each
+gauge trait's non-literal `mod` from scratch as Σ(equipment caps) inside the
+same transaction (base stays the literal value; `mod` is Evennia's sanctioned
+non-literal adjuster, and `max` is `(base+mod)`). All maximum readers and
+heal clamps then agree for free. This amends the earlier read-time phrasing:
+gauge caps are a deterministic derived write owned by the single writer,
+recomputed — never accumulated — so no drift state exists.
 
 ## 7. Status-Effect Interactions
 
