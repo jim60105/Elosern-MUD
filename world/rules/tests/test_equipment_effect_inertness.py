@@ -9,37 +9,20 @@
     literal ``import_module``/``__import__`` calls; deliberately obfuscated
     dynamic imports are out of its (and the requirement's) scope.
 
-(b) Deviant-copy behavior tests prove the still-dormant fields cannot leak:
-    the surviving probe wears the mutated ``black_maid_dress``
-    (pleasure_gain, whose consumer lands in P4) while combat modifier
-    evaluation, item-use preflight, and buff application results must stay
-    identical between the copies, with each test first proving the two
-    copies genuinely load differently. The heal probe was retired when
-    wire-equipment-combat-modifiers made ``heal_gain`` live, and the
-    immune/attachment probes were retired when
-    add-equipment-immunity-and-attached-buffs (P3) landed those fields;
-    their liveness is asserted by the P3 suites instead.
+(b) The deviant-copy behavior probes are all retired: the heal probe when
+    wire-equipment-combat-modifiers (P2) made ``heal_gain`` live, the
+    immune/attachment probes when add-equipment-immunity-and-attached-buffs
+    (P3) landed those fields, and the pleasure probe when
+    add-equipment-sexual-effects (P4) made ``pleasure_gain`` live. Their
+    liveness is asserted by the P2/P3/P4 suites instead; this file keeps
+    the import scan as the standing guard for any future dead field.
 """
 
 from tools.spec_traceability import covers_requirement
 
 import ast
-import tempfile
 import unittest
 from pathlib import Path
-
-import yaml
-
-from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTestCase
-
-from typeclasses.characters import PlayerCharacter
-from world.lore.items import EquipmentModifierKey
-from world.rules import equipment_effects
-from world.rules.buffs import _add_buff, _remove_buff_keys, tick_buffs
-from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
-from world.rules.items import ItemUseRequest, preflight_item_use
-from world.rules.equipment_effects import reload_equipment_effect_rules
 
 _ROOT = Path(__file__).resolve().parents[3]
 _PRODUCTION_ROOTS = ("commands", "server", "typeclasses", "web", "world")
@@ -51,7 +34,9 @@ _PRODUCTION_ROOTS = ("commands", "server", "typeclasses", "web", "world")
 # immunity/attached/prose consumers — the action staging gate, the buff
 # handler backstop, the equipment toggle lifecycle, the item-use cleanse
 # path, the object look card, and the command/web prose surfaces — each is
-# a gameplay consumer, but only of fields its own change owns. The
+# a gameplay consumer, but only of fields its own change owns. P4 lands the
+# sexual overlay consumers — the pleasure call site (already listed via the
+# action workflow) and the status read model's effective-exposure reads. The
 # inertness requirement bars ADDITIONAL resolution paths, and the allowlist
 # records exactly the sanctioned surface.
 _ALLOWLIST = frozenset(
@@ -60,6 +45,7 @@ _ALLOWLIST = frozenset(
         Path("world/rules/combat_modifiers.py"),
         Path("world/rules/equipment.py"),
         Path("server/conf/at_server_startstop.py"),
+        Path("world/rules/status_query.py"),
         Path("world/rules/action.py"),
         Path("world/rules/buffs.py"),
         Path("world/rules/equipment.py"),
@@ -136,123 +122,6 @@ class EquipmentRulebookImportInertnessTests(unittest.TestCase):
                 ):
                     offenders.append(str(relative))
         self.assertEqual(offenders, [])
-
-
-class EquipmentRulebookDormancyTests(EvenniaTestCase):
-    """Deviant copies differing only in dormant fields cannot move gameplay."""
-
-    def setUp(self):
-        super().setUp()
-        self.entity = self._entity()
-
-    def _entity(self):
-        entity = create_object(PlayerCharacter, key="inertness probe")
-        entity.race = "human"
-        entity.apply_race_baseline()
-        entity.traits.hp.rate = 0
-        return entity
-
-    def _rulebook_copy(self, mutate) -> Path:
-        source = Path(__file__).parents[1] / "rulebook" / "equipment_effects.yaml"
-        document = yaml.safe_load(source.read_text(encoding="utf-8"))
-        mutate(document)
-        handle = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
-        yaml.safe_dump(document, handle, allow_unicode=True)
-        handle.close()
-        return Path(handle.name)
-
-    def _gameplay_observations(self, armor: str = "black_maid_dress"):
-        """Probe every deterministic surface the dormant fields claim to feed.
-
-        The probe wears exactly the rulebook items a test mutates (the
-        ``armor`` slot is chosen per test), so a hypothetical consumer that
-        reads the entries of WORN equipment has no unexercised path to hide
-        behind. Entity state is normalized to a
-        fixed shape before each probe and every observation is a
-        state-DELTA view, so the same entity can be re-probed after a
-        rulebook swap without inheriting the previous capture's absolutes.
-        """
-        self.entity.db.inventory = [
-            "healing_potion",
-            armor,
-            "fearless_brooch",
-            "apothecary_beads",
-        ]
-        self.entity.db.equipment = {
-            "weapon_main": None,
-            "weapon_off": None,
-            "armor": armor,
-            "accessories": ["fearless_brooch", "apothecary_beads"],
-        }
-        self.entity.traits.hp.current = self.entity.traits.hp.max - 20
-        preflight = preflight_item_use(
-            ItemUseRequest(actor=self.entity, item_key="healing_potion"),
-            in_combat=False,
-        )
-        stable_preflight = (
-            preflight.allowed,
-            preflight.reason,
-            None
-            if preflight.plan is None
-            else (
-                preflight.plan.item_key,
-                preflight.plan.effect_key,
-                preflight.plan.gauge,
-                preflight.plan.consumable,
-                preflight.plan.amount,
-                preflight.plan.gauge_restored,
-            ),
-        )
-        bundle = evaluate_combat_modifiers_no_create(self.entity)
-        _add_buff(
-            self.entity,
-            "item_regen_light",
-            instance_key="item_regen_light:apothecary_beads",
-            source_key="apothecary_beads",
-        )
-        self.entity.traits.hp.current = self.entity.traits.hp.max - 10
-        before = self.entity.traits.hp.value
-        records = tick_buffs(self.entity)
-        healed = self.entity.traits.hp.value - before
-        # Leave no buff instance behind so capture B's healed delta is
-        # produced by exactly one fresh grant.
-        _remove_buff_keys(self.entity, ("item_regen_light:apothecary_beads",))
-        return {
-            "preflight": repr(stable_preflight),
-            "bundle": repr(sorted(bundle.items())),
-            "tick_records": repr(records),
-            "healed": healed,
-        }
-
-    def _observations_under(self, mutate, armor: str = "black_maid_dress"):
-        reload_equipment_effect_rules(self._rulebook_copy(mutate))
-        self.addCleanup(reload_equipment_effect_rules)
-        return self._gameplay_observations(armor)
-
-    @covers_requirement(
-        "equipment-effects::rulebook-fields-stay-inert-until-their-owning-change-lands"
-    )
-    def test_dormant_pleasure_value_never_leaks_from_worn_armor(self):
-        def deviate_a(document):
-            document["effects"]["black_maid_dress"]["adjustments"][
-                "pleasure_gain"
-            ] = "+7%"
-
-        def deviate_b(document):
-            document["effects"]["black_maid_dress"]["adjustments"][
-                "pleasure_gain"
-            ] = "+14%"
-
-        first = self._observations_under(deviate_a)
-        second = self._observations_under(deviate_b)
-        # The loaded dormant value really does differ between the captures.
-        self.assertEqual(
-            equipment_effects.EQUIPMENT_EFFECT_RULES[
-                EquipmentModifierKey.BLACK_MAID_DRESS
-            ].adjustments["pleasure_gain"],
-            "+14%",
-        )
-        self.assertEqual(first, second)
 
 if __name__ == "__main__":
     unittest.main()

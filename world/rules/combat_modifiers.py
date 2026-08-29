@@ -15,9 +15,10 @@ from typing import Any
 
 from world.lore.sexual_vocab import AROUSAL_LEVELS, CLIMAX_PHASE_LEVELS, EXPOSURE_LEVELS
 from world.rules.buffs import active_buff_keys_from_storage, entity_active_buffs
-from world.rules.equipment_effects import equipment_adjustments
+from world.rules.equipment_effects import equipment_adjustments, effective_exposure
 from world.rules.rulebook.schema import evaluate_condition, load_rules
 from world.rules.sexual_state import PLEASURE_CONFIG
+from world.rules.stored_sexual_reads import StoredLevel, stored_sexual_level
 from world.skills.equipment import dual_wielding_from_storage
 
 _RULES = load_rules(Path(__file__).parent / "rulebook" / "combat_modifiers.yaml")
@@ -28,42 +29,24 @@ _RULES = load_rules(Path(__file__).parent / "rulebook" / "combat_modifiers.yaml"
 _PERCENT_RE = re.compile(r"[+-]\d+(?:\.\d+)?%")
 
 
-class _StoredLevel:
-    """Read-only ordinal mirror for stored sexual-level comparisons."""
-
-    def __init__(self, value: int, levels: tuple[str, ...]):
-        self.value = value
-        self.levels = tuple(levels)
-
-    def _ordinal_of(self, other: Any) -> int:
-        if isinstance(other, _StoredLevel):
-            return other.value
-        if isinstance(other, str):
-            return self.levels.index(other)
-        return int(other)
-
-    def __eq__(self, other: object) -> bool:
-        return self.value == self._ordinal_of(other)
-
-    def __ge__(self, other: object) -> bool:
-        return self.value >= self._ordinal_of(other)
-
-    def __gt__(self, other: object) -> bool:
-        return self.value > self._ordinal_of(other)
-
-    def __le__(self, other: object) -> bool:
-        return self.value <= self._ordinal_of(other)
-
-    def __lt__(self, other: object) -> bool:
-        return self.value < self._ordinal_of(other)
+_StoredLevel = StoredLevel
 
 
 def _stored_sexual_level(entity: Any, field: str) -> Any:
-    """Read one stored sexual level without materializing the handler."""
+    """Read one stored sexual level without materializing the handler.
+
+    Arousal is the derived level — resolved from the stored pleasure counter
+    through ``PLEASURE_CONFIG`` here, in the rules layer — while every
+    genuinely stored ordered level is read through the neutral shared reader
+    (``world.rules.stored_sexual_reads``), which both this module and the
+    effective-exposure overlay in ``equipment_effects`` consume.
+    """
     from collections.abc import Mapping
 
-    traits = entity.attributes.get("sexual_traits", default=None, category="traits")
     if field == "arousal":
+        traits = entity.attributes.get(
+            "sexual_traits", default=None, category="traits"
+        )
         if isinstance(traits, Mapping) and "pleasure" in traits:
             raw = traits["pleasure"]
             base = raw.get("base") if isinstance(raw, Mapping) else None
@@ -76,27 +59,7 @@ def _stored_sexual_level(entity: Any, field: str) -> Any:
                     PLEASURE_CONFIG.ordinal_for(base), AROUSAL_LEVELS
                 )
             return None
-    elif isinstance(traits, Mapping) and field in traits:
-        raw = traits[field]
-        if isinstance(raw, Mapping):
-            value = raw.get("value")
-            levels = raw.get("levels") or ()
-            if isinstance(value, str):
-                if levels:
-                    try:
-                        return _StoredLevel(levels.index(value), tuple(levels))
-                    except ValueError:
-                        return value
-                return value
-            if isinstance(value, int) and isinstance(levels, (list, tuple)) and 0 <= value < len(levels):
-                return _StoredLevel(value, tuple(levels))
-            return value
-    from collections.abc import Mapping
-
-    baseline = entity.attributes.get("sexual", default=None)
-    if isinstance(baseline, Mapping) and isinstance(baseline.get(field), str):
-        return baseline[field]
-    return None
+    return stored_sexual_level(entity, field)
 
 
 def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
@@ -109,18 +72,28 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
     never create a persistent attribute or write state. The entity itself is
     passed through for ``skill_owned`` conditions, which resolve against
     ``entity.skills.owned_keys()`` (a pure stored-data read).
+
+    The exposure slot carries the EFFECTIVE level (stored ordinal plus the
+    summed equipment ``exposure_bias``, clamped) from the pure
+    :func:`effective_exposure` overlay, in the same immutable
+    :class:`StoredLevel` view the other fields use — reading it never
+    materializes a handler or writes state, so the no-create contract holds.
     """
     context: dict[str, Any] = {"active_buffs": active_buff_keys_from_storage(entity)}
     for field, levels in (
         ("arousal", AROUSAL_LEVELS),
         ("climax_phase", CLIMAX_PHASE_LEVELS),
-        ("exposure", EXPOSURE_LEVELS),
     ):
         value = _stored_sexual_level(entity, field)
         if isinstance(value, str) and value in levels:
             context[field] = _StoredLevel(levels.index(value), levels)
         elif isinstance(value, _StoredLevel):
             context[field] = value
+    exposure = effective_exposure(entity)
+    if isinstance(exposure, str) and exposure in EXPOSURE_LEVELS:
+        context["exposure"] = _StoredLevel(EXPOSURE_LEVELS.index(exposure), EXPOSURE_LEVELS)
+    elif isinstance(exposure, StoredLevel):
+        context["exposure"] = exposure
     context["entity"] = entity
     context["dual_wielding"] = dual_wielding_from_storage(entity)
     return context
@@ -148,7 +121,15 @@ def _build_context(entity) -> dict[str, Any]:
     if sexual is not None:
         context["arousal"] = sexual.arousal
         context["climax_phase"] = sexual.climax_phase
-        context["exposure"] = sexual.exposure
+    # The exposure slot is the effective overlay (stored + worn bias, clamped)
+    # as the shared immutable level view — never the raw trait — so the
+    # handler path and the no-create path fill the identical view type
+    # (add-equipment-sexual-effects D1).
+    exposure = effective_exposure(entity)
+    if isinstance(exposure, str) and exposure in EXPOSURE_LEVELS:
+        context["exposure"] = _StoredLevel(EXPOSURE_LEVELS.index(exposure), EXPOSURE_LEVELS)
+    elif isinstance(exposure, StoredLevel):
+        context["exposure"] = exposure
     context["entity"] = entity
     context["dual_wielding"] = dual_wielding_from_storage(entity)
     return context

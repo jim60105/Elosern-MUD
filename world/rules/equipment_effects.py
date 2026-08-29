@@ -22,9 +22,12 @@ gauge caps live through exactly two pure read accessors —
 :func:`equipment_adjustments` and :func:`equipment_gauge_caps` — so no
 consumer re-implements equipment math. P3 (add-equipment-immunity-and-attached-buffs)
 owns the immunity predicate, the attached-instance projection, and the
-adjustment-prose formatter. A structural inertness test allowlists the
-change-authorized consumers; ``pleasure_gain`` / ``exposure_bias`` stay
-dormant until P4, so those fields must not be folded into any accessor yet.
+adjustment-prose formatter. P4 (add-equipment-sexual-effects) lands the
+sexual overlay accessors: :func:`equipment_exposure_bias`,
+:func:`effective_exposure`, and :func:`equipment_pleasure_gain`. A structural
+inertness test allowlists the change-authorized consumers; every rulebook
+field now has its owning consumer, so no field may be folded into an
+accessor outside its owner's surface.
 """
 
 import re
@@ -565,8 +568,9 @@ def equipment_adjustments(entity: Any) -> Mapping[str, int | str]:
                     percents["agility"] = percents.get("agility", 0) + int(value[:-1])
                 else:
                     agility_flat_total += int(value)
-            # pleasure_gain stays dormant (P4); every other adjustment field
-            # is already covered by the branches above.
+            # pleasure_gain never rides the combat bundle (P4 folds it
+            # through equipment_pleasure_gain); every other adjustment
+            # field is already covered by the branches above.
     bundle: dict[str, int | str] = dict(flats)
     if agility_flat_total:
         bundle["agility_flat"] = agility_flat_total
@@ -633,6 +637,71 @@ def equipment_immune_buff_keys(entity: Any) -> frozenset[str]:
         if rule is not None:
             immune.update(rule.immune)
     return frozenset(immune)
+
+
+def equipment_exposure_bias(entity: Any) -> int:
+    """Sum the signed ``exposure_bias`` of the entity's currently worn gear.
+
+    Pure: reads stored state through the fail-closed normalization without
+    materializing handlers and writes nothing. Malformed storage contributes
+    zero bias (broken storage never rewrites how exposed the actor looks).
+    """
+    return sum(rule.exposure_bias for rule in _worn_rules(entity))
+
+
+def equipment_pleasure_gain(entity: Any) -> int:
+    """Sum the signed ``pleasure_gain`` percents of the worn equipment.
+
+    The single equipment-only pleasure source (P4 design D3): the pleasure
+    funnel receives this integer as its ``pleasure_percent`` parameter and
+    nothing else. It deliberately does NOT ride the combat bundle — the
+    evaluator's key-set stays combat-only. Pure; malformed storage yields 0.
+    """
+    total = 0
+    for rule in _worn_rules(entity):
+        value = rule.adjustments.get("pleasure_gain")
+        if value is not None:
+            total += int(value[:-1])
+    return total
+
+
+def effective_exposure(entity: Any) -> Any:
+    """Return the entity's effective exposure: stored ordinal + worn bias, clamped.
+
+    One pure read-time overlay (P4 design D1): the stored ``EXPOSURE_LEVELS``
+    ordinal — read through the neutral shared reader, so no ``entity.sexual``
+    handler is ever materialized and nothing is written — shifted by
+    :func:`equipment_exposure_bias` and clamped to the vocabulary bounds.
+    Malformed storage contributes zero bias, so the result is the stored
+    level itself. A level that cannot be resolved at all is passed through
+    unchanged (the condition builders skip unresolvable fields exactly as
+    before), and a stored record whose vocabulary differs from
+    ``EXPOSURE_LEVELS`` is passed through with its OWN vocabulary — corrupt
+    storage is never reinterpreted as a canonical band; rule matching
+    rejects it exactly as the pre-overlay evaluator did (fail-loud on a
+    threshold lookup), instead of silently firing on a relabeled ordinal.
+    The returned view is the shared immutable ``StoredLevel``, the
+    same comparison-parity type both context builders use.
+    """
+    from world.lore.sexual_vocab import EXPOSURE_LEVELS
+    from world.rules.stored_sexual_reads import StoredLevel, stored_sexual_level
+
+    stored = stored_sexual_level(entity, "exposure")
+    if isinstance(stored, str):
+        if stored not in EXPOSURE_LEVELS:
+            return stored
+        stored = StoredLevel(EXPOSURE_LEVELS.index(stored), EXPOSURE_LEVELS)
+    if not isinstance(stored, StoredLevel):
+        return stored
+    if tuple(stored.levels) != EXPOSURE_LEVELS:
+        # Fail-closed on a corrupt vocabulary: never relabel the ordinal
+        # into the canonical bands (see docstring).
+        return stored
+    ordinal = min(
+        len(EXPOSURE_LEVELS) - 1,
+        max(0, stored.value + equipment_exposure_bias(entity)),
+    )
+    return StoredLevel(ordinal, EXPOSURE_LEVELS)
 
 
 def attached_buff_instances(

@@ -21,8 +21,10 @@ from world.lore.sexual_vocab import (
 )
 from world.rules.buffs import BUFF_DEFINITIONS
 from world.rules.combat_modifiers import matched_combat_modifiers
+from world.rules.equipment_effects import effective_exposure
 from world.rules.sexual_state import PLEASURE_CONFIG, _LIFETIME_COUNTER_KEYS
 from world.rules.status_display import display_for
+from world.rules.stored_sexual_reads import StoredLevel
 from world.skills.equipment import dual_wielding_from_storage
 from world.skills.handler import INNATE_SKILL_KEYS, INNATE_SKILL_ORDER
 from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillDef, SkillKind
@@ -397,6 +399,19 @@ def _validate_intimate_level_entry(raw: Any, vocabulary: tuple[str, ...]) -> str
     raise StatusQueryError("materialized sexual level value is malformed")
 
 
+def _effective_exposure_label(entity: Any, stored_label: str) -> str:
+    """Return the effective exposure label, falling back to the stored one.
+
+    The equipment overlay (P4 D4) never fails closed on the panel: strict
+    stored validation has already passed when this runs, so a view that
+    cannot be resolved simply keeps the stored label.
+    """
+    view = effective_exposure(entity)
+    if isinstance(view, StoredLevel) and tuple(view.levels) == EXPOSURE_LEVELS:
+        return view.levels[view.value]
+    return stored_label
+
+
 def _read_intimate(entity: Any) -> IntimateView | None:
     """Build the intimate view from no-create-safe readers, or return None.
 
@@ -405,6 +420,10 @@ def _read_intimate(entity: Any) -> IntimateView | None:
     corruption that fails the panel closed, never a silent baseline fallback).
     Absent a materialized record, level fields resolve from the import-time
     baseline; absent both, the whole view is ``None``.
+
+    The exposure row renders the EFFECTIVE level (stored ordinal plus worn
+    equipment ``exposure_bias``, clamped) while the stored trait is never
+    touched; every other row keeps the stored value.
     """
     traits = _read_attribute(
         entity, _SEXUAL_TRAITS_KEY, default=None, category=_SEXUAL_TRAITS_CATEGORY
@@ -427,7 +446,7 @@ def _read_intimate(entity: Any) -> IntimateView | None:
             arousal=values["arousal"],
             wetness=values["wetness"],
             shame=values["shame"],
-            exposure=values["exposure"],
+            exposure=_effective_exposure_label(entity, values["exposure"]),
             climax_phase=values["climax_phase"],
             climax_today=_sexual_counter(entity, "climax_today"),
         )
@@ -452,25 +471,33 @@ def _read_intimate(entity: Any) -> IntimateView | None:
         arousal=values["arousal"],
         wetness=values["wetness"],
         shame=values["shame"],
-        exposure=values["exposure"],
+        exposure=_effective_exposure_label(entity, values["exposure"]),
         climax_phase=values["climax_phase"],
         climax_today=climax_today,
     )
 
 
 def _sexual_condition_context(entity: Any) -> dict[str, Any]:
-    """Build the combat-modifier condition context from read-only state."""
+    """Build the combat-modifier condition context from read-only state.
+
+    The exposure slot carries the EFFECTIVE level (stored plus worn equipment
+    bias, clamped) as this module's own immutable ``_LevelRef`` view, so the
+    panel's condition chips can never disagree with what combat resolution
+    actually matches (add-equipment-sexual-effects D4).
+    """
     context: dict[str, Any] = {"active_buffs": {key for key, _ in _active_buff_entries(entity)}}
     for field, levels in (
         ("arousal", AROUSAL_LEVELS),
         ("climax_phase", CLIMAX_PHASE_LEVELS),
-        ("exposure", EXPOSURE_LEVELS),
     ):
         value = _sexual_level(entity, field)
         if isinstance(value, str) and value in levels:
             context[field] = _LevelRef(_ordinal_of(levels, value), levels)
         elif isinstance(value, _LevelRef):
             context[field] = value
+    exposure = effective_exposure(entity)
+    if isinstance(exposure, StoredLevel) and exposure.levels == EXPOSURE_LEVELS:
+        context["exposure"] = _LevelRef(exposure.value, EXPOSURE_LEVELS)
     context["entity"] = entity
     context["dual_wielding"] = dual_wielding_from_storage(entity)
     return context
