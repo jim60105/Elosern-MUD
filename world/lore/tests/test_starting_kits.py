@@ -1,5 +1,7 @@
 """Registry contract tests for the subrace starting-kit catalog."""
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 
 from world.lore.items import ITEM_REGISTRY
@@ -13,11 +15,17 @@ from world.lore.starting_kits import (
 
 
 class SubraceStartingKitTests(unittest.TestCase):
+    @covers_requirement(
+        "player-character-creation::every-subrace-has-a-validated-basic-starting-equipment-kit-in-the-item-catalog"
+    )
     def test_kit_keys_exactly_cover_the_subrace_registry(self):
         self.assertEqual(
             set(SUBRACE_STARTING_KIT_REGISTRY), set(SUBRACE_REGISTRY)
         )
 
+    @covers_requirement(
+        "player-character-creation::every-subrace-has-a-validated-basic-starting-equipment-kit-in-the-item-catalog"
+    )
     def test_every_kit_is_a_non_empty_set_of_registered_equipment(self):
         for subrace_key, kit in SUBRACE_STARTING_KIT_REGISTRY.items():
             with self.subTest(subrace=subrace_key):
@@ -38,6 +46,9 @@ class SubraceStartingKitTests(unittest.TestCase):
                     ],
                 )
 
+    @covers_requirement(
+        "player-character-creation::every-subrace-has-a-validated-basic-starting-equipment-kit-in-the-item-catalog"
+    )
     def test_basic_items_are_shared_across_kits(self):
         shared = SubraceStartingKit(
             "wolfkin", (("leather_armor", 1), ("plain_sword", 1))
@@ -49,6 +60,9 @@ class SubraceStartingKitTests(unittest.TestCase):
         borrowed["wolfkin"] = shared
         _validate_starting_kit_coverage(borrowed)
 
+    @covers_requirement(
+        "player-character-creation::every-subrace-has-a-validated-basic-starting-equipment-kit-in-the-item-catalog"
+    )
     def test_kit_validation_rejects_malformed_unknown_and_non_equipment_entries(self):
         cases = [
             (
@@ -126,6 +140,9 @@ class SubraceStartingKitTests(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "player-character-creation::every-subrace-has-a-validated-basic-starting-equipment-kit-in-the-item-catalog"
+    )
     def test_coverage_validation_rejects_missing_and_unknown_subraces(self):
         missing = {
             key: SUBRACE_STARTING_KIT_REGISTRY[key]

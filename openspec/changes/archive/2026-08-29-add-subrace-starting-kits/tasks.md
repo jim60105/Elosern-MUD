@@ -24,5 +24,5 @@
 
 ## 5. Post-sync traceability (execute during the archive/sync workflow, after the delta is merged into `openspec/specs/`)
 
-- [ ] 5.1 After the delta requirements exist in the main spec, obtain their exact IDs with `uv run --locked python -m tools.spec_traceability list` and add literal-ID `covers_requirement` annotations to the tests from tasks 2.2 (kit-coverage requirement) and 3.3 (custom-activation requirement)
-- [ ] 5.2 Re-run `uv run --locked python -m tools.spec_traceability check` and the focused Evennia labels from 4.1 and confirm both are green with the annotations in place
+- [x] 5.1 After the delta requirements exist in the main spec, obtain their exact IDs with `uv run --locked python -m tools.spec_traceability list` and add literal-ID `covers_requirement` annotations to the tests from tasks 2.2 (kit-coverage requirement) and 3.3 (custom-activation requirement)
+- [x] 5.2 Re-run `uv run --locked python -m tools.spec_traceability check` and the focused Evennia labels from 4.1 and confirm both are green with the annotations in place

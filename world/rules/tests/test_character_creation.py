@@ -231,6 +231,7 @@ class CharacterActivationTests(EvenniaTest):
                 self.assertEqual(character.db.inventory, expected)
                 self.assertGreater(len(expected), 0)
 
+    @covers_requirement("player-character-creation::custom-activation-grants-the-chosen-subrace-s-basic-starting-kit")
     def test_custom_activation_grants_each_subrace_starting_kit(self):
         for subrace_key, subrace in SUBRACE_REGISTRY.items():
             with self.subTest(subrace=subrace_key):
