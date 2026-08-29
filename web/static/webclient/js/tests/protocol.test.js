@@ -1391,7 +1391,7 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.creation, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.character, 4);
+  assert.equal(Protocol.PANEL_ALLOWLIST.character, 5);
   assert.equal(
     Object.keys(Protocol.PANEL_ALLOWLIST).length,
     8,
@@ -3523,7 +3523,7 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
 
 test("exploration and character are in the production panel allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.character, 4);
+  assert.equal(Protocol.PANEL_ALLOWLIST.character, 5);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
@@ -3541,18 +3541,45 @@ test("exploration and character are in the production panel allowlist", () => {
 });
 
 // ---------------------------------------------------------------------------
-// character panel v3 (design D10 + skill category grouping)
+// character panel v5 (design D10 + skill category grouping + breakdown rows)
 // ---------------------------------------------------------------------------
+
+function validCharacterTraitRow(overrides) {
+  return Object.assign(
+    {
+      key: "hp",
+      label: "生命",
+      base: 10,
+      current: 10,
+      max: 10,
+      effective: 10,
+      layers: [],
+    },
+    overrides || {}
+  );
+}
+
+function validCharacterTraitRowV4(overrides) {
+  return Object.assign({ key: "hp", label: "生命", current: 10, max: 10 }, overrides || {});
+}
 
 function validCharacterPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 4,
+      schema_version: 5,
       available: true,
       kind: "character",
       traits: [
-        { key: "hp", label: "生命", current: 10, max: 10 },
-        { key: "atk_phys", label: "攻擊", current: 5, max: null },
+        validCharacterTraitRow(),
+        validCharacterTraitRow({
+          key: "atk_phys",
+          label: "攻擊",
+          base: 3,
+          current: 5,
+          max: null,
+          effective: 5,
+          layers: [{ source: "equipment", name: "鐵劍", kind: "flat", amount: 2 }],
+        }),
       ],
       actives: [
         {
@@ -3577,7 +3604,7 @@ function validCharacterPanel(overrides) {
         },
       ],
       equipment: [
-        { slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍" },
+        { slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍", adjustment: "攻擊 +2" },
       ],
       disguise: { active: false, description: "", displayed: [] },
       guild: { rank: null, merit: 0 },
@@ -3606,8 +3633,17 @@ function characterCategoryGroup(keys) {
 }
 
 test("validates the character panel available/unavailable discriminator", () => {
-  // The unavailable fixture carries the registered version (4), and the real
-  // validatePanel dispatch path is exercised.
+  // The unavailable fixture carries the registered version (5), and the real
+  // validatePanel dispatch path is exercised. The retained legacy v4 branch
+  // is accepted on both forms; every other version rejects.
+  assert.deepEqual(
+    Protocol.validatePanel(
+      "character",
+      Protocol.PANEL_ALLOWLIST.character,
+      unavailableStatusPanel({ schema_version: 5 })
+    ),
+    unavailableStatusPanel({ schema_version: 5 })
+  );
   assert.deepEqual(
     Protocol.validatePanel(
       "character",
@@ -3623,13 +3659,39 @@ test("validates the character panel available/unavailable discriminator", () => 
       unavailableStatusPanel({ schema_version: 2 })
     )
   );
+  assert.throws(() =>
+    Protocol.validatePanel(
+      "character",
+      Protocol.PANEL_ALLOWLIST.character,
+      unavailableStatusPanel({ schema_version: 6 })
+    )
+  );
   assert.doesNotThrow(() => Protocol.validateCharacterPanel(validCharacterPanel()));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ kind: "status" })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 1 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 2 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 3 })));
-  assert.doesNotThrow(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 4 })));
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 6 })));
+  // The retained legacy branch: a byte-identical v4 payload still validates,
+  // and a v5 row under version 4 (or a v4 row under 5) rejects.
+  assert.doesNotThrow(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        schema_version: 4,
+        traits: [validCharacterTraitRowV4(), validCharacterTraitRowV4({ key: "atk_phys", label: "攻擊", current: 5, max: null })],
+        equipment: [{ slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍" }],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 4 }))
+  );
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({ traits: [validCharacterTraitRowV4()] })
+    )
+  );
   const missing = validCharacterPanel();
   delete missing.actives;
   assert.throws(() => Protocol.validateCharacterPanel(missing));
@@ -3642,12 +3704,12 @@ test("a character unavailable snapshot at the registered version is accepted ato
   const store = Protocol.createStore();
   store.beginTransport(1);
   const status = validStatusPanel();
-  const version4 = unavailableStatusPanel({ schema_version: 4 });
-  const accepted = snapshot({ panels: { status: status, character: version4 } });
+  const unavailable = unavailableStatusPanel({ schema_version: 5 });
+  const accepted = snapshot({ panels: { status: status, character: unavailable } });
   const result = store.receive(1, "ui_snapshot", [accepted], {});
   assert.equal(result.accepted, true);
   assert.deepEqual(store.getState().panels.status, status, "healthy status panel stays intact");
-  assert.deepEqual(store.getState().panels.character, version4);
+  assert.deepEqual(store.getState().panels.character, unavailable);
 
   // The identical snapshot at the stale version is rejected with no panel
   // replaced or merged: a different-but-valid status panel must not leak in.
@@ -3658,38 +3720,31 @@ test("a character unavailable snapshot at the registered version is accepted ato
     panels: { status: differentStatus, character: unavailableStatusPanel({ schema_version: 2 }) },
   });
   assert.equal(store.receive(1, "ui_snapshot", [stale], {}).reason, "invalid");
-  assert.equal(store.getState().phase, "active", "the version-4 state remains committed");
+  assert.equal(store.getState().phase, "active", "the version-5 state remains committed");
   assert.deepEqual(store.getState().panels.status, status, "status panel untouched");
-  assert.deepEqual(store.getState().panels.character, version4, "character panel untouched");
+  assert.deepEqual(store.getState().panels.character, unavailable, "character panel untouched");
 });
 
 test("enforces character D10 bounds and disguise honesty", () => {
+  const overRows = new Array(Protocol.CHARACTER_MAX_TRAIT_ROWS + 1).fill(validCharacterTraitRow());
   assert.throws(() =>
     Protocol.validateCharacterPanel(
       validCharacterPanel({
-        traits: Array(Protocol.CHARACTER_MAX_TRAIT_ROWS + 1).fill({
-          key: "hp",
-          label: "生命",
-          current: 10,
-          max: 10,
-        }),
+        traits: overRows,
       })
     )
   );
   assert.throws(() =>
     Protocol.validateCharacterPanel(
       validCharacterPanel({
-        traits: [
-          { key: "hp", label: "生命", current: 10, max: 10 },
-          { key: "hp", label: "生命", current: 10, max: 10 },
-        ],
+        traits: [validCharacterTraitRow(), validCharacterTraitRow()],
       })
     )
   );
   assert.throws(() =>
     Protocol.validateCharacterPanel(
       validCharacterPanel({
-        traits: [{ key: "hp", label: "生命", current: 11, max: 10 }],
+        traits: [validCharacterTraitRow({ current: 11, max: 10 })],
       })
     )
   );
@@ -3707,6 +3762,103 @@ test("enforces character D10 bounds and disguise honesty", () => {
   );
   // A wallet is a non-negative safe integer.
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ wallet: -1 })));
+});
+
+test("v5 breakdown layers validate exactly", () => {
+  assert.doesNotThrow(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        traits: [
+          validCharacterTraitRow({
+            layers: [
+              { source: "skill", name: "防禦直覺（1/2）", kind: "mult", amount: 1.5 },
+              { source: "condition", name: "劇毒", kind: "pct", amount: -10 },
+              { source: "equipment", name: "騎士全套板甲", kind: "flat", amount: 8 },
+            ],
+          }),
+        ],
+      })
+    )
+  );
+  const layerBad = (overrides) =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        traits: [
+          validCharacterTraitRow({
+            layers: [
+              Object.assign({ source: "equipment", name: "鐵劍", kind: "flat", amount: 2 }, overrides),
+            ],
+          }),
+        ],
+      })
+    );
+  assert.throws(() => layerBad({ source: "innate" }));
+  assert.throws(() => layerBad({ kind: "percent" }));
+  assert.throws(() => layerBad({ amount: 0 }));
+  assert.throws(() => layerBad({ amount: "2" }));
+  assert.throws(() => layerBad({ amount: NaN }));
+  assert.throws(() => layerBad({ amount: Infinity }));
+  assert.throws(() => layerBad({ name: " " }));
+  assert.throws(() => layerBad({ extra: 1 }));
+  // Layer list bound and exact trait-row shape.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        traits: [
+          validCharacterTraitRow({
+            layers: new Array(17).fill({ source: "equipment", name: "鐵劍", kind: "flat", amount: 2 }),
+          }),
+        ],
+      })
+    )
+  );
+  const missingLayerField = { source: "equipment", name: "鐵劍", kind: "flat" };
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({ traits: [validCharacterTraitRow({ layers: [missingLayerField] })] })
+    )
+  );
+  // Fractional totals ride as JSON numbers (scaled rule-table grants).
+  assert.doesNotThrow(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        traits: [validCharacterTraitRow({ key: "defense", label: "防禦", base: 5, current: 7.5, max: null, effective: 7.5 })],
+      })
+    )
+  );
+  // The defining row contract: statics expose effective through current;
+  // gauges carry effective == max. Contradictions reject.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        traits: [validCharacterTraitRow({ key: "atk_phys", label: "攻擊", base: 10, current: 10, max: null, effective: 15 })],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        traits: [validCharacterTraitRow({ key: "hp", label: "生命", base: 100, current: 40, max: 115, effective: 100 })],
+      })
+    )
+  );
+});
+
+test("v5 equipment rows require the adjustment summary", () => {
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        equipment: [{ slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍" }],
+      })
+    )
+  );
+  assert.doesNotThrow(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        equipment: [{ slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍", adjustment: "" }],
+      })
+    )
+  );
 });
 
 test("character panel v4 validates the intimate status section", () => {

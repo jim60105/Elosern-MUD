@@ -253,7 +253,7 @@
     services: 3,
     creation: 1,
     exploration: 1,
-    character: 4,
+    character: 5,
   };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
@@ -2968,6 +2968,14 @@
   var CHARACTER_MAX_LABEL = 128;
   var CHARACTER_MAX_DESCRIPTION = 256;
   var CHARACTER_MAX_SLOT = 32;
+  // v5 breakdown bounds (mirror of web.webclient.presentation.character):
+  // the per-stat layer bound, the P3 adjustment-summary bound, and the
+  // closed source/kind alphabets.
+  var CHARACTER_MAX_LAYERS = 16;
+  var CHARACTER_MAX_ADJUSTMENT = CHARACTER_MAX_DESCRIPTION;
+  var CHARACTER_LEGACY_SCHEMA_VERSION = 4;
+  var CHARACTER_LAYER_SOURCES = ["skill", "condition", "equipment"];
+  var CHARACTER_LAYER_KINDS = ["mult", "flat", "pct"];
   // Fixed level vocabularies for the character panel's intimate section
   // (mirror of world/lore/sexual_vocab.py, the shared vocabulary source).
   var CHARACTER_INTIMATE_AROUSAL_LEVELS = ["平靜", "微興奮", "中等", "高度", "極限"];
@@ -2984,7 +2992,7 @@
     return key;
   }
 
-  function validateCharacterTraitRow(value) {
+  function validateCharacterTraitRowV4(value) {
     requireExactFields(value, "trait row", ["key", "label", "current", "max"], []);
     validateCharacterKey(value.key, "trait key");
     var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
@@ -2998,6 +3006,86 @@
         throw new Error("trait current must not exceed maximum");
       }
     }
+    return value;
+  }
+
+  function requireNumber(value, field, minimum, maximum) {
+    // JSON numbers with the wire bounds: finite, safe-ranged, non-boolean.
+    if (typeof value !== "number" || !isFinite(value)) {
+      throw new Error(field + " must be a finite number");
+    }
+    if (value < minimum || value > maximum || Math.abs(value) > MAX_SAFE_INTEGER) {
+      throw new Error(field + " must be within " + minimum + ".." + maximum);
+    }
+    return value;
+  }
+
+  // v5 breakdown row pieces (expose-stat-breakdown-read-model): the exact
+  // {source, name, kind, amount} layer and the seven-field trait row. The
+  // numeric fields accept JSON numbers (a scaled rule-table grant produces
+  // fractional values such as 2.5), never booleans or non-finite numbers.
+  function validateCharacterBreakdownLayer(value) {
+    requireExactFields(value, "breakdown layer", ["source", "name", "kind", "amount"], []);
+    if (CHARACTER_LAYER_SOURCES.indexOf(value.source) === -1) {
+      throw new Error("breakdown layer source is not a stable value");
+    }
+    var name = requireString(value.name, "name", CHARACTER_MAX_LABEL);
+    if (!name.trim()) {
+      throw new Error("breakdown layer name must be non-empty");
+    }
+    if (CHARACTER_LAYER_KINDS.indexOf(value.kind) === -1) {
+      throw new Error("breakdown layer kind is not a stable value");
+    }
+    var amount = requireNumber(
+      value.amount,
+      "breakdown layer amount",
+      -MAX_SAFE_INTEGER,
+      MAX_SAFE_INTEGER
+    );
+    if (amount === 0) {
+      throw new Error("breakdown layer amount must be non-zero");
+    }
+    return value;
+  }
+
+  function validateCharacterTraitRowV5(value) {
+    requireExactFields(
+      value,
+      "trait row",
+      ["key", "label", "base", "current", "max", "effective", "layers"],
+      []
+    );
+    validateCharacterKey(value.key, "trait key");
+    var label = requireString(value.label, "label", CHARACTER_MAX_LABEL);
+    if (!label.trim()) {
+      throw new Error("trait label must be non-empty");
+    }
+    requireInt(value.base, "base", 0, MAX_SAFE_INTEGER);
+    requireNumber(value.current, "current", 0, MAX_SAFE_INTEGER);
+    if (value.max !== null) {
+      requireInt(value.max, "max", 1, MAX_SAFE_INTEGER);
+      if (value.current > value.max) {
+        throw new Error("trait current must not exceed maximum");
+      }
+    }
+    requireNumber(value.effective, "effective", 0, MAX_SAFE_INTEGER);
+    // The defining row contract (v5): a gauge row's effective value IS its
+    // maximum; a static row exposes its authoritative effective total through
+    // the total-display field. A payload contradicting either is rejected at
+    // the boundary instead of letting two incompatible totals diverge.
+    if (value.max !== null) {
+      if (value.effective !== value.max) {
+        throw new Error("gauge trait effective must equal its maximum");
+      }
+    } else if (value.current !== value.effective) {
+      throw new Error("static trait current must equal effective");
+    }
+    if (!Array.isArray(value.layers) || value.layers.length > CHARACTER_MAX_LAYERS) {
+      throw new Error(
+        "layers must be a list of at most " + CHARACTER_MAX_LAYERS + " rows"
+      );
+    }
+    value.layers.forEach(validateCharacterBreakdownLayer);
     return value;
   }
 
@@ -3101,7 +3189,7 @@
     return count;
   }
 
-  function validateCharacterEquipmentRow(value) {
+  function validateCharacterEquipmentRowV4(value) {
     requireExactFields(value, "equipment row", ["slot", "item_key", "display_name"], []);
     var slot = requireString(value.slot, "slot", CHARACTER_MAX_SLOT);
     if (!slot.trim()) {
@@ -3112,6 +3200,28 @@
     if (!displayName.trim()) {
       throw new Error("equipment display_name must be non-empty");
     }
+    return value;
+  }
+
+  // v5 equipment row: the v4 fields plus the required (possibly empty)
+  // server-formatted adjustment summary.
+  function validateCharacterEquipmentRowV5(value) {
+    requireExactFields(
+      value,
+      "equipment row",
+      ["slot", "item_key", "display_name", "adjustment"],
+      []
+    );
+    var slot = requireString(value.slot, "slot", CHARACTER_MAX_SLOT);
+    if (!slot.trim()) {
+      throw new Error("slot must be non-empty");
+    }
+    validateCharacterKey(value.item_key, "item_key");
+    var displayName = requireString(value.display_name, "display_name", CHARACTER_MAX_LABEL);
+    if (!displayName.trim()) {
+      throw new Error("equipment display_name must be non-empty");
+    }
+    requireString(value.adjustment, "adjustment", CHARACTER_MAX_ADJUSTMENT);
     return value;
   }
 
@@ -3201,10 +3311,13 @@
     };
   }
 
-  // Exact available character panel v4 schema (design D10 + skill category
+  // Exact available character panel schema (design D10 + skill category
   // grouping + the intimate-status section from webclient-intimate-status-section).
-  // Shared bounds are guarded by a dual-direction parity test.
-  function validateCharacterPanel(payload) {
+  // v5 (expose-stat-breakdown-read-model) swaps in the breakdown trait rows
+  // and the adjustment-bearing equipment rows; every other section is
+  // byte-identical to v4, whose rules are retained unchanged. Shared bounds
+  // are guarded by a dual-direction parity test.
+  function validateCharacterPanelAt(payload, version) {
     requireExactFields(
       payload,
       "character panel",
@@ -3224,18 +3337,21 @@
       ],
       []
     );
-    if (payload.schema_version !== 4) {
+    if (payload.schema_version !== version) {
       throw new Error("unsupported character schema_version");
     }
     if (payload.available !== true || payload.kind !== "character") {
       throw new Error("character panel must be available with kind character");
     }
+    var traitRowValidator = version >= 5 ? validateCharacterTraitRowV5 : validateCharacterTraitRowV4;
+    var equipmentRowValidator =
+      version >= 5 ? validateCharacterEquipmentRowV5 : validateCharacterEquipmentRowV4;
     if (!Array.isArray(payload.traits) || payload.traits.length > CHARACTER_MAX_TRAIT_ROWS) {
       throw new Error("traits must be a list of at most " + CHARACTER_MAX_TRAIT_ROWS + " rows");
     }
     var traitKeys = {};
     payload.traits.forEach(function (row) {
-      validateCharacterTraitRow(row);
+      traitRowValidator(row);
       if (traitKeys[row.key]) {
         throw new Error("trait keys must be unique");
       }
@@ -3270,7 +3386,7 @@
     if (!Array.isArray(payload.equipment) || payload.equipment.length > CHARACTER_MAX_EQUIPMENT_ROWS) {
       throw new Error("equipment must be a list of at most " + CHARACTER_MAX_EQUIPMENT_ROWS + " rows");
     }
-    payload.equipment.forEach(validateCharacterEquipmentRow);
+    payload.equipment.forEach(equipmentRowValidator);
     validateCharacterDisguise(payload.disguise);
     validateCharacterGuild(payload.guild);
     requireInt(payload.wallet, "wallet", 0, MAX_SAFE_INTEGER);
@@ -3278,7 +3394,7 @@
 
     var intimate = validateCharacterIntimate(payload.intimate);
     var result = {
-      schema_version: 4,
+      schema_version: version,
       available: true,
       kind: "character",
       traits: payload.traits,
@@ -3296,6 +3412,20 @@
       throw new Error("character payload exceeds the OOB envelope limit");
     }
     return result;
+  }
+
+  function validateCharacterPanel(payload) {
+    // Version dispatch (mirror of the server validator): 5 is the shipped
+    // schema; the exact 4 branch stays available for retained legacy
+    // fixtures and is never relaxed.
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== 5) {
+      if (payload.schema_version === CHARACTER_LEGACY_SCHEMA_VERSION) {
+        return validateCharacterPanelAt(payload, CHARACTER_LEGACY_SCHEMA_VERSION);
+      }
+      throw new Error("unsupported character schema_version");
+    }
+    return validateCharacterPanelAt(payload, 5);
   }
 
   // Panel discriminator dispatch: the unavailable form is common to every
@@ -3511,13 +3641,23 @@
       throw new Error("panel " + name + " must be a JSON object");
     }
     requireInt(payload.schema_version, "panel schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== schemaVersion) {
+    // The character panel retains its exact legacy v4 branch: the registered
+    // version is 5, and v4 payloads (both forms) still validate against the
+    // byte-identical v4 rules. Every other panel must match its registered
+    // version exactly.
+    var accepted =
+      name === "character" &&
+      (payload.schema_version === schemaVersion ||
+        payload.schema_version === CHARACTER_LEGACY_SCHEMA_VERSION)
+        ? payload.schema_version
+        : schemaVersion;
+    if (payload.schema_version !== accepted) {
       throw new Error(
         "panel " + name + " schema_version does not match registered version"
       );
     }
     if (payload.available === false) {
-      return validateUnavailablePanel(payload, schemaVersion);
+      return validateUnavailablePanel(payload, accepted);
     }
     if (payload.available !== true) {
       throw new Error("panel " + name + " is missing the availability discriminator");
@@ -3804,6 +3944,9 @@
     validateArtPanel: validateArtPanel,
     validateExplorationPanel: validateExplorationPanel,
     validateCharacterPanel: validateCharacterPanel,
+    validateCharacterTraitRowV5: validateCharacterTraitRowV5,
+    validateCharacterEquipmentRowV5: validateCharacterEquipmentRowV5,
+    validateCharacterBreakdownLayer: validateCharacterBreakdownLayer,
     validateCharacterActiveSkillRow: validateCharacterActiveSkillRow,
     validateContextActionsPanel: validateContextActionsPanel,
     validateSuggestions: validateSuggestions,

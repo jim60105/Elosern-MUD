@@ -164,6 +164,13 @@ class CmdInventory(Command):
         items = list_items(self.caller)
         wallet = int(self.caller.db.wallet or 0)
         self.caller.msg(f"錢包：{wallet} 銅")
+        # v5 parity (expose-stat-breakdown-read-model D5): the same
+        # breakdown rows the character panel serializes, printed once as a
+        # totals+layers header from the same single assembly. A fail-closed
+        # read model omits the header (never a fabricated one).
+        header = self._breakdown_header()
+        if header:
+            self.caller.msg(header)
         if not items:
             self.caller.msg("背包是空的。")
             return
@@ -178,3 +185,18 @@ class CmdInventory(Command):
                 text = f"{text}——{prose}"
             lines.append(text)
         self.caller.msg("\n".join(lines))
+
+    def _breakdown_header(self) -> str | None:
+        from world.rules.status_query import (
+            StatusQueryError,
+            build_character_read_model,
+        )
+        from world.rules.status_text import breakdown_text
+
+        try:
+            model = build_character_read_model(self.caller)
+            return breakdown_text(model)
+        except Exception:
+            # Appearance-grade degradation (D5): a read model that cannot
+            # answer omits the header; inventory output never becomes fatal.
+            return None

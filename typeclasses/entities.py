@@ -111,7 +111,7 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
         desc = super().get_display_desc(looker, **kwargs)
         from world.rules.displayed_stats import display_stat_block
 
-        block = display_stat_block(self)
+        block = display_stat_block(self, looker=looker)
         if block:
             desc = f"{desc}\n{block}"
         persona_block = self.persona.flatten(

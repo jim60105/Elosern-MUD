@@ -1,6 +1,6 @@
 ## Purpose
 
-The read-only version-1 `exploration` panel and version-1 `character` panel, the eight exact allowlisted exploration adapters, the free-form dialogue composition root with offline degrade, the keyboard-first exploration dock that re-homes the service submenus, minimap movement submission, the client-local portrait-focus seam, and the Node/browser acceptance boundary.
+The read-only version-1 `exploration` panel and version-5 `character` panel, the eight exact allowlisted exploration adapters, the free-form dialogue composition root with offline degrade, the keyboard-first exploration dock that re-homes the service submenus, minimap movement submission, the client-local portrait-focus seam, and the Node/browser acceptance boundary.
 ## Requirements
 ### Requirement: The exploration panel is an exact read-only version-1 presentation panel
 The production presentation registry SHALL register panel name `exploration` at schema version 1. Its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `move`, `look`, `interact`, `character`, `quests`, and `inventory`; `available` SHALL be true and `kind` SHALL be `exploration`. `move` SHALL be a bounded list of at most 12 exit descriptors, each containing exactly `exit_ref`, `label`, `destination`, `enabled`, and nullable `disabled_reason`, where `exit_ref` is the same opaque 1..64-ASCII-character identifier the `local_map` move action uses, `label` is a bounded localized direction/exit label, `destination` is the canonical destination node ID, and `enabled`/`disabled_reason` reflect a currently present, traversable Exit from the actor's location (a locked or absent exit is a disabled row, never omitted, so the player learns it exists). `look` SHALL contain exactly `room`, `entities`, and `objects`: `room` is an exact room descriptor with a room marker for `explore.look`, `entities` is a bounded list of at most 32 present character/NPC/monster descriptors each carrying an opaque identity, bounded display name, bounded kind, and nullable opaque `portrait_ref`, and `objects` is a bounded list of at most 32 present object descriptors carrying an opaque identity and bounded display name. `interact` SHALL be a bounded list of at most 32 present target descriptors, each carrying exactly `identity`, `display_name`, nullable `portrait_ref`, a bounded `affordances` list of at most 8 descriptors, and — only for a scripted dialogue host — a bounded `keywords` list of at most 16 scripted keyword descriptors. An action affordance SHALL contain exactly `kind` (`"action"`), `action_id` (one of `explore.talk_scripted`, `explore.talk_freeform`, `explore.party_invite`, `explore.party_leave`, `explore.engage`), `label`, `enabled`, and nullable `disabled_reason`. A navigation affordance SHALL contain exactly `kind` (`"navigate"`), `surface` (one of `"guild"` or `"shop"`), `label`, `enabled`, and nullable `disabled_reason`. Navigation affordances are dock-navigation descriptors only — they are NOT registered action adapters, never enter a `ui_action` payload, and only tell the browser to open the corresponding `services` submenu. `character`, `quests`, and `inventory` SHALL each be availability entries with exactly `available` (boolean): `character` SHALL be available in exploration mode, and `quests`/`inventory` SHALL be available only when the `services` panel is registered and available. The presenter SHALL build the payload only from canonical room, entity, component, object, and service data, SHALL emit no live object or filesystem reference, SHALL NOT mutate location, traits, knowledge, dialogue, quests, inventory, or world time, and SHALL use the registered common unavailable form outside exploration mode.
@@ -52,16 +52,24 @@ Every `interact` affordance SHALL be derived from canonical data with the same c
 - **WHEN** a present NPC carries neither a dialogue component nor an eligible free-form surface nor a party binding
 - **THEN** its interact descriptor contains no talk, invite, leave, or service affordance, and the browser renders only the descriptors the server sent
 
-### Requirement: The character panel is an exact read-only version-4 panel
-The production presentation registry SHALL register panel name `character` at schema version 4. Its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `traits`, `actives`, `passives`, `equipment`, `disguise`, `guild`, `wallet`, `persona`, and `intimate`; `available` SHALL be true and `kind` SHALL be `character`. `traits` SHALL be a bounded list of at most 32 rows, each containing exactly `key`, `label`, `current`, and nullable `max`, derived from canonical trait values (gauges report current and maximum; static traits report the base value). `actives` and `passives` SHALL each be an ordered, category-grouped list of skills owned through `SkillHandler.owned_keys()`, filtered to `SkillKind.ACTIVE` and `SkillKind.PASSIVE` respectively — never read from raw imported-skill storage — with the exact grouped shape and ordering defined by this capability's skill-grouping requirement below. `equipment` SHALL be a bounded list of at most 32 rows, each with exactly `slot`, `item_key`, and bounded `display_name`, derived from canonical equipment state. `disguise` SHALL contain exactly `active` (boolean), `description` (bounded string), and a bounded list of at most 32 `displayed` rows, each with exactly `key`, `label`, and `value`, describing the outwardly displayed values when `disguise_active` is true and empty otherwise; it SHALL NEVER substitute disguised values for true traits. `guild` SHALL contain exactly `rank` (nullable rank key) and `merit` (non-negative safe integer). `wallet` SHALL be a non-negative safe integer of copper. `persona` SHALL contain exactly `background` (a nullable bounded string from the character's persona record, omitted content rendered as `null`); the section is display-only and is never used to infer any mechanical value. `intimate` SHALL be `null` when the actor has no persisted sexual-state record at all (neither a materialized handler nor an import-time baseline), and otherwise SHALL contain exactly `arousal`, `wetness`, `shame`, `exposure`, and `climax_phase` — each a member of that field's fixed vocabulary tuple in `world/lore/sexual_vocab.py` (never a raw numeric gauge value, matching the domain's existing vocabulary-closed presentation) — and `climax_today` (a non-negative safe integer). The presenter SHALL strictly read canonical records and registries through the no-mutation status/service read models — sharing the same canonical trait/equipment/disguise/sexual-state source the compact `status` panel builds from, so the two panels never diverge — SHALL emit no live object reference, SHALL NOT mutate traits, equipment, disguise, guild, wallet, persona, sexual state, or world time, and SHALL use the common unavailable form outside exploration mode.
+### Requirement: The character panel is an exact read-only version-5 panel
+The production presentation registry SHALL register panel name `character` at schema version 5. Its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `traits`, `actives`, `passives`, `equipment`, `disguise`, `guild`, `wallet`, `persona`, and `intimate`; `available` SHALL be true and `kind` SHALL be `character`. `traits` SHALL be a bounded list of at most 32 rows, each containing exactly `key`, `label`, `base`, `current`, nullable `max`, `effective`, and a bounded list of at most 16 `layers`, derived from the character-breakdown-view read model: `base` is the stored literal value (never skill-baked), `effective` is the authoritative-computation value, `current` remains the total-display field on every row (static traits report it equal to `effective`; gauges report the persisted resource remainder and an effective `max` whose layers decompose the maximum, equipment gauge caps rendered as equipment flat layers); each layer contains exactly `source` (`skill`, `condition`, or `equipment`), bounded `name` (registry label only), `kind` (`mult`, `flat`, or `pct`), and signed `amount`, in the read model's deterministic order. `actives` and `passives` SHALL each be an ordered, category-grouped list of skills owned through `SkillHandler.owned_keys()`, filtered to `SkillKind.ACTIVE` and `SkillKind.PASSIVE` respectively — never read from raw imported-skill storage — with the exact grouped shape and ordering defined by this capability's skill-grouping requirement below. `equipment` SHALL be a bounded list of at most 32 rows, each with exactly `slot`, `item_key`, bounded `display_name`, and a bounded server-formatted `adjustment` summary generated from the equipment rulebook and registry in Traditional Chinese, derived from canonical equipment state. `disguise` SHALL contain exactly `active` (boolean), `description` (bounded string), and a bounded list of at most 32 `displayed` rows, each with exactly `key`, `label`, and `value`, describing the outwardly displayed values when `disguise_active` is true and empty otherwise; it SHALL NEVER substitute disguised values for true traits. `guild` SHALL contain exactly `rank` (nullable rank key) and `merit` (non-negative safe integer). `wallet` SHALL be a non-negative safe integer of copper. `persona` SHALL contain exactly `background` (a nullable bounded string from the character's persona record, omitted content rendered as `null`); the section is display-only and is never used to infer any mechanical value. `intimate` SHALL be `null` when the actor has no persisted sexual-state record at all (neither a materialized handler nor an import-time baseline), and otherwise SHALL contain exactly `arousal`, `wetness`, `shame`, `exposure`, and `climax_phase` — each a member of that field's fixed vocabulary tuple in `world/lore/sexual_vocab.py` (never a raw numeric gauge value, matching the domain's existing vocabulary-closed presentation; `exposure` is the effective value per the equipment overlay contract) — and `climax_today` (a non-negative safe integer). The presenter SHALL strictly read canonical records and registries through the no-mutation status/service read models — sharing the same canonical trait/equipment/disguise/sexual-state source the compact `status` panel builds from, so the two panels never diverge — SHALL emit no live object reference, SHALL NOT mutate traits, equipment, disguise, guild, wallet, persona, sexual state, or world time, and SHALL use the common unavailable form outside exploration mode.
 
 #### Scenario: Expanded state shows true values and an honest disguise
 - **WHEN** an elf with active disguise opens the Character root
 - **THEN** `traits` report the true values, `disguise` lists the displayed values with `active == true`, and no trait row substitutes a disguised value for a true one
 
+#### Scenario: Worn gear decomposes into named layers
+- **WHEN** an actor wearing 騎士全套板甲 with one matching condition rule opens the Character root
+- **THEN** the defense row carries `base`, an `effective` equal to the shared-formula value, and layers naming the condition and the item with their kinds and amounts, and the HP row's `max` decomposes over the stored base plus an equipment flat cap layer
+
 #### Scenario: Undisguised actor has an empty displayed list
 - **WHEN** an actor has no active disguise
 - **THEN** `disguise.active` is false, `displayed` is empty, and the panel still reports true traits, actives, passives, equipment, guild rank, wallet, and the persona background
+
+#### Scenario: Equipment rows carry adjustment summaries
+- **WHEN** the equipment section lists a registered modifier-bearing item
+- **THEN** the row's `adjustment` equals the server formatter's Traditional-Chinese summary for that item, and non-bearing items carry an empty summary
 
 #### Scenario: The panel reports the player's own background
 - **WHEN** an active character's persona record carries a non-empty `background`
@@ -77,7 +85,7 @@ The production presentation registry SHALL register panel name `character` at sc
 
 #### Scenario: A materialized sexual-state record reports its live level words
 - **WHEN** an actor's `sexual_traits` handler has been materialized with `wetness` at `濕潤`, `shame` at `輕微`, `exposure` at `低`, `climax_phase` at `未達`, `pleasure` within the `中等` arousal band, and `climax_today` at 2
-- **THEN** `intimate` reports `arousal: "中等"`, `wetness: "濕潤"`, `shame: "輕微"`, `exposure: "低"`, `climax_phase: "未達"`, and `climax_today: 2` — never the raw `pleasure` counter value
+- **THEN** `intimate` reports `arousal: "中等"`, `wetness: "濕潤"`, `shame: "輕微"`, `exposure` at the effective vocabulary member, `climax_phase: "未達"`, and `climax_today: 2` — never the raw `pleasure` counter value
 
 #### Scenario: An unmaterialized actor resolves from its import-time baseline
 - **WHEN** a valid actor has import-time baseline sexual data but no materialized `sexual_traits` handler
@@ -90,6 +98,30 @@ The production presentation registry SHALL register panel name `character` at sc
 #### Scenario: A malformed sexual-state record fails the panel closed
 - **WHEN** an actor's persisted sexual-state record exists but is structurally malformed (e.g. a level field's stored value is absent from its vocabulary)
 - **THEN** the entire `character` panel becomes unavailable via the common unavailable form, with no partial or fabricated `intimate` value
+
+### Requirement: The legacy client tolerates the version-5 character payload
+
+Until the Vue breakdown renderer lands, the legacy web client SHALL accept
+character payloads at schema version 4 or 5 through version-dispatched
+exact-shape validators (v5 validating the added `base`, `effective`,
+`layers`, and `adjustment` fields exactly, not by relaxing v4 rules),
+rendering `current`/`max` values exactly as at v4 — static traits
+included, because `current` remains populated — and ignoring `layers`
+without console errors. Component and Python-side fixtures SHALL pin both
+version branches.
+
+#### Scenario: Version-5 payload renders totals in the legacy client
+
+- **WHEN** the legacy client receives a version-5 character payload with
+  layer-bearing trait rows including static traits
+- **THEN** it renders the same `current`/`max` values as it would for the
+  equivalent v4 payload and no error is raised
+
+#### Scenario: Version branches validate exactly
+
+- **WHEN** a v5 payload with an unknown extra field, or a v4 payload at
+  schema version 5, reaches the validator
+- **THEN** it is rejected by the version-dispatched exact-shape rules
 
 ### Requirement: Character panel skills are grouped by category with the same ordering rule as the combat panel
 Each of `actives` and `passives` SHALL be an ordered array of category groups, structurally identical

@@ -169,3 +169,37 @@ test("a character without a background renders no persona row", () => {
   const labels = menu.items.map((item) => item.label);
   assert.ok(!labels.includes("背景"));
 });
+
+test("a version-5 payload renders the same totals as the equivalent v4", () => {
+  // The legacy-client tolerance requirement: the menu reads current/max on
+  // every row (statics included), ignores the breakdown layers, and errors
+  // on nothing.
+  const v4 = validPanel();
+  const v5 = validPanel({
+    schema_version: 5,
+    traits: v4.traits.map((row) =>
+      Object.assign({}, row, {
+        base: row.current,
+        effective: row.current,
+        layers: [{ source: "equipment", name: "鐵劍", kind: "flat", amount: 2 }],
+      })
+    ),
+    equipment: v4.equipment.map((row) => Object.assign({}, row, { adjustment: "攻擊 +2" })),
+  });
+  const consoleErrors = [];
+  const originalError = console.error;
+  console.error = (...args) => consoleErrors.push(args);
+  try {
+    const menuV4 = CharacterMenu.buildMenu(v4);
+    const menuV5 = CharacterMenu.buildMenu(v5);
+    console.error = originalError;
+    assert.deepEqual(
+      menuV5.items.map((item) => item.label),
+      menuV4.items.map((item) => item.label),
+      "identical totals across versions"
+    );
+    assert.deepEqual(consoleErrors, [], "no console errors while ignoring layers");
+  } finally {
+    console.error = originalError;
+  }
+});

@@ -1,4 +1,4 @@
-"""Exact schema-version-4 ``character`` panel and presenter (webclient-exploration-menu).
+"""Exact schema-version-5 ``character`` panel and presenter (webclient-exploration-menu).
 
 The presenter serializes the read-only expanded character surface opened by the
 exploration dock's Character root. It shares the same canonical
@@ -18,12 +18,19 @@ all. The skill-ownership read is handler-free: base keys come from the stored
 are computed by ``world.skills.sexual_acts.unlocked_act_keys_for`` from the
 materialized counters (zeros when unmaterialized), so building the panel no longer
 mounts the ``entity.skills`` or ``entity.sexual`` handlers.
+Version 5 (expose-stat-breakdown-read-model) rewrites every trait row into the
+breakdown shape ``{key, label, base, current, max, effective, layers}`` —
+``current`` stays the total-display field on every row — and adds the P3
+server-formatted ``adjustment`` summary to equipment rows. The validator is
+version-dispatched: the v4 exact shapes are retained ONLY for legacy fixtures
+and are still rejected on the production path.
 
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
 by a dual-direction parity test.
 """
 
+import math
 from typing import Any
 
 from web.webclient.presentation.combat_panel import (
@@ -52,6 +59,7 @@ from world.lore.sexual_vocab import (
     SHAME_LEVELS,
     WETNESS_LEVELS,
 )
+from world.rules.equipment_effects import equipment_adjustment_text
 from world.rules.progression import freeform_scale_entries_for
 from world.rules.status_query import (
     CharacterReadModel,
@@ -62,10 +70,16 @@ from world.rules.status_query import (
 )
 from world.skills.registry import SKILL_REGISTRY, SkillCategory
 
-CHARACTER_SCHEMA_VERSION = 4
+CHARACTER_SCHEMA_VERSION = 5
+# The retained legacy payload version. Production registers and serializes v5;
+# the validator still accepts v4 exactly (never relaxed) for legacy fixtures.
+CHARACTER_LEGACY_SCHEMA_VERSION = 4
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_TRAIT_ROWS = 32
+# The per-stat breakdown-layer bound mirrored by the wire validators (the
+# read model's own bound lives in ``world.rules.status_query``).
+MAX_LAYERS_PER_STAT = 16
 MAX_ACTIVE_ROWS = 32
 MAX_PASSIVE_ROWS = 32
 # The category-group count bound equals the number of SkillCategory members
@@ -79,6 +93,9 @@ MAX_KEY_CODE_POINTS = 64
 MAX_LABEL_CODE_POINTS = 128
 MAX_DESCRIPTION_CODE_POINTS = 256
 MAX_SLOT_CODE_POINTS = 32
+# The equipment adjustment summary bound (P3 formatter output; 「｜」-joined
+# segments of the fixed vocabulary).
+MAX_ADJUSTMENT_CODE_POINTS = MAX_DESCRIPTION_CODE_POINTS
 # The display-only persona background bound mirrors the persona-field cap
 # (``world.rules.character_creation.MAX_PERSONA_FIELD_LENGTH``); the parity
 # contract pins the JS validator to this same number.
@@ -100,7 +117,23 @@ def _validate_key(value: Any, field: str) -> str:
     return key
 
 
-def _validate_trait_row(value: Any) -> dict[str, Any]:
+def _require_number(value: Any, field: str, *, minimum: float, maximum: float) -> int | float:
+    """Return a non-boolean, finite int/float within bounds.
+
+    The v5 breakdown fields are the exact read-model values, which may be
+    fractional (a scaled rule-table grant produces a ``2.5`` defense layer),
+    so the wire accepts JSON numbers but never booleans, NaN, or infinities.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ProtocolValidationError(f"{field} must be a number")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ProtocolValidationError(f"{field} must be finite")
+    if value < minimum or value > maximum:
+        raise ProtocolValidationError(f"{field} is out of bounds")
+    return value
+
+
+def _validate_trait_row_v4(value: Any) -> dict[str, Any]:
     _require_exact_fields(value, "trait row", {"key", "label", "current", "max"}, {})
     key = _validate_key(value["key"], "trait key")
     label = _require_str(value, "label", maximum=MAX_LABEL_CODE_POINTS)
@@ -113,6 +146,88 @@ def _validate_trait_row(value: Any) -> dict[str, Any]:
         if current > maximum:
             raise ProtocolValidationError("trait current must not exceed maximum")
     return {"key": key, "label": label, "current": current, "max": maximum}
+
+
+# The closed breakdown alphabets, mirrored from ``world.rules.status_query``.
+LAYER_SOURCES = ("skill", "condition", "equipment")
+LAYER_KINDS = ("mult", "flat", "pct")
+
+
+def _validate_breakdown_layer_v5(value: Any) -> dict[str, Any]:
+    """Validate one exact ``{source, name, kind, amount}`` layer (v5)."""
+    _require_exact_fields(value, "breakdown layer", {"source", "name", "kind", "amount"}, {})
+    source = value["source"]
+    if source not in LAYER_SOURCES:
+        raise CharacterPanelError("breakdown layer source is not a stable value")
+    name = _require_str(value, "name", maximum=MAX_LABEL_CODE_POINTS)
+    if not name.strip():
+        raise ProtocolValidationError("breakdown layer name must be non-empty")
+    kind = value["kind"]
+    if kind not in LAYER_KINDS:
+        raise CharacterPanelError("breakdown layer kind is not a stable value")
+    amount = _require_number(
+        value["amount"], "breakdown layer amount", minimum=-MAX_SAFE_INTEGER, maximum=MAX_SAFE_INTEGER
+    )
+    if amount == 0:
+        raise ProtocolValidationError("breakdown layer amount must be non-zero")
+    return {"source": source, "name": name, "kind": kind, "amount": amount}
+
+
+def _validate_trait_row_v5(value: Any) -> dict[str, Any]:
+    """Validate one exact v5 trait row with base/effective/layers.
+
+    ``current`` remains the total-display field (it may be fractional when a
+    scaled rule-table grant makes the effective value fractional — the wire
+    accepts numbers, not just integers). Gauge rows carry the persisted
+    remainder as ``current`` and an ``effective`` equal to ``max`` whose
+    layers decompose the maximum.
+    """
+    _require_exact_fields(
+        value,
+        "trait row",
+        {"key", "label", "base", "current", "max", "effective", "layers"},
+        {},
+    )
+    key = _validate_key(value["key"], "trait key")
+    label = _require_str(value, "label", maximum=MAX_LABEL_CODE_POINTS)
+    if not label.strip():
+        raise ProtocolValidationError("trait label must be non-empty")
+    base = _require_int(value, "base", minimum=0, maximum=MAX_SAFE_INTEGER)
+    current = _require_number(
+        value["current"], "current", minimum=0, maximum=MAX_SAFE_INTEGER
+    )
+    maximum = value["max"]
+    if maximum is not None:
+        maximum = _require_int(value, "max", minimum=1, maximum=MAX_SAFE_INTEGER)
+        if current > maximum:
+            raise ProtocolValidationError("trait current must not exceed maximum")
+    effective = _require_number(
+        value["effective"], "effective", minimum=0, maximum=MAX_SAFE_INTEGER
+    )
+    # The defining row contract (v5): a gauge row's effective value IS its
+    # maximum; a static row exposes its authoritative effective total through
+    # the total-display field. A payload contradicting either is rejected at
+    # the boundary instead of letting two incompatible totals diverge.
+    if maximum is not None:
+        if effective != maximum:
+            raise ProtocolValidationError("gauge trait effective must equal its maximum")
+    elif current != effective:
+        raise ProtocolValidationError("static trait current must equal effective")
+    layers = value["layers"]
+    if not isinstance(layers, list) or len(layers) > MAX_LAYERS_PER_STAT:
+        raise CharacterPanelError(
+            f"layers must be a list of at most {MAX_LAYERS_PER_STAT} rows"
+        )
+    layers = [_validate_breakdown_layer_v5(layer) for layer in layers]
+    return {
+        "key": key,
+        "label": label,
+        "base": base,
+        "current": current,
+        "max": maximum,
+        "effective": effective,
+        "layers": layers,
+    }
 
 
 def _validate_passive_row(value: Any) -> dict[str, Any]:
@@ -258,6 +373,35 @@ def _validate_equipment_row(value: Any) -> dict[str, Any]:
     return {"slot": slot, "item_key": item_key, "display_name": display_name}
 
 
+def _validate_equipment_row_v5(value: Any) -> dict[str, Any]:
+    """v5 equipment row: the v4 shape plus the bounded P3 ``adjustment``.
+
+    The summary is the server-formatted Traditional-Chinese text of the
+    equipment rulebook; items without a bound modifier carry the empty
+    string, so the field is required and may be empty.
+    """
+    _require_exact_fields(
+        value,
+        "equipment row",
+        {"slot", "item_key", "display_name", "adjustment"},
+        {},
+    )
+    slot = _require_str(value, "slot", maximum=MAX_SLOT_CODE_POINTS)
+    if not slot.strip():
+        raise ProtocolValidationError("slot must be non-empty")
+    item_key = _validate_key(value["item_key"], "item_key")
+    display_name = _require_str(value, "display_name", maximum=MAX_LABEL_CODE_POINTS)
+    if not display_name.strip():
+        raise ProtocolValidationError("equipment display_name must be non-empty")
+    adjustment = _require_str(value, "adjustment", maximum=MAX_ADJUSTMENT_CODE_POINTS)
+    return {
+        "slot": slot,
+        "item_key": item_key,
+        "display_name": display_name,
+        "adjustment": adjustment,
+    }
+
+
 def _validate_displayed_row(value: Any) -> dict[str, Any]:
     _require_exact_fields(value, "displayed row", {"key", "label", "value"}, {})
     key = _validate_key(value["key"], "displayed key")
@@ -372,11 +516,14 @@ def _serialize_intimate(view: Any) -> dict[str, Any] | None:
     }
 
 
-def validate_character(payload: Any) -> dict[str, Any]:
-    """Validate one exact available ``character`` payload.
+def _validate_character_at(payload: Any, version: int) -> dict[str, Any]:
+    """Validate one exact available payload at one accepted schema version.
 
-    Returns a normalized payload or raises :class:`CharacterPanelError`. The
-    common unavailable form is NOT accepted here; the registry handles it.
+    Version-dispatched exact shapes (expose-stat-breakdown-read-model task
+    2.2): v4 trait/equipment rows keep their byte-identical legacy rules;
+    v5 swaps in the breakdown row and the adjustment-bearing equipment row.
+    Nothing else differs between the versions, and neither branch relaxes
+    the other's rules.
     """
     _require_exact_fields(
         payload,
@@ -397,19 +544,21 @@ def validate_character(payload: Any) -> dict[str, Any]:
         },
         {},
     )
-    if _require_int(
-        payload, "schema_version", minimum=1, maximum=MAX_SAFE_INTEGER
-    ) != CHARACTER_SCHEMA_VERSION:
+    if _require_int(payload, "schema_version", minimum=1, maximum=MAX_SAFE_INTEGER) != version:
         raise CharacterPanelError("unsupported character schema_version")
     if not _require_bool(payload, "available"):
         raise CharacterPanelError("available must be true for the character form")
     if payload["kind"] != "character":
         raise CharacterPanelError("character panel kind must be character")
 
+    trait_row_validator = _validate_trait_row_v5 if version >= 5 else _validate_trait_row_v4
+    equipment_row_validator = (
+        _validate_equipment_row_v5 if version >= 5 else _validate_equipment_row
+    )
     traits = payload["traits"]
     if not isinstance(traits, list) or len(traits) > MAX_TRAIT_ROWS:
         raise CharacterPanelError(f"traits must be a list of at most {MAX_TRAIT_ROWS} rows")
-    traits = [_validate_trait_row(row) for row in traits]
+    traits = [trait_row_validator(row) for row in traits]
     trait_keys = [row["key"] for row in traits]
     if len(set(trait_keys)) != len(trait_keys):
         raise CharacterPanelError("trait keys must be unique")
@@ -445,7 +594,7 @@ def validate_character(payload: Any) -> dict[str, Any]:
         raise CharacterPanelError(
             f"equipment must be a list of at most {MAX_EQUIPMENT_ROWS} rows"
         )
-    equipment = [_validate_equipment_row(row) for row in equipment]
+    equipment = [equipment_row_validator(row) for row in equipment]
 
     disguise = _validate_disguise(payload["disguise"])
     guild = _validate_guild(payload["guild"])
@@ -453,7 +602,7 @@ def validate_character(payload: Any) -> dict[str, Any]:
     persona = _validate_persona(payload["persona"])
 
     result = {
-        "schema_version": CHARACTER_SCHEMA_VERSION,
+        "schema_version": version,
         "available": True,
         "kind": "character",
         "traits": traits,
@@ -471,6 +620,22 @@ def validate_character(payload: Any) -> dict[str, Any]:
     if json_byte_size(result) > MAX_CANONICAL_JSON_BYTES:
         raise CharacterPanelError("character payload exceeds the OOB envelope limit")
     return result
+
+
+def validate_character(payload: Any) -> dict[str, Any]:
+    """Validate one exact available ``character`` payload (v4 or v5).
+
+    Returns a normalized payload or raises :class:`CharacterPanelError`. The
+    common unavailable form is NOT accepted here; the registry handles it.
+    """
+    if not isinstance(payload, dict):
+        raise CharacterPanelError("character panel must be a JSON object")
+    version = payload.get("schema_version")
+    if isinstance(version, bool) or not isinstance(version, int):
+        raise CharacterPanelError("unsupported character schema_version")
+    if version not in (CHARACTER_LEGACY_SCHEMA_VERSION, CHARACTER_SCHEMA_VERSION):
+        raise CharacterPanelError("unsupported character schema_version")
+    return _validate_character_at(payload, version)
 
 
 # ---------------------------------------------------------------------------
@@ -570,14 +735,37 @@ def _serialize_active_skill_groups(keys: tuple[str, ...], actor: Any) -> list[di
 def _serialize(
     model: CharacterReadModel, background: str | None, actor: Any
 ) -> dict[str, Any]:
+    """Serialize the frozen read model into the v5 available payload.
+
+    Trait rows come from ``model.breakdown`` (the single assembly the whole
+    read shares); labels stay the shared ``TRAIT_LABELS`` map; equipment rows
+    gain the P3 adjustment summary. Every other section is byte-identical to
+    v4.
+    """
     disguise_description = _DISGUISE_DESCRIPTION if model.disguise_active else ""
     return {
         "schema_version": CHARACTER_SCHEMA_VERSION,
         "available": True,
         "kind": "character",
         "traits": [
-            {"key": view.key, "label": _trait_label(view.key), "current": view.current, "max": view.maximum}
-            for view in model.traits
+            {
+                "key": row.key,
+                "label": _trait_label(row.key),
+                "base": row.base,
+                "current": row.current,
+                "max": row.effective if row.key in ("hp", "mp", "sp") else None,
+                "effective": row.effective,
+                "layers": [
+                    {
+                        "source": layer.source,
+                        "name": layer.name,
+                        "kind": layer.kind,
+                        "amount": layer.amount,
+                    }
+                    for layer in row.layers
+                ],
+            }
+            for row in model.breakdown
         ],
         "actives": _serialize_active_skill_groups(model.active_keys, actor),
         "passives": _serialize_passive_skill_groups(model.passive_keys),
@@ -586,6 +774,7 @@ def _serialize(
                 "slot": view.slot,
                 "item_key": view.item_key,
                 "display_name": _item_display_name(view.item_key),
+                "adjustment": equipment_adjustment_text(view.item_key),
             }
             for view in model.equipment
         ],
@@ -623,12 +812,15 @@ def character_presenter(context: PresentationContext) -> dict[str, Any]:
 
 __all__ = [
     "CHARACTER_SCHEMA_VERSION",
+    "CHARACTER_LEGACY_SCHEMA_VERSION",
     "CharacterPanelError",
     "MAX_ACTIVE_ROWS",
     "MAX_CATEGORY_GROUPS",
     "MAX_DISPLAYED_ROWS",
     "MAX_EQUIPMENT_ROWS",
     "MAX_LABEL_CODE_POINTS",
+    "MAX_LAYERS_PER_STAT",
+    "MAX_ADJUSTMENT_CODE_POINTS",
     "MAX_PASSIVE_ROWS",
     "MAX_PERSONA_BACKGROUND_CODE_POINTS",
     "MAX_SLOT_CODE_POINTS",
