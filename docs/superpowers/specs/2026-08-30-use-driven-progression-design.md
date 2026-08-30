@@ -1,10 +1,11 @@
 # 使用驅動成長與 magic_power 降格 — 設計文件
 
-**日期：** 2026-08-30
+**日期：** 2026-08-30（經評審補丁：系譜樹分支語意、異名用語同步）
 **狀態：** Approved
 **範圍：** 將 `magic_level` 降格並更名為 `magic_power`，改為固定戰鬥屬性；除役魔
-法 XP 引擎；讓「各技能的使用熟練度」成為唯一的成長貨幣；以前置技能系譜鏈作為技
-能階層的使用門檻；新增宣告式修煉跳時與技能系譜面板 UI。本文件修訂
+法 XP 引擎；讓「各技能的使用熟練度」成為唯一的成長貨幣；以前置技能系譜圖作為技
+能階層的使用門檻（結構上為可分支的 DAG：首輪內容僅實作簡單樹作程式面驗證，保留
+分支發展空間）；新增宣告式修煉跳時與技能系譜面板 UI。本文件修訂
 `2026-07-29-ai-mud-engine-design.md`（見 §17）。
 
 搭檔文件為 `2026-08-30-title-system-design.md`，其中的 `title-system` change 取
@@ -38,9 +39,9 @@ bundle、`disguised_stats`、webclient 的「魔力」欄也都讀它，全倉�
   運作，行為零變更。
 - 成長不再偏魔法：種族 `learning_multiplier` 縮放的是學習（練習 XP），適用於所有
   技能。精靈學得快，但不會自動魔法升等比較快。
-- 熟練度取得真正的消費者：技能系譜鏈上的前置門檻，以及 freeform 規模階梯。
+- 熟練度取得真正的消費者：技能系譜圖上的前置門檻，以及 freeform 規模階梯。
 - 反刷規則讓「刷最便宜的技能」在機械上沒有意義。
-- 玩家能看見每條鏈距離下一個節點的進度（技能系譜面板）。
+- 玩家能看見每棵系譜樹距離下一個節點的進度（技能系譜面板）。
 
 ## 3. 非目標與前瞻縫隙
 
@@ -54,7 +55,7 @@ bundle、`disguised_stats`、webclient 的「魔力」欄也都讀它，全倉�
   入。
 - **本系統不給任何形式的擊殺獎勵。** 擊殺照舊由現有 owner 給戰利品、任務 DEFEAT
   進度與公會 merit。`COMBAT_KILL_XP_TABLE` 是刪除，不重新指派。
-- **不新增物理專屬等級。** 物理成長由同樣的系譜鏈加上裝備與被動承擔，構造上自然
+- **不新增物理專屬等級。** 物理成長由同樣的系譜樹加上裝備與被動承擔，構造上自然
   對稱。
 - **武器與物理親和**屬前瞻縫隙：親和乘數讀 `affinity_elements`，對物理技能天然不
   匹配（乘數 1.0）。未來 change 要加武器親和時零重構。
@@ -69,8 +70,8 @@ bundle、`disguised_stats`、webclient 的「魔力」欄也都讀它，全倉�
 | D2 | 種族與權力帶資料改為四維 | §6 |
 | D3 | XP 引擎直接除役（不做 shim） | §7 |
 | D4 | 使用是唯一成長（原子練習結算） | §8 |
-| D5 | 技能系譜鏈是使用門檻；registry 載入驗證圖形 | §9 |
-| D6 | 鏈頂上限與同 tick 去重反刷 | §10 |
+| D5 | 技能系譜圖是使用門檻；registry 載入驗證圖形 | §9 |
+| D6 | 樹冠上限與同 tick 去重反刷 | §10 |
 | D7 | 宣告式修煉取代環境讀書 | §11 |
 | D8 | 技能系譜 read model 與 WebClient 面板、Telnet 命令 | §12 |
 | D9 | 兩個有順序的 change 加一個獨立 change | §13 |
@@ -184,9 +185,9 @@ practice_xp += SKILL_PRACTICE_XP_PER_USE
   試不累計（考試上下文已有 nonlethal 標記，`nonlethal` 時跳過累計，與舊擊殺 XP 檢
   查相同的隔離，如今覆蓋所有成長介面）。
 
-## 9. D5 — 技能系譜鏈是使用門檻
+## 9. D5 — 技能系譜圖是使用門檻
 
-### 9.1 資料
+### 9.1 資料與結構
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -198,9 +199,28 @@ class SkillPrerequisite:
 prerequisites: tuple[SkillPrerequisite, ...] = ()
 ```
 
-示範火系鏈如下。每個 key 與顯示名都是 `world/skills/registry.py` 的真實條目；邊
-本身是本次 change 要撰寫的新 registry 內容（示意調值）。`cap` 欄為 D6 導出的累計
-上限，即消耗該節點的所有邊中最大的要求值，鏈頂預設 10：
+**結構語意是樹，不是鏈。** `prerequisites` 是 tuple，任一技能可被任意多條邊消
+耗（多子節點 = 分支），任一技能也可宣告任意多個前置（多父 = 匯合，DAG）；單一技
+能同時是多個分支的前置、或某分支的節點同時要求兩條分支，都是合法圖形。機械規則
+全部與度數無關：D6 上限按「消耗該節點的所有邊」取 max，天然涵蓋分支與匯合；
+`can_use_skill` 逐條檢查宣告的前置，與父節點數量無關。
+
+**首輪內容僅實作簡單樹作程式面驗證。** 目前沒有任何 lore 資料描述分支系譜，因此
+首輪撰寫的邊刻意全部是一條線性的火系樹（每個節點至多一個子節點），以最小內容驗
+證整套圖形機械（拓撲、上限、面板、auto-seed）。分支與匯合不是未來才支援：驗證器
+、上限導出、read model 從第一天就是 n 元 DAG 實作，補上分支邊即生效，不需要改結
+構。前瞻縫隙如下（刻意不在本 change 填內容）：
+
+- 分支邊與跨分支匯合前置（圖機械已支援，屬內容工作）；
+- 分支節點的熟練度共享或各自獨立（現行模型：每技能一個計數器，天然各自獨立，未
+  來若想要「同族共享 XP」需新的 registry 欄位，屬新 change）；
+- 面板的樹狀渲染（見 D8：view 以 root + 拓撲序列表達任意分支，客戶端首輪照線性
+  清單渲染，分支出現時同一份 view 直接升級成分支渲染，契約不動）。
+
+示範火系樹（首輪內容，刻意線性）如下。每個 key 與顯示名都是
+`world/skills/registry.py` 的真實條目；邊本身是本次 change 要撰寫的新 registry
+內容（示意調值）。`cap` 欄為 D6 導出的累計上限，即消耗該節點的所有邊中最大的要求
+值，樹冠（葉節點）預設 10：
 
 | 節點 | prerequisites | cap（導出） |
 |---|---|---|
@@ -210,11 +230,11 @@ prerequisites: tuple[SkillPrerequisite, ...] = ()
 | 火焰風暴（`firestorm`） | (`scorching_wave`, 3) | 5 |
 | 熔岩術（`lava_burst`） | (`firestorm`, 5) | 8 |
 | 龍炎術（`dragon_flame`） | (`lava_burst`, 8) | 8 |
-| 不滅鳳凰焰（`phoenix_eternal_flame`） | (`dragon_flame`, 8) | 10（tip） |
+| 不滅鳳凰焰（`phoenix_eternal_flame`） | (`dragon_flame`, 8) | 10（樹冠） |
 
 其餘火系姊妹法術（業火纏繞 `infernal_wrap`、煉獄業火 `hellfire`、焚世終焰
 `world_ending_blaze`）由同一輪內容工作補上各自的邊。五個元素精通被動（火焰精通
-`fire_mastery` 等）是 PASSIVE，因此不是鏈節點。沒有東西會使用它們，它們由匯入或
+`fire_mastery` 等）是 PASSIVE，因此不是樹節點。沒有東西會使用它們，它們由匯入或
 授予取得，剩下的唯一機械角色是下方 freeform 資格的 key-presence 檢查。
 
 ### 9.2 門檻
@@ -233,7 +253,8 @@ def can_use_skill(entity, skill) -> bool:
 
 - 這個單一門檻取代 `can_cast_spell_tier`，套用於所有 ACTIVE 技能，法術與武技一視
   同仁。`ActionResolver._step1_ownership`、preview 與兩套選單都改呼叫它。主宰階的
-  特殊覆寫路徑整個刪除：主宰階准入如今就是鏈頂條件成立。
+  特殊覆寫路徑整個刪除：主宰階准入如今就是通往該節點的所有前置邊成立（AND 語意，
+  分支與匯合同規則）。
 - ownership 不受門檻限制（匯入、preset、NPC 場景建構、conferred grant 照舊直接給
   ownership）；受門檻限制的是使用。匯入的宗師級角色擁有深層技能，如何取得可施用
   的熟練度見下方 auto-seed。
@@ -243,15 +264,15 @@ def can_use_skill(entity, skill) -> bool:
   的 `<element>_mastery` 做 key 檢查，例如火焰精通 `fire_mastery`）；之後允許的
   scale 讀該技能自身熟練度：0.25 無條件、0.5 ≥1、1.0 ≥3、2.0 ≥6、4.0 ≥10。與 D6
   上限的交互是刻意的：衍生 cap 小於 10 的中段技能會停在 cap 允許的最高規模（例如
-  cap 5 對應最大 scale 2.0）；scale 4.0 只有鏈頂技能（衍生 cap 為 tip 預設 10）能
-  觸及。行為決定論、由系譜面板渲染、對玩家完全不隱藏。
+  cap 5 對應最大 scale 2.0）；scale 4.0 只有樹冠技能（衍生 cap 為預設 10）能觸
+  及。行為決定論、由系譜面板渲染、對玩家完全不隱藏。
 
 ### 9.3 Registry 載入驗證（fail closed，匯入期）
 
 1. 每個 `prerequisites.skill_key` 存在於 `SKILL_REGISTRY`。
 2. 圖形無環（拓撲排序；有環即拋例外，訊息點名該環）。
 3. `min_proficiency` 為大於等於 1 的整數。
-4. 沒有前置即視為鏈根宣告，不需要額外 flag。
+4. 沒有前置即視為樹根宣告（分支節點是普通的非根節點，不需要額外 flag）。
 5. 反向邊映射於載入時算出並快取，供 D6 上限使用。
 
 ### 9.4 匯入 auto-seed
@@ -262,13 +283,13 @@ seed 到恰好等於要求值（絕不高於）。auto-seed 於 schema 區間驗
 匯入仍然全部拒絕；匯入檔中明確寫的 `skill_proficiency` 永遠勝過 auto-seed。NPC 場
 景建構共用同一支輔助。
 
-## 10. D6 — 鏈頂上限與反刷
+## 10. D6 — 樹冠上限與反刷
 
 兩條硬規則，全部由 registry 資料導出，不做逐技能的手工調值。
 
-1. **按消費者設上限。** 對技能 S，`cap(S)` 取遍所有消耗 S 的邊、取其
-   `min_proficiency` 最大值；若 S 不消耗任何人（鏈頂），cap 設為
-   `PROFICIENCY_TIP_CAP`（yaml 常數，初值 10）。累計飽和：一旦
+1. **按消費者設上限。** 對技能 S，`cap(S)` 取遍所有消耗 S 的邊（子節點可以有多
+   個，分支與匯合都算）、取其 `min_proficiency` 最大值；若 S 不消耗任何人（樹
+   冠），cap 設為 `PROFICIENCY_TIP_CAP`（yaml 常數，初值 10）。累計飽和：一旦
    `level(S) >= cap(S)`，XP 停止進帳，系譜面板顯示「見頂」。把已被完全消耗的底層技
    能刷到永遠為零，RuneScape 的「對空氣放火球」病理在機械上失去意義。
 2. **同 tick 去重。** 一組 `(actor, skill_key, target)` 每個世界時鐘 tick 最多計一
@@ -330,11 +351,12 @@ class LineageView:
     total_count: int
 ```
 
-- **WebClient**：新 icon 開啟大視窗。展開的鏈逐節點渲染等級與 XP 量表
+- **WebClient**：新 icon 開啟大視窗。展開的樹按節點渲染等級與 XP 量表
   （`xp_into_level / 50`，例如「23/50 → 下一階」），未解鎖節點附具體前置文字；收合
-  的鏈渲染一條鏈級量表；標頭顯示 `已完成 3 / 11 鏈`。一切由 view 渲染，客戶端零規
-  則。新 OOB 契約常數依 frozen-contract 流程走四鏡像（protocol validator、panel
-  view、JS validator、邊界測試），使用慣例的 `LINEAGE_MAX_*` 上限。
+  的樹渲染一條樹級量表；標頭顯示 `已完成 3 / 11 樹`。view 的節點列已是拓撲序，未來
+  內容出現分支時同一契約直接升級成分支渲染，客戶端零規則。一切由 view 渲染。新
+  OOB 契約常數依 frozen-contract 流程走四鏡像（protocol validator、panel view、
+  JS validator、邊界測試），使用慣例的 `LINEAGE_MAX_*` 上限。
 - **Telnet**：`lineage` 命令印出同一棵樹，見頂節點標記「見頂」，未解鎖節點附
   `prereq_text_zh`。命令文件 invariant 照走（`docs/game/commands.md`、
   `docs/game/command-reference.md`、`tests/test_command_docs.py`）。
@@ -371,7 +393,7 @@ class LineageView:
 
 - **純 `unittest`**（`world/rules/tests/`）：前置圖形驗證（環、懸空 key、root、`min
   >= 1`）；`can_use_skill` 矩陣（owned、缺前置、等級不足、恰好達標）；按消費者導出
-  上限（鏈頂預設 10、中段取 max）；去重 key 語意（同目標同 tick 只計一次、不同目
+  上限（樹冠預設 10、中段取 max、含多子節點的分支情形）；去重 key 語意（同目標同 tick 只計一次、不同目
   標、AOE）；練習結算閉式（僅 SKIP、倍率合成、上限飽和、rest 與未標註零成長）；
   freeform 階梯帶；物理技能的 `can_use_skill` 路徑與法術完全一致。
 - **Evennia 整合**：使用在同一筆提交內累計、於強制提交失敗時完整還原（沿用既有原
