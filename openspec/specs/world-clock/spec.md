@@ -238,7 +238,7 @@ the matching tick (or the reverse), and no observer can see or persist an uncomm
 #### Scenario: The fixed stage order and one-day bound survive the snapshot extension
 - **WHEN** the stage sequence and `MAX_ADVANCE_SECONDS` are inspected after this change
 - **THEN** the stage sequence is still exactly `("gauge_regen", "buff_ticks", "sexual_decay",
-  "magic_study", "daily_resets", "caravan_arrivals", "shop_hours", "quest_deadlines",
+  "practice_settlement", "daily_resets", "caravan_arrivals", "shop_hours", "quest_deadlines",
   "npc_schedules", "instance_reclamation")`, an oversized call still raises before any write, and
   contracts run before any stage write
 

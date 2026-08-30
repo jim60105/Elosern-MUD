@@ -22,8 +22,8 @@ class FakeMonster(FakeEntity):
         magic_power=30,
         **kwargs,
     ):
-        # Default 30 keeps elemental spell picks castable (術師 tier); tests
-        # that exercise the element-mastery gate pass magic_power=0 instead.
+        # Default 30 is a harmless stat value; spell selection is gated only
+        # by ownership and MP affordability (the tier gate retired).
         super().__init__(key, magic_power=magic_power, **kwargs)
         self.threat_tier = threat_tier
         self.behaviour_tree = behaviour_tree
@@ -105,46 +105,6 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
             request = monster_behaviour_policy(actor, _field(actor, enemies))
         self.assertEqual(request.skill_key, "shadow_slash")
         self.assertNotEqual(request.targets, "all-enemies")
-
-    def test_elemental_spell_above_the_magic_tier_is_never_chosen(self):
-        # A production monster sits at magic level 0, so an owned 術師-tier
-        # wind_blade cannot resolve; the policy falls back to the innate
-        # physical attack instead of choosing an action the resolver rejects.
-        actor = FakeMonster(
-            "tierless",
-            magic_power=0,
-            owned=["wind_blade", "basic_attack"],
-        )
-        enemy = FakeEntity("enemy")
-        request = monster_behaviour_policy(actor, _field(actor, [enemy]))
-        self.assertEqual(request.skill_key, "basic_attack")
-
-    def test_direct_mastery_unlocks_an_elemental_spell_for_the_policy(self):
-        actor = FakeMonster(
-            "master",
-            magic_power=0,
-            owned=["wind_blade", "wind_mastery"],
-        )
-        enemy = FakeEntity("enemy")
-        request = monster_behaviour_policy(actor, _field(actor, [enemy]))
-        self.assertEqual(request.skill_key, "wind_blade")
-
-    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
-    def test_malformed_element_spell_is_denied_not_raised(self):
-        from world.skills.registry import SKILL_REGISTRY
-
-        actor = FakeMonster(
-            "malformed",
-            magic_power=0,
-            owned=["wind_blade", "basic_attack"],
-        )
-        enemy = FakeEntity("enemy")
-        with patch(
-            "world.rules.progression.can_cast_spell_tier",
-            side_effect=ValueError("unknown element"),
-        ):
-            request = monster_behaviour_policy(actor, _field(actor, [enemy]))
-        self.assertEqual(request.skill_key, "basic_attack")
 
     def test_source_has_no_forbidden_dependencies(self):
         source = (

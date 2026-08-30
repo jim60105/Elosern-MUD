@@ -9,7 +9,6 @@ from typing import Any
 
 from world.skills.effects import (
     DisguiseEffect,
-    ElementMasteryEffect,
     RuleTableEffect,
     SexualMasteryEffect,
     StatMultiplyEffect,
@@ -21,8 +20,11 @@ from world.skills.registry import SKILL_REGISTRY
 # "partial spell unlock" or "partial disguise" has no defined meaning. The
 # exclusion is structural — matching on class, not on a maintained list of
 # forbidden skill keys — so a future gate-type effect class is automatically
-# excluded without anyone remembering to update a blocklist.
-GATE_TYPE_EFFECT_CLASSES = (ElementMasteryEffect, SexualMasteryEffect, DisguiseEffect)
+# excluded without anyone remembering to update a blocklist. The retired
+# ``element_mastery_rank`` prefix left this tuple together with the cast gate
+# (magic-xp-engine-retirement); mastery skills now carry flavor effects and
+# fall to the no-continuous-effect rejection below.
+GATE_TYPE_EFFECT_CLASSES = (SexualMasteryEffect, DisguiseEffect)
 # Continuous-valued effect classes that the grant consumers can resolve at a
 # fractional scale (``SkillHandler.effective_value`` and the ``skill_owned``
 # rule-table builder). A skill whose effects none of these classes recognize

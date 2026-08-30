@@ -8,7 +8,6 @@ import unittest
 from world.lore.elements import ELEMENT_REGISTRY, Element
 from world.skills.effects import (
     DivineMysteryEffect,
-    ElementMasteryEffect,
     SexualMasteryEffect,
 )
 from world.skills.registry import (
@@ -197,7 +196,7 @@ class SkillRegistryTests(unittest.TestCase):
                 self.assertIs(skill.kind, SkillKind.PASSIVE)
                 self.assertIs(skill.target_spec, TargetSpec.NONE)
                 self.assertIs(skill.element, ELEMENT_REGISTRY[element_key])
-                self.assertEqual(skill.effects, ["element_mastery_rank:主宰"])
+                self.assertEqual(skill.effects, ["passive_trait:element_mastery"])
 
     @covers_requirement("skill-registry::the-seed-registry-spans-every-skill-category-inventoried-from-the-sample-cards")
     def test_seed_set_spans_every_required_category(self):
@@ -409,9 +408,6 @@ class SkillRegistryTests(unittest.TestCase):
         parsed = SKILL_REGISTRY["reincarnation_boon_yuna"].parsed_effects
         self.assertEqual(len(parsed), 1)
         self.assertIsInstance(parsed[0], SexualMasteryEffect)
-        self.assertFalse(
-            any(isinstance(effect, ElementMasteryEffect) for effect in parsed)
-        )
 
     @covers_requirement("skill-registry::reincarnation-boon-labels-match-the-preset-character-names")
     def test_reincarnation_boon_labels_match_the_preset_character_names(self):
@@ -819,7 +815,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 if key in _MASTERY_KEYS:
                     self.assertEqual(
                         tuple(skill.effects),
-                        ("element_mastery_rank:主宰",),
+                        ("passive_trait:element_mastery",),
                     )
                 else:
                     self.assertEqual(

@@ -829,10 +829,10 @@ class SexualState:
         Direct ownership of any skill carrying ``SexualMasteryEffect``
         instead returns the entire catalogue. Ownership is read through
         ``base_owned_keys()``, never through ``owned_keys()`` — which would
-        recurse — and never through ``conferred_grants()``, matching
-        ``can_cast_spell_tier``'s mastery-override discipline. The rule
-        implementation lives in the catalogue package so the no-create
-        ``owned_keys()`` read shares it exactly.
+        recurse — and never through ``conferred_grants()``, keeping the
+        mastery override direct-ownership only. The rule implementation
+        lives in the catalogue package so the no-create ``owned_keys()``
+        read shares it exactly.
         """
         from world.skills.sexual_acts import unlocked_act_keys_for
 

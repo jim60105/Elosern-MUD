@@ -31,7 +31,7 @@ design §7's deletion table.
   affordability only** — `use-driven-skill-lineage` lands the real `can_use_skill`
   lineage gate before any release, so the ungated interim never ships.
 - BREAKING: delete the `element_mastery_rank` typed effect class and rewrite the
-  nine `<element>_mastery` registry rows' effects to the inert
+  eight `<element>_mastery` registry rows' effects to the inert
   `passive_trait:element_mastery` flavor form (design §7 row 7). The mastery skills
   themselves keep their identity — `sexual_magic_mastery` is explicitly untouched
   (its domain's ladder is counter-gated elsewhere).
@@ -72,6 +72,9 @@ design §7's deletion table.
 - `skill-registry`: the eight spell-set requirements lose their cast-gate scenarios
   (tier grouping survives as a data label); the eight-elements-mastery effects row
   is rewritten to the flavor form.
+- `skill-handler`: the conferral requirement loses `ElementMasteryEffect` from its
+  gate-type enumeration; mastery skills are rejected for conferral because the
+  flavor effect is not a continuous effect.
 
 ## Impact
 

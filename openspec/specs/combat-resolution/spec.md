@@ -152,7 +152,7 @@ action(entity)` and, when it returns `"extend"` or `"end"`, SHALL emit the corre
 (`climax_extended` or `climax_ends`) through `world.rules.sexual_transitions.apply_event()`. The
 upkeep SHALL collect the damaging tick records `tick_buffs` returns, per roster member, and SHALL hand
 them to the round's upkeep settlement (`world/rules/upkeep.py`) so the round's EventLogs and staged
-effects include the settled tick damage, defeat crossings, kill XP, and quest effects. `run_round`
+effects include the settled tick damage, defeat crossings, and quest effects. `run_round`
 SHALL accept keyword-only `simulated` and `nonlethal_keys` policy flags and SHALL forward them to the
 upkeep settlement.
 

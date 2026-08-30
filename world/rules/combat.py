@@ -24,7 +24,7 @@ from world.rules.combat_modifiers import (
 from world.rules.dice import roll_d100
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.items import ItemUseRequest, resolve_item_use
-from world.rules.progression import can_cast_skill, scaled_magnitude
+from world.rules.progression import scaled_magnitude
 from world.rules.sexual_state import climax_settlement_action, decay_tick
 from world.rules.sexual_transitions import apply_event
 from world.rules.targeting import Relation
@@ -544,7 +544,6 @@ def default_attack_policy(
                 _stored_trait_value(getattr(entity.traits, resource)) >= amount
                 for resource, amount in SKILL_REGISTRY[key].cost.items()
             )
-            and can_cast_skill(entity, SKILL_REGISTRY[key])
         ),
         None,
     )

@@ -5,25 +5,27 @@ Define the deterministic order and execution rules for world-clock settlement st
 ## Requirements
 
 
-### Requirement: Settlement stages run in the fixed order regen, buffs, sexual decay, magic study,
+### Requirement: Settlement stages run in the fixed order regen, buffs, sexual decay, practice settlement,
 daily resets, then the five declared world-event seams
 `world/rules/clock.py` SHALL define a single, ordered stage sequence — `gauge_regen`, `buff_ticks`,
-`sexual_decay`, `magic_study`, `daily_resets`, `caravan_arrivals`, `shop_hours`, `quest_deadlines`,
+`sexual_decay`, `practice_settlement`, `daily_resets`, `caravan_arrivals`, `shop_hours`, `quest_deadlines`,
 `npc_schedules`, `instance_reclamation` — matching design doc §6.5's four built stages plus
-`magic_study` (change 11b's `accrue_magic_study()`, inserted between `sexual_decay` and
+`practice_settlement` (the declared-practice seam — currently a zero-growth placeholder
+owned directly by `world/rules/clock.py`, which `declared-practice-skip` turns into the
+declared-practice writer — inserted between `sexual_decay` and
 `daily_resets`) plus `instance_reclamation` (change 14's `reclaim_due_instances()`, appended after
 `npc_schedules` as the final stage), and SHALL execute every `advance()` call's stages in this order
 with no configuration or call-site override capable of changing it.
 
-#### Scenario: The stage order is exactly the fixed sequence, including magic_study and instance_reclamation
+#### Scenario: The stage order is exactly the fixed sequence, including practice_settlement and instance_reclamation
 - **WHEN** the settlement stage sequence is inspected
-- **THEN** it is exactly `("gauge_regen", "buff_ticks", "sexual_decay", "magic_study", "daily_resets",
+- **THEN** it is exactly `("gauge_regen", "buff_ticks", "sexual_decay", "practice_settlement", "daily_resets",
   "caravan_arrivals", "shop_hours", "quest_deadlines", "npc_schedules", "instance_reclamation")`, in
   that order, with no duplicate or missing entry
 
 #### Scenario: Transposing any of the four ordered stages is mechanically detected
 - **WHEN** a test asserts `"buff_ticks"` appears strictly before `"sexual_decay"` and strictly after
-  `"gauge_regen"` in the stage sequence, and `"magic_study"` appears strictly between `"sexual_decay"`
+  `"gauge_regen"` in the stage sequence, and `"practice_settlement"` appears strictly between `"sexual_decay"`
   and `"daily_resets"`
 - **THEN** the assertion fails immediately if the stage sequence is ever edited to place any of these
   stages out of that relative order
@@ -37,14 +39,15 @@ with no configuration or call-site override capable of changing it.
   `max` on a step the buff-first order does not, proving the order has an observable, not merely
   documented, consequence
 
-#### Scenario: No arithmetic transposition proof exists for magic_study, because it shares no
+#### Scenario: No arithmetic transposition proof exists for practice settlement, because it shares no
 resource with its neighbors
-- **WHEN** `magic_study`'s data dependencies are inspected (reads `entity.race`,
-  `entity.skills.owned_keys()`, `entity.buffs`; writes only `entity.db.magic_xp`/
-  `entity.traits.magic_level`) against `sexual_decay`'s (`entity.sexual`'s ordered-level fields) and
+- **WHEN** `practice_settlement`'s data dependencies are inspected (it currently reads
+  nothing and writes nothing as the zero-growth placeholder; the `declared-practice-skip`
+  writer will read the declared practice booking and write only `skill_proficiency`) against `sexual_decay`'s (`entity.sexual`'s ordered-level fields) and
   `daily_resets`'s (`entity.sexual.climax_today` only)
-- **THEN** no field is written by both `magic_study` and either neighbor, so the structural check above
-  is `magic_study`'s only mechanical safeguard against transposition — this is a verified property, not
+- **THEN** no field is written by both `practice_settlement` and either neighbor, so the
+  structural check above
+  is `practice_settlement`'s only mechanical safeguard against transposition — this is a verified property, not
   an unexamined gap
 
 #### Scenario: instance_reclamation running after quest_deadlines and npc_schedules reclaims within
@@ -75,12 +78,12 @@ and this is a stated, not silent, limitation
   after it could still need the room" reasoning alone (design.md D-3), not by an arithmetic
   counter-example against any of the three
 
-### Requirement: buff_ticks, sexual_decay, and magic_study are skipped for combat-sourced advances
+### Requirement: buff_ticks, sexual_decay, and practice settlement are skipped for combat-sourced advances
 `world/rules/clock.py`'s settlement stage runner SHALL skip the `buff_ticks`, `sexual_decay`, and
-`magic_study` stages entirely when `advance()` is called with `AdvanceSource.COMBAT`: `buff_ticks` and
+`practice_settlement` stages entirely when `advance()` is called with `AdvanceSource.COMBAT`: `buff_ticks` and
 `sexual_decay` because change 9's `run_round()` already applies both once per round as part of combat's
-own per-round upkeep; `magic_study` because ambient study is a downtime concept that must never accrue
-during a fight. Every other stage (`gauge_regen`, `daily_resets`, and the four declared world-event
+own per-round upkeep; `practice_settlement` because declared practice is a downtime concept that must
+never settle during a fight. Every other stage (`gauge_regen`, `daily_resets`, and the four declared world-event
 stages) SHALL run regardless of `AdvanceSource`.
 
 #### Scenario: A combat-sourced advance does not double-tick an active buff
@@ -94,45 +97,16 @@ stages) SHALL run regardless of `AdvanceSource`.
 - **THEN** every entity in `entities`' `hp`/`mp`/`sp` gauges reflect regen for the full `seconds`
   elapsed, unaffected by the `AdvanceSource.COMBAT` gate
 
-#### Scenario: A combat-sourced advance does not accrue magic study XP
-- **WHEN** `advance(seconds, AdvanceSource.COMBAT, entities)` is called for an entity that would
-  otherwise accrue magic-study XP under `AdvanceSource.SKIP`
-- **THEN** `entity.db.magic_xp` is unchanged by the call
+#### Scenario: A combat-sourced advance performs no practice settlement
+- **WHEN** `advance(seconds, AdvanceSource.COMBAT, entities)` is called for an entity carrying
+  a declared-practice booking that would settle under `AdvanceSource.SKIP`
+- **THEN** no `skill_proficiency` or other practice state changes as a result of the call
 
 #### Scenario: A command- or skip-sourced advance runs the full stage list
 - **WHEN** `advance(seconds, AdvanceSource.COMMAND, entities)` or `advance(seconds,
   AdvanceSource.SKIP, entities)` is called
 - **THEN** `buff_ticks` and `sexual_decay` both run for every entity in `entities`, unlike the
   `AdvanceSource.COMBAT` case
-
-### Requirement: magic_study is invoked through a self-arming lazy import, and its own internal
-AdvanceSource.SKIP gate composes with, rather than duplicates, the stage-level gate
-`world/rules/clock.py` SHALL invoke `world.rules.progression.accrue_magic_study()` (change 11b) through
-a lazy import that degrades to a silent no-op while that module does not exist, and self-arms once it
-does — mirroring change 9's own `_try_sexual_decay()` treatment of `world.rules.sexual_transitions`
-(change 7b) — since change 11b depends on this change and not the reverse. The stage-level gate
-(`source is not AdvanceSource.COMBAT`) SHALL be the sole authority for whether this stage is invoked at
-all; `accrue_magic_study()`'s own internal gate (`source is not AdvanceSource.SKIP`) SHALL be the sole
-authority for whether it does anything once invoked. Neither gate SHALL be modified to duplicate the
-other's condition.
-
-#### Scenario: magic_study is a silent no-op before change 11b exists
-- **WHEN** `advance()` is called (with any `AdvanceSource`) while `world.rules.progression` is not
-  importable
-- **THEN** the call completes successfully with no exception raised, and no entity's `magic_xp`/
-  `magic_level` changes as a result
-
-#### Scenario: magic_study self-arms once change 11b's module exists
-- **WHEN** `advance(seconds, AdvanceSource.SKIP, entities)` is called once `world.rules.progression.
-  accrue_magic_study` is importable
-- **THEN** it is called with exactly the `entities`, `seconds`, and `source` `advance()` received
-
-#### Scenario: A command-sourced advance invokes the stage but its internal gate no-ops
-- **WHEN** `advance(seconds, AdvanceSource.COMMAND, entities)` is called once `world.rules.progression`
-  exists
-- **THEN** the stage-level gate lets `accrue_magic_study()` be called (it is not `AdvanceSource.COMBAT`),
-  but no entity's `magic_xp` changes, because `accrue_magic_study()`'s own internal gate no-ops for any
-  source other than `AdvanceSource.SKIP` — proving the two gates compose without contradiction
 
 ### Requirement: Long jumps settle in quanta, not per-second steps, with an early exit once nothing
 remains to settle
@@ -205,14 +179,15 @@ game seconds separately, so the handler cannot schedule real-time cleanup.
 - **WHEN** every entity in scope has continuously active settlement work for longer than
   `MAX_SETTLEMENT_QUANTA` quanta
 - **THEN** the settlement loop stops at exactly `MAX_SETTLEMENT_QUANTA` iterations, and `advance()`
-  still completes (calendar advance, gauge regen, magic study, and boundary stages are unaffected by
-  this cap)
+  still completes (calendar advance, gauge regen, practice settlement, and boundary stages are
+  unaffected by this cap)
 
-#### Scenario: magic_study is closed-form and never participates in the quantum loop
+#### Scenario: Practice settlement never participates in the quantum loop
 - **WHEN** `advance(28800, AdvanceSource.SKIP, entities)` is called
-- **THEN** `accrue_magic_study()` (once change 11b's module exists) is called exactly once, with the
-  full `28800`-second value, regardless of `SETTLEMENT_QUANTUM_SECONDS` — never chunked into quanta
-  the way `tick_buffs()`/`decay_tick()` are
+- **THEN** the `practice_settlement` stage performs no per-second work regardless of
+  `SETTLEMENT_QUANTUM_SECONDS` — it is never chunked into quanta the way
+  `tick_buffs()`/`decay_tick()` are, and the future `declared-practice-skip` writer computes
+  in closed form per study-hour
 
 ### Requirement: Hourly and daily boundary stages fire by tick-boundary arithmetic, never by iterating
 every second or quantum

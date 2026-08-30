@@ -1,15 +1,8 @@
 # These progression values are deliberately provisional balance constants.
 # Recalibrate them after combat and guild-economy playtesting supplies live data.
-magic_xp_per_level: 600
-study_base_xp_per_hour: 1.0
-combat_kill_xp:
-  low: 20
-  mid: 60
-  high: 150
-  calamity: 500
 skill_proficiency_xp_per_level: 50
 skill_practice_xp_per_use: 1.0
-# Element-affinity effective-level multipliers (element-affinity-progression D5).
+# Element-affinity multipliers (element-affinity-progression D5).
 affinity_element_multiplier: 1.1
 non_affinity_element_multiplier: 0.9
 # Closed freeform-casting scale set (element-mastery-freeform-casting D1):

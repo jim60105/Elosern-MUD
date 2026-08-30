@@ -3,7 +3,6 @@
 from tools.spec_traceability import covers_requirement
 
 import unittest
-import sys
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -24,7 +23,7 @@ from world.rules.clock import (
     _settle_buffs_and_decay,
     _settle_gauge_regen,
     _snapshot_clock_tick,
-    _try_accrue_magic_study,
+    _practice_settlement,
     build_advance_snapshot_registry,
     settle_combat_result,
     register_event_source,
@@ -166,26 +165,13 @@ class ClockTests(unittest.TestCase):
         events = clock.advance(2, AdvanceSource.COMBAT, [entity])
         self.assertEqual([event.kind for event in events], ["daily_reset", "caravan"])
 
-    @covers_requirement("settlement-stage-order::buff-ticks-sexual-decay-and-magic-study-are-skipped-for-combat-sourced-advances", "settlement-stage-order::hourly-and-daily-boundary-stages-fire-by-tick-boundary-arithmetic-never-by-iterating")
+    @covers_requirement("settlement-stage-order::buff-ticks-sexual-decay-and-practice-settlement-are-skipped-for-combat-sourced-advances", "settlement-stage-order::hourly-and-daily-boundary-stages-fire-by-tick-boundary-arithmetic-never-by-iterating")
     def test_command_runs_per_quantum_stages(self):
         entity = Entity()
         clock = WorldClock()
         with patch("world.rules.clock._settle_buffs_and_decay") as settle:
             clock.advance(10, AdvanceSource.COMMAND, [entity])
         settle.assert_called_once_with((entity,), 10)
-
-    @covers_requirement("settlement-stage-order::magic-study-is-invoked-through-a-self-arming-lazy-import-and-its-own-internal")
-    def test_magic_study_lazy_import_self_arms(self):
-        calls = []
-        module = SimpleNamespace(
-            accrue_magic_study=lambda entities, seconds, source: calls.append(
-                (entities, seconds, source)
-            )
-        )
-        entity = Entity()
-        with patch.dict(sys.modules, {"world.rules.progression": module}):
-            WorldClock().advance(10, AdvanceSource.SKIP, [entity])
-        self.assertEqual(calls, [((entity,), 10, AdvanceSource.SKIP)])
 
     def test_daily_resets_use_crossed_boundary_count(self):
         entity = Entity()
@@ -237,12 +223,12 @@ class ClockTests(unittest.TestCase):
             settle_combat_result(result, [])
         self.assertEqual(clock.tick, 18)
 
-    @covers_requirement("settlement-stage-order::settlement-stages-run-in-the-fixed-order-regen-buffs-sexual-decay-magic-study")
+    @covers_requirement("settlement-stage-order::settlement-stages-run-in-the-fixed-order-regen-buffs-sexual-decay-practice-settlement")
     def test_stage_order_is_fixed(self):
         self.assertLess(_STAGE_ORDER.index("gauge_regen"), _STAGE_ORDER.index("buff_ticks"))
         self.assertLess(_STAGE_ORDER.index("buff_ticks"), _STAGE_ORDER.index("sexual_decay"))
-        self.assertLess(_STAGE_ORDER.index("sexual_decay"), _STAGE_ORDER.index("magic_study"))
-        self.assertLess(_STAGE_ORDER.index("magic_study"), _STAGE_ORDER.index("daily_resets"))
+        self.assertLess(_STAGE_ORDER.index("sexual_decay"), _STAGE_ORDER.index("practice_settlement"))
+        self.assertLess(_STAGE_ORDER.index("practice_settlement"), _STAGE_ORDER.index("daily_resets"))
 
     def test_negative_tick_and_negative_advance_fail_closed(self):
         with self.assertRaises(ValueError):
@@ -260,9 +246,22 @@ class ClockTests(unittest.TestCase):
         idle = Entity()
         self.assertFalse(_has_settlement_work(idle))
 
-    def test_magic_study_import_failure_degrades_gracefully(self):
-        with patch.dict(sys.modules, {"world.rules.progression": None}):
-            _try_accrue_magic_study((), 60, AdvanceSource.SKIP)
+    @covers_requirement("settlement-stage-order::buff-ticks-sexual-decay-and-practice-settlement-are-skipped-for-combat-sourced-advances")
+    def test_practice_settlement_runs_outside_combat_and_writes_nothing(self):
+        # The placeholder performs no per-second work and writes no state;
+        # it only runs on non-COMBAT advances.
+        entity = Entity()
+        clock = WorldClock()
+        with patch("world.rules.clock._practice_settlement") as settle:
+            clock.advance(10, AdvanceSource.COMBAT, [entity])
+        settle.assert_not_called()
+        clock = WorldClock()
+        with patch("world.rules.clock._practice_settlement") as settle:
+            clock.advance(10, AdvanceSource.SKIP, [entity])
+        settle.assert_called_once_with((entity,), 10, AdvanceSource.SKIP)
+        _practice_settlement((entity,), 60, AdvanceSource.SKIP)
+        self.assertFalse(hasattr(entity, "skill_proficiency"))
+        self.assertFalse(hasattr(entity, "db"))
 
     def test_invalid_settlement_interval_fails_module_validation(self):
         import world.rules.clock as clock_module
@@ -507,7 +506,7 @@ class AdvanceSurfaceContractUnitTests(unittest.TestCase):
                 "gauge_regen",
                 "buff_ticks",
                 "sexual_decay",
-                "magic_study",
+                "practice_settlement",
                 "daily_resets",
                 "caravan_arrivals",
                 "shop_hours",

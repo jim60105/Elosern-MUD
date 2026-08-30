@@ -52,8 +52,7 @@ validation die with it. No attribute-scrub migration (unreleased, zero users).
 
 ### DB5: mastery skills keep identity, shed the rank effect
 The `element_mastery_rank` typed effect class is deleted; `parse_effect` fails closed
-on the prefix. All nine `<element>_mastery` rows (eight elements + existing four
-overlap → nine registry rows declaring it) switch to
+on the prefix. All eight `<element>_mastery` rows (one per element) switch to
 `effects=["passive_trait:element_mastery"]`, the established inert-flavor form.
 `sexual_magic_mastery` is explicitly NOT touched: design §7 exempts it (its ladder is
 SEXUAL_ACT_REGISTRY-gated). Freeform entitlement keys on mastery **ownership**

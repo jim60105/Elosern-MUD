@@ -2,7 +2,7 @@
 
 One deterministic boundary (fix-dot-kill-credit D3) turns the damaging tick
 records ``tick_buffs`` returns into ``damage``/``target_defeated`` EventLog
-entries, monster kill XP, nonlethal floors and knockout marks, and quest
+entries, nonlethal floors and knockout marks, and quest
 planner effects -- all staged as ``PendingEffect`` values committed through
 ``_commit`` inside the session's combat-round transaction. The HP damage of
 each tick was already applied by ``tick_buffs`` itself; this module never
@@ -12,8 +12,6 @@ re-applies it.
 from types import SimpleNamespace
 from typing import Any
 
-from typeclasses.monsters import Monster
-from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.rules.action import (
     PendingEffect,
     _ENTRY_TEMPLATES,
@@ -24,7 +22,6 @@ from world.rules.action import (
 )
 from world.rules.buffs import TickRecord
 from world.rules.event_log import EventEntry, EventLog
-from world.rules.progression import grant_combat_kill_xp
 
 UPKEEP_SKILL_KEY = "combat_upkeep"
 
@@ -57,24 +54,6 @@ def _floor_hp(entity: Any) -> None:
             trait.value = 1
 
 
-def _kill_xp_effect(
-    source: Any,
-    target: Any,
-    tier_key: str,
-) -> PendingEffect:
-    """Stage one post-tick kill award, guarded at commit time like the action path."""
-    return PendingEffect(
-        entity=source,
-        description=f"combat_kill_xp|{target.key}|{tier_key}",
-        surfaces=frozenset({"progression"}),
-        apply=lambda: (
-            grant_combat_kill_xp(source, tier_key)
-            if _stored_trait_value(target.traits.hp) <= 0
-            else None
-        ),
-    )
-
-
 def settle_upkeep(
     battlefield: Any,
     records_by_key: dict[str, tuple[TickRecord, ...]],
@@ -88,15 +67,13 @@ def settle_upkeep(
     attributed record it emits a ``damage`` entry reporting the actually
     applied amount (``min(-delta, hp_before)``) and, on a lethal crossing,
     exactly one ``target_defeated`` entry per target (dbref-deduplicated,
-    same shape as the action pipeline's). Attributed lethal ticks on tiered
-    ``Monster`` targets stage one ``grant_combat_kill_xp`` effect; protected
-    (``nonlethal_keys``) crossings floor HP at 1 and mark the target knocked
-    out instead; simulated rounds tag defeat entries ``simulated`` and stage
-    no credit. Unattributed ticks (absent or unresolvable ``source_pk``)
-    cross HP silently with no entries, XP, or quest effects. Every staged
-    mutation commits through one ``_commit`` call; a planner or commit
-    failure aborts the round and the session restore rolls back every
-    surface.
+    same shape as the action pipeline's). Protected (``nonlethal_keys``)
+    crossings floor HP at 1 and mark the target knocked out instead;
+    simulated rounds tag defeat entries ``simulated`` and stage no credit.
+    Unattributed ticks (absent or unresolvable ``source_pk``) cross HP
+    silently with no entries or quest effects. Every staged mutation commits
+    through one ``_commit`` call; a planner or commit failure aborts the
+    round and the session restore rolls back every surface.
     """
     pending: list[PendingEffect] = []
     logs: list[EventLog] = []
@@ -171,10 +148,6 @@ def settle_upkeep(
                     )
                 )
                 continue
-            if defeated is None or simulated:
-                continue
-            if isinstance(entity, Monster) and entity.threat_tier in MONSTER_TIER_REGISTRY:
-                pending.append(_kill_xp_effect(source, entity, entity.threat_tier))
     for source_pk, entries in per_source.items():
         if not entries:
             continue

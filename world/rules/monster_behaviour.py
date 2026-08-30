@@ -12,7 +12,6 @@ from world.rules import combat, dice
 from world.rules.action import ActionRequest, _stored_trait_value
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.disengage import FLEE_SKILL_KEY
-from world.rules.progression import can_cast_skill
 from world.skills.registry import (
     SKILL_REGISTRY,
     SkillDef,
@@ -152,7 +151,7 @@ def resolve_behaviour_profile(monster: Any) -> BehaviourProfile:
 
 
 def _owned_damage_skills(entity: Any) -> list[SkillDef]:
-    """Return affordable, castable active damage skills in owned-key order."""
+    """Return affordable active damage skills in owned-key order."""
     return [
         SKILL_REGISTRY[key]
         for key in entity.skills.owned_keys()
@@ -166,7 +165,6 @@ def _owned_damage_skills(entity: Any) -> list[SkillDef]:
             _stored_trait_value(getattr(entity.traits, resource)) >= amount
             for resource, amount in SKILL_REGISTRY[key].cost.items()
         )
-        and can_cast_skill(entity, SKILL_REGISTRY[key])
     ]
 
 

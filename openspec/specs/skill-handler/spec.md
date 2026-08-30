@@ -91,12 +91,16 @@ entity's own owned skills. The `skill_owned` rule-table context builder (`world/
 combat_modifiers.py`, added by `skill-owned-rule-condition`) SHALL likewise fold a conferred grant's
 scaled adjustment into its evaluated bundle when the grant references a skill whose parsed effect is a
 `RuleTableEffect`. Conferral of a skill carrying a gate-type effect
-(`ElementMasteryEffect`, `SexualMasteryEffect`, `DisguiseEffect`) SHALL raise
+(`SexualMasteryEffect`, `DisguiseEffect`) SHALL raise
 `EFFECT_RESOLUTION_FAILED` at cast-resolution time rather than silently
 applying a no-op scale, and conferral of a skill carrying no continuous-valued
 effect any grant consumer can resolve (no `StatMultiplyEffect` and no
 `RuleTableEffect`) SHALL likewise be rejected instead of recording a silent
-no-op grant. The write primitive SHALL live at
+no-op grant. `ElementMasteryEffect` left the gate-type enumeration together
+with the retired cast gate (`magic-xp-engine-retirement`): the `<element>_mastery`
+skills now carry only the inert `passive_trait:element_mastery` flavor effect and
+are therefore rejected by the no-continuous-effect clause instead. The write
+primitive SHALL live at
 `world.rules.skill_effects.record_conferred_grant()` so `world/skills/` remains
 outside the single-writer core.
 
@@ -122,8 +126,15 @@ outside the single-writer core.
 
 #### Scenario: Conferring a gate-type effect is rejected
 - **WHEN** `record_conferred_grant` or its resolver-level caller attempts to confer a skill whose sole
-  parsed effect is `ElementMasteryEffect`, `SexualMasteryEffect`, or `DisguiseEffect`
+  parsed effect is `SexualMasteryEffect` or `DisguiseEffect`
 - **THEN** the attempt raises `EFFECT_RESOLUTION_FAILED` and no `ConferredSkillGrant` is recorded
+
+#### Scenario: Conferring an element-mastery skill is still rejected
+- **WHEN** `record_conferred_grant` or its resolver-level caller attempts to confer a skill such as
+  `fire_mastery` whose only parsed effect is the retired-cast-gate flavor
+  `passive_trait:element_mastery`
+- **THEN** the attempt raises `EFFECT_RESOLUTION_FAILED` (no continuous-valued effect to scale) and no
+  `ConferredSkillGrant` is recorded
 
 #### Scenario: Conferring a skill without any continuous effect is rejected
 - **WHEN** `record_conferred_grant` or its resolver-level caller attempts to confer a skill whose

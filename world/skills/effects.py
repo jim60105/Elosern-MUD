@@ -32,18 +32,6 @@ class GrowthRateEffect:
     multiplier: float
 
 
-# Ownership-triggered cast-gate overrides (design doc D4, D7).
-@dataclass(frozen=True)
-class ElementMasteryEffect:
-    """Unlock casting of the owning skill's element regardless of magic level.
-
-    The parsed segment is the rank title (``element_mastery_rank:主宰``), not
-    an element key; the element itself lives in ``SkillDef.element``.
-    """
-
-    rank: str
-
-
 @dataclass(frozen=True)
 class SexualMasteryEffect:
     """Unlock casting of the sex-magic skill family regardless of magic level."""
@@ -364,8 +352,6 @@ def parse_effect(effect_id: str) -> object:
                 f"in {effect_id!r} (the retired 'magic' key fails closed)"
             )
         return GrowthRateEffect(stat=stat, multiplier=multiplier)
-    if prefix == "element_mastery_rank":
-        return ElementMasteryEffect(rank=_parse_single_arg(effect_id, prefix))
     if prefix == "sexual_magic_mastery":
         _parse_bare(effect_id, prefix)
         return SexualMasteryEffect()

@@ -99,7 +99,7 @@ Both preset and custom activation SHALL require `age` and `apparent_age` to be i
 The creation command SHALL submit a validated request to a deterministic `world.rules` creation
 service. The service SHALL preflight all fields and allocation constraints, then atomically write
 the trait configuration (including the allocated `magic_power` static), identity attributes,
-active state, and creation-owned initial mechanical state: `magic_xp`, skill proficiency,
+active state, and creation-owned initial mechanical state: skill proficiency,
 skills, equipment, inventory, wallet, quest log, guild rank, and guild merit. If any write fails, it
 SHALL restore all persisted and in-process trait state and leave the character pending. Activation
 SHALL not create or puppet an object, and SHALL not change the shell's dbref, account relation, or

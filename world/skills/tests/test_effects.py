@@ -14,7 +14,6 @@ from world.skills.effects import (
     DisengageEffect,
     DisguiseEffect,
     DivineMysteryEffect,
-    ElementMasteryEffect,
     FlavorEffect,
     GrowthRateEffect,
     HealEffect,
@@ -50,11 +49,12 @@ class ParseEffectTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_effect("growth_rate:magic:100")
 
-    def test_element_mastery_rank_parses_into_its_dataclass(self):
-        self.assertEqual(
-            parse_effect("element_mastery_rank:主宰"),
-            ElementMasteryEffect(rank="主宰"),
-        )
+    @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
+    def test_retired_element_mastery_rank_prefix_fails_closed(self):
+        # The cast gate retired with the magic-XP engine; the prefix left
+        # the recognized set and fails closed at parse (and registry load).
+        with self.assertRaises(ValueError):
+            parse_effect("element_mastery_rank:主宰")
 
     def test_sexual_magic_mastery_parses_into_its_dataclass(self):
         self.assertEqual(parse_effect("sexual_magic_mastery"), SexualMasteryEffect())
@@ -245,7 +245,6 @@ class ParseEffectTests(unittest.TestCase):
 
     def test_single_arg_prefixes_reject_embedded_colons(self):
         for effect in (
-            "element_mastery_rank:主宰:extra",
             "passive_buff:a:b",
             "movement:a:b",
             "sexual_event:a:b",

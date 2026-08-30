@@ -23,7 +23,7 @@ from world.rules.traits import GAUGE_KEYS, STATIC_KEYS, trait_config_for_values
 ALLOCATABLE_AXES = GAUGE_KEYS + STATIC_KEYS
 _CREATION_ATTRIBUTE_KEYS = (
     "age", "apparent_age", "race", "subrace", "creation_pending",
-    "magic_xp", "skill_proficiency", "skills", "skill_grants", "equipment",
+    "skill_proficiency", "skills", "skill_grants", "equipment",
     "inventory", "wallet", "quest_log", "guild_rank", "persona",
     "portrait_policy", "affinity_elements",
 )
@@ -452,7 +452,6 @@ def activate_player_character(
         "apparent_age": validated.apparent_age,
         "race": validated.race,
         "subrace": validated.subrace,
-        "magic_xp": 0,
         "skill_proficiency": {},
         "skills": skills_value,
         "skill_grants": [],

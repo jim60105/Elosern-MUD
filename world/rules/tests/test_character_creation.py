@@ -241,7 +241,7 @@ class CharacterActivationTests(EvenniaTest):
                 self.assertFalse(character.creation_pending)
 
     def test_fault_after_trait_write_restores_all_state_and_handler_cache(self):
-        self.character.db.magic_xp = 9
+        self.character.db.guild_rank = "preserve-me"
         before_traits = deepcopy(dict(self.character.traits.trait_data))
         old_key = self.character.key
 
@@ -256,14 +256,14 @@ class CharacterActivationTests(EvenniaTest):
             )
         self.assertEqual(self.character.key, old_key)
         self.assertTrue(self.character.creation_pending)
-        self.assertEqual(self.character.db.magic_xp, 9)
+        self.assertEqual(self.character.db.guild_rank, "preserve-me")
         self.assertEqual(dict(self.character.traits.trait_data), before_traits)
 
     @covers_requirement("player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation")
     def test_every_observable_write_failure_restores_the_complete_shell(self):
         stages = (
             "identity", "traits", "age", "apparent_age", "race", "subrace",
-            "magic_xp", "skill_proficiency", "skills", "skill_grants",
+            "skill_proficiency", "skills", "skill_grants",
             "equipment", "inventory", "wallet", "quest_log", "guild_rank",
             "creation_pending", "portrait_policy",
         )
@@ -271,7 +271,7 @@ class CharacterActivationTests(EvenniaTest):
             with self.subTest(stage=stage):
                 character = create_object(PlayerCharacter, key=f"shell-{stage}")
                 self.account.at_post_create_character(character)
-                character.db.magic_xp = 9
+                character.db.guild_rank = 9
                 before = {
                     key: (
                         character.attributes.has(key),
@@ -279,7 +279,7 @@ class CharacterActivationTests(EvenniaTest):
                     )
                     for key in (
                         "age", "apparent_age", "race", "subrace",
-                        "creation_pending", "magic_xp", "skill_proficiency",
+                        "creation_pending", "skill_proficiency",
                         "skills", "skill_grants", "equipment", "inventory",
                         "wallet", "quest_log", "guild_rank",
                         "portrait_policy",

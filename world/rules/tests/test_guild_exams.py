@@ -499,15 +499,14 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
 
     def test_lethal_exam_defeat_grants_no_kill_rewards(self):
         # A lethal simulated defeat is tagged on the event entry, so
-        # kill-credit consumers (XP is monster-tier-gated; DEFEAT progress and
-        # protected-entity failure come from the quest planner) never observe
-        # an ordinary kill from the examination.
+        # kill-credit consumers (DEFEAT progress and protected-entity
+        # failure come from the quest planner) never observe an ordinary
+        # kill from the examination.
         for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000
         self.assertEqual(self.player.db.quest_log, [])
-        magic_before = self.player.db.magic_xp
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         with patch("world.rules.combat.roll_d100", return_value=100):
@@ -521,9 +520,9 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         ]
         self.assertTrue(defeated)
         self.assertTrue(all(entry.data.get("simulated") is True for entry in defeated))
-        # No kill XP (the examiner is an NPC with no monster tier) and no
-        # quest mutations were planned from the simulated defeat.
-        self.assertEqual(self.player.db.magic_xp, magic_before)
+        # No kill credit (kills carry no progression award) and no quest
+        # mutations were planned from the simulated defeat.
+        self.assertIsNone(self.player.db.magic_xp)
         self.assertEqual(self.player.db.quest_log, [])
 
     @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
@@ -540,7 +539,6 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         opponent.traits.hp.current = 3
         opponent.buffs.all["fire_scorch"].tick_elapsed_seconds = 10
         self.assertEqual(self.player.db.quest_log, [])
-        magic_before = self.player.db.magic_xp
         with patch("world.rules.combat.roll_d100", return_value=1):
             result = submit_player_action(self.player, "basic_attack", [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
@@ -553,7 +551,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         ]
         self.assertEqual(len(defeated), 1)
         self.assertTrue(defeated[0].data["simulated"])
-        self.assertEqual(self.player.db.magic_xp, magic_before)
+        self.assertIsNone(self.player.db.magic_xp)
         self.assertEqual(self.player.db.quest_log, [])
 
     def test_failed_exam_start_restores_nothing(self):

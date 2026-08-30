@@ -25,7 +25,6 @@ from world.rules.action import (
 from world.rules.buffs import TickRecord, _add_buff, tick_buffs
 from world.rules.combat import Battlefield
 from world.rules.party import join_party
-from world.rules.progression import COMBAT_KILL_XP_TABLE
 from world.rules.upkeep import UPKEEP_SKILL_KEY, settle_upkeep
 
 
@@ -33,7 +32,6 @@ def _player(key="upkeep player"):
     player = create_object(PlayerCharacter, key=key)
     player.race = "human"
     player.apply_race_baseline()
-    player.traits.magic_power.base = 30
     return player
 
 
@@ -148,14 +146,21 @@ class UpkeepSettlementTests(EvenniaTestCase):
         self.assertEqual(logs, [])
 
     @covers_requirement("combat-upkeep-settlement::upkeep-kill-credit-requires-validated-resolvable-source-identity")
-    def test_attributed_lethal_tick_awards_tiered_monster_xp_once(self):
+    def test_attributed_lethal_tick_credits_one_defeat_entry_once(self):
         _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(self.monster)
-        self._logs(records)
-        self.assertEqual(
-            self.actor.db.magic_xp,
-            COMBAT_KILL_XP_TABLE["low"],
-        )
+        logs = self._logs(records)
+        defeated = [
+            entry
+            for log in logs
+            for entry in log.entries
+            if entry.kind == "target_defeated"
+        ]
+        self.assertEqual(len(defeated), 1)
+        self.assertEqual(defeated[0].actor, self.actor.key)
+        # The kill itself carries no progression award any more.
+        self.assertIsNone(self.actor.db.magic_xp)
+        self.assertIsNone(self.actor.db.skill_proficiency)
 
     @covers_requirement("combat-upkeep-settlement::upkeep-kill-credit-requires-validated-resolvable-source-identity")
     def test_deleted_or_absent_source_grants_no_credit(self):
@@ -173,7 +178,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
         field = _field(self.actor, self.monster)
         logs = settle_upkeep(field, records)
         self.assertEqual(logs[0].actor, bystander.key)
-        self.assertEqual(bystander.db.magic_xp, COMBAT_KILL_XP_TABLE["low"])
+        self.assertIsNone(bystander.db.magic_xp)
 
     @covers_requirement("combat-upkeep-settlement::upkeep-kill-credit-requires-validated-resolvable-source-identity")
     def test_same_key_sources_keep_distinct_credit(self):
@@ -199,19 +204,26 @@ class UpkeepSettlementTests(EvenniaTestCase):
         self.assertEqual(len(logs), 2)
         self.assertEqual(observed_actors, [second])
         self.assertIsNone(first.db.magic_xp)
-        self.assertEqual(second.db.magic_xp, COMBAT_KILL_XP_TABLE["low"])
+        self.assertIsNone(second.db.magic_xp)
 
     @covers_requirement("combat-upkeep-settlement::upkeep-kill-credit-requires-validated-resolvable-source-identity")
-    def test_non_monster_target_grants_no_xp(self):
+    def test_non_monster_target_grants_no_monster_tier_credit(self):
         npc = _npc(hp=3)
         _add_buff(npc, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(npc)
         field = _field(self.actor, npc)
         logs = settle_upkeep(field, records)
         self.assertIn("target_defeated", self._kinds(logs))
+        defeated = next(
+            entry
+            for log in logs
+            for entry in log.entries
+            if entry.kind == "target_defeated"
+        )
+        self.assertIsNone(defeated.data["monster_tier"])
         self.assertIsNone(self.actor.db.magic_xp)
 
-    def test_untiered_monster_grants_no_xp(self):
+    def test_untiered_monster_writes_no_progression(self):
         untiered = _monster(hp=3)
         untiered.threat_tier = "bogus"
         _add_buff(untiered, "poisoned", source_pk=int(self.actor.pk))
@@ -353,7 +365,7 @@ class UpkeepQuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
                 records = _tick_records(self.monster)
                 field = _field(self.actor, self.monster)
                 settle_upkeep(field, records)
-        # The XP effect was staged but never committed: the round aborted.
+        # The round aborted before committing: nothing was written.
         self.assertIsNone(self.actor.db.magic_xp)
 
 
@@ -387,7 +399,7 @@ class UpkeepKnockoutParityTests(QuestRegistryIsolation, EvenniaTestCase):
         super().tearDown()
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
-    def test_knocked_out_companion_tick_earns_companion_xp_but_no_owner_credit(self):
+    def test_knocked_out_companion_tick_earns_defeat_credit_but_no_owner_progress(self):
         _add_buff(self.monster, "poisoned", source_pk=int(self.companion.pk))
         records = _tick_records(self.monster)
         field = Battlefield(
@@ -402,11 +414,12 @@ class UpkeepKnockoutParityTests(QuestRegistryIsolation, EvenniaTestCase):
             },
             knocked_out={self.companion.key},
         )
-        settle_upkeep(field, records)
-        self.assertEqual(
-            self.companion.db.magic_xp,
-            COMBAT_KILL_XP_TABLE["low"],
-        )
+        logs = settle_upkeep(field, records)
+        # The companion owns the defeat entry (credit identity), but the
+        # kill stages no progression award and the owner earns no progress.
+        self.assertEqual([log.actor for log in logs], [self.companion.key])
+        self.assertIsNone(self.companion.db.magic_xp)
+        self.assertIsNone(self.companion.db.skill_proficiency)
         stored = [to_storage(record) for record in read_records(self.owner)][0]
         self.assertEqual(stored["stage_progress"], 0)
 
@@ -417,31 +430,40 @@ class UpkeepCommitFailureTests(EvenniaTestCase):
         self.actor = _player()
         self.monster = _monster(hp=3)
 
-    def test_commit_failure_never_commits_staged_xp(self):
+    def test_commit_failure_aborts_the_settlement_without_writing(self):
         _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(self.monster)
         field = _field(self.actor, self.monster)
-        original_commit = _commit
         from world.rules import upkeep as upkeep_module
 
-        def failing_commit(pending):
-            for effect in pending:
-                if effect.description.startswith("combat_kill_xp"):
-                    raise RuntimeError("commit boom")
-            return original_commit(pending)
-
-        with patch.object(upkeep_module, "_commit", failing_commit):
-            with self.assertRaises(RuntimeError):
-                settle_upkeep(field, records)
+        with patch.object(
+            upkeep_module, "_commit", side_effect=RuntimeError("commit boom")
+        ):
+            with patch.dict(
+                _EVENT_EFFECT_PLANNERS,
+                {
+                    "staging_planner": lambda request, log: [
+                        PendingEffect(
+                            entity=self.actor,
+                            description="staged probe",
+                            surfaces=frozenset({"progression"}),
+                            apply=lambda: None,
+                        )
+                    ]
+                },
+            ):
+                with self.assertRaises(RuntimeError):
+                    settle_upkeep(field, records)
         self.assertIsNone(self.actor.db.magic_xp)
+        self.assertIsNone(self.actor.db.skill_proficiency)
 
     @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
     def test_partially_applied_commit_restores_every_staged_surface(self):
-        # A genuine mid-commit failure: the XP effect applies first, then a
-        # planner-shaped effect raises inside the real ``_commit``. The
-        # commit's snapshot/restore must roll the already-applied XP back
-        # with the failed effect (the session outer transaction covers the
-        # tick HP separately).
+        # A genuine mid-commit failure: a benign progression effect applies
+        # first, then a planner-shaped effect raises inside the real
+        # ``_commit``. The commit's snapshot/restore must roll the
+        # already-applied effect back with the failed one (the session outer
+        # transaction covers the tick HP separately).
         _add_buff(self.monster, "poisoned", source_pk=int(self.actor.pk))
         records = _tick_records(self.monster)
         field = _field(self.actor, self.monster)
@@ -451,18 +473,27 @@ class UpkeepCommitFailureTests(EvenniaTestCase):
                 "failing_planner": lambda request, log: [
                     PendingEffect(
                         entity=self.actor,
+                        description="probe progression write",
+                        surfaces=frozenset({"progression"}),
+                        apply=lambda: setattr(
+                            self.actor.db, "skill_proficiency", {"probe": 1}
+                        ),
+                    ),
+                    PendingEffect(
+                        entity=self.actor,
                         description="injected commit failure",
                         surfaces=frozenset({"progression"}),
                         apply=lambda: (_ for _ in ()).throw(
                             RuntimeError("injected apply failure")
                         ),
-                    )
+                    ),
                 ]
             },
         ):
             with self.assertRaises(Exception) as caught:
                 settle_upkeep(field, records)
         self.assertEqual(caught.exception.reason, RejectReason.COMMIT_FAILED)
-        # The XP staged by the earlier effect in the same commit rolled back
-        # with the failing effect.
+        # The progression write staged by the earlier effect in the same
+        # commit rolled back with the failing effect.
+        self.assertIsNone(self.actor.db.skill_proficiency)
         self.assertIsNone(self.actor.db.magic_xp)

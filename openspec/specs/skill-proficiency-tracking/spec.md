@@ -9,17 +9,18 @@ Define per-entity, race-scaled skill practice progression independent of magic l
 `world/rules/progression.py` SHALL store per-skill practice progress in a new, additive raw attribute,
 `entity.db.skill_proficiency: dict[str, float]`, distinct from `entity.traits.magic_power` and from
 change 5's `entity.db.skills`/`entity.db.skill_grants`. No function in this module SHALL write to
-`entity.traits.magic_power` as a side effect of a skill-proficiency grant, and no function SHALL write
-to `entity.db.skill_proficiency` as a side effect of a magic-XP grant.
+`entity.traits.magic_power` — which is static and has no writers — as a side effect of a
+skill-proficiency grant.
 
-#### Scenario: Granting skill practice XP does not affect magic_power or its XP accumulator
+#### Scenario: Granting skill practice XP does not affect magic_power
 - **WHEN** `grant_skill_practice_xp(entity, "shadow_slash")` is called
-- **THEN** `entity.traits.magic_power.value` and `entity.db.magic_xp` are both unchanged
+- **THEN** `entity.traits.magic_power.value` is unchanged
 
-#### Scenario: Granting magic study or combat-kill XP does not affect skill_proficiency
-- **WHEN** `accrue_magic_study([entity], 3600, AdvanceSource.SKIP)` or `grant_combat_kill_xp(entity,
-  "low")` is called
-- **THEN** `entity.db.skill_proficiency` is unchanged
+#### Scenario: No magic-XP writer remains that could touch skill_proficiency
+- **WHEN** `world/rules/progression.py` is inspected after the magic-XP engine retirement
+- **THEN** `accrue_magic_study`, `grant_combat_kill_xp`, and any `entity.db.magic_xp` read or
+  write are absent, and the only practice writers to `skill_proficiency` remain the
+  practice-XP grant paths
 
 ### Requirement: grant_skill_practice_xp scales only by race learning_multiplier, never by conferred growth-rate buffs
 `world/rules/progression.py` SHALL define `grant_skill_practice_xp(entity, skill_key, uses=1)` to add
@@ -65,7 +66,7 @@ recorded practice, with no upper bound enforced by this function.
 
 ### Requirement: Successful active-skill resolution records one practice grant atomically
 `ActionResolver` SHALL stage `grant_skill_practice_xp(actor, skill_key)` after every successful active
-skill resolution. The action rollback snapshot SHALL cover `magic_xp` and `skill_proficiency`, so a failed
+skill resolution. The action rollback snapshot SHALL cover `skill_proficiency`, so a failed
 later pending effect restores their pre-action values along with every other action surface.
 
 #### Scenario: A successful active skill gains one practice increment

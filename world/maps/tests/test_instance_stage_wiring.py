@@ -24,7 +24,7 @@ EXPECTED_STAGE_ORDER = (
     "gauge_regen",
     "buff_ticks",
     "sexual_decay",
-    "magic_study",
+    "practice_settlement",
     "daily_resets",
     "caravan_arrivals",
     "shop_hours",

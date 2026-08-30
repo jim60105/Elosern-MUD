@@ -56,7 +56,6 @@ _ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("pending_climax_extension", "sexual_state"),
     ("buffs", None),
     ("skill_grants", None),
-    ("magic_xp", None),
     ("skill_proficiency", None),
 )
 
