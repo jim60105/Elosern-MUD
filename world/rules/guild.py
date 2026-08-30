@@ -137,6 +137,8 @@ def _registration_snapshot(actor: Any, staff: Any) -> dict[str, Any]:
     return {
         "registration": attribute_snapshot(actor, "guild_registration"),
         "rank": attribute_snapshot(actor, "guild_rank"),
+        "title_collection": attribute_snapshot(actor, "title_collection"),
+        "title_equipped": attribute_snapshot(actor, "title_equipped"),
         "staff_relations": attribute_snapshot(staff, "relations_data"),
     }
 
@@ -146,6 +148,10 @@ def _restore_registration(actor: Any, staff: Any, snapshot: dict[str, Any]) -> N
 
     restore_attribute_best_effort(actor, "guild_registration", snapshot["registration"])
     restore_attribute_best_effort(actor, "guild_rank", snapshot["rank"])
+    restore_attribute_best_effort(
+        actor, "title_collection", snapshot["title_collection"]
+    )
+    restore_attribute_best_effort(actor, "title_equipped", snapshot["title_equipped"])
     restore_attribute_best_effort(staff, "relations_data", snapshot["staff_relations"])
     try:
         actor.attributes.reset_cache()
@@ -177,6 +183,8 @@ def register_adventurer(
         raise GuildError(RegistrationReason.NOT_A_PLAYER)
     current = parse_guild_registration(actor)
     if current is not None:
+        # Re-registration banks nothing, so the notification channel is empty.
+        current["title_notifications"] = []
         return current
     if actor.guild_rank is not None and current is None:
         raise GuildDataError(
@@ -201,6 +209,7 @@ def register_adventurer(
         raise GuildDataError("GuildStaff component has no branch_key")
 
     snapshot = _registration_snapshot(actor, staff)
+    title_notifications: tuple[str, ...] = ()
     try:
         with transaction.atomic():
             actor.db.guild_registration = {
@@ -215,12 +224,18 @@ def register_adventurer(
             from world.rules.affinity import AffinitySource, apply_affinity_change
 
             apply_affinity_change(staff, actor, AffinitySource.GUILD, 1)
+            from world.rules.titles import grant_starter_pair
+
+            # D8 §6.5: the F-rank title plus the starter epithet bank and
+            # auto-equip inside the same all-or-nothing registration commit.
+            title_notifications = grant_starter_pair(actor)
     except Exception:
         _restore_registration(actor, staff, snapshot)
         raise
     parsed = parse_guild_registration(actor)
     if parsed is None:
         raise GuildDataError("registration write produced no parseable record")
+    parsed["title_notifications"] = list(title_notifications)
     return parsed
 
 

@@ -76,7 +76,8 @@ SHALL push one OOB notification (「獲得稱號：屠龍者」).
 
 ### Requirement: Guild registration and rank promotion grant paired titles atomically
 Each `GUILD_RANK_REGISTRY` row SHALL pair one fixed title. The existing
-`register_guild_member` transaction SHALL grant the F-rank title (「F級冒險者」)
+`world/rules/guild.py::register_adventurer` transaction SHALL grant the
+F-rank title (「F級冒險者」)
 and the starter epithet 「南門新客」 (a plain epithet entry, `origin_quote` from
 the registry constant) in one commit, with no planner or LLM involvement;
 re-registration SHALL be an idempotent no-op through the two dedupe rules.

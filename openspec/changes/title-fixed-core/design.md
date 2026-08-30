@@ -53,7 +53,7 @@ non-empty `hint_zh`, predicate references resolve to existing registry faces.
 
 ### DF4: guild pairing is transaction-bound, starter epithet is a normal entry
 
-`register_guild_member`'s existing atomic transaction grants「F級冒險者」(fixed,
+`register_adventurer`'s existing atomic transaction grants「F級冒險者」(fixed,
 D3) plus the registry constant `STARTER_EPITHET`「南門新客」(a plain epithet
 entry) — deterministic, no planner, no LLM; duplicate registration no-ops via
 the two existing dedupe rules. E→S grants ride the promotion transaction

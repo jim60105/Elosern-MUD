@@ -5,8 +5,11 @@ import json
 import unittest
 
 from world.ai.npc_dialogue import (
+    MAX_FIELD_LENGTH,
+    MAX_IDENTITY_ENTRIES,
     MAX_MEMORY_LINES,
     MAX_TOTAL_SIZE,
+    _TRUNCATION_MARKER,
     build_npc_dialogue_prompt,
 )
 from world.ai.tests._dialogue_helpers import (
@@ -202,3 +205,76 @@ class PersonaPromptTests(unittest.TestCase):
             '"player": {"disguised_stats": {"agility": 6, "atk_phys": 5, '
             '"defense": 6}, "name": "薇歐蕾"}}',
         )
+
+
+class TitleContextPromptTests(unittest.TestCase):
+    """The named title sections of the player block (title-system D6)."""
+
+    def _payload(self, player_context):
+        _, user = build_npc_dialogue_prompt(_npc_context(), player_context, _memory())
+        return json.loads(user["content"])
+
+    def test_absent_title_data_keeps_the_payload_byte_identical(self):
+        plain = build_npc_dialogue_prompt(_npc_context(), _player_context(), _memory())
+        self.assertNotIn("epithet", plain[1]["content"])
+        self.assertNotIn("identity_entries", plain[1]["content"])
+
+    def test_a_non_empty_epithet_becomes_the_named_section(self):
+        payload = self._payload(_player_context(epithet="F級冒險者　南門新客"))
+        self.assertEqual(payload["player"]["epithet"], "F級冒險者　南門新客")
+
+    def test_blank_or_non_string_epithet_is_omitted_not_placeholdered(self):
+        for value in ("", "   ", "\n", None, 7, ["F級冒險者"]):
+            with self.subTest(value=value):
+                payload = self._payload(_player_context(epithet=value))
+                self.assertNotIn("epithet", payload["player"])
+
+    def test_an_oversized_epithet_is_capped_with_the_truncation_marker(self):
+        payload = self._payload(_player_context(epithet="長" * 500))
+        epithet = payload["player"]["epithet"]
+        self.assertEqual(len(epithet), MAX_FIELD_LENGTH)
+        self.assertTrue(epithet.endswith(_TRUNCATION_MARKER))
+
+    def test_identity_entries_are_bounded_and_capped(self):
+        entries = [
+            {"display": f"異名{i}", "basis": f"引文{i}"} for i in range(9)
+        ]
+        payload = self._payload(_player_context(identity_entries=entries))
+        kept = payload["player"]["identity_entries"]
+        self.assertEqual(len(kept), MAX_IDENTITY_ENTRIES)
+        self.assertEqual(kept[0], {"display": "異名0", "basis": "引文0"})
+        long_rows = [
+            {"display": "短" * 500, "basis": "長" * 500}
+        ]
+        payload = self._payload(_player_context(identity_entries=long_rows))
+        row = payload["player"]["identity_entries"][0]
+        self.assertEqual(len(row["display"]), MAX_FIELD_LENGTH)
+        self.assertEqual(len(row["basis"]), MAX_FIELD_LENGTH)
+
+    def test_malformed_identity_rows_and_non_lists_are_dropped(self):
+        for value in (
+            None,
+            "南門新客",
+            [],
+            [{"basis": "只有引文"}],
+            [{"display": "  ", "basis": "引文"}],
+            ["南門新客"],
+        ):
+            with self.subTest(value=value):
+                payload = self._payload(_player_context(identity_entries=value))
+                self.assertNotIn("identity_entries", payload["player"])
+        # A row without a basis keeps only its display.
+        payload = self._payload(_player_context(identity_entries=[{"display": "南門新客"}]))
+        self.assertEqual(
+            payload["player"]["identity_entries"], [{"display": "南門新客"}]
+        )
+
+    def test_identical_title_inputs_produce_byte_identical_prompts(self):
+        context = _player_context(
+            epithet="F級冒險者　南門新客",
+            identity_entries=[{"display": "南門新客", "basis": "守衛的目送"}],
+        )
+        first = build_npc_dialogue_prompt(_npc_context(), context, _memory())
+        second = build_npc_dialogue_prompt(_npc_context(), context, _memory())
+        self.assertEqual(first[1]["content"], second[1]["content"])
+        self.assertNotIn("true_stats", first[1]["content"])

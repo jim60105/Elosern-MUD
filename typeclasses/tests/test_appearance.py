@@ -452,3 +452,83 @@ class PersonaBlockLookTests(EvenniaTest):
         appearance = self.char1.at_look(monster)
         self.assertNotIn("性格：", appearance)
         self.assertNotIn("背景：", appearance)
+
+
+class TitleAppearanceLineTests(EvenniaTest):
+    """The composed full title reads as the entity's public 稱號 line (D6).
+
+    Looking at a titled entity shows one 「稱號：全銜」 line between the
+    displayed-stats block and the persona block; an untitled entity — or one
+    whose title state is malformed — renders exactly the pre-title appearance,
+    and the byte-pinned displayed-stats rows never change.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
+        self.room1.key = "測試房間"
+        self.room1.save()
+        self.char1.location = self.room1
+        self.target = create_object(
+            "typeclasses.characters.PlayerCharacter",
+            key="稱號持有者",
+            location=self.room1,
+        )
+        self.target.race = "human"
+        self.target.apply_race_baseline()
+        self.target.db.desc = "一位沉默的旅人。"
+
+    def test_an_untitled_entity_renders_no_title_line(self):
+        appearance = self.char1.at_look(self.target)
+        self.assertIn("一位沉默的旅人。", appearance)
+        self.assertNotIn("稱號：", appearance)
+
+    def test_a_titled_entity_shows_the_composed_full_title(self):
+        from world.rules.titles import grant_starter_pair
+
+        grant_starter_pair(self.target)
+        appearance = self.char1.at_look(self.target)
+        self.assertIn("稱號：F級冒險者　南門新客", appearance)
+
+    def test_the_line_follows_the_description_and_the_displayed_stats_block(self):
+        from world.rules.titles import grant_starter_pair
+
+        grant_starter_pair(self.target)
+        appearance = self.char1.at_look(self.target)
+        self.assertLess(
+            appearance.index("一位沉默的旅人。"), appearance.index("稱號：")
+        )
+        self.assertLess(appearance.index("攻擊："), appearance.index("稱號："))
+
+    def test_the_displayed_stats_block_is_untouched_by_titles(self):
+        from world.rules.displayed_stats import display_stat_block
+
+        from world.rules.titles import grant_starter_pair
+
+        before = display_stat_block(self.target, looker=self.char1)
+        grant_starter_pair(self.target)
+        self.assertEqual(display_stat_block(self.target, looker=self.char1), before)
+        self.assertNotIn("稱號", before)
+
+    def test_the_title_line_reaches_the_webclient_look_path_too(self):
+        from unittest.mock import patch as _patch
+
+        from web.webclient.actions.exploration_actions import _look_adapter
+
+        from world.rules.titles import grant_starter_pair
+
+        grant_starter_pair(self.target)
+        with _patch.object(self.char1, "msg") as msg:
+            result = _look_adapter(self.char1, {"target_id": int(self.target.pk)})
+        self.assertEqual(result["outcome"], "success")
+        self.assertIn("稱號：F級冒險者　南門新客", str(msg.call_args[0][0]))
+
+    def test_malformed_title_state_degrades_to_the_untitled_appearance(self):
+        from world.rules.titles import grant_starter_pair
+
+        baseline = self.char1.at_look(self.target)
+        grant_starter_pair(self.target)
+        self.target.attributes.add("title_collection", "damaged")
+        self.assertEqual(self.char1.at_look(self.target), baseline)

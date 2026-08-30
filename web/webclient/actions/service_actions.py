@@ -276,6 +276,8 @@ def _guild_register_adapter(actor: Any, payload: dict[str, Any], session: Any = 
         return _rejected(error)
     message = f"你已註冊為冒險者，階級 F。公會：{record['branch_key']}"
     actor.msg(message)
+    for line in record.get("title_notifications", ()):
+        actor.msg(line)
     return _success("registered", message, AFFECTED_REGISTER)
 
 

@@ -639,5 +639,111 @@ class LLMNPCDeferredImportTests(unittest.TestCase):
         self.assertIn("OK", result.stdout)
 
 
+
+
+class TitleDialogueContextTests(EvenniaTest):
+    """The composed title reaches the NPC's dialogue prompt (title-system D6).
+
+    The player's full title is the named ``epithet`` section an NPC addresses
+    them by, present whenever a slot is occupied and omitted (never blank)
+    otherwise; up to five banked epithets with their basis quotes ride along
+    only on the face-to-face identity path. Malformed title state degrades to
+    no section instead of breaking the talk.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
+        _reset_all()
+        register_npc_dialogue()
+        self.player = create_object(PlayerCharacter, key="titled player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.npc = create_object(LLMNPC, key="稱號精靈", location=self.room1)
+
+    def tearDown(self):
+        _reset_all()
+        super().tearDown()
+
+    def _content(self, client):
+        return client.calls[0].messages[1]["content"]
+
+    def test_titled_player_context_carries_the_composed_epithet(self):
+        from world.rules.titles import grant_starter_pair
+
+        grant_starter_pair(self.player)
+        context = self.npc._player_context(self.player)
+        self.assertEqual(context["epithet"], "F級冒險者　南門新客")
+        # Identity detail is opt-in; the ordinary context stays minimal.
+        self.assertNotIn("identity_entries", context)
+
+    def test_untitled_player_context_omits_the_section_entirely(self):
+        context = self.npc._player_context(self.player)
+        self.assertNotIn("epithet", context)
+        self.assertNotIn("identity_entries", context)
+        self.assertEqual(sorted(context), ["disguised_stats", "name"])
+
+    def test_identity_detail_attaches_bounded_banked_entries(self):
+        from world.rules.titles import MAX_TITLE_ENTRIES, bank_epithet, grant_starter_pair
+
+        grant_starter_pair(self.player)
+        for index in range(6):
+            bank_epithet(self.player, f"異名{index}", f"引文{index}", index)
+        context = self.npc._player_context(self.player, identity_detail=True)
+        entries = context["identity_entries"]
+        self.assertEqual(len(entries), MAX_TITLE_ENTRIES)
+        self.assertEqual(entries[0]["display"], "異名5")
+        self.assertEqual(entries[0]["basis"], "引文5")
+        self.assertEqual(context["epithet"], "F級冒險者　南門新客")
+
+    def test_malformed_title_state_degrades_to_no_section(self):
+        from world.rules.titles import grant_starter_pair
+
+        grant_starter_pair(self.player)
+        self.player.attributes.add("title_collection", "damaged")
+        context = self.npc._player_context(self.player, identity_detail=True)
+        self.assertNotIn("epithet", context)
+        self.assertNotIn("identity_entries", context)
+
+    def test_plain_exchange_prompt_carries_the_epithet_but_no_identity_detail(self):
+        from world.rules.titles import bank_epithet, grant_starter_pair
+
+        grant_starter_pair(self.player)
+        bank_epithet(self.player, "夜行者", "夜裡的眼", 1)
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _reply_text())
+        await_result(self.npc.run_npc_exchange("你好", self.player, client))
+        content = self._content(client)
+        self.assertIn('"epithet": "F級冒險者　南門新客"', content)
+        self.assertNotIn("identity_entries", content)
+
+    def test_being_addressed_passes_the_identity_detail(self):
+        from world.rules.titles import bank_epithet, grant_starter_pair
+
+        grant_starter_pair(self.player)
+        bank_epithet(self.player, "夜行者", "夜裡的眼", 1)
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _reply_text())
+        with patch.object(self.player, "msg"):
+            await_result(self.npc.at_talked_to("你好", self.player, client))
+        content = self._content(client)
+        self.assertIn('"epithet": "F級冒險者　南門新客"', content)
+        self.assertIn('"identity_entries"', content)
+        self.assertIn("夜行者", content)
+
+    def test_an_untitled_exchange_prompt_is_byte_identical_to_the_baseline(self):
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _reply_text())
+        await_result(self.npc.run_npc_exchange("你好", self.player, client))
+        content = self._content(client)
+        self.assertNotIn("epithet", content)
+        self.assertNotIn("identity_entries", content)
+        payload = json.loads(content)
+        self.assertEqual(sorted(payload["player"]), ["disguised_stats", "name"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,8 +1,10 @@
-"""Version-1 read-only ``status`` panel presenter.
+"""Version-2 read-only ``status`` panel presenter.
 
 The presenter serializes the frozen status read model built by
 ``world.rules.status_query``. It never reads raw persistent records itself, never
-calls ``get_display_value``, and never mutates canonical state.
+calls ``get_display_value``, and never mutates canonical state. Version 2 adds the
+optional ``actor.full_title`` row: the composed 稱號　異名 the client addresses
+the player by, omitted entirely while both title slots are empty.
 """
 
 from typing import Any
@@ -11,7 +13,7 @@ from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.rules.status_query import StatusQueryError, build_status_read_model
 
-STATUS_SCHEMA_VERSION = 1
+STATUS_SCHEMA_VERSION = 2
 
 
 def status_presenter(context: PresentationContext) -> dict[str, Any]:
@@ -41,6 +43,11 @@ def status_presenter(context: PresentationContext) -> dict[str, Any]:
         "name": model.actor_name,
         "identity": model.actor_identity,
     }
+    # The composed full title (fixed　epithet); the wire field is optional and
+    # omitted when empty, so a pre-onboarding character keeps the v1 shape
+    # minus the version bump.
+    if model.full_title:
+        actor_field["full_title"] = model.full_title
     if model.location_label is not None:
         actor_field["location"] = {
             "label": model.location_label,

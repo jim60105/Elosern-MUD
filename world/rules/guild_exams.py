@@ -395,6 +395,9 @@ def settle_exam_outcome(
     new_state = ExamState.PASSED if passed else ExamState.FAILED
     rank_snapshot = attribute_snapshot(actor, "guild_rank")
     exams_snapshot = attribute_snapshot(actor, "guild_exams")
+    title_collection_snapshot = attribute_snapshot(actor, "title_collection")
+    title_equipped_snapshot = attribute_snapshot(actor, "title_equipped")
+    title_notifications: tuple[str, ...] = ()
     try:
         from django.db import transaction
 
@@ -410,13 +413,27 @@ def settle_exam_outcome(
             _write_exams(actor, new_records)
             if passed:
                 actor.guild_rank = _next_rank(actor.guild_rank)
+                from world.rules.titles import grant_rank_title
+
+                # D3: the promotion transaction banks the new rank's paired
+                # fixed title (auto-equipping the fixed slot only when empty).
+                title_notifications = grant_rank_title(actor, actor.guild_rank)
     except Exception:
         from world.rules.surfaces import restore_attribute_best_effort
 
         restore_attribute_best_effort(actor, "guild_rank", rank_snapshot)
         restore_attribute_best_effort(actor, "guild_exams", exams_snapshot)
+        restore_attribute_best_effort(
+            actor, "title_collection", title_collection_snapshot
+        )
+        restore_attribute_best_effort(
+            actor, "title_equipped", title_equipped_snapshot
+        )
         raise
-    return {"exam_id": exam_id, "state": new_state.value, "passed": passed}
+    result = {"exam_id": exam_id, "state": new_state.value, "passed": passed}
+    if title_notifications:
+        result["title_notifications"] = list(title_notifications)
+    return result
 
 
 def _next_rank(current: str) -> str:

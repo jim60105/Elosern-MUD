@@ -29,7 +29,7 @@ equip slots are never empty once onboarding completes.
   predicate-verified fixed-title grants inside the triggering action's commit
   (OOB notification 「獲得稱號：屠龍者」); guild rank changes pair titles
   (exam promotions via `settle_exam_outcome`; F-rank plus the starter epithet
-  both inside `register_guild_member`'s transaction, so the onboarding-complete
+  both inside `register_adventurer`'s transaction, so the onboarding-complete
   full title is 「F級冒險者　南門新客」). Re-registration is an idempotent no-op.
 - Telnet `title list` and `title equip fixed|epithet <display|key>`
   (swap-only, never empty), with the command-docs trio updated in this change.

@@ -147,6 +147,8 @@ class CmdGuildRegister(_GuildCommandBase):
             self.caller.msg(f"註冊失敗：{error}")
             return
         self.caller.msg(f"你已註冊為冒險者，階級 F。公會：{record['branch_key']}")
+        for line in record.get("title_notifications", ()):
+            self.caller.msg(line)
 
 
 class CmdGuildList(_GuildCommandBase):

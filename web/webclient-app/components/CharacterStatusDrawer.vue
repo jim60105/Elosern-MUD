@@ -207,6 +207,13 @@ const personaBackground = computed(() => (characterAvailable.value ? (props.char
 
 const intimate = computed(() => (characterAvailable.value ? (props.character?.intimate ?? null) : null));
 
+// The composed live full title (character panel v6 optional field); rendered
+// as a header line only when present — a pre-onboarding character shows no
+// title line (title-system D6 name fallback applies at the HUD head).
+const fullTitle = computed(() =>
+  characterAvailable.value ? (props.character?.full_title ?? "") : ""
+);
+
 // The 親密狀態 (intimate status) section rows: the 設計稿's #dr-status stat
 // grid. The first five rows are level words from the fixed vocabulary, and
 // the last row is the daily climax count.
@@ -223,6 +230,13 @@ const INTIMATE_ROWS = [
 <template>
   <section class="character-status-drawer" data-testid="character-status-drawer">
     <h3 class="character-status-drawer__title" data-testid="character-status-drawer__title">角色狀態</h3>
+    <p
+      v-if="fullTitle"
+      class="character-status-drawer__full-title"
+      data-testid="character-status-drawer__full-title"
+    >
+      {{ fullTitle }}
+    </p>
 
     <!-- The single labelled control that opens the skill drawer (task 5.5). -->
     <button
@@ -531,6 +545,14 @@ const INTIMATE_ROWS = [
   color: var(--paper-100);
   font-family: var(--f-display);
   font-size: 1em;
+}
+
+.character-status-drawer__full-title {
+  margin: 0;
+  color: var(--gold-400);
+  font-family: var(--f-display);
+  font-size: 0.95em;
+  overflow-wrap: anywhere;
 }
 
 .character-status-drawer__skill-link {

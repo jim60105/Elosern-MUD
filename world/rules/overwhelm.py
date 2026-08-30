@@ -368,6 +368,7 @@ def _resolve_overwhelm_raw(
     simulated: bool = False,
     nonlethal_keys: frozenset[str] = frozenset(),
     journal_sink: "list[object] | None" = None,
+    notifications_sink: "list[str] | None" = None,
 ) -> tuple[str | None, str | None, list[EventLog], int, tuple[EventLog, ...]]:
     """Resolve and expose raw logs, the round-1 slice, and round count."""
     if max_rounds < 0:
@@ -380,13 +381,19 @@ def _resolve_overwhelm_raw(
     verdict_after = initial
     round1_window: tuple[EventLog, ...] = ()
     while rounds < max_rounds and not combat.is_battle_over(battlefield):
-        if simulated or nonlethal_keys or journal_sink is not None:
+        if (
+            simulated
+            or nonlethal_keys
+            or journal_sink is not None
+            or notifications_sink is not None
+        ):
             round_logs = combat.run_round(
                 battlefield,
                 action_provider,
                 simulated=simulated,
                 nonlethal_keys=nonlethal_keys,
                 journal_sink=journal_sink,
+                notifications_sink=notifications_sink,
             )
         else:
             round_logs = combat.run_round(battlefield, action_provider)
@@ -411,6 +418,7 @@ def resolve_overwhelm(
     simulated: bool = False,
     nonlethal_keys: frozenset[str] = frozenset(),
     journal_sink: "list[object] | None" = None,
+    notifications_sink: "list[str] | None" = None,
 ) -> OverwhelmResult:
     """Resolve a currently overwhelming encounter through the normal loop.
 
@@ -424,7 +432,9 @@ def resolve_overwhelm(
     callers observe the pre-change call signature byte-identically
     (fix-dot-kill-credit D4). ``journal_sink`` collects each committed item
     journal produced inside the compression so the session's outer rollback
-    can restore the actually-deleted mirrors.
+    can restore the actually-deleted mirrors. ``notifications_sink`` collects
+    player-facing notification lines (e.g. title grant toasts) for delivery
+    by the session boundary after its commit; compression never sends.
     """
     initial, verdict_after, raw_logs, rounds, round1_window = (
         _resolve_overwhelm_raw(
@@ -434,6 +444,7 @@ def resolve_overwhelm(
             simulated=simulated,
             nonlethal_keys=nonlethal_keys,
             journal_sink=journal_sink,
+            notifications_sink=notifications_sink,
         )
     )
     event_logs = (

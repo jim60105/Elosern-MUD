@@ -70,6 +70,7 @@ from commands.localized import (
 from commands.scene import CmdEnterScene
 from commands.skip import CmdRest, CmdSleep, CmdWaitUntil
 from commands.talk import CmdsTalk
+from commands.title import CmdTitle
 
 # The stock Evennia default keys replaced by the localized zh-tw wrappers
 # (commands/localized/). After ``super().at_cmdset_creation()`` the originals
@@ -182,6 +183,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdLeave)
         self.add(CmdLore)
         self.add(CmdBackground)
+        self.add(CmdTitle)
         self.add(ProjectXYZGridCmdSet)
 
 

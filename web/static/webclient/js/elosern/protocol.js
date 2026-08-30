@@ -46,6 +46,7 @@
   var MAX_RETIRED_EPOCHS = 8;
   var MAX_ACTOR_NAME = 256;
   var MAX_ACTOR_IDENTITY = 64;
+  var MAX_FULL_TITLE_CODE_POINTS = 128;
   var MAX_LOCATION_LABEL = 256;
   var MAX_CONDITION_COUNT = 32;
   var MAX_CONDITION_LABEL = 128;
@@ -247,13 +248,13 @@
   // schema version; unknown panel names reject the whole presentation message.
   var PANEL_ALLOWLIST = {
     art: 1,
-    status: 1,
+    status: 2,
     context_actions: 5,
     local_map: 1,
     services: 3,
     creation: 1,
     exploration: 1,
-    character: 5,
+    character: 6,
   };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
@@ -588,7 +589,7 @@
     return value;
   }
 
-  // Exact available status panel v1 schema.
+  // Exact available status panel v2 schema (composed full title optional).
   function validateStatusPanel(payload) {
     requireExactFields(
       payload,
@@ -597,14 +598,24 @@
       []
     );
     requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 1) {
+    if (payload.schema_version !== 2) {
       throw new Error("unsupported status panel schema_version");
     }
 
     var actor = payload.actor;
-    requireExactFields(actor, "actor", ["name", "identity", "location"], []);
+    requireExactFields(actor, "actor", ["name", "identity", "location"], ["full_title"]);
     requireString(actor.name, "actor.name", MAX_ACTOR_NAME);
     requireString(actor.identity, "actor.identity", MAX_ACTOR_IDENTITY);
+    if (Object.prototype.hasOwnProperty.call(actor, "full_title")) {
+      requireString(
+        actor.full_title,
+        "actor.full_title",
+        MAX_FULL_TITLE_CODE_POINTS
+      );
+      if (!actor.full_title.trim()) {
+        throw new Error("actor.full_title must be non-empty when present");
+      }
+    }
     if (actor.location !== null) {
       requireExactFields(actor.location, "actor.location", ["label", "identity"], []);
       requireString(actor.location.label, "actor.location.label", MAX_LOCATION_LABEL);
@@ -3279,12 +3290,12 @@
     };
   }
 
-  // Exact available character panel v5 schema (design D10: skill category
+  // Exact available character panel v6 schema (design D10: skill category
   // grouping + the intimate-status section; expose-stat-breakdown-read-model
   // added the breakdown trait rows and the adjustment-bearing equipment
   // rows; render-equipment-breakdown-webclient closed the transitional v4
-  // tolerance window so version 5 is the only accepted version). Shared
-  // bounds are guarded by a dual-direction parity test.
+  // tolerance window; title-system added the optional composed full_title).
+  // Shared bounds are guarded by a dual-direction parity test.
   function validateCharacterAvailablePanel(payload) {
     requireExactFields(
       payload,
@@ -3303,9 +3314,20 @@
         "persona",
         "intimate",
       ],
-      []
+      ["full_title"]
     );
-    if (payload.schema_version !== 5) {
+    var fullTitle = null;
+    if (Object.prototype.hasOwnProperty.call(payload, "full_title")) {
+      fullTitle = requireString(
+        payload.full_title,
+        "full_title",
+        MAX_FULL_TITLE_CODE_POINTS
+      );
+      if (!fullTitle.trim()) {
+        throw new Error("full_title must be non-empty when present");
+      }
+    }
+    if (payload.schema_version !== 6) {
       throw new Error("unsupported character schema_version");
     }
     if (payload.available !== true || payload.kind !== "character") {
@@ -3359,7 +3381,7 @@
 
     var intimate = validateCharacterIntimate(payload.intimate);
     var result = {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "character",
       traits: payload.traits,
@@ -3372,6 +3394,9 @@
       persona: persona,
       intimate: intimate,
     };
+    if (fullTitle !== null) {
+      result.full_title = fullTitle;
+    }
     // Envelope guarantee (design D10): an over-limit payload fails closed.
     if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
       throw new Error("character payload exceeds the OOB envelope limit");
@@ -3380,10 +3405,10 @@
   }
 
   function validateCharacterPanel(payload) {
-    // Version gate (mirror of the server validator): 5 is the only accepted
-    // schema version (render-equipment-breakdown-webclient).
+    // Version gate (mirror of the server validator): 6 is the only accepted
+    // schema version (title-system character-panel full title).
     requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 5) {
+    if (payload.schema_version !== 6) {
       throw new Error("unsupported character schema_version");
     }
     return validateCharacterAvailablePanel(payload);
@@ -3785,6 +3810,7 @@
     MAX_RETIRED_EPOCHS: MAX_RETIRED_EPOCHS,
     MAX_ACTOR_NAME: MAX_ACTOR_NAME,
     MAX_ACTOR_IDENTITY: MAX_ACTOR_IDENTITY,
+    MAX_FULL_TITLE_CODE_POINTS: MAX_FULL_TITLE_CODE_POINTS,
     MAX_LOCATION_LABEL: MAX_LOCATION_LABEL,
     MAX_CONDITION_COUNT: MAX_CONDITION_COUNT,
     MAX_CONDITION_LABEL: MAX_CONDITION_LABEL,

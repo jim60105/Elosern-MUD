@@ -4,7 +4,9 @@ import CharacterStatusDrawer from "../../components/CharacterStatusDrawer.vue";
 import {
   STATUS_PANEL_SAMPLE,
   STATUS_PANEL_COMBAT_SAMPLE,
+  STATUS_PANEL_TITLED_SAMPLE,
   CHARACTER_PANEL_SAMPLE,
+  CHARACTER_PANEL_TITLED_SAMPLE,
   CHARACTER_PANEL_UNDISGUISED_SAMPLE,
 } from "../fixtures.js";
 
@@ -27,11 +29,17 @@ export default {
 function renderDrawer(args) {
   // A character panel in its registry-owned unavailable form (no fabricated
   // rows) for the combat story.
-  const character =
-    args.combat
-      ? { schema_version: 5, available: false, kind: "character", reason: { code: "no_puppet", message: "你已離開角色" } }
-      : args.undisguised
-        ? CHARACTER_PANEL_UNDISGUISED_SAMPLE
+  const character = args.combat
+    ? {
+        schema_version: 6,
+        available: false,
+        kind: "character",
+        reason: { code: "no_puppet", message: "你已離開角色" },
+      }
+    : args.undisguised
+      ? CHARACTER_PANEL_UNDISGUISED_SAMPLE
+      : args.titled
+        ? CHARACTER_PANEL_TITLED_SAMPLE
         : CHARACTER_PANEL_SAMPLE;
   return {
     render: () =>
@@ -45,7 +53,11 @@ function renderDrawer(args) {
             {
               default: () =>
                 h(CharacterStatusDrawer, {
-                  status: args.combat ? STATUS_PANEL_COMBAT_SAMPLE : STATUS_PANEL_SAMPLE,
+                  status: args.combat
+                    ? STATUS_PANEL_COMBAT_SAMPLE
+                    : args.titled
+                      ? STATUS_PANEL_TITLED_SAMPLE
+                      : STATUS_PANEL_SAMPLE,
                   character,
                   lowHp: false,
                   onOpenSkill: () => {},
@@ -95,4 +107,12 @@ export const IntimateAbsent = {
 export const BreakdownChips = {
   render: renderDrawer,
   args: {},
+};
+
+// title-system D6: the drawer addresses the player by the composed full title
+// carried by the committed `character` panel (the Untitled state above renders
+// no line at all).
+export const Titled = {
+  render: renderDrawer,
+  args: { titled: true },
 };

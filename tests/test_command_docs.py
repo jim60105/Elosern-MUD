@@ -152,6 +152,10 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "暱稱": {"syntax": "暱稱 <字串> = [<替換字串>]", "context": "一般"},
     "設定描述": {"syntax": "設定描述 <描述>", "context": "一般"},
     "設定背景": {"syntax": "設定背景 <文字>", "context": "一般（已啟用的角色）"},
+    "title": {
+        "syntax": "title list、title equip fixed <display|key>、title equip epithet <display>",
+        "context": "一般（戰鬥內外皆可用）",
+    },
     "登出": {"syntax": "登出", "context": "一般（隨時可用）"},
     "在線": {"syntax": "在線", "context": "一般"},
     "離開角色": {"syntax": "離開角色", "context": "一般"},

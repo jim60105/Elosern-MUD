@@ -52,12 +52,13 @@ def _npc_context():
     return {"name": "艾洛希雅", "desc": "南門的守衛", "location": "王都阿爾托利亞"}
 
 
-def _player_context(disguised=None):
+def _player_context(disguised=None, **extra):
     return {
         "name": "薇歐蕾",
         "disguised_stats": disguised
         if disguised is not None
         else {"atk_phys": 5, "agility": 6, "defense": 6},
+        **extra,
     }
 
 

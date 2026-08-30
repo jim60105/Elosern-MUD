@@ -4,6 +4,7 @@ import CharacterHead from "../../components/CharacterHead.vue";
 import {
   CHARACTER_PANEL_SAMPLE,
   STATUS_PANEL_SAMPLE,
+  STATUS_PANEL_TITLED_SAMPLE,
 } from "../../stories/fixtures.js";
 
 // H2 (webclient-hud-02-status-islands), design D2/D11: the head card renders
@@ -94,5 +95,39 @@ describe("CharacterHead (H2 head-card island)", () => {
       },
     });
     expect(w.get('[data-testid="character-head__glyph"]').text()).toBe("");
+  });
+
+  // title-system D6: the head card addresses the player by the composed full
+  // title when the committed status panel carries one, and falls back to the
+  // plain name when the row is absent or empty (never a blank heading).
+  it("addresses the player by the composed full title when the panel carries one", () => {
+    const w = mountHead({ status: STATUS_PANEL_TITLED_SAMPLE });
+    expect(w.get('[data-testid="character-head__name"]').text()).toBe(
+      "F級冒險者　南門新客",
+    );
+    // The glyph stays the character's own name, never the title's first char.
+    expect(w.get('[data-testid="character-head__glyph"]').text()).toBe("艾");
+  });
+
+  it("renders a fixed-only title and keeps the rank line independent", () => {
+    const fixedOnly = {
+      ...STATUS_PANEL_TITLED_SAMPLE,
+      actor: { ...STATUS_PANEL_TITLED_SAMPLE.actor, full_title: "S級傳說" },
+    };
+    const w = mountHead({ status: fixedOnly });
+    expect(w.get('[data-testid="character-head__name"]').text()).toBe("S級傳說");
+  });
+
+  it("falls back to the plain name when full_title is absent or empty", () => {
+    const empty = {
+      ...STATUS_PANEL_SAMPLE,
+      actor: { ...STATUS_PANEL_SAMPLE.actor, full_title: "" },
+    };
+    expect(mountHead({ status: empty }).get('[data-testid="character-head__name"]').text()).toBe(
+      "艾倫·灰誓",
+    );
+    expect(
+      mountHead({ status: STATUS_PANEL_SAMPLE }).get('[data-testid="character-head__name"]').text(),
+    ).toBe("艾倫·灰誓");
   });
 });

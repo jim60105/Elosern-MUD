@@ -136,7 +136,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
   // `CHARACTER_PANEL_SAMPLE`.
   function characterPanelWithSkillSlice() {
     return {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "character",
       traits: CHARACTER_PANEL_SAMPLE.traits,
@@ -232,7 +232,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         fx.snapshot({
           panels: {
             character: {
-              schema_version: 5,
+              schema_version: 6,
               available: false,
               reason: { code: "character_missing", message: "character not created" },
             },
@@ -265,7 +265,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         fx.snapshot({
           panels: {
             character: {
-              schema_version: 5,
+              schema_version: 6,
               available: false,
               reason: { code: "no_puppet", message: "你已離開角色" },
             },

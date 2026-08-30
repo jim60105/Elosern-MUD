@@ -606,6 +606,7 @@ def run_round(
     simulated: bool = False,
     nonlethal_keys: frozenset[str] = frozenset(),
     journal_sink: "list[object] | None" = None,
+    notifications_sink: "list[str] | None" = None,
 ) -> list[EventLog]:
     """Resolve one action per capable combatant, then perform upkeep.
 
@@ -619,6 +620,10 @@ def run_round(
     ``journal_sink`` when provided, so an outer rollback can restore the
     actually-deleted mirrors), and every other request resolves as an
     ``ActionRequest``.
+
+    ``notifications_sink`` collects player-facing notification lines staged
+    by committed effects (e.g. title grant toasts) for delivery by the outer
+    settlement boundary after its commit; ``run_round`` itself never sends.
     """
     logs: list[EventLog] = []
     for key in roll_initiative(battlefield):
@@ -647,6 +652,12 @@ def run_round(
         result = ActionResolver.resolve(request)
         if result.outcome == "success" and result.event_log is not None:
             logs.append(result.event_log)
+        # The action provider is a duck-typed seam: a result without the
+        # notification field (an injected double, or a pre-notification
+        # provider) simply stages nothing.
+        notifications = getattr(result, "notifications", ())
+        if notifications and notifications_sink is not None:
+            notifications_sink.extend(notifications)
     records_by_key = _end_of_round_upkeep(battlefield)
     logs.extend(
         settle_upkeep(

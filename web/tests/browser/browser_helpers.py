@@ -643,7 +643,7 @@ def valid_character_panel(**overrides) -> dict:
     active disguise).
     """
     panel = {
-        "schema_version": 5,
+        "schema_version": 6,
         "available": True,
         "kind": "character",
         "traits": [

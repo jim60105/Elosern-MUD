@@ -115,6 +115,7 @@ class EffectRegistryTests(unittest.TestCase):
                     "buffs",
                     "skill_grants",
                     "progression",
+                    "titles",
                     "battlefield",
                     "quest_log",
                     "instance_pin",

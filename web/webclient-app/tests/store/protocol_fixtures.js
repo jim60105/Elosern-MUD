@@ -43,7 +43,7 @@ export function serverTime(overrides = undefined) {
 export function statusPanel(overrides = undefined) {
   return deepMerge(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       actor: {
         name: "影行者",

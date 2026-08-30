@@ -1,4 +1,4 @@
-"""Exact schema-version-5 ``character`` panel and presenter (webclient-exploration-menu).
+"""Exact schema-version-6 ``character`` panel and presenter (webclient-exploration-menu).
 
 The presenter serializes the read-only expanded character surface opened by the
 exploration dock's Character root. It shares the same canonical
@@ -21,10 +21,11 @@ mounts the ``entity.skills`` or ``entity.sexual`` handlers.
 Version 5 (expose-stat-breakdown-read-model) rewrites every trait row into the
 breakdown shape ``{key, label, base, current, max, effective, layers}`` —
 ``current`` stays the total-display field on every row — and adds the P3
-server-formatted ``adjustment`` summary to equipment rows. Version 5 is the
-only accepted schema version (render-equipment-breakdown-webclient closed the
-P6 transitional v4 tolerance window): the validator accepts v5 exactly and
-rejects every other version.
+server-formatted ``adjustment`` summary to equipment rows. Version 6 (title-fixed-core
+D6) adds the optional ``full_title`` row: the composed 稱號　異名 the client
+addresses the player by, omitted entirely while both title slots are empty.
+Version 6 is the only accepted schema version: the validator accepts v6 exactly
+and rejects every other version.
 
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
@@ -71,7 +72,7 @@ from world.rules.status_query import (
 )
 from world.skills.registry import SKILL_REGISTRY, SkillCategory
 
-CHARACTER_SCHEMA_VERSION = 5
+CHARACTER_SCHEMA_VERSION = 6
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_TRAIT_ROWS = 32
@@ -98,6 +99,8 @@ MAX_ADJUSTMENT_CODE_POINTS = MAX_DESCRIPTION_CODE_POINTS
 # (``world.rules.character_creation.MAX_PERSONA_FIELD_LENGTH``); the parity
 # contract pins the JS validator to this same number.
 MAX_PERSONA_BACKGROUND_CODE_POINTS = 600
+# The composed full title bound, mirrored by the JS validator (parity test).
+MAX_FULL_TITLE_CODE_POINTS = 128
 
 _DISGUISE_DESCRIPTION = (
     "目前以偽裝的外貌示人，以下是他人所見的數值。真實數值不因此改變。"
@@ -486,8 +489,18 @@ def _serialize_intimate(view: Any) -> dict[str, Any] | None:
     }
 
 
+def _validate_full_title(payload: dict[str, Any]) -> str | None:
+    """Validate the optional composed full title (absent means untitled)."""
+    if "full_title" not in payload:
+        return None
+    text = _require_str(payload, "full_title", maximum=MAX_FULL_TITLE_CODE_POINTS)
+    if not text.strip():
+        raise CharacterPanelError("full_title must be non-empty when present")
+    return text
+
+
 def _validate_available(payload: Any) -> dict[str, Any]:
-    """Validate one exact available version-5 character payload."""
+    """Validate one exact available version-6 character payload."""
     _require_exact_fields(
         payload,
         "character panel",
@@ -505,7 +518,7 @@ def _validate_available(payload: Any) -> dict[str, Any]:
             "persona",
             "intimate",
         },
-        {},
+        {"full_title": "optional"},
     )
     if (
         _require_int(payload, "schema_version", minimum=1, maximum=MAX_SAFE_INTEGER)
@@ -563,7 +576,7 @@ def _validate_available(payload: Any) -> dict[str, Any]:
     wallet = _require_int(payload, "wallet", minimum=0, maximum=MAX_SAFE_INTEGER)
     persona = _validate_persona(payload["persona"])
 
-    result = {
+    result: dict[str, Any] = {
         "schema_version": CHARACTER_SCHEMA_VERSION,
         "available": True,
         "kind": "character",
@@ -577,6 +590,9 @@ def _validate_available(payload: Any) -> dict[str, Any]:
         "persona": persona,
         "intimate": _validate_intimate(payload["intimate"]),
     }
+    full_title = _validate_full_title(payload)
+    if full_title is not None:
+        result["full_title"] = full_title
     # Envelope guarantee (design D10): a conforming payload must serialize
     # within the OOB envelope limit; an over-limit payload fails closed.
     if json_byte_size(result) > MAX_CANONICAL_JSON_BYTES:
@@ -585,7 +601,7 @@ def _validate_available(payload: Any) -> dict[str, Any]:
 
 
 def validate_character(payload: Any) -> dict[str, Any]:
-    """Validate one exact available version-5 ``character`` payload.
+    """Validate one exact available version-6 ``character`` payload.
 
     Returns a normalized payload or raises :class:`CharacterPanelError`. The
     common unavailable form is NOT accepted here; the registry handles it.
@@ -697,7 +713,7 @@ def _serialize_active_skill_groups(keys: tuple[str, ...], actor: Any) -> list[di
 def _serialize(
     model: CharacterReadModel, background: str | None, actor: Any
 ) -> dict[str, Any]:
-    """Serialize the frozen read model into the v5 available payload.
+    """Serialize the frozen read model into the v6 available payload.
 
     Trait rows come from ``model.breakdown`` (the single assembly the whole
     read shares); labels stay the shared ``TRAIT_LABELS`` map; equipment rows
@@ -705,7 +721,7 @@ def _serialize(
     v4.
     """
     disguise_description = _DISGUISE_DESCRIPTION if model.disguise_active else ""
-    return {
+    payload: dict[str, Any] = {
         "schema_version": CHARACTER_SCHEMA_VERSION,
         "available": True,
         "kind": "character",
@@ -753,6 +769,11 @@ def _serialize(
         "persona": {"background": background},
         "intimate": _serialize_intimate(model.intimate),
     }
+    # The composed live full title; omitted when empty so pre-onboarding
+    # characters keep the payload shape identical.
+    if model.full_title:
+        payload["full_title"] = model.full_title
+    return payload
 
 
 def character_presenter(context: PresentationContext) -> dict[str, Any]:
@@ -779,6 +800,7 @@ __all__ = [
     "MAX_CATEGORY_GROUPS",
     "MAX_DISPLAYED_ROWS",
     "MAX_EQUIPMENT_ROWS",
+    "MAX_FULL_TITLE_CODE_POINTS",
     "MAX_LABEL_CODE_POINTS",
     "MAX_LAYERS_PER_STAT",
     "MAX_ADJUSTMENT_CODE_POINTS",
