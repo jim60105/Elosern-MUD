@@ -3,13 +3,18 @@
 ### Requirement: TitleCodexView is a pure bounded read model for the codex
 `world/rules/title_view.py` SHALL expose
 `build_title_codex_view(character, *, max_rows, max_display_chars,
-max_basis_chars) -> TitleCodexView` reading only lore registry,
-`db.title_collection`, and `db.title_equipped`: fixed rows in registry order
-carrying `key`/`display`/`category`/`hint_zh` (hint only while locked)/
-`flavor_zh` (only when unlocked)/`unlocked`, epithet rows newest-first carrying
-`display`/`basis`/`equipped`/`can_remove`, an `equipped` dict, a live-composed
-`full_title`, and unlocked/total counters. Every string SHALL respect the passed
-maxima; the view SHALL compute without mutating and repeat byte-identically
+max_basis_chars) -> TitleCodexView` reading only the lore registry,
+`db.title_collection`, `db.title_equipped`, and `db.pending_title_ballot`:
+fixed rows in registry order carrying
+`key`/`display`/`category`/`hint_zh` (hint only while locked)/`flavor_zh`
+(only when unlocked)/`unlocked`/`granted_tick`, epithet rows newest-first
+carrying `display`/`basis`/`granted_tick`/`equipped`/`can_remove`, an
+`equipped` dict, a live-composed `full_title`, the `pending_ballot` entries
+(degrading to empty when ballot state is malformed, without contaminating the
+title rows), and unlocked/total counters. Every string SHALL respect the
+passed maxima; the shipped display maxima SHALL equal the storage caps
+(64/63) so a rendered action identifier is never a truncated non-matching
+string. The view SHALL compute without mutating and repeat byte-identically
 while state is unchanged. OOB constants `TITLE_MAX_ROWS` /
 `TITLE_MAX_DISPLAY_CHARS` / `TITLE_MAX_BASIS_CHARS` (and the title-category
 enum) SHALL be mirrored across all four mirrors like every OOB surface.
@@ -45,18 +50,24 @@ SHALL update on every successful equip.
 ### Requirement: Epithet removal is the only delete path and gates precede confirmation
 `world/rules/titles.py::remove_epithet(entity, display)` SHALL be the system's
 only collection-deleting API, validating in one pass before any review state
-exists: unknown display or wrong kind ⇒ stable rejection; `display` equals the
-equipped epithet ⇒ `TITLE_EQUIPPED_UNREMOVABLE`; it is the last remaining
-epithet ⇒ `TITLE_LAST_EPITHET` — neither gate code ever enters the confirm flow.
-Only an un-gated target echoes review info (display + basis) for the two-step
-Telnet path (`title remove epithet <display>` then literal `confirm` suffix; any
-other continuation cancels without state change), after which the executing call
-re-validates both gates and, within one snapshot-registered transaction, removes
-the entry and appends `title_epithet_removed` (entity, display, tick) to the
-EventLog. Slots SHALL never be touched by removal. Fixed titles SHALL expose no
-delete API, command, or code path — a structural test asserts absence. Removal is
-irreversible; there is no recycle bin, and the removed name becomes nominatable
-again through G's live-collection filter.
+exists, in this precedence: unknown display or wrong kind ⇒ stable rejection;
+it is the last remaining epithet ⇒ `TITLE_LAST_EPITHET` (under the D8
+invariant the sole epithet is necessarily the equipped one, so this gate MUST
+be evaluated first for the one-epithet case to name the true reason);
+`display` equals the equipped epithet ⇒ `TITLE_EQUIPPED_UNREMOVABLE` — neither
+gate code ever enters the confirm flow. Only an un-gated target echoes review
+info (display + basis) for the two-step Telnet path (`title remove epithet
+<display>` then literal `confirm` suffix; a display containing the literal
+final token quotes it so the suffix stays unambiguous; any other continuation
+cancels without state change), after which the executing call re-validates
+both gates and, within one snapshot-registered transaction, removes the entry,
+records `{tick, display}` into the bounded durable removal log
+(`title_epithet_removals`, the Director-facing feed mirroring the decline
+log), and emits the renderable `title_epithet_removed`
+(actor, display, tick) EventLog. Slots SHALL never be touched by removal.
+Fixed titles SHALL expose no delete API, command, or code path — a structural
+test asserts absence. Removal is irreversible; there is no recycle bin, and
+the removed name becomes nominatable again through G's live-collection filter.
 
 #### Scenario: Equipped epithet refuses at gate one
 - **WHEN** `title remove epithet <equipped display>` is attempted
@@ -75,10 +86,11 @@ again through G's live-collection filter.
 - **THEN** no fixed-title delete API, command, or code path exists
 
 ### Requirement: Codex surfaces remain consistent across sessions
-Collection, equip record, and pending ballot are persistent attributes, so the
-codex window — including the 「提名中」tab and every `can_remove` flag — SHALL
-render identically after relogin or reload; a removal executed in one session
-SHALL be reflected in the next session's view and EventLog.
+Collection, equip record, removal log, and pending ballot are persistent
+attributes, so the codex window — including the 「提名中」tab and every
+`can_remove` flag — SHALL render identically after relogin or reload; a removal
+executed in one session SHALL be reflected in the next session's view and in
+the durable removal log.
 
 #### Scenario: Post-relogin view matches the pre-logout view
 - **WHEN** a player removes an epithet, logs out, and reopens the codex

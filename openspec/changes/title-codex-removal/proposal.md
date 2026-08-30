@@ -28,12 +28,15 @@ equivalent to slot-non-empty (D8) with no unequip path anywhere.
   「提名中」tab for a pending ballot (G's menu relocated), header full-title
   preview updating live. No 卸裝 control.
 - `world/rules/titles.py::remove_epithet(entity, display)` — the ONLY delete
-  path, gated twice before the confirm flow even starts:
-  `TITLE_EQUIPPED_UNREMOVABLE` (equipped) and `TITLE_LAST_EPITHET` (last
-  epithet), both stable codes, neither ever reaching review; success deletes the
-  collection entry, leaves slots untouched, and appends the
-  `title_epithet_removed` EventLog entry (Director-readable). Fixed titles have
-  no delete path at all (structural test asserts absence).
+  path, gated twice before the confirm flow even starts (precedence: unknown/
+  wrong-kind ⇒ stable rejection; `TITLE_LAST_EPITHET` first, because the D8
+  invariant makes the sole epithet the equipped one; then
+  `TITLE_EQUIPPED_UNREMOVABLE`), both stable codes, neither ever reaching
+  review; success deletes the collection entry, records `{tick, display}` in
+  the durable bounded `title_epithet_removals` log (Director-facing digest,
+  same discipline as the decline log), leaves slots untouched, and returns the
+  `title_epithet_removed` EventLog. Fixed titles have no delete path at all
+  (structural test asserts absence).
 - Telnet `title remove epithet <display>` → echo review info (display + basis),
   literal `confirm` suffix executes, anything else cancels; `title codex` prints
   the same two blocks in text. Docs trio updated in this change.

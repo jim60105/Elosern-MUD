@@ -147,6 +147,7 @@
         "world.rules.tests.test_targeting",
         "world.rules.tests.test_tier_construction",
         "world.rules.tests.test_time_skip",
+        "world.rules.tests.test_title_view",
         "world.rules.tests.test_titles",
         "world.rules.tests.test_to_hit_calibration",
         "world.rules.tests.test_traits",
