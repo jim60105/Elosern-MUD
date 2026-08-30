@@ -764,12 +764,17 @@ def main() -> None:
     # cast acceptance test.  ``grant_lineage`` closes the skill lineage and
     # seeds prerequisite proficiency so every requested ACTIVE skill is
     # actually castable under the lineage gate (fire_ball pulls fire_arrow).
+    # ``rungs`` raises wind_blade's OWN proficiency to the ladder's top level
+    # (use-driven-skill-lineage DC5: the skill-anchored ladder unlocks
+    # 0.25/0.5/1/2/4 at its own levels 0/1/3/6/10; wind_blade has no
+    # consuming edges, so its derived tip cap is the full 10).
     from world.rules.tests.combat_fixtures import grant_lineage
 
     grant_lineage(
         character,
         ["fire_ball", "wind_blade", "status_disguise", "concentration"],
         ["defense_instinct", "wind_mastery"],
+        rungs={"wind_blade": 10},
     )
     # A persistent poisoned buff gives the status panel a deterministic
     # applied-modifier condition (agility -10%) for viewport assertions.
