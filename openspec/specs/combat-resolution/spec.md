@@ -68,7 +68,7 @@ otherwise. This calculation SHALL only run when the to-hit check (above) already
 
 ### Requirement: effective_power combines four effective stats multiplied by max hp
 `world/rules/combat.py` SHALL provide `effective_power(entity) -> float`, computed as the sum of
-`SkillHandler.effective_value()` for `atk_phys`, `agility`, `defense`, and `magic_level`, multiplied by
+`SkillHandler.effective_value()` for `atk_phys`, `agility`, `defense`, and `magic_power`, multiplied by
 `max(entity.traits.hp.max, 0)` — the entity's race/tier hp ceiling, never its current, depletable hp
 value. This function SHALL NOT write to any entity attribute.
 

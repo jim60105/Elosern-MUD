@@ -67,7 +67,8 @@ derived deterministically from the lore tables.
 ### Requirement: NPC role tiers resolve deterministic physical stats through the lore registries
 SceneBuilder SHALL derive an NPC occupant's stored traits from its `NPCTier` entry's `race_key` and
 `static_tier_key` via `world.rules.traits.build_initial_traits(race_key, tier=static_tier_key)`,
-setting `magic_level` to the race's `starting_magic_level`; it SHALL read these values from the
+which reads the tier's `magic_band` floor into `magic_power` (the deleted race-level
+`starting_magic_level` has no successor constant); it SHALL read these values from the
 immutable registries and SHALL NOT duplicate balance constants anywhere in `world/quests/`.
 
 #### Scenario: Two NPCs of one tier store identical lore-derived stats

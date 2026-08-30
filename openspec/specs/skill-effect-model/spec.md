@@ -15,7 +15,7 @@ frozen dataclasses, one per recognized prefix (`stat_multiply`, `growth_rate`, `
 `confer_growth_rate`, `sexual_event`, `damage`, `heal`, `self_heal`, `cleanse`, `disengage`,
 `divine_mystery`). `parse_effect` SHALL raise `ValueError` for any prefix not in this set.
 `growth_rate` SHALL be recognized because
-`reincarnation_boon_elosia` already declares `growth_rate:magic:100`, which
+`reincarnation_boon_elosia` already declares `growth_rate:practice:100`, which
 `world/rules/progression.py` consumes; omitting it would make the registry's own import fail the
 "every existing entry parses" scenario below.
 
@@ -24,8 +24,10 @@ frozen dataclasses, one per recognized prefix (`stat_multiply`, `growth_rate`, `
 - **THEN** it returns a `StatMultiplyEffect(trait="atk_phys", multiplier=100.0)` instance
 
 #### Scenario: The read-time growth_rate prefix parses into its dataclass
-- **WHEN** `parse_effect("growth_rate:magic:100")` is called
-- **THEN** it returns a `GrowthRateEffect(stat="magic", multiplier=100.0)` instance
+- **WHEN** `parse_effect("growth_rate:practice:100")` is called
+- **THEN** it returns a `GrowthRateEffect(stat="practice", multiplier=100.0)` instance, and
+  `parse_effect("growth_rate:magic:100")` raises `ValueError` (the retired stat key fails closed
+  at parse and therefore at registry load)
 
 #### Scenario: heal and self_heal parse into their dataclasses
 - **WHEN** `parse_effect("heal:single")`, `parse_effect("heal:area")`, and

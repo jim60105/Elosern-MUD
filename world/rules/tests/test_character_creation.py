@@ -169,7 +169,10 @@ class CharacterActivationTests(EvenniaTest):
         self.assertEqual(result.display_name, name)
         self.assertEqual(self.character.key, name)
 
-    @covers_requirement("player-stat-allocation::starting-magic-level-is-sampled-from-a-race-owned-average-band")
+    @covers_requirement(
+        "player-stat-allocation::player-starting-profiles-are-derived-from-immutable-lore-bands",
+        "player-stat-allocation::custom-starting-stats-require-one-exact-finite-allocation-budget",
+    )
     def test_preset_activation_fixes_magic_power_deterministically(self):
         # The retired race-average sampler is replaced by the preset's own
         # allocation: elf_guardian allocates 400 over the elf floor (100).

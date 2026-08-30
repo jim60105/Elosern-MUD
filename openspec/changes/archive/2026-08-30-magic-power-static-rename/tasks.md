@@ -157,7 +157,7 @@
 
 ## Post-sync traceability (during archive/sync)
 
-- [ ] P.1 After this change's deltas are synced into `openspec/specs/`, run
+- [x] P.1 After this change's deltas are synced into `openspec/specs/`, run
       `uv run --locked python -m tools.spec_traceability list` and add
       `covers_requirement` annotations mapping the renamed requirement IDs to
       their re-pinned tests in a follow-up sync commit (no annotations for

@@ -57,7 +57,7 @@ class ProgressionTests(EvenniaTestCase):
         monster.apply_monster_tier()
         return monster
 
-    @covers_requirement("magic-level-progression::effective-magic-growth-multiplier-combines-race-self-and-conferred-multipliers")
+    @covers_requirement("magic-level-progression::effective-growth-multiplier-combines-race-self-and-conferred-multipliers")
     def test_multiplier_combines_race_owned_passive_and_conferred_buff(self):
         entity = self._character("elosia", "elf")
         entity.db.skills = {
@@ -167,7 +167,7 @@ class ProgressionTests(EvenniaTestCase):
         self.assertEqual(skill_proficiency_level(entity, "never_practiced"), 0)
         self.assertEqual(entity.db.skill_proficiency, before)
 
-    @covers_requirement("skill-proficiency-tracking::skill-proficiency-is-a-per-entity-per-skill-counter-independent-of-magic-level")
+    @covers_requirement("skill-proficiency-tracking::skill-proficiency-is-a-per-entity-per-skill-counter-independent-of-magic-power")
     def test_magic_xp_grants_preserve_skill_proficiency(self):
         entity = self._character("separate-progression")
         entity.db.skill_proficiency = {"shadow_slash": 25.0}

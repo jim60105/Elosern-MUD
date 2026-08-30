@@ -10,13 +10,13 @@ caller's explicit identity-population step, the handler SHALL be empty because `
 or `threat_tier` is not known during generic Evennia object creation. After
 `apply_race_baseline()` or `apply_monster_tier()` succeeds, it SHALL contain exactly eight traits
 with the trait types design doc §5.2 specifies: `hp`, `mp`, `sp` as
-`GaugeTrait`; `atk_phys`, `agility`, `defense` as `StaticTrait`; `magic_level`, `guild_merit` as
-`CounterTrait`.
+`GaugeTrait`; `atk_phys`, `agility`, `defense`, and `magic_power` as `StaticTrait`; `guild_merit`
+as `CounterTrait`.
 
 #### Scenario: All eight traits are present with the correct type
 - **WHEN** `entity.traits` is inspected after a valid identity-population method succeeds
 - **THEN** it contains exactly the keys `hp`, `mp`, `sp`, `atk_phys`, `agility`, `defense`,
-  `magic_level`, `guild_merit`, and each resolves to an instance of the trait type design doc §5.2
+  `magic_power`, `guild_merit`, and each resolves to an instance of the trait type design doc §5.2
   specifies for that key
 
 #### Scenario: A generically created entity is explicitly uninitialized
@@ -35,12 +35,12 @@ with the trait types design doc §5.2 specifies: `hp`, `mp`, `sp` as
 
 ### Requirement: Race-driven gauge and counter initial values come from RaceProfile, never a hardcoded per-race number
 `world/rules/traits.py` SHALL derive a `PlayerCharacter` or `NPC`'s race-baseline `hp`/`mp`/`sp`
-gauge maxima from `RaceProfile.vital_baseline`, and its race-baseline `magic_level` counter maximum
-from `RaceProfile.magic_cap`, reading both from change 2's `world.lore.races.RACE_REGISTRY`. No
-module added by this change SHALL contain a hardcoded HP, MP, SP, or magic-cap number for any
-specific race. Race-baseline construction SHALL set `magic_level` current value to `0`; a separately
-validated player-character activation service may then assign its lore-owned starting value before
-enabling gameplay.
+gauge maxima from `RaceProfile.vital_baseline`, and its race-baseline `magic_power` static base
+from `RaceProfile.static_baseline.magic_power[0]`, reading both from change 2's
+`world.lore.races.RACE_REGISTRY`. No
+module added by this change SHALL contain a hardcoded HP, MP, SP, or magic-band number for any
+specific race. Race-baseline construction SHALL set `magic_power` to the fourth band's floor
+exactly like the other three static axes; no separate starting-magic assignment step exists.
 
 #### Scenario: Elf HP gauge reflects the race's vital baseline
 - **WHEN** a `PlayerCharacter` or `NPC` is initialized with `race="elf"`
@@ -52,10 +52,11 @@ enabling gameplay.
 - **THEN** `entity.traits.hp`'s maximum equals `RACE_REGISTRY["human"].vital_baseline.hp[0]`, not a
   literal number written in `world/rules/traits.py`
 
-#### Scenario: magic_level cap reflects the race's magic_cap
+#### Scenario: magic_power base reflects the race's fourth static band
 - **WHEN** a `PlayerCharacter` or `NPC` is initialized with any valid race
-- **THEN** `entity.traits.magic_level`'s maximum equals `RACE_REGISTRY[race].magic_cap`, and its
-  current value starts at `0` during race-baseline construction
+- **THEN** `entity.traits.magic_power` is a `StaticTrait` whose base equals
+  `RACE_REGISTRY[race].static_baseline.magic_power[0]` (the fourth band's floor), never a literal
+  number written in `world/rules/traits.py`, and no counter `max` is configured for it
 
 #### Scenario: The vital-pool gap between human and elf propagates from lore to the entity
 - **WHEN** an elf `PlayerCharacter`'s `entity.traits.hp` maximum is compared against a human
@@ -67,7 +68,7 @@ enabling gameplay.
 `world/rules/traits.py` SHALL derive a `PlayerCharacter` or `NPC`'s initial `atk_phys`/`agility`/
 `defense` static bases directly from `RaceProfile.static_baseline` (the species-wide floor-to-
 ceiling band for those three stats), reading `world.lore.races.RACE_REGISTRY`. No module added by
-this change SHALL compute a static trait value as a function of `vital_baseline`, `magic_cap`, or
+this change SHALL compute a static trait value as a function of `vital_baseline` or
 any other field that is not itself a static-stat field — vital pools and static combat stats scale
 by different, independently documented factors between races, and neither is derivable from the
 other.
@@ -123,16 +124,19 @@ never blend or average with it.
 naming a key in `world.lore.races.STATIC_TIER_REGISTRY`. When `tier` is omitted, construction SHALL
 behave exactly as it does with no `tier` support (species floor). When `tier` is supplied, the
 resulting `atk_phys`/`agility`/`defense` bases SHALL be read from that tier's own `.band` (its floor
-value) rather than from `RaceProfile.static_baseline`'s species floor; `hp`/`mp`/`sp`/`magic_level`
-SHALL remain driven by `RaceProfile.vital_baseline`/`magic_cap` regardless of `tier`, since
-`STATIC_TIER_REGISTRY` carries no vital or magic dimension. This mechanism SHALL introduce no
+value) rather than from `RaceProfile.static_baseline`'s species floor, and the `magic_power` base
+SHALL be read from that tier's own `.magic_band` floor; `hp`/`mp`/`sp`
+SHALL remain driven by `RaceProfile.vital_baseline` regardless of `tier`, since
+`STATIC_TIER_REGISTRY` carries no vital dimension. This mechanism SHALL introduce no
 randomization, stat-point allocation, or level-up curve — one named tier always produces one
 deterministic value.
 
 #### Scenario: A named tier places static traits inside that tier's own band
 - **WHEN** a human `PlayerCharacter` is constructed with `tier="human_swordmaster"`
   (`STATIC_TIER_REGISTRY["human_swordmaster"].band == (18, 22)`)
-- **THEN** `entity.traits.atk_phys`, `agility`, and `defense` bases each fall within `18`-`22`
+- **THEN** `entity.traits.atk_phys`, `agility`, and `defense` bases each fall within `18`-`22`,
+  and `entity.traits.magic_power`'s base equals `STATIC_TIER_REGISTRY["human_swordmaster"]
+  .magic_band[0]`
 
 #### Scenario: A different named tier on the same race places static traits inside its own, different band
 - **WHEN** a human `PlayerCharacter` is constructed with `tier="human_commoner"`
@@ -179,11 +183,11 @@ band.
 - **THEN** population raises an error rather than silently defaulting to an arbitrary trait
   scale
 
-#### Scenario: A Monster's mp, sp, and magic_level default to zero, not an invented value
+#### Scenario: A Monster's mp, sp, and magic_power default to zero, not an invented value
 - **WHEN** a `Monster` is initialized with any valid `threat_tier`
-- **THEN** `entity.traits.mp` and `entity.traits.sp` maxima are `0` and `entity.traits.magic_level`'s
-  maximum is `0`, since `MonsterTier` documents no numeric MP/SP/magic band and this change does not
-  invent one
+- **THEN** `entity.traits.mp` and `entity.traits.sp` maxima are `0` and
+  `entity.traits.magic_power`'s base is `0`, since `MonsterTier` documents no numeric MP/SP/magic
+  band and this change does not invent one (every tier's `static_band.magic_power` is `(0, 0)`)
 
 ### Requirement: A caller may select a deterministic position within a Monster's tier band instead of always landing at the floor
 `world/rules/traits.py`'s monster trait-construction function SHALL accept an optional `position`

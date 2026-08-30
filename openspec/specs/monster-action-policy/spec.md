@@ -206,7 +206,7 @@ SHALL be the only tier-gate applied by this policy; the policy SHALL NOT raise o
 #### Scenario: An over-tier affordable spell falls back to the innate basic_attack
 - **WHEN** `default_attack_policy` runs for a non-Monster entity (e.g. a party NPC) that owns an
   affordable elemental spell above its element-effective tier — `skills=["firestorm"]`,
-  `magic_level == 15`, `mp >= 30`, `affinity_elements == []`, no `fire_mastery` — and a living enemy
+  `magic_power == 15`, `mp >= 30`, `affinity_elements == []`, no `fire_mastery` — and a living enemy
   is present
 - **THEN** the returned `ActionRequest` names `"basic_attack"` targeting that enemy, never the
   tier-blocked spell, and `ActionResolver` accepts the request

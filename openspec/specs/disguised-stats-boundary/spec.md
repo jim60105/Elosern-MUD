@@ -11,10 +11,10 @@ a display-only override value. Setting or clearing `disguised_stats` SHALL have 
 value stored in `entity.traits`.
 
 #### Scenario: Setting disguised_stats does not change true trait values
-- **WHEN** `entity.db.disguised_stats` is set to `{"atk_phys": 60, "magic_level": 30}` on an entity
+- **WHEN** `entity.db.disguised_stats` is set to `{"atk_phys": 60, "magic_power": 30}` on an entity
   whose true `atk_phys` base is 88 (within the elf `elf_common` `StaticBand` of 70-95 — a base
-  value, per design.md D-7, never a skill-multiplied `88000`) and true `magic_level` is 250
-- **THEN** `entity.traits.atk_phys.value` still equals 88 and `entity.traits.magic_level.value`
+  value, per design.md D-7, never a skill-multiplied `88000`) and true `magic_power` is 250
+- **THEN** `entity.traits.atk_phys.value` still equals 88 and `entity.traits.magic_power.value`
   still equals 250
 
 #### Scenario: disguised_stats may be absent
@@ -61,7 +61,7 @@ and resolution and fails if either symbol appears in any of them.
 The docstring of `get_display_value` and this specification SHALL name exactly three permitted call
 sites: appearance rendering (`look`), guild registration records, and appraisal items. Appearance
 rendering SHALL be implemented through the `look <target>` displayed-stats block, which SHALL call
-the accessor for the displayed combat five (`atk_phys`, `agility`, `defense`, `magic_level`, `hp`).
+the accessor for the displayed combat five (`atk_phys`, `agility`, `defense`, `magic_power`, `hp`).
 Guild registration SHALL call the accessor once per documented trait key to persist a historical
 displayed-stat snapshot. Appraisal items MAY remain deferred. No other guild operation, including
 board eligibility, reward settlement, merit checks, examiner profile selection, combat, or

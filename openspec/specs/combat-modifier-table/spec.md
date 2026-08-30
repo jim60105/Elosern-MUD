@@ -138,7 +138,7 @@ Damage resolution in `world/rules/combat.py`'s damage handler SHALL add the acto
 bundle value to the actor's effective physical attack stat before the damage multiplier is applied,
 and SHALL add the target's flat `defense` bundle value to the target's effective defense stat before
 the defense term is subtracted. The `atk_phys` adjustment SHALL apply only to physical-school
-attacks (`attack_key == "atk_phys"`); magic-school attacks (`magic_level`) SHALL NOT receive it. The
+attacks (`attack_key == "atk_phys"`); magic-school attacks (`magic_power`) SHALL NOT receive it. The
 `defense` adjustment SHALL apply to both physical and magic attacks, matching defense's existing
 dual-school mitigation role. An entity with no matching rows receives unchanged damage math.
 
@@ -150,7 +150,7 @@ dual-school mitigation role. An entity with no matching rows receives unchanged 
 
 #### Scenario: A magic attack ignores the atk_phys bonus
 - **WHEN** the same attacker casts a magic-school spell (damage effect with the magic school)
-- **THEN** the staged damage amount is computed from `effective_value("magic_level")` with no
+- **THEN** the staged damage amount is computed from `effective_value("magic_power")` with no
   `atk_phys` bundle value added
 
 #### Scenario: A defender with a defense bonus takes less damage
