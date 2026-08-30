@@ -34,6 +34,7 @@ import StatusPanel from "./components/StatusPanel.vue";
 import OverlayHost from "./components/OverlayHost.vue";
 import HelpOverlay from "./components/HelpOverlay.vue";
 import LineagePanel from "./components/LineagePanel.vue";
+import TitleCodexPanel from "./components/TitleCodexPanel.vue";
 
 const store = useElosernStore();
 
@@ -475,6 +476,13 @@ function onInventoryItemAction(intent) {
 // accept/decline intents ride the same single dispatch entry as the shop
 // and quest surfaces.
 function onTitleBallotAction(intent) {
+  store.dispatchAction(intent.action_id, intent.payload);
+}
+
+// The 稱號冊 window (title-codex-removal): equip/remove/ballot intents ride
+// the same single dispatch entry; the rules writer re-validates every gate
+// at execution, so the window forwards without client-side rules.
+function onTitleCodexAction(intent) {
   store.dispatchAction(intent.action_id, intent.payload);
 }
 
@@ -930,6 +938,15 @@ onMounted(() => {
              meters, collapsed chains their aggregate meter; the client
              computes no growth rules. -->
         <LineagePanel v-else-if="openName === 'lineage'" :lineage="panel('lineage')" />
+        <!-- title-codex-removal: the big-window codex renders the committed
+             `title_codex` panel verbatim — the server's `can_remove` flag
+             alone decides whether a 移除 control exists; the client owns no
+             gate rule and no 卸裝 control. -->
+        <TitleCodexPanel
+          v-else-if="openName === 'codex'"
+          :codex="panel('title_codex')"
+          @action="onTitleCodexAction"
+        />
         <!-- No committed panel carries authored guide content, so the help
              surface renders its client-owned control reference and the
              statement of how the game's own `help` output is reached (task

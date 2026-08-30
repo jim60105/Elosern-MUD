@@ -161,6 +161,8 @@ class RegistryTests(unittest.TestCase):
                     "options.dismiss",
                     "title.accept",
                     "title.decline",
+                    "title.equip",
+                    "title.remove",
                 }
             ),
         )

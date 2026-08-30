@@ -295,6 +295,19 @@ defineExpose({ focusField });
         <button
           type="button"
           class="cmdutil__btn"
+          aria-label="稱號冊"
+          data-testid="command-line-codex"
+          @click="onOpenOverlay('codex')"
+        >
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M5 17h14" stroke-linecap="round" />
+            <path d="m12 7 .9 1.9 2.1.3-1.5 1.5.4 2-1.9-1-1.9 1 .4-2L9 9.2l2.1-.3z" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="cmdutil__btn"
           aria-label="設定"
           data-testid="command-line-settings"
           @click="onOpenOverlay('settings')"

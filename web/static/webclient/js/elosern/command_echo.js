@@ -36,6 +36,10 @@
   // full emitted line is bounded so a hostile label can never flood the log.
   var MAX_LABEL_LENGTH = 60;
   var MAX_LINE_LENGTH = 120;
+  // Title identifiers ride the title view/validator cap (64 code points),
+  // not the generic label bound: an echo must never truncate the exact
+  // identifier its payload dispatches (protocol.js pins the same 64).
+  var MAX_TITLE_IDENTIFIER_LENGTH = 64;
 
   function isNonEmpty(value) {
     return typeof value === "string" && value.trim() !== "";
@@ -50,6 +54,21 @@
     var text = value.replace(/[\r\n\t]+/g, " ").trim();
     if (text.length > MAX_LABEL_LENGTH) {
       text = text.slice(0, MAX_LABEL_LENGTH);
+    }
+    return text;
+  }
+
+  // Bounded title identifier at the title contract cap (64): the worst-case
+  // lines — `title equip epithet <64>` (84) and `title remove epithet
+  // "<64>" confirm` (97) — still fit inside MAX_LINE_LENGTH, so the full
+  // identifier always survives the echo.
+  function titleLabel(value) {
+    if (!isNonEmpty(value)) {
+      return null;
+    }
+    var text = value.replace(/[\r\n\t]+/g, " ").trim();
+    if (text.length > MAX_TITLE_IDENTIFIER_LENGTH) {
+      text = text.slice(0, MAX_TITLE_IDENTIFIER_LENGTH);
     }
     return text;
   }
@@ -255,6 +274,34 @@
     "title.decline": function () {
       return "title decline";
     },
+    // The codex equip/remove controls replay the typed commands verbatim
+    // (commands/title.py, title-codex-removal): `title equip fixed|epithet
+    // <identifier>` and the confirmed `title remove epithet <display>
+    // confirm`. A display whose tail would eat the literal confirm token is
+    // echoed quoted, mirroring the server's quote-stripping parse, so the
+    // echoed line always re-parses to the same target.
+    "title.equip": function (payload) {
+      var kind = payload && payload.kind;
+      if (kind !== "fixed" && kind !== "epithet") {
+        return null;
+      }
+      var identifier = titleLabel(payload && payload.identifier);
+      return identifier === null
+        ? null
+        : join(["title", "equip", kind, identifier]);
+    },
+    "title.remove": function (payload) {
+      var display = titleLabel(payload && payload.display);
+      if (display === null) {
+        return null;
+      }
+      var lowered = display.toLowerCase();
+      var target =
+        lowered === "confirm" || lowered.endsWith(" confirm")
+          ? '"' + display + '"'
+          : display;
+      return join(["title", "remove", "epithet", target, "confirm"]);
+    },
     "creation.preset": function (payload) {
       var key = payload && payload.preset_key;
       return isNonEmpty(key) ? join(["character preset", key]) : null;
@@ -304,5 +351,6 @@
     SILENT_PRESENTATION_CONTROLS: SILENT_PRESENTATION_CONTROLS.slice(),
     MAX_LABEL_LENGTH: MAX_LABEL_LENGTH,
     MAX_LINE_LENGTH: MAX_LINE_LENGTH,
+    MAX_TITLE_IDENTIFIER_LENGTH: MAX_TITLE_IDENTIFIER_LENGTH,
   };
 });

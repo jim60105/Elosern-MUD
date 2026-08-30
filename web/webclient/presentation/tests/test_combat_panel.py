@@ -1485,6 +1485,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                     "lineage",
                     "character",
                     "title_ballot",
+                    "title_codex",
                 }
             ),
         )

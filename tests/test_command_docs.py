@@ -154,7 +154,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "設定描述": {"syntax": "設定描述 <描述>", "context": "一般"},
     "設定背景": {"syntax": "設定背景 <文字>", "context": "一般（已啟用的角色）"},
     "title": {
-        "syntax": "title list、title equip fixed <display|key>、title equip epithet <display>、title accept <1|2|3>、title decline",
+        "syntax": "title list、title codex、title equip fixed <display|key>、title equip epithet <display>、title accept <1|2|3>、title decline、title remove epithet <display> [confirm]",
         "context": "一般（戰鬥內外皆可用）",
     },
     "登出": {"syntax": "登出", "context": "一般（隨時可用）"},

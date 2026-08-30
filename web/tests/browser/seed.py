@@ -582,6 +582,39 @@ def _options_surface_fixture(character) -> None:
     print("seeded options-surface fixture: 選項測試廣場 + LLMNPC + wolf")
 
 
+def _titles_fixture(character) -> None:
+    """Deterministically prepare a title-codex fixture (title-codex-removal).
+
+    Opted-in with ``ELOSERN_BROWSER_TITLES=1``. Banks two unlocked guild fixed
+    titles (leaving others locked), two epithets — the first auto-equips, the
+    newer one is removable — and persists one nomination ballot, so the codex
+    window renders locked/unlocked rows, the ★ mark, the server-computed
+    ``can_remove`` flags, and the 提名中 tab without any LLM call.
+    """
+    import os
+
+    if os.environ.get("ELOSERN_BROWSER_TITLES", "") != "1":
+        return
+
+    from world.rules.clock import get_world_clock
+    from world.rules.titles import (
+        bank_epithet,
+        bank_fixed,
+        persist_nomination_ballot,
+    )
+
+    tick = get_world_clock().tick
+    bank_fixed(character, "g_f_rank", tick)
+    bank_fixed(character, "g_e_rank", tick)
+    bank_epithet(character, "南門新客", "初入南門。", tick)
+    bank_epithet(character, "破城先鋒", "率先破門。", tick + 1)
+    persist_nomination_ballot(
+        character,
+        [{"display": "夜襲之人", "basis": "夜半三度出入敵陣。"}],
+    )
+    print("seeded titles fixture: fixed 2 banked, epithets 2, one ballot")
+
+
 def main() -> None:
     os.environ.setdefault(
         "DJANGO_SETTINGS_MODULE", "web.tests.browser.browser_settings"
@@ -721,6 +754,7 @@ def main() -> None:
     _art_fixture(character, room)
     _exploration_fixture(character)
     _options_surface_fixture(character)
+    _titles_fixture(character)
 
     # Deterministic combat fixtures (webclient-combat-menu): grant active
     # skills covering every TargetSpec and spawn two living monsters in the
