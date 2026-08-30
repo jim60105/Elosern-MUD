@@ -408,6 +408,16 @@ def validate_character(record: dict[str, Any]) -> RecordReport:
     report.rejections.extend(_digit_only_key_issues(record))
     if report.rejections:
         return report
+    # Lineage auto-seed normalizes the record BEFORE the semantic phase: the
+    # report (and therefore the loader) carries prerequisite-ownership closure
+    # plus exact seeded proficiency (use-driven-skill-lineage DC6). Structural
+    # schema validation ran on the raw record, so a malformed field still
+    # rejects wholesale; explicit skill_proficiency entries always beat the
+    # seed.
+    from world.rules.progression import normalize_lineage_record
+
+    record = normalize_lineage_record(record)
+    report.record = record
     report.rejections.extend(_check_entity_key_contract(record))
     report.rejections.extend(_check_disguised_stats_subset(record))
     report.rejections.extend(_check_race_subrace(record))
@@ -473,7 +483,12 @@ def validate_batch(paths: list[Path]) -> BatchReport:
         report.path = path
         reports.append(report)
         if report.is_valid:
-            (character_records if kind == "character" else world_records).append(raw)
+            # The VALIDATED record carries the lineage auto-seed normalization
+            # (use-driven-skill-lineage DC6); the loader instantiates exactly
+            # what was validated, never the raw file content.
+            (character_records if kind == "character" else world_records).append(
+                report.record
+            )
 
     _flag_duplicate_keys(reports, character_records, "character", "character")
     _flag_duplicate_keys(reports, world_records, "world_entry", "world-entry")

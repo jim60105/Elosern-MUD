@@ -44,6 +44,7 @@ from world.quests.runtime import (
     find_record,
     read_records,
 )
+from world.rules.progression import apply_lineage_auto_seed
 from world.rules.traits import (
     build_initial_traits,
     trait_config_for_values,
@@ -300,6 +301,11 @@ def _spawn_npc(
     npc._apply_trait_config(config)
     npc.db.disposition = disposition
     _apply_characterization(npc, requirement, position)
+    # The shared lineage auto-seed (use-driven-skill-lineage DC6): a spawned
+    # NPC that owns a deep skill gets its prerequisite chain closed and each
+    # unsatisfied edge seeded to exactly the required proficiency, so its
+    # skills are usable on spawn. No-op for a skill-less prototype.
+    apply_lineage_auto_seed(npc)
     return npc
 
 

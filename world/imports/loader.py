@@ -35,7 +35,10 @@ def instantiate_character(
     report = validate_character(record)
     if not report.is_valid:
         raise ImportRejected(BatchReport([report]))
-    return _instantiate_validated_character(record, typeclass)
+    # The validated record carries the lineage auto-seed normalization
+    # (use-driven-skill-lineage DC6): ownership closure and exact seeded
+    # proficiency. Instantiate exactly what was validated.
+    return _instantiate_validated_character(report.record, typeclass)
 
 
 def _resolve_affinity_elements(record: dict[str, Any]) -> list[str]:
@@ -73,6 +76,10 @@ def _instantiate_validated_character(
         "active": record["skills"],
         "passive": record["passives"],
     }
+    # The lineage auto-seed applied by validation (exact edge values; the
+    # record's explicit entries won). Stored inside the same transaction, so
+    # a rejected batch persists nothing, seed included.
+    entity.db.skill_proficiency = dict(record.get("skill_proficiency") or {})
     entity.db.equipment = record["equipment"]
     entity.db.inventory = record["inventory"]
     entity.db.affinity_elements = _resolve_affinity_elements(record)
