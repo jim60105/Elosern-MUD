@@ -76,7 +76,11 @@ primary key, its aliases (including Traditional Chinese aliases and, for localiz
 retained full English alias set), its argument syntax, its availability context, and a non-empty
 Traditional Chinese description. The key and aliases SHALL match the command class definition, the
 syntax and context SHALL match the curated command manifest in `tests/test_command_docs.py`, and
-admin commands SHALL carry their permission requirement.
+admin commands SHALL carry their permission requirement. The `rest` entry's syntax SHALL document the optional declared-practice clause
+(`rest <duration> [practice <skill>]`) and its description SHALL state that a declared practice
+settles hourly proficiency for the owned, uncapped skill while an unlabeled rest advances time
+with no growth; the curated manifest and the `docs/game/commands.md` rest row SHALL carry the
+same clause.
 
 #### Scenario: Key and aliases match the command class
 
@@ -109,6 +113,13 @@ admin commands SHALL carry their permission requirement.
   `@open` commands)
 - **THEN** the reference entry SHALL state the builder restriction and the contract test SHALL
   verify the class locks require `Builder`
+
+#### Scenario: The rest entry documents the practice clause
+
+- **WHEN** the drift contract test inspects the `rest` canonical entry
+- **THEN** the syntax row equals the manifest's `rest <duration> [practice <skill>]` form, the
+  description mentions hourly declared-practice settlement and the zero-growth plain rest, and
+  the overview's rest row agrees
 
 ### Requirement: Docsify navigation
 

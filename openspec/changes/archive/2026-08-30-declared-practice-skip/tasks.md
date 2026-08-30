@@ -57,6 +57,6 @@
 
 ## Post-sync traceability (during archive/sync)
 
-- [ ] P1 On sync, ensure the §3.1/§3.2 assertions carry the
+- [x] P1 On sync, ensure the §3.1/§3.2 assertions carry the
   `time-skip-commands` / `skip-safety-gate` / `settlement-stage-order`
   requirement IDs (slugs unchanged — titles were not renamed).
