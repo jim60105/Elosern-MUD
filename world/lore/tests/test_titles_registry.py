@@ -10,6 +10,8 @@ rows or the startup sync order.
 import dataclasses
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.titles import (
     FIXED_TITLE_REGISTRY,
@@ -134,11 +136,13 @@ class FixedTitleRegistryContentTests(unittest.TestCase):
         with self.assertRaises(dataclasses.FrozenInstanceError):
             STARTER_EPITHET.display = "改名"
 
+    @covers_requirement("title-system::the-fixed-title-lore-registry-validates-and-syncs-idempotently")
     def test_shipped_rows_validate_against_the_live_faces(self):
         self.assertIsNone(
             validate_fixed_titles(list(FIXED_TITLE_REGISTRY.values()), **_live_faces())
         )
 
+    @covers_requirement("title-system::the-fixed-title-lore-registry-validates-and-syncs-idempotently")
     def test_registry_publication_is_immutable(self):
         # Consumers read through the mapping protocol; in-place lore mutation
         # is impossible on the published proxy.

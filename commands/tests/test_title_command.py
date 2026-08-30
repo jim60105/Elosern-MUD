@@ -8,6 +8,8 @@ malformed state, and the usage line for anything else. It also pins the mount
 (key ``title``, no aliases) and that the equip surface can never empty a slot.
 """
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
@@ -63,6 +65,7 @@ class TitleCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("◆ 異名", output)
         self.assertIn("（尚未取得）", output)
 
+    @covers_requirement("title-system::the-title-equip-surface-swaps-identifiers-and-never-un-equips")
     def test_equip_fixed_accepts_key_or_display_and_reports_the_new_title(self):
         bank_fixed(self.actor, "g_f_rank", 1)
         bank_fixed(self.actor, "g_e_rank", 2)
@@ -74,6 +77,7 @@ class TitleCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(self._call("equip fixed g_f_rank"), "你掛上稱號：F級冒險者")
         self.assertEqual(read_title_state(self.actor)[0][1]["key"], "g_e_rank")
 
+    @covers_requirement("title-system::the-title-equip-surface-swaps-identifiers-and-never-un-equips")
     def test_equip_epithet_swaps_between_banked_epithets(self):
         bank_fixed(self.actor, "g_f_rank", 1)
         bank_epithet(self.actor, "南門新客", "守衛的目送", 1)
@@ -87,6 +91,7 @@ class TitleCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             self._call("equip epithet 南門 新客 二"), "你掛上異名：南門 新客 二"
         )
 
+    @covers_requirement("title-system::the-title-equip-surface-swaps-identifiers-and-never-un-equips")
     def test_every_rejection_shares_one_line_without_candidate_leakage(self):
         bank_fixed(self.actor, "g_f_rank", 1)
         bank_epithet(self.actor, "南門新客", "守衛的目送", 1)

@@ -10,6 +10,8 @@ lose nor double-grant. Also pins the structural invariant that no
 delete/unequip mutator exists anywhere in the module or its command.
 """
 
+from tools.spec_traceability import covers_requirement
+
 import functools
 import inspect
 from copy import deepcopy
@@ -157,6 +159,7 @@ class TitleStateTests(EvenniaTest):
         self.entity.attributes.add(TITLE_COLLECTION_KEY, collection)
         self.entity.attributes.add(TITLE_EQUIPPED_KEY, equipped)
 
+    @covers_requirement("title-system::title-state-is-a-two-kind-collection-and-a-two-slot-equip-record")
     def test_missing_attributes_read_as_the_empty_state(self):
         self.assertEqual(
             read_title_state(self.entity), ([], {"fixed": None, "epithet": None})
@@ -166,6 +169,7 @@ class TitleStateTests(EvenniaTest):
         self.assertEqual(banked_epithets(self.entity), ())
         self.assertEqual(title_context_entries(self.entity), ())
 
+    @covers_requirement("title-system::compose-title-is-the-single-pure-composition-of-the-full-title")
     def test_compose_matrix_joins_non_empty_parts_fixed_first(self):
         self.assertEqual(compose_title(None, None), "")
         self.assertEqual(compose_title("F級冒險者", None), "F級冒險者")
@@ -177,6 +181,7 @@ class TitleStateTests(EvenniaTest):
         # An unregistered key degrades to the key itself, never to a guess.
         self.assertEqual(fixed_display_name("g_unknown"), "g_unknown")
 
+    @covers_requirement("title-system::compose-title-is-the-single-pure-composition-of-the-full-title")
     def test_compose_reads_only_the_equipped_slots(self):
         self._prime(
             [
@@ -189,6 +194,7 @@ class TitleStateTests(EvenniaTest):
         )
         self.assertEqual(compose_full_title(self.entity), "E級斥候　夜行者")
 
+    @covers_requirement("title-system::slot-non-empty-is-an-invariant-with-auto-equip-and-no-unequip", "title-system::title-state-is-a-two-kind-collection-and-a-two-slot-equip-record")
     def test_bank_fixed_auto_equips_once_and_dedupes(self):
         self.assertTrue(bank_fixed(self.entity, "g_f_rank", 1))
         collection, equipped = read_title_state(self.entity)
@@ -198,6 +204,7 @@ class TitleStateTests(EvenniaTest):
         self.assertFalse(bank_fixed(self.entity, "g_f_rank", 99))
         self.assertEqual(read_title_state(self.entity)[0], collection)
 
+    @covers_requirement("title-system::slot-non-empty-is-an-invariant-with-auto-equip-and-no-unequip", "title-system::title-state-is-a-two-kind-collection-and-a-two-slot-equip-record")
     def test_bank_epithet_auto_equips_once_and_dedupes(self):
         self.assertTrue(bank_epithet(self.entity, "南門新客", "守衛的目送", 2))
         _, equipped = read_title_state(self.entity)
@@ -205,6 +212,23 @@ class TitleStateTests(EvenniaTest):
         before = read_title_state(self.entity)[0]
         self.assertFalse(bank_epithet(self.entity, "南門新客", "另一段引文", 55))
         self.assertEqual(read_title_state(self.entity)[0], before)
+
+    @covers_requirement("title-system::narrative-consumers-compose-predicates-read-the-collection")
+    def test_mechanical_reads_cover_the_whole_collection_not_the_slots(self):
+        bank_fixed(self.entity, "g_f_rank", 1)
+        bank_fixed(self.entity, "g_e_rank", 2)
+        bank_epithet(self.entity, "南門新客", "守衛的目送", 3)
+        bank_epithet(self.entity, "夜行者", "夜裡的眼", 4)
+        # Only the first entry of each kind auto-equipped; the later ones
+        # never touched a slot.
+        _, equipped = read_title_state(self.entity)
+        self.assertEqual(equipped, {"fixed": "g_f_rank", "epithet": "南門新客"})
+        # The mechanical reads still see every banked entry in the collection.
+        self.assertEqual(banked_fixed_keys(self.entity), ("g_f_rank", "g_e_rank"))
+        self.assertEqual(
+            tuple(entry["display"] for entry in banked_epithets(self.entity)),
+            ("南門新客", "夜行者"),
+        )
 
     def test_bank_fixed_rejects_malformed_input_without_touching_state(self):
         bank_fixed(self.entity, "g_f_rank", 1)
@@ -258,6 +282,7 @@ class TitleStateTests(EvenniaTest):
         self.assertTrue(bank_epithet(self.entity, boundary, "引文", 2))
         self.assertIn(boundary, [e["display"] for e in banked_epithets(self.entity)])
 
+    @covers_requirement("title-system::slot-non-empty-is-an-invariant-with-auto-equip-and-no-unequip", "title-system::the-title-equip-surface-swaps-identifiers-and-never-un-equips")
     def test_no_mutator_sequence_empties_an_occupied_slot(self):
         bank_fixed(self.entity, "g_f_rank", 1)
         bank_epithet(self.entity, "南門新客", "守衛的目送", 1)
@@ -286,6 +311,7 @@ class TitleStateTests(EvenniaTest):
             self.assertIsNotNone(equipped["fixed"])
             self.assertIsNotNone(equipped["epithet"])
 
+    @covers_requirement("title-system::the-title-equip-surface-swaps-identifiers-and-never-un-equips")
     def test_equip_accepts_key_or_display_and_returns_the_display(self):
         bank_fixed(self.entity, "g_f_rank", 1)
         bank_fixed(self.entity, "g_e_rank", 2)
@@ -299,6 +325,7 @@ class TitleStateTests(EvenniaTest):
         self.assertEqual(equip_epithet(self.entity, "夜行者"), "夜行者")
         self.assertEqual(compose_full_title(self.entity), "F級冒險者　夜行者")
 
+    @covers_requirement("title-system::the-title-equip-surface-swaps-identifiers-and-never-un-equips")
     def test_equip_rejections_name_only_the_request_and_leak_no_candidates(self):
         bank_fixed(self.entity, "g_f_rank", 1)
         bank_epithet(self.entity, "南門新客", "守衛的目送", 1)
@@ -386,6 +413,7 @@ class TitleStateTests(EvenniaTest):
             ),
         }
 
+    @covers_requirement("title-system::title-state-is-a-two-kind-collection-and-a-two-slot-equip-record")
     def test_malformed_state_fails_closed_on_every_surface(self):
         mutators = {
             "read": lambda entity: read_title_state(entity),
@@ -432,6 +460,7 @@ class TitleStateTests(EvenniaTest):
             with self.subTest(limit=bad_limit), self.assertRaises(ValueError):
                 title_context_entries(self.entity, limit=bad_limit)
 
+    @covers_requirement("title-system::slot-non-empty-is-an-invariant-with-auto-equip-and-no-unequip", "title-system::title-state-is-a-two-kind-collection-and-a-two-slot-equip-record")
     def test_module_exposes_no_delete_or_unequip_mutator(self):
         forbidden = (
             "clear",
@@ -632,6 +661,7 @@ class TitlePlannerTests(EvenniaTest):
         return title_event_effect_planner(self._request(), _event_log(*entries))
 
     @_with_counter_row
+    @covers_requirement("title-system::fixed-title-grants-ride-the-triggering-action-s-atomic-transaction")
     def test_planning_writes_nothing_until_the_commit_runs(self):
         self.actor.attributes.add(
             "sexual_traits", {"watched_count": {"trait_type": "counter", "name": "Watched_Count", "base": 4, "min": 0}},
@@ -843,6 +873,7 @@ class TitleCastGrantSettlementTests(_CastSettlementTestCase):
         return settle_out_of_combat_cast(self._request(), clock=clock)
 
     @_with_counter_row
+    @covers_requirement("title-system::fixed-title-grants-ride-the-triggering-action-s-atomic-transaction")
     def test_grant_and_notification_commit_with_the_cast(self):
         settlement = self._settle(WorldClock())
         self.assertEqual(settlement.result.outcome, "success")
@@ -859,6 +890,7 @@ class TitleCastGrantSettlementTests(_CastSettlementTestCase):
         self.assertEqual(banked_fixed_keys(self.char1), (_COUNTER_ROW_KEY,))
 
     @_with_counter_row
+    @covers_requirement("title-system::fixed-title-grants-ride-the-triggering-action-s-atomic-transaction")
     def test_clock_boundary_failure_rolls_the_grant_back_and_drops_the_notice(self):
         _EVENT_SOURCES["shop_hours"] = _raising_stage()
         with self.assertRaises(RuntimeError):
@@ -910,6 +942,7 @@ class TitleGuildPairingTests(EvenniaTest):
             )
         )
 
+    @covers_requirement("title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
     def test_starter_pair_grants_and_auto_equips_both_slots(self):
         with patch("world.rules.titles.get_world_clock", return_value=WorldClock(42)):
             lines = grant_starter_pair(self.player)
@@ -927,6 +960,7 @@ class TitleGuildPairingTests(EvenniaTest):
         self.assertEqual(read_title_state(self.player), before)
         self.assertEqual(first, ("獲得稱號：F級冒險者", "獲得異名：南門新客"))
 
+    @covers_requirement("title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
     def test_rank_titles_pair_one_to_one_with_the_guild_ranks(self):
         for rank, definition in GUILD_RANK_REGISTRY.items():
             with self.subTest(rank=rank):
@@ -944,6 +978,7 @@ class TitleGuildPairingTests(EvenniaTest):
             read_title_state(self.player), ([], {"fixed": None, "epithet": None})
         )
 
+    @covers_requirement("guild-registration::guild-registration-grants-the-paired-starter-titles-atomically", "title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
     def test_registration_banks_the_starter_pair(self):
         record = register_adventurer(self.player, staff=self.staff)
         self.assertEqual(
@@ -952,6 +987,7 @@ class TitleGuildPairingTests(EvenniaTest):
         )
         self.assertEqual(compose_full_title(self.player), "F級冒險者　南門新客")
 
+    @covers_requirement("guild-registration::guild-registration-grants-the-paired-starter-titles-atomically", "title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
     def test_registration_rollback_leaves_no_titles_and_cannot_double_grant(self):
         class FakeAtomic:
             def __enter__(self):
@@ -1006,6 +1042,7 @@ class TitleGuildPairingTests(EvenniaTest):
             outcome,
         )
 
+    @covers_requirement("title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically", "title-system::narrative-consumers-compose-predicates-read-the-collection")
     def test_promotion_banks_the_rank_title_inside_the_transaction(self):
         register_adventurer(self.player, staff=self.staff)
         exam_id = self._arm_exam("E")
@@ -1028,6 +1065,7 @@ class TitleGuildPairingTests(EvenniaTest):
         self.assertEqual(self.player.guild_rank, "F")
         self.assertEqual(read_title_state(self.player), before)
 
+    @covers_requirement("title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
     def test_promotion_rollback_revokes_the_grant_and_the_notice(self):
         register_adventurer(self.player, staff=self.staff)
         exam_id = self._arm_exam("E")

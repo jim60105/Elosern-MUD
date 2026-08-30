@@ -1107,6 +1107,7 @@ class CharacterFullTitlePresenterTests(EvenniaTest):
         self.assertNotIn("full_title", self._character())
         self.assertNotIn("full_title", self._status()["actor"])
 
+    @covers_requirement("title-system::narrative-consumers-compose-predicates-read-the-collection")
     def test_a_titled_actor_shares_one_composed_title_on_both_panels(self):
         from world.rules.titles import grant_starter_pair
 

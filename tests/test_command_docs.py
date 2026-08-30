@@ -442,6 +442,7 @@ class CommandDocsContractTests(unittest.TestCase):
     def test_reference_points_to_evennia_documentation(self):
         self.assertIn(EVENNIA_DOCS_POINTER, self.reference)
 
+    @covers_requirement("game-command-docs::the-command-reference-documents-the-title-commands")
     @covers_requirement("game-command-docs::accurate-command-details")
     def test_key_and_aliases_match_command_classes(self):
         for key, command in self.mounted.items():
@@ -453,6 +454,7 @@ class CommandDocsContractTests(unittest.TestCase):
                 f"aliases for {key!r} drifted from the command class",
             )
 
+    @covers_requirement("game-command-docs::the-command-reference-documents-the-title-commands")
     @covers_requirement("game-command-docs::accurate-command-details")
     def test_syntax_and_context_match_manifest(self):
         for key, expected in EXPECTED_COMMANDS.items():
@@ -561,6 +563,7 @@ class CommandDocsContractTests(unittest.TestCase):
                 f"canonical entry {key!r} documents a command that is not mounted",
             )
 
+    @covers_requirement("game-command-docs::the-command-reference-documents-the-title-commands")
     @covers_requirement("game-command-docs::drift-contract-test")
     def test_overview_links_only_documented_keys_and_all_keys(self):
         links = parse_overview_links(self.overview)

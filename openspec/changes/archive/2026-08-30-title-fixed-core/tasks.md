@@ -71,7 +71,8 @@
 
 ## Post-sync traceability (during archive/sync)
 
-- [ ] P1 On sync, obtain the `title-system` / `guild-registration` /
-  `guild-rank-exams` / `game-command-docs` new IDs from
-  `uv run --locked python -m tools.spec_traceability list` and annotate the
-  §5.3 tests that establish each requirement.
+- [x] P1 On sync, obtain the `title-system` / `guild-registration` /
+  `guild-rank-exams` / `game-command-docs` new IDs from the
+  `uv run --locked python -m tools.spec_traceability check` uncovered list and
+  annotate the tests that establish each requirement (gate now reports
+  1110 covered, 0 uncovered, 0 errors).

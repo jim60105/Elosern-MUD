@@ -671,6 +671,7 @@ class TitleDialogueContextTests(EvenniaTest):
     def _content(self, client):
         return client.calls[0].messages[1]["content"]
 
+    @covers_requirement("title-system::narrative-consumers-compose-predicates-read-the-collection")
     def test_titled_player_context_carries_the_composed_epithet(self):
         from world.rules.titles import grant_starter_pair
 

@@ -485,6 +485,7 @@ class TitleAppearanceLineTests(EvenniaTest):
         self.assertIn("一位沉默的旅人。", appearance)
         self.assertNotIn("稱號：", appearance)
 
+    @covers_requirement("title-system::narrative-consumers-compose-predicates-read-the-collection")
     def test_a_titled_entity_shows_the_composed_full_title(self):
         from world.rules.titles import grant_starter_pair
 
