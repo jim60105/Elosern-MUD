@@ -125,6 +125,16 @@ CHARACTER_SCHEMA_V1 = {
         },
         "skills": {"type": "array", "items": {"type": "string"}},
         "passives": {"type": "array", "items": {"type": "string"}},
+        "skill_proficiency": {
+            "type": "object",
+            "propertyNames": {"type": "string"},
+            "additionalProperties": {"type": "number", "minimum": 0},
+            "description": (
+                "Optional explicit practice XP per skill key; auto-seed fills "
+                "unsatisfied prerequisite edges with the exact required value, "
+                "and an explicit entry always wins."
+            ),
+        },
         "equipment": {"type": "object"},
         "inventory": {"type": "array"},
         "sexual_baseline": {

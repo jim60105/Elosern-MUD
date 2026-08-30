@@ -11,6 +11,10 @@ from world.rules.combat import (
     roll_initiative,
     run_round,
 )
+from world.rules.progression import (
+    lineage_ownership_closure,
+    seed_lineage_proficiency,
+)
 
 from .combat_fixtures import FakeEntity, FakeGauge
 
@@ -75,10 +79,10 @@ class DefaultAttackPolicyAffordabilityTests(unittest.TestCase):
     """The generic policy only proposes resolver-backed affordable skills."""
 
     def _npc(self, key: str, owned: list[str], mp: int) -> FakeEntity:
-        # Ownership and MP affordability are the only eligibility gates
-        # until use-driven-skill-lineage lands the shared can_use_skill
-        # predicate. firestorm costs 30 MP; the innate basic_attack carries
-        # no cost, exactly as the skills handler guarantees for real entities.
+        # Ownership, the shared lineage gate (can_use_skill), and MP
+        # affordability are the eligibility gates: a deep spell owned without
+        # its prerequisite chain is not usable and the innate basic_attack
+        # (no cost) takes over.
         actor = FakeEntity(key, owned=[*owned, "basic_attack"])
         actor.traits.mp = FakeGauge(mp, 30)
         return actor
@@ -90,7 +94,7 @@ class DefaultAttackPolicyAffordabilityTests(unittest.TestCase):
             {actor.key: actor, enemy.key: enemy},
         )
 
-    @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-proposes-the-first-affordable-resolver-backed-damage-skill")
+    @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-proposes-the-first-usable-resolver-backed-damage-skill")
     def test_unaffordable_spell_falls_back_to_basic_attack(self):
         actor = self._npc("npc", ["firestorm"], mp=10)
         request = default_attack_policy(actor, self._field(actor))
@@ -100,5 +104,17 @@ class DefaultAttackPolicyAffordabilityTests(unittest.TestCase):
 
     def test_affordable_owned_spell_is_chosen_ahead_of_the_innate(self):
         actor = self._npc("npc-caster", ["firestorm"], mp=30)
+        # The caster closes the lineage with exactly-seeded XP so firestorm
+        # passes the shared use gate.
+        add_active, add_passive = lineage_ownership_closure(["firestorm"])
+        actor.skills._owned = [
+            "firestorm",
+            *add_active,
+            *add_passive,
+            "basic_attack",
+        ]
+        actor.db.skill_proficiency = seed_lineage_proficiency(
+            actor.skills._owned
+        )
         request = default_attack_policy(actor, self._field(actor))
         self.assertEqual(request.skill_key, "firestorm")

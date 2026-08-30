@@ -759,8 +759,8 @@
     if (!Array.isArray(value) || value.length === 0) {
       throw new Error("freeform_scales must be a non-empty array when present");
     }
-    if (value.length !== FREEFORM_SCALES_MAX) {
-      throw new Error("freeform_scales must cover exactly the allowed scale set");
+    if (value.length > FREEFORM_SCALES_MAX) {
+      throw new Error("freeform_scales may not exceed the canonical scale table");
     }
     value.forEach(function (entry, index) {
       requireExactFields(entry, "freeform_scales entry", ["scale", "label", "mp_cost"], []);

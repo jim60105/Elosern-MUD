@@ -45,7 +45,11 @@ from world.rules.equipment_effects import (
 from world.rules.items import ItemUseRequest, preflight_item_use
 from world.rules.overwhelm import _required_roll
 from world.rules.sexual_resist import _blended_score
-from world.rules.tests.combat_fixtures import BattlefieldIsolation, FakeEntity
+from world.rules.tests.combat_fixtures import (
+    BattlefieldIsolation,
+    FakeEntity,
+    grant_lineage,
+)
 from world.quests.catalog import register_catalog
 from world.skills.registry import SKILL_REGISTRY
 
@@ -230,7 +234,7 @@ class CostParityTests(BattlefieldIsolation, _WearerCase):
     )
     def test_preview_and_resolve_agree_on_equipment_adjusted_mp_cost(self):
         player = self.wear(_player("mp parity"), "mage_robe")
-        player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(player, ["fire_ball"])
         room = create_object(Room, key="mp parity arena")
         player.location = room
         monster = _monster("mp parity goblin", room)

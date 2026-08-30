@@ -727,11 +727,16 @@ def main() -> None:
     # start room so browser tests can ``engage`` one through the real server.
     # wind_mastery additionally activates the freeform scale step for
     # wind_blade (element-mastery-freeform-casting), exercised by the scaled
-    # cast acceptance test.
-    character.db.skills = {
-        "active": ["fire_ball", "wind_blade", "status_disguise", "concentration"],
-        "passive": ["defense_instinct", "wind_mastery"],
-    }
+    # cast acceptance test.  ``grant_lineage`` closes the skill lineage and
+    # seeds prerequisite proficiency so every requested ACTIVE skill is
+    # actually castable under the lineage gate (fire_ball pulls fire_arrow).
+    from world.rules.tests.combat_fixtures import grant_lineage
+
+    grant_lineage(
+        character,
+        ["fire_ball", "wind_blade", "status_disguise", "concentration"],
+        ["defense_instinct", "wind_mastery"],
+    )
     # A persistent poisoned buff gives the status panel a deterministic
     # applied-modifier condition (agility -10%) for viewport assertions.
     from world.rules.buffs import _add_buff

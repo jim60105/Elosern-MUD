@@ -9,11 +9,11 @@
 ### Requirement: A delegated non-Monster entity proposes the first usable resolver-backed damage skill
 `world/rules/combat.py`'s `default_attack_policy(entity, battlefield)` SHALL consider every owned
 `ACTIVE` skill with a `damage:`-prefixed effect and select the first one `ActionResolver` can
-resolve — ownership and MP affordability are the only eligibility gates until
-consume. A skill the resolver would reject (prerequisite-unsatisfied per `can_use_skill`,
-unowned, or MP-unaffordable for the current gauge) SHALL be skipped in favor of the next candidate — in practice the innate `basic_attack`, which is
-always affordable — and SHALL never be proposed in an `ActionRequest` that `ActionResolver` rejects.
-The policy SHALL NOT raise on a malformed spell.
+resolve — ownership, prerequisite satisfaction via `can_use_skill`, and MP affordability are the
+eligibility gates. A skill the resolver would reject (prerequisite-unsatisfied per `can_use_skill`,
+unowned, or MP-unaffordable for the current gauge) SHALL be skipped in favor of the next candidate —
+in practice the innate `basic_attack`, which is always affordable — and SHALL never be proposed in
+an `ActionRequest` that `ActionResolver` rejects. The policy SHALL NOT raise on a malformed spell.
 
 #### Scenario: A prerequisite-unsatisfied spell falls back to the innate basic_attack
 - **WHEN** `default_attack_policy` runs for a non-Monster entity (e.g. a party NPC) that owns an

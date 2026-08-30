@@ -70,6 +70,7 @@ class SkillRegistryTests(unittest.TestCase):
                 "faction_constraint",
                 "requires_divine_arts",
                 "parsed_effects",
+                "prerequisites",
             ],
         )
         for key, skill in SKILL_REGISTRY.items():
@@ -620,6 +621,40 @@ class SkillCategoryClassificationTests(unittest.TestCase):
             category=SkillCategory.UTILITY,
         )
         self.assertIsNone(skill.group)
+
+    @covers_requirement("skill-registry::skills-declare-only-self-only-or-free-target-scope")
+    def test_string_element_normalizes_to_the_registry_element(self):
+        """Direct SkillDef(...) authors pass a string key; consumers read
+        ``skill.element.key`` (practice XP, freeform ladder), so every
+        constructor path must yield an Element, never a raw str."""
+        skill = SkillDef(
+            key="str_element",
+            label="字串屬性",
+            description="直接建構時以字串宣告的屬性必須正規化為 Element。",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            cost={"mp": 4},
+            usable_out_of_combat=False,
+            element="fire",
+            effects=["damage:fire:magic"],
+            category=SkillCategory.UTILITY,
+        )
+        self.assertIs(skill.element, ELEMENT_REGISTRY["fire"])
+        self.assertEqual(skill.element.key, "fire")
+        with self.assertRaises(ValueError) as caught:
+            SkillDef(
+                key="bad_element",
+                label="未知屬性",
+                description="未知屬性字串必須在建構時失敗。",
+                kind=SkillKind.ACTIVE,
+                target_spec=TargetSpec.SINGLE,
+                cost={},
+                usable_out_of_combat=False,
+                element="not_an_element",
+                effects=[],
+                category=SkillCategory.UTILITY,
+            )
+        self.assertIn("bad_element", str(caught.exception))
 
     @covers_requirement("skill-category-registry::skill-registry-s-entries-partition-exactly-across-the-eight-categories")
     def test_every_registry_key_has_a_valid_category(self):

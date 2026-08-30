@@ -14,3 +14,17 @@ freeform_cast_scales:
   - { scale: 1.0, label: "1" }
   - { scale: 2.0, label: "2" }
   - { scale: 4.0, label: "4" }
+# Derived tip cap for a skill nobody consumes in the prerequisite graph
+# (use-driven-progression D6): practice saturates once
+# skill_proficiency_level >= cap. Non-canopy caps derive from the registry's
+# reverse-edge map, never from per-skill hand-tuned data.
+proficiency_tip_cap: 10
+# Freeform scale ladder (use-driven-progression D5): the mastery-entitled
+# scale set a skill's OWN proficiency unlocks. Rungs are canonical scale
+# values with ascending integer levels, the first rung exactly level 0.
+freeform_scale_ladder:
+  - { scale: 0.25, min_level: 0 }
+  - { scale: 0.5, min_level: 1 }
+  - { scale: 1.0, min_level: 3 }
+  - { scale: 2.0, min_level: 6 }
+  - { scale: 4.0, min_level: 10 }

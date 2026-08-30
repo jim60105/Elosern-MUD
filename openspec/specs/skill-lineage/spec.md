@@ -1,4 +1,9 @@
-## ADDED Requirements
+# skill-lineage Specification
+
+## Purpose
+Define the prerequisite-lineage graph, the single use-eligibility gate, use-driven practice accrual with per-tick dedupe and derived tip-cap saturation, the proficiency-anchored freeform scale ladder, and import/scene-build auto-seed.
+
+## Requirements
 
 ### Requirement: SkillPrerequisite declares registry edges and load validation fails closed
 `world/skills/registry.py` SHALL define the frozen, slotted dataclass
@@ -32,14 +37,18 @@ degree-independent.
 `SKILL_REGISTRY` SHALL carry prerequisite edges forming the fire tree:
 `fire_ball` requires `fire_arrow` >= 3; `scorching_wave` requires `fire_ball` >= 3; `firestorm`
 requires `scorching_wave` >= 3; `lava_burst` requires `firestorm` >= 5; `dragon_flame` requires
-`lava_burst` >= 8; `phoenix_eternal_flame` requires `dragon_flame` >= 8. The sister spells
-`infernal_wrap`, `hellfire`, and `world_ending_blaze` SHALL each declare their fire prerequisite
-edges in the same change. `fire_arrow` is a root with no prerequisites. The five element-mastery
-passives SHALL NOT be tree nodes (PASSIVE skills are never consumed by edges and never accrue).
+`lava_burst` >= 8; `phoenix_eternal_flame` requires `dragon_flame` >= 8. The sister spells declare
+leaf edges onto the same spine in the same change: `infernal_wrap` requires `scorching_wave` >= 3,
+`hellfire` requires `firestorm` >= 5, and `world_ending_blaze` requires `hellfire` >= 5 — none of
+them is consumed by a further edge, so `phoenix_eternal_flame` stays the strict topological canopy.
+`fire_arrow` is a root with no prerequisites. The structure is therefore a chain with sister LEAVES
+(one node may feed several edges), not a single-file list. The five element-mastery passives SHALL
+NOT be tree nodes (PASSIVE skills are never consumed by edges and never accrue).
 
-#### Scenario: The fire tree validates as a chain
+#### Scenario: The fire tree validates with the canopy last
 - **WHEN** the registry loads with the fire edges
-- **THEN** the topological order runs `fire_arrow` first and `phoenix_eternal_flame` last, and every edge threshold is >= 1
+- **THEN** the topological order runs `fire_arrow` first and `phoenix_eternal_flame` last (consumed
+  by no edge), and every edge threshold is >= 1
 
 #### Scenario: Mastery passives stay out of the graph
 - **WHEN** the reverse-edge map is inspected for `fire_mastery`
@@ -53,11 +62,15 @@ for every declared `SkillPrerequisite`: the prereq key is in `owned_keys()` and
 ACTIVE skill — spell and weapon skill alike — and SHALL be consumed by `ActionResolver`
 step-1/preflight/resolve, the shared action preview, submission revalidation, both skill menus, and
 `world/rules/combat.py`'s `default_attack_policy`, replacing the interim ownership+MP-only gate.
-The deleted mastery-tier override SHALL NOT be reintroduced: 主宰-tier entry is the prerequisite
-path (AND semantics over all declared edges). `cost_tiers` SHALL remain a display-only data label.
+An owned skill whose prerequisite chain is unmet SHALL be rejected by the resolver's step-1 with
+the SAME reason as an unowned skill (`UNKNOWN_SKILL`), its deterministic detail naming the first
+unmet edge in declared order. The deleted mastery-tier override SHALL NOT be reintroduced:
+主宰-tier entry is the prerequisite path (AND semantics over all declared edges). `cost_tiers`
+SHALL remain a display-only data label.
 
 #### Scenario: A mid-tree spell is gated by its own edge
-- **WHEN** an entity owning `firestorm` with `firestorm` practice level 0 and `scorching_wave` practice level 2 calls `can_use_skill`
+- **WHEN** an entity owning `firestorm` with `firestorm` practice level 0 and `scorching_wave`
+  practice level 2 calls `can_use_skill`
 - **THEN** it returns `False` (the `scorching_wave >= 3` edge is unsatisfied)
 
 #### Scenario: The exact threshold passes
@@ -77,18 +90,22 @@ Every successful ACTIVE skill resolution SHALL accrue to the actor, inside the e
 snapshot/restore face and the same transaction as the skill's own effects: `SKILL_PRACTICE_XP_PER_USE
 × RACE_REGISTRY[race].learning_multiplier × element_affinity_multiplier(entity, skill.element)`
 (physical or non-elemental skills multiply by `1.0`) `× growth_rate_multiplier(entity)` (the
-conferred-buff pull path). Storage and derivation are unchanged: `db.skill_proficiency[skill_key]`
-float XP with `level = floor(xp / 50)`. PASSIVE skills SHALL NOT accrue. A resolution in a
-`nonlethal` context SHALL accrue nothing. Accrual SHALL NOT read the actor's school or any magic
-stat.
+conferred-buff pull path). The affinity factor SHALL apply only to a skill whose parsed effects
+include a magic-school damage of its own element — a physical skill carrying an element (e.g.
+`basic_attack`) multiplies by `1.0`. Storage and derivation are unchanged:
+`db.skill_proficiency[skill_key]` float XP with `level = floor(xp / 50)`. PASSIVE skills SHALL NOT
+accrue. A resolution carrying the simulated marker (a guild examination's
+`event_context["simulated"]`) SHALL accrue nothing. Accrual SHALL NOT read the actor's school or any
+magic stat.
 
 #### Scenario: A physical skill accrues like a spell
 - **WHEN** an ACTIVE sword skill resolves successfully for an elf (learning x10) with no affinity and no growth buff
 - **THEN** `db.skill_proficiency[skill_key]` increases by exactly `SKILL_PRACTICE_XP_PER_USE × 10.0`
 
 #### Scenario: The affinity multiplier participates
-- **WHEN** an entity with `affinity_elements == ["fire"]` successfully casts a fire spell
-- **THEN** the accrued XP carries the `1.1` factor; a non-favored element carries `0.9`
+- **WHEN** an entity with `affinity_elements == ["fire"]` successfully casts a magic fire spell
+- **THEN** the accrued XP carries the `1.1` factor; a non-favored element carries `0.9`, and a
+  physical skill carrying `element == fire` carries `1.0`
 
 #### Scenario: The conferred growth buff participates
 - **WHEN** an entity with an active `conferred_growth_rate` buff successfully uses a skill
@@ -128,10 +145,11 @@ prerequisite never blocks its child node.
 ### Requirement: Each (actor, skill, target) accrues once per world-clock tick
 Practice accrual SHALL dedupe by `(actor, skill_key, target)` per world-clock tick: at most one
 accrual per distinct triple per tick. Dedupe state SHALL live in a transient module-level dict
-cleared whenever the current tick changes; it SHALL NOT be persisted, snapshotted, or restored. An
-AREA skill SHALL accrue once per distinct target. An out-of-combat cast SHALL advance the world
-clock (as existing cast settlement does), so consecutive casts by one actor land on different
-ticks.
+cleared whenever the current tick changes; it SHALL NOT be persisted, snapshotted, or restored, and
+claims taken by a rolled-back commit SHALL be released explicitly so a legitimate same-tick retry
+still accrues. An AREA skill SHALL accrue once per distinct target. An out-of-combat cast SHALL
+advance the world clock (as existing cast settlement does), so consecutive casts by one actor land
+on different ticks.
 
 #### Scenario: Same target twice in one tick accrues once
 - **WHEN** an actor resolves the same skill against the same target twice within one tick
@@ -150,20 +168,25 @@ The set of freeform scales an actor may cast for a skill SHALL be derived by a l
 skill's OWN proficiency level, gated on the `<element>_mastery` key-presence entitlement: scale 0.25
 unconditionally for an entitled actor, 0.5 at level >= 1, 1.0 at level >= 3, 2.0 at level >= 6,
 4.0 at level >= 10 (thresholds and set SHALL be `progression.yaml` constants). The interaction with
-tip caps is intentional: a skill capped below 10 never reaches the 4.0 rung. The ladder SHALL be
-derived deterministically from registry + proficiency state with no hidden information.
+tip caps is intentional: a rung whose threshold exceeds the skill's derived cap NEVER unlocks, so
+no skill advertises a scale it can never practise to. The ladder SHALL be
+derived deterministically from registry + proficiency state with no hidden information, and the
+resolver gate, the preview, and the combat-panel advertisement SHALL all read the same
+skill-anchored `freeform_scales_for(entity, skill)` so they can never diverge.
 
 #### Scenario: A mastery holder at level 0 sees only the small rungs
-- **WHEN** `freeform_scales_for(entity, "fire")` is called for an entity owning `fire_mastery` with `fire_arrow` level 0
-- **THEN** the returned scales for the fire skill are `(0.25,)` (plus the canonical 1.0 base form)
+- **WHEN** `freeform_scales_for(entity, skill)` is called for a fire skill on an entity owning
+  `fire_mastery` whose proficiency in THAT skill is level 0
+- **THEN** the returned scales are `(0.25,)`
 
 #### Scenario: Canopy proficiency unlocks the 4.0 rung
-- **WHEN** the entity's skill proficiency reaches 10 (the canopy cap)
+- **WHEN** the entity's proficiency in the skill reaches 10 (the canopy cap)
 - **THEN** `4.0` appears in the allowed scale set
 
-#### Scenario: A capped mid-tree skill stops at 2.0
-- **WHEN** `firestorm` (derived cap 5) is practiced to its cap by a mastery holder
-- **THEN** the allowed scale set tops out at 2.0, never 4.0
+#### Scenario: A capped mid-tree skill stops below the canopy rungs
+- **WHEN** `firestorm` (derived cap 5) is practiced past its cap by a mastery holder
+- **THEN** its allowed scale set tops out at 1.0 — the 2.0 rung (Lv.6) and 4.0 rung (Lv.10) sit
+  above the skill's own ceiling and never appear, so no skill advertises a rung it cannot practise to
 
 #### Scenario: No mastery still means no ladder
 - **WHEN** an entity without `<element>_mastery` asks for any scale set
@@ -172,13 +195,19 @@ derived deterministically from registry + proficiency state with no hidden infor
 ### Requirement: Import and scene-build auto-seed prerequisite proficiency exactly
 The character loader SHALL, inside the existing all-or-nothing transaction, seed the practice
 proficiency of any prerequisite edge that is unsatisfied for an owned skill to EXACTLY the required
-value, never above. Auto-seed SHALL run before schema range validation so malformed imports still
-reject wholesale, and an explicit `skill_proficiency` entry in the import record SHALL always win
-over auto-seed. `world/quests/scene_builder.py`'s NPC spawn path SHALL share the same helper.
+value, never above, and SHALL extend the record's ownership with the transitive prerequisite
+closure so a deep import is gate-usable, not merely seeded. Auto-seed normalization SHALL run on
+the record before the semantic validation phase reads it (schema range checks included), so
+malformed imports still reject wholesale, and an explicit `skill_proficiency` entry in the import
+record SHALL always win over auto-seed, even when it leaves an edge unmet. Every explicit
+`skill_proficiency` key SHALL resolve in `SKILL_REGISTRY` — the check runs against the RAW record
+before normalization, so an unregistered key names itself and rejects the whole record instead of
+being silently dropped or silently persisted by the seed.
+`world/quests/scene_builder.py`'s NPC spawn path SHALL share the same helper.
 
 #### Scenario: A deep imported skill arrives usable
 - **WHEN** an import record owns `firestorm` (prereq `scorching_wave >= 3`) and carries no proficiency for `scorching_wave`
-- **THEN** the loaded entity's `scorching_wave` level is exactly 3 and `can_use_skill` passes
+- **THEN** the loaded entity owns the closed chain, its `scorching_wave` level is exactly 3 and `can_use_skill` passes
 
 #### Scenario: Explicit proficiency beats auto-seed
 - **WHEN** the same record explicitly carries `skill_proficiency: {"scorching_wave": 120}` (level 2)
@@ -191,3 +220,7 @@ over auto-seed. `world/quests/scene_builder.py`'s NPC spawn path SHALL share the
 #### Scenario: Malformed imports still reject all-or-nothing
 - **WHEN** a record with an invalid field also triggers auto-seed
 - **THEN** validation rejects the record and nothing persists, seed included
+
+#### Scenario: An unregistered proficiency key rejects the record
+- **WHEN** a record carries `skill_proficiency: {"not_a_skill": 50}`
+- **THEN** validation rejects the record naming the key, and nothing persists

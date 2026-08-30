@@ -20,7 +20,7 @@ from web.webclient.actions.combat_actions import (
 )
 from world.rules.action import RejectReason
 from world.rules.combat_session import engage, read_session
-from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 
 
 def _player(key="adapter player"):
@@ -143,7 +143,7 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.room = create_object(Room, key="adapter arena")
         self.player = _player()
         self.player.location = self.room
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
         self.monster = _monster()
         self.monster.location = self.room
 
@@ -269,10 +269,9 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
     def test_scaled_cast_adapter_path_deducts_scaled_mp(self):
         engage(self.player, self.monster)
-        self.player.db.skills = {
-            "active": ["wind_blade"],
-            "passive": ["wind_mastery"],
-        }
+        grant_lineage(
+            self.player, ["wind_blade"], ["wind_mastery"], rungs={"wind_blade": 6}
+        )
         self.player.traits.mp.base = 500
         self.player.traits.mp.current = 500
         # A scaled crit must not end the round (a terminal settlement would

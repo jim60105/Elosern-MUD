@@ -1020,9 +1020,11 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         )
         fire = elemental["groups"][0]
         self.assertEqual(fire["label"], "火")
+        # The lineage closure adds fire_arrow (fire_ball's prereq) behind the
+        # requested fire_ball, so the group lists both in ownership order.
         self.assertEqual(
             [skill["key"] for skill in fire["skills"]],
-            ["fire_ball"],
+            ["fire_ball", "fire_arrow"],
         )
         # A category without a group carries exactly one null-keyed sub-group.
         enhancement = panel["skills"][2]

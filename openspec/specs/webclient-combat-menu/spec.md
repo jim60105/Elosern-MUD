@@ -306,9 +306,11 @@ A skill SHALL be marked unavailable in the combat menu when the session's `event
 
 ### Requirement: The combat panel hides freeform casting from non-masters
 A skill descriptor SHALL include a `freeform_scales` array only when the skill is
-`is_freeform_eligible` and the actor's `freeform_scales_for(actor, skill.element.key)` is non-empty
-(direct mastery ownership). The array SHALL be strictly ascending, exactly one entry per allowed
-scale, each entry an exact object containing the numeric `scale`, the canonical label of that scale
+`is_freeform_eligible` and the skill-anchored `freeform_scales_for(actor, skill)` ladder set is
+non-empty (mastery entitlement anchored to the CAST skill's own proficiency — the array lists
+exactly the rungs the actor's proficiency in that skill unlocks). The array SHALL be strictly
+ascending, exactly one entry
+per allowed scale, each entry an exact object containing the numeric `scale`, the canonical label of that scale
 (`1/4`, `1/2`, `1`, `2`, `4` — a label never pairs with any other scale), and the server-computed
 scaled `mp_cost` (via `scaled_mp_cost`, so the browser never performs rounding). Every other
 skill — including eligible spells of a non-master — SHALL omit the field
@@ -316,8 +318,9 @@ entirely. The feature is deliberately a surprise: a player without the element's
 no scale selector, no freeform text, and no other indication that scaling exists in any rendered
 panel.
 
-#### Scenario: A master's eligible spells advertise their scales
-- **WHEN** a `wind_mastery` holder's combat panel is built
+#### Scenario: A master's eligible spells advertise their unlocked scales
+- **WHEN** a `wind_mastery` holder whose `wind_blade` proficiency reaches level 10 has its combat
+  panel built
 - **THEN** `wind_blade` carries `freeform_scales` with exactly the five entries in ascending order
   (e.g. `{scale: 0.25, label: "1/4", mp_cost: 4}`, `{scale: 0.5, label: "1/2", mp_cost: 7}`,
   `{scale: 1.0, label: "1", mp_cost: 14}`, `{scale: 2.0, label: "2", mp_cost: 28}`,
@@ -331,8 +334,8 @@ panel.
 
 ### Requirement: The combat dock offers a scale-choice step only for masters
 When the focused skill carries `freeform_scales`, the keyboard dock SHALL insert one 威力-choice
-menu between skill selection and target selection, listing every entry (label plus scaled `mp_cost`)
-in ascending order with `1` preselected, and SHALL include the chosen numeric `scale` in the
+menu between skill selection and target selection, listing exactly the entries the actor's current
+ladder unlocks (label plus scaled `mp_cost`) in ascending order with `1` preselected, and SHALL include the chosen numeric `scale` in the
 eventual cast payload for every target form (NONE, SELF, SINGLE, and AREA, including shorthands).
 Arrow keys SHALL navigate, Enter SHALL confirm the choice and open the target flow, and Escape SHALL
 pop back to the skill list. The chosen scale SHALL live in the same client-local selection state the

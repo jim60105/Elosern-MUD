@@ -21,7 +21,7 @@ from world.rules.combat_view import (
     build_combat_view,
     group_skill_views,
 )
-from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 from world.skills.registry import SKILL_REGISTRY
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
@@ -73,7 +73,9 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         self.room = create_object(Room, key="view arena")
         self.player = _player()
         self.player.location = self.room
-        self.player.db.skills = {"active": ["fire_ball"], "passive": ["defense_instinct"]}
+        grant_lineage(
+            self.player, ["fire_ball"], ["defense_instinct"]
+        )
         self.monster = _monster()
         self.monster.location = self.room
 
@@ -102,10 +104,13 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_skills_follow_handler_order_and_exclude_passives(self):
-        self.player.db.skills = {
-            "active": ["wind_blade", "fire_ball"],
-            "passive": ["defense_instinct"],
-        }
+        # The closure seeds fire_arrow after fire_ball, so the stored active
+        # order stays wind_blade, fire_ball, fire_arrow.
+        grant_lineage(
+            self.player,
+            ["wind_blade", "fire_ball"],
+            ["defense_instinct"],
+        )
         engage(self.player, self.monster)
         view = build_combat_view(self.player)
         keys = [skill.key for skill in view.skills]
@@ -114,6 +119,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
             [
                 "wind_blade",
                 "fire_ball",
+                "fire_arrow",
                 "flee",
                 "basic_attack",
                 *sorted(
@@ -150,10 +156,13 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         gale = next(skill for skill in view.skills if skill.key == "gale_step")
         self.assertEqual(gale.freeform_scales, ())
 
-        self.player.db.skills = {
-            "active": ["wind_blade", "gale_step"],
-            "passive": ["wind_mastery"],
-        }
+        # The full ladder shows only with wind_blade itself at the top rung.
+        grant_lineage(
+            self.player,
+            ["wind_blade", "gale_step"],
+            ["wind_mastery"],
+            rungs={"wind_blade": 10},
+        )
         view = build_combat_view(self.player)
         wind = next(skill for skill in view.skills if skill.key == "wind_blade")
         self.assertEqual(
@@ -194,10 +203,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("action-resolution-pipeline::actionresolver-exposes-shared-side-effect-free-action-preview")
     def test_spell_descriptor_ignores_numeric_magic_power(self):
         """magic-xp-engine-retirement: no numeric tier gate on descriptors."""
-        self.player.db.skills = {
-            "active": ["firestorm"],
-            "passive": [],
-        }
+        grant_lineage(self.player, ["firestorm"])
         self.player.traits.mp.base = 50
         self.player.traits.mp.current = 50
         engage(self.player, self.monster)
@@ -225,10 +231,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         companion.traits.hp.base = 100
         companion.traits.hp.current = 100
         join_party(companion, self.player)
-        self.player.db.skills = {
-            "active": ["wind_blade", "fire_ball"],
-            "passive": [],
-        }
+        grant_lineage(self.player, ["wind_blade", "fire_ball"])
         engage(self.player, self.monster)
         view = build_combat_view(self.player)
         wind = next(skill for skill in view.skills if skill.key == "wind_blade")

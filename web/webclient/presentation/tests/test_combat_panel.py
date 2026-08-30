@@ -41,7 +41,7 @@ from web.webclient.presentation.registry import (
     build_production_registry,
 )
 from world.rules.combat_session import engage
-from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 
 
 def _valid_skill(**overrides):
@@ -611,7 +611,7 @@ class ContextActionsSchemaTests(unittest.TestCase):
             "wrong mp_cost": [
                 {"scale": 1.0, "label": "1", "mp_cost": 21}
             ],
-            "partial set": valid_entries[:3],
+            "missing the 0.25 prefix": valid_entries[2:],
             "empty array": [],
             "entry with extra key": [
                 {"scale": 1.0, "label": "1", "mp_cost": 20, "extra": 1}
@@ -1163,7 +1163,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.room = create_object(Room, key="panel arena")
         self.player = _player()
         self.player.location = self.room
-        self.player.db.skills = {"active": ["fire_ball"], "passive": ["defense_instinct"]}
+        grant_lineage(self.player, ["fire_ball"], ["defense_instinct"])
         self.monster = _monster()
         self.monster.location = self.room
         self.registry = build_production_registry()
@@ -1374,10 +1374,12 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
     def test_panel_advertises_freeform_scales_only_for_masters(self):
-        self.player.db.skills = {
-            "active": ["wind_blade", "gale_step"],
-            "passive": ["wind_mastery"],
-        }
+        grant_lineage(
+            self.player,
+            ["wind_blade", "gale_step"],
+            ["wind_mastery"],
+            rungs={"wind_blade": 10},
+        )
         engage(self.player, self.monster)
         payload = self.registry.render(
             "context_actions",

@@ -1422,9 +1422,16 @@ test("freeform_scales is optional and validated when present", () => {
   assert.throws(() => Protocol.validateContextActionsPanel(
     validCombatPanel({ skills: nestedSkills(validCombatSkill({ freeform_scales: [] })) })
   ));
-  assert.throws(() =>
+  // A ladder prefix (bottom rungs only) is the server-authoritative shape.
+  assert.doesNotThrow(() =>
     Protocol.validateContextActionsPanel(
       validCombatPanel({ skills: nestedSkills(validCombatSkill({ freeform_scales: scales.slice(0, 3) })) })
+    )
+  );
+  // A set that is not a prefix (missing the 0.25 rung) still rejects.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(
+      validCombatPanel({ skills: nestedSkills(validCombatSkill({ freeform_scales: scales.slice(2) })) })
     )
   );
   assert.throws(() =>

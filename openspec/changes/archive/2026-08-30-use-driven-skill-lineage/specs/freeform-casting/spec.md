@@ -3,9 +3,10 @@
 ### Requirement: The resolver gates scaled casts at the ownership step
 `ActionResolver.preflight` and `resolve` SHALL reject a cast with `RejectReason.SCALED_CAST_FORBIDDEN`
 when `ActionRequest.scale != 1.0` and any of the following holds: the scale is not a member of the
-`freeform_cast_scales` table; `is_freeform_eligible(skill)` is `False`; or the requested scale is not a member of the actor's ladder-derived
-`freeform_scales_for(actor, skill.element.key)` set (mastery entitlement anchored to the
-skill's own proficiency; see `use-driven-skill-lineage`). The checks
+`freeform_cast_scales` table; `is_freeform_eligible(skill)` is `False`; or the requested scale is not
+a member of the skill-anchored `freeform_scales_for(actor, skill)` ladder set (see
+`element-mastery`; mastery entitlement is anchored to the skill's own proficiency, see
+`use-driven-skill-lineage`). The checks
 SHALL short-circuit in exactly that order, so `skill.element` is never dereferenced for an
 ineligible skill (a non-elemental or cost-less skill can never raise `AttributeError`). A request
 with `scale == 1.0` SHALL bypass the check entirely and can never be rejected by it. The check

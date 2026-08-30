@@ -25,6 +25,7 @@ from world.rules.clock import AdvanceSource, WorldClock
 from world.rules.combat import Battlefield, _end_of_round_upkeep
 from world.rules.sexual_state import climax_settlement_action, decay_tick
 from world.rules.sexual_transitions import apply_event
+from world.rules.tests.combat_fixtures import grant_lineage
 
 class FixedRng:
     """RNG stub returning a chosen in-range value."""
@@ -369,7 +370,7 @@ class ClimaxRollbackTests(EvenniaTest):
         arena = create_object(Room, key="rollback arena")
         entity.location = arena
         monster.location = arena
-        entity.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(entity, ["fire_ball"])
         engage(entity, monster)
         clock = WorldClock()
         with (

@@ -3,6 +3,7 @@
 ## Purpose
 TBD - created by archiving change buffs-rulebook. Update Purpose after archive.
 ## Requirements
+
 ### Requirement: entity.buffs is mounted as the real BuffHandler, replacing the change-3 placeholder
 `LivingEntity` SHALL mount `evennia.contrib.rpg.buffs.BuffHandler` as a read-only computed property named
 `entity.buffs`, replacing change 3's `None`-defaulting `AttributeProperty` placeholder. `entity.buffs`
@@ -101,9 +102,8 @@ active. This function SHALL NOT write to `entity.traits`, `entity.buffs`, or any
 than push
 `_apply_rate_modifier()` SHALL treat `skill_practice` (the `conferred_growth_rate` buff's declared
 `rate` target) as an explicit, documented no-op on tick, not an unimplemented or erroring case. The
-buff's `scale` SHALL be consumed exclusively by pull, through `growth_rate_multiplier(entity)` (the query has no live reader after the magic-XP engine's retirement and will be read
-again when `use-driven-skill-lineage` re-anchors the practice-XP formula onto it), and SHALL
-NOT be additionally applied as a per-tick effect. This SHALL be stated in `_apply_rate_modifier()`'s own
+buff's `scale` SHALL be consumed exclusively by pull, through `growth_rate_multiplier(entity)` (its live reader is `use-driven-skill-lineage`'s practice-XP formula, read by pull at
+the moment proficiency accrues), and SHALL NOT be additionally applied as a per-tick effect. This SHALL be stated in `_apply_rate_modifier()`'s own
 docstring, naming `growth_rate_multiplier()`/change 11b as the actual reader, so a future edit does not
 reintroduce a push-side application and double-count the scale.
 

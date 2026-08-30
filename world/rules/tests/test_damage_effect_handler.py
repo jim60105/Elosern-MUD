@@ -25,7 +25,7 @@ from world.rules.combat import (
     _stored_hp,
 )
 
-from .combat_fixtures import FakeEntity
+from .combat_fixtures import FakeEntity, grant_lineage
 
 
 class DamageEffectHandlerTests(unittest.TestCase):
@@ -221,7 +221,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         # Human static magic_power at 術師 tier so the fire_ball cast passes
         # the element-mastery cast gate.
         self.actor.traits.magic_power.base = 30
-        self.actor.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.actor, ["fire_ball"])
         self.target.db.skills = {"active": [], "passive": []}
         battlefield = Battlefield(
             {

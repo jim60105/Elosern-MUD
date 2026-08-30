@@ -1,11 +1,4 @@
-## Purpose
-
-Element mastery ties the display rank title and the mechanical cast gate to an
-entity's numeric magic level, with direct ownership of an element's mastery
-skill overriding the gate. Everything here is a pure, side-effect-free query;
-nothing in this capability writes game state.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Mastery ownership entitles freeform scaling of the element's eligible spells
 `world/rules/progression.py` SHALL define `freeform_mastery_entitled(entity, element: str) -> bool`

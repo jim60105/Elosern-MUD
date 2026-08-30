@@ -224,7 +224,9 @@ def validate_freeform_scales(value: Any, base_mp: int | None) -> list[dict[str, 
 
     When absent (the server omits the field for every non-eligible skill and
     every non-master) an empty list is returned. When present the array must
-    cover exactly the actor's allowed scale set in ascending order, one entry
+    be a non-empty PREFIX of the canonical scale table in ascending order (the
+    skill-anchored ladder unlocks rungs bottom-up: 0.25 always, higher rungs as
+    proficiency rises), one entry
     per scale, each an exact object with the member numeric ``scale``, its
     canonical ``label`` (the label MUST pair with its scale), and the
     server-computed ``mp_cost`` equal to ``scaled_mp_cost(base_mp, scale)``.
@@ -240,9 +242,9 @@ def validate_freeform_scales(value: Any, base_mp: int | None) -> list[dict[str, 
         raise ProtocolValidationError(
             "freeform_scales must be a non-empty array when present"
         )
-    if len(value) != len(FREEFORM_CAST_SCALES):
+    if len(value) > len(FREEFORM_CAST_SCALES):
         raise ProtocolValidationError(
-            "freeform_scales must cover exactly the allowed scale set"
+            "freeform_scales may not exceed the canonical scale table"
         )
     entries: list[dict[str, Any]] = []
     for index, entry in enumerate(value):

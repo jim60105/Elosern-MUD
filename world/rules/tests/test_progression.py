@@ -17,6 +17,7 @@ from world.rules.action import (
     CommitFailed,
     PendingEffect,
     RejectReason,
+    _EVENT_EFFECT_PLANNERS,
     _commit,
 )
 from world.rules.buffs import grant_conferred_growth_rate
@@ -32,9 +33,17 @@ from world.rules.progression import (
 from world.skills.cost_tiers import spell_tier_for
 from world.skills.registry import SKILL_REGISTRY
 import world.rules.progression as progression
+from .combat_fixtures import grant_lineage
 
 
 class ProgressionTests(EvenniaTestCase):
+    def setUp(self):
+        super().setUp()
+        # The dedupe triple is keyed by pk; EvenniaTestCase rollbacks reuse
+        # pks across tests, so a claim from a previous test (or a rolled-back
+        # commit) must not suppress this test's accrual.
+        progression.reset_practice_dedupe()
+
     def _character(self, key: str, race: str = "human") -> PlayerCharacter:
         entity = create_object(PlayerCharacter, key=key)
         entity.race = race
@@ -56,23 +65,34 @@ class ProgressionTests(EvenniaTestCase):
                     grant_conferred_growth_rate(entity, "source", scale)
         self.assertFalse(entity.buffs.all)
 
-    @covers_requirement("skill-proficiency-tracking::grant-skill-practice-xp-scales-only-by-race-learning-multiplier-never-by-conferred-growth-rate-buffs")
-    def test_skill_practice_is_race_scaled_and_independent_of_conferred_growth(self):
+    @covers_requirement(
+        "skill-lineage::successful-active-resolution-accruses-lineage-practice-xp",
+        "skill-lineage::each-actor-skill-target-accrues-once-per-world-clock-tick",
+    )
+    def test_skill_practice_is_scaled_by_race_and_growth(self):
+        # Use-driven lineage: one grant per call, race learning AND the
+        # conferred growth buff both participate; magic_power never moves.
         entity = self._character("practitioner", "elf")
         grant_conferred_growth_rate(entity, "elosia", 0.5)
         before = entity.traits.magic_power.value
-        grant_skill_practice_xp(entity, "shadow_slash", uses=3)
+        self.assertTrue(grant_skill_practice_xp(entity, "shadow_slash"))
         self.assertEqual(
             entity.db.skill_proficiency["shadow_slash"],
-            3 * SKILL_PRACTICE_XP_PER_USE * 10,
+            SKILL_PRACTICE_XP_PER_USE * 10 * 0.5,
         )
         # The magic-XP engine is retired: practice is the only growth writer
         # and the static magic_power trait never moves (delta scenario
         # "Granting skill practice XP does not affect magic_power").
         self.assertEqual(entity.traits.magic_power.value, before)
         self.assertEqual(skill_proficiency_level(entity, "shadow_slash"), 0)
+        # Same (actor, skill, target) in one tick dedupes to a single accrual.
+        self.assertFalse(grant_skill_practice_xp(entity, "shadow_slash"))
+        self.assertEqual(
+            entity.db.skill_proficiency["shadow_slash"],
+            SKILL_PRACTICE_XP_PER_USE * 10 * 0.5,
+        )
 
-    @covers_requirement("skill-proficiency-tracking::skill-proficiency-level-is-a-pure-unbounded-derived-query")
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
     def test_proficiency_query_is_pure(self):
         entity = self._character("query")
         entity.db.skill_proficiency = {"shadow_slash": 151.0}
@@ -101,7 +121,7 @@ class ProgressionTests(EvenniaTestCase):
             _commit(effects)
         self.assertIsNone(entity.db.skill_proficiency)
 
-    @covers_requirement("skill-proficiency-tracking::successful-active-skill-resolution-records-one-practice-grant-atomically")
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
     def test_successful_combat_action_awards_practice_once(self):
         actor = self._character("fighter")
         actor.db.skills = {"active": ["shadow_slash"], "passive": []}
@@ -166,9 +186,11 @@ class ProgressionTests(EvenniaTestCase):
         ]
         self.assertEqual(kinds.count("target_defeated"), 2)
         self.assertIsNone(actor.db.magic_xp)
+        # Use-driven accrual is per distinct hit target: the two newly
+        # living monsters each claim one grant; the dead corpse claims none.
         self.assertEqual(
             actor.db.skill_proficiency["wind_blade"],
-            SKILL_PRACTICE_XP_PER_USE,
+            2 * SKILL_PRACTICE_XP_PER_USE,
         )
 
     def test_duplicate_area_targets_reject_before_resolution(self):
@@ -227,7 +249,7 @@ class ProgressionTests(EvenniaTestCase):
             any("divine" in name for name in vars(progression))
         )
 
-    @covers_requirement("skill-proficiency-tracking::skill-proficiency-is-a-per-entity-per-skill-counter-independent-of-magic-power")
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
     def test_magic_xp_engine_is_absent_from_progression_source(self):
         """skill-proficiency delta: no magic-XP writer may remain."""
         source = inspect.getsource(progression)
@@ -274,7 +296,7 @@ class NpcPolicyAffordabilityIntegrationTests(EvenniaTestCase):
             {str(self.companion.key): self.companion, str(self.goblin.key): self.goblin},
         )
 
-    @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-proposes-the-first-affordable-resolver-backed-damage-skill")
+    @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-proposes-the-first-usable-resolver-backed-damage-skill")
     def test_companion_acts_every_round_with_resolved_basic_attack(self):
         from world.rules.combat import default_attack_policy
         from world.rules.monster_behaviour import monster_behaviour_policy
@@ -467,3 +489,124 @@ class ElementAffinityProgressionTests(EvenniaTestCase):
         with self.assertRaises(ValueError):
             element_affinity_multiplier(entity, "not_an_element")
         self.assertIsNone(entity.db.affinity_elements)
+
+
+class PracticePipelineIntegrationTests(EvenniaTestCase):
+    """End-to-end resolve(): accrual, simulated marker, AOE per-target, release."""
+
+    def setUp(self):
+        super().setUp()
+        progression.reset_practice_dedupe()
+        # One fixed tick for the whole test: dedupe behaviour must come from
+        # claims, never from the clock silently rolling.
+        tick = patch.object(progression, "_current_tick", lambda: 5)
+        tick.start()
+        self.addCleanup(tick.stop)
+        self.actor = create_object(PlayerCharacter, key="pipeline caster")
+        self.actor.race = "human"
+        self.actor.apply_race_baseline()
+        self.actor.traits.magic_power.base = 30
+        grant_lineage(self.actor, ["wind_blade", "fire_ball"])
+
+    def _monsters(self, count):
+        monsters = []
+        for index in range(count):
+            monster = create_object(Monster, key=f"pipeline wolf {index}")
+            monster.threat_tier = "low"
+            monster.apply_monster_tier("floor")
+            monster.traits.hp.base = 200
+            monster.traits.hp.current = 200
+            monsters.append(monster)
+        return monsters
+
+    def _request(self, skill, targets, context):
+        return ActionRequest(self.actor, skill, targets, context)
+
+    def _field(self, monsters, **event_context):
+        field = Battlefield(
+            {
+                "party": frozenset({"pipeline caster"}),
+                "foes": frozenset(monster.key for monster in monsters),
+            },
+            {"pipeline caster": self.actor}
+            | {monster.key: monster for monster in monsters},
+        )
+        return BattlefieldActionContext(field, event_context=dict(event_context))
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_simulated_marker_suppresses_every_accrual(self):
+        monster = self._monsters(1)[0]
+        context = self._field([monster], simulated=True)
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(
+                self._request("fire_ball", [monster], context)
+            )
+        self.assertEqual(result.outcome, "success")
+        self.assertLess(monster.traits.hp.current, 200)
+        # A real, committed cast that grants nothing.
+        self.assertNotIn(
+            "fire_ball", dict(self.actor.db.skill_proficiency or {})
+        )
+
+    @covers_requirement("skill-lineage::each-actor-skill-target-accrues-once-per-world-clock-tick")
+    def test_area_hit_accrues_once_per_distinct_target(self):
+        monsters = self._monsters(3)
+        context = self._field(monsters)
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(
+                self._request("wind_blade", "all-enemies", context)
+            )
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(
+            self.actor.db.skill_proficiency["wind_blade"],
+            3 * SKILL_PRACTICE_XP_PER_USE,
+        )
+
+    @covers_requirement("skill-lineage::each-actor-skill-target-accrues-once-per-world-clock-tick")
+    def test_rolled_back_commit_releases_claims_so_retry_accrues(self):
+        monster = self._monsters(1)[0]
+        context = self._field([monster])
+        request = self._request("fire_ball", [monster], context)
+        before = dict(self.actor.db.skill_proficiency)
+        real = dict(_EVENT_EFFECT_PLANNERS)
+
+        def poison(_request, _log):
+            # Runs after the staged practice batch; its failure forces the
+            # snapshot/restore rollback the release path must undo.
+            return [
+                PendingEffect(
+                    self.actor,
+                    "poisoned commit",
+                    frozenset({"progression"}),
+                    lambda: (_ for _ in ()).throw(RuntimeError("injected")),
+                )
+            ]
+
+        _EVENT_EFFECT_PLANNERS["test-poison"] = poison
+        try:
+            with patch("world.rules.combat.roll_d100", return_value=100):
+                first = ActionResolver.resolve(request)
+        finally:
+            _EVENT_EFFECT_PLANNERS.clear()
+            _EVENT_EFFECT_PLANNERS.update(real)
+        self.assertNotEqual(first.outcome, "success")
+        self.assertEqual(dict(self.actor.db.skill_proficiency), before)
+        self.assertEqual(
+            progression.practice_claims_for(self.actor, "fire_ball"), set()
+        )
+        # The legitimate same-tick retry accrues normally.
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            retry = ActionResolver.resolve(request)
+        self.assertEqual(retry.outcome, "success")
+        self.assertEqual(
+            self.actor.db.skill_proficiency["fire_ball"],
+            SKILL_PRACTICE_XP_PER_USE,
+        )
+        # And the same (actor, skill, target) is then deduped for the tick.
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            again = ActionResolver.resolve(request)
+        self.assertEqual(again.outcome, "success")
+        self.assertEqual(
+            self.actor.db.skill_proficiency["fire_ball"],
+            SKILL_PRACTICE_XP_PER_USE,
+        )

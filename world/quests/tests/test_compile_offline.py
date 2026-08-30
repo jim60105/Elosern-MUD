@@ -39,6 +39,7 @@ from world.rules.action import ActionRequest, ActionResolver
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.guild import register_adventurer, turn_in_quest
 from world.rules.surfaces import read_counter_trait
+from world.rules.tests.combat_fixtures import grant_lineage
 
 from tools.spec_traceability import covers_requirement
 
@@ -66,7 +67,7 @@ class OfflineDirectorEndToEndTests(CompileRegistryIsolation, EvenniaTestCase):
         self.player.apply_race_baseline()
         # Human static magic_power at 術師 tier so fire_ball casts pass.
         self.player.traits.magic_power.base = 30
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
         self.player.location = self.hall
         register_adventurer(self.player, self.staff)
 

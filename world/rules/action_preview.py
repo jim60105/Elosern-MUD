@@ -35,8 +35,10 @@ from world.rules.combat_modifiers import (
     evaluate_combat_modifiers_no_create,
 )
 from world.rules.progression import (
+    can_use_skill,
     FREEFORM_SCALE_VALUES,
     freeform_scales_for,
+    missing_prerequisite,
     scaled_mp_cost,
 )
 from world.rules.targeting import (
@@ -89,8 +91,9 @@ def _freeform_gate_failure(
 
     Mirrors the resolver's step-1 gate with the same fixed crash-safe order:
     scale membership in the closed table first, then eligibility, then direct
-    mastery ownership — so a non-elemental MP skill rejects cleanly instead of
-    dereferencing a missing element. ``scale == 1.0`` never fires the gate.
+    mastery ownership and the requested rung in the skill-anchored ladder — so
+    a non-elemental MP skill rejects cleanly instead of dereferencing a missing
+    element. ``scale == 1.0`` never fires the gate.
     """
     if scale == 1.0:
         return None
@@ -98,7 +101,7 @@ def _freeform_gate_failure(
         return RejectReason.SCALED_CAST_FORBIDDEN, skill.key
     if not is_freeform_eligible(skill):
         return RejectReason.SCALED_CAST_FORBIDDEN, skill.key
-    if not freeform_scales_for(actor, skill.element.key):
+    if scale not in freeform_scales_for(actor, skill):
         return RejectReason.SCALED_CAST_FORBIDDEN, skill.key
     return None
 
@@ -121,6 +124,18 @@ def _skill_wide_failure(
     skill = SKILL_REGISTRY.get(skill_key)
     if skill is None or skill_key not in actor.skills.owned_keys():
         return RejectReason.UNKNOWN_SKILL, skill_key
+    # The lineage gate mirrors ``_step1_ownership`` exactly, so the preview
+    # never advertises a skill the resolver would reject (DC2): can_use_skill
+    # is the boolean authority (the ONE shared predicate), and
+    # missing_prerequisite only reconstructs the named edge for the detail.
+    if not can_use_skill(actor, skill):
+        unmet = missing_prerequisite(actor, skill)
+        required = SKILL_REGISTRY.get(unmet.skill_key)
+        name = required.label if required is not None else unmet.skill_key
+        return (
+            RejectReason.UNKNOWN_SKILL,
+            f"{skill.key}:需先精通「{name}」至 Lv.{unmet.min_proficiency}",
+        )
     if skill.kind is not SkillKind.ACTIVE:
         return RejectReason.SKILL_NOT_ACTIVE, skill_key
     if not skill.usable_out_of_combat and context.battlefield is None:

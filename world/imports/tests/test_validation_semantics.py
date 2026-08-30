@@ -228,6 +228,24 @@ class SemanticValidationTests(TestCase):
         report = validate_character(record)
         self.assertTrue(report.is_valid)
 
+    @covers_requirement("skill-lineage::import-and-scene-build-auto-seed-prerequisite-proficiency-exactly")
+    def test_unregistered_skill_proficiency_key_rejects_the_record(self):
+        # Fail-closed: the auto-seed understands registry keys only, so an
+        # explicit practice-XP typo must name itself and reject the whole
+        # record instead of being dropped or persisted unchecked.
+        record = example_record()
+        record["skills"] = ["fire_ball"]
+        record["skill_proficiency"] = {"not_a_skill": 50}
+        report = validate_character(record)
+        self.assertFalse(report.is_valid)
+        self.assertIn(
+            "'not_a_skill' not found in skill registry",
+            " ".join(issue.message for issue in report.rejections),
+        )
+        # A registered explicit key still validates cleanly.
+        record["skill_proficiency"] = {"fire_arrow": 150}
+        self.assertTrue(validate_character(record).is_valid)
+
     def test_internal_registry_import_failure_is_not_misreported_as_absent(self):
         error = ModuleNotFoundError("broken dependency")
         error.name = "broken_dependency"

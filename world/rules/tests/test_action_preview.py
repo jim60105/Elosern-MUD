@@ -22,7 +22,7 @@ from world.rules.combat_session import engage, read_session, reconstruct_battlef
 from world.rules.sexual_state import AROUSAL_LEVELS
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import SKILL_REGISTRY
-from .combat_fixtures import BattlefieldIsolation
+from .combat_fixtures import BattlefieldIsolation, grant_lineage
 
 
 def _player(key="preview player"):
@@ -50,7 +50,7 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
         self.room = create_object(Room, key="preview arena")
         self.player = _player()
         self.player.location = self.room
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
         self.monster = _monster()
         self.monster.location = self.room
 
@@ -464,6 +464,64 @@ class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTestCase):
             e for e in result.event_log.entries if e.kind == "resource_spend"
         )
         self.assertEqual(spend.data, {"resource_key": "mp", "amount": 9})
+
+
+class LineageRejectionParityTests(BattlefieldIsolation, EvenniaTestCase):
+    """The lineage gate denies identically on preview, preflight, resolve."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="lineage arena")
+        self.player = _player("lineage caster")
+        self.player.location = self.room
+        self.monster = _monster("lineage goblin")
+        self.monster.location = self.room
+
+    def _context(self):
+        engage(self.player, self.monster)
+        battlefield = reconstruct_battlefield(self.player, read_session(self.player))
+        return BattlefieldActionContext(battlefield)
+
+    def _denied_pair(self, skill_key, targets):
+        context = self._context()
+        preview = preview_skill(self.player, skill_key, context, targets)
+        preflight = ActionResolver.preflight(
+            ActionRequest(self.player, skill_key, targets, context)
+        )
+        resolution = ActionResolver.resolve(
+            ActionRequest(self.player, skill_key, targets, context)
+        )
+        self.assertFalse(preview.enabled)
+        self.assertEqual(preview.reason, RejectReason.UNKNOWN_SKILL)
+        self.assertEqual(preflight.reason, RejectReason.UNKNOWN_SKILL)
+        self.assertEqual(resolution.reason, RejectReason.UNKNOWN_SKILL)
+        return preview, preflight, resolution
+
+    @covers_requirement("skill-lineage::can-use-skill-is-the-single-shared-use-eligibility-predicate")
+    def test_missing_prerequisite_ownership_denies_identically(self):
+        self.player.db.skills = {"active": ["firestorm"], "passive": []}
+        preview, preflight, resolution = self._denied_pair(
+            "firestorm", [self.monster]
+        )
+        # The detail names the first unmet edge in declared order.
+        self.assertEqual(
+            preview.detail, "firestorm:需先精通「灼熱波動」至 Lv.3"
+        )
+        self.assertEqual(preview.detail, preflight.detail)
+        self.assertEqual(preview.detail, resolution.detail)
+
+    @covers_requirement("skill-lineage::can-use-skill-is-the-single-shared-use-eligibility-predicate")
+    def test_sub_threshold_prerequisite_level_denies_identically(self):
+        self.player.db.skills = {
+            "active": ["fire_arrow", "fire_ball", "scorching_wave", "firestorm"],
+            "passive": [],
+        }
+        self.player.db.skill_proficiency = {}
+        preview, preflight, resolution = self._denied_pair(
+            "firestorm", [self.monster]
+        )
+        self.assertEqual(preview.detail, preflight.detail)
+        self.assertEqual(preview.detail, resolution.detail)
 
 
 if __name__ == "__main__":

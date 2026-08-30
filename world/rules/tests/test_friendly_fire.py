@@ -40,7 +40,7 @@ from world.rules.combat_session import (
 )
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.party import AUTO_LEAVE_MESSAGE, PartyWriteError, join_party, party_ids
-from .combat_fixtures import BattlefieldIsolation
+from .combat_fixtures import BattlefieldIsolation, grant_lineage
 from world.skills.registry import (
     FactionConstraint,
     SKILL_REGISTRY,
@@ -126,7 +126,7 @@ class FriendlyFireBase(BattlefieldIsolation, EvenniaTest):
         super().tearDown()
 
     def _equip(self, *skill_keys):
-        self.player.db.skills = {"active": list(skill_keys), "passive": []}
+        grant_lineage(self.player, list(skill_keys))
 
     def _run_hit(self, skill_key, targets):
         with patch("world.rules.combat.roll_d100", return_value=100):

@@ -64,6 +64,7 @@ from world.rules.guild_offers import (
     list_guild_offers,
 )
 from world.rules.service_view import build_services_view
+from world.rules.tests.combat_fixtures import grant_lineage
 
 from tools.spec_traceability import covers_requirement
 
@@ -358,7 +359,7 @@ class RestartRestoreIntegrationTests(RegistryIsolationMixin, EvenniaTestCase):
         self.player.apply_race_baseline()
         # Human static magic_power at 術師 tier so fire_ball casts pass.
         self.player.traits.magic_power.base = 30
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
 
     def _monster(self, key: str, hp: int = 1) -> Monster:
         monster = create_object(Monster, key=key)

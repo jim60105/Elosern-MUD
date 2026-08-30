@@ -3,6 +3,7 @@
 ## Purpose
 TBD - created by archiving change import-contract. Update Purpose after archive.
 ## Requirements
+
 ### Requirement: loader.py instantiates entities only after batch validation reports zero rejections
 `world/imports/loader.py` SHALL run full batch validation (reusing `world.imports.validate`'s
 functions, not a separate re-implementation) before constructing any entity, and SHALL raise
@@ -52,7 +53,11 @@ multiplying, or otherwise deriving it from another field.
 ### Requirement: Non-trait record fields are stored verbatim into the seam attributes without interpretation
 `loader.py` SHALL store `persona`, `sexual_baseline`, `skills`/`passives`, `equipment`, and
 `disguised_stats` into the corresponding `LivingEntity` attributes exactly as validated, without
-adding, removing, or transforming any content, and SHALL store `inventory` into
+adding, removing, or transforming any content (the sole derived write is the lineage auto-seed —
+see `use-driven-skill-lineage`: `skills`/`passives` are extended with the transitive
+prerequisite-ownership closure of what the record declared, prerequisite proficiency is seeded to
+exactly the edge value, the whole normalization runs before schema range validation, and an explicit
+imported `skill_proficiency` entry always beats the seed), and SHALL store `inventory` into
 `entity.db.inventory` using Evennia's attribute store directly (no seam attribute declaration
 required from any other change).
 
@@ -67,6 +72,13 @@ required from any other change).
 - **THEN** the constructed entity's `entity.db.sexual` equals that dict exactly, and no
   `SexualState`-like object is constructed (that class does not exist yet), leaving the bare
   `entity.sexual` name free for change 7's `SexualState` to mount on
+
+#### Scenario: Lineage auto-seed lands inside the same transaction
+- **WHEN** a valid record owns `firestorm` (prereq `scorching_wave >= 3`) with no explicit
+  `skill_proficiency` for its prerequisites
+- **THEN** the loaded entity OWNS the closed prerequisite chain, carries `scorching_wave` proficiency
+  seeded to exactly the edge value, and `can_use_skill` passes for `firestorm`; a record rejected by
+  schema validation persists nothing, seed and closure included
 
 #### Scenario: skills and passives are stored together as a raw structure
 - **WHEN** a valid character record has `"skills": ["fire_mastery"]` and `"passives":
@@ -114,4 +126,3 @@ SHALL always read a value present in the validated record, never a missing key.
 - **WHEN** `loader.py`'s instantiation code is inspected
 - **THEN** the `sex` assignment reads `entity.sex = record["sex"]`, with no corresponding
   `entity.db.sex` assignment anywhere in the loader
-

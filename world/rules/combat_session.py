@@ -39,6 +39,10 @@ from world.rules.clock import get_world_clock, settle_combat_result
 from world.rules.items import ItemUseRequest, preflight_item_use
 from world.rules.monster_behaviour import monster_behaviour_policy
 from world.rules.overwhelm import classify_overwhelm, resolve_overwhelm
+from world.rules.progression import (
+    restore_practice_dedupe,
+    snapshot_practice_dedupe,
+)
 from world.rules.skip_safety import (
     register_active_battlefield,
     unregister_active_battlefield,
@@ -1099,6 +1103,7 @@ def _submit_request(
     notifications: tuple[str, ...] = ()
     item_journals: list[Any] = []
     simulated, nonlethal_keys = _session_policy(battlefield, record)
+    dedupe_before = snapshot_practice_dedupe()
     try:
         with transaction.atomic():
             # Shared outer transaction (fix-combat-settlement-recovery D1):
@@ -1182,6 +1187,11 @@ def _submit_request(
             members_before,
             relations_before,
         )
+        # Resolved rounds inside a rolled-back outer transaction kept their
+        # practice-dedupe claims (the resolve-level release only covers an
+        # INNER rolled-back commit); restore the pre-round state so a
+        # same-tick retry after the failed round accrues normally.
+        restore_practice_dedupe(dedupe_before)
         register_active_battlefield(battlefield)
         raise
     # Deliver auto-leave notices only after the whole round committed, so a
