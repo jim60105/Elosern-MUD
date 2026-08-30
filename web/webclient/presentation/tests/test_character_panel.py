@@ -1130,6 +1130,47 @@ class CharacterFullTitlePresenterTests(EvenniaTest):
         self.assertFalse(self._character()["available"])
         self.assertFalse(self._status()["available"])
 
+    def test_an_over_bound_composed_title_fails_the_panel_closed(self):
+        # The presenter validates its own payload; the read model must fail
+        # closed on a composed title past the wire bound (legacy/corrupt
+        # storage that no writer can create anymore) instead of serializing a
+        # panel the client validator would reject whole.
+        self.player.attributes.add(
+            "title_collection",
+            [
+                {
+                    "kind": "epithet",
+                    "display": "長" * (MAX_FULL_TITLE_CODE_POINTS + 1),
+                    "origin_quote": "超出傳輸上限的異名。",
+                    "granted_tick": 1,
+                }
+            ],
+        )
+        self.player.attributes.add(
+            "title_equipped", {"fixed": None, "epithet": "長" * (MAX_FULL_TITLE_CODE_POINTS + 1)}
+        )
+        self.assertFalse(self._character()["available"])
+        self.assertFalse(self._status()["available"])
+
+    def test_a_title_at_the_wire_bound_renders_on_both_panels(self):
+        at_bound = "長" * MAX_FULL_TITLE_CODE_POINTS
+        self.player.attributes.add(
+            "title_collection",
+            [
+                {
+                    "kind": "epithet",
+                    "display": at_bound,
+                    "origin_quote": "正好貼線上限的異名。",
+                    "granted_tick": 1,
+                }
+            ],
+        )
+        self.player.attributes.add(
+            "title_equipped", {"fixed": None, "epithet": at_bound}
+        )
+        self.assertEqual(self._character()["full_title"], at_bound)
+        self.assertEqual(self._status()["actor"]["full_title"], at_bound)
+
 
 if __name__ == "__main__":
     unittest.main()

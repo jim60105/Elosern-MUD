@@ -35,6 +35,12 @@ _FIXED_KIND = "fixed"
 _EPITHET_KIND = "epithet"
 _FULL_WIDTH_SPACE = "　"
 
+# Wire bound on the composed full title, mirrored by the panel validator
+# (``web.webclient.presentation.character.MAX_FULL_TITLE_CODE_POINTS``); the
+# status/character producers fail closed past it. Epithet displays carry their
+# own storage cap so a legitimate banking write can never compose past it.
+MAX_FULL_TITLE_CODE_POINTS = 128
+MAX_EPITHET_DISPLAY_CODE_POINTS = 64
 # Forward seam: Change C (use-driven-skill-lineage) raises this to the
 # registry-derived tree-crown cap (`PROFICIENCY_TIP_CAP` in progression.yaml).
 # A lineage root with no satisfying edges is a crown, so 10 is the exact
@@ -213,6 +219,10 @@ def bank_fixed(entity: Any, key: str, tick: int) -> bool:
     entry is auto-equipped in the same write (D8). Runs inside the caller's
     transaction; rollback is the caller's snapshot/restore responsibility.
     """
+    _require_tick(tick, "granted_tick")
+    _require_identifier(key, "fixed title key")
+    if key not in FIXED_TITLE_REGISTRY:
+        raise TitleDataError(f"unknown fixed title key {key!r}")
     collection, equipped = read_title_state(entity)
     if any(e["kind"] == _FIXED_KIND and e["key"] == key for e in collection):
         return False
@@ -234,6 +244,15 @@ def bank_epithet(
     Auto-equips the epithet slot when empty, mirroring ``bank_fixed``. The
     starter epithet and (later, change G) adopted epithets both arrive here.
     """
+    _require_tick(tick, "granted_tick")
+    _require_identifier(display, "epithet display")
+    _require_identifier(origin_quote, "epithet origin quote")
+    if not display.strip() or not origin_quote.strip():
+        raise TitleDataError("epithet display and quote must not be blank")
+    if len(display) > MAX_EPITHET_DISPLAY_CODE_POINTS:
+        raise TitleDataError(
+            f"epithet display exceeds {MAX_EPITHET_DISPLAY_CODE_POINTS} code points"
+        )
     collection, equipped = read_title_state(entity)
     if any(e["kind"] == _EPITHET_KIND and e["display"] == display for e in collection):
         return False
@@ -388,12 +407,24 @@ def title_context_entries(entity: Any, limit: int = MAX_TITLE_ENTRIES) -> tuple[
 
 
 def _owned_skill_keys(entity: Any) -> frozenset[str]:
-    """No-create ownership read mirroring the shipped handler fold."""
+    """No-create ownership read mirroring the shipped handler fold.
+
+    Foreign-state reads fail closed with ``TitleDataError`` on malformed
+    storage; they never leak an ``AttributeError``/``TypeError`` into the
+    action pipeline.
+    """
     try:
         return frozenset(entity.skills.owned_keys())
+    except TitleDataError:
+        raise
     except Exception:
         raw = entity.db.skills or {}
-        owned = list(raw.get("active") or ()) + list(raw.get("passive") or ())
+        if not isinstance(raw, Mapping):
+            raise TitleDataError("skills state is not a mapping") from None
+        try:
+            owned = list(raw.get("active") or ()) + list(raw.get("passive") or ())
+        except TypeError:
+            raise TitleDataError("skills state is malformed") from None
         from world.skills.handler import INNATE_SKILL_ORDER
 
         return frozenset([*owned, *INNATE_SKILL_ORDER])
@@ -486,11 +517,13 @@ def predicate_satisfied(
     if family is TitlePredicateFamily.COUNTER_THRESHOLD:
         return _sexual_counter_value(entity, predicate.counter) >= predicate.threshold
     if family is TitlePredicateFamily.LINEAGE_COMPLETE:
-        return (
-            predicate.root_skill_key in _owned_skill_keys(entity)
-            and skill_proficiency_level(entity, predicate.root_skill_key)
-            >= _LINEAGE_CROWN_CAP
-        )
+        if predicate.root_skill_key not in _owned_skill_keys(entity):
+            return False
+        try:
+            level = skill_proficiency_level(entity, predicate.root_skill_key)
+        except (AttributeError, TypeError, ValueError):
+            raise TitleDataError("skill proficiency state is malformed") from None
+        return level >= _LINEAGE_CROWN_CAP
     return False
 
 
@@ -524,7 +557,7 @@ def title_event_effect_planner(request: Any, event_log: Any) -> list[Any]:
             continue
         try:
             satisfied = predicate_satisfied(actor, event_log, definition.predicate)
-        except TitleDataError:
+        except (TitleDataError, AttributeError, TypeError, ValueError):
             # A predicate reading some other subsystem's corrupted state must
             # never reject the player's action: that row simply grants nothing.
             # The strict ``read_title_state`` still guards every mutator and

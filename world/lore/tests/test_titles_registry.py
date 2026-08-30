@@ -13,6 +13,7 @@ import unittest
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.titles import (
     FIXED_TITLE_REGISTRY,
+    MAX_TITLE_DISPLAY_CODE_POINTS,
     STARTER_EPITHET,
     FixedTitleDef,
     StarterEpithet,
@@ -138,6 +139,15 @@ class FixedTitleRegistryContentTests(unittest.TestCase):
             validate_fixed_titles(list(FIXED_TITLE_REGISTRY.values()), **_live_faces())
         )
 
+    def test_registry_publication_is_immutable(self):
+        # Consumers read through the mapping protocol; in-place lore mutation
+        # is impossible on the published proxy.
+        with self.assertRaises(TypeError):
+            FIXED_TITLE_REGISTRY["g_tampered"] = _row(key="g_tampered")
+        with self.assertRaises(AttributeError):
+            FIXED_TITLE_REGISTRY.update({})
+        self.assertNotIn("g_tampered", FIXED_TITLE_REGISTRY)
+
 
 class FixedTitleValidatorTests(unittest.TestCase):
     """Every load-contract rule, with faces injected instead of mutated."""
@@ -176,6 +186,51 @@ class FixedTitleValidatorTests(unittest.TestCase):
                 **_faces(),
             )
         self.assertIn("duplicate", str(caught.exception))
+
+    def test_duplicate_display_names_are_rejected(self):
+        # ``equip_fixed`` resolves display names, so two rows sharing one
+        # display make equip ambiguous.
+        with self.assertRaises(TitleRegistryError) as caught:
+            validate_fixed_titles(
+                [
+                    _row(key="t_a"),
+                    _row(
+                        key="t_b",
+                        family=TitlePredicateFamily.MASTERY_OWNED,
+                        element="fire",
+                    ),
+                ],
+                **_faces(),
+            )
+        self.assertIn("display collision", str(caught.exception))
+        self.assertIn("t_b", str(caught.exception))
+
+    def test_key_colliding_with_another_rows_display_is_rejected(self):
+        first = _row(key="alpha")
+        second = _row(
+            key="測試稱號",
+            family=TitlePredicateFamily.MASTERY_OWNED,
+            element="fire",
+        )
+        object.__setattr__(second, "display_name_zh", "第二稱號")
+        with self.assertRaises(TitleRegistryError) as caught:
+            validate_fixed_titles([first, second], **_faces())
+        self.assertIn("key collision", str(caught.exception))
+        self.assertIn("測試稱號", str(caught.exception))
+
+    def test_a_row_may_share_its_own_key_and_display(self):
+        row = _row(key="測試稱號", guild_rank="F")
+        self.assertIsNone(validate_fixed_titles([row], **_faces()))
+
+    def test_oversized_display_names_are_rejected(self):
+        row = _row(key="t_long", guild_rank="F")
+        object.__setattr__(row, "display_name_zh", "長" * (MAX_TITLE_DISPLAY_CODE_POINTS + 1))
+        with self.assertRaises(TitleRegistryError) as caught:
+            validate_fixed_titles([row], **_faces())
+        self.assertIn("t_long", str(caught.exception))
+        # The bound itself is bankable content.
+        object.__setattr__(row, "display_name_zh", "長" * MAX_TITLE_DISPLAY_CODE_POINTS)
+        self.assertIsNone(validate_fixed_titles([row], **_faces()))
 
     def test_non_registry_row_is_rejected(self):
         with self.assertRaises(TitleRegistryError):

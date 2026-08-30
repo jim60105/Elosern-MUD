@@ -10,7 +10,11 @@ removable (no delete API, command, or code path — asserted by a structural tes
 `db.title_equipped` SHALL be `{"fixed": <fixed key or None>, "epithet": <display
 or None>}`, storing identifiers (never copies). Both attributes SHALL be
 registered on the snapshot/restore surface before any writer; missing attributes
-SHALL read exactly as `[]` and `{"fixed": None, "epithet": None}`.
+SHALL read exactly as `[]` and `{"fixed": None, "epithet": None}`. Bank writers
+SHALL validate every input before any write — a fixed key must name a registry
+row, epithet display and origin quote must be non-blank strings, the epithet
+display must fit its storage cap, and `granted_tick` must be a non-negative
+integer — and SHALL raise `TitleDataError` leaving state byte-identical.
 
 #### Scenario: Duplicate fixed grant is a no-op
 - **WHEN** an entity already holding fixed key `g_f_rank` is granted it again
@@ -45,8 +49,12 @@ into Evennia Scripts idempotently at startup, alongside the registry constant
 `STARTER_EPITHET` (display 「南門新客」). Load validation SHALL reject: duplicate
 keys; empty `hint_zh`; predicates referencing registry faces that do not exist
 (element, monster threat tier, quest key, guild rank key, sexual experience
-type). Predicate families are declarative (`lineage_complete`, `mastery_owned`,
-`first_kill_tier`, `quest_completed`, `guild_rank_reached`, `sexual_experience`,
+type). Load validation SHALL additionally reject ambiguous equip identifiers —
+a duplicate `display_name_zh` or a key equal to another row's display — and a
+display longer than 63 code points. The published registry SHALL be an
+immutable mapping proxy (no in-place mutation). Predicate families are
+declarative (`lineage_complete`, `mastery_owned`, `first_kill_tier`,
+`quest_completed`, `guild_rank_reached`, `sexual_experience`,
 `counter_threshold`) carrying parameters only.
 
 #### Scenario: A dangling predicate reference fails at load

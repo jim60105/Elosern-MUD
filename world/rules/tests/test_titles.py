@@ -105,9 +105,12 @@ def _with_counter_row(func):
 
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
-        with patch.dict(
+        # The published registry is an immutable proxy, so the seam replaces
+        # the module attribute wholesale (merged with the shipped rows) for
+        # the duration of the test.
+        with patch(
             "world.rules.titles.FIXED_TITLE_REGISTRY",
-            {_COUNTER_ROW_KEY: _COUNTER_ROW},
+            {**FIXED_TITLE_REGISTRY, _COUNTER_ROW_KEY: _COUNTER_ROW},
         ):
             return func(self, *args, **kwargs)
 
@@ -202,6 +205,58 @@ class TitleStateTests(EvenniaTest):
         before = read_title_state(self.entity)[0]
         self.assertFalse(bank_epithet(self.entity, "南門新客", "另一段引文", 55))
         self.assertEqual(read_title_state(self.entity)[0], before)
+
+    def test_bank_fixed_rejects_malformed_input_without_touching_state(self):
+        bank_fixed(self.entity, "g_f_rank", 1)
+        bank_epithet(self.entity, "南門新客", "守衛的目送", 1)
+        before = deepcopy(read_title_state(self.entity))
+        cases = (
+            ("", 1),
+            ("g_unknown_rank", 1),
+            ("S級傳說", 1),
+            ("g_e_rank", -1),
+            ("g_e_rank", 1.0),
+            ("g_e_rank", True),
+            ("g_e_rank", "1"),
+            (None, 1),
+            (7, 1),
+        )
+        for key, tick in cases:
+            with self.subTest(key=key, tick=tick):
+                with self.assertRaises(TitleDataError):
+                    bank_fixed(self.entity, key, tick)
+                self.assertEqual(read_title_state(self.entity), before)
+
+    def test_bank_epithet_rejects_malformed_input_without_touching_state(self):
+        from world.rules.titles import MAX_EPITHET_DISPLAY_CODE_POINTS
+
+        bank_fixed(self.entity, "g_f_rank", 1)
+        bank_epithet(self.entity, "南門新客", "守衛的目送", 1)
+        before = deepcopy(read_title_state(self.entity))
+        oversized = "長" * (MAX_EPITHET_DISPLAY_CODE_POINTS + 1)
+        cases = (
+            ("", "引文", 1),
+            ("　", "引文", 1),
+            ("   ", "引文", 1),
+            ("新異名", "", 1),
+            ("新異名", " ", 1),
+            (7, "引文", 1),
+            ("新異名", 7, 1),
+            (None, "引文", 1),
+            ("新異名", None, 1),
+            (oversized, "引文", 1),
+            ("新異名", "引文", -1),
+            ("新異名", "引文", 1.5),
+        )
+        for display, quote, tick in cases:
+            with self.subTest(display=display):
+                with self.assertRaises(TitleDataError):
+                    bank_epithet(self.entity, display, quote, tick)
+                self.assertEqual(read_title_state(self.entity), before)
+        # The cap itself stays bankable, so the bound is not off-by-one.
+        boundary = "長" * MAX_EPITHET_DISPLAY_CODE_POINTS
+        self.assertTrue(bank_epithet(self.entity, boundary, "引文", 2))
+        self.assertIn(boundary, [e["display"] for e in banked_epithets(self.entity)])
 
     def test_no_mutator_sequence_empties_an_occupied_slot(self):
         bank_fixed(self.entity, "g_f_rank", 1)
@@ -595,7 +650,7 @@ class TitlePlannerTests(EvenniaTest):
         self.assertEqual(compose_full_title(self.actor), "受矚者")
 
     def test_one_grant_per_action_and_key_idempotency(self):
-        with patch.dict(
+        with patch(
             "world.rules.titles.FIXED_TITLE_REGISTRY",
             {"t_first_high": _FIRST_KILL_ROW},
         ):
@@ -606,6 +661,48 @@ class TitlePlannerTests(EvenniaTest):
                 title_event_effect_planner(self._request(), _event_log(_defeated("high", 3))),
                 [],
             )
+
+    def test_malformed_foreign_state_skips_rows_and_never_rejects_the_action(self):
+        # A predicate reading another subsystem's corrupted storage must not
+        # propagate out of the planner: the row grants nothing, the action
+        # stands. ``db.skills`` as a non-mapping makes both the handler fold
+        # and the no-create fallback fail.
+        self.actor.db.skills = [{"active": "basic_attack"}]
+        for family, parameter, value in (
+            (TitlePredicateFamily.MASTERY_OWNED, "element", "fire"),
+            (TitlePredicateFamily.LINEAGE_COMPLETE, "root_skill_key", "firebolt"),
+        ):
+            with self.subTest(family=family.value):
+                row = FixedTitleDef(
+                    "t_contained",
+                    "受試者",
+                    TitleCategory.COMBAT,
+                    "風味文字。",
+                    "提示文字。",
+                    TitlePredicate(family=family, **{parameter: value}),
+                )
+                with patch("world.rules.titles.FIXED_TITLE_REGISTRY", {"t_contained": row}):
+                    with self.assertRaises(TitleDataError):
+                        predicate_satisfied(self.actor, _event_log(), row.predicate)
+                    self.assertEqual(self._plan(), [])
+
+    def test_malformed_proficiency_state_fails_the_lineage_row_closed(self):
+        row = FixedTitleDef(
+            "t_lineage",
+            "宗師",
+            TitleCategory.SPELL,
+            "風味文字。",
+            "提示文字。",
+            TitlePredicate(
+                family=TitlePredicateFamily.LINEAGE_COMPLETE,
+                root_skill_key="basic_attack",
+            ),
+        )
+        self.actor.db.skill_proficiency = {"basic_attack": "not-a-number"}
+        with patch("world.rules.titles.FIXED_TITLE_REGISTRY", {"t_lineage": row}):
+            with self.assertRaises(TitleDataError):
+                predicate_satisfied(self.actor, _event_log(), row.predicate)
+            self.assertEqual(self._plan(), [])
 
     def test_an_uneventful_action_stages_nothing(self):
         self.assertEqual(title_event_effect_planner(self._request(), _event_log()), [])

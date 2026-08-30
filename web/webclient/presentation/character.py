@@ -70,6 +70,7 @@ from world.rules.status_query import (
     build_character_read_model,
     group_skill_keys,
 )
+from world.rules.titles import MAX_FULL_TITLE_CODE_POINTS
 from world.skills.registry import SKILL_REGISTRY, SkillCategory
 
 CHARACTER_SCHEMA_VERSION = 6
@@ -99,8 +100,9 @@ MAX_ADJUSTMENT_CODE_POINTS = MAX_DESCRIPTION_CODE_POINTS
 # (``world.rules.character_creation.MAX_PERSONA_FIELD_LENGTH``); the parity
 # contract pins the JS validator to this same number.
 MAX_PERSONA_BACKGROUND_CODE_POINTS = 600
-# The composed full title bound, mirrored by the JS validator (parity test).
-MAX_FULL_TITLE_CODE_POINTS = 128
+# The composed full title bound is owned by ``world.rules.titles`` (the
+# producer bounds composition at it); the JS validator mirrors this number in
+# the parity contract.
 
 _DISGUISE_DESCRIPTION = (
     "目前以偽裝的外貌示人，以下是他人所見的數值。真實數值不因此改變。"

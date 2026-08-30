@@ -11,10 +11,19 @@ the declarative predicate families it validates against, and the
 
 from dataclasses import dataclass
 from enum import StrEnum
+from types import MappingProxyType
 
 from .guild import GUILD_RANK_REGISTRY
 from .monsters import MONSTER_TIER_REGISTRY
 from .elements import ELEMENT_REGISTRY
+
+
+# The wire bound every presenter enforces on ``full_title`` is 128 code
+# points (``web.webclient.presentation.character.MAX_FULL_TITLE_CODE_POINTS``
+#). Registry displays are capped so fixed + separator + maximum epithet
+# composes to exactly that bound: a legitimate write can never overflow the
+# panel protocol.
+MAX_TITLE_DISPLAY_CODE_POINTS = 63
 
 
 class TitleCategory(StrEnum):
@@ -123,7 +132,7 @@ def _predicate(
 # transactions, and the planner's ``guild_rank_reached`` evaluation is a
 # dedupe-level no-op in practice. Predicate rows beyond the guild pairings are
 # future content work (design §6.2 note).
-FIXED_TITLE_REGISTRY: dict[str, FixedTitleDef] = {
+_FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     "g_f_rank": FixedTitleDef(
         "g_f_rank",
         "F級冒險者",
@@ -182,6 +191,11 @@ FIXED_TITLE_REGISTRY: dict[str, FixedTitleDef] = {
     ),
 }
 
+# The published registry is a read-only proxy: every consumer reads through
+# ``.get`` / ``.values`` / ``[key]`` / ``in``, and no subsystem may mutate lore
+# data in place.
+FIXED_TITLE_REGISTRY = MappingProxyType(_FIXED_TITLE_ROWS)
+
 
 class TitleRegistryError(ValueError):
     """A fixed-title registry row violates the closed load contract."""
@@ -235,6 +249,32 @@ def validate_fixed_titles(
     if unknown:
         names = ", ".join(sorted(str(family) for family in unknown))
         raise TitleRegistryError(f"unknown predicate family: {names}")
+
+    # Equip-identifier resolution: ``equip_fixed`` accepts a registry key or a
+    # display name, so a duplicate display or a key colliding with another
+    # row's display makes equip ambiguous. Displays are additionally bounded
+    # so a composed full title cannot overflow the wire bound on its half.
+    seen_displays: dict[str, str] = {}
+    for entry in entries:
+        display = entry.display_name_zh
+        if len(display) > MAX_TITLE_DISPLAY_CODE_POINTS:
+            raise TitleRegistryError(
+                f"title display exceeds {MAX_TITLE_DISPLAY_CODE_POINTS} "
+                f"code points: {entry.key}"
+            )
+        if display in seen_displays:
+            raise TitleRegistryError(
+                f"title display collision: {entry.key} duplicates "
+                f"{seen_displays[display]}"
+            )
+        seen_displays[display] = entry.key
+    for entry in entries:
+        owner = seen_displays.get(entry.key)
+        if owner is not None and owner != entry.key:
+            raise TitleRegistryError(
+                f"title key collision: {entry.key} is also the display of "
+                f"{owner}"
+            )
 
     # Parameter-shape validation: exactly the family's declared parameter may
     # be set, and `counter_threshold` additionally requires an integer
@@ -346,8 +386,10 @@ def _live_faces() -> dict[str, set[str]]:
 # Shipped content must be valid the moment the module loads; the seven guild
 # rows only reference the static guild-rank face, so boot-time validation is
 # deterministic and independent of startup sync order.
+# The concrete dict is validated (and then published through the proxy), so a
+# row is checked against the real data before anything can observe it.
 validate_fixed_titles(
-    list(FIXED_TITLE_REGISTRY.values()),
+    list(_FIXED_TITLE_ROWS.values()),
     **{
         key: value
         for key, value in _live_faces().items()

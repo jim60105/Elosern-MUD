@@ -37,7 +37,7 @@ from world.skills.effects import StatMultiplyEffect
 from world.rules.sexual_state import PLEASURE_CONFIG, _LIFETIME_COUNTER_KEYS
 from world.rules.status_display import display_for
 from world.rules.stored_sexual_reads import StoredLevel
-from world.rules.titles import compose_full_title
+from world.rules.titles import MAX_FULL_TITLE_CODE_POINTS, compose_full_title
 from world.skills.equipment import dual_wielding_from_storage
 from world.skills.handler import INNATE_SKILL_KEYS, INNATE_SKILL_ORDER
 from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillDef, SkillKind
@@ -306,9 +306,15 @@ def _read_full_title(entity: Any) -> str:
     ``presentation_unavailable`` rather than fabricating a title.
     """
     try:
-        return compose_full_title(entity)
+        composed = compose_full_title(entity)
     except Exception as error:
         raise StatusQueryError(f"title state is malformed: {error}") from error
+    # The wire validator bounds this field; an over-long composed title is
+    # corrupt state and degrades the panel exactly like a malformed record
+    # instead of being serialized into a panel the client would reject whole.
+    if len(composed) > MAX_FULL_TITLE_CODE_POINTS:
+        raise StatusQueryError("composed full title exceeds the wire bound")
+    return composed
 
 
 def _require_gauge(data: dict[str, Any], key: str) -> GaugeValue:

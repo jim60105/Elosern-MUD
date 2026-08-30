@@ -69,6 +69,22 @@ occupied slots just bank the entry. There is no unequip path, hence no
 (character created, not yet registered). Tests assert no mutator sequence
 reaches "collection non-empty and slot empty".
 
+### DF6: writers validate, readers contain, producers bound
+
+The bank writers are the only persistent mutators, so they validate every
+input before any write (registry-membership fixed keys, non-blank bounded
+epithet strings, integer ticks) and fail with `TitleDataError` leaving state
+untouched — malformed entries can never be persisted into an occupied slot to
+poison later strict reads. Predicate reads of foreign subsystems normalize
+malformed storage to `TitleDataError`, and the planner's per-row guard means a
+corrupted skills/proficiency record skips only its own row; a title lookup
+never rejects a player action. The composed full title is bounded at the
+producer: registry displays cap at 63 code points and epithet storage at 64
+(composing to exactly the 128-code-point wire bound with the separator), and
+the read model fails the panel closed past 128 so a legacy/corrupt record can
+never serialize a payload the client validator would reject whole. The
+registry is published as an immutable mapping proxy.
+
 ## Risks
 
 - Planner overhead per action: predicate scan is registry-sized (small), and
