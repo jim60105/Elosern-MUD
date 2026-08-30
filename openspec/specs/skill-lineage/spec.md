@@ -199,7 +199,10 @@ value, never above, and SHALL extend the record's ownership with the transitive 
 closure so a deep import is gate-usable, not merely seeded. Auto-seed normalization SHALL run on
 the record before the semantic validation phase reads it (schema range checks included), so
 malformed imports still reject wholesale, and an explicit `skill_proficiency` entry in the import
-record SHALL always win over auto-seed, even when it leaves an edge unmet.
+record SHALL always win over auto-seed, even when it leaves an edge unmet. Every explicit
+`skill_proficiency` key SHALL resolve in `SKILL_REGISTRY` — the check runs against the RAW record
+before normalization, so an unregistered key names itself and rejects the whole record instead of
+being silently dropped or silently persisted by the seed.
 `world/quests/scene_builder.py`'s NPC spawn path SHALL share the same helper.
 
 #### Scenario: A deep imported skill arrives usable
@@ -217,3 +220,7 @@ record SHALL always win over auto-seed, even when it leaves an edge unmet.
 #### Scenario: Malformed imports still reject all-or-nothing
 - **WHEN** a record with an invalid field also triggers auto-seed
 - **THEN** validation rejects the record and nothing persists, seed included
+
+#### Scenario: An unregistered proficiency key rejects the record
+- **WHEN** a record carries `skill_proficiency: {"not_a_skill": 50}`
+- **THEN** validation rejects the record naming the key, and nothing persists

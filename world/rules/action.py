@@ -23,6 +23,7 @@ from world.rules.dice import roll_d100
 from world.rules.equipment_effects import equipment_immune_buff_keys, equipment_pleasure_gain
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.progression import (
+    can_use_skill,
     FREEFORM_SCALE_VALUES,
     freeform_scales_for,
     grant_skill_practice_xp,
@@ -273,9 +274,11 @@ def _step1_ownership(request: ActionRequest) -> SkillDef:
     # prerequisite chain is unmet is rejected with the SAME reason, its detail
     # deterministically naming the first unmet edge. Detail stays the bare
     # skill key for the registry-miss/unowned case, so every pre-existing
-    # matcher keeps working.
-    unmet = missing_prerequisite(request.actor, skill)
-    if unmet is not None:
+    # matcher keeps working. can_use_skill is the boolean authority (the ONE
+    # shared predicate); missing_prerequisite only reconstructs the named
+    # edge for the message.
+    if not can_use_skill(request.actor, skill):
+        unmet = missing_prerequisite(request.actor, skill)
         required = SKILL_REGISTRY.get(unmet.skill_key)
         name = required.label if required is not None else unmet.skill_key
         raise RejectedAction(

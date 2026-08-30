@@ -35,6 +35,7 @@ from world.rules.combat_modifiers import (
     evaluate_combat_modifiers_no_create,
 )
 from world.rules.progression import (
+    can_use_skill,
     FREEFORM_SCALE_VALUES,
     freeform_scales_for,
     missing_prerequisite,
@@ -124,9 +125,11 @@ def _skill_wide_failure(
     if skill is None or skill_key not in actor.skills.owned_keys():
         return RejectReason.UNKNOWN_SKILL, skill_key
     # The lineage gate mirrors ``_step1_ownership`` exactly, so the preview
-    # never advertises a skill the resolver would reject (DC2).
-    unmet = missing_prerequisite(actor, skill)
-    if unmet is not None:
+    # never advertises a skill the resolver would reject (DC2): can_use_skill
+    # is the boolean authority (the ONE shared predicate), and
+    # missing_prerequisite only reconstructs the named edge for the detail.
+    if not can_use_skill(actor, skill):
+        unmet = missing_prerequisite(actor, skill)
         required = SKILL_REGISTRY.get(unmet.skill_key)
         name = required.label if required is not None else unmet.skill_key
         return (

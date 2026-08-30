@@ -352,6 +352,26 @@ def _check_skills(record: dict[str, Any]) -> list[Issue]:
     ]
 
 
+def _check_skill_proficiency_keys(record: dict[str, Any]) -> list[Issue]:
+    """Reject explicit practice XP for unregistered skill keys.
+
+    The lineage auto-seed normalizes the record before the semantic phase and
+    seeds proficiency for registry keys only; a typo in an explicit
+    ``skill_proficiency`` map would otherwise be silently dropped or silently
+    persisted (use-driven-skill-lineage: imports are all-or-nothing, so a
+    bad key must name itself and reject the whole record). Checked against
+    the RAW record so normalization cannot hide it.
+    """
+    registry = _resolve_skill_registry()
+    if registry is None:
+        return []
+    return [
+        Issue("skill_proficiency", f"{key!r} not found in skill registry")
+        for key in (record.get("skill_proficiency") or {})
+        if key not in registry
+    ]
+
+
 def collect_degraded_checks() -> list[DegradedCheck]:
     checks: list[DegradedCheck] = []
     if _resolve_skill_registry() is None:
@@ -416,6 +436,10 @@ def validate_character(record: dict[str, Any]) -> RecordReport:
     # seed.
     from world.rules.progression import normalize_lineage_record
 
+    # The raw record's explicit proficiency keys are validated verbatim: the
+    # seed below only understands registered keys, so an unregistered one
+    # must reject here instead of being dropped or persisted unchecked.
+    report.rejections.extend(_check_skill_proficiency_keys(record))
     record = normalize_lineage_record(record)
     report.record = record
     report.rejections.extend(_check_entity_key_contract(record))
