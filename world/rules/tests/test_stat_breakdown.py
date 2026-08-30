@@ -260,6 +260,21 @@ class ConditionLayerTests(EvenniaTestCase):
         self.assertEqual(row.effective, adjusted_agility(player))
 
     @covers_requirement("character-breakdown-view::each-displayed-stat-matches-its-named-authoritative-computation")
+    def test_fractional_agility_current_equals_effective(self):
+        # A percent-scaled static agility stays fractional: the shipped
+        # adjusted_agility returns a float and the v5 wire rejects any static
+        # row whose total-display current diverges from effective (rounding
+        # it here made the whole character panel unavailable).
+        player = _player("breakdown fraction")
+        player.traits.agility.base = 1
+        _add_buff(player, "poisoned")
+        row = _rows(player)["agility"]
+        self.assertEqual(row.effective, 0.9)
+        self.assertEqual(row.current, 0.9)
+        self.assertEqual(row.current, row.effective)
+        self.assertEqual(row.current, adjusted_agility(player))
+
+    @covers_requirement("character-breakdown-view::each-displayed-stat-matches-its-named-authoritative-computation")
     def test_skill_owned_rule_flows_through_the_facade(self):
         player = _player("breakdown skill owned")
         player.db.skills = {"active": ["retainer_martial_training"], "passive": []}
@@ -496,7 +511,7 @@ class FailClosedTests(EvenniaTestCase):
         )
         row = next(row for row in build_stat_breakdown(player, assembly) if row.key == "agility")
         self.assertEqual(row.effective, 0.0)
-        self.assertEqual(row.current, 0)
+        self.assertEqual(row.current, 0.0)
         self.assertEqual(row.layers[0].kind, "pct")
         self.assertEqual(row.layers[0].amount, -120.0)
 

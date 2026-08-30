@@ -1301,6 +1301,11 @@ def _agility_breakdown(assembly: _Assembly) -> StatBreakdownRow:
     ``+g`` percent string — rule-table matches merged in ``_RULES`` order,
     then the gear bucket's ``:+d%`` rendering, all through the shipped
     ``_merge_adjustments``), then the flat addend, then ``max(0.0, …)``.
+
+    The static row's total-display ``current`` equals ``effective`` even when
+    a percent scale leaves it fractional — the shipped ``adjusted_agility``
+    returns a float, and the v5 wire rejects any static row where the two
+    diverge.
     """
     base = assembly.trait_values["agility"]
     _require_untouched_modifiers(assembly.traits_data, "agility")
@@ -1321,7 +1326,7 @@ def _agility_breakdown(assembly: _Assembly) -> StatBreakdownRow:
     return StatBreakdownRow(
         key="agility",
         base=base_literal,
-        current=round(effective),
+        current=effective,
         effective=effective,
         layers=(*skill_layers, *condition_layers, *equipment_layers),
     )
