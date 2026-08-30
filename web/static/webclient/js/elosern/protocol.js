@@ -145,6 +145,12 @@
   var LOCAL_MAP_MAX_EDGES = 128;
   var LOCAL_MAP_MAX_LEGEND = 16;
   var LOCAL_MAP_MAX_STRING = 256;
+
+  // Exact shared lineage bounds -- must stay equal to
+  // web.webclient.presentation.lineage (skill-lineage-panel design DD3).
+  var LINEAGE_MAX_CHAINS = 16;
+  var LINEAGE_MAX_NODES_PER_CHAIN = 32;
+  var LINEAGE_MAX_TEXT = 128;
   var LOCAL_MAP_MAX_TITLE = 128;
   var LOCAL_MAP_MAX_NODE_ID = 128;
   var LOCAL_MAP_MAX_EXIT_REF = 64;
@@ -255,6 +261,7 @@
     creation: 1,
     exploration: 1,
     character: 6,
+    lineage: 1,
   };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
@@ -1473,6 +1480,148 @@
       known: known,
       traversable: traversable,
     };
+  }
+
+  function validateLineageNode(value) {
+    requireExactFields(
+      value,
+      "lineage node",
+      [
+        "skill_key",
+        "display_name_zh",
+        "owned",
+        "usable",
+        "level",
+        "xp_into_level",
+        "xp_to_next_level",
+        "capped",
+        "prereq_text_zh",
+      ],
+      []
+    );
+    var skillKey = validateIdentifier(value.skill_key, "skill_key");
+    var displayName = requireString(
+      value.display_name_zh,
+      "display_name_zh",
+      LINEAGE_MAX_TEXT
+    );
+    if (!displayName.trim()) {
+      throw new Error("display_name_zh must be non-empty");
+    }
+    var prereqText = requireString(
+      value.prereq_text_zh,
+      "prereq_text_zh",
+      LINEAGE_MAX_TEXT
+    );
+    return {
+      skill_key: skillKey,
+      display_name_zh: displayName,
+      owned: requireBool(value.owned, "owned"),
+      usable: requireBool(value.usable, "usable"),
+      level: requireInt(value.level, "level", 0, MAX_SAFE_INTEGER),
+      xp_into_level: requireNumber(
+        value.xp_into_level,
+        "xp_into_level",
+        0,
+        MAX_SAFE_INTEGER
+      ),
+      xp_to_next_level: requireNumber(
+        value.xp_to_next_level,
+        "xp_to_next_level",
+        0,
+        MAX_SAFE_INTEGER
+      ),
+      capped: requireBool(value.capped, "capped"),
+      prereq_text_zh: prereqText,
+    };
+  }
+
+  function validateLineageChain(value) {
+    requireExactFields(
+      value,
+      "lineage chain",
+      ["root_skill_key", "element_or_style_zh", "consumed", "meter", "nodes"],
+      []
+    );
+    var rootKey = validateIdentifier(value.root_skill_key, "root_skill_key");
+    var label = requireString(
+      value.element_or_style_zh,
+      "element_or_style_zh",
+      LINEAGE_MAX_TEXT
+    );
+    if (!label.trim()) {
+      throw new Error("element_or_style_zh must be non-empty");
+    }
+    if (!Array.isArray(value.nodes) || value.nodes.length < 1 || value.nodes.length > LINEAGE_MAX_NODES_PER_CHAIN) {
+      throw new Error(
+        "nodes must be a list of 1.." + LINEAGE_MAX_NODES_PER_CHAIN + " entries"
+      );
+    }
+    var nodeViews = value.nodes.map(validateLineageNode);
+    if (nodeViews[0].skill_key !== rootKey) {
+      throw new Error("truncated chains keep their head: nodes[0] must be the root");
+    }
+    return {
+      root_skill_key: rootKey,
+      element_or_style_zh: label,
+      consumed: requireBool(value.consumed, "consumed"),
+      meter: requireNumber(value.meter, "meter", 0, 1),
+      nodes: nodeViews,
+    };
+  }
+
+  function validateLineagePanel(payload) {
+    requireExactFields(
+      payload,
+      "lineage panel",
+      ["schema_version", "available", "kind", "completed_count", "total_count", "chains"],
+      []
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== 1) {
+      throw new Error("unsupported lineage panel schema_version");
+    }
+    // Mirror the Python validate_lineage: the exported validator rejects the
+    // unavailable discriminator directly (rubber-duck R2-2); the dispatcher's
+    // guard is defense in depth, not the only gate.
+    requireBool(payload.available, "available");
+    if (payload.available !== true) {
+      throw new Error("lineage panel available must be true in the available form");
+    }
+    if (payload.kind !== "lineage") {
+      throw new Error("lineage panel kind must be lineage");
+    }
+    var completed = requireInt(
+      payload.completed_count,
+      "completed_count",
+      0,
+      MAX_SAFE_INTEGER
+    );
+    var total = requireInt(payload.total_count, "total_count", 0, MAX_SAFE_INTEGER);
+    if (completed > total) {
+      throw new Error("completed_count must not exceed total_count");
+    }
+    if (!Array.isArray(payload.chains) || payload.chains.length > LINEAGE_MAX_CHAINS) {
+      throw new Error(
+        "chains must be a list of at most " + LINEAGE_MAX_CHAINS + " entries"
+      );
+    }
+    var chainViews = payload.chains.map(validateLineageChain);
+    var result = {
+      schema_version: 1,
+      available: true,
+      kind: "lineage",
+      completed_count: completed,
+      total_count: total,
+      chains: chainViews,
+    };
+    // Envelope guarantee: the presenter truncates until a real payload fits;
+    // the validator enforces the serialized byte size directly and fails
+    // closed over the envelope.
+    if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("lineage payload exceeds the OOB envelope limit");
+    }
+    return result;
   }
 
   function validateLocalMapPanel(payload) {
@@ -3665,6 +3814,9 @@
     if (name === "creation") {
       return validateCreationPanel(payload);
     }
+    if (name === "lineage") {
+      return validateLineagePanel(payload);
+    }
     throw new Error("panel " + name + " has no registered schema");
   }
 
@@ -3942,6 +4094,10 @@
     validateLocalMapPanel: validateLocalMapPanel,
     validateServicesPanel: validateServicesPanel,
     validateCreationPanel: validateCreationPanel,
+    validateLineagePanel: validateLineagePanel,
+    LINEAGE_MAX_CHAINS: LINEAGE_MAX_CHAINS,
+    LINEAGE_MAX_NODES_PER_CHAIN: LINEAGE_MAX_NODES_PER_CHAIN,
+    LINEAGE_MAX_TEXT: LINEAGE_MAX_TEXT,
     validatePanel: validatePanel,
 
     // The only accepted client->server synchronization body.

@@ -126,6 +126,7 @@ class RegistryTests(unittest.TestCase):
         from web.webclient.presentation.exploration import (
             EXPLORATION_SCHEMA_VERSION,
         )
+        from web.webclient.presentation.lineage import LINEAGE_SCHEMA_VERSION
         from web.webclient.presentation.local_map import LOCAL_MAP_SCHEMA_VERSION
         from web.webclient.presentation.services import SERVICES_SCHEMA_VERSION
         from web.webclient.presentation.status import STATUS_SCHEMA_VERSION
@@ -138,6 +139,7 @@ class RegistryTests(unittest.TestCase):
             "services": SERVICES_SCHEMA_VERSION,
             "creation": CREATION_SCHEMA_VERSION,
             "exploration": EXPLORATION_SCHEMA_VERSION,
+            "lineage": LINEAGE_SCHEMA_VERSION,
             "character": CHARACTER_SCHEMA_VERSION,
         }
         registry = build_production_registry()
