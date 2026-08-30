@@ -16,6 +16,8 @@ beyond the configured maximum.
 
 import math
 import re
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any
 
 from world.rules.clock import (
@@ -24,8 +26,10 @@ from world.rules.clock import (
     ScheduledEvent,
     get_world_clock,
 )
+from world.rules.progression import proficiency_cap, skill_proficiency_level
 from world.rules.skip_safety import SkipRejectReason, evaluate_skip_safety
 from world.rules.traits import GAUGE_KEYS
+from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 
 class DurationParseError(ValueError):
@@ -47,6 +51,51 @@ _REJECTION_MESSAGES = {
     SkipRejectReason.IN_COMBAT: "你仍在戰鬥中，無法跳過時間。",
     SkipRejectReason.HOSTILE_PRESENT: "附近有活著的怪物，這裡不安全。",
 }
+
+
+class PracticeRejectReason(StrEnum):
+    """Stable declared-practice booking rejection codes (D7)."""
+
+    SKILL_UNKNOWN = "PRACTICE_SKILL_UNKNOWN"
+    SKILL_CAPPED = "PRACTICE_SKILL_CAPPED"
+
+
+@dataclass(frozen=True)
+class PracticeReject:
+    """One rejected practice booking: stable code plus player-facing text."""
+
+    reason: PracticeRejectReason
+    message: str
+
+
+def preflight_practice_booking(
+    actor: Any, skill_key: str
+) -> PracticeReject | None:
+    """Return the booking rejection for a declared-practice clause, or None.
+
+    Checked BEFORE any clock advance (the skip never half-applies): the skill
+    must be registered, ACTIVE (nothing practises a passive), owned, and not
+    saturated at its derived tip cap (D6). Reasons are the stable codes
+    ``PRACTICE_SKILL_UNKNOWN`` / ``PRACTICE_SKILL_CAPPED``.
+    """
+    skill = SKILL_REGISTRY.get(skill_key)
+    if (
+        skill is None
+        or skill.kind is not SkillKind.ACTIVE
+        or skill.key not in actor.skills.owned_keys()
+    ):
+        return PracticeReject(
+            PracticeRejectReason.SKILL_UNKNOWN,
+            f"你無法宣告修煉「{skill_key}」（{PracticeRejectReason.SKILL_UNKNOWN}）："
+            "技能不存在、無法主動使用，或你尚未學會它。",
+        )
+    if skill_proficiency_level(actor, skill_key) >= proficiency_cap(skill_key):
+        return PracticeReject(
+            PracticeRejectReason.SKILL_CAPPED,
+            f"「{skill.label}」的熟練度已見頂（{PracticeRejectReason.SKILL_CAPPED}），"
+            "無需再宣告修煉。",
+        )
+    return None
 
 
 def parse_duration(text: str) -> int:
@@ -118,8 +167,11 @@ __all__ = [
     "DurationParseError",
     "MAX_SKIP_SECONDS",
     "MAX_WEB_SKIP_SECONDS",
+    "PracticeReject",
+    "PracticeRejectReason",
     "advance_skip",
     "parse_duration",
+    "preflight_practice_booking",
     "rejection_message",
     "render_skip_summary",
     "seconds_to_full_regen",

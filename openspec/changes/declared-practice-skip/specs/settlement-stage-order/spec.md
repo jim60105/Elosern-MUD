@@ -126,9 +126,11 @@ game seconds separately, so the handler cannot schedule real-time cleanup.
 - **WHEN** `advance(28800, AdvanceSource.SKIP, entities)` is called
 - **THEN** the `practice_settlement` stage is called exactly once with the full elapsed value
   regardless of `SETTLEMENT_QUANTUM_SECONDS` — it is never chunked into quanta the way
-  `tick_buffs()`/`decay_tick()` are — and accrues `completed_whole_hours × 
+  `tick_buffs()`/`decay_tick()` are — and accrues `completed_whole_hours ×
 PRACTICE_XP_PER_STUDY_HOUR` scaled by learning, affinity, and `growth_rate_multiplier`, once per
   entity per advance, SKIP-source only, saturating at the skill's derived tip cap and writing
-  nothing when the actor's booking has been consumed or never existed
+  nothing when the actor's booking has been consumed or never existed. A successful SKIP advance
+  of fewer than 3600 seconds consumes any booking while growing nothing (whole-hour closed form),
+  and a COMMAND-source advance leaves the booking unconsumed for the actor's next SKIP advance
 
 ## REMOVED Requirements

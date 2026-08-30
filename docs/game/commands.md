@@ -35,7 +35,7 @@
 
 | 指令 | 說明 |
 | --- | --- |
-| [`rest`](/game/command-reference?id=rest) | 休息並推進時間。 |
+| [`rest`](/game/command-reference?id=rest) | 休息並推進時間；可用 `practice <技能>` 宣告每整小時熟練度修煉。 |
 | [`sleep`](/game/command-reference?id=sleep) | 睡到完全恢復。 |
 | [`wait`](/game/command-reference?id=wait) | 等待直到指定時段。 |
 

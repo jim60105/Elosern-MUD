@@ -36,6 +36,10 @@ AFFINITY_ELEMENT_MULTIPLIER = float(
 NON_AFFINITY_ELEMENT_MULTIPLIER = float(
     PROGRESSION_YAML["non_affinity_element_multiplier"]
 )
+PRACTICE_XP_PER_STUDY_HOUR = float(PROGRESSION_YAML["practice_xp_per_study_hour"])
+if not isfinite(PRACTICE_XP_PER_STUDY_HOUR) or PRACTICE_XP_PER_STUDY_HOUR <= 0:
+    raise ValueError("practice_xp_per_study_hour must be a positive finite number")
+
 
 FREEFORM_CAST_SCALE_COUNT = 5
 
@@ -617,13 +621,15 @@ def restore_practice_dedupe(
     _dedupe_seen.update(seen)
 
 
-def practice_xp_amount(entity: Any, skill: SkillDef) -> float:
-    """Return the closed-form practice XP one use of ``skill`` is worth.
+def _practice_growth_factors(entity: Any, skill: SkillDef) -> float:
+    """Return the shared growth-factor composite for one skill's practice.
 
-    ``SKILL_PRACTICE_XP_PER_USE`` × race ``learning_multiplier`` ×
-    element-affinity multiplier (``1.0`` for a physical or non-elemental
-    skill) × ``growth_rate_multiplier(entity)`` (the conferred-buff pull
-    path, whose live reader this is). Every factor is a finite, non-negative
+    Race ``learning_multiplier`` x element-affinity multiplier (``1.0`` for a
+    physical or non-elemental skill) x ``growth_rate_multiplier(entity)``
+    (the conferred-buff pull path). One formula, two entry points: the
+    per-use grant and the booked-hourly settlement both scale their base
+    amount by this composite, so learning, affinity, and buff growth can
+    never diverge between them. Every factor is a finite, non-negative
     query; the composite is validated before any caller writes it.
     """
     from world.rules.buffs import growth_rate_multiplier
@@ -633,12 +639,24 @@ def practice_xp_amount(entity: Any, skill: SkillDef) -> float:
         if _is_elemental_magic(skill)
         else 1.0
     )
-    amount = (
-        SKILL_PRACTICE_XP_PER_USE
-        * _race_learning_multiplier(entity)
+    factors = (
+        _race_learning_multiplier(entity)
         * element_factor
         * growth_rate_multiplier(entity)
     )
+    if not isfinite(factors) or factors < 0:
+        raise ValueError(f"practice factors produced an invalid {factors!r}")
+    return float(factors)
+
+
+def practice_xp_amount(entity: Any, skill: SkillDef) -> float:
+    """Return the closed-form practice XP one use of ``skill`` is worth.
+
+    ``SKILL_PRACTICE_XP_PER_USE`` scaled by the shared
+    :func:`_practice_growth_factors` composite. Reads no school and no magic
+    stat.
+    """
+    amount = SKILL_PRACTICE_XP_PER_USE * _practice_growth_factors(entity, skill)
     if not isfinite(amount) or amount < 0:
         raise ValueError(f"practice XP formula produced an invalid {amount!r}")
     return float(amount)
@@ -710,6 +728,34 @@ def grant_skill_practice_xp(
         for candidate in candidates:
             if not was_usable[candidate.key] and can_use_skill(entity, candidate):
                 unlocks_out.append(unlock_line(candidate))
+    return True
+
+
+def grant_study_practice_xp(entity: Any, skill_key: str, hours: int) -> bool:
+    """Accrue the closed-form booked-study grant for ``hours`` whole hours.
+
+    The declared-practice settlement entry point (D7):
+    ``hours x PRACTICE_XP_PER_STUDY_HOUR x _practice_growth_factors`` — the
+    same composite the per-use path scales, one formula, two entry points.
+    Returns ``False`` and writes nothing for a non-positive or non-integer
+    hour count, or an unregistered/PASSIVE skill (booked practice follows the
+    per-use eligibility rule: nothing practises a passive). Storage routes
+    ONLY through :func:`award_practice_xp`, so a booked award crossing the
+    derived tip cap saturates byte-identically to a per-use award.
+    """
+    if isinstance(hours, bool) or not isinstance(hours, int):
+        raise ValueError(f"study hours must be an int, got {hours!r}")
+    if hours <= 0:
+        return False
+    skill = SKILL_REGISTRY.get(skill_key)
+    if skill is None or skill.kind is not SkillKind.ACTIVE:
+        return False
+    amount = hours * PRACTICE_XP_PER_STUDY_HOUR * _practice_growth_factors(
+        entity, skill
+    )
+    if not isfinite(amount) or amount < 0:
+        raise ValueError(f"study XP formula produced an invalid {amount!r}")
+    award_practice_xp(entity, skill_key, amount)
     return True
 
 

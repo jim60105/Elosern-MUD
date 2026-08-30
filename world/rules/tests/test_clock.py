@@ -225,6 +225,21 @@ class ClockTests(unittest.TestCase):
 
     @covers_requirement("settlement-stage-order::settlement-stages-run-in-the-fixed-order-regen-buffs-sexual-decay-practice-settlement")
     def test_stage_order_is_fixed(self):
+        self.assertEqual(
+            _STAGE_ORDER,
+            (
+                "gauge_regen",
+                "buff_ticks",
+                "sexual_decay",
+                "practice_settlement",
+                "daily_resets",
+                "caravan_arrivals",
+                "shop_hours",
+                "quest_deadlines",
+                "npc_schedules",
+                "instance_reclamation",
+            ),
+        )
         self.assertLess(_STAGE_ORDER.index("gauge_regen"), _STAGE_ORDER.index("buff_ticks"))
         self.assertLess(_STAGE_ORDER.index("buff_ticks"), _STAGE_ORDER.index("sexual_decay"))
         self.assertLess(_STAGE_ORDER.index("sexual_decay"), _STAGE_ORDER.index("practice_settlement"))
@@ -247,9 +262,10 @@ class ClockTests(unittest.TestCase):
         self.assertFalse(_has_settlement_work(idle))
 
     @covers_requirement("settlement-stage-order::buff-ticks-sexual-decay-and-practice-settlement-are-skipped-for-combat-sourced-advances")
-    def test_practice_settlement_runs_outside_combat_and_writes_nothing(self):
-        # The placeholder performs no per-second work and writes no state;
-        # it only runs on non-COMBAT advances.
+    def test_practice_settlement_runs_outside_combat_and_writes_nothing_without_booking(self):
+        # The runner never calls the stage on a COMBAT advance; the stage body
+        # itself is inert for an entity without a db and writes no state for
+        # an entity that never booked practice.
         entity = Entity()
         clock = WorldClock()
         with patch("world.rules.clock._practice_settlement") as settle:
@@ -259,7 +275,7 @@ class ClockTests(unittest.TestCase):
         with patch("world.rules.clock._practice_settlement") as settle:
             clock.advance(10, AdvanceSource.SKIP, [entity])
         settle.assert_called_once_with((entity,), 10, AdvanceSource.SKIP)
-        _practice_settlement((entity,), 60, AdvanceSource.SKIP)
+        _practice_settlement((entity,), 3600, AdvanceSource.SKIP)
         self.assertFalse(hasattr(entity, "skill_proficiency"))
         self.assertFalse(hasattr(entity, "db"))
 
@@ -277,6 +293,57 @@ class ClockTests(unittest.TestCase):
         finally:
             sexual_state.DECAY_CONFIG.clear()
             sexual_state.DECAY_CONFIG.update(original)
+
+
+class BookingEntity(Entity):
+    """Fake settlement entity carrying one declared-practice booking."""
+
+    def __init__(self, booking: str | None = "fire_arrow"):
+        super().__init__()
+        self.db = SimpleNamespace(
+            practice_booking=booking, skill_proficiency={}
+        )
+
+
+class DeclaredPracticeSettlementTests(unittest.TestCase):
+    """Closed-form stage consumption: SKIP-only, once per advance, whole hours."""
+
+    @covers_requirement("settlement-stage-order::buff-ticks-sexual-decay-and-practice-settlement-are-skipped-for-combat-sourced-advances")
+    def test_booking_survives_combat_and_command_advances_untouched(self):
+        entity = BookingEntity()
+        clock = WorldClock()
+        with patch("world.rules.clock.grant_study_practice_xp") as grant:
+            clock.advance(7200, AdvanceSource.COMBAT, [entity])
+            clock.advance(7200, AdvanceSource.COMMAND, [entity])
+        grant.assert_not_called()
+        self.assertEqual(entity.db.practice_booking, "fire_arrow")
+
+    @covers_requirement("settlement-stage-order::gauge-and-buff-elapsed-time-is-deterministic")
+    def test_skip_advance_consumes_the_booking_with_whole_hour_math(self):
+        entity = BookingEntity()
+        clock = WorldClock()
+        with patch("world.rules.clock.grant_study_practice_xp") as grant:
+            clock.advance(9000, AdvanceSource.SKIP, [entity])
+        # 9000 seconds = 2 completed hours; the 300-second remainder is
+        # ignored and the value is passed closed-form, never quantum-looped.
+        grant.assert_called_once_with(entity, "fire_arrow", 2)
+        self.assertIsNone(entity.db.practice_booking)
+
+    @covers_requirement("settlement-stage-order::gauge-and-buff-elapsed-time-is-deterministic")
+    def test_sub_hour_skip_consumes_the_booking_and_grows_nothing(self):
+        entity = BookingEntity()
+        with patch("world.rules.clock.grant_study_practice_xp") as grant:
+            WorldClock().advance(1800, AdvanceSource.SKIP, [entity])
+        grant.assert_not_called()
+        self.assertIsNone(entity.db.practice_booking)
+
+    @covers_requirement("settlement-stage-order::gauge-and-buff-elapsed-time-is-deterministic")
+    def test_advance_without_a_booking_writes_nothing(self):
+        entity = BookingEntity(booking=None)
+        with patch("world.rules.clock.grant_study_practice_xp") as grant:
+            WorldClock().advance(28800, AdvanceSource.SKIP, [entity])
+        grant.assert_not_called()
+        self.assertEqual(entity.db.skill_proficiency, {})
 
 
 class WorldClockPersistenceTests(EvenniaTestCase):
@@ -403,6 +470,49 @@ class WorldClockAtomicityTests(EvenniaTest):
         self.assertEqual(get_world_clock().tick, before_tick)
         self.assertEqual(self.player.traits.hp.current, 10)
         self.assertEqual(self._stored_hp(), 10)
+
+    @covers_requirement("settlement-stage-order::buff-ticks-sexual-decay-and-practice-settlement-are-skipped-for-combat-sourced-advances")
+    def test_booking_survives_combat_and_settles_on_next_skip_advance(self):
+        from world.rules.clock import get_world_clock
+        from world.rules.progression import practice_xp_amount
+        from world.skills.registry import SKILL_REGISTRY
+
+        self.player.db.skill_proficiency = {"fire_arrow": 20.0}
+        self.player.db.practice_booking = "fire_arrow"
+        clock = get_world_clock()
+        clock.advance(7200, AdvanceSource.COMBAT, [self.player])
+        self.assertEqual(self.player.db.practice_booking, "fire_arrow")
+        self.assertEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0)
+        clock.advance(7200, AdvanceSource.SKIP, [self.player])
+        self.assertIsNone(self.player.db.practice_booking)
+        # One formula, two entry points: two booked hours award ten times
+        # the per-use composite amount.
+        per_use = practice_xp_amount(self.player, SKILL_REGISTRY["fire_arrow"])
+        self.assertAlmostEqual(
+            self.player.db.skill_proficiency["fire_arrow"],
+            20.0 + 2 * 10.0 * per_use,
+        )
+
+    @covers_requirement("settlement-stage-order::gauge-and-buff-elapsed-time-is-deterministic")
+    def test_failed_advance_restores_consumed_booking_and_awarded_proficiency(self):
+        from world.rules.clock import get_world_clock
+
+        self.player.db.skill_proficiency = {"fire_arrow": 20.0}
+        self.player.db.practice_booking = "fire_arrow"
+        clock = get_world_clock()
+        with (
+            patch(
+                "world.rules.clock._settle_boundary_stages",
+                side_effect=RuntimeError("simulated post-practice failure"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            clock.advance(28800, AdvanceSource.SKIP, [self.player])
+        # The stage consumed the booking and awarded XP before the boundary
+        # failed; the rollback restores both registered surfaces to their
+        # pre-advance values, leaving the declared intent retryable.
+        self.assertEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0)
+        self.assertEqual(self.player.db.practice_booking, "fire_arrow")
 
 
 class _FakeAttributeStore:

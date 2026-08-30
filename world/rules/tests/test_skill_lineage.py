@@ -733,3 +733,96 @@ class DerivedUnlockSinkTests(unittest.TestCase):
         self.assertTrue(
             can_use_skill(actor, SKILL_REGISTRY["scorching_wave"])
         )
+
+
+class StudyPracticeGrantTests(unittest.TestCase):
+    """Closed-form booked-study grants (declared-practice-skip D7)."""
+
+    def setUp(self):
+        reset_practice_dedupe()
+        patcher = patch("world.rules.buffs.growth_rate_multiplier", lambda e: 1.0)
+        self.addCleanup(patcher.stop)
+        patcher.start()
+
+    @covers_requirement("settlement-stage-order::gauge-and-buff-elapsed-time-is-deterministic")
+    def test_hourly_grant_is_the_shared_composite_times_whole_hours(self):
+        entity = _entity(owned=("fire_arrow",), race="human")
+        self.assertTrue(
+            progression.grant_study_practice_xp(entity, "fire_arrow", 8)
+        )
+        per_use = practice_xp_amount(entity, SKILL_REGISTRY["fire_arrow"])
+        # One formula, two entry points: 8 booked hours award 8 ×
+        # PRACTICE_XP_PER_STUDY_HOUR / SKILL_PRACTICE_XP_PER_USE = 80 uses.
+        self.assertAlmostEqual(
+            entity.db.skill_proficiency["fire_arrow"], 80.0 * per_use
+        )
+
+    def test_growth_buff_and_learning_scale_the_hourly_grant(self):
+        entity = _entity(owned=("fire_arrow",), race="human")
+        with patch("world.rules.buffs.growth_rate_multiplier", lambda e: 2.0):
+            self.assertTrue(
+                progression.grant_study_practice_xp(entity, "fire_arrow", 1)
+            )
+        # 1h x 10.0 x growth 2.0 = 20 below the derived ceiling: the buff
+        # composite is the one the per-use path shares, not a re-derived copy.
+        self.assertAlmostEqual(
+            entity.db.skill_proficiency["fire_arrow"],
+            progression.PRACTICE_XP_PER_STUDY_HOUR * 2.0,
+        )
+        elf = _entity(owned=("fire_arrow",), race="elf")
+        progression.grant_study_practice_xp(elf, "fire_arrow", 1)
+        # 1h x 10.0 x learning 10.0 = 100 for the elf (still under 150).
+        self.assertAlmostEqual(
+            elf.db.skill_proficiency["fire_arrow"],
+            progression.PRACTICE_XP_PER_STUDY_HOUR * 10.0,
+        )
+
+    @covers_requirement("settlement-stage-order::gauge-and-buff-elapsed-time-is-deterministic")
+    def test_booked_award_saturates_identically_to_per_use_award(self):
+        cap = proficiency_cap("fire_arrow")
+        ceiling = cap * SKILL_PROFICIENCY_XP_PER_LEVEL
+        studied = _entity(owned=("fire_arrow",), proficiency={"fire_arrow": ceiling - 10.0})
+        self.assertTrue(
+            progression.grant_study_practice_xp(studied, "fire_arrow", 8)
+        )
+        self.assertEqual(studied.db.skill_proficiency["fire_arrow"], ceiling)
+        used = _entity(
+            owned=("fire_arrow",), proficiency={"fire_arrow": ceiling - 10.0}
+        )
+        award_practice_xp(used, "fire_arrow", 10.0 * cap)
+        self.assertEqual(
+            studied.db.skill_proficiency["fire_arrow"],
+            used.db.skill_proficiency["fire_arrow"],
+        )
+        # Beyond the ceiling the booked grant writes nothing further.
+        self.assertTrue(
+            progression.grant_study_practice_xp(studied, "fire_arrow", 8)
+        )
+        self.assertEqual(studied.db.skill_proficiency["fire_arrow"], ceiling)
+
+    def test_nonpositive_hours_are_no_op_and_bad_types_raise(self):
+        entity = _entity(owned=("fire_arrow",), race="human")
+        self.assertFalse(
+            progression.grant_study_practice_xp(entity, "fire_arrow", 0)
+        )
+        self.assertFalse(
+            progression.grant_study_practice_xp(entity, "fire_arrow", -3)
+        )
+        self.assertEqual(entity.db.skill_proficiency, {})
+        with self.assertRaises(ValueError):
+            progression.grant_study_practice_xp(entity, "fire_arrow", True)
+        with self.assertRaises(ValueError):
+            progression.grant_study_practice_xp(entity, "fire_arrow", 1.5)
+        self.assertEqual(entity.db.skill_proficiency, {})
+
+    def test_unknown_and_passive_skills_grant_nothing(self):
+        entity = _entity(
+            owned=("fire_arrow", "fire_mastery"), race="human"
+        )
+        self.assertFalse(
+            progression.grant_study_practice_xp(entity, "not_a_skill", 4)
+        )
+        self.assertFalse(
+            progression.grant_study_practice_xp(entity, "fire_mastery", 4)
+        )
+        self.assertEqual(entity.db.skill_proficiency, {})

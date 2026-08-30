@@ -14,7 +14,10 @@ growth. The clause SHALL be preflighted BEFORE any clock advance: the skill must
 the caller's `owned_keys()`, and not be saturated at its derived tip cap, rejecting with the
 stable reason codes `PRACTICE_SKILL_UNKNOWN` (unknown key, non-ACTIVE, or unowned) or
 `PRACTICE_SKILL_CAPPED` with zero clock advance and no booking recorded — a skip never
-half-applies.
+half-applies. After the safety gate passes, the command owns the booking state outright: an
+accepted clause records its skill, a clause-less rest clears any stale prior booking (so plain
+rest grows nothing even after a rollback-restored booking), and a rejected clause leaves no
+booking — new or stale — standing to settle on a later advance.
 
 #### Scenario: rest 1h advances the clock by exactly 3600 seconds
 - **WHEN** a safe actor issues `rest 1h`
@@ -40,7 +43,14 @@ half-applies.
 
 #### Scenario: An unknown or unowned booking skill rejects with zero clock advance
 - **WHEN** an actor issues `rest 1h practice not_a_skill`, or practices a PASSIVE skill, or a spell they do not own
-- **THEN** the command reports `PRACTICE_SKILL_UNKNOWN`, `WorldClock.advance()` is never called, and no booking is recorded
+- **THEN** the command reports `PRACTICE_SKILL_UNKNOWN`, `WorldClock.advance()` is never called,
+  and no booking — new or stale — survives for a later advance
+
+#### Scenario: A plain rest clears a stale rolled-back booking
+- **WHEN** a caller whose stored `practice_booking` was restored by an earlier rolled-back
+  advance issues `rest 8h` with no practice clause
+- **THEN** the clock advances 28800 seconds, no `skill_proficiency` value changes, and no
+  booking remains after the command
 
 #### Scenario: Plain rest grows nothing
 - **WHEN** a safe actor issues `rest 8h` with no practice clause

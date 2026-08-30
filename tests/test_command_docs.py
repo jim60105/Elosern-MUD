@@ -69,7 +69,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     },
     "leave": {"syntax": "leave <npc>", "context": "一般（需有同伴）"},
     "lore": {"syntax": "lore、lore <category> <key>", "context": "一般（隨時可用）"},
-    "rest": {"syntax": "rest <數字><s|m|h|d>", "context": "一般"},
+    "rest": {"syntax": "rest <duration> [practice <skill>]", "context": "一般"},
     "sleep": {"syntax": "sleep", "context": "一般"},
     "wait": {"syntax": "wait until <midnight|dawn|noon|dusk>", "context": "一般"},
     "進入": {"syntax": "進入", "context": "一般（需有任務場景入口）"},
