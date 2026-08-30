@@ -20,6 +20,7 @@ const PANEL_ALLOWLIST = [
   "creation",
   "exploration",
   "character",
+  "title_ballot",
 ];
 
 function openActiveSession(store) {

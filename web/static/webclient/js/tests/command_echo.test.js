@@ -374,6 +374,29 @@ test("inventory.toggle_equip echoes the typed equip command in both directions",
   );
 });
 
+test("title.accept resolves to the typed ballot answer", () => {
+  for (const index of [1, 2, 3]) {
+    assert.strictEqual(
+      Echo.commandLine("title.accept", { index }, null),
+      "title accept " + index
+    );
+  }
+});
+
+test("title.accept stays silent on a missing or out-of-cap index", () => {
+  assert.strictEqual(Echo.commandLine("title.accept", {}, null), null);
+  assert.strictEqual(Echo.commandLine("title.accept", { index: 0 }, null), null);
+  assert.strictEqual(Echo.commandLine("title.accept", { index: 4 }, null), null);
+  assert.strictEqual(
+    Echo.commandLine("title.accept", { index: "1" }, null),
+    null
+  );
+});
+
+test("title.decline resolves to the typed decline command", () => {
+  assert.strictEqual(Echo.commandLine("title.decline", {}, null), "title decline");
+});
+
 test("combat.cast echoes explicit multi-target labels in payload order (D3b)", () => {
   const line = Echo.commandLine(
     "combat.cast",
@@ -459,6 +482,8 @@ const REGISTERED_MUTATION_ACTIONS = {
   "options.dismiss": null,
   "shop.buy": { payload: { item_key: "healing_potion", quantity: 2 }, display: { itemLabel: "治療藥水" } },
   "shop.sell": { payload: { item_key: "healing_potion", quantity: 1 }, display: { itemLabel: "治療藥水" } },
+  "title.accept": { payload: { index: 2 }, display: {} },
+  "title.decline": { payload: {}, display: {} },
 };
 
 test("every registered mutation action resolves non-null or is declared silent", () => {

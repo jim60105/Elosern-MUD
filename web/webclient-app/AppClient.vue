@@ -28,6 +28,7 @@ import RestForm from "./components/RestForm.vue";
 import SceneBackdrop from "./components/SceneBackdrop.vue";
 import SettingsOverlay from "./components/SettingsOverlay.vue";
 import ShopPanel from "./components/ShopPanel.vue";
+import TitleBallotMenu from "./components/TitleBallotMenu.vue";
 import SkillBook from "./components/SkillBook.vue";
 import StatusPanel from "./components/StatusPanel.vue";
 import OverlayHost from "./components/OverlayHost.vue";
@@ -470,6 +471,19 @@ function onInventoryItemAction(intent) {
   store.dispatchAction(intent.action_id, intent.payload);
 }
 
+// The pending 異名提名 ballot (title-epithet-nomination): the menu's
+// accept/decline intents ride the same single dispatch entry as the shop
+// and quest surfaces.
+function onTitleBallotAction(intent) {
+  store.dispatchAction(intent.action_id, intent.payload);
+}
+
+const titleBallotPanel = computed(() => panel("title_ballot"));
+const titleBallotCandidates = computed(() => {
+  const p = titleBallotPanel.value;
+  return !!p && p.available === true && Array.isArray(p.candidates) ? p.candidates : [];
+});
+
 function onMapMove(moveData) {
   // The minimap node action carries `exit_ref` + `destination`; the
   // `explore.move` payload requires exactly `{ exit_ref, current_node }`,
@@ -740,6 +754,16 @@ onMounted(() => {
           v-if="contextActionsPanel && contextActionsPanel.kind === 'combat' && Array.isArray(contextActionsPanel.participants)"
           :participants="contextActionsPanel.participants"
           :art-panel="panel('art')"
+        />
+        <!-- The epithet nomination ballot menu (title-epithet-nomination):
+             mounted only while the committed `title_ballot` panel carries
+             candidates; answering consumes the ballot and the targeted
+             panel update unmounts it. -->
+        <TitleBallotMenu
+          v-if="titleBallotCandidates.length > 0"
+          :ballot="titleBallotPanel"
+          @accept="onTitleBallotAction"
+          @decline="onTitleBallotAction"
         />
         <!-- H4 (task 7.4): the six reference panels moved into the drawer
              layer; the `#panel-right` anchor keeps only the minimap island

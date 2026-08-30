@@ -15,7 +15,7 @@ from .definitions import ObjectiveKind
 from .runtime import (
     QuestState,
     definition_for,
-    fulfill_record,
+    fulfill_record_for,
     read_records,
 )
 from .transitions import release_stage_binding
@@ -73,7 +73,9 @@ def compute_acquire_replacement(
             continue
         new_progress = record.stage_progress + gained
         if new_progress >= objective.quantity:
-            replacements[record.quest_id] = fulfill_record(record, definition)
+            replacements[record.quest_id] = fulfill_record_for(
+                entity, record, definition
+            )
             pin_operations.extend(release_stage_binding(entity, record))
         else:
             replacements[record.quest_id] = replace(

@@ -25,7 +25,9 @@
     "inventory.use",
     "options.dismiss",
     "shop.buy",
-    "shop.sell"
+    "shop.sell",
+    "title.accept",
+    "title.decline"
   ],
   "silentPresentationControlIds": [
     "options.dismiss"

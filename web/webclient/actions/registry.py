@@ -84,7 +84,8 @@ def build_production_action_registry() -> ActionRegistry:
     ``creation.concept``, ``creation.activate``, ``creation.reset``), and the
     eight exploration adapters (``explore.move``, ``explore.look``,
     ``explore.talk_scripted``, ``explore.talk_freeform``, ``explore.party_invite``,
-    ``explore.party_leave``, ``explore.engage``, ``explore.wait``), and the
+    ``explore.party_leave``, ``explore.engage``, ``explore.wait``), the two
+    title ballot adapters (``title.accept``, ``title.decline``), and the
     ``options.dismiss`` action. Each action
     binds one exact payload validator and one narrow deterministic adapter; no
     action routes through the text parser.
@@ -150,6 +151,12 @@ def build_production_action_registry() -> ActionRegistry:
         validate_quest_accept_payload,
         validate_quest_turnin_payload,
         validate_sell_payload,
+    )
+    from web.webclient.actions.title_actions import (
+        _title_accept_adapter,
+        _title_decline_adapter,
+        validate_title_accept_payload,
+        validate_title_decline_payload,
     )
 
     registry = ActionRegistry("elosern")
@@ -381,6 +388,25 @@ def build_production_action_registry() -> ActionRegistry:
             # eviction is state-only, and the panel renders the session's
             # now-unavailable options state exactly once (design D1).
             affected_panels=("context_actions",),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="title.accept",
+            validate_payload=validate_title_accept_payload,
+            adapter=_title_accept_adapter,
+            # Targeted refresh: answering consumes the ballot, so the
+            # completion publication re-renders the menu panel immediately
+            # (the options.dismiss precedent).
+            affected_panels=("title_ballot",),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="title.decline",
+            validate_payload=validate_title_decline_payload,
+            adapter=_title_decline_adapter,
+            affected_panels=("title_ballot",),
         )
     )
     return registry

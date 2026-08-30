@@ -52,6 +52,7 @@ const PANEL_ALLOWLIST = [
   "creation",
   "exploration",
   "character",
+  "title_ballot",
 ];
 
 // Stable JSON with sorted keys: content comparison that is insensitive to

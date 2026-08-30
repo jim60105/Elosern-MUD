@@ -590,6 +590,12 @@ def _wait_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
         return _rejected("skip_failed", "無法跳過時間。")
     message = render_skip_summary(seconds, events)
     actor.msg(message)
+    # Rest-point nomination trigger (title-system D4 §7.1, change G): the
+    # service helper gates on a day-boundary event and never raises. The
+    # composition-root import is function-local (the dispatcher precedent).
+    from server.title_nomination_service import schedule_rest_boundary_nomination
+
+    schedule_rest_boundary_nomination(actor, events)
     return _success("skipped", message, AFFECTED_FULL)
 
 

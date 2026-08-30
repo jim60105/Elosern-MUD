@@ -60,6 +60,30 @@ def _schedule_action_options_committed(actor: Any) -> None:
         )
 
 
+def _schedule_nomination_on_logout(character: Any) -> None:
+    """Logout rest-point trigger (title-system D4 §7.1, change G).
+
+    ``at_post_unpuppet`` runs after the disconnect transition completed, so
+    this is a committed rest point by construction. The composition-root
+    import is function-local (the ``commands/scene.py`` precedent) and every
+    failure is swallowed with a bounded diagnostic: logging out can never be
+    broken by nomination, and the whole stage is a silent no-op offline.
+    Watchers are empty by definition — the ballot survives in ``db`` and the
+    next session's full snapshot renders it.
+    """
+    try:
+        from server.title_nomination_service import schedule_epithet_nomination
+
+        schedule_epithet_nomination(character)
+    except Exception:
+        logger.warning(
+            "titles: logout nomination trigger failed for %s: %s",
+            getattr(character, "key", "?"),
+            "scheduling call raised (swallowed)",
+            exc_info=True,
+        )
+
+
 class PlayerCharacter(LivingEntity):
     """A player-controlled living entity with deferred progression seams."""
 
@@ -126,6 +150,11 @@ class PlayerCharacter(LivingEntity):
             if guidance:
                 look_string = f"{look_string}\n\n{guidance}"
         return look_string
+
+    def at_post_unpuppet(self, account=None, session=None, **kwargs) -> None:
+        """Fire the logout epithet-nomination rest point (change G)."""
+        super().at_post_unpuppet(account=account, session=session, **kwargs)
+        _schedule_nomination_on_logout(self)
 
 
 class Character(PlayerCharacter):

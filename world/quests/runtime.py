@@ -1,8 +1,11 @@
 """Persisted deterministic quest records and lifecycle operations (D-2, D-6)."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
+
+from evennia.utils.logger import log_warn
 
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
@@ -275,6 +278,48 @@ def fulfill_record(record: QuestRecord, definition: QuestDefinition) -> QuestRec
         objective_target_ids=(),
         protected_entity_ids=(),
     )
+
+
+# ---------------------------------------------------------------------------
+# Completion observers (title-system change G trigger seam).
+# ---------------------------------------------------------------------------
+# The three quest-log writers (DEFEAT planner, acquisition observer, room
+# observation) all converge on ``fulfill_record``; ``fulfill_record_for`` is
+# the entity-aware wrapper that fires the registered observers exactly when a
+# transition lands on COMPLETED. Observers are scheduling seams only: they
+# must defer side effects through ``transaction.on_commit`` and an exception
+# they raise is isolated and logged — a broken observer can never change
+# quest settlement (the deterministic game stays fully playable offline).
+
+_QUEST_COMPLETION_OBSERVERS: list[Callable[[Any, QuestRecord, QuestDefinition], None]] = []
+
+
+def register_quest_completion_observer(
+    observer: Callable[[Any, QuestRecord, QuestDefinition], None],
+) -> None:
+    """Idempotently install one quest-completion observer."""
+    if observer not in _QUEST_COMPLETION_OBSERVERS:
+        _QUEST_COMPLETION_OBSERVERS.append(observer)
+
+
+def _notify_quest_completion(
+    entity: Any, record: QuestRecord, definition: QuestDefinition
+) -> None:
+    for observer in tuple(_QUEST_COMPLETION_OBSERVERS):
+        try:
+            observer(entity, record, definition)
+        except Exception as error:  # noqa: BLE001 - isolation is the contract
+            log_warn(f"quest completion observer failed: {error}")
+
+
+def fulfill_record_for(
+    entity: Any, record: QuestRecord, definition: QuestDefinition
+) -> QuestRecord:
+    """``fulfill_record`` plus the COMPLETED-transition observer dispatch."""
+    result = fulfill_record(record, definition)
+    if result.state is QuestState.COMPLETED:
+        _notify_quest_completion(entity, result, definition)
+    return result
 
 
 def definition_for(record: QuestRecord) -> QuestDefinition:

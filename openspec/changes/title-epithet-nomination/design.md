@@ -27,14 +27,23 @@ nothing except the pending-ballot attribute, and F's snapshot registration makes
 
 ### DG1: triggers are the four rest points; throttle is ballot + cooldown
 
-`maybe_nominate(entity)` is called from logout, the world-clock day-boundary
-while resting, exam pass settlement, and quest-arc completion. Suppression: a
-pending ballot (silent return — replacement paths deliberately do not exist) or
-an active cooldown of `NOMINATION_COOLDOWN_DAYS` (registry constant 2) day
-boundaries started by a decline. Decline is the only cooldown source: ballots
-never expire, so no expiry transition exists anywhere. An accepted ballot never
-starts a cooldown (the next trigger point is the next gate anyway). Cooldown
-state is derived from a stored decline timestamp — no new subsystem.
+`schedule_epithet_nomination(entity)` — the composition-root service
+`server/title_nomination_service.py`, because the repo transport contract
+(`tests/test_ai_transport_contract.py`) forbids `world/rules` and `commands`
+from importing `world/ai` — is fired from logout (`PlayerCharacter.at_post_unpuppet`),
+the resting day boundary (typed `rest`/`sleep`/`wait` routes and the WebClient
+`explore.wait` adapter, gated on the `daily_reset` advance event), exam pass (an
+observer registered inside `settle_exam_outcome`), and quest-arc completion (an
+observer fired when any quest-log writer's `fulfill_record` transition lands on
+COMPLETED); the two settlement observers defer through
+`transaction.on_commit`, so a rolled-back settlement nominates nothing.
+Suppression: a pending ballot (silent return — replacement paths deliberately
+do not exist) or an active cooldown of `NOMINATION_COOLDOWN_DAYS` (registry
+constant 2) day boundaries started by a decline. Decline is the only cooldown
+source: ballots never expire, so no expiry transition exists anywhere. An
+accepted ballot never starts a cooldown (the next trigger point is the next
+gate anyway). Cooldown state is derived from the stored decline log records —
+no new subsystem.
 
 ### DG2: pipeline stages are pure proposal work; the rules layer persists
 
@@ -47,10 +56,12 @@ hit; own-collection hit; in-batch duplicate (keep first). First three survivors
 form the ballot; 1–3 survivors ballot as-is; 0 voids silently. LLM offline /
 timeout / degraded ⇒ the stage does not fire at all. The `world/ai/` module is
 pure proposal: it returns the filtered candidates (or nothing) and writes no
-attribute. The rules-layer `maybe_nominate` writer re-checks suppression after
-the call returns and persists the ballot itself in one all-or-nothing step (a
-failed persist voids the round) — the single-writer boundary is untouched,
-matching design §14.
+attribute. The rules-layer writer
+`persist_nomination_ballot` re-checks suppression after the call returns and
+persists the ballot itself in one all-or-nothing step (a failed persist voids
+the round) — the single-writer boundary is untouched, matching design §14,
+and the service schedules the call through the existing fire-and-forget
+`option_proposal_service` pattern (offline profile ⇒ no call at all).
 
 ### DG3: ballot is persistent; persistence, acceptance, and decline share the rules layer
 
@@ -59,9 +70,14 @@ re-renders the OOB menu on sync; Telnet gets `title accept <1|2|3>` /
 `title decline`. `accept_epithet(entity, index)` validates the index against the
 pending ballot, then banks (display, origin_quote = basis, granted_tick) +
 auto-equip-when-empty in one atomic transaction and clears the ballot. Decline
-discards the batch and appends an EventLog entry naming the rejected displays —
-Director-facing soft learning, no blacklist. Out-of-range index ⇒ stable reason,
-no state change.
+discards the batch and records the rejected displays into a bounded per-entity
+decline log (which also starts the cooldown) and emits a
+`title_epithet_declined` EventLog entry through the answering surface — the
+nomination prompt digests the decline log for Director-facing soft learning;
+no blacklist exists. Out-of-range index ⇒ stable reason, no state change.
+Repo note: the EventLog is per-action in this codebase and no rolling event
+store exists (verified in F/G research); the decline log attribute is the
+durable feed, and the spec requirement wording was amended to match.
 
 ### DG4: tests mock the client, never a live call
 

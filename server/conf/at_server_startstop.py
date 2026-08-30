@@ -175,6 +175,46 @@ def _register_action_options_layer():
         logger.log_warn(f"action_options registration skipped at server start: {exc}")
 
 
+def _register_title_nomination_layer():
+    """Register the title_nomination layer's guardrail hooks.
+
+    Called from ``at_server_start`` for the same reason as
+    ``_register_narrator_layer``: ``world.ai.guardrail`` captures the logger at
+    import time, so registration must happen after ``evennia._init()``. The
+    registration is boot-tolerant: a foreign leftover title_nomination
+    registration (a conflicting fallback or output schema) must never abort
+    server startup; the proposal gate still fails loudly on a
+    non-title_nomination registration, so correctness is preserved.
+    """
+    from evennia import logger
+    from world.ai.guardrail import GuardrailRegistrationError
+    from world.ai.schemas.registry import DuplicateSchemaError
+    from world.ai.title_nomination import register_title_nomination
+
+    try:
+        register_title_nomination()
+    except (GuardrailRegistrationError, DuplicateSchemaError) as exc:
+        logger.log_warn(f"title_nomination registration skipped at server start: {exc}")
+
+
+def _register_nomination_triggers():
+    """Install the epithet-nomination rest-point trigger observers (change G).
+
+    The composition-root service registers the exam-pass and quest-completion
+    observers (and owns the schedule path); every rest point silently no-ops
+    while the LLM is offline, so this wiring is boot-tolerant with a bounded
+    warning: a failure here can never take the deterministic game offline.
+    """
+    from evennia import logger
+
+    try:
+        from server.title_nomination_service import register_nomination_triggers
+
+        register_nomination_triggers()
+    except Exception as exc:
+        logger.log_warn(f"nomination triggers skipped at server start: {exc}")
+
+
 def at_server_start():
     """
     This is called every time the server starts up, regardless of
@@ -248,6 +288,8 @@ def at_server_start():
     _register_character_creation_layer()
     _register_scene_flavor_layer()
     _register_action_options_layer()
+    _register_title_nomination_layer()
+    _register_nomination_triggers()
 
     # Deterministic art-assets startup sync: ensure a record for every scene
     # and generic-monster subject, then recover explicit named portrait

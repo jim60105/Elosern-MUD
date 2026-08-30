@@ -192,6 +192,27 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "equip item_leather_armor",
     },
     {
+      id: "ballot menu: numbered accept row (payload-only)",
+      ids: ["title.accept"],
+      prepare() {
+        openExploration();
+        // The title_ballot menu intent (AppClient forwards {action_id,
+        // payload}; the catalog resolves the numbered choice from the
+        // payload alone).
+        store.dispatchAction("title.accept", { index: 2 });
+      },
+      expected: "title accept 2",
+    },
+    {
+      id: "ballot menu: decline row (payload-only)",
+      ids: ["title.decline"],
+      prepare() {
+        openExploration();
+        store.dispatchAction("title.decline", {});
+      },
+      expected: "title decline",
+    },
+    {
       id: "shop drawer buy row (central fill from the services panel)",
       ids: ["shop.buy"],
       prepare() {

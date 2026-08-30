@@ -21,7 +21,9 @@ from world.quests.runtime import (
     definition_for,
     fail_record,
     from_storage,
+    fulfill_record_for,
     read_records,
+    register_quest_completion_observer,
     to_storage,
 )
 from world.quests.transitions import apply_quest_log_replacement
@@ -302,6 +304,96 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
         self.player.db.quest_log = ["oops-not-a-dict"]
         with self.assertRaises(QuestDataError):
             read_records(self.player)
+
+
+class QuestCompletionObserverTests(unittest.TestCase):
+    """The COMPLETED-transition observer seam (change G nomination trigger).
+
+    Pure ``unittest``: ``fulfill_record_for`` is transition math plus a
+    dispatch; the entity is an opaque sentinel here (the service resolves it
+    in its own tests). Observers must never change settlement, so the list is
+    saved and restored around every case.
+    """
+
+    def setUp(self):
+        from world.quests import runtime
+
+        self.runtime = runtime
+        self.saved = list(runtime._QUEST_COMPLETION_OBSERVERS)
+        self.addCleanup(
+            lambda: runtime._QUEST_COMPLETION_OBSERVERS.__setitem__(
+                slice(None), self.saved
+            )
+        )
+
+    def _two_stage(self):
+        from world.quests.definitions import QuestStage
+
+        from ._fixtures import defeat, quest
+
+        definition = quest(
+            "observer_two_stage", stages=(QuestStage(index=0, objective=defeat()), QuestStage(index=1, objective=defeat()))
+        )
+        record = from_storage(
+            {
+                "quest_id": "observer_two_stage:1",
+                "definition_key": "observer_two_stage",
+                "state": "in_progress",
+                "stage_index": 0,
+                "stage_progress": 0,
+                "deadline_tick": None,
+                "accepted_tick": 0,
+                "stage_room_id": None,
+                "objective_target_ids": [],
+                "protected_entity_ids": [],
+                "failure_reason": None,
+            }
+        )
+        return definition, record
+
+    def test_intermediate_fulfillment_does_not_notify(self):
+        calls = []
+        register_quest_completion_observer(
+            lambda *args: calls.append(args)
+        )
+        definition, record = self._two_stage()
+        advanced = fulfill_record_for("sentinel", record, definition)
+        self.assertIs(advanced.state, QuestState.IN_PROGRESS)
+        self.assertEqual(calls, [])
+
+    def test_final_fulfillment_notifies_once(self):
+        calls = []
+        # A plain ``calls.append`` cannot stand in: the dispatch passes three
+        # positional args, and the isolation guard would swallow the arity
+        # TypeError as if the observer had simply not fired.
+        register_quest_completion_observer(
+            lambda entity, record, definition: calls.append(
+                (entity, record, definition)
+            )
+        )
+        definition, record = self._two_stage()
+        advanced = fulfill_record_for("sentinel", record, definition)
+        final = fulfill_record_for("sentinel", advanced, definition)
+        self.assertIs(final.state, QuestState.COMPLETED)
+        self.assertEqual(calls, [("sentinel", final, definition)])
+
+    def test_raising_observer_is_isolated(self):
+        def explode(*args):
+            raise RuntimeError("observer boom")
+
+        register_quest_completion_observer(explode)
+        definition, record = self._two_stage()
+        advanced = fulfill_record_for("sentinel", record, definition)
+        final = fulfill_record_for("sentinel", advanced, definition)
+        self.assertIs(final.state, QuestState.COMPLETED)
+
+    def test_registration_is_idempotent(self):
+        observer = lambda *args: None  # noqa: E731
+        register_quest_completion_observer(observer)
+        register_quest_completion_observer(observer)
+        self.assertEqual(
+            self.runtime._QUEST_COMPLETION_OBSERVERS.count(observer), 1
+        )
 
 
 if __name__ == "__main__":
