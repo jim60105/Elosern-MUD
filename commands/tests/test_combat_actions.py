@@ -22,7 +22,7 @@ from world.rules.combat_session import (
     resolve_target_token,
 )
 from world.rules.combat_view import build_combat_view
-from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 
 
 def _player(key="token player"):
@@ -121,7 +121,7 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         self.char1.location = self.room
         self.char1.race = "human"
         self.char1.apply_race_baseline()
-        self.char1.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.char1, ["fire_ball"])
         self.monster = _monster("actions goblin")
         self.monster.location = self.room
 

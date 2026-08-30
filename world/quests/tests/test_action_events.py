@@ -26,6 +26,7 @@ from world.skills.registry import (
     SkillKind,
     TargetSpec,
 )
+from world.rules.tests.combat_fixtures import grant_lineage
 from world.quests.planner import quest_event_effect_planner
 
 from ._fixtures import QuestRegistryIsolation, defeat, quest, register
@@ -49,10 +50,7 @@ class TargetDefeatedEventTests(EvenniaTestCase):
         self.actor.apply_race_baseline()
         # Direct mastery keeps the cast gate open at magic level 0, preserving
         # this class's small-damage profile for the defeat-event scenarios.
-        self.actor.db.skills = {
-            "active": ["fire_ball"],
-            "passive": ["fire_mastery"],
-        }
+        grant_lineage(self.actor, ["fire_ball"], ["fire_mastery"])
 
     def _monster(self, key: str, hp: int) -> Monster:
         monster = create_object(Monster, key=key)
@@ -151,7 +149,7 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTestCase):
         self.player.apply_race_baseline()
         # Human static magic_power at 術師 tier so fire_ball casts pass.
         self.player.traits.magic_power.base = 30
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
         register_event_effect_planner("quest", quest_event_effect_planner)
         self.low_hunt = register(quest("planner_hunt"))
 

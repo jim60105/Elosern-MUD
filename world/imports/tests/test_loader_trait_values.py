@@ -121,3 +121,69 @@ class LoaderTraitTests(EvenniaTestCase):
         record["affinity_elements"] = ["light"]
         with self.assertRaises(ImportRejected):
             instantiate_character(record)
+
+
+class LoaderLineageAutoSeedTests(EvenniaTestCase):
+    """use-driven-skill-lineage DC6: import auto-seeds closure + exact XP."""
+
+    def setUp(self):
+        super().setUp()
+        from world.rules import progression
+
+        progression.reset_practice_dedupe()
+
+    @covers_requirement("skill-lineage::import-and-scene-build-auto-seed-prerequisite-proficiency-exactly")
+    def test_deep_skill_import_closes_ownership_and_seeds_exact_edges(self):
+        record = example_record()
+        record["key"] = "lineage seeded mage"
+        record["skills"] = ["firestorm"]
+        entity = instantiate_character(record)
+        active = set(entity.db.skills["active"])
+        self.assertLessEqual(
+            {"fire_arrow", "fire_ball", "scorching_wave", "firestorm"}, active
+        )
+        self.assertEqual(
+            dict(entity.db.skill_proficiency),
+            {
+                "scorching_wave": 150.0,
+                "fire_ball": 150.0,
+                "fire_arrow": 150.0,
+            },
+        )
+        # The seeded chain is USABLE, not merely stored.
+        from world.rules.progression import can_use_skill
+        from world.skills.registry import SKILL_REGISTRY
+
+        self.assertTrue(can_use_skill(entity, SKILL_REGISTRY["firestorm"]))
+
+    @covers_requirement("skill-lineage::import-and-scene-build-auto-seed-prerequisite-proficiency-exactly")
+    def test_explicit_proficiency_wins_and_is_never_overwritten(self):
+        record = example_record()
+        record["key"] = "lineage explicit mage"
+        record["skills"] = ["firestorm"]
+        record["skill_proficiency"] = {"scorching_wave": 120.0}
+        entity = instantiate_character(record)
+        # Explicit wins even though it leaves the scorching->firestorm edge
+        # unmet: the record author said what they meant.
+        self.assertEqual(entity.db.skill_proficiency["scorching_wave"], 120.0)
+        from world.rules.progression import can_use_skill
+        from world.skills.registry import SKILL_REGISTRY
+
+        self.assertFalse(can_use_skill(entity, SKILL_REGISTRY["firestorm"]))
+        self.assertTrue(
+            can_use_skill(entity, SKILL_REGISTRY["scorching_wave"])
+        )
+
+    @covers_requirement("skill-lineage::import-and-scene-build-auto-seed-prerequisite-proficiency-exactly")
+    def test_malformed_sibling_field_rejects_before_any_entity_or_seed(self):
+        from typeclasses.npcs import NPC
+
+        record = example_record()
+        record["key"] = "lineage malformed mage"
+        record["skills"] = ["firestorm"]
+        record["age"] = 17
+        with self.assertRaises(ImportRejected):
+            instantiate_character(record)
+        self.assertFalse(
+            NPC.objects.filter(db_key="lineage malformed mage").exists()
+        )

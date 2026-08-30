@@ -133,6 +133,7 @@
         "world.rules.tests.test_sexual_unlock",
         "world.rules.tests.test_shop_clock_sources",
         "world.rules.tests.test_shop_economy",
+        "world.rules.tests.test_skill_lineage",
         "world.rules.tests.test_skip_commands",
         "world.rules.tests.test_skip_safety",
         "world.rules.tests.test_stat_breakdown",

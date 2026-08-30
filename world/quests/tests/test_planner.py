@@ -29,6 +29,7 @@ from world.rules.action import (
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.party import join_party
 from world.rules.targeting import RoomActionContext
+from world.rules.tests.combat_fixtures import grant_lineage
 from world.skills.registry import (
     SKILL_REGISTRY,
     SkillCategory,
@@ -84,7 +85,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.player.apply_race_baseline()
         # Human static magic_power at 術師 tier so fire_ball casts pass.
         self.player.traits.magic_power.base = 30
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
         self.tier_hunt = register(quest("tier_hunt_three", stages=(QuestStage(0, defeat(quantity=3)),)))
         self.bound_hunt = register(
             quest("bound_hunt", stages=(QuestStage(0, defeat(bound=True)),))
@@ -379,7 +380,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         # Human static magic_power at 術師 tier so fire_ball casts pass.
         self.player.traits.magic_power.base = 30
         self.player.location = self.room
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
         self.tier_hunt = register(quest("tier_hunt_three", stages=(QuestStage(0, defeat(quantity=3)),)))
         self.two_stage = register(
             quest(

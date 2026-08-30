@@ -30,6 +30,7 @@ from world.rules.progression import (
     FREEFORM_CAST_SCALES,
     FREEFORM_SCALE_VALUES,
     _load_freeform_cast_scales,
+    freeform_mastery_entitled,
     freeform_scale_entries_for,
     freeform_scales_for,
     scale_for_label,
@@ -40,7 +41,7 @@ from world.rules.progression import (
 from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.handler import ConferredSkillGrant
 from world.skills.registry import SKILL_REGISTRY
-from .combat_fixtures import BattlefieldIsolation
+from .combat_fixtures import BattlefieldIsolation, grant_lineage
 
 
 def _player(key="freeform caster"):
@@ -197,7 +198,7 @@ class FreeformEligibilityTests(unittest.TestCase):
 
 
 class FreeformScalesForTests(EvenniaTestCase):
-    """Mastery ownership entitles scaling of the element's spells."""
+    """Mastery entitlement plus the cast skill's own proficiency ladder."""
 
     def setUp(self):
         super().setUp()
@@ -205,25 +206,55 @@ class FreeformScalesForTests(EvenniaTestCase):
         self.entity.db.skills = {"active": [], "passive": []}
 
     @covers_requirement("element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells")
-    def test_mastery_holder_receives_the_full_scale_set(self):
-        self.entity.db.skills = {"active": [], "passive": ["wind_mastery"]}
+    def test_ladder_follows_the_cast_skill_own_proficiency(self):
+        self.entity.db.skills = {"active": ["wind_blade"], "passive": ["wind_mastery"]}
+        wind = SKILL_REGISTRY["wind_blade"]
+        grant_lineage(self.entity, ["wind_blade"], ["wind_mastery"], rungs={"wind_blade": 10})
         self.assertEqual(
-            freeform_scales_for(self.entity, "wind"),
+            freeform_scales_for(self.entity, wind),
             (0.25, 0.5, 1.0, 2.0, 4.0),
+        )
+        for level, expected in (
+            (0, (0.25,)),
+            (1, (0.25, 0.5)),
+            (3, (0.25, 0.5, 1.0)),
+            (6, (0.25, 0.5, 1.0, 2.0)),
+        ):
+            with self.subTest(level=level):
+                self.entity.db.skill_proficiency = {
+                    "wind_blade": float(level) * 50.0
+                }
+                self.assertEqual(freeform_scales_for(self.entity, wind), expected)
+
+    @covers_requirement("element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells")
+    def test_sibling_proficiency_never_raises_the_set(self):
+        self.entity.db.skills = {
+            "active": ["wind_blade", "tornado_blade"],
+            "passive": ["wind_mastery"],
+        }
+        self.entity.db.skill_proficiency = {"wind_blade": 500.0}
+        self.assertEqual(
+            freeform_scales_for(self.entity, SKILL_REGISTRY["tornado_blade"]),
+            (0.25,),
         )
 
     @covers_requirement("element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells")
     def test_entity_without_mastery_receives_an_empty_set(self):
         self.entity.traits.magic_power.base = 100
-        self.assertEqual(freeform_scales_for(self.entity, "wind"), ())
+        self.entity.db.skills = {"active": ["wind_blade"], "passive": []}
+        self.assertEqual(
+            freeform_scales_for(self.entity, SKILL_REGISTRY["wind_blade"]), ()
+        )
         _granted_mastery_only(self.entity)
-        self.assertEqual(freeform_scales_for(self.entity, "wind"), ())
+        self.assertEqual(
+            freeform_scales_for(self.entity, SKILL_REGISTRY["wind_blade"]), ()
+        )
 
     @covers_requirement("element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells")
     def test_unknown_element_fails_closed(self):
         self.entity.db.skills = {"active": [], "passive": ["not_an_element_mastery"]}
         with self.assertRaises(ValueError):
-            freeform_scales_for(self.entity, "not_an_element")
+            freeform_mastery_entitled(self.entity, "not_an_element")
 
 
 class FreeformScaleEntriesForTests(EvenniaTestCase):
@@ -238,10 +269,9 @@ class FreeformScaleEntriesForTests(EvenniaTestCase):
         "element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells"
     )
     def test_mastery_holder_receives_the_full_entry_set(self):
-        self.entity.db.skills = {
-            "active": ["wind_blade"],
-            "passive": ["wind_mastery"],
-        }
+        grant_lineage(
+            self.entity, ["wind_blade"], ["wind_mastery"], rungs={"wind_blade": 10}
+        )
         skill = SKILL_REGISTRY["wind_blade"]
         self.assertEqual(
             freeform_scale_entries_for(self.entity, skill),
@@ -318,10 +348,9 @@ class FreeformResolverGateTests(EvenniaTestCase):
 
     @covers_requirement("freeform-casting::the-resolver-gates-scaled-casts-at-the-ownership-step")
     def test_mastery_holder_can_scale_an_eligible_spell(self):
-        self.actor.db.skills = {
-            "active": ["wind_blade"],
-            "passive": ["wind_mastery"],
-        }
+        grant_lineage(
+            self.actor, ["wind_blade"], ["wind_mastery"], rungs={"wind_blade": 6}
+        )
         result = ActionResolver.preflight(self._request("wind_blade", 2.0))
         self.assertEqual(result.outcome, "success")
         self.assertNotEqual(result.reason, RejectReason.SCALED_CAST_FORBIDDEN)
@@ -335,10 +364,12 @@ class FreeformResolverGateTests(EvenniaTestCase):
 
     @covers_requirement("freeform-casting::the-resolver-gates-scaled-casts-at-the-ownership-step")
     def test_mastery_entitles_scaling_of_that_element_only(self):
-        self.actor.db.skills = {
-            "active": ["wind_blade", "light_arrow"],
-            "passive": ["wind_mastery"],
-        }
+        grant_lineage(
+            self.actor,
+            ["wind_blade", "light_arrow"],
+            ["wind_mastery"],
+            rungs={"wind_blade": 6},
+        )
         light = ActionResolver.preflight(self._request("light_arrow", 2.0))
         self.assertEqual(light.reason, RejectReason.SCALED_CAST_FORBIDDEN)
         wind = ActionResolver.preflight(self._request("wind_blade", 2.0))
@@ -383,10 +414,11 @@ class FreeformResolverGateTests(EvenniaTestCase):
 
     @covers_requirement("freeform-casting::the-resolver-gates-scaled-casts-at-the-ownership-step")
     def test_scale_one_is_always_permitted(self):
-        self.actor.db.skills = {
-            "active": ["concentration", "scorching_wave", "gale_step"],
-            "passive": ["wind_mastery", "fire_mastery"],
-        }
+        grant_lineage(
+            self.actor,
+            ["concentration", "scorching_wave", "gale_step"],
+            ["wind_mastery", "fire_mastery"],
+        )
         for key in ("concentration", "scorching_wave", "gale_step"):
             with self.subTest(skill=key):
                 result = ActionResolver.preflight(self._request(key, 1.0))
@@ -405,10 +437,9 @@ class ActionRequestScaleContractTests(EvenniaTestCase):
         self.target = create_object(PlayerCharacter, key="scale contract target")
         self.target.race = "human"
         self.target.apply_race_baseline()
-        self.actor.db.skills = {
-            "active": ["wind_blade"],
-            "passive": ["wind_mastery"],
-        }
+        grant_lineage(
+            self.actor, ["wind_blade"], ["wind_mastery"], rungs={"wind_blade": 1}
+        )
         self.actor.traits.mp.base = 500
         self.actor.traits.mp.current = 500
         self.field = Battlefield(
@@ -503,10 +534,16 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
             {"freeform caster": self.actor, "freeform wolf": self.monster},
         )
         self.context = BattlefieldActionContext(self.field)
-        self.actor.db.skills = {
-            "active": ["wind_blade", "tornado_blade", "phoenix_eternal_flame"],
-            "passive": ["wind_mastery", "fire_mastery", "water_mastery"],
-        }
+        grant_lineage(
+            self.actor,
+            ["wind_blade", "tornado_blade", "phoenix_eternal_flame"],
+            ["wind_mastery", "fire_mastery", "water_mastery"],
+            rungs={
+                "wind_blade": 6,
+                "tornado_blade": 6,
+                "phoenix_eternal_flame": 6,
+            },
+        )
 
     def _request(self, skill_key, targets, scale):
         return ActionRequest(
@@ -551,10 +588,12 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
 
     @covers_requirement("freeform-casting::a-scaled-cast-deducts-scaled-mp-and-applies-scaled-magnitudes-atomically")
     def test_unaffordable_scaled_cost_rejects_without_any_effect(self):
-        self.actor.db.skills = {
-            "active": ["world_ending_blaze"],
-            "passive": ["fire_mastery"],
-        }
+        grant_lineage(
+            self.actor,
+            ["world_ending_blaze"],
+            ["fire_mastery"],
+            rungs={"world_ending_blaze": 10},
+        )
         self.actor.traits.mp.base = 200
         self.actor.traits.mp.current = 200
         hp_before = self.monster.traits.hp.value
@@ -603,10 +642,10 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
 
     @covers_requirement("freeform-casting::a-scaled-cast-deducts-scaled-mp-and-applies-scaled-magnitudes-atomically")
     def test_scaled_healing_respects_the_maximum_and_knockout_rules(self):
-        self.actor.db.skills = {
-            "active": ["sea_of_life"],
-            "passive": ["water_mastery"],
-        }
+        grant_lineage(
+            self.actor, ["sea_of_life"], ["water_mastery"],
+            rungs={"sea_of_life": 6},
+        )
         self.monster.traits.hp.base = 200
         self.monster.traits.hp.current = 150
         # magic_power 30 → base heal 30 → double scale 60, capped by the gap 50.
@@ -667,10 +706,9 @@ class FreeformPreviewTests(EvenniaTestCase):
         self.target = create_object(PlayerCharacter, key="preview target")
         self.target.race = "human"
         self.target.apply_race_baseline()
-        self.actor.db.skills = {
-            "active": ["wind_blade"],
-            "passive": ["wind_mastery"],
-        }
+        grant_lineage(
+            self.actor, ["wind_blade"], ["wind_mastery"], rungs={"wind_blade": 10}
+        )
         self.field = Battlefield(
             {
                 "party": frozenset({"freeform caster"}),
@@ -731,10 +769,9 @@ class FreeformSessionFacadeTests(EvenniaTest, BattlefieldIsolation):
     def setUp(self):
         super().setUp()
         self.actor = _player("freeform session")
-        self.actor.db.skills = {
-            "active": ["wind_blade"],
-            "passive": ["wind_mastery"],
-        }
+        grant_lineage(
+            self.actor, ["wind_blade"], ["wind_mastery"], rungs={"wind_blade": 6}
+        )
         self.actor.traits.mp.base = 1000
         self.actor.traits.mp.current = 1000
         self.monster = create_object(Monster, key="session wolf")
@@ -781,10 +818,12 @@ class FreeformTextCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.char1.race = "human"
         self.char1.apply_race_baseline()
         self.char1.traits.magic_power.base = 30
-        self.char1.db.skills = {
-            "active": ["wind_blade", "gale_step"],
-            "passive": ["wind_mastery"] if mastery else [],
-        }
+        grant_lineage(
+            self.char1,
+            ["wind_blade", "gale_step"],
+            ["wind_mastery"] if mastery else [],
+            rungs={"wind_blade": 10} if mastery else None,
+        )
         self.char1.traits.mp.base = 500
         self.char1.traits.mp.current = 500
         self.char1.move_to(self.room1)

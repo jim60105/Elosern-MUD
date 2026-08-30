@@ -36,6 +36,7 @@ from ._combat_session_helpers import (
     _monster,
     _player,
 )
+from .combat_fixtures import grant_lineage
 
 
 class InnateSkillTests(EvenniaTest):
@@ -155,7 +156,7 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
         self.room = create_object(Room, key="arena")
         self.player = _player()
         self.player.location = self.room
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
         self.monster = _monster("goblin", hp=100)
         self.monster.location = self.room
 
@@ -476,7 +477,7 @@ class CommandSessionTests(BattlefieldIsolation, QuestRegistryIsolation, EvenniaC
     def test_active_session_cast_does_not_advance_command_time(self):
         from world.rules.combat_session import engage
 
-        self.char1.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.char1, ["fire_ball"])
         engage(self.char1, self.monster)
         clock = WorldClock()
         with patch("world.rules.cast_settlement.get_world_clock", return_value=clock):

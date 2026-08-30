@@ -24,6 +24,7 @@ from world.rules.overwhelm import (
     resolve_overwhelm,
     team_effective_power,
 )
+from world.rules.tests.combat_fixtures import grant_lineage
 from world.skills.registry import SKILL_REGISTRY
 
 
@@ -175,7 +176,7 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
         self.assertEqual(self.actor.traits.atk_phys.value, before)
 
     def test_failed_flee_spends_turn_while_opponent_still_attacks(self):
-        self.pursuer.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.pursuer, ["fire_ball"])
 
         def provider(entity, field):
             if entity is self.actor:

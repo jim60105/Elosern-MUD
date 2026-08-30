@@ -25,13 +25,14 @@ from world.maps.bootstrap import sync_grid
 from world.quests.catalog import register_catalog
 from world.quests.compile import compile_quest_blueprint, register_generated_quest
 from world.quests.runtime import QuestState, accept_quest, read_records
-from world.quests.scene_builder import materialize_stage
+from world.quests.scene_builder import _spawn_npc, materialize_stage
 from world.quests.tests.test_scene_builder import (
     SceneBuilderIsolation,
     _install_scenario_director,
     _instance_bound_payload,
     _raw,
 )
+from world.rules.tests.combat_fixtures import grant_lineage
 
 from tools.spec_traceability import covers_requirement
 
@@ -50,7 +51,7 @@ class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixi
         self.player.apply_race_baseline()
         # Human static magic_power at 術師 tier so fire_ball casts pass.
         self.player.traits.magic_power.base = 30
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
         self.player.location = self.anchor
         self.staff = create_object(NPC, key="scene staff", location=self.anchor)
         self.staff.components.add(
@@ -214,5 +215,63 @@ class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixi
         # enterable scene and creates nothing.
         self.call(CmdEnterScene(), "", "你目前沒有需要進入的任務場景", caller=self.player)
         self.assertEqual(InstanceRoom.objects.all().count(), rooms_before)
+
+
+class SceneSpawnLineageSeedTests(SceneBuilderIsolation, EvenniaTest):
+    """DC6 spawn seam: a deep-skill scene NPC can use its skills."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(InstanceRoom, key="seed scene")
+
+    @covers_requirement("skill-lineage::import-and-scene-build-auto-seed-prerequisite-proficiency-exactly")
+    def test_spawned_deep_skill_npc_is_usable_via_exact_seed(self):
+        from types import SimpleNamespace
+
+        from unittest.mock import patch
+
+        from world.rules.progression import can_use_skill
+        from world.quests import scene_builder
+        from world.skills.registry import SKILL_REGISTRY
+
+        real_spawn = scene_builder.spawn
+
+        def deep_skill_spawn(prototype):
+            # Simulate an NPC tier whose prototype owns only the deep skill;
+            # the seed must run inside _spawn_npc itself, not after it.
+            spawned = real_spawn(prototype)
+            spawned[0].db.skills = {"active": ["firestorm"], "passive": []}
+            spawned[0].db.skill_proficiency = {}
+            return spawned
+
+        requirement = SimpleNamespace(archetype="forest_path", characterizations=())
+        with patch.object(scene_builder, "spawn", deep_skill_spawn):
+            npc = _spawn_npc(self.room, requirement, "bandit", "bandit", None, 0)
+        self.assertLessEqual(
+            {"fire_arrow", "fire_ball", "scorching_wave", "firestorm"},
+            set(npc.db.skills["active"]),
+        )
+        self.assertEqual(
+            dict(npc.db.skill_proficiency),
+            {
+                "scorching_wave": 150.0,
+                "fire_ball": 150.0,
+                "fire_arrow": 150.0,
+            },
+        )
+        self.assertTrue(can_use_skill(npc, SKILL_REGISTRY["firestorm"]))
+
+    @covers_requirement("skill-lineage::import-and-scene-build-auto-seed-prerequisite-proficiency-exactly")
+    def test_skill_less_spawn_is_an_unaffected_no_op(self):
+        from types import SimpleNamespace
+
+        requirement = SimpleNamespace(archetype="forest_path", characterizations=())
+        npc = _spawn_npc(self.room, requirement, "bandit", "bandit", None, 0)
+        # The scene_npc prototype carries no skills: spawn must not fabricate
+        # any proficiency state.
+        self.assertIsNone(npc.db.skills)
+        self.assertEqual(dict(npc.db.skill_proficiency or {}), {})
+
+
 if __name__ == "__main__":
     unittest.main()

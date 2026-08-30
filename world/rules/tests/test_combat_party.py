@@ -51,7 +51,7 @@ from world.rules.skip_safety import SkipRejectReason, _BATTLEFIELDS
 from world.rules.targeting import expand_target_shorthand
 
 from .combat_fixtures import FakeEntity
-from .combat_fixtures import BattlefieldIsolation
+from .combat_fixtures import BattlefieldIsolation, grant_lineage
 
 
 def _player(key="combat party player"):
@@ -60,7 +60,7 @@ def _player(key="combat party player"):
     player.apply_race_baseline()
     # Human static magic_power at 術師 tier so element-gated spell casts pass.
     player.traits.magic_power.base = 30
-    player.db.skills = {"active": ["fire_ball", "wind_blade"], "passive": []}
+    grant_lineage(player, ["fire_ball", "wind_blade"])
     return player
 
 

@@ -55,7 +55,7 @@ from world.rules.party import (
     is_companion,
 )
 from world.rules.surfaces import read_counter_trait
-from .combat_fixtures import BattlefieldIsolation
+from .combat_fixtures import BattlefieldIsolation, grant_lineage
 
 ALTORIA_BRANCH = "guild_branch_altoria"
 MOVE = CLOCK_YAML["command_defaults"]["move"]
@@ -102,7 +102,7 @@ class OfflinePartyQuestLoopTests(BattlefieldIsolation, EvenniaCommandTestMixin, 
         self.char1.apply_race_baseline()
         # Human static magic_power at 術師 tier so fire_ball casts pass.
         self.char1.traits.magic_power.base = 30
-        self.char1.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.char1, ["fire_ball"])
         self.char1.location = self.hall
         register_adventurer(self.char1, self.staff)
         register_guild_offer(

@@ -27,6 +27,7 @@ from world.rules.combat_session import (
 )
 
 from ._combat_session_helpers import BattlefieldIsolation, _monster, _player
+from .combat_fixtures import grant_lineage
 
 
 
@@ -160,7 +161,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         self.room = create_object(Room, key="recovery arena")
         self.player = _player()
         self.player.location = self.room
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
         self.monster = _monster("recovery goblin", hp=100)
         self.monster.location = self.room
 
@@ -375,7 +376,7 @@ class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):
         self.room = create_object(Room, key="upkeep tick arena")
         self.player = _player()
         self.player.location = self.room
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
         self.monster = _monster("upkeep tick goblin", hp=100)
         self.monster.location = self.room
         from world.rules.buffs import _add_buff
@@ -446,7 +447,7 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
         self.room = create_object(Room, key="overwhelm direction arena")
         self.player = _player("direction player")
         self.player.location = self.room
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
         # Foe team overwhelming by the power-ratio rule alone (>= 100x):
         # monster power = (20+50+100) x 3000 = 510000 vs the player's
         # (1+51+1) x 45 = 2385 (~214x), with a ~4.8-round estimate. The
@@ -540,7 +541,7 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTestCase):
         self.room = create_object(Room, key="preflight room")
         self.player = _player()
         self.player.location = self.room
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
         self.monster = _monster("preflight goblin")
         self.monster.location = self.room
 

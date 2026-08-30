@@ -17,7 +17,7 @@ from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.registry import build_production_registry
 from world.rules.combat_session import engage, read_session
-from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 
 
 def _player(key="dispatch player"):
@@ -53,7 +53,7 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
         self.room = create_object(Room, key="dispatch arena")
         self.player = _player()
         self.player.location = self.room
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
         self.monster = _monster()
         self.monster.location = self.room
         self.action_registry = build_production_action_registry()

@@ -31,7 +31,7 @@ from world.rules.clock import (
     _EVENT_SOURCES,
 )
 from world.rules.combat import Battlefield, BattlefieldActionContext
-from world.rules.progression import SKILL_PRACTICE_XP_PER_USE
+from world.rules.progression import SKILL_PRACTICE_XP_PER_USE, reset_practice_dedupe
 from world.rules.surfaces import attribute_snapshot
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import SKILL_REGISTRY, SkillKind, TargetSpec
@@ -53,6 +53,13 @@ class _CastSettlementTestCase(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        # EvenniaTest rolls the database back between tests while the
+        # transient practice-dedupe state survives in module globals, and the
+        # rollback reuses entity primary keys with a tickless clock — without
+        # this reset, a claim taken by one test's committed settlement
+        # silently suppresses the next test's accrual (same convention as
+        # ``test_progression`` / ``test_skill_lineage``).
+        reset_practice_dedupe()
         self._sources = dict(_EVENT_SOURCES)
         self.char1.race = "human"
         self.char1.apply_race_baseline()
@@ -164,6 +171,29 @@ class OutOfCombatCastSettlementTests(_CastSettlementTestCase):
         self.assertEqual(self.char1.db.skill_proficiency or {}, {})
         self.assertIsNone(self._raw_attribute(self.char1, "disguised_stats"))
         self.assertIsNone(self._raw_attribute(self.char1, "skill_proficiency"))
+
+    @covers_requirement("cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces")
+    def test_rolled_back_settlement_releases_practice_claims_for_same_tick_retry(self):
+        # The resolve-level claim release only covers an INNER rolled-back
+        # commit; here the inner resolve COMMITS and the OUTER transaction
+        # fails afterwards (the clock persist), so the settlement itself must
+        # give the dedupe state back. Without that release the same-tick
+        # retry would resolve successfully yet accrue nothing.
+        clock = WorldClock()
+        clock._persist = lambda tick: (_ for _ in ()).throw(
+            RuntimeError("simulated persist failure")
+        )
+        with self.assertRaises(RuntimeError):
+            settle_out_of_combat_cast(self._request(), clock=clock)
+        self.assertEqual(self.char1.db.skill_proficiency or {}, {})
+        retry = settle_out_of_combat_cast(self._request(), clock=WorldClock())
+        self.assertEqual(retry.result.outcome, "success")
+        expected_xp = (
+            SKILL_PRACTICE_XP_PER_USE * RACE_REGISTRY["human"].learning_multiplier
+        )
+        self.assertEqual(
+            self.char1.db.skill_proficiency, {"status_disguise": expected_xp}
+        )
 
     @covers_requirement("cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces")
     def test_buff_applying_cast_commits_and_rolls_back(self):
@@ -448,7 +478,7 @@ class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
                 RoomActionContext(caster.location, contexts.get(skill_key, {})),
             )
             effects = _step5_effect_resolution(request, skill, targets)
-            effects.append(_step6_skill_practice(caster, skill))
+            effects += _step6_skill_practice(request, skill, targets, [])
             for effect in effects:
                 self.assertIn(
                     id(effect.entity),

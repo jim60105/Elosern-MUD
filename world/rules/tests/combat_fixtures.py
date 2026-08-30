@@ -2,6 +2,11 @@
 
 from types import SimpleNamespace
 
+from world.rules.progression import (
+    SKILL_PROFICIENCY_XP_PER_LEVEL,
+    lineage_ownership_closure,
+    seed_lineage_proficiency,
+)
 from world.rules.skip_safety import _BATTLEFIELDS
 
 
@@ -72,6 +77,42 @@ class FakeGauge:
     @property
     def max(self) -> int:
         return self._data["base"]
+
+
+def grant_lineage(
+    entity,
+    active: list[str],
+    passive: list[str] | None = None,
+    *,
+    rungs: dict[str, int] | None = None,
+) -> None:
+    """Set ``db.skills``/``db.skill_proficiency`` so every listed skill is USABLE.
+
+    The lineage gate (use-driven-skill-lineage) requires prerequisite
+    ownership plus threshold proficiency, so a fixture that only lists a deep
+    skill is no longer enough. This helper closes the prerequisite-ownership
+    chain over ``active`` + ``passive``, seeds the exact minimal prerequisite
+    XP via :func:`seed_lineage_proficiency`, and (for freeform fixtures)
+    raises the named skills' own proficiency to ``rungs[key]`` levels so the
+    skill-anchored ladder unlocks that rung. Existing stored proficiency is
+    preserved unless the seed or an explicit rung overwrites it.
+    """
+    declared_passive = list(passive or [])
+    add_active, add_passive = lineage_ownership_closure([*active, *declared_passive])
+    skills = {
+        "active": [*active, *add_active],
+        "passive": [*declared_passive, *add_passive],
+    }
+    seed = seed_lineage_proficiency(
+        [*skills["active"], *skills["passive"]],
+        dict(entity.db.skill_proficiency or {}),
+    )
+    for key, level in (rungs or {}).items():
+        seed[key] = max(
+            float(seed.get(key, 0.0)), level * SKILL_PROFICIENCY_XP_PER_LEVEL
+        )
+    entity.db.skills = skills
+    entity.db.skill_proficiency = seed
 
 
 class FakeEntity:

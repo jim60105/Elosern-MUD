@@ -35,6 +35,7 @@ from world.rules.combat import (
     run_round,
 )
 from world.rules.overwhelm import resolve_overwhelm
+from world.rules.tests.combat_fixtures import grant_lineage
 
 from ._fixtures import QuestRegistryIsolation, defeat, quest, register
 
@@ -50,7 +51,7 @@ class OfflineRuntimePathTests(QuestRegistryIsolation, EvenniaTestCase):
         self.player.apply_race_baseline()
         # Human static magic_power at 術師 tier so fire_ball casts pass.
         self.player.traits.magic_power.base = 30
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
 
     def _monster(self, key: str, hp: int = 1) -> Monster:
         monster = create_object(Monster, key=key)
@@ -110,7 +111,7 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
         self.player.apply_race_baseline()
         # Human static magic_power at 術師 tier so fire_ball casts pass.
         self.player.traits.magic_power.base = 30
-        self.player.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.player, ["fire_ball"])
 
     def _monster(self, key: str, hp: int = 1) -> Monster:
         monster = create_object(Monster, key=key)
@@ -157,7 +158,7 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
         self.char1.apply_race_baseline()
         # Human static magic_power at 術師 tier so fire_ball casts pass.
         self.char1.traits.magic_power.base = 30
-        self.char1.db.skills = {"active": ["fire_ball"], "passive": []}
+        grant_lineage(self.char1, ["fire_ball"])
         monster = self._monster("round")
         field = self._field(self.char1, [monster])
         with patch("world.rules.combat.roll_d100", return_value=100):

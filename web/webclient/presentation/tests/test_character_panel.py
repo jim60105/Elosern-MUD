@@ -19,7 +19,7 @@ from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
-from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 
 from typeclasses.characters import PlayerCharacter
 from web.webclient.presentation.character import (
@@ -775,10 +775,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.player.race = "human"
         self.player.apply_race_baseline()
         self.player.db.wallet = 500
-        self.player.db.skills = {
-            "active": ["fire_ball"],
-            "passive": ["defense_instinct"],
-        }
+        grant_lineage(self.player, ["fire_ball"], ["defense_instinct"])
         self.player.db.equipment = {
             "weapon_main": "plain_sword",
             "weapon_off": None,
@@ -822,6 +819,8 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             _flattened_keys(payload["actives"]),
             [
                 "fire_ball",
+                # The lineage closure owns fire_arrow alongside fire_ball.
+                "fire_arrow",
                 "basic_attack",
                 "flee",
                 *sorted(
@@ -1011,10 +1010,15 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         "webclient-component-showcase::the-status-character-and-skill-surfaces-present-truthful-non-color-only-state"
     )
     def test_freeform_scales_populated_for_mastery_holder(self):
-        self.player.db.skills = {
-            "active": ["fire_ball"],
-            "passive": ["defense_instinct", "fire_mastery"],
-        }
+        # fire_ball's derived tip cap is Lv.3 (its consuming edges), so the
+        # ladder can never unlock above the 1.0 rung for it (use-driven-
+        # skill-lineage D6: a ceiling is the max consuming edge).
+        grant_lineage(
+            self.player,
+            ["fire_ball"],
+            ["defense_instinct", "fire_mastery"],
+            rungs={"fire_ball": 3},
+        )
         payload = self._render()
         row = next(
             r
@@ -1023,9 +1027,10 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             for r in g["skills"]
             if r["key"] == "fire_ball"
         )
+        # Ladder rungs available at the Lv.3 ceiling: 0.25/0.5/1.0.
         self.assertEqual(
             [entry["mp_cost"] for entry in row["freeform_scales"]],
-            [4, 7, 14, 28, 56],
+            [4, 7, 14],
         )
 
     @covers_requirement(

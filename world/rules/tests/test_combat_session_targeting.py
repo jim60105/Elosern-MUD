@@ -20,6 +20,7 @@ from world.rules.combat_session import (
 )
 
 from ._combat_session_helpers import BattlefieldIsolation, _monster, _player
+from .combat_fixtures import grant_lineage
 
 
 class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
@@ -30,7 +31,7 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
         self.room = create_object(Room, key="explicit arena")
         self.player = _player()
         self.player.location = self.room
-        self.player.db.skills = {"active": ["wind_blade", "fire_ball"], "passive": []}
+        grant_lineage(self.player, ["wind_blade", "fire_ball"])
         self.monster_a = _monster("alpha", hp=100)
         self.monster_b = _monster("beta", hp=100)
         self.monster_a.location = self.room
