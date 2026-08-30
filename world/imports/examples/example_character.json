@@ -23,7 +23,7 @@
     "agility": 9
   },
   "affinity_elements": ["fire", "wind"],
-  "skills": [],
+  "skills": ["light_sword_style"],
   "passives": ["body_enhancement"],
   "equipment": {},
   "inventory": [],
