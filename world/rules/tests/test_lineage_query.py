@@ -10,6 +10,9 @@ import copy
 import unittest
 from types import SimpleNamespace
 
+from tools.spec_traceability import covers_requirement
+
+
 from world.rules.lineage_query import (
     LineageQueryError,
     build_lineage_view,
@@ -82,6 +85,7 @@ class LineageViewShapeTests(unittest.TestCase):
     def tearDown(self):
         validate_prerequisite_graph(SKILL_REGISTRY)
 
+    @covers_requirement("skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-side-effect-free")
     def test_fire_tree_is_one_chain_in_topological_order(self):
         view = build_lineage_view(_entity(FIRE_CLOSURE))
         fire = next(
@@ -100,6 +104,7 @@ class LineageViewShapeTests(unittest.TestCase):
             SKILL_REGISTRY["fire_arrow"].element.display_name_zh,
         )
 
+    @covers_requirement("skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-side-effect-free")
     def test_prereq_less_uncconsumed_skill_starts_no_chain(self):
         # basic_attack declares no prerequisites and nobody consumes it.
         view = build_lineage_view(_entity(("basic_attack",)))
@@ -125,6 +130,7 @@ class NodeStateTests(unittest.TestCase):
         chain = next(c for c in view.chains if c.root_skill_key == "fire_arrow")
         return next(n for n in chain.nodes if n.skill_key == key)
 
+    @covers_requirement("skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-side-effect-free")
     def test_capped_mid_tree_node_reports_saturation(self):
         # fire_arrow is consumed up to level 3; 3 levels + band XP saturates it.
         view = self._view_for({"fire_arrow": _level_xp(3, 23.0)})
@@ -143,6 +149,7 @@ class NodeStateTests(unittest.TestCase):
             self.assertEqual(node.prereq_text_zh, "")
             self.assertTrue(node.usable)
 
+    @covers_requirement("skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-side-effect-free")
     def test_locked_node_names_its_missing_edge(self):
         # firestorm requires scorching_wave Lv.3; level 2 locks it.
         view = self._view_for({"scorching_wave": _level_xp(2)})
@@ -200,6 +207,7 @@ class MeterTests(unittest.TestCase):
 
 
 class PurityTests(unittest.TestCase):
+    @covers_requirement("skill-lineage-panel::the-lineage-read-model-is-pure-derived-and-side-effect-free")
     def test_double_build_is_equal_and_writes_nothing(self):
         entity = _entity(FIRE_TREE, {"fire_arrow": _level_xp(2, 12.5)})
         before = copy.deepcopy(entity.db.__dict__)

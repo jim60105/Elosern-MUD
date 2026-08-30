@@ -638,7 +638,8 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
     _character = ProgressionTests._character
     _monster = ProgressionTests._monster
 
-    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp",
+        "skill-lineage-panel::a-newly-usable-skill-pushes-one-derived-unlock-notification")
     def test_edge_crossing_action_notifies_exactly_one_line(self):
         actor, _, request = self._near_edge_cast("unlock-cast")
         with patch("world.rules.combat.roll_d100", return_value=100):

@@ -10,6 +10,9 @@ import dataclasses
 import unittest
 from types import SimpleNamespace
 
+from tools.spec_traceability import covers_requirement
+
+
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.lineage import (
     LINEAGE_SCHEMA_VERSION,
@@ -129,6 +132,7 @@ def _payload(chains, completed=0, total=None):
 class ValidatorFieldTests(unittest.TestCase):
     """Exact fields, kind, and one-over boundary rejections."""
 
+    @covers_requirement("skill-lineage-panel::the-lineage-panel-ships-as-one-bounded-versioned-oob-contract")
     def test_valid_minimal_payload_normalizes(self):
         payload = _payload([_chain("root_a")])
         normalized = validate_lineage(payload)
@@ -159,6 +163,7 @@ class ValidatorFieldTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_lineage(payload)
 
+    @covers_requirement("skill-lineage-panel::the-lineage-panel-ships-as-one-bounded-versioned-oob-contract")
     def test_chain_count_caps(self):
         at_cap = _payload([_chain(f"root_{index}", node_count=1) for index in range(MAX_CHAINS)])
         # 16 one-node chains serialize under the envelope and pass.
@@ -170,6 +175,7 @@ class ValidatorFieldTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_lineage(over)
 
+    @covers_requirement("skill-lineage-panel::the-lineage-panel-ships-as-one-bounded-versioned-oob-contract")
     def test_node_count_caps(self):
         at_cap = _payload([_chain("root_a", node_count=MAX_NODES_PER_CHAIN)])
         validate_lineage(at_cap)
@@ -182,6 +188,7 @@ class ValidatorFieldTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_lineage(payload)
 
+    @covers_requirement("skill-lineage-panel::the-lineage-panel-ships-as-one-bounded-versioned-oob-contract")
     def test_text_caps(self):
         long_text = "測" * (MAX_TEXT_CODE_POINTS + 1)
         for mutate in (
@@ -199,6 +206,7 @@ class ValidatorFieldTests(unittest.TestCase):
             with self.assertRaises(ProtocolValidationError):
                 validate_lineage(_payload([_chain("root_a", meter=meter)]))
 
+    @covers_requirement("skill-lineage-panel::the-lineage-panel-ships-as-one-bounded-versioned-oob-contract")
     def test_head_truncation_keeps_the_root(self):
         # Truncated chains keep their head: nodes[0] must remain the root.
         chain = _chain("root_a")
@@ -266,6 +274,7 @@ class PresenterTests(InjectedRegistryMixin):
                 )
         return tuple(registry_extras)
 
+    @covers_requirement("skill-lineage-panel::the-lineage-panel-ships-as-one-bounded-versioned-oob-contract")
     def test_malformed_proficiency_fails_closed_as_unavailable(self):
         registry = build_production_registry()
         context = _context(_entity(FIRE_KEYS, {"fire_arrow": "junk"}))
@@ -273,6 +282,7 @@ class PresenterTests(InjectedRegistryMixin):
         self.assertFalse(payload["available"])
         self.assertEqual(payload["reason"]["code"], "lineage_unavailable")
 
+    @covers_requirement("skill-lineage-panel::the-lineage-panel-ships-as-one-bounded-versioned-oob-contract")
     def test_chain_cap_truncates_trailing_chains_with_full_view_counts(self):
         keys = self._inject_ladder_chains(MAX_CHAINS + 4, 2)
         # Fully saturate one ladder (both nodes) so completed_count is 1.

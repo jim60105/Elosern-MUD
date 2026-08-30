@@ -663,7 +663,8 @@ class DerivedUnlockSinkTests(unittest.TestCase):
             race="human",
         )
 
-    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp",
+        "skill-lineage-panel::a-newly-usable-skill-pushes-one-derived-unlock-notification")
     def test_crossing_an_edge_appends_exactly_one_line(self):
         actor = self._near_edge()
         sink: list[str] = []
@@ -672,7 +673,8 @@ class DerivedUnlockSinkTests(unittest.TestCase):
         )
         self.assertEqual(sink, ["新法術可用：灼熱波動"])
 
-    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp",
+        "skill-lineage-panel::a-newly-usable-skill-pushes-one-derived-unlock-notification")
     def test_a_second_award_after_the_flip_appends_nothing(self):
         actor = self._near_edge()
         sink: list[str] = []
@@ -720,6 +722,7 @@ class DerivedUnlockSinkTests(unittest.TestCase):
         keys = [skill.key for skill in progression.unlock_candidates_for("fire_ball")]
         self.assertEqual(keys, ["scorching_wave"])
 
+    @covers_requirement("skill-lineage-panel::a-newly-usable-skill-pushes-one-derived-unlock-notification")
     def test_seeded_lineage_crosses_edges_silently(self):
         # Seeding writes proficiency directly (no grant, no sink): the
         # notification surface belongs to live awards only.
