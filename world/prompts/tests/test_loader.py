@@ -57,6 +57,7 @@ class ValidLoadTests(unittest.TestCase):
                 "art.yaml",
                 "character_creation.yaml",
                 "action_options.yaml",
+                "title_nomination.yaml",
             },
         )
 

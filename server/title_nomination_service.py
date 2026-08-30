@@ -84,6 +84,7 @@ def _build_context(entity: Any, event_logs: Any) -> Any:
             for definition in FIXED_TITLE_REGISTRY.values()
         ),
         event_logs=tuple(event_logs or ()),
+        removed=title_rules.removal_digest(entity),
     )
 
 

@@ -158,6 +158,18 @@ class NominationSchedulingTests(EvenniaTest):
         user_text = client.calls[0].messages[1]["content"]
         self.assertIn("已拒之名", user_text)
 
+    def test_removal_digest_flows_into_the_prompt(self):
+        # The durable removal log is the second soft-learning feed: the
+        # removed display must appear in the next round's user message.
+        title_rules.bank_epithet(self.player, "南門新客", "初入南門。", 1)
+        title_rules.bank_epithet(self.player, "放下之名", "舊事蹟。", 2)
+        title_rules.remove_epithet(self.player, "放下之名")
+        client = _good_client()
+        self._schedule(client)
+        self.assertEqual(len(client.calls), 1)
+        user_text = client.calls[0].messages[1]["content"]
+        self.assertIn("放下之名", user_text)
+
     def test_push_passes_the_captured_epoch(self):
         # The unpatched push path hands publish_panel_update the epoch
         # captured at trigger time (the coordinator's own guard test pins

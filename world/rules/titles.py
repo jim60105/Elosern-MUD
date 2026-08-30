@@ -1,13 +1,21 @@
 """Deterministic title storage, composition, equip surface, and grants.
 
 Two kinds of titles live on a character: fixed titles (registry-driven,
-append-only) and epithets (banked entries, adopted by the nomination system
-later; F only banks them for the starter pair). ``db.title_collection`` holds
-entries identified by ``(kind, key | display)``; ``db.title_equipped`` holds
-the two slot identifiers. Every reader and mutator passes through the single
-strict ``read_title_state`` parser: missing attributes read as the defaults,
-present-but-malformed state raises ``TitleDataError`` (fail closed), and the
-D8 slot-non-empty invariant is asserted on every read.
+append-only) and epithets (banked entries, adopted by the nomination system;
+``db.title_collection`` holds entries identified by ``(kind, key | display)``;
+``db.title_equipped`` holds the two slot identifiers. Every reader and mutator
+passes through the single strict ``read_title_state`` parser: missing
+attributes read as the defaults, present-but-malformed state raises
+``TitleDataError`` (fail closed), and the D8 slot-non-empty invariant is
+asserted on every read.
+
+The only delete path in the title surface is ``remove_epithet`` — the
+two-gated, two-step epithet removal (change H, title-system D5 §8). It deletes
+exactly one epithet collection entry, never a fixed entry and never an
+equipped-identifier list, and leaves the equipment slots byte-identical; the
+D8 invariant stays structurally unbreakable. Fixed titles have no removal
+path, and no module-level callable in this file other than ``remove_epithet``
+deletes a title entry (the structural-absence boundary test guards this).
 
 The event-effect planner (``title_event_effect_planner``) evaluates the
 registry's pending predicates against a committed action's ``EventLog`` and
@@ -67,6 +75,13 @@ PENDING_BALLOT_KEY = "pending_title_ballot"
 DECLINED_LOG_KEY = "title_nomination_declines"
 MAX_BALLOT_CANDIDATES = 3
 MAX_DECLINE_RECORDS = 3
+# Epithet removal (change H, title-system D5 §8). The bounded newest-first
+# removal log is the durable Director-facing feed mirroring the decline log:
+# ``{tick, display}`` records the nomination prompt digests as soft-learning
+# context (prompt context only, never a filter rule — the removed name is
+# renominatable through the live-collection filter).
+REMOVALS_LOG_KEY = "title_epithet_removals"
+MAX_REMOVAL_RECORDS = 3
 # Wire bound shared by the closed AI schema (overlong basis voids the round)
 # and the WebClient ballot panel validator (mirrored constant).
 BALLOT_BASIS_MAX_CHARS = 80
@@ -942,6 +957,164 @@ def decline_epithet_ballot(entity: Any) -> EventLog:
         target=None,
         data={"displays": list(displays), "joined": "、".join(displays)},
         text_template="{actor}拒絕了異名提名：{data[joined]}",
+    )
+    return EventLog(
+        actor=str(entity.key),
+        skill_key="title",
+        targets=(),
+        entries=(entry,),
+        time_cost_seconds=0,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Epithet removal (change H, title-system D5 §8) — the ONLY delete path.
+# ---------------------------------------------------------------------------
+
+
+class TitleRemovalReason(StrEnum):
+    """Stable removal-gate rejection codes (design §13 error table)."""
+
+    TARGET_UNKNOWN = "title_removal_target_unknown"
+    LAST_EPITHET = "title_last_epithet"
+    EQUIPPED_UNREMOVABLE = "title_equipped_unremovable"
+
+
+class TitleRemovalError(ValueError):
+    """A removal attempt hit a stable gate; no state changed."""
+
+    def __init__(self, reason: TitleRemovalReason, detail: str | None = None) -> None:
+        super().__init__(detail or reason.value)
+        self.reason = reason
+
+
+def epithet_removal_gate(
+    entity: Any, display: Any
+) -> TitleRemovalReason | None:
+    """Pure two-gate verdict; ``None`` means the removal may proceed.
+
+    Gate precedence (design DH1): unknown/wrong-kind first, then
+    ``LAST_EPITHET``, then ``EQUIPPED_UNREMOVABLE`` — a sole epithet is
+    necessarily equipped (D8), and the spec scenario demands LAST for that
+    row, so LAST is evaluated before EQUIPPED. Malformed title state
+    propagates ``TitleDataError`` (fail closed).
+    """
+    if isinstance(display, bool) or not isinstance(display, str) or not display:
+        return TitleRemovalReason.TARGET_UNKNOWN
+    collection, equipped = read_title_state(entity)
+    epithets = [entry for entry in collection if entry["kind"] == _EPITHET_KIND]
+    if not any(entry["display"] == display for entry in epithets):
+        return TitleRemovalReason.TARGET_UNKNOWN
+    if len(epithets) <= 1:
+        return TitleRemovalReason.LAST_EPITHET
+    if display == equipped["epithet"]:
+        return TitleRemovalReason.EQUIPPED_UNREMOVABLE
+    return None
+
+
+def removal_records(entity: Any) -> tuple[dict[str, Any], ...]:
+    """Strict read of the bounded removal log (newest-first storage order)."""
+    raw = entity.attributes.get(REMOVALS_LOG_KEY, default=None)
+    if raw is None:
+        return ()
+    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
+        raise TitleDataError("title_epithet_removals must be a list")
+    if len(raw) > MAX_REMOVAL_RECORDS:
+        raise TitleDataError(
+            f"title_epithet_removals exceeds the {MAX_REMOVAL_RECORDS}-record cap"
+        )
+    records: list[dict[str, Any]] = []
+    for index, record in enumerate(raw):
+        label = f"title_epithet_removals[{index}]"
+        if not isinstance(record, Mapping) or set(record) != {"tick", "display"}:
+            raise TitleDataError(f"{label} must hold exactly tick/display")
+        records.append(
+            {
+                "tick": _require_tick(record["tick"], f"{label} tick"),
+                "display": _require_identifier(
+                    record["display"], f"{label} display"
+                ),
+            }
+        )
+    return tuple(records)
+
+
+def removal_digest(
+    entity: Any, limit: int = MAX_REMOVAL_RECORDS
+) -> tuple[str, ...]:
+    """Distinct recent removal-log displays for the nomination prompt's
+    soft-learning digest (newest record first). Malformed history degrades to
+    empty; this is prompt context only and never a filter rule — a removed
+    name stays renominatable through the live-collection collision filter.
+    """
+    try:
+        records = removal_records(entity)
+    except TitleDataError:
+        return ()
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
+        raise ValueError("removal_digest limit must be a non-negative int")
+    seen: set[str] = set()
+    digest: list[str] = []
+    for record in records[:limit]:
+        display = record["display"]
+        if display not in seen:
+            seen.add(display)
+            digest.append(display)
+    return tuple(digest)
+
+
+def remove_epithet(entity: Any, display: Any) -> EventLog:
+    """Delete exactly one banked epithet; the ONLY delete path in the surface.
+
+    One gate pass executes (answering surfaces re-validate at execution
+    time): a gated target raises ``TitleRemovalError`` and a malformed state
+    raises ``TitleDataError``, each with NOTHING changed. On success the
+    collection shrinks by exactly the one entry, the durable bounded removal
+    log gains a newest-first ``{tick, display}`` record in the same
+    transaction, and the equipment slots are written back unchanged — a
+    removal can never empty a slot or orphan an identifier, so the D8
+    invariant is structurally unbreakable here. Returns a renderable
+    ``title_epithet_removed`` EventLog (``decline_epithet_ballot`` shape)
+    for the answering surface and the EventLog consumers.
+    """
+    reason = epithet_removal_gate(entity, display)
+    if reason is not None:
+        raise TitleRemovalError(reason)
+    tick = get_world_clock().tick
+    collection, equipped = read_title_state(entity)
+    new_collection = [
+        entry
+        for entry in collection
+        if not (entry["kind"] == _EPITHET_KIND and entry["display"] == display)
+    ]
+    record = {"tick": tick, "display": display}
+    history = [dict(entry) for entry in removal_records(entity)]
+    collection_snapshot = attribute_snapshot(entity, TITLE_COLLECTION_KEY)
+    equipped_snapshot = attribute_snapshot(entity, TITLE_EQUIPPED_KEY)
+    removals_snapshot = attribute_snapshot(entity, REMOVALS_LOG_KEY)
+    try:
+        with transaction.atomic():
+            _write_title_state(entity, new_collection, equipped)
+            entity.attributes.add(
+                REMOVALS_LOG_KEY, [record, *history][:MAX_REMOVAL_RECORDS]
+            )
+    except Exception:
+        restore_attribute_best_effort(
+            entity, TITLE_COLLECTION_KEY, collection_snapshot
+        )
+        restore_attribute_best_effort(
+            entity, TITLE_EQUIPPED_KEY, equipped_snapshot
+        )
+        restore_attribute_best_effort(
+            entity, REMOVALS_LOG_KEY, removals_snapshot
+        )
+        raise
+    entry = EventEntry(
+        kind="title_epithet_removed",
+        actor=str(entity.key),
+        target=None,
+        data={"display": display, "tick": tick},
+        text_template="{actor}放下了異名：{data[display]}",
     )
     return EventLog(
         actor=str(entity.key),

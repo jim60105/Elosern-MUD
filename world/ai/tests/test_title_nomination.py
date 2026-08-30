@@ -401,6 +401,26 @@ class PromptShapeTests(unittest.TestCase):
                 self.assertNotIn(token, system["content"])
                 self.assertNotIn(token, user["content"])
 
+    def test_prompt_feeds_the_removal_digest_as_soft_context(self):
+        # The durable removal log rides the prompt as a preference hint,
+        # explicitly NOT a blacklist (title-codex-removal DH3).
+        system, user = build_nomination_prompt(
+            _context(removed=("放下過的異名",))
+        )
+        self.assertIn("放下過的異名", user["content"])
+        self.assertIn("不是黑名單", user["content"])
+        # The declined digest keeps its own separate line.
+        self.assertNotIn("放下過的異名", system["content"])
+
+    def test_prompt_renders_the_empty_removal_digest_as_none(self):
+        _system, user = build_nomination_prompt(_context())
+        line = next(
+            row
+            for row in user["content"].splitlines()
+            if "主動放下（移除）的異名" in row
+        )
+        self.assertTrue(line.endswith("：無"))
+
 
 class EventSummaryTests(unittest.TestCase):
     """The bounded recent-event feed shape."""

@@ -73,8 +73,8 @@ class NominationContext:
     """Plain-data nomination inputs assembled by the scheduling service.
 
     Nothing here references a game entity: the service reads the collection,
-    decline log, and full title through rules readers and hands the values
-    over as frozen data.
+    decline log, removal log, and full title through rules readers and hands
+    the values over as frozen data.
     """
 
     player_name: str
@@ -83,6 +83,7 @@ class NominationContext:
     owned_epithet_displays: frozenset[str]
     fixed_displays: frozenset[str]
     event_logs: tuple[Any, ...] = ()
+    removed: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -231,6 +232,7 @@ def build_nomination_prompt(context: NominationContext) -> tuple[dict, dict]:
             full_title=context.full_title or "",
             recent_events=summarize_event_logs(context.event_logs),
             declined="、".join(context.declined) if context.declined else "無",
+            removed="、".join(context.removed) if context.removed else "無",
         ),
     }
     return system, user
