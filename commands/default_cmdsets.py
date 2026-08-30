@@ -67,6 +67,7 @@ from commands.localized import (
     CmdWho,
     ProjectXYZGridCmdSet,
 )
+from commands.lineage import CmdLineage
 from commands.scene import CmdEnterScene
 from commands.skip import CmdRest, CmdSleep, CmdWaitUntil
 from commands.talk import CmdsTalk
@@ -184,6 +185,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdLore)
         self.add(CmdBackground)
         self.add(CmdTitle)
+        self.add(CmdLineage)
         self.add(ProjectXYZGridCmdSet)
 
 
