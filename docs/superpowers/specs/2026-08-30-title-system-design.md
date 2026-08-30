@@ -310,10 +310,23 @@ title decline                         # 待決投票
 
 ## 11. Change 切分
 
-單一 change `title-system`，排在 `magic-power-trait-demotion`（刪除舊稱號帶）之
-後。內部提交順序：lore registry 加規則層寫入者（`world/rules/titles.py`：收藏、
-裝備、合成、採納、刪除）→ planner／授予路徑與公會位階配對 → read model、OOB 契
-約、webclient、browser class → 命令與文件 → 測試模組同 change 登記分片清單。
+原單一 change 依「單一工程師一個工作日」粒度拆為三個序列 change，全部排在
+`magic-power-static-rename`（刪除舊稱號帶）與 `magic-xp-engine-retirement` 之後：
+
+- **F `title-fixed-core`**（依賴 A、B；§5／§6／§6.5）：兩類稱號儲存與 lore
+  registry、`world/rules/titles.py` 規則層寫入者（收藏、裝備、合成、採納）、
+  `STARTER_EPITHET`「南門新客」與「F級冒險者」同一交易授予、D8 槽非空
+  ＋自動裝備、EventLog planner 授予、`title list`／`title equip`、read model 與
+  webclient、命令文件；新capability `title-system` 於此 change ADDED。
+- **G `title-epithet-nomination`**（依賴 F；§7）：投票流程（5→schema→撞名→top-3）、
+  單一 pending 投票、跨兩日邊界冷卻、`title accept`／`title decline`。
+- **H `title-codex-removal`**（依賴 F、G；§8＋§10）：codex read model＋視窗＋
+  `can_remove`、兩關兩步綽號刪除（`TITLE_EQUIPPED_UNREMOVABLE`／
+  `TITLE_LAST_EPITHET`）。
+
+嚴格序列 F → G → H（共享 `world/rules/titles.py` 與 lore registry；不平行）。
+每個 change 的新測試模組同 change 登記 `.github/evennia-shards.json`；玩家命令
+變更同 change 更新兩份命令文件與 `tests/test_command_docs.py`。
 
 ## 12. 測試
 

@@ -364,30 +364,64 @@ class LineageView:
 
 ## 13. D9 — Change 切分與 cutover 清單
 
-**Change 1 `magic-power-trait-demotion`**（對戰鬥行為零變更；刪掉舊成長寫入者）：
+原三塊切分改為八個「單一工程師一個工作日」粒度的 change，以縮短序列並讓每個
+change 可獨立驗證。全部一次性 cutover、零相容 shim（AGENTS.md）。依賴邊與平行
+批次見本節末。
 
-- `traits.py` keys；`lore/races.py` 與 tier 帶（四維）；`lore/magic.py` 稱號
-  registry 刪除。
-- 執行 §7 刪除對照表；過渡期使用門檻僅 ownership（系譜在 change 2 落地；兩個
-  change 都在任何 release 之前完成，無門檻的過渡態不會出貨）。
+**Change A `magic-power-static-rename`**（無前置；對戰鬥行為零變更）：
+
+- `traits.py` keys（`magic_power` 入 `STATIC_KEYS`）；`lore/races.py` 與 tier 帶
+  四維化（`magic_cap`／`starting_magic_level` 刪除、tier `magic_band` 載入驗證）；
+  `lore/magic.py` 稱號 registry、`MAGIC_RANK_BANDS`、`magic_rank_title()` 刪除
+  （僅顯示面；`MAGIC_TIER_*` 成本階資料不動）。
 - `combat.py`、`displayed_stats.py`、`equipment_effects.py`、
-  `character_creation.py`、`imports/`（schema、validate、example）、
-  `quests/scene_builder.py`、`buffs.py` 目標改名、skills registry 前綴改 key。
-- Webclient 鏡像與 vitest fixtures；文件部分僅當玩家可見措辭變更時動命令文件。
-- 聚焦測試：`world.rules`、`world.imports`、`world.skills`、`typeclasses`；除非測試
-  模組搬移，分片清單不動。
+  `character_creation.py`（sampler 刪除、`magic_power` 為第七條分配軸）、
+  `imports/`（schema、validate、example）、`quests/scene_builder.py`、
+  `buffs.py` 目標改名（`skill_practice`）、skills registry 前綴改 key
+  （`growth_rate:practice:<N>`；舊前綴令載入失敗）。
+- 過渡態：XP 寫入者照常運算，只是寫進已更名的 static 值；施法數值門檻不動。
+- Webclient 鏡像與 vitest fixtures（頭卡改公會位階專用列）；命令文件僅動玩家可見
+  措辭（look 列標籤 魔法階級→魔力、建立完成回聲改「初始魔力」）。
+- 聚焦測試：`world.rules`、`world.imports`、`world.skills`、`typeclasses`、
+  `commands`、`web.webclient`；無新測試模組，分片清單不動。
 
-**Change 2 `use-driven-progression`**（依賴 change 1）：
+**Change B `magic-xp-engine-retirement`**（依賴 A）：
 
-- `SkillDef.prerequisites`、載入驗證、反向邊上限；`can_use_skill` 接入
-  resolver/preview/選單；freeform 改錨。
-- 練習累計泛化（含物理技能）、考試隔離檢查、去重暫存器、上限飽和。
-- `skip ... practice <skill>` 命令與 `practice_settlement` stage 改名；匯入
-  auto-seed。
-- `lineage_query.py`、OOB 契約、webclient 面板、`lineage` 命令與兩份命令文件；新測
-  試模組於同一 change 登記進 `.github/evennia-shards.json`。
+- 執行 §7 刪除對照表：`magic_xp`、`magic_xp_per_level`、`accrue_magic_study`、
+  `_apply_level_ups`、`grant_combat_kill_xp`、`COMBAT_KILL_XP_TABLE`、
+  `element_mastery_rank` typed effect 與元素覆寫分支、effective-level 概念。
+- 時鐘 `magic_study` stage 改名 `practice_settlement`（零成長佔位、順序不動）；
+  過渡期使用門檻僅 ownership＋MP 負擔（系譜在 C 落地；兩者都在 release 前完成）。
+- 移除整個 `magic-level-progression` capability（六條需求）；
+  `player-combat-session` 擊殺 XP 敘述同步改寫。
 
-**Change 3 `title-system`**：見搭檔文件，獨立推進。
+**Change C `use-driven-skill-lineage`**（依賴 A、B；§8／§9／§10）：
+
+- `SkillDef.prerequisites`、載入驗證（無環、key 存在）、反向邊上限快取；
+  `can_use_skill` 取代所有使用門檻並接入 resolver／preview／選單。
+- 練習累計泛化（含物理技能、(actor, skill, target) 每 tick 去重、D6 上限飽和、
+  考試隔離）、freeform 階梯改錨熟練度、匯入 auto-seed 精確階級級聯。
+- 新 capability `skill-lineage` 吸收並 REMOVED `skill-proficiency-tracking`。
+
+**Change D `skill-lineage-panel`**（依賴 C；§12）：
+
+- `lineage_query.py` 四個唯讀鏡像與 OOB 契約、WebClient 大視窗、`lineage` telnet
+  命令、兩份命令文件；新測試模組同 change 登記 `.github/evennia-shards.json`。
+
+**Change E `declared-practice-skip`**（依賴 B、C；§11）：
+
+- `skip <hours> [practice <skill>]`、`PRACTICE_XP_PER_STUDY_HOUR`、穩定拒絕原因、
+  拒絕時零時鐘推進；`practice_settlement` 由佔位變為真正寫入者。
+
+**Change F／G／H 稱號三部曲**：見搭檔文件 §11。F `title-fixed-core`（依賴 A、B）、
+G `title-epithet-nomination`（依賴 F）、H `title-codex-removal`（依賴 F、G）。
+
+依賴邊：B→A；C→A,B；D→C；E→B,C；F→A,B；G→F；H→F,G。
+平行批次：[A] → [B] → [C ∥ F] → [D ∥ E ∥ G] → [H]。
+檔案衝突須序列化處：A∥B 共享 `test_progression.py`／`test_traits.py`／
+`test_status_query.py`（已由邊 B→A 序列化）；C∥E 共享 progression 練習程式碼
+（邊 E→C 已序列化）；F→G→H 嚴格序列（共享 `world/rules/titles.py` 與 lore
+registry）。
 
 ## 14. 測試
 
