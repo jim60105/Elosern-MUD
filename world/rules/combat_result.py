@@ -41,6 +41,9 @@ def settle_to_messages(result: dict[str, Any]) -> tuple[tuple[str, ...], str]:
     outcome = result["outcome"]
     if outcome in _ROUND_CODES:
         return lines, CONTINUE_MESSAGE
+    exam = result.get("exam")
+    if isinstance(exam, dict):
+        lines = (*lines, *tuple(exam.get("title_notifications", ())))
     return lines, terminal_outcome_message(outcome)
 
 

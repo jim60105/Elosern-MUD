@@ -24,6 +24,7 @@ class LoreSyncTests(EvenniaTestCase):
                 records.append(matches[0])
         return records
 
+    @covers_requirement("title-system::the-fixed-title-lore-registry-validates-and-syncs-idempotently")
     def test_sync_all_is_idempotent_and_complete(self):
         expected = sum(len(registry) for registry in _ALL_REGISTRIES.values())
 

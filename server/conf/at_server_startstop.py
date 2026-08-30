@@ -214,6 +214,12 @@ def at_server_start():
     sync_guild_economy()
     sync_guard_npc()
     sync_npc_schedules()
+    # The title event-effect planner derives fixed-title grants from committed
+    # actions; like the quest planner it must be registered before any player
+    # action resolves (idempotent).
+    from world.rules.titles import register_title_planner
+
+    register_title_planner()
     # Restore persisted combat sessions BEFORE wilderness population
     # reconciliation: a defeated population monster still referenced by a
     # committed session must not be deleted or respawned first

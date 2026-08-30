@@ -107,6 +107,10 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
         record has content. Entities without a persona (e.g. monsters) render
         no persona block, and the onboarding look beat is untouched (the blocks
         are part of the appearance, not of beat detection).
+        The composed full title (title-system D6) adds one ``稱號：…`` line
+        between the stats block and the persona block whenever the entity
+        occupies a title slot; an untitled entity — or one whose title state
+        is malformed — renders exactly the pre-change description.
         """
         desc = super().get_display_desc(looker, **kwargs)
         from world.rules.displayed_stats import display_stat_block
@@ -114,6 +118,11 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
         block = display_stat_block(self, looker=looker)
         if block:
             desc = f"{desc}\n{block}"
+        from world.rules.titles import safe_full_title
+
+        full_title = safe_full_title(self)
+        if full_title:
+            desc = f"{desc}\n稱號：{full_title}"
         persona_block = self.persona.flatten(
             ("personality", "life_story", "habit", "background")
         )

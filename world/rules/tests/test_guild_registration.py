@@ -120,7 +120,13 @@ class GuildRegistrationTests(EvenniaTestCase):
         first = self._register(staff=self.staff)
         self.player.db.disguised_stats = {"atk_phys": 88}
         second = self._register(staff=self.staff)
-        self.assertEqual(second, first)
+        # The stored record is preserved verbatim; only the (empty) grant
+        # notification channel differs, proving the repeat banks no title.
+        self.assertEqual(second["title_notifications"], [])
+        self.assertEqual(
+            {key: value for key, value in second.items() if key != "title_notifications"},
+            {key: value for key, value in first.items() if key != "title_notifications"},
+        )
         self.assertEqual(
             self.player.db.guild_registration["displayed_stats"]["atk_phys"],
             first["displayed_stats"]["atk_phys"],

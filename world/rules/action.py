@@ -130,10 +130,19 @@ class ActionResult:
     time_cost_seconds: int | None
     reason: RejectReason | None
     detail: str | None
+    # Player-facing notification lines staged by committed effects (e.g. the
+    # title planner's grant toasts). Delivered only after the OUTER settlement
+    # transaction commits — resolve() only returns them; callers emit.
+    notifications: tuple[str, ...] = ()
 
     @classmethod
-    def success(cls, event_log: EventLog, time_cost: int) -> "ActionResult":
-        return cls("success", event_log, time_cost, None, None)
+    def success(
+        cls,
+        event_log: EventLog,
+        time_cost: int,
+        notifications: tuple[str, ...] = (),
+    ) -> "ActionResult":
+        return cls("success", event_log, time_cost, None, None, notifications)
 
     @classmethod
     def rejected(
@@ -152,6 +161,10 @@ class PendingEffect:
     description: str
     surfaces: frozenset[str]
     apply: Callable[[], None]
+    # A player-facing notification line delivered (by the outer settlement
+    # boundary, never by the writer) only when this effect commits. ``None``
+    # stages nothing.
+    notify: str | None = None
 
 
 class UnsnapshottedSurfaceError(Exception):
@@ -169,6 +182,7 @@ SNAPSHOTTED_SURFACES = frozenset(
         "buffs",
         "skill_grants",
         "progression",
+        "titles",
         "battlefield",
         "quest_log",
         "instance_pin",
@@ -1890,6 +1904,8 @@ def _snapshot_entity_state(entity: Any) -> dict[str, Any]:
         "buffs": _attribute_snapshot(entity, "buffs"),
         "skill_grants": _attribute_snapshot(entity, "skill_grants"),
         "skill_proficiency": _attribute_snapshot(entity, "skill_proficiency"),
+        "title_collection": _attribute_snapshot(entity, "title_collection"),
+        "title_equipped": _attribute_snapshot(entity, "title_equipped"),
     }
 
 
@@ -1937,6 +1953,8 @@ def _restore_entity_state(entity: Any, snapshot: dict[str, Any]) -> None:
     _restore_attribute(entity, "buffs", snapshot["buffs"])
     _restore_attribute(entity, "skill_grants", snapshot["skill_grants"])
     _restore_attribute(entity, "skill_proficiency", snapshot["skill_proficiency"])
+    _restore_attribute(entity, "title_collection", snapshot["title_collection"])
+    _restore_attribute(entity, "title_equipped", snapshot["title_equipped"])
     entity.traits.trait_data = entity.attributes.get(
         "traits",
         default={},
@@ -1951,7 +1969,9 @@ def _is_battlefield_like(obj: Any) -> bool:
     return hasattr(obj, "fled") and hasattr(obj, "roster")
 
 
-_ENTITY_SURFACES = frozenset({"traits", "sexual", "buffs", "skill_grants", "progression"})
+_ENTITY_SURFACES = frozenset(
+    {"traits", "sexual", "buffs", "skill_grants", "progression", "titles"}
+)
 
 
 def _snapshot_touched(obj: Any, surfaces: frozenset[str]) -> dict[str, Any]:
@@ -2148,4 +2168,5 @@ class ActionResolver:
             # same-tick retry still accrues (rubber-duck DC3 finding).
             release_practice_claims(practice_claims)
             return ActionResult.rejected(failure.reason, failure.detail)
-        return ActionResult.success(event_log, time_cost)
+        notifications = tuple(effect.notify for effect in pending if effect.notify)
+        return ActionResult.success(event_log, time_cost, notifications)

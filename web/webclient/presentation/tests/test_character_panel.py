@@ -34,6 +34,7 @@ from web.webclient.presentation.character import (
     MAX_PASSIVE_ROWS,
     MAX_SLOT_CODE_POINTS,
     MAX_TRAIT_ROWS,
+    MAX_FULL_TITLE_CODE_POINTS,
     CharacterPanelError,
     validate_character,
 )
@@ -483,9 +484,9 @@ class CharacterSchemaTests(unittest.TestCase):
         with self.assertRaises(CharacterPanelError):
             validate_character(_valid_panel(schema_version=3))
         with self.assertRaises(CharacterPanelError):
-            validate_character(_valid_panel(schema_version=6))
-        with self.assertRaises(CharacterPanelError):
             validate_character(_valid_panel(schema_version="4"))
+        with self.assertRaises(CharacterPanelError):
+            validate_character(_valid_panel(schema_version=5))
         with self.assertRaises(CharacterPanelError):
             validate_character(_valid_panel(available=False))
         with self.assertRaises(CharacterPanelError):
@@ -1044,6 +1045,132 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             fallback["groups"][0]["skills"][0],
             {"key": "no_such_skill", "label": "no_such_skill"},
         )
+
+
+
+
+class CharacterFullTitleSchemaTests(unittest.TestCase):
+    """The optional ``full_title`` row: bounded, non-blank, absent when empty."""
+
+    def test_absent_field_is_accepted_and_never_synthesized(self):
+        normalized = validate_character(_valid_panel())
+        self.assertNotIn("full_title", normalized)
+
+    def test_a_valid_full_title_round_trips(self):
+        normalized = validate_character(
+            _valid_panel(full_title="F級冒險者　南門新客")
+        )
+        self.assertEqual(normalized["full_title"], "F級冒險者　南門新客")
+
+    def test_the_field_bound_matches_the_python_constant(self):
+        at_bound = "長" * MAX_FULL_TITLE_CODE_POINTS
+        self.assertEqual(
+            validate_character(_valid_panel(full_title=at_bound))["full_title"],
+            at_bound,
+        )
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(_valid_panel(full_title=at_bound + "長"))
+
+    def test_blank_non_string_and_null_forms_reject(self):
+        for bad in ("", "　", "   ", 7, 1.5, True, ["F級冒險者"], None):
+            with self.subTest(bad=bad), self.assertRaises(ProtocolValidationError):
+                validate_character(_valid_panel(full_title=bad))
+
+    def test_the_panel_stays_read_only_with_a_title(self):
+        # full_title joins the exact available field set; an unknown sibling
+        # of it is still rejected.
+        with self.assertRaises(ProtocolValidationError):
+            validate_character(_valid_panel(titles=["F級冒險者"]))
+
+
+class CharacterFullTitlePresenterTests(EvenniaTest):
+    """Both panels address the player by the one composed title."""
+
+    def setUp(self):
+        super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
+        self.player = create_object(PlayerCharacter, key="稱號面板測試")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.player.save()
+
+    def _character(self):
+        return build_production_registry().render("character", _context(self.player))
+
+    def _status(self):
+        return build_production_registry().render("status", _context(self.player))
+
+    def test_an_untitled_actor_omits_the_row_on_both_panels(self):
+        self.assertNotIn("full_title", self._character())
+        self.assertNotIn("full_title", self._status()["actor"])
+
+    @covers_requirement("title-system::narrative-consumers-compose-predicates-read-the-collection")
+    def test_a_titled_actor_shares_one_composed_title_on_both_panels(self):
+        from world.rules.titles import grant_starter_pair
+
+        grant_starter_pair(self.player)
+        character = self._character()
+        status = self._status()
+        self.assertEqual(character["full_title"], "F級冒險者　南門新客")
+        self.assertEqual(status["actor"]["full_title"], character["full_title"])
+
+    def test_a_fixed_only_actor_shows_the_registry_display(self):
+        from world.rules.titles import bank_fixed
+
+        bank_fixed(self.player, "g_s_rank", 1)
+        self.assertEqual(self._character()["full_title"], "S級傳說")
+
+    def test_a_corrupt_title_record_fails_the_panel_closed(self):
+        from world.rules.titles import grant_starter_pair
+
+        grant_starter_pair(self.player)
+        self.player.attributes.add("title_collection", "damaged")
+        self.assertFalse(self._character()["available"])
+        self.assertFalse(self._status()["available"])
+
+    def test_an_over_bound_composed_title_fails_the_panel_closed(self):
+        # The presenter validates its own payload; the read model must fail
+        # closed on a composed title past the wire bound (legacy/corrupt
+        # storage that no writer can create anymore) instead of serializing a
+        # panel the client validator would reject whole.
+        self.player.attributes.add(
+            "title_collection",
+            [
+                {
+                    "kind": "epithet",
+                    "display": "長" * (MAX_FULL_TITLE_CODE_POINTS + 1),
+                    "origin_quote": "超出傳輸上限的異名。",
+                    "granted_tick": 1,
+                }
+            ],
+        )
+        self.player.attributes.add(
+            "title_equipped", {"fixed": None, "epithet": "長" * (MAX_FULL_TITLE_CODE_POINTS + 1)}
+        )
+        self.assertFalse(self._character()["available"])
+        self.assertFalse(self._status()["available"])
+
+    def test_a_title_at_the_wire_bound_renders_on_both_panels(self):
+        at_bound = "長" * MAX_FULL_TITLE_CODE_POINTS
+        self.player.attributes.add(
+            "title_collection",
+            [
+                {
+                    "kind": "epithet",
+                    "display": at_bound,
+                    "origin_quote": "正好貼線上限的異名。",
+                    "granted_tick": 1,
+                }
+            ],
+        )
+        self.player.attributes.add(
+            "title_equipped", {"fixed": None, "epithet": at_bound}
+        )
+        self.assertEqual(self._character()["full_title"], at_bound)
+        self.assertEqual(self._status()["actor"]["full_title"], at_bound)
 
 
 if __name__ == "__main__":

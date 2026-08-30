@@ -4,7 +4,9 @@ import CharacterStatusDrawer from "../../components/CharacterStatusDrawer.vue";
 import {
   STATUS_PANEL_COMBAT_SAMPLE,
   STATUS_PANEL_SAMPLE,
+  STATUS_PANEL_TITLED_SAMPLE,
   CHARACTER_PANEL_SAMPLE,
+  CHARACTER_PANEL_TITLED_SAMPLE,
   CHARACTER_PANEL_UNDISGUISED_SAMPLE,
 } from "../../stories/fixtures.js";
 
@@ -22,7 +24,7 @@ import {
 // renders no doll and no wallet figure.
 
 const CHARACTER_UNAVAILABLE = {
-  schema_version: 5,
+  schema_version: 6,
   available: false,
   kind: "character",
   reason: { code: "no_puppet", message: "你已離開角色" },
@@ -263,5 +265,68 @@ describe("CharacterStatusDrawer", () => {
     expect(danger.text()).toBe("危險");
     const hpTile = w.get('[data-testid="character-status-drawer__vital--hp"]');
     expect(hpTile.text()).toContain("危險");
+  });
+});
+
+// title-system D6: the drawer body addresses the player by the composed full
+// title carried by the committed `character` panel. An untitled actor, a blank
+// row, or an unavailable `character` panel renders no line at all — never a
+// placeholder heading.
+describe("CharacterStatusDrawer full-title line", () => {
+  let wrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  function mountDrawer(props = {}) {
+    wrapper = mount(CharacterStatusDrawer, {
+      props: {
+        status: STATUS_PANEL_SAMPLE,
+        character: CHARACTER_PANEL_SAMPLE,
+        lowHp: false,
+        ...props,
+      },
+    });
+    return wrapper;
+  }
+
+  it("renders the composed title when the character panel carries one", () => {
+    const w = mountDrawer({
+      status: STATUS_PANEL_TITLED_SAMPLE,
+      character: CHARACTER_PANEL_TITLED_SAMPLE,
+    });
+    expect(w.get('[data-testid="character-status-drawer__full-title"]').text()).toBe(
+      "F級冒險者　南門新客",
+    );
+  });
+
+  it("omits the line entirely for an untitled actor", () => {
+    const w = mountDrawer();
+    expect(
+      w.find('[data-testid="character-status-drawer__full-title"]').exists(),
+    ).toBe(false);
+    expect(w.text()).not.toContain("稱號");
+  });
+
+  it("omits a blank title row instead of rendering an empty heading", () => {
+    const w = mountDrawer({
+      character: { ...CHARACTER_PANEL_TITLED_SAMPLE, full_title: "" },
+    });
+    expect(
+      w.find('[data-testid="character-status-drawer__full-title"]').exists(),
+    ).toBe(false);
+  });
+
+  it("renders no title while the character panel is unavailable, even with a titled status panel", () => {
+    const w = mountDrawer({
+      status: STATUS_PANEL_TITLED_SAMPLE,
+      character: CHARACTER_UNAVAILABLE,
+    });
+    expect(
+      w.find('[data-testid="character-status-drawer__full-title"]').exists(),
+    ).toBe(false);
   });
 });

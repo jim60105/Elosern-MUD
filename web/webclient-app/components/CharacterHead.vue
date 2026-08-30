@@ -7,7 +7,10 @@
 // the display name, the guild rank/merit line, the wallet, and the disguise
 // marker. The retired magic-rank ladder is not reconstructed client-side:
 // no magic-derived rank word appears in any form (magic-power-static-rename;
-// the title-system change line owns title display). No race, subrace,
+// the title-system change line owns title display). The composed full title
+// (`status.actor.full_title`) renders as the addressed name when present;
+// a pre-onboarding character (empty title) falls back to the plain name
+// (title-system D6 name fallback). No race, subrace,
 // class, or faction line: no such field exists in the `status` or
 // `character` payload, and none is rendered (not dimmed, not "未知", not
 // a placeholder). The wallet is the HUD's single persistent surface.
@@ -20,6 +23,8 @@ const props = defineProps({
 });
 
 const actorName = computed(() => props.status?.actor?.name ?? "");
+// The composed full title (fixed　epithet) or the plain name fallback.
+const displayName = computed(() => props.status?.actor?.full_title || actorName.value);
 const portrait = computed(() => portraitGlyph(actorName.value));
 
 // The magic_power trait row's current value is the only bounded numeric
@@ -44,7 +49,7 @@ const disguiseActive = computed(() => props.status?.disguise_active === true);
       </span>
     </div>
     <div class="meta">
-      <p class="name" data-testid="character-head__name">{{ actorName }}</p>
+      <p class="name" data-testid="character-head__name">{{ displayName }}</p>
       <p class="rank" data-testid="character-head__rank">
         <span class="rank-guild"
           >公會 {{ guild?.rank ?? "未加入公會" }} · 功績 {{ guild?.merit ?? 0 }}</span

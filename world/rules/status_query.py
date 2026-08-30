@@ -37,6 +37,7 @@ from world.skills.effects import StatMultiplyEffect
 from world.rules.sexual_state import PLEASURE_CONFIG, _LIFETIME_COUNTER_KEYS
 from world.rules.status_display import display_for
 from world.rules.stored_sexual_reads import StoredLevel
+from world.rules.titles import MAX_FULL_TITLE_CODE_POINTS, compose_full_title
 from world.skills.equipment import dual_wielding_from_storage
 from world.skills.handler import INNATE_SKILL_KEYS, INNATE_SKILL_ORDER
 from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillDef, SkillKind
@@ -197,6 +198,7 @@ class StatusReadModel:
 
     actor_name: str
     actor_identity: str
+    full_title: str
     location_label: str | None
     location_identity: str | None
     resources: dict[str, GaugeValue]
@@ -287,12 +289,32 @@ class CharacterReadModel:
     guild_rank: str | None
     guild_merit: int
     wallet: int
+    full_title: str
     intimate: IntimateView | None
     breakdown: tuple[StatBreakdownRow, ...]
 
 
 def _read_attribute(entity: Any, key: str, default=None, category: str | None = None) -> Any:
     return entity.attributes.get(key, default=default, category=category)
+
+
+def _read_full_title(entity: Any) -> str:
+    """Compose the live full title, fail-closed on malformed title state.
+
+    The empty string means no title (consumers fall back to the character's
+    own name); malformed persisted title state degrades the whole panel to
+    ``presentation_unavailable`` rather than fabricating a title.
+    """
+    try:
+        composed = compose_full_title(entity)
+    except Exception as error:
+        raise StatusQueryError(f"title state is malformed: {error}") from error
+    # The wire validator bounds this field; an over-long composed title is
+    # corrupt state and degrades the panel exactly like a malformed record
+    # instead of being serialized into a panel the client would reject whole.
+    if len(composed) > MAX_FULL_TITLE_CODE_POINTS:
+        raise StatusQueryError("composed full title exceeds the wire bound")
+    return composed
 
 
 def _require_gauge(data: dict[str, Any], key: str) -> GaugeValue:
@@ -682,6 +704,7 @@ def build_status_read_model(entity: Any) -> StatusReadModel:
     return StatusReadModel(
         actor_name=str(getattr(entity, "key", "?")),
         actor_identity=identity,
+        full_title=_read_full_title(entity),
         location_label=None if location is None else str(location.key),
         location_identity=None if location is None else str(location.pk),
         resources={key: assembly.gauges[key] for key in _GAUGE_KEYS},
@@ -1529,6 +1552,7 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
         guild_rank=getattr(entity, "guild_rank", None),
         guild_merit=_read_guild_merit(assembly.traits_data),
         wallet=_read_wallet(entity),
+        full_title=_read_full_title(entity),
         intimate=intimate,
         breakdown=build_stat_breakdown(entity, assembly),
     )

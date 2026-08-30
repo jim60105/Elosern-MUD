@@ -10,6 +10,8 @@ class GuildRank:
     reward_min_copper: int
     reward_max_copper: int | None
     description: str
+    # The paired fixed-title key (title-system D3); every rank row carries one.
+    title_key: str
 
 
 @dataclass(frozen=True)
@@ -22,13 +24,13 @@ class GuildBranch:
 
 
 GUILD_RANK_REGISTRY: dict[str, GuildRank] = {
-    "F": GuildRank("F", 1, 10, 100, "Simple collection and caravan escort tasks."),
-    "E": GuildRank("E", 2, 100, 500, "Low-tier monster hunts."),
-    "D": GuildRank("D", 3, 500, 5_000, "Party-based dungeon runs."),
-    "C": GuildRank("C", 4, 5_000, 50_000, "Work for an adventurer capable of acting alone."),
-    "B": GuildRank("B", 5, 50_000, 500_000, "High-difficulty commissions."),
-    "A": GuildRank("A", 6, 500_000, 5_000_000, "Top-tier human combat assignments."),
-    "S": GuildRank("S", 7, 5_000_000, None, "Legendary assignments beyond the human scale."),
+    "F": GuildRank("F", 1, 10, 100, "Simple collection and caravan escort tasks.", "g_f_rank"),
+    "E": GuildRank("E", 2, 100, 500, "Low-tier monster hunts.", "g_e_rank"),
+    "D": GuildRank("D", 3, 500, 5_000, "Party-based dungeon runs.", "g_d_rank"),
+    "C": GuildRank("C", 4, 5_000, 50_000, "Work for an adventurer capable of acting alone.", "g_c_rank"),
+    "B": GuildRank("B", 5, 50_000, 500_000, "High-difficulty commissions.", "g_b_rank"),
+    "A": GuildRank("A", 6, 500_000, 5_000_000, "Top-tier human combat assignments.", "g_a_rank"),
+    "S": GuildRank("S", 7, 5_000_000, None, "Legendary assignments beyond the human scale.", "g_s_rank"),
 }
 
 GUILD_BRANCH_REGISTRY: dict[str, GuildBranch] = {

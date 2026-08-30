@@ -2,8 +2,10 @@ import { h } from "vue";
 import CharacterHead from "../../components/CharacterHead.vue";
 import {
   CHARACTER_PANEL_SAMPLE,
+  CHARACTER_PANEL_TITLED_SAMPLE,
   STATUS_PANEL_COMBAT_SAMPLE,
   STATUS_PANEL_SAMPLE,
+  STATUS_PANEL_TITLED_SAMPLE,
 } from "../fixtures.js";
 
 // CharacterHead (H2, webclient-hud-02-status-islands, design D2/D3): the
@@ -93,5 +95,16 @@ export const LongNameEllipsize = {
       actor: { ...STATUS_PANEL_SAMPLE.actor, name: "艾倫·灰誓·拾荒者同盟·灰裔血脈" },
     },
     character: CHARACTER_PANEL_SAMPLE,
+  },
+};
+
+// title-system D6: with a composed full title on the committed status panel,
+// the head card addresses the player by 稱號　異名 while the glyph portrait
+// keeps deriving from the character's own name.
+export const TitledFullTitle = {
+  render: renderHead,
+  args: {
+    status: STATUS_PANEL_TITLED_SAMPLE,
+    character: CHARACTER_PANEL_TITLED_SAMPLE,
   },
 };

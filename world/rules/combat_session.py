@@ -1102,6 +1102,7 @@ def _submit_request(
 
     notifications: tuple[str, ...] = ()
     item_journals: list[Any] = []
+    grant_notifications: list[str] = []
     simulated, nonlethal_keys = _session_policy(battlefield, record)
     dedupe_before = snapshot_practice_dedupe()
     try:
@@ -1137,6 +1138,7 @@ def _submit_request(
                     simulated=simulated,
                     nonlethal_keys=nonlethal_keys,
                     journal_sink=item_journals,
+                    notifications_sink=grant_notifications,
                 )
                 logs = result.event_logs
                 gained = result.rounds_elapsed
@@ -1149,11 +1151,13 @@ def _submit_request(
                     simulated=simulated,
                     nonlethal_keys=nonlethal_keys,
                     journal_sink=item_journals,
+                    notifications_sink=grant_notifications,
                 )
                 gained = 1
 
             notifications = _scan_friendly_fire(actor, battlefield, logs)
             notifications += _scan_sexual_coercion(actor, battlefield, logs)
+            notifications += tuple(grant_notifications)
 
             knocked = _knocked_out_ids(logs, battlefield)
             new_record = replace(

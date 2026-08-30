@@ -93,7 +93,7 @@ function longLabels() {
 
 function unavailableCharacter() {
   return {
-    schema_version: 5,
+    schema_version: 6,
     available: false,
     kind: "character",
     reason: { code: "no_puppet", message: "你已離開角色" },

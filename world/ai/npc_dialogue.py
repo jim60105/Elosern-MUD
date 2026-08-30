@@ -74,6 +74,11 @@ MAX_RELATION_DELTA = 10
 # step across the boundary.
 MAX_INTENT_KEY_LENGTH = 64
 
+# Identity-injection bounds (title-system D6): at most five banked entries
+# ride along, each field capped by ``_cap_string`` like every other prompt
+# field. The composed full title is the always-on ``epithet`` section.
+MAX_IDENTITY_ENTRIES = 5
+
 # The eight whitelisted intent kinds (design §7.4).
 NPC_INTENT_KINDS = (
     "give_item",
@@ -385,6 +390,27 @@ def _cap_value(value: Any) -> Any:
     return str(value)
 
 
+def _bounded_identity_entries(entries: Any) -> list[dict[str, str]]:
+    """Cap banked identity rows deterministically: first five valid ``{display, basis}``."""
+    if not isinstance(entries, (list, tuple)):
+        return []
+    bounded: list[dict[str, str]] = []
+    for entry in entries:
+        if len(bounded) == MAX_IDENTITY_ENTRIES:
+            break
+        if not isinstance(entry, dict):
+            continue
+        display = entry.get("display")
+        basis = entry.get("basis")
+        if not isinstance(display, str) or not display.strip():
+            continue
+        row = {"display": _cap_string(display)}
+        if isinstance(basis, str) and basis.strip():
+            row["basis"] = _cap_string(basis)
+        bounded.append(row)
+    return bounded
+
+
 def _bounded_memory(memory: Any) -> list[str]:
     """Cap the chat-memory window deterministically with a truncation marker.
 
@@ -474,6 +500,13 @@ def build_npc_dialogue_prompt(
     ``ensure_ascii=False``. An optional ``affinity_context`` block
     (``player.affinity`` carrying the true value, cap, and stage name) is
     injected through the same per-field bounds; ``None`` omits the block.
+    Title context (title-system D6) rides in the same per-field bounds: a
+    non-empty ``player_context["epithet"]`` becomes the named ``epithet``
+    section the NPC addresses the player by, and
+    ``player_context["identity_entries"]`` contributes at most
+    ``MAX_IDENTITY_ENTRIES`` banked ``{display, basis}`` rows. Absent or empty
+    title data omits both sections entirely — never a placeholder — and keeps
+    the byte-identical pre-change payload.
     Optional persona blocks (read-only context, already bounded by the
     PersonaStore contract) feed the speaking NPC's flattened block into the
     system message and the speaking player's flattened block as
@@ -487,6 +520,12 @@ def build_npc_dialogue_prompt(
         "name": _cap_string(str(player_context.get("name", ""))),
         "disguised_stats": _cap_value(player_context.get("disguised_stats", {})),
     }
+    epithet = player_context.get("epithet")
+    if isinstance(epithet, str) and epithet.strip():
+        player["epithet"] = _cap_string(epithet)
+    identity_entries = _bounded_identity_entries(player_context.get("identity_entries"))
+    if identity_entries:
+        player["identity_entries"] = identity_entries
     if affinity_context is not None:
         player["affinity"] = _cap_value(dict(affinity_context))
     if player_persona is not None:

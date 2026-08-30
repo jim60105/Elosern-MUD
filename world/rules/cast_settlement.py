@@ -61,6 +61,8 @@ _ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("buffs", None),
     ("skill_grants", None),
     ("skill_proficiency", None),
+    ("title_collection", None),
+    ("title_equipped", None),
 )
 
 
@@ -460,4 +462,7 @@ def settle_out_of_combat_cast(
         if coercion_restore is not None:
             coercion_restore.restore(request.actor)
         raise
-    return CastSettlement(result, events, notifications)
+    # The title planner's grant toasts ride the same post-commit delivery
+    # channel as the coercion notices: the caller emits every line only after
+    # the outer transaction commits, so a rolled-back cast never notifies.
+    return CastSettlement(result, events, result.notifications + notifications)

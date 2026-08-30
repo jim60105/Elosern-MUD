@@ -173,7 +173,7 @@ export const SUGGESTIONS_UNAVAILABLE_SAMPLE = { status: "unavailable" };
 // combat-modifier condition carrying its exact applied modifiers, an active
 // disguise, and no combat session.
 export const STATUS_PANEL_SAMPLE = {
-  schema_version: 1,
+  schema_version: 2,
   available: true,
   actor: {
     name: "艾倫·灰誓",
@@ -208,6 +208,16 @@ export const STATUS_PANEL_SAMPLE = {
   combat: null,
 };
 
+// A titled variant: the HUD head renders the composed full title as the
+// addressed name when `actor.full_title` is present (title-system D6).
+export const STATUS_PANEL_TITLED_SAMPLE = {
+  ...STATUS_PANEL_SAMPLE,
+  actor: {
+    ...STATUS_PANEL_SAMPLE.actor,
+    full_title: "F級冒險者　南門新客",
+  },
+};
+
 // The same actor mid-combat (guild examination), for the combat story.
 export const STATUS_PANEL_COMBAT_SAMPLE = {
   ...STATUS_PANEL_SAMPLE,
@@ -237,7 +247,7 @@ export const STATUS_PANEL_MINIMAL_SAMPLE = {
   combat: null,
 };
 
-// The committed `character` v5 payload for the same actor: all eight
+// The committed `character` v6 payload for the same actor: all eight
 // breakdown trait rows — gauges carry a non-null max with `effective == max`
 // (the maximum the layers decompose), statics/counters carry a null max with
 // `current == effective` — each with its server-computed `layers` in payload
@@ -251,7 +261,7 @@ export const STATUS_PANEL_MINIMAL_SAMPLE = {
 // test's serialized sample (web/webclient/presentation/tests/
 // test_character_panel.py); reviewers diff both when either changes.
 export const CHARACTER_PANEL_SAMPLE = {
-  schema_version: 5,
+  schema_version: 6,
   available: true,
   kind: "character",
   traits: [
@@ -400,6 +410,10 @@ export const CHARACTER_PANEL_SAMPLE = {
 // The same actor without a disguise, no guild, no persona background — the
 // honest empty-state story (displayed list must be empty, rank → 未加入公會,
 // persona renders nothing).
+export const CHARACTER_PANEL_TITLED_SAMPLE = {
+  ...CHARACTER_PANEL_SAMPLE,
+  full_title: "F級冒險者　南門新客",
+};
 export const CHARACTER_PANEL_UNDISGUISED_SAMPLE = {
   ...CHARACTER_PANEL_SAMPLE,
   // The honest empty state: no worn breakdown source, so every layer list

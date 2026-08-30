@@ -157,12 +157,31 @@ class LLMNPC(NPC):
             "location": self.location.key if self.location else "",
         }
 
-    def _player_context(self, character: Any) -> dict[str, Any]:
-        """Build the plain-data player identity plus what the NPC perceives."""
-        return {
+    def _player_context(self, character: Any, *, identity_detail: bool = False) -> dict[str, Any]:
+        """Build the plain-data player identity plus what the NPC perceives.
+
+        The composed full title (title-system D6) rides as the named
+        ``epithet`` section whenever a slot is occupied; an empty title
+        omits the section entirely (never a placeholder). ``identity_detail``
+        additionally attaches up to five banked epithets with their basis
+        quotes for exchanges where the NPC is being told who the player is.
+        Malformed title state degrades to no section rather than breaking
+        the talk.
+        """
+        from world.rules.titles import safe_full_title, safe_title_context_entries
+
+        context: dict[str, Any] = {
             "name": character.key or "",
             "disguised_stats": dict(character.db.disguised_stats or {}),
         }
+        full_title = safe_full_title(character)
+        if full_title:
+            context["epithet"] = full_title
+        if identity_detail:
+            entries = safe_title_context_entries(character)
+            if entries:
+                context["identity_entries"] = list(entries)
+        return context
 
     def _affinity_context(self, character: Any) -> dict[str, Any] | None:
         """The NPC's own affinity context for ``character``, read-only.
@@ -244,7 +263,9 @@ class LLMNPC(NPC):
             return ""
 
     @defer.inlineCallbacks
-    def run_npc_exchange(self, speech: str, character: Any, client: Any, *, reactor=None):
+    def run_npc_exchange(
+        self, speech: str, character: Any, client: Any, *, reactor=None, identity_detail: bool = False
+    ):
         """Run one guarded dialogue exchange without applying anything.
 
         Performs the same steps ``at_talked_to`` used to: rejects an explicit
@@ -266,6 +287,9 @@ class LLMNPC(NPC):
                 construction or transport work.
             reactor: Optional Twisted reactor for the thinking timer; tests
                 inject ``twisted.internet.task.Clock`` for determinism.
+            identity_detail: When ``True`` the prompt also carries up to five
+                banked epithets with their basis quotes; the composed full
+                title (``epithet``) is always included when a slot is occupied.
 
         Returns:
             A Deferred resolving to a frozen :class:`DialogueExchangeResult`
@@ -304,7 +328,7 @@ class LLMNPC(NPC):
             reply = yield generate_npc_reply(
                 client,
                 npc_context=self._npc_context(),
-                player_context=self._player_context(character),
+                player_context=self._player_context(character, identity_detail=identity_detail),
                 memory=self._chat_lines(character),
                 affinity_context=self._affinity_context(character),
                 npc_persona=npc_persona,
@@ -332,7 +356,9 @@ class LLMNPC(NPC):
         resolves the reply, the degraded outcome maps to the authored greeting
         or silence, and a verified intent is applied deterministically. This
         is a thin composition of :meth:`run_npc_exchange` plus presentation
-        and intent application.
+        and intent application. Being addressed face to face is the identity
+        detail case: the NPC is told who the speaker is, so the banked
+        epithets ride along.
 
         Args:
             speech: The player's line.
@@ -374,7 +400,9 @@ class LLMNPC(NPC):
                 "at_talked_to requires an injected client; got None"
             )
 
-        result = yield self.run_npc_exchange(speech, character, client, reactor=reactor)
+        result = yield self.run_npc_exchange(
+            speech, character, client, reactor=reactor, identity_detail=True
+        )
         if result.degraded:
             from world.rules.dialogue import greeting_for
 

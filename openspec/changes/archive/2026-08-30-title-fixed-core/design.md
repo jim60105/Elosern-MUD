@@ -53,7 +53,7 @@ non-empty `hint_zh`, predicate references resolve to existing registry faces.
 
 ### DF4: guild pairing is transaction-bound, starter epithet is a normal entry
 
-`register_guild_member`'s existing atomic transaction grants「F級冒險者」(fixed,
+`register_adventurer`'s existing atomic transaction grants「F級冒險者」(fixed,
 D3) plus the registry constant `STARTER_EPITHET`「南門新客」(a plain epithet
 entry) — deterministic, no planner, no LLM; duplicate registration no-ops via
 the two existing dedupe rules. E→S grants ride the promotion transaction
@@ -68,6 +68,22 @@ occupied slots just bank the entry. There is no unequip path, hence no
 `title clear` command. The only empty-slot window is before guild registration
 (character created, not yet registered). Tests assert no mutator sequence
 reaches "collection non-empty and slot empty".
+
+### DF6: writers validate, readers contain, producers bound
+
+The bank writers are the only persistent mutators, so they validate every
+input before any write (registry-membership fixed keys, non-blank bounded
+epithet strings, integer ticks) and fail with `TitleDataError` leaving state
+untouched — malformed entries can never be persisted into an occupied slot to
+poison later strict reads. Predicate reads of foreign subsystems normalize
+malformed storage to `TitleDataError`, and the planner's per-row guard means a
+corrupted skills/proficiency record skips only its own row; a title lookup
+never rejects a player action. The composed full title is bounded at the
+producer: registry displays cap at 63 code points and epithet storage at 64
+(composing to exactly the 128-code-point wire bound with the separator), and
+the read model fails the panel closed past 128 so a legacy/corrupt record can
+never serialize a payload the client validator would reject whole. The
+registry is published as an immutable mapping proxy.
 
 ## Risks
 
