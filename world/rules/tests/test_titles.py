@@ -12,6 +12,7 @@ delete/unequip mutator exists anywhere in the module or its command.
 
 from tools.spec_traceability import covers_requirement
 
+import ast
 import functools
 import inspect
 from copy import deepcopy
@@ -49,14 +50,18 @@ from world.rules.guild import register_adventurer
 from world.rules.titles import (
     DECLINED_LOG_KEY,
     MAX_DECLINE_RECORDS,
+    MAX_REMOVAL_RECORDS,
     MAX_TITLE_ENTRIES,
     PENDING_BALLOT_KEY,
+    REMOVALS_LOG_KEY,
     TITLE_COLLECTION_KEY,
     TITLE_EQUIPPED_KEY,
     TitleBallotError,
     TitleBallotReason,
     TitleDataError,
     TitleEquipError,
+    TitleRemovalError,
+    TitleRemovalReason,
     accept_epithet,
     bank_epithet,
     bank_fixed,
@@ -69,6 +74,7 @@ from world.rules.titles import (
     declined_digest,
     equip_epithet,
     equip_fixed,
+    epithet_removal_gate,
     fixed_display_name,
     grant_rank_title,
     grant_starter_pair,
@@ -80,6 +86,9 @@ from world.rules.titles import (
     read_pending_ballot,
     read_title_state,
     register_title_planner,
+    remove_epithet,
+    removal_digest,
+    removal_records,
     safe_full_title,
     safe_pending_ballot,
     title_context_entries,
@@ -476,10 +485,12 @@ class TitleStateTests(EvenniaTest):
                 title_context_entries(self.entity, limit=bad_limit)
 
     @covers_requirement("title-system::slot-non-empty-is-an-invariant-with-auto-equip-and-no-unequip", "title-system::title-state-is-a-two-kind-collection-and-a-two-slot-equip-record")
-    def test_module_exposes_no_delete_or_unequip_mutator(self):
+    def test_module_exposes_epithet_removal_as_the_only_delete_surface(self):
+        # title-codex-removal tightened this pin from "no delete mutator at
+        # all" to "exactly ONE delete surface": the epithet removal family.
+        # Every other deletion/undress name stays forbidden.
         forbidden = (
             "clear",
-            "remove",
             "delete",
             "unequip",
             "unbank",
@@ -488,16 +499,28 @@ class TitleStateTests(EvenniaTest):
             "forget",
             "reset",
         )
+        allowed_removal_family = {
+            "remove_epithet",
+            "epithet_removal_gate",
+            "removal_records",
+            "removal_digest",
+            "TitleRemovalError",
+            "TitleRemovalReason",
+        }
         defined = {
             name
             for name, member in vars(titles_module).items()
             if not name.startswith("_") and callable(member)
         }
         offenders = {
-            name for name in defined for word in forbidden if word in name.lower()
+            name
+            for name in defined
+            for word in (*forbidden, "remove", "removal")
+            if word in name.lower()
         }
-        self.assertEqual(offenders, set())
-        # The command surface is swap-only too: no `title clear`, no unequip verb.
+        self.assertEqual(offenders, allowed_removal_family)
+        # The command surface mirrors it: a `remove` verb exists, and no
+        # other deletion/undress word appears anywhere in the command.
         from commands import title as title_command
 
         methods = {
@@ -508,12 +531,97 @@ class TitleStateTests(EvenniaTest):
             if not name.startswith("_")
         }
         offenders = {
-            name for name in methods for word in forbidden if word in name.lower()
+            name
+            for name in methods
+            for word in (*forbidden, "remove")
+            if word in name.lower()
         }
         self.assertEqual(offenders, set())
         source = inspect.getsource(title_command.CmdTitle)
         for word in ("clear", "unequip", "卸下"):
             self.assertNotIn(word, source)
+        self.assertIn("remove", source)
+
+    def test_removal_source_structurally_preserves_equipment_and_fixed(self):
+        # Body-level AST pin (complements the name-level scan): the sole
+        # delete path writes the EQUIPPED record back unchanged and its
+        # comprehension filters only epithet rows — no fixed-kind token,
+        # no assignment to the slots. The command dispatcher mirrors this:
+        # ``parts[1]`` is never gated on ``fixed``, so a bare
+        # ``title remove fixed …`` falls through to usage.
+        tree = ast.parse(inspect.getsource(titles_module))
+        fn = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "remove_epithet"
+        )
+        writes = [
+            node
+            for node in ast.walk(fn)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "_write_title_state"
+        ]
+        self.assertEqual(len(writes), 1)
+        self.assertEqual(ast.unparse(writes[0].args[2]), "equipped")
+        stores = [
+            target
+            for node in ast.walk(fn)
+            if isinstance(node, ast.Assign)
+            for target in node.targets
+            if isinstance(target, ast.Name) and target.id == "equipped"
+        ]
+        self.assertEqual(stores, [])
+        # Structural (not source-text): ast.unparse would emit a fixed-kind
+        # literal as 'fixed', so a text scan for the double-quoted form would
+        # be vacuous. Assert on the constant VALUES instead — no "fixed" kind
+        # string appears anywhere in the sole delete path — and positively
+        # pin that the one collection-filter compares kind ONLY to the
+        # epithet marker.
+        literal_values = {
+            node.value
+            for node in ast.walk(fn)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+        self.assertNotIn("fixed", literal_values)
+        self.assertNotIn(
+            "_FIXED_KIND",
+            {node.id for node in ast.walk(fn) if isinstance(node, ast.Name)},
+        )
+        kind_comparisons = {
+            ast.unparse(node.comparators[0])
+            for node in ast.walk(fn)
+            if isinstance(node, ast.Compare)
+            and ast.unparse(node.left) in ('entry["kind"]', "entry['kind']")
+        }
+        self.assertEqual(kind_comparisons, {"_EPITHET_KIND"})
+        # Non-vacuity: the IDENTICAL detector (every string constant's value)
+        # catches a fixed-kind mutant — proving the pin above can actually
+        # fire, unlike a source-text scan for '"fixed"' that ast.unparse's
+        # single-quote canonicalization would render always-green.
+        mutant_fn = ast.parse(
+            "def f(collection):\n"
+            "    return [e for e in collection if e['kind'] == 'fixed']\n"
+        ).body[0]
+        mutant_literals = {
+            node.value
+            for node in ast.walk(mutant_fn)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+        self.assertIn("fixed", mutant_literals)
+
+        from commands import title as title_command
+
+        command_tree = ast.parse(inspect.getsource(title_command))
+        gated = {
+            comparator.value
+            for node in ast.walk(command_tree)
+            if isinstance(node, ast.Compare)
+            and ast.unparse(node.left) == "parts[1].lower()"
+            for comparator in node.comparators
+            if isinstance(comparator, ast.Constant)
+        }
+        self.assertEqual(gated, {"epithet"})
 
 
 class TitlePredicateTests(EvenniaTest):
@@ -863,6 +971,34 @@ class TitleCommitRollbackTests(EvenniaTest):
     def test_a_successful_commit_grants_once(self):
         _commit([self._bank_effect("g_f_rank")])
         self.assertEqual(banked_fixed_keys(self.actor), ("g_f_rank",))
+
+    def test_failed_commit_restores_the_removal_log_surface(self):
+        # The durable removal log is registered in the commit-window entity
+        # snapshot: a failed commit restores it byte-identically alongside
+        # the title attributes (no orphaned removal record).
+        bank_epithet(self.actor, "南門新客", "初入南門。", 1)
+        bank_epithet(self.actor, "待放之名", "舊事蹟。", 2)
+        remove_epithet(self.actor, "待放之名")
+        before_log = deepcopy(self.actor.attributes.get(REMOVALS_LOG_KEY))
+        self.assertTrue(self.actor.attributes.has(REMOVALS_LOG_KEY))
+
+        def mutate_removals():
+            self.actor.attributes.add(
+                REMOVALS_LOG_KEY, [{"tick": 999, "display": "注入之名"}]
+            )
+
+        effects = [
+            PendingEffect(
+                self.actor,
+                "removal-log-write",
+                frozenset({"titles"}),
+                mutate_removals,
+            ),
+            self._raising_effect(),
+        ]
+        with self.assertRaises(CommitFailed):
+            _commit(effects)
+        self.assertEqual(self.actor.attributes.get(REMOVALS_LOG_KEY), before_log)
 
 
 class TitleCastGrantSettlementTests(_CastSettlementTestCase):
@@ -1389,3 +1525,220 @@ def get_world_clock_tick() -> int:
     from world.rules.clock import get_world_clock
 
     return get_world_clock().tick
+
+
+class EpithetRemovalRulesTests(EvenniaTest):
+    """The sole delete path: gate precedence, the transactional writer, and
+    the bounded durable removal log (title-codex-removal task 4.2)."""
+
+    def setUp(self):
+        super().setUp()
+        self.entity = create_object(PlayerCharacter, key="removal-holder")
+
+    def _bank_pair(self):
+        """Starter pair plus one removable epithet at a pinned tick."""
+        grant_starter_pair(self.entity)
+        bank_epithet(self.entity, "破城先鋒", "率先破門。", 500)
+
+    def test_gate_precedence_unknown_then_last_then_equipped(self):
+        # Unknown before anything: no epithets at all, fixed keys, blanks,
+        # and non-strings all read TARGET_UNKNOWN.
+        grant_starter_pair(self.entity)
+        for target in (" nonexistent", "g_f_rank", "", None, 7, True, ["破城先鋒"]):
+            with self.subTest(target=target):
+                self.assertIs(
+                    epithet_removal_gate(self.entity, target),
+                    TitleRemovalReason.TARGET_UNKNOWN,
+                )
+        self.assertIs(
+            epithet_removal_gate(self.entity, "破城先鋒"),
+            TitleRemovalReason.TARGET_UNKNOWN,
+        )
+        # Sole epithet (necessarily equipped by D8) reads LAST, not EQUIPPED.
+        self.assertIs(
+            epithet_removal_gate(self.entity, "南門新客"),
+            TitleRemovalReason.LAST_EPITHET,
+        )
+        # With two epithets the equipped one reads EQUIPPED, the other passes.
+        bank_epithet(self.entity, "破城先鋒", "率先破門。", 500)
+        self.assertIs(
+            epithet_removal_gate(self.entity, "南門新客"),
+            TitleRemovalReason.EQUIPPED_UNREMOVABLE,
+        )
+        self.assertIsNone(epithet_removal_gate(self.entity, "破城先鋒"))
+        # Swapping moves the verdict, never the precedence.
+        equip_epithet(self.entity, "破城先鋒")
+        self.assertIsNone(epithet_removal_gate(self.entity, "南門新客"))
+        self.assertIs(
+            epithet_removal_gate(self.entity, "破城先鋒"),
+            TitleRemovalReason.EQUIPPED_UNREMOVABLE,
+        )
+        # A malformed collection fails closed through the strict read.
+        self.entity.attributes.add(TITLE_COLLECTION_KEY, "not-a-list")
+        with self.assertRaises(TitleDataError):
+            epithet_removal_gate(self.entity, "破城先鋒")
+
+    def test_gated_calls_raise_stable_reasons_without_touching_state(self):
+        self._bank_pair()
+        before = read_title_state(self.entity)
+        for target, reason in (
+            ("不存在", TitleRemovalReason.TARGET_UNKNOWN),
+            ("g_f_rank", TitleRemovalReason.TARGET_UNKNOWN),
+            ("南門新客", TitleRemovalReason.EQUIPPED_UNREMOVABLE),
+        ):
+            with self.subTest(target=target):
+                with self.assertRaises(TitleRemovalError) as caught:
+                    remove_epithet(self.entity, target)
+                self.assertIs(caught.exception.reason, reason)
+                self.assertEqual(read_title_state(self.entity), before)
+                self.assertEqual(removal_records(self.entity), ())
+
+    def test_successful_removal_shrinks_by_one_and_writes_the_log(self):
+        self._bank_pair()
+        before_collection, before_equipped = read_title_state(self.entity)
+        before_serialized = (
+            deepcopy(self.entity.attributes.get(TITLE_COLLECTION_KEY)),
+            deepcopy(self.entity.attributes.get(TITLE_EQUIPPED_KEY)),
+        )
+        with patch("world.rules.titles.get_world_clock", return_value=WorldClock(900)):
+            event_log = remove_epithet(self.entity, "破城先鋒")
+        collection, equipped = read_title_state(self.entity)
+        # Exactly one entry gone; the OTHER entry is byte-identical.
+        self.assertEqual(len(collection), len(before_collection) - 1)
+        self.assertEqual(collection, before_serialized[0][: len(collection)])
+        # Slots are written back UNCHANGED (a removal can never orphan one).
+        self.assertEqual(equipped, before_equipped)
+        self.assertEqual(
+            self.entity.attributes.get(TITLE_EQUIPPED_KEY), before_serialized[1]
+        )
+        # The durable log gained exactly the newest-first {tick, display}.
+        records = removal_records(self.entity)
+        self.assertEqual(records, ({"tick": 900, "display": "破城先鋒"},))
+        # The EventLog is renderable and names the display.
+        self.assertEqual(event_log.entries[0].kind, "title_epithet_removed")
+        self.assertEqual(
+            event_log.entries[0].data, {"display": "破城先鋒", "tick": 900}
+        )
+        self.assertIn("放下了異名：破城先鋒", render_plain_text(event_log))
+
+    def test_swap_then_delete_keeps_both_slots_intact(self):
+        self._bank_pair()
+        equip_epithet(self.entity, "破城先鋒")
+        remove_epithet(self.entity, "南門新客")
+        _collection, equipped = read_title_state(self.entity)
+        self.assertEqual(
+            equipped, {"fixed": "g_f_rank", "epithet": "破城先鋒"}
+        )
+        self.assertEqual(
+            [entry["display"] for entry in banked_epithets(self.entity)],
+            ["破城先鋒"],
+        )
+
+    def test_writer_failure_restores_all_three_attributes(self):
+        self._bank_pair()
+        before = (
+            deepcopy(self.entity.attributes.get(TITLE_COLLECTION_KEY)),
+            deepcopy(self.entity.attributes.get(TITLE_EQUIPPED_KEY)),
+            self.entity.attributes.has(REMOVALS_LOG_KEY),
+        )
+
+        def explode(key, value, **kwargs):
+            if key == REMOVALS_LOG_KEY:
+                raise RuntimeError("db failure")
+
+        with patch.object(
+            self.entity.attributes, "add", side_effect=explode
+        ):
+            with self.assertRaises(RuntimeError):
+                remove_epithet(self.entity, "破城先鋒")
+        self.assertEqual(
+            self.entity.attributes.get(TITLE_COLLECTION_KEY), before[0]
+        )
+        self.assertEqual(
+            self.entity.attributes.get(TITLE_EQUIPPED_KEY), before[1]
+        )
+        self.assertEqual(
+            self.entity.attributes.has(REMOVALS_LOG_KEY), before[2]
+        )
+        # One retry after the fault completes exactly once.
+        with patch("world.rules.titles.get_world_clock", return_value=WorldClock(901)):
+            remove_epithet(self.entity, "破城先鋒")
+        self.assertEqual(
+            [entry["display"] for entry in banked_epithets(self.entity)],
+            ["南門新客"],
+        )
+        self.assertEqual(
+            removal_records(self.entity),
+            ({"tick": 901, "display": "破城先鋒"},),
+        )
+
+    def test_removal_log_is_bounded_newest_first(self):
+        grant_starter_pair(self.entity)
+        previous = "南門新客"
+        for index in range(1, 6):
+            display = f"異名{index}"
+            bank_epithet(self.entity, display, f"事蹟{index}。", 100 * index)
+            equip_epithet(self.entity, display)
+            # The previously equipped epithet is now unequipped (and the
+            # collection holds at least two) → removable.
+            with patch(
+                "world.rules.titles.get_world_clock",
+                return_value=WorldClock(1000 + index),
+            ):
+                remove_epithet(self.entity, previous)
+            previous = display
+        records = removal_records(self.entity)
+        self.assertEqual(len(records), MAX_REMOVAL_RECORDS)
+        self.assertEqual(records[0], {"tick": 1005, "display": "異名4"})
+        self.assertEqual(records[1], {"tick": 1004, "display": "異名3"})
+        self.assertEqual(records[2], {"tick": 1003, "display": "異名2"})
+
+    def test_removed_display_is_renomable_and_digests_softly(self):
+        self._bank_pair()
+        with patch("world.rules.titles.get_world_clock", return_value=WorldClock(900)):
+            remove_epithet(self.entity, "破城先鋒")
+        # The live-collection collision filter no longer blocks the name.
+        self.assertNotIn("破城先鋒", owned_epithet_displays(self.entity))
+        self.assertTrue(
+            bank_epithet(self.entity, "破城先鋒", "再次破門。", 950)
+        )
+        # The digest is prompt context ONLY, never a filter rule.
+        self.assertEqual(removal_digest(self.entity), ("破城先鋒",))
+
+    def test_digest_dedupes_and_degrades_on_malformed_history(self):
+        grant_starter_pair(self.entity)
+        bank_epithet(self.entity, "甲名", "甲事蹟。", 100)
+        bank_epithet(self.entity, "乙名", "乙事蹟。", 200)
+        equip_epithet(self.entity, "乙名")
+        remove_epithet(self.entity, "甲名")
+        # Force a duplicate display record directly (same name, older tick).
+        history = list(self.entity.attributes.get(REMOVALS_LOG_KEY))
+        self.entity.attributes.add(
+            REMOVALS_LOG_KEY,
+            [*history, {"tick": 50, "display": "甲名"}],
+        )
+        digest = removal_digest(self.entity)
+        self.assertEqual(len(digest), len(set(digest)))
+        self.assertEqual(digest, ("甲名",))
+        # Malformed history degrades the digest to empty (prompt context only).
+        self.entity.attributes.add(REMOVALS_LOG_KEY, "not-a-list")
+        self.assertEqual(removal_digest(self.entity), ())
+        with self.assertRaises(TitleDataError):
+            removal_records(self.entity)
+        # The over-cap log is a strict failure too.
+        self.entity.attributes.add(
+            REMOVALS_LOG_KEY,
+            [{"tick": i, "display": f"名{i}"} for i in range(1, MAX_REMOVAL_RECORDS + 2)],
+        )
+        with self.assertRaises(TitleDataError):
+            removal_records(self.entity)
+        self.assertEqual(removal_digest(self.entity), ())
+
+    def test_digest_limit_validates(self):
+        self._bank_pair()
+        remove_epithet(self.entity, "破城先鋒")
+        self.assertEqual(removal_digest(self.entity, 0), ())
+        self.assertEqual(removal_digest(self.entity, 1), ("破城先鋒",))
+        for bad_limit in (True, -1, "1", None):
+            with self.subTest(limit=bad_limit), self.assertRaises(ValueError):
+                removal_digest(self.entity, bad_limit)
