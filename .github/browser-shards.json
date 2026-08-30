@@ -198,7 +198,8 @@
         "web.tests.browser.test_browser_options_surface"
       ],
       "files_b": [
-        "web.tests.browser.test_browser_shell.ShellAcceptanceTest"
+        "web.tests.browser.test_browser_shell.ShellAcceptanceTest",
+        "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest"
       ]
     },
     {
