@@ -43,7 +43,7 @@ non-empty, multi-key `persona` object.
 
 #### Scenario: The example's stats object sets all eight documented keys
 - **WHEN** `examples/example_character.json`'s `stats` object is inspected
-- **THEN** it contains exactly `hp`, `mp`, `sp`, `atk_phys`, `agility`, `defense`, `magic_level`,
+- **THEN** it contains exactly `hp`, `mp`, `sp`, `atk_phys`, `agility`, `defense`, `magic_power`,
   and `guild_merit`
 
 #### Scenario: The example's disguised_stats is a non-empty, proper subset of stats keys

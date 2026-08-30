@@ -356,8 +356,8 @@ class RestartRestoreIntegrationTests(RegistryIsolationMixin, EvenniaTestCase):
         self.player = create_object(PlayerCharacter, key="restore-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
-        # Human starting magic level (術師 tier) so fire_ball casts pass.
-        self.player.traits.magic_level.base = 30
+        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        self.player.traits.magic_power.base = 30
         self.player.db.skills = {"active": ["fire_ball"], "passive": []}
 
     def _monster(self, key: str, hp: int = 1) -> Monster:

@@ -93,7 +93,7 @@ class LivingEntityTests(EvenniaTestCase):
             "atk_phys",
             "agility",
             "defense",
-            "magic_level",
+            "magic_power",
             "guild_merit",
         }
         for entity in (player, npc, monster):

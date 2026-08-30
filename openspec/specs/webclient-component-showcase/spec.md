@@ -81,8 +81,8 @@ C1 store) — so no action or target SHALL be invented.
 ### Requirement: The status, character, and skill surfaces present truthful, non-color-only state
 The `StatusPanel`, the `CharacterStatusDrawer` (housing the `EquipmentDoll`), and the `SkillBook`
 components SHALL present the `status` panel payload (schema version 1), the `character` panel
-payload (schema version 3), and the character's skill data: gauges (hp/mp/sp), counters (magic_level,
-guild_merit), static traits, wallet, and conditions with their derived modifiers; character
+payload (schema version 3), and the character's skill data: gauges (hp/mp/sp), the counter (guild_merit),
+static traits (atk_phys/agility/defense/magic_power), wallet, and conditions with their derived modifiers; character
 details, the equipment doll's equipped items, disguise, guild rank/merit, and persona; and a skill
 book with active/passive tabs, categories, search, and per-skill cost/target/cast/availability detail. The gauges and conditions come from the `status` payload; the counters,
 static traits, wallet, character details, equipment, disguise, guild, and persona come from the
@@ -116,8 +116,7 @@ ungrouped content.
 `StatusPanel` SHALL present its share of that data as the stage's left HUD island stack rather than as
 a single boxed column card: a character head card, a vitals island, and a conditions island, composed
 from the `CharacterHead`, `VitalsTrack`, and `ConditionChips` components. The head card SHALL render
-only identity the payloads carry — the display name, the numeric magic level with its client-derived
-display rank title, the guild rank and merit, the wallet, and the disguise marker — with a glyph
+only identity the payloads carry — the display name, the numeric magic power, the guild rank and merit, the wallet, and the disguise marker — with a glyph
 portrait rather than an image, and SHALL render no race, subrace, class, or faction line, because no
 such field exists in either payload. The wallet SHALL have exactly one persistently-visible surface.
 

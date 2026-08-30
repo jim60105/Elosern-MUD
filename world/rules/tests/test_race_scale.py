@@ -16,8 +16,16 @@ class RaceScaleTests(unittest.TestCase):
         self.assertEqual(human["hp"]["base"], RACE_REGISTRY["human"].vital_baseline.hp[0])
         self.assertEqual(elf["hp"]["base"], RACE_REGISTRY["elf"].vital_baseline.hp[0])
         self.assertGreaterEqual(elf["hp"]["base"], human["hp"]["base"] * 50)
-        self.assertEqual(elf["magic_level"]["base"], 0)
-        self.assertEqual(elf["magic_level"]["max"], RACE_REGISTRY["elf"].magic_cap)
+        # magic_power is a static axis now: its base is the race band floor.
+        self.assertEqual(elf["magic_power"]["trait_type"], "static")
+        self.assertEqual(
+            elf["magic_power"]["base"],
+            RACE_REGISTRY["elf"].static_baseline.magic_power[0],
+        )
+        self.assertEqual(
+            human["magic_power"]["base"],
+            RACE_REGISTRY["human"].static_baseline.magic_power[0],
+        )
         self.assertEqual(human["guild_merit"]["base"], 0)
         self.assertIsNone(human["guild_merit"]["max"])
         for key in ("atk_phys", "agility", "defense"):

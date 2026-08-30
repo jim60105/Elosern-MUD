@@ -83,7 +83,8 @@ class LoaderTraitTests(EvenniaTestCase):
     @covers_requirement("import-validation::physical-and-vital-stats-outside-plausible-bands-warn-magic-above-its-cap-rejects")
     def test_magic_above_race_cap_is_rejected_before_trait_clamping(self):
         record = example_record()
-        record["stats"]["magic_level"] = RACE_REGISTRY["human"].magic_cap + 1
+        # 91 is one above the human magic_power band ceiling (90).
+        record["stats"]["magic_power"] = 91
         with self.assertRaises(ImportRejected):
             instantiate_character(record)
 
@@ -100,7 +101,7 @@ class LoaderTraitTests(EvenniaTestCase):
         record["stats"] = {
             "hp": 10000, "mp": 10000, "sp": 10000,
             "atk_phys": 88, "agility": 84, "defense": 76,
-            "magic_level": 120, "guild_merit": 0,
+            "magic_power": 120, "guild_merit": 0,
         }
         record["disguised_stats"] = {"atk_phys": 12, "agility": 10}
         record.pop("affinity_elements", None)
@@ -114,7 +115,7 @@ class LoaderTraitTests(EvenniaTestCase):
         record["stats"] = {
             "hp": 10000, "mp": 10000, "sp": 10000,
             "atk_phys": 88, "agility": 84, "defense": 76,
-            "magic_level": 120, "guild_merit": 0,
+            "magic_power": 120, "guild_merit": 0,
         }
         record["disguised_stats"] = {"atk_phys": 12, "agility": 10}
         record["affinity_elements"] = ["light"]

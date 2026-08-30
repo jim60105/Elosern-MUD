@@ -10,7 +10,12 @@ from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 @dataclass(frozen=True)
 class PlayerPreset:
-    """A complete player-owned identity, raw stat allocation, and skill kit."""
+    """A complete player-owned identity, raw stat allocation, and skill kit.
+
+    ``allocations`` covers all seven allocatable axes (the three gauges and the
+    four statics); the ``magic_power`` entry fixes the preset's starting magic
+    power as a literal (growth-redesign D-A5 deleted the magic sampler).
+    """
 
     key: str
     display_name: str
@@ -47,7 +52,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
     "human_wanderer": PlayerPreset(
         "human_wanderer", "艾琳", 24, 24, "human", "human_commoner",
         (("hp", 50), ("mp", 50), ("sp", 50), ("atk_phys", 10),
-         ("agility", 10), ("defense", 11)),
+         ("agility", 10), ("defense", 11), ("magic_power", 43)),
         "生命力與魔力均衡的開局配點",
         "來自南境的年輕旅人，腰間掛著一把磨亮的長劍，追逐著地圖邊緣未標記的空白。"
         "剛在公會登記為新人冒險者，均衡的劍術與基礎強化讓她對什麼委託都躍躍欲試。",
@@ -60,7 +65,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
     "foxkin_scout": PlayerPreset(
         "foxkin_scout", "露芙", 22, 22, "beastfolk", "foxkin",
         (("hp", 25), ("mp", 10), ("sp", 25), ("atk_phys", 15),
-         ("agility", 15), ("defense", 15)),
+         ("agility", 15), ("defense", 15), ("magic_power", 14)),
         "敏捷與近身作戰優先的斥候配點",
         "出身獸王國瓦爾哈拉的狐人斥候，身手矯健，習慣走在隊伍前方探路。"
         "疾風術與瞬步是她的雙腿，總能在危險降臨之前，先把消息帶回夥伴身邊。",
@@ -74,7 +79,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
     "elf_guardian": PlayerPreset(
         "elf_guardian", "瑟芮雅", 180, 24, "elf", "fionnen",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 12),
-         ("agility", 12), ("defense", 13)),
+         ("agility", 12), ("defense", 13), ("magic_power", 400)),
         "防禦與均衡戰技優先的守護者配點",
         "斐歐恩森林出身的精靈族護衛，以長壽的眼光看待短暫的人類王國。"
         "硬化肌膚與防禦直覺讓她成為隊伍最可靠的盾，守護他人的意志遠勝於爭勝之心。",
@@ -87,7 +92,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
     "violet_altoria": PlayerPreset(
         "violet_altoria", "薇歐蕾特", 18, 18, "human", "human_royal",
         (("hp", 50), ("mp", 67), ("sp", 50), ("atk_phys", 4),
-         ("agility", 5), ("defense", 5)),
+         ("agility", 5), ("defense", 5), ("magic_power", 43)),
         "魔力優先、體力與生命力兼顧的術師配點",
         "阿爾托利亞王國的第一王女，成年禮後以風之術師的身份離開宮廷歷練。"
         "過人的魔法陣理解與精準魔力控制，讓她的火球與風刃遠超同齡術師，"
@@ -101,7 +106,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
     "lidzia_rosenthal": PlayerPreset(
         "lidzia_rosenthal", "莉茲婭", 18, 18, "human", "human_noble",
         (("hp", 55), ("mp", 39), ("sp", 60), ("atk_phys", 9),
-         ("agility", 10), ("defense", 8)),
+         ("agility", 10), ("defense", 8), ("magic_power", 43)),
         "體力與生命力優先、均衡的近侍劍術配點",
         "世代侍奉王室的羅森塔爾家族之女，薇歐蕾特王女的貼身近侍。"
         "輕劍術在護衛考核名列前茅，隨從武藝與護主本能，使她永遠站在主人與危險之間。",
@@ -113,7 +118,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
     "yuka_darknight": PlayerPreset(
         "yuka_darknight", "悠花", 18, 18, "elf", "ciaran",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 11),
-         ("agility", 14), ("defense", 12)),
+         ("agility", 14), ("defense", 12), ("magic_power", 400)),
         "敏捷與攻擊優先的雙刀配點",
         "暗影谷村出身的黑暗精靈雙刀使，罕見的黑短髮在銀髮同族中格外醒目。"
         "宗師級雙刀流與影斬令她名聲在外，轉生祝福的武感使她總能先一步抵達對手要害。"
@@ -127,7 +132,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
     "yuna_darknight": PlayerPreset(
         "yuna_darknight", "悠奈", 18, 18, "elf", "ciaran",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 6),
-         ("agility", 6), ("defense", 25)),
+         ("agility", 6), ("defense", 25), ("magic_power", 400)),
         "防禦特化的魔力體質配點",
         "與雙胞胎妹妹一同離開暗影谷村的黑暗精靈，罕見的黑長髮與知性外表之下，"
         "是將性魔法鑽研到極致的享樂主義者。精通火與闇屬性，"
@@ -140,7 +145,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
     "elosia_shadowmoon": PlayerPreset(
         "elosia_shadowmoon", "伊洛希雅", 222, 24, "elf", "fionnen",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 10),
-         ("agility", 10), ("defense", 17)),
+         ("agility", 10), ("defense", 17), ("magic_power", 400)),
         "防禦紮實、攻守均衡的魔導師配點",
         "自稱兩百二十二歲的森林精靈術師，精通風與光的主宰級魔法，"
         "也掌握統御術與狀態偽裝。她離開斐歐恩村落走入人類王國，"

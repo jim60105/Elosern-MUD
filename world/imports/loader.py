@@ -64,7 +64,7 @@ def _instantiate_validated_character(
     entity.subrace = record.get("subrace")
     entity.sex = record["sex"]
     entity._apply_trait_config(
-        _trait_config(_resolve_trait_values(record), RACE_REGISTRY[record["race"]].magic_cap)
+        _trait_config(_resolve_trait_values(record))
     )
     entity.db.disguised_stats = record["disguised_stats"] or None
     entity.db.persona = record["persona"]

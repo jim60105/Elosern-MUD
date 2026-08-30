@@ -9,9 +9,9 @@ a direct player-facing view on `look <target>`.
 `world/rules/displayed_stats.py` SHALL provide
 `display_stat_block(entity, looker=None) -> str | None` that renders one
 `label：value` row per key in the fixed order `atk_phys`, `agility`, `defense`,
-`magic_level`, `hp`, every value read through `get_display_value()`. The labels SHALL be the
+`magic_power`, `hp`, every value read through `get_display_value()`. The labels SHALL be the
 canonical Traditional Chinese trait labels used by the character panel (`生命` for `hp`, `攻擊` for
-`atk_phys`, `敏捷` for `agility`, `防禦` for `defense`, `魔法階級` for `magic_level`). The `hp` row
+`atk_phys`, `敏捷` for `agility`, `防禦` for `defense`, `魔力` for `magic_power`). The `hp` row
 SHALL render the gauge's current value (the value the accessor returns), not a maximum. The
 function SHALL return `None` for a non-living target (an object or a room) and SHALL omit — never
 raise on — a missing or malformed trait row. The function SHALL be read-only: it SHALL NOT write
@@ -42,9 +42,9 @@ before.
 #### Scenario: A disguised living entity shows disguised values in fixed order
 - **WHEN** `display_stat_block(entity)` is called on a living entity with
   `disguised_stats = {"atk_phys": 60}` whose true `atk_phys` base is 88, true `agility` 92, true
-  `defense` 90, true `magic_level` 250, and true `hp` current value 120 of 10000
-- **THEN** the block contains exactly five rows in the order 攻擊, 敏捷, 防禦, 魔法階級, 生命; the
-  攻擊 row shows 60; the 敏捷, 防禦, and 魔法階級 rows show 92, 90, and 250; and the 生命 row shows
+  `defense` 90, true `magic_power` 250, and true `hp` current value 120 of 10000
+- **THEN** the block contains exactly five rows in the order 攻擊, 敏捷, 防禦, 魔力, 生命; the
+  攻擊 row shows 60; the 敏捷, 防禦, and 魔力 rows show 92, 90, and 250; and the 生命 row shows
   120
 
 #### Scenario: A non-living target yields no block

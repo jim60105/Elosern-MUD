@@ -114,7 +114,7 @@ CHARACTER_SCHEMA_V1 = {
                 "atk_phys": dict(_NONNEGATIVE),
                 "agility": dict(_NONNEGATIVE),
                 "defense": dict(_NONNEGATIVE),
-                "magic_level": dict(_NONNEGATIVE),
+                "magic_power": dict(_NONNEGATIVE),
                 "guild_merit": dict(_NONNEGATIVE),
             },
             "additionalProperties": False,

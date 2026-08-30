@@ -261,7 +261,7 @@ def _choose_skill(
         attack_key = (
             "atk_phys"
             if _damage_school(skill) == "physical"
-            else "magic_level"
+            else "magic_power"
         )
         return combat._adjusted_attack(entity, attack_key) - defender_defense
 

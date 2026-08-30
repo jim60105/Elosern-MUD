@@ -257,7 +257,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
             "atk_phys": 2,
             "agility": 30,
             "defense": 50,
-            "magic_level": 90,
+            "magic_power": 90,
         }.items():
             getattr(self.player.traits, key).base = value
         self.player.traits.hp.base = 500
@@ -508,7 +508,7 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
     def test_player_overwhelming_still_dispatches_the_resolver(self):
         weak = _monster("weak goblin", hp=100, atk=10)
         weak.location = self.room
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000

@@ -349,7 +349,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
 
     def test_lethal_examiner_defeat_passes_and_restores_both_sides(self):
         # Make the candidate overwhelmingly strong for one decisive hit.
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000
@@ -375,7 +375,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         self.assertIsNone(ObjectDB.objects.filter(id=record.opponent_id).first())
 
     def test_promotion_preserves_merit(self):
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000
@@ -425,7 +425,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
     def test_same_named_player_can_complete_the_exam(self):
         self.player.key = "guild-examiner-E"
         self.player.save()
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000
@@ -444,7 +444,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         # the simulated battle restores the candidate to full HP/MP/SP.
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(opponent.traits, key).base = 500
         opponent.traits.hp.base = 2000
         opponent.traits.hp.current = 2000
@@ -502,7 +502,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         # kill-credit consumers (XP is monster-tier-gated; DEFEAT progress and
         # protected-entity failure come from the quest planner) never observe
         # an ordinary kill from the examination.
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000
@@ -695,7 +695,7 @@ class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTestCase):
         # settles, deletes it, and advances the clock exactly once.
         from world.rules.clock import WorldClock
 
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000
@@ -764,7 +764,7 @@ class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTestCase):
         # round-and-settlement transaction: a restore failure rolls the round
         # effects and the settlement back, leaving the exam ACTIVE and both
         # sides' in-process gauges at their pre-round values.
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000

@@ -62,7 +62,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
     wrapper.get('[data-testid="creation-field-displayName"]').setValue("測試者");
     wrapper.get('[data-testid="creation-field-age"]').setValue(21);
     wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(21);
-    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 });
+    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 });
     wrapper.get('[data-testid="creation-background"]').setValue("測試背景。");
     wrapper.get('[data-testid="creation-affinity-fire"]').element.checked = true;
     wrapper.get('[data-testid="creation-affinity-fire"]').trigger("change");
@@ -77,7 +77,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
         apparent_age: 21,
         race: "human",
         subrace: null,
-        allocations: { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 },
+        allocations: { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 },
         background: "測試背景。",
         affinity_elements: ["fire", "wind"],
       },
@@ -90,7 +90,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
     wrapper.get('[data-testid="creation-field-displayName"]').setValue("無名者");
     wrapper.get('[data-testid="creation-field-age"]').setValue(21);
     wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(21);
-    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 });
+    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 });
     wrapper.get('[data-testid="creation-submit"]').trigger("click");
     const event = lastAction(wrapper, "creation.custom");
     expect(event).not.toBeNull();
@@ -113,7 +113,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
     await switchToCustom(wrapper);
     wrapper.get('[data-testid="creation-field-age"]').setValue(17);
     wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(21);
-    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 });
+    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 });
     wrapper.get('[data-testid="creation-submit"]').trigger("click");
     await nextTick();
     expect(wrapper.get('[data-testid="creation-form-message"]').exists()).toBe(true);
@@ -125,7 +125,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
     await switchToCustom(wrapper);
     wrapper.get('[data-testid="creation-field-age"]').setValue(21);
     wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(17);
-    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 });
+    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 });
     wrapper.get('[data-testid="creation-submit"]').trigger("click");
     await nextTick();
     expect(wrapper.get('[data-testid="creation-form-message"]').exists()).toBe(true);
@@ -137,7 +137,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
     await switchToCustom(wrapper);
     wrapper.get('[data-testid="creation-field-age"]').setValue(30);
     wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(25);
-    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 });
+    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 });
     wrapper.get('[data-testid="creation-submit"]').trigger("click");
     const event = lastAction(wrapper, "creation.custom");
     expect(event).not.toBeNull();
@@ -224,8 +224,8 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(wrapper.get('[data-testid="creation-background"]').element.value).toBe("從渡口學來運貨的年輕人。");
     expect(wrapper.get('[data-testid="creation-affinity-fire"]').element.checked).toBe(true);
     expect(wrapper.get('[data-testid="creation-affinity-wind"]').element.checked).toBe(true);
-    // The budget briefing states the human budget and the six-axis spans.
-    expect(wrapper.get('[data-testid="creation-budget-briefing"]').text()).toContain("24");
+    // The budget briefing states the human budget and the seven-axis spans.
+    expect(wrapper.get('[data-testid="creation-budget-briefing"]').text()).toContain("28");
     expect(lastAction(wrapper, "creation.custom")).toBeNull(); // not auto-emitted on resume
   });
 
@@ -269,11 +269,11 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(wrapper.get('[data-testid="creation-form-message"]').exists()).toBe(true);
     expect(lastAction(wrapper, "creation.custom")).toBeNull();
     // Selecting the subrace exposes the allocation inputs; the total must equal
-    // the beastfolk/wolf profile budget (26) or confirm stays blocked.
+    // the beastfolk/wolf profile budget (30) or confirm stays blocked.
     wrapper.get('[data-testid="creation-subrace"]').setValue("subrace_wolf");
     await nextTick();
     expect(wrapper.find('[data-testid="creation-field-hp"]').exists()).toBe(true);
-    setAllocations(wrapper, { hp: 9, mp: 4, sp: 4, atk_phys: 3, agility: 3, defense: 3 });
+    setAllocations(wrapper, { hp: 9, mp: 4, sp: 4, atk_phys: 3, agility: 3, defense: 3, magic_power: 4 });
     wrapper.get('[data-testid="creation-submit"]').trigger("click");
     const ev = lastAction(wrapper, "creation.custom");
     expect(ev).not.toBeNull();

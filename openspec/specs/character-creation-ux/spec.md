@@ -38,8 +38,8 @@ a dedicated prompt.
 
 #### Scenario: The allocation briefing precedes the allocation step
 - **WHEN** a pending player has chosen race and subrace in `character create` and is about to enter
-  the six allocation values
-- **THEN** before the first allocation input the game states the total budget, the six-axis count,
+  the seven allocation values
+- **THEN** before the first allocation input the game states the total budget, the seven-axis count,
   each axis's 0–span range, and the rule that the sum must equal the budget
 
 #### Scenario: The custom flow collects an optional background

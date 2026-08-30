@@ -136,8 +136,7 @@ def _player(key: str):
     player = create_object(PlayerCharacter, key=key)
     player.race = "human"
     player.apply_race_baseline()
-    player.traits.magic_level.base = 40
-    player.traits.magic_level.current = 40
+    player.traits.magic_power.base = 40
     player.db.equipment = None
     player.db.inventory = []
     return player

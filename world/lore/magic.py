@@ -13,15 +13,6 @@ class MagicTier:
     description: str
 
 
-@dataclass(frozen=True)
-class RankTitle:
-    key: str
-    display_name_zh: str
-    order: int
-    unlocks_tier: str | None
-    description: str
-
-
 MAGIC_TIER_REGISTRY: dict[str, MagicTier] = {
     "apprentice": MagicTier(
         "apprentice", "初級", 0, 15,
@@ -46,17 +37,5 @@ MAGIC_TIER_REGISTRY: dict[str, MagicTier] = {
     "ultimate": MagicTier(
         "ultimate", "究極", 91, None, (),
         "Legendary magic almost impossible for humans to master.",
-    ),
-}
-
-
-RANK_TITLE_REGISTRY: dict[str, RankTitle] = {
-    "apprentice": RankTitle("apprentice", "學徒", 1, None, "A beginning magic user."),
-    "mage": RankTitle("mage", "術師", 2, "intermediate", "Can use intermediate magic."),
-    "master": RankTitle("master", "大師", 3, "advanced", "Can use advanced magic."),
-    "sage": RankTitle("sage", "賢者", 4, "superior", "Understands and develops formulae."),
-    "sovereign": RankTitle(
-        "sovereign", "主宰", 5, "ultimate",
-        "Transcends fixed magical formulae and acts by intent.",
     ),
 }

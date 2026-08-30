@@ -55,7 +55,7 @@ _REGISTRATION_KEYS = (
     "atk_phys",
     "agility",
     "defense",
-    "magic_level",
+    "magic_power",
     "guild_merit",
 )
 

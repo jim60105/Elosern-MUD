@@ -75,12 +75,12 @@ class DefaultAttackPolicyCastGateTests(unittest.TestCase):
     """The generic policy never proposes a tier-blocked elemental spell."""
 
     def _npc(self, key: str, owned: list[str]) -> FakeEntity:
-        # magic_level 15 with no affinities and no mastery: floor(15 * 1.0)
+        # magic_power 15 with no affinities and no mastery: floor(15 * 1.0)
         # is below the 術師 threshold, so an owned 術師-tier firestorm is
         # blocked even though the entity could afford its 30 MP cost. The
         # innate basic_attack is always owned, exactly as the skills handler
         # guarantees for real entities.
-        actor = FakeEntity(key, magic_level=15, owned=[*owned, "basic_attack"])
+        actor = FakeEntity(key, magic_power=15, owned=[*owned, "basic_attack"])
         actor.traits.mp = FakeGauge(30, 30)
         return actor
 

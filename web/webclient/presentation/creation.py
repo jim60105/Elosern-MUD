@@ -83,7 +83,7 @@ AFFINITY_ELEMENT_KEYS = tuple(ELEMENT_REGISTRY)
 MAX_AFFINITY_CHOICES = 8
 MAX_AFFINITY_ELEMENTS = 8
 
-ALLOCATABLE_AXES = ("hp", "mp", "sp", "atk_phys", "agility", "defense")
+ALLOCATABLE_AXES = ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power")
 
 
 class CreationPanelError(ProtocolValidationError):
@@ -268,8 +268,8 @@ def _validate_profile(value: Any) -> dict[str, Any]:
         subrace = _validate_key(subrace, "profile subrace", MAX_SUBRACE_KEY_CODE_POINTS)
     budget = _require_int(value, "budget", minimum=0, maximum=MAX_SAFE_INTEGER)
     axes = value["axes"]
-    if not isinstance(axes, list) or len(axes) != 6:
-        raise ProtocolValidationError("profile axes must contain exactly six axes")
+    if not isinstance(axes, list) or len(axes) != 7:
+        raise ProtocolValidationError("profile axes must contain exactly seven axes")
     axis_keys = set()
     normalized_axes = []
     for entry in axes:
@@ -277,7 +277,7 @@ def _validate_profile(value: Any) -> dict[str, Any]:
         axis_keys.add(normalized["axis"])
         normalized_axes.append(normalized)
     if axis_keys != set(ALLOCATABLE_AXES):
-        raise ProtocolValidationError("profile axes must match the six starting axes")
+        raise ProtocolValidationError("profile axes must match the seven starting axes")
     return {"race": race, "subrace": subrace, "budget": budget, "axes": normalized_axes}
 
 
@@ -364,7 +364,7 @@ def _validate_affinity(value: Any) -> dict[str, Any]:
 def _validate_allocations(value: dict[str, Any], name: str) -> dict[str, Any]:
     allocations = value["allocations"]
     if not isinstance(allocations, dict) or set(allocations) != set(ALLOCATABLE_AXES):
-        raise ProtocolValidationError(f"{name} allocations must contain exactly the six axes")
+        raise ProtocolValidationError(f"{name} allocations must contain exactly the seven axes")
     normalized_allocations: dict[str, int] = {}
     for axis in ALLOCATABLE_AXES:
         normalized_allocations[axis] = _require_int(

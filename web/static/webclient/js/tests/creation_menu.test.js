@@ -21,9 +21,10 @@ function validPanel(overrides) {
     sp: { axis: "sp", label: "體力值", explanation: "支撐行動", minimum: 0, maximum: 100 },
     atk_phys: { axis: "atk_phys", label: "物理攻擊", explanation: "影響傷害", minimum: 0, maximum: 21 },
     agility: { axis: "agility", label: "敏捷", explanation: "命中迴避", minimum: 0, maximum: 21 },
-    defense: { axis: "defense", label: "防禦", explanation: "減免傷害", minimum: 0, maximum: 21 },
+    defense: { axis: "defense", label: "防禦", explanation: "減免傷害", minimum: 0, maximum: 85 },
+    magic_power: { axis: "magic_power", label: "魔力", explanation: "魔法傷害", minimum: 0, maximum: 85 },
   };
-  const humanAxes = ["hp", "mp", "sp", "atk_phys", "agility", "defense"].map((k) =>
+  const humanAxes = ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power"].map((k) =>
     Object.assign({}, axes[k])
   );
   const panel = {
@@ -70,10 +71,10 @@ function validPanel(overrides) {
         ciaran: { display_name_zh: "基亞蘭族", common_name_zh: "黑暗精靈", specialty: "劍術" },
       },
       profiles: [
-        { race: "human", subrace: "human_royal", budget: 181, axes: humanAxes },
-        { race: "human", subrace: "human_commoner", budget: 181, axes: humanAxes },
-        { race: "elf", subrace: "fionnen", budget: 37, axes: humanAxes },
-        { race: "elf", subrace: "ciaran", budget: 37, axes: humanAxes },
+        { race: "human", subrace: "human_royal", budget: 224, axes: humanAxes },
+        { race: "human", subrace: "human_commoner", budget: 224, axes: humanAxes },
+        { race: "elf", subrace: "fionnen", budget: 437, axes: humanAxes },
+        { race: "elf", subrace: "ciaran", budget: 437, axes: humanAxes },
       ],
       affinity: {
         human: {
@@ -127,10 +128,9 @@ test("disabled empty preset list stays focusable and submits nothing", () => {
 test("profile resolution follows race and subrace selection", () => {
   const panel = validPanel();
   const human = CreationMenu.profileFor(panel, "human", "human_commoner");
-  assert.equal(human.budget, 181);
+  assert.equal(human.budget, 224);
   const fionnen = CreationMenu.profileFor(panel, "elf", "fionnen");
-  assert.equal(fionnen.budget, 37);
-  assert.equal(CreationMenu.profileFor(panel, "human", null), null);
+  assert.equal(fionnen.budget, 437);
   assert.equal(CreationMenu.profileFor(panel, "human", "fionnen"), null);
 });
 
@@ -153,9 +153,9 @@ test("axis fields and budget follow the active profile", () => {
   const panel = validPanel();
   const state = CreationMenu.defaultCustomState(panel);
   state.subraceKey = "human_commoner";
-  assert.equal(CreationMenu.budgetFor(panel, state), 181);
+  assert.equal(CreationMenu.budgetFor(panel, state), 224);
   const fields = CreationMenu.axisFields(panel, state);
-  assert.equal(fields.length, 6);
+  assert.equal(fields.length, 7);
   const hp = fields.find((f) => f.axis === "hp");
   assert.deepEqual({ min: hp.minimum, max: hp.maximum }, { min: 0, max: 100 });
 });
@@ -174,7 +174,7 @@ test("the allocation briefing mirrors the server profile exactly", () => {
     assert.equal(span.minimum, axis.minimum);
     assert.equal(span.maximum, axis.maximum);
   });
-  assert.equal(humanBriefing.rule, "六項配點總和必須恰好等於 " + humanProfile.budget + "。");
+  assert.equal(humanBriefing.rule, "七項配點總和必須恰好等於 " + humanProfile.budget + "。");
   // A subrace with no profile resolves to no briefing.
   assert.equal(CreationMenu.briefingFor(panel, { raceKey: "human", subraceKey: null }), null);
 });
@@ -186,7 +186,7 @@ test("advisory validation flags underage, name, and budget errors", () => {
   state.age = "20";
   state.apparentAge = "20";
   state.subraceKey = "human_commoner";
-  Object.assign(state.allocations, { hp: "50", mp: "50", sp: "50", atk_phys: "10", agility: "10", defense: "11" });
+  Object.assign(state.allocations, { hp: "50", mp: "50", sp: "50", atk_phys: "10", agility: "10", defense: "11", magic_power: "43" });
   assert.equal(CreationMenu.validateCustom(panel, state).valid, true);
 
   const underage = Object.assign({}, state, { age: "17" });
@@ -213,7 +213,7 @@ test("exact custom payload production", () => {
   state.raceKey = "elf";
   state.subraceKey = "fionnen";
   state.background = "  在公會登記的新人冒險者  ";
-  Object.assign(state.allocations, { hp: "0", mp: "0", sp: "0", atk_phys: "12", agility: "12", defense: "13" });
+  Object.assign(state.allocations, { hp: "0", mp: "0", sp: "0", atk_phys: "12", agility: "12", defense: "13", magic_power: "10" });
   const payload = CreationMenu.customPayload(state);
   assert.deepEqual(payload, {
     display_name: "新角色",
@@ -223,7 +223,7 @@ test("exact custom payload production", () => {
     subrace: "fionnen",
     background: "在公會登記的新人冒險者",
     affinity_elements: [],
-    allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13 },
+    allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13, magic_power: 10 },
   });
 });
 
@@ -237,7 +237,7 @@ test("saved custom draft restores the form at the saved stage", () => {
       apparent_age: 22,
       race: "elf",
       subrace: "ciaran",
-      allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13 },
+      allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13, magic_power: 10 },
     },
   });
   const state = CreationMenu.stateFromDraft(panel, panel.draft);
@@ -246,7 +246,7 @@ test("saved custom draft restores the form at the saved stage", () => {
   assert.equal(state.raceKey, "elf");
   assert.equal(state.subraceKey, "ciaran");
   assert.equal(state.allocations.defense, "13");
-  assert.equal(CreationMenu.profileFor(panel, state.raceKey, state.subraceKey).budget, 37);
+  assert.equal(CreationMenu.profileFor(panel, state.raceKey, state.subraceKey).budget, 437);
 });
 
 test("concept draft pre-fills finite controls without name or ages", () => {

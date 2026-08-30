@@ -146,7 +146,7 @@ def validate_creation_custom_payload(payload: dict[str, Any]) -> dict[str, Any]:
     allocations = payload["allocations"]
     if not isinstance(allocations, dict) or set(allocations) != set(ALLOCATABLE_AXES):
         raise CreationActionError(
-            "allocations must contain exactly the six starting axes"
+            "allocations must contain exactly the seven starting axes"
         )
     checked_allocations: dict[str, int] = {}
     for axis in ALLOCATABLE_AXES:
@@ -461,10 +461,10 @@ def _creation_activate_adapter(actor: Any, payload: dict[str, Any], session: Any
 
     relocate_to_starting_location(actor)
     actor.msg(
-        f"角色 {result.display_name} 已建立，初始魔法等級為 {result.magic_level}。"
+        f"角色 {result.display_name} 已建立，初始魔力為 {result.magic_power}。"
     )
     maybe_play_arrival(actor)
-    message = f"角色 {result.display_name} 已建立，初始魔法等級為 {result.magic_level}。"
+    message = f"角色 {result.display_name} 已建立，初始魔力為 {result.magic_power}。"
     # No affected panels: the dispatcher publishes a full snapshot so the mode
     # change to exploration and every panel replacement are one atomic hand-off.
     return _success("activated", message, AFFECTED_ACTIVATE)

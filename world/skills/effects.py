@@ -14,7 +14,8 @@ from typing import Literal
 # Continuous-valued ownership effects read by deterministic consumers.
 # ``StatMultiplyEffect`` is consumed by ``SkillHandler.effective_value``;
 # ``GrowthRateEffect`` mirrors ``world/rules/progression.py``'s existing
-# ``growth_rate:magic:<multiplier>`` convention.
+# ``growth_rate:practice:<multiplier>`` convention (the retired
+# ``growth_rate:magic:<N>`` prefix fails closed at parse).
 @dataclass(frozen=True)
 class StatMultiplyEffect:
     """Multiply one stored trait by a fixed factor while owned."""
@@ -357,6 +358,11 @@ def parse_effect(effect_id: str) -> object:
         return StatMultiplyEffect(trait=trait, multiplier=multiplier)
     if prefix == "growth_rate":
         stat, multiplier = _parse_stat_like(effect_id, prefix)
+        if stat != "practice":
+            raise ValueError(
+                f"growth_rate effect stat must be 'practice', got {stat!r} "
+                f"in {effect_id!r} (the retired 'magic' key fails closed)"
+            )
         return GrowthRateEffect(stat=stat, multiplier=multiplier)
     if prefix == "element_mastery_rank":
         return ElementMasteryEffect(rank=_parse_single_arg(effect_id, prefix))

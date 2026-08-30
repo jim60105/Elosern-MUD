@@ -47,7 +47,7 @@ persist, or mutate a persona record — the block is read-only context.
 The reply no-leak check SHALL be installed for a call whenever its secret set is non-empty —
 independently of whether an affinity context exists — and SHALL validate speech against that
 per-call set: the affinity value and cap (when present) plus the true trait values of `atk_phys`,
-`agility`, `defense`, `magic_level`, and `hp` when the NPC has an active `disguised_stats` record
+`agility`, `defense`, `magic_power`, and `hp` when the NPC has an active `disguised_stats` record
 whose value for that key differs from the true trait value. All five values SHALL be read from the
 traits' current `.value` (for `hp`, the current gauge value, not the maximum). A reply whose
 speech contains any bound secret as a decimal integer substring (fullwidth digit forms folded via

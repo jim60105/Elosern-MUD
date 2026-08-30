@@ -101,7 +101,6 @@ class OnboardingJourneyMixin:
             self.account,
             self.player,
             CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
-            sampler=lambda low, high: low,
         )
         relocate_to_starting_location(self.player)
 

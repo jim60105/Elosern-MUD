@@ -23,7 +23,7 @@ class TraitIntegrationTests(EvenniaTestCase):
         entity = self._entity("human")
         self.assertEqual(set(entity.traits.all()), {
             "hp", "mp", "sp", "atk_phys", "agility", "defense",
-            "magic_level", "guild_merit",
+            "magic_power", "guild_merit",
         })
         for key in ("hp", "mp", "sp"):
             trait = getattr(entity.traits, key)
@@ -35,8 +35,8 @@ class TraitIntegrationTests(EvenniaTestCase):
             trait = getattr(entity.traits, key)
             self.assertIsInstance(trait, StaticTrait)
             self.assertEqual(trait.value, trait.base + trait.mod)
-        for key in ("magic_level", "guild_merit"):
-            self.assertIsInstance(getattr(entity.traits, key), CounterTrait)
+        self.assertIsInstance(entity.traits.magic_power, StaticTrait)
+        self.assertIsInstance(entity.traits.guild_merit, CounterTrait)
 
     def test_species_floor_static_values_stay_in_registry_bands(self):
         for race_key, race in RACE_REGISTRY.items():
@@ -55,7 +55,7 @@ class TraitIntegrationTests(EvenniaTestCase):
             adjusted = build_initial_traits(subrace.race_key, subrace_key)
             for key in STATIC_KEYS:
                 expected = round(
-                    baseline[key] * (1 + getattr(subrace.static_modifiers, key))
+                    baseline[key] * (1 + getattr(subrace.static_modifiers, key, 0.0))
                 )
                 self.assertEqual(adjusted[key], expected)
 

@@ -19,12 +19,12 @@ class FakeMonster(FakeEntity):
         *,
         threat_tier="low",
         behaviour_tree=None,
-        magic_level=30,
+        magic_power=30,
         **kwargs,
     ):
         # Default 30 keeps elemental spell picks castable (術師 tier); tests
-        # that exercise the element-mastery gate pass magic_level=0 instead.
-        super().__init__(key, magic_level=magic_level, **kwargs)
+        # that exercise the element-mastery gate pass magic_power=0 instead.
+        super().__init__(key, magic_power=magic_power, **kwargs)
         self.threat_tier = threat_tier
         self.behaviour_tree = behaviour_tree
         self.traits.mp = FakeGauge(100, 100)
@@ -112,7 +112,7 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
         # physical attack instead of choosing an action the resolver rejects.
         actor = FakeMonster(
             "tierless",
-            magic_level=0,
+            magic_power=0,
             owned=["wind_blade", "basic_attack"],
         )
         enemy = FakeEntity("enemy")
@@ -122,7 +122,7 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
     def test_direct_mastery_unlocks_an_elemental_spell_for_the_policy(self):
         actor = FakeMonster(
             "master",
-            magic_level=0,
+            magic_power=0,
             owned=["wind_blade", "wind_mastery"],
         )
         enemy = FakeEntity("enemy")
@@ -135,7 +135,7 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
 
         actor = FakeMonster(
             "malformed",
-            magic_level=0,
+            magic_power=0,
             owned=["wind_blade", "basic_attack"],
         )
         enemy = FakeEntity("enemy")

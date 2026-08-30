@@ -73,8 +73,8 @@ def _player(key="friendly fire player"):
     player = create_object(PlayerCharacter, key=key)
     player.race = "human"
     player.apply_race_baseline()
-    # Human starting magic level (術師 tier) so element-gated spell casts pass.
-    player.traits.magic_level.base = 30
+    # Human static magic_power at 術師 tier so element-gated spell casts pass.
+    player.traits.magic_power.base = 30
     player.traits.hp.base = 500
     player.traits.hp.current = 500
     return player
@@ -514,7 +514,7 @@ class OverwhelmCompressionTests(FriendlyFireBase):
         companion = _companion(self.player, "壓縮誤傷")
         _grant_affinity(companion, self.player, 70)
         self._equip("wind_blade")
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000

@@ -620,10 +620,6 @@ def main() -> None:
             raise AssertionError("starting profile budget exceeds allocatable spans")
         return result
 
-    def sampler(_low: int, _high: int) -> int:
-        """Fixed magic-band sample: deterministic lower bound."""
-        return _low
-
     account = create_account(
         BROWSER_ACCOUNT_USERNAME,
         BROWSER_ACCOUNT_EMAIL,
@@ -715,7 +711,7 @@ def main() -> None:
         subrace="human_commoner",
         allocations=balanced_allocations("human", "human_commoner"),
     )
-    result = activate_player_character(account, character, request, sampler=sampler)
+    result = activate_player_character(account, character, request)
 
     if os.environ.get("ELOSERN_BROWSER_MINIMAP") == "1":
         _minimap_fixture(character)
@@ -753,7 +749,7 @@ def main() -> None:
         monster.save()
     print(
         f"seeded account={account.key} character={result.display_name} "
-        f"race={result.race} magic_level={result.magic_level}"
+        f"race={result.race} magic_power={result.magic_power}"
     )
 
 

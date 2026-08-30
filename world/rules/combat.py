@@ -186,7 +186,7 @@ def effective_power(entity: Any) -> float:
     """Return the four-stat effective sum scaled by maximum hp."""
     stat_sum = sum(
         entity.skills.effective_value(key)
-        for key in ("atk_phys", "agility", "defense", "magic_level")
+        for key in ("atk_phys", "agility", "defense", "magic_power")
     )
     return float(stat_sum) * _max_hp(entity)
 
@@ -194,13 +194,13 @@ def effective_power(entity: Any) -> float:
 def _adjusted_attack(entity: Any, attack_key: str) -> float:
     """Return effective attack plus the matching flat bundle bonus.
 
-    The ``atk_phys`` bonus enters only physical attacks, the ``magic_level``
+    The ``atk_phys`` bonus enters only physical attacks, the ``magic_power``
     bonus (mage robes, staves, magic swords) only the magic school, each
     matching the stat's role in the damage formula; neither school receives
     the other stat's adjustment.
     """
     attack = float(entity.skills.effective_value(attack_key))
-    if attack_key not in {"atk_phys", "magic_level"}:
+    if attack_key not in {"atk_phys", "magic_power"}:
         return attack
     return attack + evaluate_combat_modifiers(entity).get(attack_key, 0)
 
@@ -278,7 +278,7 @@ def _handle_damage(
     scaled, so even a 1/4 cast lands its minimum hit).
     """
     _, school = _parse_damage_effect(effect_id)
-    attack_key = "atk_phys" if school == "physical" else "magic_level"
+    attack_key = "atk_phys" if school == "physical" else "magic_power"
     session_nonlethal = bool(event_context.get("nonlethal", False))
     nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
     battlefield = event_context.get("battlefield")
@@ -362,7 +362,7 @@ def _heal_magnitude(actor: Any) -> int:
     the magnitude shares damage's ``round(effective value x multiplier)``
     shape without inheriting its to-hit or defense assumptions (design.md
     magnitude decision). The caster stat reads through the equipment-aware
-    attack path (a ``magic_level``-granting robe heals harder), and the
+    attack path (a ``magic_power``-granting robe heals harder), and the
     unamplified base is then scaled by the merged ``heal_gain`` percent with
     the normative formula ``max(floor(base x (1 + pct/100)), heal.floor)``
     (wire-equipment-combat-modifiers D4): flooring, not banker-rounding, and
@@ -371,7 +371,7 @@ def _heal_magnitude(actor: Any) -> int:
     """
     multiplier = float(COMBAT_YAML["heal"]["multiplier"])
     floor = int(COMBAT_YAML["heal"]["floor"])
-    magic = _adjusted_attack(actor, "magic_level")
+    magic = _adjusted_attack(actor, "magic_power")
     base_amount = max(round(magic * multiplier), floor)
     heal_gain = evaluate_combat_modifiers(actor).get("heal_gain")
     return max(apply_cost_modifier(base_amount, heal_gain), floor)

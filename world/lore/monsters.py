@@ -18,7 +18,15 @@ class MonsterTier:
 
 def _static_band(lower: int, upper: int) -> StaticBand:
     band = (lower, upper)
-    return StaticBand(atk_phys=band, agility=band, defense=band)
+    return StaticBand(
+        atk_phys=band,
+        agility=band,
+        defense=band,
+        # Monster magic power is documented nowhere in lore; every tier
+        # carries the zero band so monster construction reads the fourth
+        # axis deterministically without inventing a value (D-A2).
+        magic_power=(0, 0),
+    )
 
 
 MONSTER_TIER_REGISTRY: dict[str, MonsterTier] = {

@@ -48,8 +48,8 @@ class OfflineRuntimePathTests(QuestRegistryIsolation, EvenniaTestCase):
         self.player = create_object(PlayerCharacter, key="offline-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
-        # Human starting magic level (術師 tier) so fire_ball casts pass.
-        self.player.traits.magic_level.base = 30
+        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        self.player.traits.magic_power.base = 30
         self.player.db.skills = {"active": ["fire_ball"], "passive": []}
 
     def _monster(self, key: str, hp: int = 1) -> Monster:
@@ -108,8 +108,8 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
         self.player = create_object(PlayerCharacter, key="path-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
-        # Human starting magic level (術師 tier) so fire_ball casts pass.
-        self.player.traits.magic_level.base = 30
+        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        self.player.traits.magic_power.base = 30
         self.player.db.skills = {"active": ["fire_ball"], "passive": []}
 
     def _monster(self, key: str, hp: int = 1) -> Monster:
@@ -155,8 +155,8 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
     def test_combat_round_executes_the_planner(self):
         self.char1.race = "human"
         self.char1.apply_race_baseline()
-        # Human starting magic level (術師 tier) so fire_ball casts pass.
-        self.char1.traits.magic_level.base = 30
+        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        self.char1.traits.magic_power.base = 30
         self.char1.db.skills = {"active": ["fire_ball"], "passive": []}
         monster = self._monster("round")
         field = self._field(self.char1, [monster])
@@ -173,7 +173,7 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
         self.assertEqual(self.calls.count("quest"), 1)
 
     def test_overwhelm_path_executes_the_planner(self):
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             trait = getattr(self.player.traits, key)
             trait.base = 200
         self.player.traits.hp.base = 2000

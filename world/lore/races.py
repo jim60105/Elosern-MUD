@@ -14,11 +14,17 @@ class Vitals:
 
 @dataclass(frozen=True)
 class StaticBand:
-    """Independent physical-stat bands on the world's absolute scale."""
+    """Independent combat-stat bands on the world's absolute scale.
+
+    The fourth axis ``magic_power`` is the magic-school combat stat's
+    species-wide floor-to-ceiling band (growth-redesign D2); it carries no
+    progression semantics.
+    """
 
     atk_phys: tuple[int, int]
     agility: tuple[int, int]
     defense: tuple[int, int]
+    magic_power: tuple[int, int]
 
 
 @dataclass(frozen=True)
@@ -27,8 +33,6 @@ class RaceProfile:
 
     key: str
     lifespan: tuple[int, int]
-    magic_cap: int
-    starting_magic_level: int
     vital_baseline: Vitals
     static_baseline: StaticBand
     learning_multiplier: float
@@ -38,7 +42,15 @@ class RaceProfile:
 
 @dataclass(frozen=True)
 class StaticTier:
-    """A named physical-power band within a race."""
+    """A named physical-power band within a race.
+
+    ``band`` remains the shared physical-power band applied to
+    ``atk_phys``/``agility``/``defense``; ``magic_band`` is the tier's own
+    deterministic ``magic_power`` floor-to-ceiling band, replacing the deleted
+    race-level ``starting_magic_level`` as the source of tier-built NPC and
+    profile magic power. It must be a subset of the owning race's
+    ``static_baseline.magic_power`` band (validated at registry load).
+    """
 
     key: str
     race_key: str
@@ -47,6 +59,7 @@ class StaticTier:
     band: tuple[int, int | None]
     guild_rank_hint: str | None
     description: str
+    magic_band: tuple[int, int]
 
 
 @dataclass(frozen=True)
@@ -74,19 +87,25 @@ class Subrace:
     vital_overrides: dict[str, tuple[int, int]] | None = None
 
 
-def _static_band(lower: int, upper: int) -> StaticBand:
-    band = (lower, upper)
-    return StaticBand(atk_phys=band, agility=band, defense=band)
+def _static_band(
+    lower: int, upper: int, magic_lower: int, magic_upper: int
+) -> StaticBand:
+    """Build one race's four-axis combat band (physical axes share one band)."""
+    physical = (lower, upper)
+    return StaticBand(
+        atk_phys=physical,
+        agility=physical,
+        defense=physical,
+        magic_power=(magic_lower, magic_upper),
+    )
 
 
 RACE_REGISTRY: dict[str, RaceProfile] = {
     "human": RaceProfile(
         key="human",
         lifespan=(60, 80),
-        magic_cap=90,
-        starting_magic_level=30,
         vital_baseline=Vitals(hp=(100, 200), mp=(100, 200), sp=(100, 200)),
-        static_baseline=_static_band(1, 22),
+        static_baseline=_static_band(1, 22, 5, 90),
         learning_multiplier=1.0,
         can_use_divine_arts=False,
         description="壽命短暫而繁衍迅速的人類，適應力強，是這片大陸最常見的種族。",
@@ -94,10 +113,8 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
     "beastfolk": RaceProfile(
         key="beastfolk",
         lifespan=(50, 70),
-        magic_cap=30,
-        starting_magic_level=10,
         vital_baseline=Vitals(hp=(150, 200), mp=(30, 50), sp=(150, 200)),
-        static_baseline=_static_band(4, 34),
+        static_baseline=_static_band(4, 34, 1, 30),
         learning_multiplier=1.0,
         can_use_divine_arts=False,
         description="獸耳與尾巴的獸人族，體魄強健、感官敏銳，以部族文化與野性力量聞名。",
@@ -105,12 +122,10 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
     "elf": RaceProfile(
         key="elf",
         lifespan=(800, 1200),
-        magic_cap=900,
-        starting_magic_level=300,
         vital_baseline=Vitals(
             hp=(10000, 10000), mp=(10000, 10000), sp=(10000, 10000)
         ),
-        static_baseline=_static_band(70, 95),
+        static_baseline=_static_band(70, 95, 100, 900),
         learning_multiplier=10.0,
         can_use_divine_arts=True,
         description="壽命數百年的精靈族，魔力深厚、體質超凡，與森林和魔法息息相關。",
@@ -121,47 +136,47 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
 STATIC_TIER_REGISTRY: dict[str, StaticTier] = {
     "human_commoner": StaticTier(
         "human_commoner", "human", "平民與非戰鬥者", 1, (1, 5), None,
-        "Commoners and non-combatants.",
+        "Commoners and non-combatants.", (5, 20),
     ),
     "human_adventurer": StaticTier(
         "human_adventurer", "human", "一般冒險者", 2, (5, 9), "F",
-        "General adventurers spanning guild ranks F through D.",
+        "General adventurers spanning guild ranks F through D.", (25, 35),
     ),
     "human_elite": StaticTier(
         "human_elite", "human", "精銳", 3, (7, 14), "C",
-        "Elite fighters spanning guild ranks C through B.",
+        "Elite fighters spanning guild ranks C through B.", (35, 55),
     ),
     "human_veteran": StaticTier(
         "human_veteran", "human", "一流", 4, (14, 18), "A",
-        "First-rate human fighters associated with guild rank A.",
+        "First-rate human fighters associated with guild rank A.", (55, 72),
     ),
     "human_swordmaster": StaticTier(
         "human_swordmaster", "human", "大劍豪", 5, (18, 22), "S",
-        "The absolute human ceiling, associated with guild rank S.",
+        "The absolute human ceiling, associated with guild rank S.", (72, 90),
     ),
     "beastfolk_juvenile": StaticTier(
         "beastfolk_juvenile", "beastfolk", "幼年與非戰鬥者", 1, (4, 8), None,
-        "Juveniles and non-combatants.",
+        "Juveniles and non-combatants.", (1, 8),
     ),
     "beastfolk_warrior": StaticTier(
         "beastfolk_warrior", "beastfolk", "一般部族戰士", 2, (10, 16), None,
-        "The band containing most adult beastfolk warriors.",
+        "The band containing most adult beastfolk warriors.", (8, 15),
     ),
     "beastfolk_city_apex": StaticTier(
         "beastfolk_city_apex", "beastfolk", "城級頂尖戰士", 3, (18, 24), None,
-        "A top fighter of a tribal city, overlapping human swordmasters.",
+        "A top fighter of a tribal city, overlapping human swordmasters.", (15, 22),
     ),
     "beastfolk_tribal_apex": StaticTier(
         "beastfolk_tribal_apex", "beastfolk", "部族最強者、獸王級", 4, (26, 34), None,
-        "One of the handful of strongest beastfolk alive.",
+        "One of the handful of strongest beastfolk alive.", (22, 30),
     ),
     "elf_common": StaticTier(
         "elf_common", "elf", "一般精靈", 1, (70, 95), None,
-        "The physical band of a typical elf.",
+        "The physical band of a typical elf.", (100, 500),
     ),
     "elf_prodigy": StaticTier(
         "elf_prodigy", "elf", "精靈中的異數", 2, (95, None), None,
-        "An exceptional elf with no documented hard ceiling.",
+        "An exceptional elf with no documented hard ceiling.", (500, 900),
     ),
 }
 
@@ -235,3 +250,44 @@ SUBRACE_REGISTRY: dict[str, Subrace] = {
         {"mp": (50, 70)},
     ),
 }
+
+
+def _validate_static_tier_magic_bands(registry: dict[str, StaticTier]) -> None:
+    """Reject a tier whose magic_band deviates from its owning race's band.
+
+    Every ``StaticTier`` must reference a registered race and its closed
+    ``magic_band`` must be a subset of that race's
+    ``static_baseline.magic_power`` band (growth-redesign D2). A deviating
+    tier fails the whole registry at import, exactly like the other
+    fail-closed registry validations.
+    """
+    for tier_key, tier in registry.items():
+        if tier.key != tier_key:
+            raise ValueError(
+                f"tier {tier_key!r} key mismatch (declared {tier.key!r})"
+            )
+        race = RACE_REGISTRY.get(tier.race_key)
+        if race is None:
+            raise ValueError(
+                f"tier {tier_key!r} declares unknown race {tier.race_key!r}"
+            )
+        band = tier.magic_band
+        if (
+            not isinstance(band, tuple)
+            or len(band) != 2
+            or any(type(edge) is not int for edge in band)
+            or band[0] > band[1]
+        ):
+            raise ValueError(
+                f"tier {tier_key!r} magic_band must be a closed "
+                f"non-decreasing integer tuple, got {band!r}"
+            )
+        race_band = race.static_baseline.magic_power
+        if not (race_band[0] <= band[0] and band[1] <= race_band[1]):
+            raise ValueError(
+                f"tier {tier_key!r} magic_band {band} is outside race "
+                f"{race.key!r} magic_power band {race_band}"
+            )
+
+
+_validate_static_tier_magic_bands(STATIC_TIER_REGISTRY)

@@ -84,7 +84,7 @@ class FakeEntity:
         atk_phys: int = 10,
         agility: int = 10,
         defense: int = 5,
-        magic_level: int = 10,
+        magic_power: int = 10,
         owned: list[str] | None = None,
     ):
         self.key = key
@@ -93,12 +93,12 @@ class FakeEntity:
                 "atk_phys": atk_phys,
                 "agility": agility,
                 "defense": defense,
-                "magic_level": magic_level,
+                "magic_power": magic_power,
             },
             owned,
         )
         self.traits = SimpleNamespace(hp=FakeGauge(hp, max_hp or hp))
-        self.traits.magic_level = FakeGauge(magic_level, magic_level)
+        self.traits.magic_power = FakeGauge(magic_power, magic_power)
         # Minimal buff/equipment storage so the pure combat-modifier query
         # (used by the shared adjusted-stat helpers) evaluates a fake to the
         # empty bundle without materializing any handler.

@@ -166,17 +166,13 @@ const traits = computed(() => (characterAvailable.value && Array.isArray(props.c
 // owned by the 生命量 and 計數・公會 sections, so the 屬性 section filters
 // to an allowlist (fails closed: a new server trait key renders nowhere
 // until reviewed in) rather than rendering every trait row.
-const ATTRIBUTE_KEYS = ["atk_phys", "agility", "defense", "magic_level"];
+const ATTRIBUTE_KEYS = ["atk_phys", "agility", "defense", "magic_power"];
 
 const attributeRows = computed(() => {
   const byKey = new Map(traits.value.map((row) => [row.key, row]));
   return ATTRIBUTE_KEYS.map((key) => byKey.get(key)).filter(Boolean);
 });
 
-// Client-side display override: the 設計稿 abbreviates `magic_level` to 魔階
-// inside #dr-status; the server's shared TRAIT_LABELS (魔法階級) is preserved
-// for every other consumer (e.g., the disguise displayed rows).
-const TRAIT_LABEL_OVERRIDES = { magic_level: "魔階" };
 
 function traitValue(row) {
   return row.max === null ? String(row.current) : `${row.current} / ${row.max}`;
@@ -312,7 +308,7 @@ const INTIMATE_ROWS = [
           class="character-status-drawer__statrow"
           :data-testid="`character-status-drawer__trait--${row.key}`"
         >
-          <span class="character-status-drawer__statrow-key">{{ TRAIT_LABEL_OVERRIDES[row.key] ?? row.label }}</span>
+          <span class="character-status-drawer__statrow-key">{{ row.label }}</span>
           <span class="character-status-drawer__statrow-value">{{ traitValue(row) }}</span>
           <!-- One chip per payload layer, payload order, all rendered (≤ 16
                by the payload contract); no layers → no element. -->

@@ -94,9 +94,9 @@ class LoreSyncTests(EvenniaTestCase):
     def test_sync_one_updates_existing_record(self):
         entry = RACE_REGISTRY["human"]
         sync_one("test_races", entry.key, entry)
-        changed = replace(entry, magic_cap=91)
+        changed = replace(entry, learning_multiplier=0.5)
         sync_one("test_races", changed.key, changed)
 
         records = search_script("lore:test_races:human")
         self.assertEqual(len(records), 1)
-        self.assertEqual(records[0].db.fields["magic_cap"], 91)
+        self.assertEqual(records[0].db.fields["learning_multiplier"], 0.5)

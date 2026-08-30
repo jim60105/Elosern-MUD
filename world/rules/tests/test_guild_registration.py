@@ -58,7 +58,7 @@ class GuildRegistrationTests(EvenniaTestCase):
         record = self._register(staff=self.staff)
         self.assertEqual(self.player.guild_rank, "F")
         self.assertEqual(record["branch_key"], "guild_branch_altoria")
-        for key in ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_level", "guild_merit"):
+        for key in ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power", "guild_merit"):
             self.assertEqual(
                 record["displayed_stats"][key],
                 int(getattr(self.player.traits, key).value),

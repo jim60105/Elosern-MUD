@@ -32,7 +32,6 @@ from typeclasses.rooms import AnchorRoom, GridRoom, InstanceRoom
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.anchors import ANCHOR_REGISTRY
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
-from world.lore.races import RACE_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.maps.instance import register_owned_entity, spawn_instance_room
 from world.quests.binding import bind_stage_runtime
@@ -275,10 +274,11 @@ def _spawn_npc(
     position: int,
 ) -> NPC:
     tier = NPC_TIER_REGISTRY[tier_key]
-    race = RACE_REGISTRY[tier.race_key]
-    values = build_initial_traits(tier.race_key, tier=tier.static_tier_key)
-    values["magic_level"] = race.starting_magic_level
-    config = trait_config_for_values(values, race.magic_cap)
+    # The tier's four bands (three physical + magic_power) drive the whole
+    # stat block; the deleted race-level magic fields have no caller (D-A2).
+    config = trait_config_for_values(
+        build_initial_traits(tier.race_key, tier=tier.static_tier_key)
+    )
 
     prototype = {
         "prototype_parent": "scene_npc",

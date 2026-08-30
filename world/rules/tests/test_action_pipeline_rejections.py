@@ -183,20 +183,20 @@ class ElementTierCastGateTests(EvenniaTestCase):
 
     @covers_requirement("action-resolution-pipeline::casting-an-elemental-spell-above-the-caster-s-tier-without-mastery-is-rejected")
     def test_preflight_rejects_under_tier_cast_without_mastery(self):
-        self.actor.traits.magic_level.current = 20
+        self.actor.traits.magic_power.base = 20
         self.actor.db.skills = {"active": ["status_disguise"], "passive": []}
         result = ActionResolver.preflight(self._request())
         self.assertIs(result.outcome, "rejected")
         self.assertIs(result.reason, RejectReason.UNKNOWN_SKILL)
 
     def test_preflight_succeeds_via_numeric_level_alone(self):
-        self.actor.traits.magic_level.current = 71
+        self.actor.traits.magic_power.base = 71
         self.actor.db.skills = {"active": ["status_disguise"], "passive": []}
         result = ActionResolver.preflight(self._request())
         self.assertIs(result.outcome, "success")
 
     def test_preflight_succeeds_via_mastery_ownership_alone(self):
-        self.actor.traits.magic_level.current = 1
+        self.actor.traits.magic_power.base = 1
         self.actor.db.skills = {
             "active": ["status_disguise"],
             "passive": ["fire_mastery"],
@@ -212,7 +212,7 @@ class ElementTierCastGateTests(EvenniaTestCase):
             cost={"mp": 5},
         )
         try:
-            self.actor.traits.magic_level.current = 71
+            self.actor.traits.magic_power.base = 71
             self.actor.db.skills = {"active": ["status_disguise"], "passive": []}
             result = ActionResolver.preflight(self._request())
             self.assertIs(result.outcome, "rejected")
@@ -221,7 +221,7 @@ class ElementTierCastGateTests(EvenniaTestCase):
             SKILL_REGISTRY["status_disguise"] = original
 
     def test_resolve_rejects_under_tier_without_mastery(self):
-        self.actor.traits.magic_level.current = 20
+        self.actor.traits.magic_power.base = 20
         self.actor.db.skills = {"active": ["status_disguise"], "passive": []}
         result = ActionResolver.resolve(self._request())
         self.assertIs(result.outcome, "rejected")
@@ -229,7 +229,7 @@ class ElementTierCastGateTests(EvenniaTestCase):
         self.assertIsNone(self.actor.db.disguised_stats)
 
     def test_resolve_succeeds_via_mastery_ownership_at_level_one(self):
-        self.actor.traits.magic_level.current = 1
+        self.actor.traits.magic_power.base = 1
         self.actor.db.skills = {
             "active": ["status_disguise"],
             "passive": ["fire_mastery"],

@@ -97,9 +97,9 @@ Both preset and custom activation SHALL require `age` and `apparent_age` to be i
 
 ### Requirement: Activation is an all-or-nothing deterministic-core operation
 The creation command SHALL submit a validated request to a deterministic `world.rules` creation
-service. The service SHALL preflight all fields and allocation constraints before sampling a magic
-value, then atomically write the trait configuration, identity attributes, sampled starting magic
-level, active state, and creation-owned initial mechanical state: `magic_xp`, skill proficiency,
+service. The service SHALL preflight all fields and allocation constraints, then atomically write
+the trait configuration (including the allocated `magic_power` static), identity attributes,
+active state, and creation-owned initial mechanical state: `magic_xp`, skill proficiency,
 skills, equipment, inventory, wallet, quest log, guild rank, and guild merit. If any write fails, it
 SHALL restore all persisted and in-process trait state and leave the character pending. Activation
 SHALL not create or puppet an object, and SHALL not change the shell's dbref, account relation, or
@@ -118,12 +118,12 @@ instead of the arrival welcome, and no map-knowledge observation SHALL be record
 #### Scenario: An activation write failure leaves no partially initialized character
 - **WHEN** a test injects a failure at any activation write position after preflight
 - **THEN** the character has its original pending state, trait data, identity attributes, and
-  magic-progress attributes, with no active command set enabled
+  initial mechanical attributes, with no active command set enabled
 
 #### Scenario: Successful activation enables normal gameplay exactly once
 - **WHEN** a valid activation commits
 - **THEN** the pending gate is removed, the normal character command set is available, and a
-  subsequent `rest 5s` reaches the world clock with a real `magic_level` trait
+  subsequent `rest 5s` reaches the world clock with a real `magic_power` trait
 
 #### Scenario: Activation moves the shell to the starting location and records it
 - **WHEN** a valid activation commits for an already puppeted pending shell and the 南門 room exists

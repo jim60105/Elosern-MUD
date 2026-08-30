@@ -32,11 +32,10 @@ from world.rules.progression import (
     accrue_magic_study,
     can_cast_skill,
     can_cast_spell_tier,
-    effective_magic_growth_multiplier,
+    effective_growth_multiplier,
     element_affinity_multiplier,
     grant_combat_kill_xp,
     grant_skill_practice_xp,
-    magic_rank_title,
     skill_proficiency_level,
 )
 from world.skills.cost_tiers import spell_tier_for
@@ -58,7 +57,7 @@ class ProgressionTests(EvenniaTestCase):
         monster.apply_monster_tier()
         return monster
 
-    @covers_requirement("magic-level-progression::effective-magic-growth-multiplier-combines-race-self-and-conferred-multipliers")
+    @covers_requirement("magic-level-progression::effective-growth-multiplier-combines-race-self-and-conferred-multipliers")
     def test_multiplier_combines_race_owned_passive_and_conferred_buff(self):
         entity = self._character("elosia", "elf")
         entity.db.skills = {
@@ -66,18 +65,18 @@ class ProgressionTests(EvenniaTestCase):
             "passive": ["reincarnation_boon_elosia"],
         }
         grant_conferred_growth_rate(entity, "source", 0.5)
-        self.assertEqual(effective_magic_growth_multiplier(entity), 500.0)
+        self.assertEqual(effective_growth_multiplier(entity), 500.0)
 
     def test_multiplier_applies_race_and_passive_sources_independently(self):
         elf = self._character("race-multiplier", "elf")
-        self.assertEqual(effective_magic_growth_multiplier(elf), 10.0)
+        self.assertEqual(effective_growth_multiplier(elf), 10.0)
 
         passive = self._character("passive-multiplier")
         passive.db.skills = {
             "active": [],
             "passive": ["reincarnation_boon_elosia"],
         }
-        self.assertEqual(effective_magic_growth_multiplier(passive), 100.0)
+        self.assertEqual(effective_growth_multiplier(passive), 100.0)
 
     def test_conferred_growth_changes_study_xp(self):
         baseline = self._character("baseline")
@@ -88,7 +87,7 @@ class ProgressionTests(EvenniaTestCase):
 
     def test_missing_race_and_growth_sources_return_identity_multiplier(self):
         monster = self._monster("identity")
-        self.assertEqual(effective_magic_growth_multiplier(monster), 1.0)
+        self.assertEqual(effective_growth_multiplier(monster), 1.0)
 
     @covers_requirement("magic-level-progression::world-clock-and-combat-integration-use-the-progression-seams-exactly-once")
     def test_study_requires_skip_source_and_world_clock_invokes_it(self):
@@ -109,21 +108,22 @@ class ProgressionTests(EvenniaTestCase):
         entity = self._character("elf", "elf")
         entity.db.magic_xp = MAGIC_XP_PER_LEVEL * 10000
         grant_combat_kill_xp(entity, "low")
-        self.assertEqual(entity.traits.magic_level.value, 900)
+        self.assertEqual(entity.traits.magic_power.value, 900)
         self.assertEqual(entity.db.magic_xp, 0.0)
 
     @covers_requirement("magic-level-progression::magic-level-never-exceeds-the-entity-s-race-driven-cap-regardless-of-xp-surplus")
     def test_monster_magic_level_never_grows(self):
         monster = self._monster("monster")
         grant_combat_kill_xp(monster, "low")
-        self.assertEqual(monster.traits.magic_level.value, 0)
+        self.assertEqual(monster.traits.magic_power.value, 0)
         self.assertEqual(monster.db.magic_xp, 0.0)
 
     def test_magic_xp_at_cap_is_discarded_on_later_grants(self):
         entity = self._character("capped-elf", "elf")
-        entity.traits.magic_level.current = entity.traits.magic_level.max
+        # The race band ceiling (900) is the cap; a static trait has no .max.
+        entity.traits.magic_power.base = 900
         grant_combat_kill_xp(entity, "low")
-        self.assertEqual(entity.traits.magic_level.value, 900)
+        self.assertEqual(entity.traits.magic_power.value, 900)
         self.assertEqual(entity.db.magic_xp, 0.0)
 
     @covers_requirement("magic-level-progression::grant-combat-kill-xp-awards-magic-xp-scaled-by-monster-tier-and-the-entity-s-growth-multiplier")
@@ -153,7 +153,8 @@ class ProgressionTests(EvenniaTestCase):
             entity.db.skill_proficiency["shadow_slash"],
             3 * SKILL_PRACTICE_XP_PER_USE * 10,
         )
-        self.assertEqual(entity.traits.magic_level.value, 0)
+        # The elf race floor is the starting magic power; practice never moves it.
+        self.assertEqual(entity.traits.magic_power.value, 100)
         self.assertIsNone(entity.db.magic_xp)
         self.assertEqual(skill_proficiency_level(entity, "shadow_slash"), 0)
 
@@ -166,7 +167,7 @@ class ProgressionTests(EvenniaTestCase):
         self.assertEqual(skill_proficiency_level(entity, "never_practiced"), 0)
         self.assertEqual(entity.db.skill_proficiency, before)
 
-    @covers_requirement("skill-proficiency-tracking::skill-proficiency-is-a-per-entity-per-skill-counter-independent-of-magic-level")
+    @covers_requirement("skill-proficiency-tracking::skill-proficiency-is-a-per-entity-per-skill-counter-independent-of-magic-power")
     def test_magic_xp_grants_preserve_skill_proficiency(self):
         entity = self._character("separate-progression")
         entity.db.skill_proficiency = {"shadow_slash": 25.0}
@@ -226,8 +227,8 @@ class ProgressionTests(EvenniaTestCase):
 
     def test_area_shorthand_awards_each_newly_defeated_monster_once(self):
         actor = self._character("area-fighter")
-        # Human starting magic level (術師 tier) so wind_blade passes the gate.
-        actor.traits.magic_level.base = 30
+        # Human static magic_power at 術師 tier so wind_blade passes the gate.
+        actor.traits.magic_power.base = 30
         actor.db.skills = {"active": ["wind_blade"], "passive": []}
         first, second, corpse = (
             self._monster("first"),
@@ -263,8 +264,8 @@ class ProgressionTests(EvenniaTestCase):
 
     def test_duplicate_area_targets_reject_before_resolution(self):
         actor = self._character("duplicate-fighter")
-        # Human starting magic level (術師 tier) so wind_blade passes the gate.
-        actor.traits.magic_level.base = 30
+        # Human static magic_power at 術師 tier so wind_blade passes the gate.
+        actor.traits.magic_power.base = 30
         actor.db.skills = {"active": ["wind_blade"], "passive": []}
         monster = self._monster("duplicate-goblin")
         monster.traits.hp.current = 1
@@ -342,12 +343,13 @@ class ProgressionTests(EvenniaTestCase):
     def test_calibration_anchors(self):
         violet = self._character("violet")
         accrue_magic_study([violet], 11680 * 3600, AdvanceSource.SKIP)
-        self.assertIn(violet.traits.magic_level.value, {19, 20})
+        # Base is the human race floor (5), so the same XP lands 5 higher.
+        self.assertIn(violet.traits.magic_power.value, {24, 25})
 
         ordinary_human = self._character("ordinary-human")
         accrue_magic_study([ordinary_human], 29200 * 3600, AdvanceSource.SKIP)
-        self.assertGreaterEqual(ordinary_human.traits.magic_level.value, 30)
-        self.assertLessEqual(ordinary_human.traits.magic_level.value, 50)
+        self.assertGreaterEqual(ordinary_human.traits.magic_power.value, 30)
+        self.assertLessEqual(ordinary_human.traits.magic_power.value, 55)
 
         elosia = self._character("calibration-elosia", "elf")
         elosia.db.skills = {
@@ -355,8 +357,8 @@ class ProgressionTests(EvenniaTestCase):
             "passive": ["reincarnation_boon_elosia"],
         }
         accrue_magic_study([elosia], 524 * 3600, AdvanceSource.SKIP)
-        self.assertIn(elosia.traits.magic_level.value, {873, 874})
-        self.assertLess(elosia.traits.magic_level.value, 900)
+        # Floor (100) + 1000x growth saturates the race band ceiling (900).
+        self.assertEqual(elosia.traits.magic_power.value, 900)
 
     def test_divine_arts_remain_outside_progression_scope(self):
         self.assertFalse(
@@ -380,7 +382,7 @@ class NpcPolicyCastGateIntegrationTests(EvenniaTestCase):
         self.companion.apply_race_baseline()
         # Below the 術師 threshold for firestorm (floor(15 * 1.0) == 15) with
         # no declared affinity and no fire_mastery, but with enough MP.
-        self.companion.traits.magic_level.current = 15
+        self.companion.traits.magic_power.base = 15
         self.companion.traits.mp.current = 30
         self.companion.db.skills = {"active": ["firestorm"], "passive": []}
         self.goblin = create_object(Monster, key="goblin")
@@ -437,49 +439,21 @@ class NpcPolicyCastGateIntegrationTests(EvenniaTestCase):
 
 
 class ElementMasteryGateTests(EvenniaTestCase):
-    """element-mastery: rank-title and cast-gate pure functions."""
+    """element-mastery: cast-gate pure functions (rank ladder retired)."""
 
     def _caster(
         self,
         key: str,
-        magic_level: int,
+        magic_power: int,
         race: str = "elf",
     ) -> PlayerCharacter:
         entity = create_object(PlayerCharacter, key=key)
         entity.race = race
         entity.apply_race_baseline()
-        entity.traits.magic_level.current = magic_level
+        entity.traits.magic_power.base = magic_power
         entity.db.skills = {"active": [], "passive": []}
         return entity
 
-    @covers_requirement("element-mastery::magic-rank-title-derives-a-display-only-title-from-numeric-magic-level")
-    def test_rank_title_matches_the_five_documented_bands(self):
-        cases = (
-            (0, "學徒"),
-            (15, "學徒"),
-            (16, "術師"),
-            (30, "術師"),
-            (31, "大師"),
-            (70, "大師"),
-            (71, "賢者"),
-            (90, "賢者"),
-            (91, "主宰"),
-            (873, "主宰"),
-        )
-        for level, expected in cases:
-            with self.subTest(level=level):
-                self.assertEqual(
-                    magic_rank_title(self._caster(f"rank-{level}", level)),
-                    expected,
-                )
-
-    def test_rank_title_ignores_owned_skills(self):
-        entity = self._caster("rank-with-skills", 5)
-        entity.db.skills = {
-            "active": [],
-            "passive": ["fire_mastery", "wind_mastery"],
-        }
-        self.assertEqual(magic_rank_title(entity), "學徒")
 
     def test_gate_requires_numeric_threshold_without_mastery(self):
         self.assertFalse(
@@ -527,9 +501,9 @@ class ElementMasteryGateTests(EvenniaTestCase):
         ]
         self.assertTrue(can_cast_spell_tier(high, "fire", "主宰"))
 
-    def test_gate_and_rank_are_independent_at_the_top_boundary(self):
+    def test_gate_rejects_dominance_at_the_top_boundary(self):
+        # The 主宰 gate threshold (91) sits above the 90 power boundary.
         entity = self._caster("boundary", 90)
-        self.assertEqual(magic_rank_title(entity), "賢者")
         self.assertFalse(can_cast_spell_tier(entity, "fire", "主宰"))
 
     def test_gate_rejects_unknown_tier(self):
@@ -779,12 +753,13 @@ class ElementMasteryGateTests(EvenniaTestCase):
             with self.subTest(tier=tier, with_mastery=True):
                 self.assertTrue(can_cast_spell_tier(master, "dark", tier))
 
-    def test_created_humans_always_satisfy_the_apprentice_gate(self):
-        from world.rules.character_creation import starting_magic_interval
-
-        low, _high = starting_magic_interval("human")
-        self.assertGreaterEqual(low, 16)
-        entity = self._caster("created-human", low, "human")
+    def test_created_humans_start_below_the_apprentice_gate(self):
+        # magic-power-static-rename: the retired 27–33 sampler is replaced by
+        # the race floor (5) plus player allocation, so a freshly created
+        # human sits below the 術師 threshold until points are allocated.
+        entity = self._caster("created-human", 5, "human")
+        self.assertFalse(can_cast_spell_tier(entity, "fire", "術師"))
+        entity.traits.magic_power.base = 16
         self.assertTrue(can_cast_spell_tier(entity, "fire", "術師"))
 
 
@@ -794,14 +769,14 @@ class ElementAffinityProgressionTests(EvenniaTestCase):
     def _caster(
         self,
         key: str,
-        magic_level: int,
+        magic_power: int,
         race: str = "human",
         affinity: tuple[str, ...] | None = None,
     ) -> PlayerCharacter:
         entity = create_object(PlayerCharacter, key=key)
         entity.race = race
         entity.apply_race_baseline()
-        entity.traits.magic_level.current = magic_level
+        entity.traits.magic_power.base = magic_power
         entity.db.skills = {"active": [], "passive": []}
         if affinity is not None:
             entity.db.affinity_elements = list(affinity)
@@ -859,7 +834,7 @@ class ElementAffinityProgressionTests(EvenniaTestCase):
         self.assertTrue(can_cast_spell_tier(entity, "fire", "主宰"))
         for level in (84, 90):
             with self.subTest(level=level):
-                entity.traits.magic_level.current = level
+                entity.traits.magic_power.base = level
                 self.assertFalse(can_cast_spell_tier(entity, "wind", "主宰"))
 
     @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")

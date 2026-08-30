@@ -22,7 +22,7 @@
 | `sexual_baseline` | 必須含 `arousal`、`virgin` 與 `sensitivity`，值域受正規詞彙表限制。 |
 | `persona` | 物件型別的敘事資料。匯入器不解析其內部欄位。 |
 
-`stats` 可提供 `hp`、`mp`、`sp`、`atk_phys`、`agility`、`defense`、`magic_level` 與 `guild_merit`。未提供的特質會以種族基準補足。`hp` 至少為 `1`；其餘數值為非負整數。若值落在種族建議區間外，驗證器會提出警告；超過魔法上限、未知種族、錯誤亞種、未知技能與不合格的結構會直接拒絕匯入。
+`stats` 可提供 `hp`、`mp`、`sp`、`atk_phys`、`agility`、`defense`、`magic_power` 與 `guild_merit`。未提供的特質會以種族基準補足。`hp` 至少為 `1`；其餘數值為非負整數。若值落在種族建議區間外，驗證器會提出警告；`magic_power` 超過種族魔力帶上界、未知種族、錯誤亞種、未知技能與不合格的結構會直接拒絕匯入。
 
 ```json
 {

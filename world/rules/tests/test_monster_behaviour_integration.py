@@ -37,7 +37,7 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
             atk_phys=1000,
             agility=1000,
             defense=1000,
-            magic_level=1000,
+            magic_power=1000,
         )
         self.enemy = FakeEntity("enemy", hp=100, agility=1)
         self.field = Battlefield(
@@ -81,7 +81,7 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
                 atk_phys=1,
                 agility=1,
                 defense=1,
-                magic_level=1,
+                magic_power=1,
             )
             return []
 

@@ -6,9 +6,16 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 
 ### Requirement: RaceProfile encodes the three-race power gap
 `world/lore/races.py` SHALL define a frozen `RaceProfile` dataclass with exactly the fields
-`key`, `lifespan`, `magic_cap`, `starting_magic_level`, `vital_baseline`, `static_baseline`,
-`learning_multiplier`, and `can_use_divine_arts`, and a module-level `RACE_REGISTRY: dict[str, RaceProfile]` containing
-exactly three entries keyed `"human"`, `"beastfolk"`, and `"elf"`.
+`key`, `lifespan`, `vital_baseline`, `static_baseline`, `learning_multiplier`, and
+`can_use_divine_arts`, and a module-level `RACE_REGISTRY: dict[str, RaceProfile]` containing
+exactly three entries keyed `"human"`, `"beastfolk"`, and `"elf"`. `StaticBand` SHALL be
+four-dimensional — `atk_phys`, `agility`, `defense`, and `magic_power`, each a
+`tuple[int, int]` — and the race `static_baseline` SHALL carry the growth-redesign interim
+bands: human `(1, 22)` on the three combat axes with `magic_power (5, 90)`, beastfolk
+`(4, 34)` with `magic_power (1, 30)`, elf `(70, 95)` with `magic_power (100, 900)`. The
+former `magic_cap` and `starting_magic_level` fields SHALL NOT exist: the fourth
+`static_baseline` axis is the only race-owned magic-power bound, and no race-owned magic
+average survives.
 
 #### Scenario: Registry has exactly the three documented races
 - **WHEN** `RACE_REGISTRY` is inspected
@@ -35,26 +42,35 @@ exactly three entries keyed `"human"`, `"beastfolk"`, and `"elf"`.
 - **WHEN** `RACE_REGISTRY` is inspected
 - **THEN** `can_use_divine_arts` is `True` for `"elf"` and `False` for `"human"` and `"beastfolk"`
 
-#### Scenario: magic_cap ordering matches the documented gap
-- **WHEN** the three races' `magic_cap` values are compared
-- **THEN** `beastfolk.magic_cap < human.magic_cap < elf.magic_cap`, matching 30 / 90 / 900
+#### Scenario: magic_power band ordering matches the documented gap
+- **WHEN** the three races' `static_baseline.magic_power` bands are compared
+- **THEN** every upper bound of `beastfolk` is below every lower bound of `human`, and every
+  upper bound of `human` is below every lower bound of `elf`, matching the interim table
+  1–30 / 5–90 / 100–900, and no `RaceProfile` field named `magic_cap` or
+  `starting_magic_level` exists anywhere in the dataclass
 
-#### Scenario: Starting magic averages are immutable and cap-safe
-- **WHEN** the three races' `starting_magic_level` values are inspected
-- **THEN** they are respectively 30, 10, and 300 for human, beastfolk, and elf,
-  each is an integer greater than zero and no greater than that race's `magic_cap`
+#### Scenario: The fourth band axis is mandatory and integral
+- **WHEN** every `StaticBand` instance in the registry modules is inspected
+- **THEN** each carries a `magic_power` tuple of two integers with a non-decreasing range, for
+  every race baseline and every monster tier band
 
 ### Requirement: StaticTier registry records named power bands within each race's static_baseline
 `world/lore/races.py` SHALL define a frozen `StaticTier` dataclass with fields `key`, `race_key`,
-`display_name_zh`, `order`, `band: tuple[int, int | None]`, `guild_rank_hint`, and `description`, and a module-level
+`display_name_zh`, `order`, `band: tuple[int, int | None]`, `magic_band: tuple[int, int]`,
+`guild_rank_hint`, and `description`, and a module-level
 `STATIC_TIER_REGISTRY: dict[str, StaticTier]` containing five human tiers, four beastfolk tiers,
-and two elf tiers.
+and two elf tiers. `band` remains the shared physical-power band applied to
+`atk_phys`/`agility`/`defense`; `magic_band` is the tier's own deterministic `magic_power`
+floor-to-ceiling band, replacing the deleted race-level `starting_magic_level` as the source of
+tier-built NPC and profile magic power. Registry load SHALL validate every `magic_band` is a
+subset of the owning race's `static_baseline.magic_power` band.
 
 #### Scenario: Every tier references a real race and stays within that race's static_baseline
 - **WHEN** every entry in `STATIC_TIER_REGISTRY` is inspected
 - **THEN** each entry's `race_key` exists as a key in `RACE_REGISTRY`, and each entry's `band` falls
   within (or, for the top tier of a race, extends to) that race's `static_baseline` range on every
-  axis
+  combat axis, and each entry's `magic_band` is a subset of that race's
+  `static_baseline.magic_power` range
 
 #### Scenario: Human tiers are ordered and reach the species ceiling
 - **WHEN** the five human tiers are sorted by `order`
@@ -62,6 +78,13 @@ and two elf tiers.
   `order`, and the highest tier's `band` upper bound equals `RACE_REGISTRY["human"]
   .static_baseline.atk_phys[1]` (22) — a human S-rank adventurer is numerically representable, not
   capped out by a narrower species band
+
+#### Scenario: Old magic lore anchors survive as tier magic bands
+- **WHEN** `STATIC_TIER_REGISTRY["human_adventurer"].magic_band` is inspected
+- **THEN** it is mid-band within the human `magic_power` band (5–90), anchored on the old human
+  average 30, and the 平民 tier's `magic_band` lower bound is the race floor 5 while the 大劍豪
+  tier's upper bound is the race ceiling 90 — the race magic band is spanned deterministically by
+  the tier ladder instead of the deleted `starting_magic_level`
 
 #### Scenario: Guild rank hints are present only where world_info.md states them
 - **WHEN** every `StaticTier` entry is inspected
@@ -72,7 +95,14 @@ and two elf tiers.
 
 #### Scenario: An open-ended top tier is representable
 - **WHEN** `STATIC_TIER_REGISTRY["elf_prodigy"]` is inspected
-- **THEN** its `band` is `(95, None)`, where `None` records the source's lack of a hard ceiling
+- **THEN** its `band` is `(95, None)`, where `None` records the source's lack of a hard ceiling,
+  while its `magic_band` is a closed two-integer tuple within the elf `magic_power` band (no
+  open-ended magic dimension exists)
+
+#### Scenario: A magic_band outside the race band fails registry load
+- **WHEN** a `StaticTier` is constructed with a `magic_band` whose endpoints fall outside the
+  owning race's `static_baseline.magic_power` band
+- **THEN** registry load raises a named error rather than accepting the deviating tier
 
 ### Requirement: Subrace registry covers elf branches, beastfolk subspecies, and human social classes with stat modifiers
 `world/lore/races.py` SHALL define a frozen `StatModifiers` dataclass with fields `atk_phys`,
@@ -168,20 +198,6 @@ entries (`apprentice`/初級, `intermediate`/中級, `advanced`/高級, `superio
 #### Scenario: Ultimate tier is open-ended
 - **WHEN** `MAGIC_TIER_REGISTRY["ultimate"]` is inspected
 - **THEN** `level_min` is 91 and `level_max` is `None`
-
-### Requirement: RankTitle registry is ordered and references magic tiers
-`world/lore/magic.py` SHALL define a frozen `RankTitle` dataclass with an `order: int` field and
-an `unlocks_tier: str | None` field, and a module-level `RANK_TITLE_REGISTRY: dict[str, RankTitle]`
-with five entries (學徒, 術師, 大師, 賢者, 主宰) ordered 1 through 5.
-
-#### Scenario: Titles are strictly ordered
-- **WHEN** `RANK_TITLE_REGISTRY` entries are sorted by `order`
-- **THEN** the resulting sequence is 學徒, 術師, 大師, 賢者, 主宰 with `order` values 1 through 5
-  and no duplicate `order` values
-
-#### Scenario: Non-apprentice titles reference an existing magic tier
-- **WHEN** any `RankTitle` entry with a non-`None` `unlocks_tier` is inspected
-- **THEN** `unlocks_tier` exists as a key in `MAGIC_TIER_REGISTRY`
 
 ### Requirement: Nation registry covers the three states
 `world/lore/nations.py` SHALL define a frozen `Nation` dataclass and a module-level

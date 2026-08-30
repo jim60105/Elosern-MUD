@@ -324,11 +324,11 @@ The deterministic rules layer SHALL expose a frozen preview query factored from 
 - **THEN** preview reports disabled with `RejectReason.INSUFFICIENT_RESOURCE` and MP detail, matching preflight without executing an effect
 
 #### Scenario: An over-tier owned spell is disabled in preview and revalidation
-- **WHEN** an actor owns and can afford `firestorm` (術師 tier, 30 MP) at `magic_level == 15` with no declared affinities and no owned `fire_mastery`, so `floor(15 × 1.0) == 15` is below the 16 threshold
+- **WHEN** an actor owns and can afford `firestorm` (術師 tier, 30 MP) at `magic_power == 15` with no declared affinities and no owned `fire_mastery`, so `floor(15 × 1.0) == 15` is below the 16 threshold
 - **THEN** preview reports disabled with `RejectReason.UNKNOWN_SKILL` naming the skill key, submission revalidation reports the same, and `ActionResolver.preflight()` rejects with the same reason — the three agree
 
 #### Scenario: The affinity boundary passes the preview gate
-- **WHEN** the same actor additionally declares `affinity_elements == ["fire"]`, so `floor(15 × 1.1) == 16` meets the 術師 threshold — or holds `magic_level == 16` with no affinities, so `floor(16 × 1.0) == 16` meets it on the pure numeric path
+- **WHEN** the same actor additionally declares `affinity_elements == ["fire"]`, so `floor(15 × 1.1) == 16` meets the 術師 threshold — or holds `magic_power == 16` with no affinities, so `floor(16 × 1.0) == 16` meets it on the pure numeric path
 - **THEN** preview and submission revalidation report the spell enabled (when other checks pass), exactly as preflight succeeds
 
 #### Scenario: The mastery override enables a tier-blocked spell in preview
@@ -381,12 +381,12 @@ rejection category already used for unowned-skill casts (no new `RejectReason` m
 
 #### Scenario: Preflight rejects an under-tier cast with no mastery
 - **WHEN** `preflight` is called for a cast of a 賢者-tier fire spell by an entity with
-  `magic_level.value == 20` and no owned `fire_mastery`
+  `magic_power.value == 20` and no owned `fire_mastery`
 - **THEN** it returns the same rejection category as an unowned-skill cast
 
 #### Scenario: An entity meeting the tier or holding mastery passes this check
 - **WHEN** `preflight` is called for a cast of a 賢者-tier fire spell by an entity with either
-  `magic_level.value >= 71` or owned `fire_mastery`
+  `magic_power.value >= 71` or owned `fire_mastery`
 - **THEN** this check does not reject the cast (other unrelated checks still apply normally)
 
 #### Scenario: A malformed elemental spell fails closed

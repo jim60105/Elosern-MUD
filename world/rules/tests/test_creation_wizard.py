@@ -194,7 +194,7 @@ class CreationWizardTests(EvenniaTest):
     )
     def test_activation_clears_draft_atomically(self):
         save_custom_draft(self.account, self.character, self.custom_request())
-        result = activate_draft(self.account, self.character, sampler=lambda low, high: low)
+        result = activate_draft(self.account, self.character)
         self.assertEqual(result.display_name, "新角色")
         self.assertFalse(self.character.creation_pending)
         self.assertIsNone(read_draft(self.character))
@@ -219,7 +219,7 @@ class CreationWizardTests(EvenniaTest):
         with self.assertRaisesRegex(RuntimeError, "injected clear failure"):
             activate_draft(
                 self.account, self.character,
-                sampler=lambda low, high: low, write_observer=fail,
+                write_observer=fail,
             )
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(read_draft(self.character), draft_before)
@@ -229,7 +229,7 @@ class CreationWizardTests(EvenniaTest):
 
     def test_concurrent_activations_apply_exactly_once(self):
         save_custom_draft(self.account, self.character, self.custom_request())
-        first = activate_draft(self.account, self.character, sampler=lambda low, high: low)
+        first = activate_draft(self.account, self.character)
         self.assertFalse(self.character.creation_pending)
         # A second activation attempt for the same shell must fail its re-check
         # rather than double-applying: the first commit already cleared the
@@ -253,7 +253,6 @@ class CreationWizardTests(EvenniaTest):
 
         activate_player_character(
             self.account, self.character, self.custom_request(),
-            sampler=lambda low, high: low,
         )
         self.assertFalse(self.character.creation_pending)
         with self.assertRaises(CharacterCreationError) as ctx:
@@ -271,7 +270,7 @@ class CreationWizardTests(EvenniaTest):
         with self.assertRaisesRegex(RuntimeError, "injected trait failure"):
             activate_draft(
                 self.account, self.character,
-                sampler=lambda low, high: low, write_observer=fail,
+                write_observer=fail,
             )
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(read_draft(self.character), draft_before)
@@ -279,7 +278,7 @@ class CreationWizardTests(EvenniaTest):
 
     def test_preset_activation_uses_the_stored_preset_key(self):
         save_preset_draft(self.account, self.character, "elf_guardian")
-        result = activate_draft(self.account, self.character, sampler=lambda low, high: high)
+        result = activate_draft(self.account, self.character)
         self.assertEqual(result.race, "elf")
         self.assertEqual(result.display_name, "瑟芮雅")
         self.assertFalse(self.character.creation_pending)
@@ -294,7 +293,6 @@ class CreationWizardTests(EvenniaTest):
 
         activate_player_character(
             self.account, self.character, self.custom_request(),
-            sampler=lambda low, high: low,
         )
         self.assertFalse(self.character.creation_pending)
         self.assertIsNone(read_draft(self.character))
@@ -570,7 +568,7 @@ class ConceptDraftTests(EvenniaTest):
             expected_fingerprint=draft_fingerprint(self.character),
         )
         save_custom_draft(self.account, self.character, self.custom_request())
-        activate_draft(self.account, self.character, sampler=lambda low, high: low)
+        activate_draft(self.account, self.character)
         self.assertFalse(self.character.creation_pending)
         self.assertFalse(self.character.attributes.has("creation_draft"))
         self.assertEqual(
@@ -592,7 +590,7 @@ class ConceptDraftTests(EvenniaTest):
             expected_fingerprint=fingerprint,
         )
         save_custom_draft(self.account, self.character, self.custom_request())
-        activate_draft(self.account, self.character, sampler=lambda low, high: low)
+        activate_draft(self.account, self.character)
         self.assertFalse(self.character.creation_pending)
         self.assertIsNone(read_draft(self.character))
         self.assertEqual(self.character.db.persona["personality"], "沉穩")
@@ -639,7 +637,6 @@ class ConceptDraftTests(EvenniaTest):
 
         activate_player_character(
             self.account, self.character, self.custom_request(),
-            sampler=lambda low, high: low,
         )
         with self.assertRaises(CharacterCreationError) as ctx:
             apply_concept_proposal(
@@ -702,7 +699,7 @@ class ConceptDraftTests(EvenniaTest):
         draft = read_draft(self.character)
         self.assertEqual(draft["background"], "背景文字")
         self.assertEqual(self.character.age, None)
-        activate_draft(self.account, self.character, sampler=lambda low, high: low)
+        activate_draft(self.account, self.character)
         self.assertFalse(self.character.creation_pending)
         self.assertIsNone(read_draft(self.character))
         self.assertEqual(self.character.db.persona["background"], "背景文字")
@@ -737,7 +734,7 @@ class ConceptDraftTests(EvenniaTest):
         self.assertEqual(draft["mode"], "custom")
         self.assertEqual(draft["background"], "背景文字")
         self.assertEqual(draft["persona"], PERSONA_BLOCK)
-        activate_draft(self.account, self.character, sampler=lambda low, high: low)
+        activate_draft(self.account, self.character)
         self.assertFalse(self.character.creation_pending)
         stored = self.character.db.persona
         self.assertEqual(stored["background"], "背景文字")
@@ -766,7 +763,7 @@ class ConceptDraftTests(EvenniaTest):
         draft = read_draft(self.character)
         self.assertEqual(draft["background"], "背景文字")
         self.assertEqual(draft["persona"], PERSONA_BLOCK)
-        activate_draft(self.account, self.character, sampler=lambda low, high: low)
+        activate_draft(self.account, self.character)
         self.assertFalse(self.character.creation_pending)
         stored = self.character.db.persona
         self.assertEqual(stored["background"], "背景文字")

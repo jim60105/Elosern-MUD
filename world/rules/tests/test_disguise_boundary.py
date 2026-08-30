@@ -35,8 +35,11 @@ class DisguiseBoundaryTests(EvenniaTest):
         entity.apply_race_baseline()
         true_attack = entity.traits.atk_phys.value
         true_defense = entity.traits.defense.value
-        entity.db.disguised_stats = {"atk_phys": 60, "magic_level": 30}
+        entity.db.disguised_stats = {"atk_phys": 60, "magic_power": 30}
         self.assertEqual(get_display_value(entity, "atk_phys"), 60)
         self.assertEqual(get_display_value(entity, "defense"), true_defense)
         self.assertEqual(entity.traits.atk_phys.value, true_attack)
-        self.assertEqual(entity.traits.magic_level.value, 0)
+        # magic_power is static; the elf floor is its true value, while the
+        # disguise layer renders 30 through the sanctioned accessor.
+        self.assertEqual(entity.traits.magic_power.value, 100)
+        self.assertEqual(get_display_value(entity, "magic_power"), 30)

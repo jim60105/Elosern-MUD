@@ -82,8 +82,8 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.player = create_object(PlayerCharacter, key="quest-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
-        # Human starting magic level (術師 tier) so fire_ball casts pass.
-        self.player.traits.magic_level.base = 30
+        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        self.player.traits.magic_power.base = 30
         self.player.db.skills = {"active": ["fire_ball"], "passive": []}
         self.tier_hunt = register(quest("tier_hunt_three", stages=(QuestStage(0, defeat(quantity=3)),)))
         self.bound_hunt = register(
@@ -376,8 +376,8 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         self.player = create_object(PlayerCharacter, key="companion-owner")
         self.player.race = "human"
         self.player.apply_race_baseline()
-        # Human starting magic level (術師 tier) so fire_ball casts pass.
-        self.player.traits.magic_level.base = 30
+        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        self.player.traits.magic_power.base = 30
         self.player.location = self.room
         self.player.db.skills = {"active": ["fire_ball"], "passive": []}
         self.tier_hunt = register(quest("tier_hunt_three", stages=(QuestStage(0, defeat(quantity=3)),)))
@@ -410,9 +410,9 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         npc = create_object(NPC, key=key, location=self.room)
         npc.race = "human"
         npc.apply_race_baseline()
-        # Human starting magic level (術師 tier) so elemental companion casts
+        # Human static magic_power at 術師 tier so elemental companion casts
         # (wind_blade) pass the cast gate.
-        npc.traits.magic_level.base = 30
+        npc.traits.magic_power.base = 30
         npc.traits.hp._data["current"] = 1
         npc.db.skills = {"active": ["claw"], "passive": []}
         join_party(npc, self.player)

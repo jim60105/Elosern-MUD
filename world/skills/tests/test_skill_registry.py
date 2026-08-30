@@ -419,7 +419,7 @@ class SkillRegistryTests(unittest.TestCase):
 
         expected = {
             "reincarnation_boon_elosia": (
-                "elosia_shadowmoon", "伊洛希雅", ("growth_rate:magic:100",),
+                "elosia_shadowmoon", "伊洛希雅", ("growth_rate:practice:100",),
             ),
             "reincarnation_boon_yuka": (
                 "yuka_darknight", "悠花", ("combat_prediction:武感",),

@@ -5,42 +5,43 @@ Define deterministic magic-level progression from study time and tiered monster 
 
 ## Requirements
 
-### Requirement: effective_magic_growth_multiplier combines race, self, and conferred multipliers
-`world/rules/progression.py` SHALL define `effective_magic_growth_multiplier(entity)` as a pure query
+### Requirement: effective_growth_multiplier combines race, self, and conferred multipliers
+`world/rules/progression.py` SHALL define `effective_growth_multiplier(entity)` (renamed from
+`effective_magic_growth_multiplier()`; the magic-only name retires with the trait rename) as a pure query
 that multiplies together exactly three sources: `RaceProfile.learning_multiplier` for the entity's
 race (`1.0` if the entity has no race), a self-multiplier read from the entity's own owned `PASSIVE`
-skills via the existing `growth_rate:magic:<N>` effect-ID convention (`1.0` if none owned), and change
+skills via the existing `growth_rate:practice:<N>` effect-ID convention (`1.0` if none owned), and change
 6's `growth_rate_multiplier(entity)`. This function SHALL NOT write to any entity attribute.
 
 #### Scenario: An entity with no race, no self-multiplier skill, and no buff returns 1.0
-- **WHEN** `effective_magic_growth_multiplier(entity)` is called on an entity with no owned skill
-  carrying a `growth_rate:magic:` effect and no active `conferred_growth_rate` buff
+- **WHEN** `effective_growth_multiplier(entity)` is called on an entity with no owned skill
+  carrying a `growth_rate:practice:` effect and no active `conferred_growth_rate` buff
 - **THEN** it returns exactly `1.0`
 
 #### Scenario: An elf's race learning_multiplier is folded in
-- **WHEN** `effective_magic_growth_multiplier(entity)` is called on an entity with `race == "elf"`
+- **WHEN** `effective_growth_multiplier(entity)` is called on an entity with `race == "elf"`
   (`RACE_REGISTRY["elf"].learning_multiplier == 10.0`), no self-multiplier skill, and no active buff
 - **THEN** it returns exactly `10.0`
 
 #### Scenario: A self-multiplier passive skill is folded in
-- **WHEN** `effective_magic_growth_multiplier(entity)` is called on a human entity (`learning_multiplier
-  == 1.0`) owning a `PASSIVE` skill whose `effects` includes `"growth_rate:magic:100"`, with no
+- **WHEN** `effective_growth_multiplier(entity)` is called on a human entity (`learning_multiplier
+  == 1.0`) owning a `PASSIVE` skill whose `effects` includes `"growth_rate:practice:100"`, with no
   active buff
 - **THEN** it returns exactly `100.0`
 
 #### Scenario: A conferred_growth_rate buff changes the multiplier through change 6's own function
 - **WHEN** a human entity has `world.rules.buffs.grant_conferred_growth_rate(entity,
-  source_key="elosia", scale=0.5)` applied, no owned `growth_rate:magic:` skill, and
+  source_key="elosia", scale=0.5)` applied, no owned `growth_rate:practice:` skill, and
   `growth_rate_multiplier(entity)` therefore returns `0.5`
-- **THEN** `effective_magic_growth_multiplier(entity)` returns exactly `0.5`, and `accrue_magic_study()`
+- **THEN** `effective_growth_multiplier(entity)` returns exactly `0.5`, and `accrue_magic_study()`
   called on this entity grants exactly half the magic XP it would grant the same entity with no buff
   active for the same elapsed time — proving change 6's conferred grant changes this entity's actual
   progression rate through this change's code, not merely through an unread return value
 
 #### Scenario: All three sources combine multiplicatively, not additively
-- **WHEN** an elf entity (`learning_multiplier == 10.0`) owns a `growth_rate:magic:100` passive
+- **WHEN** an elf entity (`learning_multiplier == 10.0`) owns a `growth_rate:practice:100` passive
   skill and has an active `conferred_growth_rate` buff with `scale=0.5`
-- **THEN** `effective_magic_growth_multiplier(entity)` returns exactly `10.0 * 100 * 0.5 == 500.0`
+- **THEN** `effective_growth_multiplier(entity)` returns exactly `10.0 * 100 * 0.5 == 500.0`
 
 ### Requirement: accrue_magic_study grants magic XP only for SKIP-sourced elapsed time
 `world/rules/progression.py` SHALL define `accrue_magic_study(entities, seconds, source)` as a
@@ -120,7 +121,9 @@ entity with no race), and SHALL discard XP surplus once the cap is reached rathe
 
 ### Requirement: World-clock and combat integration use the progression seams exactly once
 The existing `magic_study` world-clock stage SHALL call `accrue_magic_study()` for elapsed non-combat
-time, whose SKIP-only source gate remains authoritative. Combat action resolution SHALL stage
+time, whose SKIP-only source gate remains authoritative. The seam contract is unchanged by the trait
+rename; the drained destination trait is now the `magic_power` static (interim state until
+`magic-xp-engine-retirement` deletes these seams). Combat action resolution SHALL stage
 `grant_combat_kill_xp()` in the same atomic commit for each unique, resolved tiered monster newly reduced
 from positive HP to zero, using its `threat_tier`; it SHALL not award XP for non-monsters, an already-dead
 target, or duplicate target references. Combat upkeep settlement SHALL additionally stage exactly one

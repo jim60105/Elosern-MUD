@@ -2820,9 +2820,9 @@ function validCreationPanel(overrides) {
           ciaran: { display_name_zh: "基亞蘭族", common_name_zh: "黑暗精靈", specialty: "劍術" },
         },
         profiles: [
-          { race: "human", subrace: "human_commoner", budget: 181, axes },
-          { race: "elf", subrace: "fionnen", budget: 37, axes },
-          { race: "elf", subrace: "ciaran", budget: 37, axes },
+          { race: "human", subrace: "human_commoner", budget: 224, axes },
+          { race: "elf", subrace: "fionnen", budget: 437, axes },
+          { race: "elf", subrace: "ciaran", budget: 437, axes },
         ],
         affinity: {
           human: {
@@ -2899,7 +2899,7 @@ test("creation panel rejects malformed and unknown-node fields", () => {
   unknownProfile.custom.profiles[0].axes[0].axis = "luck";
   assert.throws(() => Protocol.validateCreationPanel(unknownProfile));
   const wrongAxes = validCreationPanel();
-  wrongAxes.custom.profiles[0].axes = wrongAxes.custom.profiles[0].axes.slice(0, 5);
+  wrongAxes.custom.profiles[0].axes = wrongAxes.custom.profiles[0].axes.slice(0, 6);
   assert.throws(() => Protocol.validateCreationPanel(wrongAxes));
 });
 
@@ -2918,6 +2918,7 @@ test("creation panel accepts a valid concept draft with the background indicator
         atk_phys: 10,
         agility: 10,
         defense: 11,
+        magic_power: 43,
       },
       background_generated: true,
     },
@@ -2941,6 +2942,7 @@ test("creation panel accepts a valid concept draft with the background indicator
         atk_phys: 10,
         agility: 10,
         defense: 11,
+        magic_power: 43,
       },
       background_generated: true,
     },
@@ -2960,6 +2962,7 @@ test("creation panel accepts a valid concept draft with the background indicator
         atk_phys: 10,
         agility: 10,
         defense: 11,
+        magic_power: 43,
       },
       background_generated: "yes",
     },
@@ -2979,6 +2982,7 @@ test("creation panel accepts a valid concept draft with the background indicator
         atk_phys: 10,
         agility: 10,
         defense: 11,
+        magic_power: 43,
       },
       background_generated: true,
       persona: { personality: "沉穩" },
@@ -3009,7 +3013,7 @@ test("creation panel enforces per-field bounds", () => {
       race: "human",
       subrace: "human_commoner",
       background: null,
-      allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0 },
+      allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0, magic_power: 0 },
       background_generated: false,
       affinity_elements: [],
     },

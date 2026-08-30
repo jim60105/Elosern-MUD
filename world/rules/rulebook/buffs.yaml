@@ -116,7 +116,7 @@
   modifiers:
     bounds:
       - {target: atk_phys, ceiling: -5}
-      - {target: magic_level, ceiling: -5}
+      - {target: magic_power, ceiling: -5}
 - key: dark_curse
   duration: 60
   stacking: refresh
@@ -124,7 +124,7 @@
   modifiers:
     bounds:
       - {target: atk_phys, ceiling: -10}
-      - {target: magic_level, ceiling: -10}
+      - {target: magic_power, ceiling: -10}
       - {target: agility, ceiling: -10}
 - key: dark_corrosion
   duration: 300
@@ -141,7 +141,7 @@
   duration: null
   stacking: unique_per_source
   modifiers:
-    rate: {target: magic_level_growth, scale_from_source: true}
+    rate: {target: skill_practice, scale_from_source: true}
 # Passive equipment regen (add-equipment-effect-rulebook D5): dormant data
 # until P3's equipping attaches it from apothecary_beads. Gentle positive hp
 # rate; trait.current clamps growth at maximum.

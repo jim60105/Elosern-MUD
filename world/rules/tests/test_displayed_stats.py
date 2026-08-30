@@ -50,7 +50,7 @@ def _living(traits=None, disguised_stats=None):
         "atk_phys": _FakeTrait(88),
         "agility": _FakeTrait(92),
         "defense": _FakeTrait(90),
-        "magic_level": _FakeTrait(250),
+        "magic_power": _FakeTrait(250),
         "hp": _FakeTrait(120),
     }
     if traits is not None:
@@ -64,14 +64,14 @@ class DisplayStatBlockTests(unittest.TestCase):
         entity = _living(disguised_stats={"atk_phys": 60})
         self.assertEqual(
             display_stat_block(entity),
-            "攻擊：60\n敏捷：92\n防禦：90\n魔法階級：250\n生命：120",
+            "攻擊：60\n敏捷：92\n防禦：90\n魔力：250\n生命：120",
         )
 
     @covers_requirement("displayed-stats-view::display-stat-block-renders-the-displayed-combat-five-through-the-disguise-accessor")
     def test_undisguised_entity_shows_true_values_in_fixed_order(self):
         self.assertEqual(
             display_stat_block(_living()),
-            "攻擊：88\n敏捷：92\n防禦：90\n魔法階級：250\n生命：120",
+            "攻擊：88\n敏捷：92\n防禦：90\n魔力：250\n生命：120",
         )
 
     @covers_requirement("displayed-stats-view::display-stat-block-renders-the-displayed-combat-five-through-the-disguise-accessor")
@@ -88,7 +88,7 @@ class DisplayStatBlockTests(unittest.TestCase):
         block = display_stat_block(entity)
         self.assertEqual(
             block.splitlines(),
-            ["攻擊：88", "敏捷：92", "防禦：90", "魔法階級：250"],
+            ["攻擊：88", "敏捷：92", "防禦：90", "魔力：250"],
         )
         self.assertNotIn("生命", block)
 
@@ -98,7 +98,7 @@ class DisplayStatBlockTests(unittest.TestCase):
         block = display_stat_block(entity)
         self.assertEqual(
             block.splitlines(),
-            ["攻擊：88", "敏捷：92", "防禦：90", "魔法階級：250"],
+            ["攻擊：88", "敏捷：92", "防禦：90", "魔力：250"],
         )
         self.assertNotIn("生命", block)
 
@@ -108,7 +108,7 @@ class DisplayStatBlockTests(unittest.TestCase):
         block = display_stat_block(entity)
         self.assertEqual(
             block.splitlines(),
-            ["攻擊：88", "敏捷：92", "防禦：90", "魔法階級：250"],
+            ["攻擊：88", "敏捷：92", "防禦：90", "魔力：250"],
         )
         self.assertNotIn("生命", block)
 
@@ -123,7 +123,7 @@ class DisplayStatBlockTests(unittest.TestCase):
 
     def test_block_key_order_matches_the_documented_five(self):
         self.assertEqual(
-            DISPLAYED_KEYS, ("atk_phys", "agility", "defense", "magic_level", "hp")
+            DISPLAYED_KEYS, ("atk_phys", "agility", "defense", "magic_power", "hp")
         )
 
 

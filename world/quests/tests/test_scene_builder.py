@@ -31,7 +31,7 @@ from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.subjects import ArtSubjectKind
 from world.art.worker import drain_synchronous
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
-from world.lore.races import RACE_REGISTRY
+from world.lore.races import STATIC_TIER_REGISTRY
 from world.maps.bootstrap import sync_grid
 from world.quests.compile import (
     SCENE_REQUIREMENT_REGISTRY,
@@ -424,11 +424,15 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         result = materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
         npc = next(obj for obj in result.room.contents if isinstance(obj, NPC))
         tier = NPC_TIER_REGISTRY["bandit"]
-        race = RACE_REGISTRY[tier.race_key]
-        values = build_initial_traits(tier.race_key, tier=tier.static_tier_key)
-        values["magic_level"] = race.starting_magic_level
-        config = trait_config_for_values(values, race.magic_cap)
-        for key in ("hp", "atk_phys", "agility", "defense", "magic_level"):
+        config = trait_config_for_values(
+            build_initial_traits(tier.race_key, tier=tier.static_tier_key)
+        )
+        # The tier path pins magic_power at the tier's own band floor.
+        self.assertEqual(
+            npc.traits.magic_power.base,
+            STATIC_TIER_REGISTRY[tier.static_tier_key].magic_band[0],
+        )
+        for key in ("hp", "atk_phys", "agility", "defense", "magic_power"):
             self.assertEqual(
                 getattr(npc.traits, key).base,
                 config[key]["base"],
@@ -450,11 +454,10 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         result = materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
         npc = next(obj for obj in result.room.contents if isinstance(obj, NPC))
         tier = NPC_TIER_REGISTRY["bandit"]
-        race = RACE_REGISTRY[tier.race_key]
-        values = build_initial_traits(tier.race_key, tier=tier.static_tier_key)
-        values["magic_level"] = race.starting_magic_level
-        config = trait_config_for_values(values, race.magic_cap)
-        for key in ("hp", "atk_phys", "agility", "defense", "magic_level"):
+        config = trait_config_for_values(
+            build_initial_traits(tier.race_key, tier=tier.static_tier_key)
+        )
+        for key in ("hp", "atk_phys", "agility", "defense", "magic_power"):
             self.assertEqual(
                 getattr(npc.traits, key).base,
                 config[key]["base"],

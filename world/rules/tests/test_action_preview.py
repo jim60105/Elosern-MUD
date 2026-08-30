@@ -29,8 +29,8 @@ def _player(key="preview player"):
     player = create_object(PlayerCharacter, key=key)
     player.race = "human"
     player.apply_race_baseline()
-    # Human starting magic level (術師 tier) so element-gated spell casts pass.
-    player.traits.magic_level.base = 30
+    # Human static magic_power at 術師 tier so element-gated spell casts pass.
+    player.traits.magic_power.base = 30
     return player
 
 
@@ -38,7 +38,7 @@ def _under_tier_player(key="preview under-tier player"):
     player = _player(key)
     # 學徒-tier magic level: below the 術師 threshold (16) that gates
     # 30-MP firestorm casts.
-    player.traits.magic_level.base = 15
+    player.traits.magic_power.base = 15
     return player
 
 
@@ -542,7 +542,7 @@ class SpellTierPreviewGateTests(BattlefieldIsolation, EvenniaTestCase):
 
         # (b) no affinities at magic level 16: floor(16 * 1.0) == 16.
         self.player.db.affinity_elements = []
-        self.player.traits.magic_level.base = 16
+        self.player.traits.magic_power.base = 16
         self.assertTrue(
             preview_skill(self.player, "firestorm", context, [self.monster]).enabled
         )
@@ -595,7 +595,7 @@ class SpellTierPreviewGateTests(BattlefieldIsolation, EvenniaTestCase):
         # A gate-passing actor isolates the fail-closed behavior: with the
         # tier lookup broken, the disabled result can only come from the
         # predicate converting the ValueError to False.
-        self.player.traits.magic_level.base = 30
+        self.player.traits.magic_power.base = 30
         context = self._context()
         with patch(
             "world.rules.progression.spell_tier_for",

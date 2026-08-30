@@ -53,6 +53,16 @@ def load_buff_definitions(path: Path) -> dict[str, BuffDefinition]:
         modifiers = entry.get("modifiers", {})
         if not isinstance(modifiers, dict) or set(modifiers) - {"rate", "bounds", "decay"}:
             raise ValueError(f"{path}: buff {key!r} has invalid modifiers")
+        rate = modifiers.get("rate")
+        if rate is not None:
+            if not isinstance(rate, dict) or "target" not in rate:
+                raise ValueError(f"{path}: buff {key!r} rate modifier must be a mapping with a target")
+            if rate["target"] not in GAUGE_KEYS and rate["target"] != "skill_practice":
+                raise ValueError(
+                    f"{path}: buff {key!r} rate target {rate['target']!r} is not "
+                    "a gauge key or the pull-only 'skill_practice' target "
+                    "(the retired 'magic_level_growth' target is rejected here)"
+                )
         stacking = entry.get("stacking", "refresh")
         if stacking not in {"refresh", "unique_per_source"}:
             raise ValueError(f"{path}: buff {key!r} has unsupported stacking {stacking!r}")
@@ -74,7 +84,7 @@ BUFF_DEFINITIONS = load_buff_definitions(
     Path(__file__).parent / "rulebook" / "buffs.yaml"
 )
 BLOCKING_BUFF_KEYS = frozenset({"paralysis"})
-_NO_OP_RATE_TARGETS = frozenset({"magic_level_growth"})
+_NO_OP_RATE_TARGETS = frozenset({"skill_practice"})
 
 
 class RulebookBuff(BaseBuff):
@@ -108,9 +118,11 @@ def _is_damaging_rate(rate: dict[str, Any] | None) -> bool:
 def _apply_rate_modifier(entity, rate_mod: dict[str, Any]) -> None:
     """Apply one rate tick.
 
-    ``magic_level_growth`` intentionally does nothing here: change 11b reads it
-    by pull through ``growth_rate_multiplier()``. Applying it on tick as well
-    would double-apply the conferred scale.
+    ``skill_practice`` (the ``conferred_growth_rate`` buff's declared rate
+    target) intentionally does nothing here: change 11b's
+    ``growth_rate_multiplier(entity)`` reads it by pull at the moment
+    progression is computed. Applying it on tick as well would double-apply
+    the conferred scale.
     """
     target = rate_mod["target"]
     if target in _NO_OP_RATE_TARGETS:

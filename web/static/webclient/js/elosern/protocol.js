@@ -221,7 +221,7 @@
   var CREATION_MAX_EXPLANATION = 256;
   // The concept input bound (mirror of the adapter/command/layer caps).
   var CREATION_MAX_CONCEPT = 500;
-  var CREATION_AXES = ["hp", "mp", "sp", "atk_phys", "agility", "defense"];
+  var CREATION_AXES = ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power"];
   var CREATION_PRESET_STAGE = "preset_selected";
   var CREATION_CUSTOM_STAGE = "custom_filled";
   var CREATION_CONCEPT_STAGE = "concept_filled";
@@ -2297,8 +2297,8 @@
       }
     }
     requireInt(value.budget, "budget", 0, MAX_SAFE_INTEGER);
-    if (!Array.isArray(value.axes) || value.axes.length !== 6) {
-      throw new Error("profile axes must contain exactly six axes");
+    if (!Array.isArray(value.axes) || value.axes.length !== 7) {
+      throw new Error("profile axes must contain exactly seven axes");
     }
     var axisKeys = {};
     value.axes.forEach(function (axis) {
@@ -2312,7 +2312,7 @@
     var keyCount = Object.keys(axisKeys).length;
     var expectedCount = Object.keys(expected).length;
     if (keyCount !== expectedCount) {
-      throw new Error("profile axes must match the six starting axes");
+      throw new Error("profile axes must match the seven starting axes");
     }
     return value;
   }
@@ -2546,7 +2546,7 @@
     var allocationKeys = Object.keys(allocations).slice().sort();
     var expectedKeys = CREATION_AXES.slice().sort();
     if (allocationKeys.join(",") !== expectedKeys.join(",")) {
-      throw new Error("draft allocations must contain exactly the six axes");
+      throw new Error("draft allocations must contain exactly the seven axes");
     }
     CREATION_AXES.forEach(function (axis) {
       requireInt(allocations[axis], axis, 0, 10000);

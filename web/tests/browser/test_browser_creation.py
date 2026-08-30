@@ -358,7 +358,8 @@ class CustomCreationJourneys(CreationBrowserTest):
         )
         self.assertEqual(foxkin_selected, "foxkin", "foxkin subrace must be selected")
 
-        # Fill the six allocation inputs deterministically for beastfolk/foxkin.
+        # Fill the seven allocation inputs deterministically for
+        # beastfolk/foxkin: 25+10+25+15+15+15+14 == the 119-point budget.
         page.evaluate("document.querySelector('[data-testid=\"creation-field-hp\"]').focus()")
         page.keyboard.type("25")
         page.evaluate("document.querySelector('[data-testid=\"creation-field-mp\"]').focus()")
@@ -371,6 +372,8 @@ class CustomCreationJourneys(CreationBrowserTest):
         page.keyboard.type("15")
         page.evaluate("document.querySelector('[data-testid=\"creation-field-defense\"]').focus()")
         page.keyboard.type("15")
+        page.evaluate("document.querySelector('[data-testid=\"creation-field-magic_power\"]').focus()")
+        page.keyboard.type("14")
 
         # Submit the custom form (keyboard-only Enter on the submit button).
         page.evaluate("document.querySelector('[data-testid=\"creation-submit\"]').focus()")
@@ -473,7 +476,7 @@ class CustomCreationJourneys(CreationBrowserTest):
                   subrace: "human_commoner",
                   background: null,
                   affinity_elements: null,
-                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
+                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
                 },
               }], {});
             }"""
@@ -521,7 +524,7 @@ class CustomCreationJourneys(CreationBrowserTest):
                   subrace: "human_commoner",
                   background: null,
                   affinity_elements: null,
-                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
+                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
                 },
               }], {});
             }"""
@@ -759,7 +762,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
                   subrace: "human_commoner",
                   background: null,
                   affinity_elements: null,
-                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
+                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
                 },
               }], {});
             }""",
@@ -795,7 +798,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
                   subrace: 'human_commoner',
                   background: null,
                   affinity_elements: null,
-                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
+                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
                     },
                   }], {});
                 }""",
@@ -856,7 +859,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
                   subrace: "human_commoner",
                   background: null,
                   affinity_elements: null,
-                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11 },
+                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
                 },
               }], {});
             }""",

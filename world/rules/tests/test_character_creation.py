@@ -21,7 +21,6 @@ from world.rules.character_creation import (
     activate_player_character,
     preflight_character_creation,
     resolve_starting_profile,
-    starting_magic_interval,
 )
 
 
@@ -42,7 +41,7 @@ class StartingProfileTests(unittest.TestCase):
     @covers_requirement("player-stat-allocation::custom-starting-stats-require-one-exact-finite-allocation-budget")
     def test_exact_budget_and_foxkin_override(self):
         human = resolve_starting_profile("human")
-        self.assertEqual(human.budget, 181)
+        self.assertEqual(human.budget, 224)
         foxkin = resolve_starting_profile("beastfolk", "foxkin")
         self.assertEqual(foxkin.bounds_dict()["mp"], (50, 70))
 
@@ -51,11 +50,6 @@ class StartingProfileTests(unittest.TestCase):
         self.assertEqual(profile.static_modifiers.atk_phys, -0.10)
         self.assertEqual(profile.static_modifiers.agility, 0.40)
         self.assertEqual(profile.static_modifiers.defense, -0.30)
-
-    def test_magic_intervals_use_each_race_average(self):
-        self.assertEqual(starting_magic_interval("human"), (27, 33))
-        self.assertEqual(starting_magic_interval("beastfolk"), (9, 11))
-        self.assertEqual(starting_magic_interval("elf"), (270, 330))
 
 
 class CharacterActivationTests(EvenniaTest):
@@ -84,13 +78,13 @@ class CharacterActivationTests(EvenniaTest):
     def test_activation_persists_identity_traits_and_empty_mechanical_state(self):
         old_id, old_location = self.character.id, self.character.location
         result = activate_player_character(
-            self.account, self.character, self.request(), sampler=lambda low, high: low
+            self.account, self.character, self.request()
         )
-        self.assertEqual(result.magic_level, 27)
+        self.assertEqual(result.magic_power, 5)
         self.assertEqual(self.character.key, "新角色")
         self.assertEqual((self.character.age, self.character.apparent_age), (20, 20))
         self.assertFalse(self.character.creation_pending)
-        self.assertEqual(self.character.traits.magic_level.value, 27)
+        self.assertEqual(self.character.traits.magic_power.value, 5)
         self.assertEqual(self.character.traits.guild_merit.value, 0)
         self.assertEqual(self.character.db.skills, {"active": [], "passive": []})
         self.assertEqual(
@@ -116,24 +110,21 @@ class CharacterActivationTests(EvenniaTest):
             expected = round(raw * (1 + getattr(profile.static_modifiers, key)))
             self.assertEqual(checked.values[key], expected)
 
-    def test_under_and_over_budget_reject_before_sampling(self):
+    def test_under_and_over_budget_rejections_are_non_mutating(self):
         valid = balanced_allocations("human")
         for delta in (-1, 1):
             allocations = dict(valid)
             key = next(key for key in ALLOCATABLE_AXES if 0 <= allocations[key] + delta <= resolve_starting_profile("human").bounds_dict()[key][1] - resolve_starting_profile("human").bounds_dict()[key][0])
             allocations[key] += delta
-            calls = []
             with self.subTest(delta=delta), self.assertRaises(CharacterCreationError):
                 activate_player_character(
                     self.account, self.character,
                     self.request(allocations=allocations),
-                    sampler=lambda low, high: calls.append((low, high)) or low,
                 )
-            self.assertEqual(calls, [])
             self.assertEqual(self.character.traits.all(), [])
 
     @covers_requirement("player-character-creation::character-creation-enforces-adult-identity-and-registry-compatibility")
-    def test_age_name_subrace_and_invalid_sampler_rejections_are_non_mutating(self):
+    def test_age_name_and_subrace_rejections_are_non_mutating(self):
         requests = (
             self.request(age=17),
             self.request(apparent_age=17),
@@ -145,12 +136,6 @@ class CharacterActivationTests(EvenniaTest):
                 activate_player_character(self.account, self.character, request)
             self.assertTrue(self.character.creation_pending)
             self.assertEqual(self.character.traits.all(), [])
-        for sample in (26, 34, 27.0):
-            with self.subTest(sample=sample), self.assertRaises(CharacterCreationError):
-                activate_player_character(
-                    self.account, self.character, self.request(),
-                    sampler=lambda low, high, value=sample: value,
-                )
 
     @covers_requirement("player-character-creation::character-creation-offers-preset-and-custom-modes")
     def test_custom_creation_without_a_subrace_is_rejected(self):
@@ -180,19 +165,22 @@ class CharacterActivationTests(EvenniaTest):
         result = activate_player_character(
             self.account, self.character,
             self.request(display_name=name),
-            sampler=lambda low, high: low,
         )
         self.assertEqual(result.display_name, name)
         self.assertEqual(self.character.key, name)
 
-    @covers_requirement("player-stat-allocation::starting-magic-level-is-sampled-from-a-race-owned-average-band")
-    def test_preset_activation_uses_the_same_magic_sampler(self):
+    @covers_requirement(
+        "player-stat-allocation::player-starting-profiles-are-derived-from-immutable-lore-bands",
+        "player-stat-allocation::custom-starting-stats-require-one-exact-finite-allocation-budget",
+    )
+    def test_preset_activation_fixes_magic_power_deterministically(self):
+        # The retired race-average sampler is replaced by the preset's own
+        # allocation: elf_guardian allocates 400 over the elf floor (100).
         result = activate_player_character(
             self.account, self.character,
             CharacterCreationRequest(mode="preset", preset_key="elf_guardian"),
-            sampler=lambda low, high: high,
         )
-        self.assertEqual(result.magic_level, 330)
+        self.assertEqual(result.magic_power, 500)
         self.assertEqual(self.character.race, "elf")
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
@@ -206,7 +194,6 @@ class CharacterActivationTests(EvenniaTest):
                 activate_player_character(
                     self.account, character,
                     CharacterCreationRequest(mode="preset", preset_key=preset_key),
-                    sampler=lambda low, high: low,
                 )
                 self.assertEqual(
                     character.db.skills,
@@ -225,7 +212,6 @@ class CharacterActivationTests(EvenniaTest):
                 activate_player_character(
                     self.account, character,
                     CharacterCreationRequest(mode="preset", preset_key=preset_key),
-                    sampler=lambda low, high: low,
                 )
                 expected = PLAYER_PRESET_REGISTRY[preset_key].inventory_list()
                 self.assertEqual(character.db.inventory, expected)
@@ -246,7 +232,6 @@ class CharacterActivationTests(EvenniaTest):
                         subrace=subrace_key,
                         allocations=balanced_allocations(subrace.race_key, subrace_key),
                     ),
-                    sampler=lambda low, high: low,
                 )
                 expected = SUBRACE_STARTING_KIT_REGISTRY[
                     subrace_key
@@ -266,7 +251,7 @@ class CharacterActivationTests(EvenniaTest):
 
         with self.assertRaisesRegex(RuntimeError, "injected"):
             activate_player_character(
-                self.account, self.character, self.request(), sampler=lambda low, high: low,
+                self.account, self.character, self.request(),
                 write_observer=fail,
             )
         self.assertEqual(self.character.key, old_key)
@@ -310,7 +295,7 @@ class CharacterActivationTests(EvenniaTest):
                 with self.assertRaisesRegex(RuntimeError, stage):
                     activate_player_character(
                         self.account, character, self.request(),
-                        sampler=lambda low, high: low, write_observer=fail,
+                        write_observer=fail,
                     )
                 self.assertEqual(character.key, old_key)
                 self.assertEqual(character.location, old_location)
@@ -334,7 +319,7 @@ class CharacterActivationTests(EvenniaTest):
         self.assertIsNotNone(south_gate)
         old_location = self.character.location
         result = activate_player_character(
-            self.account, self.character, self.request(), sampler=lambda low, high: low
+            self.account, self.character, self.request()
         )
         clock = __import__("world.rules.clock", fromlist=["get_world_clock"]).get_world_clock()
         tick_before = clock.tick
@@ -350,7 +335,7 @@ class CharacterActivationTests(EvenniaTest):
 
         old_location = self.character.location
         activate_player_character(
-            self.account, self.character, self.request(), sampler=lambda low, high: low
+            self.account, self.character, self.request()
         )
         with patch("world.rules.onboarding._south_gate", return_value=None):
             relocate_to_starting_location(self.character)
@@ -362,7 +347,7 @@ class CharacterActivationTests(EvenniaTest):
         from world.rules.onboarding import relocate_to_starting_location
 
         activate_player_character(
-            self.account, self.character, self.request(), sampler=lambda low, high: low
+            self.account, self.character, self.request()
         )
         old_location = self.character.location
 
@@ -374,7 +359,7 @@ class CharacterActivationTests(EvenniaTest):
         with patch("world.rules.onboarding._south_gate", side_effect=boom):
             relocate_to_starting_location(self.character)
         self.assertFalse(self.character.creation_pending)
-        self.assertIsNotNone(self.character.traits.magic_level)
+        self.assertIsNotNone(self.character.traits.magic_power)
         self.assertIs(self.character.location, old_location)
         self.assertTrue(any("南門" in message for message in messages))
 
@@ -415,7 +400,6 @@ class PortraitFinalizationTests(EvenniaTest):
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             activate_player_character(
                 self.account, self.character, self.request(),
-                sampler=lambda low, high: low,
             )
         self.assertEqual(
             self.character.db.portrait_policy,
@@ -477,7 +461,7 @@ class PortraitFinalizationTests(EvenniaTest):
         with self.assertRaisesRegex(RuntimeError, "injected portrait failure"):
             activate_draft(
                 self.account, self.character,
-                sampler=lambda low, high: low, write_observer=fail,
+                write_observer=fail,
             )
         self.assertTrue(self.character.creation_pending)
         self.assertFalse(self.character.attributes.has("portrait_policy"))
@@ -517,7 +501,6 @@ class AffinityCreationTests(EvenniaTest):
         result = activate_player_character(
             self.account, self.character,
             self.request(affinity_elements=("fire", "wind")),
-            sampler=lambda low, high: low,
         )
         self.assertEqual(result.display_name, "新角色")
         self.assertEqual(self.character.db.affinity_elements, ["fire", "wind"])
@@ -527,7 +510,6 @@ class AffinityCreationTests(EvenniaTest):
             activate_player_character(
                 self.account, character,
                 self.request(affinity_elements=("fire", "wind", "water")),
-                sampler=lambda low, high: low,
             )
         self.assertTrue(character.creation_pending)
         self.assertFalse(character.attributes.has("affinity_elements"))
@@ -541,7 +523,6 @@ class AffinityCreationTests(EvenniaTest):
                 race="beastfolk", subrace="foxkin", allocations=allocations,
                 affinity_elements=("wind",),
             ),
-            sampler=lambda low, high: low,
         )
         self.assertEqual(self.character.db.affinity_elements, ["wind"])
         character = create_object(PlayerCharacter, key="beast-two-shell")
@@ -553,7 +534,6 @@ class AffinityCreationTests(EvenniaTest):
                     race="beastfolk", subrace="foxkin", allocations=allocations,
                     affinity_elements=("wind", "fire"),
                 ),
-                sampler=lambda low, high: low,
             )
         self.assertTrue(character.creation_pending)
 
@@ -571,7 +551,6 @@ class AffinityCreationTests(EvenniaTest):
                             race="elf", subrace="fionnen", allocations=elf_allocations,
                             affinity_elements=supplied,
                         ),
-                        sampler=lambda low, high: low,
                     )
                 self.assertTrue(character.creation_pending)
         activated = create_object(PlayerCharacter, key="elf-activate")
@@ -582,7 +561,6 @@ class AffinityCreationTests(EvenniaTest):
                 race="elf", subrace="fionnen", allocations=elf_allocations,
                 affinity_elements=(),
             ),
-            sampler=lambda low, high: low,
         )
         self.assertEqual(activated.db.affinity_elements, ["light"])
 
@@ -600,7 +578,6 @@ class AffinityCreationTests(EvenniaTest):
                 race="elf", subrace="eolas", allocations=eolas_allocations,
                 affinity_elements=(),
             ),
-            sampler=lambda low, high: low,
         )
         self.assertEqual(
             set(character.db.affinity_elements), set(ELEMENT_REGISTRY)
@@ -621,7 +598,6 @@ class AffinityCreationTests(EvenniaTest):
                     activate_player_character(
                         self.account, character,
                         self.request(affinity_elements=supplied),
-                        sampler=lambda low, high: low,
                     )
                 self.assertTrue(character.creation_pending)
                 self.assertFalse(character.attributes.has("affinity_elements"))
@@ -631,7 +607,6 @@ class AffinityCreationTests(EvenniaTest):
         activate_player_character(
             self.account, self.character,
             CharacterCreationRequest(mode="preset", preset_key="violet_altoria"),
-            sampler=lambda low, high: low,
         )
         self.assertEqual(self.character.db.affinity_elements, ["fire", "wind"])
 
@@ -640,7 +615,6 @@ class AffinityCreationTests(EvenniaTest):
         activate_player_character(
             self.account, self.character,
             CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
-            sampler=lambda low, high: low,
         )
         self.assertEqual(self.character.db.affinity_elements, [])
 
@@ -649,7 +623,6 @@ class AffinityCreationTests(EvenniaTest):
         activate_player_character(
             self.account, self.character,
             CharacterCreationRequest(mode="preset", preset_key="elf_guardian"),
-            sampler=lambda low, high: low,
         )
         self.assertEqual(self.character.db.affinity_elements, ["light"])
 
@@ -665,7 +638,6 @@ class AffinityCreationTests(EvenniaTest):
             activate_player_character(
                 self.account, self.character,
                 self.request(affinity_elements=("fire",)),
-                sampler=lambda low, high: low,
                 write_observer=fail,
             )
         self.assertEqual(self.character.key, old_key)
@@ -700,7 +672,6 @@ class AffinityCreationTests(EvenniaTest):
                                 race="elf", subrace="fionnen", allocations=elf_allocations,
                                 affinity_elements=(),
                             ),
-                            sampler=lambda low, high: low,
                         )
                 self.assertTrue(character.creation_pending)
                 self.assertFalse(character.attributes.has("affinity_elements"))
@@ -742,7 +713,7 @@ class PersonaActivationTests(EvenniaTest):
     def test_concept_persona_persists_in_the_six_key_import_card_shape(self):
         result = activate_player_character(
             self.account, self.character, self.request(),
-            persona=PERSONA_BLOCK, sampler=lambda low, high: low,
+            persona=PERSONA_BLOCK,
         )
         self.assertEqual(result.display_name, "新角色")
         self.assertEqual(
@@ -769,7 +740,7 @@ class PersonaActivationTests(EvenniaTest):
         with self.assertRaisesRegex(RuntimeError, "injected persona failure"):
             activate_player_character(
                 self.account, self.character, self.request(),
-                persona=PERSONA_BLOCK, sampler=lambda low, high: low,
+                persona=PERSONA_BLOCK,
                 write_observer=fail,
             )
         self.assertEqual(self.character.key, old_key)
@@ -781,7 +752,7 @@ class PersonaActivationTests(EvenniaTest):
     @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
     def test_draft_without_persona_writes_nothing(self):
         activate_player_character(
-            self.account, self.character, self.request(), sampler=lambda low, high: low
+            self.account, self.character, self.request()
         )
         self.assertFalse(self.character.creation_pending)
         self.assertFalse(self.character.attributes.has("persona"))
@@ -791,7 +762,6 @@ class PersonaActivationTests(EvenniaTest):
         activate_player_character(
             self.account, self.character,
             self.request(background="在公會登記的新人冒險者"),
-            sampler=lambda low, high: low,
         )
         self.assertFalse(self.character.creation_pending)
         stored = self.character.db.persona
@@ -805,7 +775,7 @@ class PersonaActivationTests(EvenniaTest):
         activate_player_character(
             self.account, self.character,
             self.request(background="背景文字"),
-            persona=PERSONA_BLOCK, sampler=lambda low, high: low,
+            persona=PERSONA_BLOCK,
         )
         stored = self.character.db.persona
         self.assertEqual(stored["background"], "背景文字")
@@ -818,7 +788,6 @@ class PersonaActivationTests(EvenniaTest):
                 activate_player_character(
                     self.account, self.character,
                     self.request(background=background),
-                    sampler=lambda low, high: low,
                 )
                 self.assertFalse(self.character.creation_pending)
                 if background in ("  ", "", None):
@@ -829,7 +798,6 @@ class PersonaActivationTests(EvenniaTest):
             activate_player_character(
                 self.account, self.character,
                 self.request(background="x" * (MAX_PERSONA_FIELD_LENGTH + 1)),
-                sampler=lambda low, high: low,
             )
         self.assertTrue(self.character.creation_pending)
 
@@ -849,7 +817,7 @@ class PersonaActivationTests(EvenniaTest):
             with self.subTest(persona=persona), self.assertRaises(CharacterCreationError):
                 activate_player_character(
                     self.account, self.character, self.request(),
-                    persona=persona, sampler=lambda low, high: low,
+                    persona=persona,
                 )
             self.assertTrue(self.character.creation_pending)
             self.assertEqual(self.character.traits.all(), [])

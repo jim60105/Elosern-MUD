@@ -185,6 +185,7 @@ def _browser_concept_proposal(client=None, *, concept):
             allocations={
                 "hp": 50, "mp": 50, "sp": 50,
                 "atk_phys": 10, "agility": 10, "defense": 11,
+                "magic_power": 43,
             },
             suggested_skills=("flight",),
             persona={

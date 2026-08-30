@@ -12,7 +12,7 @@ from .entities import LivingEntity
 # Trait keys whose true current values become no-leak secrets when the NPC
 # carries an active disguise (persona-dialogue-injection D2). ``hp`` binds its
 # current gauge value, never the maximum.
-_DISGUISE_SECRET_KEYS = ("atk_phys", "agility", "defense", "magic_level", "hp")
+_DISGUISE_SECRET_KEYS = ("atk_phys", "agility", "defense", "magic_power", "hp")
 
 # Canonical adult age baseline for procedurally spawned or synced NPCs
 # (fix-npc-adult-identity D1); every character must be an adult.

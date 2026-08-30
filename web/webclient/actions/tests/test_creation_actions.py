@@ -166,7 +166,7 @@ class CreationPayloadValidationTests(unittest.TestCase):
             {**custom_payload(), "account": 1},
             {**custom_payload(), "actor": 1},
             {**custom_payload(), "session": 1},
-            {**custom_payload(), "magic_level": 1},
+            {**custom_payload(), "magic_power": 1},
             {**custom_payload(), "skills": []},
             {**custom_payload(), "display_name": "x" * 65},
             {**custom_payload(), "age": -1},
@@ -353,7 +353,6 @@ class CreationAdapterTests(CreationActionBase):
         activate_player_character(
             self.account, self.character,
             CharacterCreationRequest(mode="custom", **custom_payload()),
-            sampler=lambda low, high: low,
         )
         result = _creation_custom_adapter(self.character, custom_payload())
         self.assertEqual(result["outcome"], "rejected")
@@ -399,7 +398,6 @@ class CreationAdapterTests(CreationActionBase):
         activate_player_character(
             self.account, self.character,
             CharacterCreationRequest(mode="custom", **custom_payload()),
-            sampler=lambda low, high: low,
         )
         self.assertFalse(self.character.creation_pending)
         result = _creation_reset_adapter(self.character, {})
@@ -427,7 +425,6 @@ class CreationAdapterTests(CreationActionBase):
         activate_player_character(
             self.account, self.character,
             CharacterCreationRequest(mode="custom", **custom_payload()),
-            sampler=lambda low, high: low,
         )
         held.callback(_proposal())
         result = await_result(deferred)
@@ -590,7 +587,7 @@ class CreationActivateIntegrationTests(CreationActionBase):
         self.assertEqual(self.character.key, "新角色")
         self.assertEqual(self.character.age, 20)
         self.assertIs(self.character.location, south_gate)
-        self.assertIsNotNone(self.character.traits.magic_level)
+        self.assertIsNotNone(self.character.traits.magic_power)
 
     def test_failed_relocation_preserves_activated_state(self):
         messages = []
@@ -599,7 +596,7 @@ class CreationActivateIntegrationTests(CreationActionBase):
             result = _creation_activate_adapter(self.character, {})
         self.assertEqual(result["outcome"], "success")
         self.assertFalse(self.character.creation_pending)
-        self.assertIsNotNone(self.character.traits.magic_level)
+        self.assertIsNotNone(self.character.traits.magic_power)
         self.assertTrue(any("南門" in message for message in messages))
 
     def test_draft_clear_failure_rolls_back_the_whole_activation(self):
@@ -613,7 +610,7 @@ class CreationActivateIntegrationTests(CreationActionBase):
         with self.assertRaisesRegex(RuntimeError, "injected clear failure"):
             activate_draft(
                 self.account, self.character,
-                sampler=lambda low, high: low, write_observer=fail,
+                write_observer=fail,
             )
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(read_draft(self.character), draft_before)
@@ -623,7 +620,7 @@ class CreationActivateIntegrationTests(CreationActionBase):
     def test_concurrent_activations_apply_exactly_once(self):
         from world.rules.creation_wizard import activate_draft
 
-        first = activate_draft(self.account, self.character, sampler=lambda low, high: low)
+        first = activate_draft(self.account, self.character)
         self.assertFalse(self.character.creation_pending)
         from world.rules.character_creation import CharacterCreationError
 

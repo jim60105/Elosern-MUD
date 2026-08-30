@@ -8,10 +8,10 @@ import {
 
 // H2 (webclient-hud-02-status-islands), design D2/D11: the head card renders
 // only backed identity — a glyph portrait (never an image), the numeric
-// magic_level badge, the display name, the derived rank title paired with
-// guild rank/merit, the wallet, and the disguise marker. No race,
-// subrace, class, or faction line (no such field exists in either payload),
-// and the wallet is the HUD's single persistent surface.
+// magic_power badge, the display name, the guild rank/merit line, the wallet,
+// and the disguise marker. No magic-derived rank word appears in any form
+// (magic-power-static-rename), and no race, subrace, class, or faction line
+// exists in either payload. The wallet is the HUD's single persistent surface.
 
 describe("CharacterHead (H2 head-card island)", () => {
   let wrapper;
@@ -39,9 +39,9 @@ describe("CharacterHead (H2 head-card island)", () => {
     expect(w.get('[data-testid="character-head__badge"]').text()).toBe("31");
     expect(w.get('[data-testid="character-head__name"]').text()).toBe("艾倫·灰誓");
     const rank = w.get('[data-testid="character-head__rank"]').text();
-    expect(rank).toContain("魔階·大師");
     expect(rank).toContain("公會 E");
     expect(rank).toContain("功績 140");
+    expect(rank).not.toMatch(/學徒|術師|大師|賢者|主宰/);
     expect(w.get('[data-testid="character-head__wallet"]').text()).toBe("錢包 3,240 銅");
     expect(w.get('[data-testid="character-head__disguise"]').text()).toBe("目前有偽裝");
   });
@@ -60,21 +60,21 @@ describe("CharacterHead (H2 head-card island)", () => {
     }
   });
 
-  it("keeps the true magic_level on the badge and rank line under an active disguise", () => {
-    // The fixture's disguise carries a displayed magic_level of 12, but the
-    // true trait is 31 — the card must keep the true value (design D2).
+  it("keeps the true magic_power on the badge under an active disguise", () => {
+    // The fixture's disguise carries a displayed magic_power of 12, but the
+    // true trait is 31 — the badge must keep the true value (design D2).
     const w = mountHead();
     expect(w.get('[data-testid="character-head__badge"]').text()).toBe("31");
     expect(
       w.get('[data-testid="character-head__rank"]').text(),
-    ).toContain("魔階·大師");
+    ).toContain("公會 E");
   });
 
-  it("omits the guild line when the payload has no guild object", () => {
+  it("shows the explicit marker when the payload has no guild object", () => {
     const w = mountHead({ character: { ...CHARACTER_PANEL_SAMPLE, guild: null } });
     const rank = w.get('[data-testid="character-head__rank"]').text();
-    expect(rank).toContain("魔階·大師");
-    expect(rank).not.toContain("公會");
+    expect(rank).toContain("未加入公會");
+    expect(rank).toContain("功績 0");
   });
 
   it("renders 未加入公會 for a null guild rank", () => {

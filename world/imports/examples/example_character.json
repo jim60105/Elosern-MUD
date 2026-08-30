@@ -15,7 +15,7 @@
     "atk_phys": 12,
     "agility": 14,
     "defense": 11,
-    "magic_level": 60,
+    "magic_power": 60,
     "guild_merit": 0
   },
   "disguised_stats": {
@@ -23,7 +23,7 @@
     "agility": 9
   },
   "affinity_elements": ["fire", "wind"],
-  "skills": [],
+  "skills": ["light_sword_style"],
   "passives": ["body_enhancement"],
   "equipment": {},
   "inventory": [],

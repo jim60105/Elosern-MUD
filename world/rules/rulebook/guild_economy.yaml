@@ -34,7 +34,7 @@ exam_profiles:
     atk_phys: 8
     agility: 8
     defense: 7
-    magic_level: 10
+    magic_power: 10
     skills:
       - basic_attack
   D:
@@ -45,7 +45,7 @@ exam_profiles:
     atk_phys: 9
     agility: 9
     defense: 8
-    magic_level: 12
+    magic_power: 12
     skills:
       - basic_attack
   C:
@@ -56,7 +56,7 @@ exam_profiles:
     atk_phys: 12
     agility: 12
     defense: 11
-    magic_level: 20
+    magic_power: 20
     skills:
       - basic_attack
   B:
@@ -67,7 +67,7 @@ exam_profiles:
     atk_phys: 14
     agility: 14
     defense: 13
-    magic_level: 25
+    magic_power: 25
     skills:
       - basic_attack
   A:
@@ -78,7 +78,7 @@ exam_profiles:
     atk_phys: 17
     agility: 17
     defense: 16
-    magic_level: 30
+    magic_power: 30
     skills:
       - basic_attack
   S:
@@ -89,7 +89,7 @@ exam_profiles:
     atk_phys: 20
     agility: 20
     defense: 19
-    magic_level: 35
+    magic_power: 35
     skills:
       - basic_attack
 

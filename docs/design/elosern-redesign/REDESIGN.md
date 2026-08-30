@@ -29,8 +29,8 @@
 |---|---|---|---|
 | 角色卡 | 名稱/種族(亞種)/職業/階級(魔法 rank F..主宰)、肖像 | 點開「狀態」全表 | 左上錨點 |
 | 生命/魔力/耐力 | hp/mp/sp（current/max）| 點開狀態 | 組合條＋數字＋受傷拖尾bar；低血暈影 |
-| 計數器 | magic_level(0..cap)、guild_merit | — | 顯示 rank 標題＋功績 |
-| 靜態屬性 | atk_phys/agility/defense（真值＋技能乘數有效值）| 狀態 | hover 顯示乘數來源 |
+| 計數器 | guild_merit | — | 顯示功績 |
+| 靜態屬性 | atk_phys/agility/defense/magic_power（真值＋技能乘數有效值）| 狀態 | hover 顯示乘數來源 |
 | 錢包 | 銅（整數）| — | 分群格式 3,240 銅 |
 | 公會階級 | rank F–S | 點開任務 | 徽記 |
 | 偽裝旗標 | disguise_active | — | 「目前有偽裝」 |

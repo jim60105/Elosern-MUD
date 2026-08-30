@@ -56,7 +56,7 @@ class ExamProfile:
     atk_phys: int
     agility: int
     defense: int
-    magic_level: int
+    magic_power: int
     skills: tuple[str, ...]
 
 
@@ -179,8 +179,8 @@ def validate_exam_profiles(raw: Mapping[str, Any]) -> dict[str, ExamProfile]:
             atk_phys=physical["atk_phys"],
             agility=physical["agility"],
             defense=physical["defense"],
-            magic_level=_require_int(
-                entry.get("magic_level"), f"exam_profiles.{rank}.magic_level", minimum=0
+            magic_power=_require_int(
+                entry.get("magic_power"), f"exam_profiles.{rank}.magic_power", minimum=0
             ),
             skills=tuple(skills),
         )

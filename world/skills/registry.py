@@ -798,7 +798,7 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
             "轉生帶來的祝福，被動加速魔力成長。",
             SkillKind.PASSIVE,
             TargetSpec.NONE,
-            effects=["growth_rate:magic:100"],
+            effects=["growth_rate:practice:100"],
             category=SkillCategory.INNATE_GIFT,
         ),
         _skill(

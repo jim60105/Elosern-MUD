@@ -75,7 +75,7 @@ class BuffDefinitionValidationTests(unittest.TestCase):
 
     def test_noop_rate_target_tick_does_nothing(self):
         entity = SimpleNamespace(traits=SimpleNamespace())
-        _apply_rate_modifier(entity, {"target": "magic_level_growth", "delta": 1})
+        _apply_rate_modifier(entity, {"target": "skill_practice", "delta": 1})
 
     def test_unknown_rate_target_is_rejected(self):
         entity = SimpleNamespace(traits=SimpleNamespace())
@@ -398,7 +398,7 @@ class BuffIntegrationTests(EvenniaTestCase):
             {
                 "bounds": [
                     {"target": "atk_phys", "ceiling": -5},
-                    {"target": "magic_level", "ceiling": -5},
+                    {"target": "magic_power", "ceiling": -5},
                 ]
             },
         )
@@ -418,7 +418,7 @@ class BuffIntegrationTests(EvenniaTestCase):
             {
                 "bounds": [
                     {"target": "atk_phys", "ceiling": -10},
-                    {"target": "magic_level", "ceiling": -10},
+                    {"target": "magic_power", "ceiling": -10},
                     {"target": "agility", "ceiling": -10},
                 ]
             },
@@ -551,9 +551,9 @@ class BuffIntegrationTests(EvenniaTestCase):
     def test_conferred_growth_rate_tick_is_a_no_op(self):
         entity = self._entity()
         grant_conferred_growth_rate(entity, "elosia", 0.5)
-        before = entity.traits.magic_level.value
+        before = entity.traits.magic_power.value
         tick_buffs(entity)
-        self.assertEqual(entity.traits.magic_level.value, before)
+        self.assertEqual(entity.traits.magic_power.value, before)
 
     @covers_requirement("cleanse-effect-handler::buffs-yaml-entries-declare-a-polarity-defaulting-to-buff")
     def test_rulebook_polarity_classification(self):
