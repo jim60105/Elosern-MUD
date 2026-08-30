@@ -27,7 +27,9 @@
     "shop.buy",
     "shop.sell",
     "title.accept",
-    "title.decline"
+    "title.decline",
+    "title.equip",
+    "title.remove"
   ],
   "silentPresentationControlIds": [
     "options.dismiss"

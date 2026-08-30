@@ -194,6 +194,10 @@ def build_production_registry() -> PresentationRegistry:
         TITLE_BALLOT_SCHEMA_VERSION,
         title_ballot_presenter,
     )
+    from web.webclient.presentation.title_codex import (
+        TITLE_CODEX_SCHEMA_VERSION,
+        title_codex_presenter,
+    )
 
     registry = PresentationRegistry("elosern")
     registry.register(
@@ -274,6 +278,14 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=TITLE_BALLOT_SCHEMA_VERSION,
             unavailable_reason=("ballot_unavailable", "異名提名目前無法顯示"),
             presenter=title_ballot_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="title_codex",
+            schema_version=TITLE_CODEX_SCHEMA_VERSION,
+            unavailable_reason=("codex_unavailable", "稱號冊目前無法顯示"),
+            presenter=title_codex_presenter,
         )
     )
     return registry

@@ -325,7 +325,7 @@ export const useElosernStore = defineStore("elosern", () => {
     // The store is the single writer and owns the teardown on a mode change
     // into creation, an epoch reset, or a transport loss (same events as
     // the drawer teardown in `syncHudDrawer`).
-    const HUD_OVERLAY_NAMES = new Set(["map", "settings", "help", "lineage"]);
+    const HUD_OVERLAY_NAMES = new Set(["map", "settings", "help", "lineage", "codex"]);
     const hudOverlay = ref(null);
     const hudOverlayOpener = ref(null);
 

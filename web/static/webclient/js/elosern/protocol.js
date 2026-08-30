@@ -210,6 +210,24 @@
   var TITLE_BALLOT_MAX_DISPLAY = 64;
   var TITLE_BALLOT_MAX_BASIS = 80;
 
+  // title_codex panel bounds (mirror of web.webclient.presentation.
+  // title_codex, title-codex-removal D5/D7). The values are owned by
+  // world/rules/title_view.py; these constants mirror the panel validator
+  // and must stay equal.
+  var TITLE_CODEX_MAX_ROWS = 50;
+  var TITLE_CODEX_MAX_DISPLAY = 64;
+  var TITLE_CODEX_MAX_BASIS = 160;
+  var TITLE_CODEX_MAX_FULL_TITLE = 128;
+  var TITLE_CODEX_MAX_BALLOT = 3;
+  var TITLE_CODEX_BASIS_WIRE_MAX = 80;
+  var TITLE_CODEX_CATEGORIES = [
+    "combat",
+    "spell",
+    "explore",
+    "guild",
+    "romance",
+  ];
+
   // creation panel bounds (mirror of web.webclient.presentation.creation,
   // design D2). These constants are shared with the server through a
   // dual-direction parity test.
@@ -271,6 +289,7 @@
     character: 6,
     lineage: 1,
     title_ballot: 1,
+    title_codex: 1,
   };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
@@ -3830,6 +3849,219 @@
     return result;
   }
 
+  // -------------------------------------------------------------------------
+  // title_codex panel validator (mirror of web.webclient.presentation.
+  // title_codex, title-codex-removal D5/D7). Bounds are owned by
+  // world/rules/title_view.py; the hint/flavor exclusivity and the category
+  // closed set are re-asserted here exactly as the Python validator does.
+  // -------------------------------------------------------------------------
+
+  function inCategorySet(value) {
+    for (var i = 0; i < TITLE_CODEX_CATEGORIES.length; i++) {
+      if (TITLE_CODEX_CATEGORIES[i] === value) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function validateTitleCodexFixedRow(value, position) {
+    var label = "title codex fixed row " + position;
+    requireExactFields(
+      value,
+      label,
+      [
+        "key",
+        "display",
+        "category",
+        "hint",
+        "flavor",
+        "unlocked",
+        "granted_tick",
+      ],
+      []
+    );
+    validateIdentifier(value.key, label + " key");
+    requireString(value.display, label + " display", TITLE_CODEX_MAX_DISPLAY);
+    if (codePoints(value.display.trim()) < 1) {
+      throw new Error(label + " display must be non-empty");
+    }
+    requireString(value.category, label + " category", 32);
+    if (!inCategorySet(value.category)) {
+      throw new Error(label + " category is outside the closed set");
+    }
+    var unlocked = requireBool(value.unlocked, label + " unlocked");
+    var hint = requireString(value.hint, label + " hint", TITLE_CODEX_MAX_BASIS);
+    var flavor = requireString(
+      value.flavor,
+      label + " flavor",
+      TITLE_CODEX_MAX_BASIS
+    );
+    if (unlocked && codePoints(hint) > 0) {
+      throw new Error(label + " unlocked row must not carry a hint");
+    }
+    if (!unlocked && codePoints(flavor) > 0) {
+      throw new Error(label + " locked row must not carry flavor");
+    }
+    requireInt(value.granted_tick, label + " granted_tick", 0, MAX_SAFE_INTEGER);
+    return {
+      key: value.key,
+      display: value.display,
+      category: value.category,
+      hint: hint,
+      flavor: flavor,
+      unlocked: unlocked,
+      granted_tick: value.granted_tick,
+    };
+  }
+
+  function validateTitleCodexEpithetRow(value, position) {
+    var label = "title codex epithet row " + position;
+    requireExactFields(
+      value,
+      label,
+      ["display", "basis", "granted_tick", "equipped", "can_remove"],
+      []
+    );
+    requireString(value.display, label + " display", TITLE_CODEX_MAX_DISPLAY);
+    if (codePoints(value.display.trim()) < 1) {
+      throw new Error(label + " display must be non-empty");
+    }
+    requireString(value.basis, label + " basis", TITLE_CODEX_MAX_BASIS);
+    requireInt(value.granted_tick, label + " granted_tick", 0, MAX_SAFE_INTEGER);
+    var equipped = requireBool(value.equipped, label + " equipped");
+    // The server owns the gate verdict; the client renders the flag and
+    // evaluates no removal rule of its own.
+    var canRemove = requireBool(value.can_remove, label + " can_remove");
+    return {
+      display: value.display,
+      basis: value.basis,
+      granted_tick: value.granted_tick,
+      equipped: equipped,
+      can_remove: canRemove,
+    };
+  }
+
+  function validateTitleCodexBallotEntry(value, position) {
+    var label = "title codex pending ballot " + position;
+    requireExactFields(value, label, ["display", "basis"], []);
+    requireString(value.display, label + " display", TITLE_CODEX_MAX_DISPLAY);
+    if (codePoints(value.display.trim()) < 1) {
+      throw new Error(label + " display must be non-empty");
+    }
+    requireString(value.basis, label + " basis", TITLE_CODEX_BASIS_WIRE_MAX);
+    return { display: value.display, basis: value.basis };
+  }
+
+  function validateTitleCodexEquipped(value) {
+    requireExactFields(value, "title codex equipped", ["fixed", "epithet"], []);
+    if (value.fixed !== null) {
+      validateIdentifier(value.fixed, "equipped.fixed");
+    }
+    if (value.epithet !== null) {
+      requireString(value.epithet, "equipped.epithet", TITLE_CODEX_MAX_DISPLAY);
+      if (codePoints(value.epithet) < 1) {
+        throw new Error("equipped.epithet must be non-empty or null");
+      }
+    }
+    return { fixed: value.fixed, epithet: value.epithet };
+  }
+
+  // Exact available title_codex panel v1 schema.
+  function validateTitleCodexPanel(payload) {
+    requireExactFields(
+      payload,
+      "title_codex panel",
+      [
+        "schema_version",
+        "available",
+        "kind",
+        "fixed_rows",
+        "epithet_rows",
+        "equipped",
+        "full_title",
+        "unlocked",
+        "total",
+        "pending_ballot",
+      ],
+      []
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== 1) {
+      throw new Error("unsupported title_codex schema_version");
+    }
+    if (payload.available !== true || payload.kind !== "title_codex") {
+      throw new Error(
+        "title_codex panel must be available with kind title_codex"
+      );
+    }
+    if (!Array.isArray(payload.fixed_rows)) {
+      throw new Error("title codex fixed_rows must be a list");
+    }
+    if (payload.fixed_rows.length > TITLE_CODEX_MAX_ROWS) {
+      throw new Error(
+        "title codex fixed_rows must hold at most " + TITLE_CODEX_MAX_ROWS + " entries"
+      );
+    }
+    if (!Array.isArray(payload.epithet_rows)) {
+      throw new Error("title codex epithet_rows must be a list");
+    }
+    if (payload.epithet_rows.length > TITLE_CODEX_MAX_ROWS) {
+      throw new Error(
+        "title codex epithet_rows must hold at most " +
+          TITLE_CODEX_MAX_ROWS +
+          " entries"
+      );
+    }
+    if (!Array.isArray(payload.pending_ballot)) {
+      throw new Error("title codex pending_ballot must be a list");
+    }
+    if (payload.pending_ballot.length > TITLE_CODEX_MAX_BALLOT) {
+      throw new Error(
+        "title codex pending_ballot must hold at most " +
+          TITLE_CODEX_MAX_BALLOT +
+          " entries"
+      );
+    }
+    var unlocked = requireInt(payload.unlocked, "unlocked", 0, MAX_SAFE_INTEGER);
+    var total = requireInt(payload.total, "total", 0, MAX_SAFE_INTEGER);
+    if (unlocked > total) {
+      throw new Error("unlocked must not exceed total");
+    }
+    requireString(payload.full_title, "full_title", TITLE_CODEX_MAX_FULL_TITLE);
+    var fixedRows = [];
+    for (var f = 0; f < payload.fixed_rows.length; f++) {
+      fixedRows.push(validateTitleCodexFixedRow(payload.fixed_rows[f], f + 1));
+    }
+    var epithetRows = [];
+    for (var e = 0; e < payload.epithet_rows.length; e++) {
+      epithetRows.push(
+        validateTitleCodexEpithetRow(payload.epithet_rows[e], e + 1)
+      );
+    }
+    var ballot = [];
+    for (var b = 0; b < payload.pending_ballot.length; b++) {
+      ballot.push(validateTitleCodexBallotEntry(payload.pending_ballot[b], b + 1));
+    }
+    var result = {
+      schema_version: 1,
+      available: true,
+      kind: "title_codex",
+      fixed_rows: fixedRows,
+      epithet_rows: epithetRows,
+      equipped: validateTitleCodexEquipped(payload.equipped),
+      full_title: payload.full_title,
+      unlocked: unlocked,
+      total: total,
+      pending_ballot: ballot,
+    };
+    // Envelope guarantee mirrors the Python validator's closing check.
+    if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("title_codex payload exceeds the OOB envelope limit");
+    }
+    return result;
+  }
+
   // Panel discriminator dispatch: the unavailable form is common to every
   // registered panel; the available form is validated against its schema.
   function validateUnavailablePanel(payload, schemaVersion) {
@@ -3887,6 +4119,9 @@
     }
     if (name === "character") {
       return validateCharacterPanel(payload);
+    }
+    if (name === "title_codex") {
+      return validateTitleCodexPanel(payload);
     }
     if (name === "status") {
       return validateStatusPanel(payload);
@@ -4194,6 +4429,14 @@
     LINEAGE_MAX_NODES_PER_CHAIN: LINEAGE_MAX_NODES_PER_CHAIN,
     LINEAGE_MAX_TEXT: LINEAGE_MAX_TEXT,
     validateTitleBallotPanel: validateTitleBallotPanel,
+    validateTitleCodexPanel: validateTitleCodexPanel,
+    TITLE_CODEX_MAX_ROWS: TITLE_CODEX_MAX_ROWS,
+    TITLE_CODEX_MAX_DISPLAY: TITLE_CODEX_MAX_DISPLAY,
+    TITLE_CODEX_MAX_BASIS: TITLE_CODEX_MAX_BASIS,
+    TITLE_CODEX_MAX_FULL_TITLE: TITLE_CODEX_MAX_FULL_TITLE,
+    TITLE_CODEX_MAX_BALLOT: TITLE_CODEX_MAX_BALLOT,
+    TITLE_CODEX_BASIS_WIRE_MAX: TITLE_CODEX_BASIS_WIRE_MAX,
+    TITLE_CODEX_CATEGORIES: TITLE_CODEX_CATEGORIES.slice(),
     validatePanel: validatePanel,
 
     // The only accepted client->server synchronization body.

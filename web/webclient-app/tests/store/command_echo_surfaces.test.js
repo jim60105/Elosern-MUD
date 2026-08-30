@@ -213,6 +213,28 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "title decline",
     },
     {
+      id: "codex window: fixed equip row (payload-only)",
+      ids: ["title.equip"],
+      prepare() {
+        openExploration();
+        // The codex window intent (AppClient forwards {action_id, payload}).
+        store.dispatchAction("title.equip", {
+          kind: "fixed",
+          identifier: "g_f_rank",
+        });
+      },
+      expected: "title equip fixed g_f_rank",
+    },
+    {
+      id: "codex window: confirmed epithet removal row (payload-only)",
+      ids: ["title.remove"],
+      prepare() {
+        openExploration();
+        store.dispatchAction("title.remove", { display: "夜襲之人" });
+      },
+      expected: "title remove epithet 夜襲之人 confirm",
+    },
+    {
       id: "shop drawer buy row (central fill from the services panel)",
       ids: ["shop.buy"],
       prepare() {

@@ -397,6 +397,73 @@ test("title.decline resolves to the typed decline command", () => {
   assert.strictEqual(Echo.commandLine("title.decline", {}, null), "title decline");
 });
 
+test("title.equip resolves both kinds from the payload identifier", () => {
+  assert.strictEqual(
+    Echo.commandLine("title.equip", { kind: "fixed", identifier: "g_f_rank" }, null),
+    "title equip fixed g_f_rank"
+  );
+  assert.strictEqual(
+    Echo.commandLine(
+      "title.equip",
+      { kind: "epithet", identifier: "夜襲之人" },
+      null
+    ),
+    "title equip epithet 夜襲之人"
+  );
+  assert.strictEqual(
+    Echo.commandLine("title.equip", { kind: "widget", identifier: "x" }, null),
+    null
+  );
+  assert.strictEqual(
+    Echo.commandLine("title.equip", { kind: "fixed", identifier: "" }, null),
+    null
+  );
+});
+
+test("title.remove echoes the confirmed removal, quoting a confirm-tailed display", () => {
+  assert.strictEqual(
+    Echo.commandLine("title.remove", { display: "夜襲之人" }, null),
+    "title remove epithet 夜襲之人 confirm"
+  );
+  // A display whose tail would eat the literal confirm token is echoed
+  // quoted so the echoed line re-parses to the same target (the server's
+  // parse strips one matching quote pair before the gate match).
+  assert.strictEqual(
+    Echo.commandLine("title.remove", { display: "破門 confirm" }, null),
+    'title remove epithet "破門 confirm" confirm'
+  );
+  assert.strictEqual(
+    Echo.commandLine("title.remove", { display: "confirm" }, null),
+    'title remove epithet "confirm" confirm'
+  );
+  assert.strictEqual(Echo.commandLine("title.remove", {}, null), null);
+  assert.strictEqual(Echo.commandLine("title.remove", { display: 7 }, null), null);
+});
+
+test("title echoes keep the full 64-code-point contract cap, never 60", () => {
+  // The title view/validator contract admits identifiers up to 64 code
+  // points; the echo must dispatch exactly what the payload carries, so
+  // the generic 60-char label bound must not truncate a 61-64 display.
+  const display = "名".repeat(Echo.MAX_TITLE_IDENTIFIER_LENGTH);
+  assert.strictEqual(
+    Echo.commandLine("title.remove", { display }, null),
+    `title remove epithet ${display} confirm`
+  );
+  assert.strictEqual(
+    Echo.commandLine("title.equip", { kind: "epithet", identifier: display }, null),
+    `title equip epithet ${display}`
+  );
+  // Anything past the contract cap degrades to the cap, and the worst-case
+  // quoted remove line still fits the global line bound.
+  const over = "名".repeat(Echo.MAX_TITLE_IDENTIFIER_LENGTH + 8);
+  const line = Echo.commandLine("title.remove", { display: over }, null);
+  assert.strictEqual(
+    line,
+    `title remove epithet ${"名".repeat(64)} confirm`
+  );
+  assert.ok(line.length <= Echo.MAX_LINE_LENGTH);
+});
+
 test("combat.cast echoes explicit multi-target labels in payload order (D3b)", () => {
   const line = Echo.commandLine(
     "combat.cast",
@@ -484,6 +551,8 @@ const REGISTERED_MUTATION_ACTIONS = {
   "shop.sell": { payload: { item_key: "healing_potion", quantity: 1 }, display: { itemLabel: "治療藥水" } },
   "title.accept": { payload: { index: 2 }, display: {} },
   "title.decline": { payload: {}, display: {} },
+  "title.equip": { payload: { kind: "fixed", identifier: "g_f_rank" }, display: {} },
+  "title.remove": { payload: { display: "夜襲之人" }, display: {} },
 };
 
 test("every registered mutation action resolves non-null or is declared silent", () => {

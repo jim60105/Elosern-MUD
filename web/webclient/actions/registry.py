@@ -155,8 +155,12 @@ def build_production_action_registry() -> ActionRegistry:
     from web.webclient.actions.title_actions import (
         _title_accept_adapter,
         _title_decline_adapter,
+        _title_equip_adapter,
+        _title_remove_adapter,
         validate_title_accept_payload,
         validate_title_decline_payload,
+        validate_title_equip_payload,
+        validate_title_remove_payload,
     )
 
     registry = ActionRegistry("elosern")
@@ -397,8 +401,9 @@ def build_production_action_registry() -> ActionRegistry:
             adapter=_title_accept_adapter,
             # Targeted refresh: answering consumes the ballot, so the
             # completion publication re-renders the menu panel immediately
-            # (the options.dismiss precedent).
-            affected_panels=("title_ballot",),
+            # (the options.dismiss precedent). The codex carries the 「提名中」
+            # tab, so it refreshes with the ballot.
+            affected_panels=("title_ballot", "title_codex"),
         )
     )
     registry.register(
@@ -406,7 +411,27 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="title.decline",
             validate_payload=validate_title_decline_payload,
             adapter=_title_decline_adapter,
-            affected_panels=("title_ballot",),
+            affected_panels=("title_ballot", "title_codex"),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="title.equip",
+            validate_payload=validate_title_equip_payload,
+            adapter=_title_equip_adapter,
+            # Equipping re-renders the codex rows and the character panel's
+            # full-title row (both describe the equipped pair).
+            affected_panels=("title_codex", "character"),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="title.remove",
+            validate_payload=validate_title_remove_payload,
+            adapter=_title_remove_adapter,
+            # Removal leaves the equipment slots untouched; only the codex
+            # rows change.
+            affected_panels=("title_codex",),
         )
     )
     return registry

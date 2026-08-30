@@ -1433,7 +1433,7 @@ test("the unavailable forms differ only in schema_version", () => {
 });
 
 test("mirrors every registered panel schema version in the allowlist", () => {
-  // The allowlist must cover all ten registered panels so an unmirrored
+  // The allowlist must cover all eleven registered panels so an unmirrored
   // panel can never slip through the registered-version gate.
   assert.equal(Protocol.PANEL_ALLOWLIST.status, 2);
   assert.equal(Protocol.PANEL_ALLOWLIST.local_map, 1);
@@ -1444,10 +1444,11 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.character, 6);
   assert.equal(Protocol.PANEL_ALLOWLIST.lineage, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.title_ballot, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.title_codex, 1);
   assert.equal(
     Object.keys(Protocol.PANEL_ALLOWLIST).length,
-    10,
-    "PANEL_ALLOWLIST must list exactly the ten registered panels"
+    11,
+    "PANEL_ALLOWLIST must list exactly the eleven registered panels"
   );
 });
 
@@ -4593,4 +4594,259 @@ test("title_ballot is in the production panel allowlist and a bad panel rejects 
   };
   envelope.revision = 6;
   assert.doesNotThrow(() => Protocol.validateUpdate(envelope));
+});
+
+// ---------------------------------------------------------------------------
+// title_codex panel v1 (mirror of web.webclient.presentation.title_codex,
+// title-codex-removal D5/D7).
+// ---------------------------------------------------------------------------
+
+function validTitleCodexFixedRow(overrides) {
+  return Object.assign(
+    {
+      key: "g_f_rank",
+      display: "F級冒險者",
+      category: "guild",
+      hint: "",
+      flavor: "公會註冊的起點。",
+      unlocked: true,
+      granted_tick: 120,
+    },
+    overrides || {}
+  );
+}
+
+function validTitleCodexEpithetRow(overrides) {
+  return Object.assign(
+    {
+      display: "南門新客",
+      basis: "初入南門。",
+      granted_tick: 121,
+      equipped: true,
+      can_remove: false,
+    },
+    overrides || {}
+  );
+}
+
+function validTitleCodexPanel(overrides) {
+  return Object.assign(
+    {
+      schema_version: 1,
+      available: true,
+      kind: "title_codex",
+      fixed_rows: [validTitleCodexFixedRow()],
+      epithet_rows: [validTitleCodexEpithetRow()],
+      equipped: { fixed: "g_f_rank", epithet: "南門新客" },
+      full_title: "F級冒險者　南門新客",
+      unlocked: 1,
+      total: 7,
+      pending_ballot: [],
+    },
+    overrides || {}
+  );
+}
+
+test("title_codex pins its mirrored bounds and validates the minimal payload", () => {
+  assert.equal(Protocol.TITLE_CODEX_MAX_ROWS, 50);
+  assert.equal(Protocol.TITLE_CODEX_MAX_DISPLAY, 64);
+  assert.equal(Protocol.TITLE_CODEX_MAX_BASIS, 160);
+  assert.equal(Protocol.TITLE_CODEX_MAX_FULL_TITLE, 128);
+  assert.equal(Protocol.TITLE_CODEX_MAX_BALLOT, 3);
+  assert.equal(Protocol.TITLE_CODEX_BASIS_WIRE_MAX, 80);
+  assert.deepEqual(Protocol.TITLE_CODEX_CATEGORIES, [
+    "combat",
+    "spell",
+    "explore",
+    "guild",
+    "romance",
+  ]);
+  const normalized = Protocol.validatePanel(
+    "title_codex",
+    Protocol.PANEL_ALLOWLIST.title_codex,
+    validTitleCodexPanel()
+  );
+  assert.equal(normalized.kind, "title_codex");
+  assert.equal(normalized.epithet_rows[0].display, "南門新客");
+});
+
+test("title_codex rejects wrong kind, version, and discriminator", () => {
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(validTitleCodexPanel({ kind: "lineage" }))
+  );
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(validTitleCodexPanel({ schema_version: 2 }))
+  );
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(validTitleCodexPanel({ available: false }))
+  );
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(validTitleCodexPanel({ extra: 1 }))
+  );
+});
+
+test("title_codex enforces the hint/flavor exclusivity and category closed set", () => {
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({
+        fixed_rows: [validTitleCodexFixedRow({ unlocked: true, hint: "解鎖提示" })],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({
+        fixed_rows: [
+          validTitleCodexFixedRow({ unlocked: false, hint: "解鎖提示", flavor: "風味" }),
+        ],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({
+        fixed_rows: [validTitleCodexFixedRow({ category: "commerce" })],
+      })
+    )
+  );
+  // A locked row carrying only its hint is the legitimate form.
+  assert.doesNotThrow(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({
+        fixed_rows: [
+          validTitleCodexFixedRow({
+            unlocked: false,
+            hint: "完成公會註冊",
+            flavor: "",
+            granted_tick: 0,
+          }),
+        ],
+      })
+    )
+  );
+});
+
+test("title_codex caps row counts and string bounds", () => {
+  const rows = [];
+  for (let i = 0; i <= Protocol.TITLE_CODEX_MAX_ROWS; i++) {
+    rows.push(validTitleCodexEpithetRow({ display: `異名${i}` }));
+  }
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(validTitleCodexPanel({ epithet_rows: rows }))
+  );
+  assert.doesNotThrow(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({ epithet_rows: rows.slice(1) })
+    )
+  );
+  const displayCap = "長".repeat(Protocol.TITLE_CODEX_MAX_DISPLAY);
+  const basisCap = "援".repeat(Protocol.TITLE_CODEX_MAX_BASIS);
+  assert.doesNotThrow(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({
+        full_title: "銜".repeat(Protocol.TITLE_CODEX_MAX_FULL_TITLE),
+        epithet_rows: [
+          validTitleCodexEpithetRow({ display: displayCap, basis: basisCap }),
+        ],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({
+        epithet_rows: [
+          validTitleCodexEpithetRow({
+            display: "長".repeat(Protocol.TITLE_CODEX_MAX_DISPLAY + 1),
+          }),
+        ],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({
+        epithet_rows: [
+          validTitleCodexEpithetRow({
+            basis: "援".repeat(Protocol.TITLE_CODEX_MAX_BASIS + 1),
+          }),
+        ],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({
+        full_title: "銜".repeat(Protocol.TITLE_CODEX_MAX_FULL_TITLE + 1),
+      })
+    )
+  );
+});
+
+test("title_codex requires counters, equipped slots, and ballot shape", () => {
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(validTitleCodexPanel({ unlocked: 8 }))
+  );
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({
+        equipped: { fixed: "BAD KEY", epithet: "南門新客" },
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({ equipped: { fixed: null, epithet: "" } })
+    )
+  );
+  assert.doesNotThrow(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({ equipped: { fixed: null, epithet: null } })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({
+        pending_ballot: [{ display: "破城先鋒", basis: "率先破門。", index: 1 }],
+      })
+    )
+  );
+  assert.doesNotThrow(() =>
+    Protocol.validateTitleCodexPanel(
+      validTitleCodexPanel({
+        pending_ballot: [{ display: "破城先鋒", basis: "率先破門。" }],
+      })
+    )
+  );
+});
+
+test("title_codex is in the production panel allowlist and a bad panel rejects atomically", () => {
+  assert.equal(Protocol.PANEL_ALLOWLIST.title_codex, 1);
+  const envelope = {
+    protocol_version: 1,
+    presentation_epoch: VALID_EPOCH,
+    revision: 7,
+    mode: "exploration",
+    panels: {
+      title_codex: { ...validTitleCodexPanel(), unlocked: 9, total: 1 },
+    },
+    layout_version: 1,
+    server_time: serverTime(),
+  };
+  assert.throws(() => Protocol.validateSnapshot(envelope));
+  envelope.panels.title_codex = validTitleCodexPanel();
+  assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
+  envelope.revision = 8;
+  assert.doesNotThrow(() => Protocol.validateUpdate(envelope));
+});
+
+test("title_codex unavailable form validates through the common discriminator", () => {
+  const unavailable = {
+    schema_version: 1,
+    available: false,
+    reason: { code: "codex_unavailable", message: "稱號冊目前無法顯示" },
+  };
+  assert.deepEqual(
+    Protocol.validatePanel("title_codex", Protocol.PANEL_ALLOWLIST.title_codex, unavailable),
+    unavailable
+  );
 });
