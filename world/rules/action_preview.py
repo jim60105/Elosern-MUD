@@ -36,7 +36,6 @@ from world.rules.combat_modifiers import (
 )
 from world.rules.progression import (
     FREEFORM_SCALE_VALUES,
-    can_cast_skill,
     freeform_scales_for,
     scaled_mp_cost,
 )
@@ -113,11 +112,11 @@ def _skill_wide_failure(
     """Return the first skill-wide rejection ``(reason, detail)`` or ``None``.
 
     Mirrors ``ActionResolver.preflight()``'s ordering: ownership and active
-    kind, out-of-combat availability, elemental spell-tier eligibility through
-    the shared cast-eligibility predicate (``progression.can_cast_skill``,
-    fail-closed), the freeform-casting gate, resources (checked against the
-    scaled ``mp`` cost), capability (including ``actions_per_turn == 0``),
-    registered effect prefixes, and time metadata.
+    kind, out-of-combat availability, the freeform-casting gate, resources
+    (checked against the scaled ``mp`` cost), capability (including
+    ``actions_per_turn == 0``), registered effect prefixes, and time metadata.
+    The retired numeric cast gate (``magic-xp-engine-retirement``) has no
+    preview-side counterpart any more.
     """
     skill = SKILL_REGISTRY.get(skill_key)
     if skill is None or skill_key not in actor.skills.owned_keys():
@@ -126,11 +125,6 @@ def _skill_wide_failure(
         return RejectReason.SKILL_NOT_ACTIVE, skill_key
     if not skill.usable_out_of_combat and context.battlefield is None:
         return RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT, skill_key
-    # Elemental spells are gated by the caster's magic tier exactly like the
-    # resolver's step-1 check; an unmet gate — or a malformed elemental spell
-    # the predicate fails closed on — rejects like an unowned-skill cast.
-    if not can_cast_skill(actor, skill):
-        return RejectReason.UNKNOWN_SKILL, skill_key
     try:
         _step1_divine_arts_gate(actor, skill)
     except RejectedAction as rejection:

@@ -389,8 +389,7 @@ class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):
         self.monster.buffs.all["fire_scorch"].tick_elapsed_seconds = 10
 
     @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
-    def test_dot_tick_kill_of_final_foe_commits_victory_and_one_xp(self):
-        from world.rules.progression import COMBAT_KILL_XP_TABLE
+    def test_dot_tick_kill_of_final_foe_commits_victory(self):
 
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=1):
@@ -401,7 +400,8 @@ class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):
         kinds = [entry.kind for log in upkeep_logs for entry in log.entries]
         self.assertIn("damage", kinds)
         self.assertEqual(kinds.count("target_defeated"), 1)
-        self.assertEqual(self.player.db.magic_xp, COMBAT_KILL_XP_TABLE["low"])
+        # The tick kill carries no progression award any more.
+        self.assertIsNone(self.player.db.magic_xp)
         self.assertEqual(result["rounds_elapsed"], 1)
         self.assertIsNone(self.player.db.active_combat)
 

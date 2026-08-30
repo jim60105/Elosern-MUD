@@ -24,8 +24,6 @@ def _player(key="dispatch player"):
     player = create_object(PlayerCharacter, key=key)
     player.race = "human"
     player.apply_race_baseline()
-    # Human static magic_power at 術師 tier so element-gated spell casts pass.
-    player.traits.magic_power.base = 30
     return player
 
 

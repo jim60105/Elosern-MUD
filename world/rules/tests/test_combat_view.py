@@ -192,7 +192,8 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(fire.description.strip())
 
     @covers_requirement("action-resolution-pipeline::actionresolver-exposes-shared-side-effect-free-action-preview")
-    def test_tier_blocked_spell_descriptor_is_disabled(self):
+    def test_spell_descriptor_ignores_numeric_magic_power(self):
+        """magic-xp-engine-retirement: no numeric tier gate on descriptors."""
         self.player.db.skills = {
             "active": ["firestorm"],
             "passive": [],
@@ -201,17 +202,13 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.traits.mp.current = 50
         engage(self.player, self.monster)
 
-        # magic level 15 with no affinities and no mastery: floor(15 * 1.0)
-        # == 15 is below the 術師 threshold (16), so the descriptor is
-        # disabled with the unknown-skill reason code.
+        # An owned, affordable spell stays enabled at any static magic_power:
+        # interim eligibility is ownership + MP only.
         self.player.traits.magic_power.base = 15
         view = build_combat_view(self.player)
         fire = next(skill for skill in view.skills if skill.key == "firestorm")
-        self.assertFalse(fire.enabled)
-        self.assertEqual(fire.reason_code, "unknown_skill")
+        self.assertTrue(fire.enabled)
 
-        # The same actor at magic level 30 passes the gate: the descriptor
-        # stays enabled, proving the assertion is about the tier gate alone.
         self.player.traits.magic_power.base = 30
         view = build_combat_view(self.player)
         fire = next(skill for skill in view.skills if skill.key == "firestorm")

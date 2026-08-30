@@ -8,7 +8,6 @@ from typing import Any, Callable, Literal
 from django.db import transaction
 
 from typeclasses.monsters import Monster
-from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
@@ -25,9 +24,7 @@ from world.rules.equipment_effects import equipment_immune_buff_keys, equipment_
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.progression import (
     FREEFORM_SCALE_VALUES,
-    can_cast_skill,
     freeform_scales_for,
-    grant_combat_kill_xp,
     grant_skill_practice_xp,
     scaled_mp_cost,
 )
@@ -276,14 +273,6 @@ def _step1_ownership(request: ActionRequest) -> SkillDef:
             RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT,
             request.skill_key,
         )
-    # Elemental spells are additionally gated by the caster's magic tier
-    # through the shared cast-eligibility predicate
-    # (``progression.can_cast_skill``), unless the caster directly owns the
-    # element's mastery skill. An unmet gate — or a malformed elemental spell
-    # that the predicate fails closed on — rejects like an unowned-skill cast
-    # (no new RejectReason member).
-    if not can_cast_skill(request.actor, skill):
-        raise RejectedAction(RejectReason.UNKNOWN_SKILL, request.skill_key)
     _step1_divine_arts_gate(request.actor, skill)
     _step1_freeform_gate(request, skill)
     return skill
@@ -1484,39 +1473,6 @@ def _step6_skill_practice(actor: Any, skill: SkillDef) -> PendingEffect:
     )
 
 
-def _step6_combat_kill_xp(
-    request: ActionRequest,
-    targets: list[Any],
-) -> list[PendingEffect]:
-    """Stage one post-damage kill award per initially living tiered monster."""
-    if request.context.battlefield is None:
-        return []
-    pending: list[PendingEffect] = []
-    seen: set[int] = set()
-    for target in targets:
-        if id(target) in seen:
-            continue
-        seen.add(id(target))
-        if not isinstance(target, Monster):
-            continue
-        tier_key = target.threat_tier
-        if tier_key not in MONSTER_TIER_REGISTRY or _stored_trait_value(target.traits.hp) <= 0:
-            continue
-        pending.append(
-            PendingEffect(
-                request.actor,
-                f"combat_kill_xp|{_entity_key(target)}|{tier_key}",
-                frozenset({"progression"}),
-                lambda target=target, tier_key=tier_key: (
-                    grant_combat_kill_xp(request.actor, tier_key)
-                    if _stored_trait_value(target.traits.hp) <= 0
-                    else None
-                ),
-            )
-        )
-    return pending
-
-
 _ENTRY_TEMPLATES = {
     "resource_spend": "{actor} 消耗了資源。",
     "skill_granted": "{actor} 對 {target} 施展了「統御術」的部分效果。",
@@ -1868,7 +1824,6 @@ def _snapshot_entity_state(entity: Any) -> dict[str, Any]:
         ),
         "buffs": _attribute_snapshot(entity, "buffs"),
         "skill_grants": _attribute_snapshot(entity, "skill_grants"),
-        "magic_xp": _attribute_snapshot(entity, "magic_xp"),
         "skill_proficiency": _attribute_snapshot(entity, "skill_proficiency"),
     }
 
@@ -1916,7 +1871,6 @@ def _restore_entity_state(entity: Any, snapshot: dict[str, Any]) -> None:
     )
     _restore_attribute(entity, "buffs", snapshot["buffs"])
     _restore_attribute(entity, "skill_grants", snapshot["skill_grants"])
-    _restore_attribute(entity, "magic_xp", snapshot["magic_xp"])
     _restore_attribute(entity, "skill_proficiency", snapshot["skill_proficiency"])
     entity.traits.trait_data = entity.attributes.get(
         "traits",
@@ -2095,7 +2049,6 @@ class ActionResolver:
             )
             pending += _step6_resource_deduction(request.actor, skill, request.scale)
             pending.append(_step6_skill_practice(request.actor, skill))
-            pending += _step6_combat_kill_xp(request, targets)
             event_log = _step7_build_event_log(request, skill, pending)
             try:
                 for planner in _EVENT_EFFECT_PLANNERS.values():

@@ -15,7 +15,7 @@
 魔法是 `world/skills/registry.py` 中 `SKILL_REGISTRY` 字典裡的 `SkillDef`。結構上的重點：
 
 - **純資料、不可變**：`SkillDef` 是 frozen dataclass，`cost`／`effects` 都是不可變集合；`SkillDef.__post_init__` 會在建構時解析每個 `effects` 字串（無法辨識的前綴直接拋錯，registry 載入即失敗）。
-- **沒有 tier 欄位**：位階由 registry 位置與 MP 成本帶推導（`world/skills/cost_tiers.py::spell_tier_for`），再交給 `world/rules/progression.py::can_cast_spell_tier` 施放門檻使用。
+- **沒有 tier 欄位**：位階由 registry 位置與 MP 成本帶推導（`world/skills/cost_tiers.py::spell_tier_for`）。數值施放門檻已隨 magic-XP 引擎除役（`magic-xp-engine-retirement`）；位階目前是純資料標籤，未來的解鎖階梯（`use-driven-skill-lineage`）讀的是階梯樹，不是 MP 成本帶。
 - **效果字串是型別化契約**：所有效果前綴在 `world/skills/effects.py` 有對應的 typed dataclass。魔法會用到的前綴：
 
 | 前綴 | 語法 | 說明 |
@@ -161,7 +161,7 @@ _skill(
    - `test_all_ten_<element>_spells_declare_the_exact_catalog_fields` — 逐一斷言 label、kind、element、target、faction、cost、effects
    - `test_every_<element>_spell_effect_round_trips_through_typed_dispatch` — 每個 effect 字串經 `parse_effect` 得到正確的 typed dataclass 且存在於 `parsed_effects`
    - `test_<element>_active_spell_keys_are_exactly_the_catalog_set` — 精確 key 集合（元素已有其他 ACTIVE 技能時記得納入，例如 光含 `light_sword_style`、暗含 `shadow_slash`／`dual_blade_mastery`）
-2. **`world/rules/tests/test_progression.py`**：在 `ElementMasteryGateTests` 加 `test_<element>_spell_tier_boundaries_reject_without_mastery_and_permit_with_it`——四階層門檻（15/16、30/31、70/71、90/91）與 mastery 覆寫；PASSIVE 技能不放進 `spell_tier_for` 配對。
+2. **`world/rules/tests/test_progression.py`**：在 `SpellTierLabelTests` 加 `test_<element>_spell_tier_labels_match_the_catalog`——以 `spell_tier_for` 斷言每個位階的兩個代表魔法得到正確位階標籤（施放門檻已除役，位階是資料標籤）；PASSIVE 技能不放進 `spell_tier_for` 配對。
 3. **`world/rules/tests/test_buffs.py`**：每個新 buff key 恰好一個 `test_buff_<key>`（`buff-handler-integration` 規格有機械式對應檢查）；DoT buff 要實際 `tick_buffs` 驗證扣血。
 4. **traceability 標註**：上述測試以 `tools.spec_traceability.covers_requirement` 標註需求 ID（如 `skill-registry::skill-registry-contains-the-full-水-element-spell-set`）。ID 用 `uv run --locked python -m tools.spec_traceability list` 取得，不要手造。
 
@@ -217,4 +217,4 @@ openspec validate --all --strict
 - **`rate` 用在非 gauge trait**：tick 時拋 `NotImplementedError`，會炸掉世界時鐘的 buff 結算。
 - **新 buff key 漏掉 `status_display.yaml`**：模組 import 直接失敗（fail-closed），不是執行期警告。
 - **效果字串帶數值**（如 `damage:fire:magic:50`）：`damage` 語法就是三段，量級由公式推導；帶數值會在建構時被拒。
-- **位階註解與成本帶不一致**：`spell_tier_for` 只看 MP 成本帶，註解寫錯位階會誤導後續維護者與門檻測試。
+- **位階註解與成本帶不一致**：`spell_tier_for` 只看 MP 成本帶，註解寫錯位階會誤導後續維護者與位階標籤測試。

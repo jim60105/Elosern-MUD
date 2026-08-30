@@ -1,6 +1,7 @@
 """Regression tests for deterministic character progression."""
 
-from dataclasses import replace
+import inspect
+import unittest
 from tools.spec_traceability import covers_requirement
 
 from unittest.mock import patch
@@ -10,7 +11,6 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
-from world.lore.elements import Element
 from world.rules.action import (
     ActionRequest,
     ActionResolver,
@@ -20,26 +20,16 @@ from world.rules.action import (
     _commit,
 )
 from world.rules.buffs import grant_conferred_growth_rate
-from world.rules.buffs import _add_buff
-from world.rules.clock import AdvanceSource, WorldClock
 from world.rules.combat import Battlefield, BattlefieldActionContext, run_round
 from world.rules.progression import (
     AFFINITY_ELEMENT_MULTIPLIER,
     NON_AFFINITY_ELEMENT_MULTIPLIER,
-    COMBAT_KILL_XP_TABLE,
-    MAGIC_XP_PER_LEVEL,
     SKILL_PRACTICE_XP_PER_USE,
-    accrue_magic_study,
-    can_cast_skill,
-    can_cast_spell_tier,
-    effective_growth_multiplier,
     element_affinity_multiplier,
-    grant_combat_kill_xp,
     grant_skill_practice_xp,
     skill_proficiency_level,
 )
 from world.skills.cost_tiers import spell_tier_for
-from world.skills.handler import ConferredSkillGrant
 from world.skills.registry import SKILL_REGISTRY
 import world.rules.progression as progression
 
@@ -57,84 +47,6 @@ class ProgressionTests(EvenniaTestCase):
         monster.apply_monster_tier()
         return monster
 
-    @covers_requirement("magic-level-progression::effective-growth-multiplier-combines-race-self-and-conferred-multipliers")
-    def test_multiplier_combines_race_owned_passive_and_conferred_buff(self):
-        entity = self._character("elosia", "elf")
-        entity.db.skills = {
-            "active": [],
-            "passive": ["reincarnation_boon_elosia"],
-        }
-        grant_conferred_growth_rate(entity, "source", 0.5)
-        self.assertEqual(effective_growth_multiplier(entity), 500.0)
-
-    def test_multiplier_applies_race_and_passive_sources_independently(self):
-        elf = self._character("race-multiplier", "elf")
-        self.assertEqual(effective_growth_multiplier(elf), 10.0)
-
-        passive = self._character("passive-multiplier")
-        passive.db.skills = {
-            "active": [],
-            "passive": ["reincarnation_boon_elosia"],
-        }
-        self.assertEqual(effective_growth_multiplier(passive), 100.0)
-
-    def test_conferred_growth_changes_study_xp(self):
-        baseline = self._character("baseline")
-        conferred = self._character("conferred")
-        grant_conferred_growth_rate(conferred, "elosia", 0.5)
-        accrue_magic_study([baseline, conferred], 3600, AdvanceSource.SKIP)
-        self.assertEqual(conferred.db.magic_xp, baseline.db.magic_xp * 0.5)
-
-    def test_missing_race_and_growth_sources_return_identity_multiplier(self):
-        monster = self._monster("identity")
-        self.assertEqual(effective_growth_multiplier(monster), 1.0)
-
-    @covers_requirement("magic-level-progression::world-clock-and-combat-integration-use-the-progression-seams-exactly-once")
-    def test_study_requires_skip_source_and_world_clock_invokes_it(self):
-        entity = self._character("student")
-        accrue_magic_study([entity], 3600, AdvanceSource.COMMAND)
-        accrue_magic_study([entity], 3600, AdvanceSource.COMBAT)
-        self.assertIsNone(entity.db.magic_xp)
-        WorldClock().advance(3600, AdvanceSource.SKIP, [entity])
-        self.assertEqual(entity.db.magic_xp, 1.0)
-
-    @covers_requirement("magic-level-progression::accrue-magic-study-grants-magic-xp-only-for-skip-sourced-elapsed-time")
-    def test_long_skip_uses_closed_form_study_xp(self):
-        entity = self._character("long-skip")
-        accrue_magic_study([entity], 28800, AdvanceSource.SKIP)
-        self.assertEqual(entity.db.magic_xp, 8.0)
-
-    def test_magic_level_is_capped_and_surplus_is_discarded(self):
-        entity = self._character("elf", "elf")
-        entity.db.magic_xp = MAGIC_XP_PER_LEVEL * 10000
-        grant_combat_kill_xp(entity, "low")
-        self.assertEqual(entity.traits.magic_power.value, 900)
-        self.assertEqual(entity.db.magic_xp, 0.0)
-
-    @covers_requirement("magic-level-progression::magic-level-never-exceeds-the-entity-s-race-driven-cap-regardless-of-xp-surplus")
-    def test_monster_magic_level_never_grows(self):
-        monster = self._monster("monster")
-        grant_combat_kill_xp(monster, "low")
-        self.assertEqual(monster.traits.magic_power.value, 0)
-        self.assertEqual(monster.db.magic_xp, 0.0)
-
-    def test_magic_xp_at_cap_is_discarded_on_later_grants(self):
-        entity = self._character("capped-elf", "elf")
-        # The race band ceiling (900) is the cap; a static trait has no .max.
-        entity.traits.magic_power.base = 900
-        grant_combat_kill_xp(entity, "low")
-        self.assertEqual(entity.traits.magic_power.value, 900)
-        self.assertEqual(entity.db.magic_xp, 0.0)
-
-    @covers_requirement("magic-level-progression::grant-combat-kill-xp-awards-magic-xp-scaled-by-monster-tier-and-the-entity-s-growth-multiplier")
-    def test_kill_xp_table_is_ordered_and_unknown_tier_does_not_write(self):
-        self.assertLess(COMBAT_KILL_XP_TABLE["low"], COMBAT_KILL_XP_TABLE["mid"])
-        self.assertLess(COMBAT_KILL_XP_TABLE["mid"], COMBAT_KILL_XP_TABLE["high"])
-        self.assertLess(COMBAT_KILL_XP_TABLE["high"], COMBAT_KILL_XP_TABLE["calamity"])
-        entity = self._character("unknown-tier")
-        with self.assertRaises(KeyError):
-            grant_combat_kill_xp(entity, "unknown")
-        self.assertIsNone(entity.db.magic_xp)
 
     def test_growth_rate_conferral_rejects_invalid_scales(self):
         entity = self._character("invalid-scale")
@@ -148,14 +60,16 @@ class ProgressionTests(EvenniaTestCase):
     def test_skill_practice_is_race_scaled_and_independent_of_conferred_growth(self):
         entity = self._character("practitioner", "elf")
         grant_conferred_growth_rate(entity, "elosia", 0.5)
+        before = entity.traits.magic_power.value
         grant_skill_practice_xp(entity, "shadow_slash", uses=3)
         self.assertEqual(
             entity.db.skill_proficiency["shadow_slash"],
             3 * SKILL_PRACTICE_XP_PER_USE * 10,
         )
-        # The elf race floor is the starting magic power; practice never moves it.
-        self.assertEqual(entity.traits.magic_power.value, 100)
-        self.assertIsNone(entity.db.magic_xp)
+        # The magic-XP engine is retired: practice is the only growth writer
+        # and the static magic_power trait never moves (delta scenario
+        # "Granting skill practice XP does not affect magic_power").
+        self.assertEqual(entity.traits.magic_power.value, before)
         self.assertEqual(skill_proficiency_level(entity, "shadow_slash"), 0)
 
     @covers_requirement("skill-proficiency-tracking::skill-proficiency-level-is-a-pure-unbounded-derived-query")
@@ -165,15 +79,6 @@ class ProgressionTests(EvenniaTestCase):
         before = dict(entity.db.skill_proficiency)
         self.assertEqual(skill_proficiency_level(entity, "shadow_slash"), 3)
         self.assertEqual(skill_proficiency_level(entity, "never_practiced"), 0)
-        self.assertEqual(entity.db.skill_proficiency, before)
-
-    @covers_requirement("skill-proficiency-tracking::skill-proficiency-is-a-per-entity-per-skill-counter-independent-of-magic-power")
-    def test_magic_xp_grants_preserve_skill_proficiency(self):
-        entity = self._character("separate-progression")
-        entity.db.skill_proficiency = {"shadow_slash": 25.0}
-        before = dict(entity.db.skill_proficiency)
-        accrue_magic_study([entity], 3600, AdvanceSource.SKIP)
-        grant_combat_kill_xp(entity, "low")
         self.assertEqual(entity.db.skill_proficiency, before)
 
     def test_action_commit_restores_progression_attributes_on_failure(self):
@@ -195,10 +100,9 @@ class ProgressionTests(EvenniaTestCase):
         with self.assertRaises(CommitFailed):
             _commit(effects)
         self.assertIsNone(entity.db.skill_proficiency)
-        self.assertIsNone(entity.db.magic_xp)
 
     @covers_requirement("skill-proficiency-tracking::successful-active-skill-resolution-records-one-practice-grant-atomically")
-    def test_successful_combat_action_awards_practice_and_kill_xp_once(self):
+    def test_successful_combat_action_awards_practice_once(self):
         actor = self._character("fighter")
         actor.db.skills = {"active": ["shadow_slash"], "passive": []}
         monster = self._monster("goblin")
@@ -219,16 +123,13 @@ class ProgressionTests(EvenniaTestCase):
                 lambda entity, _: request if entity is actor else None,
             )
         self.assertTrue(logs)
-        self.assertEqual(actor.db.magic_xp, COMBAT_KILL_XP_TABLE["low"])
         self.assertEqual(
             actor.db.skill_proficiency["shadow_slash"],
             SKILL_PRACTICE_XP_PER_USE,
         )
 
-    def test_area_shorthand_awards_each_newly_defeated_monster_once(self):
+    def test_area_shorthand_defeats_each_newly_living_monster_once(self):
         actor = self._character("area-fighter")
-        # Human static magic_power at 術師 tier so wind_blade passes the gate.
-        actor.traits.magic_power.base = 30
         actor.db.skills = {"active": ["wind_blade"], "passive": []}
         first, second, corpse = (
             self._monster("first"),
@@ -256,16 +157,22 @@ class ProgressionTests(EvenniaTestCase):
             BattlefieldActionContext(battlefield),
         )
         with patch("world.rules.combat.roll_d100", return_value=100):
-            run_round(
+            logs = run_round(
                 battlefield,
                 lambda entity, _: request if entity is actor else None,
             )
-        self.assertEqual(actor.db.magic_xp, 2 * COMBAT_KILL_XP_TABLE["low"])
+        kinds = [
+            entry.kind for log in logs for entry in log.entries
+        ]
+        self.assertEqual(kinds.count("target_defeated"), 2)
+        self.assertIsNone(actor.db.magic_xp)
+        self.assertEqual(
+            actor.db.skill_proficiency["wind_blade"],
+            SKILL_PRACTICE_XP_PER_USE,
+        )
 
     def test_duplicate_area_targets_reject_before_resolution(self):
         actor = self._character("duplicate-fighter")
-        # Human static magic_power at 術師 tier so wind_blade passes the gate.
-        actor.traits.magic_power.base = 30
         actor.db.skills = {"active": ["wind_blade"], "passive": []}
         monster = self._monster("duplicate-goblin")
         monster.traits.hp.current = 1
@@ -282,10 +189,10 @@ class ProgressionTests(EvenniaTestCase):
         result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "rejected")
         self.assertEqual(result.reason, RejectReason.TARGET_SPEC_MISMATCH)
-        self.assertIsNone(actor.db.magic_xp)
+        self.assertIsNone(actor.db.skill_proficiency)
         self.assertEqual(monster.traits.hp.current, 1)
 
-    def test_non_monster_target_never_awards_kill_xp(self):
+    def test_non_monster_defeat_awards_practice_only(self):
         actor = self._character("player-fighter")
         actor.db.skills = {"active": ["shadow_slash"], "passive": []}
         target = self._character("tiered-player")
@@ -306,73 +213,41 @@ class ProgressionTests(EvenniaTestCase):
                 battlefield,
                 lambda entity, _: request if entity is actor else None,
             )
+        # Defeat carries no progression award any more; the single growth
+        # writer is the practice grant for the resolved skill itself.
+        self.assertEqual(
+            actor.db.skill_proficiency["shadow_slash"],
+            SKILL_PRACTICE_XP_PER_USE,
+        )
         self.assertIsNone(actor.db.magic_xp)
 
-    @covers_requirement("magic-level-progression::magic-growth-values-are-finite-and-non-negative")
-    def test_invalid_legacy_multiplier_rolls_back_combat_action(self):
-        actor = self._character("rollback-fighter")
-        actor.db.skills = {"active": ["shadow_slash"], "passive": []}
-        monster = self._monster("rollback-goblin")
-        monster.traits.hp.current = 1
-        _add_buff(
-            actor,
-            "conferred_growth_rate",
-            instance_key="conferred_growth_rate:invalid",
-            source_key="invalid",
-            scale=-1,
-        )
-        battlefield = Battlefield(
-            {"party": frozenset({"rollback-fighter"}), "foes": frozenset({"rollback-goblin"})},
-            {"rollback-fighter": actor, "rollback-goblin": monster},
-        )
-        request = ActionRequest(
-            actor,
-            "shadow_slash",
-            [monster],
-            BattlefieldActionContext(battlefield),
-        )
-        initial_sp = actor.traits.sp.value
-        with patch("world.rules.combat.roll_d100", return_value=100):
-            result = ActionResolver.resolve(request)
-        self.assertEqual(result.outcome, "rejected")
-        self.assertEqual(monster.traits.hp.value, 1)
-        self.assertEqual(actor.traits.sp.value, initial_sp)
-        self.assertIsNone(actor.db.magic_xp)
-        self.assertIsNone(actor.db.skill_proficiency)
-
-    def test_calibration_anchors(self):
-        violet = self._character("violet")
-        accrue_magic_study([violet], 11680 * 3600, AdvanceSource.SKIP)
-        # Base is the human race floor (5), so the same XP lands 5 higher.
-        self.assertIn(violet.traits.magic_power.value, {24, 25})
-
-        ordinary_human = self._character("ordinary-human")
-        accrue_magic_study([ordinary_human], 29200 * 3600, AdvanceSource.SKIP)
-        self.assertGreaterEqual(ordinary_human.traits.magic_power.value, 30)
-        self.assertLessEqual(ordinary_human.traits.magic_power.value, 55)
-
-        elosia = self._character("calibration-elosia", "elf")
-        elosia.db.skills = {
-            "active": [],
-            "passive": ["reincarnation_boon_elosia"],
-        }
-        accrue_magic_study([elosia], 524 * 3600, AdvanceSource.SKIP)
-        # Floor (100) + 1000x growth saturates the race band ceiling (900).
-        self.assertEqual(elosia.traits.magic_power.value, 900)
 
     def test_divine_arts_remain_outside_progression_scope(self):
         self.assertFalse(
             any("divine" in name for name in vars(progression))
         )
 
+    @covers_requirement("skill-proficiency-tracking::skill-proficiency-is-a-per-entity-per-skill-counter-independent-of-magic-power")
+    def test_magic_xp_engine_is_absent_from_progression_source(self):
+        """skill-proficiency delta: no magic-XP writer may remain."""
+        source = inspect.getsource(progression)
+        for token in (
+            "magic_xp",
+            "accrue_magic_study",
+            "grant_combat_kill_xp",
+            "effective_growth_multiplier",
+        ):
+            with self.subTest(token=token):
+                self.assertNotIn(token, source)
 
-class NpcPolicyCastGateIntegrationTests(EvenniaTestCase):
-    """The generic NPC policy never wastes a turn on a tier-blocked spell.
+
+class NpcPolicyAffordabilityIntegrationTests(EvenniaTestCase):
+    """The generic NPC policy never wastes a turn on an unaffordable spell.
 
     Drives ``run_round`` with ``monster_behaviour_policy`` — the exact
     delegation path combat sessions use — so a companion whose only damage
-    spell is over-tier falls back to the innate attack and acts every round
-    instead of silently losing turns to a rejected request.
+    spell it cannot afford falls back to the innate attack and acts every
+    round instead of silently losing turns to a rejected request.
     """
 
     def setUp(self):
@@ -380,10 +255,9 @@ class NpcPolicyCastGateIntegrationTests(EvenniaTestCase):
         self.companion = create_object(PlayerCharacter, key="companion")
         self.companion.race = "human"
         self.companion.apply_race_baseline()
-        # Below the 術師 threshold for firestorm (floor(15 * 1.0) == 15) with
-        # no declared affinity and no fire_mastery, but with enough MP.
-        self.companion.traits.magic_power.base = 15
-        self.companion.traits.mp.current = 30
+        # firestorm costs 30 MP; the companion cannot afford it, so the
+        # interim gate (ownership + MP) skips it in favour of the innate.
+        self.companion.traits.mp.current = 10
         self.companion.db.skills = {"active": ["firestorm"], "passive": []}
         self.goblin = create_object(Monster, key="goblin")
         self.goblin.threat_tier = "low"
@@ -435,336 +309,114 @@ class NpcPolicyCastGateIntegrationTests(EvenniaTestCase):
             str(self.companion.key),
             {call.args[0].key for call in delegated.call_args_list},
         )
-        self.assertEqual(self.companion.traits.mp.value, 30)
 
 
-class ElementMasteryGateTests(EvenniaTestCase):
-    """element-mastery: cast-gate pure functions (rank ladder retired)."""
+class SpellTierLabelTests(unittest.TestCase):
+    """Tier grouping survives as a data label after the cast gate retired.
 
-    def _caster(
-        self,
-        key: str,
-        magic_power: int,
-        race: str = "elf",
-    ) -> PlayerCharacter:
-        entity = create_object(PlayerCharacter, key=key)
-        entity.race = race
-        entity.apply_race_baseline()
-        entity.traits.magic_power.base = magic_power
-        entity.db.skills = {"active": [], "passive": []}
-        return entity
+    The magic-XP gate is gone (magic-xp-engine-retirement); the tier label a
+    spell belongs to is now purely catalog data. Each element test pins the
+    two representative spells per MP band to their expected label via
+    ``spell_tier_for``.
+    """
 
-
-    def test_gate_requires_numeric_threshold_without_mastery(self):
-        self.assertFalse(
-            can_cast_spell_tier(self._caster("below", 30), "fire", "大師")
-        )
-        self.assertTrue(
-            can_cast_spell_tier(self._caster("at-threshold", 31), "fire", "大師")
-        )
-
-    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
-    def test_gate_boundaries_match_the_four_tier_thresholds(self):
-        for tier, below, at in (
-            ("術師", 15, 16),
-            ("大師", 30, 31),
-            ("賢者", 70, 71),
-            ("主宰", 90, 91),
-        ):
-            with self.subTest(tier=tier):
-                self.assertFalse(
-                    can_cast_spell_tier(
-                        self._caster(f"below-{tier}", below), "fire", tier
-                    )
-                )
-                self.assertTrue(
-                    can_cast_spell_tier(
-                        self._caster(f"at-{tier}", at), "fire", tier
-                    )
-                )
-
-    def test_gate_mastery_override_unlocks_every_tier_at_level_one(self):
-        entity = self._caster("master-wind", 1)
-        entity.db.skills = {"active": [], "passive": ["wind_mastery"]}
-        self.assertTrue(can_cast_spell_tier(entity, "wind", "主宰"))
-
-    def test_gate_mastery_override_is_direct_ownership_only(self):
-        granted = self._caster("granted", 1)
-        granted.db.skill_grants = [
-            ConferredSkillGrant("source", "fire_mastery", 1.0)
-        ]
-        self.assertNotIn("fire_mastery", granted.skills.owned_keys())
-        self.assertFalse(can_cast_spell_tier(granted, "fire", "主宰"))
-        high = self._caster("granted-high", 100)
-        high.db.skill_grants = [
-            ConferredSkillGrant("source", "fire_mastery", 1.0)
-        ]
-        self.assertTrue(can_cast_spell_tier(high, "fire", "主宰"))
-
-    def test_gate_rejects_dominance_at_the_top_boundary(self):
-        # The 主宰 gate threshold (91) sits above the 90 power boundary.
-        entity = self._caster("boundary", 90)
-        self.assertFalse(can_cast_spell_tier(entity, "fire", "主宰"))
-
-    def test_gate_rejects_unknown_tier(self):
-        with self.assertRaises(ValueError):
-            can_cast_spell_tier(self._caster("unknown-tier", 50), "fire", "不存在")
-
-    def test_can_cast_skill_passes_non_elemental_skills(self):
-        # basic_attack carries an element but no MP cost, so it has no tier;
-        # shadow_slash is a physical skill. Both must pass at any level.
-        entity = self._caster("plain-attacks", 90)
-        self.assertTrue(can_cast_skill(entity, SKILL_REGISTRY["basic_attack"]))
-        self.assertTrue(can_cast_skill(entity, SKILL_REGISTRY["shadow_slash"]))
-
-    @covers_requirement("element-mastery::can-cast-skill-is-the-shared-side-effect-free-cast-eligibility-predicate")
-    def test_can_cast_skill_rejects_an_over_tier_spell_without_mastery(self):
-        entity = self._caster("over-tier", 15)
-        self.assertFalse(can_cast_skill(entity, SKILL_REGISTRY["firestorm"]))
-
-    def test_can_cast_skill_honors_the_mastery_override(self):
-        entity = self._caster("master", 1)
-        entity.db.skills = {"active": [], "passive": ["fire_mastery"]}
-        self.assertTrue(can_cast_skill(entity, SKILL_REGISTRY["firestorm"]))
-
-    def test_can_cast_skill_honors_the_favored_affinity_boundary(self):
-        entity = self._caster("affinity", 15)
-        entity.db.affinity_elements = ["fire"]
-        self.assertTrue(can_cast_skill(entity, SKILL_REGISTRY["firestorm"]))
-
-    @covers_requirement("element-mastery::can-cast-skill-is-the-shared-side-effect-free-cast-eligibility-predicate")
-    def test_can_cast_skill_fails_closed_on_malformed_spells(self):
-        entity = self._caster("malformed", 90)
-        out_of_band = replace(SKILL_REGISTRY["firestorm"], cost={"mp": 5})
-        unknown_element = replace(
-            SKILL_REGISTRY["firestorm"],
-            element=Element("not_an_element", "不存在", "test"),
-        )
-        self.assertFalse(can_cast_skill(entity, out_of_band))
-        self.assertFalse(can_cast_skill(entity, unknown_element))
+    def _assert_labels(self, spell_tiers: dict[str, tuple[str, ...]]) -> None:
+        for tier, spell_keys in spell_tiers.items():
+            for key in spell_keys:
+                with self.subTest(tier=tier, spell=key):
+                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
 
     @covers_requirement("skill-registry::skill-registry-contains-the-full-火-element-spell-set")
-    def test_fire_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
-        fire_spell_tiers = {
-            "術師": (15, 16, ("firestorm", "scorching_wave")),
-            "大師": (30, 31, ("lava_burst", "infernal_wrap")),
-            "賢者": (70, 71, ("dragon_flame", "hellfire")),
-            "主宰": (90, 91, ("phoenix_eternal_flame", "world_ending_blaze")),
-        }
-        for tier, (below, at, spell_keys) in fire_spell_tiers.items():
-            for key in spell_keys:
-                with self.subTest(tier=tier, spell=key):
-                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
-            self.assertFalse(
-                can_cast_spell_tier(
-                    self._caster(f"below-{tier}", below), "fire", tier
-                )
-            )
-            self.assertTrue(
-                can_cast_spell_tier(self._caster(f"at-{tier}", at), "fire", tier)
-            )
-        master = self._caster("fire-master", 1)
-        master.db.skills = {"active": [], "passive": ["fire_mastery"]}
-        for tier in fire_spell_tiers:
-            with self.subTest(tier=tier, with_mastery=True):
-                self.assertTrue(can_cast_spell_tier(master, "fire", tier))
+    def test_fire_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("firestorm", "scorching_wave"),
+                "大師": ("lava_burst", "infernal_wrap"),
+                "賢者": ("dragon_flame", "hellfire"),
+                "主宰": ("phoenix_eternal_flame", "world_ending_blaze"),
+            }
+        )
 
     @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
-    def test_water_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
-        water_spell_tiers = {
-            "術師": (15, 16, ("healing_spring", "water_shield")),
-            "大師": (30, 31, ("abyssal_whirlpool", "wellspring_of_life")),
-            "賢者": (70, 71, ("tsunami", "tidal_revival")),
-            "主宰": (90, 91, ("sea_of_life", "abyssal_tide")),
-        }
-        for tier, (below, at, spell_keys) in water_spell_tiers.items():
-            for key in spell_keys:
-                with self.subTest(tier=tier, spell=key):
-                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
-            self.assertFalse(
-                can_cast_spell_tier(
-                    self._caster(f"below-{tier}", below), "water", tier
-                )
-            )
-            self.assertTrue(
-                can_cast_spell_tier(self._caster(f"at-{tier}", at), "water", tier)
-            )
-        master = self._caster("water-master", 1)
-        master.db.skills = {"active": [], "passive": ["water_mastery"]}
-        for tier in water_spell_tiers:
-            with self.subTest(tier=tier, with_mastery=True):
-                self.assertTrue(can_cast_spell_tier(master, "water", tier))
+    def test_water_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("healing_spring", "water_shield"),
+                "大師": ("abyssal_whirlpool", "wellspring_of_life"),
+                "賢者": ("tsunami", "tidal_revival"),
+                "主宰": ("sea_of_life", "abyssal_tide"),
+            }
+        )
 
     @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
-    def test_earth_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
-        earth_spell_tiers = {
-            "術師": (15, 16, ("stone_armor", "dust_veil")),
-            "大師": (30, 31, ("earth_bind", "rockslide")),
-            "賢者": (70, 71, ("earthquake", "earthen_ward")),
-            "主宰": (90, 91, ("mountain_collapse", "earths_judgment")),
-        }
-        for tier, (below, at, spell_keys) in earth_spell_tiers.items():
-            for key in spell_keys:
-                with self.subTest(tier=tier, spell=key):
-                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
-            self.assertFalse(
-                can_cast_spell_tier(
-                    self._caster(f"below-{tier}", below), "earth", tier
-                )
-            )
-            self.assertTrue(
-                can_cast_spell_tier(self._caster(f"at-{tier}", at), "earth", tier)
-            )
-        master = self._caster("earth-master", 1)
-        master.db.skills = {"active": [], "passive": ["earth_mastery"]}
-        for tier in earth_spell_tiers:
-            with self.subTest(tier=tier, with_mastery=True):
-                self.assertTrue(can_cast_spell_tier(master, "earth", tier))
+    def test_earth_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("stone_armor", "dust_veil"),
+                "大師": ("earth_bind", "rockslide"),
+                "賢者": ("earthquake", "earthen_ward"),
+                "主宰": ("mountain_collapse", "earths_judgment"),
+            }
+        )
 
     @covers_requirement("skill-registry::skill-registry-contains-the-full-風-element-spell-set")
-    def test_wind_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
-        wind_spell_tiers = {
-            "術師": (15, 16, ("tornado_blade",)),
-            "大師": (30, 31, ("storm_domain", "gale_dance_strike")),
-            "賢者": (70, 71, ("heavens_wrath_storm", "haste_domain")),
-            "主宰": (90, 91, ("vacuum_severance", "sky_tempest")),
-        }
-        for tier, (below, at, spell_keys) in wind_spell_tiers.items():
-            for key in spell_keys:
-                with self.subTest(tier=tier, spell=key):
-                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
-            self.assertFalse(
-                can_cast_spell_tier(
-                    self._caster(f"below-{tier}", below), "wind", tier
-                )
-            )
-            self.assertTrue(
-                can_cast_spell_tier(self._caster(f"at-{tier}", at), "wind", tier)
-            )
-        master = self._caster("wind-master", 1)
-        master.db.skills = {"active": [], "passive": ["wind_mastery"]}
-        for tier in wind_spell_tiers:
-            with self.subTest(tier=tier, with_mastery=True):
-                self.assertTrue(can_cast_spell_tier(master, "wind", tier))
+    def test_wind_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("tornado_blade",),
+                "大師": ("storm_domain", "gale_dance_strike"),
+                "賢者": ("heavens_wrath_storm", "haste_domain"),
+                "主宰": ("vacuum_severance", "sky_tempest"),
+            }
+        )
 
     @covers_requirement("skill-registry::skill-registry-contains-the-full-雷-element-spell-set")
-    def test_lightning_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
-        lightning_spell_tiers = {
-            "術師": (15, 16, ("chain_lightning", "paralyzing_bolt")),
-            "大師": (30, 31, ("thunder_combo", "lightning_strike")),
-            "賢者": (70, 71, ("heavens_thunder", "thunder_gods_haste")),
-            "主宰": (90, 91, ("judgement_thunder", "divine_lightning_slaughter")),
-        }
-        for tier, (below, at, spell_keys) in lightning_spell_tiers.items():
-            for key in spell_keys:
-                with self.subTest(tier=tier, spell=key):
-                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
-            self.assertFalse(
-                can_cast_spell_tier(
-                    self._caster(f"below-{tier}", below), "lightning", tier
-                )
-            )
-            self.assertTrue(
-                can_cast_spell_tier(
-                    self._caster(f"at-{tier}", at), "lightning", tier
-                )
-            )
-        master = self._caster("lightning-master", 1)
-        master.db.skills = {"active": [], "passive": ["lightning_mastery"]}
-        for tier in lightning_spell_tiers:
-            with self.subTest(tier=tier, with_mastery=True):
-                self.assertTrue(can_cast_spell_tier(master, "lightning", tier))
+    def test_lightning_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("chain_lightning", "paralyzing_bolt"),
+                "大師": ("thunder_combo", "lightning_strike"),
+                "賢者": ("heavens_thunder", "thunder_gods_haste"),
+                "主宰": ("judgement_thunder", "divine_lightning_slaughter"),
+            }
+        )
 
     @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
-    def test_ice_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
-        ice_spell_tiers = {
-            "術師": (15, 16, ("ice_wall", "frost_arrow_rain")),
-            "大師": (30, 31, ("permafrost_domain", "ice_prison")),
-            "賢者": (70, 71, ("blizzard", "absolute_tundra")),
-            "主宰": (90, 91, ("absolute_zero", "eternal_ice_field")),
-        }
-        for tier, (below, at, spell_keys) in ice_spell_tiers.items():
-            for key in spell_keys:
-                with self.subTest(tier=tier, spell=key):
-                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
-            self.assertFalse(
-                can_cast_spell_tier(
-                    self._caster(f"below-{tier}", below), "ice", tier
-                )
-            )
-            self.assertTrue(
-                can_cast_spell_tier(self._caster(f"at-{tier}", at), "ice", tier)
-            )
-        master = self._caster("ice-master", 1)
-        master.db.skills = {"active": [], "passive": ["ice_mastery"]}
-        for tier in ice_spell_tiers:
-            with self.subTest(tier=tier, with_mastery=True):
-                self.assertTrue(can_cast_spell_tier(master, "ice", tier))
+    def test_ice_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("ice_wall", "frost_arrow_rain"),
+                "大師": ("permafrost_domain", "ice_prison"),
+                "賢者": ("blizzard", "absolute_tundra"),
+                "主宰": ("absolute_zero", "eternal_ice_field"),
+            }
+        )
 
     @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
-    def test_light_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
-        light_spell_tiers = {
-            "術師": (15, 16, ("purify", "mass_heal")),
-            "大師": (30, 31, ("advanced_heal", "holy_shield")),
-            "賢者": (70, 71, ("holy_radiance", "revival_light")),
-            "主宰": (90, 91, ("goddess_blessing", "heavens_judgment_light")),
-        }
-        for tier, (below, at, spell_keys) in light_spell_tiers.items():
-            for key in spell_keys:
-                with self.subTest(tier=tier, spell=key):
-                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
-            self.assertFalse(
-                can_cast_spell_tier(
-                    self._caster(f"below-{tier}", below), "light", tier
-                )
-            )
-            self.assertTrue(
-                can_cast_spell_tier(self._caster(f"at-{tier}", at), "light", tier)
-            )
-        master = self._caster("light-master", 1)
-        master.db.skills = {"active": [], "passive": ["light_mastery"]}
-        for tier in light_spell_tiers:
-            with self.subTest(tier=tier, with_mastery=True):
-                self.assertTrue(can_cast_spell_tier(master, "light", tier))
+    def test_light_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("purify", "mass_heal"),
+                "大師": ("advanced_heal", "holy_shield"),
+                "賢者": ("holy_radiance", "revival_light"),
+                "主宰": ("goddess_blessing", "heavens_judgment_light"),
+            }
+        )
 
     @covers_requirement("skill-registry::skill-registry-contains-the-full-暗-element-spell-set")
-    def test_dark_spell_tier_boundaries_reject_without_mastery_and_permit_with_it(self):
-        dark_spell_tiers = {
-            "術師": (15, 16, ("curse", "dark_burst")),
-            "大師": (30, 31, ("dark_corrosion_domain", "shadow_torment")),
-            "賢者": (70, 71, ("abyss_devour", "dark_dominion")),
-            "主宰": (90, 91, ("void_annihilation", "netherworld_judgment")),
-        }
-        for tier, (below, at, spell_keys) in dark_spell_tiers.items():
-            for key in spell_keys:
-                with self.subTest(tier=tier, spell=key):
-                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
-            self.assertFalse(
-                can_cast_spell_tier(
-                    self._caster(f"below-{tier}", below), "dark", tier
-                )
-            )
-            self.assertTrue(
-                can_cast_spell_tier(self._caster(f"at-{tier}", at), "dark", tier)
-            )
-        master = self._caster("dark-master", 1)
-        master.db.skills = {"active": [], "passive": ["dark_mastery"]}
-        for tier in dark_spell_tiers:
-            with self.subTest(tier=tier, with_mastery=True):
-                self.assertTrue(can_cast_spell_tier(master, "dark", tier))
-
-    def test_created_humans_start_below_the_apprentice_gate(self):
-        # magic-power-static-rename: the retired 27–33 sampler is replaced by
-        # the race floor (5) plus player allocation, so a freshly created
-        # human sits below the 術師 threshold until points are allocated.
-        entity = self._caster("created-human", 5, "human")
-        self.assertFalse(can_cast_spell_tier(entity, "fire", "術師"))
-        entity.traits.magic_power.base = 16
-        self.assertTrue(can_cast_spell_tier(entity, "fire", "術師"))
+    def test_dark_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("curse", "dark_burst"),
+                "大師": ("dark_corrosion_domain", "shadow_torment"),
+                "賢者": ("abyss_devour", "dark_dominion"),
+                "主宰": ("void_annihilation", "netherworld_judgment"),
+            }
+        )
 
 
 class ElementAffinityProgressionTests(EvenniaTestCase):
-    """element-affinity: multiplicative effective-level derivation and gate."""
+    """element-affinity: multiplicative per-element multiplier (pure read)."""
 
     def _caster(
         self,
@@ -815,40 +467,3 @@ class ElementAffinityProgressionTests(EvenniaTestCase):
         with self.assertRaises(ValueError):
             element_affinity_multiplier(entity, "not_an_element")
         self.assertIsNone(entity.db.affinity_elements)
-
-    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
-    def test_favored_element_unlocks_a_tier_earlier(self):
-        entity = self._caster("fire-affinity", 29, affinity=("fire",))
-        self.assertTrue(can_cast_spell_tier(entity, "fire", "大師"))
-
-    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
-    def test_non_favored_element_unlocks_a_tier_later(self):
-        below = self._caster("non-favored-below", 34, affinity=("wind",))
-        self.assertFalse(can_cast_spell_tier(below, "fire", "大師"))
-        at = self._caster("non-favored-at", 35, affinity=("wind",))
-        self.assertTrue(can_cast_spell_tier(at, "fire", "大師"))
-
-    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
-    def test_human_reaches_dominance_only_for_a_favored_element(self):
-        entity = self._caster("dominant-human", 83, affinity=("fire",))
-        self.assertTrue(can_cast_spell_tier(entity, "fire", "主宰"))
-        for level in (84, 90):
-            with self.subTest(level=level):
-                entity.traits.magic_power.base = level
-                self.assertFalse(can_cast_spell_tier(entity, "wind", "主宰"))
-
-    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
-    def test_mastery_override_still_wins_over_affinity_scaling(self):
-        entity = self._caster("mastery-wins", 1, affinity=("water",))
-        entity.db.skills = {"active": [], "passive": ["fire_mastery"]}
-        self.assertTrue(can_cast_spell_tier(entity, "fire", "主宰"))
-
-    @covers_requirement("element-mastery::can-cast-spell-tier-gates-casting-by-element-effective-numeric-level-overridden-by-direct-mastery-ownership")
-    def test_unknown_element_fails_closed_even_with_a_fabricated_mastery(self):
-        entity = self._caster("fabricated-mastery", 90)
-        entity.db.skills = {
-            "active": [],
-            "passive": ["not_an_element_mastery"],
-        }
-        with self.assertRaises(ValueError):
-            can_cast_spell_tier(entity, "not_an_element", "學徒")

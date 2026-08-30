@@ -29,8 +29,6 @@ def _player(key="token player"):
     player = create_object(PlayerCharacter, key=key)
     player.race = "human"
     player.apply_race_baseline()
-    # Human static magic_power at 術師 tier so element-gated spell casts pass.
-    player.traits.magic_power.base = 30
     return player
 
 
@@ -123,8 +121,6 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         self.char1.location = self.room
         self.char1.race = "human"
         self.char1.apply_race_baseline()
-        # Human static magic_power at 術師 tier so element-gated casts pass.
-        self.char1.traits.magic_power.base = 30
         self.char1.db.skills = {"active": ["fire_ball"], "passive": []}
         self.monster = _monster("actions goblin")
         self.monster.location = self.room

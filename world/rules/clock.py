@@ -54,7 +54,7 @@ _STAGE_ORDER = (
     "gauge_regen",
     "buff_ticks",
     "sexual_decay",
-    "magic_study",
+    "practice_settlement",
     "daily_resets",
     "caravan_arrivals",
     "shop_hours",
@@ -245,12 +245,16 @@ def _settle_buffs_and_decay(entities: tuple[Any, ...], elapsed_seconds: int) -> 
                 apply_event(entity, "climax_ends")
 
 
-def _try_accrue_magic_study(entities: tuple[Any, ...], seconds: int, source: AdvanceSource) -> None:
-    try:
-        from world.rules.progression import accrue_magic_study
-    except ImportError:
-        return
-    accrue_magic_study(entities, seconds, source)
+def _practice_settlement(entities: tuple[Any, ...], seconds: int, source: AdvanceSource) -> None:
+    """Zero-growth placeholder for the retired magic-study stage.
+
+    The magic-XP engine was retired by ``magic-xp-engine-retirement``: no
+    elapsed-time growth accrues here any more. This is the reserved insertion
+    point for a future ``declared-practice-skip`` settlement; the COMBAT-source
+    gate in ``_run_stages`` stays permanent so combat time never feeds any
+    progression seam introduced here.
+    """
+    return None
 
 
 def register_event_source(
@@ -290,7 +294,7 @@ def _run_stages(clock: "WorldClock", seconds: int, source: AdvanceSource, entiti
     _settle_gauge_regen(entities, seconds)
     if source is not AdvanceSource.COMBAT:
         _settle_buffs_and_decay(entities, seconds)
-        _try_accrue_magic_study(entities, seconds, source)
+        _practice_settlement(entities, seconds, source)
     return _settle_boundary_stages(clock.tick, clock.tick + seconds, entities)
 
 
@@ -307,7 +311,6 @@ _ADVANCE_ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("pending_climax_extension", "sexual_state"),
     ("buffs", None),
     ("skill_grants", None),
-    ("magic_xp", None),
     ("skill_proficiency", None),
 ) + tuple((f"decay_elapsed__{field}", "sexual_state") for field in DECAY_CONFIG)
 

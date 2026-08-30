@@ -29,16 +29,9 @@ def _player(key="preview player"):
     player = create_object(PlayerCharacter, key=key)
     player.race = "human"
     player.apply_race_baseline()
-    # Human static magic_power at 術師 tier so element-gated spell casts pass.
+    # Static magic_power pinned so magic-school damage assertions stay far
+    # from the floor (the cast gate that once consumed it retired).
     player.traits.magic_power.base = 30
-    return player
-
-
-def _under_tier_player(key="preview under-tier player"):
-    player = _player(key)
-    # 學徒-tier magic level: below the 術師 threshold (16) that gates
-    # 30-MP firestorm casts.
-    player.traits.magic_power.base = 15
     return player
 
 
@@ -471,149 +464,6 @@ class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTestCase):
             e for e in result.event_log.entries if e.kind == "resource_spend"
         )
         self.assertEqual(spend.data, {"resource_key": "mp", "amount": 9})
-
-
-class SpellTierPreviewGateTests(BattlefieldIsolation, EvenniaTestCase):
-    """Preview/revalidation/preflight parity for the elemental spell-tier gate.
-
-    ``firestorm`` is a 術師-tier spell (30 MP, AREA) whose threshold (16)
-    exceeds the under-tier fixture's magic level 15, so it exercises the gate
-    through the shared ``progression.can_cast_skill`` predicate on every
-    surface.
-    """
-
-    def setUp(self):
-        super().setUp()
-        self.room = create_object(Room, key="preview tier arena")
-        self.player = _under_tier_player()
-        self.player.location = self.room
-        self.player.db.skills = {"active": ["firestorm"], "passive": []}
-        # firestorm costs 30 MP; a full pool keeps the resource check out of
-        # the way so every assertion is about the tier gate alone.
-        self.player.traits.mp.base = 50
-        self.player.traits.mp.current = 50
-        self.monster = _monster()
-        self.monster.location = self.room
-
-    def _context(self):
-        engage(self.player, self.monster)
-        battlefield = reconstruct_battlefield(self.player, read_session(self.player))
-        return BattlefieldActionContext(battlefield)
-
-    def _preflight(self, context):
-        return ActionResolver.preflight(
-            ActionRequest(self.player, "firestorm", [self.monster], context)
-        )
-
-    def _assert_disabled_with_unknown_skill(self, preview):
-        self.assertFalse(preview.enabled)
-        self.assertIs(preview.reason, RejectReason.UNKNOWN_SKILL)
-        self.assertEqual(preview.detail, "firestorm")
-
-    @covers_requirement("action-resolution-pipeline::actionresolver-exposes-shared-side-effect-free-action-preview")
-    def test_over_tier_owned_spell_disabled_across_all_three_surfaces(self):
-        context = self._context()
-        preview = preview_skill(self.player, "firestorm", context, [self.monster])
-        self._assert_disabled_with_unknown_skill(preview)
-        result = revalidate_submission(
-            self.player, "firestorm", context, "all-enemies"
-        )
-        self._assert_disabled_with_unknown_skill(result)
-        preflight = self._preflight(context)
-        self.assertEqual(preflight.outcome, "rejected")
-        self.assertIs(preflight.reason, RejectReason.UNKNOWN_SKILL)
-        self.assertEqual(preflight.detail, "firestorm")
-
-    @covers_requirement("action-resolution-pipeline::actionresolver-exposes-shared-side-effect-free-action-preview")
-    def test_affinity_boundary_and_pure_numeric_boundary_enable_firestorm(self):
-        # (a) declared fire affinity at magic level 15:
-        # floor(15 * 1.1) == 16 meets the 術師 threshold.
-        self.player.db.affinity_elements = ["fire"]
-        context = self._context()
-        self.assertTrue(
-            preview_skill(self.player, "firestorm", context, [self.monster]).enabled
-        )
-        self.assertTrue(
-            revalidate_submission(
-                self.player, "firestorm", context, "all-enemies"
-            ).enabled
-        )
-        self.assertEqual(self._preflight(context).outcome, "success")
-
-        # (b) no affinities at magic level 16: floor(16 * 1.0) == 16.
-        self.player.db.affinity_elements = []
-        self.player.traits.magic_power.base = 16
-        self.assertTrue(
-            preview_skill(self.player, "firestorm", context, [self.monster]).enabled
-        )
-        self.assertTrue(
-            revalidate_submission(
-                self.player, "firestorm", context, "all-enemies"
-            ).enabled
-        )
-        self.assertEqual(self._preflight(context).outcome, "success")
-
-    @covers_requirement("action-resolution-pipeline::actionresolver-exposes-shared-side-effect-free-action-preview")
-    def test_mastery_override_enables_over_tier_spell(self):
-        self.player.db.skills = {
-            "active": ["firestorm"],
-            "passive": ["fire_mastery"],
-        }
-        context = self._context()
-        self.assertTrue(
-            preview_skill(self.player, "firestorm", context, [self.monster]).enabled
-        )
-        self.assertTrue(
-            revalidate_submission(
-                self.player, "firestorm", context, "all-enemies"
-            ).enabled
-        )
-        self.assertEqual(self._preflight(context).outcome, "success")
-
-    @covers_requirement("action-resolution-pipeline::actionresolver-exposes-shared-side-effect-free-action-preview")
-    def test_conferred_mastery_grant_does_not_override_the_gate(self):
-        from world.skills.handler import ConferredSkillGrant
-
-        self.player.db.skill_grants = [
-            ConferredSkillGrant("source", "fire_mastery", 1.0)
-        ]
-        self.assertNotIn("fire_mastery", self.player.skills.owned_keys())
-        context = self._context()
-        self._assert_disabled_with_unknown_skill(
-            preview_skill(self.player, "firestorm", context, [self.monster])
-        )
-        self._assert_disabled_with_unknown_skill(
-            revalidate_submission(self.player, "firestorm", context, "all-enemies")
-        )
-        preflight = self._preflight(context)
-        self.assertEqual(preflight.outcome, "rejected")
-        self.assertIs(preflight.reason, RejectReason.UNKNOWN_SKILL)
-        self.assertEqual(preflight.detail, "firestorm")
-
-    @covers_requirement("action-resolution-pipeline::actionresolver-exposes-shared-side-effect-free-action-preview")
-    def test_malformed_spell_fails_closed_in_preview_and_revalidation(self):
-        # A gate-passing actor isolates the fail-closed behavior: with the
-        # tier lookup broken, the disabled result can only come from the
-        # predicate converting the ValueError to False.
-        self.player.traits.magic_power.base = 30
-        context = self._context()
-        with patch(
-            "world.rules.progression.spell_tier_for",
-            side_effect=ValueError("broken tier lookup"),
-        ) as lookup:
-            preview = preview_skill(
-                self.player, "firestorm", context, [self.monster]
-            )
-            result = revalidate_submission(
-                self.player, "firestorm", context, "all-enemies"
-            )
-            preflight = self._preflight(context)
-        lookup.assert_called()
-        self._assert_disabled_with_unknown_skill(preview)
-        self._assert_disabled_with_unknown_skill(result)
-        self.assertEqual(preflight.outcome, "rejected")
-        self.assertIs(preflight.reason, RejectReason.UNKNOWN_SKILL)
-        self.assertEqual(preflight.detail, "firestorm")
 
 
 if __name__ == "__main__":

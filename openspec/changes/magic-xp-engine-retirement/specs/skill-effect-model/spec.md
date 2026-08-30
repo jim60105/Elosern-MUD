@@ -9,7 +9,9 @@ frozen dataclasses, one per recognized prefix (`stat_multiply`, `growth_rate`,
 `divine_mystery`). `parse_effect` SHALL raise `ValueError` for any prefix not in this set.
 `growth_rate` SHALL be recognized because
 `reincarnation_boon_elosia` already declares `growth_rate:practice:100`, which
-`world/rules/progression.py` consumes; omitting it would make the registry's own import fail the
+the registry parses at load (the magic-XP consumer retired with
+`magic-xp-engine-retirement`; the prefix stays until the use-driven ladder
+lands); omitting it would make the registry's own import fail the
 "every existing entry parses" scenario below.
 
 #### Scenario: A known prefix parses into its dataclass
