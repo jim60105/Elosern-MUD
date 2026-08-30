@@ -420,6 +420,7 @@ class CustomCreationJourneys(CreationBrowserTest):
         for axis, value in (
             ("hp", "50"), ("mp", "50"), ("sp", "50"),
             ("atk_phys", "10"), ("agility", "10"), ("defense", "11"),
+            ("magic_power", "43"),
         ):
             page.evaluate(
                 "document.querySelector('[data-testid=\"creation-field-%s\"]').focus()" % axis
@@ -1056,7 +1057,8 @@ class PointerCreationJourneys(CreationBrowserTest):
         page.wait_for_timeout(150)
         for axis, value in (
             ("hp", "100"), ("mp", "50"), ("sp", "31"),
-            ("atk_phys", "0"), ("agility", "0"), ("defense", "0"),
+            ("atk_phys", "21"), ("agility", "21"), ("defense", "1"),
+            ("magic_power", "0"),
         ):
             page.evaluate(
                 "document.querySelector('[data-testid=\"creation-field-%s\"]').focus()" % axis
