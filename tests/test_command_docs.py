@@ -444,6 +444,7 @@ class CommandDocsContractTests(unittest.TestCase):
         self.assertIn(EVENNIA_DOCS_POINTER, self.reference)
 
     @covers_requirement("game-command-docs::the-command-reference-documents-the-title-commands")
+    @covers_requirement("game-command-docs::the-command-reference-documents-the-lineage-command")
     @covers_requirement("game-command-docs::accurate-command-details")
     def test_key_and_aliases_match_command_classes(self):
         for key, command in self.mounted.items():
@@ -456,6 +457,7 @@ class CommandDocsContractTests(unittest.TestCase):
             )
 
     @covers_requirement("game-command-docs::the-command-reference-documents-the-title-commands")
+    @covers_requirement("game-command-docs::the-command-reference-documents-the-lineage-command")
     @covers_requirement("game-command-docs::accurate-command-details")
     def test_syntax_and_context_match_manifest(self):
         for key, expected in EXPECTED_COMMANDS.items():
@@ -470,6 +472,23 @@ class CommandDocsContractTests(unittest.TestCase):
                 expected["context"],
                 f"context for {key!r} drifted from the curated manifest",
             )
+
+    @covers_requirement("game-command-docs::the-command-reference-documents-the-lineage-command")
+    def test_lineage_entry_documents_the_ledger_surface(self):
+        entry = self.entries["lineage"]
+        self.assertEqual(entry["指令"], "lineage")
+        self.assertEqual(parse_aliases(entry["別名"]), set())
+        self.assertEqual(entry["語法"].replace("`", ""), "lineage")
+        self.assertEqual(entry["情境"], EXPECTED_COMMANDS["lineage"]["context"])
+        for token in ("見頂", "門檻", "熟練度"):
+            self.assertIn(token, entry["說明"])
+        row = next(
+            line
+            for line in self.overview.splitlines()
+            if line.startswith("| [`lineage`](")
+        )
+        self.assertIn("見頂", row)
+        self.assertIn("門檻", row)
 
     @covers_requirement("game-command-docs::the-cast-command-reference-documents-the-optional-scale-token")
     def test_cast_entry_documents_the_freeform_scale_token(self):
@@ -565,6 +584,7 @@ class CommandDocsContractTests(unittest.TestCase):
             )
 
     @covers_requirement("game-command-docs::the-command-reference-documents-the-title-commands")
+    @covers_requirement("game-command-docs::the-command-reference-documents-the-lineage-command")
     @covers_requirement("game-command-docs::drift-contract-test")
     def test_overview_links_only_documented_keys_and_all_keys(self):
         links = parse_overview_links(self.overview)

@@ -75,7 +75,7 @@
 
 ## Post-sync traceability (during archive/sync)
 
-- [ ] P1 On sync, annotate the `skill-lineage-panel` requirement IDs (from
+- [x] P1 On sync, annotate the `skill-lineage-panel` requirement IDs (from
   `tools.spec_traceability list`) on the §1.2/§2.4/§3.2/§4.2 tests that
   establish them; annotate the new `game-command-docs` requirement on the
   drift-test scenario.

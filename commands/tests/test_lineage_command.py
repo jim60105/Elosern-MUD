@@ -10,6 +10,9 @@ from unittest.mock import patch
 
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
+from tools.spec_traceability import covers_requirement
+
+
 from commands.lineage import CmdLineage
 from world.rules.lineage_query import LineageView, build_lineage_view
 from world.rules.progression import SKILL_PROFICIENCY_XP_PER_LEVEL
@@ -41,6 +44,7 @@ class LineageCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         )
         self.before = dict(self.char1.db.skill_proficiency)
 
+    @covers_requirement("skill-lineage-panel::the-lineage-telnet-command-mirrors-the-panel-surface")
     def test_printed_tree_mirrors_the_view(self):
         view = build_lineage_view(self.char1)
         output = self.call(CmdLineage(), "")
@@ -60,6 +64,7 @@ class LineageCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertFalse(mid.capped)
         self.assertIn("本階 23/50", output)
 
+    @covers_requirement("skill-lineage-panel::the-lineage-telnet-command-mirrors-the-panel-surface")
     def test_malformed_record_prints_the_fixed_line_and_writes_nothing(self):
         self.char1.db.skill_proficiency["fire_ball"] = "junk"
         output = self.call(CmdLineage(), "")
@@ -71,6 +76,7 @@ class LineageCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         output = self.call(CmdLineage(), "extra")
         self.assertEqual(output, "語法：lineage")
 
+    @covers_requirement("skill-lineage-panel::the-lineage-telnet-command-mirrors-the-panel-surface")
     def test_state_unchanged_after_print(self):
         self.call(CmdLineage(), "")
         self.assertEqual(self.char1.db.skill_proficiency, self.before)
@@ -87,6 +93,7 @@ class LineageCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             output = self.call(CmdLineage(), "")
         self.assertEqual(output, "目前尚無可追蹤的技能系譜。")
 
+    @covers_requirement("skill-lineage-panel::the-lineage-telnet-command-mirrors-the-panel-surface")
     def test_command_is_available_in_and_out_of_combat(self):
         from commands.default_cmdsets import CharacterCmdSet
 

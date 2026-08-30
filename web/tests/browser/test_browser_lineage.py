@@ -10,6 +10,8 @@ live LLM, Stable Diffusion, or other network service.
 
 from __future__ import annotations
 
+from tools.spec_traceability import covers_requirement
+
 from .browser_base import BrowserAcceptanceTest
 from .test_browser_contextual_hud import _inject_snapshot, _wait_mode
 
@@ -107,6 +109,7 @@ def _unavailable_lineage_panel() -> dict:
 class LineagePanelBrowserTest(BrowserAcceptanceTest):
     """The lineage window on the shared managed server."""
 
+    @covers_requirement("skill-lineage-panel::the-webclient-renders-the-lineage-window-from-the-view-alone")
     def test_lineage_window_renders_the_committed_ledger_verbatim(self):
         """Icon opens the window; collapsed meter and expanded rows match the payload."""
         page = self.logged_in_page()
@@ -165,6 +168,7 @@ class LineagePanelBrowserTest(BrowserAcceptanceTest):
             timeout=15000,
         )
 
+    @covers_requirement("skill-lineage-panel::the-webclient-renders-the-lineage-window-from-the-view-alone")
     def test_unavailable_lineage_renders_only_the_registry_reason(self):
         """The unavailable payload renders its reason line and no placeholder tree."""
         page = self.logged_in_page()
