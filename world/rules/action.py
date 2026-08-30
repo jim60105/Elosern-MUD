@@ -26,6 +26,9 @@ from world.rules.progression import (
     FREEFORM_SCALE_VALUES,
     freeform_scales_for,
     grant_skill_practice_xp,
+    missing_prerequisite,
+    practice_claim_key,
+    release_practice_claims,
     scaled_mp_cost,
 )
 from world.rules.sexual_act_effects import (
@@ -247,9 +250,10 @@ def _step1_freeform_gate(request: ActionRequest, skill: SkillDef) -> None:
     and never rejected here). The check order is fixed and crash-safe: scale
     membership in the closed table first, then ``is_freeform_eligible``
     (which itself requires an element and an ``mp`` cost), and only then
-    ``freeform_scales_for(actor, skill.element.key)`` — so a non-elemental MP
-    skill like ``concentration`` rejects cleanly instead of dereferencing a
-    missing element.
+    the skill-anchored ``freeform_scales_for(actor, skill)`` ladder — so a
+    non-elemental MP skill like ``concentration`` rejects cleanly instead of
+    dereferencing a missing element, and the rung set is the one the panel
+    advertises (use-driven-skill-lineage DC5).
     """
     if request.scale == 1.0:
         return
@@ -257,7 +261,7 @@ def _step1_freeform_gate(request: ActionRequest, skill: SkillDef) -> None:
         raise RejectedAction(RejectReason.SCALED_CAST_FORBIDDEN, request.skill_key)
     if not is_freeform_eligible(skill):
         raise RejectedAction(RejectReason.SCALED_CAST_FORBIDDEN, request.skill_key)
-    if not freeform_scales_for(request.actor, skill.element.key):
+    if request.scale not in freeform_scales_for(request.actor, skill):
         raise RejectedAction(RejectReason.SCALED_CAST_FORBIDDEN, request.skill_key)
 
 
@@ -265,6 +269,19 @@ def _step1_ownership(request: ActionRequest) -> SkillDef:
     skill = SKILL_REGISTRY.get(request.skill_key)
     if skill is None or skill.key not in request.actor.skills.owned_keys():
         raise RejectedAction(RejectReason.UNKNOWN_SKILL, request.skill_key)
+    # The lineage gate (use-driven-skill-lineage DC2): an owned skill whose
+    # prerequisite chain is unmet is rejected with the SAME reason, its detail
+    # deterministically naming the first unmet edge. Detail stays the bare
+    # skill key for the registry-miss/unowned case, so every pre-existing
+    # matcher keeps working.
+    unmet = missing_prerequisite(request.actor, skill)
+    if unmet is not None:
+        required = SKILL_REGISTRY.get(unmet.skill_key)
+        name = required.label if required is not None else unmet.skill_key
+        raise RejectedAction(
+            RejectReason.UNKNOWN_SKILL,
+            f"{skill.key}:需先精通「{name}」至 Lv.{unmet.min_proficiency}",
+        )
     if skill.kind is not SkillKind.ACTIVE:
         raise RejectedAction(RejectReason.SKILL_NOT_ACTIVE, request.skill_key)
     # The ONE sanctioned combat-context read in this entire module — see design.md D-3.
@@ -1463,14 +1480,59 @@ def _step6_resource_deduction(
     return pending
 
 
-def _step6_skill_practice(actor: Any, skill: SkillDef) -> PendingEffect:
-    """Stage one practice award inside the action's transactional commit."""
-    return PendingEffect(
-        actor,
-        f"skill_practice|{_entity_key(actor)}|{skill.key}",
-        frozenset({"progression"}),
-        lambda: grant_skill_practice_xp(actor, skill.key),
-    )
+def _step6_skill_practice(
+    request: ActionRequest,
+    skill: SkillDef,
+    targets: list[Any],
+    claims_out: list[tuple[Any, str, Any]],
+) -> list[PendingEffect]:
+    """Stage one practice award per DISTINCT target (DC3).
+
+    An AREA hit accrues for each initially-living target it resolved against
+    (dedupe claims are ``(actor, skill, target)`` triples), while a NONE/SELF
+    skill with no targets accrues once against ``None``. A simulated (guild
+    examination) context passes the nonlethal marker, so the whole staged
+    batch awards nothing. Every claim the batch actually takes is appended to
+    ``claims_out`` so a rolled-back commit can release them (a failed action
+    must not silence the same tick's legitimate retry).
+    """
+    simulated = bool(_event_context(request).get("simulated"))
+    seen: list[Any] = []
+    seen_keys: set[Any] = set()
+    for target in targets:
+        key = practice_claim_key(request.actor, skill.key, target)[2]
+        if key not in seen_keys:
+            seen_keys.add(key)
+            seen.append(target)
+    staged_targets: list[Any] = seen or [None]
+    pending: list[PendingEffect] = []
+    for target in staged_targets:
+        actor = request.actor
+        target_key = "-" if target is None else _entity_key(target)
+        pending.append(
+            PendingEffect(
+                actor,
+                f"skill_practice|{_entity_key(actor)}|{skill.key}|{target_key}",
+                frozenset({"progression"}),
+                lambda actor=actor, skill_key=skill.key, target=target,
+                simulated=simulated, claims_out=claims_out: _apply_practice(
+                    actor, skill_key, target, simulated, claims_out
+                ),
+            )
+        )
+    return pending
+
+
+def _apply_practice(
+    actor: Any,
+    skill_key: str,
+    target: Any,
+    simulated: bool,
+    claims_out: list[tuple[Any, str, Any]],
+) -> None:
+    """Apply one staged practice award, recording its claim when taken."""
+    if grant_skill_practice_xp(actor, skill_key, target=target, nonlethal=simulated):
+        claims_out.append(practice_claim_key(actor, skill_key, target))
 
 
 _ENTRY_TEMPLATES = {
@@ -2048,7 +2110,13 @@ class ActionResolver:
                 targets,
             )
             pending += _step6_resource_deduction(request.actor, skill, request.scale)
-            pending.append(_step6_skill_practice(request.actor, skill))
+            practice_claims: list[tuple[Any, str, Any]] = []
+            pending += _step6_skill_practice(
+                request,
+                skill,
+                targets,
+                practice_claims,
+            )
             event_log = _step7_build_event_log(request, skill, pending)
             try:
                 for planner in _EVENT_EFFECT_PLANNERS.values():
@@ -2072,5 +2140,9 @@ class ActionResolver:
         try:
             _commit(pending)
         except CommitFailed as failure:
+            # The staged practice awards rolled back with everything else; the
+            # dedupe claims they took must be released so a legitimate
+            # same-tick retry still accrues (rubber-duck DC3 finding).
+            release_practice_claims(practice_claims)
             return ActionResult.rejected(failure.reason, failure.detail)
         return ActionResult.success(event_log, time_cost)

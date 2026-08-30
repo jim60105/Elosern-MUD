@@ -10,6 +10,14 @@ import yaml
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.skills.cost_tiers import is_freeform_eligible
+from world.skills.effects import DamageEffect
+from world.skills.registry import (
+    SKILL_REGISTRY,
+    SkillPrerequisite,
+    SkillDef,
+    SkillKind,
+    prerequisite_consumers,
+)
 
 
 PROGRESSION_YAML = yaml.safe_load(
@@ -123,8 +131,74 @@ def _load_freeform_cast_scales(
 FREEFORM_CAST_SCALES: tuple[tuple[float, str], ...] = _load_freeform_cast_scales(
     PROGRESSION_YAML
 )
+# Canonical table membership (the closed wire-level scale set). NOT the
+# actor's entitlement: which rungs one may actually cast derives from
+# :func:`freeform_scales_for` (the ladder).
 FREEFORM_SCALE_VALUES = tuple(scale for scale, _ in FREEFORM_CAST_SCALES)
 FREEFORM_SCALE_LABELS = frozenset(label for _, label in FREEFORM_CAST_SCALES)
+
+
+def _load_freeform_scale_ladder(
+    raw: Any, canonical: tuple[tuple[float, str], ...]
+) -> tuple[tuple[float, int], ...]:
+    """Load and fail-closed validate the proficiency-anchored scale ladder.
+
+    Each rung is ``{scale, min_level}``: the scale must be a canonical table
+    member, ``min_level`` an int >= 0, and both sequences strictly ascending
+    starting at level 0 (the entry rung is unconditional for an entitled
+    actor). A ladder deviating in any way fails at import.
+    """
+    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)) or not raw:
+        raise ValueError("freeform_scale_ladder must be a non-empty sequence")
+    canonical_values = {scale for scale, _ in canonical}
+    parsed: list[tuple[float, int]] = []
+    for index, entry in enumerate(raw):
+        if not isinstance(entry, dict) or set(entry) != {"scale", "min_level"}:
+            raise ValueError(
+                "freeform_scale_ladder entries must name exactly scale and "
+                f"min_level, got {entry!r} at index {index}"
+            )
+        scale, min_level = entry["scale"], entry["min_level"]
+        if (
+            isinstance(scale, bool)
+            or not isinstance(scale, (int, float))
+            or not isfinite(scale)
+            or scale <= 0
+            or float(scale) not in canonical_values
+        ):
+            raise ValueError(
+                f"freeform_scale_ladder scale {scale!r} is not a canonical "
+                "positive finite scale at index "
+                f"{index}"
+            )
+        if isinstance(min_level, bool) or not isinstance(min_level, int) or min_level < 0:
+            raise ValueError(
+                f"freeform_scale_ladder min_level must be an int >= 0, got "
+                f"{min_level!r} at index {index}"
+            )
+        if parsed:
+            if float(scale) <= parsed[-1][0]:
+                raise ValueError("freeform_scale_ladder scales must ascend")
+            if min_level <= parsed[-1][1]:
+                raise ValueError("freeform_scale_ladder levels must ascend")
+        parsed.append((float(scale), min_level))
+    if parsed[0][1] != 0:
+        raise ValueError("freeform_scale_ladder must start at min_level 0")
+    return tuple(parsed)
+
+
+# The proficiency ladder (use-driven-progression D5): ascending
+# ``(scale, min_level)`` rungs an entitled actor unlocks through the CAST
+# SKILL's own proficiency. Never hard-coded anywhere else.
+FREEFORM_SCALE_LADDER: tuple[tuple[float, int], ...] = _load_freeform_scale_ladder(
+    PROGRESSION_YAML["freeform_scale_ladder"], FREEFORM_CAST_SCALES
+)
+
+# D6 canopy default: the tip cap of a skill nobody consumes in the
+# prerequisite graph.
+PROFICIENCY_TIP_CAP = int(PROGRESSION_YAML["proficiency_tip_cap"])
+if PROFICIENCY_TIP_CAP < 1:
+    raise ValueError("proficiency_tip_cap must be >= 1")
 
 
 def _validate_nonnegative_multiplier(value: float, name: str) -> None:
@@ -231,23 +305,47 @@ def scaled_mp_cost(base: int, scale: float) -> int:
     return max(1, scaled_magnitude(base, scale))
 
 
-def freeform_scales_for(entity: Any, element: str) -> tuple[float, ...]:
-    """Return the element's allowed freeform scale set, or ``()``.
+def freeform_mastery_entitled(entity: Any, element: str) -> bool:
+    """Return whether the entity directly owns the element's mastery passive.
 
-    Pure side-effect-free query: ``element`` is validated against
+    Pure side-effect-free entitlement query: ``element`` is validated against
     ``ELEMENT_REGISTRY`` first (an unrecognized element raises ``ValueError``
-    even when the entity owns a fabricated ``<element>_mastery``), then the
-    ascending ``freeform_cast_scales`` set is returned when
-    ``f"{element}_mastery"`` appears in ``entity.skills.owned_keys()`` (direct
-    ownership only, never ``conferred_grants()``), and an empty tuple
-    otherwise. The empty tuple is the entitlement signal consumed by the
-    freeform-casting gate. Never writes any entity state.
+    even when the entity owns a fabricated ``<element>_mastery``), then
+    ``True`` when ``f"{element}_mastery"`` appears in
+    ``entity.skills.owned_keys()`` (direct ownership only, never
+    ``conferred_grants()``). It grants NO scale by itself; the unlocked set is
+    the skill-anchored :func:`freeform_scales_for`. Never writes entity state.
     """
     if element not in ELEMENT_REGISTRY:
         raise ValueError(f"unknown element {element!r}")
-    if f"{element}_mastery" in entity.skills.owned_keys():
-        return FREEFORM_SCALE_VALUES
-    return ()
+    return f"{element}_mastery" in entity.skills.owned_keys()
+
+
+def freeform_scales_for(entity: Any, skill: SkillDef) -> tuple[float, ...]:
+    """Return the freeform scales one SKILL's own proficiency unlocks.
+
+    The single ladder authority (use-driven-skill-lineage DC5): empty for a
+    non-elemental skill or a non-entitled actor, else the ascending ladder
+    rungs whose ``min_level`` the entity's OWN proficiency in ``skill``
+    reaches AND which sit at or below the skill's derived tip cap — a rung
+    gated above ``proficiency_cap(skill.key)`` could never be practised to,
+    so it never unlocks (a Lv.3-capped mid-tree spell tops out at the 1.0
+    rung). Skill-anchored on purpose: a mastery holder with a level-10 canopy
+    spell cannot scale a cap-5 mid-tree spell past its own rung, so no caller
+    can ever advertise a scale the resolver would reject. Never writes entity
+    state.
+    """
+    if skill.element is None:
+        return ()
+    if not freeform_mastery_entitled(entity, skill.element.key):
+        return ()
+    level = skill_proficiency_level(entity, skill.key)
+    cap = proficiency_cap(skill.key)
+    return tuple(
+        scale
+        for scale, min_level in FREEFORM_SCALE_LADDER
+        if level >= min_level and min_level <= cap
+    )
 
 
 def freeform_scale_entries_for(actor: Any, skill: Any) -> tuple[tuple[float, str, int], ...]:
@@ -258,11 +356,13 @@ def freeform_scale_entries_for(actor: Any, skill: Any) -> tuple[tuple[float, str
     the browser never re-implements cost scaling. An ineligible skill or an
     actor without direct mastery ownership of the skill's element yields an
     empty tuple, so the panel can omit the field entirely (the freeform
-    feature is invisible to non-masters).
+    feature is invisible to non-masters). The rungs come from the
+    skill-anchored ladder, so the advertised set and the resolver gate can
+    never diverge.
     """
     if not is_freeform_eligible(skill) or skill.element is None:
         return ()
-    allowed = frozenset(freeform_scales_for(actor, skill.element.key))
+    allowed = frozenset(freeform_scales_for(actor, skill))
     if not allowed:
         return ()
     base_mp = int(skill.cost["mp"])
@@ -299,18 +399,406 @@ def _race_learning_multiplier(entity: Any) -> float:
     return float(race.learning_multiplier) if race is not None else 1.0
 
 
-def grant_skill_practice_xp(entity: Any, skill_key: str, uses: int = 1) -> None:
-    """Record race-scaled practice XP for one skill, independent of magic growth."""
-    if uses < 0:
-        raise ValueError("uses must be non-negative")
-    proficiency = dict(entity.db.skill_proficiency or {})
-    proficiency[skill_key] = proficiency.get(skill_key, 0.0) + (
-        uses * SKILL_PRACTICE_XP_PER_USE * _race_learning_multiplier(entity)
-    )
-    entity.db.skill_proficiency = proficiency
-
-
 def skill_proficiency_level(entity: Any, skill_key: str) -> int:
-    """Return the unbounded whole proficiency level derived from practice XP."""
+    """Return the whole proficiency level derived from stored practice XP."""
     proficiency = entity.db.skill_proficiency or {}
     return int(float(proficiency.get(skill_key, 0.0)) // SKILL_PROFICIENCY_XP_PER_LEVEL)
+
+
+def can_use_skill(entity: Any, skill: SkillDef) -> bool:
+    """Return whether the entity may USE one skill right now (the ONE gate).
+
+    Pure, side-effect-free predicate (DC2): ownership of the skill, then every
+    declared prerequisite edge — the prereq key must also be owned and its
+    derived proficiency level must reach the threshold. School-agnostic: a
+    weapon skill and a spell traverse this identical path, so 主宰-tier entry
+    is simply every edge on the path into that node (AND semantics). MP
+    affordability and every other check stay in the resolver; this answers
+    lineage eligibility only.
+    """
+    owned = entity.skills.owned_keys()
+    if skill.key not in owned:
+        return False
+    for prereq in skill.prerequisites:
+        if prereq.skill_key not in owned:
+            return False
+        if skill_proficiency_level(entity, prereq.skill_key) < prereq.min_proficiency:
+            return False
+    return True
+
+
+def missing_prerequisite(entity: Any, skill: SkillDef) -> SkillPrerequisite | None:
+    """Return the first unmet prerequisite edge of ``skill``, or ``None``.
+
+    Reports in declared edge order so rejection text is deterministic. The
+    caller owns the ownership check for the skill itself; this only walks the
+    prerequisite list (an already-usable skill yields ``None``).
+    """
+    owned = entity.skills.owned_keys()
+    for prereq in skill.prerequisites:
+        if prereq.skill_key not in owned:
+            return prereq
+        if skill_proficiency_level(entity, prereq.skill_key) < prereq.min_proficiency:
+            return prereq
+    return None
+
+
+def proficiency_cap(skill_key: str) -> int:
+    """Return the derived tip cap for one skill (D6, rule 1).
+
+    ``cap(S)`` is the maximum ``min_proficiency`` over every edge consuming
+    ``S`` — read from the registry's load-time reverse-edge map, so branching
+    and merging topologies need no special case — or ``PROFICIENCY_TIP_CAP``
+    when nobody consumes it. A ceiling is therefore never below any single
+    consuming edge, so a saturated prerequisite never blocks its child.
+    """
+    consumers = prerequisite_consumers(skill_key)
+    if not consumers:
+        return PROFICIENCY_TIP_CAP
+    return max(min_proficiency for _, min_proficiency in consumers)
+
+
+def award_practice_xp(entity: Any, skill_key: str, xp: float) -> None:
+    """THE accrual writer for ``db.skill_proficiency``; saturating at the cap.
+
+    Every practice entry point (the per-use grant and the booked-practice
+    settlement) routes through this one primitive, so the two can never
+    diverge at a cap boundary: once
+    ``skill_proficiency_level(entity, skill_key)`` reaches
+    :func:`proficiency_cap`, further XP is dropped and the stored value never
+    exceeds ``cap * SKILL_PROFICIENCY_XP_PER_LEVEL``. Fails closed on a
+    non-finite or negative amount before any write.
+    """
+    if isinstance(xp, bool) or not isinstance(xp, (int, float)) or not isfinite(xp):
+        raise ValueError(f"practice XP must be a finite number, got {xp!r}")
+    if xp < 0:
+        raise ValueError(f"practice XP must be non-negative, got {xp!r}")
+    if xp == 0:
+        return
+    cap = proficiency_cap(skill_key)
+    stored = dict(entity.db.skill_proficiency or {})
+    current = float(stored.get(skill_key, 0.0))
+    if current // SKILL_PROFICIENCY_XP_PER_LEVEL >= cap:
+        return
+    stored[skill_key] = min(
+        current + float(xp), cap * SKILL_PROFICIENCY_XP_PER_LEVEL
+    )
+    entity.db.skill_proficiency = stored
+
+
+def _is_elemental_magic(skill: SkillDef) -> bool:
+    """Return whether element affinity may ever scale this skill's practice.
+
+    ``basic_attack`` carries ``element == fire`` with a PHYSICAL damage
+    school, so the element field alone cannot decide affinity eligibility:
+    only a skill whose parsed effects include a magic-school damage of its own
+    element is elemental magic. Physical and non-elemental skills take the
+    neutral ``1.0`` (design §8: the accrual formula reads no school bias, but
+    affinity is a magic-affinity concept by definition).
+    """
+    if skill.element is None:
+        return False
+    return any(
+        isinstance(effect, DamageEffect)
+        and effect.school == "magic"
+        and effect.element == skill.element.key
+        for effect in skill.parsed_effects
+    )
+
+
+# Per-tick practice dedupe (D6, rule 2). Transient by contract: a module-level
+# dict keyed by the current world-clock tick plus the claimed
+# ``(actor, skill_key, target)`` triples. Never persisted, never snapshotted,
+# never restored — a rollback releases its claims explicitly instead.
+_dedupe_tick: int | None = None
+_dedupe_seen: set[tuple[Any, str, Any]] = set()
+
+
+def _dedupe_key(entity: Any) -> Any:
+    """Return a stable identity for one entity inside this process."""
+    pk = getattr(entity, "pk", None)
+    return pk if pk is not None else id(entity)
+
+
+def _current_tick() -> int:
+    """Return the current world-clock tick, or 0 when no clock exists yet.
+
+    Read through ``read_world_clock()`` so a pure/unit context (no persisted
+    singleton) still gets a usable, monotonic-enough bucket without creating
+    one. Import is deferred: ``world.rules.clock`` imports the rules layer
+    broadly, and the dedupe path must never create an import cycle.
+    """
+    from world.rules.clock import read_world_clock
+
+    clock = read_world_clock()
+    return int(clock.tick) if clock is not None else 0
+
+
+def _claim_practice(actor: Any, skill_key: str, target: Any) -> bool:
+    """Claim ``(actor, skill, target)`` for this tick; ``False`` if taken.
+
+    The first claim of a tick clears the previous tick's set, so the state is
+    bounded by one tick's distinct triples. Claims are released on a rolled
+    back commit via :func:`release_practice_claims`.
+    """
+    global _dedupe_tick
+    tick = _current_tick()
+    if _dedupe_tick != tick:
+        _dedupe_tick = tick
+        _dedupe_seen.clear()
+    key = (_dedupe_key(actor), skill_key, None if target is None else _dedupe_key(target))
+    if key in _dedupe_seen:
+        return False
+    _dedupe_seen.add(key)
+    return True
+
+
+def practice_claim_key(actor: Any, skill_key: str, target: Any) -> tuple[Any, str, Any]:
+    """Return the dedupe key one practice award occupies.
+
+    Computed exactly as :func:`_claim_practice` computes it, so the action
+    pipeline can record which claims a staged batch took and release precisely
+    those on a rolled-back commit.
+    """
+    return (
+        _dedupe_key(actor),
+        skill_key,
+        None if target is None else _dedupe_key(target),
+    )
+
+
+def release_practice_claims(claims: Sequence[tuple[Any, str, Any]]) -> None:
+    """Release dedupe claims made by a commit that was rolled back.
+
+    A rolled-back action restored the proficiency surface without a
+    successful accrual, so its dedupe claims must not suppress the XP a
+    legitimate same-tick retry would earn.
+    """
+    for actor_key, skill_key, target_key in claims:
+        _dedupe_seen.discard((actor_key, skill_key, target_key))
+
+
+def practice_claims_for(actor: Any, skill_key: str) -> set[tuple[Any, str, Any]]:
+    """Return the claims this actor currently holds for one skill (tests/diag)."""
+    actor_key = _dedupe_key(actor)
+    return {key for key in _dedupe_seen if key[0] == actor_key and key[1] == skill_key}
+
+
+def reset_practice_dedupe() -> None:
+    """Clear the transient dedupe state (test isolation only)."""
+    global _dedupe_tick
+    _dedupe_tick = None
+    _dedupe_seen.clear()
+
+
+def snapshot_practice_dedupe() -> tuple[int | None, frozenset]:
+    """Return the whole transient dedupe state for an outer owner to restore.
+
+    Outer transaction owners (cast settlement, combat-session rounds) wrap
+    ``resolve()`` in their own ``transaction.atomic()``: when that OUTER
+    transaction rolls back, the resolve-level ``release_practice_claims``
+    never runs (the inner commit succeeded), yet the practice XP the claims
+    recorded is gone with the rollback. Such owners snapshot the state before
+    opening their transaction and restore it in their compensation path —
+    the transient analogue of the attribute-surface snapshots they already
+    take.
+    """
+    return _dedupe_tick, frozenset(_dedupe_seen)
+
+
+def restore_practice_dedupe(
+    snapshot: tuple[int | None, frozenset]
+) -> None:
+    """Reinstall a :func:`snapshot_practice_dedupe` snapshot verbatim."""
+    global _dedupe_tick
+    _dedupe_tick, seen = snapshot
+    _dedupe_seen.clear()
+    _dedupe_seen.update(seen)
+
+
+def practice_xp_amount(entity: Any, skill: SkillDef) -> float:
+    """Return the closed-form practice XP one use of ``skill`` is worth.
+
+    ``SKILL_PRACTICE_XP_PER_USE`` × race ``learning_multiplier`` ×
+    element-affinity multiplier (``1.0`` for a physical or non-elemental
+    skill) × ``growth_rate_multiplier(entity)`` (the conferred-buff pull
+    path, whose live reader this is). Every factor is a finite, non-negative
+    query; the composite is validated before any caller writes it.
+    """
+    from world.rules.buffs import growth_rate_multiplier
+
+    element_factor = (
+        element_affinity_multiplier(entity, skill.element.key)
+        if _is_elemental_magic(skill)
+        else 1.0
+    )
+    amount = (
+        SKILL_PRACTICE_XP_PER_USE
+        * _race_learning_multiplier(entity)
+        * element_factor
+        * growth_rate_multiplier(entity)
+    )
+    if not isfinite(amount) or amount < 0:
+        raise ValueError(f"practice XP formula produced an invalid {amount!r}")
+    return float(amount)
+
+
+def grant_skill_practice_xp(
+    entity: Any, skill_key: str, target: Any = None, nonlethal: bool = False
+) -> bool:
+    """Accrue one use of practice XP; return whether XP was actually claimed.
+
+    The use-driven accrual entry point (DC3). Skips silently — returning
+    ``False`` — for an unregistered or PASSIVE skill (nothing uses a passive,
+    so it has no practice), for a ``nonlethal``/simulated context (a guild
+    examination is a simulation and grants no growth of any kind), and when
+    the per-tick dedupe already holds this ``(actor, skill, target)`` triple.
+    Otherwise the closed-form amount flows through
+    :func:`award_practice_xp`, the only writer, which clamps at the derived
+    cap. Reads no school and no magic stat.
+    """
+    if nonlethal:
+        return False
+    skill = SKILL_REGISTRY.get(skill_key)
+    if skill is None or skill.kind is not SkillKind.ACTIVE:
+        return False
+    amount = practice_xp_amount(entity, skill)
+    if not _claim_practice(entity, skill_key, target):
+        return False
+    award_practice_xp(entity, skill_key, amount)
+    return True
+
+
+def seed_lineage_proficiency(
+    owned_keys: Sequence[str], explicit: dict[str, float] | None = None
+) -> dict[str, float]:
+    """Return the proficiency map satisfying every edge of the owned skills.
+
+    The import/scene-build auto-seed (DC6): for each owned skill, every
+    prerequisite edge whose derived level falls short is seeded to EXACTLY
+    ``min_proficiency * SKILL_PROFICIENCY_XP_PER_LEVEL`` — the minimal value
+    meeting the threshold, never above. An explicit entry always wins, even
+    when it leaves an edge unmet (the record author said what they meant).
+    Resolution runs to a fixed point in registry-key order, so a chain of
+    owned skills seeds every unsatisfied edge in one pass and the result is
+    order-independent and deterministic. Ownership is never invented: an
+    unowned prerequisite stays unowned (the use gate still denies it); this
+    only writes XP for keys the entity could already have practised.
+    """
+    explicit_entries = {
+        key: float(value)
+        for key, value in (explicit or {}).items()
+        if key in SKILL_REGISTRY
+    }
+    stored = dict(explicit_entries)
+    explicit_keys = set(explicit_entries)
+    owned = set(owned_keys)
+    for _ in range(len(owned) + 1):
+        changed = False
+        for skill_key in sorted(owned):
+            skill = SKILL_REGISTRY.get(skill_key)
+            if skill is None:
+                continue
+            for prereq in skill.prerequisites:
+                required = prereq.min_proficiency * SKILL_PROFICIENCY_XP_PER_LEVEL
+                current = float(stored.get(prereq.skill_key, 0.0))
+                if current >= required:
+                    continue
+                if prereq.skill_key in explicit_keys:
+                    # Explicit and below the edge: the record wins; no override.
+                    continue
+                # A previously seeded value may be RAISED to a tighter edge
+                # (max over edges), but only to that edge's exact value.
+                stored[prereq.skill_key] = max(current, required)
+                changed = True
+        if not changed:
+            break
+    return stored
+
+
+def lineage_ownership_closure(
+    declared_keys: Sequence[str],
+) -> tuple[list[str], list[str]]:
+    """Return ``(active_additions, passive_additions)`` closing the lineage.
+
+    A record or NPC that owns a deep skill but not its prerequisite chain is
+    unusable under the single gate (the gate requires prerequisite
+    OWNERSHIP), so import auto-seed also extends ownership transitively:
+    every prerequisite of every owned skill (walking its own prerequisites)
+    joins the entity's skill lists. Returned in sorted registry-key order for
+    deterministic storage; only keys absent from ``declared_keys`` are
+    returned, split by each skill's declared kind.
+    """
+    declared = set(declared_keys)
+    frontier = list(declared)
+    seen = set(declared)
+    additions: set[str] = set()
+    while frontier:
+        skill_key = frontier.pop()
+        skill = SKILL_REGISTRY.get(skill_key)
+        if skill is None:
+            continue
+        for prereq in skill.prerequisites:
+            if prereq.skill_key in seen:
+                continue
+            seen.add(prereq.skill_key)
+            additions.add(prereq.skill_key)
+            frontier.append(prereq.skill_key)
+    active = sorted(
+        key
+        for key in additions
+        if SKILL_REGISTRY[key].kind is SkillKind.ACTIVE
+    )
+    passive = sorted(key for key in additions if key not in set(active))
+    return active, passive
+
+
+def apply_lineage_auto_seed(entity: Any) -> None:
+    """Seed one freshly-built entity's lineage (ownership + exact XP).
+
+    The ONE auto-seed writer shared by the import loader and the scene
+    builder: extends ``db.skills`` with the prerequisite-ownership closure,
+    then stores the fixed-point seeded proficiency map (explicit stored
+    entries win). Called inside the caller's all-or-nothing transaction, so
+    a rejected import leaves nothing behind, seed included.
+    """
+    raw = entity.db.skills or {}
+    active = list(raw.get("active", []))
+    passive = list(raw.get("passive", []))
+    add_active, add_passive = lineage_ownership_closure([*active, *passive])
+    if add_active or add_passive:
+        entity.db.skills = {
+            "active": [*active, *add_active],
+            "passive": [*passive, *add_passive],
+        }
+    entity.db.skill_proficiency = seed_lineage_proficiency(
+        [*active, *add_active, *passive, *add_passive],
+        entity.db.skill_proficiency,
+    )
+
+
+def normalize_lineage_record(record: dict[str, Any]) -> dict[str, Any]:
+    """Return one import record with its lineage auto-seed applied.
+
+    The shared normalization the validator and the loader BOTH apply before
+    any range validation: a copy whose ``skills``/``passives`` close over the
+    prerequisite chain and whose ``skill_proficiency`` carries the exact
+    seeded values (explicit entries win, merged records are order-independent
+    and idempotent). Validating the NORMALIZED record is what makes a deep
+    import provably usable while a malformed sibling field still rejects the
+    whole record. Unknown skill keys pass through untouched so the existing
+    semantic check keeps naming them.
+    """
+    normalized = dict(record)
+    active = list(record.get("skills") or [])
+    passive = list(record.get("passives") or [])
+    add_active, add_passive = lineage_ownership_closure([*active, *passive])
+    merged = seed_lineage_proficiency(
+        [*active, *add_active, *passive, *add_passive],
+        record.get("skill_proficiency") or {},
+    )
+    normalized["skills"] = [*active, *add_active]
+    normalized["passives"] = [*passive, *add_passive]
+    if merged:
+        normalized["skill_proficiency"] = merged
+    return normalized

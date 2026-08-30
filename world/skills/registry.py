@@ -4,10 +4,16 @@
 action resolver to import rather than redefine. Every ``effects`` string is
 parsed into a typed dataclass by ``world.skills.effects.parse_effect`` at
 construction; see that module for the recognized effect-ID conventions.
+
+``SkillPrerequisite`` declares the skill-lineage DAG (use-driven-progression
+design §9): an edge ``consumer -> (skill_key, min_proficiency)`` gating USE
+(never ownership). ``validate_prerequisite_graph`` runs fail-closed at
+registry load and caches the reverse-edge map the tip-cap derivation reads.
 """
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 
 from world.lore.elements import ELEMENT_REGISTRY, Element
 from world.skills.effects import HealEffect, parse_effect
@@ -105,6 +111,38 @@ LABEL_MAX = 128
 DESCRIPTION_MAX = 512
 
 
+@dataclass(frozen=True, slots=True)
+class SkillPrerequisite:
+    """One skill-lineage edge: a consumer requires ``min_proficiency`` in ``skill_key``.
+
+    The threshold is a whole proficiency level and must be >= 1: a 0-level
+    requirement would gate nothing while still rendering as a visible edge,
+    so the constructor rejects it (fail closed at construction, matching the
+    registry's other invariant checks).
+    """
+
+    skill_key: str
+    min_proficiency: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.skill_key, str) or not self.skill_key.strip():
+            raise ValueError(
+                "SkillPrerequisite.skill_key must be a non-empty string"
+            )
+        if isinstance(self.min_proficiency, bool) or not isinstance(
+            self.min_proficiency, int
+        ):
+            raise ValueError(
+                f"SkillPrerequisite on {self.skill_key!r}: min_proficiency "
+                f"must be an int, got {self.min_proficiency!r}"
+            )
+        if self.min_proficiency < 1:
+            raise ValueError(
+                f"SkillPrerequisite on {self.skill_key!r}: min_proficiency "
+                f"must be >= 1, got {self.min_proficiency}"
+            )
+
+
 @dataclass(frozen=True)
 class SkillDef:
     """Immutable definition of a skill known to deterministic consumers."""
@@ -123,6 +161,7 @@ class SkillDef:
     faction_constraint: FactionConstraint = FactionConstraint.ANY
     requires_divine_arts: bool = False
     parsed_effects: tuple = ()
+    prerequisites: tuple["SkillPrerequisite", ...] = ()
 
     def __post_init__(self) -> None:
         """Enforce the registry invariants for every constructor path.
@@ -141,6 +180,36 @@ class SkillDef:
             raise ValueError(
                 f"skill {self.key!r} declares an invalid group; "
                 "group must be a non-empty string when present"
+            )
+        if isinstance(self.prerequisites, (str, bytes)) or not isinstance(
+            self.prerequisites, tuple
+        ):
+            raise ValueError(
+                f"skill {self.key!r} prerequisites must be a tuple of "
+                "SkillPrerequisite"
+            )
+        for prereq in self.prerequisites:
+            if not isinstance(prereq, SkillPrerequisite):
+                raise ValueError(
+                    f"skill {self.key!r} prerequisite {prereq!r} is not a "
+                    "SkillPrerequisite"
+                )
+        # The declared type is Element | None: normalize (and validate) a raw
+        # string on EVERY constructor path, so direct SkillDef(...) authors
+        # (flee, test fixtures) cannot leave a str where consumers read
+        # ``skill.element.key``.
+        if isinstance(self.element, str):
+            resolved = ELEMENT_REGISTRY.get(self.element)
+            if resolved is None:
+                raise ValueError(
+                    f"skill {self.key!r} declares unknown element "
+                    f"{self.element!r}"
+                )
+            object.__setattr__(self, "element", resolved)
+        elif self.element is not None and not isinstance(self.element, Element):
+            raise ValueError(
+                f"skill {self.key!r} element must be an Element, a string key, "
+                f"or None, got {type(self.element).__name__}"
             )
         object.__setattr__(self, "cost", _FrozenDict(self.cost))
         object.__setattr__(self, "effects", _FrozenList(self.effects))
@@ -205,6 +274,7 @@ def _skill(
     requires_divine_arts: bool = False,
     category: SkillCategory,
     group: str | None = None,
+    prerequisites: tuple[SkillPrerequisite, ...] = (),
 ) -> SkillDef:
     """Build seed data without duplicating empty collection literals."""
     _validate_metadata(label, description)
@@ -222,6 +292,7 @@ def _skill(
         requires_divine_arts=requires_divine_arts,
         category=category,
         group=group,
+        prerequisites=prerequisites,
     )
 
 
@@ -237,6 +308,7 @@ def _spell(
     usable_out_of_combat: bool = False,
     category: SkillCategory,
     group: str | None = None,
+    prerequisites: tuple[SkillPrerequisite, ...] = (),
 ) -> SkillDef:
     """Build one ACTIVE elemental spell — the design doc §4.4 catalog shape.
 
@@ -257,23 +329,37 @@ def _spell(
         faction_constraint=FactionConstraint.ANY,
         category=category,
         group=group,
+        prerequisites=prerequisites,
     )
 
 
 def _elemental_spells(
     element: str,
-    *spells: tuple[str, str, str, TargetSpec, int, tuple[str, ...]],
+    *spells: tuple[Any, ...],
 ) -> tuple[SkillDef, ...]:
     """Build one element's full ACTIVE spell set (design doc §4.4).
 
-    Each row is ``(key, label, description, target_spec, mp, effects)`` in
-    the exact order of the design doc's catalog table. The element is written
-    once for the whole set. A spell's tier is deliberately NOT a stored
-    field: it stays derivable from the set's grouping and each row's MP cost
-    band (``spell_tier_for``), per the skill-registry spec.
+    Each row is ``(key, label, description, target_spec, mp, effects)``, with
+    an optional seventh ``prerequisites`` entry carrying this skill's lineage
+    edges (``()`` when absent — the only lineage content today is the fire
+    tree). The element is written once for the whole set. A spell's tier is
+    deliberately NOT a stored field: it stays derivable from the set's
+    grouping and each row's MP cost band (``spell_tier_for``), per the
+    skill-registry spec.
     """
     if element not in ELEMENT_REGISTRY:
         raise ValueError(f"unknown element {element!r} for elemental spell set")
+
+    def _row(row: tuple[Any, ...]) -> tuple[Any, ...]:
+        if len(row) == 6:
+            return (*row, ())
+        if len(row) == 7:
+            return row
+        raise ValueError(
+            "elemental spell rows carry 6 or 7 fields, got "
+            f"{len(row)}: {row[0] if row else '?'}"
+        )
+
     return tuple(
         _spell(
             key,
@@ -285,8 +371,11 @@ def _elemental_spells(
             effects=effects,
             category=SkillCategory.ELEMENTAL_MAGIC,
             group=element,
+            prerequisites=prerequisites,
         )
-        for key, label, description, target_spec, mp, effects in spells
+        for key, label, description, target_spec, mp, effects, prerequisites in (
+            _row(row) for row in spells
+        )
     )
 
 
@@ -418,20 +507,20 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         *_elemental_spells(
             "fire",
             # 火 — 學徒
-            ("fire_ball", "火球術", "凝聚火焰魔力，對單一目標造成魔法傷害。", TargetSpec.SINGLE, 14, ("damage:fire:magic",)),
+            ("fire_ball", "火球術", "凝聚火焰魔力，對單一目標造成魔法傷害。", TargetSpec.SINGLE, 14, ("damage:fire:magic",), (SkillPrerequisite("fire_arrow", 3),)),
             ("fire_arrow", "火焰箭", "射出火焰凝聚的箭矢，以低耗能對單一目標造成魔法傷害。", TargetSpec.SINGLE, 10, ("damage:fire:magic",)),
             # 火 — 術師
-            ("firestorm", "火焰風暴", "召喚覆蓋範圍的火焰風暴，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 30, ("damage:fire:magic",)),
-            ("scorching_wave", "灼熱波動", "釋放灼熱的波動，對單一目標造成魔法傷害並使其灼燒。", TargetSpec.SINGLE, 24, ("damage:fire:magic", "buff_apply:fire_scorch")),
+            ("firestorm", "火焰風暴", "召喚覆蓋範圍的火焰風暴，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 30, ("damage:fire:magic",), (SkillPrerequisite("scorching_wave", 3),)),
+            ("scorching_wave", "灼熱波動", "釋放灼熱的波動，對單一目標造成魔法傷害並使其灼燒。", TargetSpec.SINGLE, 24, ("damage:fire:magic", "buff_apply:fire_scorch"), (SkillPrerequisite("fire_ball", 3),)),
             # 火 — 大師
-            ("lava_burst", "熔岩術", "使地面迸裂噴出熔岩，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 52, ("damage:fire:magic",)),
-            ("infernal_wrap", "業火纏繞", "以業火纏繞單一目標，造成高額魔法傷害。", TargetSpec.SINGLE, 42, ("damage:fire:magic",)),
+            ("lava_burst", "熔岩術", "使地面迸裂噴出熔岩，對範圍內所有目標造成魔法傷害。", TargetSpec.AREA, 52, ("damage:fire:magic",), (SkillPrerequisite("firestorm", 5),)),
+            ("infernal_wrap", "業火纏繞", "以業火纏繞單一目標，造成高額魔法傷害。", TargetSpec.SINGLE, 42, ("damage:fire:magic",), (SkillPrerequisite("scorching_wave", 3),)),
             # 火 — 賢者
-            ("dragon_flame", "龍炎術", "喚起龍之吐息，對範圍內所有目標造成高額魔法傷害。", TargetSpec.AREA, 95, ("damage:fire:magic",)),
-            ("hellfire", "煉獄業火", "召喚煉獄的業火，對單一目標造成極高魔法傷害。", TargetSpec.SINGLE, 78, ("damage:fire:magic",)),
+            ("dragon_flame", "龍炎術", "喚起龍之吐息，對範圍內所有目標造成高額魔法傷害。", TargetSpec.AREA, 95, ("damage:fire:magic",), (SkillPrerequisite("lava_burst", 8),)),
+            ("hellfire", "煉獄業火", "召喚煉獄的業火，對單一目標造成極高魔法傷害。", TargetSpec.SINGLE, 78, ("damage:fire:magic",), (SkillPrerequisite("firestorm", 5),)),
             # 火 — 主宰
-            ("phoenix_eternal_flame", "不滅鳳凰焰", "召喚不滅的鳳凰之焰，對範圍內所有目標造成極高魔法傷害，並治癒自身。", TargetSpec.AREA, 150, ("damage:fire:magic", "self_heal")),
-            ("world_ending_blaze", "焚世終焰", "召喚足以焚盡世界的終焰，對單一目標造成毀滅級魔法傷害。", TargetSpec.SINGLE, 130, ("damage:fire:magic",)),
+            ("phoenix_eternal_flame", "不滅鳳凰焰", "召喚不滅的鳳凰之焰，對範圍內所有目標造成極高魔法傷害，並治癒自身。", TargetSpec.AREA, 150, ("damage:fire:magic", "self_heal"), (SkillPrerequisite("dragon_flame", 8),)),
+            ("world_ending_blaze", "焚世終焰", "召喚足以焚盡世界的終焰，對單一目標造成毀滅級魔法傷害。", TargetSpec.SINGLE, 130, ("damage:fire:magic",), (SkillPrerequisite("hellfire", 5),)),
         ),
         *_elemental_spells(
             "water",
@@ -889,3 +978,107 @@ SKILL_REGISTRY: dict[str, SkillDef] = {
         ),
     )
 }
+
+
+# ---------------------------------------------------------------------------
+# Skill-lineage graph validation (use-driven-progression design §9.3)
+# ---------------------------------------------------------------------------
+
+# skill_key -> the edges that CONSUME it, as ``(consumer_key,
+# min_proficiency)`` pairs, ascending by threshold. Computed and cached by
+# :func:`validate_prerequisite_graph` at registry load; the tip-cap
+# derivation reads this cache in O(1) and never walks the registry again.
+_LINEAGE_CONSUMERS: dict[str, tuple[tuple[str, int], ...]] = {}
+
+# skill_key -> declared edges, in registry order (same load-time cache).
+_LINEAGE_PREREQS: dict[str, tuple[SkillPrerequisite, ...]] = {}
+
+
+def prerequisite_consumers(skill_key: str) -> tuple[tuple[str, int], ...]:
+    """Return the cached consuming edges ``(consumer_key, min_proficiency)``.
+
+    Reads the load-time cache built by ``validate_prerequisite_graph``; an
+    unknown key yields ``()`` (a skill nobody consumes is a lineage canopy).
+    """
+    return _LINEAGE_CONSUMERS.get(skill_key, ())
+
+
+def declared_prerequisites(skill_key: str) -> tuple[SkillPrerequisite, ...]:
+    """Return the cached declared edges of one skill (``()`` when unknown)."""
+    return _LINEAGE_PREREQS.get(skill_key, ())
+
+
+def validate_prerequisite_graph(
+    registry: dict[str, SkillDef],
+) -> dict[str, tuple[tuple[str, int], ...]]:
+    """Fail closed on an invalid lineage graph; cache and return the reverse map.
+
+    Load-time rules (design §9.3), every violator named:
+
+    1. every ``prerequisites.skill_key`` exists in ``registry``;
+    2. the graph is acyclic — a Kahn topological sort; leftover nodes are
+       reported as a named cycle;
+    3. every ``min_proficiency`` is an int >= 1 (the dataclass constructor
+       enforces the same rule per entry; this pass names the owning skill);
+    4. a skill with no prerequisites is a tree root (no extra flag exists);
+    5. the reverse-edge map is computed and cached for O(1) tip-cap lookup.
+
+    The structure is an n-ary DAG: any number of edges may consume one node
+    (branching) and one skill may declare any number of prerequisites
+    (merging); the rules above are degree-independent. Idempotent, so the
+    sexual-act sidecar re-runs it after extending the registry.
+    """
+    consumers: dict[str, list[tuple[str, int]]] = {}
+    prereqs: dict[str, tuple[SkillPrerequisite, ...]] = {}
+    for key, skill in registry.items():
+        if not skill.prerequisites:
+            continue
+        prereqs[key] = tuple(skill.prerequisites)
+        for prereq in skill.prerequisites:
+            if prereq.skill_key not in registry:
+                raise ValueError(
+                    f"skill {key!r} declares prerequisite {prereq.skill_key!r} "
+                    "which is not in SKILL_REGISTRY"
+                )
+            if prereq.min_proficiency < 1:
+                raise ValueError(
+                    f"skill {key!r} declares min_proficiency "
+                    f"{prereq.min_proficiency} for {prereq.skill_key!r}; the "
+                    "threshold must be >= 1"
+                )
+            consumers.setdefault(prereq.skill_key, []).append(
+                (key, prereq.min_proficiency)
+            )
+
+    # Kahn topological sort over the prerequisite edges (prereq -> consumer).
+    indegree = {key: len(prereqs.get(key, ())) for key in registry}
+    queue = sorted(key for key, degree in indegree.items() if degree == 0)
+    visited = 0
+    while queue:
+        current = queue.pop(0)
+        visited += 1
+        for consumer_key, _ in sorted(consumers.get(current, ())):
+            indegree[consumer_key] -= 1
+            if indegree[consumer_key] == 0:
+                queue.append(consumer_key)
+                queue.sort()
+    if visited != len(registry):
+        cycle = sorted(key for key, degree in indegree.items() if degree > 0)
+        raise ValueError(
+            "skill prerequisite graph is cyclic; the offending nodes are "
+            f"{cycle!r} (every listed skill either prereqs a cycle member or "
+            "is consumed by one)"
+        )
+
+    reverse = {
+        key: tuple(sorted(edges, key=lambda edge: (edge[1], edge[0])))
+        for key, edges in consumers.items()
+    }
+    _LINEAGE_CONSUMERS.clear()
+    _LINEAGE_CONSUMERS.update(reverse)
+    _LINEAGE_PREREQS.clear()
+    _LINEAGE_PREREQS.update(prereqs)
+    return reverse
+
+
+validate_prerequisite_graph(SKILL_REGISTRY)

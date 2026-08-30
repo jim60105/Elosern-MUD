@@ -36,6 +36,10 @@ from world.rules.clock import (
     read_world_clock,
 )
 from world.rules.event_log import EventLog
+from world.rules.progression import (
+    restore_practice_dedupe,
+    snapshot_practice_dedupe,
+)
 from world.rules.surfaces import attribute_snapshot
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
@@ -422,6 +426,7 @@ def settle_out_of_combat_cast(
     if clock is None:
         clock = read_world_clock() or WorldClock()
     snapshot = _snapshot_settlement_state(request, clock)
+    dedupe_before = snapshot_practice_dedupe()
     coercion_restore: _CoercionRestoreState | None = None
     try:
         with transaction.atomic():
@@ -442,6 +447,11 @@ def settle_out_of_combat_cast(
             )
     except Exception:
         _restore_settlement_state(snapshot, clock)
+        # The resolve-level release only covers an INNER rolled-back commit;
+        # when THIS transaction rolls back after resolve succeeded, the
+        # claims its practice awards took must be released too, or a
+        # legitimate same-tick retry would accrue nothing.
+        restore_practice_dedupe(dedupe_before)
         # A failure after the scan's own penalty block (e.g. the clock
         # advance) leaves the scan's relations/party writes rolled back in
         # the database but still readable through the idmapper cache; restore

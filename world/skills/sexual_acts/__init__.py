@@ -13,7 +13,7 @@ act rows without racing the base registry.
 from collections.abc import Iterable, Mapping
 
 from world.skills.effects import SexualMasteryEffect
-from world.skills.registry import SKILL_REGISTRY, SkillDef
+from world.skills.registry import SKILL_REGISTRY, SkillDef, validate_prerequisite_graph
 
 from world.skills.sexual_acts._builder import SexualActDef, _act_family
 
@@ -59,6 +59,12 @@ _register_rows(
         *divine.DIVINE_ACTS,
     )
 )
+
+# Act rows never declare prerequisites (they unlock through sexual state,
+# not the lineage graph), but the shared graph cache is registry-wide, so it
+# is rebuilt over the extended registry. ``validate_prerequisite_graph`` is
+# idempotent.
+validate_prerequisite_graph(SKILL_REGISTRY)
 
 
 def unlocked_act_keys_for(
