@@ -639,3 +639,94 @@ class ProficiencyCapTableTests(unittest.TestCase):
                     prereq.min_proficiency,
                     f"{key} edge exceeds cap({prereq.skill_key})",
                 )
+class DerivedUnlockSinkTests(unittest.TestCase):
+    """``unlocks_out`` appends exactly one derived line per false->true flip."""
+
+    def setUp(self):
+        reset_practice_dedupe()
+        patcher = patch("world.rules.buffs.growth_rate_multiplier", lambda e: 1.0)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.tick = {"value": 11}
+        tick_patch = patch.object(progression, "_current_tick", lambda: self.tick["value"])
+        tick_patch.start()
+        self.addCleanup(tick_patch.stop)
+
+    def _near_edge(self):
+        """Owner with fire_ball at level 2: scorching_wave not yet usable."""
+        return _entity(
+            ("fire_arrow", "fire_ball", "scorching_wave"),
+            {
+                "fire_arrow": SKILL_PROFICIENCY_XP_PER_LEVEL * 10,
+                "fire_ball": SKILL_PROFICIENCY_XP_PER_LEVEL * 2 + 49,
+            },
+            race="human",
+        )
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_crossing_an_edge_appends_exactly_one_line(self):
+        actor = self._near_edge()
+        sink: list[str] = []
+        self.assertTrue(
+            progression.grant_skill_practice_xp(actor, "fire_ball", unlocks_out=sink)
+        )
+        self.assertEqual(sink, ["新法術可用：灼熱波動"])
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_a_second_award_after_the_flip_appends_nothing(self):
+        actor = self._near_edge()
+        sink: list[str] = []
+        progression.grant_skill_practice_xp(actor, "fire_ball", unlocks_out=sink)
+        self.assertEqual(len(sink), 1)
+        # Same tick: the dedupe claim suppresses the award itself.
+        self.assertFalse(
+            progression.grant_skill_practice_xp(actor, "fire_ball", unlocks_out=sink)
+        )
+        self.assertEqual(len(sink), 1)
+        # New tick: the award runs again but the child is already usable.
+        self.tick["value"] = 12
+        self.assertTrue(
+            progression.grant_skill_practice_xp(actor, "fire_ball", unlocks_out=sink)
+        )
+        self.assertEqual(len(sink), 1)
+
+    def test_nonlethal_and_deduped_awards_touch_the_sink_not_at_all(self):
+        actor = self._near_edge()
+        sink: list[str] = []
+        self.assertFalse(
+            progression.grant_skill_practice_xp(
+                actor, "fire_ball", nonlethal=True, unlocks_out=sink
+            )
+        )
+        self.assertEqual(sink, [])
+        self.assertEqual(
+            actor.db.skill_proficiency["fire_ball"],
+            SKILL_PROFICIENCY_XP_PER_LEVEL * 2 + 49,
+        )
+
+    def test_sink_is_optional_for_existing_callers(self):
+        actor = self._near_edge()
+        self.assertTrue(progression.grant_skill_practice_xp(actor, "fire_ball"))
+
+    def test_wording_splits_on_skill_category(self):
+        spell = SKILL_REGISTRY["firestorm"]
+        physical = SKILL_REGISTRY["basic_attack"]
+        self.assertEqual(progression.unlock_line(spell), "新法術可用：火焰風暴")
+        self.assertEqual(
+            progression.unlock_line(physical), f"新技能可用：{physical.label}"
+        )
+
+    def test_unlock_candidates_are_the_reverse_edge_consumers(self):
+        keys = [skill.key for skill in progression.unlock_candidates_for("fire_ball")]
+        self.assertEqual(keys, ["scorching_wave"])
+
+    def test_seeded_lineage_crosses_edges_silently(self):
+        # Seeding writes proficiency directly (no grant, no sink): the
+        # notification surface belongs to live awards only.
+        actor = _entity(("fire_arrow", "fire_ball", "scorching_wave"), race="human")
+        actor.db.skill_proficiency = seed_lineage_proficiency(
+            ("fire_arrow", "fire_ball", "scorching_wave"), {}
+        )
+        self.assertTrue(
+            can_use_skill(actor, SKILL_REGISTRY["scorching_wave"])
+        )

@@ -478,7 +478,7 @@ class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
                 RoomActionContext(caster.location, contexts.get(skill_key, {})),
             )
             effects = _step5_effect_resolution(request, skill, targets)
-            effects += _step6_skill_practice(request, skill, targets, [])
+            effects += _step6_skill_practice(request, skill, targets, [], [])
             for effect in effects:
                 self.assertIn(
                     id(effect.entity),

@@ -80,6 +80,7 @@
         "world.rules.tests.test_item_combat_turn",
         "world.rules.tests.test_item_effects_rulebook",
         "world.rules.tests.test_item_use",
+        "world.rules.tests.test_lineage_query",
         "world.rules.tests.test_lore_knowledge",
         "world.rules.tests.test_map_knowledge",
         "world.rules.tests.test_map_knowledge_integration",

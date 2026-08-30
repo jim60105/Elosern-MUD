@@ -11,8 +11,11 @@ shared `can_use_skill` predicate). `nodes` SHALL be in topological order;
 `consumed` SHALL be true exactly when every node is capped; `meter` SHALL be the
 0..1 shallowest-uncapped progress; `prereq_text_zh` SHALL render the unsatisfied
 edge as 「需「X Lv.N」」 from registry data and be empty for roots and unlocked
-nodes. Building any view SHALL NOT create, mutate, or persist any entity or
-world state.
+nodes. Chains SHALL be generated exactly from the roots that at least one
+prerequisite edge consumes — a prerequisite-less skill nobody consumes is not a
+系譜樹 and starts no chain — each chain the reverse-edge closure from its root,
+chains in registry order. Building any view SHALL NOT create, mutate, or
+persist any entity or world state.
 
 #### Scenario: A capped mid-tree node reports saturation
 - **WHEN** the view is built for an entity whose `fire_arrow` practice has saturated at its derived cap
@@ -28,12 +31,15 @@ world state.
 
 ### Requirement: The lineage panel ships as one bounded versioned OOB contract
 The presentation registry SHALL register panel name `lineage` at schema version 1
-with the standard availability discriminator. The payload SHALL serialize the
+with the standard availability discriminator and a `kind` of `lineage` in the
+available form. The payload SHALL serialize the
 `LineageView` under the conventional caps `LINEAGE_MAX_CHAINS`,
 `LINEAGE_MAX_NODES_PER_CHAIN`, and bounded text lengths, truncating in a fixed
-declared order. The four contract mirrors — protocol validator, panel view, JS
-validator, and boundary tests — SHALL ship in lockstep, and boundary tests SHALL
-pin every cap.
+declared order (trailing chains, then trailing nodes, then further trailing
+chains until the payload fits the envelope limit), while `completed_count` and
+`total_count` always describe the full, untruncated view. The four contract
+mirrors — protocol validator, panel view, JS validator, and boundary tests —
+SHALL ship in lockstep, and boundary tests SHALL pin every cap.
 
 #### Scenario: Oversized content truncates deterministically
 - **WHEN** an entity's registry lineage exceeds `LINEAGE_MAX_CHAINS`
@@ -65,17 +71,23 @@ renders: chains in registry order, nodes in topological order, 見頂 markers on
 saturated nodes, and `prereq_text_zh` on locked nodes. The command SHALL be
 available in and out of combat and SHALL mutate nothing.
 
-#### Scenario: Telnet output matches the view
-- **WHEN** a player runs `lineage`
-- **THEN** the printed tree equals the `LineageView` content (same nodes, levels, saturation markers, prereq texts) and world/entity state is unchanged
+#### Scenario: The printed tree equals the panel view
+- **WHEN** a player types `lineage` in or out of combat
+- **THEN** the printed chains, node order, 見頂 markers, and prerequisite lines match the panel's view, and stored state is unchanged
+
+#### Scenario: A malformed record prints one fixed line
+- **WHEN** `db.skill_proficiency` carries a structurally invalid entry
+- **THEN** the command prints the fixed unavailable line and repairs nothing
 
 ### Requirement: A newly usable skill pushes one derived unlock notification
 When a practice grant makes `can_use_skill` flip from false to true for any skill
 whose prerequisite edges consume the granted skill (reverse-edge map), the system
-SHALL push exactly one Traditional-Chinese unlock toast (e.g. 「新法術可用：火焰風暴」)
-through the existing OOB toast/menu channel to a puppeted client (and the
-equivalent text line to Telnet). Unlock state SHALL be recomputed from
-proficiency, never persisted, and SHALL NOT fire during import or scene-build
+SHALL stage exactly one Traditional-Chinese unlock line (e.g. 「新法術可用：火焰風暴」)
+through the existing post-commit notification channel (the same one title-grant
+toasts ride: `ActionResult.notifications`, delivered by the owning settlement
+boundary to every client type as a text line). Unlock state SHALL be recomputed
+from proficiency, never persisted, SHALL be staged only after the transaction
+that applied the grant commits, and SHALL NOT fire during import or scene-build
 auto-seed.
 
 #### Scenario: Meeting an edge announces the child node
