@@ -100,8 +100,8 @@ class OfflinePartyQuestLoopTests(BattlefieldIsolation, EvenniaCommandTestMixin, 
         )
         self.char1.race = "human"
         self.char1.apply_race_baseline()
-        # Human starting magic level (術師 tier) so fire_ball casts pass.
-        self.char1.traits.magic_level.base = 30
+        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        self.char1.traits.magic_power.base = 30
         self.char1.db.skills = {"active": ["fire_ball"], "passive": []}
         self.char1.location = self.hall
         register_adventurer(self.char1, self.staff)

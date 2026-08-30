@@ -53,13 +53,13 @@ TRAIT_LABELS = {
     "atk_phys": "攻擊",
     "agility": "敏捷",
     "defense": "防禦",
-    "magic_level": "魔法階級",
+    "magic_power": "魔力",
     "guild_merit": "功績",
 }
 
 _GAUGE_KEYS = ("hp", "mp", "sp")
-_STATIC_KEYS = ("atk_phys", "agility", "defense")
-_COUNTER_KEYS = ("magic_level", "guild_merit")
+_STATIC_KEYS = ("atk_phys", "agility", "defense", "magic_power")
+_COUNTER_KEYS = ("guild_merit",)
 _EQUIPMENT_SLOTS = ("weapon_main", "weapon_off", "armor")
 _BUFF_CACHE_KEY = "buffs"
 _SEXUAL_TRAITS_KEY = "sexual_traits"
@@ -75,7 +75,7 @@ _BREAKDOWN_ROW_ORDER = (
     "atk_phys",
     "agility",
     "defense",
-    "magic_level",
+    "magic_power",
     "guild_merit",
 )
 _LAYER_SOURCES = ("skill", "condition", "equipment")
@@ -1075,7 +1075,7 @@ def _condition_layers(
     buff_rules = _buff_active_rule_ids()
     if stat_key == "agility":
         fields: tuple[str, ...] = ("agility", "agility_flat")
-    elif stat_key in ("atk_phys", "defense", "magic_level"):
+    elif stat_key in ("atk_phys", "defense", "magic_power"):
         fields = (stat_key,)
     else:
         return []
@@ -1257,7 +1257,7 @@ def _gauge_breakdown(assembly: _Assembly, key: str) -> StatBreakdownRow:
 
 
 def _flat_stat_breakdown(assembly: _Assembly, stat_key: str) -> StatBreakdownRow:
-    """attack/defense/magic_level: shipped skill fold, then merged flats.
+    """attack/defense/magic_power: shipped skill fold, then merged flats.
 
     Parity anchor ``combat._adjusted_attack``/``_adjusted_defense``:
     ``float(effective_value(key)) + merged flat``, where the merged flat is
@@ -1353,7 +1353,7 @@ def build_stat_breakdown(
     Composition replays the shipped operations exactly (design D1): gauges
     decompose the ceiling reader's ``(base + mod) × mult`` form; skill stats
     fold ``round(base × Π mults)`` in shipped order; attack/defense and
-    magic_level add merged rule-table flats after the skill fold; agility
+    magic_power add merged rule-table flats after the skill fold; agility
     replays the percent-then-flat pipeline floored at zero. Every accounting
     amount that cannot be attributed to a named, registry-labelled layer
     fails the whole read closed.
@@ -1366,7 +1366,7 @@ def build_stat_breakdown(
             rows.append(_gauge_breakdown(assembly, key))
         elif key == "agility":
             rows.append(_agility_breakdown(assembly))
-        elif key in ("atk_phys", "defense", "magic_level"):
+        elif key in ("atk_phys", "defense", "magic_power"):
             rows.append(_flat_stat_breakdown(assembly, key))
         else:
             rows.append(_merit_breakdown(assembly))

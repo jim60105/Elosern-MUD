@@ -108,6 +108,7 @@ describe("H1 preserved DOM contract (design D6)", () => {
               { axis: "atk_phys", label: "攻擊", explanation: "物理攻擊", minimum: 0, maximum: 100 },
               { axis: "agility", label: "敏捷", explanation: "敏捷", minimum: 0, maximum: 100 },
               { axis: "defense", label: "防禦", explanation: "防禦力", minimum: 0, maximum: 100 },
+              { axis: "magic_power", label: "魔力", explanation: "魔法傷害", minimum: 0, maximum: 100 },
             ],
           },
         ],

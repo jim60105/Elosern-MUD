@@ -618,6 +618,7 @@ class CreationPanelPresenterTests(EvenniaTest):
                 allocations={
                     "hp": 50, "mp": 50, "sp": 50,
                     "atk_phys": 10, "agility": 10, "defense": 11,
+                    "magic_power": 43,
                 },
             ),
         )
@@ -633,9 +634,9 @@ class CreationPanelPresenterTests(EvenniaTest):
                 allocations={
                     "hp": 50, "mp": 50, "sp": 50,
                     "atk_phys": 10, "agility": 10, "defense": 11,
+                    "magic_power": 43,
                 },
             ),
-            sampler=lambda low, high: low,
         )
         payload = self._render()
         self.assertFalse(payload["available"])
@@ -713,6 +714,7 @@ class CreationPanelPresenterTests(EvenniaTest):
                 allocations={
                     "hp": 50, "mp": 50, "sp": 50,
                     "atk_phys": 10, "agility": 10, "defense": 11,
+                    "magic_power": 43,
                 },
             ),
         )
@@ -735,6 +737,7 @@ class CreationPanelPresenterTests(EvenniaTest):
                 "allocations": {
                     "hp": 50, "mp": 50, "sp": 50,
                     "atk_phys": 10, "agility": 10, "defense": 11,
+                    "magic_power": 43,
                 },
                 "persona": {
                     "personality": "沉穩",
@@ -773,6 +776,7 @@ class CreationPanelPresenterTests(EvenniaTest):
                 "allocations": {
                     "hp": 50, "mp": 50, "sp": 50,
                     "atk_phys": 10, "agility": 10, "defense": 11,
+                    "magic_power": 43,
                 },
                 "persona": {
                     "personality": "沉穩",
@@ -800,6 +804,7 @@ class CreationPanelPresenterTests(EvenniaTest):
                 allocations={
                     "hp": 50, "mp": 50, "sp": 50,
                     "atk_phys": 10, "agility": 10, "defense": 11,
+                    "magic_power": 43,
                 },
             ),
         )

@@ -175,7 +175,7 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
 
         self.player.location = self.guild_hall
         # Give the player decisive power so the simulated exam resolves.
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000

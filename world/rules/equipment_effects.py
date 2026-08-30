@@ -65,7 +65,7 @@ _ADJUSTMENT_FIELDS = frozenset(
     {
         "atk_phys",
         "defense",
-        "magic_level",
+        "magic_power",
         "agility",
         "mp_cost",
         "sp_cost",
@@ -505,7 +505,7 @@ EQUIPMENT_EFFECT_RULES: dict[EquipmentModifierKey, EquipmentEffectRule] = _loade
 # integer under ``agility_flat``, because the shared merge in
 # ``combat_modifiers._merge_adjustments`` silently replaces values of
 # different kinds and the percent consumers reject flat ints.
-_BUNDLE_FLAT_FIELDS = frozenset({"atk_phys", "defense", "magic_level"})
+_BUNDLE_FLAT_FIELDS = frozenset({"atk_phys", "defense", "magic_power"})
 _BUNDLE_PERCENT_FIELDS = frozenset({"mp_cost", "sp_cost", "heal_gain"})
 
 
@@ -769,7 +769,7 @@ _PROSE_ADJUSTMENTS = (
     ("atk_phys", "攻擊"),
     ("defense", "防禦"),
     ("agility", "敏捷"),
-    ("magic_level", "魔力"),
+    ("magic_power", "魔力"),
     ("mp_cost", "施法消耗"),
     ("heal_gain", "治療"),
 )

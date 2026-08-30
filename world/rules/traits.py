@@ -15,8 +15,8 @@ from world.lore.races import (
 
 GAUGE_REGEN_RATE_PCT = 0.01
 GAUGE_KEYS = ("hp", "mp", "sp")
-STATIC_KEYS = ("atk_phys", "agility", "defense")
-COUNTER_KEYS = ("magic_level", "guild_merit")
+STATIC_KEYS = ("atk_phys", "agility", "defense", "magic_power")
+COUNTER_KEYS = ("guild_merit",)
 TRAIT_KEYS = GAUGE_KEYS + STATIC_KEYS + COUNTER_KEYS
 
 
@@ -61,7 +61,7 @@ def race_floor(race: RaceProfile) -> dict[str, int]:
         "atk_phys": race.static_baseline.atk_phys[0],
         "agility": race.static_baseline.agility[0],
         "defense": race.static_baseline.defense[0],
-        "magic_level": 0,
+        "magic_power": race.static_baseline.magic_power[0],
         "guild_merit": 0,
     }
 
@@ -84,6 +84,9 @@ def build_initial_traits(
             )
         for axis in STATIC_KEYS:
             values[axis] = static_tier.band[0]
+        # The fourth static axis has its own tier band: ``band`` is the
+        # shared physical-power band and must not drive magic power (D-A2).
+        values["magic_power"] = static_tier.magic_band[0]
 
     if subrace_key is not None:
         subrace = SUBRACE_REGISTRY[subrace_key]
@@ -93,7 +96,9 @@ def build_initial_traits(
                 f"not {race_key!r}"
             )
         for axis in STATIC_KEYS:
-            delta = getattr(subrace.static_modifiers, axis)
+            # Subrace magic is untouched: ``StatModifiers`` documents no
+            # magic skew, so the fourth axis reads a zero modifier (D-A5).
+            delta = getattr(subrace.static_modifiers, axis, 0.0)
             values[axis] = round(values[axis] * (1 + delta))
         if subrace.vital_overrides:
             for stat_key, band in subrace.vital_overrides.items():
@@ -103,7 +108,7 @@ def build_initial_traits(
 
 
 def trait_config_for_values(
-    values: dict[str, int], magic_cap: int
+    values: dict[str, int],
 ) -> dict[str, dict[str, Any]]:
     """Convert raw base values to Evennia 6.1 ``TraitHandler.add`` kwargs."""
     config: dict[str, dict[str, Any]] = {}
@@ -117,12 +122,6 @@ def trait_config_for_values(
         }
     for key in STATIC_KEYS:
         config[key] = {"trait_type": "static", "base": values[key], "mod": 0}
-    config["magic_level"] = {
-        "trait_type": "counter",
-        "base": values["magic_level"],
-        "min": 0,
-        "max": magic_cap,
-    }
     config["guild_merit"] = {
         "trait_type": "counter",
         "base": values["guild_merit"],
@@ -132,9 +131,9 @@ def trait_config_for_values(
     return config
 
 
-def _trait_config(values: dict[str, int], magic_cap: int) -> dict[str, dict[str, Any]]:
+def _trait_config(values: dict[str, int]) -> dict[str, dict[str, Any]]:
     """Retain the existing internal construction entry point."""
-    return trait_config_for_values(values, magic_cap)
+    return trait_config_for_values(values)
 
 
 def initial_trait_config(
@@ -144,7 +143,7 @@ def initial_trait_config(
 ) -> dict[str, dict[str, Any]]:
     """Return race construction data ready for ``TraitHandler.add``."""
     values = build_initial_traits(race_key, subrace_key, tier)
-    return trait_config_for_values(values, RACE_REGISTRY[race_key].magic_cap)
+    return trait_config_for_values(values)
 
 
 def _resolve_band_position(
@@ -177,7 +176,9 @@ def build_initial_traits_for_monster_tier(
         "atk_phys": _resolve_band_position(tier.static_band.atk_phys, position),
         "agility": _resolve_band_position(tier.static_band.agility, position),
         "defense": _resolve_band_position(tier.static_band.defense, position),
-        "magic_level": 0,
+        "magic_power": _resolve_band_position(
+            tier.static_band.magic_power, position
+        ),
         "guild_merit": 0,
     }
 
@@ -187,7 +188,7 @@ def initial_trait_config_for_monster_tier(
 ) -> dict[str, dict[str, Any]]:
     """Return monster construction data ready for ``TraitHandler.add``."""
     values = build_initial_traits_for_monster_tier(tier_key, position)
-    return trait_config_for_values(values, 0)
+    return trait_config_for_values(values)
 
 
 def restore_gauges_to_full(entity: Any) -> None:

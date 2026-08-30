@@ -128,7 +128,7 @@ effects:
 載入器 `world/rules/equipment_effects.py` 驗證（任一失敗即拋 `EquipmentEffectsRulebookError`，伺服器啟動時就爆）：
 
 - 雙向封閉：每個 `EquipmentModifierKey` 恰好一個條目、條目 key 必須已綁定、`adjustments` 欄位與 `gauge_caps` 目標都在封閉詞彙內、`attached_buffs` 必須是 `buffs.yaml` 存在的 buff key。
-- 數值種類：平值欄（`atk_phys`／`defense`／`magic_level`／`exposure_bias`）是整數；百分比欄（`mp_cost`／`sp_cost`／`pleasure_gain`／`heal_gain`）是帶正負號字串（`"-10%"`／`"+15%"`，`^[+-]\d+%$`）；唯獨 `agility` 兩種皆可，種類決定預算欄位。`bool` 一律不是合法整數。
+- 數值種類：平值欄（`atk_phys`／`defense`／`magic_power`／`exposure_bias`）是整數；百分比欄（`mp_cost`／`sp_cost`／`pleasure_gain`／`heal_gain`）是帶正負號字串（`"-10%"`／`"+15%"`，`^[+-]\d+%$`）；唯獨 `agility` 兩種皆可，種類決定預算欄位。`bool` 一律不是合法整數。
 - 預算：條目所綁物品 `presentation.rarity` 對應的預算列決定每欄上限，`abs(值)` 超過即拒絕（`bias` 欄允許 0 上限）。護盾上限只收正整數（hp／mp／sp），單筆上限 ≤ 9999。
 - 空條目合法（`storage_pouch: {}`），代表「純觀察的裝備，無效果」；同一條目不得同時宣告 `immune` 與 `attached_buffs` 的同源矛盾。
 

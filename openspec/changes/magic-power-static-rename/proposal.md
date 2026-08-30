@@ -54,12 +54,16 @@ observable behavior.
 - WebClient mirrors: `character-identity.js` drops the duplicated
   `magicRankTitle` table and the head card rank line becomes guild-rank-only;
   `CharacterHead.vue` badge reads the `magic_power` trait row;
-  `CharacterStatusDrawer.vue` allowlist/label-override keys rename (labels
-  魔力/魔階 unchanged); Storybook fixtures and vitest suites follow.
-- Chinese display labels are unchanged for players everywhere they already
-  appear (look rows keep 魔法階級, drawer keeps 魔階, equipment prose keeps
-  魔力). The creation completion echo rewords 初始魔法等級 to 初始魔力 because
-  "level" describes a system being retired.
+  `CharacterStatusDrawer.vue` allowlist renames the fourth key and its label
+  override is deleted (design D-A6 — the shared server label is now 魔力, so
+  no client-side 魔階 abbreviation remains); Storybook fixtures and vitest
+  suites follow.
+- Chinese display labels are consistent for players everywhere they already
+  appear: the look row label 魔法階級 becomes 魔力 (design D-A6 — 「階級」
+  advertises the retired rank system to players on every `look`), equipment
+  prose keeps 魔力, and the drawer renders 魔力 with no abbreviation. The
+  creation completion echo rewords 初始魔法等級 to 初始魔力 because "level"
+  describes a system being retired.
 - No backward-compatibility or migration work: the project is unreleased with
   zero users. No shim keys, no data migration; existing SQLite rows are simply
   rebuilt (test DB uses `--keepdb` against renamed trait keys as usual for this

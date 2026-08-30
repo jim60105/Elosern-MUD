@@ -149,8 +149,8 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTestCase):
         self.player = create_object(PlayerCharacter, key="planner-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
-        # Human starting magic level (術師 tier) so fire_ball casts pass.
-        self.player.traits.magic_level.current = 30
+        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        self.player.traits.magic_power.base = 30
         self.player.db.skills = {"active": ["fire_ball"], "passive": []}
         register_event_effect_planner("quest", quest_event_effect_planner)
         self.low_hunt = register(quest("planner_hunt"))

@@ -25,7 +25,7 @@ class MonsterScaleTests(unittest.TestCase):
         self.assertEqual(calamity["hp"], tier.hp_band[0])
         self.assertGreater(calamity["atk_phys"], low["atk_phys"])
         self.assertGreater(calamity["hp"], low["hp"])
-        for key in ("mp", "sp", "magic_level"):
+        for key in ("mp", "sp", "magic_power"):
             self.assertEqual(calamity[key], 0)
 
     def test_positions_and_invalid_inputs(self):

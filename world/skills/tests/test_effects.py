@@ -43,9 +43,12 @@ class ParseEffectTests(unittest.TestCase):
     @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
     def test_growth_rate_parses_into_its_dataclass(self):
         self.assertEqual(
-            parse_effect("growth_rate:magic:100"),
-            GrowthRateEffect(stat="magic", multiplier=100.0),
+            parse_effect("growth_rate:practice:100"),
+            GrowthRateEffect(stat="practice", multiplier=100.0),
         )
+        # The retired 'magic' stat key fails closed at parse time.
+        with self.assertRaises(ValueError):
+            parse_effect("growth_rate:magic:100")
 
     def test_element_mastery_rank_parses_into_its_dataclass(self):
         self.assertEqual(

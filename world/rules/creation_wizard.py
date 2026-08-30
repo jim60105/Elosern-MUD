@@ -85,9 +85,8 @@ AGE_MAXIMUM = 10000
 APPARENT_AGE_MINIMUM = 18
 APPARENT_AGE_MAXIMUM = 10000
 ALLOCATION_MAXIMUM = 10000
-
 # Stable Traditional Chinese axis labels and player-facing explanations for the
-# six allocatable starting axes. Presentation text only; the numeric authority
+# seven allocatable starting axes. Presentation text only; the numeric authority
 # lives in ``resolve_starting_profile``.
 ALLOCATION_AXIS_LABELS: dict[str, str] = {
     "hp": "生命值",
@@ -96,6 +95,7 @@ ALLOCATION_AXIS_LABELS: dict[str, str] = {
     "atk_phys": "物理攻擊",
     "agility": "敏捷",
     "defense": "防禦",
+    "magic_power": "魔力",
 }
 ALLOCATION_AXIS_EXPLANATIONS: dict[str, str] = {
     "hp": "生命值，決定你能承受多少傷害",
@@ -104,6 +104,7 @@ ALLOCATION_AXIS_EXPLANATIONS: dict[str, str] = {
     "atk_phys": "物理攻擊，影響造成的傷害",
     "agility": "敏捷，影響命中與迴避",
     "defense": "防禦，減免受到的傷害",
+    "magic_power": "魔力，決定魔法傷害與治療強度",
 }
 
 
@@ -739,7 +740,6 @@ def activate_draft(
     account: Any,
     character: Any,
     *,
-    sampler: Callable[[int, int], int] | None = None,
     write_observer: Callable[[str], None] | None = None,
 ):
     """Atomically activate the stored draft and clear it in one transaction.
@@ -779,17 +779,10 @@ def activate_draft(
             request = _request_from_draft(draft)
             preflight_character_creation(account, character, request)
             persona = draft.get("persona")
-            if sampler is None:
-                result = activate_player_character(
-                    account, character, request,
-                    persona=persona, write_observer=write_observer,
-                )
-            else:
-                result = activate_player_character(
-                    account, character, request,
-                    persona=persona,
-                    sampler=sampler, write_observer=write_observer,
-                )
+            result = activate_player_character(
+                account, character, request,
+                persona=persona, write_observer=write_observer,
+            )
     except Exception:
         character.key = old_key
         restore_traits(character, trait_snapshot)

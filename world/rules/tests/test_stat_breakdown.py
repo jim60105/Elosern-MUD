@@ -76,7 +76,7 @@ def _synthetic_assembly(entity, *, matches=(), equipment=()) -> _Assembly:
     gauges = {key: GaugeValue(current=100, maximum=100) for key in ("hp", "mp", "sp")}
     trait_values = {
         key: (traits_data[key].get("current", traits_data[key].get("base")))
-        for key in ("atk_phys", "agility", "defense", "magic_level", "guild_merit")
+        for key in ("atk_phys", "agility", "defense", "magic_power", "guild_merit")
     }
     return _Assembly(
         entity=entity,
@@ -100,12 +100,12 @@ class BreakdownShapeTests(EvenniaTestCase):
         rows = build_stat_breakdown(player)
         self.assertEqual(
             [row.key for row in rows],
-            ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_level", "guild_merit"],
+            ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power", "guild_merit"],
         )
         for row in rows:
             self.assertEqual(row.layers, ())
         traits = _traits_data(player)
-        for key in ("atk_phys", "agility", "defense", "magic_level", "guild_merit"):
+        for key in ("atk_phys", "agility", "defense", "magic_power", "guild_merit"):
             row = next(r for r in rows if r.key == key)
             base = traits[key].get("current", traits[key].get("base"))
             self.assertEqual(row.base, traits[key]["base"])
@@ -130,7 +130,7 @@ class BreakdownShapeTests(EvenniaTestCase):
         second = build_character_read_model(player)
         self.assertEqual(
             [row.key for row in first.breakdown],
-            ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_level", "guild_merit"],
+            ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power", "guild_merit"],
         )
         self.assertEqual(first.breakdown, second.breakdown)
         hp = next(row for row in first.breakdown if row.key == "hp")
@@ -384,7 +384,7 @@ class EquipmentLayerTests(EvenniaTestCase):
         self.assertEqual(rows["atk_phys"].effective, combat._adjusted_attack(player, "atk_phys"))
         self.assertEqual(rows["defense"].effective, combat._adjusted_defense(player))
         self.assertEqual(
-            rows["magic_level"].effective, combat._adjusted_attack(player, "magic_level")
+            rows["magic_power"].effective, combat._adjusted_attack(player, "magic_power")
         )
 
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")

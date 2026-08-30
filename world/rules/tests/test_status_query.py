@@ -403,7 +403,7 @@ class CharacterReadModelTests(EvenniaTestCase):
         model = self._model()
         self.assertEqual(
             [trait.key for trait in model.traits],
-            ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_level", "guild_merit"],
+            ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power", "guild_merit"],
         )
         hp = next(trait for trait in model.traits if trait.key == "hp")
         self.assertEqual(hp.current, 100)
@@ -763,7 +763,7 @@ class CharacterReadModelTests(EvenniaTestCase):
 
         self.assertEqual(
             tuple(k for k in status_query._STATIC_KEYS + status_query._COUNTER_KEYS if k != "guild_merit"),
-            ("atk_phys", "agility", "defense", "magic_level"),
+            ("atk_phys", "agility", "defense", "magic_power"),
         )
 
 

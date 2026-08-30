@@ -213,7 +213,7 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(self.player.db.active_combat)
 
     def test_no_action_before_overwhelm_round(self):
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000
@@ -222,7 +222,7 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(self.monster.traits.hp.current, 100)
 
     def test_overwhelming_player_resolves_after_first_action(self):
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000
@@ -244,7 +244,7 @@ class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
         self.room = create_object(Room, key="attribution arena")
         self.player = _player("attribution player")
         self.player.location = self.room
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000
@@ -323,14 +323,14 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
             "active": [SEAM_AREA_KEY],
             "passive": ["wind_mastery"],
         }
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 2
         self.player.traits.hp.base = 390
         self.player.traits.hp.current = 390
         self.companion = create_object(NPC, key="誤傷夥伴", location=self.room)
         self.companion.race = "human"
         self.companion.apply_race_baseline()
-        for key in ("atk_phys", "agility", "defense", "magic_level"):
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.companion.traits, key).base = 2
         self.companion.traits.hp.base = 100
         self.companion.traits.hp.current = 100
@@ -343,7 +343,8 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
         # Foe team overwhelming by the power-ratio rule alone (>= 100x):
         # power = stat sum x hp = (200+30+100) x 1300 = 429000 vs player team
         # 3920, with a <= 5-round estimate (198 base damage at a 0.78 hit
-        # rate). Monster magic_level is a counter trait capped at 0, so the
+        # rate). Monster magic_power is a static trait pinned to the (0, 0)
+        # band, so the
         # attack/agility/defense carry the power. The monster's d100 margin
         # (77) stays below the critical threshold: its solid hit lands for
         # 298 damage, flooring the companion but leaving the player standing.

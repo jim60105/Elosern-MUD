@@ -35,9 +35,9 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
         for entity in (self.actor, self.pursuer):
             entity.race = "human"
             entity.apply_race_baseline()
-            # Human starting magic level (術師 tier) so the pursuer's
+            # Human static magic_power at 術師 tier so the pursuer's
             # element-gated fire_ball casts pass.
-            entity.traits.magic_level.base = 30
+            entity.traits.magic_power.base = 30
             entity.db.skills = {"active": [], "passive": []}
         self.field = Battlefield(
             {

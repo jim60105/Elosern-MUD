@@ -2,7 +2,6 @@
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-import random
 import unicodedata
 from typing import Any
 
@@ -179,12 +178,12 @@ class CharacterCreationRequest:
 
 @dataclass(frozen=True)
 class CharacterCreationResult:
-    """Persisted identity and sampled starting magic level."""
+    """Persisted identity and allocated starting magic power."""
 
     display_name: str
     race: str
     subrace: str | None
-    magic_level: int
+    magic_power: int
 
 
 @dataclass(frozen=True)
@@ -251,7 +250,7 @@ def _validate_adult(value: Any, field: str) -> int:
 
 def _validate_allocations(profile: StartingProfile, allocations: Any) -> dict[str, int]:
     if not isinstance(allocations, Mapping) or set(allocations) != set(ALLOCATABLE_AXES):
-        raise CharacterCreationError("allocations must contain exactly the six starting axes")
+        raise CharacterCreationError("allocations must contain exactly the seven starting axes")
     bounds = profile.bounds_dict()
     checked: dict[str, int] = {}
     for key in ALLOCATABLE_AXES:
@@ -363,7 +362,11 @@ def preflight_character_creation(
     bounds = profile.bounds_dict()
     values = {key: bounds[key][0] + checked[key] for key in ALLOCATABLE_AXES}
     for key in STATIC_KEYS:
-        values[key] = round(values[key] * (1 + getattr(profile.static_modifiers, key)))
+        # Subrace static modifiers cover the three physical axes only; the
+        # fourth axis (magic_power) is allocable but modifier-free (D-A5).
+        values[key] = round(
+            values[key] * (1 + getattr(profile.static_modifiers, key, 0.0))
+        )
     values["guild_merit"] = 0
     if request.mode == "custom":
         # Custom-mode affinity is race-bounded player input (D4): an elf
@@ -384,16 +387,6 @@ def preflight_character_creation(
         valid_name, valid_age, valid_apparent_age, race, subrace, values,
         background, checked_affinity,
     )
-
-
-def starting_magic_interval(race_key: str) -> tuple[int, int]:
-    race = RACE_REGISTRY[race_key]
-    average = race.starting_magic_level
-    low = (average * 9 + 9) // 10
-    high = average * 11 // 10
-    if low < 0 or high < low or high > race.magic_cap:
-        raise CharacterCreationError("race has an invalid starting magic interval")
-    return low, high
 
 
 def finalize_player_portrait(character: Any) -> None:
@@ -420,7 +413,6 @@ def activate_player_character(
     character: Any,
     request: CharacterCreationRequest,
     *,
-    sampler: Callable[[int, int], int] = random.randint,
     write_observer: Callable[[str], None] | None = None,
     persona: Mapping[str, Any] | None = None,
 ) -> CharacterCreationResult:
@@ -430,18 +422,15 @@ def activate_player_character(
     (creation-persona-persistence D3): when present it is validated
     deterministically and persisted as the six-key import-card record inside
     the same all-or-nothing transaction; when absent nothing is written.
+
+    The retired magic sampler is gone (D-A5): ``magic_power`` arrives as the
+    seventh allocated static axis, so activation writes exactly what the
+    profile resolved -- no injected randomness.
     """
     validated = preflight_character_creation(account, character, request)
-    low, high = starting_magic_interval(validated.race)
-    magic_level = sampler(low, high)
-    if type(magic_level) is not int or not low <= magic_level <= high:
-        raise CharacterCreationError("magic sampler returned a value outside its integer band")
-    race = RACE_REGISTRY[validated.race]
-    if not 0 <= magic_level <= race.magic_cap:
-        raise CharacterCreationError("magic sampler returned a value outside the race cap")
 
-    values = {**validated.values, "magic_level": magic_level}
-    trait_config = trait_config_for_values(values, race.magic_cap)
+    values = validated.values
+    trait_config = trait_config_for_values(values)
     skills_value = (
         PLAYER_PRESET_REGISTRY[request.preset_key].skill_lists()
         if request.mode == "preset"
@@ -548,5 +537,5 @@ def activate_player_character(
         restore_attributes(character, attribute_snapshots)
         raise
     return CharacterCreationResult(
-        validated.display_name, validated.race, validated.subrace, magic_level
+        validated.display_name, validated.race, validated.subrace, validated.values["magic_power"]
     )

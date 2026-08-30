@@ -132,13 +132,14 @@ override branch with the gate it feeds); keeping it here would force rewriting
 (one registry entry: `reincarnation_boon_elosia`). The buff target string
 `magic_level_growth` → `skill_practice` everywhere: `buffs.yaml` conferred
 growth-rate rows, `_NO_OP_RATE_TARGETS`, `effective_magic_growth_multiplier()`
-(its name keeps `magic` only if it is also renamed — decision: rename the query
-to `effective_growth_multiplier()`, since after this change it scales practice,
-not magic, and its sole caller is `progression.grant_skill_practice_xp`'s
-multiplier fold; the rename is in-scope because leaving `magic` in the name of
-the surviving multiplier contradicts the change's whole point). Registry-load
-and buff-table load MUST reject the old prefixes/target (fail closed on the old
-key, per design doc §7 "old prefix fails registry load").
+(decision: rename the query to `effective_growth_multiplier()`, since after
+this change it scales practice, not magic, and its callers —
+`progression.accrue_magic_study` and `progression.grant_combat_kill_xp`'s
+multiplier folds — feed the surviving growth writes; the rename is in-scope
+because leaving `magic` in the name of the surviving multiplier contradicts the
+change's whole point). Registry-load and buff-table load MUST reject the old
+prefixes/target (fail closed on the old key, per design doc §7 "old prefix
+fails registry load").
 `element_mastery_rank` is NOT touched here (see D-A3).
 
 ### D-A5: creation loses its sampler; `magic_power` rides the static path

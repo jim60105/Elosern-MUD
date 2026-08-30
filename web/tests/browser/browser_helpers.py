@@ -633,7 +633,7 @@ def valid_character_panel(**overrides) -> dict:
     injected snapshots.
 
     Mirrors the exact available character form the server presenter emits
-    (``web/webclient/presentation/character.py``): a `magic_level` breakdown
+    (``web/webclient/presentation/character.py``): a `magic_power` breakdown
     trait row (``base``/``current``/``max``/``effective``/``layers``; a
     static row's ``current`` equals its ``effective`` and ``max`` is null),
     adjustment-bearing equipment rows, a guild rank/merit, and an integer-
@@ -648,8 +648,8 @@ def valid_character_panel(**overrides) -> dict:
         "kind": "character",
         "traits": [
             {
-                "key": "magic_level",
-                "label": "魔法階級",
+                "key": "magic_power",
+                "label": "魔力",
                 "base": 27,
                 "current": 27,
                 "max": None,

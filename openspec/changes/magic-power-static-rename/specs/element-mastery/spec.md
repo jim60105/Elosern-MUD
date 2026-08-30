@@ -9,11 +9,9 @@ level SHALL be `floor(entity.traits.magic_power.value * element_affinity_multipl
 element))`, so a favored element unlocks tiers earlier and a non-favored element unlocks them later.
 The element SHALL be validated against `ELEMENT_REGISTRY` before either check, and an unrecognized
 element key SHALL raise `ValueError` even when the entity owns a fabricated `<element>_mastery`.
-Consumers that must not propagate exceptions (the monster behaviour policy) SHALL treat a
-`ValueError` from this function as a denied cast. This function SHALL NOT consult any display title (the deleted magic-rank title ladder must not return).
 The threshold table is 學徒 0 / 術師 16 / 大師 31 / 賢者 71 / 主宰 91: the lore's "90+" 主宰 display
-band resolves at 91 mechanically, so a human at the magic cap (90) without a favored affinity or
-direct mastery ownership reads as 賢者 and never satisfies the 主宰 gate.
+band resolves at 91 mechanically, so a human at the race ``magic_power`` band ceiling (90) without a
+favored affinity or direct mastery ownership reads as 賢者 and never satisfies the 主宰 gate.
 
 #### Scenario: A low-level entity without mastery cannot cast a high-tier spell
 - **WHEN** `can_cast_spell_tier(entity, "fire", "大師")` is called on a neutral entity (no
@@ -43,11 +41,12 @@ direct mastery ownership reads as 賢者 and never satisfies the 主宰 gate.
   same entity at `magic_power.value == 35` returns `True`
 
 #### Scenario: A human can reach 主宰 only for a favored element
-- **WHEN** a human entity (`magic_power.max == 90`) with `entity.db.affinity_elements == ["fire"]`
-  reaches `magic_power.value == 83`
+- **WHEN** a human entity (whose `RACE_REGISTRY["human"].static_baseline.magic_power` band ceiling
+  is `90`, so its static `magic_power.value` is at most 90) with
+  `entity.db.affinity_elements == ["fire"]` reaches `magic_power.value == 83`
 - **THEN** `can_cast_spell_tier(entity, "fire", "主宰")` returns `True`
   (`floor(83 * 1.1) == 91`), while `can_cast_spell_tier(entity, "wind", "主宰")` for the same entity
-  returns `False` at every level up to the cap (`floor(90 * 0.9) == 81`)
+  returns `False` at every value up to the band ceiling (`floor(90 * 0.9) == 81`)
 
 #### Scenario: An unknown element fails closed even with a fabricated mastery
 - **WHEN** `can_cast_spell_tier(entity, "not_an_element", "學徒")` is called on an entity that owns

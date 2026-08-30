@@ -20,7 +20,6 @@ from evennia.utils.create import create_object
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer
 from typeclasses.npcs import NPC, ensure_npc_adult_identity
-from world.lore.races import RACE_REGISTRY
 from world.rules.guild import parse_guild_registration
 from world.rules.guild_config import get_catalog
 from world.rules.surfaces import (
@@ -206,10 +205,9 @@ def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
                     "atk_phys": profile.atk_phys,
                     "agility": profile.agility,
                     "defense": profile.defense,
-                    "magic_level": profile.magic_level,
+                    "magic_power": profile.magic_power,
                     "guild_merit": 0,
                 },
-                RACE_REGISTRY["human"].magic_cap,
             )
         )
         opponent.db.skills = {"active": list(profile.skills), "passive": []}

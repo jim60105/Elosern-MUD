@@ -312,7 +312,7 @@ export const CHARACTER_PANEL_SAMPLE = {
         { source: "condition", name: "再生", kind: "flat", amount: 1 },
       ],
     },
-    { key: "magic_level", label: "魔法階級", base: 31, current: 31, max: null, effective: 31, layers: [] },
+    { key: "magic_power", label: "魔力", base: 31, current: 31, max: null, effective: 31, layers: [] },
     { key: "guild_merit", label: "功績", base: 140, current: 140, max: null, effective: 140, layers: [] },
   ],
   actives: [
@@ -379,7 +379,7 @@ export const CHARACTER_PANEL_SAMPLE = {
     description: "目前以「旅商」身分示人；顯示值只影響外觀與鑑定。",
     displayed: [
       { key: "atk_phys", label: "攻擊", value: 25 },
-      { key: "magic_level", label: "魔法階級", value: 12 },
+      { key: "magic_power", label: "魔力", value: 12 },
     ],
   },
    guild: { rank: "E", merit: 140 },
@@ -1525,7 +1525,7 @@ export const CREATION_PANEL_SAMPLE = {
       {
         race: "human",
         subrace: null,
-        budget: 24,
+        budget: 28,
         axes: [
           { axis: "hp", label: "生命", explanation: "承傷能力", minimum: 0, maximum: 8 },
           { axis: "mp", label: "魔力", explanation: "法術資源", minimum: 0, maximum: 4 },
@@ -1533,12 +1533,13 @@ export const CREATION_PANEL_SAMPLE = {
           { axis: "atk_phys", label: "攻擊", explanation: "近戰傷害", minimum: 0, maximum: 4 },
           { axis: "agility", label: "敏捷", explanation: "閃避與先攻", minimum: 0, maximum: 4 },
           { axis: "defense", label: "防禦", explanation: "傷害減輕", minimum: 0, maximum: 4 },
+          { axis: "magic_power", label: "魔力", explanation: "魔法傷害", minimum: 0, maximum: 4 },
         ],
       },
       {
         race: "beastfolk",
         subrace: "subrace_wolf",
-        budget: 26,
+        budget: 30,
         axes: [
           { axis: "hp", label: "生命", explanation: "承傷能力", minimum: 0, maximum: 9 },
           { axis: "mp", label: "魔力", explanation: "法術資源", minimum: 0, maximum: 4 },
@@ -1546,12 +1547,13 @@ export const CREATION_PANEL_SAMPLE = {
           { axis: "atk_phys", label: "攻擊", explanation: "近戰傷害", minimum: 0, maximum: 5 },
           { axis: "agility", label: "敏捷", explanation: "閃避與先攻", minimum: 0, maximum: 4 },
           { axis: "defense", label: "防禦", explanation: "傷害減輕", minimum: 0, maximum: 4 },
+          { axis: "magic_power", label: "魔力", explanation: "魔法傷害", minimum: 0, maximum: 4 },
         ],
       },
       {
         race: "elf",
         subrace: null,
-        budget: 22,
+        budget: 26,
         axes: [
           { axis: "hp", label: "生命", explanation: "承傷能力", minimum: 0, maximum: 6 },
           { axis: "mp", label: "魔力", explanation: "法術資源", minimum: 0, maximum: 6 },
@@ -1559,6 +1561,7 @@ export const CREATION_PANEL_SAMPLE = {
           { axis: "atk_phys", label: "攻擊", explanation: "近戰傷害", minimum: 0, maximum: 3 },
           { axis: "agility", label: "敏捷", explanation: "閃避與先攻", minimum: 0, maximum: 5 },
           { axis: "defense", label: "防禦", explanation: "傷害減輕", minimum: 0, maximum: 4 },
+          { axis: "magic_power", label: "魔力", explanation: "魔法傷害", minimum: 0, maximum: 4 },
         ],
       },
     ],
@@ -1588,7 +1591,7 @@ export const CREATION_PANEL_CUSTOM_DRAFT_SAMPLE = {
     apparent_age: 21,
     race: "human",
     subrace: null,
-    allocations: { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2 },
+    allocations: { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 },
     background: "從渡口學來運貨的年輕人。",
     background_generated: false,
     affinity_elements: ["fire", "wind"],
@@ -1602,7 +1605,7 @@ export const CREATION_PANEL_CONCEPT_DRAFT_SAMPLE = {
     stage: "concept_filled",
     race: "elf",
     subrace: null,
-    allocations: { hp: 6, mp: 6, sp: 2, atk_phys: 2, agility: 4, defense: 2 },
+    allocations: { hp: 6, mp: 6, sp: 2, atk_phys: 2, agility: 4, defense: 2, magic_power: 4 },
     background: "燈下讀書的年輕學者。",
     background_generated: true,
   },

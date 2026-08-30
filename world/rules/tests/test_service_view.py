@@ -53,7 +53,7 @@ _REGISTRATION_TRAIT_KEYS = (
     "atk_phys",
     "agility",
     "defense",
-    "magic_level",
+    "magic_power",
     "guild_merit",
 )
 
@@ -354,7 +354,7 @@ class PlayerSummaryTests(ServiceRegistryIsolation):
     def test_disguised_elf_does_not_distort_the_summary(self):
         room = FakeRoom(FakeHost("a", 1, guild_staff(), location=None))
         player = actor(location=room, wallet=500, registration=registration(), merit=0, guild_rank="F")
-        player.db.disguised_stats = {"atk_phys": 60, "magic_level": 30}
+        player.db.disguised_stats = {"atk_phys": 60, "magic_power": 30}
         with patch(
             "world.rules.service_view.read_world_clock",
             return_value=SimpleNamespace(tick=TICK_NOON),

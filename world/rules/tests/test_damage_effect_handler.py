@@ -153,7 +153,7 @@ class AdjustedStatDamageTests(unittest.TestCase):
         "combat-modifier-table::flat-defense-and-atk-phys-bundle-values-adjust-deterministic-damage-magnitude"
     )
     def test_magic_school_damage_ignores_the_atk_phys_bonus(self):
-        actor = FakeEntity("actor", magic_level=20, agility=10)
+        actor = FakeEntity("actor", magic_power=20, agility=10)
         target = FakeEntity("target", defense=5, agility=10)
         self.assertEqual(
             _staged_amount(
@@ -169,7 +169,7 @@ class AdjustedStatDamageTests(unittest.TestCase):
         "combat-modifier-table::flat-defense-and-atk-phys-bundle-values-adjust-deterministic-damage-magnitude"
     )
     def test_defense_bonus_mitigates_physical_and_magic_damage(self):
-        actor = FakeEntity("actor", atk_phys=20, magic_level=20, agility=10)
+        actor = FakeEntity("actor", atk_phys=20, magic_power=20, agility=10)
         target = FakeEntity("target", defense=5, agility=10)
         for effect_id in ("damage:dark:physical", "damage:fire:magic"):
             with self.subTest(effect_id=effect_id):
@@ -218,9 +218,9 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         for entity in (self.actor, self.target):
             entity.race = "human"
             entity.apply_race_baseline()
-        # Human starting magic level (術師 tier) so the fire_ball cast passes
+        # Human static magic_power at 術師 tier so the fire_ball cast passes
         # the element-mastery cast gate.
-        self.actor.traits.magic_level.base = 30
+        self.actor.traits.magic_power.base = 30
         self.actor.db.skills = {"active": ["fire_ball"], "passive": []}
         self.target.db.skills = {"active": [], "passive": []}
         battlefield = Battlefield(

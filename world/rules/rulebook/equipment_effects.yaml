@@ -14,11 +14,11 @@ budgets:
   legendary: {flat: 12, percent: 15, soft_percent: 30, bias: 2, gauge: 25}
 effects:
   apprentice_focus_staff:
-    adjustments: {magic_level: 4, mp_cost: "-5%"}
+    adjustments: {magic_power: 4, mp_cost: "-5%"}
   apothecary_beads:
     attached_buffs: [item_regen_light]
   archmage_mending_robe:
-    adjustments: {magic_level: 8, mp_cost: "-12%"}
+    adjustments: {magic_power: 8, mp_cost: "-12%"}
   ashen_scimitar:
     adjustments: {atk_phys: 4, agility: 2}
   black_maid_dress:
@@ -65,9 +65,9 @@ effects:
   leather_armor:
     adjustments: {defense: 4}
   mage_robe:
-    adjustments: {magic_level: 3, mp_cost: "-8%"}
+    adjustments: {magic_power: 3, mp_cost: "-8%"}
   magic_sword:
-    adjustments: {atk_phys: 8, magic_level: 6}
+    adjustments: {atk_phys: 8, magic_power: 6}
   passion_silk_choker:
     adjustments: {defense: -3, pleasure_gain: "+25%"}
   pilgrim_medallion:
@@ -75,7 +75,7 @@ effects:
   plain_sword:
     adjustments: {atk_phys: 2}
   prism_charm:
-    adjustments: {magic_level: 5}
+    adjustments: {magic_power: 5}
   protective_ring:
     adjustments: {defense: 6}
     gauge_caps: {hp: 10}

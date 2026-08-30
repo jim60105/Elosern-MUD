@@ -38,26 +38,34 @@ class RaceRegistryTests(unittest.TestCase):
         self.assertEqual(len(STATIC_TIER_REGISTRY), 11)
         self.assertEqual(len(SUBRACE_REGISTRY), 15)
 
-    def test_magic_cap_and_divine_arts(self):
-        beastfolk = RACE_REGISTRY["beastfolk"]
-        human = RACE_REGISTRY["human"]
-        elf = RACE_REGISTRY["elf"]
-        self.assertLess(beastfolk.magic_cap, human.magic_cap)
-        self.assertLess(human.magic_cap, elf.magic_cap)
-        self.assertFalse(human.can_use_divine_arts)
-        self.assertFalse(beastfolk.can_use_divine_arts)
-        self.assertTrue(elf.can_use_divine_arts)
+    def test_magic_power_band_ordering_and_divine_arts(self):
+        bands = {
+            key: race.static_baseline.magic_power
+            for key, race in RACE_REGISTRY.items()
+        }
+        self.assertEqual(bands, {"human": (5, 90), "beastfolk": (1, 30), "elf": (100, 900)})
+        # Ordering by upper bound: beastfolk < human < elf on the interim table
+        # 1-30 / 5-90 / 100-900; the elf floor clears the human ceiling outright.
+        self.assertLess(bands["beastfolk"][1], bands["human"][1])
+        self.assertLess(bands["human"][1], bands["elf"][1])
+        self.assertGreater(bands["elf"][0], bands["human"][1])
+        self.assertFalse(RACE_REGISTRY["human"].can_use_divine_arts)
+        self.assertFalse(RACE_REGISTRY["beastfolk"].can_use_divine_arts)
+        self.assertTrue(RACE_REGISTRY["elf"].can_use_divine_arts)
 
     @covers_requirement("lore-registries::raceprofile-encodes-the-three-race-power-gap")
-    def test_starting_magic_averages_are_cap_safe(self):
-        self.assertEqual(
-            {key: race.starting_magic_level for key, race in RACE_REGISTRY.items()},
-            {"human": 30, "beastfolk": 10, "elf": 300},
-        )
+    def test_magic_power_axis_is_the_only_race_magic_bound(self):
         for race in RACE_REGISTRY.values():
-            self.assertIs(type(race.starting_magic_level), int)
-            self.assertGreater(race.starting_magic_level, 0)
-            self.assertLessEqual(race.starting_magic_level, race.magic_cap)
+            with self.subTest(race=race.key):
+                band = race.static_baseline.magic_power
+                self.assertIsInstance(band, tuple)
+                self.assertEqual(len(band), 2)
+                self.assertIs(type(band[0]), int)
+                self.assertIs(type(band[1]), int)
+                self.assertLessEqual(band[0], band[1])
+                # The deleted magic-only fields must not resurface.
+                self.assertFalse(hasattr(race, "magic_cap"))
+                self.assertFalse(hasattr(race, "starting_magic_level"))
 
     def test_vital_pool_scale_is_independent(self):
         human_ceiling = RACE_REGISTRY["human"].vital_baseline.hp[1]

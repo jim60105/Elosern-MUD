@@ -155,7 +155,7 @@ class RoundEstimateTests(unittest.TestCase):
             atk_phys=88,
             agility=92,
             defense=90,
-            magic_level=250,
+            magic_power=250,
         )
         human = FakeEntity(
             "human",
@@ -163,7 +163,7 @@ class RoundEstimateTests(unittest.TestCase):
             atk_phys=8,
             agility=9,
             defense=7,
-            magic_level=40,
+            magic_power=40,
         )
         monsters = [
             FakeEntity(
@@ -172,7 +172,7 @@ class RoundEstimateTests(unittest.TestCase):
                 atk_phys=6,
                 agility=6,
                 defense=6,
-                magic_level=0,
+                magic_power=0,
             )
             for index in range(3)
         ]
@@ -364,7 +364,7 @@ class CombinedSignalTests(unittest.TestCase):
             atk_phys=88,
             agility=92,
             defense=90,
-            magic_level=250,
+            magic_power=250,
         )
         weak = FakeEntity("weak", hp=120, agility=9, defense=7)
         field = battlefield([strong], [weak])
@@ -378,6 +378,6 @@ class CombinedSignalTests(unittest.TestCase):
                 atk_phys=1,
                 agility=10,
                 defense=1,
-                magic_level=1,
+                magic_power=1,
             )
             self.assertIsNone(classify_overwhelm(field))

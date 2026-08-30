@@ -13,7 +13,7 @@ from .anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from .economy import PRICE_TABLE
 from .elements import ELEMENT_REGISTRY
 from .guild import GUILD_RANK_REGISTRY
-from .magic import MAGIC_TIER_REGISTRY, RANK_TITLE_REGISTRY
+from .magic import MAGIC_TIER_REGISTRY
 from .monsters import MONSTER_TIER_REGISTRY
 from .nations import NATION_REGISTRY
 from .races import RACE_REGISTRY, STATIC_TIER_REGISTRY, SUBRACE_REGISTRY
@@ -31,7 +31,6 @@ _ALL_REGISTRIES: dict[str, Mapping[str, Any]] = {
     "subraces": SUBRACE_REGISTRY,
     "elements": ELEMENT_REGISTRY,
     "magic_tiers": MAGIC_TIER_REGISTRY,
-    "rank_titles": RANK_TITLE_REGISTRY,
     "nations": NATION_REGISTRY,
     "guild_ranks": GUILD_RANK_REGISTRY,
     "monster_tiers": MONSTER_TIER_REGISTRY,

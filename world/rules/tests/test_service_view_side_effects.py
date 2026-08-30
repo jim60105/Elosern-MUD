@@ -133,7 +133,7 @@ class ServicesViewSideEffectTests(EvenniaTestCase):
         newcomer.apply_race_baseline()
         newcomer.location = self.hall
         newcomer.db.wallet = 0
-        newcomer.db.disguised_stats = {"atk_phys": 60, "magic_level": 30}
+        newcomer.db.disguised_stats = {"atk_phys": 60, "magic_power": 30}
         newcomer.traits.atk_phys.base = 88
         newcomer.traits.guild_merit.base = 0
         snapshot = {

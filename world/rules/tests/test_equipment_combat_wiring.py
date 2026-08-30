@@ -72,7 +72,7 @@ def _player(key: str):
     player.race = "human"
     player.apply_race_baseline()
     player.traits.hp.rate = 0
-    player.traits.magic_level.base = 30
+    player.traits.magic_power.base = 30
     player.db.equipment = None
     player.db.inventory = []
     return player
@@ -130,7 +130,7 @@ class AccessorFoldTests(_WearerCase):
         bundle = dict(equipment_adjustments(entity))
         self.assertEqual(bundle["mp_cost"], "-8%")
         self.assertEqual(bundle["sp_cost"], "-5%")
-        self.assertEqual(bundle["magic_level"], 3)
+        self.assertEqual(bundle["magic_power"], 3)
 
     def test_accessor_is_a_pure_read(self):
         entity = self.wear(_player("fold purity"), "gilded_saber")
@@ -427,8 +427,7 @@ class HealWiringTests(_WearerCase):
     def setUp(self):
         super().setUp()
         self.caster = _player("wiring caster")
-        self.caster.traits.magic_level.base = 40
-        self.caster.traits.magic_level.current = 40
+        self.caster.traits.magic_power.base = 40
 
     @covers_requirement(
         "combat-resolution::skill-heal-magnitude-scales-by-the-merged-heal-gain-percent"
@@ -443,8 +442,7 @@ class HealWiringTests(_WearerCase):
         "combat-resolution::skill-heal-magnitude-scales-by-the-merged-heal-gain-percent"
     )
     def test_gear_scaling_floors_instead_of_banker_rounding(self):
-        self.caster.traits.magic_level.base = 3
-        self.caster.traits.magic_level.current = 3
+        self.caster.traits.magic_power.base = 3
         self.wear(self.caster, "radiant_holy_emblem")
         self.assertEqual(_heal_magnitude(self.caster), 3)  # floor(3 * 1.2)
 
@@ -453,7 +451,7 @@ class HealWiringTests(_WearerCase):
     )
     def test_magic_gear_lifts_the_heal_base(self):
         self.wear(self.caster, "mage_robe")
-        # mage_robe magic_level +3 raises the caster-stat base.
+        # mage_robe magic_power +3 raises the caster-stat base.
         self.assertEqual(_heal_magnitude(self.caster), 43)
 
     @covers_requirement(

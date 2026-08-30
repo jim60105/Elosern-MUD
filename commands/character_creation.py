@@ -22,6 +22,7 @@ from world.rules.character_creation import (
     resolve_starting_profile,
 )
 from world.rules.creation_wizard import (
+    ALLOCATION_AXIS_EXPLANATIONS,
     ConceptDraftStaleError,
     apply_concept_proposal,
     draft_fingerprint,
@@ -46,15 +47,6 @@ def _integer(response: str, field: str) -> int:
     except ValueError as error:
         raise CharacterCreationError(f"{field} 必須是整數。") from error
 
-
-ALLOCATION_AXIS_EXPLANATIONS: dict[str, str] = {
-    "hp": "生命值，決定你能承受多少傷害",
-    "mp": "魔力值，驅動魔法的消耗",
-    "sp": "體力值，支撐行動與攻擊",
-    "atk_phys": "物理攻擊，影響造成的傷害",
-    "agility": "敏捷，影響命中與迴避",
-    "defense": "防禦，減免受到的傷害",
-}
 
 
 def _collect_affinity_elements(
@@ -144,7 +136,7 @@ def _activate_creation(
     # policy or emits a job (fix-creation-finalization-safety D3).
     relocate_to_starting_location(caller)
     caller.msg(
-        f"角色 {result.display_name} 已建立，初始魔法等級為 {result.magic_level}。"
+        f"角色 {result.display_name} 已建立，初始魔力為 {result.magic_power}。"
     )
     maybe_play_arrival(caller)
 
@@ -225,7 +217,7 @@ class CmdCharacter(Command):
                 span = upper - lower
                 label = ALLOCATION_AXIS_EXPLANATIONS.get(axis, "")
                 briefing_lines.append(f"  {axis} {label}：0–{span}")
-            briefing_lines.append(f"六項配點總和必須恰好等於 {profile.budget}。")
+            briefing_lines.append(f"七項配點總和必須恰好等於 {profile.budget}。")
             self.caller.msg("\n".join(briefing_lines))
             allocations: dict[str, int] = {}
             for axis, (lower, upper) in profile.bounds:

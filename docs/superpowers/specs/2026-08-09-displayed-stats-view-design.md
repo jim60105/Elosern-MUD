@@ -10,6 +10,11 @@ This document is a slice of the master design
 amends the D2 consumer form: the forward-declared "appraisal items" consumer becomes a direct
 view surface with no item or service.
 
+> **Amended 2026-08-30 (change `magic-power-static-rename`).** The fourth combat-five key is
+> `magic_power` (a `StaticTrait` since that change) and its canonical label is `魔力`, not
+> `魔法階級`. Everywhere this document says `magic_level` / `魔法階級`, read `magic_power` /
+> `魔力`.
+
 ---
 
 ## 1. Product Context

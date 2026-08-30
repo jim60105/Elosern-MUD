@@ -3,14 +3,16 @@
 // the left stack's head-card island. It renders exactly the identity the
 // committed payloads carry — a glyph portrait tile (the player is never a
 // present focusable subject of their own exploration catalog, so no
-// portrait image exists and none is invented), a numeric magic_level badge,
-// the display name, the derived magic-rank title paired with the guild
-// rank/merit, the wallet, and the disguise marker. No race, subrace,
+// portrait image exists and none is invented), a numeric magic_power badge,
+// the display name, the guild rank/merit line, the wallet, and the disguise
+// marker. The retired magic-rank ladder is not reconstructed client-side:
+// no magic-derived rank word appears in any form (magic-power-static-rename;
+// the title-system change line owns title display). No race, subrace,
 // class, or faction line: no such field exists in the `status` or
 // `character` payload, and none is rendered (not dimmed, not "未知", not
 // a placeholder). The wallet is the HUD's single persistent surface.
 import { computed } from "vue";
-import { formatCopper, magicRankTitle, portraitGlyph } from "./character-identity.js";
+import { formatCopper, portraitGlyph } from "./character-identity.js";
 
 const props = defineProps({
   status: { type: Object, required: true },
@@ -20,17 +22,13 @@ const props = defineProps({
 const actorName = computed(() => props.status?.actor?.name ?? "");
 const portrait = computed(() => portraitGlyph(actorName.value));
 
-// The magic_level trait row's current value is the only bounded numeric
-// progression the payload carries; the rank title is a client-side
-// display-only derivation (design D3), always from the true trait, never
-// from the disguised displayed value.
-const magicLevel = computed(() => {
+// The magic_power trait row's current value is the only bounded numeric
+// progression the payload carries; it is a display-only badge, always from
+// the true trait, never from the disguised displayed value (design D2).
+const magicPower = computed(() => {
   const rows = props.character?.traits ?? [];
-  return rows.find((row) => row.key === "magic_level")?.current ?? null;
+  return rows.find((row) => row.key === "magic_power")?.current ?? null;
 });
-const rankTitle = computed(() =>
-  magicLevel.value === null ? "未知" : magicRankTitle(magicLevel.value),
-);
 
 const guild = computed(() => props.character?.guild ?? null);
 const wallet = computed(() => Math.max(0, Number(props.character?.wallet ?? 0)));
@@ -41,17 +39,16 @@ const disguiseActive = computed(() => props.status?.disguise_active === true);
   <div class="hud character-head" data-testid="character-head">
     <div class="portrait" data-testid="character-head__portrait">
       <span class="mono" data-testid="character-head__glyph">{{ portrait }}</span>
-      <span v-if="magicLevel !== null" class="lv" data-testid="character-head__badge">
-        {{ magicLevel }}
+      <span v-if="magicPower !== null" class="lv" data-testid="character-head__badge">
+        {{ magicPower }}
       </span>
     </div>
     <div class="meta">
       <p class="name" data-testid="character-head__name">{{ actorName }}</p>
       <p class="rank" data-testid="character-head__rank">
-        魔階·{{ rankTitle }}
-        <template v-if="guild">
-          <span class="rank-guild">· 公會 {{ guild.rank ?? "未加入公會" }} · 功績 {{ guild.merit ?? 0 }}</span>
-        </template>
+        <span class="rank-guild"
+          >公會 {{ guild?.rank ?? "未加入公會" }} · 功績 {{ guild?.merit ?? 0 }}</span
+        >
       </p>
       <p class="sub" data-testid="character-head__wallet">錢包 {{ formatCopper(wallet) }} 銅</p>
       <p v-if="disguiseActive" class="disguise" data-testid="character-head__disguise">目前有偽裝</p>

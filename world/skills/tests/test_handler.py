@@ -135,7 +135,7 @@ class SkillHandlerTests(EvenniaTestCase):
             _matching_multiplier(skill.parsed_effects, "atk_phys"),
             100.0,
         )
-        self.assertIsNone(_matching_multiplier(skill.parsed_effects, "magic_level"))
+        self.assertIsNone(_matching_multiplier(skill.parsed_effects, "magic_power"))
         self.assertIsNone(_matching_multiplier((), "atk_phys"))
         duplicate = (
             StatMultiplyEffect(trait="atk_phys", multiplier=2.0),

@@ -97,6 +97,7 @@ def _proposal(**overrides):
             "atk_phys": 10,
             "agility": 10,
             "defense": 11,
+            "magic_power": 43,
         },
         "suggested_skills": ("flight",),
         "persona": {
@@ -297,7 +298,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.char1.msg = message_mock
         replies = [
             "自訂者", "20", "20", "human", "human_commoner",
-            "", "100", "50", "31", "0", "0", "0", "", "yes",
+            "", "100", "50", "31", "0", "0", "0", "43", "", "yes",
         ]
         try:
             with QueuedDeferLater() as queue:
@@ -377,7 +378,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertFalse(self.char1.creation_pending)
         self.char1.at_cmdset_get()
         self.assertFalse(self.char1.cmdset.has("CharacterCreation"))
-        self.assertIsNotNone(self.char1.traits.magic_level)
+        self.assertIsNotNone(self.char1.traits.magic_power)
 
     def test_creation_start_screen_is_registry_derived_and_reusable(self):
         screen = creation_start_screen()
@@ -398,7 +399,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.char1.msg = message_mock
         try:
             generator = command.func()
-            replies = ["自訂者", "20", "20", "human", "human_commoner"] + [""] + ["0"] * 6 + [""]
+            replies = ["自訂者", "20", "20", "human", "human_commoner"] + [""] + ["0"] * 7 + [""]
             prompts = [next(generator)]
             for reply in replies:
                 prompts.append(generator.send(reply))
@@ -413,7 +414,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("王族", joined)
         self.assertIn("平民", joined)
         self.assertIn("配點說明", joined)
-        self.assertIn("六項配點總和必須恰好等於", joined)
+        self.assertIn("七項配點總和必須恰好等於", joined)
         self.assertIn("屬性親和", joined)
         self.assertIn("背景設定", joined)
 
@@ -444,7 +445,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         replies = (
             ["自訂者", "20", "20", "human", "human_commoner"]
             + [""]
-            + ["100", "50", "31", "0", "0", "0"]
+            + ["100", "50", "31", "0", "0", "0", "43"]
             + ["在公會登記的新人冒險者", "yes"]
         )
         next(generator)
@@ -466,7 +467,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         replies = (
             ["自訂者", "20", "20", "human", "human_commoner"]
             + ["fire wind"]
-            + ["100", "50", "31", "0", "0", "0"]
+            + ["100", "50", "31", "0", "0", "0", "43"]
             + ["", "yes"]
         )
         next(generator)
@@ -491,7 +492,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         replies = (
             ["自訂者", "20", "20", "human", "human_commoner"]
             + ["fire wind water"]
-            + ["100", "50", "31", "0", "0", "0"]
+            + ["100", "50", "31", "0", "0", "0", "43"]
             + ["", "yes"]
         )
         try:
@@ -519,7 +520,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         generator = command.func()
         replies = (
             ["瑟芮雅", "180", "24", "elf", "fionnen"]
-            + ["0", "0", "0", "12", "12", "13"]
+            + ["0", "0", "0", "12", "12", "13", "400"]
             + ["", "yes"]
         )
         prompts = [next(generator)]
@@ -549,7 +550,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         old_id, old_location = self.char1.id, self.char1.location
         replies = [
             "自訂者", "20", "20", "human", "human_commoner",
-            "fire", "100", "50", "31", "0", "0", "0", "背景文字", "yes",
+            "fire", "100", "50", "31", "0", "0", "0", "43", "背景文字", "yes",
         ]
         output = self.call(
             CmdCharacter(), "create", inputs=[*reversed(replies), None]
@@ -585,7 +586,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         old_key = self.char1.key
         replies = [
             "新冒險者", "17", "20", "human", "human_commoner",
-            "fire", "100", "50", "31", "0", "0", "0", "背景文字", "yes",
+            "fire", "100", "50", "31", "0", "0", "0", "43", "背景文字", "yes",
         ]
         output = self.call(
             CmdCharacter(), "create", inputs=[*reversed(replies), None]
@@ -809,6 +810,7 @@ class CharacterConceptCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                     "atk_phys": 12,
                     "agility": 12,
                     "defense": 13,
+                    "magic_power": 400,
                 },
             )
         )
@@ -881,6 +883,7 @@ class CharacterConceptCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                     allocations={
                         "hp": 50, "mp": 50, "sp": 50,
                         "atk_phys": 10, "agility": 10, "defense": 11,
+                        "magic_power": 43,
                     },
                 ),
             )
@@ -932,6 +935,7 @@ class CharacterConceptCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                     allocations={
                         "hp": 50, "mp": 50, "sp": 50,
                         "atk_phys": 10, "agility": 10, "defense": 11,
+                        "magic_power": 43,
                     },
                 ),
             )

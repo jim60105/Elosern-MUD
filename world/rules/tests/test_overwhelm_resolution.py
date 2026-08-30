@@ -34,7 +34,7 @@ def battlefield() -> Battlefield:
         atk_phys=88,
         agility=92,
         defense=90,
-        magic_level=250,
+        magic_power=250,
     )
     defender = FakeEntity(
         "human",
@@ -42,7 +42,7 @@ def battlefield() -> Battlefield:
         atk_phys=8,
         agility=9,
         defense=7,
-        magic_level=40,
+        magic_power=40,
     )
     return Battlefield(
         {
@@ -112,7 +112,7 @@ class ResolutionTests(unittest.TestCase):
             current.roster["elf"].skills.values["agility"] = 10
             current.roster["elf"].skills.values["atk_phys"] = 1
             current.roster["elf"].skills.values["defense"] = 1
-            current.roster["elf"].skills.values["magic_level"] = 1
+            current.roster["elf"].skills.values["magic_power"] = 1
             return []
 
         with (
@@ -241,7 +241,7 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
                 "atk_phys": 1000,
                 "agility": 92,
                 "defense": 90,
-                "magic_level": 250,
+                "magic_power": 250,
             }
             if strong
             else {
@@ -250,7 +250,7 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
                 "atk_phys": 8,
                 "agility": 9,
                 "defense": 7,
-                "magic_level": 40,
+                "magic_power": 40,
             }
         )
         for trait_key, value in values.items():
@@ -400,7 +400,7 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
             monster.traits.atk_phys.base = 6
             monster.traits.agility.base = 6
             monster.traits.defense.base = 6
-            monster.traits.magic_level.base = 0
+            monster.traits.magic_power.base = 0
         field = Battlefield(
             {
                 "elves": frozenset({elf.key}),

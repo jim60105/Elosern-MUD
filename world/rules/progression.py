@@ -36,7 +36,7 @@ AFFINITY_ELEMENT_MULTIPLIER = float(
 NON_AFFINITY_ELEMENT_MULTIPLIER = float(
     PROGRESSION_YAML["non_affinity_element_multiplier"]
 )
-MAGIC_GROWTH_MULTIPLIER_PREFIX = "growth_rate:magic:"
+GROWTH_MULTIPLIER_PREFIX = "growth_rate:practice:"
 
 FREEFORM_CAST_SCALE_COUNT = 5
 
@@ -150,22 +150,10 @@ _validate_nonnegative_multiplier(
     NON_AFFINITY_ELEMENT_MULTIPLIER, "non_affinity_element_multiplier"
 )
 
-# Display rank bands from world lore (skill-system-redesign design doc §4.1).
-# The lore table writes the top band as "90+"; scanning the bands in order
-# resolves the overlap at exactly 90 toward 賢者, so a human at the magic cap
-# (90) reads as 賢者 and never satisfies the 主宰 gate.
-MAGIC_RANK_BANDS: tuple[tuple[str, int, int | None], ...] = (
-    ("學徒", 0, 15),
-    ("術師", 16, 30),
-    ("大師", 31, 70),
-    ("賢者", 71, 90),
-    ("主宰", 90, None),
-)
-
 # Mechanical cast-gate thresholds, one per rank title. 主宰's threshold is 91
-# (not 90): the spell-catalog gate scenarios pin magic level 90 as below
-# 主宰, and combined with the human magic cap of 90 this makes "humans can
-# rarely ever cast 主宰-tier spells" (world lore) a mechanical fact.
+# (not 90): the spell-catalog gate scenarios pin magic_power 90 as below
+# 主宰, and combined with the human static band ceiling of 90 this makes
+# "humans can rarely ever cast 主宰-tier spells" (world lore) a mechanical fact.
 MAGIC_TIER_THRESHOLDS: dict[str, int] = {
     "學徒": 0,
     "術師": 16,
@@ -173,19 +161,6 @@ MAGIC_TIER_THRESHOLDS: dict[str, int] = {
     "賢者": 71,
     "主宰": 91,
 }
-
-
-def magic_rank_title(entity: Any) -> str:
-    """Return the display-only rank title for an entity's numeric magic level.
-
-    Pure function of ``entity.traits.magic_level.value`` alone; never consults
-    owned skills or any other entity state.
-    """
-    level = float(entity.traits.magic_level.value)
-    for title, lower, upper in MAGIC_RANK_BANDS:
-        if level >= lower and (upper is None or level <= upper):
-            return title
-    raise ValueError(f"magic level {level:g} falls outside every rank band")
 
 
 def _affinity_elements(entity: Any) -> list[str]:
@@ -232,15 +207,15 @@ def element_affinity_multiplier(entity: Any, element: str) -> float:
 
 
 def _element_effective_magic_level(entity: Any, element: str) -> int:
-    """Return ``floor(magic_level * element_affinity_multiplier)`` (design D1).
+    """Return ``floor(magic_power * element_affinity_multiplier)`` (design D1).
 
     The element-effective level is a transient gate-only value: it is never a
-    stored trait, never replaces ``magic_level``, and never changes
-    ``magic_level.max``. It exists only for the ``can_cast_spell_tier``
+    stored trait, never replaces ``magic_power``, and never changes
+    ``magic_power``'s base. It exists only for the ``can_cast_spell_tier``
     comparison.
     """
     return floor(
-        float(entity.traits.magic_level.value)
+        float(entity.traits.magic_power.value)
         * element_affinity_multiplier(entity, element)
     )
 
@@ -252,8 +227,8 @@ def can_cast_spell_tier(entity: Any, element: str, tier: str) -> bool:
     unrecognized element raises ``ValueError`` even when the entity owns a
     fabricated ``<element>_mastery`` (design D6, fail-closed). ``True`` when
     the entity directly owns that element's ``<element>_mastery`` skill
-    (unconditionally), or when the element-effective magic level
-    ``floor(magic_level × element_affinity_multiplier)`` meets the tier's
+    (unconditionally), or when the element-effective magic power
+    ``floor(magic_power × element_affinity_multiplier)`` meets the tier's
     threshold. Conferred grants never satisfy the mastery override (design doc
     D4/D6): only ``entity.skills.owned_keys()`` counts, never
     ``conferred_grants()``.
@@ -391,30 +366,34 @@ def _race_learning_multiplier(entity: Any) -> float:
     return float(race.learning_multiplier) if race is not None else 1.0
 
 
-def _self_magic_growth_multiplier(entity: Any) -> float:
-    """Return the product of owned passive magic-growth effects."""
+def _self_growth_multiplier(entity: Any) -> float:
+    """Return the product of owned passive growth-rate effects."""
     multiplier = 1.0
     for skill_key in entity.skills.owned_keys():
         skill = SKILL_REGISTRY.get(skill_key)
         if skill is None or skill.kind is not SkillKind.PASSIVE:
             continue
         for effect_id in skill.effects:
-            if effect_id.startswith(MAGIC_GROWTH_MULTIPLIER_PREFIX):
+            if effect_id.startswith(GROWTH_MULTIPLIER_PREFIX):
                 multiplier *= float(
-                    effect_id.removeprefix(MAGIC_GROWTH_MULTIPLIER_PREFIX)
+                    effect_id.removeprefix(GROWTH_MULTIPLIER_PREFIX)
                 )
     return multiplier
 
 
-def effective_magic_growth_multiplier(entity: Any) -> float:
-    """Combine race, owned passive, and conferred magic-growth multipliers."""
+def effective_growth_multiplier(entity: Any) -> float:
+    """Combine race, owned passive, and conferred growth multipliers.
+
+    Renamed from ``effective_magic_growth_multiplier`` (D-A4): the surviving
+    multiplier scales practice growth, not the retired magic level.
+    """
     multiplier = (
         _race_learning_multiplier(entity)
-        * _self_magic_growth_multiplier(entity)
+        * _self_growth_multiplier(entity)
         * growth_rate_multiplier(entity)
     )
     if not isfinite(multiplier) or multiplier < 0:
-        raise ValueError("magic growth multiplier must be finite and non-negative")
+        raise ValueError("growth multiplier must be finite and non-negative")
     return multiplier
 
 
@@ -427,10 +406,18 @@ def _stored_magic_xp(entity: Any) -> float:
 
 
 def _apply_level_ups(entity: Any) -> None:
-    """Convert accumulated XP into capped magic levels without per-level loops."""
-    magic_level = entity.traits.magic_level
-    current = float(magic_level.value)
-    cap = float(magic_level.max)
+    """Convert accumulated XP into capped magic power without loops.
+
+    Interim writer (magic-power-static-rename): the retired XP engine keeps
+    feeding the renamed static trait until ``magic-xp-engine-retirement``
+    deletes the seam. The level state is the stored ``base`` (never
+    ``value``, so equipment/passive mods are never baked in), capped at the
+    race's ``magic_power`` band ceiling — the old ``magic_cap`` number.
+    """
+    magic_power = entity.traits.magic_power
+    current = float(magic_power.base)
+    race = RACE_REGISTRY.get(getattr(entity, "race", None))
+    cap = float(race.static_baseline.magic_power[1]) if race is not None else current
     if current >= cap:
         entity.db.magic_xp = 0.0
         return
@@ -440,7 +427,7 @@ def _apply_level_ups(entity: Any) -> None:
     entity.db.magic_xp = (
         0.0 if new_level >= cap else xp - levels_gained * MAGIC_XP_PER_LEVEL
     )
-    magic_level.current = int(new_level)
+    magic_power.base = int(new_level)
 
 
 def accrue_magic_study(
@@ -456,7 +443,7 @@ def accrue_magic_study(
     base_xp = seconds / 3600 * STUDY_BASE_XP_PER_HOUR
     for entity in entities:
         entity.db.magic_xp = _stored_magic_xp(entity) + (
-            base_xp * effective_magic_growth_multiplier(entity)
+            base_xp * effective_growth_multiplier(entity)
         )
         _apply_level_ups(entity)
 
@@ -465,7 +452,7 @@ def grant_combat_kill_xp(entity: Any, monster_tier_key: str) -> None:
     """Grant one tier-scaled combat-kill XP award through the shared pool."""
     base_xp = COMBAT_KILL_XP_TABLE[monster_tier_key]
     entity.db.magic_xp = _stored_magic_xp(entity) + (
-        base_xp * effective_magic_growth_multiplier(entity)
+        base_xp * effective_growth_multiplier(entity)
     )
     _apply_level_ups(entity)
 

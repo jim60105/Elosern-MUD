@@ -45,7 +45,6 @@ class BackgroundCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 subrace="human_commoner",
                 allocations=_balanced_allocations("human", "human_commoner"),
             ),
-            sampler=lambda low, high: low,
         )
 
     def _call(self, args=""):
@@ -93,7 +92,9 @@ class BackgroundCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         stored = self.char1.db.persona
         self.assertEqual(stored["background"], "新背景")
         self.assertEqual(stored["personality"], "沉穩")
-        self.assertEqual(self.char1.traits.magic_level.value, 27)
+        # Balanced allocation spends the budget on hp/mp/sp first; the
+        # magic_power axis gets 0, so the trait sits at the human floor (5).
+        self.assertEqual(self.char1.traits.magic_power.value, 5)
 
     def test_works_without_a_persona_record(self):
         self.char1.attributes.remove("persona")

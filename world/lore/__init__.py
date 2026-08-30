@@ -10,7 +10,7 @@ from .economy import (
 )
 from .elements import ELEMENT_REGISTRY, Element
 from .guild import GUILD_RANK_REGISTRY, GuildRank
-from .magic import MAGIC_TIER_REGISTRY, RANK_TITLE_REGISTRY, MagicTier, RankTitle
+from .magic import MAGIC_TIER_REGISTRY, MagicTier
 from .monsters import MONSTER_TIER_REGISTRY, MonsterTier
 from .nations import NATION_REGISTRY, Nation
 from .races import (
@@ -47,7 +47,6 @@ __all__ = [
     "NATION_REGISTRY",
     "PRICE_TABLE",
     "RACE_REGISTRY",
-    "RANK_TITLE_REGISTRY",
     "SENSITIVITY_LEVELS",
     "SHAME_LEVELS",
     "STATIC_TIER_REGISTRY",
@@ -61,7 +60,6 @@ __all__ = [
     "Nation",
     "PriceEntry",
     "RaceProfile",
-    "RankTitle",
     "StaticBand",
     "StaticTier",
     "StatModifiers",

@@ -75,10 +75,10 @@ describe("StatusPanel (H2 island-stack root)", () => {
 
   it("relocates every pre-change row so no row loses its only home", () => {
     const w = mountPanel();
-    // magic_level + guild rank/merit + wallet moved to the head card's rank
-    // and wallet lines (design D1/D11).
+    // magic_power badge + guild rank/merit + wallet moved to the head card's
+    // badge, rank, and wallet lines (design D1/D11); no rank word remains.
     const rank = w.get('[data-testid="character-head__rank"]').text();
-    expect(rank).toContain("魔階·大師");
+    expect(rank).not.toMatch(/學徒|術師|大師|賢者|主宰/);
     expect(rank).toContain("公會 E");
     expect(rank).toContain("功績 140");
     expect(w.get('[data-testid="character-head__wallet"]').text()).toBe("錢包 3,240 銅");

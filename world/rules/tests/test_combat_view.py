@@ -204,7 +204,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         # magic level 15 with no affinities and no mastery: floor(15 * 1.0)
         # == 15 is below the 術師 threshold (16), so the descriptor is
         # disabled with the unknown-skill reason code.
-        self.player.traits.magic_level.base = 15
+        self.player.traits.magic_power.base = 15
         view = build_combat_view(self.player)
         fire = next(skill for skill in view.skills if skill.key == "firestorm")
         self.assertFalse(fire.enabled)
@@ -212,7 +212,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
 
         # The same actor at magic level 30 passes the gate: the descriptor
         # stays enabled, proving the assertion is about the tier gate alone.
-        self.player.traits.magic_level.base = 30
+        self.player.traits.magic_power.base = 30
         view = build_combat_view(self.player)
         fire = next(skill for skill in view.skills if skill.key == "firestorm")
         self.assertTrue(fire.enabled)

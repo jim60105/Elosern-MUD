@@ -46,7 +46,7 @@ const age = ref(18);
 const apparentAge = ref(18);
 const race = ref("human");
 const subrace = ref(null);
-const allocations = reactive({ hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0 });
+const allocations = reactive({ hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0, magic_power: 0 });
 const background = ref("");
 const affinitySelected = ref(new Set());
 const conceptText = ref("");
@@ -59,6 +59,7 @@ function zeroAllocations() {
   allocations.atk_phys = 0;
   allocations.agility = 0;
   allocations.defense = 0;
+  allocations.magic_power = 0;
 }
 
 // Tracks any local form input since the last server draft: a no-draft
@@ -265,6 +266,7 @@ function confirmCustom() {
       atk_phys: Number(allocations.atk_phys),
       agility: Number(allocations.agility),
       defense: Number(allocations.defense),
+      magic_power: Number(allocations.magic_power),
     },
   };
   emit("action", { action_id: "creation.custom", payload });

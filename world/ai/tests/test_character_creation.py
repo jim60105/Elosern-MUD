@@ -84,6 +84,7 @@ def _proposal_text(**overrides):
             "atk_phys": 10,
             "agility": 10,
             "defense": 11,
+            "magic_power": 43,
         },
         "suggested_skills": ["flight"],
         "persona": {
@@ -167,7 +168,7 @@ class CharacterCreationProposalTests(unittest.TestCase):
         self.assertEqual(result.subrace_key, "human_commoner")
         self.assertEqual(
             result.allocations,
-            {"hp": 100, "mp": 50, "sp": 0, "atk_phys": 10, "agility": 10, "defense": 11},
+            {"hp": 100, "mp": 50, "sp": 0, "atk_phys": 10, "agility": 10, "defense": 11, "magic_power": 43},
         )
         self.assertEqual(result.suggested_skills, ("flight",))
         self.assertEqual(
@@ -191,6 +192,7 @@ class CharacterCreationProposalTests(unittest.TestCase):
                     "atk_phys": 12,
                     "agility": 12,
                     "defense": 13,
+                    "magic_power": 400,
                 },
                 suggested_skills=["flight", "fire_mastery"],
             ),
@@ -284,6 +286,7 @@ class CharacterCreationProposalTests(unittest.TestCase):
                     "atk_phys": 0,
                     "agility": 0,
                     "defense": 0,
+                    "magic_power": 0,
                 }
             ),
         )
@@ -305,6 +308,7 @@ class CharacterCreationProposalTests(unittest.TestCase):
                     "atk_phys": 10,
                     "agility": 10,
                     "defense": 12,
+                    "magic_power": 41,
                 }
             ),
         )
@@ -331,7 +335,7 @@ class CharacterCreationProposalTests(unittest.TestCase):
         client.add_response(lambda d: len(d.messages) == 3, _proposal_text())
         result = self._run(client)
         self.assertEqual(len(client.calls), 2)
-        self.assertIn("exactly the six starting axes", client.calls[1].messages[-1]["content"])
+        self.assertIn("exactly the seven starting axes", client.calls[1].messages[-1]["content"])
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_age_field_is_rejected(self):
@@ -351,12 +355,12 @@ class CharacterCreationProposalTests(unittest.TestCase):
         client = FakeLLMClient()
         client.add_response(
             lambda d: len(d.messages) == 2,
-            _proposal_text(magic_level=5),
+            _proposal_text(magic_power=5),
         )
         client.add_response(lambda d: len(d.messages) == 3, _proposal_text())
         result = self._run(client)
         self.assertEqual(len(client.calls), 2)
-        self.assertIn("magic_level", client.calls[1].messages[-1]["content"])
+        self.assertIn("magic_power", client.calls[1].messages[-1]["content"])
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_invalid_persona_rejects_the_whole_proposal_and_retries(self):

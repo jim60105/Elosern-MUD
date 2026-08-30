@@ -3,7 +3,7 @@
 The ``character_creation`` layer maps a player's free-form character concept to
 a validated frozen ``CharacterProposal`` through the shared
 validation-retry-degrade guardrail (design §7.5). The proposal carries only
-existing registry keys (race/subrace/skill) plus the six allocation values and
+existing registry keys (race/subrace/skill) plus the seven allocation values and
 a three-field persona draft; it never carries an age or any other mechanical
 number, so the deterministic adult gate stays the only age authority. When the
 layer is disabled, the transport fails, the prompt key is unavailable, or the
@@ -48,11 +48,11 @@ from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.prompts.loader import PromptUnavailableError, render_prompt
 from world.skills.registry import SKILL_REGISTRY
 
-# The six allocatable starting axes (design D2). Mirrors
+# The seven allocatable starting axes (design D2). Mirrors
 # ``world/rules/traits.GAUGE_KEYS + STATIC_KEYS``; the tuple is duplicated here
 # only because ``world/ai`` must not import ``world.rules`` (transport-boundary
 # contract), and the activation preflight remains the authoritative checker.
-ALLOCATABLE_AXES = ("hp", "mp", "sp", "atk_phys", "agility", "defense")
+ALLOCATABLE_AXES = ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power")
 
 # Hard prompt bounds (design D2): the concept input is capped before it enters
 # any prompt, the race catalog is bounded with an explicit truncation marker,
@@ -182,6 +182,7 @@ def _race_bands(race_key: str, subrace_key: str | None) -> dict[str, tuple[int, 
         "atk_phys": race.static_baseline.atk_phys,
         "agility": race.static_baseline.agility,
         "defense": race.static_baseline.defense,
+        "magic_power": race.static_baseline.magic_power,
     }
     if subrace_key is not None:
         subrace = SUBRACE_REGISTRY[subrace_key]
@@ -213,7 +214,7 @@ def _validate_allocations(parsed: Any) -> list[str]:
         return []
     allocations = parsed.get("allocations")
     if not isinstance(allocations, Mapping) or set(allocations) != set(ALLOCATABLE_AXES):
-        return ["allocations must contain exactly the six starting axes"]
+        return ["allocations must contain exactly the seven starting axes"]
     bands = _race_bands(race_key, subrace_key)
     for axis in ALLOCATABLE_AXES:
         value = allocations.get(axis)

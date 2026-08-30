@@ -400,7 +400,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
             atk_phys=88,
             agility=92,
             defense=90,
-            magic_level=250,
+            magic_power=250,
         )
         defender = FakeEntity("human", hp=120, atk_phys=8, agility=9, defense=7)
         self.attacker = attacker

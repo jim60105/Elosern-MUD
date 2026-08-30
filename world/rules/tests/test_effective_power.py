@@ -16,7 +16,7 @@ from .combat_fixtures import FakeEntity
 class EffectivePowerTests(unittest.TestCase):
     def test_reference_ratios(self):
         human = FakeEntity(
-            "human", hp=120, atk_phys=8, agility=9, defense=7, magic_level=40
+            "human", hp=120, atk_phys=8, agility=9, defense=7, magic_power=40
         )
         elf = FakeEntity(
             "elf",
@@ -24,7 +24,7 @@ class EffectivePowerTests(unittest.TestCase):
             atk_phys=88,
             agility=92,
             defense=90,
-            magic_level=250,
+            magic_power=250,
         )
         monster = FakeEntity(
             "monster",
@@ -32,7 +32,7 @@ class EffectivePowerTests(unittest.TestCase):
             atk_phys=16,
             agility=16,
             defense=16,
-            magic_level=0,
+            magic_power=0,
         )
         self.assertGreaterEqual(effective_power(elf) / effective_power(human), 100)
         ratio = effective_power(monster) / effective_power(human)

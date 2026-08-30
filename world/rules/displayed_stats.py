@@ -20,7 +20,7 @@ from world.rules.traits import get_display_value
 
 # The displayed combat five in fixed presentation order (displayed-stats-view
 # A2); ``hp`` renders the gauge's current value, never the maximum.
-DISPLAYED_KEYS = ("atk_phys", "agility", "defense", "magic_level", "hp")
+DISPLAYED_KEYS = ("atk_phys", "agility", "defense", "magic_power", "hp")
 
 
 def _self_breakdown_block(entity: Any) -> str | None:

@@ -12,8 +12,8 @@ def _player(key="combat player"):
     player = create_object(PlayerCharacter, key=key)
     player.race = "human"
     player.apply_race_baseline()
-    # Human starting magic level (術師 tier) so element-gated spell casts pass.
-    player.traits.magic_level.base = 30
+    # Human static magic_power at 術師 tier so element-gated spell casts pass.
+    player.traits.magic_power.base = 30
     return player
 
 

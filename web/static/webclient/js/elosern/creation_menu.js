@@ -2,7 +2,7 @@
  * Elosern DOM-independent character-creation menu model.
  *
  * Reduces a validated `creation` panel into the logical preset cards, the
- * custom-form geometry (selected race/subrace, the six allocation axes, and
+ * custom-form geometry (selected race/subrace, the seven allocation axes, and
  * the name plus two adult age fields), the saved-draft restoration, and the
  * exact wire payloads consumed by KeyboardRouter and the creation dock. The
  * server is authoritative for every bound and the adult gate; this model only
@@ -156,6 +156,7 @@
       atk_phys: "",
       agility: "",
       defense: "",
+      magic_power: "",
     };
   }
 
@@ -242,7 +243,7 @@
   }
 
   // The allocation briefing facts shown above the allocation fields: the total
-  // budget, the six-axis count, each axis's 0–span, and the sum-must-equal-
+  // budget, the seven-axis count, each axis's 0–span, and the sum-must-equal-
   // budget rule. Derived entirely from the server-owned profile so the web
   // form can never drift from ``resolve_starting_profile`` (design D3).
   function briefingFor(panel, state) {
@@ -262,7 +263,7 @@
       budget: profile.budget,
       axisCount: spans.length,
       spans: spans,
-      rule: "六項配點總和必須恰好等於 " + profile.budget + "。",
+      rule: "七項配點總和必須恰好等於 " + profile.budget + "。",
     };
   }
 

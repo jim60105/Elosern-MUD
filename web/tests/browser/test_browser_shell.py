@@ -1154,7 +1154,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         head = page.locator('[data-testid="character-head"]')
         # Glyph portrait: first grapheme of the display name (艾).
         self.assertEqual(page.locator('[data-testid="character-head__glyph"]').inner_text(), "艾")
-        # Numeric magic-level badge from the magic_level trait row.
+        # Numeric magic-power badge from the magic_power static trait row.
         self.assertEqual(
             page.locator('[data-testid="character-head__badge"]').inner_text(), "27"
         )
@@ -1162,10 +1162,10 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertEqual(
             page.locator('[data-testid="character-head__name"]').inner_text(), "艾倫·灰誓"
         )
-        # The rank line pairs the derived magic-rank title (level 27 → 術師)
-        # with the guild rank and merit from character.guild.
+        # The rank line is guild-only: the derived magic-rank ladder is
+        # retired with the XP system (magic-power-static-rename).
         rank_text = page.locator('[data-testid="character-head__rank"]').inner_text()
-        self.assertIn("魔階·術師", rank_text)
+        self.assertNotIn("術師", rank_text)
         self.assertIn("公會 銀牌", rank_text)
         self.assertIn("功績 120", rank_text)
         # The wallet, thousands-grouped integer copper (design D11).

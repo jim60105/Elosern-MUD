@@ -58,8 +58,8 @@ def _player(key="combat party player"):
     player = create_object(PlayerCharacter, key=key)
     player.race = "human"
     player.apply_race_baseline()
-    # Human starting magic level (術師 tier) so element-gated spell casts pass.
-    player.traits.magic_level.base = 30
+    # Human static magic_power at 術師 tier so element-gated spell casts pass.
+    player.traits.magic_power.base = 30
     player.db.skills = {"active": ["fire_ball", "wind_blade"], "passive": []}
     return player
 
@@ -518,7 +518,7 @@ class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("party-system::combat-terminal-rules-are-player-centric")
     def test_victory_requires_only_the_foes_team_to_be_gone(self):
         self.player.traits.agility.base = 50
-        self.player.traits.magic_level.base = 200
+        self.player.traits.magic_power.base = 200
         companion = _companion(self.player, "觀戰者", hp=100)
         self.monster.traits.hp.base = 100
         self.monster.traits.hp.current = 100

@@ -47,7 +47,7 @@ def _player(key="freeform caster"):
     player = create_object(PlayerCharacter, key=key)
     player.race = "human"
     player.apply_race_baseline()
-    player.traits.magic_level.current = 30
+    player.traits.magic_power.base = 30
     return player
 
 
@@ -214,7 +214,7 @@ class FreeformScalesForTests(EvenniaTestCase):
 
     @covers_requirement("element-mastery::mastery-ownership-entitles-freeform-scaling-of-the-element-s-eligible-spells")
     def test_entity_without_mastery_receives_an_empty_set(self):
-        self.entity.traits.magic_level.current = 100
+        self.entity.traits.magic_power.base = 100
         self.assertEqual(freeform_scales_for(self.entity, "wind"), ())
         _granted_mastery_only(self.entity)
         self.assertEqual(freeform_scales_for(self.entity, "wind"), ())
@@ -444,7 +444,7 @@ class ActionRequestScaleContractTests(EvenniaTestCase):
         self.target.traits.defense.base = 0
         self.target.traits.hp.base = 200
         self.target.traits.hp.current = 200
-        self.actor.traits.magic_level.current = 6
+        self.actor.traits.magic_power.base = 6
         request = ActionRequest(
             self.actor,
             "wind_blade",
@@ -519,9 +519,9 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
 
     @covers_requirement("freeform-casting::a-scaled-cast-deducts-scaled-mp-and-applies-scaled-magnitudes-atomically")
     def test_half_scale_wind_blade_deducts_half_mp_and_deals_half_damage(self):
-        # magic_level 6 gives an unscaled critical of round(6 * 2.0) = 12
+        # magic_power 6 gives an unscaled critical of round(6 * 2.0) = 12
         # against zero defense; half scale stages 6.
-        self.actor.traits.magic_level.current = 6
+        self.actor.traits.magic_power.base = 6
         self.monster.traits.defense.base = 0
         self.monster.traits.hp.base = 200
         self.monster.traits.hp.current = 200
@@ -568,8 +568,8 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
 
     @covers_requirement("freeform-casting::a-scaled-cast-deducts-scaled-mp-and-applies-scaled-magnitudes-atomically")
     def test_scaled_damage_obeys_the_floor(self):
-        # magic_level 2 → base critical 4 → quarter scale 1 (the floor), never 0.
-        self.actor.traits.magic_level.current = 2
+        # magic_power 2 → base critical 4 → quarter scale 1 (the floor), never 0.
+        self.actor.traits.magic_power.base = 2
         self.monster.traits.defense.base = 0
         self.monster.traits.hp.base = 200
         self.monster.traits.hp.current = 200
@@ -609,7 +609,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         }
         self.monster.traits.hp.base = 200
         self.monster.traits.hp.current = 150
-        # magic_level 30 → base heal 30 → double scale 60, capped by the gap 50.
+        # magic_power 30 → base heal 30 → double scale 60, capped by the gap 50.
         with patch("world.rules.combat.roll_d100", return_value=1):
             result = ActionResolver.resolve(
                 self._request("sea_of_life", [self.monster], 2.0)
@@ -647,7 +647,7 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         damage_entry = next(
             entry for entry in result.event_log.entries if entry.kind == "damage"
         )
-        # magic_level 30 → base critical 60 → double scale 120.
+        # magic_power 30 → base critical 60 → double scale 120.
         self.assertEqual(damage_entry.data["amount"], 120)
         self.assertEqual(self.monster.traits.hp.value, 80)
         heal_entry = next(
@@ -780,7 +780,7 @@ class FreeformTextCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def _setup_caster(self, *, mastery: bool) -> None:
         self.char1.race = "human"
         self.char1.apply_race_baseline()
-        self.char1.traits.magic_level.current = 30
+        self.char1.traits.magic_power.base = 30
         self.char1.db.skills = {
             "active": ["wind_blade", "gale_step"],
             "passive": ["wind_mastery"] if mastery else [],

@@ -7,15 +7,16 @@ import {
 } from "../fixtures.js";
 
 // CharacterHead (H2, webclient-hud-02-status-islands, design D2/D3): the
-// head-card island with deterministic offline args — each rank band, guild
-// joined vs 未加入公會, disguise on/off, a zero wallet, and a long name
-// that must ellipsize.
+// head-card island with deterministic offline args — badge power levels,
+// guild joined vs 未加入公會, disguise on/off, a zero wallet, and a long
+// name that must ellipsize. The per-rank-band stories are retired with the
+// magic-rank ladder (magic-power-static-rename).
 
-function withMagicLevel(character, level) {
+function withMagicPower(character, power) {
   return {
     ...character,
     traits: character.traits.map((row) =>
-      row.key === "magic_level" ? { ...row, current: level } : row,
+      row.key === "magic_power" ? { ...row, current: power } : row,
     ),
   };
 }
@@ -30,45 +31,21 @@ export default {
   component: CharacterHead,
 };
 
-// One story per magic rank band (the client-side display table's five bands,
-// pinned by the Vitest boundary tests).
-export const RankApprentice = {
+// Low and high magic-power badges (the numeric badge is a plain value; the
+// retired rank ladder shows nowhere on the card).
+export const PowerLow = {
   render: renderHead,
   args: {
     status: STATUS_PANEL_SAMPLE,
-    character: withMagicLevel(CHARACTER_PANEL_SAMPLE, 5),
+    character: withMagicPower(CHARACTER_PANEL_SAMPLE, 5),
   },
 };
 
-export const RankSorcerer = {
+export const PowerHigh = {
   render: renderHead,
   args: {
     status: STATUS_PANEL_SAMPLE,
-    character: withMagicLevel(CHARACTER_PANEL_SAMPLE, 20),
-  },
-};
-
-export const RankMaster = {
-  render: renderHead,
-  args: {
-    status: STATUS_PANEL_SAMPLE,
-    character: withMagicLevel(CHARACTER_PANEL_SAMPLE, 45),
-  },
-};
-
-export const RankSage = {
-  render: renderHead,
-  args: {
-    status: STATUS_PANEL_SAMPLE,
-    character: withMagicLevel(CHARACTER_PANEL_SAMPLE, 80),
-  },
-};
-
-export const RankSovereign = {
-  render: renderHead,
-  args: {
-    status: STATUS_PANEL_SAMPLE,
-    character: withMagicLevel(CHARACTER_PANEL_SAMPLE, 95),
+    character: withMagicPower(CHARACTER_PANEL_SAMPLE, 90),
   },
 };
 

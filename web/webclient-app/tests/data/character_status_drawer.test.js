@@ -221,15 +221,16 @@ describe("CharacterStatusDrawer", () => {
     // The 屬性 section renders exactly the four true-attribute rows; the
     // gauge (hp/mp/sp) and guild-merit values are owned by the 生命量 and
     // 計數・公會 sections, so they are not repeated under 屬性.
-    for (const key of ["atk_phys", "agility", "defense", "magic_level"]) {
+    for (const key of ["atk_phys", "agility", "defense", "magic_power"]) {
       expect(w.find(`[data-testid="character-status-drawer__trait--${key}"]`).exists()).toBe(true);
     }
     for (const key of ["hp", "mp", "sp", "guild_merit"]) {
       expect(w.find(`[data-testid="character-status-drawer__trait--${key}"]`).exists()).toBe(false);
     }
-    // The 設計稿 abbreviates magic_level to 魔階 and the guild rank row
-    // reads 公會階級.
-    expect(w.get('[data-testid="character-status-drawer__trait--magic_level"]').text()).toContain("魔階");
+    // The fourth attribute row renders the server label 魔力 directly — the
+    // client-side 魔階 abbreviation is retired with the rank ladder — and the
+    // guild rank row reads 公會階級.
+    expect(w.get('[data-testid="character-status-drawer__trait--magic_power"]').text()).toContain("魔力");
     expect(w.get('[data-testid="character-status-drawer__guild-rank"]').text()).toContain("公會階級");
     // The vitals labels agree with VitalsTrack and the 設計稿: 魔力/耐力.
     expect(w.get('[data-testid="character-status-drawer__vital--mp"]').text()).toContain("魔力");

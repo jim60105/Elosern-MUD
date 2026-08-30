@@ -214,6 +214,9 @@ def _check_stats_band(record: dict[str, Any]) -> list[Issue]:
         "atk_phys": race.static_baseline.atk_phys,
         "agility": race.static_baseline.agility,
         "defense": race.static_baseline.defense,
+        # ``magic_power`` is deliberately absent: its band is checked by
+        # ``_check_magic_power_band``, which rejects above the ceiling and
+        # warns below the floor.
     }
     warnings: list[Issue] = []
     for key, band in (*vitals.items(), *static.items()):
@@ -228,17 +231,40 @@ def _check_stats_band(record: dict[str, Any]) -> list[Issue]:
     return warnings
 
 
-def _check_magic_cap(record: dict[str, Any]) -> list[Issue]:
+def _check_magic_power_band(
+    record: dict[str, Any],
+) -> tuple[list[Issue], list[Issue]]:
+    """Reject magic_power above the race band; warn below it (D-A8).
+
+    The race's ``static_baseline.magic_power`` upper bound is the hard
+    mechanical maximum (the retired ``magic_cap`` number): a value above it
+    rejects deterministically. A value below the lower bound warns exactly
+    like the other static axes.
+    """
     race = RACE_REGISTRY.get(record.get("race"))
-    magic_level = record.get("stats", {}).get("magic_level")
-    if race is None or magic_level is None or magic_level <= race.magic_cap:
-        return []
-    return [
-        Issue(
-            "stats.magic_level",
-            f"{magic_level} exceeds {race.key!r} magic cap {race.magic_cap}",
+    if race is None:
+        return [], []
+    value = record.get("stats", {}).get("magic_power")
+    if value is None:
+        return [], []
+    band = race.static_baseline.magic_power
+    rejections: list[Issue] = []
+    warnings: list[Issue] = []
+    if value > band[1]:
+        rejections.append(
+            Issue(
+                "stats.magic_power",
+                f"{value} exceeds {race.key!r} magic_power band {band}",
+            )
         )
-    ]
+    elif value < band[0]:
+        warnings.append(
+            Issue(
+                "stats.magic_power",
+                f"{value} below {race.key!r} magic_power band {band}",
+            )
+        )
+    return rejections, warnings
 
 
 # Race-aware affinity input bounds (element-affinity-progression D3/D4): a
@@ -385,7 +411,9 @@ def validate_character(record: dict[str, Any]) -> RecordReport:
     report.rejections.extend(_check_entity_key_contract(record))
     report.rejections.extend(_check_disguised_stats_subset(record))
     report.rejections.extend(_check_race_subrace(record))
-    report.rejections.extend(_check_magic_cap(record))
+    magic_rejections, magic_warnings = _check_magic_power_band(record)
+    report.rejections.extend(magic_rejections)
+    report.warnings.extend(magic_warnings)
     report.rejections.extend(_check_affinity_elements(record))
     report.rejections.extend(_check_skills(record))
     report.warnings.extend(_check_stats_band(record))

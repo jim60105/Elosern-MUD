@@ -215,12 +215,18 @@ hardcoding magic numbers:
 class RaceProfile:
     key: str                    # human / beastfolk / elf
     lifespan: tuple[int, int]
-    magic_cap: int              # human 90 | beastfolk 30 | elf 900
     vital_baseline: Vitals      # human 100 | beastfolk HP/SP 150-200 MP 30-50 | elf 10000
-    static_baseline: StaticBand # atk_phys / agility / defense band — see below
+    static_baseline: StaticBand # atk_phys / agility / defense / magic_power bands — see below
     learning_multiplier: float  # elf 10.0
     can_use_divine_arts: bool   # elf only
 ```
+
+> **Amended 2026-08-30 (change `magic-power-static-rename`, growth redesign D1/D2).** The
+> `magic_cap` field is deleted. `StaticBand` is four-dimensional: `magic_power` joins
+> `atk_phys`/`agility`/`defense` as the magic school's combat stat with a species-wide
+> floor-to-ceiling band (human 5-90, beastfolk 1-30, elf 100-900) and no progression semantics.
+> `StaticTier` carries its own `magic_band` (validated against the owning race band at registry
+> load), which replaces the deleted race-level `starting_magic_level` for tier-built NPCs.
 
 **Vital pools and static stats scale by different factors, and neither may be derived from the
 other.** Pools scale ~100× from human to elf (120-150 → 10000); static combat stats scale ~10×
@@ -230,8 +236,9 @@ likewise scales 10× (cap 90 → 900). Reference points taken from the sample ca
 | | human elite | human non-combatant | elf | ratio |
 |---|---|---|---|---|
 | `atk_phys` / `agility` / `defense` | 8 / 9 / 7 | 5 / 6 / 6 | 88 / 92 / 90 | ~10× |
-| `magic_level` cap | 90 | 90 | 900 | 10× |
+| `magic_power` band ceiling | 90 | 90 | 900 | 10× |
 | `hp` | 120 | 150 | 10000 | ~100× |
+
 
 The asymmetry is deliberate: elves are absurdly durable but "only" ten times as damaging, which is
 why `hp` is an input to `effective_power()` — a stat-only ratio would not flag an elf-versus-human
@@ -241,8 +248,8 @@ fight as overwhelming even though the human cannot win.
 time: ×10 (統御術 partial effect), ×100 (身體強化), ×1000 (身體超強化). They are never baked into
 stored stats.
 
-Other registries: `Element` (eight elements), `MagicTier` (初級→究極), `RankTitle`
-(學徒→術師→大師→賢者→主宰), `Nation` (three states), `GuildRank` (F→S with reward bands),
+Other registries: `Element` (eight elements), `MagicTier` (初級→究極), `Nation` (three states),
+`GuildRank` (F→S with reward bands),
 `MonsterTier` (F-E / D-C / B-A / 災厄級), `Anchor` (capitals, the three elven villages, known
 dungeon entrances).
 
@@ -274,8 +281,13 @@ NPC(LivingEntity)              + dialogue memory, schedule
 Monster(LivingEntity)          + threat tier, loot table, behaviour tree
 ```
 
-Trait types: `hp/mp/sp` are **gauges** (max + regen rate); `atk_phys/agility/defense` are **static**
-(base + mod); `magic_level/guild_merit` are **counters**.
+Trait types: `hp/mp/sp` are **gauges** (max + regen rate); `atk_phys/agility/defense/magic_power`
+are **static** (base + mod); `guild_merit` is the sole **counter**.
+
+> **Amended 2026-08-30 (change `magic-power-static-rename`, growth redesign D1).** `magic_level`
+> is renamed `magic_power` and moves from the counter set into the static set. It is the magic
+> school's combat stat (symmetric to `atk_phys`), not a progression counter; the magic XP engine
+> and the display rank-title ladder (學徒→主宰) retire with it.
 
 Per D2, `disguised_stats` lives in a separate attribute read by exactly three consumers: appearance
 rendering, guild registration records, and appraisal items.
@@ -293,6 +305,10 @@ rendering, guild registration records, and appraisal items.
 > `defense`, `magic_level`, `hp`) directly from the shared target-appearance path, with the
 > accessor hardened to treat a non-mapping `disguised_stats` record as "no disguise". Appraisal
 > items remain the forward-declared third consumer; the consumer wording is unchanged.
+>
+> **Amended 2026-08-30 (change `magic-power-static-rename`).** The fourth displayed key is
+> `magic_power` (a `StaticTrait`), and its character-panel label is `魔力`, not `魔法階級`.
+> The key list and label above read accordingly after the rename; no counter semantics remain.
 
 ```python
 @dataclass(frozen=True)
@@ -344,8 +360,8 @@ world/imports/
 
   // Base values only. Skill multipliers (×10 / ×100 / ×1000) are applied at
   // resolution time and must never be baked in here.
-  "stats":           { "hp": 10000, "atk_phys": 88, "agility": 92, "magic_level": 250 },
-  "disguised_stats": { "atk_phys": 60, "magic_level": 30 },
+  "stats":           { "hp": 10000, "atk_phys": 88, "agility": 92, "magic_power": 250 },
+  "disguised_stats": { "atk_phys": 60, "magic_power": 30 },
 
   "skills":   ["fire_mastery", "flight", "status_disguise"],
   "passives": ["defense_instinct"],
@@ -372,6 +388,11 @@ world/imports/
 > when the value exceeds the race's magic cap — not a warning. It is the sole safeguard against
 > unachievable magic levels (import-contract D-14 judged a warning too easy to miss); the other
 > stats keep the warn-on-outside-band behavior for prodigies.
+>
+> **Amended 2026-08-30 (change `magic-power-static-rename`).** The stat key is `magic_power`.
+> The check is band membership against `static_baseline.magic_power`: above the ceiling rejects
+> deterministically (`Issue("stats.magic_power", ...)`), below the floor warns like every other
+> static axis. The "cap" wording above reads as the band ceiling after the rename.
 
 Import is **all-or-nothing**. Failure reports which record, which field, and why. No partial import.
 
@@ -481,7 +502,7 @@ time settlement: rounds × 6s → WorldClock
 Formulas live in `rulebook/combat.yaml`:
 
 ```
-effective_power = f(atk_phys, agility, defense, magic_level, hp)
+effective_power = f(atk_phys, agility, defense, magic_power, hp)
 
 overwhelm check (at engage AND recomputed every round)
   ratio >= 100    → single-shot resolution, ends in one round
