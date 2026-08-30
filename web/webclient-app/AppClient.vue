@@ -32,6 +32,7 @@ import SkillBook from "./components/SkillBook.vue";
 import StatusPanel from "./components/StatusPanel.vue";
 import OverlayHost from "./components/OverlayHost.vue";
 import HelpOverlay from "./components/HelpOverlay.vue";
+import LineagePanel from "./components/LineagePanel.vue";
 
 const store = useElosernStore();
 
@@ -900,6 +901,11 @@ onMounted(() => {
           @reduced-motion-change="store.setReducedMotion"
           @colorblind-change="store.setColorblind"
         />
+        <!-- skill-lineage-panel (task 2.3): the big-window ledger renders the
+             committed `lineage` panel verbatim — expanded chains carry per-node
+             meters, collapsed chains their aggregate meter; the client
+             computes no growth rules. -->
+        <LineagePanel v-else-if="openName === 'lineage'" :lineage="panel('lineage')" />
         <!-- No committed panel carries authored guide content, so the help
              surface renders its client-owned control reference and the
              statement of how the game's own `help` output is reached (task

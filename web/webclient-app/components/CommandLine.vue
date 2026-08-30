@@ -281,6 +281,20 @@ defineExpose({ focusField });
         <button
           type="button"
           class="cmdutil__btn"
+          aria-label="技能系譜"
+          data-testid="command-line-lineage"
+          @click="onOpenOverlay('lineage')"
+        >
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="5" r="2.2" />
+            <circle cx="5.5" cy="18.5" r="2.2" />
+            <circle cx="18.5" cy="18.5" r="2.2" />
+            <path d="M12 7.2v4.3M12 11.5 6.6 16.6M12 11.5l5.4 5.1" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="cmdutil__btn"
           aria-label="設定"
           data-testid="command-line-settings"
           @click="onOpenOverlay('settings')"

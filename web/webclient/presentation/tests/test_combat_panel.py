@@ -1482,6 +1482,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                     "services",
                     "creation",
                     "exploration",
+                    "lineage",
                     "character",
                 }
             ),

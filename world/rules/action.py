@@ -1502,6 +1502,7 @@ def _step6_skill_practice(
     skill: SkillDef,
     targets: list[Any],
     claims_out: list[tuple[Any, str, Any]],
+    unlocks_out: list[str],
 ) -> list[PendingEffect]:
     """Stage one practice award per DISTINCT target (DC3).
 
@@ -1511,7 +1512,9 @@ def _step6_skill_practice(
     examination) context passes the nonlethal marker, so the whole staged
     batch awards nothing. Every claim the batch actually takes is appended to
     ``claims_out`` so a rolled-back commit can release them (a failed action
-    must not silence the same tick's legitimate retry).
+    must not silence the same tick's legitimate retry). Unlock lines a live
+    award appends to ``unlocks_out`` are notification candidates only — the
+    caller folds them into the result AFTER the commit succeeds.
     """
     simulated = bool(_event_context(request).get("simulated"))
     seen: list[Any] = []
@@ -1532,8 +1535,9 @@ def _step6_skill_practice(
                 f"skill_practice|{_entity_key(actor)}|{skill.key}|{target_key}",
                 frozenset({"progression"}),
                 lambda actor=actor, skill_key=skill.key, target=target,
-                simulated=simulated, claims_out=claims_out: _apply_practice(
-                    actor, skill_key, target, simulated, claims_out
+                simulated=simulated, claims_out=claims_out,
+                unlocks_out=unlocks_out: _apply_practice(
+                    actor, skill_key, target, simulated, claims_out, unlocks_out
                 ),
             )
         )
@@ -1546,9 +1550,12 @@ def _apply_practice(
     target: Any,
     simulated: bool,
     claims_out: list[tuple[Any, str, Any]],
+    unlocks_out: list[str],
 ) -> None:
-    """Apply one staged practice award, recording its claim when taken."""
-    if grant_skill_practice_xp(actor, skill_key, target=target, nonlethal=simulated):
+    """Apply one staged practice award, recording claims and unlock lines."""
+    if grant_skill_practice_xp(
+        actor, skill_key, target=target, nonlethal=simulated, unlocks_out=unlocks_out
+    ):
         claims_out.append(practice_claim_key(actor, skill_key, target))
 
 
@@ -2134,11 +2141,13 @@ class ActionResolver:
             )
             pending += _step6_resource_deduction(request.actor, skill, request.scale)
             practice_claims: list[tuple[Any, str, Any]] = []
+            unlock_lines: list[str] = []
             pending += _step6_skill_practice(
                 request,
                 skill,
                 targets,
                 practice_claims,
+                unlock_lines,
             )
             event_log = _step7_build_event_log(request, skill, pending)
             try:
@@ -2169,4 +2178,9 @@ class ActionResolver:
             release_practice_claims(practice_claims)
             return ActionResult.rejected(failure.reason, failure.detail)
         notifications = tuple(effect.notify for effect in pending if effect.notify)
+        # Unlock lines ride the same post-commit channel: appended here only
+        # because the commit above succeeded. A rolled-back action returns at
+        # the CommitFailed branch above and its sink lines die with the result.
+        if unlock_lines:
+            notifications = notifications + tuple(unlock_lines)
         return ActionResult.success(event_log, time_cost, notifications)

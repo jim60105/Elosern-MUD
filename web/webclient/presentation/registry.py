@@ -174,6 +174,10 @@ def build_production_registry() -> PresentationRegistry:
         EXPLORATION_SCHEMA_VERSION,
         exploration_presenter,
     )
+    from web.webclient.presentation.lineage import (
+        LINEAGE_SCHEMA_VERSION,
+        lineage_presenter,
+    )
     from web.webclient.presentation.local_map import (
         LOCAL_MAP_SCHEMA_VERSION,
         local_map_presenter,
@@ -242,6 +246,14 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=EXPLORATION_SCHEMA_VERSION,
             unavailable_reason=("exploration_unavailable", "探索選單目前無法顯示"),
             presenter=exploration_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="lineage",
+            schema_version=LINEAGE_SCHEMA_VERSION,
+            unavailable_reason=("lineage_unavailable", "技能系譜目前無法顯示"),
+            presenter=lineage_presenter,
         )
     )
     registry.register(

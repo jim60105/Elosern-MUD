@@ -13,6 +13,7 @@ from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.effects import DamageEffect
 from world.skills.registry import (
     SKILL_REGISTRY,
+    SkillCategory,
     SkillPrerequisite,
     SkillDef,
     SkillKind,
@@ -643,8 +644,32 @@ def practice_xp_amount(entity: Any, skill: SkillDef) -> float:
     return float(amount)
 
 
+def unlock_candidates_for(skill_key: str) -> tuple[SkillDef, ...]:
+    """Registry definitions of every skill whose edge consumes ``skill_key``.
+
+    The reverse-edge consumers are exactly the skills whose ``can_use_skill``
+    verdict a grant to ``skill_key`` could flip; derivation order follows the
+    cached consumer tuple, which is deterministic.
+    """
+    return tuple(
+        SKILL_REGISTRY[key]
+        for key, _ in prerequisite_consumers(skill_key)
+        if key in SKILL_REGISTRY
+    )
+
+
+def unlock_line(skill: SkillDef) -> str:
+    """The one Traditional-Chinese line announcing one newly usable skill."""
+    prefix = "新法術可用" if skill.category is SkillCategory.ELEMENTAL_MAGIC else "新技能可用"
+    return f"{prefix}：{skill.label}"
+
+
 def grant_skill_practice_xp(
-    entity: Any, skill_key: str, target: Any = None, nonlethal: bool = False
+    entity: Any,
+    skill_key: str,
+    target: Any = None,
+    nonlethal: bool = False,
+    unlocks_out: list[str] | None = None,
 ) -> bool:
     """Accrue one use of practice XP; return whether XP was actually claimed.
 
@@ -656,6 +681,15 @@ def grant_skill_practice_xp(
     Otherwise the closed-form amount flows through
     :func:`award_practice_xp`, the only writer, which clamps at the derived
     cap. Reads no school and no magic stat.
+
+    ``unlocks_out`` is an optional caller-owned list sink: when the award
+    flips ``can_use_skill`` from false to true for a skill whose prerequisite
+    edges consume ``skill_key``, exactly one unlock line (``新法術可用`` /
+    ``新技能可用``) is appended per newly usable skill. Detection is derived
+    (before/after snapshot of the shared gate, never persisted), happens only
+    alongside a live award, and the SINK ITSELF is not a notification — the
+    caller owns delivery and must stage the lines only after its transaction
+    commits.
     """
     if nonlethal:
         return False
@@ -665,7 +699,17 @@ def grant_skill_practice_xp(
     amount = practice_xp_amount(entity, skill)
     if not _claim_practice(entity, skill_key, target):
         return False
+    candidates = unlock_candidates_for(skill_key) if unlocks_out is not None else ()
+    was_usable = (
+        {candidate.key: can_use_skill(entity, candidate) for candidate in candidates}
+        if unlocks_out is not None
+        else {}
+    )
     award_practice_xp(entity, skill_key, amount)
+    if unlocks_out is not None:
+        for candidate in candidates:
+            if not was_usable[candidate.key] and can_use_skill(entity, candidate):
+                unlocks_out.append(unlock_line(candidate))
     return True
 
 

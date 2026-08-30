@@ -610,3 +610,109 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
             self.actor.db.skill_proficiency["fire_ball"],
             SKILL_PRACTICE_XP_PER_USE,
         )
+class DerivedUnlockNotificationTests(EvenniaTestCase):
+    """Unlock lines reach ``ActionResult.notifications`` post-commit only."""
+
+    def setUp(self):
+        super().setUp()
+        progression.reset_practice_dedupe()
+
+    def _near_edge_cast(self, key: str) -> tuple[PlayerCharacter, Monster, ActionRequest]:
+        actor = self._character(key)
+        grant_lineage(actor, ["fire_arrow", "fire_ball", "scorching_wave"])
+        # Level 2 + 49 XP: one human grant crosses scorching_wave's Lv.3 edge.
+        actor.db.skill_proficiency["fire_ball"] = 149.0
+        monster = self._monster(f"{key}-goblin")
+        battlefield = Battlefield(
+            {"party": frozenset({key}), "foes": frozenset({monster.key})},
+            {key: actor, monster.key: monster},
+        )
+        request = ActionRequest(
+            actor,
+            "fire_ball",
+            [monster],
+            BattlefieldActionContext(battlefield),
+        )
+        return actor, monster, request
+
+    _character = ProgressionTests._character
+    _monster = ProgressionTests._monster
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_edge_crossing_action_notifies_exactly_one_line(self):
+        actor, _, request = self._near_edge_cast("unlock-cast")
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(
+            [line for line in result.notifications if "可用：" in line],
+            ["新法術可用：灼熱波動"],
+        )
+
+    def test_action_without_an_edge_crossing_notifies_no_line(self):
+        actor, _, request = self._near_edge_cast("no-cross")
+        actor.db.skill_proficiency["fire_ball"] = 100.0
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual([line for line in result.notifications if "可用：" in line], [])
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_rolled_back_commit_delivers_no_line_and_keeps_state(self):
+        actor, _, request = self._near_edge_cast("rolled-back")
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch(
+                "world.rules.action._commit",
+                side_effect=CommitFailed(RejectReason.COMMIT_FAILED, "injected"),
+            ),
+        ):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "rejected")
+        self.assertEqual(result.notifications, ())
+        # The practice award rolled back with the commit: the edge was never
+        # crossed in stored state, so nothing was announced.
+        self.assertEqual(actor.db.skill_proficiency["fire_ball"], 149.0)
+
+    @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
+    def test_rollback_after_the_sink_was_filled_delivers_no_line(self):
+        """The meaningful leak scenario: the practice applied, the unlock line
+        entered the sink, and only THEN did the commit fail (rubber-duck R2-3).
+        The post-commit fold must never run, and a retry announces exactly
+        once — last among the notification lines."""
+        actor, _, request = self._near_edge_cast("late-rollback")
+        real = dict(_EVENT_EFFECT_PLANNERS)
+
+        def poison(_request, _log):
+            # Staged AFTER the practice batch; its apply runs after the
+            # practice effect crossed the edge, so the sink holds one line
+            # when this raise aborts the transaction.
+            return [
+                PendingEffect(
+                    actor,
+                    "poisoned late commit",
+                    frozenset({"progression"}),
+                    lambda: (_ for _ in ()).throw(RuntimeError("injected late")),
+                )
+            ]
+
+        _EVENT_EFFECT_PLANNERS["test-late-poison"] = poison
+        try:
+            with patch("world.rules.combat.roll_d100", return_value=100):
+                result = ActionResolver.resolve(request)
+        finally:
+            _EVENT_EFFECT_PLANNERS.clear()
+            _EVENT_EFFECT_PLANNERS.update(real)
+        self.assertEqual(result.outcome, "rejected")
+        self.assertEqual(result.notifications, ())
+        self.assertEqual(actor.db.skill_proficiency["fire_ball"], 149.0)
+        # The claims released with the rollback: the legitimate retry accrues,
+        # crosses the edge for real, and announces exactly once — last.
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            retry = ActionResolver.resolve(request)
+        self.assertEqual(retry.outcome, "success")
+        self.assertEqual(
+            [line for line in retry.notifications if "可用：" in line],
+            ["新法術可用：灼熱波動"],
+        )
+        self.assertEqual(retry.notifications[-1], "新法術可用：灼熱波動")

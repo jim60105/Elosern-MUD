@@ -14,7 +14,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { createFocusTrap } from "./focus-trap.js";
 
 const props = defineProps({
-  // The single open-overlay name (design D8): map | settings | help.
+  // The single open-overlay name (design D8): map | settings | help | lineage.
   overlay: { type: String, required: true },
   // The trigger control that opened this overlay, captured at open time
   // (design D7). Focus is restored to it on every close path.
@@ -40,12 +40,14 @@ function titleFor(name) {
     return props.locationLabel ? `地圖 · ${props.locationLabel}` : "地圖";
   }
   if (name === "settings") return "設定";
+  if (name === "lineage") return "技能系譜";
   return "說明";
 }
 
 function subtitleFor(name) {
   if (name === "map") return "分層 · 霧戰 · 路徑";
   if (name === "settings") return "音訊 · 顯示 · 可達 · 輸入";
+  if (name === "lineage") return "熟練度 · 見頂 · 前置";
   return "分類 → 條目 → 子主題";
 }
 

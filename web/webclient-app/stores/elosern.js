@@ -314,8 +314,8 @@ export const useElosernStore = defineStore("elosern", () => {
 
     // H5 (webclient-hud-05-overlays-and-command-line, design D7/D8): the
     // full-screen overlay controller. `view.hudOverlay` is the single
-    // open-overlay name (null | map | settings | help); at most one overlay
-    // is open at a time (structural: a single value). Unknown names are
+    // open-overlay name (null | map | settings | help | lineage); at most one
+    // overlay is open at a time (structural: a single value). Unknown names are
     // rejected, not coerced. Opening an overlay closes any open reference
     // drawer (design D8: an overlay and a drawer are never open together,
     // so at most one focus-trapped surface exists at any moment), and the
@@ -324,7 +324,7 @@ export const useElosernStore = defineStore("elosern", () => {
     // The store is the single writer and owns the teardown on a mode change
     // into creation, an epoch reset, or a transport loss (same events as
     // the drawer teardown in `syncHudDrawer`).
-    const HUD_OVERLAY_NAMES = new Set(["map", "settings", "help"]);
+    const HUD_OVERLAY_NAMES = new Set(["map", "settings", "help", "lineage"]);
     const hudOverlay = ref(null);
     const hudOverlayOpener = ref(null);
 
@@ -1624,7 +1624,8 @@ export const useElosernStore = defineStore("elosern", () => {
         // time (structural: one value).
         hudDrawer: hudDrawer.value,
         // H5 (task 5.2): the single open-overlay name (null | map | settings
-        // | help), plus the opener element captured at open time — the anchor
+        // | help | lineage), plus the opener element captured at open time —
+        // the anchor
         // for the host's focus restoration (design D7).
         hudOverlay: hudOverlay.value,
         hudOverlayOpener: hudOverlayOpener.value,
@@ -2350,7 +2351,8 @@ export const useElosernStore = defineStore("elosern", () => {
        openHudDrawer,
        closeHudDrawer,
         // H5 (task 5.3): the full-screen overlay controller — the single open
-        // entry (`openOverlay` over `map` / `settings` / `help`, unknown names
+        // entry (`openOverlay` over `map` / `settings` / `help` / `lineage`,
+        // unknown names
         // rejected, closes any open drawer for mutual exclusion, design D8)
         // and the single close entry (`closeOverlay`). The opener element is
         // captured at open time and published as `view.hudOverlayOpener` for

@@ -23,8 +23,10 @@ everything with zero hidden information.
   conventional `LINEAGE_MAX_*` bounds.
 - New Telnet `lineage` command printing the same tree: 見頂 markers on
   saturated nodes, `prereq_text_zh` on locked nodes.
-- Unlock push: the moment `can_use_skill` flips true for a skill, one toast
-  via the existing OOB toast/menu channel (e.g. 「新法術可用：火焰風暴」).
+- Unlock notification: the moment `can_use_skill` flips true for a skill, one
+  line (e.g. 「新法術可用：火焰風暴」) rides the existing post-commit
+  notification channel (`ActionResult.notifications`, the title-grant-toast
+  delivery), not a new transport.
 - Command docs: `lineage` canonical entry in
   `docs/game/command-reference.md` + row in `docs/game/commands.md` + curated
   manifest in `tests/test_command_docs.py`.
