@@ -7,6 +7,8 @@ diverge. The clock advance uses the module-level ``get_world_clock`` name so
 the deterministic command tests can keep patching it.
 """
 
+import re
+
 from evennia import Command
 
 from world.rules.clock import (
@@ -19,6 +21,7 @@ from world.rules.skip_safety import evaluate_skip_safety
 from world.rules.time_skip import (
     DurationParseError,
     parse_duration,
+    preflight_practice_booking,
     rejection_message,
     render_skip_summary,
     seconds_to_full_regen,
@@ -38,18 +41,48 @@ def _safe_to_skip(caller) -> bool:
     return False
 
 
+# ``rest <duration> [practice <skill>]``: a duration token plus an optional
+# declared-practice clause naming a skill key (whitespace-free by contract).
+_REST_ARGS_RE = re.compile(
+    r"^(?P<duration>\S+)(?:\s+practice\s+(?P<skill>\S+))?$"
+)
+
+_REST_USAGE = "用法：rest <數字><s|m|h|d> [practice <技能>]"
+
+
 class CmdRest(Command):
     key = "rest"
     aliases = ("休息",)
 
     def func(self) -> None:
+        # Fixed order: parse -> safety gate -> booking preflight -> advance.
+        # Every rejection performs ZERO clock advance; a skip never
+        # half-applies (declared-practice-skip D7).
+        match = _REST_ARGS_RE.fullmatch(self.args.strip())
+        if match is None:
+            self.caller.msg(_REST_USAGE)
+            return
         try:
-            seconds = _parse_duration(self.args)
+            seconds = _parse_duration(match["duration"])
         except DurationParseError:
-            self.caller.msg("用法：rest <數字><s|m|h|d>")
+            self.caller.msg(_REST_USAGE)
             return
         if not _safe_to_skip(self.caller):
             return
+        skill_key = match["skill"]
+        if skill_key is not None:
+            reject = preflight_practice_booking(self.caller, skill_key)
+            if reject is not None:
+                # Rejected bookings leave no practice state at all: not even
+                # a stale earlier booking may settle later.
+                self.caller.db.practice_booking = None
+                self.caller.msg(reject.message)
+                return
+        # The booking always reflects THIS command's declared intention: an
+        # accepted clause records it, a clause-less explicit rest clears any
+        # stale booking (plain rest grows nothing), and the clock's
+        # practice_settlement stage is the sole consumer/writer.
+        self.caller.db.practice_booking = skill_key
         events = get_world_clock().advance(seconds, AdvanceSource.SKIP, [self.caller])
         self.caller.msg(_render_skip_summary(seconds, events))
 
@@ -62,6 +95,7 @@ class CmdSleep(Command):
         if not _safe_to_skip(self.caller):
             return
         seconds = _seconds_to_full_regen(self.caller)
+        self.caller.db.practice_booking = None  # unlabeled skips grow nothing
         events = get_world_clock().advance(seconds, AdvanceSource.SKIP, [self.caller])
         self.caller.msg(_render_skip_summary(seconds, events))
 
@@ -84,5 +118,6 @@ class CmdWaitUntil(Command):
             return
         if not _safe_to_skip(self.caller):
             return
+        self.caller.db.practice_booking = None  # unlabeled skips grow nothing
         events = clock.advance(seconds, AdvanceSource.SKIP, [self.caller])
         self.caller.msg(_render_skip_summary(seconds, events))

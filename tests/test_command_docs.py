@@ -69,7 +69,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     },
     "leave": {"syntax": "leave <npc>", "context": "一般（需有同伴）"},
     "lore": {"syntax": "lore、lore <category> <key>", "context": "一般（隨時可用）"},
-    "rest": {"syntax": "rest <數字><s|m|h|d>", "context": "一般"},
+    "rest": {"syntax": "rest <duration> [practice <skill>]", "context": "一般"},
     "sleep": {"syntax": "sleep", "context": "一般"},
     "wait": {"syntax": "wait until <midnight|dawn|noon|dusk>", "context": "一般"},
     "進入": {"syntax": "進入", "context": "一般（需有任務場景入口）"},
@@ -553,6 +553,27 @@ class CommandDocsContractTests(unittest.TestCase):
                 r"[\u4e00-\u9fff]",
                 f"canonical entry {key!r} 說明 is not Traditional Chinese prose",
             )
+
+    @covers_requirement("game-command-docs::accurate-command-details")
+    def test_rest_entry_documents_the_practice_clause(self):
+        entry = self.entries["rest"]
+        self.assertEqual(
+            entry["語法"], "rest <duration> [practice <skill>]"
+        )
+        self.assertEqual(entry["語法"], EXPECTED_COMMANDS["rest"]["syntax"])
+        description = entry["說明"]
+        # Declared practice settles hourly proficiency, and a clause-less
+        # rest is explicitly zero-growth (the delta scenario's two claims).
+        self.assertIn("practice <技能>", description)
+        self.assertIn("每整小時", description)
+        self.assertIn("不帶來任何成長", description)
+        overview_row = next(
+            line
+            for line in self.overview.splitlines()
+            if line.startswith("| [`rest`]")
+        )
+        self.assertIn("`practice <技能>`", overview_row)
+        self.assertIn("熟練度", overview_row)
 
     @covers_requirement("game-command-docs::accurate-command-details")
     def test_admin_marking_matches_class_locks(self):

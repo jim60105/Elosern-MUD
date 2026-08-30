@@ -10,9 +10,8 @@ daily resets, then the five declared world-event seams
 `world/rules/clock.py` SHALL define a single, ordered stage sequence — `gauge_regen`, `buff_ticks`,
 `sexual_decay`, `practice_settlement`, `daily_resets`, `caravan_arrivals`, `shop_hours`, `quest_deadlines`,
 `npc_schedules`, `instance_reclamation` — matching design doc §6.5's four built stages plus
-`practice_settlement` (the declared-practice seam — currently a zero-growth placeholder
-owned directly by `world/rules/clock.py`, which `declared-practice-skip` turns into the
-declared-practice writer — inserted between `sexual_decay` and
+`practice_settlement` (the declared-practice writer owned directly by
+`world/rules/clock.py`, inserted between `sexual_decay` and
 `daily_resets`) plus `instance_reclamation` (change 14's `reclaim_due_instances()`, appended after
 `npc_schedules` as the final stage), and SHALL execute every `advance()` call's stages in this order
 with no configuration or call-site override capable of changing it.
@@ -41,9 +40,8 @@ with no configuration or call-site override capable of changing it.
 
 #### Scenario: No arithmetic transposition proof exists for practice settlement, because it shares no
 resource with its neighbors
-- **WHEN** `practice_settlement`'s data dependencies are inspected (it currently reads
-  nothing and writes nothing as the zero-growth placeholder; the `declared-practice-skip`
-  writer will read the declared practice booking and write only `skill_proficiency`) against `sexual_decay`'s (`entity.sexual`'s ordered-level fields) and
+- **WHEN** `practice_settlement`'s data dependencies are inspected (it reads the caller's
+  declared-practice booking and race/buff state, and writes only `skill_proficiency`) against `sexual_decay`'s (`entity.sexual`'s ordered-level fields) and
   `daily_resets`'s (`entity.sexual.climax_today` only)
 - **THEN** no field is written by both `practice_settlement` and either neighbor, so the
   structural check above
@@ -100,7 +98,8 @@ stages) SHALL run regardless of `AdvanceSource`.
 #### Scenario: A combat-sourced advance performs no practice settlement
 - **WHEN** `advance(seconds, AdvanceSource.COMBAT, entities)` is called for an entity carrying
   a declared-practice booking that would settle under `AdvanceSource.SKIP`
-- **THEN** no `skill_proficiency` or other practice state changes as a result of the call
+- **THEN** no `skill_proficiency` or other practice state changes as a result of the call, and the
+  booking survives untouched for the actor's next SKIP-sourced advance
 
 #### Scenario: A command- or skip-sourced advance runs the full stage list
 - **WHEN** `advance(seconds, AdvanceSource.COMMAND, entities)` or `advance(seconds,
@@ -184,10 +183,18 @@ game seconds separately, so the handler cannot schedule real-time cleanup.
 
 #### Scenario: Practice settlement never participates in the quantum loop
 - **WHEN** `advance(28800, AdvanceSource.SKIP, entities)` is called
-- **THEN** the `practice_settlement` stage performs no per-second work regardless of
-  `SETTLEMENT_QUANTUM_SECONDS` — it is never chunked into quanta the way
-  `tick_buffs()`/`decay_tick()` are, and the future `declared-practice-skip` writer computes
-  in closed form per study-hour
+- **THEN** the `practice_settlement` stage is called exactly once with the full elapsed value
+  regardless of `SETTLEMENT_QUANTUM_SECONDS` — it is never chunked into quanta the way
+  `tick_buffs()`/`decay_tick()` are — and accrues `completed_whole_hours ×
+PRACTICE_XP_PER_STUDY_HOUR` scaled by learning, affinity, and `growth_rate_multiplier`, once per
+  entity per advance, SKIP-source only, saturating at the skill's derived tip cap and writing
+  nothing when the actor's booking has been consumed or never existed. A successful SKIP advance
+  of fewer than 3600 seconds consumes any booking while growing nothing (whole-hour closed form),
+  and a COMMAND-source advance leaves the booking unconsumed for the actor's next SKIP advance.
+  Settlement is per-entity against each entity's OWN booking — the design §11 batch note's
+  contract that every member's growth comes only from that member's own declared command; the
+  only production SKIP callers supply a single-entity scope, and every unlabeled skip path
+  clears stale bookings before advancing (see `time-skip-commands`)
 
 ### Requirement: Hourly and daily boundary stages fire by tick-boundary arithmetic, never by iterating
 every second or quantum
@@ -210,6 +217,7 @@ crossings.
 #### Scenario: No day-boundary crossing produces no daily reset
 - **WHEN** `advance()` is called with a `seconds` value too small to cross a midnight boundary
 - **THEN** `reset_daily_counters()` is not invoked
+
 ### Requirement: caravan_arrivals, shop_hours, quest_deadlines, and npc_schedules are declared,
 registrable, no-op seams
 

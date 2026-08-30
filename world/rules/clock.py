@@ -14,6 +14,7 @@ from evennia.utils.create import create_script
 from evennia.utils.search import search_script
 
 from world.rules.buffs import BUFF_DEFINITIONS, tick_buffs
+from world.rules.progression import grant_study_practice_xp
 from world.rules.sexual_state import (
     DECAY_CONFIG,
     PLEASURE_CONFIG,
@@ -246,15 +247,34 @@ def _settle_buffs_and_decay(entities: tuple[Any, ...], elapsed_seconds: int) -> 
 
 
 def _practice_settlement(entities: tuple[Any, ...], seconds: int, source: AdvanceSource) -> None:
-    """Zero-growth placeholder for the retired magic-study stage.
+    """Settle declared-practice bookings in closed form (D7: the real writer).
 
-    The magic-XP engine was retired by ``magic-xp-engine-retirement``: no
-    elapsed-time growth accrues here any more. This is the reserved insertion
-    point for a future ``declared-practice-skip`` settlement; the COMBAT-source
-    gate in ``_run_stages`` stays permanent so combat time never feeds any
-    progression seam introduced here.
+    SKIP-source only: declared practice is downtime, so a combat advance must
+    never settle it (the COMBAT gate in ``_run_stages`` stays permanent, and
+    this gate additionally leaves a COMMAND-source advance's booking
+    unconsumed for the actor's next SKIP). Exactly once per entity per
+    advance: the whole elapsed value collapses to completed whole hours —
+    never the quantum loop — and a sub-hour or zero-second SKIP advance
+    consumes the booking with zero growth, so a booking can only ever be
+    settled by the first successful SKIP advance after it was declared.
+    Storage routes exclusively through progression's ``grant_study_practice_xp``
+    (whose sole writer is ``award_practice_xp``), so booked awards saturate
+    identically to per-use awards at the derived tip cap. An entity without a
+    booking — or without a ``db`` at all — is written nothing.
     """
-    return None
+    if source is not AdvanceSource.SKIP:
+        return
+    hours = seconds // 3600
+    for entity in entities:
+        db = getattr(entity, "db", None)
+        if db is None:
+            continue
+        booking = getattr(db, "practice_booking", None)
+        if booking is None:
+            continue
+        db.practice_booking = None
+        if hours >= 1:
+            grant_study_practice_xp(entity, booking, hours)
 
 
 def register_event_source(
@@ -312,6 +332,7 @@ _ADVANCE_ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("buffs", None),
     ("skill_grants", None),
     ("skill_proficiency", None),
+    ("practice_booking", None),
 ) + tuple((f"decay_elapsed__{field}", "sexual_state") for field in DECAY_CONFIG)
 
 

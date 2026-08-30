@@ -19,6 +19,12 @@ freeform_cast_scales:
 # skill_proficiency_level >= cap. Non-canopy caps derive from the registry's
 # reverse-edge map, never from per-skill hand-tuned data.
 proficiency_tip_cap: 10
+# Declared-practice hourly rate (use-driven-progression D7): the closed-form
+# study grant is completed_whole_hours x this rate x learning x affinity x
+# growth buff, settling in the clock's practice_settlement stage. 10.0/hour
+# makes one human non-affinity proficiency level about five hours; provisional
+# like the rest of this file, recalibrate after playtesting.
+practice_xp_per_study_hour: 10.0
 # Freeform scale ladder (use-driven-progression D5): the mastery-entitled
 # scale set a skill's OWN proficiency unlocks. Rungs are canonical scale
 # values with ascending integer levels, the first rung exactly level 0.

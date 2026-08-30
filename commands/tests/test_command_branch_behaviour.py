@@ -566,7 +566,9 @@ class SkipCommandBranchTests(TestCase):
     def test_rest_rejects_bad_duration_and_unsafe_skip(self):
         command = _command(CmdRest, "tomorrow")
         command.func()
-        command.caller.msg.assert_called_with("用法：rest <數字><s|m|h|d>")
+        command.caller.msg.assert_called_with(
+            "用法：rest <數字><s|m|h|d> [practice <技能>]"
+        )
 
         command = _command(CmdRest, "2h")
         with patch("commands.skip._safe_to_skip", return_value=False), patch(

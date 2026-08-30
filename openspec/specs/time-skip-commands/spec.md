@@ -6,10 +6,32 @@ Define deterministic player commands that advance game time through the world cl
 
 
 ### Requirement: rest <duration> parses an explicit duration and advances the clock by that much, capped at the configured maximum
-`commands/skip.py::CmdRest` SHALL parse an explicit duration argument (e.g., `"1h"`, `"30m"`) into a
-concrete number of seconds, cap that value at `MAX_SKIP_SECONDS` (`rulebook/clock.yaml`'s
-`max_sleep_seconds`), and, when `evaluate_skip_safety()` returns `None`, call
-`WorldClock.advance(seconds, AdvanceSource.SKIP, entities=[caller])` with exactly the capped value.
+`commands/skip.py::CmdRest` SHALL parse an explicit duration argument (e.g., `"1h"`, `"30m"`)
+into a concrete number of seconds, cap that value at `MAX_SKIP_SECONDS`
+(`rulebook/clock.yaml`'s `max_sleep_seconds`), and, when `evaluate_skip_safety()` returns `None`,
+call `WorldClock.advance(seconds, AdvanceSource.SKIP, entities=[caller])` with exactly the capped
+value. The syntax SHALL accept the optional declared-practice clause
+`rest <duration> practice <skill>` (the design's `skip <hours> [practice <skill>]` surface on the
+mounted duration command): an accepted booking is recorded on the caller before the advance, and
+the clock's `practice_settlement` stage is its sole writer (see `settlement-stage-order`). An
+unlabeled duration and `rest` without the clause are explicit rest: clock advance with zero
+growth. The clause SHALL be preflighted BEFORE any clock advance: the skill must be ACTIVE, be in
+the caller's `owned_keys()`, and not be saturated at its derived tip cap, rejecting with the
+stable reason codes `PRACTICE_SKILL_UNKNOWN` (unknown key, non-ACTIVE, or unowned) or
+`PRACTICE_SKILL_CAPPED` with zero clock advance and no booking recorded — a skip never
+half-applies. After the safety gate passes, the command owns the booking state outright: an
+accepted clause records its skill, a clause-less rest clears any stale prior booking (so plain
+rest grows nothing even after a rollback-restored booking), and a rejected clause leaves no
+booking — new or stale — standing to settle on a later advance. Every other accepted unlabeled
+skip — `sleep`, `wait until`, and the `advance_skip()` helper behind the WebClient
+`explore.wait` adapter — SHALL likewise clear any stale booking before its SKIP advance, so
+the accepted `rest` practice clause is the only way a booking can ever settle.
+
+#### Scenario: An unlabeled adapter skip clears a rolled-back booking before advancing
+- **WHEN** a rolled-back advance has restored a stale `practice_booking` and the accepted
+  `explore.wait` adapter (or `sleep`/`wait until`) performs its SKIP advance
+- **THEN** the booking was cleared before the advance, `skill_proficiency` is unchanged, and
+  no booking survives
 
 #### Scenario: rest 1h advances the clock by exactly 3600 seconds
 - **WHEN** a safe actor issues `rest 1h`
@@ -24,6 +46,29 @@ concrete number of seconds, cap that value at `MAX_SKIP_SECONDS` (`rulebook/cloc
 - **WHEN** `rest` is issued with an argument that does not match a valid duration shape
 - **THEN** the command rejects with a parse error, calls neither `evaluate_skip_safety()` nor
   `WorldClock.advance()`
+
+#### Scenario: A valid booking settles hourly practice with the advance
+- **WHEN** a safe actor owning `fire_arrow` issues `rest 8h practice fire_arrow`
+- **THEN** `WorldClock.advance()` is called with `seconds == 28800` and the `practice_settlement` stage accrues `8 × PRACTICE_XP_PER_STUDY_HOUR` scaled by learning, affinity, and the growth buff onto `fire_arrow`, saturated at its tip cap
+
+#### Scenario: A capped booking rejects with zero clock advance
+- **WHEN** the actor's `fire_arrow` has saturated at its derived tip cap and they issue `rest 8h practice fire_arrow`
+- **THEN** the command reports `PRACTICE_SKILL_CAPPED`, `WorldClock.advance()` is never called, and no practice state changes
+
+#### Scenario: An unknown or unowned booking skill rejects with zero clock advance
+- **WHEN** an actor issues `rest 1h practice not_a_skill`, or practices a PASSIVE skill, or a spell they do not own
+- **THEN** the command reports `PRACTICE_SKILL_UNKNOWN`, `WorldClock.advance()` is never called,
+  and no booking — new or stale — survives for a later advance
+
+#### Scenario: A plain rest clears a stale rolled-back booking
+- **WHEN** a caller whose stored `practice_booking` was restored by an earlier rolled-back
+  advance issues `rest 8h` with no practice clause
+- **THEN** the clock advances 28800 seconds, no `skill_proficiency` value changes, and no
+  booking remains after the command
+
+#### Scenario: Plain rest grows nothing
+- **WHEN** a safe actor issues `rest 8h` with no practice clause
+- **THEN** the clock advances 28800 seconds and no `skill_proficiency` value changes
 
 #### Scenario: rest is blocked by the safety gate
 - **WHEN** a safe-check-failing actor issues `rest 1h`
