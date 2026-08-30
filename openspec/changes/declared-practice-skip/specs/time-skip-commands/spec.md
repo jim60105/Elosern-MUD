@@ -17,7 +17,16 @@ stable reason codes `PRACTICE_SKILL_UNKNOWN` (unknown key, non-ACTIVE, or unowne
 half-applies. After the safety gate passes, the command owns the booking state outright: an
 accepted clause records its skill, a clause-less rest clears any stale prior booking (so plain
 rest grows nothing even after a rollback-restored booking), and a rejected clause leaves no
-booking — new or stale — standing to settle on a later advance.
+booking — new or stale — standing to settle on a later advance. Every other accepted unlabeled
+skip — `sleep`, `wait until`, and the `advance_skip()` helper behind the WebClient
+`explore.wait` adapter — SHALL likewise clear any stale booking before its SKIP advance, so
+the accepted `rest` practice clause is the only way a booking can ever settle.
+
+#### Scenario: An unlabeled adapter skip clears a rolled-back booking before advancing
+- **WHEN** a rolled-back advance has restored a stale `practice_booking` and the accepted
+  `explore.wait` adapter (or `sleep`/`wait until`) performs its SKIP advance
+- **THEN** the booking was cleared before the advance, `skill_proficiency` is unchanged, and
+  no booking survives
 
 #### Scenario: rest 1h advances the clock by exactly 3600 seconds
 - **WHEN** a safe actor issues `rest 1h`

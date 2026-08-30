@@ -95,6 +95,7 @@ class CmdSleep(Command):
         if not _safe_to_skip(self.caller):
             return
         seconds = _seconds_to_full_regen(self.caller)
+        self.caller.db.practice_booking = None  # unlabeled skips grow nothing
         events = get_world_clock().advance(seconds, AdvanceSource.SKIP, [self.caller])
         self.caller.msg(_render_skip_summary(seconds, events))
 
@@ -117,5 +118,6 @@ class CmdWaitUntil(Command):
             return
         if not _safe_to_skip(self.caller):
             return
+        self.caller.db.practice_booking = None  # unlabeled skips grow nothing
         events = clock.advance(seconds, AdvanceSource.SKIP, [self.caller])
         self.caller.msg(_render_skip_summary(seconds, events))

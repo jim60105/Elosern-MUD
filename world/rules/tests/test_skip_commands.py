@@ -6,6 +6,8 @@ from unittest.mock import Mock, patch
 
 from commands.skip import (
     CmdRest,
+    CmdSleep,
+    CmdWaitUntil,
     DurationParseError,
     _parse_duration,
     _render_skip_summary,
@@ -15,7 +17,7 @@ from tools.spec_traceability import covers_requirement
 from world.rules.clock import AdvanceSource, ScheduledEvent
 from world.rules.progression import proficiency_cap
 from world.rules.skip_safety import SkipRejectReason
-from world.rules.time_skip import MAX_SKIP_SECONDS
+from world.rules.time_skip import MAX_SKIP_SECONDS, advance_skip
 
 
 class SkipCommandHelperTests(unittest.TestCase):
@@ -211,3 +213,72 @@ class RestPracticeBookingTests(unittest.TestCase):
         caller.msg.assert_called_once_with(
             "用法：rest <數字><s|m|h|d> [practice <技能>]"
         )
+
+
+class UnlabeledSkipClearingTests(unittest.TestCase):
+    """Accepted unlabeled skips clear stale bookings before advancing."""
+
+    @staticmethod
+    def _caller():
+        return SimpleNamespace(
+            msg=Mock(),
+            db=SimpleNamespace(practice_booking="fire_arrow"),
+            traits=SimpleNamespace(
+                hp=SimpleNamespace(value=100, max=100, rate=1),
+                mp=SimpleNamespace(value=100, max=100, rate=1),
+                sp=SimpleNamespace(value=100, max=100, rate=1),
+            ),
+        )
+
+    @staticmethod
+    def _clock(seen: list, caller):
+        clock = Mock()
+        clock.advance.return_value = []
+        clock.advance.side_effect = lambda *a, **k: (
+            seen.append(caller.db.practice_booking),
+            [],
+        )[1]
+        return clock
+
+    @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
+    def test_sleep_clears_stale_booking_before_advance(self):
+        caller = self._caller()
+        seen: list = []
+        clock = self._clock(seen, caller)
+        command = CmdSleep()
+        command.caller = caller
+        with (
+            patch("commands.skip._safe_to_skip", return_value=True),
+            patch("commands.skip.get_world_clock", return_value=clock),
+        ):
+            command.func()
+        clock.advance.assert_called_once()
+        self.assertEqual(seen, [None])
+
+    @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
+    def test_wait_until_clears_stale_booking_before_advance(self):
+        caller = self._caller()
+        seen: list = []
+        clock = self._clock(seen, caller)
+        command = CmdWaitUntil()
+        command.caller = caller
+        command.args = "until dawn"
+        with (
+            patch("commands.skip._safe_to_skip", return_value=True),
+            patch("commands.skip.seconds_until_daypart", return_value=60),
+            patch("commands.skip.get_world_clock", return_value=clock),
+        ):
+            command.func()
+        clock.advance.assert_called_once_with(60, AdvanceSource.SKIP, [caller])
+        self.assertEqual(seen, [None])
+
+    @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
+    def test_advance_skip_clears_before_the_webclient_adapter_advance(self):
+        caller = self._caller()
+        seen: list = []
+        clock = self._clock(seen, caller)
+        with patch("world.rules.time_skip.get_world_clock", return_value=clock):
+            advance_skip(caller, 3600)
+        self.assertEqual(seen, [None])
+        self.assertIsNone(caller.db.practice_booking)
+        clock.advance.assert_called_once_with(3600, AdvanceSource.SKIP, [caller])

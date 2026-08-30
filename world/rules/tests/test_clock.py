@@ -514,6 +514,30 @@ class WorldClockAtomicityTests(EvenniaTest):
         self.assertEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0)
         self.assertEqual(self.player.db.practice_booking, "fire_arrow")
 
+    @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
+    def test_advance_skip_after_rollback_grows_nothing(self):
+        from world.rules.clock import get_world_clock
+        from world.rules.time_skip import advance_skip
+
+        self.player.db.skill_proficiency = {"fire_arrow": 20.0}
+        self.player.db.practice_booking = "fire_arrow"
+        clock = get_world_clock()
+        with (
+            patch(
+                "world.rules.clock._settle_boundary_stages",
+                side_effect=RuntimeError("simulated post-practice failure"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            clock.advance(28800, AdvanceSource.SKIP, [self.player])
+        # The rollback restored the declared intent...
+        self.assertEqual(self.player.db.practice_booking, "fire_arrow")
+        # ...and an accepted unlabeled skip (the explore.wait adapter path)
+        # clears it before advancing: zero growth, nothing survives.
+        advance_skip(self.player, 7200)
+        self.assertIsNone(self.player.db.practice_booking)
+        self.assertEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0)
+
 
 class _FakeAttributeStore:
     """Minimal in-memory attribute handler for pure registry unit tests."""

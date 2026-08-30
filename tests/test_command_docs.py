@@ -555,6 +555,27 @@ class CommandDocsContractTests(unittest.TestCase):
             )
 
     @covers_requirement("game-command-docs::accurate-command-details")
+    def test_rest_entry_documents_the_practice_clause(self):
+        entry = self.entries["rest"]
+        self.assertEqual(
+            entry["語法"], "rest <duration> [practice <skill>]"
+        )
+        self.assertEqual(entry["語法"], EXPECTED_COMMANDS["rest"]["syntax"])
+        description = entry["說明"]
+        # Declared practice settles hourly proficiency, and a clause-less
+        # rest is explicitly zero-growth (the delta scenario's two claims).
+        self.assertIn("practice <技能>", description)
+        self.assertIn("每整小時", description)
+        self.assertIn("不帶來任何成長", description)
+        overview_row = next(
+            line
+            for line in self.overview.splitlines()
+            if line.startswith("| [`rest`]")
+        )
+        self.assertIn("`practice <技能>`", overview_row)
+        self.assertIn("熟練度", overview_row)
+
+    @covers_requirement("game-command-docs::accurate-command-details")
     def test_admin_marking_matches_class_locks(self):
         for key, command in self.mounted.items():
             context = EXPECTED_COMMANDS[key]["context"]

@@ -158,7 +158,12 @@ def advance_skip(actor: Any, seconds: int) -> list[ScheduledEvent]:
 
     ``seconds`` must already be safe and validated; this call performs the
     single ``AdvanceSource.SKIP`` advance and returns the settled events.
+    The skip is unlabeled by definition, so it carries zero growth: any
+    stale booking a rolled-back advance restored is cleared BEFORE the
+    advance, keeping the accepted ``rest`` practice clause the only way a
+    booking can settle.
     """
+    actor.db.practice_booking = None
     return get_world_clock().advance(seconds, AdvanceSource.SKIP, [actor])
 
 
