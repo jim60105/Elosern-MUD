@@ -1,8 +1,12 @@
 ## ADDED Requirements
 
 ### Requirement: Epithet nomination fires only at rest points and is throttled
-`maybe_nominate(entity)` SHALL fire only at the four narrative rest points —
-logout, a world-clock day boundary while the entity is resting, an examination
+The nomination trigger (the composition-root
+`server.title_nomination_service.schedule_epithet_nomination(entity)`; the
+transport contract forbids `world/rules` and `commands` from importing
+`world/ai`, so scheduling lives in the service and persisting in the rules
+writer) SHALL fire only at the four narrative rest points — logout, a
+world-clock day boundary while the entity is resting, an examination
 pass, and a quest-arc completion — and never during combat settlement. While a
 `db.pending_title_ballot` exists, every trigger SHALL return silently (one ballot
 at a time; no replacement path). A declined ballot SHALL suppress
@@ -77,11 +81,14 @@ validated proposal into `db.pending_title_ballot` in its own all-or-nothing step
 transaction: bank the epithet (display, `origin_quote = basis`, `granted_tick`),
 auto-equip the epithet slot when empty (F's D8 discipline), and clear the ballot;
 a repeated or out-of-range accept SHALL reject with a stable reason and change
-nothing. A decline SHALL discard the batch, start the cooldown, and append an
-EventLog entry naming the declined displays so the Director's future summaries
-see what the player rejected (soft learning; no programmatic blacklist). No code
-path outside these three rules-layer writers SHALL change title state from a
-ballot.
+nothing. A decline SHALL discard the batch, start the cooldown, record the
+declined displays into a bounded per-entity decline log, and emit a
+`title_epithet_declined` EventLog entry through the answering surface; the
+nomination prompt SHALL digest that decline log as soft-learning context so the
+Director's future summaries see what the player rejected, and no programmatic
+blacklist SHALL exist anywhere (the decline log is prompt context only, never a
+filter rule). No code path outside these three rules-layer writers SHALL change
+title state from a ballot.
 
 #### Scenario: Accept banks and auto-equips atomically
 - **WHEN** a player accepts candidate 1 while the epithet slot is occupied
@@ -89,4 +96,6 @@ ballot.
 
 #### Scenario: Decline records for the Director
 - **WHEN** a player declines a ballot
-- **THEN** an EventLog entry lists the declined displays and no collection entry is created
+- **THEN** a `title_epithet_declined` EventLog entry lists the declined
+  displays, no collection entry is created, and the decline log persists them
+  so the next nomination prompt digest carries what the player rejected

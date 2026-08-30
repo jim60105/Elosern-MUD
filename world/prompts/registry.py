@@ -79,6 +79,12 @@ def _build() -> dict[str, PromptSpec]:
                 "affordances",
             ),
         ),
+        PromptSpec("title_nomination.system", "title_nomination.yaml"),
+        PromptSpec(
+            "title_nomination.user",
+            "title_nomination.yaml",
+            ("player_name", "full_title", "recent_events", "declined"),
+        ),
     )
     return {spec.key: spec for spec in specs}
 

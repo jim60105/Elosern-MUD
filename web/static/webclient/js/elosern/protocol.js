@@ -202,6 +202,14 @@
   var SERVICES_BUY = "shop.buy";
   var SERVICES_SELL = "shop.sell";
 
+  // title_ballot panel bounds (mirror of web.webclient.presentation.
+  // title_ballot, title-epithet-nomination D4). The values are owned by
+  // world/rules/titles.py (the ballot writer); these constants mirror the
+  // panel validator and must stay equal.
+  var TITLE_BALLOT_MAX_CANDIDATES = 3;
+  var TITLE_BALLOT_MAX_DISPLAY = 64;
+  var TITLE_BALLOT_MAX_BASIS = 80;
+
   // creation panel bounds (mirror of web.webclient.presentation.creation,
   // design D2). These constants are shared with the server through a
   // dual-direction parity test.
@@ -262,6 +270,7 @@
     exploration: 1,
     character: 6,
     lineage: 1,
+    title_ballot: 1,
   };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
@@ -3741,6 +3750,86 @@
     return result;
   }
 
+  // -------------------------------------------------------------------------
+  // title_ballot panel validator (mirror of web.webclient.presentation.
+  // title_ballot, title-epithet-nomination D4). Zero candidates is the
+  // legitimate idle form; the rules layer never truncates the basis, and
+  // neither does this mirror.
+  // -------------------------------------------------------------------------
+
+  function validateTitleBallotCandidate(value, position) {
+    requireExactFields(
+      value,
+      "title ballot candidate",
+      ["index", "display", "basis"],
+      []
+    );
+    requireInt(value.index, "candidate index", 1, TITLE_BALLOT_MAX_CANDIDATES);
+    if (value.index !== position) {
+      throw new Error("candidate indices must be strictly 1..n ascending");
+    }
+    requireString(value.display, "candidate display", TITLE_BALLOT_MAX_DISPLAY);
+    if (codePoints(value.display) < 1) {
+      throw new Error("candidate display must be non-empty");
+    }
+    requireString(value.basis, "candidate basis", TITLE_BALLOT_MAX_BASIS);
+    if (codePoints(value.basis) < 1) {
+      throw new Error("candidate basis must be non-empty");
+    }
+    return {
+      index: value.index,
+      display: value.display,
+      basis: value.basis,
+    };
+  }
+
+  // Exact available title_ballot panel v1 schema.
+  function validateTitleBallotPanel(payload) {
+    requireExactFields(
+      payload,
+      "title_ballot panel",
+      ["schema_version", "available", "kind", "candidates"],
+      []
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== 1) {
+      throw new Error("unsupported title_ballot schema_version");
+    }
+    if (payload.available !== true || payload.kind !== "title_ballot") {
+      throw new Error(
+        "title_ballot panel must be available with kind title_ballot"
+      );
+    }
+    var candidates = payload.candidates;
+    if (!Array.isArray(candidates)) {
+      throw new Error("title ballot candidates must be a list");
+    }
+    if (candidates.length > TITLE_BALLOT_MAX_CANDIDATES) {
+      throw new Error(
+        "title ballot candidates must hold at most " +
+          TITLE_BALLOT_MAX_CANDIDATES +
+          " entries"
+      );
+    }
+    var normalized = [];
+    for (var i = 0; i < candidates.length; i++) {
+      normalized.push(validateTitleBallotCandidate(candidates[i], i + 1));
+    }
+    var result = {
+      schema_version: 1,
+      available: true,
+      kind: "title_ballot",
+      candidates: normalized,
+    };
+    // Envelope guarantee: the per-field ceilings keep any legal ballot far
+    // below the envelope limit; an over-limit payload can only come from a
+    // producer bug and fails closed.
+    if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("title_ballot payload exceeds the OOB envelope limit");
+    }
+    return result;
+  }
+
   // Panel discriminator dispatch: the unavailable form is common to every
   // registered panel; the available form is validated against its schema.
   function validateUnavailablePanel(payload, schemaVersion) {
@@ -3816,6 +3905,9 @@
     }
     if (name === "lineage") {
       return validateLineagePanel(payload);
+    }
+    if (name === "title_ballot") {
+      return validateTitleBallotPanel(payload);
     }
     throw new Error("panel " + name + " has no registered schema");
   }
@@ -4007,6 +4099,9 @@
     EXPLORATION_MAX_SCRIPTED_KEYWORDS: EXPLORATION_MAX_SCRIPTED_KEYWORDS,
     EXPLORATION_MAX_EXIT_REF: EXPLORATION_MAX_EXIT_REF,
     EXPLORATION_MAX_NODE_ID: EXPLORATION_MAX_NODE_ID,
+    TITLE_BALLOT_MAX_CANDIDATES: TITLE_BALLOT_MAX_CANDIDATES,
+    TITLE_BALLOT_MAX_DISPLAY: TITLE_BALLOT_MAX_DISPLAY,
+    TITLE_BALLOT_MAX_BASIS: TITLE_BALLOT_MAX_BASIS,
     EXPLORATION_MAX_DISPLAY_NAME: EXPLORATION_MAX_DISPLAY_NAME,
     EXPLORATION_MAX_KIND: EXPLORATION_MAX_KIND,
     EXPLORATION_MAX_LABEL: EXPLORATION_MAX_LABEL,
@@ -4098,6 +4193,7 @@
     LINEAGE_MAX_CHAINS: LINEAGE_MAX_CHAINS,
     LINEAGE_MAX_NODES_PER_CHAIN: LINEAGE_MAX_NODES_PER_CHAIN,
     LINEAGE_MAX_TEXT: LINEAGE_MAX_TEXT,
+    validateTitleBallotPanel: validateTitleBallotPanel,
     validatePanel: validatePanel,
 
     // The only accepted client->server synchronization body.

@@ -237,6 +237,24 @@
       var key = label(payload && payload.item_key);
       return key === null ? null : join(["equip", key]);
     },
+    // Ballot answers replay the typed `title accept <編號>` / `title decline`
+    // commands (commands/title.py) verbatim: the numbered choice only, never
+    // free text. A missing or out-of-cap index stays silent.
+    "title.accept": function (payload) {
+      var index = payload && payload.index;
+      if (
+        typeof index !== "number" ||
+        !Number.isInteger(index) ||
+        index < 1 ||
+        index > 3
+      ) {
+        return null;
+      }
+      return join(["title", "accept", String(index)]);
+    },
+    "title.decline": function () {
+      return "title decline";
+    },
     "creation.preset": function (payload) {
       var key = payload && payload.preset_key;
       return isNonEmpty(key) ? join(["character preset", key]) : null;

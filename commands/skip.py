@@ -48,6 +48,23 @@ _REST_ARGS_RE = re.compile(
 )
 
 _REST_USAGE = "用法：rest <數字><s|m|h|d> [practice <技能>]"
+def _maybe_nominate_after_rest(caller, events) -> None:
+    """Rest-point nomination trigger (title-system D4 §7.1, change G).
+
+    Fires only when the SKIP-source advance crossed a world-clock day
+    boundary. The composition-root import is function-local (the
+    ``commands/scene.py`` precedent) and every failure is swallowed: resting
+    can never be broken by nomination, and the stage is a silent no-op
+    offline.
+    """
+    try:
+        from server.title_nomination_service import (
+            schedule_rest_boundary_nomination,
+        )
+
+        schedule_rest_boundary_nomination(caller, events)
+    except Exception:
+        pass
 
 
 class CmdRest(Command):
@@ -85,6 +102,7 @@ class CmdRest(Command):
         self.caller.db.practice_booking = skill_key
         events = get_world_clock().advance(seconds, AdvanceSource.SKIP, [self.caller])
         self.caller.msg(_render_skip_summary(seconds, events))
+        _maybe_nominate_after_rest(self.caller, events)
 
 
 class CmdSleep(Command):
@@ -98,6 +116,7 @@ class CmdSleep(Command):
         self.caller.db.practice_booking = None  # unlabeled skips grow nothing
         events = get_world_clock().advance(seconds, AdvanceSource.SKIP, [self.caller])
         self.caller.msg(_render_skip_summary(seconds, events))
+        _maybe_nominate_after_rest(self.caller, events)
 
 
 class CmdWaitUntil(Command):
@@ -121,3 +140,4 @@ class CmdWaitUntil(Command):
         self.caller.db.practice_booking = None  # unlabeled skips grow nothing
         events = clock.advance(seconds, AdvanceSource.SKIP, [self.caller])
         self.caller.msg(_render_skip_summary(seconds, events))
+        _maybe_nominate_after_rest(self.caller, events)

@@ -159,6 +159,8 @@ class RegistryTests(unittest.TestCase):
                     "explore.engage",
                     "explore.wait",
                     "options.dismiss",
+                    "title.accept",
+                    "title.decline",
                 }
             ),
         )

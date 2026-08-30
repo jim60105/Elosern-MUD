@@ -14,10 +14,13 @@ the single-writer boundary intact and the deterministic-offline invariant whole
 
 ## What Changes
 
-- `maybe_nominate(entity)` fires only at narrative rest points: logout, a
-  world-clock day boundary while resting, exam pass, quest-arc completion —
-  never mid-combat. At most one pending ballot per entity; a decline starts a
-  `NOMINATION_COOLDOWN_DAYS` (registry constant, 2) day-boundary cooldown
+- The nomination trigger (composition-root
+  `server/title_nomination_service.schedule_epithet_nomination(entity)` — the
+  transport contract forbids rules/commands importing `world/ai`) fires only at
+  narrative rest points: logout, a world-clock day boundary while resting,
+  exam pass, quest-arc completion — never mid-combat. At most one pending
+  ballot per entity; a decline starts a `NOMINATION_COOLDOWN_DAYS`
+  (registry constant, 2) day-boundary cooldown
   (decline is the only cooldown source — ballots never expire); an accepted
   ballot does not.
 - Proposal pipeline in `world/ai/` (proposal-only, writes nothing): Director
@@ -37,9 +40,11 @@ the single-writer boundary intact and the deterministic-offline invariant whole
   voids the round); consent writes via `accept_epithet(entity,
   index)` banks the entry (display, origin_quote = basis, granted_tick) and
   auto-equips an empty epithet slot in one atomic transaction; decline records
-  the rejected displays to the EventLog (soft learning for the Director; no
-  programmatic blacklist). Deleted-then-renominated names are legal again
-  because collision filtering reads the live collection.
+  the rejected displays into a bounded per-entity decline log and emits a
+  `title_epithet_declined` EventLog entry through the answering surface (soft
+  learning for the Director — the nomination prompt digests the decline log;
+  no programmatic blacklist exists). Deleted-then-renominated names are legal
+  again because collision filtering reads the live collection.
 
 ## Capabilities
 

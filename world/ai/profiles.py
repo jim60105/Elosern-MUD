@@ -25,6 +25,7 @@ LAYER_NAMES = (
     "scene_builder",
     "character_creation",
     "action_options",
+    "title_nomination",
 )
 
 DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
@@ -33,6 +34,10 @@ DEFAULT_MODEL = "llama3.2"
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_MAX_TOKENS = 250
 ACTION_OPTIONS_MAX_TOKENS = 320
+# 5-candidate ``{display, basis}`` JSON payload (change G); sized like the
+# action-options payload with headroom for 80-character Traditional-Chinese
+# basis quotes.
+TITLE_NOMINATION_MAX_TOKENS = 640
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_HEADERS: Mapping[str, tuple[str, ...]] = MappingProxyType(
@@ -170,6 +175,10 @@ def default_profiles() -> dict[str, dict[str, Any]]:
         **profiles["action_options"],
         "max_tokens": ACTION_OPTIONS_MAX_TOKENS,
         "supports_response_format": True,
+    }
+    profiles["title_nomination"] = {
+        **profiles["title_nomination"],
+        "max_tokens": TITLE_NOMINATION_MAX_TOKENS,
     }
     return profiles
 

@@ -63,6 +63,8 @@ _ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("skill_proficiency", None),
     ("title_collection", None),
     ("title_equipped", None),
+    ("pending_title_ballot", None),
+    ("title_nomination_declines", None),
 )
 
 

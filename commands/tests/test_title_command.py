@@ -18,10 +18,13 @@ from commands.title import CmdTitle
 from typeclasses.characters import PlayerCharacter
 from world.lore.titles import FIXED_TITLE_REGISTRY, STARTER_EPITHET
 from world.rules.titles import (
+    PENDING_BALLOT_KEY,
     TITLE_COLLECTION_KEY,
     bank_fixed,
     bank_epithet,
+    decline_records,
     grant_starter_pair,
+    persist_nomination_ballot,
     read_title_state,
 )
 
@@ -132,3 +135,116 @@ class TitleCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIsInstance(commands["title"], CmdTitle)
         self.assertFalse(set(commands["title"].aliases))
         self.assertNotIn("稱號", commands)
+
+
+_NO_BALLOT = "目前沒有待決的異名提名。"
+_BAD_INDEX = "沒有這個編號的提名。"
+
+
+class TitleBallotCommandTests(EvenniaCommandTestMixin, EvenniaTest):
+    """``title accept`` / ``title decline`` against a real pending ballot."""
+
+    def setUp(self):
+        super().setUp()
+        self.actor = create_object(PlayerCharacter, key="ballot command actor")
+
+    def _call(self, args):
+        return self.call(CmdTitle(), args, caller=self.actor, receiver=self.actor)
+
+    def _ballot(self):
+        self.assertTrue(
+            persist_nomination_ballot(
+                self.actor,
+                [
+                    {"display": "火焰之心", "basis": "焚盡匪寨"},
+                    {"display": "破曉之刃", "basis": "曙間退敵"},
+                ],
+            )
+        )
+
+    def test_usage_lists_the_ballot_verbs(self):
+        output = self._call("")
+        self.assertIn("title accept <1|2|3>", output)
+        self.assertIn("title decline", output)
+
+    def test_answers_without_ballot_use_the_stable_line(self):
+        for args in ("accept", "accept 1", "decline"):
+            with self.subTest(args=args):
+                self.assertEqual(self._call(args), _NO_BALLOT)
+        self.assertFalse(self.actor.attributes.has(PENDING_BALLOT_KEY))
+
+    @covers_requirement("title-system::the-ballot-persists-unchanged-until-consent")
+    def test_bare_accept_lists_the_ballot(self):
+        self._ballot()
+        output = self._call("accept")
+        self.assertIn("◆ 異名提名（待決）", output)
+        self.assertIn("1. 火焰之心——焚盡匪寨", output)
+        self.assertIn("2. 破曉之刃——曙間退敵", output)
+        self.assertEqual(len(read_title_state(self.actor)[0]), 0)
+
+    @covers_requirement("title-system::the-ballot-persists-unchanged-until-consent")
+    def test_accept_records_the_numbered_choice(self):
+        self._ballot()
+        self.assertEqual(self._call("accept 1"), "你採納異名：火焰之心")
+        collection, equipped = read_title_state(self.actor)
+        self.assertEqual([e["display"] for e in collection], ["火焰之心"])
+        self.assertEqual(equipped["epithet"], "火焰之心")
+        self.assertFalse(self.actor.attributes.has(PENDING_BALLOT_KEY))
+        # A second answer has nothing to answer.
+        self.assertEqual(self._call("accept 1"), _NO_BALLOT)
+        self.assertEqual(self._call("decline"), _NO_BALLOT)
+
+    def test_accept_rejects_out_of_range_and_non_numeric(self):
+        self._ballot()
+        for args in ("accept 3", "accept 0", "accept abc", "accept -1"):
+            with self.subTest(args=args):
+                self.assertEqual(self._call(args), _BAD_INDEX)
+        self.assertTrue(self.actor.attributes.has(PENDING_BALLOT_KEY))
+
+    def test_accept_reports_already_owned_epithet(self):
+        grant_starter_pair(self.actor)
+        self.assertTrue(
+            persist_nomination_ballot(
+                self.actor, [{"display": "南門新客", "basis": "再度入票"}]
+            )
+        )
+        self.assertEqual(self._call("accept 1"), "你早已擁有異名：南門新客")
+        self.assertFalse(self.actor.attributes.has(PENDING_BALLOT_KEY))
+        self.assertEqual(len(read_title_state(self.actor)[0]), 2)
+
+    @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
+    def test_decline_consumes_ballot_and_starts_the_record(self):
+        self._ballot()
+        output = self._call("decline")
+        self.assertIn("拒絕了異名提名", output)
+        self.assertIn("火焰之心", output)
+        self.assertIn("破曉之刃", output)
+        self.assertFalse(self.actor.attributes.has(PENDING_BALLOT_KEY))
+        records = decline_records(self.actor)
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["displays"], ("火焰之心", "破曉之刃"))
+
+    @covers_requirement("title-system::the-ballot-persists-unchanged-until-consent")
+    def test_list_shows_the_pending_ballot_section(self):
+        bank_fixed(self.actor, "g_f_rank", 1)
+        self._ballot()
+        output = self._call("list")
+        self.assertIn("◆ 異名提名（待決）", output)
+        self.assertIn("title accept <編號>", output)
+        # After accepting, the section is gone.
+        self._call("accept 2")
+        self.assertNotIn("◆ 異名提名（待決）", self._call("list"))
+
+    def test_malformed_ballot_presents_stable_lines_and_writes_nothing(self):
+        self.actor.attributes.add(PENDING_BALLOT_KEY, [{"display": "缺 basis"}])
+        # Strict readers fail closed: the answer surfaces present the fixed
+        # unavailable line and the bare listing degrades to "nothing pending".
+        self.assertEqual(self._call("accept 1"), _UNAVAILABLE)
+        self.assertEqual(self._call("decline"), _UNAVAILABLE)
+        self.assertEqual(self._call("accept"), _NO_BALLOT)
+        self.assertNotIn("◆ 異名提名", self._call("list"))
+        # The malformed face stays untouched (the writer fails closed too).
+        self.assertEqual(
+            self.actor.attributes.get(PENDING_BALLOT_KEY, default=None),
+            [{"display": "缺 basis"}],
+        )

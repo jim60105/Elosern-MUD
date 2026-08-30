@@ -25,6 +25,13 @@ from .elements import ELEMENT_REGISTRY
 # panel protocol.
 MAX_TITLE_DISPLAY_CODE_POINTS = 63
 
+# Epithet nomination throttle (change G, title-system D4): a declined ballot
+# suppresses re-nomination for this many world-clock day boundaries. Decline is
+# the only cooldown source — pending ballots never expire. Plain module
+# constant; registry rows, not constants, are what ``world.lore.sync`` mirrors
+# into Scripts.
+NOMINATION_COOLDOWN_DAYS = 2
+
 
 class TitleCategory(StrEnum):
     """The closed display taxonomy of the fixed-title codex (D7)."""

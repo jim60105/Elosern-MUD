@@ -17,7 +17,7 @@ from .runtime import (
     QuestState,
     definition_for,
     fail_record,
-    fulfill_record,
+    fulfill_record_for,
     read_records,
 )
 from .transitions import pending_effects_for_transition, release_stage_binding
@@ -91,7 +91,9 @@ def _defeat_progress_changes(
         gained = min(matches, objective.quantity - record.stage_progress)
         new_progress = record.stage_progress + gained
         if new_progress >= objective.quantity:
-            replacements[record.quest_id] = fulfill_record(record, definition)
+            replacements[record.quest_id] = fulfill_record_for(
+                owner, record, definition
+            )
             pin_operations.extend(release_stage_binding(owner, record))
         else:
             replacements[record.quest_id] = replace(record, stage_progress=new_progress)

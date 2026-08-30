@@ -1913,6 +1913,11 @@ def _snapshot_entity_state(entity: Any) -> dict[str, Any]:
         "skill_proficiency": _attribute_snapshot(entity, "skill_proficiency"),
         "title_collection": _attribute_snapshot(entity, "title_collection"),
         "title_equipped": _attribute_snapshot(entity, "title_equipped"),
+        "pending_title_ballot": _attribute_snapshot(entity, "pending_title_ballot"),
+        "title_nomination_declines": _attribute_snapshot(
+            entity,
+            "title_nomination_declines",
+        ),
     }
 
 
@@ -1962,6 +1967,16 @@ def _restore_entity_state(entity: Any, snapshot: dict[str, Any]) -> None:
     _restore_attribute(entity, "skill_proficiency", snapshot["skill_proficiency"])
     _restore_attribute(entity, "title_collection", snapshot["title_collection"])
     _restore_attribute(entity, "title_equipped", snapshot["title_equipped"])
+    _restore_attribute(
+        entity,
+        "pending_title_ballot",
+        snapshot["pending_title_ballot"],
+    )
+    _restore_attribute(
+        entity,
+        "title_nomination_declines",
+        snapshot["title_nomination_declines"],
+    )
     entity.traits.trait_data = entity.attributes.get(
         "traits",
         default={},

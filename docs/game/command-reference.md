@@ -481,9 +481,9 @@
 | --- | --- |
 | 指令 | `title` |
 | 別名 | （無） |
-| 語法 | `title list`、`title equip fixed <display|key>`、`title equip epithet <display>` |
+| 語法 | `title list`、`title equip fixed <display|key>`、`title equip epithet <display>`、`title accept <1|2|3>`、`title decline` |
 | 情境 | 一般（戰鬥內外皆可用） |
-| 說明 | 檢視與更換稱號。`title list` 顯示目前全銜、稱號冊中的稱號與異名（尚未取得的固定稱號會顯示獲得提示）；`title equip fixed <display|key>` 與 `title equip epithet <display>` 把該欄位換成另一筆已取得的內容。稱號與異名是互斥槽位，一旦有內容便恆為已掛上，沒有卸下的指令；他人查看你時看到的稱呼即為這組全銜。未知、尚未取得或類別錯誤的顯示名一律回覆相同的拒絕訊息，不列出可選內容。 |
+| 說明 | 檢視與更換稱號。`title list` 顯示目前全銜、稱號冊中的稱號與異名（尚未取得的固定稱號會顯示獲得提示；有待決提名時並列出候選）；`title equip fixed <display|key>` 與 `title equip epithet <display>` 把該欄位換成另一筆已取得的內容。稱號與異名是互斥槽位，一旦有內容便恆為已掛上，沒有卸下的指令；他人查看你時看到的稱呼即為這組全銜。`title accept <1|2|3>` 與 `title decline` 回覆待決的異名提名投票：接受以編號選擇並記入該異名（投票一律不使用自由文字），放棄則丟棄該批並進入冷卻。未知、尚未取得或類別錯誤的顯示名一律回覆相同的拒絕訊息，不列出可選內容。 |
 
 ### 暱稱
 

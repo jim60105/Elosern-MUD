@@ -11,11 +11,13 @@ sides are restored to full HP/MP/SP again after settlement, win or lose
 and promotes exactly one rank on PASS.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
 
 from evennia.utils.create import create_object
+from evennia.utils.logger import log_warn
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer
@@ -32,6 +34,29 @@ from world.rules.surfaces import (
 
 class GuildExamError(ValueError):
     """An examination operation violates the deterministic exam contract."""
+
+
+# Exam-pass observers (title-system change G nomination trigger seam):
+# registered by the composition-root service at server start, called once
+# after a PASS settlement's transaction block completes. Observers must defer
+# their side effects through ``transaction.on_commit`` (an outer transaction
+# may still own the commit) and a raising observer is isolated and logged —
+# settlement semantics never change because of an observer.
+_EXAM_PASS_OBSERVERS: list[Callable[[Any, str], None]] = []
+
+
+def register_exam_pass_observer(observer: Callable[[Any, str], None]) -> None:
+    """Idempotently install one exam-pass observer."""
+    if observer not in _EXAM_PASS_OBSERVERS:
+        _EXAM_PASS_OBSERVERS.append(observer)
+
+
+def _notify_exam_pass(actor: Any, target_rank: str) -> None:
+    for observer in tuple(_EXAM_PASS_OBSERVERS):
+        try:
+            observer(actor, target_rank)
+        except Exception as error:  # noqa: BLE001 - isolation is the contract
+            log_warn(f"exam pass observer failed: {error}")
 
 
 class ExamReason(StrEnum):
@@ -430,6 +455,11 @@ def settle_exam_outcome(
             actor, "title_equipped", title_equipped_snapshot
         )
         raise
+    if passed:
+        # The settlement transaction block succeeded; observers defer their
+        # own side effects to ``transaction.on_commit`` because an outer
+        # transaction (the caller's session settlement) may still commit.
+        _notify_exam_pass(actor, record.target_rank)
     result = {"exam_id": exam_id, "state": new_state.value, "passed": passed}
     if title_notifications:
         result["title_notifications"] = list(title_notifications)
