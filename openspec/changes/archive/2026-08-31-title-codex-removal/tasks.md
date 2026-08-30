@@ -67,6 +67,6 @@
 
 ## Post-sync traceability (during archive/sync)
 
-- [ ] P1 On sync, annotate the new `title-system` requirement IDs on the §4.2–
+- [x] P1 On sync, annotate the new `title-system` requirement IDs on the §4.2–
   §4.4 tests; re-check the `game-command-docs` title-entry ID coverage (same ID
   through F→G→H syntax extensions).

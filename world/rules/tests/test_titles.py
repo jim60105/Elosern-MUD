@@ -542,6 +542,9 @@ class TitleStateTests(EvenniaTest):
             self.assertNotIn(word, source)
         self.assertIn("remove", source)
 
+    @covers_requirement(
+        "title-system::epithet-removal-is-the-only-delete-path-and-gates-precede-confirmation"
+    )
     def test_removal_source_structurally_preserves_equipment_and_fixed(self):
         # Body-level AST pin (complements the name-level scan): the sole
         # delete path writes the EQUIPPED record back unchanged and its
@@ -1540,6 +1543,9 @@ class EpithetRemovalRulesTests(EvenniaTest):
         grant_starter_pair(self.entity)
         bank_epithet(self.entity, "破城先鋒", "率先破門。", 500)
 
+    @covers_requirement(
+        "title-system::epithet-removal-is-the-only-delete-path-and-gates-precede-confirmation"
+    )
     def test_gate_precedence_unknown_then_last_then_equipped(self):
         # Unknown before anything: no epithets at all, fixed keys, blanks,
         # and non-strings all read TARGET_UNKNOWN.

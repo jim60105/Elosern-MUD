@@ -11,6 +11,7 @@ strict reads.
 """
 
 
+from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
@@ -59,6 +60,9 @@ class TitleCodexViewTests(EvenniaTest):
             self.assertGreater(len(row.hint), 0)
             self.assertEqual(row.granted_tick, 0)
 
+    @covers_requirement(
+        "title-system::titlecodexview-is-a-pure-bounded-read-model-for-the-codex"
+    )
     def test_locked_rows_show_hints_and_unlocked_rows_show_flavors_never_both(self):
         bank_fixed(self.character, "g_f_rank", 100)
         view = build_title_codex_view(self.character)
@@ -141,6 +145,9 @@ class TitleCodexViewTests(EvenniaTest):
             {"fixed": "g_f_rank", "epithet": "南門新客"},
         )
 
+    @covers_requirement(
+        "title-system::titlecodexview-is-a-pure-bounded-read-model-for-the-codex"
+    )
     def test_clipping_is_a_contiguous_prefix_within_every_cap(self):
         long_quote = "援" * (TITLE_MAX_BASIS_CHARS + 40)
         bank_epithet(self.character, "破城先鋒", long_quote, 100)

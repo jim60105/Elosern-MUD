@@ -417,6 +417,9 @@ class TitleRemovalCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             ["南門新客", "破城先鋒"],
         )
 
+    @covers_requirement(
+        "title-system::epithet-removal-is-the-only-delete-path-and-gates-precede-confirmation"
+    )
     def test_remove_fixed_has_no_delete_surface_at_all(self):
         self._bank_pair()
         before = read_title_state(self.actor)
@@ -425,6 +428,9 @@ class TitleRemovalCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 self.assertIn("語法：title list", self._call(args))
         self.assertEqual(read_title_state(self.actor), before)
 
+    @covers_requirement(
+        "title-system::codex-surfaces-remain-consistent-across-sessions"
+    )
     def test_removed_state_survives_an_attribute_cache_reset(self):
         # Logout/reload analog: a cache reset forces a durable re-read.
         self._bank_pair()

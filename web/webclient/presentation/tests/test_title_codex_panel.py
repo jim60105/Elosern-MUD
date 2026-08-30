@@ -123,6 +123,9 @@ class TitleCodexSchemaTests(unittest.TestCase):
             frozenset(member.value for member in TitleCategory),
         )
 
+    @covers_requirement(
+        "title-system::the-codex-oob-payload-and-webclient-window-are-server-authored"
+    )
     def test_exact_available_field_set_and_version_discipline(self):
         for bad in (
             {**_valid_panel(), "extra": 1},

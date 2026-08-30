@@ -15,6 +15,7 @@ seeded state; no live LLM, Stable Diffusion, or other network service.
 
 from __future__ import annotations
 
+from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     install_outbound_recorder,
@@ -79,6 +80,9 @@ class TitleCodexBrowserTest(BrowserAcceptanceTest):
 
     # -- journeys ---------------------------------------------------------------
 
+    @covers_requirement(
+        "title-system::the-codex-oob-payload-and-webclient-window-are-server-authored"
+    )
     def test_codex_window_renders_rows_flags_and_ballot_tab_verbatim(self):
         """Locked hints, unlocked affordances, the ★ mark, can_remove buttons."""
         page = self.logged_in_page()
