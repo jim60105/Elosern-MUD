@@ -521,9 +521,15 @@ def wait_for_narrative_settled(page: Page, before: int, timeout: int = 30000) ->
 
 
 def valid_status_panel(name: str, identity: str) -> dict:
-    """A schema-valid available status panel for injected snapshots."""
+    """A schema-valid available status panel for injected snapshots.
+
+    Tracks ``STATUS_SCHEMA_VERSION = 2`` (``web/webclient/presentation/
+    status.py``): the v2 shape adds the optional ``full_title`` actor field;
+    every other field is identical to v1, and the client's
+    ``validateStatusPanel`` rejects any other registered version outright.
+    """
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
         "actor": {"name": name, "identity": identity, "location": None},
         "resources": {
