@@ -49,7 +49,7 @@ rejected resolution SHALL advance nothing and SHALL leave every snapshotted surf
 When the clock callback, the final clock persistence, or the outer commit fails after a successful
 resolution, the settlement SHALL restore, before propagating the failure, the pre-action state of every
 snapshotted surface — actor and target Evennia Attributes (`traits`, `disguised_stats`, `sexual_traits`,
-`virgin`, `experience_types`, `buffs`, `skill_grants`, `magic_xp`, `skill_proficiency`, `quest_log`),
+`virgin`, `experience_types`, `buffs`, `skill_grants`, `skill_proficiency`, `quest_log`),
 the battlefield's fled/knocked-out sets when present, every callback-owned advance surface, and the
 clock tick — because Django rollback reverts only durable rows while Evennia's in-process caches keep
 the uncommitted values. Restore SHALL run in a fixed deterministic order after the rollback, SHALL be

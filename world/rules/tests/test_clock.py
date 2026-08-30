@@ -165,7 +165,7 @@ class ClockTests(unittest.TestCase):
         events = clock.advance(2, AdvanceSource.COMBAT, [entity])
         self.assertEqual([event.kind for event in events], ["daily_reset", "caravan"])
 
-    @covers_requirement("settlement-stage-order::buff-ticks-sexual-decay-and-magic-study-are-skipped-for-combat-sourced-advances", "settlement-stage-order::hourly-and-daily-boundary-stages-fire-by-tick-boundary-arithmetic-never-by-iterating")
+    @covers_requirement("settlement-stage-order::buff-ticks-sexual-decay-and-practice-settlement-are-skipped-for-combat-sourced-advances", "settlement-stage-order::hourly-and-daily-boundary-stages-fire-by-tick-boundary-arithmetic-never-by-iterating")
     def test_command_runs_per_quantum_stages(self):
         entity = Entity()
         clock = WorldClock()
@@ -223,7 +223,7 @@ class ClockTests(unittest.TestCase):
             settle_combat_result(result, [])
         self.assertEqual(clock.tick, 18)
 
-    @covers_requirement("settlement-stage-order::settlement-stages-run-in-the-fixed-order-regen-buffs-sexual-decay-magic-study")
+    @covers_requirement("settlement-stage-order::settlement-stages-run-in-the-fixed-order-regen-buffs-sexual-decay-practice-settlement")
     def test_stage_order_is_fixed(self):
         self.assertLess(_STAGE_ORDER.index("gauge_regen"), _STAGE_ORDER.index("buff_ticks"))
         self.assertLess(_STAGE_ORDER.index("buff_ticks"), _STAGE_ORDER.index("sexual_decay"))
@@ -246,7 +246,7 @@ class ClockTests(unittest.TestCase):
         idle = Entity()
         self.assertFalse(_has_settlement_work(idle))
 
-    @covers_requirement("settlement-stage-order::buff-ticks-sexual-decay-and-magic-study-are-skipped-for-combat-sourced-advances")
+    @covers_requirement("settlement-stage-order::buff-ticks-sexual-decay-and-practice-settlement-are-skipped-for-combat-sourced-advances")
     def test_practice_settlement_runs_outside_combat_and_writes_nothing(self):
         # The placeholder performs no per-second work and writes no state;
         # it only runs on non-COMBAT advances.

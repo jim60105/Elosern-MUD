@@ -80,7 +80,7 @@
 
 ## Post-sync traceability (during archive/sync)
 
-- [ ] P1 After this change's deltas sync into `openspec/specs/`, run
+- [x] P1 After this change's deltas sync into `openspec/specs/`, run
   `uv run --locked python -m tools.spec_traceability list` and re-pin
   `covers_requirement` IDs whose slugs changed (RENAMED titles in
   `settlement-stage-order` ×2, `monster-action-policy` ×1; all

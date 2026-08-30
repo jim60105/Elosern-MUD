@@ -274,7 +274,7 @@ class NpcPolicyAffordabilityIntegrationTests(EvenniaTestCase):
             {str(self.companion.key): self.companion, str(self.goblin.key): self.goblin},
         )
 
-    @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-is-never-proposed-a-tier-blocked-elemental-spell")
+    @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-proposes-the-first-affordable-resolver-backed-damage-skill")
     def test_companion_acts_every_round_with_resolved_basic_attack(self):
         from world.rules.combat import default_attack_policy
         from world.rules.monster_behaviour import monster_behaviour_policy

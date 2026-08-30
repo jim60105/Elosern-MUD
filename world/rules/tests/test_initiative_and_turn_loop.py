@@ -90,7 +90,7 @@ class DefaultAttackPolicyAffordabilityTests(unittest.TestCase):
             {actor.key: actor, enemy.key: enemy},
         )
 
-    @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-is-never-proposed-a-tier-blocked-elemental-spell")
+    @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-proposes-the-first-affordable-resolver-backed-damage-skill")
     def test_unaffordable_spell_falls_back_to_basic_attack(self):
         actor = self._npc("npc", ["firestorm"], mp=10)
         request = default_attack_policy(actor, self._field(actor))

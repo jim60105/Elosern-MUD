@@ -9,7 +9,8 @@ registry contract used to validate imported active and passive skill keys.
 `TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["fire"]`, and
 an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Each
 spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to consume.
+dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
+retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
 
 | Key | 名稱 | 位階 | TargetSpec | Cost | effects |
 |---|---|---|---|---|---|
@@ -30,31 +31,6 @@ dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to
   `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
   and a nonempty `effects` list matching this change's `design.md`
 
-#### Scenario: 術師-tier 火 spells are gated at magic level 16 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 15 with no `fire_mastery` skill attempts to cast `firestorm`
-  (術師-tier), **AND** a separate entity at magic level 1 that owns `fire_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 術師-tier 火 spell (`firestorm`, `scorching_wave`)
-#### Scenario: 大師-tier 火 spells are gated at magic level 31 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 30 with no `fire_mastery` skill attempts to cast `lava_burst`
-  (大師-tier), **AND** a separate entity at magic level 1 that owns `fire_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 大師-tier 火 spell (`lava_burst`, `infernal_wrap`)
-#### Scenario: 賢者-tier 火 spells are gated at magic level 71 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 70 with no `fire_mastery` skill attempts to cast `dragon_flame`
-  (賢者-tier), **AND** a separate entity at magic level 1 that owns `fire_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 賢者-tier 火 spell (`dragon_flame`, `hellfire`)
-#### Scenario: 主宰-tier 火 spells are gated at magic level 91 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 90 with no `fire_mastery` skill attempts to cast `phoenix_eternal_flame`
-  (主宰-tier), **AND** a separate entity at magic level 1 that owns `fire_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 主宰-tier 火 spell (`phoenix_eternal_flame`, `world_ending_blaze`)
-
 #### Scenario: The pre-existing 火 anchor skill(s) were recosted per §4.3, not duplicated
 - **WHEN** `SKILL_REGISTRY` is inspected for `fire_ball`
 - **THEN** it is present exactly once (no duplicate key), with its `cost["mp"]` updated
@@ -67,7 +43,8 @@ dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to
 `TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["water"]`, and
 an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Each
 spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to consume.
+dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
+retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
 
 | Key | 名稱 | 位階 | TargetSpec | Cost | effects |
 |---|---|---|---|---|---|
@@ -88,38 +65,14 @@ dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to
   `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
   and a nonempty `effects` list matching this change's `design.md`
 
-#### Scenario: 術師-tier 水 spells are gated at magic level 16 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 15 with no `water_mastery` skill attempts to cast `healing_spring`
-  (術師-tier), **AND** a separate entity at magic level 1 that owns `water_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 術師-tier 水 spell (`healing_spring`, `water_shield`)
-#### Scenario: 大師-tier 水 spells are gated at magic level 31 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 30 with no `water_mastery` skill attempts to cast `abyssal_whirlpool`
-  (大師-tier), **AND** a separate entity at magic level 1 that owns `water_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 大師-tier 水 spell (`abyssal_whirlpool`, `wellspring_of_life`)
-#### Scenario: 賢者-tier 水 spells are gated at magic level 71 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 70 with no `water_mastery` skill attempts to cast `tsunami`
-  (賢者-tier), **AND** a separate entity at magic level 1 that owns `water_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 賢者-tier 水 spell (`tsunami`, `tidal_revival`)
-#### Scenario: 主宰-tier 水 spells are gated at magic level 91 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 90 with no `water_mastery` skill attempts to cast `sea_of_life`
-  (主宰-tier), **AND** a separate entity at magic level 1 that owns `water_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 主宰-tier 水 spell (`sea_of_life`, `abyssal_tide`)
-
 ### Requirement: SKILL_REGISTRY contains the full 土-element spell set
 `world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 土-element spells from design doc
 §4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
 `TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["earth"]`, and
 an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Each
 spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to consume.
+dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
+retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
 
 | Key | 名稱 | 位階 | TargetSpec | Cost | effects |
 |---|---|---|---|---|---|
@@ -140,31 +93,6 @@ dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to
   `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
   and a nonempty `effects` list matching this change's `design.md`
 
-#### Scenario: 術師-tier 土 spells are gated at magic level 16 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 15 with no `earth_mastery` skill attempts to cast `stone_armor`
-  (術師-tier), **AND** a separate entity at magic level 1 that owns `earth_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 術師-tier 土 spell (`stone_armor`, `dust_veil`)
-#### Scenario: 大師-tier 土 spells are gated at magic level 31 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 30 with no `earth_mastery` skill attempts to cast `earth_bind`
-  (大師-tier), **AND** a separate entity at magic level 1 that owns `earth_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 大師-tier 土 spell (`earth_bind`, `rockslide`)
-#### Scenario: 賢者-tier 土 spells are gated at magic level 71 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 70 with no `earth_mastery` skill attempts to cast `earthquake`
-  (賢者-tier), **AND** a separate entity at magic level 1 that owns `earth_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 賢者-tier 土 spell (`earthquake`, `earthen_ward`)
-#### Scenario: 主宰-tier 土 spells are gated at magic level 91 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 90 with no `earth_mastery` skill attempts to cast `mountain_collapse`
-  (主宰-tier), **AND** a separate entity at magic level 1 that owns `earth_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 主宰-tier 土 spell (`mountain_collapse`, `earths_judgment`)
-
 ### Requirement: SKILL_REGISTRY contains the full 風-element spell set
 `world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 風-element spells from design doc
 §4.4, each with the exact key, Traditional Chinese `label`, the tier-appropriate
@@ -172,7 +100,8 @@ dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to
 an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Nine
 of the ten declare `SkillKind.ACTIVE`; `flight` stays `SkillKind.PASSIVE` per `movement-skill-waiver`.
 Each spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to consume.
+dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
+retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
 
 | Key | 名稱 | 位階 | TargetSpec | Cost | effects |
 |---|---|---|---|---|---|
@@ -194,32 +123,6 @@ dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to
   `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
   and a nonempty `effects` list matching this change's `design.md`
 
-#### Scenario: 術師-tier 風 spells are gated at magic level 16 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 15 with no `wind_mastery` skill attempts to cast `tornado_blade`
-  (術師-tier), **AND** a separate entity at magic level 1 that owns `wind_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 術師-tier 風 spell (`tornado_blade`). `flight` shares the
-  table's 術師 MP band but is a PASSIVE movement skill and is never cast-gated.
-#### Scenario: 大師-tier 風 spells are gated at magic level 31 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 30 with no `wind_mastery` skill attempts to cast `storm_domain`
-  (大師-tier), **AND** a separate entity at magic level 1 that owns `wind_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 大師-tier 風 spell (`storm_domain`, `gale_dance_strike`)
-#### Scenario: 賢者-tier 風 spells are gated at magic level 71 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 70 with no `wind_mastery` skill attempts to cast `heavens_wrath_storm`
-  (賢者-tier), **AND** a separate entity at magic level 1 that owns `wind_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 賢者-tier 風 spell (`heavens_wrath_storm`, `haste_domain`)
-#### Scenario: 主宰-tier 風 spells are gated at magic level 91 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 90 with no `wind_mastery` skill attempts to cast `vacuum_severance`
-  (主宰-tier), **AND** a separate entity at magic level 1 that owns `wind_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 主宰-tier 風 spell (`vacuum_severance`, `sky_tempest`)
-
 #### Scenario: The pre-existing 風 anchor skill(s) were recosted per §4.3, not duplicated
 - **WHEN** `SKILL_REGISTRY` is inspected for `wind_blade` and `flight`
 - **THEN** each is present exactly once (no duplicate key), with its `cost["mp"]` updated
@@ -232,7 +135,8 @@ dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to
 `TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["lightning"]`, and
 an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Each
 spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to consume.
+dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
+retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
 
 | Key | 名稱 | 位階 | TargetSpec | Cost | effects |
 |---|---|---|---|---|---|
@@ -253,38 +157,14 @@ dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to
   `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
   and a nonempty `effects` list matching this change's `design.md`
 
-#### Scenario: 術師-tier 雷 spells are gated at magic level 16 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 15 with no `lightning_mastery` skill attempts to cast `chain_lightning`
-  (術師-tier), **AND** a separate entity at magic level 1 that owns `lightning_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 術師-tier 雷 spell (`chain_lightning`, `paralyzing_bolt`)
-#### Scenario: 大師-tier 雷 spells are gated at magic level 31 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 30 with no `lightning_mastery` skill attempts to cast `thunder_combo`
-  (大師-tier), **AND** a separate entity at magic level 1 that owns `lightning_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 大師-tier 雷 spell (`thunder_combo`, `lightning_strike`)
-#### Scenario: 賢者-tier 雷 spells are gated at magic level 71 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 70 with no `lightning_mastery` skill attempts to cast `heavens_thunder`
-  (賢者-tier), **AND** a separate entity at magic level 1 that owns `lightning_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 賢者-tier 雷 spell (`heavens_thunder`, `thunder_gods_haste`)
-#### Scenario: 主宰-tier 雷 spells are gated at magic level 91 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 90 with no `lightning_mastery` skill attempts to cast `judgement_thunder`
-  (主宰-tier), **AND** a separate entity at magic level 1 that owns `lightning_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 主宰-tier 雷 spell (`judgement_thunder`, `divine_lightning_slaughter`)
-
 ### Requirement: SKILL_REGISTRY contains the full 冰-element spell set
 `world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 冰-element spells from design doc
 §4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
 `TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["ice"]`, and
 an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Each
 spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to consume.
+dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
+retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
 
 | Key | 名稱 | 位階 | TargetSpec | Cost | effects |
 |---|---|---|---|---|---|
@@ -305,38 +185,14 @@ dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to
   `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
   and a nonempty `effects` list matching this change's `design.md`
 
-#### Scenario: 術師-tier 冰 spells are gated at magic level 16 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 15 with no `ice_mastery` skill attempts to cast `ice_wall`
-  (術師-tier), **AND** a separate entity at magic level 1 that owns `ice_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 術師-tier 冰 spell (`ice_wall`, `frost_arrow_rain`)
-#### Scenario: 大師-tier 冰 spells are gated at magic level 31 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 30 with no `ice_mastery` skill attempts to cast `permafrost_domain`
-  (大師-tier), **AND** a separate entity at magic level 1 that owns `ice_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 大師-tier 冰 spell (`permafrost_domain`, `ice_prison`)
-#### Scenario: 賢者-tier 冰 spells are gated at magic level 71 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 70 with no `ice_mastery` skill attempts to cast `blizzard`
-  (賢者-tier), **AND** a separate entity at magic level 1 that owns `ice_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 賢者-tier 冰 spell (`blizzard`, `absolute_tundra`)
-#### Scenario: 主宰-tier 冰 spells are gated at magic level 91 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 90 with no `ice_mastery` skill attempts to cast `absolute_zero`
-  (主宰-tier), **AND** a separate entity at magic level 1 that owns `ice_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 主宰-tier 冰 spell (`absolute_zero`, `eternal_ice_field`)
-
 ### Requirement: SKILL_REGISTRY contains the full 光-element spell set
 `world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 光-element spells from design doc
 §4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
 `TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["light"]`, and
 an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Each
 spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to consume.
+dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
+retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
 
 | Key | 名稱 | 位階 | TargetSpec | Cost | effects |
 |---|---|---|---|---|---|
@@ -357,38 +213,14 @@ dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to
   `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
   and a nonempty `effects` list matching this change's `design.md`
 
-#### Scenario: 術師-tier 光 spells are gated at magic level 16 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 15 with no `light_mastery` skill attempts to cast `purify`
-  (術師-tier), **AND** a separate entity at magic level 1 that owns `light_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 術師-tier 光 spell (`purify`, `mass_heal`)
-#### Scenario: 大師-tier 光 spells are gated at magic level 31 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 30 with no `light_mastery` skill attempts to cast `advanced_heal`
-  (大師-tier), **AND** a separate entity at magic level 1 that owns `light_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 大師-tier 光 spell (`advanced_heal`, `holy_shield`)
-#### Scenario: 賢者-tier 光 spells are gated at magic level 71 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 70 with no `light_mastery` skill attempts to cast `holy_radiance`
-  (賢者-tier), **AND** a separate entity at magic level 1 that owns `light_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 賢者-tier 光 spell (`holy_radiance`, `revival_light`)
-#### Scenario: 主宰-tier 光 spells are gated at magic level 91 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 90 with no `light_mastery` skill attempts to cast `goddess_blessing`
-  (主宰-tier), **AND** a separate entity at magic level 1 that owns `light_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 主宰-tier 光 spell (`goddess_blessing`, `heavens_judgment_light`)
-
 ### Requirement: SKILL_REGISTRY contains the full 暗-element spell set
 `world/skills/registry.py`'s `SKILL_REGISTRY` SHALL declare all ten 暗-element spells from design doc
 §4.4, each with the exact key, Traditional Chinese `label`, `SkillKind.ACTIVE`, the tier-appropriate
 `TargetSpec`/`FactionConstraint` pair, `cost={"mp": <value>}`, `element=ELEMENT_REGISTRY["dark"]`, and
 an `effects` list that parses cleanly under `skill-effects-typed-model`'s typed dispatch table. Each
 spell's tier SHALL be derivable from its registry grouping (position and MP cost band) without a
-dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to consume.
+dedicated tier field; the tier grouping is a data label only — the numeric cast gate is
+retired, and the lineage gate that replaces it reads the registry tree, not the MP band.
 
 | Key | 名稱 | 位階 | TargetSpec | Cost | effects |
 |---|---|---|---|---|---|
@@ -408,31 +240,6 @@ dedicated tier field, for `element-mastery-cast-gate`'s `can_cast_spell_tier` to
 - **THEN** each key is present with `SkillKind.ACTIVE`, `element=ELEMENT_REGISTRY["dark"]`, the
   `TargetSpec`/`FactionConstraint` pair and `cost["mp"]` value documented in this change's `design.md`,
   and a nonempty `effects` list matching this change's `design.md`
-
-#### Scenario: 術師-tier 暗 spells are gated at magic level 16 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 15 with no `dark_mastery` skill attempts to cast `curse`
-  (術師-tier), **AND** a separate entity at magic level 1 that owns `dark_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 術師-tier 暗 spell (`curse`, `dark_burst`)
-#### Scenario: 大師-tier 暗 spells are gated at magic level 31 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 30 with no `dark_mastery` skill attempts to cast `dark_corrosion_domain`
-  (大師-tier), **AND** a separate entity at magic level 1 that owns `dark_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 大師-tier 暗 spell (`dark_corrosion_domain`, `shadow_torment`)
-#### Scenario: 賢者-tier 暗 spells are gated at magic level 71 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 70 with no `dark_mastery` skill attempts to cast `abyss_devour`
-  (賢者-tier), **AND** a separate entity at magic level 1 that owns `dark_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 賢者-tier 暗 spell (`abyss_devour`, `dark_dominion`)
-#### Scenario: 主宰-tier 暗 spells are gated at magic level 91 without mastery, and unlocked below that level with mastery
-- **WHEN** an entity at magic level 90 with no `dark_mastery` skill attempts to cast `void_annihilation`
-  (主宰-tier), **AND** a separate entity at magic level 1 that owns `dark_mastery` attempts to cast
-  the same spell
-- **THEN** `can_cast_spell_tier` (from `element-mastery-cast-gate`) rejects the first entity's cast and
-  permits the second entity's cast, for every 主宰-tier 暗 spell (`void_annihilation`, `netherworld_judgment`)
 
 ### Requirement: SKILL_REGISTRY exists at the exact path change 4 forward-declared
 `world/skills/registry.py` SHALL define a module-level `SKILL_REGISTRY: dict[str, SkillDef]` importable
@@ -570,9 +377,9 @@ multiplier math.
 
 ### Requirement: reincarnation_boon_yuna's effect string is well-formed
 `reincarnation_boon_yuna` SHALL declare `effects=["sexual_magic_mastery"]` (corrected from the
-malformed three-segment `"element_mastery_rank:性魔法:主宰"`, which did not parse as a recognized
-prefix and was inconsistent with every other mastery skill's two-segment form). This fix is a
-prerequisite for this change's own registry-load-time validation to succeed on import.
+malformed three-segment `"element_mastery_rank:性魔法:主宰"`, which never parsed as a recognized
+prefix). `sexual_magic_mastery` remains the sole mastery-domain declaration for this skill; the
+`element_mastery_rank` prefix itself left the recognized prefix set with the retired cast gate.
 
 #### Scenario: reincarnation_boon_yuna parses as SexualMasteryEffect
 - **WHEN** `SKILL_REGISTRY["reincarnation_boon_yuna"].parsed_effects` is inspected
@@ -628,9 +435,9 @@ description SHALL explicitly cover both 劍術 and 刀術. Neither skill's `key`
 ### Requirement: All eight elements have a mastery skill
 `SKILL_REGISTRY` SHALL contain `water_mastery`, `earth_mastery`, `lightning_mastery`, and
 `ice_mastery`, each `PASSIVE`, `TargetSpec.NONE`, with `element` set to the corresponding
-`world.lore.elements.ELEMENT_REGISTRY` entry and `effects=["element_mastery_rank:主宰"]`, matching the
-existing four mastery skills' (`fire_mastery`/`dark_mastery`/`wind_mastery`/`light_mastery`) shape
-exactly.
+`world.lore.elements.ELEMENT_REGISTRY` entry and `effects=["passive_trait:element_mastery"]`, matching
+the existing four mastery skills' (`fire_mastery`/`dark_mastery`/`wind_mastery`/`light_mastery`) shape
+exactly (all eight move to the flavor form together with the retired cast gate).
 
 #### Scenario: All eight elemental-mastery skills are present
 - **WHEN** `SKILL_REGISTRY` is inspected
