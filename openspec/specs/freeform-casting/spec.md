@@ -84,8 +84,10 @@ SHALL return `False`. The predicate SHALL NOT read entity state.
 ### Requirement: The resolver gates scaled casts at the ownership step
 `ActionResolver.preflight` and `resolve` SHALL reject a cast with `RejectReason.SCALED_CAST_FORBIDDEN`
 when `ActionRequest.scale != 1.0` and any of the following holds: the scale is not a member of the
-`freeform_cast_scales` table; `is_freeform_eligible(skill)` is `False`; or the actor's
-`freeform_scales_for(actor, skill.element.key)` is empty (no direct mastery ownership). The checks
+`freeform_cast_scales` table; `is_freeform_eligible(skill)` is `False`; or the requested scale is not
+a member of the skill-anchored `freeform_scales_for(actor, skill)` ladder set (see
+`element-mastery`; mastery entitlement is anchored to the skill's own proficiency, see
+`use-driven-skill-lineage`). The checks
 SHALL short-circuit in exactly that order, so `skill.element` is never dereferenced for an
 ineligible skill (a non-elemental or cost-less skill can never raise `AttributeError`). A request
 with `scale == 1.0` SHALL bypass the check entirely and can never be rejected by it. The check
@@ -94,8 +96,13 @@ be side-effect free in preflight.
 
 #### Scenario: A mastery holder can scale an eligible spell
 - **WHEN** `preflight` is called for `wind_blade` with `scale == 2.0` by an entity whose
-  `owned_keys()` contains `wind_mastery`
+  `owned_keys()` contains `wind_mastery` and whose `wind_blade` proficiency level is >= 6
 - **THEN** the freeform check does not reject (other unrelated checks still apply)
+
+#### Scenario: A rung above the current ladder tier is rejected
+- **WHEN** `preflight` is called for `wind_blade` with `scale == 2.0` by a `wind_mastery` holder
+  whose `wind_blade` proficiency level is 3 (rung tops at 1.0)
+- **THEN** it returns `outcome == "rejected"` with `RejectReason.SCALED_CAST_FORBIDDEN`
 
 #### Scenario: Scaling without mastery is rejected
 - **WHEN** `preflight` is called for `wind_blade` with `scale == 2.0` by an entity without
@@ -181,8 +188,8 @@ practice staging SHALL observe the scaled amounts exactly as they observe unscal
 ### Requirement: Preview and the combat facade accept and revalidate scale
 `preview_skill(actor, skill_key, context, candidates, scale=1.0)` and
 `revalidate_submission(actor, skill_key, context, targets, scale=1.0)` SHALL apply the same
-step-1 scale gate and the scaled resource check, so a disabled or tampered scaled submission reports
-the matching stable reason before initiative. `submit_player_action(actor, skill_key,
+step-1 scale gate and the scaled resource check, (the ladder set re-derived from the actor's current proficiency) so a disabled or
+tampered scaled submission reports the matching stable reason before initiative. `submit_player_action(actor, skill_key,
 targets_or_shorthand, scale=1.0)` SHALL thread the scale into the preview, preflight, and the
 `ActionRequest` of the resolved round. All three SHALL treat `scale == 1.0` as the current behavior.
 
@@ -203,9 +210,10 @@ targets_or_shorthand, scale=1.0)` SHALL thread the scale into the preview, prefl
 `cast` SHALL accept the syntax `cast <skill_key>[@<scale>][=<target_key>]` in and out of combat,
 where `<scale>` is one of the canonical table labels (`1/4`, `1/2`, `1`, `2`, `4`) and defaults to
 `1`. The scale SHALL be threaded into the combat-session facade and the out-of-combat settlement
-path. A non-label token or a token applied to a spell the actor cannot scale SHALL reject with the
-stable `SCALED_CAST_FORBIDDEN` rejection message (a Traditional Chinese explanation), with no MP
-change and no world-time advance.
+path. A non-label token or a token applied to a spell the actor cannot scale (no mastery
+entitlement, or a rung above the skill's proficiency ladder) SHALL reject with the stable
+`SCALED_CAST_FORBIDDEN` rejection message (a Traditional Chinese explanation), with no MP change
+and no world-time advance.
 
 #### Scenario: A scaled combat cast via the text command
 - **WHEN** a `wind_mastery` holder types `cast wind_blade@2=wolf` in an active session
@@ -221,7 +229,7 @@ change and no world-time advance.
   applies
 
 #### Scenario: An invalid scale token or unauthorized scale rejects cleanly
-- **WHEN** a player types `cast wind_blade@3`, or `cast wind_blade@2` without `wind_mastery`, or
-  `cast gale_step@2` with `wind_mastery`
+- **WHEN** a player types `cast wind_blade@3`, or `cast wind_blade@2` without `wind_mastery` or at a
+  proficiency level whose rung tops below 2.0, or `cast gale_step@2` with `wind_mastery`
 - **THEN** each is rejected with the `SCALED_CAST_FORBIDDEN` message, no MP is deducted, no effect
   applies, and no world time advances

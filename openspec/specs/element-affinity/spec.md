@@ -49,7 +49,9 @@ be rejected. The subrace seed itself SHALL be validated (every key exists in `EL
 duplicates) when the registry loads or when the seed is resolved, so an invalid seed can never be
 persisted. An entity with an empty or absent affinity set is neutral and gets the `1.0` multiplier
 for every element. The multiplier is a pure transient factor: it is never stored, never
-replaces `magic_power`, and never changes `magic_power.max`.
+replaces `magic_power`, and never changes `magic_power.max`. Its live consumer is
+`use-driven-skill-lineage`'s practice-XP formula (favored element x1.1, non-favored x0.9,
+physical or non-elemental x1.0).
 
 #### Scenario: An elf subrace seed may exceed the player input bound
 - **WHEN** an eolas elf activates with `SUBRACE_REGISTRY["eolas"].affinity_elements` (all eight

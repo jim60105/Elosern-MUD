@@ -4,8 +4,10 @@
 `loader.py` SHALL store `persona`, `sexual_baseline`, `skills`/`passives`, `equipment`, and
 `disguised_stats` into the corresponding `LivingEntity` attributes exactly as validated, without
 adding, removing, or transforming any content (the sole derived write is the lineage auto-seed —
-see `use-driven-skill-lineage`: prerequisite proficiency seeded to exactly the edge value, running
-before schema range validation, always beaten by an explicit imported `skill_proficiency`), and SHALL store `inventory` into
+see `use-driven-skill-lineage`: `skills`/`passives` are extended with the transitive
+prerequisite-ownership closure of what the record declared, prerequisite proficiency is seeded to
+exactly the edge value, the whole normalization runs before schema range validation, and an explicit
+imported `skill_proficiency` entry always beats the seed), and SHALL store `inventory` into
 `entity.db.inventory` using Evennia's attribute store directly (no seam attribute declaration
 required from any other change).
 
@@ -22,8 +24,11 @@ required from any other change).
   `entity.sexual` name free for change 7's `SexualState` to mount on
 
 #### Scenario: Lineage auto-seed lands inside the same transaction
-- **WHEN** a valid record owns `firestorm` with no explicit `skill_proficiency` for its prerequisites
-- **THEN** the loaded entity carries prerequisite proficiency seeded to exactly the edge values, and a record rejected by schema validation persists nothing, seed included
+- **WHEN** a valid record owns `firestorm` (prereq `scorching_wave >= 3`) with no explicit
+  `skill_proficiency` for its prerequisites
+- **THEN** the loaded entity OWNS the closed prerequisite chain, carries `scorching_wave` proficiency
+  seeded to exactly the edge value, and `can_use_skill` passes for `firestorm`; a record rejected by
+  schema validation persists nothing, seed and closure included
 
 #### Scenario: skills and passives are stored together as a raw structure
 - **WHEN** a valid character record has `"skills": ["fire_mastery"]` and `"passives":

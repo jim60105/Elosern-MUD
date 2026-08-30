@@ -1,4 +1,9 @@
-## ADDED Requirements
+# skill-lineage Specification
+
+## Purpose
+Define the prerequisite-lineage graph, the single use-eligibility gate, use-driven practice accrual with per-tick dedupe and derived tip-cap saturation, the proficiency-anchored freeform scale ladder, and import/scene-build auto-seed.
+
+## Requirements
 
 ### Requirement: SkillPrerequisite declares registry edges and load validation fails closed
 `world/skills/registry.py` SHALL define the frozen, slotted dataclass

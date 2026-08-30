@@ -61,6 +61,7 @@ retain existing lethal behavior.
 #### Scenario: Ordinary hostile damage is unchanged
 - **WHEN** identical damage resolves without a nonlethal policy
 - **THEN** the existing lethal HP crossing and target-defeated planner behavior apply
+
 ### Requirement: ActionResolver is the sole entry point for every skill invocation
 `world/rules/action.py` SHALL provide `ActionResolver.resolve(request: ActionRequest) -> ActionResult`
 as the only function through which any skill — active or passive-gated, combat or non-combat — is
@@ -310,7 +311,7 @@ SHALL NOT need a separate quest observer call, and SHALL NOT bypass planner exec
 - **THEN** registered planners run exactly as they do for command and combat callers
 
 ### Requirement: ActionResolver exposes shared side-effect-free action preview
-The deterministic rules layer SHALL expose a frozen preview query factored from the same pure checks used by `ActionResolver.preflight()`. Given an actor, skill, context, and optional candidate, it SHALL report enabled state, the exact stable rejection reason and resource detail when disabled, and valid targets or applicable AREA shorthands. It SHALL cover ownership and active kind, current resources, exact target shape, presence, alive state, range, faction, action-blocking buffs, `actions_per_turn == 0`, registered effect prefixes, and time metadata. The same checks SHALL apply to the combat-session submission revalidation path, so a rejected submission stops before initiative. Modifier evaluation SHALL read a no-create context from existing stored buff and sexual-state data and SHALL NOT materialize a lazy handler or default. Preview SHALL NOT roll randomness, stage or apply effects, construct EventLogs, invoke event-effect planners, mutate any persistent or nonpersistent game state, or advance world time. `preflight()` and final `resolve()` SHALL remain authoritative and SHALL rerun their required checks.
+The deterministic rules layer SHALL expose a frozen preview query factored from the same pure checks used by `ActionResolver.preflight()`. Given an actor, skill, context, and optional candidate, it SHALL report enabled state, the exact stable rejection reason and resource detail when disabled, and valid targets or applicable AREA shorthands. It SHALL cover ownership and active kind, current resources, exact target shape, presence, alive state, range, faction, action-blocking buffs, `actions_per_turn == 0`, registered effect prefixes, time metadata, and lineage eligibility. The lineage check SHALL use the single shared side-effect-free predicate `can_use_skill` — the same predicate consumed by `ActionResolver`, the skill menus, and the deterministic AI policy — so preview, submission revalidation, and authoritative preflight agree on the same eligibility; a prerequisite-unsatisfied skill SHALL report `RejectReason.UNKNOWN_SKILL` with the skill key. The same checks SHALL apply to the combat-session submission revalidation path, so a rejected submission stops before initiative. Modifier evaluation SHALL read a no-create context from existing stored buff and sexual-state data and SHALL NOT materialize a lazy handler or default. Preview SHALL NOT roll randomness, stage or apply effects, construct EventLogs, invoke event-effect planners, mutate any persistent or nonpersistent game state, or advance world time. `preflight()` and final `resolve()` SHALL remain authoritative and SHALL rerun their required checks.
 
 #### Scenario: Preview has no side effects
 - **WHEN** previews are built for every owned active skill and every current combat participant
@@ -327,6 +328,14 @@ The deterministic rules layer SHALL expose a frozen preview query factored from 
 #### Scenario: Preview does not materialize sexual state
 - **WHEN** an actor has a stored sexual baseline but no materialized sexual trait handler and combat preview is built
 - **THEN** modifier matching is interpreted in memory and no sexual trait Attribute or default handler state is created
+
+#### Scenario: A prerequisite-unsatisfied owned skill is disabled in preview
+- **WHEN** an actor owns `firestorm` but its `scorching_wave` practice level is below the edge threshold
+- **THEN** preview reports disabled with `RejectReason.UNKNOWN_SKILL` naming the skill key, submission revalidation agrees, and the shared combat view renders the descriptor unavailable
+
+#### Scenario: Meeting the edge exactly enables the preview
+- **WHEN** the same actor's `scorching_wave` level reaches exactly the edge threshold
+- **THEN** preview, revalidation, and preflight all report the skill enabled (when other checks pass)
 
 #### Scenario: Target previews use ordinary ordered validation
 - **WHEN** candidate previews are requested for a SINGLE or AREA skill
