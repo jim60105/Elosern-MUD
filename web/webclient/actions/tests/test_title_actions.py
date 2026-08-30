@@ -13,6 +13,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
+from tools.spec_traceability import covers_requirement
 from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.actions.title_actions import (
     AFFECTED_BALLOT,
@@ -102,6 +103,7 @@ class TitleBallotAdapterTests(EvenniaTestCase):
             persist_nomination_ballot(self.player, entries or _BALLOT)
         )
 
+    @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_accept_banks_the_numbered_choice_and_consumes_the_ballot(self):
         self._deliver_ballot()
         result = _title_accept_adapter(self.player, {"index": 2})
@@ -161,6 +163,7 @@ class TitleBallotAdapterTests(EvenniaTestCase):
         self.assertEqual(result["code"], BALLOT_UNAVAILABLE_CODE)
         self.assertEqual(banked_epithets(self.player), ())
 
+    @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_decline_consumes_the_ballot_records_the_rejection_line(self):
         self._deliver_ballot()
         result = _title_decline_adapter(self.player, {})

@@ -14,6 +14,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
+from tools.spec_traceability import covers_requirement
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
@@ -210,6 +211,7 @@ class TitleBallotPresenterTests(EvenniaTestCase):
             },
         )
 
+    @covers_requirement("title-system::the-ballot-persists-unchanged-until-consent")
     def test_persisted_ballot_renders_one_based_ascending_candidates(self):
         self.assertTrue(
             persist_nomination_ballot(

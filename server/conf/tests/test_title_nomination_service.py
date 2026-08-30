@@ -19,6 +19,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from server import title_nomination_service as service
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles
@@ -93,6 +94,7 @@ class NominationSchedulingTests(EvenniaTest):
             await_result(deferred)
         return deferred
 
+    @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_happy_path_persists_and_pushes(self):
         deferred = self._schedule(_good_client(), watchers=(("session", "epoch"),))
         self.assertIsNotNone(deferred)
@@ -106,6 +108,7 @@ class NominationSchedulingTests(EvenniaTest):
         )
         self.assertEqual(self.push.calls, [(self.player, (("session", "epoch"),))])
 
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_pending_ballot_suppresses_without_touching_transport(self):
         self.assertTrue(
             title_rules.persist_nomination_ballot(
@@ -120,6 +123,7 @@ class NominationSchedulingTests(EvenniaTest):
             ({"display": "先來", "basis": "一"},),
         )
 
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_decline_cooldown_suppresses_then_expires(self):
         self.assertTrue(
             title_rules.persist_nomination_ballot(
@@ -136,6 +140,7 @@ class NominationSchedulingTests(EvenniaTest):
         with patch("world.rules.titles.get_world_clock", return_value=clock):
             self.assertIsNotNone(self._schedule(_good_client()))
 
+    @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_decline_digest_flows_into_the_prompt(self):
         # The durable decline log is the prompt's soft-learning feed: the
         # declined displays must appear in the next round's user message.
@@ -179,6 +184,7 @@ class NominationSchedulingTests(EvenniaTest):
         self.assertEqual(publish.call_args.kwargs["expected_epoch"], "epoch-7")
         self.assertEqual(publish.call_args.args[0], "session")
 
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_accept_never_starts_a_cooldown(self):
         self.assertTrue(
             title_rules.persist_nomination_ballot(
@@ -200,12 +206,14 @@ class NominationSchedulingTests(EvenniaTest):
         self.assertEqual(client.calls, [])
         self.assertFalse(self.player.attributes.has(title_rules.PENDING_BALLOT_KEY))
 
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_offline_client_builder_yields_no_call(self):
         with override_settings(
             LLM_PROFILES=_profiles(title_nomination={"enabled": False})
         ):
             self.assertIsNone(service.schedule_epithet_nomination(self.player))
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_void_rounds_store_nothing(self):
         cases = ["{not json", _reply([{"display": "甲名", "basis": "一"}])]
         for text in cases:
@@ -217,6 +225,7 @@ class NominationSchedulingTests(EvenniaTest):
                     self.player.attributes.has(title_rules.PENDING_BALLOT_KEY)
                 )
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_all_filtered_candidates_store_nothing(self):
         client = FakeLLMClient()
         client.add_response(
@@ -262,6 +271,7 @@ class RestBoundaryTests(EvenniaTest):
         super().setUp()
         self.player = create_object(PlayerCharacter, key="rest-nominee")
 
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_only_day_boundary_events_trigger_scheduling(self):
         crossed = [SimpleNamespace(kind="daily_reset", due_tick=86400, payload={})]
         quiet = [SimpleNamespace(kind="buff_expiry", due_tick=10, payload={})]
@@ -314,6 +324,7 @@ class ObserverWiringTests(EvenniaTest):
             1,
         )
 
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_observers_defer_to_on_commit(self):
         with patch.object(service, "schedule_epithet_nomination") as schedule:
             with transaction.atomic():
@@ -327,6 +338,7 @@ class ObserverWiringTests(EvenniaTest):
             self.assertEqual(schedule.call_count, 1)
             self.assertIs(schedule.call_args.args[0], self.player)
 
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_rolled_back_transactions_schedule_nothing(self):
         # A settlement whose transaction rolls back never reaches commit, so
         # the on_commit scheduling must not fire for either observer.

@@ -102,7 +102,7 @@
 
 ## Post-sync traceability (during archive/sync)
 
-- [ ] P1 On sync, annotate the new `title-system` requirement IDs on the §5.1/
+- [x] P1 On sync, annotate the new `title-system` requirement IDs on the §5.1/
   §5.2 tests (delta-only IDs cannot be annotated before sync — the checker
   parses `openspec/specs` only); re-check the `game-command-docs` title entry
   ID (same ID after F's sync, now covering the extended syntax).

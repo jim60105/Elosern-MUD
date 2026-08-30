@@ -173,6 +173,7 @@ class TitleBallotCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 self.assertEqual(self._call(args), _NO_BALLOT)
         self.assertFalse(self.actor.attributes.has(PENDING_BALLOT_KEY))
 
+    @covers_requirement("title-system::the-ballot-persists-unchanged-until-consent")
     def test_bare_accept_lists_the_ballot(self):
         self._ballot()
         output = self._call("accept")
@@ -181,6 +182,7 @@ class TitleBallotCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("2. 破曉之刃——曙間退敵", output)
         self.assertEqual(len(read_title_state(self.actor)[0]), 0)
 
+    @covers_requirement("title-system::the-ballot-persists-unchanged-until-consent")
     def test_accept_records_the_numbered_choice(self):
         self._ballot()
         self.assertEqual(self._call("accept 1"), "你採納異名：火焰之心")
@@ -210,6 +212,7 @@ class TitleBallotCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertFalse(self.actor.attributes.has(PENDING_BALLOT_KEY))
         self.assertEqual(len(read_title_state(self.actor)[0]), 2)
 
+    @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_decline_consumes_ballot_and_starts_the_record(self):
         self._ballot()
         output = self._call("decline")
@@ -221,6 +224,7 @@ class TitleBallotCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["displays"], ("火焰之心", "破曉之刃"))
 
+    @covers_requirement("title-system::the-ballot-persists-unchanged-until-consent")
     def test_list_shows_the_pending_ballot_section(self):
         bank_fixed(self.actor, "g_f_rank", 1)
         self._ballot()

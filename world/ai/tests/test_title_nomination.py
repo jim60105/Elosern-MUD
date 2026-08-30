@@ -17,6 +17,7 @@ from types import SimpleNamespace
 from django.test import override_settings
 
 from world.ai import guardrail
+from tools.spec_traceability import covers_requirement
 from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
@@ -121,11 +122,13 @@ class FilterMatrixTests(unittest.TestCase):
         kwargs.update(over)
         return filter_candidates(candidates, **kwargs)
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_form_gate_accepts_pure_cjk_2_to_8(self):
         self.assertTrue(display_form_valid("火焰之心", PLAYER))
         self.assertTrue(display_form_valid("火心", PLAYER))
         self.assertTrue(display_form_valid("一二三四五六七八", PLAYER))
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_form_gate_rejects_bad_shape(self):
         for bad in (
             "火",                   # too short
@@ -142,18 +145,22 @@ class FilterMatrixTests(unittest.TestCase):
             with self.subTest(display=bad):
                 self.assertFalse(display_form_valid(bad, PLAYER))
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_player_name_substring_rejected(self):
         self.assertFalse(display_form_valid("艾洛希雅之友", PLAYER))
         self.assertFalse(display_form_valid("小艾洛希雅", PLAYER))
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_fixed_registry_collision_rejected(self):
         survivors = self._filter([_candidate(1, "F級冒險者"), _candidate(2, "新月")])
         self.assertEqual([c.display for c in survivors], ["新月"])
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_live_collection_collision_rejected(self):
         survivors = self._filter([_candidate(1, "南門新客"), _candidate(2, "新月")])
         self.assertEqual([c.display for c in survivors], ["新月"])
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_deleted_name_is_renominable(self):
         # The collection is read live: a deleted epithet is simply absent
         # from owned_epithet_displays, so the same name survives again.
@@ -162,6 +169,7 @@ class FilterMatrixTests(unittest.TestCase):
         )
         self.assertEqual([c.display for c in survivors], ["南門新客"])
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_in_batch_duplicates_keep_first(self):
         survivors = self._filter(
             [
@@ -175,6 +183,7 @@ class FilterMatrixTests(unittest.TestCase):
             [("新月", "第一段事蹟"), ("流星", "事蹟引用3")],
         )
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_top_three_cut(self):
         survivors = self._filter([_candidate(i) for i in range(1, 6)])
         self.assertEqual(len(survivors), BALLOT_TOP)
@@ -182,6 +191,10 @@ class FilterMatrixTests(unittest.TestCase):
             [c.display for c in survivors], ["異名一", "異名二", "異名三"]
         )
 
+    @covers_requirement(
+        "title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled",
+        "title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters",
+    )
     def test_survivor_counts_2_1_0(self):
         two = self._filter(
             [
@@ -224,6 +237,7 @@ class SchemaBoundaryTests(unittest.TestCase):
         register_title_nomination()
         self.addCleanup(_reset_all)
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_five_good_candidates_return_top_three(self):
         client = _client_replying(_good_reply())
         with override_settings(LLM_PROFILES=_profiles()):
@@ -238,6 +252,7 @@ class SchemaBoundaryTests(unittest.TestCase):
         )
         self.assertEqual(len(client.calls), 1)
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_wrong_count_voids_round(self):
         for count in (CANDIDATES_PER_ROUND - 1, CANDIDATES_PER_ROUND + 1):
             with self.subTest(count=count):
@@ -251,12 +266,14 @@ class SchemaBoundaryTests(unittest.TestCase):
                     )
                 self.assertIsNone(result)
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_malformed_json_voids_round(self):
         client = _client_replying("{not json")
         with override_settings(LLM_PROFILES=_profiles()):
             result = await_result(generate_epithet_candidates(_context(), client))
         self.assertIsNone(result)
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_basis_over_80_voids_whole_round(self):
         long_basis = "事" * (BASIS_MAX_CHARS + 1)
         text = _reply(
@@ -345,6 +362,7 @@ class DegradeTests(unittest.TestCase):
             result = await_result(generate_epithet_candidates(_context(), client))
         self.assertIsNone(result)
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_all_candidates_filtered_returns_empty_tuple_not_none(self):
         text = _reply([_candidate(i, "南門新客") for i in range(1, 6)])
         client = _client_replying(text)
@@ -373,6 +391,7 @@ class PromptShapeTests(unittest.TestCase):
         )[1].split("\n", 1)[0]
         self.assertEqual(json.loads(summary_line), {"event_logs": []})
 
+    @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_prompt_never_states_collision_rules(self):
         system, user = build_nomination_prompt(_context())
         # The prompt may state form rules only; the collision rules

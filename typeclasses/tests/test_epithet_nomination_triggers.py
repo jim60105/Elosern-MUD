@@ -15,11 +15,13 @@ from unittest.mock import patch
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
 from commands.skip import CmdRest
+from tools.spec_traceability import covers_requirement
 from world.rules.clock import WorldClock, get_world_clock
 
 class LogoutTriggerTests(EvenniaTest):
     """``at_post_unpuppet`` schedules one logout nomination for the player."""
 
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_logout_hook_schedules_for_the_puppeted_player(self):
         with patch(
             "server.title_nomination_service.schedule_epithet_nomination"
@@ -51,6 +53,7 @@ class TypedRestTriggerTests(EvenniaCommandTestMixin, EvenniaTest):
     def _run(self, cmd, args):
         return self.call(cmd, args, caller=self.actor, receiver=self.actor)
 
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_rest_passes_events_across_the_gate(self):
         self._run(CmdRest(), "1h")
         self.assertEqual(self.schedule.call_count, 1)
@@ -59,6 +62,7 @@ class TypedRestTriggerTests(EvenniaCommandTestMixin, EvenniaTest):
         kinds = [getattr(event, "kind", None) for event in events]
         # 1h from tick 0 crosses no day boundary; the gate sees no daily_reset.
         self.assertNotIn("daily_reset", kinds)
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_rest_crossing_the_boundary_reports_daily_reset(self):
         # commands/skip.py resolves the clock through its own module-level
         # name; a fresh instance two seconds before the day boundary makes
@@ -82,6 +86,7 @@ class TypedRestTriggerTests(EvenniaCommandTestMixin, EvenniaTest):
 class WebWaitAdapterTriggerTests(EvenniaTest):
     """The ``explore.wait`` adapter routes through the same boundary gate."""
 
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_wait_adapter_calls_the_gate(self):
         from web.webclient.actions.exploration_actions import _wait_adapter
 
@@ -111,6 +116,7 @@ class WebWaitAdapterTriggerTests(EvenniaTest):
 class CombatNeverTriggersTests(unittest.TestCase):
     """Nomination stays out of the combat round machinery by structure."""
 
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_combat_modules_never_reference_nomination(self):
         from world.rules import combat, combat_session
 

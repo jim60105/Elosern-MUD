@@ -1165,6 +1165,7 @@ class EpithetNominationRulesTests(EvenniaTest):
         self.assertEqual(decline_records(self.entity), ())
         self.assertFalse(nomination_suppressed(self.entity))
 
+    @covers_requirement("title-system::the-ballot-persists-unchanged-until-consent")
     def test_persist_round_trips_the_ballot(self):
         self.assertTrue(self._persist(("火焰之心", "烧毁匪寨"), ("新月", "月下救人")))
         self.assertEqual(
@@ -1191,6 +1192,7 @@ class EpithetNominationRulesTests(EvenniaTest):
                 self.assertFalse(persist_nomination_ballot(self.entity, candidates))
         self.assertFalse(self.entity.attributes.has(PENDING_BALLOT_KEY))
 
+    @covers_requirement("title-system::epithet-nomination-fires-only-at-rest-points-and-is-throttled")
     def test_single_pending_ballot_blocks_replacement(self):
         self._persist(("甲名", "一"))
         self.assertFalse(self._persist(("乙名", "二")))
@@ -1219,6 +1221,7 @@ class EpithetNominationRulesTests(EvenniaTest):
             )
         self.assertEqual(len(read_pending_ballot(self.entity)), 2)
 
+    @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_accept_banks_auto_equips_and_clears(self):
         bank_fixed(self.entity, "g_f_rank", 1)
         self._persist(("火焰之心", "焚盡匪寨"))
@@ -1234,6 +1237,7 @@ class EpithetNominationRulesTests(EvenniaTest):
         # Accepting never starts a cooldown.
         self.assertFalse(nomination_suppressed(self.entity))
 
+    @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_accept_with_occupied_slot_banks_without_touching_it(self):
         grant_starter_pair(self.entity)
         self._persist(("新月", "月下救人"))
@@ -1258,6 +1262,7 @@ class EpithetNominationRulesTests(EvenniaTest):
             accept_epithet(self.entity, 1)
         self.assertIs(caught.exception.reason, TitleBallotReason.NO_PENDING_BALLOT)
 
+    @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_accept_failure_restores_every_attribute(self):
         bank_fixed(self.entity, "g_f_rank", 1)
         self._persist(("甲名", "一"))
@@ -1274,6 +1279,7 @@ class EpithetNominationRulesTests(EvenniaTest):
         self.assertFalse(self.entity.attributes.has(PENDING_BALLOT_KEY))
         self.assertEqual(len(banked_epithets(self.entity)), 1)
 
+    @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_decline_records_emits_and_suppresses(self):
         self._persist(("甲名", "一"), ("乙名", "二"))
         event_log = decline_epithet_ballot(self.entity)
@@ -1349,6 +1355,7 @@ class EpithetNominationRulesTests(EvenniaTest):
             with self.subTest(now=bad), self.assertRaises(TitleDataError):
                 nomination_cooldown_active(self.entity, bad)
 
+    @covers_requirement("title-system::the-ballot-persists-unchanged-until-consent")
     def test_ballot_survives_cache_reset(self):
         self._persist(("甲名", "一"))
         self.entity.attributes.reset_cache()
@@ -1365,6 +1372,7 @@ class EpithetNominationRulesTests(EvenniaTest):
             with self.subTest(limit=bad_limit), self.assertRaises(ValueError):
                 declined_digest(self.entity, bad_limit)
 
+    @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_persist_rechecks_suppression_after_proposal(self):
         # Race: a ballot appears between the service pre-check and the
         # writer's re-check. The writer must refuse without touching it.
