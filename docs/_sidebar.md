@@ -3,6 +3,7 @@
 - 遊戲指令
   - [指令總覽](/game/commands)
   - [指令參考](/game/command-reference)
+  - [裝備效果指南](/game/equipment)
 
 - 遊戲主持人
   - [總覽與工作原則](/gm/overview)
