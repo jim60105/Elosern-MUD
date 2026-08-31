@@ -97,7 +97,7 @@ No player-facing surface changes. No backward compatibility work (unreleased,
 - Code: `world/art/sd_worker.py` (enumeration, auth, seed, timeout param,
   request builder), `world/art/fake_sd_client.py` and
   `web/tests/browser/fake_sd_client.py` (interface), `world/art/worker.py` +
-  `world/art/service.py` (settle carries seed), `world/art/store.py` (+`seed`),
+  `world/art/queue.py` (settle carries seed), `world/art/store.py` (+`seed`),
   `world/art/presenter.py` untouched (never staff data), `commands/art.py`
   (`@art options`, `@art status` seed column), `server/conf/settings.py`
   (+4 settings; 2 env-backed).

@@ -124,6 +124,7 @@
 | [`art run`](/game/command-reference?id=art-run) | 立即排空美術佇列。 |
 | [`art retry`](/game/command-reference?id=art-retry) | 重新排入失敗記錄。 |
 | [`art requeue`](/game/command-reference?id=art-requeue) | 強制重新生成主體。 |
+| [`art options`](/game/command-reference?id=art-options) | 查詢 sd-webui 可選名稱。 |
 
 ## 系統與建造
 

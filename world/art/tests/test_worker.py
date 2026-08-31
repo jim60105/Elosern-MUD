@@ -26,7 +26,7 @@ from world.art.queue import (
     settle,
     settle_generated,
 )
-from world.art.sd_worker import SDError
+from world.art.sd_worker import GeneratedImage, SDError
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.art.worker import (
@@ -45,19 +45,21 @@ class _MixedOutcomeClient:
 
     ``None`` means a valid generation; any other value is raised verbatim, so
     tests can script named ``SDError``s and unexpected internal errors in one
-    batch. Records every call like the fake client.
+    batch. Records every call like the fake client. A valid generation returns
+    the default PNG with a scripted seed (default ``None``).
     """
 
     def __init__(self):
         self.calls: list[tuple[ArtSubject, str]] = []
         self.outcomes: dict[str, Exception | None] = {}
+        self.seed: int | None = None
 
-    def generate(self, subject: ArtSubject, description: str) -> bytes:
+    def generate(self, subject: ArtSubject, description: str) -> GeneratedImage:
         self.calls.append((subject, description))
         error = self.outcomes.get(description)
         if error is not None:
             raise error
-        return DEFAULT_PNG
+        return GeneratedImage(data=DEFAULT_PNG, seed=self.seed)
 
 
 class WorkerStoreIsolation(EvenniaTest):
@@ -131,6 +133,56 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             path for path in (self.root / "scene").iterdir() if path.name != "forest_path.png"
         ]
         self.assertEqual(leftovers, [])
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_server_reported_seed_is_persisted_on_publish(self):
+        subject = self._subject()
+        self._record(subject)
+        fake = FakeSDWebUIClient()
+        fake.seed = 42
+        with self._client(fake):
+            drain_synchronous(10)
+        record = self._record_for(subject)
+        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        self.assertEqual(record.db.seed, 42)
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_seedless_regeneration_clears_the_previous_seed(self):
+        # A seedless regeneration must never keep advertising the old image's
+        # seed: settle_generated assigns the new (absent) seed unconditionally.
+        subject = self._subject()
+        self._record(subject)
+        seeded = FakeSDWebUIClient()
+        seeded.seed = 42
+        with self._client(seeded):
+            drain_synchronous(10)
+        self.assertEqual(self._record_for(subject).db.seed, 42)
+        requeue(subject)
+        seedless = FakeSDWebUIClient()
+        seedless.seed = None
+        with self._client(seedless):
+            drain_synchronous(10)
+        record = self._record_for(subject)
+        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        self.assertIsNone(record.db.seed)
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_failed_regeneration_retains_prior_output_and_seed(self):
+        subject = self._subject()
+        self._record(subject)
+        seeded = FakeSDWebUIClient()
+        seeded.seed = 7
+        with self._client(seeded):
+            drain_synchronous(10)
+        requeue(subject)
+        failing = FakeSDWebUIClient()
+        failing.fail_every_call(SDError("sd_connection_error", "offline"))
+        with self._client(failing):
+            drain_synchronous(10)
+        record = self._record_for(subject)
+        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
+        self.assertEqual(record.db.output_identity, "scene/forest_path.png")
+        self.assertEqual(record.db.seed, 7)
 
     @covers_requirement(
         "internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes",

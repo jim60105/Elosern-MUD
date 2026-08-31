@@ -17,7 +17,7 @@ own cmdsets by inheriting from them or directly from `evennia.CmdSet`.
 from evennia import default_cmds
 
 from commands.action import CmdCast
-from commands.art import CmdArtRequeue, CmdArtRetry, CmdArtRun, CmdArtStatus
+from commands.art import CmdArtOptions, CmdArtRequeue, CmdArtRetry, CmdArtRun, CmdArtStatus
 from commands.background import CmdBackground
 from commands.combat import (
     CmdCombatActions,
@@ -156,6 +156,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdArtRun)
         self.add(CmdArtRetry)
         self.add(CmdArtRequeue)
+        self.add(CmdArtOptions)
         self.add(CmdRest)
         self.add(CmdSleep)
         self.add(CmdWaitUntil)

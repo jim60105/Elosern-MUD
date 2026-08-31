@@ -230,6 +230,7 @@ def settle_generated(
     generation_token: str,
     output_identity: str,
     tmp_path: str,
+    seed: int | None = None,
 ) -> ArtAssetRecord | None:
     """Atomically publish a generated PNG for the current claim under the lock.
 
@@ -238,9 +239,11 @@ def settle_generated(
     ``pending``) or reclaimed can never publish, so a stale generation can
     never replace the record's prior valid output. When the claim is current,
     the already-written temporary file is atomically replaced onto the expected
-    identity and the record settles ``done`` in the same critical section. On
-    any failure the temporary file is removed, the existing output is never
-    touched, and the error propagates for the worker to bound.
+    identity and the record settles ``done`` in the same critical section,
+    with ``seed`` assigned unconditionally (``None`` clears the previous
+    output's seed — a seedless regeneration must never advertise the old
+    image's seed). On any failure the temporary file is removed, the existing
+    output is never touched, and the error propagates for the worker to bound.
     """
     with queue_lock:
         records = _records_for(subject)
@@ -275,6 +278,7 @@ def settle_generated(
         record.db.last_error_code = None
         record.db.claimed_at = None
         record.db.generation_token = ""
+        record.db.seed = seed
         return record
 
 

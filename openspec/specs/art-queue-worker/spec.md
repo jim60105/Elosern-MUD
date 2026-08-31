@@ -63,11 +63,16 @@ wait. The external worker SHALL run at most one job at a time.
 ### Requirement: The internal worker contract generates every output through the sd-webui client and confines paths to the store root
 `world/art/worker.py` SHALL generate one image per claimed record by calling the configured
 internal sd-webui client (`world.art.sd_worker.SDWebUIClient` via the settings `ART_SD_CLIENT`
-dotted path) on a background thread with a bounded timeout, and SHALL write the returned bytes to
-the engine pre-computed exact expected relative identity for that subject (the `out_path`
-equivalent, `expected_output_identity(subject)`). A job SHALL settle `done` only when the client returns PNG bytes and
-the engine writes them to exactly the pre-computed expected identity, resolving to an existing
-regular file under the configured `ART_STORE_ROOT` (symlink-resolved). The output write SHALL be
+dotted path) on a background thread with a bounded timeout, and SHALL write the returned image
+bytes to the engine pre-computed exact expected relative identity for that subject (the
+`out_path` equivalent, `expected_output_identity(subject)`). The client SHALL return a
+`GeneratedImage` result carrying the validated PNG bytes and the server-reported generation seed
+(a non-negative integer parsed from the response `info` JSON, or `None` when `info` is absent,
+unparseable, or carries no non-negative integer `seed`); a missing or invalid seed SHALL never
+fail an otherwise valid generation. A job SHALL settle `done` only when the client returns PNG
+bytes and the engine writes them to exactly the pre-computed expected identity, resolving to an
+existing regular file under the configured `ART_STORE_ROOT` (symlink-resolved), and a successful
+settle SHALL persist the returned seed on the record (nullable). The output write SHALL be
 atomic: bytes SHALL be written to a unique temporary file inside the store directory and moved
 onto the final identity with an atomic replace, so a failed or interrupted regeneration never
 corrupts or replaces the record's prior valid output. A named client error
@@ -84,6 +89,16 @@ per-item timeout, so a legitimately slow batch is not reclaimed mid-generation.
 - **WHEN** the internal client returns valid PNG bytes for a scene subject and the engine writes
   the exact expected identity under the store root
 - **THEN** the record becomes `done` with the validated relative output identity
+
+#### Scenario: The server-reported seed is persisted on the record
+- **WHEN** the client's transport returns an envelope whose `info` JSON carries `seed: 42` and
+  the job settles `done`
+- **THEN** the record stores seed `42` and `@art status` shows it for that record
+
+#### Scenario: A missing or malformed seed never fails the job
+- **WHEN** the envelope has no `info`, unparseable `info`, or an `info` whose `seed` is absent,
+  negative, boolean, or non-integer, and the PNG bytes are otherwise valid
+- **THEN** the job still settles `done` with seed `None`
 
 #### Scenario: A named client error is a bounded failure
 - **WHEN** the client raises a named `SDError` (for example a connection error or timeout) for a

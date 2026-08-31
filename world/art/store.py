@@ -58,3 +58,7 @@ class ArtAssetRecord(DefaultScript):
     completed_at: float | None = AttributeProperty(default=None)
     aspect_ratio: str = AttributeProperty(default="")
     hash_changed: bool = AttributeProperty(default=False)
+    # The server-reported generation seed of the CURRENT output (nullable:
+    # servers may not report one). settle_generated assigns it unconditionally
+    # on publish, so a seedless regeneration never keeps a stale seed.
+    seed: int | None = AttributeProperty(default=None)

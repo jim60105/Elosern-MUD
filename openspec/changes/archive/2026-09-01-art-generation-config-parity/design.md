@@ -51,20 +51,27 @@ Reference facts this design locks in (source-verified in
 
 ## Decisions
 
-### D1 — Enumeration reuses `_http_json` with a per-call timeout, capped list validation
+### D1 — Enumeration reuses the bounded transport with fixed private caps, verbatim names
 
-`list_options(path, *, item_key_fallbacks, max_items=100, timeout_seconds=10)`:
-GETs via `_http_json(url, payload=None, timeout_seconds=...)`, requires a JSON
-**list** of at most `max_items` items, each a dict; extracts the first present
-string among the reference fallbacks for that endpoint; drops empty strings;
-raises the existing named errors (`sd_http_error`, `sd_timeout`,
-`sd_malformed_response`, `sd_response_too_large`) on any violation. No new
-error taxonomy. GET requests omit `Content-Type` (cosmetic parity nit noted in
-the audit; matches "GET has no body type" correctness).
-
-Alternative considered: a parallel async/gradio-client enumeration — rejected;
-the worker is synchronous by design and one shared bounded transport is one
-less deadline implementation to trust.
+A private `_list_options(path, *, item_keys, max_items=_OPTIONS_MAX_ITEMS, timeout_seconds=_OPTIONS_TIMEOUT_SECONDS)`
+GETs via the transport core and requires a JSON **list** of at most 100 items,
+each a dict; the caps are module constants (`_OPTIONS_MAX_ITEMS = 100`,
+`_OPTIONS_TIMEOUT_SECONDS = 10.0`) and the five public wrappers
+(`list_models/list_samplers/list_schedulers/list_styles/list_modules`) accept
+no parameters, so the 100-item and 10-s bounds are enforced invariants, not
+caller-adjustable defaults. Per item the helper extracts the first present
+string among the reference fallbacks for that endpoint; a list member that is
+not a dict or carries no string fallback value is `sd_malformed_response`
+(never a silent drop); a selected string is tested for emptiness via `strip()`
+and dropped when empty, otherwise returned **verbatim** (unstripped) — the
+command's purpose is exact copy/paste of server names. Violations raise only
+the existing named errors (`sd_http_error`, `sd_timeout`,
+`sd_malformed_response`, `sd_response_too_large`) — no new error taxonomy.
+GET requests omit `Content-Type` (cosmetic parity nit noted in the audit;
+matches "GET has no body type" correctness). `_http_json` gains a
+`timeout_seconds: float | None = None` parameter (default = the existing
+setting); the deadline and every refreshed socket timeout derive from that
+budget.
 
 ### D2 — Auth settings are secret-file-only plain settings
 
@@ -136,21 +143,24 @@ Alternative considered: JSON-list env syntax — rejected; the existing
 free-text idiom (`ART_SD_CHECKPOINT` etc.) and `.env.example` single-line
 style favor CSV with documented exact-match semantics.
 
-### D5 — `@art options` is a read-only staff diagnostic
+### D5 — `@art options` is a read-only staff diagnostic off the reactor
 
 `CmdArtOptions(_ArtCommand)` (Developer lock), arg one of
-`models|samplers|schedulers|styles|modules`. Runs synchronously: a GET with a
-**10 s** cap (D1 parameter) never blocks play longer than a bounded diagnostic
-and is well under the drain timeout; acceptable for a staff-only command
-(consistent with `@art run` dispatching without waiting, but a 10-s bounded
-read is far cheaper and gives the answer inline). Output: numbered list, one
-name per line (names capped at 256 code points for display), header line with
-server base URL host only (no credentials) + total count. Any `SDError` prints
-`error: <code>` and no partial list (never falls back to cached/prior values).
-The command performs **zero** state writes — single-writer invariant intact
-(`@art options` is not in any queue lock because it touches no record).
-Help/syntax/doc updates: `docs/game/commands.md` row + anchor row in
-`command-reference.md`, `tests/test_command_docs.py` green.
+`models|samplers|schedulers|styles|modules`. The enumeration is dispatched
+with `twisted.internet.threads.deferToThread` and the reply is sent from a
+reactor callback — never inline on the reactor thread (the command `func` IS
+the reactor; a synchronous bounded stall still freezes every session, which
+the established `worker.drain()` deferToThread architecture exists to avoid).
+The transport keeps the fixed 10-s cap (D1), so the callback latency is
+bounded. Output: numbered list, one **verbatim** name per line (names clamped
+to 256 code points for display), header line naming the kind with the server
+base URL host only (never userinfo/credentials) + total count. Any `SDError`
+prints the named `error: <code>` and no partial list (never falls back to
+cached/prior values). The command performs **zero** state writes —
+single-writer invariant intact (`@art options` is not in any queue lock
+because it touches no record). Help/syntax/doc updates:
+`docs/game/commands.md` row + anchor row in `command-reference.md`,
+`tests/test_command_docs.py` green.
 
 ### D6 — Traceability timing and shard ownership
 
@@ -176,9 +186,10 @@ inventory tests (extended tables).
   server-side error surfaces as `sd_http_error` at generation, exactly like
   any wrong-name typo; `@art options modules` on A1111 404s → named error,
   no list. Not worth client-side fork detection.
-- [10 s synchronous GET on `@art options`] → hard-capped, staff-only, no
-  lock; worst case a 10-s wait for the invoking staff session, never the
-  reactor.
+- [Deferred option-list arriving after a disconnect] → the reply is sent via
+  the invoking caller's `msg`; a vanished session drops the message the same
+  way any deferred command reply does. The command itself never blocks the
+  reactor; worst-case latency is the fixed 10-s transport cap.
 - [Password leakage] → header built from settings at request time; error
   paths stringify exception types/messages only (no headers); explicit tests:
   SDError messages and logs never contain the password literal; `.env.example`

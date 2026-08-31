@@ -26,7 +26,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 
 絕對不會靜默退回預設值、clamp 或延後到第一次使用時才報錯。
 
-## 本變更提供的 18 個環境變數（加上 SD_WEBUI_BASE_URL）
+## 本變更提供的 20 個環境變數（加上 SD_WEBUI_BASE_URL）
 
 `ART_SD_BASE_URL` 的變數名稱由 `internal-art-worker` 規格固定為 `SD_WEBUI_BASE_URL`；其餘變數與設定同名。
 
@@ -41,6 +41,8 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `ART_SD_SAMPLER` | `ART_SD_SAMPLER` | 自由文字 | 空字串 | 空＝sd-webui 伺服器預設；設定後必須與伺服器列舉完全一致 |
 | `ART_SD_SCHEDULER` | `ART_SD_SCHEDULER` | 自由文字 | 空字串 | 空＝sd-webui 伺服器預設 |
 | `ART_SD_CHECKPOINT` | `ART_SD_CHECKPOINT` | 自由文字 | 空字串 | 空＝伺服器現用模型；確切標題（含 hash 後綴） |
+| `ART_SD_STYLES` | `ART_SD_STYLES` | 自由文字 | 空字串 | 逗號分隔風格名稱清單；空＝請求省略該欄；名稱逐字通過，需與 `@art options styles` 列舉一致 |
+| `ART_SD_MODULES` | `ART_SD_MODULES` | 自由文字 | 空字串 | 逗號分隔 Forge 模組檔名清單；空＝請求省略該欄；僅適用 Forge 分支（附固定 dtype 伴隨欄位） |
 | `ART_SD_SCENE_WIDTH` | `ART_SD_SCENE_WIDTH` | 整數 | `1344` | 正的 8 倍數（SDXL contract） |
 | `ART_SD_SCENE_HEIGHT` | `ART_SD_SCENE_HEIGHT` | 整數 | `768` | 正的 8 倍數（SDXL contract） |
 | `ART_SD_PORTRAIT_WIDTH` | `ART_SD_PORTRAIT_WIDTH` | 整數 | `768` | 正的 8 倍數（SDXL contract） |
@@ -64,7 +66,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | --- | --- | --- | --- | --- |
 | `ELOSERN_VUE_CLIENT` | `ELOSERN_VUE_CLIENT` | 布林 | `True`（Vue SPA） | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；設為假值後重啟＝文件記載的緊急回退到 legacy webclient |
 
-驗證細節：布林只接受上述固定字彙表（`bool("False")` 會是 `True`，這正是需要字彙表的原因）；「正的 8 倍數」同時拒絕 0、負數與非倍數；空白值對 typed／布林／URL knob 等同未設定，對三個自由文字 knob 則是正當的「伺服器預設」值。
+驗證細節：布林只接受上述固定字彙表（`bool("False")` 會是 `True`，這正是需要字彙表的原因）；「正的 8 倍數」同時拒絕 0、負數與非倍數；空白值對 typed／布林／URL knob 等同未設定；五個自由文字 knob 分兩族——`ART_SD_SAMPLER`／`ART_SD_SCHEDULER`／`ART_SD_CHECKPOINT` 空白＝正當的「伺服器預設」值，`ART_SD_STYLES`／`ART_SD_MODULES` 空白＝請求省略對應欄位。
 
 ## 既有的應用層變數
 
@@ -102,6 +104,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `LLM_PROFILES` 每層調校 | 規格 `llm-profiles` 範圍；結構化的每層調校值不適合塞進單一環境變數 |
 | `ART_SD_CLIENT` | 這是會執行匯入的 dotted path；環境可控制的匯入縫等於讓任何繼承環境在引擎啟動時匯入任意程式碼（匯入注入） |
 | `ART_STORE_ROOT` | 環境打字錯誤會把生成美術靜默搬到持久卷之外的路徑；罕見的非標準佈局請在 `secret_settings.py` 明確設定 |
+| `ART_SD_USERNAME`／`ART_SD_PASSWORD` | 這是憑證；環境變數會洩漏進程序清單與 `compose inspect`。客戶端只在兩者皆非空時送出 Basic auth；密碼永不出現在任何記錄 |
 
 ## Bare-metal（非容器）設定步驟
 

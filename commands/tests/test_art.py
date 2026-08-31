@@ -3,18 +3,37 @@
 from unittest.mock import patch
 
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
+from twisted.internet.defer import Deferred
+from twisted.python.failure import Failure
 
 from commands.art import (
+    CmdArtOptions,
     CmdArtRequeue,
     CmdArtRetry,
     CmdArtRun,
     CmdArtStatus,
 )
 from world.art.queue import claim, ensure, requeue, settle
+from world.art.sd_worker import SDError
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 
 from tools.spec_traceability import covers_requirement
+
+
+def _sync_defer_to_thread(inline_callback, *args, **kwargs):
+    """Run the threaded work synchronously and return a settled Deferred.
+
+    Replaces ``twisted.internet.threads.deferToThread`` so command tests never
+    spawn a thread: a success resolves the deferred with the value, a failure
+    errbacks it with a ``Failure`` exactly like the real dispatch.
+    """
+    deferred = Deferred()
+    try:
+        deferred.callback(inline_callback(*args, **kwargs))
+    except Exception:  # noqa: BLE001 - mirror real dispatch semantics
+        deferred.errback(Failure())
+    return deferred
 
 
 def _scene(key="forest_path"):
@@ -169,6 +188,95 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             db_key=f"art:portrait:character:{player.pk}"
         ).first()
         self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
+
+
+class ArtOptionsCommandTests(EvenniaCommandTestMixin, EvenniaTest):
+    """``@art options`` with the thread dispatch replaced by a sync seam."""
+
+    def _options(self, args, names=None, error=None, caller=None):
+        def work():
+            if error is not None:
+                raise error
+            return names
+
+        with patch(
+            "twisted.internet.threads.deferToThread",
+            side_effect=_sync_defer_to_thread,
+        ) as dispatch:
+            with patch("world.art.sd_worker.list_models", side_effect=work):
+                with patch("world.art.sd_worker.list_samplers", side_effect=work):
+                    with patch("world.art.sd_worker.list_styles", side_effect=work):
+                        output = self.call(CmdArtOptions(), args, caller=caller)
+        return output, dispatch
+
+    @covers_requirement("art-staff-commands::art-options-lists-the-live-server-s-selectable-option-names")
+    def test_lists_names_under_a_kind_and_count_header(self):
+        output, dispatch = self._options("samplers", names=["Euler a", "ER SDE"])
+        dispatch.assert_called_once()
+        self.assertIn("2 項", output)
+        self.assertIn("1. Euler a", output)
+        self.assertIn("2. ER SDE", output)
+        # Zero writes: the enumeration never creates or mutates a record.
+        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+
+    @covers_requirement("art-staff-commands::art-options-lists-the-live-server-s-selectable-option-names")
+    def test_display_names_are_clamped_to_256_code_points(self):
+        output, _ = self._options("samplers", names=["x" * 300])
+        self.assertIn("x" * 256, output)
+        self.assertNotIn("x" * 257, output)
+
+    @covers_requirement("art-staff-commands::art-options-lists-the-live-server-s-selectable-option-names")
+    def test_failure_prints_the_named_code_and_no_partial_list(self):
+        output, _ = self._options(
+            "models", error=SDError("sd_connection_error", "offline")
+        )
+        self.assertIn("sd_connection_error", output)
+        self.assertNotIn("1.", output)
+
+    @covers_requirement("art-staff-commands::art-options-lists-the-live-server-s-selectable-option-names")
+    def test_invalid_argument_is_rejected_without_any_request(self):
+        for args in ("", "nope", "models extra"):
+            with self.subTest(args=args):
+                output, dispatch = self._options(args, names=[])
+                self.assertIn("用法：art options", output)
+                dispatch.assert_not_called()
+
+    @covers_requirement("art-staff-commands::art-options-lists-the-live-server-s-selectable-option-names")
+    @covers_requirement("art-staff-commands::players-have-no-access-to-any-art-control")
+    def test_non_staff_is_denied_with_no_request(self):
+        output, dispatch = self._options("models", names=[], caller=self.char2)
+        self.assertIn("沒有權限", output)
+        dispatch.assert_not_called()
+
+    @covers_requirement("art-staff-commands::art-options-lists-the-live-server-s-selectable-option-names")
+    def test_output_never_leaks_credentials_or_authorization_material(self):
+        output, _ = self._options("styles", names=["cinematic"])
+        self.assertNotIn("Authorization", output)
+        self.assertNotIn("Basic ", output)
+
+
+class ArtStatusSeedColumnTests(EvenniaCommandTestMixin, EvenniaTest):
+    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
+    def test_done_record_shows_its_persisted_seed(self):
+        ensure(_scene("forest_path"), "desc")
+        claim(10)
+        settle(
+            _scene("forest_path"),
+            status=ArtAssetStatus.DONE,
+            output_identity="scene/forest_path.png",
+            error=None,
+        )
+        record = ArtAssetRecord.objects.filter(db_key="art:scene:forest_path").first()
+        record.db.seed = 42
+        output = self.call(CmdArtStatus(), "")
+        self.assertIn(" seed=42", output)
+
+    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
+    def test_seedless_record_shows_no_seed_field(self):
+        ensure(_scene("forest_path"), "desc")
+        output = self.call(CmdArtStatus(), "")
+        self.assertIn("scene:forest_path", output)
+        self.assertNotIn("seed=", output)
 
 
 if __name__ == "__main__":
