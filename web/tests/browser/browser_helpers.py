@@ -702,3 +702,26 @@ def snapshot_envelope(epoch: str, revision: int, panels: dict, **overrides) -> d
 def fresh_epoch() -> str:
     """A valid 22-character epoch not yet used by a real server snapshot."""
     return "browserTestEpoch_0001a"
+
+
+def inject_snapshot(page: Page, panels: dict, mode: str = "exploration") -> None:
+    """Inject one schema-valid ``ui_snapshot``, stamped from the live view.
+
+    The presentation epoch, revision, and transport generation are read and
+    consumed inside ONE ``page.evaluate``: a server snapshot committing
+    between a Python state read and the injection can never make a
+    precomputed revision stale (the reducer admits only strictly newer
+    same-epoch revisions, so a split read/commit races as ``not_newer``).
+    Any rejection raises immediately; the live reason is preserved verbatim.
+    """
+    result = page.evaluate(
+        "(args) => { const s = window.__elosernBridge.store.view;"
+        " const env = args.envelope;"
+        " env.presentation_epoch = s.epoch;"
+        " env.revision = s.revision + 1;"
+        " return window.__elosernBridge.store.receive("
+        "s.generation, 'ui_snapshot', [env], {}); }",
+        {"envelope": snapshot_envelope("", 0, panels, mode=mode)},
+    )
+    if not result.get("accepted"):
+        raise AssertionError("injected ui_snapshot was rejected: %r" % (result,))

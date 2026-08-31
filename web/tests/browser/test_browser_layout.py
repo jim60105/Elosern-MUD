@@ -17,6 +17,7 @@ from .browser_helpers import (
     fresh_epoch,
     focus_action_dock,
     install_outbound_recorder,
+    inject_snapshot,
     sent_action_count,
     snapshot_envelope,
     store_state,
@@ -395,19 +396,7 @@ class ContextualHudStandingJourneyTest(BrowserAcceptanceTest):
 
     def _inject_snapshot(self, page, panels: dict, mode: str = "exploration") -> None:
         """Inject one schema-valid ``ui_snapshot`` through the store's ``receive``."""
-        state = store_state(page)
-        result = page.evaluate(
-            "(args) => window.__elosernBridge.store.receive("
-            "args.generation, 'ui_snapshot', [args.envelope], {})",
-            {
-                "generation": state["generation"],
-                "envelope": snapshot_envelope(
-                    state["epoch"], state["revision"] + 1, panels, mode=mode
-                ),
-            },
-        )
-        if not result.get("accepted"):
-            raise AssertionError("injected ui_snapshot was rejected: %r" % (result,))
+        inject_snapshot(page, panels, mode=mode)
 
     def _wait_mode(self, page, mode: str, timeout: int = 30000) -> None:
         """Gate on the committed store mode matching ``mode``."""

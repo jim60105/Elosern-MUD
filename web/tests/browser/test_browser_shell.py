@@ -8,8 +8,8 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
+    inject_snapshot,
     sent_action_count,
-    snapshot_envelope,
     store_state,
     valid_art_panel,
     valid_character_panel,
@@ -927,44 +927,17 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         ``data-elosern-mode``.
         """
         page = self.logged_in_page()
-        state = store_state(page)
-
         # Exploration: inject an available local_map panel; the minimap renders.
-        expl = page.evaluate(
-            "(args) => window.__elosernBridge.store.receive("
-            "args.generation, 'ui_snapshot', [args.envelope], {})",
-            {
-                "generation": state["generation"],
-                "envelope": snapshot_envelope(
-                    state["epoch"],
-                    state["revision"] + 1,
-                    {"local_map": valid_local_map_panel()},
-                    mode="exploration",
-                ),
-            },
+        inject_snapshot(
+            page, {"local_map": valid_local_map_panel()}, mode="exploration"
         )
-        self.assertTrue(expl["accepted"], "the exploration snapshot was accepted")
         page.wait_for_timeout(150)
         lm = page.locator('[data-testid="local-map"]')
         self.assertEqual(lm.count(), 1, "minimap renders in exploration mode")
         self.assertTrue(lm.is_visible(), "minimap is visible in exploration mode")
 
         # Combat: force combat mode; the minimap is hidden by the CSS mode-gate.
-        state = store_state(page)
-        combat = page.evaluate(
-            "(args) => window.__elosernBridge.store.receive("
-            "args.generation, 'ui_snapshot', [args.envelope], {})",
-            {
-                "generation": state["generation"],
-                "envelope": snapshot_envelope(
-                    state["epoch"],
-                    state["revision"] + 1,
-                    {"local_map": valid_local_map_panel()},
-                    mode="combat",
-                ),
-            },
-        )
-        self.assertTrue(combat["accepted"], "the combat-mode snapshot was accepted")
+        inject_snapshot(page, {"local_map": valid_local_map_panel()}, mode="combat")
         page.wait_for_timeout(150)
         lm = page.locator('[data-testid="local-map"]')
         self.assertEqual(lm.count(), 1, "the minimap element remains in the DOM")
@@ -1052,7 +1025,6 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 from .browser_helpers import login_and_open
 
                 login_and_open(page, self.webclient_url, self.base_url)
-                state = store_state(page)
                 # An 8-condition status panel makes the +N overflow chip
                 # render, so the assertion runs with the overflow disclosed.
                 status = valid_status_panel("艾倫·灰誓", "char-42")
@@ -1065,22 +1037,14 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                     }
                     for i in range(8)
                 ]
-                page.evaluate(
-                    "(args) => window.__elosernBridge.store.receive("
-                    "args.generation, 'ui_snapshot', [args.envelope], {})",
+                inject_snapshot(
+                    page,
                     {
-                        "generation": state["generation"],
-                        "envelope": snapshot_envelope(
-                            state["epoch"],
-                            state["revision"] + 1,
-                            {
-                                "status": status,
-                                "local_map": valid_local_map_panel(),
-                                "art": valid_art_panel(),
-                            },
-                            mode="exploration",
-                        ),
+                        "status": status,
+                        "local_map": valid_local_map_panel(),
+                        "art": valid_art_panel(),
                     },
+                    mode="exploration",
                 )
                 page.wait_for_timeout(300)
                 overflow = page.locator('[data-testid="status-panel__condition-overflow"]')
@@ -1133,22 +1097,9 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         rank and merit, and the thousands-grouped wallet — and no race,
         subrace, class, or faction line (none exists in either payload)."""
         page = self.logged_in_page()
-        state = store_state(page)
         status = valid_status_panel("艾倫·灰誓", "char-42")
         character = valid_character_panel()
-        page.evaluate(
-            "(args) => window.__elosernBridge.store.receive("
-            "args.generation, 'ui_snapshot', [args.envelope], {})",
-            {
-                "generation": state["generation"],
-                "envelope": snapshot_envelope(
-                    state["epoch"],
-                    state["revision"] + 1,
-                    {"status": status, "character": character},
-                    mode="exploration",
-                ),
-            },
-        )
+        inject_snapshot(page, {"status": status, "character": character})
         page.wait_for_timeout(300)
 
         head = page.locator('[data-testid="character-head"]')
@@ -1191,34 +1142,15 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         ratio (hp 20/100 = 0.2) sets data-lowhp="true"; a healthy ratio
         (hp 100/100 = 1.0) sets data-lowhp="false"."""
         page = self.logged_in_page()
-        state = store_state(page)
-        revision_cursor = state["revision"]
 
         def inject_status(hp_current: int, hp_maximum: int) -> None:
-            nonlocal revision_cursor
-            # The reducer admits only strictly newer revisions (protocol.js
-            # rejects `not_newer`), so each injection must advance the
-            # revision cursor.
-            revision_cursor += 1
             st = valid_status_panel("艾倫·灰誓", "char-42")
             st["resources"] = {
                 "hp": {"current": hp_current, "maximum": hp_maximum},
                 "mp": {"current": 50, "maximum": 50},
                 "sp": {"current": 20, "maximum": 20},
             }
-            page.evaluate(
-                "(args) => window.__elosernBridge.store.receive("
-                "args.generation, 'ui_snapshot', [args.envelope], {})",
-                {
-                    "generation": state["generation"],
-                    "envelope": snapshot_envelope(
-                        state["epoch"],
-                        revision_cursor,
-                        {"status": st},
-                        mode="exploration",
-                    ),
-                },
-            )
+            inject_snapshot(page, {"status": st})
             page.wait_for_timeout(300)
 
         # Low hp (0.2 <= 0.25): the stage root carries the low-HP state.

@@ -22,9 +22,8 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
+    inject_snapshot,
     sent_action_count,
-    snapshot_envelope,
-    store_state,
     valid_character_panel,
     valid_local_map_panel,
     valid_status_panel,
@@ -291,22 +290,7 @@ def _local_map_unavailable_panel() -> dict:
 
 def _inject_snapshot(page, panels: dict, mode: str = "exploration") -> None:
     """Inject one schema-valid ``ui_snapshot`` through the store's ``receive``."""
-    state = store_state(page)
-    result = page.evaluate(
-        "(args) => window.__elosernBridge.store.receive("
-        "args.generation, 'ui_snapshot', [args.envelope], {})",
-        {
-            "generation": state["generation"],
-            "envelope": snapshot_envelope(
-                state["epoch"],
-                state["revision"] + 1,
-                panels,
-                mode=mode,
-            ),
-        },
-    )
-    if not result.get("accepted"):
-        raise AssertionError("injected ui_snapshot was rejected: %r" % (result,))
+    inject_snapshot(page, panels, mode=mode)
 
 
 def _wait_mode(page, mode: str, timeout: int = 30000) -> None:
