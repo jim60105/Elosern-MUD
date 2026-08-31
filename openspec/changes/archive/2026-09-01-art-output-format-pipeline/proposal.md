@@ -58,7 +58,18 @@ option), so the format enum is the reference's full four: `png|webp|jpeg|avif`.
 - Serve them: `web/art_media.py` allowlist accepts the four extensions with
   correct `Content-Type`s (`image/png|image/webp|image/jpeg|image/avif`).
 - New bounded error code `sd_format_error` for encode/decode failures, settle
-  path identical to every other named client error.
+  path identical to every other named client error. `encode` rejects any
+  input whose decoded format is not PNG (valid JPEG/WebP fail exactly like
+  garbage), and every encode path works from a sanitized pixel copy so
+  server-embedded text/EXIF/ICC can never pass through in either mode.
+- `GeneratedImage` carries the exact provenance (prompt pair + generation
+  parameters) of the request that produced it, so embedded metadata can never
+  describe a later re-render of the mutable prompt library.
+- The lease formula gains a bounded per-item local-conversion allowance
+  (`N × (timeout + 60 s) + margin`) so a slow encode never gets reclaimed.
+- The presenter validates a done record's STORED identity against the closed
+  four-extension set (not equality with the configured format), so a format
+  switch keeps every existing asset presenting until it is regenerated.
 
 ## Capabilities
 
@@ -84,11 +95,16 @@ same-origin URLs derived from validated stored identities — format-agnostic.)
 
 - Dependencies: `pillow`, `piexif` via `uv add` (pyproject + uv.lock updated by
   the tool, never by hand).
-- Code: new `world/art/formats.py`; `world/art/worker.py` (identity ext,
-  encode step, prior-file deletion on ext change, `sd_format_error`);
+- Code: new `world/art/formats.py`; `world/art/sd_worker.py` (`GeneratedImage`
+  provenance fields, filled from the built request);
+  `world/art/worker.py` (identity ext, encode step, provenance passthrough,
+  prior-file deletion on ext change, `sd_format_error`, lease allowance);
+  `world/art/queue.py` (`settle_generated` validates both identities and
+  returns the committed prior as the post-commit cleanup candidate);
+  `world/art/presenter.py` (closed-set stored-identity validation);
   `web/art_media.py` (extension allowlist + Content-Types);
-  `server/conf/settings.py` (3 settings + `_env_choice` + maximum kwarg);
-  `server/conf/test_settings.py` pop list grows to 24.
+  `server/conf/settings.py` (3 settings + `_env_choice` + maximum kwarg +
+  derived extension); `server/conf/test_settings.py` pop list grows to 24.
 - Docs: `.env.example` (3 entries), guide (24-row inventory + format-switch
   procedure), `docs/gm/prompts.md` table.
 - Tests: new `world/art/tests/test_formats.py` (real Pillow encodes —

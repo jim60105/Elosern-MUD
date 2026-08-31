@@ -12,6 +12,7 @@ from django.conf import settings
 from evennia import logger
 
 from world.art.adult import portrait_eligibility
+from world.art.formats import STORE_EXTENSIONS
 from world.art.queue import record_key
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import (
@@ -21,7 +22,6 @@ from world.art.subjects import (
     character_subject_for,
     monster_subject_for,
 )
-from world.art.worker import expected_output_identity
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 
 # Placeholder kinds, exactly what the browser must show when no asset exists.
@@ -43,8 +43,22 @@ def media_url_for(identity: str) -> str:
 
 
 def _validated_output_identity(subject: ArtSubject, identity: str | None) -> str | None:
-    """Return a presentable identity only when its expected file still exists."""
-    if not isinstance(identity, str) or identity != expected_output_identity(subject):
+    """Return a presentable identity only when its expected file still exists.
+
+    The STORED identity is validated against the subject's directory/key
+    shape and the closed set of ALL store extensions — never equality with
+    the currently configured ``expected_output_identity`` — so a store
+    mid-way through a format switch keeps presenting every existing asset
+    until that subject is regenerated under the new format.
+    """
+    if not isinstance(identity, str) or not identity:
+        return None
+    expected_prefix = f"{_subject_directory(subject)}/"
+    stem = f"{subject.key}."
+    if not identity.startswith(expected_prefix) or not identity[len(expected_prefix):].startswith(stem):
+        return None
+    extension = identity[len(expected_prefix) + len(stem) - 1:]
+    if extension.lower() not in STORE_EXTENSIONS:
         return None
     target = Path(settings.ART_STORE_ROOT) / identity
     if target.is_symlink():
@@ -57,6 +71,15 @@ def _validated_output_identity(subject: ArtSubject, identity: str | None) -> str
     if resolved == root or root not in resolved.parents or not resolved.is_file():
         return None
     return identity
+
+
+def _subject_directory(subject: ArtSubject) -> str:
+    """The store directory a subject's identity must live in."""
+    if subject.kind is ArtSubjectKind.SCENE:
+        return "scene"
+    if subject.kind is ArtSubjectKind.MONSTER:
+        return "portrait/monster"
+    return "portrait/character"
 
 
 def resolve_subject(subject: ArtSubject) -> dict:

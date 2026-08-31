@@ -78,37 +78,61 @@ path identical to all named errors (prior output retained). `encode` assembles
 the A1111-shaped parameters text itself from the passed fields (single
 source of truth for the shape; prompt digest is NOT included; the text
 carries prompt, negative prompt, steps, cfg, sampler, scheduler, sizes, seed
-entry omitted when `None`, checkpoint line when configured) — the worker
-supplies data, never pre-formats it.
+entry omitted when `None`, checkpoint entry when configured) — the worker
+supplies data, never pre-formats it. **The provenance fields are the exact
+values the client rendered for the request, carried on the
+`GeneratedImage` result (prompt pair, steps, cfg_scale, width/height, plus
+sampler/scheduler/checkpoint when set; new fields appended after `seed` with
+defaults so existing doubles construct unchanged). The worker never re-renders
+the prompt pair for encoding: the prompt library is operator-editable, and a
+second render after the response could describe a different generation than
+the one that produced the bytes.**
 
 ### D3 — Metadata policy semantics (mirrors the reference exactly)
 
 - **ON (`ART_SD_PRESERVE_GENERATION_METADATA=True`, default):** output carries
-  the A1111-shaped `parameters` text — PNG `tEXt` key `parameters` (via
-  `PngInfo`); JPEG/WebP/AVIF EXIF `UserComment` written with piexif —
-  verified that all three of Pillow's WebP, JPEG, and AVIF encoders accept
+  the A1111-shaped `parameters` text — PNG a text chunk with key `parameters`
+  (via `PngInfo`; Pillow writes `tEXt` for Latin-1-safe text and `iTXt` for
+  anything else, matching what A1111 itself has written since its Unicode
+  fix — both families are read back by keyword by A1111 and by the reference
+  plugin's `extractA1111Parameters`); JPEG/WebP/AVIF EXIF `UserComment`
+  written with piexif —
   the same piexif-produced `exif=` bytes and expose them back on
   `Image.info["exif"]`. sd-webui's own tEXt chunks from the transport PNG are
   NOT copied wholesale; the block is regenerated from known values so OFF⇒ON
   never leaks unknown server-embedded fields. Read-back for tests AND for any
   future ingest is defined concretely per container: PNG via
   `Image.info["parameters"]`; JPEG/WebP/AVIF via
-  `piexif.load(image.info["exif"])` comparing `Exif.Image.UserComment`
-  (decoded per the piexif charset prefix) byte-for-byte against the generated
-  text, plus a container-level EXIF presence assertion. `UserComment`
-  encoding is pinned: piexif `USER_COMMENT` with a fixed ASCII prefix
-  (`"ASCII\x00\x00\x00"`), so the write and read sides are byte-stable.
-- **OFF:** strip is guaranteed by construction — PNG re-saved with an empty
-  `PngInfo` (no text chunks at all), JPEG/WebP/AVIF encoded from raw pixel
-  data with no `exif=`/`icc_profile=` arguments. The test obligation is
-  **format-aware metadata inspection, not marker scanning**: parse every PNG
-  ancillary chunk type and assert none of `tEXt`/`zTXt`/`iTXt`/`eXIf`/`iCCP`
-  is present; parse JPEG APP-segments and WebP RIFF chunks and assert no
-  EXIF/XMP/ICC payload; for AVIF (ISOBMFF) assert `Image.open(...).info`
-  exposes no `exif`/`xmp` and no ICC profile and the parameter text is
-  absent. ON-input fixtures deliberately carry `tEXt`, `iTXt`, EXIF, and ICC
-  so a silent encoder pass-through cannot pass the OFF suite, matching the
-  reference's promise "關閉後輸出的圖片不會夾帶任何描述資訊".
+  `piexif.load(image.info["exif"])` comparing `Exif.ExifIFD.UserComment`
+  (decoded per the charset prefix) byte-for-byte against the generated text,
+  plus a container-level EXIF presence assertion. `UserComment` encoding
+  mirrors the reference plugin's two-family rule verbatim: pure-ASCII text
+  gets the 8-byte `ASCII\0\0\0` charset prefix plus the ASCII bytes; anything
+  else (the zh-tw prompts are non-ASCII) gets `UNICODE\0` plus UTF-16 BE —
+  the EXIF-spec representation ExifTool and A1111 decode correctly — so the
+  write and read sides are byte-stable for every prompt language.
+- **Sanitized by construction (BOTH modes):** every encode path works from a
+  freshly allocated pixel copy of the decoded source whose `.info` is empty —
+  Pillow's JPEG/WebP/AVIF savers pass `im.info["exif"]` and
+  `im.info["icc_profile"]` through when the argument is merely omitted, so
+  omission is NOT stripping; the clean image is what makes "server chunks
+  never propagate" true in both directions. PNG receives only a newly created
+  `PngInfo` (parameters text when ON, empty when OFF); lossy paths receive
+  only the freshly generated piexif bytes when ON and no metadata arguments
+  when OFF.
+- **OFF:** strip is guaranteed by that sanitization — PNG re-saved with an
+  empty `PngInfo` (no text chunks at all), JPEG/WebP/AVIF encoded from the
+  clean pixel copy with no `exif=`/`icc_profile=` arguments. The test
+  obligation is **format-aware metadata inspection, not marker scanning**:
+  parse every PNG ancillary chunk type and assert none of
+  `tEXt`/`zTXt`/`iTXt`/`eXIf`/`iCCP` is present; parse JPEG APP-segments and
+  WebP RIFF chunks and assert no EXIF/XMP/ICC payload; for AVIF (ISOBMFF)
+  assert `Image.open(...).info` exposes no `exif`/`xmp` and no ICC profile and
+  the parameter text is absent. OFF **and ON** input fixtures deliberately
+  carry `tEXt`, `iTXt`, EXIF, and ICC so a silent encoder pass-through cannot
+  pass either suite (the ON suite asserts only the regenerated parameters
+  survive — no source ICC/EXIF alongside them), matching the reference's
+  promise "關閉後輸出的圖片不會夾帶任何描述資訊".
 - Seed availability: seed comes from change A's `GeneratedImage.seed`; when
   `None` the seed entry is **omitted from the parameters text entirely**
   (never a `None`/sentinel token).
@@ -142,23 +166,37 @@ PNG can never be named `.webp` or served under the wrong MIME type. The
 setting is derived-only: it appears in NO inventory table, no `.env.example`,
 and is asserted in the never-env inventory. `formats.py` and consumers read
 `settings.ART_SD_OUTPUT_EXTENSION`, never re-deriving it (settings modules
-must not import `world.art.*`). On successful settle, strict order: (1)
-validate BOTH new and prior identity under the store root; (2) write temp +
+must not import `world.art.*`). On successful settle, strict order: (1) under
+the queue lock, `settle_generated` validates BOTH the NEW target identity AND
+the record's current committed `output_identity` (the authoritative prior;
+NEVER the transient `prior_output_identity` recovery field, which
+`ensure`-retry chains never populate) under the store root; (2) write temp +
 atomic replace to the NEW identity (prior output still intact + still
-referenced at this point); (3) under the queue lock, transition the record's
-status/identity to the new file — this is the authoritative commit; (4) only
-after the transition succeeds, if the prior identity has a different
-extension, `os.unlink` it. A deletion error NEVER reverts the committed
-transition: log a bounded `cleanup_failed` note, leave the orphan
-unreferenced (never served; next regeneration cleans it). A same-extension
-regeneration is the unchanged replace-only path (no delete). A settle that
-fails at or before step (3) leaves the prior file on disk AND referenced —
-prior-output retention unchanged. The media route allowlist becomes
+referenced at this point); (3) under the same lock hold, transition the
+record's status/identity to the new file — this is the authoritative commit,
+and `settle_generated` returns the validated prior identity as the cleanup
+candidate (a stale-token no-commit returns no candidate); (4) only after the
+transition commits, if the prior identity's extension differs from the new
+one, the worker re-checks under-root confinement and `os.unlink`s exactly it.
+A deletion error NEVER reverts the committed transition: log a bounded
+`cleanup_failed` note, leave the orphan unreferenced (never served; next
+regeneration cleans it). A same-extension regeneration is the unchanged
+replace-only path (no delete). A settle that fails at or before step (3)
+leaves the prior file on disk AND referenced — prior-output retention
+unchanged.
+
+Presenter and media serving follow the same closed-set rule as the store:
+`_validated_output_identity` validates a `done` record's STORED identity
+against the subject's directory/key shape plus the closed set of the four
+store extensions (file exists, regular, non-symlink, under root) — NOT
+equality with the currently configured `expected_output_identity`, which is
+write-path policy only. Otherwise a png→webp config switch would make every
+existing `done` asset present as "unavailable" until individually
+regenerated; the media route likewise accepts the closed four-extension set
 `^(scene|portrait/monster|portrait/character)/[^/]+\.(png|webp|jpg|avif)$`
-(the closed set of all four store extensions, so a mixed store during a
-format switch stays servable) with `FileResponse(content_type=...)` chosen
-from a fixed extension→mime map (`.jpg`→`image/jpeg`,
-`.avif`→`image/avif`).
+so a mixed store during a format switch stays servable end to end, with
+`FileResponse(content_type=...)` chosen from a fixed extension→mime map
+(`.jpg`→`image/jpeg`, `.avif`→`image/avif`).
 
 Risk accepted: two `done` identities for one subject can never coexist in a
 record (single `output_identity` field), so an orphan is at worst a stale
@@ -170,18 +208,40 @@ Pillow encoders are stable per version but not cross-version byte-identical,
 so `test_formats.py` asserts per format (png/webp/jpeg/avif): decoded-pixel
 equality for the default png path (never container byte equality);
 decode(output).size == source size; format magic bytes match extension
-(including the AVIF `ftypavif` brand); quality ON/OFF produce different sizes
-for a noise PNG (quality knob is live); metadata ON round-trips the
-parameters text via the D3 read-backs (PNG `Image.info["parameters"]`;
-JPEG/WebP/AVIF via `piexif.load(image.info["exif"])` on `UserComment`); OFF
-output passes format-aware metadata inspection (every PNG ancillary chunk
-type parsed — no `tEXt`/`zTXt`/`iTXt`/`eXIf`/`iCCP`; JPEG APP-segments and
-WebP RIFF chunks parsed — no EXIF/XMP/ICC; AVIF `info` free of
-exif/xmp/icc), never byte-marker scanning; `sd_format_error` on non-PNG
-input; RGBA input under `jpeg` succeeds via the D1 `convert("RGB")`
+(including the AVIF `ftypavif` brand); the quality knob is live via the
+SPEC-REQUIRED case only — WebP noise content at quality 100 encodes larger
+than at 60 (JPEG/AVIF byte-size ordering is encoder/version dependent and is
+NOT asserted; their tests prove decode, container, size, extension);
+metadata ON round-trips the parameters text via the D3 read-backs (PNG
+`Image.info["parameters"]`; JPEG/WebP/AVIF via
+`piexif.load(image.info["exif"])` on `UserComment`) AND, from ON fixtures
+whose input carries source tEXt/iTXt/EXIF/ICC, that only the regenerated
+text survived; OFF output passes format-aware metadata inspection (every PNG
+ancillary chunk type parsed — no `tEXt`/`zTXt`/`iTXt`/`eXIf`/`iCCP`; JPEG
+APP-segments and WebP RIFF chunks parsed — no EXIF/XMP/ICC; AVIF `info` free
+of exif/xmp/icc), never byte-marker scanning; `sd_format_error` on
+non-decodable input, on a TRUNCATED valid-header PNG, and on a decodable
+non-PNG (valid JPEG/WebP supplied as `png_bytes` — `encode` verifies the
+decoded `Image.format == "PNG"` before any work, failing before producing
+any output); RGBA input under `jpeg` succeeds via the D1 `convert("RGB")`
 normalization. Worker tests inject `formats.encode` monkeypatch + one real
-Pillow round-trip case; media tests extend the existing module for webp/jpeg/
-avif serve + disallowed extension 404 unchanged.
+Pillow round-trip case, the extension-change/same-extension/delete-failure
+cases, a delayed-conversion lease case, and the presenter mixed-store case;
+media tests extend the existing module for webp/jpeg/avif serve + disallowed
+extension 404 unchanged.
+
+### D7 — Local conversion joins the lease formula as a bounded per-item allowance
+
+The transport timeout bounds only the HTTP exchange; the new local encode is
+CPU work on the worker thread that the old lease model
+(`N × timeout + 5 s margin`) does not cover, so a slow batch of lossy encodes
+could be reclaimed mid-conversion and its results go stale. The lease becomes
+`N × (ART_SD_TIMEOUT_SECONDS + _CONVERSION_ALLOWANCE_SECONDS) + margin` with
+`_CONVERSION_ALLOWANCE_SECONDS = 60` as a documented worker constant: the
+store's own pixel caps (`ART_SD_MAX_IMAGE_PIXELS`) keep one encode's realistic
+worst case far below 60 s, and the alternative (lease heartbeat refresh during
+conversion) adds locking complexity for no operator-visible benefit. The
+delta worker requirement and its slow-batch scenario state the new formula.
 
 ## Risks / Trade-offs
 
@@ -201,3 +261,10 @@ avif serve + disallowed extension 404 unchanged.
 - [Format switch mid-store] → old files persist until each subject is
   regenerated (`@art retry`/`requeue`); guide documents the switch procedure
   end to end; no automated bulk migration by design.
+- [Conversion CPU time unbounded by the transport timeout] → bounded through
+  the D7 per-item lease allowance; reclaim only fires after a batch exceeded
+  every item's HTTP budget PLUS 60 s each.
+- [Presenter equality with the configured identity would blank the UI during
+  a format switch] → presenter validates stored identities against the closed
+  four-extension set (D5), so existing assets keep presenting until each is
+  regenerated under the new format.

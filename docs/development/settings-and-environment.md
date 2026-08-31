@@ -26,7 +26,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 
 絕對不會靜默退回預設值、clamp 或延後到第一次使用時才報錯。
 
-## 本變更提供的 20 個環境變數（加上 SD_WEBUI_BASE_URL）
+## 本變更提供的 23 個環境變數（加上 SD_WEBUI_BASE_URL）
 
 `ART_SD_BASE_URL` 的變數名稱由 `internal-art-worker` 規格固定為 `SD_WEBUI_BASE_URL`；其餘變數與設定同名。
 
@@ -51,6 +51,9 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `ART_SD_MAX_IMAGE_DIMENSIONS` | `ART_SD_MAX_IMAGE_DIMENSIONS` | 整數 | `4096` | 正整數；解碼 PNG 邊長上限 |
 | `ART_SD_MAX_IMAGE_PIXELS` | `ART_SD_MAX_IMAGE_PIXELS` | 整數 | `16777216`（16 MiP） | 正整數；總像素上限 |
 | `ART_SD_PREPIN_SAMPLES_FORMAT` | `ART_SD_PREPIN_SAMPLES_FORMAT` | 布林 | `False` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；⚠️ 會永久修改共用伺服器持久預設 |
+| `ART_SD_OUTPUT_FORMAT` | `ART_SD_OUTPUT_FORMAT` | 選擇 | `png` | 不分大小寫限於封閉集合 `png/webp/jpeg/avif`；集合外值（如 `heic`）啟動即失敗；決定本機轉換格式與庫存檔副檔名 |
+| `ART_SD_OUTPUT_QUALITY` | `ART_SD_OUTPUT_QUALITY` | 整數 | `80` | 1 到 100 包含兩端（拒絕 0、負數、大於 100）；僅影響有損格式（webp/jpeg/avif）；png 為無損重存、完全忽略此值 |
+| `ART_SD_PRESERVE_GENERATION_METADATA` | `ART_SD_PRESERVE_GENERATION_METADATA` | 布林 | `True` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；True＝產出物嵌入 A1111 形狀的 parameters 文字（PNG 文字區塊 `parameters`——latin-1 內容走 `tEXt`、其餘走 `iTXt`，A1111 讀取時兩種都認；JPEG／WebP／AVIF EXIF UserComment），False＝可證明的零中繼資料（無 text chunk、EXIF、ICC）；兩種模式下伺服器端嵌入的文字／EXIF／ICC 一律不會留存 |
 
 ### 美術佇列排空控制
 
@@ -66,7 +69,11 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | --- | --- | --- | --- | --- |
 | `ELOSERN_VUE_CLIENT` | `ELOSERN_VUE_CLIENT` | 布林 | `True`（Vue SPA） | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；設為假值後重啟＝文件記載的緊急回退到 legacy webclient |
 
-驗證細節：布林只接受上述固定字彙表（`bool("False")` 會是 `True`，這正是需要字彙表的原因）；「正的 8 倍數」同時拒絕 0、負數與非倍數；空白值對 typed／布林／URL knob 等同未設定；五個自由文字 knob 分兩族——`ART_SD_SAMPLER`／`ART_SD_SCHEDULER`／`ART_SD_CHECKPOINT` 空白＝正當的「伺服器預設」值，`ART_SD_STYLES`／`ART_SD_MODULES` 空白＝請求省略對應欄位。
+驗證細節：布林只接受上述固定字彙表（`bool("False")` 會是 `True`，這正是需要字彙表的原因）；「正的 8 倍數」同時拒絕 0、負數與非倍數；空白值對 typed／布林／選擇／URL knob 等同未設定；五個自由文字 knob 分兩族——`ART_SD_SAMPLER`／`ART_SD_SCHEDULER`／`ART_SD_CHECKPOINT` 空白＝正當的「伺服器預設」值，`ART_SD_STYLES`／`ART_SD_MODULES` 空白＝請求省略對應欄位。
+
+**衍生設定（不可直接設定）**：`ART_SD_OUTPUT_EXTENSION`（庫存檔副檔名：`png`→`.png`、`webp`→`.webp`、`jpeg`→`.jpg`、`avif`→`.avif`）在 settings 匯入的最後、`secret_settings` 匯入之後，由**有效**的 `ART_SD_OUTPUT_FORMAT` 經單一封閉映射計算。它不讀取任何環境變數、不出現在任何清單或 `.env.example`；環境或 `secret_settings.py` 對它的任何直接指派都會被無條件丟棄，因此格式與副檔名矛盾在構造上不可能發生。
+
+**輸出格式切換程序**：改 `ART_SD_OUTPUT_FORMAT` 並重啟後，新生成以新格式寫入；既有資產仍以舊副檔名持續正確呈現與服務（媒體路由接受全部四種庫副檔名，presentation 驗證庫存身份而非比對現行設定），直到該主題被重新生成（GM 指令 `@art retry`／`@art requeue`）。切換本身不動任何既有檔案。
 
 ## 既有的應用層變數
 

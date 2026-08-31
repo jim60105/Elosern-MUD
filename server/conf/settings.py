@@ -75,6 +75,7 @@ def _env_typed(
     default: object,
     *,
     minimum: int | float | None = None,
+    maximum: int | float | None = None,
     multiple: int | None = None,
     rule: str,
 ) -> object:
@@ -84,8 +85,9 @@ def _env_typed(
     knob carries no intent and must not poison a typed value). Otherwise the
     stripped value is converted and bounded: `minimum` is an EXCLUSIVE lower
     bound (pass 0 to require positivity; non-finite results are rejected
-    first so inf/nan can never slip past the bound), `multiple` requires
-    divisibility. Any conversion or bound violation raises
+    first so inf/nan can never slip past the bound), `maximum` is an INCLUSIVE
+    upper bound, `multiple` requires divisibility. Any conversion or bound
+    violation raises
     ImproperlyConfigured naming the variable, quoting the raw value, and
     stating the violated `rule` — a mis-set deployment knob is loud at boot,
     never silently inert.
@@ -110,6 +112,10 @@ def _env_typed(
         raise ImproperlyConfigured(
             f"setting {name}: invalid environment value '{raw}' ({rule})"
         )
+    if maximum is not None and value > maximum:
+        raise ImproperlyConfigured(
+            f"setting {name}: invalid environment value '{raw}' ({rule})"
+        )
     if multiple is not None and value % multiple:
         raise ImproperlyConfigured(
             f"setting {name}: invalid environment value '{raw}' ({rule})"
@@ -117,10 +123,23 @@ def _env_typed(
     return value
 
 
-def _env_int(name: str, default: int) -> int:
-    """Positive-bound integer knob (zero and negatives fail closed)."""
+def _env_int(
+    name: str, default: int, *, maximum: int | None = None
+) -> int:
+    """Positive-bound integer knob (zero and negatives fail closed); an
+    explicit INCLUSIVE `maximum` switches the rule text to the bounded
+    family, so e.g. the quality knob reports the 1-to-100 contract."""
+    if maximum is None:
+        return _env_typed(
+            name, int, default, minimum=0, rule="expected a positive integer"
+        )
     return _env_typed(
-        name, int, default, minimum=0, rule="expected a positive integer"
+        name,
+        int,
+        default,
+        minimum=0,
+        maximum=maximum,
+        rule=f"expected an integer between 1 and {maximum}",
     )
 
 
@@ -148,6 +167,20 @@ def _env_bool(name: str, default: bool) -> bool:
     return _env_typed(
         name, _env_bool_word, default, rule=_ENV_BOOL_RULE
     )
+
+
+def _env_choice(name: str, choices: tuple[str, ...], default: str) -> str:
+    """Choice knob: case-insensitive membership in a closed set; the stored
+    value is the canonical (lowercase) member. Anything else fails closed."""
+    rule = "expected one of " + "/".join(choices) + " (case-insensitive)"
+
+    def convert(text: str) -> str:
+        lowered = text.lower()
+        if lowered not in choices:
+            raise ValueError(text)
+        return lowered
+
+    return _env_typed(name, convert, default, rule=rule)
 
 ######################################################################
 # Evennia base server config
@@ -265,6 +298,25 @@ ART_SD_MAX_IMAGE_PIXELS = _env_int("ART_SD_MAX_IMAGE_PIXELS", 16777216)
 # defaults to False and is meant only for a dedicated sd-webui instance.
 ART_SD_PREPIN_SAMPLES_FORMAT = _env_bool("ART_SD_PREPIN_SAMPLES_FORMAT", False)
 
+# Local output-format pipeline (art-output-format-pipeline). The wire format
+# stays PNG; these knobs govern the local conversion applied before the store
+# write. Closed choice set — an unknown format is a fail-closed boot error,
+# never a fallback to the default.
+ART_SD_OUTPUT_FORMAT = _env_choice(
+    "ART_SD_OUTPUT_FORMAT", ("png", "webp", "jpeg", "avif"), "png"
+)
+# Encoder quality, 1-100 inclusive; affects the lossy formats (webp/jpeg/avif)
+# only. The png path ignores it entirely (lossless re-save).
+ART_SD_OUTPUT_QUALITY = _env_int("ART_SD_OUTPUT_QUALITY", 80, maximum=100)
+# When true, the encoded artifact carries the A1111-shaped generation-
+# parameters text (PNG tEXt `parameters`; JPEG/WebP/AVIF EXIF UserComment).
+# When false, the artifact is provably metadata-free: the encoder always works
+# from a sanitized pixel copy, so no server-supplied text/EXIF/ICC survives in
+# either mode — the flag governs only whether OUR parameters block is added.
+ART_SD_PRESERVE_GENERATION_METADATA = _env_bool(
+    "ART_SD_PRESERVE_GENERATION_METADATA", True
+)
+
 ######################################################################
 # Prompt library (prompt-library)
 ######################################################################
@@ -337,3 +389,16 @@ except ImportError:
 # misconfigured action_options structured-output slot fails at startup rather
 # than at the first live call, even when it arrives via secret_settings.
 build_profiles(LLM_PROFILES)
+
+# Derived (not configurable): the store extension for the EFFECTIVE output
+# format, computed after every override (environment AND secret_settings) so
+# it can never disagree with ART_SD_OUTPUT_FORMAT. Any direct assignment —
+# environment or secret_settings — is discarded here on purpose; the format
+# knob is the single source of truth. Kept as a plain module-level name so
+# `from server.conf.settings import *` and attribute reads both see it.
+ART_SD_OUTPUT_EXTENSION = {
+    "png": ".png",
+    "webp": ".webp",
+    "jpeg": ".jpg",
+    "avif": ".avif",
+}[ART_SD_OUTPUT_FORMAT]

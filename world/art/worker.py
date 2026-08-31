@@ -28,6 +28,7 @@ from typing import Any
 from django.conf import settings
 from twisted.internet import threads
 
+from world.art.formats import encode
 from world.art.queue import (
     claim,
     queue_lock,
@@ -41,6 +42,11 @@ from world.art.subjects import ArtSubject, ArtSubjectKind, parse_subject
 from world.prompts.loader import PromptLibraryError
 
 _LEASE_MARGIN_SECONDS = 5
+
+# Per-item wall-clock allowance for the LOCAL conversion step (decode +
+# encode is pure CPU and unbounded by the network timeout), folded into the
+# lease bound so a slow encode never gets a legitimate batch reclaimed.
+_CONVERSION_ALLOWANCE_SECONDS = 60
 
 
 class WorkerStoreError(ValueError):
@@ -70,11 +76,12 @@ def _release_worker_slot() -> None:
 
 def expected_output_identity(subject: ArtSubject) -> str:
     """The exact same-store relative identity the engine expects for a subject."""
+    extension = str(settings.ART_SD_OUTPUT_EXTENSION)
     if subject.kind is ArtSubjectKind.SCENE:
-        return f"scene/{subject.key}.png"
+        return f"scene/{subject.key}{extension}"
     if subject.kind is ArtSubjectKind.MONSTER:
-        return f"portrait/monster/{subject.key}.png"
-    return f"portrait/character/{subject.key}.png"
+        return f"portrait/monster/{subject.key}{extension}"
+    return f"portrait/character/{subject.key}{extension}"
 
 
 def _store_root() -> Path:
@@ -134,23 +141,48 @@ def _settle_one(
     client: Any,
     record: ArtAssetRecord,
 ) -> tuple[str, str | None, str | None, bool] | None:
-    """Generate and publish one claimed record; return the settle outcome.
+    """Generate, convert, and publish one claimed record; return the settle outcome.
 
     Every failure mode maps to a bounded settle: named ``SDError`` codes,
-    prompt-library failures (``sd_prompt_error``), and any unexpected internal
-    error (``sd_internal_error``); the record's prior valid output is retained
-    on every failure path. A success publishes the PNG atomically through
-    ``settle_generated`` (carrying the returned seed), which already settles
-    the record ``done`` under the queue lock (the returned flag marks that).
+    local-conversion failures (``sd_format_error``), prompt-library failures
+    (``sd_prompt_error``), and any unexpected internal error
+    (``sd_internal_error``); the record's prior valid output is retained on
+    every failure path. The embedded-metadata provenance comes from the
+    ``GeneratedImage`` the client returned — never from a second render of
+    the mutable prompt library. A success publishes the encoded bytes
+    atomically through ``settle_generated`` (carrying the returned seed),
+    which settles the record ``done`` under the queue lock (the returned flag
+    marks that); only after that commit does an extension change delete the
+    validated prior file (a deletion error is a bounded log, never a revert).
     Returns ``None`` when the claim was requeued or reclaimed mid-flight and
     must not be settled by this worker.
     """
     subject = subject_for(record)
     description = str(record.db.source_description or "")
+    # The claim-time token snapshot is captured BEFORE any blocking work:
+    # settle authority is the token this worker actually claimed, never
+    # whatever the record field happens to hold after the generation.
+    generation_token = str(record.db.generation_token or "")
     try:
         image = client.generate(subject, description)
+        encoded, _extension = encode(
+            image.data,
+            prompt=image.prompt,
+            negative_prompt=image.negative_prompt,
+            steps=image.steps,
+            cfg_scale=image.cfg_scale,
+            sampler=image.sampler,
+            scheduler=image.scheduler,
+            width=image.width,
+            height=image.height,
+            seed=image.seed,
+            checkpoint=image.checkpoint,
+            output_format=str(settings.ART_SD_OUTPUT_FORMAT),
+            quality=int(settings.ART_SD_OUTPUT_QUALITY),
+            preserve_metadata=bool(settings.ART_SD_PRESERVE_GENERATION_METADATA),
+        )
         identity = expected_output_identity(subject)
-        tmp_path = _write_temp(identity, image.data)
+        tmp_path = _write_temp(identity, encoded)
     except SDError as error:
         return ArtAssetStatus.FAILED, None, error.code, False
     except PromptLibraryError:
@@ -161,14 +193,40 @@ def _settle_one(
         return ArtAssetStatus.FAILED, None, "sd_internal_error", False
     committed = settle_generated(
         subject,
-        generation_token=str(record.db.generation_token or ""),
+        generation_token=generation_token,
         output_identity=identity,
         tmp_path=tmp_path,
         seed=image.seed,
     )
     if committed is None:
         return None
+    _record, prior_identity = committed
+    if prior_identity:
+        _cleanup_prior_output(prior_identity)
     return ArtAssetStatus.DONE, identity, None, True
+
+
+def _cleanup_prior_output(identity: str) -> None:
+    """Delete the validated prior file after the record transition committed.
+
+    Runs strictly after the commit, so the record can never point at the
+    deleted file. The under-root confinement is re-checked before unlinking;
+    any deletion error is a bounded ``cleanup_failed`` log that leaves an
+    unreferenced orphan (cleaned by the next regeneration) and NEVER reverts
+    the committed transition.
+    """
+    from evennia import logger
+
+    path = _store_root() / identity
+    if _resolved_under_root(path) is None:
+        return
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as error:
+        logger.log_warn(
+            f"art cleanup_failed: could not delete stale-format output "
+            f"{identity!r} after a format change: {error}"
+        )
 
 
 def _run_and_settle_batch(records: list[ArtAssetRecord]) -> list[ArtSubject]:
@@ -227,13 +285,16 @@ def _lease_timeout() -> float:
     """Lease-reclaim bound sized by the worst-case claimed batch.
 
     A batch of up to ``ART_SCHEDULER_LIMIT`` claimed records can run for
-    ``N x ART_SD_TIMEOUT_SECONDS`` on the single slot, so the lease bound is
-    ``N x timeout + margin`` -- never a flat per-item timeout -- so a
-    legitimately slow batch is not reclaimed while its worker thread is still
-    running. The hard per-request deadline plus the per-subject terminal-settle
-    guarantee mean a batch always finishes within a bounded wall-clock budget.
+    ``N x (ART_SD_TIMEOUT_SECONDS + per-item local-conversion allowance)`` on
+    the single slot, so the lease bound is
+    ``N x (timeout + conversion allowance) + margin`` -- never a flat per-item
+    timeout -- so neither a slow generation nor a slow local encode reclaims a
+    legitimately slow batch while its worker thread is still running. The
+    hard per-request deadline plus the per-subject terminal-settle guarantee
+    mean a batch always finishes within a bounded wall-clock budget.
     """
-    return (int(settings.ART_SCHEDULER_LIMIT) * float(settings.ART_SD_TIMEOUT_SECONDS)) + _LEASE_MARGIN_SECONDS
+    per_item = float(settings.ART_SD_TIMEOUT_SECONDS) + _CONVERSION_ALLOWANCE_SECONDS
+    return int(settings.ART_SCHEDULER_LIMIT) * per_item + _LEASE_MARGIN_SECONDS
 
 
 def _notify_completed_batch(subjects: list[ArtSubject]) -> None:

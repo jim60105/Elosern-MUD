@@ -190,6 +190,65 @@ class ArtPresenterTests(EvenniaTestCase):
         self.assertTrue(url.startswith("/art/"))
         self.assertNotIn(".art", url)
 
+    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
+    def test_existing_png_asset_survives_a_switch_to_another_format(self):
+        subject = _scene()
+        ensure(subject, "desc")
+        self._write_asset("scene/forest_path.png")
+        claim(10)
+        settle(
+            subject,
+            status=ArtAssetStatus.DONE,
+            output_identity="scene/forest_path.png",
+            error=None,
+        )
+        # Store mid-way through a format switch: the configured format is
+        # webp, but the existing png asset must keep presenting until this
+        # subject is regenerated under the new format.
+        with override_settings(
+            ART_SD_OUTPUT_FORMAT="webp", ART_SD_OUTPUT_EXTENSION=".webp"
+        ):
+            payload = resolve_subject(subject)
+        self.assertEqual(payload["kind"], "asset")
+        self.assertEqual(payload["url"], "/art/scene/forest_path.png")
+
+    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
+    def test_foreign_directory_identity_resolves_to_unavailable(self):
+        subject = ArtSubject(ArtSubjectKind.MONSTER, "goblin")
+        ensure(subject, "desc")
+        self._write_asset("scene/goblin.png")
+        claim(10)
+        settle(
+            subject,
+            status=ArtAssetStatus.DONE,
+            output_identity="scene/goblin.png",
+            error=None,
+        )
+        # A monster identity living outside portrait/monster/ fails the
+        # subject-shape validation no matter which format is configured.
+        payload = resolve_subject(subject)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["url"])
+
+    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
+    def test_all_four_store_extensions_present_as_assets(self):
+        for extension in (".png", ".webp", ".jpg", ".avif"):
+            subject = _scene(f"mixed_store_{extension[1:]}")
+            identity = f"scene/mixed_store_{extension[1:]}{extension}"
+            ensure(subject, "desc")
+            self._write_asset(identity)
+            claim(10)
+            settle(
+                subject,
+                status=ArtAssetStatus.DONE,
+                output_identity=identity,
+                error=None,
+            )
+            payload = resolve_subject(subject)
+            with self.subTest(extension=extension):
+                self.assertEqual(payload["kind"], "asset")
+                self.assertEqual(payload["url"], f"/art/{identity}")
+
 
 class ResolveEntityTests(EvenniaTestCase):
     """Additive ``resolve_entity`` dispatch tests (task 1.3/1.4)."""
