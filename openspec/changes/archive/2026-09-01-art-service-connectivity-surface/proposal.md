@@ -42,6 +42,9 @@ our idiom (env knobs + one staff command).
 - Two env-backed settings (typed set 24 → 26): `ART_SD_PROBE_TIMEOUT_MS`
   (integer 1000–60000 inclusive, default 5000) and `ART_SD_PROBE_CACHE_SECONDS`
   (integer 5–3600 inclusive, default 300).
+- Move the `samples_format` pre-pin out of `SDWebUIClient.__init__` into
+  `generate()` so constructing a client (which the diagnostic probe must do)
+  issues zero HTTP and can never mutate the server (design D1a).
 
 ## Capabilities
 
@@ -58,8 +61,9 @@ our idiom (env knobs + one staff command).
 ## Impact
 
 - Code: new `world/art/connectivity.py`; `commands/art.py` (`CmdArtHealth`);
-  `server/conf/settings.py` (2 knobs — reuses B's inclusive-bounded integer
-  helper); `server/conf/test_settings.py` pop list 26;
+  `server/conf/settings.py` (2 knobs — new two-sided-inclusive int helper);
+  `server/conf/test_settings.py` pop list 26; `world/art/sd_worker.py`
+  (`probe_samplers` seam + pre-pin relocation); both fake clients;
   `world/art/tests/test_connectivity.py` (fake transport, fake clock).
 - Docs: `.env.example` (2 entries), guide inventory 26 rows + troubleshooting
   row ("probe is diagnostic only; it never blocks generation"),

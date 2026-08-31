@@ -549,7 +549,10 @@ class SDWebUIClient:
         self,
         transport: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     ):
-        maybe_prepin_samples_format()
+        # Constructing a client issues ZERO HTTP (design D1a): the
+        # samples_format pre-pin — which can mutate the shared server — runs
+        # in generate(), the only flow that needs it, so the diagnostic
+        # connectivity probe can construct clients freely.
         self._transport = transport or default_transport
 
     def generate(self, subject: ArtSubject, description: str) -> GeneratedImage:
@@ -561,6 +564,7 @@ class SDWebUIClient:
         exception escapes this method. The returned seed is the server-reported
         generation seed, or ``None`` when absent/unparseable — never job-fatal.
         """
+        maybe_prepin_samples_format()
         request = build_txt2img_request(subject, description)
         try:
             response = self._transport(request)
@@ -584,3 +588,23 @@ class SDWebUIClient:
             raise SDError(
                 "sd_internal_error", f"unexpected sd-webui client failure: {error}"
             ) from error
+
+    def probe_samplers(self, *, timeout_seconds: float) -> None:
+        """One bounded GET ``/sdapi/v1/samplers`` — the connectivity seam.
+
+        Validates only that the server answers 200 with a top-level JSON
+        list: reachability and liveness, NOT enumeration (no item cap, no
+        item-shape checks — that is ``@art options``' job). The caller's
+        ``timeout_seconds`` is the whole budget (not the generation or
+        enumeration timeout). Returns ``None`` on success; every transport,
+        HTTP-status, decode, or shape failure raises the corresponding named
+        ``SDError``. Never mutates the server.
+        """
+        body = _http_request(
+            f"{_base_url()}/sdapi/v1/samplers", None, timeout_seconds=timeout_seconds
+        )
+        if not isinstance(body, list):
+            raise SDError(
+                "sd_malformed_response",
+                "sd-webui samplers probe returned a non-list body",
+            )

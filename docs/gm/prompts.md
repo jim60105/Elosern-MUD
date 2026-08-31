@@ -107,10 +107,12 @@ prompts:
 | `ART_SD_CLIENT` | —（僅限程式碼） | `world.art.sd_worker.SDWebUIClient` | 客戶端類別的可抽換點（dotted path）；測試與瀏覽器測試掛鉤指向 `world.art.fake_sd_client.FakeSDWebUIClient`，永不開啟 socket。基於匯入注入風險刻意不提供環境變數 |
 | `ART_SD_MAX_RESPONSE_BYTES` | 同名 | `52428800`（50 MiB） | 回應本文／base64 上限 |
 | `ART_SD_MAX_IMAGE_DIMENSIONS` / `ART_SD_MAX_IMAGE_PIXELS` | 同名 | `4096` / `16777216`（16 MiP） | 解碼 PNG 的寬高與總像素上限 |
-| `ART_SD_PREPIN_SAMPLES_FORMAT` | 同名 | `False` | 選用：啟動時把伺服器持久設定 `samples_format` 預先釘選為 `png`（`POST /sdapi/v1/options`，每行程式一次）。⚠️ 這會永久改變共用伺服器的持久預設值，只建議用於專屬 sd-webui 實例；一般情況靠請求內 `override_settings.samples_format` 即足夠 |
+| `ART_SD_PREPIN_SAMPLES_FORMAT` | 同名 | `False` | 選用：首次生成前把伺服器持久設定 `samples_format` 預先釘選為 `png`（`POST /sdapi/v1/options`，每行程式一次；僅在生成流程觸發，`@art health` 探測不會觸發）。⚠️ 這會永久改變共用伺服器的持久預設值，只建議用於專屬 sd-webui 實例；一般情況靠請求內 `override_settings.samples_format` 即足夠 |
 | `ART_SD_OUTPUT_FORMAT` | 同名 | `png` | 本機轉碼輸出的格式（`png`／`webp`／`jpeg`／`avif`，大小寫不拘）；衍生副檔名 `.png`／`.webp`／`.jpg`／`.avif`。切換格式後既有資產照常展示與服務，直到個別主題重新生成才換檔（換檔時舊檔在新狀態提交後才刪除） |
 | `ART_SD_OUTPUT_QUALITY` | 同名 | `80` | 有損格式（webp／jpeg／avif）的品質 1–100；png 忽略此值 |
 | `ART_SD_PRESERVE_GENERATION_METADATA` | 同名 | `True` | 是否在輸出內嵌 A1111 形式的生成資訊（提示詞、負向提示詞、步驟、CFG、取樣器、排程器、seed、尺寸、模型）；`png` 走文字區塊、有損格式走 EXIF，來源一律是引擎-known 的請求值；`False`＝完全不寫入（此時 seed 仍存於記錄供程式使用） |
+| `ART_SD_PROBE_TIMEOUT_MS` | 同名 | `5000` | `@art health` 連線探測（`GET /sdapi/v1/samplers`）的總預算毫秒數，1000–60000 包含兩端；僅診斷用途 |
+| `ART_SD_PROBE_CACHE_SECONDS` | 同名 | `300` | 探測判定可重複使用的最長秒數，5–3600 包含兩端；URL／憑證存在性／探測預算任一變更即失效；`@art health` 一律強制重新探測 |
 
 標註「同名」的設定由同名環境變數設定（變數不存在或空白時用預設值；存在但無效的值會在啟動時直接報錯並點名變數，絕不靜默失效）。完整的三層設定模型、優先順序與驗證規則見[設定與環境變數](/development/settings-and-environment)。
 

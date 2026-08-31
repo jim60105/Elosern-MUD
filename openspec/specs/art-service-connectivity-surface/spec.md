@@ -1,6 +1,14 @@
-# art-service-connectivity-surface delta specification
+# art-service-connectivity-surface Specification
 
-## ADDED Requirements
+## Purpose
+Give operators a bounded, cached, diagnostic-only view of sd-webui reachability:
+a never-raising connectivity probe (world/art/connectivity.py) keyed by the
+effective configuration, the `@art health` staff dashboard that consumes it,
+and the two probe budget knobs (`ART_SD_PROBE_TIMEOUT_MS`,
+`ART_SD_PROBE_CACHE_SECONDS`) — with the structural guarantee that a
+connectivity verdict can never gate, block, or alter deterministic generation.
+
+## Requirements
 
 ### Requirement: Connectivity probing is bounded, cached by effective configuration, and never raises
 `world/art/connectivity.py` SHALL provide `probe(*, force: bool = False) -> ProbeResult`, where
@@ -13,7 +21,10 @@ The probe SHALL issue exactly one call to a PUBLIC client seam method
 `ART_SD_CLIENT` class: one `GET /sdapi/v1/samplers`, JSON-list validation, `None` on success,
 named `SDError`s on failure — the seam the project's fake clients implement), with
 `timeout_seconds = ART_SD_PROBE_TIMEOUT_MS / 1000`, and SHALL NEVER raise: every transport,
-HTTP-shape, or decode failure becomes an `ok=False` result with the named code. Results SHALL be
+HTTP-shape, decode, settings-snapshot, host-derivation, or client-resolution failure becomes an
+`ok=False` result — the named `SDError` code verbatim when one is known, `sd_connection_error`
+for an `OSError`, and `sd_internal_error` for any other unexpected failure — with a host
+placeholder carrying no URL text when the host cannot be derived. Results SHALL be
 cached in a single process-local slot and reused (as `from_cache=True`, no request) only while
 `force` is false, the cached entry is younger than `ART_SD_PROBE_CACHE_SECONDS`, and a stored
 fingerprint over the effective connectivity settings (base URL, credential presence booleans,
@@ -21,6 +32,10 @@ probe timeout) equals the fingerprint recomputed at call time; any change to tho
 including a settings reload — SHALL miss the cache. `force=True` SHALL always probe fresh and
 never consume the cached entry. No credential value SHALL ever appear in a `ProbeResult`, in
 cache state, or in any log line.
+The base-URL component of that fingerprint SHALL be a USERINFO-STRIPPED
+normalisation of the configured URL (`scheme://host[:port]/path[?query]`), so
+no credential value — including one embedded as URL userinfo — is ever an
+input to a stored digest.
 
 #### Scenario: A reachable server yields a clean ok verdict
 - **WHEN** `probe()` runs against a server whose samplers endpoint returns a JSON list
@@ -31,13 +46,15 @@ cache state, or in any log line.
 - **THEN** the result is `ok=False` with `code` equal to the client's named error (for example
   `sd_connection_error`) and the caller sees no exception
 
-#### Scenario: A fresh cached verdict is reused without a request
-- **WHEN** `probe()` is called twice within `ART_SD_PROBE_CACHE_SECONDS` for unchanged settings
-- **THEN** the second call performs no HTTP request and returns `from_cache=True`
-
 #### Scenario: A forced probe bypasses a young cache entry
 - **WHEN** `probe(force=True)` is called immediately after a successful probe
 - **THEN** exactly one new request is issued and `from_cache=False`
+
+#### Scenario: A misconfigured client seam yields a failed verdict, never an exception
+- **WHEN** `ART_SD_CLIENT` names an unresolvable dotted path (or its constructor raises) and
+  `probe()` is called
+- **THEN** the result is `ok=False` with `code="sd_internal_error"`, the host field carries no
+  URL text, and the caller sees no exception
 
 #### Scenario: A settings change invalidates the verdict
 - **WHEN** the effective base URL (or credential presence, or probe timeout) changes and
@@ -53,6 +70,17 @@ cache state, or in any log line.
   result or cache state is produced and inspected
 - **THEN** the host field is `example.test:7860` and no result, cache entry, or health line
   contains `user`, `password`, `@`, or the raw netloc
+- **AND** the stored cache fingerprint is derived from the userinfo-stripped URL, so it is
+  identical to the fingerprint of the same target configured as
+  `http://example.test:7860/` and is not an offline-guessable digest of the embedded
+  credentials
+
+#### Scenario: URL userinfo is not a cache-identity component
+- **WHEN** two probe calls run against configurations differing ONLY in URL userinfo
+  (`http://example.test:7860/` versus `http://user:password@example.test:7860/`)
+- **THEN** the second call reuses the cached verdict (`from_cache=True`), because userinfo
+  never affects a request — the transport derives Basic auth solely from the credential
+  settings
 
 ### Requirement: Connectivity state never gates generation
 No production module under `world/art/` except `connectivity.py` itself SHALL import
@@ -74,4 +102,3 @@ requires regardless of the latest probe verdict.
 - **WHEN** the import-boundary test parses every production module under `world/art/`
 - **THEN** no module other than `connectivity.py` itself imports `world.art.connectivity`,
   and any import from service, scheduler, queue, or a future module fails the test
-

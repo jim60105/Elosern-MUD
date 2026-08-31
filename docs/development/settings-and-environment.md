@@ -26,7 +26,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 
 絕對不會靜默退回預設值、clamp 或延後到第一次使用時才報錯。
 
-## 本變更提供的 23 個環境變數（加上 SD_WEBUI_BASE_URL）
+## 本變更提供的 25 個環境變數（加上 SD_WEBUI_BASE_URL）
 
 `ART_SD_BASE_URL` 的變數名稱由 `internal-art-worker` 規格固定為 `SD_WEBUI_BASE_URL`；其餘變數與設定同名。
 
@@ -54,6 +54,8 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `ART_SD_OUTPUT_FORMAT` | `ART_SD_OUTPUT_FORMAT` | 選擇 | `png` | 不分大小寫限於封閉集合 `png/webp/jpeg/avif`；集合外值（如 `heic`）啟動即失敗；決定本機轉換格式與庫存檔副檔名 |
 | `ART_SD_OUTPUT_QUALITY` | `ART_SD_OUTPUT_QUALITY` | 整數 | `80` | 1 到 100 包含兩端（拒絕 0、負數、大於 100）；僅影響有損格式（webp/jpeg/avif）；png 為無損重存、完全忽略此值 |
 | `ART_SD_PRESERVE_GENERATION_METADATA` | `ART_SD_PRESERVE_GENERATION_METADATA` | 布林 | `True` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；True＝產出物嵌入 A1111 形狀的 parameters 文字（PNG 文字區塊 `parameters`——latin-1 內容走 `tEXt`、其餘走 `iTXt`，A1111 讀取時兩種都認；JPEG／WebP／AVIF EXIF UserComment），False＝可證明的零中繼資料（無 text chunk、EXIF、ICC）；兩種模式下伺服器端嵌入的文字／EXIF／ICC 一律不會留存 |
+| `ART_SD_PROBE_TIMEOUT_MS` | `ART_SD_PROBE_TIMEOUT_MS` | 整數 | `5000` | 1000 到 60000 包含兩端（拒絕低於 1000 或高於 60000）；單次 samplers 探測的總預算；僅診斷用途 |
+| `ART_SD_PROBE_CACHE_SECONDS` | `ART_SD_PROBE_CACHE_SECONDS` | 整數 | `300` | 5 到 3600 包含兩端（拒絕低於 5 或高於 3600）；探測判定可重複使用的最長秒數；`@art health` 一律強制重新探測 |
 
 ### 美術佇列排空控制
 
@@ -137,7 +139,7 @@ uv run --locked evennia reload   # 或 evennia stop && evennia start
 
 ## 讓未來的設定可用環境變數覆蓋（4 步驟）
 
-1. 在 `server/conf/settings.py` 用 `_env_str`／`_env_int`／`_env_float`／`_env_bool`／`_env_dimension`（或 `_env_typed`）指派該設定。
+1. 在 `server/conf/settings.py` 用 `_env_str`／`_env_int`／`_env_int_bounded`／`_env_float`／`_env_bool`／`_env_dimension`（或 `_env_typed`）指派該設定。
 2. 在 `.env.example` 新增附註解的範列（說明型別、預設值、界線；typed knob 絕不出現未註解的空值條目）。
 3. 在 `docs/development/settings-and-environment.md` 與（若適用）`docs/gm/prompts.md` 補表格列。
 4. 在 `server/conf/tests/test_env_overrides.py` 補一筆有效值 case 與無效值 case，並在 `server/conf/test_settings.py` 的 `_ENV_OVERRIDES` 加入名稱——清單同步由該模組的 AST 盤點測試強制。
@@ -149,4 +151,5 @@ uv run --locked evennia reload   # 或 evennia stop && evennia start
 | 啟動時 `ImproperlyConfigured: setting <NAME>: invalid environment value '<raw>' (<rule>)` | 該環境變數值無效。**所有**匯入這些 settings 的 Evennia 程序（portal 與 server 皆然）都會無法啟動——關閉美術排程器無法救援。解法：改正或 unset 該變數後重啟。compose 環境檢查 `podman compose config` 與容器日誌。 |
 | `.env` 裡留著空白的 `VAR=` | typed／布林／URL knob 視為未設定（用預設值）；自由文字 knob 取其正當的「伺服器預設」空值。Podman 會把未註解的空值原樣傳進容器，這是文件化行為。 |
 | 測試結果疑似受 shell 環境影響 | 不該再發生：test settings 會 pop 所有覆蓋名稱。若仍見到，檢查是否用了未 sanitized 的 settings 模組並回報。 |
+| `@art health` 顯示 `server: unreachable` 但生成仍成功 | 正常：health 探測僅診斷，unreachable 判定永不阻擋佇列、跳過或延後任何工作（伺服器正在恢復時就會出現這種短暫時差）。生成嘗試不受 `ART_SD_PROBE_*` 影響。 |
 | 想知道某個變數是否真的被讀取 | `server/conf/tests/test_env_overrides.py` 的 AST 盤點測試保證 `.env.example` 每個 active 條目都有真實讀者；死變數會讓該測試失敗。 |

@@ -2,10 +2,12 @@
 
 Restricted to staff: ``@art status`` (list/filter records), ``@art run``
 (drain now, non-blocking), ``@art retry`` (re-enqueue failed records),
-``@art requeue <full-subject-key>`` (forced regeneration), and ``@art
-options <kind>`` (list the live server's selectable option names). Status
-output never includes persona text, prompt content, absolute filesystem
-paths, or the store root (design D8).
+``@art requeue <full-subject-key>`` (forced regeneration), ``@art
+options <kind>`` (list the live server's selectable option names), and
+``@art health`` (forced connectivity verdict + scheduler/queue/output-policy
+dashboard). Status and health output never include persona text, prompt
+content, credentials, URL userinfo, absolute filesystem paths, or the store
+root (design D8).
 """
 
 from django.conf import settings
@@ -240,3 +242,60 @@ class CmdArtOptions(_ArtCommand):
         deferred = threads.deferToThread(getattr(sd_worker, f"list_{fn_name}"))
         deferred.addCallback(_reply)
         deferred.addErrback(_fail)
+
+
+class CmdArtHealth(_ArtCommand):
+    """檢視 sd-webui 連線與美術管線狀態。用法：art health"""
+
+    key = "art health"
+
+    def func(self) -> None:
+        if not self.is_accessible():
+            self.caller.msg("你沒有權限使用 art 指令。")
+            return
+        from twisted.internet import threads
+
+        from world.art import connectivity
+
+        def _reply(result: connectivity.ProbeResult) -> None:
+            lines = [self._server_line(result)]
+            enabled = "enabled" if settings.ART_SCHEDULER_ENABLED else "disabled"
+            lines.append(
+                f"scheduler: {enabled} "
+                f"interval={int(settings.ART_SCHEDULER_INTERVAL_SECONDS)}s "
+                f"limit={int(settings.ART_SCHEDULER_LIMIT)}"
+            )
+            counts: dict[str, int] = {}
+            for record in ArtAssetRecord.objects.all():
+                status = str(record.db.status)
+                counts[status] = counts.get(status, 0) + 1
+            lines.append(
+                "queue: "
+                + " ".join(
+                    f"{status}={counts.get(status, 0)}"
+                    for status in ("pending", "in_progress", "failed", "done")
+                )
+            )
+            metadata = "on" if settings.ART_SD_PRESERVE_GENERATION_METADATA else "off"
+            lines.append(
+                f"output: {settings.ART_SD_OUTPUT_FORMAT} "
+                f"q={int(settings.ART_SD_OUTPUT_QUALITY)} metadata={metadata}"
+            )
+            self.caller.msg("\n".join(lines))
+
+        # The probe is a blocking HTTP call; run it off-reactor like every
+        # other art command seam (CmdArtOptions precedent). probe() never
+        # raises, so the callback always receives a ProbeResult verdict.
+        deferred = threads.deferToThread(connectivity.probe, force=True)
+        deferred.addCallback(_reply)
+
+    @staticmethod
+    def _server_line(result) -> str:
+        """The pinned reachability line (design D3)."""
+        if result.from_cache:
+            when = f"(checked {result.age_seconds:.1f}s ago)"
+        else:
+            when = "(checked just now)"
+        if result.ok:
+            return f"server: reachable {when}"
+        return f"server: unreachable — {result.code} {when}"

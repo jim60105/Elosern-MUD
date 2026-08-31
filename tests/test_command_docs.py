@@ -132,6 +132,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "syntax": "art options <models|samplers|schedulers|styles|modules>",
         "context": "管理員（需 Developer 權限）",
     },
+    "art health": {"syntax": "art health", "context": "管理員（需 Developer 權限）"},
     "character": {
         "syntax": "character、character preset <key>、character create、character concept <構想>",
         "context": "角色建立（建立模式取代一般指令，仍可用 說明 與 登出）",
