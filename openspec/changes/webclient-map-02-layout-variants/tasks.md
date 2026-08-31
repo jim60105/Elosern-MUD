@@ -12,8 +12,8 @@ Depends on `webclient-map-01-draft-chrome` being implemented first (shares
 
 ## 2. Shared renderer variant
 
-- [ ] 2.1 `MapLattice.vue`: add `variant` prop (`"lattice" | "graph"`); source coordinates from the matching placement; keep wave-1 marker/edge/label/legend templates, activation, focus, accessible names shared and unchanged; the overlay pin (wave-1 D4 ownership) follows the active placement's current node automatically.
-- [ ] 2.2 Verify the island's uniform scale-down applies to the radial canvas (it sizes from `radial.width/height`), keeping the non-overlap invariant scale-invariant.
+- [x] 2.1 `MapLattice.vue`: add `variant` prop (`"lattice" | "graph"`); source coordinates from the matching placement; keep wave-1 marker/edge/label/legend templates, activation, focus, accessible names shared and unchanged; the overlay pin (wave-1 D4 ownership) follows the active placement's current node automatically.
+- [x] 2.2 Verify the island's uniform scale-down applies to the radial canvas (it sizes from `radial.width/height`), keeping the non-overlap invariant scale-invariant.
 
 ## 3. Data-derived layout resolution
 
@@ -24,13 +24,13 @@ Depends on `webclient-map-01-draft-chrome` being implemented first (shares
 
 - [x] 4.1 `local_map.js`: add the pure helper `remoteDirection(current, remote)` → `{ dx, dy, octant }` from RAW payload coordinates (`+y = 北`, eight octants, half-open sector bounds; comment cites design D3b). It MUST NOT read `col`/`row`.
 - [x] 4.2 `local_map.js`: export `edgeMarkers` — one per `remembered` node STRICTLY outside the in-view coordinate bounding box (zero-delta and in-view nodes never mark), placed where the current→remote ray crosses the canvas rect and slotted along that edge inside a computed gutter `g` per design D3b's closed-form packing policy (explicit `{canvasWidth, canvasHeight, current}` geometry inputs — never an assumed pitch; deterministic order; markers mutually disjoint and outside the canvas rect, hence clear of node markers, labels, and axes); empty array for coordinate-free payloads and for the graph layout.
-- [ ] 4.3 `MapLattice.vue` (lattice variant): render the marker decoration layer — memory diamond (gold landmark treatment when flagged), optional faint ray segment, and place-name text at the overlay scale (the island keeps its remembered list as the canonical reading path); markers carry no activation; overlay-scale markers carry the name as accessible name.
+- [x] 4.3 `MapLattice.vue` (lattice variant): render the marker decoration layer — memory diamond (gold landmark treatment when flagged), optional faint ray segment, and place-name text at the overlay scale (the island keeps its remembered list as the canonical reading path); markers carry no activation; overlay-scale markers carry the name as accessible name.
 - [x] 4.4 Node tests for D3b: octant correctness for due E/N and all four diagonals AND the half-open boundary vectors (a sector-edge bearing resolves to its declared octant); `(100,1)` and `(1,100)` resolve to their near-axis octants, NOT the diagonal (a compressed-rank implementation fails here); negative-coordinate deltas; a payload whose in-view span triggers rank compression still yields raw-coordinate directions; a remote coincident with the current node and an extent-interior remembered node produce no marker; interior/instance payloads export zero markers; gutter packing keeps marker footprints mutually disjoint at the 64-node bound for the all-on-one-edge worst distribution and randomized count splits at both shipped surface geometries.
 
 ## 5. Island and overlay wiring
 
-- [ ] 5.1 `LocalMap.vue` + `MapOverlay.vue`: both consume `model.layoutVariant` (and `edgeMarkers`); render NO layout control of any kind — no `.seg`, no button, no menu item (the withdrawn switch design must leave no residue); orientation marks follow `layoutVariant === "lattice"`; remove the `(x, y)` coordinate pair from `detailParts` (design D3) and update the Vitest assertions and `FocusedRemembered` story annotation that pinned it.
-- [ ] 5.2 Contrast pin: keep wave-1's lattice dot-field/axis tokens and confirm rendered contrast (dot fill-opacity ≥ 0.85, axis ≥ 1.5px at ≥ 0.65 over the map background) in the component tests.
+- [x] 5.1 `LocalMap.vue` + `MapOverlay.vue`: both consume `model.layoutVariant` (and `edgeMarkers`); render NO layout control of any kind — no `.seg`, no button, no menu item (the withdrawn switch design must leave no residue); orientation marks follow `layoutVariant === "lattice"`; remove the `(x, y)` coordinate pair from `detailParts` (design D3) and update the Vitest assertions and `FocusedRemembered` story annotation that pinned it.
+- [x] 5.2 Contrast pin: keep wave-1's lattice dot-field/axis tokens and confirm rendered contrast (dot fill-opacity ≥ 0.85, axis ≥ 1.5px at ≥ 0.65 over the map background) in the component tests.
 
 ## 6. Storybook sync
 

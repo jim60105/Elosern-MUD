@@ -8,6 +8,7 @@
 // lattice rendering and emits `select`/`hover`/`leave`/`move` so each
 // caller drives its own chrome.
 import { computed } from "vue";
+import LocalMap from "../lib/local_map.js";
 
 const props = defineProps({
   // The committed `local_map` v1 panel payload (the available form or the
@@ -36,6 +37,13 @@ const props = defineProps({
   // draws the teardrop location pin above the current marker. Off on the
   // minimap island; only the overlay passes it.
   overlayChrome: { type: Boolean, default: false },
+  // Layout variant (webclient-map-02-layout-variants D2/D3): "lattice" draws
+  // the model's rank-compressed grid placement, "graph" draws the model's
+  // radial (D1) placement. Both surfaces pass `model.layoutVariant` — the
+  // variant is a renderer parameter sourced from the committed payload, and
+  // it changes coordinate sourcing ONLY: markers, edges, labels, legend,
+  // activation, focus, and accessible names stay the shared wave-1 renderer.
+  variant: { type: String, default: "lattice" },
 });
 
 const emit = defineEmits(["select", "hover", "leave", "move"]);
@@ -51,16 +59,102 @@ const nodeById = computed(() => {
   for (const node of nodes.value) byId[node.id] = node;
   return byId;
 });
+// Placement sourcing (map-02 D2): the lattice variant draws the model's
+// rank-compressed `col`/`row` grid; the graph variant draws the model's
+// radial placement (design D1) at `markerScale`, so the D1 geometry
+// contract's footprints and the drawn footprints stay proportional and the
+// non-overlap invariant is scale-invariant under the caps. The canvas size
+// follows the active placement; `overflow: visible` lets the lattice
+// marker gutter (map-02 D3b) render outside the node canvas without
+// clipping. A graph payload with no radial placement renders empty (the
+// variant prop is only ever passed a model that carries one).
+const isGraph = computed(() => props.variant === "graph");
+const radial = computed(() =>
+  isGraph.value && props.localMap.radial && Array.isArray(props.localMap.radial.nodes)
+    ? props.localMap.radial
+    : null,
+);
+const radialById = computed(() => {
+  const byId = {};
+  for (const node of radial.value ? radial.value.nodes : []) byId[node.id] = node;
+  return byId;
+});
 
-// Lattice-driven canvas geometry (design D9 + the local-map delta): the
-// canvas sizes from the exported lattice (cols/rows), reserving its own
-// space instead of the host scrolling. The column pitch and row pitch are
-// decoupled (the crowding fix): the row pitch clears the marker height,
-// the label line, and a strictly-positive gap before the next row's
-// marker; the column pitch clears two truncated labels side by side.
+// Edge direction markers (map-02 D3b): the lattice variant asks the model
+// for markers with its OWN drawing geometry — the natural node canvas
+// (before the gutter grows the SVG), the current node's in-canvas position,
+// the scaled diamond half-extent, and the outward name-box bound at the
+// overlay scale (the island's canonical reading path stays the remembered
+// list, so it passes a name-free geometry). The graph variant never marks:
+// a radial drawing has no canvas edge a bearing could point at.
+const rememberedList = computed(() =>
+  Array.isArray(props.localMap.remembered) ? props.localMap.remembered : [],
+);
+function latticePos(node) {
+  return {
+    x: node.col * props.colPitch + props.colPitch / 2,
+    y: (Math.max(1, rows.value) - 1 - node.row) * props.rowPitch + props.rowPitch / 2,
+  };
+}
+const edgeMarkers = computed(() => {
+  if (isGraph.value || rememberedList.value.length === 0) {
+    return { markers: [], gutter: 0 };
+  }
+  const current = nodes.value.find((node) => node.visibility === "current");
+  if (!current) {
+    return { markers: [], gutter: 0 };
+  }
+  return LocalMap.edgeMarkersFor(nodes.value, rememberedList.value, {
+    canvasWidth: Math.max(1, cols.value) * props.colPitch,
+    canvasHeight: Math.max(1, rows.value) * props.rowPitch + LABEL_BAND,
+    current: latticePos(current),
+    // The drawn diamond: 9-half-extent rect rotated 45 degrees at the
+    // active marker scale (the model's reach formula consumes it directly).
+    markerHalf: MARKER_DIAMOND_HALF * props.markerScale,
+    // Only the overlay draws marker names; the bound is the truncated
+    // label's worst-case box (labelMax + 1 full-width glyphs at the 11px
+    // canvas font, which does not scale with the markers).
+    nameWidth: props.overlayChrome ? (props.labelMax + 1) * 11 : 0,
+    nameHeight: props.overlayChrome ? 16 : 0,
+  });
+});
+
+// The drawn placement follows the model: a graph payload whose nodes the
+// radial placement does not cover renders them not-at-all rather than at a
+// fabricated position (the shared omission contract of an absent edge
+// endpoint).
+const drawnNodes = computed(() =>
+  radial.value
+    ? nodes.value.filter((node) => radialById.value[node.id])
+    : nodes.value,
+);
+
 const LABEL_BAND = 14;
-const canvasWidth = computed(() => Math.max(1, cols.value) * props.colPitch);
-const canvasHeight = computed(() => Math.max(1, rows.value) * props.rowPitch + LABEL_BAND);
+const graphCanvasWidth = computed(() =>
+  radial.value ? Math.max(1, radial.value.width * props.markerScale) : 1,
+);
+const graphCanvasHeight = computed(() =>
+  radial.value ? Math.max(1, radial.value.height * props.markerScale) : 1,
+);
+// Lattice-driven canvas geometry (design D9 + the local-map delta + map-02
+// D2/D3b): the canvas sizes from the active placement. The lattice adds the
+// edge-marker gutter (0 without markers) to its natural size; the graph
+// sizes from the radial placement at the marker scale. `overflow: visible`
+// already lets the gutter content paint outside the node canvas.
+const canvasWidth = computed(() =>
+  radial.value
+    ? graphCanvasWidth.value
+    : Math.max(1, cols.value) * props.colPitch + 2 * edgeMarkers.value.gutter,
+);
+const canvasHeight = computed(() =>
+  radial.value
+    ? graphCanvasHeight.value
+    : Math.max(1, rows.value) * props.rowPitch + LABEL_BAND + 2 * edgeMarkers.value.gutter,
+);
+// The crowding fix decouples column pitch and row pitch: the row pitch
+// clears the marker height, the label line, and a strictly-positive gap
+// before the next row's marker; the column pitch clears two truncated
+// labels side by side.
 
 // Every lattice marker's base geometry in pre-scale units, multiplied by
 // the `markerScale` prop so all states scale uniformly (draft ladder,
@@ -94,12 +188,45 @@ function truncatedLabel(label) {
 }
 
 function nodePos(node) {
-  return {
-    x: node.col * props.colPitch + props.colPitch / 2,
-    y: (Math.max(1, rows.value) - 1 - node.row) * props.rowPitch + props.rowPitch / 2,
-  };
+  if (radial.value) {
+    const placed = radialById.value[node.id];
+    // A node the placement omits is not drawn (same omission contract as
+    // an edge whose endpoint is absent).
+    if (!placed) return null;
+    return { x: placed.x * props.markerScale, y: placed.y * props.markerScale };
+  }
+  const core = latticePos(node);
+  const gutter = edgeMarkers.value.gutter;
+  return { x: core.x + gutter, y: core.y + gutter };
 }
 
+// Edge-marker name placement (map-02 D4 wording): the name box is drawn
+// OUTWARD from the diamond's outer tip — never toward the canvas. The
+// 11px monospace glyph line does not scale with the markers (same policy
+// as the node labels), so the offset is the scaled rotated-diamond axial
+// reach plus the 2-unit model margin and an 11px ascent to the baseline.
+const MARKER_NAME_ASCENT = 11;
+function markerOutset() {
+  return Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale + 2;
+}
+function markerNameX(marker) {
+  // Vertical-edge names hang OUTWARD beside the diamond (anchored at the
+  // outer tip, text running away from the canvas); horizontal-edge names
+  // sit centred above/below it.
+  if (marker.side === "left") return -markerOutset();
+  if (marker.side === "right") return markerOutset();
+  return 0;
+}
+function markerNameY(marker) {
+  if (marker.side === "top") return -(markerOutset() + MARKER_NAME_ASCENT);
+  if (marker.side === "bottom") return markerOutset() + MARKER_NAME_ASCENT;
+  return 4; // vertically centred beside the diamond on the vertical edges
+}
+function markerNameAnchor(marker) {
+  if (marker.side === "left") return "end";
+  if (marker.side === "right") return "start";
+  return "middle";
+}
 // The overlay pin's anchor (design D4): the CURRENT placement's current-node
 // position, in the same coordinate system as the node groups' translate.
 // Null (no pin) when the payload carries no on-canvas current node.
@@ -129,6 +256,7 @@ const edgeGeoms = computed(() =>
       if (!s || !d) return null;
       const sp = nodePos(s);
       const dp = nodePos(d);
+      if (!sp || !dp) return null;
       return {
         i,
         x1: sp.x,
@@ -222,8 +350,49 @@ const latticeStyle = computed(() => {
       d="M0 -16 l-7 24 6 -5 5 7 5 -7 6 5 z"
       aria-hidden="true"
     />
+    <!-- Edge direction markers (map-02 D3b): remembered places outside the
+         in-view extent, claimed by the true current→remote bearing, drawn in
+         the gutter OUTSIDE the node canvas. A pure decoration layer:
+         deliberately NOT the `local-map__marker` class (the browser geometry
+         audit pairs every `.local-map__marker` box; these are not node
+         placements), no activation, pointer-events none. The island keeps
+         its focusable remembered list as the canonical reading path and
+         renders the layer aria-hidden without names; at the overlay scale
+         each marker shows its (truncated) place name and carries it as the
+         accessible name. -->
     <g
-      v-for="node in nodes"
+      v-for="marker in edgeMarkers.markers"
+      :key="`edge-marker-${marker.id}`"
+      class="local-map__edge-marker"
+      :data-testid="`local-map__edge-marker--${marker.id}`"
+      :transform="`translate(${marker.x}, ${marker.y})`"
+      :role="overlayChrome ? 'img' : null"
+      :aria-label="overlayChrome ? marker.name : null"
+      :aria-hidden="overlayChrome ? null : 'true'"
+    >
+      <rect
+        class="local-map__edge-marker-diamond"
+        :x="-MARKER_DIAMOND_HALF * markerScale"
+        :y="-MARKER_DIAMOND_HALF * markerScale"
+        :width="MARKER_DIAMOND_HALF * 2 * markerScale"
+        :height="MARKER_DIAMOND_HALF * 2 * markerScale"
+        transform="rotate(45)"
+      />
+      <circle
+        v-if="marker.landmark"
+        class="local-map__edge-marker-landmark"
+        :r="MARKER_LANDMARK_R * markerScale"
+      />
+      <text
+        v-if="overlayChrome"
+        class="local-map__edge-marker-name"
+        :x="markerNameX(marker)"
+        :y="markerNameY(marker)"
+        :text-anchor="markerNameAnchor(marker)"
+      >{{ truncatedLabel(marker.name) }}</text>
+    </g>
+    <g
+      v-for="node in drawnNodes"
       :key="node.id"
       class="local-map__node"
       :class="`local-map__node--${node.visibility}`"
@@ -434,6 +603,31 @@ const latticeStyle = computed(() => {
   stroke-width: 1.4;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
+}
+
+/* Edge direction markers (map-02 D3b): a non-interactive decoration layer
+   in the gutter. The diamond reuses the remembered-node fill so the off-
+   canvas place reads with the same state identity; the landmark ring and
+   the 11px monospace name follow the node-label/pin precedents (glyphs
+   never scale with markerScale). */
+.local-map__edge-marker {
+  pointer-events: none;
+}
+
+.local-map__edge-marker-diamond {
+  fill: var(--paper-500);
+}
+
+.local-map__edge-marker-landmark {
+  fill: none;
+  stroke: var(--gold-500);
+  stroke-width: 1;
+}
+
+.local-map__edge-marker-name {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  fill: var(--paper-500);
 }
 
 /* Edges form a non-interactive connector layer: they never intercept the
