@@ -14,7 +14,7 @@ import NarrativeFeed from "../../components/NarrativeFeed.vue";
 import OverlayHost from "../../components/OverlayHost.vue";
 import SettingsOverlay from "../../components/SettingsOverlay.vue";
 import SkillDetailPane from "../../components/SkillDetailPane.vue";
-import { CREATION_PANEL_SAMPLE, LOCAL_MAP_SAMPLE } from "../../stories/fixtures.js";
+import { CREATION_PANEL_SAMPLE, LOCAL_MAP_SAMPLE, localMapModelFor } from "../../stories/fixtures.js";
 
 // B5 (webclient-vue-06-showcase-overlays): the deferred-surfaces-absent and
 // frozen-manifest contract. A surface with no backing OOB read model today
@@ -306,7 +306,7 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
 // Map/Settings/Help did in B5.
 describe("H6 overlay reachability: every full overlay has a live trigger", () => {
   it("the minimap island's expand control opens the map overlay", async () => {
-    const wrapper = mount(LocalMap, { props: { localMap: LOCAL_MAP_SAMPLE } });
+    const wrapper = mount(LocalMap, { props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) } });
     const expand = wrapper.get('[data-testid="local-map__expand"]');
     expect(expand.exists()).toBe(true);
     await expand.trigger("click");

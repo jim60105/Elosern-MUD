@@ -2,10 +2,10 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import LocalMap from "../../components/LocalMap.vue";
 import MapLattice from "../../components/MapLattice.vue";
-import LocalMapModel from "../../lib/local_map.js";
 import {
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_WILDERNESS_SAMPLE,
+  localMapModelFor,
 } from "../../stories/fixtures.js";
 
 // The shared lattice renderer (improve-webclient-map-overlay-scale):
@@ -22,23 +22,13 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     document.body.innerHTML = "";
   });
 
-   // Mirror the store's localMapModel shape (stores/elosern.js): the
-   // reduced model plus the payload's `available` flag and reason, and the
-   // payload's `current_node` field the island chrome reads for the detail
-   // line default.
-   function modelFor(fixture) {
-     return {
-       ...LocalMapModel.reducePanel(fixture),
-       available: true,
-       reason: null,
-       current_node: fixture.current_node,
-     };
-   }
-
+  // Wave 0 binds every mount through the shared derived-shape helper (the
+  // exact store model shape); the old local copy shimmed the raw
+  // `current_node` field around the detail-line seeding bug design D1 fixed.
   function mountLattice(props = {}) {
     wrapper = mount(MapLattice, {
       props: {
-        localMap: modelFor(LOCAL_MAP_SAMPLE),
+        localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
         ...props,
       },
     });
@@ -211,10 +201,10 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
 
   it("renders the wilderness fixture content at both scales", () => {
     const island = mount(MapLattice, {
-      props: { localMap: modelFor(LOCAL_MAP_WILDERNESS_SAMPLE) },
+      props: { localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) },
     });
     const overlay = mount(MapLattice, {
-      props: { localMap: modelFor(LOCAL_MAP_WILDERNESS_SAMPLE), ...OVERLAY_PROPS },
+      props: { localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE), ...OVERLAY_PROPS },
     });
     const islandNodes = island.findAll('[data-testid^="local-map__node--"]');
     const overlayNodes = overlay.findAll('[data-testid^="local-map__node--"]');
@@ -234,20 +224,15 @@ describe("LocalMap island chrome (regression for the MapLattice extraction)", ()
     document.body.innerHTML = "";
   });
 
-   function mountIsland(props = {}) {
-     wrapper = mount(LocalMap, {
-       props: {
-         localMap: {
-           ...LocalMapModel.reducePanel(LOCAL_MAP_SAMPLE),
-           available: true,
-           reason: null,
-           current_node: LOCAL_MAP_SAMPLE.current_node,
-         },
-         ...props,
-       },
-     });
-     return wrapper;
-   }
+  function mountIsland(props = {}) {
+    wrapper = mount(LocalMap, {
+      props: {
+        localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
+        ...props,
+      },
+    });
+    return wrapper;
+  }
 
   it("clicking a lattice node updates the shared detail line through the select event", async () => {
     const w = mountIsland();

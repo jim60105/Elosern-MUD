@@ -231,6 +231,43 @@
   .mini[hidden]{display:none}
   .mode-combat .mini{display:none!important}
 
+  /* ---- map layouts (連線圖 graph ↔ 網格圖 coordinate lattice) ----
+     The layout is DATA-DERIVED and never player-selected: a payload whose
+     layer carries validated world coordinates (`grid`/`wilderness` — the
+     Evennia xyzgrid / wilderness contrib sources) renders the lattice;
+     coordinate-free layers (`interior`/`instance`) render the graph.
+     Variant state = [data-map] on .mini / #ov-map, resolved by one
+     isCoordinateLayer() pass; the overlay mirrors the island (shared-
+     renderer contract). No preference, no storage, no switch exists. */
+  /* demo-only fixture selector: presentation chrome for this static draft,
+     NOT a game control — it swaps which committed fixture payload the mock
+     displays. It never appears in the product. */
+  .demofx{position:absolute;z-index:6;left:16px;bottom:calc(var(--dock-h) + 16px);
+    display:flex;flex-direction:column;gap:7px;padding:8px 10px;
+    border:1px dashed var(--ink-600);border-radius:var(--radius);background:var(--ink-780)}
+  .demofx legend{font-size:9.5px;letter-spacing:.12em;color:var(--paper-700);font-family:var(--f-mono);padding:0 4px}
+  .demofx .fxrow{display:flex;gap:6px}
+  .demofx button{font-size:10px;padding:5px 9px;min-height:26px;border:1px solid var(--ink-600);
+    border-radius:6px;background:transparent;color:var(--paper-500);cursor:pointer;font-family:inherit}
+  .demofx button[aria-pressed="true"]{border-color:var(--gold-500);color:var(--paper-50)}
+  .demofx button:focus-visible{box-shadow:var(--focus)}
+  /* axis-convention marks exist only where an axis is drawn: the graph layout
+     asserts no axis, so its header slot stays empty; the lattice states 北↑ 東→.
+     The readout line names the DRAWING (連線圖 / 坐標空間) — no bearing, compass
+     angle, distance, or coordinate figure exists anywhere in it. */
+  .mini .c .axm{display:none}
+  .mini .compass .rd-x{display:none}
+  #ov-map .rd-x{display:none}
+  .mini[data-map="lattice"] .c .axm{display:inline}
+  .mini[data-map="lattice"] .compass .rd-g{display:none}
+  .mini[data-map="lattice"] .compass .rd-x{display:inline}
+  #ov-map[data-map="lattice"] .rd-g{display:none}
+  #ov-map[data-map="lattice"] .rd-x{display:inline}
+  /* layout layers: graph is the default; lattice swaps in */
+  .mini .lay-grid,#ov-map .lay-grid{display:none}
+  .mini[data-map="lattice"] .lay-graph,#ov-map[data-map="lattice"] .lay-graph{display:none}
+  .mini[data-map="lattice"] .lay-grid,#ov-map[data-map="lattice"] .lay-grid{display:block}
+
   /* objectives tracker */
   .obj{position:absolute;z-index:4;bottom:calc(var(--dock-h) + 60px);right:16px;width:238px;
     background:var(--panel);backdrop-filter:blur(8px);border:var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:10px 12px}
@@ -720,9 +757,10 @@
   <!-- RIGHT HUD -->
   <aside class="hud-right">
     <div class="topmeta"><span class="loc">霧骨渡口</span><span class="sep"></span><span>黎明 42日</span><span class="sep"></span><span class="coin"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9.5h6M9 14.5h6" stroke-linecap="round"/></svg>3,240</span></div>
-    <div class="mini" data-full="map" title="展開全地圖">
-      <div class="mt"><span>局部地圖</span><span class="c">北↑</span></div>
-      <svg viewBox="0 0 180 150" role="img" aria-label="局部地圖">
+    <div class="mini" data-full="map" title="展開全地圖" data-layer="interior" data-map="graph">
+      <div class="mt"><span>局部地圖</span><span class="c"><span class="axm">北↑ 東→</span></span></div>
+      <!-- 版面由 payload 決定、玩家不可切換：layer ∈ {grid, wilderness}（承載已驗證世界座標的 Evennia xyzgrid／wilderness 來源）→ 網格圖；座標自由層（interior／instance）→ 連線圖。全地圖覆蓋層跟隨同一解析（共享渲染器契約）。下方兩層＝同一渲染器的兩種版面，各自渲染對應 fixture payload（見左下展示資料選擇器）。 -->
+      <svg class="lay-graph" viewBox="0 0 180 150" role="img" aria-label="局部地圖（連線圖）">
         <line x1="90" y1="78" x2="90" y2="26" stroke="#5c4a6a" stroke-width="2.4" stroke-dasharray="3 4"/>
         <line x1="90" y1="78" x2="158" y2="58" stroke="#2c2634" stroke-width="2"/>
         <line x1="90" y1="78" x2="52" y2="128" stroke="#2c2634" stroke-width="2"/>
@@ -737,7 +775,52 @@
         <text x="40" y="140" fill="#615a4c" font-size="9" text-anchor="middle" font-family="Noto Sans TC">碼頭</text>
         <text x="16" y="58" fill="#e2c06a" font-size="9" text-anchor="middle" font-family="Noto Sans TC">市集</text>
       </svg>
-      <div class="compass">北 324° · 西 262°</div>
+      <!-- 網格圖版面，渲染 layer=wilderness fixture（Evennia Wilderness contrib 來源；「荒野」僅為此座標空間的應用舉例、非正式名稱）：
+           現在格 (12,9)=central_mountains 中央山脈；八向鄰格為 contrib 的既有出口（n/ne/e/se/s/sw/w/nw 各 ±1 格）；
+           點陣節距 24＝1 座標格（連續座標空間，非地形）；軸十字穿過現在節點＝渲染器軸約制（配頁首「北↑ 東→」，+y=北）；
+           暈影＝知識邊界（視覺範圍外），非迷霧地形。邊與連線圖同一語言：實線＝可通行出口、虛線＝封鎖出口（NW 山壁）。
+           超出視覺範圍的記憶地點（remembered，真實座標）：(27,12) eastern_plains 東部大平原（dx+15,dy+3→東方偏北）、
+           (5,4) southwest_coast 西南海岸（dx−7,dy−5→西南）。方向由壓縮前原始座標差的射線與畫布安全邊界求交決定，
+           標記只指向真實相對方向、不帶任何距離/角度數字；標記為純視覺，名稱的無礙讀取路徑由島嶼記憶清單承擔（既有契約）。
+           標籤截斷（labelMax 4＋…）與出貨渲染器一致。 -->
+      <svg class="lay-grid" viewBox="0 0 180 150" role="img" aria-label="局部地圖（網格圖）">
+        <defs>
+          <pattern id="mgrid" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="18" cy="3" r="1.15" fill="#3a3344" fill-opacity=".85"/></pattern>
+          <radialGradient id="mfog" gradientUnits="userSpaceOnUse" cx="90" cy="75" r="112"><stop offset=".5" stop-color="#0e0b13" stop-opacity="0"/><stop offset=".78" stop-color="#0e0b13" stop-opacity=".38"/><stop offset="1" stop-color="#0e0b13" stop-opacity=".72"/></radialGradient>
+        </defs>
+        <rect width="180" height="150" fill="url(#mgrid)"/>
+        <g stroke="#3a3344" stroke-width="1.5" opacity=".65"><line x1="90" y1="6" x2="90" y2="144"/><line x1="8" y1="75" x2="172" y2="75"/></g>
+        <line x1="90" y1="75" x2="90" y2="51" stroke="#2c2634" stroke-width="2"/>
+        <line x1="90" y1="75" x2="114" y2="51" stroke="#2c2634" stroke-width="2"/>
+        <line x1="90" y1="75" x2="114" y2="75" stroke="#2c2634" stroke-width="2"/>
+        <line x1="90" y1="75" x2="114" y2="99" stroke="#2c2634" stroke-width="2"/>
+        <line x1="90" y1="75" x2="90" y2="99" stroke="#2c2634" stroke-width="2"/>
+        <line x1="90" y1="75" x2="66" y2="99" stroke="#2c2634" stroke-width="2"/>
+        <line x1="90" y1="75" x2="66" y2="75" stroke="#2c2634" stroke-width="2"/>
+        <line x1="90" y1="75" x2="66" y2="51" stroke="#5c4a6a" stroke-width="2.4" stroke-dasharray="3 4"/>
+        <rect width="180" height="150" fill="url(#mfog)"/>
+        <circle cx="90" cy="51" r="4.5" fill="#2c2634" stroke="#3a3344"/>
+        <circle cx="114" cy="51" r="4.5" fill="#2c2634" stroke="#3a3344"/>
+        <circle cx="114" cy="75" r="4.5" fill="#cba135" opacity="0.5"/>
+        <circle cx="114" cy="99" r="4.5" fill="#2c2634" stroke="#e2c06a"/>
+        <circle cx="90" cy="99" r="4.5" fill="#2c2634" stroke="#e2c06a"/>
+        <circle cx="66" cy="99" r="4.5" fill="#2c2634" stroke="#3a3344"/>
+        <circle cx="66" cy="75" r="4.5" fill="#2c2634" stroke="#3a3344"/>
+        <circle cx="66" cy="51" r="4.5" fill="#2c2634" stroke="#3a3344"/>
+        <circle cx="90" cy="75" r="8" fill="#a52c31" stroke="#e06b6b" stroke-width="2"/>
+        <text x="90" y="63" fill="#615a4c" font-size="8" text-anchor="middle" font-family="Noto Sans TC">中央山脈</text>
+        <text x="114" y="45" fill="#615a4c" font-size="8" text-anchor="middle" font-family="Noto Sans TC">中央山脈</text>
+        <text x="124" y="72" fill="#615a4c" font-size="8" text-anchor="start" font-family="Noto Sans TC">中央山脈</text>
+        <text x="124" y="110" fill="#615a4c" font-size="8" text-anchor="start" font-family="Noto Sans TC">中央山脈</text>
+        <text x="90" y="111" fill="#615a4c" font-size="8" text-anchor="middle" font-family="Noto Sans TC">中央山脈</text>
+        <text x="60" y="110" fill="#615a4c" font-size="8" text-anchor="end" font-family="Noto Sans TC">中央山脈</text>
+        <text x="56" y="72" fill="#615a4c" font-size="8" text-anchor="end" font-family="Noto Sans TC">中央山脈</text>
+        <text x="90" y="88" fill="#f2ecdf" font-size="8" text-anchor="middle" font-family="Noto Sans TC">中央山脈</text>
+        <!-- 超出可見範圍的記憶地點：菱形（記憶 glyph）壓在安全邊界上、沿壓縮前真實座標差的射線，無距離數字 -->
+        <g><rect x="168.6" y="55.2" width="6.8" height="6.8" transform="rotate(45 172 58.6)" fill="#1a1420" stroke="#e2c06a" opacity="0.85"/><text x="176" y="49" fill="#8d8370" font-size="8" text-anchor="end" font-family="Noto Sans TC">東部大平…</text></g>
+        <g><rect x="8.6" y="130.1" width="6.8" height="6.8" transform="rotate(45 12 133.5)" fill="#1a1420" stroke="#3a3344"/><text x="4" y="146" fill="#615a4c" font-size="8" text-anchor="start" font-family="Noto Sans TC">西南海岸</text></g>
+      </svg>
+      <div class="compass"><span class="rd-g">連線圖</span><span class="rd-x">坐標空間</span></div>
     </div>
   </aside>
 
@@ -748,6 +831,16 @@
     <div class="row"><span class="bx"></span><span>與灰婆婆議價過河</span><span class="pr">+80</span></div>
     <div class="row opt"><span class="bx"></span><span>找出失蹤箱櫃</span><span class="rw">選修</span></div>
   </div>
+
+  <!-- 展示資料選擇器：這是本靜態稿的評審裝置，不是遊戲控制——產品中不存在任何地圖版面開關。
+       它切換島嶼＋全地圖所渲染的 fixture payload；版面仍由 payload 的 layer 自動解析。
+       aria-label 刻意用「比較兩種 payload」措辭，避免被誤讀為產品的圖層選擇功能。 -->
+  <fieldset class="demofx">
+    <legend>展示資料（非遊戲控制）</legend>
+    <div class="fxrow" role="group" aria-label="切換展示用的範例資料集，比較連線圖與網格圖兩種版面">
+      <button type="button" data-fixture="interior" aria-pressed="true">無座標房間 payload</button><button type="button" data-fixture="wilderness" aria-pressed="false">wilderness 座標 payload</button>
+    </div>
+  </fieldset>
 
   <!-- TOASTS -->
   <div class="toasts" id="toasts"></div>
@@ -1103,26 +1196,67 @@
 </aside>
 
 <!-- ===================== FULL OVERLAYS ===================== -->
-<section class="full" id="ov-map" data-name="map">
-  <div class="fh"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg><h3>地圖 · 灰河帶</h3><span class="sub">分層 · 霧戰 · 路徑</span><button class="closebtn" data-close-full aria-label="關閉"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6 6 18" stroke-linecap="round"/></svg></button></div>
+<!-- 全地圖覆蓋層沒有自己的版面開關：版面與島嶼由同一 payload 的 layer 解析（座標承載層→網格圖、座標自由層→連線圖），兩表面永不分岔（共享渲染器契約）。 -->
+<section class="full" id="ov-map" data-name="map" data-map="graph">
+  <div class="fh"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg><h3>地圖 · 灰河帶</h3><span class="sub">分層 · 霧戰<span class="rd-g"> · 連線圖</span><span class="rd-x"> · 坐標空間</span></span><button class="closebtn" data-close-full aria-label="關閉"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6 6 18" stroke-linecap="round"/></svg></button></div>
   <div class="fbody">
     <div class="mapcanvas">
-      <svg viewBox="0 0 800 520" preserveAspectRatio="xMidYMid slice">
-        <path d="M0 360 C200 330 320 400 480 360 640 320 720 380 800 350 L800 520 0 520Z" fill="#201a2a" opacity="0.6"/>
-        <path d="M0 360 C200 330 320 400 480 360 640 320 720 380 800 350" stroke="#486" stroke-width="2" fill="none" opacity="0.4"/>
-        <path d="M250 360 L480 250 L470 130" stroke="#3a3344" stroke-width="2" fill="none"/>
-        <path d="M480 250 L640 300" stroke="#3a3344" stroke-width="2" fill="none"/>
-        <path d="M480 250 L300 150" stroke="#cba135" stroke-width="2.6" stroke-dasharray="6 6" opacity="0.8"/>
+      <svg class="lay-graph" viewBox="0 0 800 520" preserveAspectRatio="xMidYMid slice">
+        <path d="M250 360 L480 250" stroke="#3a3344" stroke-width="2" fill="none"/>
+        <path d="M250 360 L470 130" stroke="#5c4a6a" stroke-width="2.4" stroke-dasharray="3 4"/>
+        <path d="M250 360 L640 300" stroke="#3a3344" stroke-width="2" fill="none"/>
+        <path d="M250 360 L140 200" stroke="#3a3344" stroke-width="2" fill="none"/>
         <circle cx="480" cy="250" r="7" fill="#2c2634" stroke="#e2c06a" opacity="0.6"/>
         <circle cx="470" cy="130" r="6" fill="#2c2634" stroke="#e2c06a"/>
         <circle cx="640" cy="300" r="6" fill="#2c2634" stroke="#3a3344"/>
-        <circle cx="300" cy="150" r="5" fill="#2c2634" stroke="#3a3344" opacity="0.7"/>
+        <circle cx="140" cy="200" r="6" fill="#2c2634" stroke="#e2c06a" opacity="0.6"/>
         <circle cx="250" cy="360" r="9" fill="#a52c31" stroke="#e06b6b" stroke-width="2"/>
         <path d="M250 344 l-7 24 6-5 5 7 5-7 6 5z" fill="#0c0a10" stroke="#e06b6b" stroke-width="1.4"/>
         <text x="480" y="270" fill="#c3b9a3" font-size="12" text-anchor="middle" font-family="Noto Sans TC">船閘</text>
         <text x="470" y="112" fill="#e2c06a" font-size="12" text-anchor="middle" font-family="Noto Sans TC">北岸大道</text>
+        <text x="140" y="182" fill="#e2c06a" font-size="12" text-anchor="middle" font-family="Noto Sans TC">市集</text>
         <text x="660" y="318" fill="#8d8370" font-size="11" text-anchor="middle" font-family="Noto Sans TC">碼頭</text>
         <text x="250" y="382" fill="#f2ecdf" font-size="12" text-anchor="middle" font-family="Noto Sans TC">渡口（你）</text>
+      </svg>
+      <!-- 網格圖版面（覆蓋層尺度），渲染 layer=wilderness payload（Evennia Wilderness contrib）：點陣節距 60（1 座標格），現在節點＝原點置中、軸十字穿過（+y=北，配頁首「北↑ 東→」）；八向鄰格為 contrib 既有出口、照真實相對位置落點（NW 封鎖＝虛線）；径向暈影＝知識邊界。
+           超出可見範圍的已知地點（remembered，真實座標）依壓縮前 dx/dy 射線與安全邊界求交，落在畫布邊緣以菱形記憶標記＋淡色方向射線呈現——只指真實方向、不帶距離/角度數字：
+           東部大平原・商都（東，grandia）、北關・石門城（北，altoria 門戶）、菌絲深窖・地下洞窟（西南）。此即使用者所求「荒野中連接兩座城市／地下洞窟，在座標軸地圖上以 marker 顯示其相對方向」。城市節點為 landmark（金環）、洞窟為記憶（ink 環）。 -->
+      <svg class="lay-grid" viewBox="0 0 800 520" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <pattern id="ogrid" width="60" height="60" patternUnits="userSpaceOnUse"><circle cx="40" cy="20" r="1.5" fill="#3a3344" fill-opacity=".85"/></pattern>
+          <radialGradient id="ofog" gradientUnits="userSpaceOnUse" cx="400" cy="260" r="480"><stop offset=".45" stop-color="#0c0a10" stop-opacity="0"/><stop offset=".75" stop-color="#0c0a10" stop-opacity=".30"/><stop offset="1" stop-color="#0c0a10" stop-opacity=".58"/></radialGradient>
+        </defs>
+        <rect width="800" height="520" fill="url(#ogrid)"/>
+        <g stroke="#3a3344" stroke-width="1.5" opacity=".65"><line x1="400" y1="12" x2="400" y2="508"/><line x1="12" y1="260" x2="788" y2="260"/></g>
+        <!-- 八向鄰格邊（NW 封鎖＝虛線） -->
+        <line x1="400" y1="260" x2="400" y2="200" stroke="#3a3344" stroke-width="2"/>
+        <line x1="400" y1="260" x2="460" y2="200" stroke="#3a3344" stroke-width="2"/>
+        <line x1="400" y1="260" x2="460" y2="260" stroke="#3a3344" stroke-width="2"/>
+        <line x1="400" y1="260" x2="460" y2="320" stroke="#3a3344" stroke-width="2"/>
+        <line x1="400" y1="260" x2="400" y2="320" stroke="#3a3344" stroke-width="2"/>
+        <line x1="400" y1="260" x2="340" y2="320" stroke="#3a3344" stroke-width="2"/>
+        <line x1="400" y1="260" x2="340" y2="260" stroke="#3a3344" stroke-width="2"/>
+        <line x1="400" y1="260" x2="340" y2="200" stroke="#5c4a6a" stroke-width="2.4" stroke-dasharray="3 4"/>
+        <rect width="800" height="520" fill="url(#ofog)"/>
+        <!-- 超出範圍記憶地點的方向射線（淡，僅指方向） -->
+        <g stroke="#e2c06a" stroke-width="1" stroke-dasharray="2 6" opacity=".28"><line x1="400" y1="260" x2="760" y2="260"/><line x1="400" y1="260" x2="400" y2="40"/></g>
+        <g stroke="#3a3344" stroke-width="1" stroke-dasharray="2 6" opacity=".4"><line x1="400" y1="260" x2="86" y2="480"/></g>
+        <!-- 八向鄰格節點（現況區域名＝中央山脈，僅標現在節點；鄰格為同區未訪/已訪點） -->
+        <circle cx="400" cy="200" r="6" fill="#2c2634" stroke="#3a3344"/>
+        <circle cx="460" cy="200" r="6" fill="#2c2634" stroke="#3a3344"/>
+        <circle cx="460" cy="260" r="6" fill="#2c2634" stroke="#3a3344"/>
+        <circle cx="460" cy="320" r="6" fill="#2c2634" stroke="#e2c06a" opacity="0.6"/>
+        <circle cx="400" cy="320" r="6" fill="#2c2634" stroke="#e2c06a" opacity="0.6"/>
+        <circle cx="340" cy="320" r="6" fill="#2c2634" stroke="#3a3344"/>
+        <circle cx="340" cy="260" r="6" fill="#2c2634" stroke="#3a3344"/>
+        <circle cx="340" cy="200" r="6" fill="#2c2634" stroke="#3a3344"/>
+        <circle cx="400" cy="260" r="9" fill="#a52c31" stroke="#e06b6b" stroke-width="2"/>
+        <path d="M400 244 l-7 24 6-5 5 7 5-7 6 5z" fill="#0c0a10" stroke="#e06b6b" stroke-width="1.4"/>
+        <text x="400" y="284" fill="#f2ecdf" font-size="12" text-anchor="middle" font-family="Noto Sans TC">中央山脈（你）</text>
+        <!-- 邊緣記憶標記：菱形＋landmark 金環（城市）／ink 環（洞窟），沿射線置於安全邊界 -->
+        <g><rect x="753" y="253" width="14" height="14" transform="rotate(45 760 260)" fill="#1a1420" stroke="#e2c06a"/><text x="748" y="248" fill="#e2c06a" font-size="12" text-anchor="end" font-family="Noto Sans TC">東部大平原・商都（東）</text></g>
+        <g><rect x="393" y="33" width="14" height="14" transform="rotate(45 400 40)" fill="#1a1420" stroke="#e2c06a"/><text x="414" y="44" fill="#e2c06a" font-size="12" text-anchor="start" font-family="Noto Sans TC">北關・石門城（北）</text></g>
+        <g><rect x="79" y="473" width="14" height="14" transform="rotate(45 86 480)" fill="#1a1420" stroke="#615a4c"/><text x="100" y="484" fill="#8d8370" font-size="12" text-anchor="start" font-family="Noto Sans TC">菌絲深窖・地下洞窟（西南）</text></g>
       </svg>
     </div>
     <div class="maplegend">
@@ -1130,8 +1264,6 @@
       <span class="lg"><span class="dot" style="background:#2c2634;border:1px solid var(--gold-500)"></span>已訪</span>
       <span class="lg"><span class="dot" style="background:#2c2634;border:1px dashed var(--gold-500)"></span>已見未訪</span>
       <span class="lg"><span class="dot" style="background:#1a1420;border:1px solid var(--ink-600)"></span>記憶</span>
-      <span class="lg"><span class="dot" style="background:var(--gold-500)"></span>任務路徑</span>
-      <span class="lg" style="margin-left:auto;color:var(--paper-700)">滾輪縮放 · 拖曳平移</span>
     </div>
   </div>
 </section>
@@ -1520,6 +1652,27 @@
     var dir=b.dataset.h==='u'?'ArrowUp':'ArrowDown';
     cmd.dispatchEvent(new KeyboardEvent('keydown',{key:dir,bubbles:true}));
   });});
+
+  /* ---------- map layout (連線圖 graph / 網格圖 lattice) ----------
+     The layout is DATA-DERIVED, exactly as the product resolves it: a payload
+     whose layer carries validated world coordinates (`grid`/`wilderness` — the
+     Evennia xyzgrid / wilderness contrib sources) renders the lattice; a
+     coordinate-free layer (`interior`/`instance`) renders the graph. There is
+     no player switch and no storage; the island and the overlay read the same
+     resolved value. The only control on this page is the DEMO fixture selector
+     (.demofx) — a review device that swaps which fixture payload both
+     surfaces render; it never exists in the product. */
+  var mapMini=document.querySelector('.mini'), mapOv=document.getElementById('ov-map');
+  var fxBtns=$$('.demofx [data-fixture]');
+  function isCoordinateLayer(layer){return layer==='grid'||layer==='wilderness';}
+  function fixtureApply(name){
+    mapMini.dataset.layer=name;
+    var resolved=isCoordinateLayer(name)?'lattice':'graph';
+    mapMini.dataset.map=resolved; mapOv.dataset.map=resolved;
+    fxBtns.forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.fixture===name));});
+  }
+  fxBtns.forEach(function(b){b.addEventListener('click',function(){fixtureApply(b.dataset.fixture);});});
+  fixtureApply('interior');
 
   /* ---------- default state ---------- */
   renderSkill('elemental');

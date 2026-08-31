@@ -3,7 +3,7 @@ import OverlayHost from "../../components/OverlayHost.vue";
 import MapOverlay from "../../components/MapOverlay.vue";
 import SettingsOverlay from "../../components/SettingsOverlay.vue";
 import HelpOverlay from "../../components/HelpOverlay.vue";
-import { LOCAL_MAP_SAMPLE } from "../fixtures.js";
+import { LOCAL_MAP_SAMPLE, localMapModelFor } from "../fixtures.js";
 
 // OverlayHost (H5, task 5.6): the shared full-screen overlay surface. The
 // stories below cover the three overlay names with their real stripped
@@ -30,8 +30,11 @@ const renderHost = (args) => ({
             default: (slotProps) => {
               const { overlay, mapModel } = slotProps;
               if (overlay === "map") {
+                // Wave 0: the map family binds through the shared
+                // derived-shape helper, so even this fallback is the exact
+                // store model shape.
                 return h(MapOverlay, {
-                  localMap: mapModel || LOCAL_MAP_SAMPLE,
+                  localMap: mapModel || localMapModelFor(LOCAL_MAP_SAMPLE),
                   onMove: () => {},
                   onOpenMap: () => {},
                 });
@@ -59,7 +62,7 @@ export default {
 
 export const MapSurface = {
   render: renderHost,
-  args: { overlay: "map", mapModel: LOCAL_MAP_SAMPLE },
+  args: { overlay: "map", mapModel: localMapModelFor(LOCAL_MAP_SAMPLE) },
 };
 
 export const SettingsSurface = {

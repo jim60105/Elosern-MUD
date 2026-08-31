@@ -4,6 +4,7 @@ import {
   LOCAL_MAP_MINIMAL_SAMPLE,
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
+  localMapModelFor,
 } from "../fixtures.js";
 
 // MapOverlay (B5 overlays family): the full-viewport dialog frame hosting
@@ -13,7 +14,10 @@ import {
 // absolutely-positioned overlay stays visible against the ink background.
 // Nothing is invented: the unavailable story shows only the payload's
 // reason.message.
-
+//
+// Wave 0 (webclient-map-00-story-fidelity): every `localMap` arg binds
+// through the shared `localMapModelFor` helper — the EXACT derived shape the
+// store passes in production — never the raw payload.
 const renderOverlay = (args) => ({
   render: () =>
     h(
@@ -36,20 +40,20 @@ export default {
 export const FullLattice = {
   render: renderOverlay,
   args: {
-    localMap: LOCAL_MAP_SAMPLE,
+    localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
   },
 };
 
 export const Minimal = {
   render: renderOverlay,
   args: {
-    localMap: LOCAL_MAP_MINIMAL_SAMPLE,
+    localMap: localMapModelFor(LOCAL_MAP_MINIMAL_SAMPLE),
   },
 };
 
 export const Unavailable = {
   render: renderOverlay,
   args: {
-    localMap: LOCAL_MAP_UNAVAILABLE_SAMPLE,
+    localMap: localMapModelFor(LOCAL_MAP_UNAVAILABLE_SAMPLE),
   },
 };

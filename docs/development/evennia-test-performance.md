@@ -103,7 +103,7 @@ uv run --locked evennia test --settings settings.py --keepdb --timing \
 - **共享規則書檔案競爭：** `AffinityConfigValidationTests` 就地重寫 `world/rules/rulebook/affinity.yaml` 並在 `tearDown` 中還原；平行 worker 在該檔案上發生競爭並讀取到異常數值。`load_config(path=...)` 現接受明確的規則書路徑，且測試從 `TemporaryDirectory` 複本中測試異常規則書，共享的來源檔案絕不再被重寫。
 - **行程全域任務與目錄註冊表洩漏：** 數個測試類別註冊了 `QUEST_DEFINITION_REGISTRY`、`GUILD_OFFER_REGISTRY` 或 `CATALOG` 而未進行快照還原（或在註冊後才快照），將 `introductory_hunt` 洩漏至執行它們的 worker。已在 `test_onboarding_journey`、`test_guild_config`、`test_dialogue`、`test_service_view`、`test_service_view_side_effects`、`test_guild_economy_sync`、`test_party_offline_loop`、`test_guild_registration` 以及轉換後的 `web.webclient` 展示器與動作類別中完成修復。編譯邊界測試現斷言註冊表相對於自身的 setUp 快照維持不變，而非斷言字面上的空註冊表，這才是語意上正確的契約。
 - **讀取路徑的資料庫寫入：** `map_knowledge._registered_grid_bounds` 呼叫了 xyzgrid contrib 的 `get_xyzgrid()`，該函式在純讀取時會建立全域 `XYZGrid` script。純 `unittest.TestCase` 在 autocommit 下執行，導致語法測試永久認可了該 script 並污染後續所有 `--keepdb` 的啟動執行。查詢現於未佈建網格時返回 `None`，因此驗證路徑絕不寫入資料庫。
-- **依賴大量 fixture 的展示器測試：** `web.webclient` 展示與動作轉接器類別（213 個方法，每項因負擔 `sync_grid()` 與 `sync_wilderness()` 耗時約 1.8 秒）從 `EvenniaTest` 移至 `EvenniaTestCase`，昂貴的網格、荒野與目錄同步提升至類別層級，並於每個測試中建立實體。它們現在序列執行約需 13 秒且具備平行安全性。
+- **依賴大量 fixture 的展示器測試：** `web.webclient` 展示與動作轉接器類別（213 個方法，每項因負擔 `sync_grid()` 與 `sync_wilderness()` 耗時約 1.8 秒）從 `EvenniaTest` 移至 `EvenniaTestCase`，昂貴的網格、Wilderness 與目錄同步提升至類別層級，並於每個測試中建立實體。它們現在序列執行約需 13 秒且具備平行安全性。
 
 證據執行（完整 2,525 項測試套件，`--parallel 4 --noinput`，連續執行兩次）：
 

@@ -257,6 +257,14 @@ These rules bind every sub-change.
 | H4 | `webclient-hud-04-reference-drawers` | H1, H3 | the right-side drawer surface (scrim, focus trap, Escape, slide transition) and the migration of SkillBook / InventoryPanel + equipment paper-doll / ShopPanel / QuestBoard / LoreDrawer / a full character-status drawer out of the right column into it; the right column is removed | Done |
 | H5 | `webclient-hud-05-overlays-and-command-line` | H1, H2, H3 | the persistent command line (prompt chevron, always-visible field, history + hints, mode-contextual quick-word chips) replacing the collapsed drawer entry; `MapOverlay` / `SettingsOverlay` / `HelpOverlay` wired to real triggers; the `--prose-scale` A−/A/A+ control persisted through the settings surface | Done |
 | H6 | `webclient-hud-06-remap-and-finalize` | H2, H4, H5 | apply the §5.1/§5.2 supersession into `webclient-ui-design.md`; re-freeze the browser contract audit and the component manifest at their complete new sets; extend the deferred-surface assertion; flip this roadmap's Status column; final gates | Done |
+| M0 | `webclient-map-00-story-fidelity` | H6 | the story/fixture contract for the map family: one shared `localMapModelFor` derived-shape binding (the exact store model), every LocalMap/MapOverlay/MapLattice story bound through it, the missing actionable / focused-remembered / tall-lattice stories, and the `currentNode` detail-line seeding fix | Done |
+| M1 | `webclient-map-01-draft-chrome` | M0 | the redesign draft's map chrome on both surfaces: seal-pair and label-tier tokens, the draft marker ladder, the overlay's mapcanvas framing + pin, dot-chip legends, the island's full-map affordance, `北↑ 東→` orientation marks — chrome-only, the lattice placement untouched | Planned |
+| M2 | `webclient-map-02-layout-variants` | M1 | the data-derived two-layout renderer: the radial placement pass, the shared `variant` parameter, `variantForLayer` (coordinate layers → lattice, coordinate-free → graph, no player control), and the lattice's edge direction markers under the raw-coordinate direction contract | Planned |
+
+**Map-wave amendment (§9).** M0–M2 split the roadmap's remaining map work into
+story-fidelity → chrome → layout waves; this row set amends the delivery table under §9, and each
+row's Status follows §9's tracker rule (M0 was created `In-progress` as the change being
+implemented; it flipped to `Done` when the change was archived on 2026-08-31).
 
 **Critical path:** `H1 → H3 → {H4, H5} → H6`. H2 depends only on H1 and runs parallel to H3, but **H5 also depends on H2**: H2's `webclient-local-map` delta withholds the minimap's full-map
 affordance until the surface it opens is reachable, and H5 is the wave that mounts `MapOverlay`, so the

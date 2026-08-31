@@ -55,7 +55,10 @@ const STATE_LABELS = {
 // `select` event (emitted on every node activation) drives `selectedId`;
 // the remembered list's own click/focus handlers still call `selectNode`
 // directly — it never left the island's scope.
-const selectedId = ref(props.localMap.current_node ?? null);
+// The live store passes the reducer's `currentNode` (the raw payload's
+// `current_node` is renamed by `reducePanel`); reading the raw field left the
+// detail line unseeded in production (wave 0 design D1).
+const selectedId = ref(props.localMap.currentNode ?? null);
 const hoveredId = ref(null);
 
 const activeNode = computed(() => {

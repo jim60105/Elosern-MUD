@@ -4,7 +4,7 @@
 
 ## 啟動順序
 
-`server/conf/at_server_startstop.py` 的 `at_server_start()` 會依序同步世界資料、網格地圖、服務室內空間、任務執行期、公會經濟、守衛 NPC 與 NPC 行程，再恢復持久化戰鬥階段，最後進行荒野復原。所有會註冊世界時鐘事件的同步都必須在任何啟動操作推進時間之前完成，因此任務目錄（`quest_deadlines`）、公會經濟（`caravan_arrivals`、`shop_hours`）與 NPC 行程（`npc_schedules`）的註冊都排在戰鬥恢復之前；任務目錄先註冊，公會經濟才會讀取其中的任務鍵與報酬設定。恢復持久化戰鬥階段仍須早於荒野復原，避免已提交戰果的荒野怪物被提前刪除或重生。
+`server/conf/at_server_startstop.py` 的 `at_server_start()` 會依序同步世界資料、網格地圖、服務室內空間、任務執行期、公會經濟、守衛 NPC 與 NPC 行程，再恢復持久化戰鬥階段，最後執行 Wilderness 復原（`sync_wilderness()`）。所有會註冊世界時鐘事件的同步都必須在任何啟動操作推進時間之前完成，因此任務目錄（`quest_deadlines`）、公會經濟（`caravan_arrivals`、`shop_hours`）與 NPC 行程（`npc_schedules`）的註冊都排在戰鬥恢復之前；任務目錄先註冊，公會經濟才會讀取其中的任務鍵與報酬設定。恢復持久化戰鬥階段仍須早於 Wilderness 復原，避免已提交戰果的 Wilderness 怪物被提前刪除或重生。
 
 在容器環境中，使用 Podman Compose。第一次使用新的資料庫卷時，先執行一次性 bootstrap，再啟動服務。
 
