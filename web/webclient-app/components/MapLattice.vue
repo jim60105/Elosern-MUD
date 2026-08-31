@@ -31,6 +31,11 @@ const props = defineProps({
   // Fill-width layout variant: the overlay renders the canvas at the body's
   // available width instead of the island's natural auto width.
   fillWidth: { type: Boolean, default: false },
+  // Draft overlay chrome (webclient-map-01-draft-chrome design D4): the
+  // full-map surface paints its canvas in the `mapcanvas` treatment and
+  // draws the teardrop location pin above the current marker. Off on the
+  // minimap island; only the overlay passes it.
+  overlayChrome: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["select", "hover", "leave", "move"]);
@@ -57,21 +62,27 @@ const LABEL_BAND = 14;
 const canvasWidth = computed(() => Math.max(1, cols.value) * props.colPitch);
 const canvasHeight = computed(() => Math.max(1, rows.value) * props.rowPitch + LABEL_BAND);
 
-// Every lattice marker's base geometry, multiplied by the `markerScale`
-// prop so all states scale uniformly: the current 26×26 rect, the
-// unvisited/visited r=12 circles (visual half-extent 13 including the 2px
-// stroke), the rotated remembered diamond, and the actionable halo.
-const MARKER_CURRENT_HALF = 13;
-const MARKER_CIRCLE_R = 12;
+// Every lattice marker's base geometry in pre-scale units, multiplied by
+// the `markerScale` prop so all states scale uniformly (draft ladder,
+// webclient-map-01-draft-chrome D2): the current seal circle r=8 (visual
+// half-extent 9 with the 2px stroke), the visited/unvisited dots r=4.5
+// (+0.5 stroke → 5), the gold landmark ring r=5, the rotated remembered
+// diamond half-extent 9, and the actionable halo r=10. Every footprint is
+// strictly smaller than the pre-draft 26px square / r=12 circles, so the
+// crowding fix's pitch guarantee carries over unchanged.
+const MARKER_CURRENT_R = 8;
+const MARKER_DOT_R = 4.5;
+const MARKER_LANDMARK_R = 5;
 const MARKER_DIAMOND_HALF = 9;
 const HALO_R = 10;
-// The label baseline sits `MARKER_CURRENT_HALF * markerScale + 13` below
-// the node origin: at the island's scale 1 this is the crowding fix's
-// 26px offset (13px marker half-extent + 13px of clearance that keeps the
-// 11px monospace line box clear of the node's own marker and of the
-// marker in the row below).
+// The label baseline sits 26px below the node origin at scale 1, scaled
+// with the markers: the crowding fix's offset (LABEL_ANCHOR_HALF 13 +
+// 13px clearance), deliberately kept after the re-skin — it clears the
+// draft ladder's smaller footprints with strictly more room, so the
+// non-overlap invariant holds a fortiori.
+const LABEL_ANCHOR_HALF = 13;
 function labelY() {
-  return MARKER_CURRENT_HALF * props.markerScale + 13;
+  return LABEL_ANCHOR_HALF * props.markerScale + 13;
 }
 
 // Node labels are bounded and truncated (the full label stays reachable
@@ -87,6 +98,25 @@ function nodePos(node) {
     x: node.col * props.colPitch + props.colPitch / 2,
     y: (Math.max(1, rows.value) - 1 - node.row) * props.rowPitch + props.rowPitch / 2,
   };
+}
+
+// The overlay pin's anchor (design D4): the CURRENT placement's current-node
+// position, in the same coordinate system as the node groups' translate.
+// Null (no pin) when the payload carries no on-canvas current node.
+const currentPos = computed(() => {
+  const current = nodes.value.find((node) => node.visibility === "current");
+  return current ? nodePos(current) : null;
+});
+
+// Label tiers (draft label palette, webclient-map-01-draft-chrome): the
+// current node reads brightest, a landmark is gold, a visited node reads
+// seen, an unvisited node reads far (faintest). Remembered nodes live in the
+// island's list, which keeps the plain paper label.
+function labelTier(node) {
+  if (node.visibility === "current") return "here";
+  if (node.landmark) return "gold";
+  if (node.visibility === "visible_visited") return "seen";
+  return "far";
 }
 
 // Edges are drawn between the centers of their endpoints; an edge whose
@@ -156,6 +186,7 @@ const latticeStyle = computed(() => {
        the overlay. -->
   <svg
     class="local-map__lattice"
+    :class="{ 'local-map__lattice--canvas': overlayChrome }"
     :width="canvasWidth"
     :height="canvasHeight"
     :viewBox="`0 0 ${canvasWidth} ${canvasHeight}`"
@@ -177,6 +208,20 @@ const latticeStyle = computed(() => {
       :y2="edge.y2"
       :aria-label="edges[edge.i].label"
     />
+    <!-- The draft location pin (webclient-map-01-draft-chrome design D4):
+         rendered inside this SVG (not positioned by the overlay wrapper) so
+         it shares the current marker's coordinate system. Anchored to the
+         CURRENT placement's current-node position and scaled with the
+         markers, its tip sits directly above the current circle. A pure
+         adornment: fixed path, non-interactive, aria-hidden, no label. -->
+    <path
+      v-if="overlayChrome && currentPos"
+      class="local-map__pin"
+      data-testid="local-map__pin"
+      :transform="`translate(${currentPos.x}, ${currentPos.y}) scale(${markerScale})`"
+      d="M0 -16 l-7 24 6 -5 5 7 5 -7 6 5 z"
+      aria-hidden="true"
+    />
     <g
       v-for="node in nodes"
       :key="node.id"
@@ -190,26 +235,28 @@ const latticeStyle = computed(() => {
       @click="activateNode(node)"
       @mouseenter="emit('hover', node)"
     >
-      <rect
+      <!-- The draft marker ladder (webclient-map-01-draft-chrome D2): the
+           current node is the large seal-stroked circle; visited is a small
+           ink-filled circle; unvisited is a small hollow circle (keeps the
+           未探索 rule); remembered keeps the rotated diamond. Shape/size
+           distinguish the states without colour. -->
+      <circle
         v-if="node.visibility === 'current'"
         class="local-map__marker local-map__marker--current"
         data-testid="local-map__marker--current"
-        :x="-MARKER_CURRENT_HALF * markerScale"
-        :y="-MARKER_CURRENT_HALF * markerScale"
-        :width="MARKER_CURRENT_HALF * 2 * markerScale"
-        :height="MARKER_CURRENT_HALF * 2 * markerScale"
+        :r="MARKER_CURRENT_R * markerScale"
         aria-hidden="true"
       />
       <circle
         v-else-if="node.visibility === 'visible_unvisited'"
         class="local-map__marker local-map__marker--visible_unvisited"
-        :r="MARKER_CIRCLE_R * markerScale"
+        :r="MARKER_DOT_R * markerScale"
         aria-hidden="true"
       />
       <circle
         v-else-if="node.visibility === 'visible_visited'"
         class="local-map__marker local-map__marker--visible_visited"
-        :r="MARKER_CIRCLE_R * markerScale"
+        :r="MARKER_DOT_R * markerScale"
         aria-hidden="true"
       />
       <rect
@@ -222,6 +269,18 @@ const latticeStyle = computed(() => {
         transform="rotate(45)"
         aria-hidden="true"
       />
+      <!-- The gold landmark treatment (draft `.mini` gold dots): an extra
+           gold ring drawn over (never replacing) the node's visibility
+           marker. Deliberately OUTSIDE the `local-map__marker` class: the
+           browser geometry audit pairs every `.local-map__marker` box, and a
+           same-node decoration is not a node marker. -->
+      <circle
+        v-if="node.landmark && node.visibility !== 'remembered'"
+        class="local-map__landmark"
+        data-testid="local-map__landmark"
+        :r="MARKER_LANDMARK_R * markerScale"
+        aria-hidden="true"
+      />
       <circle
         v-if="node.action"
         class="local-map__actionable"
@@ -229,14 +288,22 @@ const latticeStyle = computed(() => {
         :r="HALO_R * markerScale"
         aria-hidden="true"
       />
-      <text class="local-map__node-label" :y="labelY()" text-anchor="middle">
+      <text
+        class="local-map__node-label"
+        :class="`local-map__node-label--${labelTier(node)}`"
+        :y="labelY()"
+        text-anchor="middle"
+      >
         <title>{{ node.label }}</title>{{ truncatedLabel(node.label) }}
       </text>
     </g>
   </svg>
 
-  <!-- The stateless state legend (moved out of the island chrome): each
-       entry is a legend text label paired with its state glyph. -->
+  <!-- The draft dot-chip state legend (webclient-map-01-draft-chrome D6):
+       an 11px radius-3 colour chip paired with its text label. The chip
+       border style carries non-colour redundancy — the remembered chip's
+       dashed border differs from the visited chip's solid border (delta
+       scenario "Legend chips stay text-labelled at both scales"). -->
   <ul class="local-map__legend" data-testid="local-map__legend">
     <li
       v-for="(entry, i) in legend"
@@ -244,19 +311,11 @@ const latticeStyle = computed(() => {
       class="local-map__legend-item"
       :data-testid="`local-map__legend-item--${i}`"
     >
-      <svg
-        class="local-map__legend-glyph"
-        :class="`local-map__legend-glyph--${legendState(i)}`"
-        viewBox="-16 -16 32 32"
-        width="14"
-        height="14"
+      <span
+        class="local-map__legend-chip"
+        :class="`local-map__legend-chip--${legendState(i)}`"
         aria-hidden="true"
-      >
-        <rect v-if="legendState(i) === 'current'" x="-10" y="-10" width="20" height="20" />
-        <rect v-else-if="legendState(i) === 'remembered'" x="-7" y="-7" width="14" height="14" transform="rotate(45)" />
-        <circle v-else-if="legendState(i) === 'visible_visited'" r="9" />
-        <circle v-else r="9" />
-      </svg>
+      />
       {{ entry }}
     </li>
   </ul>
@@ -283,12 +342,20 @@ const latticeStyle = computed(() => {
   overflow: visible;
 }
 
+/* The draft mapcanvas framing (webclient-map-01-draft-chrome D4): the
+   overlay surface paints the dark radial-gradient terrain and the rounded
+   ink frame as pure CSS — no fabricated terrain geometry. */
+.local-map__lattice--canvas {
+  background: radial-gradient(70% 60% at 40% 30%, var(--map-canvas-hi), var(--map-canvas-lo));
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius);
+}
+
 .local-map__node {
   cursor: pointer;
 }
 
 .local-map__node-label {
-  fill: var(--paper-300);
   font-family: var(--f-mono);
   font-size: 11px;
   /* Decorative label: must never intercept pointer events intended for the
@@ -296,8 +363,32 @@ const latticeStyle = computed(() => {
   pointer-events: none;
 }
 
+/* Draft label tiers (D3 tokens): current brightest, landmark gold,
+   visited seen, unvisited far. */
+.local-map__node-label--here {
+  fill: var(--map-label-here);
+}
+
+.local-map__node-label--gold {
+  fill: var(--map-label-gold);
+}
+
+.local-map__node-label--seen {
+  fill: var(--map-label-seen);
+}
+
+.local-map__node-label--far {
+  fill: var(--map-label-far);
+}
+
+/* The draft marker ladder (D2): the large seal-stroked current circle, the
+   small ink-filled visited dot, the small hollow unvisited dot (keeps the
+   未探索 rule), the remembered diamond. Shape/size distinguish the states
+   without colour. */
 .local-map__marker--current {
-  fill: var(--gold-400);
+  fill: var(--seal-deep);
+  stroke: var(--seal-light);
+  stroke-width: 2;
 }
 
 .local-map__marker--visible_unvisited {
@@ -307,47 +398,78 @@ const latticeStyle = computed(() => {
 }
 
 .local-map__marker--visible_visited {
-  fill: var(--vit-sp);
+  fill: var(--ink-700);
+  stroke: var(--ink-edge);
+  stroke-width: 1;
 }
 
 .local-map__marker--remembered {
   fill: var(--paper-500);
 }
 
+/* The gold landmark ring (draft `.mini` 金環): a decoration over the node's
+   own visibility marker, never a second position claim. */
+.local-map__landmark {
+  fill: none;
+  stroke: var(--gold-500);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
 .local-map__actionable {
   fill: var(--seal-glow);
-  stroke: var(--seal-400);
+  stroke: var(--seal-light);
   stroke-width: 2;
 }
 
+/* The draft location pin (D4): the teardrop ornament above the current
+   marker — non-interactive, unlabelled, no activation of its own. The path
+   geometry scales with the marker ladder via the element transform, but
+   `vector-effect: non-scaling-stroke` keeps the draft's 1.4px outline at
+   any `markerScale` (an SVG transform would otherwise thicken the stroke
+   proportionally — the draft pairs a hairline pin with a 2px marker ring). */
+.local-map__pin {
+  fill: var(--map-canvas-lo);
+  stroke: var(--seal-light);
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
 /* Edges form a non-interactive connector layer: they never intercept the
-   pointer events intended for a node's actionable circle. */
+   pointer events intended for a node's actionable circle. Draft strokes
+   (D2 language): solid ink for traversable, dashed for blocked, faint for
+   unknown — all through the ink-edge token. */
 .local-map__edge {
   pointer-events: none;
 }
 
 .local-map__edge--traversable {
-  stroke: var(--paper-300);
-  stroke-width: 1.5;
+  stroke: var(--ink-edge);
+  stroke-width: 2;
 }
 
 .local-map__edge--blocked {
-  stroke: var(--paper-500);
-  stroke-width: 1.5;
-  stroke-dasharray: 6 4;
+  stroke: var(--ink-edge);
+  stroke-width: 2;
+  stroke-dasharray: 3 4;
 }
 
 .local-map__edge--unknown {
-  stroke: var(--paper-700);
+  stroke: var(--ink-edge);
   stroke-width: 1.5;
   stroke-opacity: 0.45;
   stroke-dasharray: 2 5;
 }
 
+/* The draft dot-chip legend (D6): an 11px radius-3 chip + 11px text label,
+   14px gap, no bordered pill. The text labels stay the non-colour
+   indicator; remembered (dashed) vs visited (solid) chip borders add a
+   non-colour distinction between those two entries. */
 .local-map__legend {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--sp-2);
+  gap: 14px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -356,33 +478,34 @@ const latticeStyle = computed(() => {
 .local-map__legend-item {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-1);
-  padding: 2px var(--sp-2);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--paper-300);
-  font-size: var(--text-sm);
+  gap: 6px;
+  color: var(--paper-500);
+  font-size: 11px;
 }
 
-.local-map__legend-glyph {
+.local-map__legend-chip {
   flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
 }
 
-.local-map__legend-glyph--current rect {
-  fill: var(--gold-400);
+.local-map__legend-chip--current {
+  background: var(--seal-deep);
 }
 
-.local-map__legend-glyph--visible_unvisited circle {
-  fill: transparent;
-  stroke: var(--vit-sp);
-  stroke-width: 2;
+.local-map__legend-chip--visible_unvisited {
+  background: transparent;
+  border: 1px solid var(--ink-edge);
 }
 
-.local-map__legend-glyph--visible_visited circle {
-  fill: var(--vit-sp);
+.local-map__legend-chip--visible_visited {
+  background: var(--map-canvas-hi);
+  border: 1px solid var(--gold-500);
 }
 
-.local-map__legend-glyph--remembered rect {
-  fill: var(--paper-500);
+.local-map__legend-chip--remembered {
+  background: var(--map-canvas-hi);
+  border: 1px dashed var(--gold-500);
 }
 </style>

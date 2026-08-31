@@ -153,21 +153,36 @@ onMounted(() => {
 onUpdated(() => {
   measureCanvasBudget();
 });
+
+// Pointer-click convenience (webclient-map-01-draft-chrome D5): clicking the
+// island's non-interactive body opens the full map. A click that originated
+// in an interactive descendant — the expand button, a lattice node group
+// (carrying `data-node`), its actionable halo, or a remembered-list item
+// (`[tabindex]`) — runs only that control's own behavior. The root
+// deliberately gains no role or tabindex: the labelled expand sibling stays
+// the only keyboard path, so the focus-restore contract is untouched.
+function onIslandClick(event) {
+  if (!available.value) return;
+  if (event.target?.closest?.("button, a, [tabindex], [data-node]")) return;
+  emit("open-map");
+}
 </script>
 
 <template>
-  <aside class="local-map" data-testid="local-map" ref="rootEl">
+  <aside class="local-map" data-testid="local-map" ref="rootEl" @click="onIslandClick">
     <p v-if="!available" class="local-map__unavailable" data-testid="local-map__unavailable">
       {{ reason }}
     </p>
     <template v-else>
       <!-- The island's top-meta line (design D9): the payload's title plus,
            on the coordinate-bearing layers only, the renderer's axis
-           orientation legend. No bearing or distance is rendered. -->
+           orientation marks in the draft's header treatment (`北↑ 東→`,
+           webclient-map-01-draft-chrome). No bearing or distance is
+           rendered. -->
       <div class="local-map__meta" data-testid="local-map__title" ref="metaEl">
         <span class="local-map__meta-title">{{ title }}</span>
         <span v-if="showsOrientation" class="local-map__orientation" data-testid="local-map__orientation">
-          北↑
+          北↑ 東→
         </span>
         <!-- H5 (task 6.2): the island's labelled full-map trigger, a sibling
              of the lattice on the island's header row (H2's deferred affordance
@@ -258,6 +273,14 @@ onUpdated(() => {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   font-family: var(--f-sans);
+  /* Draft `.mini` affordance (webclient-map-01-draft-chrome D5): the whole
+     island reads as clickable because the body click opens the full map;
+     the interactive descendants keep their own cursors. */
+  cursor: pointer;
+}
+
+.local-map:hover {
+  border-color: var(--ink-600);
 }
 
 .local-map__meta {

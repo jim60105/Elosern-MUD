@@ -40,6 +40,25 @@
   --gold-500: #cba135;
   --gold-glow: rgba(203, 161, 53, 0.3);
 
+  /* ---- draft map chrome (webclient-map-01-draft-chrome, design D3) ----
+     Draft-specific values the map surfaces need and the tokens above lack.
+     `--seal-deep` is the draft's current-node fill, deliberately distinct
+     from --seal-600 (#a9322a): redefining the global seal ramp would repaint
+     every other surface, so the draft-map pair gets its own tokens.
+     Sources: docs/design/elosern-redesign/index.html `.mini` / `.mapcanvas`
+     island + overlay SVGs and the `maplegend` chips. */
+  --seal-deep: #a52c31; /* draft .mini current-node circle fill */
+  --seal-light: #e06b6b; /* draft current-node stroke + pin stroke */
+  --ink-edge: #3a3344; /* draft node-dot stroke and connector-edge ink */
+  --map-canvas-hi: #1a1420; /* draft .mapcanvas gradient near stop */
+  --map-canvas-lo: #0c0a10; /* draft .mapcanvas gradient far stop / pin fill */
+  /* Node label tiers (draft island labels): current / landmark / visited /
+     unvisited, lightest to faintest. */
+  --map-label-here: #f2ecdf;
+  --map-label-gold: #e2c06a;
+  --map-label-seen: #8d8370;
+  --map-label-far: #615a4c;
+
   /* ---- vitals & status colors ---- */
   --vit-hp: #e0574f;
   --vit-mp: #5c86dd;

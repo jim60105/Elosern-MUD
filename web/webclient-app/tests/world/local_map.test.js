@@ -71,9 +71,13 @@ describe("LocalMap (B4 world family)", () => {
 
   it("encodes every state by shape, not color alone", () => {
     const w = mountMap();
-    // current → square, visible_unvisited → open circle,
-    // visible_visited → filled circle, remembered → diamond (rotated rect).
-    expect(w.get('[data-testid="local-map__node--grid:altoria:1:2"]').find("rect").exists()).toBe(true);
+    // Draft marker ladder (webclient-map-01-draft-chrome design D2):
+    // current → filled seal circle (with the seal-light ring),
+    // visible_unvisited → open circle, visible_visited → filled ink circle,
+    // remembered → diamond (rotated rect).
+    expect(
+      w.get('[data-testid="local-map__node--grid:altoria:1:2"]').find("circle.local-map__marker--current").exists(),
+    ).toBe(true);
     expect(w.get('[data-testid="local-map__node--grid:altoria:2:2"]').find("circle").exists()).toBe(true);
     expect(w.get('[data-testid="local-map__node--grid:altoria:0:2"]').find("circle").exists()).toBe(true);
     expect(
@@ -132,14 +136,20 @@ describe("LocalMap (B4 world family)", () => {
     expect(wrapper.emitted("move")).toBeUndefined();
   });
 
-  it("renders the payload's legend entries paired with their state glyphs", () => {
+  it("renders the payload's legend entries paired with their state chips", () => {
     const w = mountMap();
     const items = w.findAll('[data-testid^="local-map__legend-item--"]');
     expect(items).toHaveLength(4);
     expect(w.get('[data-testid="local-map__legend"]').text()).toContain("你目前所在的位置");
+    // Draft dot-chips (design D2): every entry carries its state chip, and
+    // visited vs remembered are distinguished by the chip's border style
+    // (solid gold frame vs dashed gold frame) — not by the label text.
     for (const [i, state] of Object.entries(["current", "visible_unvisited", "visible_visited", "remembered"])) {
-      expect(items[Number(i)].find(`.local-map__legend-glyph--${state}`).exists()).toBe(true);
+      expect(items[Number(i)].find(`.local-map__legend-chip--${state}`).exists()).toBe(true);
     }
+    expect(
+      items[2].find(".local-map__legend-chip--visible_visited").classes(),
+    ).not.toContain("local-map__legend-chip--remembered");
     expect(w.text()).toContain("尚未探索的相鄰位置");
     expect(w.text()).toContain("已經探索過的相鄰位置");
     expect(w.text()).toContain("曾經到過、但不在附近的遠方位置");
@@ -206,7 +216,10 @@ describe("LocalMap (B4 world family)", () => {
       const w = mountMap({ localMap: localMapModelFor(sample) });
       const orientation = w.find('[data-testid="local-map__orientation"]');
       expect(orientation.exists(), `legend present for ${sample.layer}`).toBe(true);
-      expect(orientation.text()).toBe("北↑");
+      // The draft header pair (webclient-map-01-draft-chrome D5): the axis
+      // marks name both readable directions; it carries no bearing or
+      // distance (the no-bearing assertions below still bind).
+      expect(orientation.text()).toBe("北↑ 東→");
       w.unmount();
     }
   });
@@ -237,6 +250,54 @@ describe("LocalMap (B4 world family)", () => {
       expect(text).not.toMatch(/\d+\s*(?:公尺|公里|km)\b/i);
       w.unmount();
     }
+  });
+
+  // ---------------------------------------------------------------------
+  // webclient-map-01-draft-chrome (design D5): the draft's whole-island
+  // click-to-open affordance, scoped to the island body — the meta-row
+  // trigger, the lattice nodes, and the remembered list keep their own
+  // behaviour and must never also emit `open-map`.
+  // ---------------------------------------------------------------------
+
+  it("emits open-map when the island body (a non-interactive spot) is clicked", async () => {
+    const w = mountMap();
+    // The island's detail line is plain text — a body click target.
+    await w.get('[data-testid="local-map-detail"]').trigger("click");
+    const emitted = w.emitted("open-map");
+    expect(emitted).toHaveLength(1);
+  });
+
+  it("clicking an interactive descendant does not also emit open-map", async () => {
+    const w = mountMap();
+    // The meta-row trigger itself (a <button>) — the click guard skips it.
+    await w.get('[data-testid="local-map__expand"]').trigger("click");
+    expect(w.emitted("open-map")).toHaveLength(1); // only the button's own emit
+    // A lattice node's own click (the <g data-node>) never bubbles into the
+    // island-wide open.
+    await w.get('[data-testid="local-map__node--grid:altoria:0:2"]').trigger("click");
+    expect(w.emitted("open-map")).toHaveLength(1);
+    // Clicking a node's interior descendant (the marker circle — the actual
+    // DOM click target) must behave identically to clicking the group.
+    await w
+      .get('[data-testid="local-map__node--grid:altoria:0:2"] circle.local-map__marker--visible_visited')
+      .trigger("click");
+    expect(w.emitted("open-map")).toHaveLength(1);
+    // A remembered-list item click selects the node without opening.
+    await w.get('[data-testid="local-map-remembered"] li').trigger("click");
+    expect(w.emitted("open-map")).toHaveLength(1);
+    expect(w.emitted("move")).toBeUndefined();
+  });
+
+  it("keeps the island root non-interactive (no role, no tabindex)", () => {
+    const w = mountMap();
+    expect(w.attributes("role")).toBeUndefined();
+    expect(w.attributes("tabindex")).toBeUndefined();
+  });
+
+  it("does not emit open-map from the unavailable island", async () => {
+    const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_UNAVAILABLE_SAMPLE) });
+    await w.get('[data-testid="local-map__unavailable"]').trigger("click");
+    expect(w.emitted("open-map")).toBeUndefined();
   });
 
   // ---------------------------------------------------------------------
@@ -317,14 +378,17 @@ describe("LocalMap (B4 world family)", () => {
       expect(label.attributes("y")).toBe("26");
     }
 
-    // Marker footprints in pre-scale units: the current 26×26 rect and the
-    // stroked unvisited circles (r=12 + stroke 2 → visual half-extent 13);
-    // the filled visited circle is plain r=12 (half-extent 12).
+    // Marker footprints in pre-scale units (draft ladder,
+    // webclient-map-01-draft-chrome D2): the current seal circle is r=8 with
+    // stroke 2 → half-extent 9; the stroked unvisited hollow dot is r=4.5 +
+    // stroke 2 → half-extent 5.5; the filled visited ink dot is r=4.5 +
+    // stroke 1 → half-extent 5. The gold landmark ring on the current node
+    // (r=5) is a same-node decoration inside the seal circle's footprint.
     const markerBoxes = {
-      "grid:altoria:1:1": { x1: 74, y1: 53, x2: 100, y2: 79 },
-      "grid:altoria:2:1": { x1: 132, y1: 53, x2: 158, y2: 79 },
-      "grid:altoria:1:2": { x1: 74, y1: 9, x2: 100, y2: 35 },
-      "grid:altoria:0:1": { x1: 17, y1: 54, x2: 45, y2: 78 },
+      "grid:altoria:1:1": { x1: 78, y1: 57, x2: 96, y2: 75 },
+      "grid:altoria:2:1": { x1: 139.5, y1: 60.5, x2: 150.5, y2: 71.5 },
+      "grid:altoria:1:2": { x1: 81.5, y1: 16.5, x2: 92.5, y2: 27.5 },
+      "grid:altoria:0:1": { x1: 24, y1: 61, x2: 34, y2: 71 },
     };
 
     // Node labels: baseline at center.y + 26; the 11px monospace line box
@@ -366,22 +430,22 @@ describe("LocalMap (B4 world family)", () => {
       }
     }
     everyPair(markerBoxes);
-
     // Connector edges stay visible: the center-to-center span (58px
-    // horizontal / 44px vertical) minus the two 26px marker footprints
-    // leaves a positive visible segment.
+    // horizontal / 44px vertical) minus the two scaled marker footprints
+    // (current half 9, unvisited half 5.5) leaves a positive visible
+    // segment.
     const e0 = w.get('[data-testid="local-map__edge--0"]');
     expect(e0.attributes("x1")).toBe("87");
     expect(e0.attributes("y1")).toBe("66");
     expect(e0.attributes("x2")).toBe("145");
     expect(e0.attributes("y2")).toBe("66");
-    expect(58 - 26).toBeGreaterThan(0);
+    expect(58 - 9 - 5.5).toBeGreaterThan(0);
     const e1 = w.get('[data-testid="local-map__edge--1"]');
     expect(e1.attributes("x1")).toBe("87");
     expect(e1.attributes("y1")).toBe("66");
     expect(e1.attributes("x2")).toBe("87");
     expect(e1.attributes("y2")).toBe("22");
-    expect(44 - 26).toBeGreaterThan(0);
+    expect(44 - 9 - 5.5).toBeGreaterThan(0);
   });
 
   it("renders a single-node room with no collision risk (no regression)", () => {
