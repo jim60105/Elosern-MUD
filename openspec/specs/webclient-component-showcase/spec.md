@@ -205,7 +205,7 @@ field (the intimate/adult block has no backing field and is not built).
 - **THEN** a one-line legend explaining the grouping, out-of-combat, and hidden-content conventions appears above the list, and the passive tab renders no legend
 
 ### Requirement: The map, art, and services surfaces render OOB-backed data truthfully
-The `LocalMap`, `ArtPanel`, and services-backed panels (`ShopPanel`, `QuestBoard`, `LoreDrawer`, and `InventoryPanel`) SHALL render only committed OOB data. The local map SHALL render the `local_map` v1 lattice with its states, actionable adjacent nodes, legend and detail line, and not-colour-only encoding. Art SHALL render the committed scene as a cover-style 16:9 image with contextual portrait overlay and SHALL render a truthful placeholder whenever the asset is missing, pending without a prior image, failed, invalid, or unavailable. Shop, quest, and lore SHALL render only their services payload.
+The `LocalMap`, `ArtPanel`, and services-backed panels (`ShopPanel`, `QuestBoard`, `LoreDrawer`, and `InventoryPanel`) SHALL render only committed OOB data. The local map SHALL render the `local_map` v1 payload with its states, actionable adjacent nodes, legend and detail line, and not-colour-only encoding, in the placement variant (coordinate lattice or radial connected graph) that the payload's `layer` resolves to — the showcase stories pass the renderer's explicit variant parameter and SHALL NOT present a layout control — and SHALL invent no distance, bearing, or terrain geometry in either variant. Art SHALL render the committed scene as a cover-style 16:9 image with contextual portrait overlay and SHALL render a truthful placeholder whenever the asset is missing, pending without a prior image, failed, invalid, or unavailable. Shop, quest, and lore SHALL render only their services payload.
 
 `InventoryPanel` SHALL render committed inventory display name, held count, equipped flag, nullable presentation, and nullable action descriptor together with committed character equipment rows. A non-null presentation SHALL supply only committed kind, icon key, rarity, and summary; a null presentation SHALL remain an explicit unknown-item state. The inventory SHALL use its local icon map only from committed icon keys and action behavior only from committed action descriptors. It SHALL provide keyboard-equivalent inspection and activation, confirmation for usable items, direct equipment toggle, and committed disabled-reason states without inventing an effect, recovery amount, condition, consumable flag, equipment slot, statistic, requirement, set bonus, comparison, sort, filter, search, drag, or drop behavior. Unknown rows SHALL remain visibly inspect-only. No surface SHALL invent data, including a dedicated party panel.
 
@@ -246,6 +246,7 @@ The showcase required-set manifest SHALL include deterministic offline stories a
 #### Scenario: Services unavailable surfaces render only the registered reason
 - **WHEN** the services OOB channel is unavailable
 - **THEN** shop, quest, lore, and inventory stories render only the registered reason with no fabricated values or controls
+
 
 ### Requirement: The full overlays are complete, the deferred surfaces are absent, and the manifest is frozen
 The full overlays `MapOverlay`, `SettingsOverlay`, `HelpOverlay`, and `CreationOverlay` SHALL be complete,
