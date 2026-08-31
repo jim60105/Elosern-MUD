@@ -31,15 +31,25 @@ Verified environment facts:
 
 ### D1 — Helper lives in `settings.py` itself, not in a package module
 
-Settings modules cannot safely import project packages at Django settings-load time (import-cycle risk with `world.*` importing Django-backed code). The helpers are two small private functions defined before use in `server/conf/settings.py`:
+Settings modules cannot safely import project packages at Django settings-load time (import-cycle risk with `world.*` importing Django-backed code). The helpers are small private functions defined before use in `server/conf/settings.py`:
 
 ```python
-def _env_str(name, default=""):   # free-text knobs: raw value or default; never coerces
-def _env_typed(name, convert, default, *, minimum=None, multiple=None):
+def _env_str(name, default=""):   # free-text knobs: stripped value or default; never coerces
+def _env_typed(name, convert, default, *, minimum=None, multiple=None, rule):
     """Absent OR blank-after-strip -> default (an open, empty knob means 'unset').
-    Present-with-content -> convert(raw.strip()) with bounds.
-    Any conversion/bound failure raises ImproperlyConfigured naming name, raw, rule."""
+    Present-with-content -> convert(raw.strip()) with bounds; non-finite floats
+    are rejected before the bound so inf/nan can never slip past `minimum`.
+    `minimum` is EXCLUSIVE (pass 0 for 'positive').
+    Any conversion/bound failure raises ImproperlyConfigured formatting
+    f"setting {name}: invalid environment value '{raw}' ({rule})" — the raw
+    environment value quoted verbatim (whitespace and all)."""
+def _env_int(name, default)        # positive-bound int wrapper
+def _env_dimension(name, default)  # positive multiple-of-8 int wrapper
+def _env_float(name, default)      # positive-bound float wrapper
+def _env_bool(name, default)       # fixed word-list bool wrapper
 ```
+
+The `rule` keyword arg exists so each family states its own violated rule in the error (positive integer / positive float / accepted boolean word list / positive multiple of 8) — the delta-spec scenarios require the word list and the multiple-of-8 rule to appear in the message. The four typed wrappers keep the 19 call-sites one-line-per-setting while sharing the single validation core.
 
 Boolean conversion uses a fixed word list — truthy `1/true/yes/on`, falsy `0/false/no/off`, case-insensitive (a bare `bool("False")` would be True; this trap is exactly why the word list exists). Dimensions (`ART_SD_SCENE_*`, `ART_SD_PORTRAIT_*`) additionally pass `multiple=8` (SDXL-friendliness is an existing settings contract asserted by `test_art_settings.py`). `_env_str` stays for free-text knobs (`ART_SD_SAMPLER`, `ART_SD_SCHEDULER`, `ART_SD_CHECKPOINT`): empty-string is their legitimate "server default" value, so no bounds.
 
