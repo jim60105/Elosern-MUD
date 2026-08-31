@@ -16,6 +16,15 @@ only data sourced from the OOB panel allowlist (art, status, context_actions, lo
 creation, exploration, character) or the transport text stream; a surface with no backing read
 model is out of scope and MUST NOT invent data.
 
+A story of a component that consumes a derived render model (a view model the
+application builds from a committed payload through a DOM-independent reducer)
+SHALL be bound to that same derived shape, not to the raw payload: story args
+MUST reproduce the exact prop shape the live wiring passes, so a story that
+renders a degenerate or partial surface because it skipped the application's
+derivation step is a contract violation and not a presentation choice. The
+derived-shape binding SHALL come from one shared story fixture helper reused by
+every story of that component family.
+
 #### Scenario: A required component always has a story
 - **WHEN** the required-component manifest is enumerated
 - **THEN** every listed component has at least one registered Storybook story
@@ -27,6 +36,13 @@ model is out of scope and MUST NOT invent data.
 #### Scenario: A surface with no backing read model is absent
 - **WHEN** the 設計稿 shows a surface that has no backing OOB read model today
 - **THEN** that surface is not among the required components and no component presents invented data for it
+
+#### Scenario: A model-consuming component is story-bound to the model
+- **WHEN** a component's live wiring passes a reducer-derived view model and one
+  of its stories instead passes the raw committed payload
+- **THEN** the showcase contract is violated: the story renders a partial
+  surface, and the fix is to bind the story args through the shared derived-shape
+  helper the application's derivation produces
 
 ### Requirement: The component showcase is completed before live wiring and is a mandatory CI gate
 The component showcase SHALL be completed before the application is wired to the live WebSocket
