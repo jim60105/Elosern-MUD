@@ -13,11 +13,14 @@ import {
 
 // LocalMap (H2, webclient-hud-02-status-islands, design D9/D10): the
 // minimap renders as the stage's right-anchor island — bounded, the
-// renderer-axis orientation legend on the coordinate-bearing `grid` /
-// `wilderness` layers only, no bearing, no distance, and no full-map
-// control (MapOverlay is H5's). The stories below cover the island chrome
-// across all four layers (grid / wilderness / instance / interior) plus the
-// minimal and unavailable forms.
+// renderer-axis orientation legend on the lattice variant (`grid` /
+// `wilderness` payloads) only, no bearing, no distance, and no full-map
+// control (MapOverlay is H5's). Layout variants (webclient-map-02): the
+// island draws grid/wilderness payloads as the rank-compressed lattice and
+// instance/interior payloads as the model's radial placement — the variant
+// comes from the model itself, so each story below renders its payload's
+// own variant. The stories cover the island chrome across all four layers
+// plus the minimal and unavailable forms.
 //
 // Wave 0 (webclient-map-00-story-fidelity): every `localMap` arg binds
 // through the shared `localMapModelFor` helper — the EXACT derived shape
@@ -97,10 +100,11 @@ export const ActionableNode = {
 
 // Focused remembered node (task 3.2): the play function moves keyboard
 // focus to the remembered list's first item (the `li` is `tabindex=0`),
-// which selects it. The detail line then renders that node's name, its
-// explored state, and its coordinates — the component renders no landmark
-// field and no travel affordance for a remembered node (focus-only, per the
-// local-map spec).
+// which selects it. The detail line then renders that node's name and its
+// explored state — the component renders no landmark field, no travel
+// affordance, and no world-coordinate numbers for a remembered node
+// (focus-only, per the local-map spec; map-02 design D3 drops the
+// coordinate pair on every variant).
 export const FocusedRemembered = {
   render: renderMap,
   args: {

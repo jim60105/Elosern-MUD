@@ -1,6 +1,7 @@
 import { h } from "vue";
 import MapOverlay from "../../components/MapOverlay.vue";
 import {
+  LOCAL_MAP_INTERIOR_SAMPLE,
   LOCAL_MAP_MINIMAL_SAMPLE,
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
@@ -55,5 +56,16 @@ export const Unavailable = {
   render: renderOverlay,
   args: {
     localMap: localMapModelFor(LOCAL_MAP_UNAVAILABLE_SAMPLE),
+  },
+};
+
+// Graph variant (webclient-map-02): the overlay passes the model's resolved
+// `layoutVariant` through to the shared renderer — the interior payload's
+// radial placement fills the mapcanvas, with the pin over the current node
+// and no lattice axis legend.
+export const RadialGraph = {
+  render: renderOverlay,
+  args: {
+    localMap: localMapModelFor(LOCAL_MAP_INTERIOR_SAMPLE),
   },
 };

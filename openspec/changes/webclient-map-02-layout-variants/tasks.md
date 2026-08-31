@@ -34,13 +34,13 @@ Depends on `webclient-map-01-draft-chrome` being implemented first (shares
 
 ## 6. Storybook sync
 
-- [ ] 6.1 `MapLattice.stories.js`: pass the explicit `variant` prop per story (renderer takes a parameter; stories stay truthful); add a lattice story with edge markers on a coordinate fixture.
-- [ ] 6.2 `LocalMap.stories.js`: fixtures for both resolved layouts (interior room-graph payload → radial; wilderness/grid payload → lattice with remembered-off-extent nodes showing markers); no story renders a layout control.
-- [ ] 6.3 `MapOverlay.stories.js`: add the graph-layout story; keep the required-set manifest green (`npm run build-storybook`, `npm run showcase-coverage`).
+- [x] 6.1 `MapLattice.stories.js`: pass the explicit `variant` prop per story (renderer takes a parameter; stories stay truthful); add a lattice story with edge markers on a coordinate fixture.
+- [x] 6.2 `LocalMap.stories.js`: fixtures for both resolved layouts (interior room-graph payload → radial; wilderness/grid payload → lattice with remembered-off-extent nodes showing markers); no story renders a layout control.
+- [x] 6.3 `MapOverlay.stories.js`: add the graph-layout story; keep the required-set manifest green (`npm run build-storybook`, `npm run showcase-coverage`).
 
 ## 7. Tests
 
-- [ ] 7.1 Vitest: layout rendering parity (same nodes/edges/legend/actions in both layouts, model-selected), pin follows current node in both layouts (one pin, shared x, above y), overlay follows the model field on payload replacement (interior payload live-swaps to radial), orientation marks positive on coordinate layers / negative on interior+instance, edge markers render only on lattice payloads with the off-extent remembered set, and an absence assertion: the map chrome DOM contains no layout-control element.
+- [x] 7.1 Vitest: layout rendering parity (same nodes/edges/legend/actions in both layouts, model-selected), pin follows current node in both layouts (one pin, shared x, above y), overlay follows the model field on payload replacement (interior payload live-swaps to radial), orientation marks positive on coordinate layers / negative on interior+instance, edge markers render only on lattice payloads with the off-extent remembered set, and an absence assertion: the map chrome DOM contains no layout-control element.
 - [ ] 7.2 Browser (mandatory, not CI-deferred): one class asserting the new public behavior — grid/wilderness fixture renders the lattice with edge markers on island and overlay; interior fixture renders the radial graph on both; no layout control exists in either surface; no outbound envelope beyond existing flows.
 - [ ] 7.3 Focused gates: `npm test`, `node --test web/static/webclient/js/tests/local_map.test.js`, `uv run --locked python -m tools.spec_traceability check`, `openspec validate webclient-map-02-layout-variants --strict`.
 

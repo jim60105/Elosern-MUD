@@ -2,6 +2,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import LocalMap from "../../components/LocalMap.vue";
 import MapLattice from "../../components/MapLattice.vue";
+import LocalMapModel from "../../lib/local_map.js";
 import {
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_WILDERNESS_SAMPLE,
@@ -43,14 +44,17 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     maxWidth: 848,
     maxHeight: null,
     fillWidth: true,
+    overlayChrome: true,
   };
-
   it("renders identical node/edge/legend content at the island's default scale", () => {
     const w = mountLattice();
-    // The grid fixture's in-view lattice: 3 cols × 1 row.
+    // The grid fixture's in-view lattice: 3 cols × 1 row. The remembered
+    // fixture node (5, 5) sits outside the in-view extent, so the island
+    // grows an edge-marker gutter around the natural 174×58 canvas
+    // (map-02 D3b; the model's gutter for this fixture is 26.4558…).
     const svg = w.find("svg.local-map__lattice");
-    expect(svg.attributes("width")).toBe("174");
-    expect(svg.attributes("height")).toBe("58");
+    expect(Number(svg.attributes("width"))).toBeCloseTo(226.91168824543144, 6);
+    expect(Number(svg.attributes("height"))).toBeCloseTo(110.91168824543144, 6);
     expect(w.findAll('[data-testid^="local-map__node--"]').length).toBe(3);
     // The payload lists 3 edges, but the third one ends at the remembered
     // node (grid:altoria:5:5), whose endpoint is not on the canvas — the
@@ -58,14 +62,21 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     expect(w.findAll('[data-testid^="local-map__edge--"]').length).toBe(2);
     expect(w.findAll('[data-testid^="local-map__legend-item--"]').length).toBe(4);
     expect(w.get('[data-testid="local-map__marker--current"]').exists()).toBe(true);
+    // The edge-marker decoration layer: one diamond for the remembered
+    // place, in the island's name-free presentation (aria-hidden, no text).
+    const edgeMarker = w.get('[data-testid="local-map__edge-marker--grid:altoria:5:5"]');
+    expect(edgeMarker.attributes("aria-hidden")).toBe("true");
+    expect(edgeMarker.find("text").exists()).toBe(false);
   });
 
   it("renders identical node/edge/legend content at the overlay's larger scale", () => {
     const w = mountLattice(OVERLAY_PROPS);
     const svg = w.find("svg.local-map__lattice");
-    // 3 × 280px column pitch wide, 1 × 212px row pitch + 14px label band.
-    expect(svg.attributes("width")).toBe("840");
-    expect(svg.attributes("height")).toBe("226");
+    // The natural canvas is 3 × 280px wide, 1 × 212px row pitch + 14px
+    // label band; the edge-marker gutter (model value 246.9517… at the
+    // overlay's name-bearing geometry) grows it on every side (map-02 D3b).
+    expect(Number(svg.attributes("width"))).toBeCloseTo(1333.9034542254337, 6);
+    expect(Number(svg.attributes("height"))).toBeCloseTo(719.9034542254337, 6);
     expect(w.findAll('[data-testid^="local-map__node--"]').length).toBe(3);
     expect(w.findAll('[data-testid^="local-map__edge--"]').length).toBe(2);
     expect(w.findAll('[data-testid^="local-map__legend-item--"]').length).toBe(4);
@@ -75,6 +86,12 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     expect(style.width).toBe("100%");
     expect(style.maxWidth).toBe("848px");
     expect(style.maxHeight).toBe("");
+    // At the overlay's scale the marker carries its place name and an
+    // accessible name (the overlay has no remembered list).
+    const edgeMarker = w.get('[data-testid="local-map__edge-marker--grid:altoria:5:5"]');
+    expect(edgeMarker.attributes("aria-hidden")).toBeUndefined();
+    expect(edgeMarker.attributes("aria-label")).toBe("舊街區");
+    expect(edgeMarker.find("text").text()).toBe("舊街區");
   });
 
   it("keeps node markers and labels non-intersecting at the overlay's scale", () => {
@@ -82,15 +99,32 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
 
     // Node centers from the model's col/row + the overlay's pitch
     // (colPitch 280, rowPitch 212, rows=1): centers are col*280+140 and
-    // (1-1-row)*212+106.
+    // (1-1-row)*212+106, shifted by the edge-marker gutter the model
+    // computes for this exact geometry (map-02 D3b — the renderer and the
+    // test derive the gutter from the same model call, pinning their
+    // composition; relative node geometry is gutter-invariant).
+    const gutter = LocalMapModel.edgeMarkersFor(
+      LOCAL_MAP_SAMPLE.nodes.filter((n) => n.visibility !== "remembered"),
+      LOCAL_MAP_SAMPLE.nodes.filter((n) => n.visibility === "remembered"),
+      {
+        canvasWidth: 3 * 280,
+        canvasHeight: 212 + 14,
+        current: { x: 420, y: 106 },
+        markerHalf: 9 * 4.83,
+        nameWidth: 11 * 11,
+        nameHeight: 16,
+      },
+    ).gutter;
     const centers = {
-      "grid:altoria:1:2": { x: 420, y: 106 },
-      "grid:altoria:2:2": { x: 700, y: 106 },
-      "grid:altoria:0:2": { x: 140, y: 106 },
+      "grid:altoria:1:2": { x: 420 + gutter, y: 106 + gutter },
+      "grid:altoria:2:2": { x: 700 + gutter, y: 106 + gutter },
+      "grid:altoria:0:2": { x: 140 + gutter, y: 106 + gutter },
     };
     for (const [id, center] of Object.entries(centers)) {
       const node = w.get(`[data-testid="local-map__node--${id}"]`);
-      expect(node.attributes("transform")).toBe(`translate(${center.x}, ${center.y})`);
+      expect(node.attributes("transform")).toBe(
+        `translate(${String(center.x)}, ${String(center.y)})`,
+      );
     }
 
     // Marker footprints in pre-scale units at markerScale 4.83 (draft
@@ -104,11 +138,10 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     const UNVISITED_HALF = 4.5 * 4.83 + 1;
     const VISITED_HALF = 4.5 * 4.83 + 0.5;
     const markerBoxes = {
-      "grid:altoria:1:2": { x1: 420 - CURRENT_HALF, y1: 106 - CURRENT_HALF, x2: 420 + CURRENT_HALF, y2: 106 + CURRENT_HALF },
-      "grid:altoria:2:2": { x1: 700 - UNVISITED_HALF, y1: 106 - UNVISITED_HALF, x2: 700 + UNVISITED_HALF, y2: 106 + UNVISITED_HALF },
-      "grid:altoria:0:2": { x1: 140 - VISITED_HALF, y1: 106 - VISITED_HALF, x2: 140 + VISITED_HALF, y2: 106 + VISITED_HALF },
+      "grid:altoria:1:2": { x1: centers["grid:altoria:1:2"].x - CURRENT_HALF, y1: centers["grid:altoria:1:2"].y - CURRENT_HALF, x2: centers["grid:altoria:1:2"].x + CURRENT_HALF, y2: centers["grid:altoria:1:2"].y + CURRENT_HALF },
+      "grid:altoria:2:2": { x1: centers["grid:altoria:2:2"].x - UNVISITED_HALF, y1: centers["grid:altoria:2:2"].y - UNVISITED_HALF, x2: centers["grid:altoria:2:2"].x + UNVISITED_HALF, y2: centers["grid:altoria:2:2"].y + UNVISITED_HALF },
+      "grid:altoria:0:2": { x1: centers["grid:altoria:0:2"].x - VISITED_HALF, y1: centers["grid:altoria:0:2"].y - VISITED_HALF, x2: centers["grid:altoria:0:2"].x + VISITED_HALF, y2: centers["grid:altoria:0:2"].y + VISITED_HALF },
     };
-
     // Node labels: baseline at the scaled offset (13×4.83 + 13 ≈ 75.8px
     // below the node origin); the 11px monospace line box extends 10.5px
     // above and 3px below the baseline. CJK glyphs are full-width (11px);
@@ -169,10 +202,10 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     // horizontal) minus the two scaled marker footprints (current 9×4.83,
     // unvisited 5.5×4.83) leaves a positive visible segment.
     const e0 = w.get('[data-testid="local-map__edge--0"]');
-    expect(e0.attributes("x1")).toBe("420");
-    expect(e0.attributes("y1")).toBe("106");
-    expect(e0.attributes("x2")).toBe("700");
-    expect(e0.attributes("y2")).toBe("106");
+    expect(Number(e0.attributes("x1"))).toBeCloseTo(420 + gutter, 6);
+    expect(Number(e0.attributes("y1"))).toBeCloseTo(106 + gutter, 6);
+    expect(Number(e0.attributes("x2"))).toBeCloseTo(700 + gutter, 6);
+    expect(Number(e0.attributes("y2"))).toBeCloseTo(106 + gutter, 6);
     expect(280 - (8 + 1) * 4.83 - (4.5 + 1) * 4.83).toBeGreaterThan(0);
   });
 

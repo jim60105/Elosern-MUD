@@ -160,13 +160,16 @@ describe("LocalMap (B4 world family)", () => {
     const detail = w.get('[data-testid="local-map-detail"]');
     expect(detail.text()).toContain("霧骨渡口");
     expect(detail.text()).toContain("目前所在");
-    expect(detail.text()).toContain("(1, 2)");
+    // map-02 design D3: the detail line never shows raw world-coordinate
+    // numbers — the radial variant makes them meaningless, and they were
+    // never a reading path on either variant.
+    expect(detail.text()).not.toContain("(1, 2)");
 
     await w.get('[data-testid="local-map__node--grid:altoria:2:2"]').trigger("mouseenter");
     const hovered = w.get('[data-testid="local-map-detail"]');
     expect(hovered.text()).toContain("南門");
     expect(hovered.text()).toContain("未探索");
-    expect(hovered.text()).toContain("(2, 2)");
+    expect(hovered.text()).not.toContain("(2, 2)");
     expect(hovered.text()).toContain("grid:altoria:2:2");
 
     await w.find(".local-map__lattice").trigger("mouseleave");
@@ -342,9 +345,12 @@ describe("LocalMap (B4 world family)", () => {
     expect(model.remembered).toHaveLength(16);
     const w = mountMap({ localMap: model });
     const svg = w.find("svg.local-map__lattice");
-    // Natural canvas: 2 × 58px wide, 48 × 44px + 14px label band tall.
-    expect(svg.attributes("width")).toBe("116");
-    expect(svg.attributes("height")).toBe("2126");
+    // Natural canvas: 2 × 58px wide, 48 × 44px + 14px label band tall,
+    // grown by the edge-marker gutter (model value 75: the 16 remembered
+    // remotes fan out along the top and right edges, and the right edge's
+    // slot packing drives the need beyond the 26.46 minimum) — map-02 D3b.
+    expect(svg.attributes("width")).toBe("266");
+    expect(svg.attributes("height")).toBe("2276");
     // The remembered list renders 16 bounded, focusable entries outside the
     // coordinate canvas.
     const list = w.find('[data-testid="local-map-remembered"]');
