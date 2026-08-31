@@ -140,17 +140,17 @@ def _settle_one(
     prompt-library failures (``sd_prompt_error``), and any unexpected internal
     error (``sd_internal_error``); the record's prior valid output is retained
     on every failure path. A success publishes the PNG atomically through
-    ``settle_generated``, which already settles the record ``done`` under the
-    queue lock (the returned flag marks that). Returns ``None`` when the claim
-    was requeued or reclaimed mid-flight and must not be settled by this
-    worker.
+    ``settle_generated`` (carrying the returned seed), which already settles
+    the record ``done`` under the queue lock (the returned flag marks that).
+    Returns ``None`` when the claim was requeued or reclaimed mid-flight and
+    must not be settled by this worker.
     """
     subject = subject_for(record)
     description = str(record.db.source_description or "")
     try:
-        png_bytes = client.generate(subject, description)
+        image = client.generate(subject, description)
         identity = expected_output_identity(subject)
-        tmp_path = _write_temp(identity, png_bytes)
+        tmp_path = _write_temp(identity, image.data)
     except SDError as error:
         return ArtAssetStatus.FAILED, None, error.code, False
     except PromptLibraryError:
@@ -164,6 +164,7 @@ def _settle_one(
         generation_token=str(record.db.generation_token or ""),
         output_identity=identity,
         tmp_path=tmp_path,
+        seed=image.seed,
     )
     if committed is None:
         return None

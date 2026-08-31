@@ -1,14 +1,16 @@
 """Staff-only ``@art`` command family for the deterministic art backend.
 
 Restricted to staff: ``@art status`` (list/filter records), ``@art run``
-(drain now, non-blocking), ``@art retry`` (re-enqueue failed records), and
-``@art requeue <full-subject-key>`` (forced regeneration). Status output never
-includes persona text, prompt content, absolute filesystem paths, or the store
-root (design D8).
+(drain now, non-blocking), ``@art retry`` (re-enqueue failed records),
+``@art requeue <full-subject-key>`` (forced regeneration), and ``@art
+options <kind>`` (list the live server's selectable option names). Status
+output never includes persona text, prompt content, absolute filesystem
+paths, or the store root (design D8).
 """
 
 from django.conf import settings
 from evennia import Command
+import urllib.parse
 
 from world.art.adult import PortraitRejected
 from world.art.queue import failed_keys, record_key, requeue
@@ -69,12 +71,14 @@ class CmdArtStatus(_ArtCommand):
             return
         lines = []
         for record in records:
+            seed = record.db.seed
             lines.append(
                 f"  {record.db_key.removeprefix('art:')} "
                 f"[{record.db.status}] 次數:{record.db.attempt_count} "
                 f"比例:{record.db.aspect_ratio or '-'} "
                 f"錯誤:{record.db.last_error_code or '-'}"
                 f"{' 提示詞變更' if record.db.hash_changed else ''}"
+                f"{f' seed={seed}' if seed is not None else ''}"
             )
         self.caller.msg("\n".join(lines))
 
@@ -189,3 +193,50 @@ class CmdArtRequeue(_ArtCommand):
             return
         requeue(subject)
         self.caller.msg(f"已將 {subject.full()} 重新排入佇列。")
+
+
+class CmdArtOptions(_ArtCommand):
+    """列出 sd-webui 伺服器可選用的選項名稱。用法：art options <models|samplers|schedulers|styles|modules>"""
+
+    key = "art options"
+
+    # kind -> (display label, sd_worker list function suffix)
+    KINDS = {
+        "models": ("模型", "models"),
+        "samplers": ("取樣器", "samplers"),
+        "schedulers": ("排程器", "schedulers"),
+        "styles": ("風格", "styles"),
+        "modules": ("模組", "modules"),
+    }
+
+    def func(self) -> None:
+        if not self.is_accessible():
+            self.caller.msg("你沒有權限使用 art 指令。")
+            return
+        import world.art.sd_worker as sd_worker
+        from twisted.internet import threads
+
+        args = self.args.strip().split()
+        if len(args) != 1 or args[0] not in self.KINDS:
+            self.caller.msg("用法：art options <models|samplers|schedulers|styles|modules>")
+            return
+        kind = args[0]
+        label, fn_name = self.KINDS[kind]
+        host = urllib.parse.urlsplit(sd_worker._base_url()).hostname or "?"
+
+        def _reply(names: list[str]) -> None:
+            lines = [f"{label}（{len(names)} 項，來源 {host}）："]
+            lines += [f"  {index}. {name[:256]}" for index, name in enumerate(names, start=1)]
+            self.caller.msg("\n".join(lines))
+
+        def _fail(error: object) -> None:
+            value = getattr(error, "value", error)
+            code = getattr(value, "code", None) or "sd_connection_error"
+            self.caller.msg(f"無法取得 {label} 清單：{code}（伺服器未回應或回應超限）")
+
+        # The enumeration is a synchronous blocking HTTP call; it must run on
+        # a background Twisted thread, never the reactor thread. The reply is
+        # sent from the deferred's callback (design D1, duck run-1 BLOCKER).
+        deferred = threads.deferToThread(getattr(sd_worker, f"list_{fn_name}"))
+        deferred.addCallback(_reply)
+        deferred.addErrback(_fail)

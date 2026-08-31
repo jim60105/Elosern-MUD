@@ -649,6 +649,16 @@
 | 情境 | 管理員（需 Developer 權限） |
 | 說明 | 強制重新生成指定的美術主體，即使原本沒有失敗記錄。 |
 
+### art options
+
+| 項目 | 內容 |
+| --- | --- |
+| 指令 | `art options` |
+| 別名 | （無） |
+| 語法 | `art options <models|samplers|schedulers|styles|modules>` |
+| 情境 | 管理員（需 Developer 權限） |
+| 說明 | 向已設定的 sd-webui 伺服器查詢目前可選用的模型、取樣器、排程器、風格或模組名稱清單（唯讀診斷，永不修改遊戲狀態）；查詢在背景執行，伺服器 unreachable 或逾時只會回報錯誤碼。 |
+
 ## 系統與建造
 
 ### @teleport

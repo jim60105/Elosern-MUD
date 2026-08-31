@@ -18,9 +18,11 @@ from django.test import override_settings
 
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.sd_worker import (
+    GeneratedImage,
     SDError,
     SDWebUIClient,
     _http_json,
+    _http_request,
     build_txt2img_request,
     default_transport,
     maybe_prepin_samples_format,
@@ -36,6 +38,9 @@ VALID_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
     "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
 )
+
+# Sentinel meaning "this key is absent" for matrix tests.
+_MISSING = object()
 
 
 def _scene(key="forest_path"):
@@ -144,13 +149,18 @@ class GenerateValidationTests(unittest.TestCase):
     def _client(self, transport):
         return SDWebUIClient(transport=transport)
 
-    def _ok_response(self, png=VALID_PNG):
-        return {"images": [base64.b64encode(png).decode("ascii")]}
+    def _ok_response(self, png=VALID_PNG, info=None):
+        response = {"images": [base64.b64encode(png).decode("ascii")]}
+        if info is not None:
+            response["info"] = info
+        return response
 
     @covers_requirement("internal-art-worker::the-internal-sd-webui-client-generates-images-through-txt2img-with-bounded-validation")
     def test_valid_response_returns_exactly_the_decoded_png_bytes(self):
         client = self._client(lambda request: self._ok_response())
-        self.assertEqual(client.generate(_scene(), "desc"), VALID_PNG)
+        image = client.generate(_scene(), "desc")
+        self.assertEqual(image.data, VALID_PNG)
+        self.assertIsNone(image.seed)
 
     @covers_requirement("internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes")
     def test_empty_images_settles_sd_no_image(self):
@@ -430,6 +440,220 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(call["path"], "/sdapi/v1/txt2img")
         self.assertEqual(json.loads(call["body"]), {"prompt": "p"})
         self.assertEqual(result, {"images": ["x"]})
+
+    @covers_requirement(
+        "art-sd-server-integration::the-sd-webui-client-enumerates-server-options-through-bounded-get-calls"
+    )
+    def test_get_requests_carry_no_content_type_header(self):
+        # A GET has no body to type: Content-Type must never be sent.
+        connection = FakeConnection("sd.example", 7860)
+        connection.script(FakeResponse(200, b'["a"]'))
+        with override_settings(ART_SD_TIMEOUT_SECONDS=10):
+            with patch(
+                "world.art.sd_worker.http.client.HTTPConnection",
+                return_value=connection,
+            ):
+                result = _http_request("http://sd.example:7860/sdapi/v1/samplers", None)
+        call = connection.calls[0]
+        self.assertEqual(call["method"], "GET")
+        self.assertIsNone(call["body"])
+        self.assertNotIn("Content-Type", call["headers"])
+        self.assertEqual(result, ["a"])
+
+    @covers_requirement(
+        "art-sd-server-integration::the-sd-webui-client-sends-basic-auth-only-from-secret-file-credentials"
+    )
+    def test_anonymous_credentials_send_no_authorization_header(self):
+        connection = FakeConnection("sd.example", 7860)
+        connection.script(FakeResponse(200, b"{}"))
+        with override_settings(
+            ART_SD_TIMEOUT_SECONDS=10, ART_SD_USERNAME="", ART_SD_PASSWORD=""
+        ):
+            with patch(
+                "world.art.sd_worker.http.client.HTTPConnection",
+                return_value=connection,
+            ):
+                _http_json("http://sd.example:7860/x", b"{}")
+        self.assertNotIn("Authorization", connection.calls[0]["headers"])
+
+    @covers_requirement(
+        "art-sd-server-integration::the-sd-webui-client-sends-basic-auth-only-from-secret-file-credentials"
+    )
+    def test_half_configured_credentials_stay_anonymous(self):
+        for username, password in (("admin", ""), ("", "hunter2")):
+            with self.subTest(username=username, password=password):
+                connection = FakeConnection("sd.example", 7860)
+                connection.script(FakeResponse(200, b"{}"))
+                with override_settings(
+                    ART_SD_TIMEOUT_SECONDS=10,
+                    ART_SD_USERNAME=username,
+                    ART_SD_PASSWORD=password,
+                ):
+                    with patch(
+                        "world.art.sd_worker.http.client.HTTPConnection",
+                        return_value=connection,
+                    ):
+                        _http_json("http://sd.example:7860/x", b"{}")
+                self.assertNotIn("Authorization", connection.calls[0]["headers"])
+
+    @covers_requirement(
+        "art-sd-server-integration::the-sd-webui-client-sends-basic-auth-only-from-secret-file-credentials"
+    )
+    def test_full_credentials_send_basic_auth_and_never_log_the_password(self):
+        connection = FakeConnection("sd.example", 7860)
+        connection.script(FakeResponse(500, b"boom hunter2 leak"))
+        with override_settings(
+            ART_SD_TIMEOUT_SECONDS=10,
+            ART_SD_USERNAME="admin",
+            ART_SD_PASSWORD="hunter2",
+        ):
+            with patch(
+                "world.art.sd_worker.http.client.HTTPConnection",
+                return_value=connection,
+            ):
+                with self.assertRaises(SDError) as ctx:
+                    _http_json("http://sd.example:7860/x", b"{}")
+        expected = "Basic " + base64.b64encode(b"admin:hunter2").decode("ascii")
+        self.assertEqual(connection.calls[0]["headers"]["Authorization"], expected)
+        # The bounded error never echoes the request headers or response body.
+        self.assertNotIn("hunter2", str(ctx.exception))
+
+    @covers_requirement(
+        "art-sd-server-integration::the-sd-webui-client-enumerates-server-options-through-bounded-get-calls"
+    )
+    def test_per_call_timeout_override_bounds_connect_and_reads(self):
+        # A 10-s diagnostic budget applies even while the generation setting is
+        # 600: the connect timeout and every refreshed read timeout derive
+        # from the override, never from ART_SD_TIMEOUT_SECONDS.
+        connections = []
+
+        def _factory(host, port, timeout=None):
+            conn = FakeConnection(host, port, timeout=timeout)
+            conn.script(FakeResponse(200, b"0123456789" * 10))
+            connections.append(conn)
+            return conn
+
+        with override_settings(
+            ART_SD_TIMEOUT_SECONDS=600, ART_SD_MAX_RESPONSE_BYTES=1_000_000
+        ):
+            with patch(
+                "world.art.sd_worker.http.client.HTTPConnection",
+                side_effect=_factory,
+            ):
+                with patch(
+                    "world.art.sd_worker.time.monotonic",
+                    side_effect=[0.0, 0.0, 5.0, 21.0],
+                ):
+                    with self.assertRaises(SDError) as ctx:
+                        _http_json(
+                            "http://sd.example:7860/sdapi/v1/samplers",
+                            None,
+                            timeout_seconds=10.0,
+                        )
+        self.assertEqual(ctx.exception.code, "sd_timeout")
+        self.assertEqual(connections[0].timeout, 10.0)
+        self.assertEqual(connections[0].sock.timeouts, [5.0])
+
+
+class SeedParsingTests(unittest.TestCase):
+    """The defensive info.seed extraction matrix (design D3)."""
+
+    def _seed(self, info):
+        response = {"images": [base64.b64encode(VALID_PNG).decode("ascii")]}
+        if info is not _MISSING:
+            response["info"] = info
+        client = SDWebUIClient(transport=lambda request: response)
+        return client.generate(_scene(), "desc").seed
+
+    @covers_requirement(
+        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
+    )
+    def test_json_string_info_seed_is_reported(self):
+        self.assertEqual(self._seed(json.dumps({"seed": 42})), 42)
+
+    @covers_requirement(
+        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
+    )
+    def test_zero_seed_is_reported(self):
+        self.assertEqual(self._seed(json.dumps({"seed": 0})), 0)
+
+    @covers_requirement(
+        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
+    )
+    def test_already_decoded_dict_info_is_accepted(self):
+        self.assertEqual(self._seed({"seed": 7}), 7)
+
+    @covers_requirement(
+        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
+    )
+    def test_absent_or_unusable_info_yields_no_seed(self):
+        for info in (
+            _MISSING,
+            None,
+            "not json",
+            json.dumps({"seed": "42"}),
+            json.dumps({"seed": -1}),
+            json.dumps({"seed": 4.2}),
+            json.dumps({"seed": True}),
+            json.dumps({"subseed": 42}),
+            json.dumps([1, 2]),
+            12345,
+        ):
+            with self.subTest(info=info):
+                self.assertIsNone(self._seed(info))
+
+    @covers_requirement(
+        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
+    )
+    def test_unparseable_info_never_fails_a_valid_image(self):
+        # Garbage info alongside a valid image still returns the image bytes.
+        image = SDWebUIClient(
+            transport=lambda request: {
+                "images": [base64.b64encode(VALID_PNG).decode("ascii")],
+                "info": "{{{corrupt",
+            }
+        ).generate(_scene(), "desc")
+        self.assertEqual(image.data, VALID_PNG)
+        self.assertIsNone(image.seed)
+
+
+class StylesModulesRequestTests(unittest.TestCase):
+    @covers_requirement(
+        "art-sd-server-integration::generation-requests-carry-configured-styles-and-forge-modules-verbatim"
+    )
+    def test_empty_knobs_omit_styles_and_module_fields(self):
+        request = build_txt2img_request(_scene(), "desc")
+        self.assertNotIn("styles", request)
+        self.assertNotIn("forge_additional_modules", request["override_settings"])
+        self.assertNotIn("forge_unet_storage_dtype", request["override_settings"])
+
+    @covers_requirement(
+        "art-sd-server-integration::generation-requests-carry-configured-styles-and-forge-modules-verbatim"
+    )
+    def test_blank_only_knobs_omit_the_fields_too(self):
+        with override_settings(ART_SD_STYLES=" , ,, ", ART_SD_MODULES=",  ,"):
+            request = build_txt2img_request(_scene(), "desc")
+        self.assertNotIn("styles", request)
+        self.assertNotIn("forge_additional_modules", request["override_settings"])
+
+    @covers_requirement(
+        "art-sd-server-integration::generation-requests-carry-configured-styles-and-forge-modules-verbatim"
+    )
+    def test_configured_knobs_pass_names_verbatim_with_the_dtype_companion(self):
+        with override_settings(
+            ART_SD_STYLES=" cinematic , portrait ",
+            ART_SD_MODULES="te.safetensors,Detailer preprocessor v3.safetensors",
+        ):
+            request = build_txt2img_request(_scene(), "desc")
+        self.assertEqual(request["styles"], ["cinematic", "portrait"])
+        self.assertEqual(
+            request["override_settings"]["forge_additional_modules"],
+            ["te.safetensors", "Detailer preprocessor v3.safetensors"],
+        )
+        self.assertEqual(
+            request["override_settings"]["forge_unet_storage_dtype"],
+            "Automatic (fp16 LoRA)",
+        )
 
 
 class ClientResolutionTests(unittest.TestCase):

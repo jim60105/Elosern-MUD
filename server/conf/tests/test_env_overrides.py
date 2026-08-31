@@ -30,7 +30,7 @@ GUIDE_PATH = os.path.join(REPO_ROOT, "docs", "development", "settings-and-enviro
 SIDEBAR_PATH = os.path.join(REPO_ROOT, "docs", "_sidebar.md")
 PROMPTS_DOC_PATH = os.path.join(REPO_ROOT, "docs", "gm", "prompts.md")
 
-# The env-backed inventory: 18 same-named variables plus the URL knob whose
+# The env-backed inventory: 20 same-named variables plus the URL knob whose
 # variable name is fixed by the internal-art-worker spec.
 ENV_BACKED: dict[str, str] = {
     "ART_SD_BASE_URL": "SD_WEBUI_BASE_URL",
@@ -40,6 +40,8 @@ ENV_BACKED: dict[str, str] = {
     "ART_SD_SAMPLER": "ART_SD_SAMPLER",
     "ART_SD_SCHEDULER": "ART_SD_SCHEDULER",
     "ART_SD_CHECKPOINT": "ART_SD_CHECKPOINT",
+    "ART_SD_STYLES": "ART_SD_STYLES",
+    "ART_SD_MODULES": "ART_SD_MODULES",
     "ART_SD_SCENE_WIDTH": "ART_SD_SCENE_WIDTH",
     "ART_SD_SCENE_HEIGHT": "ART_SD_SCENE_HEIGHT",
     "ART_SD_PORTRAIT_WIDTH": "ART_SD_PORTRAIT_WIDTH",
@@ -63,6 +65,8 @@ DEFAULT_REPR: dict[str, str] = {
     "ART_SD_SAMPLER": "''",
     "ART_SD_SCHEDULER": "''",
     "ART_SD_CHECKPOINT": "''",
+    "ART_SD_STYLES": "''",
+    "ART_SD_MODULES": "''",
     "ART_SD_SCENE_WIDTH": "1344",
     "ART_SD_SCENE_HEIGHT": "768",
     "ART_SD_PORTRAIT_WIDTH": "768",
@@ -93,6 +97,13 @@ VALID_OVERRIDES: list[tuple[str, str, str, str]] = [
         "ART_SD_CHECKPOINT",
         "anima/animaika_v43.safetensors",
         "'anima/animaika_v43.safetensors'",
+    ),
+    ("ART_SD_STYLES", "ART_SD_STYLES", "cinematic, portrait", "'cinematic, portrait'"),
+    (
+        "ART_SD_MODULES",
+        "ART_SD_MODULES",
+        "te.safetensors,vae.safetensors",
+        "'te.safetensors,vae.safetensors'",
     ),
     ("ART_SD_SCENE_WIDTH", "ART_SD_SCENE_WIDTH", "1024", "1024"),
     ("ART_SD_SCENE_HEIGHT", "ART_SD_SCENE_HEIGHT", "576", "576"),
@@ -361,6 +372,17 @@ class CodeOnlySeamTests(_SubprocessSettingsTests):
         )
         self.assertNotIn("env-override-art-root", printed["ART_STORE_ROOT"])
 
+    @covers_requirement(
+        "settings-environment-overrides::the-client-seam-and-art-store-root-are-never-environment-configurable"
+    )
+    def test_hostile_credential_variables_are_ignored(self):
+        names = ["ART_SD_USERNAME", "ART_SD_PASSWORD"]
+        result = self._run(_settings_repr(names), ART_SD_USERNAME="x", ART_SD_PASSWORD="y")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        printed = _printed_map(result.stdout, set(names))
+        self.assertEqual(printed["ART_SD_USERNAME"], "''")
+        self.assertEqual(printed["ART_SD_PASSWORD"], "''")
+
 
 class PrecedenceTests(_SubprocessSettingsTests):
     @covers_requirement(
@@ -562,6 +584,8 @@ class InventoryTests(unittest.TestCase):
         }
         self.assertNotIn("ART_SD_CLIENT", call_string_args)
         self.assertNotIn("ART_STORE_ROOT", call_string_args)
+        self.assertNotIn("ART_SD_USERNAME", call_string_args)
+        self.assertNotIn("ART_SD_PASSWORD", call_string_args)
 
     @covers_requirement(
         "settings-environment-overrides::environment-inventory-and-configuration-guide-are-version-controlled-and-exact"

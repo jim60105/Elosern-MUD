@@ -221,6 +221,14 @@ ART_SD_SAMPLER = _env_str("ART_SD_SAMPLER", "")
 ART_SD_SCHEDULER = _env_str("ART_SD_SCHEDULER", "")
 ART_SD_CHECKPOINT = _env_str("ART_SD_CHECKPOINT", "")
 
+# Prompt styles and Forge additional modules as free-text comma-separated
+# name lists (exact pass-through; names must match the server's enumeration,
+# see `@art options styles|modules`). Empty means the field is omitted from
+# the request; modules target Forge forks (fixed dtype companion is sent with
+# them). Same free-text semantics as sampler/scheduler/checkpoint.
+ART_SD_STYLES = _env_str("ART_SD_STYLES", "")
+ART_SD_MODULES = _env_str("ART_SD_MODULES", "")
+
 # Per-aspect-ratio output sizes (multiples of 8, SDXL-friendly): scenes use
 # 16:9 and portraits use 3:4.
 ART_SD_SCENE_WIDTH = _env_dimension("ART_SD_SCENE_WIDTH", 1344)
@@ -235,6 +243,15 @@ ART_SD_PORTRAIT_HEIGHT = _env_dimension("ART_SD_PORTRAIT_HEIGHT", 1024)
 # environment-controlled import seam would let any inherited process
 # environment import arbitrary code at engine startup.
 ART_SD_CLIENT = "world.art.sd_worker.SDWebUIClient"
+
+# sd-webui HTTP Basic credentials. Deliberately NOT environment-overridable
+# (settings-environment-overrides): they are credentials, and
+# secret_settings.py is the only sanctioned location for secrets. The client
+# sends the Authorization header if and only if BOTH are non-empty; a
+# half-configured pair stays anonymous and is a documented misconfiguration.
+# The password never appears in any log line or error message.
+ART_SD_USERNAME = ""
+ART_SD_PASSWORD = ""
 
 # Resource caps: response body/base64 payload size (bytes), PNG width/height,
 # and total pixels. Violations settle records failed with the bounded

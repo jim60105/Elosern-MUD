@@ -101,6 +101,7 @@ prompts:
 | `ART_SD_STEPS` / `ART_SD_CFG_SCALE` | 同名 | `30` / `7.0` | 取樣步數與 CFG（正整數／正浮點數，載入時驗證） |
 | `ART_SD_SAMPLER` / `ART_SD_SCHEDULER` | 同名 | 空字串 | 空＝伺服器預設；設定後會以 `sampler_name` / `scheduler` 傳出，必須與伺服器列舉的名稱完全一致 |
 | `ART_SD_CHECKPOINT` | `ART_SD_CHECKPOINT` | 空字串 | 選用：確切的模型標題（含 hash 後綴）；空＝伺服器現用模型 |
+| `ART_SD_STYLES` / `ART_SD_MODULES` | 同名 | 空字串 | 逗號分隔的風格名稱／Forge 模組檔名清單；空＝請求省略該欄（`styles`／`forge_additional_modules`）；名稱逐字通過，可用 `@art options styles`／`@art options modules` 查伺服器實際名稱 |
 | `ART_SD_SCENE_WIDTH/HEIGHT` | 同名 | `1344` / `768` | 場景（16:9）輸出尺寸，必須是正的 8 倍數（SDXL 友善） |
 | `ART_SD_PORTRAIT_WIDTH/HEIGHT` | 同名 | `768` / `1024` | 肖像（3:4）輸出尺寸，必須是正的 8 倍數 |
 | `ART_SD_CLIENT` | —（僅限程式碼） | `world.art.sd_worker.SDWebUIClient` | 客戶端類別的可抽換點（dotted path）；測試與瀏覽器測試掛鉤指向 `world.art.fake_sd_client.FakeSDWebUIClient`，永不開啟 socket。基於匯入注入風險刻意不提供環境變數 |
