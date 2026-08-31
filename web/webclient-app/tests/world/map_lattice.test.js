@@ -93,15 +93,20 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
       expect(node.attributes("transform")).toBe(`translate(${center.x}, ${center.y})`);
     }
 
-    // Marker footprints in pre-scale units at markerScale 4.83: the current
-    // 26×26 rect scales to a ±62.8px half-extent; the stroked circles (r=12
-    // + 2px stroke) scale to a ±59px visual half-extent.
-    const CURRENT_HALF = 13 * 4.83;
-    const CIRCLE_VISUAL_HALF = 12 * 4.83 + 1;
+    // Marker footprints in pre-scale units at markerScale 4.83 (draft
+    // ladder, webclient-map-01-draft-chrome D2): the current seal circle
+    // r=8 with a 2px stroke → half-extent 8×4.83+1; the unvisited hollow
+    // dot r=4.5 + stroke 2 → 4.5×4.83+1; the visited ink dot r=4.5 +
+    // stroke 1 → 4.5×4.83+0.5. The gold landmark ring and the actionable
+    // halo are same-node decorations, not markers — excluded here (they sit
+    // within the same footprint as their node's marker).
+    const CURRENT_HALF = 8 * 4.83 + 1;
+    const UNVISITED_HALF = 4.5 * 4.83 + 1;
+    const VISITED_HALF = 4.5 * 4.83 + 0.5;
     const markerBoxes = {
       "grid:altoria:1:2": { x1: 420 - CURRENT_HALF, y1: 106 - CURRENT_HALF, x2: 420 + CURRENT_HALF, y2: 106 + CURRENT_HALF },
-      "grid:altoria:2:2": { x1: 700 - CIRCLE_VISUAL_HALF, y1: 106 - CIRCLE_VISUAL_HALF, x2: 700 + CIRCLE_VISUAL_HALF, y2: 106 + CIRCLE_VISUAL_HALF },
-      "grid:altoria:0:2": { x1: 140 - CIRCLE_VISUAL_HALF, y1: 106 - CIRCLE_VISUAL_HALF, x2: 140 + CIRCLE_VISUAL_HALF, y2: 106 + CIRCLE_VISUAL_HALF },
+      "grid:altoria:2:2": { x1: 700 - UNVISITED_HALF, y1: 106 - UNVISITED_HALF, x2: 700 + UNVISITED_HALF, y2: 106 + UNVISITED_HALF },
+      "grid:altoria:0:2": { x1: 140 - VISITED_HALF, y1: 106 - VISITED_HALF, x2: 140 + VISITED_HALF, y2: 106 + VISITED_HALF },
     };
 
     // Node labels: baseline at the scaled offset (13×4.83 + 13 ≈ 75.8px
@@ -161,14 +166,14 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     checkAll(markerBoxes);
 
     // Connector edges stay visible: the center-to-center span (280px
-    // horizontal / 212px vertical) minus the two 26px-marker-scaled
-    // footprints leaves a positive visible segment.
+    // horizontal) minus the two scaled marker footprints (current 9×4.83,
+    // unvisited 5.5×4.83) leaves a positive visible segment.
     const e0 = w.get('[data-testid="local-map__edge--0"]');
     expect(e0.attributes("x1")).toBe("420");
     expect(e0.attributes("y1")).toBe("106");
     expect(e0.attributes("x2")).toBe("700");
     expect(e0.attributes("y2")).toBe("106");
-    expect(280 - 26 * 4.83).toBeGreaterThan(0);
+    expect(280 - (8 + 1) * 4.83 - (4.5 + 1) * 4.83).toBeGreaterThan(0);
   });
 
   it("emits select on every node activation and move only for an exact move action", async () => {
@@ -212,6 +217,130 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     expect(island.findAll('[data-testid^="local-map__edge--"]').length).toBe(
       overlay.findAll('[data-testid^="local-map__edge--"]').length,
     );
+  });
+
+  // ---------------------------------------------------------------------
+  // webclient-map-01-draft-chrome: the overlay chrome (design D4) — the
+  // mapcanvas framing class and the teardrop pin — plus the shared draft
+  // adornments (gold landmark ring, dot-chip legend).
+  // ---------------------------------------------------------------------
+
+  it("paints the mapcanvas framing only under overlayChrome", () => {
+    const island = mountLattice();
+    expect(island.get("svg.local-map__lattice").classes()).not.toContain("local-map__lattice--canvas");
+    island.unmount();
+    const overlay = mountLattice({ ...OVERLAY_PROPS, overlayChrome: true });
+    expect(overlay.get("svg.local-map__lattice").classes()).toContain("local-map__lattice--canvas");
+  });
+
+  it("renders the pin only under overlayChrome, anchored to the current node", () => {
+    const island = mountLattice();
+    expect(island.findAll('[data-testid="local-map__pin"]')).toHaveLength(0);
+    island.unmount();
+
+    const overlay = mountLattice({ ...OVERLAY_PROPS, overlayChrome: true });
+    const pins = overlay.findAll('[data-testid="local-map__pin"]');
+    expect(pins).toHaveLength(1);
+    // The pin shares the current node group's coordinate system: same
+    // translate pair, then the marker scale so it tracks the marker ladder.
+    const currentTransform = overlay
+      .get('[data-testid="local-map__node--grid:altoria:1:2"]')
+      .attributes("transform");
+    const pinTransform = pins[0].attributes("transform");
+    expect(pinTransform.startsWith(`${currentTransform} scale(`)).toBe(true);
+    expect(pinTransform).toContain("scale(4.83)");
+    // Pure adornment: it must never intercept node clicks or announce.
+    // The fixed teardrop path: apex 16 pre-scale units directly above the
+    // current node's y, x-aligned (the draft's pin geometry).
+    expect(pins[0].attributes("d").startsWith("M0 -16")).toBe(true);
+    expect(pins[0].attributes("aria-hidden")).toBe("true");
+  });
+
+  it("keeps the pin's stroke hairline at any marker scale", () => {
+    // The pin path geometry scales with the ladder via its element
+    // transform; without a non-scaling stroke the overlay's scale(4.83)
+    // would thicken the draft's 1.4px outline to ~6.8px (rubber-duck W1).
+    const w = mountLattice({ ...OVERLAY_PROPS, overlayChrome: true });
+    let rule = null;
+    for (const sheet of document.styleSheets) {
+      for (const candidate of sheet.cssRules) {
+        if (candidate.selectorText?.includes(".local-map__pin")) rule = candidate.cssText;
+      }
+    }
+    expect(rule, "the pin rule is in the component's injected style sheet").toContain(
+      "vector-effect: non-scaling-stroke",
+    );
+    w.unmount();
+  });
+
+  it("renders no pin when the payload carries no current node", () => {
+    const model = localMapModelFor(LOCAL_MAP_SAMPLE);
+    const noCurrent = {
+      ...model,
+      nodes: model.nodes.map((n) => (n.visibility === "current" ? { ...n, visibility: "visible_visited" } : n)),
+    };
+    const w = mountLattice({ ...OVERLAY_PROPS, overlayChrome: true, localMap: noCurrent });
+    expect(w.findAll('[data-testid="local-map__pin"]')).toHaveLength(0);
+  });
+
+  it("draws the gold landmark ring over (not instead of) the visibility marker", () => {
+    // The wilderness fixture's non-current landmark: 舊營地 (visited) at
+    // island scale — ring r=5 coexists with the visited dot r=4.5.
+    const w = mountLattice({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
+    const node = w.get('[data-testid="local-map__node--wild:plains:2:2"]');
+    const rings = node.findAll(".local-map__landmark");
+    expect(rings).toHaveLength(1);
+    expect(rings[0].attributes("r")).toBe("5");
+    expect(node.find(".local-map__marker--visible_visited").exists()).toBe(true);
+    // The ring is deliberately outside the `local-map__marker` class (the
+    // browser geometry audit pairs marker boxes; decorations must not
+    // self-overlap).
+    expect(rings[0].classes()).not.toContain("local-map__marker");
+    // The current landmark keeps exactly one ring; the remembered landmark
+    // (遠處山徑) stays in the list with no ring on the canvas.
+    expect(w.findAll('[data-testid="local-map__node--wild:plains:3:1"] .local-map__landmark')).toHaveLength(1);
+    expect(w.findAll('[data-testid="local-map__node--wild:plains:7:5"]').length).toBe(0);
+    expect(w.findAll(".local-map__landmark")).toHaveLength(2);
+  });
+
+  it("scales the landmark ring with the marker ladder at the overlay scale", () => {
+    const w = mountLattice({
+      ...OVERLAY_PROPS,
+      localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE),
+    });
+    expect(
+      w.get('[data-testid="local-map__node--wild:plains:2:2"] .local-map__landmark').attributes("r"),
+    ).toBe(String(5 * 4.83));
+  });
+
+  it("labels nodes by draft tier: here, gold, seen, far", () => {
+    const w = mountLattice({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
+    expect(
+      w.get('[data-testid="local-map__node--wild:plains:3:1"] .local-map__node-label').classes(),
+    ).toContain("local-map__node-label--here");
+    // 舊營地: a visited landmark reads gold, not seen.
+    expect(
+      w.get('[data-testid="local-map__node--wild:plains:2:2"] .local-map__node-label').classes(),
+    ).toContain("local-map__node-label--gold");
+    expect(
+      w.get('[data-testid="local-map__node--wild:plains:4:1"] .local-map__node-label').classes(),
+    ).toContain("local-map__node-label--far");
+  });
+
+  it("pairs every legend entry with a dot chip at both scales", () => {
+    for (const props of [{}, OVERLAY_PROPS]) {
+      const w = mountLattice(props);
+      const items = w.findAll('[data-testid^="local-map__legend-item--"]');
+      expect(items).toHaveLength(4);
+      for (const [i, state] of Object.entries(["current", "visible_unvisited", "visible_visited", "remembered"])) {
+        expect(items[Number(i)].find(`.local-map__legend-chip--${state}`).exists()).toBe(true);
+      }
+      // Non-colour redundancy lives in the chip class pair: visited (solid
+      // frame) and remembered (dashed frame) are distinct states.
+      expect(items[2].find(".local-map__legend-chip--remembered").exists()).toBe(false);
+      expect(items[3].find(".local-map__legend-chip--visible_visited").exists()).toBe(false);
+      w.unmount();
+    }
   });
 });
 

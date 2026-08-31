@@ -54,7 +54,11 @@ function handleMove(payload) {
            than the island's 4 characters, and markers scale by the same
            factor so the crowding fix's non-collision geometry carries over.
            No height cap is passed — the host body's `overflow-y: auto` is
-           the documented fallback for tall, dense payloads (design.md). -->
+           the documented fallback for tall, dense payloads (design.md).
+           `overlay-chrome` turns on the draft mapcanvas framing (the dark
+           radial-gradient canvas + rounded ink border, pure CSS) and the
+           teardrop pin anchored inside the lattice SVG above the current
+           marker (webclient-map-01-draft-chrome design D4). -->
       <MapLattice
         :local-map="localMap"
         :col-pitch="280"
@@ -64,6 +68,7 @@ function handleMove(payload) {
         :max-width="848"
         :max-height="null"
         :fill-width="true"
+        :overlay-chrome="true"
         @move="handleMove"
       />
     </div>
