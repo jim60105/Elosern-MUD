@@ -185,6 +185,7 @@
       "files_b": [
         "web.tests.browser.test_browser_input_narrative.DrawerNarrativeBrowserTest",
         "web.tests.browser.test_browser_input_narrative.InputEchoExplorationTest",
+        "web.tests.browser.test_browser_local_map.LayoutVariantsBrowserTest",
         "web.tests.browser.test_browser_local_map.LocalMapBrowserTest",
         "web.tests.browser.test_harness.ManagedServerFastTests",
         "web.tests.browser.test_harness.PortAllocationTests",
