@@ -34,11 +34,12 @@ const nodes = computed(() => (Array.isArray(props.localMap.nodes) ? props.localM
 const remembered = computed(() => (Array.isArray(props.localMap.remembered) ? props.localMap.remembered : []));
 
 // The orientation legend states the renderer's own axis convention only
-// (design D9): the wilderness adapter puts north at +y and the renderer
-// inverts y so +y draws upward — a statement about the drawing, not about
-// the world. Shown on the coordinate-bearing layers only.
+// (design D9): the lattice renderer puts north at +y and inverts y so +y
+// draws upward — a statement about the drawing, not about the world. The
+// radial graph variant has no axis convention to state, so the legend
+// follows the resolved layout variant (map-02), not the payload layer.
 const showsOrientation = computed(
-  () => layer.value === "grid" || layer.value === "wilderness",
+  () => props.localMap.layoutVariant === "lattice",
 );
 
 // The detail line localizes the raw visibility token: previously entered
@@ -76,9 +77,6 @@ const detailParts = computed(() => {
   const node = activeNode.value;
   if (!node) return [];
   const parts = [node.label, STATE_LABELS[node.visibility] ?? node.visibility];
-  if (typeof node.x === "number" && typeof node.y === "number") {
-    parts.push(`(${node.x}, ${node.y})`);
-  }
   if (node.action) parts.push(`→ ${node.action.destination}`);
   return parts;
 });
@@ -205,6 +203,7 @@ function onIslandClick(event) {
            is passed down as the canvas cap. -->
       <MapLattice
         :local-map="localMap"
+        :variant="localMap.layoutVariant || 'lattice'"
         :max-height="canvasMaxHeight || 296"
         @select="selectNode"
         @hover="hoverNode"

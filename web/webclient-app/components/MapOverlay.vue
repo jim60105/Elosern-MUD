@@ -61,6 +61,7 @@ function handleMove(payload) {
            marker (webclient-map-01-draft-chrome design D4). -->
       <MapLattice
         :local-map="localMap"
+        :variant="localMap.layoutVariant || 'lattice'"
         :col-pitch="280"
         :row-pitch="212"
         :label-max="10"
