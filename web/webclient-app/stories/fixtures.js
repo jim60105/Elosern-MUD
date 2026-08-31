@@ -3,6 +3,11 @@
 // slice, so the offline showcase and the live views cannot drift. No live
 // server, LLM, or imagegen data — fixed literals only.
 
+// The shared derived-shape helper (see `localMapModelFor` below) converts
+// local_map fixtures exactly like `stores/elosern.js` builds
+// `view.localMapModel` in production.
+import LocalMapModel from "../lib/local_map.js";
+
 export const NARRATIVE_SAMPLE = [
   { kind: "out", text: "你站在測試起點的石板廣場上，夜霧低垂，遠燈明滅。" },
   { kind: "sys", text: "—— 一則新的敘事 ——" },
@@ -727,6 +732,23 @@ export const LOCAL_MAP_UNAVAILABLE_SAMPLE = {
   available: false,
   reason: { code: "map_unavailable", message: "區域地圖目前無法顯示" },
 };
+
+// The single shared story binding for every local_map component story (wave 0,
+// webclient-map-00-story-fidelity design D1): the EXACT store-side conversion
+// — byte-identical to `stores/elosern.js`'s `localMapModel` construction
+// (`{ ...reducePanel(panel), available: panel.available !== false, reason:
+// panel.reason }`). Stories of LocalMap / MapOverlay / MapLattice consume this
+// helper's output, never a raw payload: the components' live prop is the
+// reducer-derived model, and story args must reproduce that exact shape. The
+// helper performs the store conversion and nothing else — it never mutates,
+// duplicates, or synthesizes fixture data.
+export function localMapModelFor(fixture) {
+  return {
+    ...LocalMapModel.reducePanel(fixture),
+    available: fixture.available !== false,
+    reason: fixture.reason,
+  };
+}
 
 // The maximal-height, minimal-width lattice (task 3.5): exactly 64 in-view
 // nodes — one node per row across 64 rows, alternating the two columns

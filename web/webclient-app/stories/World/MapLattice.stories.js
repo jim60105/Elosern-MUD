@@ -1,27 +1,18 @@
 import { h } from "vue";
 import MapLattice from "../../components/MapLattice.vue";
-import LocalMapModel from "../../lib/local_map.js";
 import {
   LOCAL_MAP_MINIMAL_SAMPLE,
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_WILDERNESS_SAMPLE,
+  localMapModelFor,
 } from "../fixtures.js";
 
 // MapLattice (improve-webclient-map-overlay-scale): the shared `local_map`
 // lattice renderer, parameterized by scale. The stories feed the reduced
-// render model (exactly what the C-wire store builds: `reducePanel` plus
-// the payload's `available` flag) and show the shared lattice at the
-// minimap island's default scale and at the full-map overlay's larger
-// scale, reusing the existing `local_map` fixtures so both surfaces render
-// the identical committed payload.
-
-function modelFor(fixture) {
-  return {
-    ...LocalMapModel.reducePanel(fixture),
-    available: fixture.available !== false,
-    reason: null,
-  };
-}
+// render model (exactly what the store builds in production) through the
+// shared `localMapModelFor` helper (wave 0, design D1: one shared binding,
+// the old private copy deleted), reusing the existing `local_map` fixtures
+// so both surfaces render the identical committed payload.
 
 const renderLattice = (args) => ({
   render: () =>
@@ -54,21 +45,21 @@ export default {
 export const IslandScaleSample = {
   render: renderLattice,
   args: {
-    localMap: modelFor(LOCAL_MAP_SAMPLE),
+    localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
   },
 };
 
 export const IslandScaleWilderness = {
   render: renderLattice,
   args: {
-    localMap: modelFor(LOCAL_MAP_WILDERNESS_SAMPLE),
+    localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE),
   },
 };
 
 export const IslandScaleMinimal = {
   render: renderLattice,
   args: {
-    localMap: modelFor(LOCAL_MAP_MINIMAL_SAMPLE),
+    localMap: localMapModelFor(LOCAL_MAP_MINIMAL_SAMPLE),
   },
 };
 
@@ -78,20 +69,20 @@ export const IslandScaleMinimal = {
 export const OverlayScaleSample = {
   render: renderOverlayScale,
   args: {
-    localMap: modelFor(LOCAL_MAP_SAMPLE),
+    localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
   },
 };
 
 export const OverlayScaleWilderness = {
   render: renderOverlayScale,
   args: {
-    localMap: modelFor(LOCAL_MAP_WILDERNESS_SAMPLE),
+    localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE),
   },
 };
 
 export const OverlayScaleMinimal = {
   render: renderOverlayScale,
   args: {
-    localMap: modelFor(LOCAL_MAP_MINIMAL_SAMPLE),
+    localMap: localMapModelFor(LOCAL_MAP_MINIMAL_SAMPLE),
   },
 };

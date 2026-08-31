@@ -2,7 +2,6 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import LocalMap from "../../components/LocalMap.vue";
 import MapOverlay from "../../components/MapOverlay.vue";
-import LocalMapModel from "../../lib/local_map.js";
 import {
   LOCAL_MAP_GEOMETRY_STRESS_SAMPLE,
   LOCAL_MAP_INTERIOR_SAMPLE,
@@ -14,6 +13,7 @@ import {
   LOCAL_MAP_TALL_REMEMBERED_SAMPLE,
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
   LOCAL_MAP_WILDERNESS_SAMPLE,
+  localMapModelFor,
 } from "../../stories/fixtures.js";
 
 describe("LocalMap (B4 world family)", () => {
@@ -26,9 +26,12 @@ describe("LocalMap (B4 world family)", () => {
   });
 
   function mountMap(props = {}) {
+    // Wave 0 (webclient-map-00-story-fidelity): mounts use the shared
+    // derived-shape helper so they exercise the EXACT prop shape the store
+    // passes in production, not the raw payload.
     wrapper = mount(LocalMap, {
       props: {
-        localMap: LOCAL_MAP_SAMPLE,
+        localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
         ...props,
       },
     });
@@ -44,7 +47,7 @@ describe("LocalMap (B4 world family)", () => {
   });
 
   it("renders the honest unavailable box with the payload's reason message", () => {
-    const w = mountMap({ localMap: LOCAL_MAP_UNAVAILABLE_SAMPLE });
+    const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_UNAVAILABLE_SAMPLE) });
     expect(w.get('[data-testid="local-map__unavailable"]').text()).toBe("區域地圖目前無法顯示");
     expect(w.find(".local-map__lattice").exists()).toBe(false);
     expect(w.find('[data-testid="local-map__title"]').exists()).toBe(false);
@@ -108,6 +111,27 @@ describe("LocalMap (B4 world family)", () => {
     expect(w.emitted("move")).toBeUndefined();
   });
 
+  it("selects the focused remembered list item without emitting a travel action", async () => {
+    // Wave 0 (task 3.2 contract, pinned in jsdom): the FocusedRemembered
+    // story's named state is real keyboard focus — a genuine focus() only
+    // lands because the `li` is tabindex=0, and its @focus handler selects
+    // the node. A click-triggered test cannot mask a broken tabindex/@focus
+    // wiring here.
+    wrapper = mount(LocalMap, {
+      props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) },
+      attachTo: document.body,
+    });
+    const li = wrapper.get('[data-testid="local-map__node--grid:altoria:5:5"]').element;
+    li.focus();
+    await wrapper.vm.$nextTick();
+    expect(document.activeElement).toBe(li);
+    const detail = wrapper.get('[data-testid="local-map-detail"]').text();
+    expect(detail).toContain("舊街區");
+    expect(detail).toContain("已探索");
+    expect(detail).not.toContain("→");
+    expect(wrapper.emitted("move")).toBeUndefined();
+  });
+
   it("renders the payload's legend entries paired with their state glyphs", () => {
     const w = mountMap();
     const items = w.findAll('[data-testid^="local-map__legend-item--"]');
@@ -143,17 +167,20 @@ describe("LocalMap (B4 world family)", () => {
     expect(w.get('[data-testid="local-map-detail"]').text()).toContain("南門");
   });
 
-  it("renders every edge of the payload with its own traversability styling", () => {
+  it("renders the on-canvas edges with their traversability styling and omits the off-canvas one", () => {
     const w = mountMap();
+    // The derived model splits `remembered` off the canvas, so the payload's
+    // third edge (current → the remembered 舊街區) has an off-canvas endpoint
+    // and is omitted from the drawn layer (the local-map spec's edge rule).
     const edges = w.findAll('[data-testid^="local-map__edge--"]');
-    expect(edges).toHaveLength(3);
+    expect(edges).toHaveLength(2);
     expect(w.get('[data-testid="local-map__edge--0"]').classes()).toContain("local-map__edge--traversable");
     expect(w.get('[data-testid="local-map__edge--1"]').classes()).toContain("local-map__edge--blocked");
-    expect(w.get('[data-testid="local-map__edge--2"]').classes()).toContain("local-map__edge--unknown");
+    expect(w.find('[data-testid="local-map__edge--2"]').exists()).toBe(false);
   });
 
   it("renders the minimal sample: two nodes, one unknown edge, one legend line, no actionable node", () => {
-    const w = mountMap({ localMap: LOCAL_MAP_MINIMAL_SAMPLE });
+    const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_MINIMAL_SAMPLE) });
     const nodeIds = w.findAll('[data-testid^="local-map__node--"]');
     expect(nodeIds).toHaveLength(2);
     expect(w.findAll('[data-testid^="local-map__edge--"]')).toHaveLength(1);
@@ -176,7 +203,7 @@ describe("LocalMap (B4 world family)", () => {
 
   it("shows the orientation legend on grid and wilderness layers only", () => {
     for (const sample of [LOCAL_MAP_SAMPLE, LOCAL_MAP_WILDERNESS_SAMPLE]) {
-      const w = mountMap({ localMap: sample });
+      const w = mountMap({ localMap: localMapModelFor(sample) });
       const orientation = w.find('[data-testid="local-map__orientation"]');
       expect(orientation.exists(), `legend present for ${sample.layer}`).toBe(true);
       expect(orientation.text()).toBe("北↑");
@@ -186,7 +213,7 @@ describe("LocalMap (B4 world family)", () => {
 
   it("omits the orientation legend on the coordinate-free instance and interior layers", () => {
     for (const sample of [LOCAL_MAP_INSTANCE_SAMPLE, LOCAL_MAP_INTERIOR_SAMPLE]) {
-      const w = mountMap({ localMap: sample });
+      const w = mountMap({ localMap: localMapModelFor(sample) });
       expect(
         w.find('[data-testid="local-map__orientation"]').exists(),
         `legend absent for ${sample.layer}`,
@@ -202,7 +229,7 @@ describe("LocalMap (B4 world family)", () => {
       LOCAL_MAP_INSTANCE_SAMPLE,
       LOCAL_MAP_INTERIOR_SAMPLE,
     ]) {
-      const w = mountMap({ localMap: sample });
+      const w = mountMap({ localMap: localMapModelFor(sample) });
       const text = w.text();
       expect(text).not.toContain("°");
       // No compass bearing like 「北 324° · 西 262°」 and no distance unit.
@@ -219,13 +246,10 @@ describe("LocalMap (B4 world family)", () => {
   // ---------------------------------------------------------------------
 
   it("sizes the 2-col × 64-row lattice canvas from the model's exported lattice", () => {
-    // Mirror the store's localMapModel shape (stores/elosern.js): the
-    // reduced model plus the payload's `available` flag and reason.
-    const model = {
-      ...LocalMapModel.reducePanel(LOCAL_MAP_TALL_LATTICE_SAMPLE),
-      available: true,
-      reason: null,
-    };
+    // The shared helper mirrors the store's localMapModel construction
+    // (stores/elosern.js): the reduced model plus the payload's `available`
+    // flag and reason.
+    const model = localMapModelFor(LOCAL_MAP_TALL_LATTICE_SAMPLE);
     expect(model.cols).toBe(2);
     expect(model.rows).toBe(64);
     const w = mountMap({ localMap: model });
@@ -236,17 +260,21 @@ describe("LocalMap (B4 world family)", () => {
     expect(svg.attributes("width")).toBe("116");
     expect(svg.attributes("height")).toBe("2830");
     expect(svg.attributes("viewBox")).toBe("0 0 116 2830");
+    // Wave 0 (task 3.3): the scale-down CONTRACT jsdom can prove — the
+    // island's caps bind as inline styles so a real browser scales the
+    // canvas (2830px natural height cannot overflow the island). The
+    // rendered proportional size is verified in the running Storybook
+    // (World/LocalMap — TallLatticeScaled), not here.
+    const style = svg.attributes("style") ?? "";
+    expect(style).toContain("max-width: 206px");
+    expect(style).toContain("max-height: 296px");
   });
 
   it("keeps the 48-row lattice + 16 remembered nodes within the 64-node bound", () => {
     // The rubber-duck blocking combination: 48 in-view + 16 remembered = 64
     // (MAX_NODES). The model computes the lattice from the in-view nodes
     // only; remembered nodes stay in the bounded focusable list.
-    const model = {
-      ...LocalMapModel.reducePanel(LOCAL_MAP_TALL_REMEMBERED_SAMPLE),
-      available: true,
-      reason: null,
-    };
+    const model = localMapModelFor(LOCAL_MAP_TALL_REMEMBERED_SAMPLE);
     expect(model.rows).toBe(48);
     expect(model.cols).toBe(2);
     expect(model.nodes).toHaveLength(48);
@@ -264,11 +292,7 @@ describe("LocalMap (B4 world family)", () => {
   });
 
   it("keeps adjacent node markers and labels non-intersecting at natural geometry", () => {
-    const model = {
-      ...LocalMapModel.reducePanel(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE),
-      available: true,
-      reason: null,
-    };
+    const model = localMapModelFor(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE);
     const w = mountMap({ localMap: model });
 
     // Node centers from the model's col/row + the renderer's decoupled
@@ -361,11 +385,7 @@ describe("LocalMap (B4 world family)", () => {
   });
 
   it("renders a single-node room with no collision risk (no regression)", () => {
-    const model = {
-      ...LocalMapModel.reducePanel(LOCAL_MAP_SINGLE_NODE_SAMPLE),
-      available: true,
-      reason: null,
-    };
+    const model = localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE);
     const w = mountMap({ localMap: model });
     const svg = w.find("svg.local-map__lattice");
     expect(svg.attributes("width")).toBe("58");
@@ -378,11 +398,7 @@ describe("LocalMap (B4 world family)", () => {
   });
 
   it("MapOverlay renders the shared LocalMap and forwards the move intent", async () => {
-    const model = {
-      ...LocalMapModel.reducePanel(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE),
-      available: true,
-      reason: null,
-    };
+    const model = localMapModelFor(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE);
     const overlay = mount(MapOverlay, {
       props: { localMap: model },
     });
