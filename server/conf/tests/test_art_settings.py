@@ -55,6 +55,13 @@ class ArtSettingsTests(unittest.TestCase):
         self.assertEqual(settings.ART_SD_MAX_IMAGE_PIXELS, 16777216)
         self.assertIs(settings.ART_SD_PREPIN_SAMPLES_FORMAT, False)
 
+    def test_output_format_pipeline_defaults(self):
+        self.assertEqual(settings.ART_SD_OUTPUT_FORMAT, "png")
+        self.assertEqual(settings.ART_SD_OUTPUT_QUALITY, 80)
+        self.assertIs(settings.ART_SD_PRESERVE_GENERATION_METADATA, True)
+        # Derived, never configured: the default format yields .png.
+        self.assertEqual(settings.ART_SD_OUTPUT_EXTENSION, ".png")
+
     def test_external_worker_settings_are_removed(self):
         self.assertFalse(hasattr(settings, "ART_WORKER_CMD"))
         self.assertFalse(hasattr(settings, "ART_WORKER_TIMEOUT_SECONDS"))

@@ -231,19 +231,30 @@ def settle_generated(
     output_identity: str,
     tmp_path: str,
     seed: int | None = None,
-) -> ArtAssetRecord | None:
-    """Atomically publish a generated PNG for the current claim under the lock.
+) -> tuple[ArtAssetRecord, str | None] | None:
+    """Atomically publish one generated output for the current claim under the lock.
 
     The claim's ``generation_token`` must still match the record and the record
     must still be ``in_progress``: a worker whose job was requeued (reset to
     ``pending``) or reclaimed can never publish, so a stale generation can
     never replace the record's prior valid output. When the claim is current,
-    the already-written temporary file is atomically replaced onto the expected
-    identity and the record settles ``done`` in the same critical section,
-    with ``seed`` assigned unconditionally (``None`` clears the previous
-    output's seed — a seedless regeneration must never advertise the old
-    image's seed). On any failure the temporary file is removed, the existing
-    output is never touched, and the error propagates for the worker to bound.
+    the settlement validates BOTH the new target AND the record's committed
+    ``output_identity`` (the authoritative prior — never the transient
+    ``prior_output_identity`` recovery field) under the store root, atomically
+    replaces the temporary file onto the new identity, and settles the record
+    ``done`` in the same critical section, with ``seed`` assigned
+    unconditionally (``None`` clears the previous output's seed — a seedless
+    regeneration must never advertise the old image's seed).
+
+    Returns ``(record, prior_identity)`` where ``prior_identity`` is the
+    committed prior validated under the root when its extension differs from
+    the new one (the same-extension case replaces in place and yields
+    ``None``), so the caller deletes exactly that file AFTER this transaction
+    commits. A deletion failure can therefore never strand the record on a
+    deleted file: at worst the prior stays as an unreferenced orphan. On any
+    failure at or before the record transition the temporary file is removed,
+    the existing output is never touched, and the error propagates. Returns
+    ``None`` (stale claim) after removing the temporary file.
     """
     with queue_lock:
         records = _records_for(subject)
@@ -257,15 +268,16 @@ def settle_generated(
         ):
             _remove_tmp(tmp_path)
             return None
+        root = Path(settings.ART_STORE_ROOT).resolve()
         target = Path(settings.ART_STORE_ROOT) / output_identity
         try:
             resolved = target.resolve()
         except OSError:
             resolved = None
-        root = Path(settings.ART_STORE_ROOT).resolve()
         if resolved is None or resolved == root or root not in resolved.parents:
             _remove_tmp(tmp_path)
             raise ValueError(f"output identity {output_identity!r} escapes the store root")
+        prior_cleanup = _validated_prior_cleanup(record, root, output_identity)
         try:
             os.replace(tmp_path, target)
         except BaseException:
@@ -279,7 +291,34 @@ def settle_generated(
         record.db.claimed_at = None
         record.db.generation_token = ""
         record.db.seed = seed
-        return record
+        return record, prior_cleanup
+
+
+def _validated_prior_cleanup(
+    record: ArtAssetRecord, root: Path, output_identity: str
+) -> str | None:
+    """Return the committed prior identity when it is a deletable stale-format file.
+
+    Only an extension CHANGE leaves the prior file at a different path (a
+    same-extension replace overwrote it in place). The committed prior is
+    re-validated under the root before it is ever named as a cleanup
+    candidate; an unvalidatable prior yields ``None`` (left untouched, never
+    deleted outside the root).
+    """
+    prior = str(record.db.output_identity or "")
+    if not prior or prior == output_identity:
+        return None
+    if os.path.splitext(prior)[1].lower() == os.path.splitext(output_identity)[1].lower():
+        # Same extension: the replace above already overwrote the same path.
+        return None
+    prior_path = Path(settings.ART_STORE_ROOT) / prior
+    try:
+        resolved = prior_path.resolve()
+    except OSError:
+        return None
+    if resolved == root or root not in resolved.parents:
+        return None
+    return prior
 
 
 def _remove_tmp(tmp_path: str) -> None:

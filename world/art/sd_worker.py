@@ -75,15 +75,33 @@ class SDError(Exception):
 
 @dataclass(frozen=True)
 class GeneratedImage:
-    """One generated image: validated PNG bytes plus the server seed.
+    """One generated image: validated PNG bytes plus its generation provenance.
 
     ``seed`` is the server-reported generation seed parsed defensively from
     the response ``info`` field, or ``None`` when the server reported no
     usable seed. A seedless image is still a perfectly good image.
+
+    The provenance fields are the exact prompt pair and generation parameters
+    of the request that produced these bytes (``prompt``/``negative_prompt``/
+    ``steps``/``cfg_scale``/``width``/``height`` always; ``sampler``/
+    ``scheduler``/``checkpoint`` only when the request carried them). They let
+    the worker regenerate embedded metadata WITHOUT re-rendering the mutable
+    prompt library, so metadata can never describe a different generation
+    than the bytes it ships with. The defaults exist so test doubles and
+    seedless fixtures construct unchanged; the real client always fills them.
     """
 
     data: bytes
     seed: int | None
+    prompt: str = ""
+    negative_prompt: str = ""
+    steps: int = 0
+    cfg_scale: float = 0.0
+    sampler: str | None = None
+    scheduler: str | None = None
+    width: int = 0
+    height: int = 0
+    checkpoint: str | None = None
 
 
 def render_prompt_pair(subject: ArtSubject, description: str) -> tuple[str, str]:
@@ -547,7 +565,19 @@ class SDWebUIClient:
         try:
             response = self._transport(request)
             data = _decode_image(response)
-            return GeneratedImage(data=data, seed=_parse_seed(response))
+            return GeneratedImage(
+                data=data,
+                seed=_parse_seed(response),
+                prompt=str(request["prompt"]),
+                negative_prompt=str(request["negative_prompt"]),
+                steps=int(request["steps"]),
+                cfg_scale=float(request["cfg_scale"]),
+                sampler=request.get("sampler_name"),
+                scheduler=request.get("scheduler"),
+                width=int(request["width"]),
+                height=int(request["height"]),
+                checkpoint=request["override_settings"].get("sd_model_checkpoint"),
+            )
         except SDError:
             raise
         except Exception as error:  # noqa: BLE001 - bounded; never escapes unbounded

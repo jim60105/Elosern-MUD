@@ -15,11 +15,21 @@ from django.http import FileResponse, Http404
 
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 
-# Only these exact store layouts are servable: scene and portrait directories
-# with a PNG extension, matching the engine's pre-computed output identities.
+# Only these exact store layouts are servable: the scene and portrait
+# directories with ANY of the four store extensions — the closed set of all
+# formats the engine can produce, never the currently configured format
+# alone, so a store mid-way through a format switch stays servable. Each
+# extension maps to exactly one media type; there is no sniffing.
 _ALLOWED_IDENTITY = re.compile(
-    r"^(scene|portrait/monster|portrait/character)/[^/]+\.png$"
+    r"^(scene|portrait/monster|portrait/character)/[^/]+\.(png|webp|jpg|avif)$"
 )
+
+_MIME_BY_EXTENSION = {
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".jpg": "image/jpeg",
+    ".avif": "image/avif",
+}
 
 
 def _store_root() -> Path:
@@ -59,4 +69,7 @@ def art_media(request, identity: str):
     resolved = _resolved_under_root(target)
     if resolved is None or not resolved.is_file():
         raise Http404
-    return FileResponse(resolved.open("rb"))
+    return FileResponse(
+        resolved.open("rb"),
+        content_type=_MIME_BY_EXTENSION[resolved.suffix.lower()],
+    )

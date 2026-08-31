@@ -15,25 +15,32 @@ dotted path) on a background thread with a bounded timeout, SHALL convert the re
 pre-computed exact expected relative identity for that subject (`expected_output_identity(subject)`)
 whose extension is the store extension of the configured output format (`.png`, `.webp`, `.jpg`,
 `.avif`).
-The client result carries the validated PNG bytes and the server-reported generation seed (a
+The client result carries the validated PNG bytes, the server-reported generation seed (a
 non-negative integer parsed from the response `info` JSON, or `None` when `info` is absent,
-unparseable, or carries no non-negative integer `seed`); a missing or invalid seed SHALL never
-fail an otherwise valid generation. A job SHALL settle `done` only when the encoded bytes are
-written to exactly the pre-computed expected identity, resolving to an existing regular file
+unparseable, or carries no non-negative integer `seed`), and the exact prompt pair and
+generation parameters (steps, CFG scale, width/height, and the sampler/scheduler/checkpoint
+values when set) that built the request — the worker encodes provenance from those returned
+values and SHALL NOT re-render the prompt library after the response, so embedded metadata can
+never describe a different generation than the bytes it ships with; a missing or invalid seed
+SHALL never fail an otherwise valid generation. A job SHALL settle `done` only when the encoded
+bytes are written to exactly the pre-computed expected identity, resolving to an existing
+regular file
 under the configured `ART_STORE_ROOT` (symlink-resolved), and a successful settle SHALL persist
 the returned seed on the record (nullable). The output write SHALL be atomic: bytes SHALL be
 written to a unique temporary file inside the store directory and moved onto the final identity
 with an atomic replace, so a failed or interrupted regeneration never corrupts or replaces the
 record's prior valid output. When a successful settle's identity extension differs from the
-record's prior valid identity's extension, the worker SHALL follow strict order: validate BOTH
-identities under the store root; install the new file; transition the record's committed
-identity/status under the queue lock; and only after that record transition succeeds, delete
-exactly the prior identity file (re-checking under-root confinement) — a deletion error never
-reverts the committed transition and leaves the prior file as an unreferenced orphan (logged,
-cleaned by the next regeneration), while any failure at or before the record transition leaves
-the prior file on disk AND referenced. So one subject never has two stored files referenced by
-a record, and no settle order can strand a record pointing at a deleted file; a same-extension
-regeneration replaces in place and deletes nothing.
+prior committed identity's extension, the worker SHALL follow strict order: under the queue
+lock, the settlement validates BOTH the new target and the record's current committed
+`output_identity` (the authoritative prior — never the transient `prior_output_identity`
+recovery field) under the store root; installs the new file; transitions the record's
+committed identity/status in the same critical section; and only after that record transition
+commits, deletes exactly the prior identity file (re-checking under-root confinement) — a
+deletion error never reverts the committed transition and leaves the prior file as an
+unreferenced orphan (logged, cleaned by the next regeneration), while any failure at or before
+the record transition leaves the prior file on disk AND referenced. So one subject never has
+two stored files referenced by a record, and no settle order can strand a record pointing at a
+deleted file; a same-extension regeneration replaces in place and deletes nothing.
 
 A named client error
 (`sd_connection_error`, `sd_timeout`, `sd_http_error`, `sd_malformed_response`, `sd_no_image`,
@@ -43,8 +50,9 @@ A named client error
 timed-out item SHALL settle the record `failed` with a bounded error code and SHALL retain the
 record's prior valid output; no file outside the store root is ever written, deleted, or
 honored. Lease reclaim SHALL bound `in_progress` records by the worst-case duration of a
-claimed batch (`batch size × timeout + margin`), never by a flat per-item timeout, so a
-legitimately slow batch is not reclaimed mid-generation.
+claimed batch (`batch size × (generation timeout + per-item local-conversion allowance) +
+margin`), never by a flat per-item timeout, so neither a slow generation nor a slow local
+encode reclaims a legitimately slow batch mid-work.
 
 #### Scenario: A valid generation completes a scene job
 - **WHEN** the internal client returns valid PNG bytes for a scene subject, the configured
@@ -102,8 +110,9 @@ legitimately slow batch is not reclaimed mid-generation.
   partial file replaces it, and the record's prior output is retained
 
 #### Scenario: A slow batch is not reclaimed while its worker thread is running
-- **WHEN** a batch of `N` claimed records is generating and the elapsed time exceeds a single
-  per-item timeout but not `N × timeout + margin`
+- **WHEN** a batch of `N` claimed records is generating or locally converting and the elapsed
+  time exceeds a single per-item (timeout + conversion allowance) but not
+  `N × (timeout + conversion allowance) + margin`
 - **THEN** the batch is not reclaimed to `pending`, and after it finishes every claimed job
   reaches a terminal `done` or `failed` state
 
@@ -113,16 +122,25 @@ legitimately slow batch is not reclaimed mid-generation.
 - **THEN** every claimed job reaches a terminal `done` or `failed` state with a bounded error
   code, and none stays `in_progress`
 
+#### Scenario: Embedded provenance is the request's own prompt pair
+- **WHEN** the prompt library's rendered text changes between a claim's request construction and
+  its post-response conversion
+- **THEN** the stored metadata carries the prompt pair from the original request, and the worker
+  performs no second prompt-library render for encoding
+
 ### Requirement: Media serving maps validated stored identities to same-origin URLs without exposing the store root
 `web/art_media.py` SHALL expose a same-origin route that serves only an output identity
 referenced by a `done` asset record — never an arbitrary path under the store root — after
 applying the same confinement check the worker uses, and SHALL reject `..`, symlinks,
 unexpected directories or extensions, absolute paths, and missing or out-of-root identities
 with a 404. The accepted extensions are exactly the store extensions of the supported output
-formats (`.png`, `.webp`, `.jpg`, `.avif`), each served with its fixed media type (`image/png`,
-`image/webp`, `image/jpeg`, `image/avif` respectively) from a closed extension-to-type map. The
-read-only presenter SHALL build URLs only from validated stored identities and SHALL never
-expose `out_path` or the store root.
+formats (`.png`, `.webp`, `.jpg`, `.avif`) — the closed set of ALL store extensions, never the
+currently configured format alone, so a store mid-way through a format switch stays servable —
+each served with its fixed media type (`image/png`, `image/webp`, `image/jpeg`, `image/avif`
+respectively) from a closed extension-to-type map. The read-only presenter SHALL build URLs
+only from validated stored identities — a `done` record's stored identity validated against the
+subject's directory/key shape and the same closed four-extension set, NOT against the currently
+configured output extension — and SHALL never expose `out_path` or the store root.
 
 #### Scenario: A valid done-record identity is served same-origin with its type
 - **WHEN** a `done` record references `scene/<key>.webp` resolving under the store root and it
@@ -141,5 +159,11 @@ expose `out_path` or the store root.
 
 #### Scenario: The presenter URL comes only from a validated stored identity
 - **WHEN** the presenter resolves a `done` record
-- **THEN** it returns a same-origin URL built from the validated stored identity and never the raw
-  `out_path` or an absolute path
+- **THEN** it returns a same-origin URL built from the validated stored identity and never the
+  raw `out_path` or an absolute path
+
+#### Scenario: A mixed store keeps presenting during a format switch
+- **WHEN** the configured output format is `webp` and a `done` record still references an
+  existing `scene/<key>.png` from before the switch
+- **THEN** the presenter returns that record as an `asset` with the same-origin
+  `/art/scene/<key>.png` URL (not a placeholder), and the route serves the PNG

@@ -30,7 +30,7 @@ GUIDE_PATH = os.path.join(REPO_ROOT, "docs", "development", "settings-and-enviro
 SIDEBAR_PATH = os.path.join(REPO_ROOT, "docs", "_sidebar.md")
 PROMPTS_DOC_PATH = os.path.join(REPO_ROOT, "docs", "gm", "prompts.md")
 
-# The env-backed inventory: 20 same-named variables plus the URL knob whose
+# The env-backed inventory: 23 same-named variables plus the URL knob whose
 # variable name is fixed by the internal-art-worker spec.
 ENV_BACKED: dict[str, str] = {
     "ART_SD_BASE_URL": "SD_WEBUI_BASE_URL",
@@ -50,6 +50,9 @@ ENV_BACKED: dict[str, str] = {
     "ART_SD_MAX_IMAGE_DIMENSIONS": "ART_SD_MAX_IMAGE_DIMENSIONS",
     "ART_SD_MAX_IMAGE_PIXELS": "ART_SD_MAX_IMAGE_PIXELS",
     "ART_SD_PREPIN_SAMPLES_FORMAT": "ART_SD_PREPIN_SAMPLES_FORMAT",
+    "ART_SD_OUTPUT_FORMAT": "ART_SD_OUTPUT_FORMAT",
+    "ART_SD_OUTPUT_QUALITY": "ART_SD_OUTPUT_QUALITY",
+    "ART_SD_PRESERVE_GENERATION_METADATA": "ART_SD_PRESERVE_GENERATION_METADATA",
     "ART_SCHEDULER_ENABLED": "ART_SCHEDULER_ENABLED",
     "ART_SCHEDULER_INTERVAL_SECONDS": "ART_SCHEDULER_INTERVAL_SECONDS",
     "ART_SCHEDULER_LIMIT": "ART_SCHEDULER_LIMIT",
@@ -75,6 +78,9 @@ DEFAULT_REPR: dict[str, str] = {
     "ART_SD_MAX_IMAGE_DIMENSIONS": "4096",
     "ART_SD_MAX_IMAGE_PIXELS": "16777216",
     "ART_SD_PREPIN_SAMPLES_FORMAT": "False",
+    "ART_SD_OUTPUT_FORMAT": "'png'",
+    "ART_SD_OUTPUT_QUALITY": "80",
+    "ART_SD_PRESERVE_GENERATION_METADATA": "True",
     "ART_SCHEDULER_ENABLED": "True",
     "ART_SCHEDULER_INTERVAL_SECONDS": "30",
     "ART_SCHEDULER_LIMIT": "4",
@@ -113,6 +119,17 @@ VALID_OVERRIDES: list[tuple[str, str, str, str]] = [
     ("ART_SD_MAX_IMAGE_DIMENSIONS", "ART_SD_MAX_IMAGE_DIMENSIONS", "2048", "2048"),
     ("ART_SD_MAX_IMAGE_PIXELS", "ART_SD_MAX_IMAGE_PIXELS", "4194304", "4194304"),
     ("ART_SD_PREPIN_SAMPLES_FORMAT", "ART_SD_PREPIN_SAMPLES_FORMAT", "true", "True"),
+    ("ART_SD_OUTPUT_FORMAT", "ART_SD_OUTPUT_FORMAT", "WEBP", "'webp'"),
+    ("ART_SD_OUTPUT_FORMAT", "ART_SD_OUTPUT_FORMAT", " jpeg ", "'jpeg'"),
+    ("ART_SD_OUTPUT_QUALITY", "ART_SD_OUTPUT_QUALITY", "60", "60"),
+    ("ART_SD_OUTPUT_QUALITY", "ART_SD_OUTPUT_QUALITY", "1", "1"),
+    ("ART_SD_OUTPUT_QUALITY", "ART_SD_OUTPUT_QUALITY", "100", "100"),
+    (
+        "ART_SD_PRESERVE_GENERATION_METADATA",
+        "ART_SD_PRESERVE_GENERATION_METADATA",
+        "off",
+        "False",
+    ),
     ("ART_SCHEDULER_ENABLED", "ART_SCHEDULER_ENABLED", "0", "False"),
     ("ART_SCHEDULER_INTERVAL_SECONDS", "ART_SCHEDULER_INTERVAL_SECONDS", "15", "15"),
     ("ART_SCHEDULER_LIMIT", "ART_SCHEDULER_LIMIT", "8", "8"),
@@ -140,12 +157,19 @@ INVALID_VALUES: list[tuple[str, str, str]] = [
     ("ART_SD_SCENE_WIDTH", "1001", "expected a positive multiple of 8"),
     ("ART_SD_SCENE_HEIGHT", "0", "expected a positive multiple of 8"),
     ("ART_SD_PORTRAIT_HEIGHT", "-16", "expected a positive multiple of 8"),
+    ("ART_SD_OUTPUT_FORMAT", "heic", "expected one of png/webp/jpeg/avif (case-insensitive)"),
+    ("ART_SD_OUTPUT_FORMAT", "pngs", "expected one of png/webp/jpeg/avif (case-insensitive)"),
+    ("ART_SD_OUTPUT_QUALITY", "0", "expected an integer between 1 and 100"),
+    ("ART_SD_OUTPUT_QUALITY", "101", "expected an integer between 1 and 100"),
+    ("ART_SD_OUTPUT_QUALITY", "twelve", "expected an integer between 1 and 100"),
+    ("ART_SD_PRESERVE_GENERATION_METADATA", "maybe", "1/true/yes/on/0/false/no/off"),
 ]
 
 _IMPORT = "import server.conf.settings as s"
 
 BOOL_SETTINGS = [
     "ART_SD_PREPIN_SAMPLES_FORMAT",
+    "ART_SD_PRESERVE_GENERATION_METADATA",
     "ART_SCHEDULER_ENABLED",
     "ELOSERN_VUE_CLIENT",
 ]
@@ -268,15 +292,16 @@ class ValidCoercionTests(_SubprocessSettingsTests):
     def test_boolean_words_are_case_insensitive(self):
         env = {
             "ART_SD_PREPIN_SAMPLES_FORMAT": "True",
+            "ART_SD_PRESERVE_GENERATION_METADATA": "TRUE",
             "ART_SCHEDULER_ENABLED": "OFF",
             "ELOSERN_VUE_CLIENT": "Yes",
         }
         result = self._run(_settings_repr(BOOL_SETTINGS), **env)
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
         self.assertEqual(
             _printed_map(result.stdout, set(BOOL_SETTINGS)),
             {
                 "ART_SD_PREPIN_SAMPLES_FORMAT": "True",
+                "ART_SD_PRESERVE_GENERATION_METADATA": "True",
                 "ART_SCHEDULER_ENABLED": "False",
                 "ELOSERN_VUE_CLIENT": "True",
             },
@@ -418,6 +443,98 @@ class PrecedenceTests(_SubprocessSettingsTests):
         )
 
 
+class DerivedExtensionTests(_SubprocessSettingsTests):
+    """ART_SD_OUTPUT_EXTENSION is derived, never configured: it follows the
+    EFFECTIVE format (default, environment, or secret_settings) and any
+    directly assigned value is unconditionally discarded."""
+
+    NAMES = ["ART_SD_OUTPUT_FORMAT", "ART_SD_OUTPUT_EXTENSION"]
+
+    @covers_requirement(
+        "settings-environment-overrides::the-output-extension-is-derived-never-configured"
+    )
+    def test_the_environment_format_flows_into_the_extension(self):
+        for raw, fmt, extension in (
+            ("AVIF", "avif", ".avif"),
+            ("jpeg", "jpeg", ".jpg"),
+            ("webp", "webp", ".webp"),
+            ("png", "png", ".png"),
+        ):
+            with self.subTest(raw=raw):
+                result = self._run(
+                    _settings_repr(self.NAMES), ART_SD_OUTPUT_FORMAT=raw
+                )
+                self.assertEqual(result.returncode, 0, msg=result.stderr)
+                self.assertEqual(
+                    _printed_map(result.stdout, set(self.NAMES)),
+                    {
+                        "ART_SD_OUTPUT_FORMAT": repr(fmt),
+                        "ART_SD_OUTPUT_EXTENSION": repr(extension),
+                    },
+                )
+
+    @covers_requirement(
+        "settings-environment-overrides::the-output-extension-is-derived-never-configured"
+    )
+    def test_a_secret_format_override_flows_into_the_extension(self):
+        code = (
+            "import sys\n"
+            "import types\n"
+            "secret = types.ModuleType('server.conf.secret_settings')\n"
+            "secret.ART_SD_OUTPUT_FORMAT = 'webp'\n"
+            "sys.modules['server.conf.secret_settings'] = secret\n"
+            + _settings_repr(self.NAMES)
+        )
+        result = self._run(code)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(
+            _printed_map(result.stdout, set(self.NAMES)),
+            {
+                "ART_SD_OUTPUT_FORMAT": "'webp'",
+                "ART_SD_OUTPUT_EXTENSION": "'.webp'",
+            },
+        )
+
+    @covers_requirement(
+        "settings-environment-overrides::the-output-extension-is-derived-never-configured"
+    )
+    def test_a_direct_environment_extension_assignment_is_discarded(self):
+        result = self._run(
+            _settings_repr(self.NAMES), ART_SD_OUTPUT_EXTENSION=".heic"
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(
+            _printed_map(result.stdout, set(self.NAMES)),
+            {
+                "ART_SD_OUTPUT_FORMAT": "'png'",
+                "ART_SD_OUTPUT_EXTENSION": "'.png'",
+            },
+        )
+
+    @covers_requirement(
+        "settings-environment-overrides::the-output-extension-is-derived-never-configured"
+    )
+    def test_a_secret_extension_assignment_is_discarded(self):
+        code = (
+            "import sys\n"
+            "import types\n"
+            "secret = types.ModuleType('server.conf.secret_settings')\n"
+            "secret.ART_SD_OUTPUT_FORMAT = 'avif'\n"
+            "secret.ART_SD_OUTPUT_EXTENSION = '.heic'\n"
+            "sys.modules['server.conf.secret_settings'] = secret\n"
+            + _settings_repr(self.NAMES)
+        )
+        result = self._run(code)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(
+            _printed_map(result.stdout, set(self.NAMES)),
+            {
+                "ART_SD_OUTPUT_FORMAT": "'avif'",
+                "ART_SD_OUTPUT_EXTENSION": "'.avif'",
+            },
+        )
+
+
 class TestSettingsSanitizationTests(_SubprocessSettingsTests):
     @covers_requirement(
         "settings-environment-overrides::deployment-settings-accept-typed-environment-overrides"
@@ -456,6 +573,7 @@ def _env_read_names(path: str) -> set[str]:
         "_env_int",
         "_env_dimension",
         "_env_float",
+        "_env_choice",
         "_env_bool",
     }
     for node in ast.walk(tree):

@@ -97,7 +97,7 @@ prompts:
 | 設定 | 環境變數 | 預設值 | 說明 |
 | --- | --- | --- | --- |
 | `ART_SD_BASE_URL` | `SD_WEBUI_BASE_URL` | `http://127.0.0.1:7860` | sd-webui / Forge 的 API 根位址（compose 已傳入 `SD_WEBUI_BASE_URL`） |
-| `ART_SD_TIMEOUT_SECONDS` | `ART_SD_TIMEOUT_SECONDS` | `600` | 單次 txt2img 交換的總牆鐘截止時間；租約回收以最壞批次（`ART_SCHEDULER_LIMIT` × 此值 + 餘量）計算 |
+| `ART_SD_TIMEOUT_SECONDS` | `ART_SD_TIMEOUT_SECONDS` | `600` | 單次 txt2img 交換的總牆鐘截止時間；租約回收以最壞批次（`ART_SCHEDULER_LIMIT` ×（此值＋本機轉碼餘量）＋ 餘量）計算 |
 | `ART_SD_STEPS` / `ART_SD_CFG_SCALE` | 同名 | `30` / `7.0` | 取樣步數與 CFG（正整數／正浮點數，載入時驗證） |
 | `ART_SD_SAMPLER` / `ART_SD_SCHEDULER` | 同名 | 空字串 | 空＝伺服器預設；設定後會以 `sampler_name` / `scheduler` 傳出，必須與伺服器列舉的名稱完全一致 |
 | `ART_SD_CHECKPOINT` | `ART_SD_CHECKPOINT` | 空字串 | 選用：確切的模型標題（含 hash 後綴）；空＝伺服器現用模型 |
@@ -108,6 +108,9 @@ prompts:
 | `ART_SD_MAX_RESPONSE_BYTES` | 同名 | `52428800`（50 MiB） | 回應本文／base64 上限 |
 | `ART_SD_MAX_IMAGE_DIMENSIONS` / `ART_SD_MAX_IMAGE_PIXELS` | 同名 | `4096` / `16777216`（16 MiP） | 解碼 PNG 的寬高與總像素上限 |
 | `ART_SD_PREPIN_SAMPLES_FORMAT` | 同名 | `False` | 選用：啟動時把伺服器持久設定 `samples_format` 預先釘選為 `png`（`POST /sdapi/v1/options`，每行程式一次）。⚠️ 這會永久改變共用伺服器的持久預設值，只建議用於專屬 sd-webui 實例；一般情況靠請求內 `override_settings.samples_format` 即足夠 |
+| `ART_SD_OUTPUT_FORMAT` | 同名 | `png` | 本機轉碼輸出的格式（`png`／`webp`／`jpeg`／`avif`，大小寫不拘）；衍生副檔名 `.png`／`.webp`／`.jpg`／`.avif`。切換格式後既有資產照常展示與服務，直到個別主題重新生成才換檔（換檔時舊檔在新狀態提交後才刪除） |
+| `ART_SD_OUTPUT_QUALITY` | 同名 | `80` | 有損格式（webp／jpeg／avif）的品質 1–100；png 忽略此值 |
+| `ART_SD_PRESERVE_GENERATION_METADATA` | 同名 | `True` | 是否在輸出內嵌 A1111 形式的生成資訊（提示詞、負向提示詞、步驟、CFG、取樣器、排程器、seed、尺寸、模型）；`png` 走文字區塊、有損格式走 EXIF，來源一律是引擎-known 的請求值；`False`＝完全不寫入（此時 seed 仍存於記錄供程式使用） |
 
 標註「同名」的設定由同名環境變數設定（變數不存在或空白時用預設值；存在但無效的值會在啟動時直接報錯並點名變數，絕不靜默失效）。完整的三層設定模型、優先順序與驗證規則見[設定與環境變數](/development/settings-and-environment)。
 
