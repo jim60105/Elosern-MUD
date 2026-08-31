@@ -659,6 +659,16 @@
 | 情境 | 管理員（需 Developer 權限） |
 | 說明 | 向已設定的 sd-webui 伺服器查詢目前可選用的模型、取樣器、排程器、風格或模組名稱清單（唯讀診斷，永不修改遊戲狀態）；查詢在背景執行，伺服器 unreachable 或逾時只會回報錯誤碼。 |
 
+### art health
+
+| 項目 | 內容 |
+| --- | --- |
+| 指令 | `art health` |
+| 別名 | （無） |
+| 語法 | `art health` |
+| 情境 | 管理員（需 Developer 權限） |
+| 說明 | 對 sd-webui 伺服器發一次強制的連線探測（背景執行，永不修改遊戲狀態），並顯示一頁式營運儀表板：伺服器 reachable／unreachable（含錯誤碼）、排程器狀態（間隔與每 tick 上限）、佇列各狀態計數（pending／in_progress／failed／done）、現行輸出政策（格式、品質、中繼資料開關）。探測僅診斷：unreachable 判定不會阻擋佇列或任何生成嘗試。 |
+
 ## 系統與建造
 
 ### @teleport

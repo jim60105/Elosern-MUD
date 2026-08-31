@@ -76,6 +76,7 @@ def _env_typed(
     *,
     minimum: int | float | None = None,
     maximum: int | float | None = None,
+    at_least: int | float | None = None,
     multiple: int | None = None,
     rule: str,
 ) -> object:
@@ -85,9 +86,9 @@ def _env_typed(
     knob carries no intent and must not poison a typed value). Otherwise the
     stripped value is converted and bounded: `minimum` is an EXCLUSIVE lower
     bound (pass 0 to require positivity; non-finite results are rejected
-    first so inf/nan can never slip past the bound), `maximum` is an INCLUSIVE
-    upper bound, `multiple` requires divisibility. Any conversion or bound
-    violation raises
+    first so inf/nan can never slip past the bound), `at_least` and `maximum`
+    are INCLUSIVE bounds (a two-sided bounded knob passes both), `multiple`
+    requires divisibility. Any conversion or bound violation raises
     ImproperlyConfigured naming the variable, quoting the raw value, and
     stating the violated `rule` — a mis-set deployment knob is loud at boot,
     never silently inert.
@@ -109,6 +110,10 @@ def _env_typed(
             f"setting {name}: invalid environment value '{raw}' ({rule})"
         )
     if minimum is not None and value <= minimum:
+        raise ImproperlyConfigured(
+            f"setting {name}: invalid environment value '{raw}' ({rule})"
+        )
+    if at_least is not None and value < at_least:
         raise ImproperlyConfigured(
             f"setting {name}: invalid environment value '{raw}' ({rule})"
         )
@@ -140,6 +145,21 @@ def _env_int(
         minimum=0,
         maximum=maximum,
         rule=f"expected an integer between 1 and {maximum}",
+    )
+
+
+def _env_int_bounded(
+    name: str, default: int, *, low: int, high: int
+) -> int:
+    """Two-sided INCLUSIVE integer knob: values below `low` or above `high`
+    fail closed, and the rule names both endpoints."""
+    return _env_typed(
+        name,
+        int,
+        default,
+        at_least=low,
+        maximum=high,
+        rule=f"expected an integer between {low} and {high}",
     )
 
 
@@ -315,6 +335,16 @@ ART_SD_OUTPUT_QUALITY = _env_int("ART_SD_OUTPUT_QUALITY", 80, maximum=100)
 # either mode — the flag governs only whether OUR parameters block is added.
 ART_SD_PRESERVE_GENERATION_METADATA = _env_bool(
     "ART_SD_PRESERVE_GENERATION_METADATA", True
+)
+
+# Connectivity probing (art-service-connectivity-surface): the probe budget
+# and the TTL of the cached verdict. Both are diagnostic-only knobs — the
+# probe never gates generation.
+ART_SD_PROBE_TIMEOUT_MS = _env_int_bounded(
+    "ART_SD_PROBE_TIMEOUT_MS", 5_000, low=1_000, high=60_000
+)
+ART_SD_PROBE_CACHE_SECONDS = _env_int_bounded(
+    "ART_SD_PROBE_CACHE_SECONDS", 300, low=5, high=3_600
 )
 
 ######################################################################

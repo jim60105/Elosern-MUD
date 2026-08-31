@@ -20,3 +20,8 @@ class FailingSDWebUIClient:
         raise SDError(
             "sd_connection_error", "browser-harness simulated unreachable image service"
         )
+
+    def probe_samplers(self, *, timeout_seconds: float) -> None:
+        raise SDError(
+            "sd_connection_error", "browser-harness simulated unreachable image service"
+        )

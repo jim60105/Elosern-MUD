@@ -7,12 +7,14 @@ from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
 
 from commands.art import (
+    CmdArtHealth,
     CmdArtOptions,
     CmdArtRequeue,
     CmdArtRetry,
     CmdArtRun,
     CmdArtStatus,
 )
+from world.art.connectivity import ProbeResult
 from world.art.queue import claim, ensure, requeue, settle
 from world.art.sd_worker import SDError
 from world.art.store import ArtAssetRecord, ArtAssetStatus
@@ -277,6 +279,128 @@ class ArtStatusSeedColumnTests(EvenniaCommandTestMixin, EvenniaTest):
         output = self.call(CmdArtStatus(), "")
         self.assertIn("scene:forest_path", output)
         self.assertNotIn("seed=", output)
+
+
+class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
+    """``@art health`` with the thread dispatch replaced by a sync seam."""
+
+    def _health(self, result, caller=None):
+        from world.art import connectivity
+
+        with patch(
+            "twisted.internet.threads.deferToThread",
+            side_effect=_sync_defer_to_thread,
+        ) as dispatch:
+            with patch.object(connectivity, "probe", return_value=result) as probe:
+                output = self.call(CmdArtHealth(), "", caller=caller)
+        return output, dispatch, probe
+
+    @staticmethod
+    def _verdict(ok=True, code=None, from_cache=False, age=0.0):
+        return ProbeResult(
+            ok=ok,
+            code=code,
+            host="sd.internal",
+            checked_at=0.0,
+            age_seconds=age,
+            from_cache=from_cache,
+        )
+
+    @covers_requirement(
+        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
+    )
+    def test_reachable_dashboard_shows_all_four_sections(self):
+        ensure(_scene("forest_path"), "desc")
+        claim(10)
+        settle(
+            _scene("forest_path"),
+            status=ArtAssetStatus.DONE,
+            output_identity="scene/forest_path.png",
+            error=None,
+        )
+        ensure(_scene("old_ruins"), "desc")
+        claim(10)
+        settle(
+            _scene("old_ruins"),
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="sd_connection_error",
+        )
+        output, dispatch, _ = self._health(self._verdict())
+        dispatch.assert_called_once()
+        lines = output.splitlines()
+        self.assertEqual(lines[0], "server: reachable (checked just now)")
+        self.assertEqual(lines[1], "scheduler: enabled interval=30s limit=4")
+        self.assertEqual(lines[2], "queue: pending=0 in_progress=0 failed=1 done=1")
+        self.assertEqual(lines[3], "output: png q=80 metadata=on")
+
+    @covers_requirement(
+        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
+    )
+    def test_unreachable_line_keeps_remaining_sections(self):
+        output, _, probe = self._health(
+            self._verdict(ok=False, code="sd_connection_error")
+        )
+        self.assertIn(
+            "server: unreachable — sd_connection_error (checked just now)", output
+        )
+        self.assertIn("scheduler: ", output)
+        self.assertIn("queue: pending=0 in_progress=0 failed=0 done=0", output)
+        self.assertIn("output: ", output)
+        probe.assert_called_once_with(force=True)
+
+    @covers_requirement(
+        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
+    )
+    def test_health_mutates_nothing(self):
+        ensure(_scene("forest_path"), "desc")
+        claim(1)
+        before = [
+            (r.db_key, r.db.status, r.db.attempt_count, r.db.output_identity)
+            for r in ArtAssetRecord.objects.all()
+        ]
+        self._health(self._verdict())
+        after = [
+            (r.db_key, r.db.status, r.db.attempt_count, r.db.output_identity)
+            for r in ArtAssetRecord.objects.all()
+        ]
+        self.assertEqual(before, after)
+
+    @covers_requirement(
+        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
+    )
+    def test_output_leaks_no_credentials_userinfo_or_paths(self):
+        from django.test import override_settings
+
+        with override_settings(
+            ART_SD_USERNAME="operator",
+            ART_SD_PASSWORD="sup3r-s3cret",
+            ART_SD_BASE_URL="http://user:password@sd.internal:7860",
+        ):
+            output, _, _ = self._health(self._verdict())
+        for forbidden in ("operator", "sup3r-s3cret", "user", "password", "@", "Basic ", "/app", "server/"):
+            self.assertNotIn(forbidden, output)
+
+    @covers_requirement(
+        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
+    )
+    @covers_requirement("art-staff-commands::players-have-no-access-to-any-art-control")
+    def test_non_staff_denied_without_any_probe(self):
+        output, dispatch, probe = self._health(self._verdict(), caller=self.char2)
+        self.assertIn("沒有權限", output)
+        dispatch.assert_not_called()
+        probe.assert_not_called()
+
+    @covers_requirement(
+        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
+    )
+    def test_cached_verdict_line_shows_its_age(self):
+        output, _, _ = self._health(
+            self._verdict(ok=False, code="sd_timeout", from_cache=True, age=12.34)
+        )
+        self.assertIn(
+            "server: unreachable — sd_timeout (checked 12.3s ago)", output
+        )
 
 
 if __name__ == "__main__":

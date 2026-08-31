@@ -88,9 +88,14 @@ runs one `probe_samplers(timeout_seconds=ART_SD_PROBE_TIMEOUT_MS / 1000)`
 call, catches every `SDError`/`OSError`/timeout, and caches the result. It
 NEVER raises: an unreachable or misconfigured server is
 `ProbeResult(ok=False, code=...)`.
-The fingerprint is `sha256(base_url | has_user | has_pass | timeout_ms)` —
-inclusion *presence*-booleans keeps secret material out of any loggable
-value; a change to any component (or settings reload) misses the cache.
+The fingerprint is
+`sha256(userinfo_stripped(base_url) | has_user | has_pass | timeout_ms)` —
+inclusion *presence*-booleans (plus userinfo stripping) keeps secret material
+and credential-derived digest input out of any loggable or cacheable value
+(duck run-2: a plain sha256 of URL-embedded credentials is offline-guessable
+from a cache dump, and the transport derives auth ONLY from
+`ART_SD_USERNAME`/`ART_SD_PASSWORD`, never URL userinfo); a change to any
+component (or settings reload) misses the cache.
 `ART_SD_PROBE_CACHE_SECONDS` is deliberately NOT in the fingerprint — it is
 the TTL itself, re-evaluated against the entry's age on every call, so
 shortening it invalidates immediately and lengthening it only ever admits
@@ -106,20 +111,61 @@ fingerprint invalidation, force bypass, never-throw), minus the plugin's
 `chrome.storage` persistence — process-local is the honest lifetime (the
 verdict describes *now*; a restart probing fresh is correct).
 
+### D1a — The probe never mutates: pre-pin leaves the constructor (duck run-1 BLOCKER)
+
+`SDWebUIClient.__init__` currently calls `maybe_prepin_samples_format()`, which — when
+`ART_SD_PREPIN_SAMPLES_FORMAT` is enabled — GETs and potentially POSTs `/sdapi/v1/options`,
+permanently mutating the shared server on the generation deadline. A diagnostic probe
+instantiating the client through that constructor would inherit the mutation (and its warn
+log), violating the read-only invariant. The pre-pin call therefore MOVES from `__init__` to
+the top of `generate()` (the only flow that needs it, before the txt2img POST), keeping its
+once-per-process lock-guarded semantics. Constructing any client — probe included — issues
+zero HTTP; a regression test with pre-pin enabled asserts probe() performs exactly the
+sampler GET.
+
+### D1b — One outer exception boundary over a single settings snapshot
+
+`probe()` snapshots the effective connectivity settings (base URL, credential presence,
+probe timeout, TTL) once per call, derives fingerprint/host/timeout from that snapshot only,
+and wraps the ENTIRE operation — snapshot, fingerprint/host derivation, cache access,
+client resolution/construction, seam call — in one boundary: known `SDError` codes verbatim,
+`OSError` → `sd_connection_error`, anything else (unresolvable `ART_SD_CLIENT`, malformed
+URL parsing, arbitrary seam exceptions) → `sd_internal_error` with the host placeholder
+`?` (never URL text). The never-raises contract is not just around the seam call.
+
+### D1c — Lock scope and replacement rule
+
+The cache check, probe, and slot write run under the one `threading.Lock`: a concurrent
+unforced caller waits for the in-flight probe and then gets the fresh entry
+(`from_cache=True`) instead of issuing a duplicate request (duplicate-probe suppression by
+serialization — probes are bounded by the probe timeout, and the only forced caller is a
+staff command). The slot is replaced only when its stored timestamp is older than the
+completing probe's own monotonic timestamp, so a slow stale probe can never overwrite a
+newer verdict. Tests: two simultaneous unforced calls issue exactly one request; a
+force/refresh ordering case pins the timestamp rule.
+
 ### D2 — The probe is diagnostic-only, enforced by structure
 
 No production module under `world/art/` except `connectivity.py` itself SHALL
 import `world.art.connectivity` — that is worker.py, service.py, scheduler.py,
 queue.py, store.py, formats.py, sd_worker.py, and every future module. The
 only importer is `commands/art.py`. Enforcement is an import-boundary test
-that AST-parses EVERY production `world/art/**/*.py` file and fails on any
-`connectivity` import outside `connectivity.py` itself (a one-module
-assertion on `worker` alone would let a gate through `service`/`scheduler`/
-`queue` pass), PLUS an integration test that seeds a cached `ok=False`
-verdict, recovers the fake server, and asserts a claimed job still settles
-`done`. The queue contract (`art-queue-worker`) stays unchanged. A health
+that AST-parses EVERY production `world/art/**/*.py` file (excluding
+`**/tests/**` and `connectivity.py`) and fails on any connectivity import
+outside `connectivity.py` itself (a one-module assertion on `worker` alone
+would let a gate through `service`/`scheduler`/`queue` pass). Per duck run-1
+the AST visitor MUST reject every syntactic spelling — dotted `Import` with
+aliases, absolute or relative `ImportFrom` of the module or of `connectivity`
+from the package, and literal dynamic imports through `importlib.import_module`
+or `__import__` (any alias) whose first argument is a constant string naming
+the module — and MUST be demonstrated against negative fixture sources
+(alias form, dynamic-literal form) that the checker itself rejects.
+Dynamically *constructed* names cannot be proven statically; the behavioral
+backstop is an integration test that seeds a cached `ok=False` verdict,
+recovers the fake server, and asserts a claimed job still settles `done`.
+The queue contract (`art-queue-worker`) stays unchanged. A health
 "unreachable" verdict while `@art run` succeeds is a legitimate state
-(server flapping) and the UI text says so via the verdict age.
+(server flapping) and the output says so via the verdict age.
 
 ### D3 — `@art health` output contract
 
@@ -144,6 +190,38 @@ Sections, in fixed order, each one line-ish:
 No credentials, no URL userinfo, no absolute paths, no prompt text — same
 leakage contract as `@art status`. Counts are exact integers (bounded by the
 record store); verdict age is the only float (1 decimal).
+
+Duck run-1 MAJOR: these four lines are a pinned output contract, and the
+delta scenario tests assert the state tokens verbatim — `reachable` /
+`unreachable` + named code + `(checked just now)`. They are rendered as
+written (ASCII skeleton, same convention as the design examples); command
+tests pin the complete four-section text and order for both verdicts.
+
+### D4 — Two bounded int knobs reuse a new two-sided-inclusive helper
+
+`ART_SD_PROBE_TIMEOUT_MS` (`_env_int_bounded(low=1_000, high=60_000`, default
+`5_000` — values below 1000 are `ImproperlyConfigured`; the probe's whole
+point is surviving a slow-but-alive server) and `ART_SD_PROBE_CACHE_SECONDS`
+(`_env_int_bounded(low=5, high=3_600`, default `300`). The existing
+`_env_typed` `minimum` is EXCLUSIVE, so a two-sided-inclusive wrapper is
+added (rule message: `expected an integer between {low} and {high}`, naming
+both endpoints as the delta scenario requires). Both join the exact-26
+inventory (`.env.example`, guide, `ENV_BACKED`/`DEFAULT_REPR`/
+`VALID_OVERRIDES`, pop list).
+The probe TIMEOUT is part of the cache fingerprint, so a timeout edit cannot
+be masked by a cached entry; the cache SECONDS is the TTL itself
+re-evaluated per call (see D1), not a fingerprint component.
+
+### D5 — Seam tests (duck run-1 MAJOR)
+
+`SDWebUIClient.probe_samplers` gets its own focused tests via the established
+`FakeConnection`/`FakeResponse` http.client stub (test_options.py precedent):
+exactly one GET to `/sdapi/v1/samplers` with the CALLER's timeout (not the
+fixed 10 s enumeration timeout), JSON-list success → `None`, non-list body →
+`sd_malformed_response`, non-200 → `sd_http_error`, and an arbitrary-item
+list (non-objects included) → still success, pinning the deliberate
+no-item-cap/no-item-shape decision. A pre-pin-enabled test asserts probe()
+issues only the sampler GET (D1a).
 
 ### D4 — Two bounded int knobs reuse B's inclusive-maximum helper
 

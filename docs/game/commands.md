@@ -125,6 +125,7 @@
 | [`art retry`](/game/command-reference?id=art-retry) | 重新排入失敗記錄。 |
 | [`art requeue`](/game/command-reference?id=art-requeue) | 強制重新生成主體。 |
 | [`art options`](/game/command-reference?id=art-options) | 查詢 sd-webui 可選名稱。 |
+| [`art health`](/game/command-reference?id=art-health) | 檢視 sd-webui 連線與管線狀態。 |
 
 ## 系統與建造
 
