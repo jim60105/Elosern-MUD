@@ -21,6 +21,7 @@
 - 開發者指南
   - [新增魔法指南](/development/adding-spells)
   - [新增物品指南](/development/adding-items)
+  - [設定與環境變數](/development/settings-and-environment)
   - [OpenSpec 測試可追溯性](/development/spec-test-traceability)
   - [Evennia 測試效能優化指南](/development/evennia-testing-guide)
   - [Evennia 測試效能報告](/development/evennia-test-performance)

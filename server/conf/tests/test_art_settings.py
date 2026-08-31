@@ -1,4 +1,9 @@
-"""Tests for the deterministic art-assets settings contract."""
+"""Tests for the deterministic art-assets settings contract.
+
+CI/test invocations must not export ``ART_SD_*`` environment overrides;
+``server/conf/test_settings.py`` sanitizes them regardless, so the effective
+values pinned here are always the documented code defaults.
+"""
 
 import unittest
 
