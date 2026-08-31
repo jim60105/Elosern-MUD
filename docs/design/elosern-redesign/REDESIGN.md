@@ -161,3 +161,62 @@ Escape 一律回父層；子選單開啟不重建父選單；改動進行中抑�
 1. 親密狀態預設展開或收折？（建議：收折，且僅「狀態」內可展開）
 2. 小地图戰鬥時是完全隱藏，還是縮為「敵我方位」簡版？（建議：完全隱藏，參戰框架已含方位）
 3. 快捷詞要固定一組，還是隨 context 換（探索=看/走/拿/說，戰鬥=cast/flee/defend）？（建議：隨 context 換）
+
+---
+
+## 7. Map layouts — 局部地圖的兩種版面（design note, English）
+
+*Pre-wave design for `openspec/changes/webclient-map-02-layout-variants`. The visual draft (`index.html`) implements both layouts; this section records why the split looks the way it does.*
+
+### 7.1 Two data formats, two layouts — never player-selected
+
+The world ships **two fundamentally different map formats**, and the layout is a pure function of the payload, mirroring the Evennia source model:
+
+| payload layer | Evennia source | coordinates | layout |
+|---|---|---|---|
+| `grid` | xyzgrid contrib (`XYZNode.X/Y`, 8-way links) | validated world coordinates | 網格圖 (coordinate lattice) |
+| `wilderness` | wilderness contrib (8 direction exits over provider coords) | validated world coordinates | 網格圖 |
+| `interior` / `instance` | plain Evennia room/exit graph | none (node `x` is a layout index, not a place) | 連線圖 (radial graph) |
+
+`isCoordinateLayer(layer) = layer ∈ {grid, wilderness}` is the one resolver; island and overlay read the same resolved value, so divergence is impossible. The layout's formal names follow Evennia — `grid` for the xyzgrid coordinate space, `wilderness` for the Wilderness contrib's — and the Chinese word 荒野 is a usage example of the coordinate space only, never a code or spec name. There is **no player-facing layout control, preference, or storage of any kind** — a player who stands in a coordinate space sees the lattice, and one who stands in a room cluster sees the graph. (An earlier revision of this note specified a three-segment manual switch; the owner ruled it out: the format follows the world, not taste.) The closed se...
+
+Both layouts share one renderer contract: identical marker states (current seal-red r8/r9 + pin > visited filled > unvisited hollow > gold landmark; seen-not-visited = gold at 0.5 opacity), identical edge colours/widths (solid = traversable, dashed = blocked exit), identical labels and palette. What differs is **what the geometry is allowed to claim**:
+
+| | 連線圖 (graph) | 網格圖 (lattice) |
+|---|---|---|
+| Claims | **connectivity only** — which nodes are reachable from where | **relative position** — nodes sit at committed coordinates, current node is the origin, `+y = 北` |
+| Position meaning | decorative; pixel angles mean nothing | meaningful; lattice pitch = 1 coordinate cell |
+| Header mark | none — a graph asserts no axis | `北↑ 東→` (valid only where axes are drawn) |
+| Readout line | `連線圖` (names the drawing) | `坐標空間` (names the drawing) |
+| Fog vignette | knowledge edge (not terrain) | knowledge edge (not terrain) |
+
+Neither readout ever shows a bearing, compass angle, distance, or coordinate figure. Lattice node placement is driven by committed coordinates/exit directions, never by graph-layer pixel angles.
+
+### 7.2 Remote-known places: edge direction markers (lattice only)
+
+A coordinate payload can remember places **outside the drawn visual range** (the presenter puts them in `remembered` with their real coordinates — e.g. a trade city on the eastern plains or an underground cavern seen before). The lattice SHALL plot every node whose coordinates fall inside the drawn extent at its true cell, and SHALL render each remembered node outside the extent as an **edge direction marker**: a memory diamond (gold ring if landmark) sitting on the canvas's marker-safe border, positioned where the **ray from the current node through the raw coordinate delta** (`dx = remote.x − current.x`, `dy = remote.y − current.y`) crosses that border.
+
+The direction contract is testable and strict:
+
+- The ray is computed from **raw, pre-compression coordinates** — never from `col`/`row` ranks (rank compression preserves order, not ratios; `(100,1)` must not render as 45°). A pure helper (`remoteDirection(current, remote) → { dx, dy, octant }`) owns this; `+y = 北`, eight octants with explicit half-open sector bounds.
+- The marker conveys **direction only**: no distance figure, no angle, no coordinate readout. A faint ray segment from the current node to the marker is allowed as a pure visual (it encodes direction, which the data backs).
+- Markers are a bounded decoration layer (payload caps at 64 nodes): deterministic ordering, per-edge slotting so markers never overlap each other, the current node, or the axes. They carry no travel action.
+- **Accessibility floor:** the existing island remembered-list remains the complete, focusable reading path for every remembered node (contract unchanged); the markers duplicate it visually. In surfaces without the list (the overlay), each marker carries its place name as visible text and as its accessible name.
+- Coordinate-free payloads never get markers — their `x` is a layout index, and an interior remembered node stays list-only.
+
+### 7.3 Coordinate semantics: two meanings, one field
+
+The payload's node `x`/`y` carries two distinct semantics, and the spec must say so: under `grid`/`wilderness` they are **validated world coordinates** (from `XYMap` / the wilderness provider) and may drive relative-direction geometry; under `interior`/`instance` they are **renderer-local layout values** and MUST NEVER be read as direction, distance, or place. The old blanket ban on bearing figures stands — it now reads: no numeric angle/distance/coordinate readout anywhere, and direction geometry only from validated coordinates.
+
+### 7.4 Draft demo device and accessibility
+
+The static draft shows both layouts through a **demo fixture selector** (`.demofx`, bottom-left, dashed border, legend `展示資料（非遊戲控制）`): it swaps which committed fixture payload the mock renders (`無座標房間 payload` = interior graph; `wilderness 座標 payload` = wilderness lattice) and stores nothing. It is review chrome, visually distinct from game HUD, and never ships; the layout still comes from the payload's `layer` through the same resolver the product uses. The variant SVGs carry `role="img"` + per-variant `aria-label` (`局部地圖（連線圖）` / `局部地圖（網格圖）`). Lattice dot-field and axis cross are tuned to be plainly visible (`#3a3344` at 0.85 dot fill-opacity, 1.5px axis at 0.65) — the lattice's geometry is its claim, so it must not be invisible; implementation waves pin their presence and contrast.
+
+```mermaid
+flowchart LR
+  P["local_map payload<br/>layer 欄位"] --> R{"isCoordinateLayer?<br/>grid / wilderness"}
+  R -->|yes| G["網格圖 lattice<br/>真實座標落點＋邊緣方位標記"]
+  R -->|no (interior/instance)| F["連線圖 graph<br/>BFS 環狀拓撲"]
+  G --> S["單一解析值同步島嶼＋全地圖"]
+  F --> S
+```
