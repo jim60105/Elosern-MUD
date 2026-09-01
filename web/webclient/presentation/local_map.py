@@ -445,11 +445,12 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
         builder.add_edge(current_id, node_id, _grid_direction_label(current_node, node), action is not None)
 
     # Registered wilderness gates: the grid side of the gateway pair renders
-    # the entry cell's wild node (design D2). Geometry is the renderer-local
-    # slot named by the gate's key/aliases; an occupied slot probes outward
-    # deterministically instead of dropping the gate.
-    for gate_id, (landing_cell, gate) in gate_candidates.items():
-        direction = _gate_direction(gate)
+    # the gate's own approach cell's wild node (design D2). Geometry is the
+    # renderer-local slot named by the registry face carried on the candidate
+    # (never a parse of the exit's key/aliases -- every gate exit is keyed
+    # 荒野); an occupied slot probes outward deterministically instead of
+    # dropping the gate.
+    for gate_id, (landing_cell, gate, direction) in gate_candidates.items():
         dx, dy = DIRECTION_DELTAS[direction]
         slot_x, slot_y = _free_slot(builder, x + dx, y + dy)
         action = (
@@ -494,12 +495,12 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
     return "grid"
 
 
-def _grid_gate_candidates(location) -> dict[str, tuple[Any, Any]]:
+def _grid_gate_candidates(location) -> dict[str, tuple[Any, Any, str]]:
     """Registered gate exits at ``location``, deduped by canonical wild id.
 
-    Returns ``{wild_id: (landing_cell, gate_exit)}`` in deterministic dbid order
-    (lowest dbid wins a duplicate registration of the same entry). An
-    unregistered or missing ``db.anchor_key`` is not a gate; a registered
+    Returns ``{wild_id: (landing_cell, gate_exit, face)}`` in deterministic
+    dbid order (lowest dbid wins a duplicate registration of the same entry).
+    An unregistered or missing ``db.anchor_key`` is not a gate; a registered
     entry whose coordinate cannot encode fails closed -- the presenter never
     emits an identity it cannot name.
 
@@ -511,12 +512,19 @@ def _grid_gate_candidates(location) -> dict[str, tuple[Any, Any]]:
     (``WildernessGateExit.at_traverse`` fails closed on the same lookup), so
     the presenter refuses to advertise it too -- the panel never offers an
     action that cannot be taken.
+
+    ``face`` is the renderer direction the gate's node draws toward: the
+    registry gate face (``OPPOSITE_DIRECTION[return_direction]``, the outward
+    direction from the city -- exactly the direction of the exit provisioning
+    placed on the gate room). It is derived from the registry, never from the
+    exit's key/aliases, which cannot distinguish two gates whose exits share
+    the key 荒野 (wilderness-anchor-footprint-local-map D2).
     """
     from typeclasses.exits import WildernessGateExit
-    from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+    from world.lore.wilderness_entry import OPPOSITE_DIRECTION, WILDERNESS_ENTRY_REGISTRY
     from world.maps.wilderness_provider import WILDERNESS_NAME
 
-    candidates: dict[str, tuple[Any, Any]] = {}
+    candidates: dict[str, tuple[Any, Any, str]] = {}
     gates = [e for e in location.exits if isinstance(e, WildernessGateExit)]
     for exit_obj in sorted(gates, key=lambda e: int(e.id)):
         try:
@@ -527,14 +535,15 @@ def _grid_gate_candidates(location) -> dict[str, tuple[Any, Any]]:
             continue
         gate = entry.gate_for(exit_obj.db.gate_direction) if exit_obj.db.gate_direction else None
         landing_cell = entry.approach_cell(gate) if gate is not None else None
-        if landing_cell is None:
+        face = OPPOSITE_DIRECTION.get(gate.return_direction) if gate is not None else None
+        if landing_cell is None or face is None:
             # Same lookup, same refusal as the traversal: not a gate identity.
             continue
         try:
             gate_id = encode_wild(WILDERNESS_NAME, *landing_cell)
         except Exception:
             raise PanelUnavailableError
-        candidates.setdefault(gate_id, (landing_cell, exit_obj))
+        candidates.setdefault(gate_id, (landing_cell, exit_obj, face))
     return candidates
 
 
@@ -557,29 +566,6 @@ def _trim_visible(nodes: list, current_node, cap: int) -> list:
         node.node_index for node in droppable[: max(len(droppable) - excess, 0)]
     }
     return [node for node in nodes if node.node_index in kept]
-
-
-def _gate_direction(gate) -> str:
-    """The renderer direction a gate exit's node draws toward (design D2).
-
-    Key first, then the first direction any alias normalizes to in canonical
-    ``WILD_DIRECTIONS`` order -- set-based, because alias-handler retrieval
-    order is not a repository guarantee -- then a stable ``n`` fallback.
-    """
-    from world.maps.wilderness_destination import normalize_wilderness_direction
-
-    direction = normalize_wilderness_direction(gate.key)
-    if direction is not None:
-        return direction
-    named = {
-        normalized
-        for alias in gate.aliases.all()
-        if (normalized := normalize_wilderness_direction(alias)) is not None
-    }
-    for candidate in WILD_DIRECTIONS:
-        if candidate in named:
-            return candidate
-    return "n"
 
 
 def _free_slot(builder: _GraphBuilder, x: int, y: int) -> tuple[int, int]:

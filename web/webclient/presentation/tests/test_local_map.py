@@ -1335,7 +1335,9 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
     def _registry(self):
         return build_production_registry()
 
-    def _make_gate(self, location, key="荒野", aliases=("wilderness", "north", "n")):
+    def _make_gate(
+        self, location, key="荒野", aliases=("wilderness", "north", "n"), gate_direction="s"
+    ):
         from typeclasses.exits import WildernessGateExit
 
         gate = create_object(
@@ -1345,8 +1347,9 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         gate.db.anchor_key = "capital_altoria"
         # The presenter refuses a gate row whose direction names no gate
         # (same refusal as the traversal), so synthetic gates carry the
-        # identity the tests pin: "s" -> approach cell (60, 103).
-        gate.db.gate_direction = "s"
+        # identity the tests pin: "s" -> approach cell (60, 103), face "n";
+        # "n" -> approach cell (60, 97), face "s".
+        gate.db.gate_direction = gate_direction
         return gate
 
     @covers_requirement(
@@ -1509,10 +1512,11 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
     @covers_requirement(
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
     )
-    def test_conflicting_aliases_pick_canonical_direction_order(self):
-        # Key names no direction and aliases disagree (east + southeast, in
-        # non-preferred insertion order): the first direction in canonical
-        # WILD_DIRECTIONS order wins, never a database-order-dependent choice.
+    def test_slot_direction_follows_registry_face_not_key_aliases(self):
+        # wilderness-anchor-footprint-local-map D2: the slot direction is the
+        # registry gate face (db.gate_direction "s" -> face "n"), never a
+        # parse of the exit's key or aliases -- key/alias direction parsing is
+        # deleted, and display aliases may name any direction they like.
         self._make_gate(self.plaza, key="捷徑", aliases=("southeast", "east"))
         self.char1.location = self.plaza
         record_arrival(self.char1)
@@ -1520,12 +1524,17 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         edge = next(
             e for e in payload["edges"] if e["destination"] == self.ENTRY_ID
         )
-        self.assertEqual(edge["label"], "e")
+        self.assertEqual(edge["label"], "n")
         gate_node = next(n for n in payload["nodes"] if n["id"] == self.ENTRY_ID)
-        # Preferred (3,2) is occupied by the in-range node; the sweep from
-        # (3,2) ring 1 hits (3,1),(2,2),(4,2),(3,3) occupied, then ring 2
-        # opens at (3,0) -- no city node there, so it is free.
-        self.assertEqual((gate_node["x"], gate_node["y"]), (3, 0))
+        self.assertIsNotNone(gate_node["action"])
+        # Exactly one gate edge exists and it names the face, never a
+        # direction any alias mentions.
+        labels = {
+            edge["label"]
+            for edge in payload["edges"]
+            if edge["destination"] == self.ENTRY_ID
+        }
+        self.assertEqual(labels, {"n"})
 
     @covers_requirement(
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
@@ -1566,6 +1575,276 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.assertFalse(
             any(edge["destination"] == self.ENTRY_ID for edge in payload["edges"])
         )
+
+    @covers_requirement(
+        "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
+    )
+    def test_two_gates_reserve_capacity_and_render_both(self):
+        # The reservation is len(gate_candidates), not one: with two distinct
+        # gates and a full-budget fake map the trim absorbs the pressure for
+        # BOTH reservations -- neither gate may be silently omitted, and only
+        # ordinary farthest nodes are trimmed in the pinned order.
+        self._make_gate(self.plaza, gate_direction="s")  # -> 60:103, face n
+        self._make_gate(self.plaza, key="北境之門", gate_direction="n")  # -> 60:97, face s
+        nodes = [
+            types.SimpleNamespace(
+                X=col, Y=row, node_index=row * 100 + col, links={}, symbol="#"
+            )
+            for row in range(3)
+            for col in range(3)
+        ]
+        current = nodes[0]  # (0, 0)
+        current.links = {f"l{index}": node for index, node in enumerate(nodes[1:])}
+
+        class FakeMap:
+            Z = "capital_altoria"
+            options = {"map_mode": "nodes", "map_visual_range": 8}
+            node_index_map = {node.node_index: node for node in nodes}
+
+            def get_node_from_coord(self, coord):
+                return next((n for n in nodes if (n.X, n.Y) == coord), None)
+
+        class EmptyQuery:
+            def first(self):
+                return None
+
+        self.char1.location = self.plaza
+        record_arrival(self.char1)
+        with (
+            patch.object(type(self.plaza), "xyz", (0, 0, "capital_altoria")),
+            patch.object(type(self.plaza), "xymap", FakeMap()),
+            patch("web.webclient.presentation.local_map.MAX_NODES", 4),
+            patch(
+                "typeclasses.rooms.GridRoom.objects.filter_xyz",
+                return_value=EmptyQuery(),
+            ),
+        ):
+            payload = self._registry().render("local_map", _context(self.char1))
+        self.assertTrue(payload["available"])
+        by_id = {node["id"]: node for node in payload["nodes"]}
+        # Cap 4 reserves 2 slots for the gates -> visible cap 2: the current
+        # node plus the single nearest droppable (ascending (cheb, Y, X):
+        # (1,0)). Both gate identities survive untouched.
+        self.assertEqual(len(payload["nodes"]), 4)
+        self.assertIn("grid:capital_altoria:0:0", by_id)
+        self.assertIn("grid:capital_altoria:1:0", by_id)
+        self.assertIn("wild:elosern:60:103", by_id)
+        self.assertIn("wild:elosern:60:97", by_id)
+        self.assertIsNotNone(by_id["wild:elosern:60:103"]["action"])
+        self.assertIsNotNone(by_id["wild:elosern:60:97"]["action"])
+        # Faces: 60:103 draws north to (0, 1), 60:97 draws south to (0, -1);
+        # both preferred slots are free after the trim.
+        self.assertEqual((by_id["wild:elosern:60:103"]["x"], by_id["wild:elosern:60:103"]["y"]), (0, 1))
+        self.assertEqual((by_id["wild:elosern:60:97"]["x"], by_id["wild:elosern:60:97"]["y"]), (0, -1))
+        edge_labels = {
+            edge["label"]
+            for edge in payload["edges"]
+            if edge["destination"] in ("wild:elosern:60:103", "wild:elosern:60:97")
+        }
+        self.assertEqual(edge_labels, {"n", "s"})
+
+
+class LocalMapPerGateFootprintTests(EvenniaTest):
+    """Per-gate presentation on both sides and the footprint boundary (P1b).
+
+    Registry geometry: footprint x=58..62, y=98..102; gate "n" -> 南門
+    ``grid:capital_altoria:2:0`` with approach (60, 97); gate "s" -> 北門
+    ``grid:capital_altoria:2:4`` with approach (60, 103). ``EvenniaTest``
+    because the round-trips traverse real gateway exits (same fixture need as
+    ``LocalMapGatewayPairTests``).
+    """
+
+    SOUTH_ID = "grid:capital_altoria:2:0"  # 南門
+    NORTH_ID = "grid:capital_altoria:2:4"  # 北門
+    SOUTH_APPROACH = "wild:elosern:60:97"
+    NORTH_APPROACH = "wild:elosern:60:103"
+    FOOTPRINT_X = range(58, 63)
+    FOOTPRINT_Y = range(98, 103)
+
+    def setUp(self):
+        super().setUp()
+        create_object(Room, key="虛境", location=None)
+        sync_grid()
+        sync_wilderness()
+        self.south_gate = GridRoom.objects.filter_xyz(xyz=(2, 0, "capital_altoria")).first()
+        self.north_gate = GridRoom.objects.filter_xyz(xyz=(2, 4, "capital_altoria")).first()
+
+    def _registry(self):
+        return build_production_registry()
+
+    def _wild_node_ids(self, payload):
+        ids = set()
+        for node in payload["nodes"]:
+            if not node["id"].startswith("wild:elosern:"):
+                continue
+            _, _, x, y = node["id"].split(":")
+            if int(x) in self.FOOTPRINT_X and int(y) in self.FOOTPRINT_Y:
+                ids.add(node["id"])
+        return ids
+
+    def _at_wild(self, coordinates):
+        from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
+        from world.maps.wilderness_provider import WILDERNESS_NAME
+
+        entered = enter_wilderness(self.char1, coordinates=coordinates, name=WILDERNESS_NAME)
+        self.assertTrue(entered, coordinates)
+        record_arrival(self.char1)
+
+    @covers_requirement(
+        "webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel"
+    )
+    def test_footprint_never_renders_as_walkable_wild_node(self):
+        # Every non-gate approach vantage facing the footprint renders absent
+        # ground: no footprint wild node anywhere in the payload and no edge
+        # for the footprint-facing direction (delta scenario, vantages off
+        # the two gate approach cells).
+        vantages = [
+            ((57, 100), "e"),  # -> (58, 100)
+            ((63, 100), "w"),  # -> (62, 100)
+            ((59, 97), "n"),   # -> (59, 98)
+            ((59, 103), "s"),  # -> (59, 102)
+        ]
+        for coordinates, blocked in vantages:
+            with self.subTest(vantage=coordinates, direction=blocked):
+                self._at_wild(coordinates)
+                payload = self._registry().render("local_map", _context(self.char1))
+                self.assertEqual(payload["layer"], "wilderness")
+                self.assertEqual(self._wild_node_ids(payload), set())
+                edges = {
+                    edge["label"]
+                    for edge in payload["edges"]
+                    if edge["source"] == payload["current_node"]
+                }
+                self.assertNotIn(blocked, edges)
+                self.char1.location = self.south_gate
+
+    @covers_requirement(
+        "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
+    )
+    def test_both_gates_render_independently_on_the_grid_side(self):
+        # Each city gate room shows its OWN approach cell, drawn toward its
+        # registry face -- never the other gate's approach cell.
+        for room, approach_id, other_id, slot in (
+            (self.south_gate, self.SOUTH_APPROACH, self.NORTH_APPROACH, (2, -1)),
+            (self.north_gate, self.NORTH_APPROACH, self.SOUTH_APPROACH, (2, 5)),
+        ):
+            with self.subTest(room=room.key):
+                self.char1.location = room
+                record_arrival(self.char1)
+                payload = self._registry().render("local_map", _context(self.char1))
+                by_id = {node["id"]: node for node in payload["nodes"]}
+                self.assertIn(approach_id, by_id)
+                self.assertNotIn(other_id, by_id)
+                node = by_id[approach_id]
+                self.assertEqual((node["x"], node["y"]), slot)
+                self.assertIsNotNone(node["action"])
+
+    @covers_requirement(
+        "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
+    )
+    def test_both_gates_render_independently_on_the_wild_side(self):
+        # Each approach cell resolves ONLY its own gateway: the south
+        # approach's north step is 南門, the north approach's south step is
+        # 北門, and the other gate never appears.
+        for coordinates, gate_id, other_id, direction in (
+            ((60, 97), self.SOUTH_ID, self.NORTH_ID, "n"),
+            ((60, 103), self.NORTH_ID, self.SOUTH_ID, "s"),
+        ):
+            with self.subTest(cell=coordinates):
+                self._at_wild(coordinates)
+                payload = self._registry().render("local_map", _context(self.char1))
+                by_id = {node["id"]: node for node in payload["nodes"]}
+                self.assertIn(gate_id, by_id)
+                self.assertNotIn(other_id, by_id)
+                edge = next(
+                    edge
+                    for edge in payload["edges"]
+                    if edge["source"] == payload["current_node"]
+                    and edge["destination"] == gate_id
+                )
+                self.assertEqual(edge["label"], direction)
+                self.assertTrue(edge["traversable"])
+
+    @covers_requirement(
+        "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
+    )
+    def test_gate_identity_survives_identical_keys_and_rewritten_aliases(self):
+        # sync_wilderness() provisions BOTH gate exits keyed 荒野; display
+        # aliases are affordances, not identity. With deliberately misleading
+        # aliases, each gate room still renders its OWN approach cell at its
+        # OWN face slot, and no candidate is dropped to key deduplication.
+        from typeclasses.exits import WildernessGateExit
+
+        south_exit = next(
+            exit_obj
+            for exit_obj in self.south_gate.exits
+            if isinstance(exit_obj, WildernessGateExit)
+        )
+        north_exit = next(
+            exit_obj
+            for exit_obj in self.north_gate.exits
+            if isinstance(exit_obj, WildernessGateExit)
+        )
+        self.assertEqual(south_exit.key, "荒野")
+        self.assertEqual(north_exit.key, "荒野")
+        # 南門's face is "s"; alias it as if it led north. 北門's face is "n";
+        # alias it as if it led south.
+        south_exit.aliases.clear()
+        south_exit.aliases.add("north", "n")
+        north_exit.aliases.clear()
+        north_exit.aliases.add("south", "s")
+
+        for room, approach_id, face_slot, exit_obj in (
+            (self.south_gate, self.SOUTH_APPROACH, (2, -1), south_exit),
+            (self.north_gate, self.NORTH_APPROACH, (2, 5), north_exit),
+        ):
+            with self.subTest(room=room.key):
+                self.char1.location = room
+                record_arrival(self.char1)
+                payload = self._registry().render("local_map", _context(self.char1))
+                by_id = {node["id"]: node for node in payload["nodes"]}
+                self.assertIn(approach_id, by_id)
+                node = by_id[approach_id]
+                self.assertEqual((node["x"], node["y"]), face_slot)
+                self.assertEqual(node["action"]["exit_ref"], str(int(exit_obj.id)))
+
+    @covers_requirement(
+        "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
+    )
+    def test_each_gate_pair_round_trips_through_real_traversal(self):
+        from typeclasses.exits import WildernessGateExit
+        from web.webclient.actions.node_ids import node_id_for_location
+
+        for room, gate_id, approach_id, return_key in (
+            (self.south_gate, self.SOUTH_ID, self.SOUTH_APPROACH, "north"),
+            (self.north_gate, self.NORTH_ID, self.NORTH_APPROACH, "south"),
+        ):
+            with self.subTest(gate=gate_id):
+                gate = next(
+                    exit_obj
+                    for exit_obj in room.exits
+                    if isinstance(exit_obj, WildernessGateExit)
+                )
+                # Grid side: the rendered node is the real wilderness arrival.
+                self.char1.location = room
+                record_arrival(self.char1)
+                payload = self._registry().render("local_map", _context(self.char1))
+                node = next(n for n in payload["nodes"] if n["id"] == approach_id)
+                gate.at_traverse(self.char1, room)
+                self.assertEqual(node_id_for_location(self.char1.location), node["id"])
+                self.assertEqual(node["action"]["destination"], node["id"])
+                # Wild side: the rendered node is the real gate arrival.
+                payload = self._registry().render("local_map", _context(self.char1))
+                gateway = next(n for n in payload["nodes"] if n["id"] == gate_id)
+                return_exit = next(
+                    exit_obj
+                    for exit_obj in self.char1.location.exits
+                    if exit_obj.key == return_key
+                )
+                return_exit.at_traverse(self.char1, self.char1.location)
+                self.assertEqual(self.char1.location.id, room.id)
+                self.assertEqual(node_id_for_location(room), gateway["id"])
+                self.assertEqual(gateway["action"]["destination"], gateway["id"])
 
 
 if __name__ == "__main__":

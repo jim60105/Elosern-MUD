@@ -66,8 +66,11 @@ at once is rejected.
   and the gateway node carries the gate's `grid:` ID positioned at the adjacent cell
 
 #### Scenario: An anchor footprint renders as absent ground, not a walkable cell
-- **WHEN** the puppet stands at any wilderness cell adjacent to the `capital_altoria` footprint (e.g.
-  `(57, 100)` facing east, or `(60, 96)` facing north) and the panel is built
+- **WHEN** the puppet stands at any wilderness cell adjacent to the `capital_altoria` footprint and
+  NOT on a gate approach cell (e.g. `(57, 100)` facing east toward `(58, 100)`, or `(59, 97)`
+  facing north toward `(59, 98)` — `(60, 97)`/`(60, 103)` face the footprint too but their
+  footprint-facing direction is the registered gateway, which renders per the gateway rules) and
+  the panel is built
 - **THEN** no `wild:` node with a footprint cell's coordinate exists in the payload, the direction
   toward the footprint carries no move action, and the direction is presented exactly like today's
   out-of-bounds edge
