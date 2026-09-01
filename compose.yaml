@@ -54,6 +54,11 @@ services:
       - evennia migrate --noinput && exec evennia createsuperuser
     stdin_open: true
     tty: true
+    env_file: .env
+    environment:
+      EVENNIA_SUPERUSER_USERNAME: ${EVENNIA_SUPERUSER_USERNAME:-browserplayer}
+      EVENNIA_SUPERUSER_EMAIL: ${EVENNIA_SUPERUSER_EMAIL:-browser@example.test}
+      EVENNIA_SUPERUSER_PASSWORD: ${EVENNIA_SUPERUSER_PASSWORD:-ElosernBrowserTest!2026}
     security_opt:
       - no-new-privileges
     tmpfs:
