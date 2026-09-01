@@ -341,14 +341,19 @@ An empty condition list SHALL render an explicit text statement rather than an e
 The minimap SHALL render as a bounded HUD island in the stage's right anchor, beneath the top-meta
 surface, carrying the committed `local_map` payload's title. Where the resolved layout variant is the
 coordinate lattice — which exactly the coordinate-bearing layers (`grid`, `wilderness`) select — the
-island MAY state the renderer's own axis convention as orientation marks in its header following the
+island SHALL state the renderer's own axis convention as orientation marks in its header following the
 redesign draft's header treatment (the letterspaced title style and the `北↑ 東→` marks the draft's
 lattice header draws); on the radial graph variant it SHALL omit those marks rather than assert an axis
-the presentation does not draw (a radial graph draws no axis). The island SHALL NOT render a bearing, a
-compass angle, a distance, or a coordinate figure in any form: on coordinate-bearing layers the node
-coordinates are validated world coordinates whose only permitted visual use is relative-direction
-geometry, and on every other layer they are renderer-local layout values that carry no spatial meaning
-at all.
+the presentation does not draw (a radial graph draws no axis). While the detail line shows the `current`
+node on a coordinate-bearing layer, the island SHALL additionally state that node's own coordinates as
+a two-integer figure — the payload `x` and `y` exactly as committed, with no unit, delta, or derived
+quantity — so the island's position statement is the drawing convention plus the current cell's world
+coordinates. Apart from that single figure the island SHALL NOT render a bearing angle, a compass
+angle, a distance, or any other coordinate figure: coordinate readouts for non-current nodes,
+differences between node coordinates, and every spatial figure on the graph variant remain forbidden,
+because on coordinate-bearing layers node coordinates are validated world coordinates whose only
+permitted visual uses are relative-direction geometry and the current-node figure, and on every other
+layer they are renderer-local layout values that carry no spatial meaning at all.
 
 The island SHALL NOT present any map layout control — no segmented switch, button, menu item, or other
 affordance selecting between the coordinate lattice and the radial graph — on the island or on the
@@ -366,12 +371,14 @@ per-node movement submission SHALL be unchanged.
 
 #### Scenario: The island states the axis convention on a coordinate-bearing layer
 - **WHEN** the committed payload's layer places nodes on coordinates and the resolved variant is the lattice
-- **THEN** the island may render the renderer's axis orientation marks in its draft-styled header
-  alongside the map title
+- **THEN** the island renders the renderer's axis orientation marks in its draft-styled header
+  alongside the map title, and while the detail line shows the current node it states that node's
+  two payload coordinates
 
 #### Scenario: A coordinate-free layer omits the legend
 - **WHEN** the committed payload's layer is coordinate-free
-- **THEN** the island renders no orientation marks rather than asserting a direction the payload does not support
+- **THEN** the island renders no orientation marks and no coordinate figure rather than asserting a
+  direction or position the payload does not support
 
 #### Scenario: The layout follows the payload without any control
 - **WHEN** a coordinate-bearing payload and then a coordinate-free payload are committed, with no player
@@ -380,9 +387,10 @@ per-node movement submission SHALL be unchanged.
   graph for the second, the map chrome exposes no layout-control element in either state, and no
   preference or storage write occurs
 
-#### Scenario: No bearing or distance is rendered
+#### Scenario: No compass angle or distance is rendered
 - **WHEN** the minimap island renders on any layer
-- **THEN** no compass angle, bearing, distance, or coordinate figure appears anywhere in the island
+- **THEN** no compass angle, bearing angle, or distance appears anywhere in the island, and the only
+  coordinate figure that can appear is the current node's own payload pair on a coordinate-bearing layer
 
 #### Scenario: No control opens an unmounted surface
 - **WHEN** the full-map surface is not mounted in the application
@@ -396,8 +404,6 @@ per-node movement submission SHALL be unchanged.
 #### Scenario: Clicking an interactive descendant does not open the map
 - **WHEN** the player activates a node, a remembered-list item, or the expand control itself
 - **THEN** only that control's own behavior runs and no additional map-open is emitted
-
-
 ### Requirement: The action dock renders as a floating panel in the stage's dock anchor
 The action dock SHALL render inside the stage's `dock` anchor as one floating panel bounded to a
 maximum width and horizontally centred, drawn with the stage's panel gradient, a hairline top border
@@ -1277,4 +1283,3 @@ When a dock pane's row region uses a fixed column count for keyboard row/col geo
 #### Scenario: The move frame navigates as a single-column list
 - **WHEN** the player presses ArrowUp or ArrowDown inside the move frame
 - **THEN** focus cycles through the move frame's items — the exit rows in order, then the `back` row — ArrowLeft and ArrowRight are no-ops, and the keyboard cell mapping does not depend on the pane's rendered column count
-

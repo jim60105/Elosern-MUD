@@ -48,7 +48,10 @@ export default {
 // pass it explicitly, mirroring what the surfaces wire.
 const latticeOf = (fixture) => {
   const model = localMapModelFor(fixture);
-  return { localMap: model, variant: model.layoutVariant };
+  // Mirror the real island wiring (slim-minimap-island D1): the minimap
+  // surface passes the legend-display switch off, so island-scale stories
+  // mount no legend element either.
+  return { localMap: model, variant: model.layoutVariant, showLegend: false };
 };
 
 // Island (minimap) scale: the crowding fix's decoupled pitches (58px
@@ -85,6 +88,9 @@ export const IslandScaleRadial = {
 const overlayOf = (fixture) => ({
   ...latticeOf(fixture),
   overlayChrome: true,
+  // The full-map overlay keeps the state legend (slim-minimap-island D1:
+  // the switch is on wherever the overlay renders).
+  showLegend: true,
 });
 
 export const OverlayScaleSample = {
