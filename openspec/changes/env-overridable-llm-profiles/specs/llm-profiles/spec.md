@@ -92,7 +92,7 @@ When `server/conf/secret_settings.py` defines `LLM_PROFILES`, the effective prof
 
 #### Scenario: A secret layer entry replaces its layer wholesale
 - **WHEN** a secret-settings `character_creation` entry omits `model` while `LLM_CHARACTER_CREATION_MODEL` is set in the environment
-- **THEN** the effective `character_creation` profile resolves `model` from that layer's code default via the raw-map fallback, and the environment value reached neither field nor partial merge
+- **THEN** settings import fails with the strict named validation error naming the `character_creation` layer and the `model` field — the environment value reached neither the entry nor any partial merge, and a wholesale secret entry must be complete
 
 #### Scenario: An unknown secret layer still fails the boot
 - **WHEN** `secret_settings.py` defines `LLM_PROFILES` containing a key outside the seven layer names

@@ -51,6 +51,15 @@ _ENV_OVERRIDES = (
 for _name in _ENV_OVERRIDES:
     os.environ.pop(_name, None)
 
+# Every generated LLM knob name (23 globals + 23 per layer for seven layers)
+# is sanitized too, via the inert knob table so no second list can drift. The
+# literal _ENV_OVERRIDES tuple above stays literal-only: the AST inventory
+# extractor recognises just that tuple.
+from server.conf.llm_knobs import llm_env_names
+
+for _llm_name in llm_env_names():
+    os.environ.pop(_llm_name, None)
+
 from server.conf.settings import *  # noqa: E402,F401,F403
 
 

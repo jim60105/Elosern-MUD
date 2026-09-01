@@ -24,7 +24,7 @@ Then start the service with `podman compose up`. The normal startup script appli
 database migrations before launching Evennia. Connect through telnet at `localhost:4000` or the web
 client at `http://localhost:4001`.
 
-`OLLAMA_BASE_URL` and `SD_WEBUI_BASE_URL` configure external services. They are not containerized
+`LLM_BASE_URL` and `SD_WEBUI_BASE_URL` configure external services. They are not containerized
 by this project.
 
 ## Develop locally

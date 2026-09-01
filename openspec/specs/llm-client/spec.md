@@ -46,12 +46,12 @@ A connection error, HTTP error status, malformed response body, or timeout SHALL
 - **THEN** the call resolves as a failure, the Evennia process continues running, and no raw body or prompt is written to the log
 
 ### Requirement: Local-first default endpoint from the environment
-The default profile SHALL target a local Ollama-compatible endpoint. The base URL SHALL come from the `OLLAMA_BASE_URL` environment variable when present, defaulting to `http://127.0.0.1:11434` otherwise, and the default chat path SHALL be `/v1/chat/completions`. No commercial API endpoint SHALL be configured as a built-in default.
+The default profile SHALL target a local OpenAI-compatible endpoint. The base URL SHALL come from the `LLM_BASE_URL` environment variable when present (resolved in `server/conf/settings.py` and injected into the profile defaults), defaulting to `http://127.0.0.1:11434` otherwise, and the default chat path SHALL be `/v1/chat/completions`. No commercial API endpoint SHALL be configured as a built-in default: a hosted gateway is reachable only when an operator explicitly sets `LLM_BASE_URL`.
 
-#### Scenario: The default profile points at local Ollama
-- **WHEN** no `LLM_PROFILES` setting overrides the default narrator profile
-- **THEN** its base URL is taken from `OLLAMA_BASE_URL` (or the localhost fallback) and its path is `/v1/chat/completions`
+#### Scenario: The default profile points at the local endpoint
+- **WHEN** no `LLM_PROFILES` setting overrides the default narrator profile and no `LLM_BASE_URL` is set
+- **THEN** its base URL is `http://127.0.0.1:11434` and its path is `/v1/chat/completions`
 
 #### Scenario: The environment variable selects the host
-- **WHEN** `OLLAMA_BASE_URL` is set to a non-empty value
+- **WHEN** `LLM_BASE_URL` is set to a non-empty value
 - **THEN** the default profile's base URL equals that value exactly

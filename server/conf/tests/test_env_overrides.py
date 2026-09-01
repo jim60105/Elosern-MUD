@@ -9,6 +9,14 @@ pattern in ``world/ai/tests/test_profiles.py``.
 CI/test invocations must not export ``ART_SD_*`` / ``ART_SCHEDULER_*`` /
 ``ELOSERN_VUE_CLIENT`` / ``SD_WEBUI_BASE_URL`` overrides; the test-settings
 sanitize step keeps a star-imported run at the code defaults regardless.
+
+The 23 LLM endpoint knobs are generated from the inert table in
+``server/conf/llm_knobs.py`` and read through a loop, so an AST extractor
+cannot see them: their inventory is contract-checked against the knob
+module's pure ``llm_env_names()`` definition instead (exact set equality,
+comment style irrelevant), and per-layer ``LLM_<LAYER>_*`` names are
+documented through the global entries plus the suffix grammar rather than
+enumerated here.
 """
 
 import ast
@@ -17,6 +25,8 @@ import re
 import subprocess
 import sys
 import unittest
+
+from server.conf.llm_knobs import llm_env_names, llm_global_env_names
 
 from tools.spec_traceability import covers_requirement
 
@@ -635,7 +645,36 @@ def _env_read_names(path: str) -> set[str]:
 
 def _test_settings_popped_names() -> set[str]:
     tree = ast.parse(open(TEST_SETTINGS_PATH, encoding="utf-8").read())
+    popped: set[str] = set()
+    dynamic_llm_sweep = False
     for node in ast.walk(tree):
+        # Second sanitize loop: os.environ.pop(<loop var>) where the loop
+        # iterates over llm_env_names() — the generated-name sweep (an AST
+        # extractor cannot enumerate its names, only prove it exists — and
+        # prove it binds: the loop target must be a plain name and the pop's
+        # first positional argument must be that same name (second argument
+        # None), so a decoy loop popping unrelated names never passes.
+        if (
+            isinstance(node, ast.For)
+            and isinstance(node.target, ast.Name)
+            and isinstance(node.iter, ast.Call)
+            and isinstance(node.iter.func, ast.Name)
+            and node.iter.func.id == "llm_env_names"
+            and any(
+                isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Attribute)
+                and call.func.attr == "pop"
+                and isinstance(call.func.value, ast.Attribute)
+                and call.func.value.attr == "environ"
+                and len(call.args) == 2
+                and isinstance(call.args[0], ast.Name)
+                and call.args[0].id == node.target.id
+                and isinstance(call.args[1], ast.Constant)
+                and call.args[1].value is None
+                for call in ast.walk(node)
+            )
+        ):
+            dynamic_llm_sweep = True
         if (
             isinstance(node, ast.Assign)
             and any(
@@ -644,13 +683,18 @@ def _test_settings_popped_names() -> set[str]:
             )
             and isinstance(node.value, (ast.Tuple, ast.List))
         ):
-            return {
+            popped = {
                 element.value
                 for element in node.value.elts
                 if isinstance(element, ast.Constant)
                 and isinstance(element.value, str)
             }
-    raise AssertionError("_ENV_OVERRIDES tuple not found in test_settings.py")
+    if not popped:
+        raise AssertionError("_ENV_OVERRIDES tuple not found in test_settings.py")
+    if not dynamic_llm_sweep:
+        raise AssertionError("llm_env_names() sanitize loop not found in test_settings.py")
+    popped.add("<LLM_KNOB_SWEEP>")
+    return popped
 
 
 def _active_env_example_keys() -> set[str]:
@@ -666,7 +710,6 @@ def _active_env_example_keys() -> set[str]:
 # Reviewed key-to-reader allow-list for keys .env.example may advertise that
 # are read OUTSIDE server/conf/settings.py (launcher, compose, harness, CI).
 EXTERNAL_READERS: dict[str, str] = {
-    "OLLAMA_BASE_URL": "world/ai/profiles.py default_profiles()",
     "PROMPTS_DIR": "compose.yaml bind mount interpolation",
     "CONTAINER_UID": "Containerfile build ARG",
     "IMAGE_TAG": "compose.yaml image tag interpolation",
@@ -704,6 +747,10 @@ class InventoryTests(unittest.TestCase):
     def test_settings_ast_reads_exactly_the_env_backed_inventory(self):
         read = _env_read_names(SETTINGS_PATH)
         self.assertEqual(read, set(ENV_BACKED.values()) | {"PROMPT_ROOT"})
+        # The LLM knob reads are loop-generated (invisible to this extractor)
+        # and the retired OLLAMA_BASE_URL name must not reappear anywhere in
+        # the settings module.
+        self.assertNotIn("OLLAMA_BASE_URL", read)
         # Belt-and-braces for the security seam: the forbidden names never
         # appear as an argument to ANY call in settings.py, so an aliased or
         # dynamic environment read (env = os.environ; env.get(...)) cannot
@@ -727,10 +774,12 @@ class InventoryTests(unittest.TestCase):
     )
     def test_env_example_advertises_no_dead_variables(self):
         live = set(ENV_BACKED.values()) | {"PROMPT_ROOT"}
+        generated = llm_env_names()
         for key in _active_env_example_keys():
             with self.subTest(key=key):
                 self.assertTrue(
                     key in live
+                    or key in generated
                     or key in EXTERNAL_READERS
                     or any(
                         key.startswith(prefix)
@@ -738,6 +787,43 @@ class InventoryTests(unittest.TestCase):
                     ),
                     msg=f"{key} has no reader (settings AST or allow-list)",
                 )
+
+    @covers_requirement(
+        "settings-environment-overrides::environment-inventory-and-configuration-guide-are-version-controlled-and-exact"
+    )
+    def test_llm_knob_entries_match_the_inert_definition_exactly(self):
+        # Comment style is irrelevant (typed knobs ship commented by
+        # convention): parse every NAME= assignment starting with LLM_ and
+        # compare as an EXACT SET against the knob module's generated globals
+        # (column-0 assignments only, matching the file's entry convention —
+        # indented example lines inside doc comments are prose, not entries).
+        parsed = {
+            match.group(1)
+            for line in _env_example_lines()
+            if (
+                match := re.match(
+                    r"^#?([A-Za-z_][A-Za-z0-9_]*)=", line
+                )
+            )
+            and match.group(1).startswith("LLM_")
+        }
+        self.assertEqual(parsed, set(llm_global_env_names()))
+        self.assertNotIn("OLLAMA_BASE_URL", parsed)
+        # Per-layer names are documented through the grammar, not enumerated.
+        for name in llm_env_names() - llm_global_env_names():
+            self.assertNotIn(name, parsed)
+
+    @covers_requirement(
+        "settings-environment-overrides::environment-inventory-and-configuration-guide-are-version-controlled-and-exact"
+    )
+    def test_settings_publishes_the_generated_name_set(self):
+        # Derived-export contract: settings.LLM_ENV_NAMES equals the inert
+        # function exactly. Read as source here (the module-level assignment)
+        # and asserted against the function; the subprocess boot case lives
+        # in server/conf/tests/test_llm_env_overrides.py.
+        source = open(SETTINGS_PATH, encoding="utf-8").read()
+        self.assertIn("LLM_ENV_NAMES = frozenset(llm_env_names())", source)
+        self.assertEqual(len(llm_env_names()), 184)
 
     @covers_requirement(
         "settings-environment-overrides::environment-inventory-and-configuration-guide-are-version-controlled-and-exact"
@@ -759,7 +845,14 @@ class InventoryTests(unittest.TestCase):
         "settings-environment-overrides::environment-inventory-and-configuration-guide-are-version-controlled-and-exact"
     )
     def test_test_settings_override_names_match_the_settings_ast(self):
-        self.assertEqual(_test_settings_popped_names(), set(ENV_BACKED.values()))
+        # The literal ART tuple stays exact, plus the <LLM_KNOB_SWEEP> marker
+        # proving the second sanitize loop over the inert knob module exists
+        # (an AST pass cannot enumerate that loop's generated names; the
+        # knob-module set-equality tests pin them instead).
+        self.assertEqual(
+            _test_settings_popped_names(),
+            set(ENV_BACKED.values()) | {"<LLM_KNOB_SWEEP>"},
+        )
 
     @covers_requirement(
         "settings-environment-overrides::environment-inventory-and-configuration-guide-are-version-controlled-and-exact"
@@ -826,4 +919,5 @@ class ShardOwnershipGuardTests(unittest.TestCase):
         manifest_path = os.path.join(REPO_ROOT, ".github", "evennia-shards.json")
         with open(manifest_path, encoding="utf-8") as handle:
             manifest_text = handle.read()
-        self.assertNotIn("test_env_overrides", manifest_text)
+        for module in ("test_env_overrides", "test_llm_env_overrides"):
+            self.assertNotIn(module, manifest_text)

@@ -10,25 +10,19 @@ live call.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
-import os
 from types import MappingProxyType
 from typing import Any
 
 from django.conf import settings
 
-LAYER_NAMES = (
-    "narrator",
-    "npc_dialogue",
-    "scenario_director",
-    "scene_builder",
-    "character_creation",
-    "action_options",
-    "title_nomination",
-)
+# The inert knob table owns the layer set so generated environment names and
+# the profile registry can never disagree (design D-A4); re-exported here for
+# every existing consumer of ``profiles.LAYER_NAMES``.
+from server.conf.llm_knobs import LAYER_NAMES
 
-DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+DEFAULT_BASE_URL = "http://127.0.0.1:11434"
 DEFAULT_CHAT_PATH = "/v1/chat/completions"
 DEFAULT_MODEL = "llama3.2"
 DEFAULT_TEMPERATURE = 0.7
@@ -42,6 +36,17 @@ DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_HEADERS: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {"Content-Type": ("application/json",)}
+)
+
+# Closed sets for the optional reasoning fields (endpoint design §4.1).
+REASONING_EFFORTS: tuple[str, ...] = ("minimal", "low", "medium", "high")
+REASONING_STYLES: tuple[str, ...] = ("openrouter", "vllm", "off")
+
+# The dataclass repr includes the headers mapping, so a bearer value smuggled
+# into headers would defeat api_key's repr=False exclusion; fail closed so
+# api_key stays the single credential route (design D-A5).
+CREDENTIAL_HEADER_NAMES = frozenset(
+    {"authorization", "proxy-authorization", "x-api-key", "api-key"}
 )
 
 # The only generative layer that consumes JSON-schema structured output; its
@@ -75,6 +80,13 @@ def _normalize_headers(
     for key, values in headers.items():
         if not isinstance(key, str) or not key:
             raise ProfileValidationError(layer, "headers", "keys must be non-empty strings")
+        if key.lower() in CREDENTIAL_HEADER_NAMES:
+            raise ProfileValidationError(
+                layer,
+                "headers",
+                f"{key!r} is a credential-bearing header; use the api_key"
+                " profile field as the sanctioned credential route",
+            )
         if isinstance(values, str):
             values = (values,)
         elif not isinstance(values, (list, tuple)):
@@ -99,6 +111,23 @@ class LLMProfile:
     max_retries: int
     supports_response_format: bool
     enabled: bool
+    # Optional endpoint-configuration fields (endpoint design §4.1). The api
+    # key is excluded from the repr: profile debug output never carries a
+    # credential. Unset optionals serialize as nothing in the request body.
+    api_key: str = field(default="", repr=False)
+    app_title: str = ""
+    app_url: str = ""
+    frequency_penalty: float | None = None
+    presence_penalty: float | None = None
+    top_k: int | None = None
+    top_p: float | None = None
+    repetition_penalty: float | None = None
+    min_p: float | None = None
+    top_a: float | None = None
+    reasoning_enabled: bool | None = None
+    reasoning_effort: str | None = None
+    reasoning_style: str = "openrouter"
+    max_completion_tokens: int | None = None
 
     def __post_init__(self) -> None:
         values = {
@@ -112,6 +141,20 @@ class LLMProfile:
             "max_retries": self.max_retries,
             "supports_response_format": self.supports_response_format,
             "enabled": self.enabled,
+            "api_key": self.api_key,
+            "app_title": self.app_title,
+            "app_url": self.app_url,
+            "frequency_penalty": self.frequency_penalty,
+            "presence_penalty": self.presence_penalty,
+            "top_k": self.top_k,
+            "top_p": self.top_p,
+            "repetition_penalty": self.repetition_penalty,
+            "min_p": self.min_p,
+            "top_a": self.top_a,
+            "reasoning_enabled": self.reasoning_enabled,
+            "reasoning_effort": self.reasoning_effort,
+            "reasoning_style": self.reasoning_style,
+            "max_completion_tokens": self.max_completion_tokens,
         }
         validate_profile_values("<direct>", values)
         object.__setattr__(self, "headers", _normalize_headers(self.headers, "<direct>"))
@@ -141,24 +184,99 @@ def validate_profile_values(layer: str, values: Mapping[str, Any]) -> None:
     for field in ("supports_response_format", "enabled"):
         if not isinstance(values.get(field), bool):
             raise ProfileValidationError(layer, field, "must be a boolean")
+    # Raw maps may omit these keys entirely (the dataclass default applies);
+    # direct construction always passes them, so an explicit None is rejected.
+    for field in ("api_key", "app_title", "app_url"):
+        if field in values and not isinstance(values[field], str):
+            raise ProfileValidationError(layer, field, "must be a string")
+    for field, rule, in_range in (
+        (
+            "frequency_penalty",
+            "must be None or a finite float in -2..2",
+            lambda v: -2 <= v <= 2,
+        ),
+        (
+            "presence_penalty",
+            "must be None or a finite float in -2..2",
+            lambda v: -2 <= v <= 2,
+        ),
+        (
+            "top_p",
+            "must be None or a finite float in 0 < x <= 1",
+            lambda v: 0 < v <= 1,
+        ),
+        (
+            "repetition_penalty",
+            "must be None or a finite float greater than 0",
+            lambda v: 0 < v,
+        ),
+        (
+            "min_p",
+            "must be None or a finite float in 0..1",
+            lambda v: 0 <= v <= 1,
+        ),
+        (
+            "top_a",
+            "must be None or a non-negative finite float",
+            lambda v: 0 <= v,
+        ),
+    ):
+        value = values.get(field)
+        if value is None:
+            continue
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or not in_range(float(value))
+        ):
+            raise ProfileValidationError(layer, field, rule)
+    for field in ("top_k", "max_completion_tokens"):
+        value = values.get(field)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ProfileValidationError(
+                layer, field, "must be None or a positive integer"
+            )
+    reasoning_enabled = values.get("reasoning_enabled")
+    if reasoning_enabled is not None and not isinstance(reasoning_enabled, bool):
+        raise ProfileValidationError(layer, "reasoning_enabled", "must be None or a boolean")
+    reasoning_effort = values.get("reasoning_effort")
+    if reasoning_effort is not None and reasoning_effort not in REASONING_EFFORTS:
+        raise ProfileValidationError(
+            layer,
+            "reasoning_effort",
+            "must be None or one of " + "/".join(REASONING_EFFORTS),
+        )
+    # A raw map may omit the key entirely (the dataclass default applies);
+    # direct construction always passes it, so an explicit None is rejected.
+    if "reasoning_style" in values and values["reasoning_style"] not in REASONING_STYLES:
+        raise ProfileValidationError(
+            layer,
+            "reasoning_style",
+            "must be one of " + "/".join(REASONING_STYLES),
+        )
     _normalize_headers(values.get("headers"), layer)
 
 
-def default_profiles() -> dict[str, dict[str, Any]]:
+def default_profiles(
+    defaults: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, dict[str, Any]]:
     """Return the local-first default ``LLM_PROFILES`` dict for every layer.
 
-    The base URL comes from ``OLLAMA_BASE_URL`` when present (the compose
-    runtime) and falls back to a bare-metal localhost endpoint otherwise.
-    ``supports_response_format`` defaults false because design §7.5 only
+    The module performs no environment reads (design D-A3): the base URL is
+    the bare-metal localhost code default, and ``server/conf/settings.py``
+    injects its environment-resolved per-layer field overrides through
+    ``defaults``. ``supports_response_format`` defaults false because design §7.5 only
     requests structured output when the endpoint declares support; the
     ``action_options`` layer is the single exception and always defaults to
     the capability on, with ``max_tokens`` sized for a 5-card JSON payload
     (pipeline design doc §5).
     """
-    base_url = os.environ.get("OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL
     profiles = {
         layer: {
-            "base_url": base_url,
+            "base_url": DEFAULT_BASE_URL,
             "path": DEFAULT_CHAT_PATH,
             "headers": DEFAULT_HEADERS,
             "model": DEFAULT_MODEL,
@@ -180,6 +298,14 @@ def default_profiles() -> dict[str, dict[str, Any]]:
         **profiles["title_nomination"],
         "max_tokens": TITLE_NOMINATION_MAX_TOKENS,
     }
+    if defaults is not None:
+        for layer, overrides in defaults.items():
+            if layer not in LAYER_NAMES:
+                raise UnknownLayerError(layer)
+            profiles[layer] = {**profiles[layer], **dict(overrides)}
+            # Injected values pass the same construction-time bounds here, so
+            # an invalid environment value fails even before build_profiles.
+            validate_profile_values(layer, profiles[layer])
     return profiles
 
 
@@ -190,9 +316,9 @@ def build_profiles(
 
     Accepts either a mapping or an iterable of ``(layer, values)`` pairs so
     duplicate layer keys can be detected. Unknown layers are rejected, every
-    profile is validated against every bound, and any of the six layers missing
+    profile is validated against every bound, and any of the seven layers missing
     from the source falls back to the local-first default so the registry maps
-    exactly the six layer names. Per-layer required flags (``action_options``
+    exactly the seven layer names. Per-layer required flags (``action_options``
     must declare structured output) are enforced after the generic bounds.
     """
     if isinstance(raw_profiles, Mapping):
