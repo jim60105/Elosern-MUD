@@ -14,6 +14,16 @@ import {
 // MapLattice, parameterized by scale. These tests guard the extraction
 // itself (identical content at both scales) and the non-intersection
 // invariant at the overlay's larger scale.
+
+// The server's four fixed visibility-state legend labels, in wire order
+// (web/webclient/presentation/local_map.py LEGEND_LABELS).
+const LEGEND_LABELS_FOR_TEST = [
+  "你目前所在的位置",
+  "尚未探索的相鄰位置",
+  "已經探索過的相鄰位置",
+  "曾經到過、但不在附近的遠方位置",
+];
+
 describe("MapLattice (B4 world family, shared renderer)", () => {
   let wrapper;
 
@@ -387,6 +397,45 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
       expect(items[3].find(".local-map__legend-chip--visible_visited").exists()).toBe(false);
       w.unmount();
     }
+  });
+
+  // webclient-map-scale-legend D3: entries beyond the four states are
+  // explanatory notes. They render with the neutral info-chip treatment —
+  // never a cycled state chip — and their full text label is the primary
+  // carrier. A deliberately distinctive note guards against truncation.
+  it("renders a fifth beyond-state entry as a neutral info chip, text intact", () => {
+    const note = "每格約 10 公里（荒野坐標網格）";
+    const w = mountLattice({
+      localMap: { ...localMapModelFor(LOCAL_MAP_SAMPLE), legend: [...LEGEND_LABELS_FOR_TEST, note] },
+    });
+    const items = w.findAll('[data-testid^="local-map__legend-item--"]');
+    expect(items).toHaveLength(5);
+    // The first four keep their state chip treatments in the fixed order.
+    for (const [i, state] of Object.entries(["current", "visible_unvisited", "visible_visited", "remembered"])) {
+      expect(items[Number(i)].find(`.local-map__legend-chip--${state}`).exists()).toBe(true);
+    }
+    const info = items[4];
+    expect(info.find(".local-map__legend-chip--info").exists()).toBe(true);
+    // The info entry carries no state class at all (never a fifth state).
+    for (const state of ["current", "visible_unvisited", "visible_visited", "remembered"]) {
+      expect(info.find(`.local-map__legend-chip--${state}`).exists()).toBe(false);
+    }
+    // The text label renders in full (no truncation of beyond-state notes).
+    expect(info.text()).toBe(note);
+  });
+
+  it("styles every entry beyond the fourth as info, for any payload", () => {
+    const extra = ["附註甲", "附註乙", "附註丙"];
+    const w = mountLattice({
+      localMap: { ...localMapModelFor(LOCAL_MAP_SAMPLE), legend: [...LEGEND_LABELS_FOR_TEST, ...extra] },
+    });
+    const items = w.findAll('[data-testid^="local-map__legend-item--"]');
+    expect(items).toHaveLength(7);
+    extra.forEach((label, offset) => {
+      const item = items[4 + offset];
+      expect(item.find(".local-map__legend-chip--info").exists()).toBe(true);
+      expect(item.text()).toBe(label);
+    });
   });
 });
 

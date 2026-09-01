@@ -796,6 +796,39 @@ class LocalMapPresenterTests(EvenniaTestCase):
             "an unresolvable remembered room must not surface as 未探索",
         )
 
+    @covers_requirement("webclient-local-map::the-wilderness-payload-legend-states-the-cell-scale-from-the-provider-constant")
+    def test_non_wilderness_legends_keep_exactly_the_state_labels(self):
+        from world.maps.instance import spawn_instance_room
+
+        # grid
+        self.char1.location = self.south_gate
+        record_arrival(self.char1)
+        grid_payload = self._registry().render("local_map", _context(self.char1))
+        self.assertEqual(grid_payload["layer"], "grid")
+        self.assertEqual(grid_payload["legend"], list(LEGEND_LABELS))
+
+        # instance
+        instance = spawn_instance_room(
+            self.room1,
+            {"prototype_parent": "instance_room", "key": "cave"},
+            exit_key="in",
+            return_key="out",
+            ttl_seconds=10,
+        )
+        self.char1.location = instance
+        record_arrival(self.char1)
+        instance_payload = self._registry().render("local_map", _context(self.char1))
+        self.assertEqual(instance_payload["layer"], "instance")
+        self.assertEqual(instance_payload["legend"], list(LEGEND_LABELS))
+
+        # interior
+        interior = create_object(Room, key="_LEGEND_INTEGRITY_HALL_TEST")
+        self.char1.location = interior
+        record_arrival(self.char1)
+        interior_payload = self._registry().render("local_map", _context(self.char1))
+        self.assertEqual(interior_payload["layer"], "interior")
+        self.assertEqual(interior_payload["legend"], list(LEGEND_LABELS))
+
     @covers_requirement("webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel")
     def test_no_location_is_unavailable_without_fabrication(self):
         actor = self.char1
@@ -981,6 +1014,37 @@ class LocalMapWildernessTests(EvenniaTestCase):
             decoded = node["id"].split(":")
             self.assertLessEqual(int(decoded[2]), 223)
             self.assertLessEqual(int(decoded[3]), 223)
+
+    @covers_requirement("webclient-local-map::the-wilderness-payload-legend-states-the-cell-scale-from-the-provider-constant")
+    def test_wilderness_legend_appends_scale_note_after_the_states(self):
+        self.gate.at_traverse(self.char1, self.north_gate)
+        payload = self._registry().render("local_map", _context(self.char1))
+        self.assertEqual(payload["layer"], "wilderness")
+        # The four state labels keep their exact order/positions, and the
+        # scale note is the fifth entry (webclient-map-scale-legend D2).
+        self.assertEqual(len(payload["legend"]), len(LEGEND_LABELS) + 1)
+        self.assertEqual(payload["legend"][: len(LEGEND_LABELS)], list(LEGEND_LABELS))
+        from world.maps import wilderness_provider
+
+        scale_note = payload["legend"][len(LEGEND_LABELS)]
+        self.assertIn(str(wilderness_provider.WILDERNESS_KM_PER_CELL), scale_note)
+        # The extended legend stays inside the shared bounds the validators
+        # pin (5 <= 16 entries, the note far below 256 code points); the
+        # payload above already passed the exact Python validator in render.
+        self.assertLessEqual(len(payload["legend"]), MAX_LEGEND)
+        self.assertLessEqual(len(scale_note), MAX_STRING_CODE_POINTS)
+
+    @covers_requirement("webclient-local-map::the-wilderness-payload-legend-states-the-cell-scale-from-the-provider-constant")
+    def test_scale_note_figure_follows_the_provider_module_attribute(self):
+        self.gate.at_traverse(self.char1, self.north_gate)
+        with patch("world.maps.wilderness_provider.WILDERNESS_KM_PER_CELL", 42):
+            payload = self._registry().render("local_map", _context(self.char1))
+        self.assertEqual(payload["layer"], "wilderness")
+        scale_note = payload["legend"][len(LEGEND_LABELS)]
+        # The note is derived from the provider module attribute at
+        # legend-assembly time -- never a duplicated literal.
+        self.assertIn("42", scale_note)
+        self.assertNotIn("10", scale_note)
 
     @covers_requirement("webclient-local-map::visibility-states-are-current-visible-unvisited-visible-visited-and-remembered")
     def test_visited_cells_beyond_adjacency_become_remembered(self):

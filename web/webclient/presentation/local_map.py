@@ -991,6 +991,11 @@ def local_map_presenter(context: PresentationContext) -> dict[str, Any]:
 
     from typeclasses.rooms import GridRoom, InstanceRoom, TerrainRoom
 
+    # Module import of the terrain provider (never a from-import of the
+    # constant, which would freeze the figure at import time and hide a
+    # provider-module patch from the presenter).
+    from world.maps import wilderness_provider
+
     builder = _GraphBuilder(_visited_map(visits))
     if isinstance(location, GridRoom):
         layer = _grid_layer(actor, visits, builder)
@@ -1008,6 +1013,15 @@ def local_map_presenter(context: PresentationContext) -> dict[str, Any]:
     if not any(node["current"] for node in builder.nodes):
         raise PanelUnavailableError
 
+    # The wilderness legend appends one localized scale note after the four
+    # state labels (webclient-map-scale-legend D1/D2). The figure is read as a
+    # module attribute of its owning provider module at assembly time -- never
+    # a from-import binding, which would freeze the value and hide provider
+    # patches -- so a single constant edit is the only source of the distance.
+    legend = list(LEGEND_LABELS)
+    if layer == "wilderness":
+        legend.append(f"每格約 {wilderness_provider.WILDERNESS_KM_PER_CELL} 公里")
+
     payload = {
         "schema_version": LOCAL_MAP_SCHEMA_VERSION,
         "available": True,
@@ -1016,6 +1030,6 @@ def local_map_presenter(context: PresentationContext) -> dict[str, Any]:
         "title": title,
         "nodes": builder.nodes,
         "edges": builder.edges,
-        "legend": list(LEGEND_LABELS),
+        "legend": legend,
     }
     return validate_local_map(payload)

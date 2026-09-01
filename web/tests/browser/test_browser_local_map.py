@@ -727,6 +727,104 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     )
                 page.close()
 
+    @staticmethod
+    def _wilderness_scale_panel() -> dict:
+        """A committed-form wilderness payload carrying the fifth-entry scale note.
+
+        The legend mirrors the presenter's exact wire shape: the four state
+        labels in fixed order, then the scale note derived from
+        ``WILDERNESS_KM_PER_CELL`` (server-side derivation is pinned in
+        ``web.webclient.presentation.tests.test_local_map``).
+        """
+        return {
+            "schema_version": 1,
+            "available": True,
+            "layer": "wilderness",
+            "current_node": "wild:elosern:60:103",
+            "title": "荒野地圖",
+            "nodes": [
+                {
+                    "id": "wild:elosern:60:103",
+                    "label": "丘陵",
+                    "x": 0,
+                    "y": 0,
+                    "visibility": "current",
+                    "current": True,
+                    "anchor": False,
+                    "landmark": False,
+                    "action": None,
+                },
+                {
+                    "id": "wild:elosern:60:104",
+                    "label": "森林",
+                    "x": 0,
+                    "y": 1,
+                    "visibility": "visible_unvisited",
+                    "current": False,
+                    "anchor": False,
+                    "landmark": False,
+                    "action": None,
+                },
+            ],
+            "edges": [
+                {
+                    "source": "wild:elosern:60:103",
+                    "destination": "wild:elosern:60:104",
+                    "label": "n",
+                    "known": True,
+                    "traversable": True,
+                }
+            ],
+            "legend": [
+                "你目前所在的位置",
+                "尚未探索的相鄰位置",
+                "已經探索過的相鄰位置",
+                "曾經到過、但不在附近的遠方位置",
+                "每格約 10 公里",
+            ],
+        }
+
+    @covers_requirement(
+        "webclient-local-map::the-legend-renders-beyond-state-entries-as-neutral-info-chips"
+    )
+    def test_overlay_renders_scale_note_as_neutral_info_entry(self):
+        page = self.logged_in_page()
+        self._wait_local_map_available(page)
+        result = self._inject_panel(page, self._wilderness_scale_panel())
+        self.assertTrue(result["accepted"], f"ui_update rejected: {result}")
+        wait_for_store_state(
+            page,
+            lambda s: len(((s.get("panels") or {}).get("local_map") or {}).get("legend") or [])
+            == 5,
+            timeout=30000,
+        )
+        # The island still mounts no legend element for this payload.
+        self.assertEqual(
+            page.locator('[data-testid="local-map__legend"]').count(), 0,
+            "the island mounts no legend for a scale-note payload",
+        )
+        page.evaluate("window.__elosernBridge.store.openOverlay('map')")
+        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
+        items = page.locator(
+            '[data-testid="map-overlay"] [data-testid^="local-map__legend-item--"]'
+        )
+        items.first.wait_for(timeout=15000)
+        self.assertEqual(items.count(), 5)
+        # The first four keep their state chip treatments in the fixed order.
+        states = ("current", "visible_unvisited", "visible_visited", "remembered")
+        for index, state in enumerate(states):
+            chip_classes = items.nth(index).locator(".local-map__legend-chip").get_attribute("class")
+            self.assertIn(f"local-map__legend-chip--{state}", chip_classes)
+        # The fifth entry is the scale note: neutral info chip, no state class,
+        # and its text label rendered in full.
+        fifth = items.nth(4)
+        fifth_classes = fifth.locator(".local-map__legend-chip").get_attribute("class")
+        self.assertIn("local-map__legend-chip--info", fifth_classes)
+        for state in states:
+            self.assertNotIn(f"local-map__legend-chip--{state}", fifth_classes)
+        self.assertEqual(fifth.inner_text().strip(), "每格約 10 公里")
+        page.close()
+
 
 class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
     """Map-02 layout variants: data-derived lattice/radial on both surfaces.
