@@ -1,8 +1,9 @@
 # LLM 端點設定 — 環境變數可覆寫的 Profile 設計
 
 **日期：** 2026-09-01
-**狀態：** 已核准（待使用者對本文件的最終審閱）
+**狀態：** 已核准。實作拆為兩個 OpenSpec 變更，見 §8。
 **範圍：** `world/ai/profiles.py`、`world/ai/client.py`、`server/conf/settings.py`、
+`server/conf/llm_knobs.py`（新）、
 `server/conf/test_settings.py`、`compose.yaml`、`.env.example`、
 `docs/development/settings-and-environment.md`，以及 `llm-client`／
 `settings-environment-overrides` 兩份主規格（經 OpenSpec delta 修訂）。
@@ -51,8 +52,8 @@
 | # | 決策 | 理由 |
 |---|---|---|
 | C-1 | **環境解讀住在 `server/conf/settings.py`，不住 `world/ai/`。** 所有 `LLM_*` 變數經由既有 `_env_str` / `_env_typed` / `_env_bool` / `_env_choice` 助手讀取；解析結果注入 `default_profiles()`。 | 每個其他部署 knob 都遵此先例。重用助手使驗證器恰好只有兩處且各司其職（開機 env 語法、構造時 profile 界線），且 `profiles.py` 保持 env-free——這正是 `.env.example` 庫存契約所假設的形態。 |
-| C-2 | **全域 knob + 每層例外覆寫。** `LLM_<SUFFIX>` 套用全部七層；`LLM_<LAYER>_<SUFFIX>` 覆寫單層。 | 常見情況操作者只需設幾個變數；profile 系統存在的原有理由（每層差異化）被保留，而不必寫 7×24 個變數。 |
-| C-3 | **優先序：code default < 全域 env < 每層 env < `secret_settings.py`。** `secret_settings.py` 的 `LLM_PROFILES` 條目仍整組取勝，仍是 env 表面表達不了之設定的逃生口。 | 與所有其他 knob 已文件化的有效優先序一致；secret_settings 仍是操作者私密設定的最終權威。 |
+| C-2 | **全域 knob + 每層例外覆寫。** `LLM_<SUFFIX>` 套用全部七層；`LLM_<LAYER>_<SUFFIX>` 覆寫單層。 | 常見情況操作者只需設幾個變數；profile 系統存在的原有理由（每層差異化）被保留，而不必寫 7×23＝161 個每層變數（共 184 個生成名稱）。 |
+| C-3 | **優先序：code default < 全域 env < 每層 env < `secret_settings.py`，且 secret 層級按層合併。** `secret_settings.py` 的 `LLM_PROFILES` 只取代它具名的那些層（該層條目整組取代、不做欄位合併）；未具名的層保留其環境解析值。仍是操作者私密設定的最終權威，但只具名一層的 secret 覆寫不可能再靜默丟棄其他六層的環境設定（duck 審查 BLOCKER 修正）。 | 與所有其他 knob 已文件化的有效優先序一致；按層合併使宣稱的優先序在實作上真的成立。 |
 | C-4 | **`LLMProfile` 用明確的型別化欄位，不用自由 `extra_body`。** 每個取樣參數都是具名、驗證過、可選的欄位。 | profile 系統的存在理由就是嚴格驗證。未型別的直通字典會讓 `min_p`、`top_a` 與罰項區間無界可守、無測可保。 |
 | C-5 | **省略即預設；`None` 永不序列化。** 每個新取樣欄位預設 `None`／未設定，除非顯式設定，否則不出現在 request body。 | Ollama／vLLM／OpenAI 對可選欄位的接受度互不一致；只送操作者要求的是唯一可移植的行為，且在新 knob 全未設定時讓今日線格式逐位元組不變。 |
 | C-6 | **扁平直通 + 一個標準化的 reasoning 映射。** `frequency_penalty`、`presence_penalty`、`top_k`、`top_p`、`repetition_penalty`、`min_p`、`top_a` 有設定者原樣進 body。reasoning 依 `reasoning_style` 映射：`openrouter` → `{"reasoning": {"enabled", "effort"}}`，`vllm` → `{"chat_template_kwargs": {"enable_thinking"}}`，`off` → 不送。 | vLLM 原生吃這些取樣 Extras；OpenRouter 把它們轉送給 provider Extras。reasoning 是唯一形態真正分歧的欄位，且裸送扁平 `reasoning` 會讓 vLLM 的 OpenAI 端回 400——所以它是明確、有測試的映射，不是猜測。 |
@@ -63,9 +64,12 @@
 
 ## 3. 環境變數表面
 
-單一表格是唯一真相來源：`server/conf/settings.py` 內持有一張宣告式 knob
-清單——`(profile 欄位, env 後綴, 轉換器, 界線, 是否可每層覆寫)`——全域與七個
-每層變數名稱都由它生成。沒有任何 knob 是每層手寫的，表面不可能漂移。
+單一表格是唯一真相來源：宣告式 knob 清單（23 列：`(profile 欄位, env 後綴, 轉換器,
+界線, 預設)`）住在新模組 `server/conf/llm_knobs.py`（匯入安全、零環境讀取），附純函式
+`llm_env_names()` 產生全部 184 個名稱（23 全域 + 23×7 每層）。`server/conf/settings.py`
+匯入並使用它、匯出 `LLM_ENV_NAMES = frozenset(llm_env_names())`。没有任何 knob 是每層
+手寫的，表面不可能漂移；而測試 bootstrap 與庫存契約都能在匯入生產 settings 之前直接
+消費同一個惰性定義（兩者的 AST 抽取都看不見迴圈生成的名稱）。
 
 ### 3.1 Knob 清單
 
@@ -167,10 +171,14 @@ LLM_PROFILES raw dict ──secret_settings.py 可整組取代──▶ build_pr
    `openrouter` 形態送巢狀 `reasoning` 物件並省略 `None` 子鍵，`off` 什麼都不送。
 5. `response_format` 與今日完全相同（旗標 AND 宣告的 schema）。
 
-`_headers(profile)` 以 `profile.headers` 為基底，對非空的對應欄位追加
-`Authorization: Bearer <api_key>`、`X-Title`、`HTTP-Referer`。
-金鑰絕不被插入任何 log 行或錯誤字串；`_safe_log_error` 本來就只記
-`LLMTransportError.kind`。
+`_request_headers(profile)` 先對非空的對應欄位注入派生值——`Authorization: Bearer
+<api_key>`、`X-Title`、`HTTP-Referer`——再疊上 `profile.headers`，使操作者在
+`secret_settings.py` 顯式設定的同名 header（exact-case）取勝（逃生口）。金鑰絕不被插入
+任何 log 行或錯誤字串；`_safe_log_error` 本來就只記 `LLMTransportError.kind`。
+防走私：`_normalize_headers` 以大小寫不分拒收 `authorization`／`proxy-authorization`／
+`x-api-key`／`api-key` 這幾個敏感 header 名稱（dataclass `repr` 包含 headers 映射，把
+bearer 塞進 headers 會癱瘓 `api_key` 的 `repr=False` 保護）；錯誤點名層與 `headers`
+欄位並指回 `api_key` 這條正當路徑。
 
 `FakeLLMClient` 不受影響：它以 messages + `schema_id` 比對，body 形態的斷言
 屬於真實客戶端的測試。
@@ -225,3 +233,32 @@ LLM_PROFILES raw dict ──secret_settings.py 可整組取代──▶ build_pr
 - 逐請求模型路由（呼叫時選模型而非每層選）、供應商健康探測、成本核算。
 - sd-webui 憑證對（`ART_SD_USERNAME`／`ART_SD_PASSWORD`）——維持「不走環境」舊規則。
 - 把 `SECRET_KEY`／`ALLOWED_HOSTS` 遷出 `secret_settings.py`。
+
+## 8. OpenSpec 變更清單與實作順序
+
+本設計由兩個 OpenSpec 變更實作，每個變更都是單一工程師一個工作天（8 小時）可完成的
+規模：
+
+| 順序 | 變更 | 內容 | Delta 規格 |
+|---|---|---|---|
+| 1 | `env-overridable-llm-profiles` | `LLMProfile` 新欄位＋驗證；惰性 knob 模組 `server/conf/llm_knobs.py`＋`llm_env_names()`；settings 解析（全域＋每層 env、`_env_optional`／`_env_optional_bool`）；D-A7 按層 secret 合併；`OLLAMA_BASE_URL`→`LLM_BASE_URL` 乾淨改名；`test_settings.py` sanitize；庫存契約改造；`headers` 憑證走私拒收；文件 knob 表 | `llm-profiles`、`settings-environment-overrides`、`llm-client`（僅 base-URL 改名需求） |
+| 2 | `llm-endpoint-wire-configuration` | `_format_request_body` 序列化（取樣直通、`max_completion_tokens` 取代、reasoning 三形態完整案例表）；`_request_headers` 標頭合成；金鑰防洩漏守衛；`StubAgent` 擷取改造＋線級測試矩陣；compose 可選 knob 空白轉傳；`LLM_API_KEY` 政策反轉文件 | `llm-client`、`settings-environment-overrides` |
+
+**依賴：** 變更 2 依賴變更 1（profile 欄位與 `llm_env_names()` 必須先存在；否則變更 2
+無法構造帶欄位的 profile，測試會響亮失敗而非半可用）。順序由共用的 `LLMProfile`
+簽名強制，不需要執行期守衛。
+
+**衝突面（不可並行）：** 兩者都碰 `world/ai/tests/test_client.py`、`.env.example`、
+`docs/development/settings-and-environment.md`、`compose.yaml` 區塊與
+`llm-client`／`settings-environment-overrides` 的 delta——同檔同規格，必須序列化實作。
+建議批次：Batch 1 = 變更 1（單獨）；Batch 2 = 變更 2（單獨）。變更 1 實作完成並
+`openspec archive`＋delta 同步後，變更 2 的 `settings-environment-overrides` delta
+才對準 post-變更 1 的規格狀態。
+
+**Rubber-duck 審查（已套用）：** 3 BLOCKER（secret 全圖取代破壞每層優先序→D-A7 按層
+合併；delta 六層/實作七層漂移→七層修正＋預設值存活場景；標頭優先序自相矛盾→D-B2
+單一字序）與 4 MAJOR（24→23 knob 計數＋精確集合等式測試；`LLM_ENV_NAMES` 匯入順序
+不可行→惰性 `llm_knobs.py`＋純 `llm_env_names()`；`headers` 內 Authorization 走私
+繞過 `repr=False`→構造時大小寫不分拒收敏感標頭名；reasoning 邊角（openrouter
+effort-only、vllm effort-only 不送、`off` 帶值不送、enabled=false 要送 false）→
+完整案例表＋測試矩陣）與 1 MINOR（shard 清單陳述）全部修正於兩份變更的 artifacts。

@@ -1,0 +1,6 @@
+schema: spec-driven
+created: 2026-09-01
+goal: "Serialize optional profile fields into the OpenAI request body and
+  headers: api-key Authorization, X-Title/HTTP-Referer attribution, sampling
+  passthrough, reasoning style mapping, max_completion_tokens supersession;
+  reverse the secrets-in-environment policy for LLM_API_KEY"
