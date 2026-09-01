@@ -356,6 +356,7 @@ def _traversable(exit_obj: Any, actor: Any) -> bool:
 def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> str:
     """Build the grid/anchor layer from the live XYMap node/link model (D6)."""
     from typeclasses.rooms import AnchorRoom, GridRoom
+    from world.maps.wilderness_destination import DIRECTION_DELTAS
 
     location = actor.location
     if not isinstance(location, GridRoom):
@@ -387,22 +388,23 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
         raise PanelUnavailableError
 
     visited = _visited_map(visits)
-    in_range = _grid_nodes_in_range(xymap, current_node, visual_range, map_mode)
-    known_visited_ids = {
-        node_id
-        for node_id in visited
-        if node_id.startswith("grid:") and _grid_node_in_map(xymap, node_id)
-    }
 
-    # Current node first, then in-range nodes, then bounded remembered.
-    current_id = encode_grid(str(z), x, y)
-    anchor_coord = None
-    for node in sorted(xymap.node_index_map.values(), key=lambda n: (n.Y, n.X)):
-        if node.node_index == current_node.node_index:
-            anchor_coord = (node.X, node.Y)
-            break
-    if anchor_coord is None:
+    # Registered gate exits claim their capacity BEFORE the ordinary visible
+    # set is laid down (design D2): the gate is never the node that breaks the
+    # bound and never silently dropped. Distinct gate targets beyond the
+    # representable budget fail closed.
+    gate_candidates = _grid_gate_candidates(location)
+    if len(gate_candidates) > MAX_NODES - 1:
         raise PanelUnavailableError
+    in_range = _trim_visible(
+        _grid_nodes_in_range(xymap, current_node, visual_range, map_mode),
+        current_node,
+        MAX_NODES - len(gate_candidates),
+    )
+
+    # Current node first, then in-range nodes, then gates, then bounded
+    # remembered (the remembered loop self-limits against the running count).
+    current_id = encode_grid(str(z), x, y)
 
     builder.add_node(
         current_id,
@@ -432,7 +434,7 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
         action = _grid_exit_action(actor, location, (node.X, node.Y), z)
         builder.add_node(
             node_id,
-            _grid_node_label(xymap, node, (node.X, node.Y), z),
+            _grid_room_label((node.X, node.Y), z),
             node.X,
             node.Y,
             visibility=visibility,
@@ -441,6 +443,35 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
             action=action,
         )
         builder.add_edge(current_id, node_id, _grid_direction_label(current_node, node), action is not None)
+
+    # Registered wilderness gates: the grid side of the gateway pair renders
+    # the entry cell's wild node (design D2). Geometry is the renderer-local
+    # slot named by the gate's key/aliases; an occupied slot probes outward
+    # deterministically instead of dropping the gate.
+    for gate_id, (entry, gate) in gate_candidates.items():
+        direction = _gate_direction(gate)
+        dx, dy = DIRECTION_DELTAS[direction]
+        slot_x, slot_y = _free_slot(builder, x + dx, y + dy)
+        action = (
+            {"kind": "move", "exit_ref": _exit_ref(gate), "destination": gate_id}
+            if _traversable(gate, actor)
+            else None
+        )
+        builder.add_node(
+            gate_id,
+            _wild_region_label(*entry.wilderness_xy),
+            slot_x,
+            slot_y,
+            visibility=(
+                "visible_visited"
+                if _known_node_id(gate_id, visited)
+                else "visible_unvisited"
+            ),
+            anchor=False,
+            landmark=False,
+            action=action,
+        )
+        builder.add_edge(current_id, gate_id, direction, action is not None)
 
     # Remembered grid nodes (outside visual range), bounded.
     for visit in builder.remembered(MAX_NODES - len(builder.nodes)):
@@ -451,7 +482,7 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
         decoded = decode_node(visit.node_id)
         builder.add_node(
             visit.node_id,
-            _grid_coord_label(xymap, (decoded["x"], decoded["y"]), decoded["z_map_key"]),
+            _grid_room_label((decoded["x"], decoded["y"]), decoded["z_map_key"]),
             decoded["x"],
             decoded["y"],
             visibility="remembered",
@@ -461,6 +492,120 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
         )
 
     return "grid"
+
+
+def _grid_gate_candidates(location) -> dict[str, tuple[Any, Any]]:
+    """Registered gate exits at ``location``, deduped by canonical wild id.
+
+    Returns ``{wild_id: (entry, gate_exit)}`` in deterministic dbid order
+    (lowest dbid wins a duplicate registration of the same entry). An
+    unregistered or missing ``db.anchor_key`` is not a gate; a registered
+    entry whose coordinate cannot encode fails closed -- the presenter never
+    emits an identity it cannot name.
+    """
+    from typeclasses.exits import WildernessGateExit
+    from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+    from world.maps.wilderness_provider import WILDERNESS_NAME
+
+    candidates: dict[str, tuple[Any, Any]] = {}
+    gates = [e for e in location.exits if isinstance(e, WildernessGateExit)]
+    for exit_obj in sorted(gates, key=lambda e: int(e.id)):
+        try:
+            entry = WILDERNESS_ENTRY_REGISTRY.get(exit_obj.db.anchor_key)
+        except Exception:
+            continue
+        if entry is None:
+            continue
+        try:
+            gate_id = encode_wild(WILDERNESS_NAME, *entry.wilderness_xy)
+        except Exception:
+            raise PanelUnavailableError
+        candidates.setdefault(gate_id, (entry, exit_obj))
+    return candidates
+
+
+def _trim_visible(nodes: list, current_node, cap: int) -> list:
+    """Cap the visible set, dropping the farthest nodes first (design D2).
+
+    Deterministic drop order: descending Chebyshev distance from the current
+    node, then descending Y, then descending X. The current node is never
+    dropped.
+    """
+    if len(nodes) <= cap:
+        return nodes
+    cx, cy = current_node.X, current_node.Y
+    droppable = sorted(
+        (node for node in nodes if node.node_index != current_node.node_index),
+        key=lambda node: (max(abs(node.X - cx), abs(node.Y - cy)), node.Y, node.X),
+    )
+    excess = len(nodes) - cap
+    kept = {current_node.node_index} | {
+        node.node_index for node in droppable[: max(len(droppable) - excess, 0)]
+    }
+    return [node for node in nodes if node.node_index in kept]
+
+
+def _gate_direction(gate) -> str:
+    """The renderer direction a gate exit's node draws toward (design D2).
+
+    Key first, then the first direction any alias normalizes to in canonical
+    ``WILD_DIRECTIONS`` order -- set-based, because alias-handler retrieval
+    order is not a repository guarantee -- then a stable ``n`` fallback.
+    """
+    from world.maps.wilderness_destination import normalize_wilderness_direction
+
+    direction = normalize_wilderness_direction(gate.key)
+    if direction is not None:
+        return direction
+    named = {
+        normalized
+        for alias in gate.aliases.all()
+        if (normalized := normalize_wilderness_direction(alias)) is not None
+    }
+    for candidate in WILD_DIRECTIONS:
+        if candidate in named:
+            return candidate
+    return "n"
+
+
+def _free_slot(builder: _GraphBuilder, x: int, y: int) -> tuple[int, int]:
+    """Return ``(x, y)`` or the nearest free renderer-local slot (design D2).
+
+    Deterministic probe order: ring sweep by ``(|dx| + |dy|)``, then ``dy``,
+    then ``dx``, staying within the payload coordinate bounds. A free slot
+    always exists -- the payload caps at 64 nodes while the COORD window
+    offers far more slots -- but the sweep stays bounded and fails closed.
+    """
+    occupied = {(node["x"], node["y"]) for node in builder.nodes}
+    if (
+        (x, y) not in occupied
+        and COORD_MIN <= x <= COORD_MAX
+        and COORD_MIN <= y <= COORD_MAX
+    ):
+        return (x, y)
+    for radius in range(1, MAX_NODES + 1):
+        for _distance, dy, dx in sorted(
+            (abs(dx) + abs(dy), dy, dx)
+            for dx in range(-radius, radius + 1)
+            for dy in range(-radius, radius + 1)
+            if abs(dx) + abs(dy) == radius
+        ):
+            slot = (x + dx, y + dy)
+            if (
+                COORD_MIN <= slot[0] <= COORD_MAX
+                and COORD_MIN <= slot[1] <= COORD_MAX
+                and slot not in occupied
+            ):
+                return slot
+    raise PanelUnavailableError
+
+
+def _wild_region_label(x: int, y: int) -> str:
+    """The region display name for one wilderness cell."""
+    from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+    from world.maps.wilderness_provider import region_for_coordinates
+
+    return WILDERNESS_REGION_REGISTRY[region_for_coordinates(x, y)].display_name_zh
 
 
 def _grid_nodes_in_range(xymap, current_node, visual_range: int, map_mode: str) -> list:
@@ -510,14 +655,8 @@ def _grid_coord_is_anchor(xymap, coord: tuple[int, int]) -> bool:
     )
 
 
-def _grid_node_label(xymap, node, coord: tuple[int, int], z: str) -> str:
-    from typeclasses.rooms import GridRoom
-
-    room = GridRoom.objects.filter_xyz(xyz=(coord[0], coord[1], z)).first()
-    return room.key if room is not None else f"({coord[0]},{coord[1]})"
-
-
-def _grid_coord_label(xymap, coord: tuple[int, int], z: str) -> str:
+def _grid_room_label(coord: tuple[int, int], z: str) -> str:
+    """The room key at one grid coordinate, or a coordinate fallback."""
     from typeclasses.rooms import GridRoom
 
     room = GridRoom.objects.filter_xyz(xyz=(coord[0], coord[1], z)).first()
@@ -565,11 +704,19 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
     registered gateway south exit actually returns to the grid. The edge is
     only ``traversable`` when the node carries a move action, matching the
     grid layer.
+
+    Node identity follows resolution (fix-wilderness-map-adjacency-truth D1):
+    when a step resolves to a ``grid:`` node -- the registered gateway -- the
+    node IS that grid node (id, room label, visited knowledge), positioned at
+    the renderer-local adjacent cell so the lattice keeps its clean 3x3
+    neighbourhood. A resolved grid destination that cannot be decoded (the
+    map was rescinded) fails closed.
     """
-    from typeclasses.rooms import TerrainRoom
+    from typeclasses.rooms import AnchorRoom, GridRoom, TerrainRoom
     from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
     from world.maps.wilderness_destination import (
         normalize_wilderness_direction,
+        wilderness_neighbor,
         resolve_wilderness_destination,
     )
     from world.maps.wilderness_provider import (
@@ -615,16 +762,7 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
 
     # Eight legal adjacent cells are visible (visited or unvisited).
     for direction in WILD_DIRECTIONS:
-        neighbor = _wild_neighbor(x, y, direction)
-        if neighbor is None:
-            continue
-        nx, ny = neighbor
-        node_id = encode_wild(WILDERNESS_NAME, nx, ny)
-        visibility = (
-            "visible_visited"
-            if _known_node_id(node_id, visited)
-            else "visible_unvisited"
-        )
+        neighbor = wilderness_neighbor(x, y, direction)
         destination = resolve_wilderness_destination(location, direction)
         exit_obj = exits_by_direction.get(direction)
         action = None
@@ -638,6 +776,52 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
                 "exit_ref": _exit_ref(exit_obj),
                 "destination": destination,
             }
+        if destination is not None and destination.startswith("grid:"):
+            # Registered gateway: the node is the resolved grid room itself.
+            try:
+                decoded = decode_node(destination)
+            except KnowledgeError:
+                raise PanelUnavailableError
+            room = GridRoom.objects.filter_xyz(
+                xyz=(decoded["x"], decoded["y"], decoded["z_map_key"])
+            ).first()
+            if room is None:
+                label, is_anchor = destination, False
+            else:
+                label = room.key
+                is_anchor = isinstance(room, AnchorRoom)
+            # Renderer-local geometry keeps the 3x3 lattice; an out-of-bounds
+            # step (provider edge) has no cell to draw -- the gateway never
+            # coexists with an edge cell today, and probing would only
+            # invent geometry, so fail closed instead.
+            if neighbor is None:
+                raise PanelUnavailableError
+            nx, ny = neighbor
+            builder.add_node(
+                destination,
+                label,
+                nx,
+                ny,
+                visibility=(
+                    "visible_visited"
+                    if _known_node_id(destination, visited)
+                    else "visible_unvisited"
+                ),
+                anchor=is_anchor,
+                landmark=is_anchor,
+                action=action,
+            )
+            builder.add_edge(current_id, destination, direction, action is not None)
+            continue
+        if neighbor is None:
+            continue
+        nx, ny = neighbor
+        node_id = encode_wild(WILDERNESS_NAME, nx, ny)
+        visibility = (
+            "visible_visited"
+            if _known_node_id(node_id, visited)
+            else "visible_unvisited"
+        )
         builder.add_node(
             node_id,
             WILDERNESS_REGION_REGISTRY[region_for_coordinates(nx, ny)].display_name_zh,
@@ -670,26 +854,6 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
             )
 
     return "wilderness"
-
-
-def _wild_neighbor(x: int, y: int, direction: str) -> tuple[int, int] | None:
-    from world.maps.wilderness_provider import WILDERNESS_MAX_X, WILDERNESS_MAX_Y
-
-    deltas = {
-        "n": (0, 1),
-        "ne": (1, 1),
-        "e": (1, 0),
-        "se": (1, -1),
-        "s": (0, -1),
-        "sw": (-1, -1),
-        "w": (-1, 0),
-        "nw": (-1, 1),
-    }
-    dx, dy = deltas[direction]
-    nx, ny = x + dx, y + dy
-    if not (0 <= nx <= WILDERNESS_MAX_X and 0 <= ny <= WILDERNESS_MAX_Y):
-        return None
-    return (nx, ny)
 
 
 def _interior_graph(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder, is_instance: bool) -> str:

@@ -177,6 +177,12 @@ nodes are collected (excess visible nodes trimmed farthest-first in deterministi
 the gate's preferred renderer-local slot is occupied the gate node SHALL take the nearest free slot in
 deterministic probe order instead of being dropped.
 
+Both deterministic orders are part of this contract: the capacity trim SHALL drop visible nodes in
+descending Chebyshev distance from the current node, then descending Y, then descending X (the current
+node never dropped), and the slot probe SHALL scan the preferred slot first when it is free and inside
+the payload coordinate bounds, then rings of ascending Manhattan distance from it in ascending Y-offset
+then ascending X-offset order, taking the first slot that is inside the coordinate bounds and free.
+
 #### Scenario: Wilderness side shows the gate room
 - **WHEN** the puppet stands at a registered entry coordinate and the `local_map` panel is built
 - **THEN** the gateway direction carries the gate room's `grid:` node with the room's name as label,
