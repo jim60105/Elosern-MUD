@@ -99,6 +99,9 @@ A mask of exactly one `#` encodes the **point-shape** variant: no footprint, no 
 at the anchor cell itself every direction is a gateway to the single registered gate room. The
 schema expresses the cave semantics directly; no special-case branch is needed elsewhere (the
 gateway lookup checks both cases uniformly).
+A point-shape entry's `approach_cell(gate)` IS its `anchor_cell` (the registry requirement pins
+this identity), so every consumer formula — gate exit landing cell, gateway match, resolver —
+uses `approach_cell` uniformly and can never receive `None` for a valid gate.
 
 `capital_altoria` authors a 5×5 all-`#` mask (matching its 5×5 grid extent) with origin
 `(58, 98)` (x = 58..62, y = 98..102). Gates:
@@ -125,8 +128,12 @@ terrain-type registries (huge data, no expressiveness gain).
 
 `ElosernWildernessMapProvider.is_valid_coordinates` becomes: inside the 0..223 rectangle AND not
 in any `WILDERNESS_ENTRY_REGISTRY` footprint. The footprint set is computed from the registry at
-call time through a small module-level cache keyed on registry identity, so tests that patch the
-registry stay honest. Point-shape anchors contribute no cells. Consequences ride stock machinery
+call time through a small module-level cache keyed on the ordered `(anchor_key, entry)` pairs of
+the live registry snapshot — the key tuple retains the entry objects, so CPython cannot recycle
+their ids behind the cache's back and a `patch.dict`/rebind replaces value objects, producing a
+key miss on the next call. The provider reads the registry as a module attribute of
+`world.lore.wilderness_entry` at call time (never a `from … import` binding) so a rebinding in a
+test is observed. Point-shape anchors contribute no cells. Consequences ride stock machinery
 with zero new traversal code:
 
 - Walking toward the city: the last valid cell's exit into the footprint is hidden and blocked by

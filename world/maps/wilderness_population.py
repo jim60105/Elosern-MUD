@@ -23,10 +23,18 @@ from evennia.utils.create import create_object
 
 from typeclasses.monsters import Monster
 from world.lore.monsters import MONSTER_TIER_REGISTRY
+from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps.wilderness_provider import region_for_coordinates
 
-# D-2: the fixed entry coordinate, read by both the model and the tests.
-CAPITAL_ENTRY_XY = (60, 100)
+# D-2 / wilderness-anchor-footprint: the entry coordinate is the capital's
+# NORTH-GATE approach cell -- the exterior cell a traveler lands on leaving 北門
+# toward the open wilderness -- read from the entry registry rather than
+# duplicated (AGENTS.md: consumers read registry values). The old (60, 100) is
+# now a footprint cell the provider refuses, so the hunting band recenters
+# here; the introductory hunt stays reliably completable straight outside the
+# North Gate. Read by both the model (band membership) and the tests.
+_capital_entry = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+CAPITAL_ENTRY_XY = _capital_entry.approach_cell(_capital_entry.gate_for("s"))
 
 # D-2: immutable region tables, covering every key of WILDERNESS_REGION_REGISTRY.
 # MappingProxyType enforces the spec's "immutable mapping" contract at runtime,

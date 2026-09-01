@@ -141,8 +141,8 @@ The follow function in the party module SHALL move every companion of the traver
 - **THEN** both companions' locations equal the player's new location, the player's clock advance is unchanged by their movement, and the party binding is unchanged
 
 #### Scenario: Companions follow through the wilderness gate
-- **WHEN** a player with companions in the grid room enters the wilderness through the gate exit
-- **THEN** each companion arrives at the entry wilderness coordinates through the provider API, and the player's clock advance reflects only the player's `wilderness_move` cost
+- **WHEN** a player with companions in the grid room enters the wilderness through a gate exit
+- **THEN** each companion arrives at that gate's `approach_cell` through the provider API (the same cell the player landed on — never a footprint cell), and the player's clock advance reflects only the player's `wilderness_move` cost
 
 #### Scenario: Companions follow an ordinary wilderness step
 - **WHEN** a player with companions in the same wilderness room steps to a neighboring coordinate
@@ -179,7 +179,6 @@ The follow function in the party module SHALL move every companion of the traver
 #### Scenario: A left-behind companion rejoins on a later traversal
 - **WHEN** a companion failed to follow and the player later traverses an exit from the companion's current room
 - **THEN** the companion follows on that traversal and the player receives no repeated notification
-
 ### Requirement: Companions fight as allies in the player's combat session
 When the player engages a hostile target, `engage` SHALL include every bound companion that is
 co-located, living, and not knocked out in the session's allied team (`player_ids`). The

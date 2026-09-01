@@ -448,7 +448,7 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
     # the entry cell's wild node (design D2). Geometry is the renderer-local
     # slot named by the gate's key/aliases; an occupied slot probes outward
     # deterministically instead of dropping the gate.
-    for gate_id, (entry, gate) in gate_candidates.items():
+    for gate_id, (landing_cell, gate) in gate_candidates.items():
         direction = _gate_direction(gate)
         dx, dy = DIRECTION_DELTAS[direction]
         slot_x, slot_y = _free_slot(builder, x + dx, y + dy)
@@ -459,7 +459,7 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
         )
         builder.add_node(
             gate_id,
-            _wild_region_label(*entry.wilderness_xy),
+            _wild_region_label(*landing_cell),
             slot_x,
             slot_y,
             visibility=(
@@ -497,11 +497,20 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
 def _grid_gate_candidates(location) -> dict[str, tuple[Any, Any]]:
     """Registered gate exits at ``location``, deduped by canonical wild id.
 
-    Returns ``{wild_id: (entry, gate_exit)}`` in deterministic dbid order
+    Returns ``{wild_id: (landing_cell, gate_exit)}`` in deterministic dbid order
     (lowest dbid wins a duplicate registration of the same entry). An
     unregistered or missing ``db.anchor_key`` is not a gate; a registered
     entry whose coordinate cannot encode fails closed -- the presenter never
     emits an identity it cannot name.
+
+    The gate's wilderness-side identity is its landing cell: the approach cell
+    of the gate named by the exit's ``db.gate_direction`` (wilderness-anchor-
+    footprint -- what the exit renders is where traversing it actually puts
+    you). A row whose ``db.gate_direction`` is missing or names no gate of the
+    entry is a misconfiguration the traversal itself refuses
+    (``WildernessGateExit.at_traverse`` fails closed on the same lookup), so
+    the presenter refuses to advertise it too -- the panel never offers an
+    action that cannot be taken.
     """
     from typeclasses.exits import WildernessGateExit
     from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
@@ -516,11 +525,16 @@ def _grid_gate_candidates(location) -> dict[str, tuple[Any, Any]]:
             continue
         if entry is None:
             continue
+        gate = entry.gate_for(exit_obj.db.gate_direction) if exit_obj.db.gate_direction else None
+        landing_cell = entry.approach_cell(gate) if gate is not None else None
+        if landing_cell is None:
+            # Same lookup, same refusal as the traversal: not a gate identity.
+            continue
         try:
-            gate_id = encode_wild(WILDERNESS_NAME, *entry.wilderness_xy)
+            gate_id = encode_wild(WILDERNESS_NAME, *landing_cell)
         except Exception:
             raise PanelUnavailableError
-        candidates.setdefault(gate_id, (entry, exit_obj))
+        candidates.setdefault(gate_id, (landing_cell, exit_obj))
     return candidates
 
 
@@ -716,6 +730,7 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
     from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
     from world.maps.wilderness_destination import (
         normalize_wilderness_direction,
+        DIRECTION_DELTAS,
         wilderness_neighbor,
         resolve_wilderness_destination,
     )
@@ -790,13 +805,18 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
             else:
                 label = room.key
                 is_anchor = isinstance(room, AnchorRoom)
-            # Renderer-local geometry keeps the 3x3 lattice; an out-of-bounds
-            # step (provider edge) has no cell to draw -- the gateway never
-            # coexists with an edge cell today, and probing would only
-            # invent geometry, so fail closed instead.
-            if neighbor is None:
-                raise PanelUnavailableError
-            nx, ny = neighbor
+            # Renderer-local geometry keeps the 3x3 lattice. The gateway's
+            # adjacent cell may be provider-invalid without being an edge:
+            # an approach cell's gate direction faces an anchor-footprint
+            # cell (wilderness-anchor-footprint), and provider edges refuse
+            # a step too. The node is a grid identity, never a wild cell,
+            # and footprint/edge cells can never host a drawn wild node --
+            # the geometric adjacent cell is therefore always free.
+            if neighbor is not None:
+                nx, ny = neighbor
+            else:
+                dx, dy = DIRECTION_DELTAS[direction]
+                nx, ny = x + dx, y + dy
             builder.add_node(
                 destination,
                 label,

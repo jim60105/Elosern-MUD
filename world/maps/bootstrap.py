@@ -1,5 +1,6 @@
 """Idempotent grid and wilderness bootstrap: spawn the sample city, bridge it to
-Limbo, and provision the wilderness layer and its one gate (map-wilderness)."""
+Limbo, and provision the wilderness layer and one grid-side gate exit per
+registered gate (map-wilderness, wilderness-anchor-footprint)."""
 
 from evennia.contrib.grid.xyzgrid.xyzgrid import get_xyzgrid
 from evennia.contrib.grid.wilderness.wilderness import (
@@ -12,6 +13,7 @@ from evennia.utils.search import search_object
 
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import GridRoom, Room
+from world.lore.wilderness_entry import OPPOSITE_DIRECTION, WILDERNESS_ENTRY_REGISTRY
 from world.maps.altoria_capital import XYMAP_DATA_LIST
 from world.maps.instance import register_instance_reclamation
 from world.maps.limbo import (
@@ -21,6 +23,7 @@ from world.maps.limbo import (
     LIMBO_LEGACY_KEY,
 )
 from world.maps.wilderness_provider import (
+    LONG_DIRECTIONS,
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
 )
@@ -248,29 +251,33 @@ def sync_grid() -> None:
     _ensure_exit(south_gate, limbo, **EXIT_TO_LIMBO)
 
 
-GATE_EXIT = {
-    "key": "荒野",
-    "aliases": ["wilderness", "north", "n"],
-    "anchor_key": "capital_altoria",
-}
+# Wilderness-side gate exits all share this key on DIFFERENT rooms; gateway
+# resolution matches room + direction, never key aliases, and grid-side
+# resolution reads db.anchor_key/db.gate_direction off the exit object.
+GATE_EXIT_KEY = "荒野"
 
 
 def sync_wilderness() -> None:
-    """Provision the wilderness map and the one grid-side gate idempotently.
+    """Provision the wilderness map and one grid-side gate per registered gate.
 
     ``create_wilderness()`` is itself a no-op if a ``WildernessScript`` keyed
-    ``WILDERNESS_NAME`` already exists, so no extra guard is needed there. The
-    gate exit is only created when the ``capital_altoria`` North Gate room
-    exists; its ``db.anchor_key`` is set at creation time because
-    ``WildernessGateExit.at_traverse`` reads it on first use -- a gate created
-    without it would ``KeyError`` (design.md D-7).
+    ``WILDERNESS_NAME`` already exists, so no extra guard is needed there. For
+    every gate of every ``WILDERNESS_ENTRY_REGISTRY`` entry whose destination
+    ``GridRoom`` exists, exactly one ``WildernessGateExit`` is ensured on that
+    room with ``db.anchor_key`` and ``db.gate_direction`` set -- the exit is
+    unusable (fails closed) without them, so they are part of provisioning,
+    not decoration. A gate whose destination room is missing logs a warning
+    and is skipped; other gates still provision.
 
     On every call we also re-run ``at_prepare_room()`` for each room already
     registered in the script's ``db.rooms``. This restores the deterministic
     ``ndb.active_desc``/``scene_archetype`` after a server restart, when the
     contrib's own ``at_server_start()`` restores only the non-persistent
     ``wildernessscript``/``active_coordinates`` links and the pickled
-    ``mapprovider`` is no longer re-invoked (``create_wilderness`` no-ops).
+    ``mapprovider`` is no longer re-invoked (``create_wilderness`` no-ops) --
+    and with them any gate-face exit locks the provider hook owns on active
+    approach cells. Grid-side gate-exit provisioning is independent of that
+    refresh pass.
     """
 
     create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())
@@ -279,37 +286,61 @@ def sync_wilderness() -> None:
     for coordinates, room in list(script.db.rooms.items()):
         script.mapprovider.at_prepare_room(coordinates, None, room)
 
-    north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
-    if north_gate is None:
+    for entry in WILDERNESS_ENTRY_REGISTRY.values():
+        for gate in entry.gates:
+            _provision_gate_exit(entry.anchor_key, gate)
+
+
+def _provision_gate_exit(anchor_key: str, gate) -> None:
+    """Ensure the one gate exit for ``(anchor_key, gate)`` on its destination room."""
+    gate_room = GridRoom.objects.filter_xyz((*gate.grid_xy, gate.z_map_key)).first()
+    if gate_room is None:
         log_warn(
-            f"sync_wilderness: North Gate room at {NORTH_GATE_XYZ} not found; "
-            "skipping the gateway exit."
+            f"sync_wilderness: destination room {(gate.grid_xy, gate.z_map_key)} "
+            f"for gate {gate.return_direction!r} of anchor {anchor_key!r} not found; "
+            "skipping that gate exit."
         )
         return
 
-    gates = [exit_obj for exit_obj in north_gate.exits if isinstance(exit_obj, WildernessGateExit)]
-    if gates:
-        # Idempotent heal: the project's own gate exists; make sure it is
-        # configured for this anchor and does not linger mis-keyed.
-        for gate in gates:
-            if gate.key == GATE_EXIT["key"]:
-                gate.db.anchor_key = GATE_EXIT["anchor_key"]
+    gate_exits = [
+        exit_obj for exit_obj in gate_room.exits if isinstance(exit_obj, WildernessGateExit)
+    ]
+    if len(gate_exits) > 1:
+        # Multiple WildernessGateExit rows on one room are ambiguous; never
+        # guess which one to heal.
+        log_warn(
+            f"sync_wilderness: multiple WildernessGateExit rows exist on "
+            f"{gate_room.key!r}; leaving them in place for gate {gate.return_direction!r}."
+        )
+        return
+    if gate_exits:
+        # Idempotent heal: the room's single WildernessGateExit IS this
+        # room's gate slot (validated registries never put two gates on one
+        # room), so its attributes converge on the authored pair in place --
+        # a wrong db.anchor_key/db.gate_direction is corrected with no second
+        # exit spawned.
+        gate_exits[0].db.anchor_key = anchor_key
+        gate_exits[0].db.gate_direction = gate.return_direction
         return
 
-    if any(exit_obj.key == GATE_EXIT["key"] for exit_obj in north_gate.exits):
+    if any(exit_obj.key == GATE_EXIT_KEY for exit_obj in gate_room.exits):
         # A non-project exit already occupies the gate key; do not create a
         # second ambiguous exit or claim provisioning succeeded.
         log_warn(
-            f"sync_wilderness: an exit keyed {GATE_EXIT['key']!r} exists at the North Gate "
-            "but is not a WildernessGateExit; leaving it in place."
+            f"sync_wilderness: an exit keyed {GATE_EXIT_KEY!r} exists on "
+            f"{gate_room.key!r} but is not a WildernessGateExit; leaving it in place."
         )
         return
 
-    gate = create_object(
+    # Outward direction from the city is the gate's face -- opposite of the
+    # wilderness-side return_direction: leaving 北門 toward the wild is north.
+    face = OPPOSITE_DIRECTION[gate.return_direction]
+    gate_exit = create_object(
         WildernessGateExit,
-        key=GATE_EXIT["key"],
-        aliases=GATE_EXIT["aliases"],
-        location=north_gate,
-        destination=north_gate,
+        key=GATE_EXIT_KEY,
+        aliases=["wilderness", LONG_DIRECTIONS[face], face],
+        location=gate_room,
+        destination=gate_room,
     )
-    gate.db.anchor_key = GATE_EXIT["anchor_key"]
+    gate_exit.db.anchor_key = anchor_key
+    gate_exit.db.gate_direction = gate.return_direction

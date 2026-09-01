@@ -18,7 +18,7 @@ from .monsters import MONSTER_TIER_REGISTRY
 from .nations import NATION_REGISTRY
 from .races import RACE_REGISTRY, STATIC_TIER_REGISTRY, SUBRACE_REGISTRY
 from .titles import FIXED_TITLE_REGISTRY
-from .wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+from .wilderness_entry import WILDERNESS_ENTRY_REGISTRY, validate_wilderness_entries
 from .wilderness_regions import WILDERNESS_REGION_REGISTRY
 
 
@@ -72,6 +72,11 @@ def sync_one(category: str, key: str, entry: Any) -> None:
 
 def sync_all() -> None:
     """Mirror every registry entry into persistent Evennia Script rows."""
+
+    # wilderness-anchor-footprint: malformed authored wilderness data fails at
+    # startup, before any lore:wilderness_entries:* Script is created or
+    # updated (all-or-nothing import convention).
+    validate_wilderness_entries()
 
     for category, registry in _ALL_REGISTRIES.items():
         for key, entry in registry.items():

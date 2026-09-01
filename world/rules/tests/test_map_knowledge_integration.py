@@ -29,7 +29,8 @@ from world.rules.map_knowledge import (
 )
 
 NORTH_GATE_XYZ = (2, 4, "capital_altoria")
-ENTRY_XY = WILDERNESS_ENTRY_REGISTRY["capital_altoria"].wilderness_xy
+_CAPITAL = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+ENTRY_XY = _CAPITAL.approach_cell(_CAPITAL.gate_for("s"))  # (60, 103)
 
 
 def _knowledge(character):

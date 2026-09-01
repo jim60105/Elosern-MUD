@@ -217,15 +217,19 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
     def _north_gate(self):
         return GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
 
-    def _gate_exits(self):
+    def _south_gate(self):
+        return GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+
+    def _gate_exits(self, gate=None):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        gate = self._north_gate()
+        gate = gate if gate is not None else self._north_gate()
         gates = [e for e in gate.exits if isinstance(e, WildernessGateExit)]
         return script, gates
 
-    def test_sync_wilderness_creates_script_and_gate_with_anchor_key(self):
+    @covers_requirement("wilderness-gateway::sync-wilderness-idempotently-provisions-the-wilderness-map-and-one-grid-side-gate-per-registered-gate")
+    def test_sync_wilderness_provisions_one_gate_exit_per_authored_gate(self):
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
         sync_wilderness()
@@ -235,6 +239,34 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         self.assertEqual(len(gates), 1)
         self.assertEqual(gates[0].db.anchor_key, "capital_altoria")
         self.assertEqual(gates[0].key, "荒野")
+        # Per-gate provisioning (wilderness-anchor-footprint): the 北門 room
+        # holds the return-direction "s" gate, the 南門 room the "n" gate.
+        self.assertEqual(gates[0].db.gate_direction, "s")
+        south_gates = self._gate_exits(self._south_gate())[1]
+        self.assertEqual(len(south_gates), 1)
+        self.assertEqual(south_gates[0].db.anchor_key, "capital_altoria")
+        self.assertEqual(south_gates[0].db.gate_direction, "n")
+        self.assertEqual(south_gates[0].key, "荒野")
+        # Exact outward-face aliases: the 北門 keeps its v1 surface; the
+        # 南門 faces south.
+        self.assertEqual(sorted(gates[0].aliases.all()), ["n", "north", "wilderness"])
+        self.assertEqual(sorted(south_gates[0].aliases.all()), ["s", "south", "wilderness"])
+        self.assertEqual(WildernessGateExit.objects.all().count(), 2)
+
+    def test_provisioned_gates_are_immediately_traversable(self):
+        # No extra sync pass is needed before the gates work (design D2):
+        # freshly provisioned rooms land deterministically on their approach
+        # cells.
+        create_object(Room, key=LIMBO_KEY, location=None)
+        sync_grid()
+        sync_wilderness()
+        north_gate = self._gate_exits()[1][0]
+        north_gate.at_traverse(self.char1, self._north_gate())
+        self.assertEqual(self.char1.location.coordinates, (60, 103))
+        self.char1.move_to(self._north_gate())
+        south_gate = self._gate_exits(self._south_gate())[1][0]
+        south_gate.at_traverse(self.char1, self._south_gate())
+        self.assertEqual(self.char1.location.coordinates, (60, 97))
 
     def test_sync_wilderness_is_idempotent(self):
         create_object(Room, key=LIMBO_KEY, location=None)
@@ -247,6 +279,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
 
         self.assertEqual(WildernessScript.objects.filter(db_key=WILDERNESS_NAME).count(), 1)
         self.assertEqual(len(gates), 1)
+        self.assertEqual(WildernessGateExit.objects.all().count(), 2)
 
     def test_sync_wilderness_without_north_gate_degrades_gracefully(self):
         sync_wilderness()
@@ -262,7 +295,7 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         self.assertIn("grid.spawn()", source)
         self.assertNotIn("sync_wilderness", source)
 
-    @covers_requirement("wilderness-gateway::sync-wilderness-idempotently-provisions-the-wilderness-map-and-the-one-grid-side-gate")
+    @covers_requirement("wilderness-gateway::sync-wilderness-idempotently-provisions-the-wilderness-map-and-one-grid-side-gate-per-registered-gate")
     def test_at_server_start_calls_sync_wilderness_after_sync_grid(self):
         source = inspect.getsource(at_server_start)
         self.assertLess(source.index("sync_grid()"), source.index("sync_wilderness()"))
@@ -294,16 +327,16 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         from world.maps.wilderness_provider import terrain_description
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        ok = enter_wilderness(self.char1, coordinates=(60, 100), name=WILDERNESS_NAME)
+        ok = enter_wilderness(self.char1, coordinates=(60, 103), name=WILDERNESS_NAME)
         self.assertTrue(ok)
         room = self.char1.location
-        self.assertEqual(room.ndb.active_desc, terrain_description(60, 100))
+        self.assertEqual(room.ndb.active_desc, terrain_description(60, 103))
         room.ndb.active_desc = None  # wipe like a restart would
         room.ndb.someother = 1
         # The returned room is retained (account still present); re-running
         # sync_wilderness must re-prepare it.
         sync_wilderness()
-        self.assertEqual(room.ndb.active_desc, terrain_description(60, 100))
+        self.assertEqual(room.ndb.active_desc, terrain_description(60, 103))
         self.assertEqual(room.scene_archetype, "western_hills_valleys")
 
     def test_sync_wilderness_heals_miskeyed_gate(self):
@@ -319,6 +352,53 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         script, gates = self._gate_exits()
         self.assertEqual(len(gates), 1)
         self.assertEqual(gates[0].db.anchor_key, "capital_altoria")
+        self.assertEqual(gates[0].db.gate_direction, "s")
+
+    def test_sync_wilderness_heals_misdirected_gate(self):
+        create_object(Room, key=LIMBO_KEY, location=None)
+        sync_grid()
+        sync_wilderness()
+        gate = self._gate_exits()[1][0]
+        gate.db.gate_direction = "e"
+        sync_wilderness()
+        gates = self._gate_exits()[1]
+        self.assertEqual(len(gates), 1)
+        self.assertEqual(gates[0].db.gate_direction, "s")
+
+    def test_sync_wilderness_heals_a_misattributed_single_gate_exit(self):
+        # A lone WildernessGateExit with foreign attrs on a gate room IS that
+        # room's gate slot: sync heals its (anchor, gate) pair in place rather
+        # than stacking a second gate (spec scenario "a mis-provisioned gate
+        # is healed").
+        create_object(Room, key=LIMBO_KEY, location=None)
+        sync_grid()
+        foreign = create_object(
+            WildernessGateExit,
+            key="荒野",
+            location=self._south_gate(),
+            destination=self._south_gate(),
+        )
+        foreign.db.anchor_key = "wrong_anchor"
+        foreign.db.gate_direction = "w"
+        sync_wilderness()
+        south_gates = self._gate_exits(self._south_gate())[1]
+        self.assertEqual(len(south_gates), 1)
+        self.assertIs(south_gates[0], foreign)
+        self.assertEqual(foreign.db.anchor_key, "capital_altoria")
+        self.assertEqual(foreign.db.gate_direction, "n")
+
+    def test_sync_wilderness_skips_an_ambiguous_multi_row_gate_room(self):
+        # Two WildernessGateExit rows on one room are ambiguous: sync warns and
+        # provisions nothing there, but still heals/provisions the other gate.
+        create_object(Room, key=LIMBO_KEY, location=None)
+        sync_grid()
+        south_gate = self._south_gate()
+        create_object(WildernessGateExit, key="荒野", location=south_gate, destination=south_gate)
+        create_object(WildernessGateExit, key="荒野二", location=south_gate, destination=south_gate)
+        sync_wilderness()
+        self.assertEqual(len(self._gate_exits(south_gate)[1]), 2)
+        # The unaffected north gate provisions to exactly one exit.
+        self.assertEqual(len(self._gate_exits()[1]), 1)
 
     def test_sync_wilderness_leaves_same_key_foreign_exit_alone(self):
         from typeclasses.exits import Exit

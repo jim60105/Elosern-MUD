@@ -263,9 +263,11 @@ The mask SHALL be a well-formed rectangle — every row the same non-empty lengt
 `#` and `.` (the `altoria_capital.MAPSTR` loading expectation) — and the derived `anchor_cell`
 SHALL itself be a `#` cell. Globally, two entries SHALL NOT have overlapping footprints; no
 footprint SHALL contain another entry's gate approach cell or point-shape anchor cell; and two
-gates SHALL NOT share the same `(approach_cell, return_direction)` pair. A point-shape entry's
-anchor cell SHALL have all eight wilderness neighbors provider-valid, so a gateway is never
-advertised toward a cell the provider cannot honor.
+gates SHALL NOT share the same `(approach_cell, return_direction)` pair; and two gates SHALL NOT
+share the same destination `(grid_xy, z_map_key)` room — one grid room hosts exactly one
+WildernessGateExit slot, so a second gate on that room would silently displace the first at
+provisioning time. A point-shape entry's anchor cell SHALL have all eight wilderness neighbors
+provider-valid, so a gateway is never advertised toward a cell the provider cannot honor.
 
 #### Scenario: The shipped registry validates
 - **WHEN** `validate_wilderness_entries()` is called against the shipped
@@ -283,8 +285,8 @@ advertised toward a cell the provider cannot honor.
 - **WHEN** `validate_wilderness_entries()` is called with a registry patched to contain one
   malformed entry at a time — ragged mask rows, a character outside `#`/`.`, an all-`.` mask, a
   mask whose bounding-box midpoint falls on a `.` cell, two entries whose footprints overlap, a
-  footprint containing another entry's gate approach cell, or a point anchor with a
-  provider-invalid neighbor direction
+  footprint containing another entry's gate approach cell, two gates sharing one destination
+  `(grid_xy, z_map_key)` room, or a point anchor with a provider-invalid neighbor direction
 - **THEN** each patch raises a validation error naming the offending entry and the rejected rule
 
 #### Scenario: sync_all refuses to mirror a malformed registry
