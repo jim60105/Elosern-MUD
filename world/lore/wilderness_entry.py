@@ -306,6 +306,8 @@ def validate_wilderness_entries(
         return not any(cell in other for other in all_footprints.values())
 
     seen_gate_keys: set[tuple[tuple[int, int], str]] = set()
+    seen_gate_rooms: set[tuple[tuple[int, int], str]] = set()
+    gate_rooms: list[tuple[str, WildernessGate]] = []
     for anchor_key, entry in registry.items():
         footprint = all_footprints[anchor_key]
         # -- two entries' footprints never overlap.
@@ -350,6 +352,7 @@ def validate_wilderness_entries(
                         anchor_key,
                         f"gate {gate.return_direction!r} approach cell {approach} is not provider-valid outside every footprint",
                     )
+            gate_rooms.append((anchor_key, gate))
         # -- a point anchor is never another entry's gate approach cell.
         if entry.is_point_shape and entry.anchor_cell is not None:
             for other_key, other_entry in registry.items():
@@ -371,6 +374,16 @@ def validate_wilderness_entries(
                         anchor_key,
                         f"point anchor {entry.anchor_cell} has provider-invalid neighbor {neighbor}",
                     )
+
+    # -- one grid room hosts one gate: two gates sharing a destination room
+    #    would collide on the room's single WildernessGateExit slot and leave
+    #    one gate unprovisionable. Checked after the per-entry rules so every
+    #    more precise collision rule keeps naming its own cause.
+    for anchor_key, gate in gate_rooms:
+        gate_room = (gate.grid_xy, gate.z_map_key)
+        if gate_room in seen_gate_rooms:
+            fail(anchor_key, f"gate {gate.return_direction!r} shares destination room {gate_room} with another gate")
+        seen_gate_rooms.add(gate_room)
 
 
 WILDERNESS_ENTRY_REGISTRY: dict[str, WildernessEntryPoint] = {

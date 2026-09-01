@@ -250,6 +250,20 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 _point_entry(anchor=(0, 0)),
                 "provider-invalid neighbor",
             ),
+            (
+                "two gates sharing one destination room",
+                "x",
+                WildernessEntryPoint(
+                    "x",
+                    ("#####",) * 5,
+                    (150, 150),
+                    (
+                        WildernessGate("n", (3, 3), "capital_altoria"),
+                        WildernessGate("s", (3, 3), "capital_altoria"),
+                    ),
+                ),
+                "shares destination room",
+            ),
         ]
         for label, key, entry, fragment in cases:
             with self.subTest(label):

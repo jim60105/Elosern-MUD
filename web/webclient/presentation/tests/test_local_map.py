@@ -1343,6 +1343,10 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
             location=location, destination=location,
         )
         gate.db.anchor_key = "capital_altoria"
+        # The presenter refuses a gate row whose direction names no gate
+        # (same refusal as the traversal), so synthetic gates carry the
+        # identity the tests pin: "s" -> approach cell (60, 103).
+        gate.db.gate_direction = "s"
         return gate
 
     @covers_requirement(
@@ -1539,6 +1543,28 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.assertEqual(len(edges), 1)
         self.assertFalse(
             any(n["id"] == self.ENTRY_ID for n in payload["nodes"] if n["action"] is None)
+        )
+
+    @covers_requirement(
+        "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
+    )
+    def test_gate_row_without_usable_direction_renders_no_node(self):
+        # The presenter refuses exactly what the traversal refuses: a
+        # WildernessGateExit whose db.gate_direction is unset or names no gate
+        # of the entry cannot move anyone, so it is never advertised.
+        unconfigured = self._make_gate(self.plaza)
+        unconfigured.db.gate_direction = None
+        bogus = self._make_gate(self.plaza, key="北境之門")
+        bogus.db.gate_direction = "q"
+        self.char1.location = self.plaza
+        record_arrival(self.char1)
+        payload = self._registry().render("local_map", _context(self.char1))
+        self.assertTrue(payload["available"])
+        self.assertFalse(
+            any(node["id"] == self.ENTRY_ID for node in payload["nodes"])
+        )
+        self.assertFalse(
+            any(edge["destination"] == self.ENTRY_ID for edge in payload["edges"])
         )
 
 

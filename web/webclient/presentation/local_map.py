@@ -506,9 +506,11 @@ def _grid_gate_candidates(location) -> dict[str, tuple[Any, Any]]:
     The gate's wilderness-side identity is its landing cell: the approach cell
     of the gate named by the exit's ``db.gate_direction`` (wilderness-anchor-
     footprint -- what the exit renders is where traversing it actually puts
-    you). A row without a usable ``db.gate_direction`` (legacy or synthetic)
-    falls back to the ``"s"`` gate's approach cell, the sole gate identity v1
-    ever had.
+    you). A row whose ``db.gate_direction`` is missing or names no gate of the
+    entry is a misconfiguration the traversal itself refuses
+    (``WildernessGateExit.at_traverse`` fails closed on the same lookup), so
+    the presenter refuses to advertise it too -- the panel never offers an
+    action that cannot be taken.
     """
     from typeclasses.exits import WildernessGateExit
     from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
@@ -524,10 +526,9 @@ def _grid_gate_candidates(location) -> dict[str, tuple[Any, Any]]:
         if entry is None:
             continue
         gate = entry.gate_for(exit_obj.db.gate_direction) if exit_obj.db.gate_direction else None
-        if gate is None:
-            gate = entry.gate_for("s")
         landing_cell = entry.approach_cell(gate) if gate is not None else None
         if landing_cell is None:
+            # Same lookup, same refusal as the traversal: not a gate identity.
             continue
         try:
             gate_id = encode_wild(WILDERNESS_NAME, *landing_cell)
