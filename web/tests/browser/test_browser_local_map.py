@@ -12,6 +12,7 @@ viewports.
 
 from __future__ import annotations
 
+import re
 import time
 
 from tools.spec_traceability import covers_requirement
@@ -72,7 +73,6 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         # node is asserted position-agnostic: any capital grid node renders.
         self.assertTrue(panel["current_node"].startswith("grid:capital_altoria:"))
 
-        # The surface renders legend text as text nodes and a current node.
         wait_for_store_state(
             page,
             lambda s: (s.get("panels") or {}).get("local_map", {}).get("available") is True,
@@ -83,8 +83,16 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             },
             timeout=30000,
         )
-        legend_text = page.locator('[data-testid="local-map__legend"]').inner_text()
-        self.assertIn("你目前所在的位置", legend_text)
+        # slim-minimap-island (amended requirement): the state legend is an
+        # overlay-only presentation — the island mounts no legend element
+        # for any payload, and the shape ladder below is what distinguishes
+        # states on the island without colour. (The overlay is opened at the
+        # END of this test: opening it first would make the island-scoped
+        # node assertions below match both surfaces.)
+        self.assertEqual(
+            page.locator('[data-testid="local-map__legend"]').count(), 0,
+            "the island mounts no state legend",
+        )
 
         # The seeded knowledge includes wilderness, interior, and instance
         # visits, so the grid layer carries remembered grid-adjacent nodes and
@@ -100,6 +108,15 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             1,
         )
         self.assertTrue(current.is_visible())
+
+        # The full-map overlay keeps the payload's legend, chips paired with
+        # their text labels (slim-minimap-island).
+        page.evaluate("window.__elosernBridge.store.openOverlay('map')")
+        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
+        legend_text = page.locator(
+            '[data-testid="map-overlay"] [data-testid="local-map__legend"]'
+        ).inner_text()
+        self.assertIn("你目前所在的位置", legend_text)
 
     @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
     def test_remembered_remote_node_focus_shows_name_without_travel_action(self):
@@ -301,18 +318,22 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                             f"labels {i} and {j} lack a ≥2px gap at {viewport}",
                         )
 
-                # The legend and detail line remain visible below the canvas,
-                # and the whole island's content (title/meta, canvas, legend,
-                # remembered list, detail) stays inside the island's bounded
-                # height — no required surface has to be scrolled to.
+                # The detail line remains visible below the canvas, and the
+                # whole island's content (title/meta, canvas, remembered
+                # list, detail) stays inside the island's bounded height —
+                # no required surface has to be scrolled to (slim-minimap-
+                # island: the legend left the island's section list).
                 island_box = page.locator('[data-testid="local-map"]').bounding_box()
                 self.assertIsNotNone(island_box)
-                for testid in ("local-map__legend", "local-map-detail"):
+                self.assertEqual(
+                    page.locator('[data-testid="local-map__legend"]').count(), 0,
+                    "the island mounts no state legend",
+                )
+                for testid in ("local-map-detail",):
                     box = page.locator(f'[data-testid="{testid}"]').bounding_box()
                     self.assertIsNotNone(box)
                     self.assertTrue(box["y"] >= island_box["y"] - 1)
                     self.assertTrue(box["y"] + box["height"] <= island_box["y"] + island_box["height"] + 1)
-                self.assertTrue(page.locator('[data-testid="local-map__legend"]').is_visible())
                 self.assertTrue(page.locator('[data-testid="local-map-detail"]').is_visible())
                 page.close()
 
@@ -543,10 +564,13 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
               };
             }"""
             )
+            # The +1 absorbs sub-pixel layout rounding: scrollHeight rounds
+            # fractional content heights up against an integer clientHeight
+            # (the budget formula's own 1px slack covers the same case).
             self.assertLessEqual(
                 fit["anchorScrollHeight"], fit["anchorClientHeight"] + 1
             )
-            for testid in ("local-map__title", "local-map__legend", "local-map-detail"):
+            for testid in ("local-map__title", "local-map-detail"):
                 self.assertTrue(
                     page.locator(f'[data-testid="{testid}"]').is_visible(),
                     f"{testid} must stay visible without scrolling at {viewport}",
@@ -593,8 +617,13 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                       };
                     }"""
                 )
+                # Same sub-pixel rounding tolerance as above: the island
+                # budget leaves its own 1px border-box border unreserved
+                # (reserving it regresses the >=2px marker/label separation
+                # contract), so a <=1px scroll range is the accepted
+                # residual; a real overflow fails this bound.
                 self.assertLessEqual(fit["scroll"], fit["client"] + 1)
-                for testid in ("local-map__title", "local-map__legend", "local-map-detail", "local-map-remembered"):
+                for testid in ("local-map__title", "local-map-detail", "local-map-remembered"):
                     self.assertTrue(
                         page.locator(f'[data-testid="{testid}"]').is_visible(),
                         f"{testid} must stay visible without scrolling at {viewport}",
@@ -846,12 +875,49 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(len(expected), 1, "fixture must carry an off-extent remembered node")
         self.assertEqual(island["markers"], expected)
 
+        # slim-minimap-island (amended contextual-hud requirement): the
+        # island's position statement is the header's axis marks PLUS the
+        # current node's own two payload integers on the detail line —
+        # exactly as committed. Selecting the current node deterministically
+        # (its action is null, so activation sends nothing outbound) removes
+        # any drift from an earlier journey moving the shared character.
+        current = next(node for node in panel["nodes"] if node["current"])
+        # Click the current node's marker itself: the node GROUP's bounding
+        # box centre falls in the transparent gap between the marker and the
+        # label, so a group click hit-tests nothing (the current node has no
+        # actionable halo). The marker's action is null, so activation still
+        # sends nothing outbound.
+        page.locator(
+            '[data-testid="local-map"]'
+            f' [data-testid="local-map__node--{panel["current_node"]}"]'
+            ' [data-testid="local-map__marker--current"]'
+        ).first.click()
+        expected_figure = f"座標 {current['x']},{current['y']}"
+        page.wait_for_function(
+            """(figure) => {
+              const detail = document.querySelector('[data-testid="local-map-detail"]');
+              return !!detail && detail.textContent.includes(figure);
+            }""",
+            arg=expected_figure,
+        )
+        detail_text = page.locator('[data-testid="local-map-detail"]').inner_text()
+        self.assertIn(expected_figure, detail_text)
+        self.assertEqual(
+            len(re.findall(r"座標\s*-?\d+,-?\d+", detail_text)), 1,
+            "the current node's own pair is the only coordinate figure",
+        )
+
         # The full-map overlay shares the resolved variant and marker set.
         self._open_overlay(page)
         overlay = self._surface(page, '[data-testid="map-overlay"]')
         self.assertIsNotNone(overlay)
         self.assertTrue(overlay["lattice"])
         self.assertEqual(overlay["markers"], expected)
+        # The overlay states no coordinate figure anywhere (island-only).
+        self.assertNotIn(
+            "座標",
+            page.locator('[data-testid="map-overlay"]').inner_text(),
+        )
 
         # Interior payload (committed without movement): BOTH surfaces
         # live-swap to the radial graph — no orientation marks, no markers,
@@ -904,6 +970,13 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
                     position["y"], placed[node_id]["y"] * scale, places=1,
                     msg=f"{name} {node_id}: translate matches scaled radial placement",
                 )
+
+        # The coordinate-free interior payload renders neither the axis
+        # marks nor a coordinate figure (slim-minimap-island): the island
+        # header drops the marks and the detail line loses the figure.
+        self.assertFalse(island["orientation"], "the graph island omits the axis marks")
+        island_detail = page.locator('[data-testid="local-map-detail"]').inner_text()
+        self.assertNotIn("座標", island_detail)
 
         # Absence: neither surface's chrome contains a layout-control element.
         # Scan BOTH map surfaces' interactive controls (button/input/select/

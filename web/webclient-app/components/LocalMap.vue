@@ -8,9 +8,11 @@
 // connector edges, labels, state legend) is rendered by the shared
 // MapLattice component (improve-webclient-map-overlay-scale), so the
 // full-map overlay can render the same lattice at its own larger scale.
-// The island keeps its chrome: the meta row (title + orientation legend +
-// "展開全地圖" expand button), the bounded focusable remembered-node list,
-// and the hovered/selected-node detail line driven by the lattice's
+// Since slim-minimap-island the island passes the renderer's legend switch
+// off, so the state legend is an overlay-only presentation. The island
+// keeps its chrome: the meta row (title + orientation marks + "展開全地圖"
+// expand button), the bounded focusable remembered-node list, and the
+// hovered/selected-node detail line driven by the lattice's
 // `select`/`hover`/`leave` events.
 import { computed, onMounted, onUpdated, ref } from "vue";
 import MapLattice from "./MapLattice.vue";
@@ -22,9 +24,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["move", "open-map"]);
-
-// Legend entries follow the fixed visibility order: current, visible_unvisited,
-// visible_visited, remembered. Extra entries cycle through the same glyphs.
 
 const available = computed(() => props.localMap.available === true);
 const reason = computed(() => props.localMap.reason?.message ?? "");
@@ -78,6 +77,16 @@ const detailParts = computed(() => {
   if (!node) return [];
   const parts = [node.label, STATE_LABELS[node.visibility] ?? node.visibility];
   if (node.action) parts.push(`→ ${node.action.destination}`);
+  // Current-node coordinate readout (slim-minimap-island D2): on the
+  // closed coordinate-bearing set the payload x/y are validated world
+  // coordinates, and the island's position statement is the header's axis
+  // orientation marks plus exactly this one figure — the current node's
+  // two payload integers, no unit, delta, or derived quantity. Any other
+  // active node, any other layer, and the overlay never gain a coordinate
+  // figure (the ban stays verbatim outside this single part).
+  if (node.current && (layer.value === "grid" || layer.value === "wilderness")) {
+    parts.push(`座標 ${node.x},${node.y}`);
+  }
   return parts;
 });
 
@@ -99,8 +108,10 @@ function clearHover() {
 // lattice combined with a long remembered list would push required content
 // into the anchor's overflow-y scroll fallback. Instead the canvas's
 // max-height shrinks to the space the hud-right anchor's height budget
-// leaves after the meta row, remembered list, legend, and detail line; the
-// computed cap is passed down to MapLattice as its `maxHeight` prop.
+// leaves after the meta row, remembered list, and detail line; the computed
+// cap is passed down to MapLattice as its `maxHeight` prop. (Since
+// slim-minimap-island the legend is overlay-only, so it left both the
+// section list and the gap count.)
 const rootEl = ref(null);
 const metaEl = ref(null);
 const rememberedEl = ref(null);
@@ -120,24 +131,22 @@ function measureCanvasBudget() {
   if (!anchor) return;
   const budget = anchor.clientHeight;
   if (!budget) return;
-  // 5 island sections (meta, canvas, remembered list when non-empty,
-  // legend, detail) separated by 8px (--sp-2) gaps; the meta row also
-  // carries a 4px margin-bottom outside its own bounding box; 9px island
-  // padding top and bottom; the canvas element's 2px border. The state
-  // legend now renders inside MapLattice (this component's child), so the
-  // lookup is scoped to the island root to measure its height without
-  // picking up a legend from a sibling surface (the overlay may be mounted
-  // at the same time).
-  const legendEl = root.querySelector('[data-testid="local-map__legend"]');
-  const gapCount = 3 + (remembered.value.length > 0 ? 1 : 0);
+  // 4 island sections (meta, canvas, remembered list when non-empty,
+  // detail) separated by 8px (--sp-2) gaps. Fixed chrome (25px): 18px
+  // island padding (9px top + 9px bottom), the canvas element's 2px
+  // border, the meta row's 4px margin-bottom outside its own bounding
+  // box, and 1px of rounding slack so the island never needs to scroll
+  // a required surface. The island's own 1px border-box border is
+  // deliberately not reserved: reserving it (rubber-duck run 2) cost
+  // the canvas 2px and regressed the dense-lattice >=2px separation
+  // contract, while the resulting <=1px scroll range stays inside the
+  // +1px sub-pixel tolerance the browser budget tests enforce.
+  const gapCount = 2 + (remembered.value.length > 0 ? 1 : 0);
   const others =
     sectionHeight(metaEl.value) +
     sectionHeight(rememberedEl.value) +
-    sectionHeight(legendEl) +
     sectionHeight(detailEl.value);
-  // The extra 1px of slack absorbs the island's 1px border top/bottom
-  // rounding so the island never needs to scroll a required surface.
-  const available = budget - others - gapCount * 8 - 18 - 2 - 5;
+  const available = budget - others - gapCount * 8 - 18 - 2 - 4 - 1;
   canvasMaxHeight.value = Math.max(40, Math.min(296, available));
 }
 
@@ -205,6 +214,7 @@ function onIslandClick(event) {
         :local-map="localMap"
         :variant="localMap.layoutVariant || 'lattice'"
         :max-height="canvasMaxHeight || 296"
+        :show-legend="false"
         @select="selectNode"
         @hover="hoverNode"
         @leave="clearHover"
@@ -259,7 +269,7 @@ function onIslandClick(event) {
   box-sizing: border-box;
   /* The island keeps its natural content height (design D9/D10): a flex item
      with min-height:0 + flex-shrink:1 let the capped hud-right anchor
-     compress it to the meta row, pushing the canvas/legend/detail below the
+     compress it to the meta row, pushing the canvas/remembered/detail below the
      island's box. min-height:auto makes the island size to its content; when
      the content outgrows the anchor's height budget, the anchor scrolls
      (overflow-y:auto) instead of the island being crushed. */

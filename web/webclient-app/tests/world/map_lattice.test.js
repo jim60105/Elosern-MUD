@@ -94,6 +94,19 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     expect(edgeMarker.find("text").text()).toBe("舊街區");
   });
 
+  // slim-minimap-island D1: the legend-display switch. Default-on keeps
+  // every bare mount (and the overlay) rendering the legend; off mounts no
+  // legend element at all while the canvas content is untouched.
+  it("mounts no legend element when the legend switch is off", () => {
+    const w = mountLattice({ showLegend: false });
+    expect(w.find('[data-testid="local-map__legend"]').exists()).toBe(false);
+    expect(w.findAll('[data-testid^="local-map__legend-item--"]')).toHaveLength(0);
+    // The rest of the shared render is unchanged by the switch.
+    expect(w.findAll('[data-testid^="local-map__node--"]').length).toBe(3);
+    expect(w.findAll('[data-testid^="local-map__edge--"]').length).toBe(2);
+    expect(w.get('[data-testid="local-map__marker--current"]').exists()).toBe(true);
+  });
+
   it("keeps node markers and labels non-intersecting at the overlay's scale", () => {
     const w = mountLattice(OVERLAY_PROPS);
 

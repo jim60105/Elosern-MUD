@@ -52,6 +52,9 @@ describe("LocalMap (B4 world family)", () => {
     expect(w.find(".local-map__lattice").exists()).toBe(false);
     expect(w.find('[data-testid="local-map__title"]').exists()).toBe(false);
     expect(w.find('[data-testid^="local-map__node--"]').exists()).toBe(false);
+    // slim-minimap-island D1: no legend element for ANY payload — the
+    // unavailable form included.
+    expect(w.find('[data-testid="local-map__legend"]').exists()).toBe(false);
   });
 
   it("renders one marker per visibility state, each as a distinct non-color glyph", () => {
@@ -136,48 +139,77 @@ describe("LocalMap (B4 world family)", () => {
     expect(wrapper.emitted("move")).toBeUndefined();
   });
 
-  it("renders the payload's legend entries paired with their state chips", () => {
-    const w = mountMap();
-    const items = w.findAll('[data-testid^="local-map__legend-item--"]');
-    expect(items).toHaveLength(4);
-    expect(w.get('[data-testid="local-map__legend"]').text()).toContain("你目前所在的位置");
-    // Draft dot-chips (design D2): every entry carries its state chip, and
-    // visited vs remembered are distinguished by the chip's border style
-    // (solid gold frame vs dashed gold frame) — not by the label text.
-    for (const [i, state] of Object.entries(["current", "visible_unvisited", "visible_visited", "remembered"])) {
-      expect(items[Number(i)].find(`.local-map__legend-chip--${state}`).exists()).toBe(true);
-    }
-    expect(
-      items[2].find(".local-map__legend-chip--visible_visited").classes(),
-    ).not.toContain("local-map__legend-chip--remembered");
-    expect(w.text()).toContain("尚未探索的相鄰位置");
-    expect(w.text()).toContain("已經探索過的相鄰位置");
-    expect(w.text()).toContain("曾經到過、但不在附近的遠方位置");
-  });
+  // slim-minimap-island (design D1): the state legend is an overlay-only
+  // presentation. The island passes the shared renderer's legend-display
+  // switch off, so no legend element is mounted in its DOM for any payload
+  // (the chip-pairing behavior itself stays pinned on the renderer/overlay
+  // suites: map_lattice.test.js, map_overlay.test.js).
+  for (const [name, sample] of Object.entries({
+    grid: LOCAL_MAP_SAMPLE,
+    wilderness: LOCAL_MAP_WILDERNESS_SAMPLE,
+    minimal: LOCAL_MAP_MINIMAL_SAMPLE,
+    instance: LOCAL_MAP_INSTANCE_SAMPLE,
+    interior: LOCAL_MAP_INTERIOR_SAMPLE,
+    unavailable: LOCAL_MAP_UNAVAILABLE_SAMPLE,
+  })) {
+    it(`mounts no state legend on the ${name} payload`, () => {
+      const w = mountMap({ localMap: localMapModelFor(sample) });
+      expect(w.find('[data-testid="local-map__legend"]').exists()).toBe(false);
+      expect(w.findAll('[data-testid^="local-map__legend-item--"]')).toHaveLength(0);
+      expect(w.text()).not.toContain("你目前所在的位置");
+    });
+  }
 
   it("defaults the detail line to the current node and follows hover", async () => {
     const w = mountMap();
     const detail = w.get('[data-testid="local-map-detail"]');
-    expect(detail.text()).toContain("霧骨渡口");
-    expect(detail.text()).toContain("目前所在");
-    // map-02 design D3: the detail line never shows raw world-coordinate
-    // numbers — the radial variant makes them meaningless, and they were
-    // never a reading path on either variant.
-    expect(detail.text()).not.toContain("(1, 2)");
+    // slim-minimap-island D2: on a coordinate-bearing layer the detail line
+    // states exactly the current node's two payload integers, as committed
+    // (no unit, delta, or derived quantity), in the `座標 <x>,<y>` form.
+    expect(detail.text()).toBe("霧骨渡口 · 目前所在 · 座標 1,2");
 
     await w.get('[data-testid="local-map__node--grid:altoria:2:2"]').trigger("mouseenter");
     const hovered = w.get('[data-testid="local-map-detail"]');
-    expect(hovered.text()).toContain("南門");
-    expect(hovered.text()).toContain("未探索");
-    expect(hovered.text()).not.toContain("(2, 2)");
-    expect(hovered.text()).toContain("grid:altoria:2:2");
+    // A hovered non-current node keeps its label/state/action reading and
+    // states NO coordinate figure (the ban outside the current node).
+    expect(hovered.text()).toBe("南門 · 未探索 · → grid:altoria:2:2");
 
     await w.find(".local-map__lattice").trigger("mouseleave");
-    expect(w.get('[data-testid="local-map-detail"]').text()).toContain("霧骨渡口");
+    // The permitted current-node figure returns with the current-node
+    // default (clearHover -> selectedId resolution).
+    expect(w.get('[data-testid="local-map-detail"]').text()).toBe(
+      "霧骨渡口 · 目前所在 · 座標 1,2",
+    );
 
     await w.get('[data-testid="local-map__node--grid:altoria:2:2"]').trigger("click");
     // Selection persists after the interaction.
     expect(w.get('[data-testid="local-map-detail"]').text()).toContain("南門");
+    expect(w.get('[data-testid="local-map-detail"]').text()).not.toContain("座標");
+  });
+
+  it("states the current coordinates on the wilderness layer too", () => {
+    const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
+    expect(w.get('[data-testid="local-map-detail"]').text()).toBe(
+      "灰鬮荒原 · 目前所在 · 座標 3,1",
+    );
+  });
+
+  it("appends the coordinate part after the action part on an actionable current node", () => {
+    // The fixtures' current nodes all carry `action: null`; clone the grid
+    // sample with an actionable current node to pin the full ordered parts
+    // sequence label · state · action · coordinates.
+    const actionable = {
+      ...LOCAL_MAP_SAMPLE,
+      nodes: LOCAL_MAP_SAMPLE.nodes.map((node) =>
+        node.current
+          ? { ...node, action: { kind: "move", exit_ref: "e_home", destination: "grid:altoria:0:2" } }
+          : node,
+      ),
+    };
+    const w = mountMap({ localMap: localMapModelFor(actionable) });
+    expect(w.get('[data-testid="local-map-detail"]').text()).toBe(
+      "霧骨渡口 · 目前所在 · → grid:altoria:0:2 · 座標 1,2",
+    );
   });
 
   it("renders the on-canvas edges with their traversability styling and omits the off-canvas one", () => {
@@ -192,14 +224,14 @@ describe("LocalMap (B4 world family)", () => {
     expect(w.find('[data-testid="local-map__edge--2"]').exists()).toBe(false);
   });
 
-  it("renders the minimal sample: two nodes, one unknown edge, one legend line, no actionable node", () => {
+  it("renders the minimal sample: two nodes, one unknown edge, no legend, no actionable node", () => {
     const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_MINIMAL_SAMPLE) });
     const nodeIds = w.findAll('[data-testid^="local-map__node--"]');
     expect(nodeIds).toHaveLength(2);
     expect(w.findAll('[data-testid^="local-map__edge--"]')).toHaveLength(1);
     expect(w.get('[data-testid="local-map__edge--0"]').classes()).toContain("local-map__edge--unknown");
     expect(w.findAll('[data-testid="local-map__actionable"]')).toHaveLength(0);
-    expect(w.findAll('[data-testid^="local-map__legend-item--"]')).toHaveLength(1);
+    expect(w.findAll('[data-testid^="local-map__legend-item--"]')).toHaveLength(0);
     expect(w.get('[data-testid="local-map-detail"]').text()).toContain("霧骨渡口");
   });
 
@@ -239,18 +271,27 @@ describe("LocalMap (B4 world family)", () => {
   });
 
   it("renders no bearing, no degree sign, and no distance figure anywhere in the island", () => {
-    for (const sample of [
-      LOCAL_MAP_SAMPLE,
-      LOCAL_MAP_WILDERNESS_SAMPLE,
-      LOCAL_MAP_INSTANCE_SAMPLE,
-      LOCAL_MAP_INTERIOR_SAMPLE,
-    ]) {
+    for (const [layer, sample] of Object.entries({
+      grid: LOCAL_MAP_SAMPLE,
+      wilderness: LOCAL_MAP_WILDERNESS_SAMPLE,
+      instance: LOCAL_MAP_INSTANCE_SAMPLE,
+      interior: LOCAL_MAP_INTERIOR_SAMPLE,
+    })) {
       const w = mountMap({ localMap: localMapModelFor(sample) });
       const text = w.text();
       expect(text).not.toContain("°");
       // No compass bearing like 「北 324° · 西 262°」 and no distance unit.
       expect(text).not.toMatch(/[北南東西]\s*\d+/);
       expect(text).not.toMatch(/\d+\s*(?:公尺|公里|km)\b/i);
+      // slim-minimap-island D2: the current node's own `座標 x,y` figure is
+      // the ONLY coordinate token that may appear, and only on the
+      // coordinate-bearing layers — the graph layers state nothing.
+      const figures = text.match(/座標\s*-?\d+,-?\d+/g) ?? [];
+      if (layer === "grid" || layer === "wilderness") {
+        expect(figures).toHaveLength(1);
+      } else {
+        expect(figures).toHaveLength(0);
+      }
       w.unmount();
     }
   });
@@ -465,6 +506,60 @@ describe("LocalMap (B4 world family)", () => {
       w.get('[data-testid="local-map__node--grid:altoria:1:1"]').attributes("transform"),
     ).toBe("translate(29, 22)");
     expect(w.get('[data-testid="local-map__marker--current"]').exists()).toBe(true);
+  });
+
+  // slim-minimap-island D3: the legend left the island's section list and
+  // its gap, so the measured budget = anchor height − (meta + remembered? +
+  // detail) − gapCount × 8 − fixed chrome, where the fixed chrome (25px) is
+  // the island padding (9 + 9 = 18), the canvas border (2), the meta row's
+  // external margin-bottom (4), and the rounding slack (1). Rubber-duck run
+  // 2 also reserved the island's own 2px border (chrome 27); that cost the
+  // canvas 2px and regressed the browser dense-lattice >=2px separation
+  // contract, so the <=1px residual scroll stays covered by the browser
+  // tests' +1px sub-pixel tolerance instead.
+  it("budgets the canvas from the reduced island sections, not a legend", async () => {
+    const host = document.createElement("div");
+    host.setAttribute("data-anchor", "hud-right");
+    Object.defineProperty(host, "clientHeight", { value: 200, configurable: true });
+    document.body.appendChild(host);
+    const realRect = Element.prototype.getBoundingClientRect;
+    const sectionHeights = {
+      "local-map__meta": 24,
+      "local-map__remembered": 40,
+      "local-map__detail": 18,
+    };
+    Element.prototype.getBoundingClientRect = function () {
+      for (const [cls, height] of Object.entries(sectionHeights)) {
+        if (this.classList?.contains(cls)) return { height };
+      }
+      return realRect.call(this);
+    };
+    try {
+      // No remembered list: 200 − (24 + 18) − 2 gaps × 8 − 25 = 117. A
+      // legend term would have cost one more section + gap (~36px).
+      wrapper = mount(LocalMap, {
+        props: { localMap: localMapModelFor(LOCAL_MAP_MINIMAL_SAMPLE) },
+        attachTo: host,
+      });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find("svg.local-map__lattice").attributes("style")).toContain(
+        "max-height: 117px",
+      );
+      wrapper.unmount();
+      wrapper = null;
+      // With the remembered list: 200 − (24 + 40 + 18) − 3 gaps × 8 − 25 = 69.
+      wrapper = mount(LocalMap, {
+        props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) },
+        attachTo: host,
+      });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find("svg.local-map__lattice").attributes("style")).toContain(
+        "max-height: 69px",
+      );
+    } finally {
+      Element.prototype.getBoundingClientRect = realRect;
+      host.remove();
+    }
   });
 
   it("MapOverlay renders the shared LocalMap and forwards the move intent", async () => {

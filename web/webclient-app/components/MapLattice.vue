@@ -44,6 +44,13 @@ const props = defineProps({
   // it changes coordinate sourcing ONLY: markers, edges, labels, legend,
   // activation, focus, and accessible names stay the shared wave-1 renderer.
   variant: { type: String, default: "lattice" },
+  // Legend-display switch (slim-minimap-island D1): the shared renderer
+  // mounts the draft dot-chip state legend wherever this is on. It defaults
+  // to on (the full-map overlay and every bare mount keep the legend); the
+  // minimap island passes false so no legend element exists in its DOM for
+  // any payload — v-if, not a CSS hide, so DOM assertions and the island's
+  // budget measurement never see a stray legend.
+  showLegend: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(["select", "hover", "leave", "move"]);
@@ -472,8 +479,11 @@ const latticeStyle = computed(() => {
        an 11px radius-3 colour chip paired with its text label. The chip
        border style carries non-colour redundancy — the remembered chip's
        dashed border differs from the visited chip's solid border (delta
-       scenario "Legend chips stay text-labelled at both scales"). -->
-  <ul class="local-map__legend" data-testid="local-map__legend">
+       scenario "Legend chips stay text-labelled at both scales"). Mounted
+       wherever the `showLegend` switch is on (slim-minimap-island D1): the
+       overlay keeps it, the minimap island passes false and mounts no
+       legend element at all. -->
+  <ul v-if="showLegend" class="local-map__legend" data-testid="local-map__legend">
     <li
       v-for="(entry, i) in legend"
       :key="`legend-${i}`"
