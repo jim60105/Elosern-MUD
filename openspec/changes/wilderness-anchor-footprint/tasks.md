@@ -62,7 +62,7 @@
 - [ ] 5.2 `world/lore/tests/test_wilderness_entry.py` and
       `world/maps/tests/test_wilderness_provider.py`: v2 schema assertions (shape, origin,
       gates, derived helpers); terrain literal pin moves to
-      `terrain_description(60, 96)` → same pinned string per the terrain delta.
+      `terrain_description(60, 103)` → same pinned string per the terrain delta.
 - [ ] 5.3 `world/maps/tests/test_wilderness_destination.py` + `typeclasses/tests/test_exits.py`:
       per-gate traversal/return pins (`(60,97)` north → `(2,0)`; `(60,103)` south → `(2,4)`);
       keep the `gateway_rule` injection seam working with a v2-typed rule.
@@ -75,6 +75,15 @@
       region/entry + literal-description scenario, `wilderness-monster-population` entry +
       hunting-band scenarios, `party-system` gate-follow scenario) exactly as their delta
       wording states.
+- [ ] 5.6 Minimal honest webclient survival migration (full per-gate presentation stays in
+      `wilderness-anchor-footprint-local-map`): replace the `entry.wilderness_xy` reads in
+      `web/webclient/presentation/local_map.py` — the grid-side gate candidate derives its
+      `wild:` identity from the gate exit's own `db.anchor_key`/`db.gate_direction` → registry
+      → `approach_cell` when present (key/alias parsing stays until P1b), and the region label
+      reads the north-gate approach cell. Payload schema/shape is preserved; node identity
+      legitimately changes to the real landing cells — update the `ENTRY_ID` pin, visited-node
+      fixtures, and `web/tests/browser/seed.py` entry cell accordingly. `npm test` + the one
+      local-map browser class stay green.
 
 ## 6. Traceability, docs, gates
 

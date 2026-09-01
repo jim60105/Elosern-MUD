@@ -16,6 +16,11 @@ from evennia.objects.objects import DefaultExit
 
 from .objects import ObjectParent
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+from world.maps.wilderness_destination import (
+    find_gateway,
+    grid_room_for_gate,
+    normalize_wilderness_direction,
+)
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.movement_settlement import settle_movement
 
@@ -217,27 +222,16 @@ class CostedXYZExit(MovementCostMixin, XYZExit):
     """
 
 
-def _grid_room_for_anchor(anchor_key: str):
-    """Return the grid room this anchor's wilderness gate is attached to.
-
-    Looked up through the gate exit itself (rather than from a coordinate) so
-    the return target is exactly the room the character left from, wherever
-    ``sync_wilderness()`` placed the gate.
-    """
-
-    for gate in WildernessGateExit.objects.all():
-        if gate.db.anchor_key == anchor_key:
-            return gate.location
-    return None
-
-
 class WildernessGateExit(Exit):
     """Ordinary Exit at a grid room (e.g. capital_altoria's North Gate) whose
     at_traverse is fully overridden -- mirrors WildernessExit's own pattern of
-    ignoring target_location entirely. db.anchor_key is set by sync_wilderness()
-    at creation time -- it is NOT optional, and a gate exit created without it
-    will KeyError on first use (map-wilderness design.md D-7). A successful
-    entry charges wilderness_move, records the destination ``wild:`` node
+    ignoring target_location entirely. db.anchor_key and db.gate_direction are
+    set by sync_wilderness() at creation time -- they are NOT optional: they
+    name the registered gate whose approach_cell (or point-shape anchor cell)
+    is the landing coordinate, and a gate exit missing or misconfiguring them
+    fails closed (returns False, no move, no clock, no record) instead of
+    raising out of a traversal hook. A successful entry charges wilderness_move,
+    records the destination ``wild:`` node
     (map-knowledge-minimap design D3), and completes through the shared
     ``after_successful_movement`` boundary (onboarding-skip coverage design D1).
     The whole entry body runs inside the movement-settlement boundary
@@ -246,7 +240,21 @@ class WildernessGateExit(Exit):
     """
 
     def at_traverse(self, traversing_object, target_location, **kwargs):
-        entry = WILDERNESS_ENTRY_REGISTRY[self.db.anchor_key]
+        entry = WILDERNESS_ENTRY_REGISTRY.get(self.db.anchor_key)
+        gate = entry.gate_for(self.db.gate_direction) if entry is not None else None
+        landing_cell = entry.approach_cell(gate) if gate is not None else None
+        if landing_cell is None:
+            # Misconfigured gate (unset/unknown anchor_key or gate_direction):
+            # resolve fails closed BEFORE the settlement boundary opens, so no
+            # move, charge, or knowledge write happens.
+            logger.warning(
+                "WildernessGateExit #%s: no registered gate for anchor_key=%r "
+                "gate_direction=%r; refusing traversal.",
+                self.id,
+                self.db.anchor_key,
+                self.db.gate_direction,
+            )
+            return False
         source_location = traversing_object.location
 
         def gate_traversal():
@@ -258,7 +266,7 @@ class WildernessGateExit(Exit):
                 return False
 
             ok = enter_wilderness(
-                traversing_object, coordinates=entry.wilderness_xy, name=WILDERNESS_NAME
+                traversing_object, coordinates=landing_cell, name=WILDERNESS_NAME
             )
             if not ok:
                 return False
@@ -277,7 +285,7 @@ class WildernessGateExit(Exit):
                 traversing_object,
                 source_location,
                 cost_key="wilderness_move",
-                wilderness_coordinates=entry.wilderness_xy,
+                wilderness_coordinates=landing_cell,
                 wilderness_name=WILDERNESS_NAME,
             )
             return True
@@ -285,16 +293,18 @@ class WildernessGateExit(Exit):
         return settle_movement(
             traversing_object,
             source_location,
-            wilderness_coordinates=entry.wilderness_xy,
+            wilderness_coordinates=landing_cell,
             traverse=gate_traversal,
         )
 
 
 class WildernessReturnExit(WildernessExit):
-    """The wilderness's own exit typeclass: routes exactly one registered
-    coordinate-and-direction pair (the entry coordinate, direction ``"south"``)
-    back into the grid room, and routes everything else like a stock
-    WildernessExit. The clock cost is charged on EVERY successful traversal --
+    """The wilderness's own exit typeclass: routes every registered
+    (approach_cell, return_direction) pair -- or, for a point-shape anchor,
+    every direction at its anchor cell -- back into its gate's grid room via
+    the shared ``find_gateway`` helper (the same single source the canonical
+    resolver reads), and routes everything else like a stock WildernessExit.
+    The clock cost is charged on EVERY successful traversal --
     special-cased return branch and ordinary fallback alike -- so no wilderness
     step is free (map-wilderness design.md D-6's correction note). Every
     successful step also records its destination node through
@@ -309,37 +319,40 @@ class WildernessReturnExit(WildernessExit):
     def at_traverse(self, traversing_object, target_location):
         itemcoordinates = self.location.wilderness.db.itemcoordinates
         current = itemcoordinates[traversing_object]
-        for entry in WILDERNESS_ENTRY_REGISTRY.values():
-            if current == entry.wilderness_xy and self.key == "south":
-                grid_room = _grid_room_for_anchor(entry.anchor_key)
-                if grid_room is None:
-                    # Misconfiguration (gate exit missing or wrong anchor_key):
-                    # do not report success or charge time for a move that
-                    # cannot happen -- the spec's "failed traversal does not
-                    # advance the clock" applies here too.
+        direction = normalize_wilderness_direction(self.key)
+        hit = find_gateway(current, direction) if direction is not None else None
+        if hit is not None:
+            _, gate = hit
+            grid_room = grid_room_for_gate(gate)
+            if grid_room is None:
+                # Misconfiguration (registered destination room missing):
+                # do not report success or charge time for a move that
+                # cannot happen -- the spec's "failed traversal does not
+                # advance the clock" applies here too.
+                return False
+
+            def return_traversal():
+                if not traversing_object.move_to(grid_room, quiet=False):
                     return False
-
-                def return_traversal():
-                    if not traversing_object.move_to(grid_room, quiet=False):
-                        return False
-                    after_successful_movement(
-                        traversing_object,
-                        self.location,
-                        cost_key="wilderness_move",
-                        destination=grid_room,
-                        wilderness_source_coordinates=current,
-                    )
-                    return True
-
-                return settle_movement(
+                after_successful_movement(
                     traversing_object,
                     self.location,
+                    cost_key="wilderness_move",
                     destination=grid_room,
                     wilderness_source_coordinates=current,
-                    traverse=return_traversal,
                 )
+                return True
+
+            return settle_movement(
+                traversing_object,
+                self.location,
+                destination=grid_room,
+                wilderness_source_coordinates=current,
+                traverse=return_traversal,
+            )
         # ORDINARY wilderness movement -- every coordinate/direction that is not
-        # a registered gateway. Not free: a successful step still pays
+        # a registered gateway (or whose gateway landing is refused). Not free:
+        # a successful step still pays
         # wilderness_move; only the routing decision is gated.
         stock_step = super().at_traverse
 

@@ -81,6 +81,10 @@ grid-side gate identity) is split into the sibling change
   `world/rules/tests/test_{map_knowledge_integration,movement_settlement,party_follow}.py`,
   `world/maps/tests/{test_bootstrap,test_city_wilderness_roundtrip,test_wilderness_population,test_wilderness_provider,test_wilderness_destination}.py`,
   `typeclasses/tests/test_exits.py`.
+- Webclient survival minimum: the `entry.wilderness_xy` reads in
+  `web/webclient/presentation/local_map.py`, its test seed pin, and
+  `web/tests/browser/seed.py` are repointed to the north gate's approach cell so the v2 cut
+  never leaves a red build; the per-gate presentation rework stays in the sibling change.
 - No player-command surface change: gates are directional exits, so `docs/game/commands.md` and
   `docs/game/command-reference.md` are unchanged (verified during implementation).
 - No new dependencies; no contrib patch; stock wilderness machinery (provider validity + per-exit

@@ -4,6 +4,11 @@ from evennia.contrib.grid.wilderness.wilderness import WildernessMapProvider
 
 from typeclasses.rooms import TerrainRoom
 from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+# Read the entry registry as a MODULE attribute at call time (never a
+# from-import binding): a test rebinding world.lore.wilderness_entry.
+# WILDERNESS_ENTRY_REGISTRY must be observed here (wilderness-map-provider
+# delta: registry patches change validity without patching the provider).
+from world.lore import wilderness_entry as _wilderness_entry_module
 
 # D-4: 10 km per wilderness cell, 224 cells per axis (0-indexed to 223).
 # 224 * 10 km = 2,240 km per side; 2,240^2 = 5,017,600 km^2, within 0.35% of the
@@ -19,6 +24,48 @@ _MOUNTAIN_X = (100, 123)  # 24-column central band, full Y range
 _NORTH_FOREST_Y_MIN = 190  # top 34 rows, full X range -- checked first, dominates the mountain band
 _COASTAL_Y_MAX = 40  # southern strip, both sides of the mountains
 _HIGHLAND_Y_MIN = 150  # west side only, between the coast and the northern forest
+
+# Short registry direction -> the contrib's exit key long form (the stock
+# set_active_coordinates pass keys exits "north".."northwest").
+LONG_DIRECTIONS = {
+    "n": "north",
+    "ne": "northeast",
+    "e": "east",
+    "se": "southeast",
+    "s": "south",
+    "sw": "southwest",
+    "w": "west",
+    "nw": "northwest",
+}
+
+# The exact lock-string form stock set_active_coordinates applies for a valid
+# neighbor; the gate hook re-applies this same form to a registered gate exit.
+_EXIT_OPEN = "traverse:true();view:true()"
+
+# Footprint cache: keyed on the ordered (anchor_key, entry) pairs of the live
+# registry snapshot. The key tuple RETAINS the entry objects, so their ids
+# cannot be recycled behind the cache's back; a patch/rebind replaces value
+# objects and produces a key miss on the next call.
+_FOOTPRINT_CACHE: dict[tuple[tuple[str, object], ...], frozenset] = {}
+
+
+def _footprint_union() -> frozenset:
+    """Every anchor footprint cell in the live registry (point shapes: none)."""
+    registry = _wilderness_entry_module.WILDERNESS_ENTRY_REGISTRY
+    snapshot = tuple(registry.items())
+    cached = _FOOTPRINT_CACHE.get(snapshot)
+    if cached is None:
+        cells = frozenset(cell for entry in registry.values() for cell in entry.footprint_cells)
+        _FOOTPRINT_CACHE[snapshot] = cells
+        # Keep the cache bounded against long test histories.
+        while len(_FOOTPRINT_CACHE) > 8:
+            _FOOTPRINT_CACHE.pop(next(iter(_FOOTPRINT_CACHE)))
+    return cached
+
+
+def is_footprint_cell(coordinates: tuple[int, int]) -> bool:
+    """Whether ``(x, y)`` is an anchor footprint cell of the live registry."""
+    return coordinates in _footprint_union()
 
 
 def region_for_coordinates(x: int, y: int) -> str:
@@ -77,7 +124,12 @@ class ElosernWildernessMapProvider(WildernessMapProvider):
 
     def is_valid_coordinates(self, wilderness, coordinates):
         x, y = coordinates
-        return 0 <= x <= WILDERNESS_MAX_X and 0 <= y <= WILDERNESS_MAX_Y
+        if not (0 <= x <= WILDERNESS_MAX_X and 0 <= y <= WILDERNESS_MAX_Y):
+            return False
+        # Anchor footprints are not walkable wild ground; the stock per-exit
+        # lock pass and at_traverse_coordinates re-check both inherit this
+        # single boundary rule (wilderness-anchor-footprint design D2).
+        return coordinates not in _footprint_union()
 
     def get_location_name(self, coordinates):
         return WILDERNESS_REGION_REGISTRY[region_for_coordinates(*coordinates)].display_name_zh
@@ -98,3 +150,28 @@ class ElosernWildernessMapProvider(WildernessMapProvider):
             from world.maps.wilderness_population import ensure_population
 
             ensure_population(wilderness, coordinates)
+        # Gate-face lock re-application (design D3): runs after the stock lock
+        # pass of the same set_active_coordinates activation, so it overrides
+        # exactly one activation's lock state and stock recomputes everything
+        # on the next. Away from gateway cells it touches no locks at all.
+        self._apply_gate_locks(coordinates, room)
+
+    def _apply_gate_locks(self, coordinates, room):
+        """Open the registered gate exit(s) a room shows at ``coordinates``."""
+        registry = _wilderness_entry_module.WILDERNESS_ENTRY_REGISTRY
+        exits_by_key = {exit_obj.key: exit_obj for exit_obj in room.exits}
+        for entry in registry.values():
+            if entry.is_point_shape:
+                # Cave semantics: every direction at the anchor cell is the
+                # gateway, so all eight stay offered regardless of what the
+                # stock validity pass computed (the delta pins this).
+                if coordinates == entry.anchor_cell:
+                    for exit_obj in exits_by_key.values():
+                        exit_obj.locks.add(_EXIT_OPEN)
+                continue
+            for gate in entry.gates:
+                if entry.approach_cell(gate) != coordinates:
+                    continue
+                exit_obj = exits_by_key.get(LONG_DIRECTIONS[gate.return_direction])
+                if exit_obj is not None:
+                    exit_obj.locks.add(_EXIT_OPEN)
