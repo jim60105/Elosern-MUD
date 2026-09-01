@@ -494,5 +494,116 @@ describe("store dispatch + focus", () => {
       expect(sender.sent.actions[0].payload.skill_key).toBe("basic_attack");
       expect(sender.sent.actions[0].payload.target_ids).toEqual([7]);
     });
+
+    it("a pointer confirm on a SINGLE target row submits the identical cast", () => {
+      openSession();
+      store.receive(
+        1,
+        "ui_update",
+        [fx.update({
+          revision: 2,
+          mode: "combat",
+          panels: {
+            context_actions: fx.combatActions({
+              skills: [
+                {
+                  category: "innate_gift",
+                  label: "天賦",
+                  groups: [
+                    {
+                      group: null,
+                      label: null,
+                      skills: [
+                        {
+                          key: "basic_attack",
+                          label: "攻擊",
+                          description: "基本攻擊，對單一目標造成傷害。",
+                          cost: {},
+                          target_spec: "single",
+                          element: null,
+                          enabled: true,
+                          disabled_reason: null,
+                          targets: [7, 8],
+                          shorthands: [],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        })],
+        {},
+      );
+      // Open the basic-attack target frame from the root "attack" entry.
+      expect(store.focusPress("Enter")).toBe(true);
+      // Pointer parity (webclient-pointer-activation): focusing the row and
+      // confirming with source "pointer" — exactly what a row click drives —
+      // emits the same single combat.cast that Enter emits.
+      expect(store.focusItemByKey("target-7")).toBe(true);
+      expect(store.focusConfirm("pointer")).toBe(true);
+      expect(sender.sent.actions.length).toBe(1);
+      expect(sender.sent.actions[0].action_id).toBe("combat.cast");
+      expect(sender.sent.actions[0].payload.skill_key).toBe("basic_attack");
+      expect(sender.sent.actions[0].payload.target_ids).toEqual([7]);
+      expect(store.view.lastTarget).toBe("7");
+    });
+
+    it("activating an AREA candidate toggles locally and dispatches nothing", () => {
+      openSession();
+      store.receive(
+        1,
+        "ui_update",
+        [fx.update({
+          revision: 2,
+          mode: "combat",
+          panels: {
+            context_actions: fx.combatActions({
+              skills: [
+                {
+                  category: "innate_gift",
+                  label: "天賦",
+                  groups: [
+                    {
+                      group: null,
+                      label: null,
+                      skills: [
+                        {
+                          key: "fire_ball",
+                          label: "火球術",
+                          description: "範圍火焰傷害。",
+                          cost: { mp: 5 },
+                          target_spec: "area",
+                          element: "fire",
+                          enabled: true,
+                          disabled_reason: null,
+                          targets: [7, 8],
+                          shorthands: [],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        })],
+        {},
+      );
+      // skills tab -> category frame -> group frame -> skill -> AREA targets.
+      expect(store.focusItemByKey("skills")).toBe(true);
+      store.focusConfirm("keyboard");
+      expect(store.focusItemByKey("skill-cat-0")).toBe(true);
+      store.focusConfirm("keyboard");
+      expect(store.focusItemByKey("fire_ball")).toBe(true);
+      store.focusConfirm("keyboard");
+      // The AREA candidate row: deliberate activation (pointer or Enter)
+      // toggles the client-local selection; no OOB action is ever invented.
+      expect(store.focusItemByKey("area-7")).toBe(true);
+      expect(store.focusConfirm("pointer")).toBe(true);
+      expect(sender.sent.actions.length).toBe(0);
+      expect(store.view.combatSelected).toEqual([7]);
+    });
   });
 });

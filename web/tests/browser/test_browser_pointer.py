@@ -164,8 +164,9 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         # The root combat menu (attack/skills/items/defend/flee/forfeit) has no
         # target rows; opening the basic-attack skill renders the participant
         # target frame. Pointer activation uses the same router submit path as
-        # keyboard confirmation: it records the selected identity without
-        # inventing an OOB action.
+        # keyboard confirmation: clicking the target row emits exactly one
+        # ``combat.cast`` carrying that target id — the same action ID and
+        # payload Enter on the same row emits (webclient-pointer-activation).
         self._click_row(page, "attack")
         try:
             wait_for_store_state(
@@ -196,21 +197,16 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
             ) from exc
         target_keys = [k for k in self._rows(page) if k.startswith("target-")]
         self.assertGreaterEqual(len(target_keys), 1)
-        before = sent_action_count(page)
+        cast_before = sent_action_count(page, "combat.cast")
         self._click_row(page, target_keys[0])
         def _last_target_set(state):
             return state.get("lastTarget") == target_keys[0].removeprefix("target-")
         wait_for_store_state(page, _last_target_set, timeout=15000)
         self.assertEqual(store_state(page)["lastTarget"], target_keys[0].removeprefix("target-"))
-        self.assertEqual(sent_action_count(page), before)
 
-        # The "identical path" proof: after the client-local pointer selection,
-        # a keyboard confirm (Enter) on the same focused target row dispatches
-        # exactly one combat.cast carrying the selected target id — the pointer
-        # selection feeds the same submission path as keyboard confirmation.
-        focus_action_dock(page)
-        cast_before = sent_action_count(page, "combat.cast")
-        page.keyboard.press("Enter")
+        # The "identical path" proof: the pointer click on the target row
+        # dispatches exactly one combat.cast carrying the selected target id —
+        # the same submission keyboard confirmation performs.
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             if sent_action_count(page, "combat.cast") > cast_before:
@@ -224,7 +220,7 @@ class PointerAcceptanceTest(BrowserAcceptanceTest):
         self.assertEqual(
             casts[-1][1][0]["payload"]["target_ids"],
             [int(target_keys[0].removeprefix("target-"))],
-            "keyboard confirm must cast the pointer-selected target",
+            "pointer activation must cast exactly the clicked target",
         )
 
     @covers_requirement(

@@ -160,11 +160,6 @@ export const useElosernStore = defineStore("elosern", () => {
    // Monotonic signal the shell watches to open the exploration rest-duration
    // form (the wait/rest entry point).
    let restFormRequest = 0;
-  // The confirm source ("pointer" or "keyboard") of the latest router confirm;
-  // a pointer confirm is a client-local target selection (no OOB dispatch),
-  // while a keyboard confirm submits the OOB cast (spec: selection is
-  // client-local until submission).
-  let lastConfirmSource = "keyboard";
   // A dispatched OOB mutation that has not yet been confirmed (its result
   // was withheld or the presentation has not committed). Set on dispatch,
   // cleared only when the in-flight gate releases; a transport loss while it
@@ -631,6 +626,16 @@ export const useElosernStore = defineStore("elosern", () => {
         }
         return;
       }
+      // An AREA candidate row activated deliberately (pointer click or Enter on
+      // the row) toggles the client-local selection exactly like Space; it is
+      // never an OOB action (the server registers no `toggle-target`).
+      if (item.actionId === "toggle-target") {
+        if (item.payload && combat.focusSkillKey) {
+          CombatMenu.toggleArea(combat, combat.focusSkillKey, item.payload.identity);
+        }
+        publishView();
+        return;
+      }
       // "open" items push a submenu (no OOB packet is sent).
       if (item.actionId === "open-skill" && item.payload) {
         openCombatSkill(item.payload.skillKey);
@@ -711,10 +716,12 @@ export const useElosernStore = defineStore("elosern", () => {
           return;
         }
       }
-      // SINGLE-target rows: the selection is client-local (records the
-      // identity). A keyboard confirm submits the OOB cast; a pointer confirm
-      // is a selection only (no OOB dispatch, per the spec's client-local
-      // selection-until-submission rule).
+      // SINGLE-target rows: focus and selection remain client-local until
+      // submission (no focus/selection mutation is ever sent); a deliberate
+      // confirmation submits the OOB cast. Pointer activation performs the
+      // identical confirmation the keyboard performs — exactly one
+      // `combat.cast` with the same action ID and payload
+      // (webclient-pointer-activation).
       if (
         typeof item.key === "string" &&
         item.key.startsWith("target-") &&
@@ -723,18 +730,16 @@ export const useElosernStore = defineStore("elosern", () => {
         item.payload.target_ids.length > 0
       ) {
         lastTarget = String(item.payload.target_ids[0]);
-        if (lastConfirmSource === "keyboard") {
-          const focusSkill = combat.focusSkillKey
-            ? combat.skillByKey[combat.focusSkillKey]
-            : null;
-          dispatchAction(
-            "combat.cast",
-            item.payload,
-            focusSkill
-              ? castSubmitDisplay(focusSkill, item.payload, item.commandDisplay)
-              : item.commandDisplay || null
-          );
-        }
+        const focusSkill = combat.focusSkillKey
+          ? combat.skillByKey[combat.focusSkillKey]
+          : null;
+        dispatchAction(
+          "combat.cast",
+          item.payload,
+          focusSkill
+            ? castSubmitDisplay(focusSkill, item.payload, item.commandDisplay)
+            : item.commandDisplay || null
+        );
         publishView();
         return;
       }
@@ -2205,17 +2210,11 @@ export const useElosernStore = defineStore("elosern", () => {
       // Any other key while the form is open is consumed locally.
       return true;
     }
-    // A keyboard confirm (Enter) records the keyboard source so the target-row
-    // submit path can distinguish it from a pointer confirm.
-    if (key === "Enter") {
-      lastConfirmSource = "keyboard";
-    }
     return router.press(key, !!repeat);
   }
 
   function focusConfirm(source) {
-    lastConfirmSource = source || "keyboard";
-    return router.confirm({ source: lastConfirmSource });
+    return router.confirm({ source: source || "keyboard" });
   }
 
   function focusEscape() {
