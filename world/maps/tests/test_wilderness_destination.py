@@ -24,6 +24,7 @@ from world.maps.bootstrap import NORTH_GATE_XYZ, sync_grid, sync_wilderness
 from world.maps.wilderness_destination import (
     normalize_wilderness_direction,
     resolve_wilderness_destination,
+    wilderness_neighbor,
 )
 from world.maps.wilderness_provider import (
     WILDERNESS_MAX_X,
@@ -175,6 +176,48 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
                 ),
                 encode_wild(WILDERNESS_NAME, 5, 4),
             )
+
+    def test_wilderness_neighbor_matches_the_single_delta_table(self):
+        # The exported geometry is the resolver's own: every direction steps
+        # exactly one delta-table cell, and the shared helper agrees.
+        from world.maps.wilderness_destination import DIRECTION_DELTAS
+
+        for direction, (dx, dy) in DIRECTION_DELTAS.items():
+            self.assertEqual(
+                wilderness_neighbor(50, 50, direction), (50 + dx, 50 + dy), direction
+            )
+        self.assertEqual(
+            set(DIRECTION_DELTAS),
+            {"n", "ne", "e", "se", "s", "sw", "w", "nw"},
+        )
+
+    def test_wilderness_neighbor_returns_none_at_provider_edges(self):
+        self.assertIsNone(wilderness_neighbor(0, 0, "sw"))
+        self.assertIsNone(wilderness_neighbor(0, 0, "s"))
+        self.assertIsNone(wilderness_neighbor(0, 0, "w"))
+        self.assertIsNone(wilderness_neighbor(WILDERNESS_MAX_X, WILDERNESS_MAX_Y, "ne"))
+        self.assertEqual(wilderness_neighbor(0, 0, "ne"), (1, 1))
+        self.assertEqual(
+            wilderness_neighbor(WILDERNESS_MAX_X, WILDERNESS_MAX_Y, "sw"),
+            (WILDERNESS_MAX_X - 1, WILDERNESS_MAX_Y - 1),
+        )
+
+    @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-and-shared")
+    def test_resolver_ordinary_steps_agree_with_wilderness_neighbor(self):
+        # Every ordinary (non-gateway) resolution is exactly the shared
+        # neighbor cell encoded -- no second delta table anywhere.
+        room = self._terrain(50, 50)
+        for direction in ("n", "ne", "e", "se", "s", "sw", "w", "nw"):
+            nx, ny = wilderness_neighbor(50, 50, direction)
+            self.assertEqual(
+                resolve_wilderness_destination(room, direction),
+                encode_wild(WILDERNESS_NAME, nx, ny),
+                direction,
+            )
+        edge = self._terrain(0, 0)
+        for direction in ("s", "sw", "w"):
+            self.assertIsNone(wilderness_neighbor(0, 0, direction), direction)
+            self.assertIsNone(resolve_wilderness_destination(edge, direction), direction)
 
 
 class WildernessDestinationTraversalPinTests(EvenniaTest):

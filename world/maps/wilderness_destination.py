@@ -24,7 +24,7 @@ from world.rules.map_knowledge import encode_grid, encode_wild
 
 # One cell per cardinal direction (short form), matching the contrib's eight
 # exits and the local-map layer's WILD_DIRECTIONS geometry.
-_DIRECTION_DELTAS = {
+DIRECTION_DELTAS = {
     "n": (0, 1),
     "ne": (1, 1),
     "e": (1, 0),
@@ -60,9 +60,25 @@ def normalize_wilderness_direction(value: Any) -> str | None:
         return None
     lowered = value.lower()
     normalized = _DIRECTION_NORMALIZE.get(lowered, lowered)
-    if normalized in _DIRECTION_DELTAS:
+    if normalized in DIRECTION_DELTAS:
         return normalized
     return None
+
+
+def wilderness_neighbor(x: int, y: int, direction: str) -> tuple[int, int] | None:
+    """Return the provider-bounded adjacent cell for one normalized direction.
+
+    The single direction-geometry source shared by the resolver's ordinary
+    step and the minimap layers (fix-wilderness-map-adjacency-truth D3).
+    ``direction`` must already be normalized (see
+    :func:`normalize_wilderness_direction`); returns ``None`` when the step
+    leaves the provider bounds.
+    """
+    dx, dy = DIRECTION_DELTAS[direction]
+    nx, ny = x + dx, y + dy
+    if not (0 <= nx <= WILDERNESS_MAX_X and 0 <= ny <= WILDERNESS_MAX_Y):
+        return None
+    return (nx, ny)
 
 
 def resolve_wilderness_destination(
@@ -125,11 +141,16 @@ def resolve_wilderness_destination(
                 return None
             return encode_grid(str(gz), gx, gy)
 
-    dx, dy = _DIRECTION_DELTAS[normalized]
-    nx, ny = x + dx, y + dy
-    if not (0 <= nx <= WILDERNESS_MAX_X and 0 <= ny <= WILDERNESS_MAX_Y):
+    neighbor = wilderness_neighbor(x, y, normalized)
+    if neighbor is None:
         return None
+    nx, ny = neighbor
     return encode_wild(WILDERNESS_NAME, nx, ny)
 
 
-__all__ = ["normalize_wilderness_direction", "resolve_wilderness_destination"]
+__all__ = [
+    "DIRECTION_DELTAS",
+    "normalize_wilderness_direction",
+    "resolve_wilderness_destination",
+    "wilderness_neighbor",
+]
