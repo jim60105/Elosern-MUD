@@ -329,5 +329,3 @@ contract's external-reader allow-list.
 - **WHEN** the compose configuration is rendered with `LLM_BASE_URL` unset on the host
 - **THEN** the evennia service receives `LLM_BASE_URL` with the host-gateway default and
   no `OLLAMA_BASE_URL` entry
-
-## MODIFIED Requirements

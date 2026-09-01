@@ -50,8 +50,6 @@ Profile values SHALL be validated at settings/registry construction time. `tempe
 - **WHEN** a profile is constructed without any of the optional endpoint-configuration fields
 - **THEN** construction succeeds and each optional field holds its omit default (`None`, or the empty string for the string fields)
 
-## ADDED Requirements
-
 ### Requirement: Structured output is opt-in per layer
 A profile SHALL request `response_format` / json-schema structured output only when its `supports_response_format` flag is true. Profiles that do not declare the capability SHALL be called without any structured-output hint, so that backends which reject the field remain usable.
 
@@ -71,8 +69,9 @@ A profile with `enabled: false` SHALL be treated as offline without making any n
 - **THEN** the call returns the layer's degrade fallback without any attempt to reach the endpoint
 
 #### Scenario: Every registered guarded call is offline-safe when disabled
-- **WHEN** all six `LLM_PROFILES` entries are disabled and any registered guarded call is invoked
+- **WHEN** all seven `LLM_PROFILES` entries are disabled and any registered guarded call is invoked
 - **THEN** each call returns its injected degrade fallback, no network request is made, and no state changes
+
 ### Requirement: Default profiles are injected, not environment-read
 `world/ai/profiles.py` SHALL NOT read the process environment. `default_profiles(defaults=None)` SHALL return the pure code-default profile map when `defaults` is omitted, and SHALL merge a caller-injected mapping of per-layer field overrides over the code defaults when provided, with every injected value passing the same construction-time validation. Environment parsing for these values SHALL live exclusively in `server/conf/settings.py`.
 
