@@ -116,7 +116,9 @@ def _minimap_fixture(character) -> None:
 
         entry = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
         entered = enter_wilderness(
-            character, coordinates=entry.wilderness_xy, name=WILDERNESS_NAME
+            character,
+            coordinates=entry.approach_cell(entry.gate_for("s")),
+            name=WILDERNESS_NAME,
         )
         if entered and isinstance(character.location, TerrainRoom):
             record_arrival(character)

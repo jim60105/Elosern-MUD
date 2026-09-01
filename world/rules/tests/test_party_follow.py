@@ -35,7 +35,7 @@ from world.rules.party import (
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 WILDERNESS_MOVE = CLOCK_YAML["command_defaults"]["wilderness_move"]
 
-ENTRY_XY = (60, 100)
+ENTRY_XY = (60, 103)  # the north-gate approach cell
 
 
 def follow_lines(msg):
@@ -334,8 +334,8 @@ class WildernessFollowTests(EvenniaTest):
         self.gate.at_traverse(self.char1, self.north_gate)
         before = self._tick()
         self._exit("east").at_traverse(self.char1, self.char1.location)
-        self.assertEqual(self.char1.location.coordinates, (61, 100))
-        self.assertEqual(companion.location.coordinates, (61, 100))
+        self.assertEqual(self.char1.location.coordinates, (61, 103))
+        self.assertEqual(companion.location.coordinates, (61, 103))
         self.assertEqual(self._tick(), before + WILDERNESS_MOVE)
 
     @covers_requirement("wilderness-gateway::leaving-the-wilderness-through-wildernessreturnexit-triggers-ordinary-cleanup")
@@ -368,7 +368,7 @@ class WildernessFollowTests(EvenniaTest):
         ) as announce_from:
             self.gate.at_traverse(self.char1, self.north_gate)
             self._exit("east").at_traverse(self.char1, self.char1.location)
-        self.assertEqual(companion.location.coordinates, (61, 100))
+        self.assertEqual(companion.location.coordinates, (61, 103))
         announce_to.assert_not_called()
         announce_from.assert_not_called()
 

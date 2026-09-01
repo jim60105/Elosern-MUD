@@ -91,6 +91,66 @@ class LoreSyncTests(EvenniaTestCase):
             total_wilderness,
         )
 
+    @covers_requirement(
+        "wilderness-gateway::wilderness-entry-registry-links-a-grid-placed-anchor-to-an-authored-wilderness-footprint-and-gates"
+    )
+    def test_wilderness_entry_v2_payload_is_mirrored_in_primitive_shape(self):
+        from dataclasses import asdict
+        from unittest.mock import patch
+
+        from world.lore.wilderness_entry import (
+            WILDERNESS_ENTRY_REGISTRY,
+            WildernessEntryPoint,
+            WildernessGate,
+        )
+
+        # A v2-typed extra entry proves the mirror preserves the NESTED dataclass
+        # payload (gates -> tuple of primitive dicts, shape -> tuple of str) and
+        # stays idempotent across two sync_all() calls.
+        probe = WildernessEntryPoint(
+            "capital_altoria",
+            ("#",),
+            (120, 120),
+            (WildernessGate("n", (2, 0), "capital_altoria"),),
+        )
+        with (
+            patch.dict(
+                ANCHOR_PLACEMENT_REGISTRY,
+                {"capital_altoria": ANCHOR_PLACEMENT_REGISTRY["capital_altoria"]},
+            ),
+            patch.dict(WILDERNESS_ENTRY_REGISTRY, {"capital_altoria": probe}),
+        ):
+            sync_all()
+            first = search_script("lore:wilderness_entries:capital_altoria")
+            sync_all()
+            second = search_script("lore:wilderness_entries:capital_altoria")
+        self.assertEqual(len(first), 1)
+        self.assertEqual(len(second), 1)
+        self.assertEqual(first[0].id, second[0].id)
+        self.assertEqual(first[0].db.fields, _db_safe(asdict(probe)))
+        self.assertEqual(
+            first[0].db.fields["gates"],
+            ({"return_direction": "n", "grid_xy": (2, 0), "z_map_key": "capital_altoria"},),
+        )
+        self.assertEqual(first[0].db.fields["shape"], ("#",))
+
+    @covers_requirement(
+        "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
+    )
+    def test_sync_all_refuses_to_mirror_a_malformed_registry(self):
+        from unittest.mock import patch
+
+        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY, WildernessEntryPoint
+
+        malformed = WildernessEntryPoint("capital_altoria", (), (0, 0), ())
+        with patch.dict(WILDERNESS_ENTRY_REGISTRY, {"capital_altoria": malformed}):
+            with self.assertRaises(ValueError):
+                sync_all()
+        # Nothing was created: the validation error precedes every mirror write.
+        self.assertEqual(
+            ScriptDB.objects.filter(db_key__startswith="lore:wilderness_entries:").count(), 0
+        )
+
     @covers_requirement("grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits", "grid-room-sync::sync-grid-is-idempotent-across-repeated-calls-and-server-starts", "lore-startup-sync::sync-is-idempotent-across-repeated-server-starts")
     def test_sync_one_updates_existing_record(self):
         entry = RACE_REGISTRY["human"]

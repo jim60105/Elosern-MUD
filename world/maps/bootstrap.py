@@ -302,29 +302,25 @@ def _provision_gate_exit(anchor_key: str, gate) -> None:
         )
         return
 
-    mine = [
-        exit_obj
-        for exit_obj in gate_room.exits
-        if isinstance(exit_obj, WildernessGateExit)
-        and exit_obj.db.anchor_key == anchor_key
-        and exit_obj.db.gate_direction == gate.return_direction
+    gate_exits = [
+        exit_obj for exit_obj in gate_room.exits if isinstance(exit_obj, WildernessGateExit)
     ]
-    if mine:
-        # Idempotent heal: this gate's exit exists; re-affirm its attributes
-        # (a wrong db.anchor_key/db.gate_direction is corrected in place, with
-        # no second exit spawned).
-        for exit_obj in mine:
-            exit_obj.db.anchor_key = anchor_key
-            exit_obj.db.gate_direction = gate.return_direction
-        return
-
-    if any(isinstance(exit_obj, WildernessGateExit) for exit_obj in gate_room.exits):
-        # A different anchor/gate's WildernessGateExit already sits on this
-        # room: provisioning here would create an ambiguous double gate.
+    if len(gate_exits) > 1:
+        # Multiple WildernessGateExit rows on one room are ambiguous; never
+        # guess which one to heal.
         log_warn(
-            f"sync_wilderness: a WildernessGateExit for another anchor/gate exists "
-            f"on {gate_room.key!r}; leaving it in place for gate {gate.return_direction!r}."
+            f"sync_wilderness: multiple WildernessGateExit rows exist on "
+            f"{gate_room.key!r}; leaving them in place for gate {gate.return_direction!r}."
         )
+        return
+    if gate_exits:
+        # Idempotent heal: the room's single WildernessGateExit IS this
+        # room's gate slot (validated registries never put two gates on one
+        # room), so its attributes converge on the authored pair in place --
+        # a wrong db.anchor_key/db.gate_direction is corrected with no second
+        # exit spawned.
+        gate_exits[0].db.anchor_key = anchor_key
+        gate_exits[0].db.gate_direction = gate.return_direction
         return
 
     if any(exit_obj.key == GATE_EXIT_KEY for exit_obj in gate_room.exits):

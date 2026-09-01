@@ -20,7 +20,10 @@ from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import get_world_clock
 
 NORTH_GATE_XYZ = (2, 4, "capital_altoria")
-ENTRY_XY = WILDERNESS_ENTRY_REGISTRY["capital_altoria"].wilderness_xy
+SOUTH_GATE_XYZ = (2, 0, "capital_altoria")
+_CAPITAL = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+NORTH_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("s"))  # (60, 103)
+SOUTH_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("n"))  # (60, 97)
 
 
 class WildernessGatewayExitTests(EvenniaTest):
@@ -35,6 +38,10 @@ class WildernessGatewayExitTests(EvenniaTest):
         sync_wilderness()
         self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
         self.gate = [e for e in self.north_gate.exits if isinstance(e, WildernessGateExit)][0]
+        self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        self.south_gate_exit = [
+            e for e in self.south_gate.exits if isinstance(e, WildernessGateExit)
+        ][0]
 
     def _exit(self, direction):
         return [e for e in self.char1.location.exits if e.key == direction][0]
@@ -44,14 +51,56 @@ class WildernessGatewayExitTests(EvenniaTest):
 
     @covers_requirement("wilderness-gateway::wildernessgateexit-moves-a-traversing-object-from-a-grid-room-into-the-wilderness")
     @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
-    def test_gate_exit_places_traverser_at_entry_coordinate_and_advances_clock(self):
+    def test_gate_exit_places_traverser_at_gate_approach_and_advances_clock(self):
         before = self._tick()
         self.gate.at_traverse(self.char1, self.north_gate)
         from typeclasses.rooms import TerrainRoom
 
         self.assertIsInstance(self.char1.location, TerrainRoom)
-        self.assertEqual(self.char1.location.coordinates, ENTRY_XY)
+        self.assertEqual(self.char1.location.coordinates, NORTH_APPROACH)
         self.assertEqual(self._tick(), before + 9000)
+
+    @covers_requirement("wilderness-gateway::wildernessgateexit-moves-a-traversing-object-from-a-grid-room-into-the-wilderness")
+    def test_each_gate_exit_lands_on_its_own_gate_approach_cell(self):
+        # Per-gate landing (wilderness-anchor-footprint): the 南門 gate's exit
+        # lands on the south approach, not the north one.
+        self.south_gate_exit.at_traverse(self.char1, self.south_gate)
+        self.assertEqual(self.char1.location.coordinates, SOUTH_APPROACH)
+        self.char1.move_to(self.north_gate)
+        self.gate.at_traverse(self.char1, self.north_gate)
+        self.assertEqual(self.char1.location.coordinates, NORTH_APPROACH)
+
+    @covers_requirement("wilderness-gateway::wildernessgateexit-moves-a-traversing-object-from-a-grid-room-into-the-wilderness")
+    def test_misconfigured_gate_exit_fails_closed_before_settlement(self):
+        # An unset anchor_key, an unknown anchor, or a gate_direction the
+        # entry does not author: the exit refuses in place with no clock
+        # charge, no movement, and no map knowledge recorded.
+        from world.rules.map_knowledge import parse_knowledge
+
+        def known() -> set[str]:
+            from world.rules.map_knowledge import KnowledgeError
+
+            try:
+                return {visit.node_id for visit in parse_knowledge(self.char1)}
+            except KnowledgeError:
+                return set()
+
+        original = self.char1.location
+        for misconfiguration in (
+            lambda exit_obj: setattr(exit_obj.db, "anchor_key", None),
+            lambda exit_obj: setattr(exit_obj.db, "anchor_key", "ghost_anchor"),
+            lambda exit_obj: setattr(exit_obj.db, "gate_direction", "e"),
+        ):
+            with self.subTest(misconfiguration=misconfiguration):
+                before = self._tick()
+                baseline = known()
+                misconfiguration(self.gate)
+                self.assertFalse(self.gate.at_traverse(self.char1, self.north_gate))
+                self.assertIs(self.char1.location, original)
+                self.assertEqual(self._tick(), before)
+                self.assertEqual(known(), baseline)
+                self.gate.db.anchor_key = "capital_altoria"
+                self.gate.db.gate_direction = "s"
 
     def test_failed_enter_wilderness_does_not_advance_clock(self):
         from unittest.mock import patch
@@ -73,7 +122,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         for exit_obj in self.char1.location.exits:
             self.assertIsInstance(exit_obj, WildernessReturnExit)
 
-    @covers_requirement("wilderness-gateway::wildernessreturnexit-routes-exactly-one-registered-coordinate-and-direction-pair-back-to-the-grid")
+    @covers_requirement("wilderness-gateway::wildernessreturnexit-routes-every-registered-approach-cell-and-direction-pair-back-to-the-grid")
     @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
     def test_south_from_entry_returns_to_exact_grid_room(self):
         from typeclasses.rooms import TerrainRoom
@@ -83,6 +132,15 @@ class WildernessGatewayExitTests(EvenniaTest):
         before = self._tick()
         self._exit("south").at_traverse(self.char1, self.char1.location)
         self.assertIs(self.char1.location, self.north_gate)
+        self.assertEqual(self._tick(), before + 9000)
+
+    @covers_requirement("wilderness-gateway::wildernessreturnexit-routes-every-registered-approach-cell-and-direction-pair-back-to-the-grid")
+    def test_north_from_south_approach_returns_to_the_south_gate_room(self):
+        # Every authored pair routes home: (60, 97) + north -> 南門 (2, 0).
+        self.south_gate_exit.at_traverse(self.char1, self.south_gate)
+        before = self._tick()
+        self._exit("north").at_traverse(self.char1, self.char1.location)
+        self.assertIs(self.char1.location, self.south_gate)
         self.assertEqual(self._tick(), before + 9000)
 
     @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
@@ -175,10 +233,8 @@ class WildernessGatewayExitTests(EvenniaTest):
         before = self._tick()
         wilderness_location = self.char1.location
         # Simulate a vanished gate (the true misconfiguration this guards
-        # against) by patching _grid_room_for_anchor to return None.
-        from typeclasses import exits as exits_module
-
-        with patch.object(exits_module, "_grid_room_for_anchor", return_value=None):
+        # against) by patching the shared gate-room lookup to return None.
+        with patch("typeclasses.exits.grid_room_for_gate", return_value=None):
             result = self._exit("south").at_traverse(
                 self.char1, self.char1.location
             )

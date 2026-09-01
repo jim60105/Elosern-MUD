@@ -1433,10 +1433,13 @@ class WildernessExplorationPresenterTests(EvenniaTestCase):
         payload = self._render()
         self.assertTrue(payload["available"])
         rows = {row["label"]: row for row in payload["move"]}
-        # The eight cardinal exits all route through the resolver.
+        # Every provider-valid direction routes through the resolver. At the
+        # north-gate approach (60, 103) the two directions facing the anchor
+        # footprint (southeast/southwest) are refused steps and advertise no
+        # row (wilderness-anchor-footprint).
         self.assertEqual(
             set(rows),
-            {"north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"},
+            {"north", "northeast", "east", "south", "west", "northwest"},
         )
         for direction, row in rows.items():
             expected = resolve_wilderness_destination(room, direction)

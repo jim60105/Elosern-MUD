@@ -153,17 +153,21 @@ class WildernessEntryPoint:
         footprint = self.footprint_cells
         cell = anchor
         crossed = False
-        while cell in footprint:
+        # The walk is bounded by the provider rectangle: a footprint touching
+        # a rect edge would otherwise ray forever through outside-rect cells
+        # (validation rejects such gates explicitly).
+        while cell in footprint and _in_provider_rect(cell):
             crossed = True
             cell = (cell[0] + dx, cell[1] + dy)
-        return cell if crossed else None
+        if not crossed or not _in_provider_rect(cell):
+            return None
+        return cell
 
 
 def _footprint_ray_crosses(entry: WildernessEntryPoint, gate: WildernessGate) -> bool:
+    """Whether the gate's face ray starts inside the entry's footprint."""
     anchor = entry.anchor_cell
-    footprint = entry.footprint_cells
-    cell = entry.approach_cell(gate)
-    return anchor in footprint and cell is not None and cell not in footprint
+    return anchor is not None and anchor in entry.footprint_cells
 
 
 def _iter_map_extents() -> dict[str, set[tuple[int, int]]]:
@@ -211,8 +215,8 @@ def validate_wilderness_entries(
     all_footprints: dict[str, frozenset[tuple[int, int]]] = {}
     for anchor_key, entry in registry.items():
         # -- anchor_key resolves against change 12's placement registry.
-        if anchor_key not in ANCHOR_PLACEMENT_REGISTRY:
-            fail(anchor_key, "anchor_key absent from ANCHOR_PLACEMENT_REGISTRY")
+        if entry.anchor_key not in ANCHOR_PLACEMENT_REGISTRY:
+            fail(anchor_key, f"anchor_key {entry.anchor_key!r} absent from ANCHOR_PLACEMENT_REGISTRY")
 
         # -- mask grammar: rectangle of '#'/'.' with at least one '#'.
         if not entry.shape:
@@ -317,14 +321,27 @@ def validate_wilderness_entries(
                         fail(anchor_key, f"footprint contains point anchor cell of {other_key!r}")
         for gate in entry.gates:
             approach = entry.approach_cell(gate)
-            if approach is None:  # pragma: no cover - ruled out earlier
-                fail(anchor_key, f"gate {gate.return_direction!r} has no approach cell")
+            if approach is None:
+                fail(
+                    anchor_key,
+                    f"gate {gate.return_direction!r} approach cell is undefined: its face ray "
+                    "crosses no footprint cell or never lands inside the provider rectangle",
+                )
             # -- two gates never share the same (approach_cell, return_direction).
             gate_key = (approach, gate.return_direction)
             if gate_key in seen_gate_keys:
                 fail(anchor_key, f"gate {gate.return_direction!r} collides on (approach_cell, return_direction) {gate_key}")
             seen_gate_keys.add(gate_key)
             if not entry.is_point_shape:
+                # -- no footprint contains another entry's gate approach cell
+                #    (named before the generic provider-validity rule so the
+                #    collision reports its precise cause).
+                for other_key, other_footprint in all_footprints.items():
+                    if other_key != anchor_key and approach in other_footprint:
+                        fail(
+                            anchor_key,
+                            f"gate {gate.return_direction!r} approach cell {approach} lies inside footprint of {other_key!r}",
+                        )
                 # -- a footprint-entry approach cell is provider-valid and lies
                 #    outside every footprint (its own ray rule already excludes
                 #    its own footprint).
@@ -333,13 +350,6 @@ def validate_wilderness_entries(
                         anchor_key,
                         f"gate {gate.return_direction!r} approach cell {approach} is not provider-valid outside every footprint",
                     )
-                # -- no footprint contains another entry's gate approach cell.
-                for other_key, other_footprint in all_footprints.items():
-                    if other_key != anchor_key and approach in other_footprint:
-                        fail(
-                            anchor_key,
-                            f"gate {gate.return_direction!r} approach cell {approach} lies inside footprint of {other_key!r}",
-                        )
         # -- a point anchor is never another entry's gate approach cell.
         if entry.is_point_shape and entry.anchor_cell is not None:
             for other_key, other_entry in registry.items():

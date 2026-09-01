@@ -55,9 +55,10 @@ def _footprint_union() -> frozenset:
     snapshot = tuple(registry.items())
     cached = _FOOTPRINT_CACHE.get(snapshot)
     if cached is None:
-        cells = frozenset(cell for entry in registry.values() for cell in entry.footprint_cells)
-        _FOOTPRINT_CACHE[snapshot] = cells
-        # Keep the cache bounded against long test histories.
+        cached = frozenset(cell for entry in registry.values() for cell in entry.footprint_cells)
+        _FOOTPRINT_CACHE[snapshot] = cached
+        # Keep the cache bounded against long test histories (insertion order:
+        # the entry just stored is the newest, never the first popped).
         while len(_FOOTPRINT_CACHE) > 8:
             _FOOTPRINT_CACHE.pop(next(iter(_FOOTPRINT_CACHE)))
     return cached

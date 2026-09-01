@@ -39,19 +39,19 @@ class CityWildernessRoundTripTests(EvenniaTest):
 
         self.gate.at_traverse(self.char1, self.north_gate)
         self.assertIsInstance(self.char1.location, TerrainRoom)
-        self.assertEqual(self.char1.location.coordinates, (60, 100))
+        self.assertEqual(self.char1.location.coordinates, (60, 103))
         entry_room = self.char1.location
 
-        # One east step crosses from western_hills_valleys into the central
-        # mountain band, so the region and description change.
+        # One east step off the north-gate approach leaves the gate cell;
+        # the description follows the deterministic terrain model.
         self._exit("east").at_traverse(self.char1, self.char1.location)
-        self.assertEqual(self.char1.location.coordinates, (61, 100))
+        self.assertEqual(self.char1.location.coordinates, (61, 103))
         self.assertEqual(
             self.char1.location.ndb.active_desc,
-            terrain_description(61, 100),
+            terrain_description(61, 103),
         )
 
-        # Return west to the entry coordinate, then south to the North Gate.
+        # Return west to the approach cell, then south to the North Gate.
         self._exit("west").at_traverse(self.char1, self.char1.location)
         self._exit("south").at_traverse(self.char1, self.char1.location)
         self.assertIs(self.char1.location, self.north_gate)
@@ -70,10 +70,10 @@ class CityWildernessRoundTripTests(EvenniaTest):
         entry_monsters = [
             obj
             for obj, coords in coordinates.items()
-            if isinstance(obj, Monster) and coords == (60, 100)
+            if isinstance(obj, Monster) and coords == (60, 103)
         ]
         self.assertEqual(len(entry_monsters), 1)
-        self.assertEqual(entry_monsters[0].db.population_key, "wilderness:60:100")
+        self.assertEqual(entry_monsters[0].db.population_key, "wilderness:60:103")
         retained = list(script.db.rooms.values())
         self.assertIn(entry_room, retained or script.db.unused_rooms)
 
