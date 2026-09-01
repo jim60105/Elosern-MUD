@@ -10,7 +10,7 @@
 
 ## 1. 問題現象
 
-玩家在「移動」子選單按出口按鈕後，角色確實移動，但子選單仍顯示上一個房間的出口。再按一次時送出的是舊 payload，伺服器以「你的位置已經改變，請重新操作。」或「這裡沒有這個出口。」拒絕，不會移動。
+玩家在「移動」子選單按出口按鈕後，角色確實移動，但子選單仍顯示上一個房間的出口。再按一次時送出的是舊 payload，不會移動。伺服器的拒絕訊息（「你的位置已經改變，請重新操作。」等）只在 `ui_action_result` envelope 裡派發，客戶端唯一的渲染者是建角覆蓋層（`AppClient.vue:961` → `CreationOverlay`），探索端沒有任何表面接收它。玩家觀察到的因此是靜默失敗：按了之後沒有移動、沒有提示，面板看起來像壞掉。
 
 同類斷裂涵蓋所有被 push 進堆疊的 frame，包括移動/查看/互動/等待子選單、互動目標與腳本關鍵詞選單、商店/任務抽屜的 frame、戰鬥的技能/威力/目標 frame。直接讀取已提交狀態的面板（狀態條、小地圖格點、美術、敘事流、建議卡片）則正常更新。
 
@@ -78,11 +78,13 @@ frame 的任何消費端（渲染、導航、submit）都透過 store 注入的 
 | 商店數量表單 | `quantityForm`（本機狀態） | 不變，維持「services 面板被取代即丟棄」的既有契約（spec `webclient-service-menus`） |
 | 建角精靈 stage 與確認 | `creation` model，confirm items 目前是陣列副本 | `creation.confirm` 描述符帶 `{kind, presetKey}`，items 每次由已提交 `creation` 面板解析生成，伺服器 authored 文字自動跟新 |
 
-### 5.3 解析失敗降級，軟性處理、永不自動 pop
+### 5.3 解析失敗降級，自動返回上一層、不設計時器
 
-- 描述符解析不到資料（面板缺件或不可用，例如換房後的舊 `target-42`）時，resolve 回傳「單一 disabled 說明項」選單，內容優先使用伺服器作者的 `reason.message`，沒有則用本機備援字串「畫面狀態已更新，請返回上層」。disabled 項目原本就可聚焦、不可提交，與現行語意一致。
-- resolve 擲出例外時一律捕捉並降為同款選單，文字遊玩與敘事流不受影響。
-- 面板更新永不 pop 或 re-home 堆疊。`rehomeFrame` 經 `replaceMenu` 蓋掉頂部 frame 的病根，隨著宣告式 frame 一併消失，frame 內容在使用當下推導，「何時該重建」的問題不復存在。
+- 身份型描述符（出口、互動目標、關鍵詞、服務列）在已提交面板中解析不到時，堆疊立即 pop 一層，父框以「開啟該子選單那一列」的 focusKey 恢復焦點。連續多個頂端 frame 都解析不到時 cascade 逐層 pop，直到第一個可解析的 frame 為止，全棧皆不可解析則回到根框。堆疊深度有界，cascade 必然終止。
+- 根框自身不可解析（例如 `exploration` 面板進入 unavailable 形態）時沒有上層可回，根框渲染單一 disabled 說明列，內容優先使用伺服器作者的 `reason.message`，沒有則用本機備援字串「畫面狀態已更新，請返回上層」。disabled 項目原本就可聚焦、不可提交，與現行語意一致。
+- 建議表面不参与自動 pop。suggestions 信封有伺服器明確作者的四種運算狀態（`generating` / `ready` / `degraded` / `unavailable`，見 `web/webclient/presentation/options.py:40`），`generating` 是真實的非同步等待態、可能持續數秒。該表面維持既有的原地替換語意，以狀態驅動，不以計時器驅動。
+- 例外保護：resolve 擲出例外時一律捕捉，視同該框不可解析（身份框走 pop cascade，根框走 disabled 說明列），文字遊玩與敘事流不受影響。
+- 抖動查證（0.5 秒去抖因此不設）。在現行架構下，「資料切換中」的暫時不可解析狀態在身份表面上不可能發生，論據有三。第一，`web/webclient/actions/` 全數 affected_panels 宣告中沒有任何動作以子集方式更新 `exploration` 或 `local_map`，這兩個面板只會以 full snapshot 整組替換。第二，每個快照由伺服器在同一事件迴圈裡從規範狀態同步渲染全部面板，客戶端 reducer 原子提交並以嚴格遞增 revision 排序作廢亂序（`protocol.js` 的 `not_newer` 閘門），不存在中間提交這種半成品狀態。第三，Evennia 為單執行緒 reactor，WebSocket 傳輸有序，兩次 commit 之間不會插入另一個來源的競態更新。身份只有「存在」與「真的消失」兩種已提交狀態，pop 條件因此不會誤觸。唯一真實的暫時態是建議表面的 `generating`，已由上一條以明確狀態排除；該狀態的持續時間由 AI 生成決定，0.5 秒視窗既蓋不住生成、又會在合法降級時誤跳層，時間性去抖在此無對應的失效模式，設計不引入。
 
 ### 5.4 堆疊 teardown（唯一會重置堆疊的事件集）
 
@@ -130,7 +132,7 @@ frame 在使用當下派生後，`explore.move` 的 payload（`exit_ref` 加 `cu
 1. 先重現。沿用既有 browser 探索 fixture（三出口南門 move frame，commit `1de5d1d`）擴寫失敗回歸測試，開「移動」後按出口，斷言清單為新房間出口，現行碼必失敗即同時確認根因。
 2. 實施後轉綠，本機 browser 驗證控制在單一 class 預算內。
 3. 閘門依序為 `node --test web/static/webclient/js/tests/*.test.js`（無相依 Node gate）、`npm test`（Vitest）、`uv run --locked python -m tools.spec_traceability check`。完整 managed browser 套件與 `tools.spec_traceability verify --evidence` 維持 CI 所有。
-4. Vitest 的 store 層回歸包含三項，開 Move frame 時快照提交則清單更新且焦點以 key 追蹤、目標 identity 消失則降為不可用且堆疊不動、mode 切換則以根描述符 teardown。
+4. Vitest 的 store 層回歸包含四項，開 Move frame 時快照提交則清單更新且焦點以 key 追蹤、目標 identity 消失則自動 pop 一層且焦點回到父框對應列、整棧不可解析時 cascade 回根框、suggestions 進入 `generating` 暫時態不觸發 pop，以及 mode 切換時以根描述符 teardown。
 
 驗收標準是任何已提交面板更新後，開著的每個 frame 在下一次渲染或按鍵時必然反映已提交內容，且客戶端程式碼中不存在任何 frame 專屬的刷新函式。
 
