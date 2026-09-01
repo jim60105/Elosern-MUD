@@ -492,22 +492,20 @@ def _exploration_fixture(character) -> None:
     defeated_wolf.traits.hp.current = 0
     defeated_wolf.save()
 
-    # A third exit from the south gate: a training-grounds room so the
-    # 400x720 journey (3 exits at the 2-column pane width) exercises the
-    # partial last row (fix-webclient-hud-dock-exploration-grid-width D2:
-    # the last tile spans the remaining columns of a partial final row).
-    from typeclasses.exits import Exit
-    from typeclasses.rooms import Room
+    # A third exit from the south gate: an ephemeral instance cave (the
+    # minimap fixture's spawn logic, re-used here so the exploration fixture
+    # is self-contained). The move frame's third exit — the 荒野 wilderness
+    # gate — is NOT seeded here: the managed server's startup
+    # sync_wilderness() (wilderness-anchor-footprint: one grid-side gate exit
+    # per registered gate; the South Gate is the "n" gate's grid room)
+    # provisions it after this seed process, so the move frame stays at 3
+    # exits and the 400x720 journey (2-column pane width) exercises the
+    # partial last row (fix-webclient-hud-dock-exploration-grid-width D2: the
+    # last tile spans the remaining columns of a partial final row). The
+    # former training-grounds exit is retired: it made the room render 4
+    # exits, completing the final 2-column row so the span was never emitted.
     from world.maps.instance import spawn_instance_room
 
-    training_grounds = create_object(Room, key="訓練場", nohome=True, location=None)
-    training_grounds.db.desc = "A quiet training ground outside the city wall."
-    training_grounds.save()
-    create_object(Exit, key="前往訓練場", location=south_gate, destination=training_grounds)
-    create_object(Exit, key="離開訓練場", location=training_grounds, destination=south_gate)
-
-    # A fourth exit: an ephemeral instance cave (the minimap fixture's spawn
-    # logic, re-used here so the exploration fixture is self-contained).
     spawn_instance_room(
         south_gate,
         {"prototype_parent": "instance_room", "key": "minimap-cave"},
@@ -516,7 +514,7 @@ def _exploration_fixture(character) -> None:
         ttl_seconds=3600,
     )
 
-    print("seeded exploration fixture: south gate + guard + LLMNPC + goblin + defeated wolf + training grounds + cave")
+    print("seeded exploration fixture: south gate + guard + LLMNPC + goblin + defeated wolf + cave (+ boot-provisioned 荒野 gate)")
 
 
 def _options_surface_fixture(character) -> None:
