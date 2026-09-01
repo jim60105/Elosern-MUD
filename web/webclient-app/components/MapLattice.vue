@@ -281,10 +281,14 @@ function edgeClass(edge) {
 }
 
 // Legend entries follow the fixed visibility order: current, visible_unvisited,
-// visible_visited, remembered. Extra entries cycle through the same glyphs.
+// visible_visited, remembered. Entries beyond the four states are explanatory
+// notes (e.g. the wilderness scale line), never visibility states: they get a
+// dedicated neutral info treatment instead of cycling the state glyphs, so a
+// note can never masquerade as a fifth node state (webclient-map-scale-legend
+// D3). `null` marks the beyond-state range.
 const LEGEND_STATES = ["current", "visible_unvisited", "visible_visited", "remembered"];
 function legendState(index) {
-  return LEGEND_STATES[index % LEGEND_STATES.length];
+  return index < LEGEND_STATES.length ? LEGEND_STATES[index] : null;
 }
 
 // Node activation: every click first emits `select` (the island's selection
@@ -492,7 +496,11 @@ const latticeStyle = computed(() => {
     >
       <span
         class="local-map__legend-chip"
-        :class="`local-map__legend-chip--${legendState(i)}`"
+        :class="
+          legendState(i) === null
+            ? 'local-map__legend-chip--info'
+            : `local-map__legend-chip--${legendState(i)}`
+        "
         aria-hidden="true"
       />
       {{ entry }}
@@ -711,5 +719,15 @@ const latticeStyle = computed(() => {
 .local-map__legend-chip--remembered {
   background: var(--map-canvas-hi);
   border: 1px dashed var(--gold-500);
+}
+
+/* Beyond-state note entries (webclient-map-scale-legend D3): a neutral
+   design-token chip whose dotted border is a shape distinction no state
+   chip uses (current: solid fill, unvisited: solid border, visited: solid
+   border, remembered: dashed border), so the info entry never relies on
+   colour alone and can never be mistaken for a visibility state. */
+.local-map__legend-chip--info {
+  background: transparent;
+  border: 1px dotted var(--ink-edge);
 }
 </style>
