@@ -118,6 +118,24 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         ).inner_text()
         self.assertIn("你目前所在的位置", legend_text)
 
+    def _repin_at_south_gate(self, page) -> None:
+        """Deterministically pin the shared character back at 南門 (2, 0).
+
+        Earlier journeys may have submitted one ``explore.move``, leaving the
+        character on another grid node when this journey starts. The seeded
+        account is a superuser, so ``teleport`` re-pins the character without
+        traversing a costed exit; the panel refresh rides ``at_post_move``.
+        """
+        self._send(page, "teleport 南門")
+        wait_for_store_state(
+            page,
+            lambda s: (
+                ((s.get("panels") or {}).get("local_map") or {}).get("current_node")
+                == "grid:capital_altoria:2:0"
+            ),
+            timeout=15000,
+        )
+
     @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
     def test_remembered_remote_node_focus_shows_name_without_travel_action(self):
         page = self.logged_in_page()
@@ -164,6 +182,37 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 index,
             )
             self.assertIn(node_id, presented)
+
+    @covers_requirement(
+        "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
+    )
+    @covers_requirement(
+        "webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel"
+    )
+    def test_gate_room_renders_its_own_approach_cell_and_no_footprint(self):
+        # Deterministic start: an earlier journey may have submitted one
+        # explore.move, so walk back to 南門 first. Its provisioned gate exit
+        # (key 荒野) is the registry gate whose face is "s", so the grid
+        # payload carries that gate's OWN approach cell (60, 97) -- never the
+        # 北門 gate's approach cell -- and the anchor footprint
+        # (x=58..62, y=98..102) never appears as a walkable wild node.
+        page = self.logged_in_page()
+        self._repin_at_south_gate(page)
+        panel = self._wait_local_map_available(page)
+        self.assertEqual(panel["layer"], "grid")
+        self.assertEqual(panel["current_node"], "grid:capital_altoria:2:0")
+        ids = {node["id"] for node in panel["nodes"]}
+        self.assertIn("wild:elosern:60:97", ids)
+        self.assertNotIn("wild:elosern:60:103", ids)
+        footprint = {
+            f"wild:elosern:{x}:{y}"
+            for x in range(58, 63)
+            for y in range(98, 103)
+        }
+        self.assertEqual(ids & footprint, set())
+        # DOM truth follows the payload: the gate node carries its own hook.
+        gate_node = page.locator('[data-testid="local-map__node--wild:elosern:60:97"]')
+        self.assertEqual(gate_node.count(), 1)
 
     @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
     def test_reconnect_rebuilds_minimap_from_persisted_knowledge(self):
