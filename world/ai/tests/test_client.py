@@ -117,6 +117,40 @@ class RequestBodyTests(unittest.TestCase):
         self.assertEqual(body["temperature"], narrator_profile().temperature)
         self.assertEqual(body["max_tokens"], narrator_profile().max_tokens)
 
+    def test_default_configured_body_is_byte_compatible(self):
+        """Design D-A6 guard: with no environment/setting overrides the
+        payload bytes equal exactly the pre-endpoint-knob serialization; the
+        optional endpoint fields serialize as nothing until the follow-up
+        wire-configuration change lands."""
+        from world.ai.profiles import LLMProfile
+
+        import json
+
+        body = self._body(
+            False,
+            ChatRequestDescriptor(
+                messages=({"role": "user", "content": "u"},)
+            ),
+        )
+        profile = LLMProfile(**dict(default_profiles()["narrator"]))
+        self.assertEqual(
+            body,
+            {
+                "model": profile.model,
+                "messages": [{"role": "user", "content": "u"}],
+                "temperature": profile.temperature,
+                "max_tokens": profile.max_tokens,
+            },
+        )
+        # The wire is json.dumps(request_body) exactly as get_response
+        # serializes it — pin the literal legacy payload bytes, not just the
+        # dict shape, so key order/separators/encoding regressions surface.
+        self.assertEqual(
+            json.dumps(body),
+            '{"model": "llama3.2", "messages": [{"role": "user", '
+            '"content": "u"}], "temperature": 0.7, "max_tokens": 250}',
+        )
+
     @covers_requirement(
         "llm-client::openai-compatible-chat-completions-client",
         "llm-profiles::structured-output-is-opt-in-per-layer",

@@ -124,7 +124,8 @@ class ContainerContractTests(unittest.TestCase):
             set(compose["volumes"]),
             {"evennia-db", "evennia-art", "evennia-logs", "evennia-static", "evennia-media"},
         )
-        self.assertIn("host.containers.internal", evennia["environment"]["OLLAMA_BASE_URL"])
+        self.assertIn("host.containers.internal", evennia["environment"]["LLM_BASE_URL"])
+        self.assertNotIn("OLLAMA_BASE_URL", evennia["environment"])
         self.assertIn("host.containers.internal", evennia["environment"]["SD_WEBUI_BASE_URL"])
         self.assertEqual(bootstrap["profiles"], ["bootstrap"])
         self.assertTrue(bootstrap["stdin_open"])

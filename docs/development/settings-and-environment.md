@@ -13,6 +13,7 @@ flowchart LR
 ```
 
 優先順序：`程式碼預設值 < 環境變數 < secret_settings.py`。
+（LLM profile 家族例外：環境層是兩級，且 secret 層以「整層取代」方式合併，見下方 LLM knob 節。）
 
 1. **`server/conf/settings.py` 預設值** — 所有設定的來源與文件。
 2. **環境變數覆蓋** — 下表列出的變數在 settings 匯入時被讀取、轉型、驗證。變數不存在（或 typed／布林／URL knob 存在但為空白）時使用預設值。
@@ -81,9 +82,77 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 
 | 環境變數 | 讀者 | 型別 | 預設值 | 說明 |
 | --- | --- | --- | --- | --- |
-| `OLLAMA_BASE_URL` | `world/ai/profiles.py` | URL 字串 | `http://127.0.0.1:11434`（compose：`http://host.containers.internal:11434`） | 所有 LLM 層的 OpenAI 相容端點；每層模型／溫度調校值放在 `LLM_PROFILES` |
+| `LLM_BASE_URL` | `server/conf/settings.py` | URL 字串 | `http://127.0.0.1:11434`（compose：`http://host.containers.internal:11434`） | 所有 LLM 層的 OpenAI 相容端點；見下方 LLM endpoint knob 表 |
 | `PROMPT_ROOT` | `server/conf/settings.py` | 路徑字串 | `<GAME_DIR>/prompts` | 根內提示詞資料夾；僅 bare-metal／非標準佈局使用 |
 | `WEBSOCKET_CLIENT_PROXY_PORT` | Evennia `general_context` | 整數 | `4002` | 前端可見的 websocket 埠覆寫（反代／埠重映射） |
+
+## LLM endpoint knobs（23 個）
+
+讀者一律是 `server/conf/settings.py`：名稱、型別與邊界由宣告式 knob 表
+`server/conf/llm_knobs.py`（純資料、零環境讀取）產生，解析結果注入
+`world/ai/profiles.py` 的 `default_profiles(defaults=...)`；`world/ai/profiles.py`
+本身不讀取任何環境變數。每個欄位的優先次序：
+**程式碼預設值 < 全域 `LLM_<SUFFIX>` < 每層 `LLM_<LAYER>_<SUFFIX>` < `secret_settings.py`**。
+每層名稱的 `<LAYER>` 為七個層名大寫（底線保留）：`NARRATOR`、`NPC_DIALOGUE`、
+`SCENARIO_DIRECTOR`、`SCENE_BUILDER`、`CHARACTER_CREATION`、`ACTION_OPTIONS`、
+`TITLE_NOMINATION`。空白（或未設定）＝交給下一層；可省略型 knob 未設定時
+profile 欄位保持未設定（`None`，不會存 0）。無效值讓每個 Evennia 行程在開機時中止，
+錯誤訊息指名變數、原始值與規則。
+
+**範圍說明**：本變更只負責把這 23 個 knob **儲存並驗證**進 `LLM_PROFILES`
+registry；請求體與標頭的實際序列化（`Authorization`／`X-Title`／
+`HTTP-Referer`、取樣參數、reasoning、`max_completion_tokens`）由後續的
+`llm-endpoint-wire-configuration` 變更落地——在此之前，發出的請求仍只帶
+`model`／`messages`／`temperature`／`max_tokens`。
+
+| 環境變數 | 設定／欄位 | 型別 | 預設值 | 驗證規則／說明 |
+| --- | --- | --- | --- | --- |
+| `LLM_BASE_URL` | `LLM_PROFILES[*].base_url` | URL 字串 | `http://127.0.0.1:11434` | 非空字串；compose 注入 host-gateway 預設 |
+| `LLM_PATH` | `LLM_PROFILES[*].path` | 字串 | `/v1/chat/completions` | 非空字串 |
+| `LLM_API_KEY` | `LLM_PROFILES[*].api_key` | 自由文字 | 空（未設定） | 承載（序列化後由後續變更送 `Authorization: Bearer`）；不出現在 repr／記錄；慣用位置仍是 `secret_settings.py` |
+| `LLM_APP_TITLE` | `LLM_PROFILES[*].app_title` | 自由文字 | 空（未設定） | 非空時存下；序列化後由後續變更送 `X-Title`（OpenRouter 屬性） |
+| `LLM_APP_URL` | `LLM_PROFILES[*].app_url` | 自由文字 | 空（未設定） | 非空時存下；序列化後由後續變更送 `HTTP-Referer` |
+| `LLM_MODEL` | `LLM_PROFILES[*].model` | 字串 | `llama3.2` | 非空字串 |
+| `LLM_TEMPERATURE` | `LLM_PROFILES[*].temperature` | float | `0.7` | 有限 float，`0..2`（含端點） |
+| `LLM_FREQUENCY_PENALTY` | `LLM_PROFILES[*].frequency_penalty` | 可省略 float | 省略 | `−2..2`（含端點）；空白＝省略 |
+| `LLM_PRESENCE_PENALTY` | `LLM_PROFILES[*].presence_penalty` | 可省略 float | 省略 | `−2..2`（含端點）；空白＝省略 |
+| `LLM_TOP_K` | `LLM_PROFILES[*].top_k` | 可省略整數 | 省略 | 正整數；空白＝省略 |
+| `LLM_TOP_P` | `LLM_PROFILES[*].top_p` | 可省略 float | 省略 | `0 < x <= 1`；空白＝省略 |
+| `LLM_REPETITION_PENALTY` | `LLM_PROFILES[*].repetition_penalty` | 可省略 float | 省略 | 大於 0 的有限 float；空白＝省略 |
+| `LLM_MIN_P` | `LLM_PROFILES[*].min_p` | 可省略 float | 省略 | `0..1`（含端點）；空白＝省略 |
+| `LLM_TOP_A` | `LLM_PROFILES[*].top_a` | 可省略 float | 省略 | 非負有限 float；空白＝省略 |
+| `LLM_REASONING_ENABLED` | `LLM_PROFILES[*].reasoning_enabled` | 三態布林字 | 省略（未表達意圖） | `1/true/yes/on`→True、`0/false/no/off`→False（不分大小寫）；空白／未設定＝省略，**不是** False |
+| `LLM_REASONING_EFFORT` | `LLM_PROFILES[*].reasoning_effort` | 可省略選擇 | 省略 | 閉集合 `minimal/low/medium/high`（不分大小寫，存小寫） |
+| `LLM_REASONING_STYLE` | `LLM_PROFILES[*].reasoning_style` | 選擇 | `openrouter` | 閉集合 `openrouter/vllm/off`（不分大小寫） |
+| `LLM_MAX_COMPLETION_TOKENS` | `LLM_PROFILES[*].max_completion_tokens` | 可省略整數 | 省略 | 正整數；空白＝省略 |
+| `LLM_MAX_TOKENS` | `LLM_PROFILES[*].max_tokens` | 整數 | `250`（`action_options` 320、`title_nomination` 640） | 正整數；未設定時各層保留自己的程式碼預設值 |
+| `LLM_TIMEOUT_SECONDS` | `LLM_PROFILES[*].timeout_seconds` | 整數 | `60` | 正整數 |
+| `LLM_MAX_RETRIES` | `LLM_PROFILES[*].max_retries` | 整數 | `2` | 非負整數 |
+| `LLM_SUPPORTS_RESPONSE_FORMAT` | `LLM_PROFILES[*].supports_response_format` | 布林字 | `False` | 布林字彙表；`action_options` 被強制為 True，企圖用覆寫清除會開機失敗 |
+| `LLM_ENABLED` | `LLM_PROFILES[*].enabled` | 布林字 | `True` | 布林字彙表；False 的層直接走降級路徑、不發請求 |
+
+**secret_settings 的每層合併規則**：`secret_settings.py` 若定義 `LLM_PROFILES`，
+該地圖**整層取代**它所點名的層（層內不做欄位級合併；被點名的層若遺漏必填
+欄位會以嚴格驗證錯誤開機失敗），未被點名的層完整保留其環境解析結果
+（每層覆寫→全域覆寫→程式碼預設值）。空白地圖是合法的 no-op。
+
+**範例**（vLLM；模型名必須等於伺服器的 `--served-model-name`）：
+
+```sh
+export LLM_BASE_URL=http://vllm.lan:8000
+export LLM_MODEL=meta-llama/Llama-3.2-3B-Instruct
+export LLM_CHARACTER_CREATION_MODEL=qwen2.5-32b-instruct  # 僅該層
+```
+
+**範例**（OpenRouter；金鑰慣用上屬 `secret_settings.py`，環境承載會洩漏進
+`/proc/<pid>/environ` 與 `compose config`／`docker inspect`，詳見下方政策）：
+
+```sh
+export LLM_BASE_URL=https://openrouter.ai/api/v1
+export LLM_MODEL=meta-llama/llama-3.2-3b-instruct:free
+export LLM_APP_TITLE="Elosern MUD"
+export LLM_APP_URL=https://example.test
+```
 
 ## Evennia launcher／compose／建置變數（不在 settings.py）
 
@@ -103,14 +172,14 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `OPENSPEC_TEST_EVIDENCE`、`COVERAGE_FILE` | `tools/spec_traceability`／CI | 追溯證據與覆蓋率資料檔（quality-gate workflow 設定） |
 | `ELOSERN_BROWSER_*` | `web/tests/browser/` | 受管理瀏覽器測試 harness 的隔離根、埠、身分、場景開關 |
 
-**測試隔離**：`server/conf/test_settings.py` 在 star-import 生產 settings 之前會把上面所有環境覆蓋名稱從 `os.environ` 中 pop 掉，因此開發者或 CI runner shell 裡繼承的 `ART_SD_*` 值永遠不會影響測試跑的有效設定（有效值恰為程式碼預設值）。
+**測試隔離**：`server/conf/test_settings.py` 在 star-import 生產 settings 之前會把上面所有環境覆蓋名稱、以及 `llm_env_names()` 產生的全部 184 個 LLM knob 名稱（23 個全域 + 23 × 7 層）從 `os.environ` 中 pop 掉，因此開發者或 CI runner shell 裡繼承的 `ART_SD_*`／`LLM_*` 值永遠不會影響測試跑的有效設定（有效值恰為程式碼預設值）。
 
 ## 必須留在 secret_settings.py 的內容
 
 | 項目 | 為什麼不走環境 |
 | --- | --- |
 | `SECRET_KEY` 等 Django 私密、`ALLOWED_HOSTS` | 環境變數會洩漏進程序清單與 `compose inspect`；`secret_settings.py` 是唯一核准的位置 |
-| `LLM_PROFILES` 每層調校 | 規格 `llm-profiles` 範圍；結構化的每層調校值不適合塞進單一環境變數 |
+| `LLM_PROFILES` 整張地圖 | 結構化的每層地圖（多欄位 wholesale 覆寫）仍以 `secret_settings.py` 為慣用位置；純量調校值改由上述 23 個 `LLM_*` knob（含每層變體）承載 |
 | `ART_SD_CLIENT` | 這是會執行匯入的 dotted path；環境可控制的匯入縫等於讓任何繼承環境在引擎啟動時匯入任意程式碼（匯入注入） |
 | `ART_STORE_ROOT` | 環境打字錯誤會把生成美術靜默搬到持久卷之外的路徑；罕見的非標準佈局請在 `secret_settings.py` 明確設定 |
 | `ART_SD_USERNAME`／`ART_SD_PASSWORD` | 這是憑證；環境變數會洩漏進程序清單與 `compose inspect`。客戶端只在兩者皆非空時送出 Basic auth；密碼永不出現在任何記錄 |

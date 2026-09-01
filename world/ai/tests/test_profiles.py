@@ -30,7 +30,7 @@ REPO_ROOT = os.path.dirname(
 
 class ProfileDataclassTests(unittest.TestCase):
     @covers_requirement("llm-profiles::per-layer-profile-registry")
-    def test_frozen_dataclass_carries_the_ten_declared_fields(self):
+    def test_frozen_dataclass_carries_the_declared_fields(self):
         self.assertEqual(
             [field.name for field in fields(LLMProfile)],
             [
@@ -44,6 +44,20 @@ class ProfileDataclassTests(unittest.TestCase):
                 "max_retries",
                 "supports_response_format",
                 "enabled",
+                "api_key",
+                "app_title",
+                "app_url",
+                "frequency_penalty",
+                "presence_penalty",
+                "top_k",
+                "top_p",
+                "repetition_penalty",
+                "min_p",
+                "top_a",
+                "reasoning_enabled",
+                "reasoning_effort",
+                "reasoning_style",
+                "max_completion_tokens",
             ],
         )
         profile = LLMProfile(
@@ -83,6 +97,36 @@ class ProfileDataclassTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             profile.headers["X-New"] = ("x",)
 
+    @covers_requirement("llm-profiles::per-layer-profile-registry")
+    def test_api_key_never_reaches_repr_or_str(self):
+        profile = LLMProfile(
+            **valid_profile_values(api_key="super-secret-token")
+        )
+        self.assertNotIn("super-secret-token", repr(profile))
+        self.assertNotIn("super-secret-token", str(profile))
+        self.assertEqual(profile.api_key, "super-secret-token")
+
+    @covers_requirement("llm-profiles::per-layer-profile-registry")
+    def test_omitted_optional_fields_construct_at_their_omit_defaults(self):
+        profile = LLMProfile(**valid_profile_values())
+        self.assertEqual(profile.api_key, "")
+        self.assertEqual(profile.app_title, "")
+        self.assertEqual(profile.app_url, "")
+        for name in (
+            "frequency_penalty",
+            "presence_penalty",
+            "top_k",
+            "top_p",
+            "repetition_penalty",
+            "min_p",
+            "top_a",
+            "reasoning_enabled",
+            "reasoning_effort",
+            "max_completion_tokens",
+        ):
+            self.assertIsNone(getattr(profile, name))
+        self.assertEqual(profile.reasoning_style, "openrouter")
+
 
 def valid_profile_values(**overrides):
     values = {
@@ -101,6 +145,18 @@ def valid_profile_values(**overrides):
     return values
 
 
+def _clean_subprocess_env() -> dict[str, str]:
+    """Environment without DJANGO_SETTINGS_MODULE and any LLM knob, so a
+    developer shell can never shift settings-import subprocess results."""
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key != "DJANGO_SETTINGS_MODULE"
+        and not key.startswith("LLM_")
+        and key != "OLLAMA_BASE_URL"
+    }
+
+
 class ProfileValidationTests(unittest.TestCase):
     @covers_requirement("llm-profiles::startup-profile-validation-is-strict")
     def test_valid_profile_builds(self):
@@ -117,6 +173,21 @@ class ProfileValidationTests(unittest.TestCase):
             {"max_retries": -1},
             {"enabled": 1},
             {"headers": {"X": 123}},
+            {"frequency_penalty": 2.5},
+            {"presence_penalty": -2.5},
+            {"top_p": 1.5},
+            {"top_p": 0.0},
+            {"repetition_penalty": 0.0},
+            {"min_p": 1.5},
+            {"top_a": -0.1},
+            {"top_k": 0},
+            {"max_completion_tokens": "10"},
+            {"reasoning_enabled": 1},
+            {"reasoning_effort": "extreme"},
+            {"reasoning_style": "ollama"},
+            {"reasoning_style": None},
+            {"api_key": None},
+            {"app_title": 5},
         ]
         for overrides in bad_values:
             with self.subTest(overrides=overrides):
@@ -135,6 +206,20 @@ class ProfileValidationTests(unittest.TestCase):
             "max_retries": (-1, True, 1.5),
             "supports_response_format": (0, "yes", None),
             "enabled": (1, "no", None),
+            "frequency_penalty": (-2.1, 2.1, float("nan"), True),
+            "presence_penalty": (-2.1, 2.1, float("inf")),
+            "top_p": (0, -0.1, 1.1, float("nan")),
+            "repetition_penalty": (0, -1.0),
+            "min_p": (-0.1, 1.1, float("nan")),
+            "top_a": (-0.1, float("nan")),
+            "top_k": (0, -3, True, "5"),
+            "max_completion_tokens": (0, -3, True, "5"),
+            "reasoning_enabled": (1, "yes"),
+            "reasoning_effort": ("extreme", 3),
+            "reasoning_style": ("ollama", "OFF"),
+            "api_key": (None, 7),
+            "app_title": (None,),
+            "app_url": (None,),
         }
         for field, bad_values in cases.items():
             for bad in bad_values:
@@ -143,6 +228,70 @@ class ProfileValidationTests(unittest.TestCase):
                         build_profiles({"narrator": valid_profile_values(**{field: bad})})
                     self.assertEqual(ctx.exception.layer, "narrator")
                     self.assertEqual(ctx.exception.field, field)
+
+    @covers_requirement("llm-profiles::startup-profile-validation-is-strict")
+    def test_boundary_optional_values_construct(self):
+        for field, ok in (
+            ("frequency_penalty", -2.0),
+            ("frequency_penalty", 2.0),
+            ("presence_penalty", 0.0),
+            ("top_p", 1.0),
+            ("repetition_penalty", 0.001),
+            ("min_p", 0.0),
+            ("min_p", 1.0),
+            ("top_a", 0.0),
+            ("top_k", 1),
+            ("max_completion_tokens", 1),
+            ("reasoning_enabled", False),
+            ("reasoning_effort", "minimal"),
+            ("reasoning_style", "vllm"),
+            ("reasoning_style", "off"),
+        ):
+            with self.subTest(field=field, ok=ok):
+                profile = build_profiles(
+                    {"narrator": valid_profile_values(**{field: ok})}
+                )["narrator"]
+                self.assertEqual(getattr(profile, field), ok)
+
+    @covers_requirement("llm-profiles::credential-bearing-standard-headers-are-rejected-in-profile-headers")
+    def test_credential_bearing_header_names_fail_construction(self):
+        for name in (
+            "Authorization",
+            "authorization",
+            "AUTHORIZATION",
+            "Proxy-Authorization",
+            "X-Api-Key",
+            "api-key",
+        ):
+            with self.subTest(name=name):
+                with self.assertRaises(ProfileValidationError) as ctx:
+                    build_profiles(
+                        {
+                            "narrator": valid_profile_values(
+                                headers={name: ("Bearer super-secret",)}
+                            )
+                        }
+                    )
+                self.assertEqual(ctx.exception.layer, "narrator")
+                self.assertEqual(ctx.exception.field, "headers")
+                self.assertIn("api_key", str(ctx.exception))
+
+    @covers_requirement("llm-profiles::credential-bearing-standard-headers-are-rejected-in-profile-headers")
+    def test_non_credential_headers_still_pass(self):
+        profile = build_profiles(
+            {
+                "narrator": valid_profile_values(
+                    headers={
+                        "X-Title": ("Elosern",),
+                        "X-Request-Tag": ("abc",),
+                        "HTTP-Referer": ("https://example.test",),
+                    }
+                )
+            }
+        )["narrator"]
+        self.assertEqual(profile.headers["X-Title"], ("Elosern",))
+        self.assertEqual(profile.headers["X-Request-Tag"], ("abc",))
+        self.assertEqual(profile.headers["HTTP-Referer"], ("https://example.test",))
 
     @covers_requirement("llm-profiles::startup-profile-validation-is-strict")
     def test_headers_key_or_value_not_a_string_fails_construction(self):
@@ -202,25 +351,103 @@ class RegistryTests(unittest.TestCase):
             self.assertEqual(profiles[layer].base_url, "http://127.0.0.1:11434")
             self.assertEqual(profiles[layer].path, "/v1/chat/completions")
             self.assertTrue(profiles[layer].enabled)
+            # Optional endpoint fields sit at their omit defaults.
+            self.assertIsNone(profiles[layer].frequency_penalty)
+            self.assertIsNone(profiles[layer].reasoning_enabled)
+            self.assertEqual(profiles[layer].reasoning_style, "openrouter")
+            self.assertEqual(profiles[layer].api_key, "")
             if layer == "action_options":
                 self.assertTrue(profiles[layer].supports_response_format)
                 self.assertEqual(profiles[layer].max_tokens, 320)
+            elif layer == "title_nomination":
+                self.assertEqual(profiles[layer].max_tokens, 640)
             else:
                 self.assertFalse(profiles[layer].supports_response_format)
+                self.assertEqual(profiles[layer].max_tokens, 250)
 
-    @covers_requirement("llm-client::local-first-default-endpoint-from-the-environment")
-    def test_env_variable_selects_the_compose_host(self):
-        with patch.dict(os.environ, {"OLLAMA_BASE_URL": "http://host.containers.internal:11434"}):
-            profiles = build_profiles(default_profiles())
+    @covers_requirement("llm-profiles::default-profiles-are-injected-not-environment-read")
+    def test_injected_defaults_merge_over_code_defaults(self):
+        with patch.dict(
+            os.environ,
+            {"LLM_MODEL": "poisoned-from-environment"},
+        ):
+            profiles = build_profiles(
+                default_profiles(
+                    defaults={"character_creation": {"model": "qwen2.5-32b-instruct"}}
+                )
+            )
+        self.assertEqual(
+            profiles["character_creation"].model, "qwen2.5-32b-instruct"
+        )
         for layer in LAYER_NAMES:
-            self.assertEqual(profiles[layer].base_url, "http://host.containers.internal:11434")
+            if layer != "character_creation":
+                self.assertEqual(profiles[layer].model, "llama3.2")
 
-    @covers_requirement("llm-client::local-first-default-endpoint-from-the-environment")
-    def test_env_unset_falls_back_to_bare_metal_localhost(self):
-        with patch.dict(os.environ, {}, clear=True):
-            profiles = build_profiles(default_profiles())
-        for layer in LAYER_NAMES:
-            self.assertEqual(profiles[layer].base_url, "http://127.0.0.1:11434")
+    @covers_requirement("llm-profiles::default-profiles-are-injected-not-environment-read")
+    def test_invalid_injected_values_still_fail_closed(self):
+        with self.assertRaises(ProfileValidationError) as ctx:
+            default_profiles(defaults={"narrator": {"top_p": 1.5}})
+        self.assertEqual(ctx.exception.layer, "narrator")
+        self.assertEqual(ctx.exception.field, "top_p")
+
+    @covers_requirement("llm-profiles::default-profiles-are-injected-not-environment-read")
+    def test_unknown_injected_layer_is_rejected(self):
+        with self.assertRaises(UnknownLayerError):
+            default_profiles(defaults={"bogus": {"model": "m"}})
+
+    @covers_requirement("llm-profiles::default-profiles-are-injected-not-environment-read")
+    def test_profiles_module_source_performs_no_environment_reads(self):
+        source = open(
+            os.path.join(REPO_ROOT, "world", "ai", "profiles.py"), encoding="utf-8"
+        ).read()
+        self.assertNotIn("os.environ", source)
+        self.assertNotIn("import os", source)
+        self.assertNotIn("OLLAMA", source)
+
+    @covers_requirement("llm-client::local-first-default-endpoint-from-the-environment", "settings-environment-overrides::the-base-url-environment-reader-is-the-settings-module")
+    def test_llm_base_url_selects_the_compose_host_via_settings(self):
+        code = (
+            "import sys, types\n"
+            "sys.modules.setdefault('server.conf.secret_settings',"
+            " types.ModuleType('server.conf.secret_settings'))\n"
+            "import server.conf.settings as s\n"
+            "print(s.LLM_PROFILES['narrator']['base_url'])\n"
+        )
+        env = _clean_subprocess_env()
+        env["LLM_BASE_URL"] = "http://host.containers.internal:11434"
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=str(REPO_ROOT),
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("http://host.containers.internal:11434", result.stdout)
+
+    @covers_requirement("settings-environment-overrides::the-base-url-environment-reader-is-the-settings-module")
+    def test_the_old_variable_name_is_inert(self):
+        code = (
+            "import sys, types\n"
+            "sys.modules.setdefault('server.conf.secret_settings',"
+            " types.ModuleType('server.conf.secret_settings'))\n"
+            "import server.conf.settings as s\n"
+            "print(s.LLM_PROFILES['narrator']['base_url'])\n"
+        )
+        env = _clean_subprocess_env()
+        env["OLLAMA_BASE_URL"] = "http://old-host:11434"
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=str(REPO_ROOT),
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("http://127.0.0.1:11434", result.stdout)
+        self.assertNotIn("old-host", result.stdout)
 
 
 class GetProfileTests(unittest.TestCase):
@@ -291,13 +518,13 @@ class ActionOptionsProfileTests(unittest.TestCase):
             "import world.ai.profiles as profiles\n"
             "raw = profiles.default_profiles()\n"
             "raw['action_options']['supports_response_format'] = False\n"
-            "profiles.default_profiles = lambda: raw\n"
+            "profiles.default_profiles = lambda **kw: raw\n"
             "import server.conf.settings\n"
         )
         result = subprocess.run(
             [sys.executable, "-c", code],
             cwd=str(REPO_ROOT),
-            env={key: value for key, value in os.environ.items() if key != "DJANGO_SETTINGS_MODULE"},
+            env=_clean_subprocess_env(),
             capture_output=True,
             text=True,
             check=False,
@@ -323,7 +550,7 @@ class ActionOptionsProfileTests(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, "-c", code],
             cwd=str(REPO_ROOT),
-            env={key: value for key, value in os.environ.items() if key != "DJANGO_SETTINGS_MODULE"},
+            env=_clean_subprocess_env(),
             capture_output=True,
             text=True,
             check=False,

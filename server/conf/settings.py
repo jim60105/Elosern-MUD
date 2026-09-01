@@ -26,7 +26,7 @@ put secret game- or server-specific settings in secret_settings.py.
 
 # Use the defaults from Evennia unless explicitly overridden
 from evennia.settings_default import *
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 import math
 import os
 import sys
@@ -99,6 +99,29 @@ def _env_typed(
     text = raw.strip()
     if not text:
         return default
+    return _env_validate(name, raw, convert, minimum=minimum, at_least=at_least,
+                         maximum=maximum, multiple=multiple, rule=rule)
+
+
+def _env_validate(
+    name: str,
+    raw: str,
+    convert: Callable[[str], object],
+    *,
+    minimum: float | None = None,
+    at_least: float | None = None,
+    maximum: float | None = None,
+    multiple: int | None = None,
+    rule: str,
+) -> object:
+    """Convert and bound a CONFIRMED-PRESENT raw value, failing closed.
+
+    Presence/blank handling belongs to the caller (`_env_typed`, or the LLM
+    knob resolver with its two-tier layer-then-global loop); this shared core
+    quotes the unstripped raw value in every message, exactly as `_env_typed`
+    always has.
+    """
+    text = raw.strip()
     try:
         value = convert(text)
     except ValueError:
@@ -202,6 +225,20 @@ def _env_choice(name: str, choices: tuple[str, ...], default: str) -> str:
 
     return _env_typed(name, convert, default, rule=rule)
 
+
+def _env_choice_value(name: str, choices: tuple[str, ...]) -> str:
+    """Choice knob for the knob resolver (the raw is already known present);
+    same case-insensitive contract and canonical lowercase result."""
+    rule = "expected one of " + "/".join(choices) + " (case-insensitive)"
+
+    def convert(text: str) -> str:
+        lowered = text.lower()
+        if lowered not in choices:
+            raise ValueError(text)
+        return lowered
+
+    return _env_validate(name, os.environ[name], convert, rule=rule)
+
 ######################################################################
 # Evennia base server config
 ######################################################################
@@ -231,12 +268,74 @@ PROTOTYPE_MODULES = ["world.prototypes", "evennia.contrib.grid.xyzgrid.prototype
 # page reload (server/conf/websocket_protocol.py).
 WEBSOCKET_PROTOCOL_CLASS = "server.conf.websocket_protocol.WebSocketClient"
 
-# Generative-layer LLM endpoint profiles (llm-client). Local-first by default:
-# base_url derives from OLLAMA_BASE_URL (the compose runtime) or falls back to a
-# bare-metal localhost endpoint.
-from world.ai.profiles import build_profiles, default_profiles
+# Generative-layer LLM endpoint profiles (llm-client, env-overridable-llm-
+# profiles). All twenty-three endpoint knobs resolve from the environment in
+# THIS module only — world/ai/profiles.py performs zero env reads (D-A3).
+# Precedence per field: code default < global LLM_<SUFFIX> < per-layer
+# LLM_<LAYER>_<SUFFIX> < secret_settings. Absent or present-but-blank yields
+# the next tier down; an invalid present value fails closed naming the exact
+# variable. Resolution is presence-driven: a field enters the map only when
+# some environment name carried it, so per-layer code defaults (320/640
+# max_tokens) and optional-None wire-omission semantics survive untouched
+# (D-A6). The inert knob table (server/conf/llm_knobs) is the single source
+# for names, kinds, and bounds; test_settings.py sanitizes exactly
+# llm_env_names() before importing this module.
+from world.ai.profiles import UnknownLayerError, build_profiles, default_profiles
+from server.conf.llm_knobs import LAYER_NAMES, LLM_KNOBS, llm_env_names
 
-LLM_PROFILES = default_profiles()
+
+def _llm_convert(knob, name: str):
+    """Convert the confirmed-present raw of one knob name, failing closed."""
+    if knob.kind == "str":
+        return _env_str(name)
+    if knob.kind == "bool":
+        return _env_typed(name, _env_bool_word, False, rule=_ENV_BOOL_RULE)
+    if knob.kind == "choice":
+        return _env_choice_value(name, knob.choices)
+    return _env_typed(
+        name,
+        int if knob.kind == "int" else float,
+        0,
+        minimum=knob.minimum,
+        at_least=knob.at_least,
+        maximum=knob.maximum,
+        rule=knob.rule,
+    )
+
+
+def _resolve_llm_env_overrides() -> dict[str, dict[str, object]]:
+    """Layered per-layer field overrides from the environment (D-A1).
+
+    For each layer each knob checks its per-layer name first, then the global;
+    the first name carrying a non-blank raw wins, and an invalid raw raises
+    there even when a lower tier would have parsed. Only carried fields enter
+    the map.
+    """
+    overrides: dict[str, dict[str, object]] = {}
+    for layer in LAYER_NAMES:
+        entry: dict[str, object] = {}
+        for knob in LLM_KNOBS:
+            for name in (f"LLM_{layer.upper()}_{knob.suffix}", f"LLM_{knob.suffix}"):
+                raw = os.environ.get(name)
+                if raw is not None and raw.strip():
+                    entry[knob.field] = _llm_convert(knob, name)
+                    break
+        if entry:
+            overrides[layer] = entry
+    return overrides
+
+
+_ENV_RESOLVED_LLM_PROFILES = default_profiles(
+    defaults=_resolve_llm_env_overrides()
+)
+LLM_PROFILES = {
+    layer: dict(values) for layer, values in _ENV_RESOLVED_LLM_PROFILES.items()
+}
+
+# The exact generated-name set (23 globals + 23 per layer for seven layers),
+# consumed by the inventory contract test so .env.example can be diffed
+# against resolution without a second generated list.
+LLM_ENV_NAMES = frozenset(llm_env_names())
 
 ######################################################################
 # Deterministic art-assets backend (art-assets)
@@ -414,6 +513,26 @@ try:
     from server.conf.secret_settings import *
 except ImportError:
     print("secret_settings.py file not found or failed to import.")
+
+# Per-layer secret merge (D-A7): a secret_settings LLM_PROFILES replaces the
+# named layers WHOLESALE over the environment-resolved defaults — no field
+# merge — and unnamed layers keep their environment values. An empty secret
+# map is a legal no-op. A non-Mapping source (build_profiles also accepts
+# pair iterables) is left untouched for build_profiles to validate below.
+_secret_module = sys.modules.get("server.conf.secret_settings")
+_secret_profiles = vars(_secret_module).get("LLM_PROFILES") if _secret_module else None
+if isinstance(_secret_profiles, Mapping):
+    for _secret_layer in _secret_profiles:
+        if _secret_layer not in LAYER_NAMES:
+            raise UnknownLayerError(_secret_layer)
+    LLM_PROFILES = {
+        layer: dict(
+            _secret_profiles[layer]
+            if layer in _secret_profiles
+            else _ENV_RESOLVED_LLM_PROFILES[layer]
+        )
+        for layer in LAYER_NAMES
+    }
 
 # Validate the effective profile map after every settings override, so a
 # misconfigured action_options structured-output slot fails at startup rather

@@ -43,15 +43,22 @@ stores fields without changing any wire bytes (except the model name, already se
 `LLM_KNOBS: tuple[LlmKnob, ...]`, one row per profile field (23 rows):
 `(profile_field, env_suffix, kind, bounds, default_per_layer_overrides)`. Kinds map onto
 the existing helpers: `str` (`_env_str`), `typed_float` / `typed_int` / `bool`
-(`_env_typed` with bounds and rule text), `choice` (`_env_choice`), plus one new helper:
+(`_env_typed` with bounds and rule text), `choice` (the `_env_choice` conversion as a
+confirmed-present variant), plus a refactored shared core:
 
 ```python
-def _env_optional(name, convert, *, at_least=None, maximum=None, minimum=None, rule):
-    """Omittable typed knob: absent/blank -> None; invalid -> ImproperlyConfigured."""
+def _env_validate(name, raw, convert, *, minimum=None, at_least=None, maximum=None,
+                  multiple=None, rule):
+    """Conversion/bound core shared with _env_typed: the raw is CONFIRMED-PRESENT
+    (presence/blank handling stays with the caller), and the error quotes the
+    unstripped raw value exactly as _env_typed always has."""
 ```
 
 Building the raw profile dict loops `LLM_KNOBS × LAYER_NAMES` in `settings.py`: layer
 value = per-layer env if present else global env if present else layer code default.
+Resolution is presence-driven: a field enters the map only when some name carried a
+non-blank raw, so unset optional knobs never overwrite the per-layer code defaults
+(320/640 `max_tokens`) and land as `None` via the field default instead.
 Rationale: 23 knobs × 8 names cannot be hand-written without drift. The AST inventory
 test cannot see loop-constructed names (its extractor matches literal first-arguments
 only — verified against `test_env_overrides.py::_env_read_names`), so generated names are
@@ -62,10 +69,13 @@ extraction (D-A4). Alternative considered: 184 literal calls; rejected as unmain
 
 Optional strings (`api_key`, `app_title`, `app_url`) use the existing `_env_str` default
 `""` — empty string *is* the omit sentinel (matches `ART_SD_SAMPLER` family semantics).
-Optional numbers/tri-states use `_env_optional` → `None`. `reasoning_enabled` needs a
-tri-state helper `_env_optional_bool` (absent/blank → `None`, truthy/falsy word →
-`True`/`False`, else fail closed). This keeps C-5's "None never serializes" expressible
-without a sentinel string that could collide with real content.
+Optional numbers/tri-states need no dedicated optional helper because the resolver only
+converts confirmed-present raws: absent/present-but-blank simply never enters the map and
+the field default (`None`) applies — omit-by-absence, not omit-by-sentinel.
+`reasoning_enabled` is therefore tri-state through presence alone: absent/blank →
+`None`, a truthy/falsy word (existing word list) → `True`/`False`, anything else fails
+closed. This keeps C-5's "None never serializes" expressible without a sentinel string
+that could collide with real content.
 
 ### D-A3 `default_profiles(defaults=None)` injection shape
 

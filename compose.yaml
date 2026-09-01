@@ -16,7 +16,7 @@ services:
       - "4002:4002"
     env_file: .env
     environment:
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.containers.internal:11434}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.containers.internal:11434}
       SD_WEBUI_BASE_URL: ${SD_WEBUI_BASE_URL:-http://host.containers.internal:7860}
       # Non-interactive superuser creation for a fresh database: the Evennia
       # launcher's `check_database` creates Account #1 from these vars at

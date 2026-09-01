@@ -66,7 +66,9 @@ Design source: `docs/superpowers/specs/2026-09-01-llm-endpoint-configuration-des
 - Tests: `world/ai/tests/test_profiles.py`, `server/conf/tests/`
   (`test_env_overrides.py` inventory contract + per-knob boot validation),
   `tests/test_container_contract.py`; the new `server/conf/tests/test_llm_env_overrides.py`
-  requires a same-change `.github/evennia-shards.json` ownership entry (exactly one shard).
+  needs NO `.github/evennia-shards.json` edit — the manifest's package-level `server`
+  label owns every `test*.py` under `server/` by recursive walk, and an explicit module
+  entry would violate the exactly-one-owner contract (`tests.test_evennia_test_optimization_contract`).
 - No DB, no persisted state, no command surface. Rollback removes the settings knob
   table and reverts the profile constructor signature.
 - Depends on: nothing. Blocks: `llm-endpoint-wire-configuration` (serialization of the
