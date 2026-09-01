@@ -45,11 +45,12 @@ random or wall-clock input, and SHALL return the same value for the same input o
   checked first)
 - **THEN** both calls return `"central_mountains"`
 
-#### Scenario: capital_altoria's registered wilderness entry point resolves to Altoria's own territory
-- **WHEN** `region_for_coordinates` is called with `WILDERNESS_ENTRY_REGISTRY["capital_altoria"].
-  wilderness_xy`
-- **THEN** it returns `"western_hills_valleys"`, matching `world/lore/nations.py`'s own statement that
-  Altoria's territory is "西部丘陵、谷地與西南海岸"
+#### Scenario: capital_altoria's derived anchor cells resolve to Altoria's own territory
+- **WHEN** `region_for_coordinates` is called with the `"capital_altoria"` entry's derived
+  `anchor_cell` `(60, 100)` and with every gate's derived `approach_cell` (`(60, 97)` and
+  `(60, 103)`)
+- **THEN** every call returns `"western_hills_valleys"`, matching `world/lore/nations.py`'s own
+  statement that Altoria's territory is "西部丘陵、谷地與西南海岸"
 
 ### Requirement: terrain_description is a pure, deterministic function with no LLM or randomness
 `world/maps/wilderness_provider.py` SHALL define `terrain_description(x: int, y: int) -> str`,
@@ -72,11 +73,12 @@ scenario below.
   terrain_flavor_zh`'s own variants
 
 #### Scenario: A fixed coordinate produces a literal, spec-pinned string
-- **WHEN** `terrain_description(60, 100)` is called (`capital_altoria`'s registered wilderness entry
-  point, which `region_for_coordinates` resolves to `"western_hills_valleys"`)
+- **WHEN** `terrain_description(60, 103)` is called (`capital_altoria`'s north-gate approach cell —
+  the wilderness-side landing of the 北門 gate under the footprint registry — which
+  `region_for_coordinates` resolves to `"western_hills_valleys"`)
 - **THEN** it returns exactly `"谷地間河流蜿蜒，兩岸散落著手工業者的作坊與磨坊。"` — the literal second
   (index `1`) entry of `WILDERNESS_REGION_REGISTRY["western_hills_valleys"].terrain_flavor_zh`, per
-  `(60 * 92821 + 100 * 68917) % 3 == 1`. A reimplementation using different formula constants or
+  `(60 * 92821 + 103 * 68917) % 3 == 1`. A reimplementation using different formula constants or
   reworded flavor text — either of which would still satisfy every other scenario in this
   requirement — SHALL fail this scenario, which is the point: it is what pins the formula and the
   registry text together against silent drift, the same concern that ruled out a `hash()`-based
@@ -85,7 +87,6 @@ scenario below.
 #### Scenario: No LLM or network dependency exists in the call path
 - **WHEN** `world/maps/wilderness_provider.py` is inspected for imports and calls
 - **THEN** it references no module under `world/ai/`, no HTTP client, and no `random` module call
-
 ### Requirement: WILDERNESS_REGION_REGISTRY is mirrored into LoreRecord Scripts idempotently
 `world/lore/sync.py::_ALL_REGISTRIES` SHALL include `WILDERNESS_REGION_REGISTRY` under the category
 key `"wilderness_regions"`, so `sync_all()` mirrors it into `LoreRecord` Scripts exactly as it mirrors

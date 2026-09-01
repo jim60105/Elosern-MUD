@@ -87,7 +87,7 @@ class TerrainPopulationModelTests(unittest.TestCase):
             MonsterPopulation(tier="low", name_zh="哥布林"),
         )
 
-    @covers_requirement("wilderness-monster-population::a-hunting-band-around-the-capitals-north-gate-always-hosts-a-low-tier-monster")
+    @covers_requirement("wilderness-monster-population::a-hunting-band-around-the-capital-s-north-gate-always-hosts-a-low-tier-monster")
     def test_hunting_band_is_contiguous_low_tier(self):
         # Band membership is only asserted for provider-valid ground: cells
         # inside the anchor footprint are refused by the provider and are not

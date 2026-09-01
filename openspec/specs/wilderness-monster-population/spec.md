@@ -36,11 +36,11 @@ entry pin is formula-derived, not special-cased.
 - **THEN** every non-`None` result has `tier` in `MONSTER_TIER_REGISTRY` and `name_zh` inside that
   tier's `example_monsters_zh`
 
-#### Scenario: The entry coordinate resolves to a literal, spec-pinned monster
-- **WHEN** `population_for_coordinates(60, 100)` is called (`capital_altoria`'s registered wilderness
-  entry point, and the fixed `CAPITAL_ENTRY_XY` constant)
+#### Scenario: The north-gate approach coordinate resolves to a literal, spec-pinned monster
+- **WHEN** `population_for_coordinates(60, 103)` is called (`capital_altoria`'s north-gate
+  approach cell, and the fixed `CAPITAL_ENTRY_XY` constant)
 - **THEN** it returns `MonsterPopulation(tier="low", name_zh="哥布林")` — the closed-form result of
-  `12,460,960 % 3 == 1` selecting index 1 of `("史萊姆", "哥布林", "巨鼠")`, pinning the formula and
+  `12,667,711 % 3 == 1` selecting index 1 of `("史萊姆", "哥布林", "巨鼠")`, pinning the formula and
   the tier registry together against silent drift
 
 #### Scenario: Higher-tier regions actually produce their tier
@@ -53,20 +53,23 @@ entry pin is formula-derived, not special-cased.
   presence formula yields `>= _REGION_DENSITY`
 - **THEN** `population_for_coordinates` returns `None`
 
-### Requirement: A hunting band around the capital entry always hosts a low-tier monster
-Every coordinate within Chebyshev distance 3 of `capital_altoria`'s registered wilderness entry point
-`(60, 100)` SHALL be present in the population at `low` tier, independent of the density formula, so
-the introductory hunt (討伐低階魔物) is reliably completable immediately after leaving the North Gate.
+### Requirement: A hunting band around the capital's north gate always hosts a low-tier monster
+Every provider-valid coordinate within Chebyshev distance 3 of the `capital_altoria` entry's
+north-gate `approach_cell` `(60, 103)` — the cell a traveler lands on leaving the 北門 toward the
+open wilderness — SHALL be present in the population at `low` tier, independent of the density
+formula, so the introductory hunt (討伐低階魔物) is reliably completable immediately after leaving
+the North Gate. Cells inside any anchor footprint are outside the provider's valid set and are not
+band members.
 
-#### Scenario: The entry coordinate is always populated at low tier
-- **WHEN** `population_for_coordinates(60, 100)` is called
+#### Scenario: The north-gate approach coordinate is always populated at low tier
+- **WHEN** `population_for_coordinates(60, 103)` is called
 - **THEN** it returns a `MonsterPopulation` with `tier == "low"`
 
-#### Scenario: The hunting band is contiguous around the entry point
-- **WHEN** `population_for_coordinates` is called for every coordinate within Chebyshev distance 3 of
-  `(60, 100)`
-- **THEN** every result is a `MonsterPopulation` with `tier == "low"`, never `None`
-
+#### Scenario: The hunting band is contiguous over valid ground around the north gate
+- **WHEN** `population_for_coordinates` is called for every provider-valid coordinate within
+  Chebyshev distance 3 of `(60, 103)`
+- **THEN** every result is a `MonsterPopulation` with `tier == "low"`, never `None`, and the
+  footprint cells of `capital_altoria` inside the band's square are skipped rather than populated
 ### Requirement: ensure_population idempotently places and respawns monsters at a coordinate
 `world/maps/wilderness_population.py` SHALL define `ensure_population(wilderness, coordinates) ->
 None` that reconciles a wilderness coordinate against `population_for_coordinates`. Every monster it
