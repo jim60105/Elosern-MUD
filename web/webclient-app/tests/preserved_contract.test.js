@@ -173,6 +173,12 @@ describe("H1 preserved DOM contract (design D6)", () => {
         panels: {
           status: fx.statusPanel(),
           context_actions: fx.explorationActions(),
+          // Declarative frames resolve from the committed `exploration`
+          // panel (webclient-declarative-frame-stack): the protocol-reachable
+          // exploration state always carries it, so the root frame renders
+          // its G2 rows here.
+          exploration: fx.explorationPanel(),
+          local_map: fx.localMapPanel(),
         },
       }),
     ]);

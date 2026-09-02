@@ -65,7 +65,10 @@ describe("frameless 背包 drawer (store contract)", () => {
     // The open touched nothing: no push, no sub-dock switch, no surface.
     expect(store.router.depth()).toBe(depthBefore);
     expect(trailTitles(store.router)).toEqual(trailBefore);
-    expect(store.router.currentMenu()).toBe(currentBefore);
+    // Declarative frames re-resolve per access (webclient-declarative-frame-
+    // stack): the open is unchanged in content (deep-equal), not in object
+    // identity — the drawer-open row must not mutate the frame.
+    expect(store.router.currentMenu()).toEqual(currentBefore);
     expect(store.view.activeSubDock).toBe(null);
     expect(store.currentFrameIsServiceFrame()).toBe(false);
   });

@@ -31,11 +31,10 @@ import ChoicePointLogic from "../lib/choicepoint.js";
 import OptionCards from "../lib/option_cards.js";
 import CombatMenu from "../lib/combat_menu.js";
 import CreationMenu from "../lib/creation_menu.js";
-import ExplorationMenu from "../lib/exploration_menu.js";
 import ServiceMenu from "../lib/service_menu.js";
 import CommandEcho from "../lib/command_echo.js";
 import { createFrameResolver } from "./frame-resolvers.js";
-import { actionIntentForItem, disabledReasonText, dockItemKeys } from "../components/dock-items.js";
+import { actionIntentForItem, dockItemKeys } from "../components/dock-items.js";
 import { gaugeRatio, isLowHp } from "../components/vitals.js";
 import LayoutStore from "../lib/layout_store.js";
 
@@ -210,9 +209,12 @@ export const useElosernStore = defineStore("elosern", () => {
 
   // D4: the imported keyboard router owns the focus state; its events are
   // routed through the same store actions (a broken renderer must never
-  // break the reducer).
+  // break the reducer). The declarative-frame resolver is injected so every
+  // read of a declarative frame resolves at access time (webclient-
+  // declarative-frame-stack D-A); the router never copies a resolved menu.
   const router = KeyboardRouter.createRouter({
     onEvent: onRouterEvent,
+    resolve: (descriptor) => frameResolver.resolve(descriptor),
   });
 
   // G1 re-home: the test helpers (and a user Escape at the root frame) call
@@ -230,6 +232,16 @@ export const useElosernStore = defineStore("elosern", () => {
       return depth;
     };
   }
+
+  // The exploration root descriptor (webclient-declarative-frame-stack): the
+  // one source for root pushes, replaces, and teardown re-homes.
+  const EXPLORATION_ROOT_DESCRIPTOR = Object.freeze({
+    source: "exploration.root",
+    params: Object.freeze({}),
+  });
+  // Set while the store drives a router stack mutation, so a focus emit that
+  // re-enters the store never nests a second mutation.
+  let inStackMutation = false;
 
   // The active sub-dock surface (null | "character" | "services"): which
   // re-homed sub-dock currently owns the action-dock surface. The
@@ -586,6 +598,7 @@ export const useElosernStore = defineStore("elosern", () => {
           lastTarget = String(item.payload.target_ids[0]);
         }
       }
+      syncDockRawByKey();
       publishView();
       return;
     }
@@ -597,7 +610,15 @@ export const useElosernStore = defineStore("elosern", () => {
       // clear the sub-dock and re-home the exploration root frame.
       else if (reducer.getState().mode === "exploration" && activeSubDock.value) {
         setActiveSubDock(null);
-        rehomeFrame(reducer.getState());
+        // The sub-dock owned the surface, not the frame stack: re-home the
+        // declarative exploration root (the sub-dock frames were legacy).
+        inStackMutation = true;
+        try {
+          router.replaceFrame(EXPLORATION_ROOT_DESCRIPTOR, { openerKey: null });
+        } finally {
+          inStackMutation = false;
+        }
+        syncDockRawByKey();
       }
       return;
     }
@@ -615,6 +636,10 @@ export const useElosernStore = defineStore("elosern", () => {
     if (!item) {
       return;
     }
+    // Activation reads the RAW committed row (the focus projection strips the
+    // intent fields): re-sync the key map for the current frame first (the
+    // frame did not change between the focus event and this activation).
+    syncDockRawByKey();
     // The creation dock owns the router in creation mode (the legacy
     // creation_dock.js keyboard journey): submenu opens, preset-card saves,
     // confirmation dispatches, and cancel pops one level.
@@ -908,31 +933,47 @@ export const useElosernStore = defineStore("elosern", () => {
     }
   }
 
-  // D4: the focus menu is rebuilt only when the committed `context_actions`
-  // content changes (stable-stringified comparison against the signature of
-  // the last built menu — a store-local signature, NOT the stale previous
-  // view, which would re-trigger the rebuild through the router's focus
-  // events and re-enter publishView forever), preserving the component
-  // dock's preserved `action-`/`target-` item keys as the single key
-  // contract.
-  let lastMenuSig = null;
-  // H3: the committed suggestions block signature (OptionCards.
-  // suggestionsSignature). A suggestions-only update (the AI proposal set
-  // changed but the panel structure did not) replaces the open suggestions
-  // frame in place instead of re-homing the whole dock.
-  let lastSuggSig = null;
   // The committed `services` panel signature: a replacement (a reconnect
   // resync) discards the unsubmitted client-local quantity form.
   let lastServicesSig = null;
   // H5 (tasks 7.5/7.8): re-apply the persisted presentation preferences at
-  // load. Placed after every `let` signature variable that `publishView`
-  // touches (lastMenuSig / lastSuggSig / lastServicesSig) and after `view`,
-  // so the init-time `publishView` cannot hit a temporal-dead-zone.
+  // load (placed after the signature variables `publishView` touches so the
+  // init-time `publishView` cannot hit a temporal-dead-zone).
   loadPresentationPreferences();
-  // G1 re-home: repopulate the root frame from the committed `context_actions`
-  // panel after a menu-less `router.reset()` emptied the stack. Called by the
-  // wrapped `router.reset` (synchronous) and by `rebuildFocusMenu`'s re-home
-  // path (the commit-driven safety net).
+
+  // ---------------------------------------------------------------- frames
+  //
+  // webclient-declarative-frame-stack: the exploration dock's frames are
+  // DECLARATIVE. A push stores only a `{source, params}` descriptor; every
+  // read of the frame resolves through the injected registry seam at access
+  // time, so a committed push ALWAYS reaches an open submenu — the copy-based
+  // `rebuildFocusMenu`/`lastMenuSig`/`lastSuggSig` signature machinery is
+  // deleted. Combat/creation keep the transitional legacy frame shape (a
+  // frozen copy + their preserved signature gates) until
+  // webclient-services-combat-creation-frames migrates them; `rehomeFrame`
+  // and the `router.reset` fuse stay for exactly those surfaces.
+
+  // The exploration-family push map: a root `openSubmenu` key or submenu frame
+  // title -> the descriptor of its declarative frame. The map is the ONE
+  // place naming exploration frame sources; the frame content itself comes
+  // only from the resolver.
+  const EXPLORATION_SUBMENU_PUSHES = {
+    move: { source: "exploration.move", params: {} },
+    look: { source: "exploration.look", params: {} },
+    interact: { source: "exploration.interact", params: {} },
+    wait: { source: "exploration.wait", params: {} },
+    suggestions: { source: "exploration.suggestions", params: {} },
+  };
+  // The suggestions frame leaves the WHOLE stack when its envelope commits
+  // `unavailable` (the options-surface no-pane rule): exit to the root
+  // without a reason row. Every other exploration submenu pops one level.
+  const UNRESOLVABLE_ACTION = { "exploration.suggestions": "root" };
+
+  // G1 re-home (transitional): repopulate the root frame after a menu-less
+  // `router.reset()` emptied the stack. Exploration re-homes the declarative
+  // root descriptor; the unmigrated combat/creation families keep the legacy
+  // root copy. Called by the wrapped `router.reset` (synchronous) and by the
+  // combat signature gate's re-home path (the commit-driven safety net).
   function rehomeFrame(rs) {
     const panel = (rs.panels && rs.panels.context_actions) || null;
     if (panel && panel.kind === "combat") {
@@ -940,7 +981,7 @@ export const useElosernStore = defineStore("elosern", () => {
         ? { skillKey: combat.focusSkillKey, page: combat.page || 0, skillByKey: combat.skillByKey }
         : {};
       combat = CombatMenu.rebuildForPanel(combat, panel, previous);
-      lastMenuSig = stableStringify(combat.menus.root.items);
+      combatRootSig = stableStringify(combat.menus.root.items);
       router.replaceMenu({
         items: combat.menus.root.items,
         grid: true,
@@ -949,150 +990,119 @@ export const useElosernStore = defineStore("elosern", () => {
       });
       return;
     }
-    // Exploration mode: the stable hierarchical root (Move/Look/Interact/
-    // Character/Quests/Inventory/Wait) is composed only from the validated
-    // `exploration` panel (G2: the dock renders the hierarchical root, never a
-    // flat affordance list). Submenus (move exits, look targets, interact
-    // targets, wait dayparts) are separate router frames.
-    const explorationPanel = (rs.panels && rs.panels.exploration) || {};
-    const currentNode = (rs.panels.local_map && rs.panels.local_map.current_node) || null;
-    const suggestions = (panel && panel.suggestions) || null;
-    const model = ExplorationMenu.buildMenus(explorationPanel, { currentNode, suggestions });
-    const root = model.menus.root;
-    // H3: the structural signature excludes the volatile suggestions row —
-    // a suggestions-only change must not re-home the whole dock.
-    lastMenuSig = stableStringify(root.items.filter((it) => it.key !== "suggestions"));
-    lastSuggSig = OptionCards.suggestionsSignature(suggestions);
-    // Leaving combat mode: the exploration root frame owns the keyboard
-    // router now.
+    // Creation mode: the preserved legacy dock owns the root frame; the
+    // router copy is rebuilt from the committed creation menus.
+    if (rs.mode === "creation" && creation && creation.menus) {
+      router.replaceMenu(creation.menus.menus.root);
+      return;
+    }
+    // Exploration mode: the declarative root descriptor. Resolution happens
+    // at access time inside the router — never a copy here.
     combat = null;
-    if (root.items.length === 0) {
-      if (router.depth() > 0) {
-        // A committed panel without focusable items clears the frame stack
-        // (the wrapped reset re-homes synchronously; the depth guard keeps
-        // the re-home from recursing).
-        router.reset();
-      }
-      return;
-    }
-    dockRawByKey = {};
-    const items = root.items.map((raw) => {
-      const item = KeyboardRouter.menuItem(raw.label, raw.enabled !== false, disabledReasonText(raw));
-      item.key = raw.key;
-      item.openSubmenu = raw.openSubmenu || null;
-      item.openCharacter = !!raw.openCharacter;
-      item.openServiceSubmenu = raw.openServiceSubmenu || null;
-      // Client-local drawer-open rows (make-inventory-drawer-frameless):
-      // activation opens the named reference drawer without touching the
-      // router (the frameless `openCharacter` precedent).
-      item.openDrawer = raw.openDrawer || null;
-      item.actionId = raw.actionId || null;
-      item.payload = raw.payload || null;
-       dockRawByKey[raw.key] = raw;
-       return item;
-     });
-     router.replaceMenu({ items, grid: true, gridCols: root.gridCols, title: root.title || "探索" });
-   }
-
-  function rebuildFocusMenu(prev, rs) {
-    const panel = (rs.panels && rs.panels.context_actions) || null;
-    const kind = (panel && panel.kind) || null;
-    if (kind === "combat") {
-      // The combat keyboard hierarchy (root/skills/forfeit menus) is built by
-      // the preserved CombatMenu model; selection state (skill/scale/target)
-      // is rebuilt deterministically across a panel replacement. The signature
-      // guard is essential: without it, replaceMenu -> notifyFocus ->
-      // publishView -> rebuildFocusMenu would recurse (replaceMenu resets
-      // focus, which re-enters publishView).
-      const previous = combat
-        ? {
-            skillKey: combat.focusSkillKey,
-            page: combat.page || 0,
-            skillByKey: combat.skillByKey,
-          }
-        : {};
-      const probe = CombatMenu.buildMenus(panel, { skillKey: previous.skillKey, page: previous.page || 0 });
-      const sig = stableStringify(probe.menus.root.items);
-      const rehomeNeeded = router.depth() === 0;
-      if (sig === lastMenuSig && !rehomeNeeded) {
-        // Panel unchanged and the router frame is alive: keep the existing
-        // combat tree so the in-progress client-local selection state
-        // (chosen skill, 威力 scale, AREA shorthand/candidates) set by the
-        // keyboard flow survives publishView cycles. Only a genuine panel
-        // replacement — or a router reset (depth 0, the test helper's
-        // `router.reset()` re-home) — rebuilds.
-        return;
-      }
-      lastMenuSig = sig;
-      rehomeFrame(rs);
-      return;
-    }
-    // Exploration mode: the menu frame's content is the validated `exploration`
-    // panel (G2 hierarchical root). Any change to the committed exploration
-    // panel resets the router focus to the first root item, while an identical
-    // re-commit preserves the focus position.
-    const explorationPanel = (rs.panels && rs.panels.exploration) || {};
-    const currentNode = (rs.panels.local_map && rs.panels.local_map.current_node) || null;
-    const suggestions = (panel && panel.suggestions) || null;
-    const model = ExplorationMenu.buildMenus(explorationPanel, { currentNode, suggestions });
-    // H3: separate the structural and suggestions signatures. A
-    // suggestions-only change (identical structure, new proposal set) takes
-    // the in-place update path instead of a full re-home.
-    const structSig = stableStringify(model.menus.root.items.filter((it) => it.key !== "suggestions"));
-    const suggSig = OptionCards.suggestionsSignature(suggestions);
-    const rehomeNeeded = router.depth() === 0 && model.menus.root.items.length > 0;
-    const structChanged = structSig !== lastMenuSig;
-    const suggChanged = suggSig !== lastSuggSig;
-    if (!structChanged && !suggChanged && !rehomeNeeded) {
-      return;
-    }
-    if (structChanged || rehomeNeeded) {
-      lastMenuSig = structSig;
-      lastSuggSig = suggSig;
-      rehomeFrame(rs);
-      return;
-    }
-    // Suggestions-only: replace the open suggestions frame in place,
-    // preserving focus deterministically — a card whose action_code + params
-    // survives keeps focus; otherwise the nearest surviving row.
-    lastSuggSig = suggSig;
-    replaceSuggestionsFrameInPlace(suggestions);
+    router.replaceFrame(EXPLORATION_ROOT_DESCRIPTOR, { openerKey: null });
   }
 
-  // H3: the suggestions frame holds the volatile AI proposal set. When only
-  // that set changes, its router frame is replaced in place (the rest of the
-  // dock is untouched) with focus preserved per webclient-options-surface.
-  function replaceSuggestionsFrameInPlace(suggestions) {
-    const currentMenu = router.currentMenu();
-    if (!currentMenu || currentMenu.title !== "建議") {
-      // The suggestions frame is not open (the user navigated elsewhere) —
-      // the next re-home will surface the new suggestions row.
+  // The transitional combat root-frame signature gate (the legacy
+  // `rebuildFocusMenu` combat branch, kept for the unmigrated family): the
+  // combat keyboard hierarchy is built by the preserved CombatMenu model and
+  // its client-local selection state (skill / 威力 scale / AREA candidates)
+  // must survive publishView cycles, so only a genuine panel replacement —
+  // or an emptied stack — rebuilds the root frame. Focus position lives in
+  // the legacy frame itself.
+  let combatRootSig = null;
+  function syncCombatRootFrame(rs) {
+    const panel = (rs.panels && rs.panels.context_actions) || null;
+    if (!panel || panel.kind !== "combat") {
       return;
     }
-    const oldItems = currentMenu.items;
-    const focusedItem = router.currentItem();
-    const focusedIndex = focusedItem ? oldItems.indexOf(focusedItem) : -1;
-    const newMenu = ExplorationMenu.suggestionsMenu(suggestions);
-    let focusKey = null;
-    if (focusedItem && focusedItem.actionId) {
-      const match = newMenu.items.find(
-        (it) => it.actionId === focusedItem.actionId &&
-          stableStringify(it.payload || {}) === stableStringify(focusedItem.payload || {})
-      );
-      if (match) {
-        focusKey = match.key;
+    const previous = combat
+      ? { skillKey: combat.focusSkillKey, page: combat.page || 0, skillByKey: combat.skillByKey }
+      : {};
+    const probe = CombatMenu.buildMenus(panel, { skillKey: previous.skillKey, page: previous.page || 0 });
+    const sig = stableStringify(probe.menus.root.items);
+    const rehomeNeeded = router.depth() === 0;
+    if (sig === combatRootSig && !rehomeNeeded) {
+      return;
+    }
+    combatRootSig = sig;
+    rehomeFrame(rs);
+  }
+
+  // The declarative-frame mutation window (webclient-declarative-frame-stack
+  // D-A): the ONE commit hook for the exploration dock. A committed push
+  // never re-pushes anything — the next access re-resolves. This window only
+  // (a) settles the stack so a degradation pops synchronously at the commit,
+  // (b) discards the sub-dock the frame stack no longer hosts, and (c) keeps
+  // `dockRawByKey` pointed at the current frame's raw rows (deleted together
+  // with the legacy families by the follow-up change).
+  function settleFrameStack(rs) {
+    if (inStackMutation || rs.mode !== "exploration") {
+      return;
+    }
+    if (router.depth() === 0) {
+      // The G1 fuse path: an emptied stack re-homes the root frame.
+      rehomeFrame(rs);
+      return;
+    }
+    const depthBefore = router.depth();
+    inStackMutation = true;
+    let descriptor = null;
+    try {
+      router.depth(); // access-time settle: pops/cascades/degrades, zero timers
+      descriptor = router.currentDescriptor();
+    } finally {
+      inStackMutation = false;
+    }
+    // A settle cascade that popped the sub-dock's own frame leaves the root —
+    // no frame the sub-dock hosts any more, so the drawer closes with it. A
+    // root that merely re-resolved (or degraded in place) does NOT touch the
+    // sub-dock: the character/services sub-docks legitimately host the root
+    // frame, which is present in every commit by construction.
+    if (
+      activeSubDock.value &&
+      depthBefore > router.depth() &&
+      (!descriptor || descriptor.source === "exploration.root")
+    ) {
+      setActiveSubDock(null);
+    }
+    syncDockRawByKey();
+  }
+
+  // One declarative exploration push: the store mutation window covers the
+  // push itself (the push-time resolve focuses the first item; an
+  // immediately-unresolvable push settles per its policy before the focus
+  // event reaches the store). `openerKey` is the activated row's key so a
+  // later degradation restores focus to it.
+  function pushExplorationFrame(descriptor, openerKey) {
+    inStackMutation = true;
+    try {
+      router.pushFrame(descriptor, {
+        openerKey: openerKey === undefined ? null : openerKey,
+        // The suggestions status split: `unavailable` exits the whole stack
+        // to the root (the no-pane rule); every other submenu pops one level.
+        unresolvableAction: UNRESOLVABLE_ACTION[descriptor.source] || "pop",
+      });
+    } finally {
+      inStackMutation = false;
+    }
+    syncDockRawByKey();
+  }
+
+  // The focus-event window: `dockRawByKey` follows the current frame's raw
+  // rows (the router's focus projection strips the server intent fields, so
+  // activation reads them back by key). Never inside the mutation window —
+  // the focus emit during a settle cascade must not nest a second read.
+  function syncDockRawByKey() {
+    if (inStackMutation) {
+      return;
+    }
+    const menu = router.currentMenu();
+    const raws = menu ? menu.items : [];
+    dockRawByKey = {};
+    for (const raw of raws) {
+      if (raw && raw.key) {
+        dockRawByKey[raw.key] = raw;
       }
-    }
-    if (!focusKey) {
-      const idx = focusedIndex >= 0 && focusedIndex < newMenu.items.length ? focusedIndex : 0;
-      const item = newMenu.items[idx];
-      focusKey = item ? item.key : null;
-    }
-    // replaceMenu resets focus (and re-enters publishView, guarded by the
-    // updated signatures); then restore the deterministic focus key.
-    router.replaceMenu(newMenu);
-    if (focusKey) {
-      router.focusItemByKey(focusKey);
     }
   }
 
@@ -1152,14 +1162,6 @@ export const useElosernStore = defineStore("elosern", () => {
     if (rs.mode !== "exploration") {
       return false;
     }
-    const explorationPanel = (rs.panels && rs.panels.exploration) || {};
-    const currentNode = (rs.panels.local_map && rs.panels.local_map.current_node) || null;
-    // H3: the suggestions root row (openSubmenu "suggestions") resolves only
-    // when the committed suggestions envelope is passed to the builder.
-    const contextActions = (rs.panels && rs.panels.context_actions) || null;
-    const suggestions = (contextActions && contextActions.suggestions) || null;
-    const model = ExplorationMenu.buildMenus(explorationPanel, { currentNode, suggestions });
-    const menus = model.menus;
     // A client-local drawer-open row (the frameless 背包 row, the
     // `openCharacter` precedent): open the drawer without pushing a frame,
     // switching the sub-dock, or recording a service surface.
@@ -1167,15 +1169,11 @@ export const useElosernStore = defineStore("elosern", () => {
       openHudDrawer("inventory");
       return true;
     }
-    if (item.openSubmenu && menus[item.openSubmenu]) {
-      const submenu = menus[item.openSubmenu];
-      router.pushMenu(submenu);
-      dockRawByKey = {};
-      (submenu.items || []).forEach((raw) => {
-        if (raw && raw.key) {
-          dockRawByKey[raw.key] = raw;
-        }
-      });
+    if (item.openSubmenu && EXPLORATION_SUBMENU_PUSHES[item.openSubmenu]) {
+      // Declarative push (webclient-declarative-frame-stack): the frame is
+      // ONLY the descriptor — the submenu content resolves at access time,
+      // so a later commit reaches this open frame without any re-push.
+      pushExplorationFrame(EXPLORATION_SUBMENU_PUSHES[item.openSubmenu], item.key);
       publishView();
       return true;
     }
@@ -1215,58 +1213,39 @@ export const useElosernStore = defineStore("elosern", () => {
       }
       return true;
     }
-    // A back row returns to the parent menu: pop exactly one router level and
-    // re-sync the dock to the parent frame's cells.
+    // A back row returns to the parent menu: pop exactly one router level
+    // (the parent's focus key is its own frame state; the copy-driven dock
+    // re-sync is gone — the parent frame re-resolves on the next read).
     if (item.goBack) {
-      router.popMenu();
-      const menu = router.currentMenu();
-      dockRawByKey = {};
-      if (menu && Array.isArray(menu.items)) {
-        menu.items.forEach((raw) => {
-          if (raw && raw.key) {
-            dockRawByKey[raw.key] = raw;
-          }
-        });
+      inStackMutation = true;
+      try {
+        router.popMenu();
+      } finally {
+        inStackMutation = false;
       }
+      syncDockRawByKey();
       publishView();
       return true;
     }
-    // An interact target row: record the selected identity (client-local) and
-    // push that target's server-authored affordance menu (scripted keywords,
-    // free-form dialogue, party, engage).
+    // An interact target row: push the target's declarative affordance frame.
+    // The subject travels as the descriptor's `{identity}` — the SAME
+    // server-authored identity the row carries — so the open frame follows
+    // the committed panel (identity loss pops it; no client-local copy of
+    // the selection is kept for exploration surfaces).
     if (item.openTarget != null) {
-      const identity = item.openTarget;
-      lastTarget = String(identity);
-      const target = ExplorationMenu.targetById(model, identity);
-      const targetMenu = ExplorationMenu.targetMenuFor(model, target);
-      if (targetMenu) {
-        router.pushMenu(targetMenu);
-        dockRawByKey = {};
-        (targetMenu.items || []).forEach((raw) => {
-          if (raw && raw.key) {
-            dockRawByKey[raw.key] = raw;
-          }
-        });
-      }
+      pushExplorationFrame({ source: "exploration.target", params: { identity: item.openTarget } }, item.key);
       publishView();
       return true;
     }
-    // The "talk-scripted" item opens the scripted-keyword menu for the focused
-    // target (G2: finite keyword buttons, not free text). The selected target
-    // identity is client-local in `lastTarget`; look its descriptor up from the
-    // committed exploration panel to build the bounded keyword buttons.
+    // The "talk-scripted" item opens the scripted-keyword menu for the target
+    // of the CURRENT frame (G2: finite keyword buttons, not free text). The
+    // identity comes from the open target frame's descriptor — one source,
+    // never a second client-local selection.
     if (item.openKeywords) {
-      const target = lastTarget ? ExplorationMenu.targetById(model, Number(lastTarget)) : null;
-      const scripted = target ? ExplorationMenu.scriptedAffordanceFor(target) : null;
-      const keywordMenu = target ? ExplorationMenu.keywordMenuFor(model, target, scripted) : null;
-      if (keywordMenu) {
-        router.pushMenu(keywordMenu);
-        dockRawByKey = {};
-        (keywordMenu.items || []).forEach((raw) => {
-          if (raw && raw.key) {
-            dockRawByKey[raw.key] = raw;
-          }
-        });
+      const current = router.currentDescriptor();
+      const identity = current && current.params ? current.params.identity : null;
+      if (identity !== null && identity !== undefined) {
+        pushExplorationFrame({ source: "exploration.keywords", params: { identity } }, item.key);
       }
       publishView();
       return true;
@@ -1572,6 +1551,15 @@ export const useElosernStore = defineStore("elosern", () => {
    // frame's rows; leaving the surface closes the drawer. The status drawer's
    // payload is available in every mode, so it stays openable in combat.
    function syncHudDrawer(prev, rs) {
+      // Re-entrancy guard: a router stack mutation emits `focus`, which
+      // re-enters `publishView`. The old signature gates stopped that loop
+      // for the copy path; with declarative frames the guard is explicit —
+      // the outer mutation already applied the teardown, a nested pass must
+      // mutate nothing (the legacy copy families' rebuilds were exactly the
+      // recursion the old `lastMenuSig` existed to break).
+      if (inStackMutation) {
+        return;
+      }
       const modeChanged = !!prev && prev.mode !== rs.mode;
       const epochChanged = !!prev && prev.epoch !== rs.activeEpoch;
       const transportLost = !!prev && prev.connected && !rs.connected;
@@ -1600,6 +1588,39 @@ export const useElosernStore = defineStore("elosern", () => {
           hudOverlayOpener.value = null;
         }
         setServiceSurface(null);
+        // Teardown (webclient-declarative-frame-stack D-E): every event above
+        // yields EXACTLY one root frame — the declarative exploration root,
+        // or the preserved legacy root copy while combat/creation own the
+        // router (their families migrate in the follow-up change). The mode
+        // the teardown targets may not have its panel committed yet; the
+        // next commit rebuilds the copy (creation) or re-resolves (the
+        // declarative root degrades to the marker-reason row until the
+        // panel arrives, then recovers).
+        inStackMutation = true;
+        try {
+          if (rs.mode === "exploration") {
+            router.resetFrame(EXPLORATION_ROOT_DESCRIPTOR, { openerKey: null });
+          } else if (rs.mode === "creation" && creation && creation.menus) {
+            router.reset(creation.menus.menus.root);
+          } else {
+            const teardownPanel = (rs.panels && rs.panels.context_actions) || null;
+            if (teardownPanel && teardownPanel.kind === "combat") {
+              combat = CombatMenu.rebuildForPanel(combat, teardownPanel, {});
+              combatRootSig = stableStringify(combat.menus.root.items);
+              router.reset({
+                items: combat.menus.root.items,
+                grid: true,
+                gridCols: combat.menus.root.gridCols,
+                title: combat.menus.root.title || "戰鬥",
+              });
+            } else {
+              router.reset();
+            }
+          }
+        } finally {
+          inStackMutation = false;
+        }
+        syncDockRawByKey();
         return;
       }
 
@@ -1721,8 +1742,14 @@ export const useElosernStore = defineStore("elosern", () => {
        combatMenu: router.currentMenu(),
        // H3 (task 3.2): the root frame's menu — the dock's tab bar renders
        // the root frame's items while the pane follows the current frame,
-       // both from one commit.
+       // both from one commit. Null while the root is degraded: the marker
+       // row is pane content (below), never a tab (the router keeps it out
+       // of `rootMenu` for exactly this reason).
        rootMenu: router.rootMenu(),
+       // The degraded-root presentation (webclient-frame-resolution): the
+       // single disabled marker-reason row the pane host renders while the
+       // root frame itself is unresolvable; null in every normal state.
+       degradedRoot: router.degradedRoot(),
        // The keyboard router's menu depth (1 = the root frame, 2+ = a submenu
        // frame is active). The action dock's detail pane renders only at
        // depth 2+ (or in combat mode), not at the exploration root.
@@ -1793,10 +1820,12 @@ export const useElosernStore = defineStore("elosern", () => {
     handleTransportLifecycle(prev, rs);
     handleActionResult(rs);
     releaseIfReady(rs);
-    rebuildFocusMenu(prev, rs);
+    syncCombatRootFrame(rs);
     rebuildCreationDock(prev, rs);
     syncRouterGates();
     syncHudDrawer(prev, rs);
+    settleFrameStack(rs);
+    syncDockRawByKey();
     view.value = buildView(prev, rs);
   }
 
