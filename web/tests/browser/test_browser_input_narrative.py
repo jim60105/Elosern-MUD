@@ -390,12 +390,21 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     def test_slash_while_the_rest_form_is_open_never_toggles_the_command_line(self):
         page = self.logged_in_page()
         # Open the rest form (Wait/休息 → 休息一段時間).
+        # Navigate to the Wait/休息 tab by the store's committed focus KEY,
+        # not by cell arithmetic: the declarative root's tab set is
+        # capability-driven (H3 design D5 appends the 建議 tab when the
+        # suggestions envelope is not `unavailable`), so the wait cell is
+        # no longer guaranteed to be last.
         focus_action_dock(page)
-        cell_count = page.evaluate(
-            "document.querySelectorAll('#action-dock [data-item-key]').length"
-        )
-        for _ in range(cell_count - 1):
+        for _ in range(10):
+            focused = page.evaluate(
+                "() => window.__elosernBridge.store.view.focus.key"
+            )
+            if focused == "wait":
+                break
             _press(page, "ArrowRight")
+        else:
+            raise AssertionError("the wait tab never reached focus")
         _press(page, "Enter")  # Wait/休息
         _press(page, "ArrowDown")  # 等待至正午
         _press(page, "ArrowDown")  # 休息一段時間

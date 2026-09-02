@@ -621,14 +621,21 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     def test_open_rest_form_never_swallows_command_line_enter(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        # The Wait/休息 entry is always the last root cell (5-7 cells
-        # depending on quest/inventory capability availability).
+        # Navigate to the Wait/休息 tab by the store's committed focus KEY,
+        # not by cell arithmetic: the declarative root's tab set is
+        # capability-driven (H3 design D5 appends the 建議 tab when the
+        # suggestions envelope is not `unavailable`), so the wait cell is
+        # no longer guaranteed to be last.
         focus_action_dock(page)
-        cell_count = page.evaluate(
-            "document.querySelectorAll('#action-dock [data-item-key]').length"
-        )
-        for _ in range(cell_count - 1):
+        for _ in range(10):
+            focused = page.evaluate(
+                "() => window.__elosernBridge.store.view.focus.key"
+            )
+            if focused == "wait":
+                break
             page.keyboard.press("ArrowRight")
+        else:
+            raise AssertionError("the wait tab never reached focus")
         page.keyboard.press("Enter")  # Wait/休息
         page.keyboard.press("ArrowDown")  # 等待至正午
         page.keyboard.press("ArrowDown")  # 休息一段時間
@@ -755,11 +762,12 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             for keyword in ("方向鍵選擇", "Enter 確認", "Esc 返回", "/ 聚焦指令列"):
                 self.assertIn(keyword, description)
             # The root is now the tab bar (H3): one row of tabs (the root
-            # frame's items as tabs). The tab count varies 5-7 with
-            # quest/inventory capability availability.
+            # frame's items as tabs). The tab count varies 5-8 with
+            # quest/inventory capability availability (H3 design D5 adds the
+            # 建議 tab whenever the suggestions envelope is not `unavailable`).
             cells = page.locator("#action-dock [data-item-key]")
             self.assertGreaterEqual(cells.count(), 5)
-            self.assertLessEqual(cells.count(), 7)
+            self.assertLessEqual(cells.count(), 8)
             # The open/focused tab carries the seal-red gradient fill (the
             # `--on` class), and its leading glyph is an SVG icon.
             focused = page.locator("#action-dock .dock-tab-bar__tab--on").first
