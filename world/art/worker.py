@@ -39,6 +39,8 @@ from world.art.queue import (
 from world.art.sd_worker import SDError, resolve_sd_client
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind, parse_subject
+from world.observability import log_error, log_info, log_warn
+from world.observability.sanitize import safe_endpoint
 from world.prompts.loader import PromptLibraryError
 
 _LEASE_MARGIN_SECONDS = 5
@@ -92,7 +94,7 @@ def _resolved_under_root(path: Path) -> Path | None:
     """Return the symlink-resolved path if it stays inside the store root."""
     try:
         resolved = path.resolve()
-    except OSError:
+    except OSError:  # observability: ignore R2: confinement probe; None result is the caller's bounded-failure signal
         return None
     root = _store_root().resolve()
     if resolved == root or root not in resolved.parents:
@@ -126,7 +128,7 @@ def _write_temp(identity: str, png_bytes: bytes) -> str:
     except BaseException:
         try:
             os.unlink(tmp_path)
-        except OSError:
+        except OSError:  # observability: ignore R2: best-effort temp cleanup; the original error propagates below
             pass
         raise
     return tmp_path
@@ -184,20 +186,40 @@ def _settle_one(
         identity = expected_output_identity(subject)
         tmp_path = _write_temp(identity, encoded)
     except SDError as error:
+        log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": error.code}, exc=error)
         return ArtAssetStatus.FAILED, None, error.code, False
-    except PromptLibraryError:
+    except PromptLibraryError as error:
+        log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": "sd_prompt_error"}, exc=error)
         return ArtAssetStatus.FAILED, None, "sd_prompt_error", False
-    except WorkerStoreError:
+    except WorkerStoreError as error:
+        log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": "worker_output_out_of_root"}, exc=error)
         return ArtAssetStatus.FAILED, None, "worker_output_out_of_root", False
-    except Exception:
+    except Exception as error:
+        log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": "sd_internal_error"}, exc=error)
         return ArtAssetStatus.FAILED, None, "sd_internal_error", False
-    committed = settle_generated(
-        subject,
-        generation_token=generation_token,
-        output_identity=identity,
-        tmp_path=tmp_path,
-        seed=image.seed,
-    )
+    try:
+        committed = settle_generated(
+            subject,
+            generation_token=generation_token,
+            output_identity=identity,
+            tmp_path=tmp_path,
+            seed=image.seed,
+        )
+    except Exception as error:  # noqa: BLE001 - a publication failure is a terminal per-record failure, never a batch abort
+        # A non-stale claim whose atomic publication failed must still reach
+        # a terminal settle (the batch settles FAILED with the prior output
+        # retained); letting this escape would strand the record
+        # ``in_progress`` and skip every later record in the batch.
+        log_warn(
+            "sd_generation_error",
+            context={
+                "endpoint": _sd_endpoint(),
+                "code": "sd_internal_error",
+                "stage": "publication",
+            },
+            exc=error,
+        )
+        return ArtAssetStatus.FAILED, None, "sd_internal_error", False
     if committed is None:
         return None
     _record, prior_identity = committed
@@ -215,18 +237,44 @@ def _cleanup_prior_output(identity: str) -> None:
     unreferenced orphan (cleaned by the next regeneration) and NEVER reverts
     the committed transition.
     """
-    from evennia import logger
-
     path = _store_root() / identity
     if _resolved_under_root(path) is None:
         return
     try:
         path.unlink(missing_ok=True)
     except OSError as error:
-        logger.log_warn(
-            f"art cleanup_failed: could not delete stale-format output "
-            f"{identity!r} after a format change: {error}"
-        )
+        log_warn("art_cleanup_failed", context={"identity": identity}, exc=error)
+
+
+def _sd_endpoint() -> str:
+    """The configured sd-webui endpoint identity, credential-free.
+
+    Log-only: configured URLs may embed ``user:password@`` or query
+    secrets, so the identity is sanitized at the source before any
+    event context can carry it.
+    """
+    return safe_endpoint(settings.ART_SD_BASE_URL)
+
+
+def _log_claim(record: ArtAssetRecord) -> None:
+    """One boundary event per actually-claimed record."""
+    subject = subject_for(record)
+    log_info("sd_job_claim", context={"job": record.db_key, "subject": subject.full()})
+
+
+def _log_settled(
+    record: ArtAssetRecord, subject: ArtSubject, status: str, reason: str
+) -> None:
+    """One boundary event per record whose terminal settle was applied."""
+    log_info(
+        "sd_job_settled",
+        context={
+            "job": record.db_key,
+            "subject": subject.full(),
+            "status": status,
+            "reason": reason,
+        },
+    )
 
 
 def _run_and_settle_batch(records: list[ArtAssetRecord]) -> list[ArtSubject]:
@@ -243,20 +291,26 @@ def _run_and_settle_batch(records: list[ArtAssetRecord]) -> list[ArtSubject]:
     result whose claim was requeued or reclaimed is excluded, so the completion
     notification is emitted only for a result that is truly the current record.
     """
-    subjects = [subject_for(record) for record in records]
+    pairs = [(record, subject_for(record)) for record in records]
     try:
         client = resolve_sd_client()
-    except Exception:
-        _fail_batch(subjects, "sd_client_config_error")
+    except Exception as error:
+        log_error(
+            "sd_client_config_failed",
+            context={"endpoint": _sd_endpoint(), "code": "sd_client_config_error"},
+            exc=error,
+        )
+        _fail_batch(pairs, "sd_client_config_error")
         return []
     settled: list[ArtSubject] = []
-    for subject, record in zip(subjects, records):
+    for record, subject in pairs:
         outcome = _settle_one(client, record)
         if outcome is None:
             continue
         status, identity, error, already_settled = outcome
         if already_settled:
             settled.append(subject)
+            _log_settled(record, subject, status, "generated")
             continue
         if (
             settle(
@@ -268,17 +322,27 @@ def _run_and_settle_batch(records: list[ArtAssetRecord]) -> list[ArtSubject]:
             is not None
         ):
             settled.append(subject)
+            _log_settled(record, subject, status, str(error))
     return settled
 
 
-def _fail_batch(subjects: list[ArtSubject], error: str) -> None:
-    for subject in subjects:
-        settle(
-            subject,
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error=error,
-        )
+def _fail_batch(pairs: list[tuple[ArtAssetRecord, ArtSubject]], error: str) -> None:
+    """Settle every claimed record ``failed``; event only when applied.
+
+    A stale record (requeued or reclaimed mid-flight) settles to a no-op
+    (``settle`` returns ``None``) and must not fabricate a settle event.
+    """
+    for record, subject in pairs:
+        if (
+            settle(
+                subject,
+                status=ArtAssetStatus.FAILED,
+                output_identity=None,
+                error=error,
+            )
+            is not None
+        ):
+            _log_settled(record, subject, ArtAssetStatus.FAILED, error)
 
 
 def _lease_timeout() -> float:
@@ -327,13 +391,20 @@ def drain(limit: int) -> int:
         return 0
     try:
         reclaim_expired_leases(_lease_timeout())
-        records = claim(limit)
     except Exception:
         _release_worker_slot()
+        raise
+    try:
+        records = claim(limit)
+    except Exception as error:
+        _release_worker_slot()
+        log_error("sd_job_claim_failed", context={"endpoint": _sd_endpoint()}, exc=error)
         raise
     if not records:
         _release_worker_slot()
         return 0
+    for record in records:
+        _log_claim(record)
     deferred = threads.deferToThread(_run_and_release_slot, records)
     # The success callback runs on the reactor thread, so the completion
     # notification is never emitted from the worker generation thread.
@@ -360,9 +431,21 @@ def drain_synchronous(limit: int) -> int:
         return 0
     try:
         reclaim_expired_leases(_lease_timeout())
+    except Exception:
+        _release_worker_slot()
+        raise
+    try:
         records = claim(limit)
-        if not records:
-            return 0
+    except Exception as error:
+        _release_worker_slot()
+        log_error("sd_job_claim_failed", context={"endpoint": _sd_endpoint()}, exc=error)
+        raise
+    if not records:
+        _release_worker_slot()
+        return 0
+    try:
+        for record in records:
+            _log_claim(record)
         settled = _run_and_settle_batch(records)
         _notify_completed_batch(settled)
         return len(records)
@@ -371,7 +454,5 @@ def drain_synchronous(limit: int) -> int:
 
 
 def _log_drain_failure(failure) -> None:
-    from evennia import logger
-
-    logger.log_err(f"art drain failed: {failure.getTraceback()}")
+    log_error("art_drain_failed", context={"exc_type": type(failure.value).__name__}, exc=failure.value)
     return None

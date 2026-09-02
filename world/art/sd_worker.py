@@ -29,8 +29,6 @@ import base64
 import binascii
 from collections.abc import Callable
 from dataclasses import dataclass
-from django.conf import settings
-from evennia import logger
 import hashlib
 import http.client
 import importlib
@@ -41,6 +39,11 @@ import threading
 import time
 import urllib.parse
 from typing import Any
+
+from django.conf import settings
+
+from world.observability import log_info, log_warn
+from world.observability.sanitize import safe_endpoint
 
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.prompts.loader import render_prompt
@@ -327,7 +330,7 @@ def _read_body_capped(response, connection, deadline: float) -> bytes:
         if sock is not None:
             try:
                 sock.settimeout(remaining)
-            except OSError:
+            except OSError:  # observability: ignore R2: deadline nudge is best-effort; the request deadline still bounds the read
                 pass
         chunk = response.read(_READ_CHUNK_BYTES)
         if not chunk:
@@ -472,7 +475,7 @@ def _parse_seed(response: dict[str, Any]) -> int | None:
     if isinstance(info, str):
         try:
             info = json.loads(info)
-        except ValueError:
+        except ValueError:  # observability: ignore R2: unparseable seed info -> None seed; the image itself remains valid
             return None
     if not isinstance(info, dict):
         return None
@@ -513,13 +516,17 @@ def maybe_prepin_samples_format() -> None:
             json.dumps({"samples_format": "png"}).encode("utf-8"),
         )
         if result.get("samples_format") != "png":
-            logger.log_warn(
-                "art sd-webui: samples_format pre-pin was not confirmed by the server"
+            log_warn(
+                "sd_prepin_unconfirmed",
+                context={
+                    "endpoint": safe_endpoint(_base_url()),
+                    "samples_format": result.get("samples_format"),
+                },
             )
         else:
-            logger.log_info("art sd-webui: pinned samples_format to png on the server")
+            log_info("sd_prepin_pinned", context={"endpoint": safe_endpoint(_base_url())})
     except Exception as error:  # noqa: BLE001 - the pre-pin never fails a job
-        logger.log_warn(f"art sd-webui: samples_format pre-pin failed: {error}")
+        log_warn("sd_prepin_failed", context={"endpoint": safe_endpoint(_base_url())}, exc=error)
 
 
 def resolve_sd_client() -> SDWebUIClient:

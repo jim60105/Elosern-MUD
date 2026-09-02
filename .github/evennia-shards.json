@@ -164,9 +164,7 @@
         "world.art",
         "world.ai",
         "world.onboarding",
-        "world.lore",
-        "world.ai.tests.test_ai_observability",
-        "world.art.tests.test_art_observability"
+        "world.lore"
       ]
     },
     {

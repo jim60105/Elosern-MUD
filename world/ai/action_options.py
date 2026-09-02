@@ -1162,11 +1162,11 @@ def _evaluate_enriched(
     """
     try:
         payload = parse_action_options_payload(parsed)
-    except OptionsValidationError as exc:
+    except OptionsValidationError as exc:  # observability: ignore R2: error becomes the retry-feedback message, not a log
         return None, [_stage_message(exc.code)]
     try:
         resolved = _resolve_freeform_bindings(payload, npc_bindings)
-    except ActionOptionsBindingError as exc:
+    except ActionOptionsBindingError as exc:  # observability: ignore R2: error becomes the retry-feedback message, not a log
         return None, [str(exc)]
     try:
         optionset = validate_optionset(
@@ -1175,9 +1175,9 @@ def _evaluate_enriched(
             affordances=affordances,
             leak_blocklist=leak_blocklist,
         )
-    except OptionsValidationError as exc:
+    except OptionsValidationError as exc:  # observability: ignore R2: error becomes the retry-feedback message, not a log
         return None, [_stage_message(exc.code)]
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError) as exc:  # observability: ignore R2: error becomes the bounded internal-error feedback message
         return None, [f"internal error: {type(exc).__name__}: {exc}"]
     if len(optionset.cards) < MIN_CARDS:
         return None, [f"generation rule: fewer than {MIN_CARDS} cards proposed"]
@@ -1266,10 +1266,10 @@ def register_action_options() -> None:
 
 
 def _log_bounded_diagnostic(problem: str) -> None:
-    """Log one bounded degrade diagnostic through the evennia logger."""
-    from evennia import logger
+    """Log one bounded degrade diagnostic through the observability facade."""
+    from world.observability import log_warn
 
-    logger.log_warn(f"action_options: {problem}")
+    log_warn("action_options_diagnostic", context={"problem": problem})
 
 
 @defer.inlineCallbacks
@@ -1311,7 +1311,7 @@ def generate_action_options(
     _require_registered()
     try:
         system, user = build_action_options_prompt(context)
-    except (PromptUnavailableError, ActionOptionsInputError) as exc:
+    except (PromptUnavailableError, ActionOptionsInputError) as exc:  # observability: ignore R2: logged via _log_bounded_diagnostic below
         _log_bounded_diagnostic(str(exc))
         return None
     npc_bindings = tuple(entry.npc_id for entry in context.npc_entries)

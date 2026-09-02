@@ -14,7 +14,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field as dataclass_field
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-import logging
 import os
 import re
 from threading import Lock
@@ -23,9 +22,8 @@ from typing import Any, Mapping
 
 import yaml
 
+from world.observability import log_error, log_info, log_warn
 from world.prompts.registry import PROMPT_SPECS, PromptSpec
-
-logger = logging.getLogger(__name__)
 
 # A placeholder is an exact ``{token}`` of a Python identifier that is not
 # adjacent to another brace, so ``{{name}}`` and JSON example braces such as
@@ -47,11 +45,21 @@ class PromptLibraryError(ValueError):
     whatever is known.
     """
 
-    def __init__(self, file: str | None, key: str | None, problem: str):
+    def __init__(
+        self,
+        file: str | None,
+        key: str | None,
+        problem: str,
+        cause: BaseException | None = None,
+    ):
         self.file = file
         self.key = key
         self.problem = problem
         super().__init__(self._message())
+        if cause is not None:
+            # Keep the swallowed OS/YAML failure reachable through the
+            # rendered exception chain (observability requirement).
+            self.__cause__ = cause
 
     def _message(self) -> str:
         location = self.file or "<prompt library>"
@@ -144,7 +152,7 @@ def _prompt_root() -> str:
     """
     try:
         configured = getattr(settings, "PROMPT_ROOT", None)
-    except (ImproperlyConfigured, AttributeError):
+    except (ImproperlyConfigured, AttributeError):  # observability: ignore R2: settings fallback keeps the loader import-safe outside Django
         configured = None
     if configured:
         return configured
@@ -162,10 +170,11 @@ def _record_file_failure(
     file: str,
     spec_keys: list[str],
     problem: str,
+    cause: BaseException | None = None,
 ) -> None:
     """Record the same file-level ``problem`` for every spec key in the file."""
     for key in spec_keys:
-        errors[key] = PromptLibraryError(file, key, problem)
+        errors[key] = PromptLibraryError(file, key, problem, cause=cause)
 
 
 def load_prompt_library(root: str | None = None) -> PromptLibrary:
@@ -199,10 +208,13 @@ def _load(resolved_root: str) -> PromptLibrary:
             root_files = {
                 name for name in os.listdir(resolved_root) if name.endswith(".yaml")
             }
-    except OSError as exc:
+    except OSError as exc:  # observability: ignore R2: failure captured per key; _finish_load events every named error
         for key in PROMPT_SPECS:
             errors[key] = PromptLibraryError(
-                None, key, f"cannot list prompt root {resolved_root}: {exc}"
+                None,
+                key,
+                f"cannot list prompt root {resolved_root}: {exc}",
+                cause=exc,
             )
         return _finish_load(resolved_root, texts, errors)
 
@@ -220,18 +232,23 @@ def _load(resolved_root: str) -> PromptLibrary:
         try:
             with open(os.path.join(resolved_root, file), encoding="utf-8") as handle:
                 raw = yaml.load(handle, Loader=_DuplicateRejectingLoader)
-        except _DuplicateMappingKeyError as exc:
+        except _DuplicateMappingKeyError as exc:  # observability: ignore R2: failure captured per file; _finish_load events every named error
             parse_error = PromptLibraryError(
                 file,
                 None,
                 f"duplicate mapping key {exc.duplicate_key!r} at line {exc.line}",
+                cause=exc,
             )
-        except (yaml.YAMLError, OSError, UnicodeError, TypeError, ValueError) as exc:
-            parse_error = PromptLibraryError(file, None, f"cannot read prompt file: {exc}")
+        except (yaml.YAMLError, OSError, UnicodeError, TypeError, ValueError) as exc:  # observability: ignore R2: failure captured per file; _finish_load events every named error
+            parse_error = PromptLibraryError(
+                file, None, f"cannot read prompt file: {exc}", cause=exc
+            )
 
         if parse_error is not None:
             for key in spec_keys:
-                errors[key] = PromptLibraryError(file, key, parse_error.problem)
+                errors[key] = PromptLibraryError(
+                    file, key, parse_error.problem, cause=parse_error
+                )
             continue
         if not isinstance(raw, Mapping):
             _record_file_failure(errors, file, spec_keys, "prompt file must be a mapping")
@@ -241,9 +258,9 @@ def _load(resolved_root: str) -> PromptLibrary:
                 set(raw) - set(_TOP_LEVEL_KEYS),
                 key=repr,
             )
-        except TypeError as exc:
+        except TypeError as exc:  # observability: ignore R2: failure captured per file; _finish_load events every named error
             _record_file_failure(
-                errors, file, spec_keys, f"unhashable top-level key: {exc}"
+                errors, file, spec_keys, f"unhashable top-level key: {exc}", cause=exc
             )
             continue
         if unknown_top:
@@ -276,7 +293,7 @@ def _load(resolved_root: str) -> PromptLibrary:
                 continue
             try:
                 text = _validate_key(spec, declared)
-            except PromptLibraryError as exc:
+            except PromptLibraryError as exc:  # observability: ignore R2: failure captured per key; _finish_load events every named error
                 errors[spec.key] = exc
                 continue
             if text is None:
@@ -294,18 +311,23 @@ def _finish_load(
     texts: dict[str, str],
     errors: dict[str, PromptLibraryError],
 ) -> PromptLibrary:
-    """Build the frozen library, log every named failure, and install it."""
+    """Build the frozen library, event every named failure, and install it."""
     library = PromptLibrary(root=resolved_root, texts=texts, errors=errors)
     for key, error in sorted(errors.items()):
         if key == "character_creation.system":
-            logger.warning("%s (consuming layer degrades)", error)
+            log_warn(
+                "prompt_load_degraded",
+                context={"key": key, "file": error.file, "reason": str(error)},
+            )
         else:
-            logger.error("%s", error)
-    logger.info(
-        "prompt library loaded: %d/%d keys available from %s",
-        len(texts),
-        len(PROMPT_SPECS),
-        resolved_root,
+            log_error("prompt_load_failed", context={"key": key, "file": error.file, "reason": str(error)}, exc=error)
+    log_info(
+        "prompt_library_loaded",
+        context={
+            "available": len(texts),
+            "total": len(PROMPT_SPECS),
+            "root": resolved_root,
+        },
     )
     global _LIBRARY
     _LIBRARY = library

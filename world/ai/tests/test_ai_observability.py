@@ -135,6 +135,35 @@ class LlmCallEventTests(EvenniaTestCase):
         self.assertEqual(context["result"], "degraded")
         self.assertEqual(context["reason"], "invalid_output")
 
+    def test_raising_fallback_emits_exactly_one_rejected_not_degraded(self):
+        # Exactly-one invariant: the degraded event is written only after the
+        # fallback returned, so a fallback that raises yields ONE rejected
+        # event and the original error propagates (rubber-duck P3 BLOCKER).
+        import world.ai.guardrail as guardrail_module
+
+        class _FallbackBroken(Exception):
+            pass
+
+        def _broken_fallback():
+            raise _FallbackBroken("fallback exploded")
+
+        # setUp registered a working narrator fallback; override the binding
+        # directly (register_degrade_fallback refuses double registration).
+        guardrail_module._degrade_fallbacks["narrator"] = _broken_fallback
+        self.addCleanup(
+            guardrail_module._degrade_fallbacks.clear
+        )
+        client = FakeLLMClient()
+        with override_settings(LLM_PROFILES=_raw(narrator={"enabled": False})):
+            with patch("world.ai.guardrail.log_info") as info:
+                d = guarded_call("narrator", client, _descriptor())
+                result = await_result(d)
+        self.assertTrue(result.check(_FallbackBroken), result)
+        events = self._events(info)
+        self.assertEqual(len(events), 1, events)
+        context = events[0].kwargs["context"]
+        self.assertEqual(context["result"], "rejected")
+
     def test_unexpected_client_error_emits_one_rejected_and_reraises(self):
         class _Boom(Exception):
             pass
