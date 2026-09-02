@@ -34,7 +34,7 @@ When the custom draft carries a non-null persona block, `activate_player_charact
 - **WHEN** a pending character activates with a draft whose persona is null and that has no background
 - **THEN** `entity.db.persona` remains absent and activation behaves exactly as before
 
-### Requirement: The background survives the draft, custom-save, and activation journey
+### Requirement: The background survives the draft, concept, custom-save, and activation journey
 The `background` SHALL be a first-class custom-draft field: `save_custom_draft` validates and stores it, the draft normalizer accepts it with its bound and includes it in the draft fingerprint. Activation SHALL merge the background into the persona record together with any custom-draft persona block — the six import-card keys are written first, then `background` when the draft carries one — inside the same all-or-nothing transaction.
 
 #### Scenario: A background persists through every entry order
