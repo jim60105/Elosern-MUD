@@ -82,19 +82,27 @@ The keyboard router SHALL store each frame as `{descriptor, focusKey}` only — 
 
 Mode switch (exploration / combat / creation), presentation epoch reset, transport loss, and no-puppet detach SHALL each replace the whole descriptor stack with exactly one declarative root frame of the new mode — the `exploration.root`, `combat.root`, or `creation.root` descriptor — from the single existing teardown decision point. The stack SHALL never be empty in a live mode, and the wrapped empty-stack reset fuse SHALL no longer exist: an empty-stack read is a programmer error surfaced by the router, not a runtime re-home. Teardown SHALL remain the only event that replaces the whole stack; ordinary commits SHALL never pop or reset frames.
 
-#### Scenario: Combat adoption resets to the combat root descriptor
+#### Scenario: Combat adoption resets to the combat root
 
 - **WHEN** a valid committed snapshot switches the mode from exploration to combat while exploration submenus are open
-- **THEN** the stack holds exactly the `combat.root` descriptor and no exploration row remains activatable
+- **THEN** the stack holds exactly the `combat.root` descriptor, the exploration frames and their focus keys are gone, and no exploration row remains activatable
+
+#### Scenario: Transport loss leaves only the root frame
+
+- **WHEN** the transport is lost while frames are open
+- **THEN** the stack holds only the current mode's root descriptor and no stale activation can dispatch after reconnect without a fresh player action, with the stack non-empty at every observable moment after teardown
+
+#### Scenario: Epoch reset leaves only the root frame
+
+- **WHEN** a new transport generation retires the epoch and a fresh-epoch snapshot establishes the new one while submenus are open
+- **THEN** the stack contains exactly one root descriptor for the new presentation before any player action
+
+#### Scenario: No-puppet detach collapses the stack without a mode change
+
+- **WHEN** a `no_puppet` protocol error detaches the character while exploration submenus are open and neither the mode nor the epoch changes
+- **THEN** the stack collapses to exactly the single root descriptor and no open submenu row remains activatable
 
 #### Scenario: Creation mode tears down to its root descriptor
 
 - **WHEN** the presentation epoch resets while creation-mode frames are open
 - **THEN** the stack holds exactly `creation.root` and no prior-frame payload can dispatch without a fresh player action
-
-#### Scenario: Transport loss leaves only the root descriptor
-
-- **WHEN** the transport is lost while frames are open
-- **THEN** the stack holds only the current mode's root descriptor and the stack is non-empty at every observable moment after teardown
-
-
