@@ -8,8 +8,6 @@ never per-second iteration.
 
 from typing import Any
 
-from evennia.utils.logger import log_warn
-
 from world.rules.clock import CLOCK_YAML, ScheduledEvent, register_event_source
 from world.rules.guild_config import get_catalog
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY

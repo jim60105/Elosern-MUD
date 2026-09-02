@@ -170,7 +170,7 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
             ),
         ]
         with self.assertRaises(Exception) as caught:
-            _commit(effects)
+            _commit(effects, char="tester", action="test_skill")
         self.assertIs(caught.exception.reason, RejectReason.COMMIT_FAILED)
         self.assertEqual(self.field.fled, set())
         self.assertEqual(self.actor.traits.atk_phys.value, before)

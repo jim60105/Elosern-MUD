@@ -19,6 +19,8 @@ from typing import Any
 
 from django.conf import settings
 
+from world.observability import log_warn
+
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.ingress import build_presentation_context, is_webclient
 from web.webclient.presentation.registry import build_production_registry
@@ -82,12 +84,17 @@ def on_asset_completed(**kwargs: Any) -> None:
             if coordinator is None:
                 continue
             _push_for_subject(session, actor, subject_key)
-        except Exception:
+        except Exception as error:
             # A bad session logs a bounded diagnostic and cannot stop the
             # others; the push never propagates back into world/art/.
-            from evennia import logger
-
-            logger.log_warn("art push failed for session %s" % getattr(session, "sessid", "?"))
+            log_warn(
+                "art_push_unavailable",
+                context={
+                    "surface": "art",
+                    "session": getattr(session, "sessid", "?"),
+                },
+                exc=error,
+            )
 
 
 def connect_art_push() -> None:

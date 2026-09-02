@@ -37,6 +37,16 @@ class QualityGateContractTests(unittest.TestCase):
         self.assertIn(
             "Validate execution shard manifests", [s["name"] for s in preflight["steps"]]
         )
+        self.assertIn(
+            "Run observability lint", [s["name"] for s in preflight["steps"]]
+        )
+        lint_step = next(
+            step for step in preflight["steps"] if step["name"] == "Run observability lint"
+        )
+        self.assertEqual(
+            lint_step["run"],
+            "uv run --locked python -m tools.observability_lint check",
+        )
         self.assertEqual(
             preflight["outputs"]["browser-shards"], "${{ steps.shards.outputs.matrix }}"
         )

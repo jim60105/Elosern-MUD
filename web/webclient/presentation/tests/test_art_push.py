@@ -268,7 +268,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
         bad = BadSession(self.player, sessid=2)
         with (
             patch("evennia.SESSION_HANDLER.get_sessions", return_value=[bad, good]),
-            patch("evennia.logger.log_warn") as log_warn,
+            patch("web.webclient.presentation.art_push.log_warn") as log_warn,
         ):
             self._complete_scene()
             on_asset_completed(subject_key=self._scene_key)

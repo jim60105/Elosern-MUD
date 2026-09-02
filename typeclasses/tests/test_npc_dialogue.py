@@ -626,7 +626,7 @@ class LLMNPCDeferredImportTests(unittest.TestCase):
             "assert 'world.ai.guardrail' not in _sys.modules, 'typeclass import pulled in the guardrail'\n"
             "assert 'world.rules.npc_intents' not in _sys.modules, 'typeclass import pulled in the applier'\n"
             "from world.ai import guardrail\n"
-            "assert guardrail.logger is not None, 'guardrail logger bound to None'\n"
+            "assert guardrail.log_info is not None, 'guardrail facade binding missing'\n"
             "print('OK')\n"
         )
         result = subprocess.run(

@@ -8,7 +8,7 @@ existence of a registry entry is never leaked; the command never displays an
 entry the player has not revealed.
 """
 
-from evennia import Command
+from commands.command import Command
 
 from world.rules.lore_knowledge import (
     LoreCategoryError,

@@ -23,13 +23,14 @@ account APIs.
 
 from collections import OrderedDict
 from dataclasses import dataclass, field
-import logging
 import secrets
 from typing import Any
 
 from twisted.internet.defer import Deferred
 
 from web.webclient.actions.registry import ActionRegistry
+from world.observability import log_error, log_warn
+
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import (
     PresentationCoordinator,
@@ -45,7 +46,6 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import PresentationRegistry
 
-logger = logging.getLogger(__name__)
 
 # Bounded size of the completed-request cache per live sequence.
 CACHE_CAPACITY = 64
@@ -194,7 +194,7 @@ def handle_ui_action(
     try:
         check_envelope(payload)
         action = validate_ui_action(payload)
-    except Exception:
+    except Exception:  # observability: ignore R2: malformed client input is answered with the protocol-error envelope; the response IS the reported failure
         _send_protocol_error(
             session,
             _protocol_error_envelope("malformed_envelope", "操作訊息格式錯誤"),
@@ -219,13 +219,13 @@ def handle_ui_action(
 
     try:
         spec = action_registry.spec(action["action_id"])
-    except KeyError:
+    except KeyError:  # observability: ignore R2: an unknown action_id is answered with the rejected envelope; the client-visible rejection IS the report
         _send_rejected(session, coordinator, request_id, _UNKNOWN_ACTION_CODE, _UNKNOWN_ACTION_MESSAGE)
         return
 
     try:
         normalized = spec.validate_payload(action["payload"])
-    except Exception:
+    except Exception:  # observability: ignore R2: a payload failing the action's schema is answered with the malformed-payload rejection envelope; the rejection IS the report
         _send_rejected(session, coordinator, request_id, _MALFORMED_PAYLOAD_CODE, _MALFORMED_PAYLOAD_MESSAGE)
         return
 
@@ -268,7 +268,16 @@ def _invoke_adapter(
     """
     try:
         result = adapter(actor, normalized, session)
-    except Exception:
+    except Exception as error:
+        log_error(
+            "action_adapter_failed",
+            context={
+                "char": str(getattr(actor, "pk", "?")),
+                "surface": "dispatcher",
+                "request_id": request_id,
+            },
+            exc=error,
+        )
         return _settle_internal_error(session, actor, action_registry, registry, request_id, epoch)
     if isinstance(result, Deferred):
         result.addBoth(
@@ -368,8 +377,17 @@ def _publish_completion(
             _publish_presentation(session, coordinator, context, None)
         else:
             _publish_presentation(session, coordinator, context, tuple(affected))
-    except Exception:
+    except Exception as error:
         correlation_id = secrets.token_hex(16)
+        log_error(
+            "presentation_publish_failed",
+            context={
+                "char": str(getattr(actor, "pk", "?")),
+                "surface": "dispatcher",
+                "correlation_id": correlation_id,
+            },
+            exc=error,
+        )
         result = {
             "outcome": "error",
             "code": _INTERNAL_CODE,
@@ -416,11 +434,14 @@ def _schedule_dialogue_options(
             actor,
             watchers=((session, coordinator.epoch),),
         )
-    except Exception:
-        logger.warning(
-            "action options: dialogue-reply trigger scheduling failed for session %s (swallowed)",
-            getattr(session, "sessid", "?"),
-            exc_info=True,
+    except Exception as error:
+        log_warn(
+            "action_options_schedule_failed",
+            context={
+                "surface": "dialogue-reply",
+                "session": getattr(session, "sessid", "?"),
+            },
+            exc=error,
         )
 
 
@@ -446,11 +467,14 @@ def _schedule_terminal_combat_options(actor: Any) -> None:
             actor,
             watchers=watchers_for(actor),
         )
-    except Exception:
-        logger.warning(
-            "action options: terminal-combat trigger scheduling failed for %s (swallowed)",
-            getattr(actor, "key", "?"),
-            exc_info=True,
+    except Exception as error:
+        log_warn(
+            "action_options_schedule_failed",
+            context={
+                "surface": "terminal-combat",
+                "char": str(getattr(actor, "pk", "?")),
+            },
+            exc=error,
         )
 
 
@@ -482,7 +506,7 @@ def _normalize_result(value: dict[str, Any]) -> dict[str, Any]:
             correlation_id = _validate_correlation_id(correlation_id)
         else:
             correlation_id = None
-    except ProtocolValidationError:
+    except ProtocolValidationError:  # observability: ignore R2: an out-of-schema adapter result is replaced by the internal-error envelope; the browser-visible error IS the report
         return _internal_result(None)
     result: dict[str, Any] = {
         "outcome": outcome,

@@ -22,6 +22,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from django.db import transaction
+
+from world.observability import log_warn
 from evennia.objects.models import ObjectDB
 from evennia.prototypes.spawner import spawn
 
@@ -502,10 +504,12 @@ def apply_scene_flavor(room: Any, text: str) -> bool:
             return False
         room.db.scene_flavor = text
         return True
-    except Exception:  # noqa: BLE001 - bounded, never propagates (design D3)
-        from evennia import logger
-
-        logger.log_warn(f"scene flavor apply skipped: room {getattr(room, 'pk', None)}")
+    except Exception as error:  # noqa: BLE001 - bounded, never propagates (design D3)
+        log_warn(
+            "scene_flavor_skipped",
+            context={"room": getattr(room, "pk", None)},
+            exc=error,
+        )
         return False
 
 

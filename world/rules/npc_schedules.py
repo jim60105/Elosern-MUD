@@ -40,8 +40,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from evennia.utils.logger import log_err, log_warn
 
+from world.observability import log_error, log_warn
 from typeclasses.npcs import NPC
 from world.rules.clock import (
     CLOCK_YAML,
@@ -446,7 +446,7 @@ def _stored_schedule_error(npc: Any) -> str | None:
         return None
     try:
         resolve_schedule(raw)
-    except ScheduleError as exc:
+    except ScheduleError as exc:  # observability: ignore R2: the validation diagnostic is returned to the caller, which decides whether to log
         return _bounded_diagnostic(str(exc))
     effective = npc.db.schedule_effective_from_tick
     if isinstance(effective, bool) or not isinstance(effective, int):
@@ -490,8 +490,8 @@ def parse_stored_schedule(npc: Any) -> ParsedSchedule | None:
     diagnostic = _stored_schedule_error(npc)
     if diagnostic is not None:
         log_warn(
-            f"npc_schedules: {npc.key or '?'} has a malformed schedule "
-            f"({diagnostic}); treating as no schedule"
+            "schedule_read_malformed_treated_as_none",
+            context={"npc": npc.key or "?", "diagnostic": diagnostic},
         )
         return None
     return resolve_schedule(raw, effective_from_tick=npc.db.schedule_effective_from_tick)
@@ -500,8 +500,8 @@ def parse_stored_schedule(npc: Any) -> ParsedSchedule | None:
 def _clear_schedule(npc: Any, diagnostic: str) -> None:
     """Log and degrade one NPC to the canonical no-schedule state."""
     log_warn(
-        f"npc_schedules: {npc.key or '?'} has a malformed schedule "
-        f"({_bounded_diagnostic(diagnostic)}); treating as no schedule"
+        "schedule_cleared_malformed",
+        context={"npc": npc.key or "?", "diagnostic": _bounded_diagnostic(diagnostic)},
     )
     npc.db.schedule = None
     npc.db.schedule_effective_from_tick = None
@@ -517,9 +517,10 @@ def _sync_npc_schedules() -> None:
         # layer without touching stored data, so fixing the file and
         # restarting re-enables every schedule. The tags are the runtime's
         # index -- without them no NPC is found by settlement.
-        log_err(
-            f"npc_schedules: rulebook failed to load ({_bounded_diagnostic(str(exc))}); "
-            "deactivating every NPC schedule until it loads"
+        log_error(
+            "schedule_rulebook_load_failed",
+            exc=exc,
+            context={"action": "deactivate_every_schedule"},
         )
         for npc in NPC.objects.all_family():
             try:
@@ -527,7 +528,8 @@ def _sync_npc_schedules() -> None:
                     npc.tags.remove(SCHEDULE_TAG)
             except Exception:
                 log_warn(
-                    f"npc_schedules: could not clear the schedule tag on {npc.key or '?'}"
+                    "schedule_tag_clear_failed",
+                    context={"npc": npc.key or "?"},
                 )
         return
     for npc in NPC.objects.all_family():
@@ -536,8 +538,8 @@ def _sync_npc_schedules() -> None:
             if raw is None:
                 if npc.tags.has(SCHEDULE_TAG):
                     log_warn(
-                        f"npc_schedules: {npc.key or '?'} carries a stale schedule tag "
-                        "without a schedule; removing it"
+                        "schedule_stale_tag_removed",
+                        context={"npc": npc.key or "?"},
                     )
                     npc.tags.remove(SCHEDULE_TAG)
                 continue
@@ -550,8 +552,9 @@ def _sync_npc_schedules() -> None:
         except Exception as exc:
             # One NPC's persistence failure must never stall the pass.
             log_warn(
-                f"npc_schedules: could not synchronize {npc.key or '?'} "
-                f"({_bounded_diagnostic(str(exc))}); leaving it unchanged"
+                "schedule_sync_npc_failed",
+                exc=exc,
+                context={"npc": npc.key or "?", "action": "leave_unchanged"},
             )
 
 
@@ -575,9 +578,10 @@ def sync_npc_schedules() -> None:
     try:
         _sync_npc_schedules()
     except Exception as exc:
-        log_err(
-            f"npc_schedules: startup sync aborted "
-            f"({_bounded_diagnostic(str(exc))}); startup continues"
+        log_error(
+            "schedule_startup_sync_aborted",
+            exc=exc,
+            context={"action": "continue_startup"},
         )
 
 
@@ -706,8 +710,13 @@ def _first_traversable_exit(npc: Any, destination: Any) -> Any | None:
 def _skip_diagnostic(npc: Any, due_tick: int, entry_index: int, message: str) -> None:
     """Log one bounded per-entry skip diagnostic (never raises)."""
     log_warn(
-        f"npc_schedules: {npc.key or '?'} entry {entry_index} due {due_tick}: "
-        f"{_bounded_diagnostic(message)}; skipping"
+        "npc_schedule_entry_skipped",
+        context={
+            "npc": npc.key or "?",
+            "entry_index": entry_index,
+            "due_tick": due_tick,
+            "reason": _bounded_diagnostic(message),
+        },
     )
 
 
@@ -762,7 +771,7 @@ def _settle_occurrence(
         # map-movement-clock D-2); success is detected by the NPC actually
         # relocating, exactly as the webclient move adapter does.
         exit_obj.at_traverse(npc, destination)
-    except Exception as exc:
+    except Exception as exc:  # observability: ignore R2: the skip diagnostic is emitted by _skip_diagnostic
         _skip_diagnostic(npc, due_tick, entry_index, f"traversal raised: {exc}")
         return []
     if npc.location is not destination:
@@ -868,14 +877,15 @@ def settle_npc_schedules(start_tick: int, end_tick: int) -> list[ScheduledEvent]
                 work.append((due_tick, int(npc.pk), entry_index, npc, parsed, entry))
         except Exception as exc:
             log_warn(
-                f"npc_schedules: {npc.key or '?'} could not be read for settlement "
-                f"({_bounded_diagnostic(str(exc))}); skipping"
+                "schedule_settlement_npc_read_failed",
+                exc=exc,
+                context={"npc": npc.key or "?", "action": "skip_npc"},
             )
     work.sort(key=lambda item: (item[0], item[1], item[2]))
     events: list[ScheduledEvent] = []
     for due_tick, _, entry_index, npc, parsed, entry in work:
         try:
             events.extend(_settle_occurrence(npc, parsed, due_tick, entry_index, entry))
-        except Exception as exc:
+        except Exception as exc:  # observability: ignore R2: the skip diagnostic is emitted by _skip_diagnostic
             _skip_diagnostic(npc, due_tick, entry_index, f"unexpected failure: {exc}")
     return events

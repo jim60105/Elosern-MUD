@@ -5,7 +5,7 @@ membership module's ``leave_party(..., reason="dismissed")``. Dismissal never
 changes affinity in either direction.
 """
 
-from evennia import Command
+from commands.command import Command
 
 from commands.talk import _resolve_npc
 from world.rules.party import (

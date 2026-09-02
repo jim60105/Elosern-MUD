@@ -307,5 +307,39 @@ class BoundedFailureDegradeTests(PromptFixture):
         register_narrator.assert_called_once()
 
 
+class LoaderExceptionChainTests(PromptFixture):
+    """Swallowed OS/YAML failures stay reachable through ``__cause__``."""
+
+    def test_parse_failure_keeps_the_underlying_cause(self):
+        # The duplicate-key loader error names the real failure; the recorded
+        # PromptLibraryError must chain to it so the facade renders the
+        # causal type/traceback, not just the flattened message string.
+        self.write_file(
+            "art.yaml",
+            "schema_version: 1\nprompts:\n"
+            "  art.style: approved visual style\n"
+            "  art.style: approved visual style\n",
+        )
+        library = self.load()
+        error = library.errors["art.style"]
+        self.assertIsNotNone(error.__cause__)
+        self.assertIsInstance(error.__cause__, Exception)
+
+    def test_root_listing_failure_keeps_the_os_error_cause(self):
+        # A prompt root that cannot be listed records per-key errors chained
+        # to the underlying OSError (rubber-duck P3 MAJOR: loader swallowed
+        # the exception chain).
+        import unittest.mock
+
+        with unittest.mock.patch(
+            "world.prompts.loader.os.listdir",
+            side_effect=OSError("permission denied"),
+        ):
+            library = self.load()
+        self.assertTrue(library.errors)
+        for error in library.errors.values():
+            self.assertIsInstance(error.__cause__, OSError)
+
+
 if __name__ == "__main__":
     unittest.main()

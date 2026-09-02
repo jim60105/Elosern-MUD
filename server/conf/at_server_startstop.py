@@ -17,12 +17,167 @@ at_server_cold_stop()
 
 """
 
+import importlib
+import time
+
+from world.observability import log_error, log_info, log_warn
+
+# Patchable monotonic clock seam for startup timing tests.
+_startup_clock = time.monotonic
+
+
+def _late(module: str, name: str):
+    """Import ``module`` at call time and run its ``name`` attribute.
+
+    Keeps each dependency's import at its original pre-refactor execution
+    point (title planner, prompt loader, art sync, art push), so an
+    import-time failure in a late dependency can never block an earlier step.
+    Uses the real import machinery (not the patchable
+    ``importlib.import_module`` seam) so the attribute lookup still resolves
+    test-patched bindings on the genuinely imported module.
+    """
+    return getattr(__import__(module, fromlist=(name,)), name)()
+
+# Canonical ordered startup step catalog (change add-observability-lint-gate,
+# design D7). The order IS the contract: clock-source registration must
+# precede session restoration, restoration must precede wilderness sync, and
+# quest runtime must run after the lore/map syncs. Guard tests assert against
+# this catalog (behaviorally, via stubs) instead of source text.
+STARTUP_STEP_ORDER: tuple[str, ...] = (
+    "world_clock_init",
+    "equipment_rulebook_validation",
+    "sync_all",
+    "sync_limbo",
+    "sync_grid",
+    "sync_service_interiors",
+    "sync_quest_runtime",
+    "sync_guild_economy",
+    "sync_guard_npc",
+    "sync_npc_schedules",
+    "register_title_planner",
+    "restore_persisted_sessions",
+    "sync_wilderness",
+    "load_prompt_library",
+    "register_narrator_layer",
+    "register_npc_dialogue_layer",
+    "register_scenario_director_layer",
+    "register_character_creation_layer",
+    "register_scene_flavor_layer",
+    "register_action_options_layer",
+    "register_title_nomination_layer",
+    "register_nomination_triggers",
+    "art_sync_all",
+    "connect_art_push",
+)
+
+# Any-unexpected-error tolerance, used by steps that were broadly guarded
+# before the observability refactor (prompt library, nomination triggers).
+_ALL_ERRORS: tuple[type[BaseException], ...] = (Exception,)
+
+
+def _startup_step(
+    name: str,
+    run,
+    *,
+    fail_loud: bool = True,
+    tolerant_on=(),
+    degrade_level: str = "warn",
+) -> None:
+    """Run one catalog step with timing, one event, and preserved semantics.
+
+    Success emits exactly one ``startup_step`` info event (``step``, ``ms``).
+    Fail-loud steps log ``startup_step_failed`` with the exception chain and
+    re-raise: the deterministic startup must not partially boot. Boot-tolerant
+    steps (``fail_loud=False``) catch exactly the ``tolerant_on`` classes
+    (a tuple, or a zero-argument callable resolving one lazily so the
+    conflict classes are not imported until a step actually fails — the
+    pre-refactor helpers imported them only at their own execution point), emit a structured
+    ``startup_step_degraded`` with ``step`` and ``reason`` context plus the
+    exception chain at ``degrade_level``, and let startup continue — at the
+    level the pre-refactor site logged (prompt library at error, registration
+    skips at warn). Any other exception propagates unlogged, exactly as
+    before the refactor. The wrapper never re-orders steps.
+
+    A step callable may also self-report a tolerated skip by returning
+    ``False`` (the registration seams do this, so a direct call keeps the
+    pre-refactor swallow-and-warn contract); the wrapper then emits no
+    ``startup_step`` success event for it.
+    """
+    started = _startup_clock()
+    try:
+        result = run()
+    except Exception as exc:
+        classes = tolerant_on() if callable(tolerant_on) else tolerant_on
+        if not isinstance(exc, classes):
+            if fail_loud:
+                log_error("startup_step_failed", exc=exc, context={"step": name})
+            raise
+        emit = log_error if degrade_level == "error" else log_warn
+        emit(
+            "startup_step_degraded",
+            exc=exc,
+            context={
+                "step": name,
+                "reason": f"{type(exc).__name__}: {exc}",
+            },
+        )
+        return
+    if result is False:
+        return
+    log_info(
+        "startup_step",
+        context={"step": name, "ms": int((_startup_clock() - started) * 1000)},
+    )
+
 
 def at_server_init():
     """
     This is called first as the server is starting up, regardless of how.
     """
     pass
+
+
+def _conflict_classes(*, schema: bool = False, profile: bool = False):
+    """Resolve the tolerated registration-conflict classes (pre-refactor, the
+    registration helpers imported them inside their own bodies; resolving them
+    lazily keeps those imports off the path of every earlier startup step).
+    """
+    from world.ai.guardrail import GuardrailRegistrationError
+
+    classes: list[type[BaseException]] = [GuardrailRegistrationError]
+    if schema:
+        from world.ai.schemas.registry import DuplicateSchemaError
+
+        classes.append(DuplicateSchemaError)
+    if profile:
+        from world.ai.profiles import UnknownLayerError
+
+        classes.append(UnknownLayerError)
+    return tuple(classes)
+
+
+def _tolerant_register(name: str, register, *, schema: bool = False, profile: bool = False) -> bool:
+    """Register one guardrail layer, preserving the seam-level tolerance contract.
+
+    The registration seams are called both from ``at_server_start`` (through
+    ``_startup_step``) and directly by guarded tests that assert a foreign
+    leftover registration never raises. The tolerance therefore lives here, at
+    the seam: a tolerated conflict class is swallowed with a structured
+    ``startup_step_degraded`` warn (``step``, ``reason``, exception chain), and
+    ``False`` is returned so the wrapper skips its success event. Anything else
+    propagates unchanged.
+    """
+    classes = _conflict_classes(schema=schema, profile=profile)
+    try:
+        register()
+    except classes as exc:
+        log_warn(
+            "startup_step_degraded",
+            exc=exc,
+            context={"step": name, "reason": f"{type(exc).__name__}: {exc}"},
+        )
+        return False
+    return True
 
 
 def _register_narrator_layer():
@@ -40,17 +195,15 @@ def _register_narrator_layer():
     still fails loudly on a non-narrator registration, so correctness is
     preserved even when this swallow path is taken.
     """
-    from evennia import logger
-    from world.ai.guardrail import GuardrailRegistrationError
     from world.ai.narrator import register_narrator
     from world.rules.event_log import render_plain_text
 
-    try:
-        register_narrator(
+    return _tolerant_register(
+        "register_narrator_layer",
+        lambda: register_narrator(
             lambda event_logs: "\n".join(render_plain_text(log) for log in event_logs)
-        )
-    except GuardrailRegistrationError as exc:
-        logger.log_warn(f"narrator registration skipped at server start: {exc}")
+        ),
+    )
 
 
 def _register_npc_dialogue_layer():
@@ -64,15 +217,11 @@ def _register_npc_dialogue_layer():
     never abort server startup; the reply gate still fails loudly on a
     non-npc_dialogue registration, so correctness is preserved.
     """
-    from evennia import logger
-    from world.ai.guardrail import GuardrailRegistrationError
     from world.ai.npc_dialogue import register_npc_dialogue
-    from world.ai.schemas.registry import DuplicateSchemaError
 
-    try:
-        register_npc_dialogue()
-    except (GuardrailRegistrationError, DuplicateSchemaError) as exc:
-        logger.log_warn(f"npc_dialogue registration skipped at server start: {exc}")
+    return _tolerant_register(
+        "register_npc_dialogue_layer", register_npc_dialogue, schema=True
+    )
 
 
 def _register_scenario_director_layer():
@@ -87,15 +236,11 @@ def _register_scenario_director_layer():
     loudly on a non-scenario_director registration, so correctness is
     preserved.
     """
-    from evennia import logger
-    from world.ai.guardrail import GuardrailRegistrationError
     from world.ai.scenario_director import register_scenario_director
-    from world.ai.schemas.registry import DuplicateSchemaError
 
-    try:
-        register_scenario_director()
-    except (GuardrailRegistrationError, DuplicateSchemaError) as exc:
-        logger.log_warn(f"scenario_director registration skipped at server start: {exc}")
+    return _tolerant_register(
+        "register_scenario_director_layer", register_scenario_director, schema=True
+    )
 
 
 def _register_character_creation_layer():
@@ -108,17 +253,14 @@ def _register_character_creation_layer():
     registration (a conflicting fallback/validator, or a conflicting output
     schema) must never abort server startup; the proposal gate still fails
     loudly on a non-character_creation registration, so correctness is
-    preserved.
+    preserved. The tolerance lives in ``_tolerant_register`` so direct seam
+    calls keep the same boot-tolerant contract.
     """
-    from evennia import logger
     from world.ai.character_creation import register_character_creation
-    from world.ai.guardrail import GuardrailRegistrationError
-    from world.ai.schemas.registry import DuplicateSchemaError
 
-    try:
-        register_character_creation()
-    except (GuardrailRegistrationError, DuplicateSchemaError) as exc:
-        logger.log_warn(f"character_creation registration skipped at server start: {exc}")
+    return _tolerant_register(
+        "register_character_creation_layer", register_character_creation, schema=True
+    )
 
 
 def _register_scene_flavor_layer():
@@ -137,14 +279,9 @@ def _register_scene_flavor_layer():
     file's source (startup must not resync its generated registry). Keep that
     key out of this module's text — the seam imports only the layer.
     """
-    from evennia import logger
-    from world.ai.guardrail import GuardrailRegistrationError
     from world.ai.scene_flavor import register_scene_flavor
 
-    try:
-        register_scene_flavor()
-    except GuardrailRegistrationError as exc:
-        logger.log_warn(f"scene_flavor registration skipped at server start: {exc}")
+    return _tolerant_register("register_scene_flavor_layer", register_scene_flavor)
 
 
 def _register_action_options_layer():
@@ -163,16 +300,11 @@ def _register_action_options_layer():
     layers. The proposal gate still fails loudly on a non-action_options
     registration, so correctness is preserved.
     """
-    from evennia import logger
     from world.ai.action_options import register_action_options
-    from world.ai.guardrail import GuardrailRegistrationError
-    from world.ai.profiles import UnknownLayerError
-    from world.ai.schemas.registry import DuplicateSchemaError
 
-    try:
-        register_action_options()
-    except (GuardrailRegistrationError, DuplicateSchemaError, UnknownLayerError) as exc:
-        logger.log_warn(f"action_options registration skipped at server start: {exc}")
+    return _tolerant_register(
+        "register_action_options_layer", register_action_options, schema=True, profile=True
+    )
 
 
 def _register_title_nomination_layer():
@@ -186,15 +318,11 @@ def _register_title_nomination_layer():
     server startup; the proposal gate still fails loudly on a
     non-title_nomination registration, so correctness is preserved.
     """
-    from evennia import logger
-    from world.ai.guardrail import GuardrailRegistrationError
-    from world.ai.schemas.registry import DuplicateSchemaError
     from world.ai.title_nomination import register_title_nomination
 
-    try:
-        register_title_nomination()
-    except (GuardrailRegistrationError, DuplicateSchemaError) as exc:
-        logger.log_warn(f"title_nomination registration skipped at server start: {exc}")
+    return _tolerant_register(
+        "register_title_nomination_layer", register_title_nomination, schema=True
+    )
 
 
 def _register_nomination_triggers():
@@ -204,21 +332,23 @@ def _register_nomination_triggers():
     observers (and owns the schedule path); every rest point silently no-ops
     while the LLM is offline, so this wiring is boot-tolerant with a bounded
     warning: a failure here can never take the deterministic game offline.
+    The tolerance (any error) lives in the ``_startup_step`` wrapper.
     """
-    from evennia import logger
+    from server.title_nomination_service import register_nomination_triggers
 
-    try:
-        from server.title_nomination_service import register_nomination_triggers
-
-        register_nomination_triggers()
-    except Exception as exc:
-        logger.log_warn(f"nomination triggers skipped at server start: {exc}")
+    register_nomination_triggers()
 
 
 def at_server_start():
     """
     This is called every time the server starts up, regardless of
     how it was shut down.
+
+    Every operation runs as a ``_startup_step`` from the ordered catalog
+    above: one timed ``startup_step`` event per success, structured degrade
+    events for the boot-tolerant classes, and log-then-raise for fail-loud
+    steps. The call order below IS ``STARTUP_STEP_ORDER``; guard tests assert
+    it behaviorally.
     """
     from world.lore.sync import sync_all
     from world.maps.bootstrap import (
@@ -233,75 +363,108 @@ def at_server_start():
     from world.rules.npc_schedules import sync_npc_schedules
     from world.rules.onboarding import sync_guard_npc
 
+    # Per-layer tolerated registration-conflict classes, resolved lazily at
+    # first failure exactly like the pre-refactor helper-local imports.
+
     # Deterministic startup owns the world-clock singleton; presentation reads
     # only through read_world_clock() and must never create it.
-    get_world_clock()
+    _startup_step("world_clock_init", get_world_clock)
     # Fail-loud equipment-effect rulebook validation (add-equipment-effect-
     # rulebook D4): the only sanctioned startup consumer of the loader. The
     # module import itself validates the canonical rulebook; a malformed
     # roster aborts boot before any world sync can persist partial state.
-    import world.rules.equipment_effects  # noqa: F401
-    sync_all()
-    sync_limbo()
-    sync_grid()
+    _startup_step(
+        "equipment_rulebook_validation",
+        lambda: importlib.import_module("world.rules.equipment_effects"),
+    )
+    _startup_step("sync_all", sync_all)
+    _startup_step("sync_limbo", sync_limbo)
+    _startup_step("sync_grid", sync_grid)
     # Every world-event clock source must be registered before any startup
     # operation can advance time: the service interiors, quest runtime, guild
     # economy, guard, and NPC-schedule syncs all move ahead of session
     # restoration so a recovery settlement runs the complete stage set
     # (fix-startup-clock-source-order D1).
-    sync_service_interiors()
-    sync_quest_runtime()
-    sync_guild_economy()
-    sync_guard_npc()
-    sync_npc_schedules()
+    _startup_step("sync_service_interiors", sync_service_interiors)
+    _startup_step("sync_quest_runtime", sync_quest_runtime)
+    _startup_step("sync_guild_economy", sync_guild_economy)
+    _startup_step("sync_guard_npc", sync_guard_npc)
+    _startup_step("sync_npc_schedules", sync_npc_schedules)
     # The title event-effect planner derives fixed-title grants from committed
     # actions; like the quest planner it must be registered before any player
     # action resolves (idempotent).
-    from world.rules.titles import register_title_planner
-
-    register_title_planner()
+    _startup_step(
+        "register_title_planner",
+        lambda: _late("world.rules.titles", "register_title_planner"),
+    )
     # Restore persisted combat sessions BEFORE wilderness population
     # reconciliation: a defeated population monster still referenced by a
     # committed session must not be deleted or respawned first
     # (fix-startup-session-restore-order D1).
-    restore_persisted_sessions()
-    sync_wilderness()
+    _startup_step("restore_persisted_sessions", restore_persisted_sessions)
+    _startup_step("sync_wilderness", sync_wilderness)
 
     # Prompt library: validate every YAML prompt file and mark broken keys
     # unavailable. Failures are bounded per key and logged; server startup
     # always continues (design D3), so a broken prompt never takes the
     # deterministic game offline. The wrapper is a last-resort guard: even an
-    # unforeseen loader failure must not abort startup.
-    from evennia import logger as evennia_logger
-    from world.prompts.loader import load_prompt_library
+    # unforeseen loader failure must not abort startup (degrade at error
+    # level, matching the pre-refactor log_err).
+    _startup_step(
+        "load_prompt_library",
+        lambda: _late("world.prompts.loader", "load_prompt_library"),
+        fail_loud=False,
+        tolerant_on=_ALL_ERRORS,
+        degrade_level="error",
+    )
 
-    try:
-        load_prompt_library()
-    except Exception as exc:
-        evennia_logger.log_err(
-            f"prompt library load failed; continuing with degraded prompts: {exc}"
-        )
-
-    _register_narrator_layer()
-    _register_npc_dialogue_layer()
-    _register_scenario_director_layer()
-    _register_character_creation_layer()
-    _register_scene_flavor_layer()
-    _register_action_options_layer()
-    _register_title_nomination_layer()
-    _register_nomination_triggers()
+    # Guardrail-layer registrations: each seam is boot-tolerant for its
+    # conflict classes via ``_tolerant_register`` (emitting its own
+    # ``startup_step_degraded`` warn and reporting False); any other error
+    # propagates unlogged, exactly as pre-refactor.
+    _startup_step("register_narrator_layer", _register_narrator_layer, fail_loud=False)
+    _startup_step(
+        "register_npc_dialogue_layer", _register_npc_dialogue_layer, fail_loud=False
+    )
+    _startup_step(
+        "register_scenario_director_layer",
+        _register_scenario_director_layer,
+        fail_loud=False,
+    )
+    _startup_step(
+        "register_character_creation_layer",
+        _register_character_creation_layer,
+        fail_loud=False,
+    )
+    _startup_step("register_scene_flavor_layer", _register_scene_flavor_layer, fail_loud=False)
+    _startup_step(
+        "register_action_options_layer", _register_action_options_layer, fail_loud=False
+    )
+    _startup_step(
+        "register_title_nomination_layer",
+        _register_title_nomination_layer,
+        fail_loud=False,
+    )
+    # Nomination triggers: any failure here can never take the deterministic
+    # game offline (pre-refactor caught Exception broadly).
+    _startup_step(
+        "register_nomination_triggers",
+        _register_nomination_triggers,
+        fail_loud=False,
+        tolerant_on=_ALL_ERRORS,
+    )
 
     # Deterministic art-assets startup sync: ensure a record for every scene
     # and generic-monster subject, then recover explicit named portrait
-    # policies (idempotent; a failure is bounded and never aborts startup).
-    from world.art.service import art_sync_all
-
-    art_sync_all()
+    # policies (idempotent; failures are bounded internally, so the wrapper
+    # keeps the pre-refactor fail-loud posture for unforeseen leaks).
+    _startup_step("art_sync_all", lambda: _late("world.art.service", "art_sync_all"))
 
     # WebClient art completion push: re-entrant-safe via a stable dispatch UID.
-    from web.webclient.presentation.art_push import connect_art_push
-
-    connect_art_push()
+    _startup_step(
+        "connect_art_push",
+        lambda: _late("web.webclient.presentation.art_push", "connect_art_push"),
+    )
 
 
 def at_server_stop():

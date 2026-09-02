@@ -8,7 +8,7 @@ clear without a record is a no-op). Over-bound input is rejected with the
 shared persona-field bound.
 """
 
-from evennia import Command
+from commands.command import Command
 
 from world.rules.character_creation import MAX_PERSONA_FIELD_LENGTH
 from world.rules.persona_edit import update_background

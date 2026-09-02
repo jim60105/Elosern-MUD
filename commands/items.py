@@ -9,7 +9,7 @@ never consumes a round). Stable rejections render the same Traditional
 Chinese reason semantics as UI actions through ``service_messages``.
 """
 
-from evennia import Command
+from commands.command import Command
 
 from world.lore.items import ITEM_REGISTRY
 from world.rules.combat_result import settle_to_messages

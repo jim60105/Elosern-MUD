@@ -24,6 +24,7 @@ AI 開發者產出的 code）都強制可觀測。
 | 痛點範圍 | 全 codebase 通例規範 | 各類異常（AI 降級、rules 回滾、art worker）都被壓成一句話 |
 | 輸出形態 | 結構化 context 尾綴、維持 Evennia logger 純文字檔 | 人類可讀、grep 友好、改動最小；不引入 JSON line 雙軌 |
 | 遷移範圍 | 全部既有呼叫點遷移，分 1＋3 個 change 執行（見 §5） | 全量遷移超出單一 change 單一工程師單日容量；凍結清單僅為遷移期臨時機制，最終必須為空 |
+| R2 作用域 | 例外不得無痕規則以「已匯入 facade 的檔案」為作用域（含凍結檔） | 實測 legacy 吞例外散佈 89 檔／323 處，其中 67 檔不屬任何遷移批次——全 repo R2 使凍結清單永遠清不空；adopter 範圍讓檔案一採用 facade 立即受管，全部 log 站點於批次 4 後 100% 受 R2/R3 涵蓋；一般性 error-hygiene 債務顯式延後給後續觸及該檔的變更 |
 | 實作路線 | 方案 A：自建 log facade ＋ AST 掃描 gate 工具 | repo 刻意無 linter；自寫工具可表達「except 必須含 log 或 re-raise」等 ruff 表達不了的規則；零新增依賴 |
 
 拒絕的替代方案：
@@ -108,7 +109,9 @@ exit 0/1。無 `list` 子命令（無 registry 可列）。
   import）、`from evennia import logger`、`from evennia.utils import
   logger`（含 alias）與 `import evennia` 後的 `evennia.logger.*` 呼叫一律
   違規；`world/observability/` 自身是唯一白名單。violation 訊息含檔案:行。
-- **R2 — 例外不得無痕吞掉**：每個 `except`／`except*` 區塊的 body 必須
+- **R2 — 例外不得無痕吞掉**（作用域＝匯入 facade 的檔案，含凍結檔；未
+  採用 facade 的 legacy 檔不受 R2 約束，見 §2 決策表）：
+  每個 `except`／`except*` 區塊的 body 必須
   滿足其一：① body 的 AST 子樹（遞迴尋找、不含巢狀函式定義內部）出現
   `raise` ② 出現 facade log 呼叫 ③ 或豁免註解（見下）。豁免註解定位以
   tokenize 判定：R2 在 `except` 頭行行尾或 body 首行之前；R3 在呼叫行
@@ -204,9 +207,11 @@ combat 每回合中間值等高頻資料走 `log_debug`，受 Evennia `VERBOSE` 
 1. **`add-observability-lint-gate`**：facade ＋ lint 工具＋兩者自身測試、
    命令流事件（`cmd_in`／`cmd_done`）、生命週期事件、事件目錄落地、
    AGENTS.md 條目、CI 接入，並遷移 `server/`＋`commands/`。掃到既有
-   code 時以**過渡期凍結清單**（`tools/observability_lint/frozen.json`）
-   豁免尚未遷移的檔案；凍結清單只許縮小——lint 對清單中多餘（已可移除
-   卻未移除）或已遷移檔案残留在清單上的條目報錯。
+   code 時以**過渡期凍結清單**（`tools/observability_freeze.json`）
+   豁免尚未遷移的檔案。清單由掃描生成、恰好等於全 repo Evennia-logger
+   import 債務檔集合（R1 inventory）；條目只壓 R1，R2/R3 對已採用 facade
+   的檔案即時生效（含凍結檔）。凍結清單只許縮小——lint 對清單中已無 R1
+   債務卻未移除的殭屍條目報錯。
 2. **`migrate-rules-maps-observability`**：`world/rules/`＋
    `world/maps/` 呼叫點與提交點事件（§4.2）。
 3. **`migrate-ai-art-server-observability`**：`world/ai/`＋
@@ -233,12 +238,17 @@ combat 每回合中間值等高頻資料走 `log_debug`，受 Evennia `VERBOSE` 
 
 - facade 永不拋例外（§3.1 stderr 退路）。
 - lint 對無法 parse 的檔案報 violation。
+- traceability 標註時序：`tools.spec_traceability` 只索引
+  `openspec/specs/` 主規格；active change delta 的 id 在實作期間標註必報
+  `unknown-requirement-id`。新能力測試的 `covers_requirement` 標註與
+  archive 同步主規格同批加入。
 - 事件目錄由 AGENTS.md 規則 ＋ OpenSpec verify 清單雙重把關；lint 不
   靜態驗證正常路徑 coverage（AST 無法可靠判定），這是刻意的邊界。
 
 ## 7. 測試
 
-- `tools/tests/test_observability_lint.py`（stdlib `unittest`）：以
+- `tests/test_observability_lint.py`（top-level，stdlib `unittest`，走
+  `unittest discover`，不佔 evennia shard）：以
   `textwrap.dedent` 小段原始碼字串跑規則，每規則正例／反例／豁免三案；
   另測 parse error 報 violation、豁免 reason 為空報錯。
 - facade 純邏輯測試（stdlib `unittest`）：context 渲染（排序、截斷、

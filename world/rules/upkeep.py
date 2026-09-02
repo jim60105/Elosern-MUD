@@ -173,5 +173,12 @@ def settle_upkeep(
                     )
                 pending.append(effect)
     if pending:
-        _commit(pending)
+        _commit(
+            # System-attributed commit: no character performed these effects.
+            # The stable "system:" sentinel keeps ``char`` unambiguous against
+            # real character identities (design: char is a character pk).
+            pending,
+            char="system:upkeep",
+            action=UPKEEP_SKILL_KEY,
+        )
     return logs

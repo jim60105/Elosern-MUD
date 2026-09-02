@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from evennia import Command
+from commands.command import Command
 
 from world.rules.action import (
     ActionRequest,

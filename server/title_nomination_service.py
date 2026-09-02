@@ -23,22 +23,15 @@ called from ``at_server_start``), whose bodies defer to
 ``transaction.on_commit`` so a rolled-back settlement nominates nothing.
 """
 
-import logging
 from typing import Any
 
 from twisted.internet import defer
 
-logger = logging.getLogger(__name__)
+from world.observability import log_warn
+
 
 # The registered WebClient panel that renders the pending ballot.
 BALLOT_PANEL = "title_ballot"
-
-
-def _log(message: str) -> None:
-    try:
-        logger.info(message)
-    except Exception:
-        pass
 
 
 # ---------------------------------------------------------------------------
@@ -135,12 +128,23 @@ def _push_ballot_panel(entity: Any, watchers: tuple) -> None:
                 expected_epoch=captured_epoch,
             )
         except Exception as error:  # noqa: BLE001 - guarded push, next sync wins
-            _log(f"ballot panel push failed: {error}")
+            log_warn(
+                "title_nomination_panel_push_failed",
+                exc=error,
+                context={
+                    "char": getattr(entity, "pk", 0) or 0,
+                    "sessid": getattr(session, "sessid", 0) or 0,
+                },
+            )
 
 
 def _log_generation_error(failure: Any) -> None:
     """Swallow a generation Deferred that still errbacks after routing."""
-    _log(f"epithet nomination generation failed: {failure.getErrorMessage()}")
+    log_warn(
+        "title_nomination_generation_failed",
+        exc=failure.value,
+        context={"reason": failure.getErrorMessage()},
+    )
     failure.trap(Exception)
 
 
@@ -180,7 +184,11 @@ def schedule_epithet_nomination(
         generation.addErrback(_log_generation_error)
         return generation
     except Exception as error:  # noqa: BLE001 - fire-and-forget contract
-        _log(f"epithet nomination scheduling failed: {error}")
+        log_warn(
+            "title_nomination_scheduling_failed",
+            exc=error,
+            context={"char": getattr(entity, "pk", 0) or 0},
+        )
         return None
 
 
@@ -200,7 +208,11 @@ def schedule_rest_boundary_nomination(entity: Any, events: Any) -> None:
 
         schedule_epithet_nomination(entity, watchers=watchers_for(entity))
     except Exception as error:  # noqa: BLE001 - fire-and-forget contract
-        _log(f"rest-boundary nomination trigger failed: {error}")
+        log_warn(
+            "title_nomination_rest_trigger_failed",
+            exc=error,
+            context={"char": getattr(entity, "pk", 0) or 0},
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +225,7 @@ def _watchers(entity: Any) -> tuple:
 
     try:
         return watchers_for(entity)
-    except Exception:  # noqa: BLE001 - presentation-only input
+    except Exception:  # noqa: BLE001 - presentation-only input # observability: ignore R2: presentation-only fallback; an empty watcher tuple degrades the push only
         return ()
 
 
@@ -239,7 +251,11 @@ def _schedule_committed(entity: Any) -> None:
     try:
         schedule_epithet_nomination(entity, watchers=_watchers(entity))
     except Exception as error:  # noqa: BLE001 - fire-and-forget contract
-        _log(f"post-commit nomination scheduling failed: {error}")
+        log_warn(
+            "title_nomination_post_commit_failed",
+            exc=error,
+            context={"char": getattr(entity, "pk", 0) or 0},
+        )
 
 
 _TRIGGERS_REGISTERED = False

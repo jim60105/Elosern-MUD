@@ -7,12 +7,13 @@ for allowing Characters to traverse the exit to its destination.
 
 """
 
-import logging
 from typing import Any
 
 from evennia.contrib.grid.wilderness.wilderness import WildernessExit, enter_wilderness
 from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
 from evennia.objects.objects import DefaultExit
+
+from world.observability import log_warn
 
 from .objects import ObjectParent
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
@@ -24,7 +25,6 @@ from world.maps.wilderness_destination import (
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.movement_settlement import settle_movement
 
-logger = logging.getLogger(__name__)
 
 
 def after_successful_movement(
@@ -158,7 +158,7 @@ class MovementCostMixin:
         try:
             if accessing_obj.locks.lock_bypass:
                 return True
-        except AttributeError:
+        except AttributeError:  # observability: ignore R2: a caller without lock plumbing is the documented anonymous-access shape, not a failure; the superuser checks below decide
             pass
         if getattr(accessing_obj, "is_superuser", False):
             return True
@@ -247,12 +247,13 @@ class WildernessGateExit(Exit):
             # Misconfigured gate (unset/unknown anchor_key or gate_direction):
             # resolve fails closed BEFORE the settlement boundary opens, so no
             # move, charge, or knowledge write happens.
-            logger.warning(
-                "WildernessGateExit #%s: no registered gate for anchor_key=%r "
-                "gate_direction=%r; refusing traversal.",
-                self.id,
-                self.db.anchor_key,
-                self.db.gate_direction,
+            log_warn(
+                "wilderness_gate_misconfigured",
+                context={
+                    "exit": self.id,
+                    "anchor_key": self.db.anchor_key,
+                    "gate_direction": self.db.gate_direction,
+                },
             )
             return False
         source_location = traversing_object.location

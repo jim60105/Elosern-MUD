@@ -10,8 +10,7 @@ which never imports this module — the dependency direction is
 from dataclasses import dataclass
 from typing import Any
 
-from evennia.utils.logger import log_warn
-
+from world.observability import log_warn
 from typeclasses.components import GuildStaff, OnboardingGuide
 from typeclasses.npcs import NPC
 from world.maps.bootstrap import SOUTH_GATE_XYZ
@@ -109,9 +108,11 @@ def relocate_to_starting_location(character: Any) -> None:
                 character.msg(_DEGRADATION_NOTICE)
                 return
     except Exception as error:
-        from evennia.utils.logger import log_warn
-
-        log_warn(f"relocate_to_starting_location: relocation failed: {error}")
+        log_warn(
+            "onboarding_relocation_failed",
+            exc=error,
+            context={"obj": str(character), "key": "location"},
+        )
         character.msg(_DEGRADATION_NOTICE)
         return
     from world.rules.map_knowledge import record_arrival
@@ -338,8 +339,8 @@ def sync_guard_npc() -> None:
     south_gate = _south_gate()
     if south_gate is None:
         log_warn(
-            "sync_guard_npc: South Gate room at "
-            f"{SOUTH_GATE_XYZ} not found; skipping guard creation."
+            "onboarding_guard_sync_south_gate_missing",
+            context={"xyz": SOUTH_GATE_XYZ, "action": "skip_guard_creation"},
         )
         return
     guards = search_object_by_tag(GUARD_NPC_TAG)

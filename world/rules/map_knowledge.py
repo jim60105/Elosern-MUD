@@ -26,8 +26,7 @@ from dataclasses import dataclass
 from copy import deepcopy
 from typing import Any
 
-from evennia.utils.logger import log_warn
-
+from world.observability import log_warn
 from world.maps.wilderness_provider import (
     WILDERNESS_MAX_X,
     WILDERNESS_MAX_Y,
@@ -122,7 +121,7 @@ def _registered_grid_bounds(z_map_key: str) -> tuple[int, int] | None:
         if not XYZGrid.objects.exists():
             return None
         xymap = get_xyzgrid().get_map(z_map_key)
-    except Exception:
+    except Exception:  # observability: ignore R2: read-only grid probe; an unavailable grid is reported as None and handled by the caller
         return None
     if xymap is None:
         return None
@@ -232,7 +231,7 @@ def validate_node(node_id: Any) -> bool:
     """Return ``True`` when ``node_id`` decodes, ``False`` otherwise."""
     try:
         decode_node(node_id)
-    except NodeIDError:
+    except NodeIDError:  # observability: ignore R2: the predicate's False return is the caller-visible result
         return False
     return True
 
@@ -286,10 +285,9 @@ def record_arrival(character: Any) -> None:
                 visits = _validated_visits(current)
             except KnowledgeError as error:
                 log_warn(
-                    "map_knowledge: record for {character} is corrupt ({error}); "
-                    "leaving it unchanged and recording nothing.",
-                    character=character,
-                    error=error,
+                    "map_knowledge_record_corrupt",
+                    exc=error,
+                    context={"obj": str(character), "key": KNOWLEDGE_ATTR},
                 )
                 return
             record = {"schema_version": SCHEMA_VERSION, "visited": visits}
@@ -308,10 +306,9 @@ def record_arrival(character: Any) -> None:
         character.attributes.add(KNOWLEDGE_ATTR, record)
     except Exception as error:
         log_warn(
-            "map_knowledge: record_arrival failed for {character} ({error}); "
-            "the traversal still completes.",
-            character=character,
-            error=error,
+            "map_knowledge_record_arrival_failed",
+            exc=error,
+            context={"obj": str(character), "key": KNOWLEDGE_ATTR},
         )
 
 
@@ -375,9 +372,9 @@ def prune_reclaimed_room(room_id: int) -> bool:
             visits = _validated_visits(current)
         except KnowledgeError as error:
             log_warn(
-                "map_knowledge: prune skipped corrupt record on {character} ({error}).",
-                character=character,
-                error=error,
+                "map_knowledge_prune_skipped_corrupt_record",
+                exc=error,
+                context={"obj": str(character), "key": KNOWLEDGE_ATTR, "room_id": room_id},
             )
             continue
         if target not in visits:
@@ -393,14 +390,25 @@ def prune_reclaimed_room(room_id: int) -> bool:
             for character_restore, snapshot in zip(touched, snapshots):
                 try:
                     _write_knowledge(character_restore, snapshot)
-                except Exception:
-                    pass
+                except Exception as restore_error:
+                    log_warn(
+                        "rollback_restore_failed",
+                        exc=restore_error,
+                        context={
+                            "stage": "map_knowledge_prune_restore",
+                            "obj": str(character_restore),
+                            "key": KNOWLEDGE_ATTR,
+                        },
+                    )
             log_warn(
-                "map_knowledge: prune of room:{room_id} failed for {character} "
-                "({error}); snapshots restored.",
-                room_id=room_id,
-                character=character,
-                error=error,
+                "map_knowledge_prune_failed",
+                exc=error,
+                context={
+                    "room_id": room_id,
+                    "obj": str(character),
+                    "key": KNOWLEDGE_ATTR,
+                    "restored_count": len(touched),
+                },
             )
             raise KnowledgePruneError(
                 f"failed to prune reclaimed room {room_id}"

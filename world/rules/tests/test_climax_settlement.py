@@ -346,7 +346,7 @@ class ClimaxRollbackTests(EvenniaTest):
             ),
         ]
         with self.assertRaises(CommitFailed) as caught:
-            _commit(effects)
+            _commit(effects, char="tester", action="test_skill")
         self.assertIs(caught.exception.reason, RejectReason.COMMIT_FAILED)
         self.assertFalse(
             entity.attributes.has("climax_turns", category="sexual_state")

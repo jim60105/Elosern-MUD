@@ -9,8 +9,7 @@ and other merchants still settle.
 
 from typing import Any
 
-from evennia.utils.logger import log_warn
-
+from world.observability import log_warn
 from typeclasses.npcs import NPC
 from typeclasses.components import Merchant
 from world.rules.clock import CLOCK_YAML, ScheduledEvent, SurfaceSnapshot, register_event_source
@@ -89,15 +88,15 @@ def _apply_restock_days(
         for key, value in dict(raw_stock).items():
             if key not in offers or isinstance(value, bool) or not isinstance(value, int) or value < 0:
                 log_warn(
-                    f"caravan_arrivals: malformed stock on {host.key}; "
-                    "leaving host unchanged"
+                    "caravan_arrivals_malformed_stock",
+                    context={"host": host.key, "item_key": key, "action": "leave_host_unchanged"},
                 )
                 return []
             stock[key] = int(value)
     else:
         log_warn(
-            f"caravan_arrivals: malformed stock on {host.key}; "
-            "leaving host unchanged"
+            "caravan_arrivals_malformed_stock",
+            context={"host": host.key, "action": "leave_host_unchanged"},
         )
         return []
 
@@ -134,8 +133,8 @@ def settle_caravan_arrivals(start_tick: int, end_tick: int) -> list[ScheduledEve
         shop_config = catalog.shop_configs.get(shop_key)
         if shop_config is None:
             log_warn(
-                f"caravan_arrivals: merchant {host.key} has unknown shop "
-                f"{shop_key!r}"
+                "caravan_arrivals_unknown_shop",
+                context={"host": host.key, "shop_key": shop_key},
             )
             continue
         restock_hour = shop_config.restock_hour
@@ -150,8 +149,8 @@ def settle_caravan_arrivals(start_tick: int, end_tick: int) -> list[ScheduledEve
             last_day = start_boundary
         elif isinstance(current, bool) or not isinstance(current, int):
             log_warn(
-                f"caravan_arrivals: malformed last_restock_day on {host.key}; "
-                "leaving host unchanged"
+                "caravan_arrivals_malformed_last_restock_day",
+                context={"host": host.key, "last_restock_day": repr(current)},
             )
             continue
         else:

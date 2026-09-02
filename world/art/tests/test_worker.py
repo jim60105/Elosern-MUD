@@ -670,7 +670,7 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
         requeue(subject)
         with self._formats("webp", ".webp"):
             with patch("pathlib.Path.unlink", side_effect=OSError("read-only")):
-                with patch("evennia.logger.log_warn") as warned:
+                with patch("world.art.worker.log_warn") as warned:
                     with self._client(FakeSDWebUIClient()):
                         drain_synchronous(10)
         record = self._record_for(subject)

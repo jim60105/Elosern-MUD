@@ -14,7 +14,7 @@
         "world.rules.tests.test_buffs",
         "world.rules.tests.test_cap_break_turnin",
         "world.rules.tests.test_cast_settlement",
-      "world.rules.tests.test_cast_settlement_sexual_coercion",
+        "world.rules.tests.test_cast_settlement_sexual_coercion",
         "world.rules.tests.test_character_creation",
         "world.rules.tests.test_climax_phase_cycle",
         "world.rules.tests.test_climax_settlement",
@@ -103,7 +103,8 @@
         "world.rules.tests.test_onboarding_journey",
         "world.rules.tests.test_ordered_level_trait",
         "world.rules.tests.test_overwhelm_compression",
-        "world.rules.tests.test_overwhelm_resolution"
+        "world.rules.tests.test_overwhelm_resolution",
+        "world.rules.tests.test_rules_observability"
       ]
     },
     {
@@ -174,6 +175,7 @@
         "web.webclient",
         "world.imports",
         "world.prompts",
+        "world.observability",
         "world.tests"
       ]
     },

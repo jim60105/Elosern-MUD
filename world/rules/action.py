@@ -1,5 +1,6 @@
 """Atomic, deterministic skill-action resolution."""
 
+import time
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from enum import StrEnum
@@ -8,6 +9,7 @@ from typing import Any, Callable, Literal
 from django.db import transaction
 
 from typeclasses.monsters import Monster
+from world.observability import log_info, log_warn
 from world.lore.races import RACE_REGISTRY
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
@@ -2062,19 +2064,21 @@ def _restore_touched_best_effort(
     leaves the next read consistent with persistence instead of serving a
     stale value.
     """
-    from evennia.utils.logger import log_warn
-
     try:
         _restore_touched(obj, snapshot, surfaces)
     except Exception as error:
         try:
             obj.attributes.reset_cache()
-        except Exception:
+        except Exception:  # observability: ignore R2: cache invalidation is best-effort; the restore failure itself is logged below
             pass
-        log_warn(f"action commit could not restore {obj}: {error}")
+        log_warn(
+            "rollback_restore_failed",
+            exc=error,
+            context={"stage": "action_commit", "obj": str(obj), "key": "touched"},
+        )
 
 
-def _commit(pending: list[PendingEffect]) -> None:
+def _commit(pending: list[PendingEffect], *, char: str, action: str) -> None:
     for effect in pending:
         unsupported = effect.surfaces - SNAPSHOTTED_SURFACES
         if unsupported:
@@ -2098,9 +2102,22 @@ def _commit(pending: list[PendingEffect]) -> None:
         for entity in touched
     }
     try:
+        started = time.monotonic()
         with transaction.atomic():
             for effect in pending:
                 effect.apply()
+            # Boundary event fires only on the OUTERMOST durable commit: the
+            # resolver's atomic block is routinely a savepoint inside a
+            # combat/item transaction, and a rolled-back outer unit must not
+            # leave an action_commit line behind (on_commit discards it).
+            effects = len(pending)
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            transaction.on_commit(
+                lambda: log_info(
+                    "action_commit",
+                    context={"char": char, "action": action, "ms": elapsed_ms, "effects": effects},
+                )
+            )
     except Exception as error:
         for entity in touched:
             _restore_touched_best_effort(entity, snapshots[id(entity)], surfaces_of[id(entity)])
@@ -2142,7 +2159,7 @@ class ActionResolver:
                         f"missing event_context key {sorted(missing)[0]!r}",
                     )
             _step8_time_cost(request, skill)
-        except RejectedAction as rejection:
+        except RejectedAction as rejection:  # observability: ignore R2: the rejection is returned to the caller as ActionResult.rejected; it is reported, not swallowed
             return ActionResult.rejected(rejection.reason, rejection.detail)
         return ActionResult.success(None, None)
 
@@ -2191,11 +2208,17 @@ class ActionResolver:
                 ) from error
             time_cost = _step8_time_cost(request, skill)
             event_log = replace(event_log, time_cost_seconds=time_cost)
-        except RejectedAction as rejection:
+        except RejectedAction as rejection:  # observability: ignore R2: the rejection is returned to the caller as ActionResult.rejected; it is reported, not swallowed
             return ActionResult.rejected(rejection.reason, rejection.detail)
         try:
-            _commit(pending)
-        except CommitFailed as failure:
+            _commit(
+                pending,
+                # Design context convention: char is the pk, never the
+                # user-controlled display key (stable join, no PII retention).
+                char=str(request.actor.pk),
+                action=request.skill_key,
+            )
+        except CommitFailed as failure:  # observability: ignore R2: the commit failure is returned as ActionResult.rejected after the rollback/restore path logged every failed surface restore
             # The staged practice awards rolled back with everything else; the
             # dedupe claims they took must be released so a legitimate
             # same-tick retry still accrues (rubber-duck DC3 finding).

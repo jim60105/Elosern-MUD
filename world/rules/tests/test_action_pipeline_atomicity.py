@@ -37,7 +37,7 @@ class ActionPipelineAtomicityTests(EvenniaTestCase):
             ),
         ]
         with self.assertRaises(CommitFailed) as caught:
-            _commit(effects)
+            _commit(effects, char="tester", action="test_skill")
         self.assertIs(caught.exception.reason, RejectReason.COMMIT_FAILED)
         self.assertEqual(entity.traits.atk_phys.value, before)
         self.assertEqual(dict(entity.traits.trait_data), raw_before)
@@ -66,7 +66,7 @@ class ActionPipelineAtomicityTests(EvenniaTestCase):
             ),
         ]
         with self.assertRaises(CommitFailed):
-            _commit(effects)
+            _commit(effects, char="tester", action="test_skill")
         self.assertEqual(_stored_trait_value(entity.traits.mp), before)
         self.assertFalse(entity.attributes.has("sexual_traits", category="traits"))
         self.assertEqual(entity.sexual.arousal.value, 0)

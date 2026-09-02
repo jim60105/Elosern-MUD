@@ -13,13 +13,14 @@ changes 18-21 add their hooks without editing the pipeline.
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable, Mapping
 from typing import Any
 
 from jsonschema import Draft7Validator
 from twisted.internet import defer
 
-from evennia import logger
+from world.observability import log_debug, log_info
 
 from world.ai.errors import LLMTransportError
 from world.ai.profiles import LAYER_NAMES, UnknownLayerError, get_profile
@@ -68,8 +69,20 @@ def _degrade(layer: str) -> Any:
     fallback = _degrade_fallbacks.get(layer)
     if fallback is None:
         raise NoDegradeFallbackError(layer)
-    logger.log_info(f"guardrail: {layer} degraded")
     return fallback()
+
+
+def _emit_call(layer: str, profile: Any, started: float, result: str, reason: str | None) -> None:
+    """Write the single ``llm_call`` boundary event for one guarded call."""
+    context: dict[str, Any] = {
+        "layer": layer,
+        "profile": profile.model,
+        "ms": int((time.monotonic() - started) * 1000),
+        "result": result,
+    }
+    if reason is not None:
+        context["reason"] = reason
+    log_info("llm_call", context=context)
 
 
 def _jsonschema_errors(instance: Any, schema: Mapping[str, Any]) -> list[str]:
@@ -128,10 +141,33 @@ def guarded_call(layer: str, client: Any, descriptor: ChatRequestDescriptor):
         A Deferred resolving to the accepted text, or the layer's degrade
         fallback result when the profile is disabled, a transport failure
         occurs, or the retry budget is exhausted.
+
+    Observability: exactly one ``llm_call`` boundary event per call —
+    ``ok``, ``degraded`` (with the degrade reason), or ``rejected`` when an
+    unexpected error escapes the pipeline (including a failing degrade
+    fallback); escaping errors are re-raised unchanged. The degraded event
+    is written only after the fallback actually returned, so a raising
+    fallback yields one ``rejected`` event, never a prior ``degraded``.
     """
     profile = get_profile(layer)
+    started = time.monotonic()
+    try:
+        result = yield _guarded_pipeline(layer, profile, client, descriptor, started)
+    except Exception as error:
+        _emit_call(layer, profile, started, "rejected", f"unexpected_error:{type(error).__name__}")
+        raise
+    return result
+
+
+@defer.inlineCallbacks
+def _guarded_pipeline(
+    layer: str, profile: Any, client: Any, descriptor: ChatRequestDescriptor, started: float
+):
+    """One validation-retry-degrade pass; emits its own terminal event."""
     if not profile.enabled:
-        return _degrade(layer)
+        fallback = _degrade(layer)
+        _emit_call(layer, profile, started, "degraded", "profile_disabled")
+        return fallback
 
     output_schema = resolve_output_schema(
         descriptor.output_schema, descriptor.schema_id
@@ -147,8 +183,10 @@ def guarded_call(layer: str, client: Any, descriptor: ChatRequestDescriptor):
         )
         try:
             text = yield client.get_response(attempt_descriptor)
-        except LLMTransportError:
-            return _degrade(layer)
+        except LLMTransportError:  # observability: ignore R2: llm_call event below; the client layer owns the llm_transport_error chain
+            fallback = _degrade(layer)
+            _emit_call(layer, profile, started, "degraded", "transport_error")
+            return fallback
         try:
             errors = _validate_output(
                 layer,
@@ -156,10 +194,19 @@ def guarded_call(layer: str, client: Any, descriptor: ChatRequestDescriptor):
                 output_schema,
                 attempt_descriptor.semantic_validators,
             )
-        except LLMTransportError:
-            return _degrade(layer)
+        except LLMTransportError:  # observability: ignore R2: llm_call event below; unparseable output is fully named by the degrade reason
+            fallback = _degrade(layer)
+            _emit_call(layer, profile, started, "degraded", "transport_error")
+            return fallback
         if not errors:
+            _emit_call(layer, profile, started, "ok", None)
             return text
+        log_debug(
+            "llm_call_retry",
+            context={"layer": layer, "attempt": attempt, "errors": len(errors)},
+        )
         if attempt < budget - 1:
             messages = messages + (_error_message(errors),)
-    return _degrade(layer)
+    fallback = _degrade(layer)
+    _emit_call(layer, profile, started, "degraded", "invalid_output")
+    return fallback

@@ -958,7 +958,7 @@ class TitleCommitRollbackTests(EvenniaTest):
 
     def test_failed_commit_restores_absent_title_state(self):
         with self.assertRaises(CommitFailed):
-            _commit([self._bank_effect(), self._raising_effect()])
+            _commit([self._bank_effect(), self._raising_effect()], char="tester", action="test_skill")
         self.assertEqual(
             read_title_state(self.actor), ([], {"fixed": None, "epithet": None})
         )
@@ -968,11 +968,11 @@ class TitleCommitRollbackTests(EvenniaTest):
         bank_fixed(self.actor, "g_f_rank", 1)
         before = deepcopy(read_title_state(self.actor))
         with self.assertRaises(CommitFailed):
-            _commit([self._bank_effect("g_e_rank"), self._raising_effect()])
+            _commit([self._bank_effect("g_e_rank"), self._raising_effect()], char="tester", action="test_skill")
         self.assertEqual(read_title_state(self.actor), before)
 
     def test_a_successful_commit_grants_once(self):
-        _commit([self._bank_effect("g_f_rank")])
+        _commit([self._bank_effect("g_f_rank")], char="tester", action="test_skill")
         self.assertEqual(banked_fixed_keys(self.actor), ("g_f_rank",))
 
     def test_failed_commit_restores_the_removal_log_surface(self):
@@ -1000,7 +1000,7 @@ class TitleCommitRollbackTests(EvenniaTest):
             self._raising_effect(),
         ]
         with self.assertRaises(CommitFailed):
-            _commit(effects)
+            _commit(effects, char="tester", action="test_skill")
         self.assertEqual(self.actor.attributes.get(REMOVALS_LOG_KEY), before_log)
 
 

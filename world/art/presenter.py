@@ -9,7 +9,8 @@ Change 23f's browser panel consumes these primitives; this change owns them.
 from pathlib import Path
 
 from django.conf import settings
-from evennia import logger
+
+from world.observability import log_warn
 
 from world.art.adult import portrait_eligibility
 from world.art.formats import STORE_EXTENSIONS
@@ -66,7 +67,7 @@ def _validated_output_identity(subject: ArtSubject, identity: str | None) -> str
     try:
         resolved = target.resolve()
         root = Path(settings.ART_STORE_ROOT).resolve()
-    except OSError:
+    except OSError:  # observability: ignore R2: identity validation probe; None is the caller's placeholder signal
         return None
     if resolved == root or root not in resolved.parents or not resolved.is_file():
         return None
@@ -110,9 +111,7 @@ def resolve_subject(subject: ArtSubject) -> dict:
         }
     identity = _validated_output_identity(subject, record.db.output_identity)
     if identity is None:
-        logger.log_warn(
-            f"art presenter found missing or invalid output for {subject.full()}"
-        )
+        log_warn("art_asset_output_missing", context={"subject": subject.full()})
         return _placeholder_unavailable("無法提供")
     return {
         "kind": "asset",
@@ -134,13 +133,13 @@ def resolve_character(entity) -> dict:
     """
     try:
         subject = character_subject_for(entity)
-    except ArtSubjectError:
+    except ArtSubjectError:  # observability: ignore R2: unresolvable subject -> specified unavailable placeholder payload
         subject = None
     if subject is None:
         return _placeholder_unavailable("無肖像")
     try:
         portrait_eligibility(entity)
-    except Exception:
+    except Exception:  # observability: ignore R2: adult-gate failure -> specified unavailable placeholder; eligibility errors must never leak
         return _placeholder_unavailable("無法提供")
     return resolve_subject(subject)
 
@@ -160,7 +159,7 @@ def resolve_entity(entity) -> dict:
     if threat_tier in MONSTER_TIER_REGISTRY:
         try:
             subject = monster_subject_for(threat_tier)
-        except ArtSubjectError:
+        except ArtSubjectError:  # observability: ignore R2: unregistered tier -> specified unavailable placeholder
             return _placeholder_unavailable("無法提供")
         payload = resolve_subject(subject)
         payload["subject_key"] = subject.full()
@@ -174,7 +173,7 @@ def resolve_scene(archetype: str) -> dict:
 
     try:
         subject = scene_subject_for(archetype)
-    except ArtSubjectError:
+    except ArtSubjectError:  # observability: ignore R2: unregistered archetype -> specified unavailable placeholder
         return _placeholder_unavailable("無法提供")
     return resolve_subject(subject)
 

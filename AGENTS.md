@@ -57,6 +57,36 @@ The main code areas are:
 - The project has no released users. Do not add backward-compatibility layers or
   data migrations unless a task explicitly requires them.
 
+## Observability
+
+- All game-code operational logging goes through the `world.observability`
+  facade (`log_debug`/`log_info`/`log_warn`/`log_error`). Importing the Evennia
+  logger or stdlib `logging` in production modules is forbidden and enforced by
+  `uv run --locked python -m tools.observability_lint check`. Production code
+  uses named imports (`from world.observability import log_warn`); event
+  assertions in tests patch the caller module's binding, never
+  `world.observability.*`.
+- `event` is a stable snake_case identifier in English; player-facing prose
+  never enters logs. Exception chains ride `exc=` (any level renders a one-line
+  `tb:` summary; `log_error` also double-writes the full traceback).
+- Every call carries a `context` dict; put every business identifier available
+  at the site (`room`, `tick`, `layer`, `quest`, `job`, `char`, `step`, ...) in
+  context keys instead of the message text.
+- An `except` block must do exactly one of three things: re-raise, emit a
+  facade event with the exception, or carry a reasoned exemption comment
+  (`# observability: ignore R2: <reason>`). Silent swallowing is a lint
+  violation in facade-adopter files.
+- Normal paths leave traces: any new or changed persistent state change,
+  external I/O, or cross-system workflow emits its boundary info event per the
+  catalog in
+  `docs/superpowers/specs/2026-09-02-observability-logging-design.md` §4
+  (`cmd_in`/`cmd_done`, `startup_step`, `action_commit`, `clock_advance`,
+  `llm_call`, worker settlement events, ...).
+- Whenever a logging code path changes, run the observability lint plus the
+  focused tests in the same batch. The freeze list
+  `tools/observability_freeze.json` is shrink-only: migrating a file removes
+  its entry in the same change, never adds one.
+
 ## Python and Evennia conventions
 
 - Match the surrounding Python style: four spaces, modern type annotations

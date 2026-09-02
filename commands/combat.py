@@ -1,6 +1,6 @@
 """Player-facing combat engagement, forfeit, and guild-examination commands."""
 
-from evennia import Command
+from commands.command import Command
 
 from typeclasses.components import GuildExaminer
 from world.rules.combat_session import (

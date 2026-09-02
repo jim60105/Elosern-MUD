@@ -5,7 +5,11 @@ Commands describe the input the account can do to the game.
 
 """
 
+import time
+
 from evennia.commands.command import Command as BaseCommand
+
+from world.observability import log_info
 
 # from evennia import default_cmds
 
@@ -30,7 +34,35 @@ class Command(BaseCommand):
     #     - at_post_cmd(): Extra actions, often things done after
     #         every command, like prompts.
     #
-    pass
+    # Command-boundary observability (design §4.1): cmd_in/cmd_done bracket
+    # normal execution. The Evennia cmdhandler invokes at_post_cmd only after
+    # func() completes without error, so cmd_done always means outcome=ok;
+    # an aborted command is reconstructed from an unpaired cmd_in.
+
+    def at_pre_cmd(self) -> None:
+        """Emit the cmd_in boundary event before parse/func."""
+        self._observability_started = time.perf_counter()
+        char = getattr(self.caller, "pk", 0) or 0
+        args = self.args or ""
+        log_info(
+            "cmd_in",
+            context={"char": char, "cmd": self.key, "args": args[:200]},
+        )
+        return None
+
+    def at_post_cmd(self) -> None:
+        """Emit the cmd_done boundary event after normal completion."""
+        started = getattr(self, "_observability_started", None)
+        elapsed_ms = (
+            int((time.perf_counter() - started) * 1000)
+            if started is not None
+            else -1
+        )
+        char = getattr(self.caller, "pk", 0) or 0
+        log_info(
+            "cmd_done",
+            context={"char": char, "cmd": self.key, "ms": elapsed_ms, "outcome": "ok"},
+        )
 
 
 # -------------------------------------------------------------

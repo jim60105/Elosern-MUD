@@ -14,6 +14,8 @@ mutation helper: calendar data comes only from the read-only
 
 from typing import Any, Callable
 
+from world.observability import log_warn
+
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
     MAX_SAFE_INTEGER,
@@ -239,10 +241,15 @@ def publish_panel_update(
         return None
     try:
         return coordinator.panel_update(context, panels)
-    except Exception:
-        # A guarded push's contract is a silent no-op on any failure: an
+    except Exception as error:
+        # A guarded push's contract is a silent no-op toward its caller: an
         # async delivery cannot raise into the generation route, and the
         # session's next snapshot re-establishes the truth.
+        log_warn(
+            "presentation_push_failed",
+            context={"surface": "presentation", "panels": str(panels)},
+            exc=error,
+        )
         return None
 
 
@@ -254,6 +261,7 @@ def detach_coordinator(session: Any) -> None:
 
 def log_unavailable(session_tag: str, message: str) -> None:
     """Log a safe presentation-unavailable notice without a traceback."""
-    from evennia.utils.logger import log_err
-
-    log_err("presentation %s: %s" % (session_tag, message))
+    log_warn(
+        "presentation_unavailable",
+        context={"surface": "presentation", "session": session_tag, "reason": message},
+    )

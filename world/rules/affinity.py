@@ -14,8 +14,8 @@ from enum import StrEnum
 from typing import Any
 
 from django.db import transaction
-from evennia.utils.logger import log_warn
 
+from world.observability import log_warn
 from world.rules.affinity_config import AffinityStage, get_config
 from world.rules.clock import CLOCK_YAML
 
@@ -72,7 +72,10 @@ class AffinityRecord:
             try:
                 data = dict(data)
             except (TypeError, ValueError):
-                _recover("record is not a mapping")
+                log_warn(
+                    "affinity_relations_record_reset",
+                    context={"reason": "record is not a mapping"},
+                )
                 return cls()
         fields = {}
         for field, default in (
@@ -93,7 +96,7 @@ class AffinityRecord:
 
 
 def _recover(reason: str) -> None:
-    log_warn(f"affinity: relations record reset to defaults: {reason}")
+    log_warn("affinity_relations_record_reset", context={"reason": reason})
 
 
 class RelationHandler:
@@ -112,7 +115,10 @@ class RelationHandler:
         if raw is None:
             return {}
         if not hasattr(raw, "items"):
-            log_warn("affinity: relations_data is not a mapping; treating as empty")
+            log_warn(
+                "affinity_relations_data_not_mapping",
+                context={"npc": str(self.npc), "key": "relations_data"},
+            )
             return {}
         return {str(key): value for key, value in dict(raw).items()}
 
@@ -224,7 +230,7 @@ def apply_affinity_change(
     if isinstance(source, str):
         try:
             source = AffinitySource(source)
-        except ValueError:
+        except ValueError:  # observability: ignore R2: an unknown source is a validation rejection surfaced to the caller as a rejected outcome
             return AffinityChangeOutcome.rejected()
     elif not isinstance(source, AffinitySource):
         return AffinityChangeOutcome.rejected()

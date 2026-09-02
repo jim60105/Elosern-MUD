@@ -676,7 +676,7 @@ class BattlefieldCommitSurfaceTests(EvenniaTestCase):
             ),
         ]
         with self.assertRaises(Exception) as caught:
-            _commit(effects)
+            _commit(effects, char="tester", action="test_skill")
         self.assertIs(caught.exception.reason, RejectReason.COMMIT_FAILED)
         self.assertEqual(field.knocked_out, set())
         self.assertEqual(field.fled, set())
@@ -713,7 +713,7 @@ class BattlefieldCommitSurfaceTests(EvenniaTestCase):
             ),
         ]
         with self.assertRaises(Exception) as caught:
-            _commit(effects)
+            _commit(effects, char="tester", action="test_skill")
         self.assertIs(caught.exception.reason, RejectReason.COMMIT_FAILED)
         self.assertEqual(entity.traits.atk_phys.value, before)
         self.assertEqual(field.knocked_out, {str(entity.key)})

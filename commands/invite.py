@@ -9,7 +9,7 @@ decides; otherwise the reply's speech is shown and its verified
 is never bound by the threshold -- only the degraded terminal consults it.
 """
 
-from evennia import Command
+from commands.command import Command
 
 from commands.talk import _resolve_npc
 from typeclasses.npcs import LLMNPC

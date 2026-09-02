@@ -21,6 +21,7 @@ from types import MappingProxyType
 
 from evennia.utils.create import create_object
 
+from world.observability import log_warn
 from typeclasses.monsters import Monster
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
@@ -171,7 +172,12 @@ def _session_participant_ids() -> frozenset[int]:
             continue
         try:
             record = from_storage(dict(raw))
-        except Exception:
+        except Exception as error:
+            log_warn(
+                "combat_session_payload_unparseable_skip",
+                exc=error,
+                context={"char": player.key or str(player.pk), "key": "active_combat"},
+            )
             continue
         participants.update(record.player_ids)
         participants.update(record.enemy_ids)

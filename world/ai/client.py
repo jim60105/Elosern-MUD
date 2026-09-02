@@ -29,9 +29,8 @@ from world.ai.schemas.descriptor import ChatRequestDescriptor
 from world.ai.schemas.registry import resolve_output_schema
 from world.ai.schemas.response import validate_chat_completion_envelope
 
-from evennia import logger
-
-_SAFE_LOG_PREFIX = "LLM client"
+from world.observability import log_warn
+from world.observability.sanitize import safe_endpoint
 
 # Verbatim-passthrough sampling knobs (endpoint design §4.2 request order).
 _TOKEN_FIELDS: tuple[str, ...] = (
@@ -67,6 +66,79 @@ def _request_headers(profile: LLMProfile) -> dict[str, list[str]]:
     for name, values in profile.headers.items():
         headers[name] = list(values)
     return headers
+
+
+class _RedactedChainLink(Exception):
+    """Stand-in for a chain link whose text carried the api key.
+
+    Instances are built with the original link's type name so the rendered
+    ``tb`` segment still identifies the exception type while its message is
+    scrubbed.
+    """
+
+
+def _copy_chain_link(link: BaseException, api_key: str) -> BaseException:
+    """Copy one chain link, scrubbing the key from its observable text.
+
+    A type-preserving copy keeps ``args``, ``__dict__`` (so ``kind``-style
+    attributes survive) and the traceback (so the rendered raise site is the
+    real one). If the key still appears in the copy's ``str()`` — a custom
+    ``__str__`` closing over the credential — the copy degrades to a
+    name-preserving ``_RedactedChainLink`` with the scrubbed message.
+    """
+    try:
+        copy = type(link).__new__(type(link))
+        copy.__dict__.update(link.__dict__)
+        copy.args = tuple(
+            value.replace(api_key, "[redacted]")
+            if isinstance(value, str) and api_key in value
+            else value
+            for value in link.args
+        )
+    except Exception:  # observability: ignore R2: copy failure must not raise — an uncopyable link degrades to the scrubbing stand-in below, never a log that could carry the key
+        copy = None
+    if copy is None or (copy is not None and api_key in str(copy)):
+        message = str(link).replace(api_key, "[redacted]")
+        copy = type(
+            type(link).__name__,
+            (_RedactedChainLink,),
+            {"__module__": type(link).__module__},
+        )(message)
+    copy.__traceback__ = link.__traceback__
+    copy.__suppress_context__ = link.__suppress_context__
+    return copy
+
+
+def _redact_chain(error: BaseException, api_key: str) -> BaseException:
+    """Return the exception chain with every link's text key-scrubbed.
+
+    The observability facade renders the full ``__cause__``/``__context__``
+    chain into the log line, and a hostile endpoint can smuggle the bearer
+    key into an exception chained to the scrubbed ``LLMTransportError``. The
+    api-key non-disclosure invariant is fail-closed, so the emitted chain is
+    a copy with each link scrubbed; when no link carries the key the
+    original error is returned untouched.
+    """
+    from world.observability.render import _chain
+
+    links = _chain(error)
+    if not api_key or not any(api_key in str(link) for link in links):
+        return error
+    outer: BaseException | None = None
+    # ``_chain`` is innermost-first; rebuild outermost-first so every inner
+    # copy relinks to its outer neighbour's replacement.
+    for index in range(len(links) - 1, -1, -1):
+        link = links[index]
+        copy = _copy_chain_link(link, api_key)
+        if outer is not None:
+            neighbour = links[index + 1]
+            if link.__cause__ is neighbour:
+                copy.__cause__ = outer
+            elif link.__context__ is neighbour:
+                copy.__context__ = outer
+        outer = copy
+    assert outer is not None
+    return outer
 
 
 class OpenAICompatClient(LLMClient):
@@ -206,12 +278,31 @@ class OpenAICompatClient(LLMClient):
         raise LLMTransportError("timeout", f"request timed out after {timeout}s")
 
     def _safe_log_error(self, failure):
-        """Log a safe error summary containing no prompt, body, or player text."""
+        """Log one bounded transport diagnostic containing no prompt, body, or player text.
+
+        ``LLMTransportError`` messages are static or key-scrubbed at
+        construction, but the facade also renders the chained links, so the
+        emitted chain is scrubbed link-by-link first. Residual unexpected
+        failure values never passed through the scrub, so their chain stays
+        fail-closed: only the exception type is logged.
+        """
         error = failure.value
         if isinstance(error, LLMTransportError):
-            logger.log_info(f"{_SAFE_LOG_PREFIX} {error.kind} failure")
+            log_warn(
+                "llm_transport_error",
+                context={
+                    "endpoint": safe_endpoint(
+                        self.profile.base_url.rstrip("/") + self.profile.path
+                    ),
+                    "kind": error.kind,
+                },
+                exc=_redact_chain(error, self.profile.api_key),
+            )
         else:
-            logger.log_info(f"{_SAFE_LOG_PREFIX} unexpected failure")
+            log_warn(
+                "llm_client_unexpected_error",
+                context={"kind": "unexpected", "exc_type": type(error).__name__},
+            )
         return failure
 
     def get_response(self, descriptor: ChatRequestDescriptor):

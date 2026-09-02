@@ -313,7 +313,7 @@ class CrossRequestSurfaceRestoreTests(EvenniaTestCase):
             ),
         ]
         with self.assertRaises(Exception) as caught:
-            _commit(effects)
+            _commit(effects, char="victim", action="quest_step")
         self.assertEqual(caught.exception.reason, RejectReason.COMMIT_FAILED)
         self.assertEqual(owner_one.db.quest_log, [{"quest_id": "owner-one:1"}])
         self.assertEqual(owner_two.db.quest_log, [{"quest_id": "owner-two:1"}])

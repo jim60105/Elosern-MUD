@@ -17,8 +17,8 @@ from enum import StrEnum
 from typing import Any
 
 from evennia.utils.create import create_object
-from evennia.utils.logger import log_warn
 
+from world.observability import log_warn
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer
 from typeclasses.npcs import NPC, ensure_npc_adult_identity
@@ -56,7 +56,11 @@ def _notify_exam_pass(actor: Any, target_rank: str) -> None:
         try:
             observer(actor, target_rank)
         except Exception as error:  # noqa: BLE001 - isolation is the contract
-            log_warn(f"exam pass observer failed: {error}")
+            log_warn(
+                "exam_pass_observer_failed",
+                exc=error,
+                context={"observer": getattr(observer, "__qualname__", str(observer))},
+            )
 
 
 class ExamReason(StrEnum):
@@ -246,8 +250,12 @@ def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
     except Exception:
         try:
             opponent.delete()
-        except Exception:
-            pass
+        except Exception as error:
+            log_warn(
+                "exam_opponent_delete_failed",
+                exc=error,
+                context={"stage": "spawn_opponent", "obj": str(opponent)},
+            )
         raise
     return opponent
 
@@ -385,8 +393,12 @@ def start_guild_exam(
         if opponent is not None:
             try:
                 opponent.delete()
-            except Exception:
-                pass
+            except Exception as error:
+                log_warn(
+                    "exam_opponent_delete_failed",
+                    exc=error,
+                    context={"stage": "start_exam_compensation", "obj": str(opponent)},
+                )
         raise
     return exam_record
 

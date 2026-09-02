@@ -17,7 +17,8 @@ never rolls back creation, import, spawn, or movement (design D7).
 """
 
 from django.db import transaction
-from evennia import logger
+
+from world.observability import log_error, log_info, log_warn
 
 from world.art.adult import PortraitRejected, portrait_eligibility
 from world.art.queue import ensure as queue_ensure
@@ -60,7 +61,7 @@ def _gate_at_schedule(entity) -> bool:
     try:
         portrait_eligibility(entity)
     except PortraitRejected as error:
-        logger.log_info(f"art portrait skipped at schedule: {error}")
+        log_info("art_portrait_skipped", context={"stage": "schedule"}, exc=error)
         return False
     return True
 
@@ -83,9 +84,9 @@ def schedule_portrait_ensure(entity) -> None:
         try:
             _ensure_character_portrait(entity)
         except PortraitRejected as error:
-            logger.log_info(f"art portrait skipped: {error}")
+            log_info("art_portrait_skipped", context={"stage": "ensure"}, exc=error)
         except Exception as error:  # noqa: BLE001 - bounded, never propagates
-            logger.log_warn(f"art portrait ensure failed: {error}")
+            log_warn("art_portrait_ensure_failed", context={"entity": entity.key}, exc=error)
 
     transaction.on_commit(_safe)
 
@@ -112,7 +113,7 @@ def _living_entity_for_stable_key(stable_key: str):
             continue
         try:
             subject = character_subject_for(entity)
-        except ArtSubjectError:
+        except ArtSubjectError:  # observability: ignore R2: scan skip; the unpaired entity yields no portrait request
             continue
         if subject is not None and subject.key == stable_key:
             return entity
@@ -171,7 +172,7 @@ def ensure_scene_asset(archetype) -> None:
         description = description_for(subject)
         queue_ensure(subject, description)
     except Exception as error:  # noqa: BLE001 - bounded, never blocks the move
-        logger.log_warn(f"art scene ensure skipped: {error}")
+        log_warn("art_scene_ensure_skipped", context={"archetype": archetype}, exc=error)
 
 
 def _sync_registry_subjects() -> None:
@@ -181,13 +182,13 @@ def _sync_registry_subjects() -> None:
             subject = scene_subject_for(archetype)
             queue_ensure(subject, description_for(subject))
         except ArtSubjectError as error:
-            logger.log_warn(f"art startup sync skipped scene {archetype!r}: {error}")
+            log_warn("art_startup_sync_skipped", context={"kind": "scene", "key": archetype}, exc=error)
     for tier in MONSTER_TIER_REGISTRY:
         try:
             subject = monster_subject_for(tier)
             queue_ensure(subject, description_for(subject))
         except ArtSubjectError as error:
-            logger.log_warn(f"art startup sync skipped monster {tier!r}: {error}")
+            log_warn("art_startup_sync_skipped", context={"kind": "monster", "key": tier}, exc=error)
 
 
 def _recover_named_portraits() -> None:
@@ -207,14 +208,14 @@ def _recover_named_portraits() -> None:
         try:
             subject = character_subject_for(entity)
         except ArtSubjectError as error:
-            logger.log_warn(f"art recovery skipped {entity.key}: {error}")
+            log_warn("art_recovery_skipped", context={"kind": "subject", "key": entity.key}, exc=error)
             continue
         if subject is None:
             continue
         try:
             portrait_eligibility(entity)
         except PortraitRejected as error:
-            logger.log_info(f"art recovery skipped portrait: {error}")
+            log_info("art_recovery_skipped", context={"kind": "portrait", "key": entity.key}, exc=error)
             continue
         _ensure_character_portrait(entity)
 
@@ -230,8 +231,8 @@ def art_sync_all() -> None:
     try:
         _sync_registry_subjects()
     except Exception as error:  # pragma: no cover - defensive startup isolation
-        logger.log_err(f"art startup registry sync failed: {error}")
+        log_error("art_startup_registry_sync_failed", context={"scope": "registry-sync"}, exc=error)
     try:
         _recover_named_portraits()
     except Exception as error:  # pragma: no cover - defensive startup isolation
-        logger.log_err(f"art startup portrait recovery failed: {error}")
+        log_error("art_startup_recovery_failed", context={"scope": "portrait-recovery"}, exc=error)

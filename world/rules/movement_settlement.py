@@ -38,10 +38,10 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from django.db import transaction
-from evennia.utils.logger import log_warn
 from evennia.utils.search import search_script
 
 from world.maps.wilderness_provider import WILDERNESS_NAME
+from world.observability import log_warn
 from world.quests.transitions import snapshot_pin_reasons, snapshot_quest_log
 from world.rules.clock import (
     AdvanceSource,
@@ -205,7 +205,9 @@ def _snapshot_movement_state(
                 # stale or corrupt companion is skipped, never allowed to abort
                 # the settlement before it starts.
                 log_warn(
-                    f"movement settlement: companion snapshot skipped {npc} ({error})"
+                    "movement_companion_snapshot_skipped",
+                    exc=error,
+                    context={"obj": str(npc)},
                 )
 
     itemcoordinates = rooms = unused_rooms = None
@@ -271,8 +273,9 @@ def _compensate_after_rollback(snapshot: MovementSnapshot) -> None:
         _compensate(snapshot)
     except Exception as error:
         log_warn(
-            f"movement settlement: compensation failed after a traversal failure "
-            f"({error})"
+            "movement_compensation_failed",
+            exc=error,
+            context={"obj": str(snapshot.traverser)},
         )
 
 
@@ -321,8 +324,13 @@ def _compensate_traverser(snapshot: MovementSnapshot) -> None:
             traverser.move_to(snapshot.source_location, quiet=True, move_hooks=False)
     except Exception as error:
         log_warn(
-            f"movement settlement: could not return {traverser} to "
-            f"{snapshot.source_location} ({error})"
+            "rollback_restore_failed",
+            exc=error,
+            context={
+                "stage": "movement_traverser",
+                "obj": str(traverser),
+                "key": "location",
+            },
         )
         _force_reconcile_location(traverser, snapshot.source_location)
 
@@ -350,8 +358,13 @@ def _compensate_companions(snapshot: MovementSnapshot) -> None:
                     npc.ndb.wilderness.at_post_object_leave(npc)
         except Exception as error:
             log_warn(
-                f"movement settlement: could not return companion {npc} to "
-                f"{companion.location} ({error})"
+                "rollback_restore_failed",
+                exc=error,
+                context={
+                    "stage": "movement_companion",
+                    "obj": str(npc),
+                    "key": "location",
+                },
             )
             _force_reconcile_location(npc, companion.location)
 
@@ -379,7 +392,11 @@ def _restore_wilderness_bookkeeping(snapshot: MovementSnapshot) -> None:
         try:
             setattr(wilderness.db, key, value)
         except Exception as error:
-            log_warn(f"movement settlement: could not restore wilderness {key} ({error})")
+            log_warn(
+                "rollback_restore_failed",
+                exc=error,
+                context={"stage": "movement_wilderness", "obj": "wilderness", "key": key},
+            )
 
 
 def _restore_surfaces(snapshot: MovementSnapshot) -> None:
@@ -396,7 +413,15 @@ def _restore_surfaces(snapshot: MovementSnapshot) -> None:
         # and refreshes the traverser's trait/sexual caches.
         _restore_advance_registry(snapshot.registry, (snapshot.traverser,))
     except Exception as error:
-        log_warn(f"movement settlement: could not restore advance surfaces ({error})")
+        log_warn(
+            "rollback_restore_failed",
+            exc=error,
+            context={
+                "stage": "movement_advance_surfaces",
+                "obj": str(snapshot.traverser),
+                "key": "registry",
+            },
+        )
 
 
 def _force_reconcile_location(obj: Any, target: Any) -> None:
@@ -414,4 +439,8 @@ def _force_reconcile_location(obj: Any, target: Any) -> None:
         if previous is not None and previous is not target:
             previous.contents_cache.init()
     except Exception as error:
-        log_warn(f"movement settlement: could not reconcile the location of {obj} ({error})")
+        log_warn(
+            "rollback_restore_failed",
+            exc=error,
+            context={"stage": "movement_reconcile", "obj": str(obj), "key": "location"},
+        )

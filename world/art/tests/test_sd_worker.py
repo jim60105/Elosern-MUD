@@ -695,7 +695,7 @@ class PrepinTests(unittest.TestCase):
                 "world.art.sd_worker._http_json",
                 return_value={"samples_format": "png"},
             ) as http:
-                with patch("evennia.logger.log_info") as log:
+                with patch("world.art.sd_worker.log_info") as log:
                     maybe_prepin_samples_format()
         http.assert_called_once()
         log.assert_not_called()
@@ -710,7 +710,7 @@ class PrepinTests(unittest.TestCase):
 
         with override_settings(ART_SD_PREPIN_SAMPLES_FORMAT=True):
             with patch("world.art.sd_worker._http_json", side_effect=_http) as http:
-                with patch("evennia.logger.log_info") as log:
+                with patch("world.art.sd_worker.log_info") as log:
                     maybe_prepin_samples_format()
         self.assertEqual(len(calls), 2)
         self.assertIn("/sdapi/v1/options", calls[0][0])
@@ -723,7 +723,7 @@ class PrepinTests(unittest.TestCase):
 
         with override_settings(ART_SD_PREPIN_SAMPLES_FORMAT=True):
             with patch("world.art.sd_worker._http_json", side_effect=_http):
-                with patch("evennia.logger.log_warn") as log:
+                with patch("world.art.sd_worker.log_warn") as log:
                     maybe_prepin_samples_format()
         log.assert_called_once()
 
@@ -733,7 +733,7 @@ class PrepinTests(unittest.TestCase):
                 "world.art.sd_worker._http_json",
                 side_effect=SDError("sd_connection_error", "offline"),
             ):
-                with patch("evennia.logger.log_warn") as log:
+                with patch("world.art.sd_worker.log_warn") as log:
                     maybe_prepin_samples_format()
         log.assert_called_once()
 
@@ -743,7 +743,7 @@ class PrepinTests(unittest.TestCase):
                 "world.art.sd_worker._http_json",
                 return_value={"samples_format": "webp"},
             ) as http:
-                with patch("evennia.logger.log_info"):
+                with patch("world.art.sd_worker.log_info"):
                     maybe_prepin_samples_format()
                     maybe_prepin_samples_format()
         self.assertEqual(http.call_count, 2)

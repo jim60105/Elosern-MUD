@@ -437,7 +437,7 @@ class GuardrailMutationBoundaryTests(EvenniaTest):
         self.assertEqual(before, after)
 
     def test_logged_summaries_contain_no_prompt_or_player_text(self):
-        with patch("evennia.logger.log_info") as mock_log:
+        with patch("world.ai.guardrail.log_info") as mock_log:
             client = FakeLLMClient()
             client.add_timeout(lambda d: True)
             with override_settings(LLM_PROFILES=_raw()):

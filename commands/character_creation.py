@@ -1,12 +1,13 @@
 """Player-facing character creation command and pending command gate."""
 
 import evennia
-from evennia import CmdSet, Command
+from evennia import CmdSet
 from evennia.commands.cmdhandler import CMD_NOMATCH, CMD_NOINPUT
-from evennia.utils import logger
+from world.observability import log_error, log_warn
 from evennia.utils.evmenu import InputCmdSet
 from evennia.utils.utils import inherits_from
 
+from commands.command import Command
 from commands.localized import CmdHelp, CmdQuit
 from server.ai_director_service import request_character_proposal
 from world.lore.elements import ELEMENT_REGISTRY
@@ -122,7 +123,7 @@ def _activate_creation(
         result = activate_player_character(
             account, caller, request, persona=persona
         )
-    except CharacterCreationError as error:
+    except CharacterCreationError as error:  # observability: ignore R2: player-facing recovery; the reason is rendered to the caller and the draft stays retryable
         caller.msg(f"角色建立失敗：{error}")
         return
     from world.rules.onboarding import (
@@ -260,7 +261,7 @@ class CmdCharacter(Command):
                 allocations=allocations, background=background,
                 affinity_elements=affinity_elements,
             ))
-        except CharacterCreationError as error:
+        except CharacterCreationError as error:  # observability: ignore R2: player-facing recovery; cancel and invalid-input outcomes reach the caller
             if str(error) == "角色建立已取消":
                 self.caller.msg("已取消角色建立。")
             else:
@@ -411,7 +412,7 @@ class CmdCharacterConcept(Command):
         self.caller.cmdset.add(_ConceptPromptCmdSet, persistent=False)
         try:
             first_prompt = next(generator)
-        except StopIteration:
+        except StopIteration:  # observability: ignore R2: control flow; an instantly-exhausted generator is a completed prompt
             self._finish_prompt()
             return
         self.caller.msg(first_prompt)
@@ -426,7 +427,7 @@ class CmdCharacterConcept(Command):
         """
         try:
             value = generator.send(result)
-        except StopIteration:
+        except StopIteration:  # observability: ignore R2: control flow; generator completion is the prompt's normal end
             self._finish_prompt()
             return
         caller.msg(value)
@@ -463,10 +464,10 @@ class CmdCharacterConcept(Command):
                 },
                 expected_fingerprint=self._concept_fingerprint,
             )
-        except ConceptDraftStaleError:
+        except ConceptDraftStaleError:  # observability: ignore R2: expected concurrency flow; the player is told to re-run the command
             self.caller.msg("構想草稿已被修改，請重新執行 character concept。")
             return
-        except CharacterCreationError as error:
+        except CharacterCreationError as error:  # observability: ignore R2: player-facing recovery; the reason is rendered to the caller and the draft stays retryable
             self.caller.msg(f"角色建立失敗：{error}")
             return
         self.caller.msg(_proposal_summary(proposal))
@@ -477,7 +478,7 @@ class CmdCharacterConcept(Command):
                 return
             age = _integer((yield "實際年齡（至少 18，可輸入 cancel 取消）："), "實際年齡")
             apparent_age = _integer((yield "外表年齡（至少 18，可輸入 cancel 取消）："), "外表年齡")
-        except CharacterCreationError as error:
+        except CharacterCreationError as error:  # observability: ignore R2: player-facing recovery; cancel and invalid-input outcomes reach the caller
             if str(error) == "角色建立已取消":
                 self.caller.msg("已取消角色建立。")
             else:
@@ -531,9 +532,14 @@ class _CmdConceptPrompt(Command):
             return
         try:
             pending["feeder"](caller, self.raw_string.rstrip(), pending["generator"])
-        except Exception:
+        except Exception as error:
             # Never leak the prompt state or leave the gate replaced; the
             # deterministic wizard stays usable and the player can retry.
+            log_warn(
+                "character_creation_concept_feed_failed",
+                exc=error,
+                context={"char": getattr(caller, "pk", 0) or 0},
+            )
             if hasattr(caller.ndb, "concept_prompt"):
                 del caller.ndb.concept_prompt
             while caller.cmdset.has(_ConceptPromptCmdSet):
@@ -603,15 +609,19 @@ class CmdCreationRequired(Command):
                 # anything
                 del caller.ndb._getinput
                 caller.cmdset.remove(InputCmdSet)
-        except Exception:
+        except Exception as error:
             # never leak the prompt state or leave the gate replaced; the
             # deterministic wizard stays usable and the player can retry.
             # ``caller`` may have been reassigned to the account in the
             # fallback branch; deleting on the (possibly absent) key is a
             # quiet no-op for Evennia's in-memory nattr backend.
+            log_error(
+                "character_creation_input_error",
+                exc=error,
+                context={"char": getattr(caller, "pk", 0) or 0},
+            )
             del caller.ndb._getinput
             caller.msg("|rError in get_input. Choice not confirmed (report to admin)|n")
-            logger.log_trace("Error in get_input")
             caller.cmdset.remove(InputCmdSet)
 
 

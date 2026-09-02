@@ -213,7 +213,7 @@ class DisengageStagingTests(unittest.TestCase):
             ),
         ]
         with self.assertRaises(Exception) as caught:
-            _commit(effects)
+            _commit(effects, char="tester", action="test_skill")
         self.assertIs(caught.exception.reason, RejectReason.COMMIT_FAILED)
         self.assertEqual(field.fled, set())
 

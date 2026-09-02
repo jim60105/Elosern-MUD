@@ -1,7 +1,7 @@
 """Presenter registry contract tests (foundation section 1.2)."""
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from tools.spec_traceability import covers_requirement
 
@@ -105,9 +105,19 @@ class RegistryTests(unittest.TestCase):
     def test_logger_failure_still_isolates_presenter_errors(self):
         registry = PresentationRegistry("test")
         registry.register(_spec(presenter=lambda context: 1 / 0))
-        with patch(
-            "evennia.utils.logger.log_trace",
-            side_effect=RuntimeError("log down"),
+        # The facade acquires its sink through the documented test seam; a
+        # dead sink exercises the real containment path (fallback stderr,
+        # patched silent) instead of stubbing the facade itself away.
+        broken_logger = Mock()
+        broken_logger.log_err.side_effect = RuntimeError("log down")
+        broken_logger.log_warn.side_effect = RuntimeError("log down")
+        broken_logger.log_info.side_effect = RuntimeError("log down")
+        with (
+            patch(
+                "world.observability.api._get_evennia_logger",
+                return_value=broken_logger,
+            ),
+            patch("builtins.print"),
         ):
             payload = registry.render("status", _context())
         self.assertFalse(payload["available"])

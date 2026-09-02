@@ -178,8 +178,12 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
     @covers_requirement("grid-room-sync::sync-grid-runs-automatically-at-server-start-after-sync-all")
     @covers_requirement("grid-room-sync::the-evennia-xyzgrid-cli-remains-available-but-is-not-required-for-boot", "lore-startup-sync::sync-runs-automatically-at-evennia-server-start")
     def test_at_server_start_calls_sync_grid_after_sync_all(self):
-        source = inspect.getsource(at_server_start)
-        self.assertLess(source.index("sync_all()"), source.index("sync_grid()"))
+        from server.conf.at_server_startstop import STARTUP_STEP_ORDER
+
+        self.assertLess(
+            STARTUP_STEP_ORDER.index("sync_all"),
+            STARTUP_STEP_ORDER.index("sync_grid"),
+        )
 
     def test_at_server_start_without_limbo_syncs_lore_and_grid(self):
         at_server_start()
@@ -297,8 +301,12 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
 
     @covers_requirement("wilderness-gateway::sync-wilderness-idempotently-provisions-the-wilderness-map-and-one-grid-side-gate-per-registered-gate")
     def test_at_server_start_calls_sync_wilderness_after_sync_grid(self):
-        source = inspect.getsource(at_server_start)
-        self.assertLess(source.index("sync_grid()"), source.index("sync_wilderness()"))
+        from server.conf.at_server_startstop import STARTUP_STEP_ORDER
+
+        self.assertLess(
+            STARTUP_STEP_ORDER.index("sync_grid"),
+            STARTUP_STEP_ORDER.index("sync_wilderness"),
+        )
 
     def test_at_server_start_provisions_wilderness_too(self):
         at_server_start()
