@@ -29,12 +29,9 @@ from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
     _CREATION_ATTRIBUTE_KEYS,
-    _owned_character,
     MAX_PERSONA_FIELD_LENGTH,
-    PERSONA_PROSE_KEYS,
     CharacterCreationError,
     CharacterCreationRequest,
-    _validate_allocations,
     _validate_persona_block,
     activate_player_character,
     max_affinity_elements,
@@ -50,21 +47,14 @@ from world.rules.surfaces import (
 )
 
 # Storage format of the staging draft attribute. Bounded and versioned so a
-# future draft shape can be rejected cleanly rather than misread.
-DRAFT_VERSION = 1
+# legacy draft shape is rejected cleanly rather than misread. Version 2 made
+# the custom draft's ``persona`` key required (nullable): the concept becomes a
+# transient form-filler with no server draft (retool-concept-transient-fill),
+# so any draft carrying the retired concept stage or missing the persona key
+# degrades through the normalizer's existing corruption path.
+DRAFT_VERSION = 2
 PRESET_STAGE = "preset_selected"
 CUSTOM_STAGE = "custom_filled"
-CONCEPT_STAGE = "concept_filled"
-
-
-class ConceptDraftStaleError(CharacterCreationError):
-    """The draft fingerprint changed while the concept proposal was in flight.
-
-    Raised by :func:`apply_concept_proposal` when the fingerprint captured
-    before the generative call no longer matches the stored draft, so a late
-    generative response can never overwrite a draft changed by another session
-    or entry (creation-persona-persistence D2).
-    """
 
 # Presentation bounds shared with the wire presenter (web.webclient.
 # presentation.creation) and the JS validator; the registries today are far
@@ -510,38 +500,19 @@ def _normalize_draft(storage: Any) -> dict[str, Any] | None:
             if background is None:
                 return None
             normalized["background"] = background
-        if "persona" in storage:
+        # The persona key is REQUIRED (nullable) in the version-2 custom shape:
+        # a missing key is a legacy v1 draft and degrades like any other
+        # corruption; null explicitly records "the player has no persona"
+        # (retool-concept-transient-fill D2).
+        if "persona" not in storage:
+            return None
+        if storage["persona"] is not None:
             persona = _normalize_persona(storage["persona"])
             if persona is None:
                 return None
             normalized["persona"] = persona
-        return normalized
-    if mode == "concept":
-        stage = storage.get("stage")
-        if stage != CONCEPT_STAGE:
-            return None
-        if not _normalize_identity_choices(storage.get("race"), storage.get("subrace")):
-            return None
-        checked_allocations = _normalize_allocations(storage.get("allocations"))
-        if checked_allocations is None:
-            return None
-        normalized = {
-            "mode": "concept",
-            "stage": stage,
-            "race": storage["race"],
-            "subrace": storage.get("subrace"),
-            "allocations": checked_allocations,
-        }
-        if "background" in storage:
-            background = _normalize_background(storage["background"])
-            if background is None:
-                return None
-            normalized["background"] = background
-        if "persona" in storage:
-            persona = _normalize_persona(storage["persona"])
-            if persona is None:
-                return None
-            normalized["persona"] = persona
+        else:
+            normalized["persona"] = None
         return normalized
     return None
 
@@ -565,10 +536,10 @@ def draft_fingerprint(character: Any) -> str:
 
     Built from the normalized draft so two drafts with the same accepted
     values always share one fingerprint and any change (save, clear, or
-    persona-preserving custom save) produces a different one. The fingerprint
-    is captured before a generative call and compared inside
-    :func:`apply_concept_proposal`'s transaction (creation-persona-persistence
-    D2); ``"absent"`` is the stable marker for a missing draft.
+    persona-changing custom save) produces a different one. The fingerprint
+    binds the activation confirmation to the exact draft the player confirmed
+    (fix-creation-finalization-safety D2); ``"absent"`` is the stable marker
+    for a missing draft.
     """
     draft = read_draft(character)
     if draft is None:
@@ -576,84 +547,12 @@ def draft_fingerprint(character: Any) -> str:
     return json.dumps(draft, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
 
-def apply_concept_proposal(
-    account: Any,
-    character: Any,
-    proposal: Mapping[str, Any],
-    *,
-    expected_fingerprint: str,
-) -> dict[str, Any]:
-    """Validate a concept proposal and save the ``concept_filled`` draft.
-
-    The proposal is a plain-data mapping with exactly ``race_key``,
-    ``subrace_key``, ``allocations``, and ``persona`` (the validated persona
-    block; may be omitted for a draft without persona). The proposal is
-    re-validated deterministically -- race/subrace registry membership and
-    compatibility plus in-band allocations through the same preflight checks,
-    and the persona block's exact three-field bounded shape -- before anything
-    is written. The draft is saved inside one ``transaction.atomic()`` block
-    that compares ``draft_fingerprint(character)`` to the fingerprint captured
-    before the generative call; a mismatch raises
-    :class:`ConceptDraftStaleError` and writes nothing, so a late response can
-    never clobber a draft changed by another session or entry while the call
-    was in flight. Returns the normalized saved draft.
-    """
-    if not isinstance(proposal, Mapping) or set(proposal) != {
-        "race_key", "subrace_key", "allocations", "persona",
-    }:
-        raise CharacterCreationError("concept proposal carries unexpected fields")
-    if account is None or not _owned_character(account, character):
-        raise CharacterCreationError("character is not owned by this account")
-    if not bool(getattr(character, "creation_pending", False)):
-        raise CharacterCreationError("character creation is already complete")
-    race_key = proposal["race_key"]
-    subrace_key = proposal["subrace_key"]
-    if not isinstance(race_key, str) or not race_key:
-        raise CharacterCreationError("race must be a registry key")
-    if not isinstance(subrace_key, str) or not subrace_key:
-        raise CharacterCreationError("subrace must be a registered registry key")
-    profile = resolve_starting_profile(race_key, subrace_key)
-    checked_allocations = _validate_allocations(profile, proposal["allocations"])
-    persona_block = None
-    if proposal["persona"] is not None:
-        persona_block = _validate_persona_block(proposal["persona"])
-    storage: dict[str, Any] = {
-        "version": DRAFT_VERSION,
-        "mode": "concept",
-        "stage": CONCEPT_STAGE,
-        "race": race_key,
-        "subrace": subrace_key,
-        "allocations": checked_allocations,
-    }
-    if persona_block is not None:
-        storage["persona"] = persona_block
-    with transaction.atomic():
-        if draft_fingerprint(character) != expected_fingerprint:
-            raise ConceptDraftStaleError("concept draft fingerprint changed")
-        # The concept-apply service never overwrites a player-authored
-        # background: a custom draft's accepted background survives the apply
-        # so the journey (background, then concept, then custom save, then
-        # activation) keeps the text at every step
-        # (creation-persona-persistence D4).
-        previous = _normalize_draft(getattr(character, "creation_draft", None))
-        if (
-            previous is not None
-            and previous.get("mode") == "custom"
-            and previous.get("background") is not None
-        ):
-            storage["background"] = previous["background"]
-        _write_draft(character, storage)
-    return read_draft(character)
-
-
 def _request_from_draft(draft: dict[str, Any]) -> CharacterCreationRequest:
     if draft["mode"] == "preset":
         return CharacterCreationRequest(mode="preset", preset_key=draft["preset_key"])
     if draft["mode"] != "custom":
-        # A concept stage never carries the display name and both ages the
-        # activation preflight requires; it can only be completed through a
-        # custom save, never activated directly (creation-persona-persistence
-        # D1).
+        # Only the two live stages can activate; anything else is an
+        # incomplete draft.
         raise CharacterCreationError("creation draft is incomplete")
     return CharacterCreationRequest(
         mode="custom",
@@ -686,7 +585,10 @@ def save_preset_draft(account: Any, character: Any, preset_key: str) -> dict[str
 
 
 def save_custom_draft(
-    account: Any, character: Any, request: CharacterCreationRequest
+    account: Any,
+    character: Any,
+    request: CharacterCreationRequest,
+    persona: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Validate the complete custom request and persist the ``custom_filled`` draft.
 
@@ -696,19 +598,19 @@ def save_custom_draft(
     before the draft is written. The trimmed server-accepted display name is
     persisted; no canonical identity or trait value changes.
 
-    A custom save preserves the concept draft's server-owned persona block only
-    when the submitted race equals the concept draft's race -- the generated
-    background still fits -- and clears it otherwise
-    (creation-persona-persistence D1).
+    ``persona`` is the player-owned persona block (``None`` when the player
+    submitted no persona): a non-null block is validated through the shared
+    persona-block validator and stored verbatim. The saved draft always carries
+    the ``persona`` key; there is no carry-over from any earlier draft and no
+    race comparison (retool-concept-transient-fill D2/D5) -- the submitted
+    value is the player's intent.
     """
     if request.mode != "custom":
         raise CharacterCreationError("creation mode must be 'preset' or 'custom'")
     validated = preflight_character_creation(account, character, request)
     persona_block = None
-    previous = read_draft(character)
-    if previous is not None and previous.get("mode") == "concept":
-        if previous.get("race") == validated.race:
-            persona_block = previous.get("persona")
+    if persona is not None:
+        persona_block = _validate_persona_block(persona)
     storage: dict[str, Any] = {
         "version": DRAFT_VERSION,
         "mode": "custom",
@@ -719,13 +621,12 @@ def save_custom_draft(
         "race": validated.race,
         "subrace": validated.subrace,
         "allocations": dict(request.allocations),
+        "persona": persona_block,
     }
     if validated.affinity_elements:
         storage["affinity_elements"] = list(validated.affinity_elements)
     if validated.background is not None:
         storage["background"] = validated.background
-    if persona_block is not None:
-        storage["persona"] = persona_block
     _write_draft(character, storage)
     return read_draft(character)
 
@@ -803,8 +704,6 @@ __all__ = [
     "AffinityElementView",
     "AffinityView",
     "AllocationAxisView",
-    "CONCEPT_STAGE",
-    "ConceptDraftStaleError",
     "CreationView",
     "CustomFormView",
     "CUSTOM_STAGE",
@@ -822,7 +721,6 @@ __all__ = [
     "RaceOptionView",
     "SubraceView",
     "activate_draft",
-    "apply_concept_proposal",
     "build_custom_form",
     "build_preset_cards",
     "clear_draft",

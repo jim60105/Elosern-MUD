@@ -1,91 +1,33 @@
 ## Purpose
 
-Define the creation-persona persistence slice: a server-owned concept draft
-stage on the creation wizard that stores the validated concept proposal values
-plus an optional persona block, a fingerprint-protected deterministic
-concept-apply service shared by Telnet and the WebClient, the activation-time
-persona write in the import-card shape, and the `creation.concept` action with
-its panel concept field that never exposes persona content.
+Define the creation-persona persistence slice: the player-owned persona block
+that rides the custom draft, payload, and activation into the import-card
+persona record written inside the all-or-nothing activation transaction, the
+background field's journey through the same slice, the owner's post-activation
+background updates, and the `creation.concept` action sharing the guarded
+generative pipeline while applying its proposal transiently with zero
+persistent writes (retool-concept-transient-fill retired the server-owned
+concept draft stage and its fingerprint-protected apply service).
 
 ## Requirements
 
-### Requirement: A server-owned concept draft stores the validated proposal and persona block
-The creation-wizard draft service SHALL provide a `concept_filled` stage storing exactly the
-validated proposal values (`race`, `subrace`, `allocations`) plus an optional persona block
-(`personality`, `life_story`, `habit` bounded text fields), written only by the deterministic
-concept-apply service from a proposal that passed the registry/band validation. The persona block
-SHALL persist with the draft across logout, login, reload, and reconnect, SHALL be cleared with
-the draft at activation and reset, and SHALL NOT be accepted from any client-submitted field. A
-later `creation.custom` save SHALL preserve the persona block only when the submitted race equals
-the concept draft's race; otherwise the block SHALL be cleared.
-
-#### Scenario: A concept draft persists its persona across reconnect
-- **WHEN** a concept-apply saves a validated concept draft with a persona block, then the session
-  disconnects and reconnects
-- **THEN** the draft's concept stage and persona block are intact and activation later persists
-  the persona
-
-#### Scenario: A custom save with a different race clears the persona
-- **WHEN** a player edits the custom form's race to a different race after a concept draft was
-  saved
-- **THEN** the custom save clears the persona block and the panel no longer shows the
-  background-generated indicator
-
-#### Scenario: The persona block is cleared atomically with the draft
-- **WHEN** activation commits or `creation.reset` succeeds for a concept draft
-- **THEN** the draft and its persona block are cleared in the same transaction and no later
-  snapshot or activation returns them
-
-### Requirement: Concept-apply is deterministic and fingerprint-protected
-The deterministic concept-apply service SHALL re-validate the proposal against the registries and
-race bands and save the concept draft inside one transaction that compares the character's draft
-fingerprint captured before the generative call; a mismatch SHALL return a stale outcome and
-write nothing. Both the Telnet `character concept` command and the `creation.concept` adapter
-SHALL call this same service.
-
-#### Scenario: A late concept response cannot overwrite a newer draft
-- **WHEN** the generative call is in flight and another session or entry saves or clears the
-  draft, then the concept response arrives
-- **THEN** the apply service detects the fingerprint mismatch, returns a stale outcome, and the
-  newer draft is unchanged
-
-#### Scenario: A matching fingerprint applies the concept draft
-- **WHEN** the draft fingerprint at apply time equals the fingerprint captured before the call
-- **THEN** the concept draft is saved atomically with the validated proposal and persona block
-
 ### Requirement: Activation persists the persona block in the import-card shape
-When the draft carries a persona block, `activate_player_character()` SHALL write
-`entity.db.persona` as a dict with the import-card keys
-(identity/personality/life_story/habit/appearance/social_connection), the block filling the three
-prose fields and the remaining keys stored as empty containers, inside the same all-or-nothing
-activation transaction; a persona write failure SHALL roll back activation, and a draft without a
-persona block SHALL write nothing. When the draft carries a player-authored bounded background
-field, the same activation transaction SHALL additionally store that text under the persona
-record's `background` key (kept separate from the three prose fields), so a custom character's
-background survives activation; a draft without a background SHALL omit the key. `world/rules/
-character_creation.py` SHALL be the sole writer of creation-generated persona; `world/imports/
-loader.py` remains the import-time writer and is unchanged.
+When the custom draft carries a non-null persona block, `activate_player_character()` SHALL write `entity.db.persona` as a dict with the import-card keys (identity/personality/life_story/habit/appearance/social_connection), the block filling the three prose fields and the remaining keys stored as empty containers, inside the same all-or-nothing activation transaction; a persona write failure SHALL roll back activation, and a draft with a null persona SHALL write nothing beyond the background rule below. The persona block SHALL be read from the custom draft — no concept-stage state exists to consult. When the draft carries a player-authored bounded background field, the same activation transaction SHALL additionally store that text under the persona record's `background` key (kept separate from the three prose fields), so a custom character's background survives activation; a draft without a background SHALL omit the key. `world/rules/character_creation.py` SHALL be the sole writer of creation-generated persona; `world/imports/loader.py` remains the import-time writer and is unchanged.
 
-#### Scenario: A concept draft persists its persona at activation
-- **WHEN** a pending character activates with a draft carrying a persona block
-- **THEN** `entity.db.persona` contains the six-key import-card dict with the block's three prose
-  fields and empty containers for the rest, activation commits, and the character is an active
-  persona owner
+#### Scenario: A custom draft persists its persona at activation
+- **WHEN** a pending character activates with a custom draft carrying a non-null persona block
+- **THEN** `entity.db.persona` contains the six-key import-card dict with the block's three prose fields and empty containers for the rest, activation commits, and the character is an active persona owner
 
 #### Scenario: A custom background is persisted inside the persona record
-- **WHEN** a pending character activates with a custom draft carrying a non-empty bounded
-  `background`
-- **THEN** `entity.db.persona` contains the six import-card keys plus a `background` key holding the
-  exact accepted text, activation commits, and the character is an active persona owner
+- **WHEN** a pending character activates with a custom draft carrying a non-empty bounded `background`
+- **THEN** `entity.db.persona` contains the six import-card keys plus a `background` key holding the exact accepted text, activation commits, and the character is an active persona owner
 
 #### Scenario: A persona write failure rolls back activation
-- **WHEN** a write failure is injected into the persona-persistence step of the activation
-  transaction
-- **THEN** activation rolls back entirely, the character remains pending, and no canonical
-  identity, trait, or persona state is written
+- **WHEN** a write failure is injected into the persona-persistence step of the activation transaction
+- **THEN** activation rolls back entirely, the character remains pending, and no canonical identity, trait, or persona state is written
 
 #### Scenario: A draft without persona or background writes nothing
-- **WHEN** a pending character activates with a draft that has no persona block and no background
+- **WHEN** a pending character activates with a draft whose persona is null and that has no background
 - **THEN** `entity.db.persona` remains absent and activation behaves exactly as before
 
 ### Requirement: The owner can freely update the background after activation
@@ -112,55 +54,34 @@ attributes, the three prose fields, or the world clock.
   for the non-prose keys) and the `background` key, and no other state changes
 
 ### Requirement: The background survives the draft, concept, custom-save, and activation journey
-The `background` SHALL be a first-class custom-draft field: `save_custom_draft` validates and
-stores it, the draft normalizer accepts it with its bound and includes it in the draft fingerprint,
-and the concept-apply service SHALL NOT overwrite it. Activation SHALL merge the background into the
-persona record together with any concept persona block — the six import-card keys are written first,
-then `background` when the draft carries one — inside the same all-or-nothing transaction.
+The `background` SHALL be a first-class custom-draft field: `save_custom_draft` validates and stores it, the draft normalizer accepts it with its bound and includes it in the draft fingerprint. Activation SHALL merge the background into the persona record together with any custom-draft persona block — the six import-card keys are written first, then `background` when the draft carries one — inside the same all-or-nothing transaction.
 
 #### Scenario: A background persists through every entry order
-- **WHEN** a background is entered alone (no concept), then a concept is applied, then a custom
-  save follows, and finally activation commits
-- **THEN** `entity.db.persona["background"]` equals the entered text at every step and after
-  activation, and the concept persona block is also present when the concept's race matches
+- **WHEN** a background is entered, saved through the custom form, and activation commits
+- **THEN** `entity.db.persona["background"]` equals the entered text at every step and after activation, and the custom persona block is also present when the draft carries one
 
 ### Requirement: The creation panel offers a concept field and adapter sharing the guarded pipeline
-The WebClient creation panel SHALL provide a bounded concept text field, and the production action
-registry SHALL register `creation.concept` with a payload of exactly `concept` (a non-empty string
-of at most the declared bound). The adapter SHALL obtain the actor from the authenticated session,
-reject unknown fields, capture the draft fingerprint, run the same guarded `character_creation`
-generative layer as the Telnet command (injected client), and call the deterministic concept-apply
-service; on success it SHALL refresh the `creation` panel, on degrade or stale fingerprint it
-SHALL return the stable outcome with no state change. The panel SHALL render the concept field and
-the draft's finite controls pre-filled from the concept stage plus a non-content indicator that a
-background was generated; persona content SHALL NOT be part of any panel payload or browser state.
-The adapter SHALL NOT assign `.db`, traits, identity attributes, or `creation_pending` directly and
-SHALL NOT route through the text command parser.
+The WebClient creation panel SHALL provide a bounded concept text field, and the production action registry SHALL register `creation.concept` with a payload of exactly `concept` (a non-empty string of at most the declared bound). The adapter SHALL obtain the actor from the authenticated session, reject unknown fields, and run the same guarded `character_creation` generative layer as the Telnet command (injected client); on success it SHALL store the validated proposal in the session-scoped transient slot, return the stable applied outcome, and refresh the `creation` panel so the proposal reaches the browser through the panel's proposal slot; on degrade it SHALL return the stable outcome with no state change. The adapter SHALL NOT assign `.db`, traits, identity attributes, or `creation_pending` directly, SHALL write no persistent draft state, and SHALL NOT route through the text command parser.
 
-#### Scenario: A concept submission fills the draft form
-- **WHEN** a pending character submits `creation.concept` with a bounded concept and the guarded
-  layer returns a valid proposal with a matching fingerprint
-- **THEN** the adapter saves the concept draft (including the server-owned persona block),
-  refreshes the `creation` panel with the pre-filled finite controls and the background indicator,
-  and the player completes the form and activates through the ordinary flow
+#### Scenario: A concept submission delivers the proposal through the panel
+- **WHEN** a pending character submits `creation.concept` with a bounded concept and the guarded layer returns a valid proposal
+- **THEN** the adapter stores the proposal in the session slot, returns the applied outcome, and the completion `ui_update` for the refreshed `creation` panel carries the proposal (with its transient revision) for the browser to pre-fill
 
 #### Scenario: Offline concept degrades without state change
-- **WHEN** the `character_creation` layer is offline and a pending character submits
-  `creation.concept`
-- **THEN** the adapter returns the stable unavailable message, no draft or character state
-  changes, and the preset/custom/activate adapters remain fully usable
-
-#### Scenario: A stale draft fingerprint rejects the apply
-- **WHEN** the draft changed between the fingerprint capture and the concept response
-- **THEN** the adapter returns the stale outcome, writes nothing, and refreshes the panel
+- **WHEN** the `character_creation` layer is offline and a pending character submits `creation.concept`
+- **THEN** the adapter returns the stable unavailable message, no draft, slot, or character state changes, and the preset/custom/activate adapters remain fully usable
 
 #### Scenario: Unknown fields on the concept adapter are rejected
-- **WHEN** a client submits `creation.concept` carrying actor, account, session, persona, skill,
-  or any field beyond `concept`
-- **THEN** exact-schema validation rejects the request without invoking the adapter or the
-  generative layer
+- **WHEN** a client submits `creation.concept` carrying actor, account, session, skills, or any field beyond `concept`
+- **THEN** exact-schema validation rejects the request without invoking the adapter or the generative layer
 
-#### Scenario: Persona content never reaches the browser
-- **WHEN** a creation panel or snapshot is produced for a concept draft carrying a persona block
-- **THEN** no payload contains persona text, keys, or length information — at most the
-  background-generated indicator is present
+### Requirement: The retired concept stage leaves no draft or carry-over machinery
+The creation-wizard draft service SHALL provide exactly the `preset_selected` and `custom_filled` stages; the `concept_filled` stage, the deterministic concept-apply service, the fingerprint compare-and-swap around concept application, and the custom-save persona carry-over (including its race-equality comparison) SHALL NOT exist. A draft carrying the retired stage or shape SHALL be treated as malformed through the existing degradation path. The draft-fingerprint helper SHALL remain solely for activation confirmation.
+
+#### Scenario: No draft stage or apply service survives
+- **WHEN** the draft service and wizard module surface are inspected
+- **THEN** no `concept_filled` stage, apply service, concept CAS, or carry-over branch is present, and a stored legacy concept-shaped draft degrades to no draft
+
+#### Scenario: A custom save never touches persona implicitly
+- **WHEN** a custom save submits `persona: null` while any prior draft value existed
+- **THEN** the stored draft's persona becomes null with no carry-over and no race comparison

@@ -1,6 +1,15 @@
-# concept-transient-fill — Delta Spec
+# concept-transient-fill Specification
 
-## ADDED Requirements
+## Purpose
+
+Define the transient concept form-fill contract: the `creation.concept` adapter
+and the Telnet concept command apply a validated generative proposal with zero
+persistent writes through a session-scoped revision-numbered slot, the
+`creation` panel renders that slot, the custom draft, payload, and activation
+carry the player-owned persona block, and the browser pre-fills its editable
+form from the proposal without ever auto-submitting it.
+
+## Requirements
 
 ### Requirement: Concept applies transiently with zero persistent writes
 The `creation.concept` adapter and the Telnet `character concept` command SHALL run the same guarded `character_creation` generative pipeline and, on a validated proposal, write no persistent state: the WebClient adapter SHALL store the validated proposal (race, subrace, allocations, and the persona block) in a session-scoped transient slot mirroring the existing session options-state pattern, return a plain success with the stable code `concept_applied`, and declare the `creation` panel affected so the panel refresh carries the proposal. Because the concept path writes no draft, no concept outcome SHALL read, write, or invalidate the activation-confirmation fingerprint state — a still-valid earlier save confirmation survives a concept apply untouched, and a concept completion can never authorize activation of a draft it did not save. The slot SHALL bind the actor it was written for (mirroring the options-state owner binding), SHALL NOT render for a different puppet, and SHALL be cleared when the session's puppet changes. The slot SHALL be overwritten by a later successful apply, cleared when a `creation.custom` save or `creation.reset` succeeds, and lost with the session. The `ui_action_result` envelope SHALL NOT gain a data field, and no draft, trait, identity, or `creation_pending` value SHALL change on any concept outcome.

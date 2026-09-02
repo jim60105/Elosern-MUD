@@ -430,6 +430,9 @@ class PortraitFinalizationTests(EvenniaTest):
                 "race": "human",
                 "subrace": "human_commoner",
                 "allocations": balanced_allocations("human", "human_commoner"),
+                "background": None,
+                "affinity_elements": [],
+                "persona": None,
             },
         )
         with self.captureOnCommitCallbacks(execute=True) as callbacks:

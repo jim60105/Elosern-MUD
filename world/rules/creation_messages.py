@@ -41,7 +41,6 @@ CREATION_REASON_MESSAGES: dict[str, str] = {
     "no_confirmed_save": "尚未成功儲存草稿，無法啟用。",
     "confirmation_stale": "草稿在確認後已被修改，請重新提交。",
     "concept_unavailable": "生成不可用，請手動創角",
-    "concept_stale": "構想草稿已被修改，請重新提交。",
     "malformed_request": "角色建立要求格式有誤。",
     "unknown_affinity_element": "屬性親和包含未註冊的元素。",
     "duplicate_affinity_element": "屬性親和不能重複選擇同一個元素。",

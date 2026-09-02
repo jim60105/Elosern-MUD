@@ -6,16 +6,17 @@ import {
   CREATION_PANEL_SAMPLE,
   CREATION_PANEL_PRESET_DRAFT_SAMPLE,
   CREATION_PANEL_CUSTOM_DRAFT_SAMPLE,
-  CREATION_PANEL_CONCEPT_DRAFT_SAMPLE,
+  CREATION_PANEL_PROPOSAL_SAMPLE,
   CREATION_PANEL_UNAVAILABLE_SAMPLE,
 } from "../../stories/fixtures.js";
 
 // CreationOverlay (B5 overlays family): the character-creation wizard over
-// the committed `creation` v1 panel — preset pick, custom form with the
-// adult gate on BOTH age fields (design D1), the concept branch, and the
-// server-persisted draft resume. Every assertion checks the exact
-// `creation.*` envelopes (no invented fields) and the registry-owned
-// unavailable reason; the server remains authoritative.
+// the committed `creation` v2 panel — preset pick, custom form with the
+// adult gate on BOTH age fields (design D1), the transient concept proposal
+// fill (retool-concept-transient-fill), and the server-persisted draft
+// resume. Every assertion checks the exact `creation.*` envelopes (no
+// invented fields) and the registry-owned unavailable reason; the server
+// remains authoritative.
 
 function lastAction(wrapper, actionId) {
   const actions = wrapper.emitted("action") ?? [];
@@ -80,11 +81,12 @@ describe("CreationOverlay (B5 overlays family)", () => {
         allocations: { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 },
         background: "測試背景。",
         affinity_elements: ["fire", "wind"],
+        persona: null,
       },
     });
   });
 
-  it("the custom payload always carries the exact eight keys (blank background and no affinity emit JSON-safe defaults)", async () => {
+  it("the custom payload always carries the exact nine keys (blank background and no affinity emit JSON-safe defaults)", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);
     wrapper.get('[data-testid="creation-field-displayName"]').setValue("無名者");
@@ -101,11 +103,13 @@ describe("CreationOverlay (B5 overlays family)", () => {
       "apparent_age",
       "background",
       "display_name",
+      "persona",
       "race",
       "subrace",
     ]);
     expect(event.payload.background).toBeNull();
     expect(event.payload.affinity_elements).toEqual([]);
+    expect(event.payload.persona).toBeNull();
   });
 
   it("the adult gate rejects age below 18 (gate error, no creation.custom)", async () => {
@@ -157,6 +161,96 @@ describe("CreationOverlay (B5 overlays family)", () => {
       action_id: "creation.concept",
       payload: { concept: "在燈下研讀古籍的學士。" },
     });
+  });
+
+  // -- Transient proposal fill (retool-concept-transient-fill) --------------
+  it("a proposal fills the form on confirm without submitting anything", async () => {
+    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_PROPOSAL_SAMPLE } });
+    // The fill lands immediately; the mode switch waits for the player.
+    expect(wrapper.get('[data-testid="creation-proposal-notice"]').exists()).toBe(true);
+    wrapper.get('[data-testid="creation-proposal-open"]').trigger("click");
+    await nextTick();
+    expect(wrapper.get('[data-testid="creation-overlay"]').attributes("data-mode")).toBe("custom");
+    expect(wrapper.get('[data-testid="creation-field-hp"]').element.value).toBe("6");
+    expect(wrapper.get('[data-testid="creation-field-mp"]').element.value).toBe("6");
+    expect(wrapper.get('[data-testid="creation-persona-personality"]').element.value).toBe("沉穩內斂");
+    expect(wrapper.get('[data-testid="creation-persona-life_story"]').element.value).toBe("燈下研讀古籍的年輕學者。");
+    expect(wrapper.get('[data-testid="creation-persona-habit"]').element.value).toBe("睡前必整理書架。");
+    // Nothing auto-submits.
+    expect(lastAction(wrapper, "creation.custom")).toBeNull();
+    expect(lastAction(wrapper, "creation.concept")).toBeNull();
+  });
+
+  it("a rebuild at the same revision never overwrites player edits", async () => {
+    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_PROPOSAL_SAMPLE } });
+    wrapper.get('[data-testid="creation-proposal-open"]').trigger("click");
+    await nextTick();
+    wrapper.get('[data-testid="creation-persona-personality"]').setValue("我改過的個性");
+    await nextTick();
+    // A panel re-publish carrying the SAME revision must not touch the edit.
+    wrapper.setProps({ creation: { ...CREATION_PANEL_PROPOSAL_SAMPLE } });
+    await nextTick();
+    expect(wrapper.get('[data-testid="creation-persona-personality"]').element.value).toBe(
+      "我改過的個性",
+    );
+    // A fresh revision with byte-identical content DOES replace the fields.
+    wrapper.setProps({
+      creation: {
+        ...CREATION_PANEL_PROPOSAL_SAMPLE,
+        proposal: { ...CREATION_PANEL_PROPOSAL_SAMPLE.proposal, revision: 2 },
+      },
+    });
+    await nextTick();
+    expect(wrapper.get('[data-testid="creation-persona-personality"]').element.value).toBe(
+      "沉穩內斂",
+    );
+  });
+
+  it("a partially-filled persona blocks submission locally with no action", async () => {
+    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
+    await switchToCustom(wrapper);
+    wrapper.get('[data-testid="creation-field-displayName"]').setValue("半填者");
+    wrapper.get('[data-testid="creation-field-age"]').setValue(21);
+    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(21);
+    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 });
+    wrapper.get('[data-testid="creation-persona-personality"]').setValue("只有個性有填");
+    wrapper.get('[data-testid="creation-submit"]').trigger("click");
+    await nextTick();
+    expect(wrapper.get('[data-testid="creation-form-message"]').text()).toContain("全部填寫或全部留空");
+    expect(lastAction(wrapper, "creation.custom")).toBeNull();
+    // Filling the other two unblocks and ships the trimmed block.
+    wrapper.get('[data-testid="creation-persona-life_story"]').setValue("邊境小村");
+    wrapper.get('[data-testid="creation-persona-habit"]').setValue("清晨練劍");
+    wrapper.get('[data-testid="creation-submit"]').trigger("click");
+    const event = lastAction(wrapper, "creation.custom");
+    expect(event.payload.persona).toEqual({
+      personality: "只有個性有填",
+      life_story: "邊境小村",
+      habit: "清晨練劍",
+    });
+  });
+
+  it("a race-changing proposal over local persona prose shows a non-blocking review prompt", async () => {
+    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
+    await switchToCustom(wrapper);
+    wrapper.get('[data-testid="creation-persona-personality"]').setValue("玩家自己打的個性");
+    wrapper.get('[data-testid="creation-persona-life_story"]').setValue("玩家自己的生平");
+    wrapper.get('[data-testid="creation-persona-habit"]').setValue("玩家自己的習慣");
+    await nextTick();
+    // A new proposal for a different race arrives while prose exists locally.
+    wrapper.setProps({
+      creation: { ...CREATION_PANEL_PROPOSAL_SAMPLE, proposal: { ...CREATION_PANEL_PROPOSAL_SAMPLE.proposal } },
+    });
+    await nextTick();
+    const prompt = wrapper.get('[data-testid="creation-proposal-review"]');
+    expect(prompt.text()).toContain("elf");
+    // Non-blocking: the player's own text stays and the form stays submittable.
+    wrapper.get('[data-testid="creation-field-displayName"]').setValue("審視後仍送出");
+    wrapper.get('[data-testid="creation-field-age"]').setValue(21);
+    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(21);
+    setAllocations(wrapper, { hp: 6, mp: 6, sp: 2, atk_phys: 2, agility: 4, defense: 2, magic_power: 4 });
+    wrapper.get('[data-testid="creation-submit"]').trigger("click");
+    expect(lastAction(wrapper, "creation.custom")).not.toBeNull();
   });
 
   // -- Frame actions ----------------------------------------------------------
@@ -300,6 +394,12 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(wrapper.get('[data-testid="creation-field-agility"]').element.value).toBe("2");
     expect(wrapper.get('[data-testid="creation-field-defense"]').element.value).toBe("2");
     expect(wrapper.get('[data-testid="creation-background"]').element.value).toBe("從渡口學來運貨的年輕人。");
+    // The player-owned persona block resumes verbatim (v2 D3).
+    expect(wrapper.get('[data-testid="creation-persona-personality"]').element.value).toBe("沉穩寡言");
+    expect(wrapper.get('[data-testid="creation-persona-life_story"]').element.value).toBe(
+      "在霧骨渡口搬運貨物長大的年輕人。",
+    );
+    expect(wrapper.get('[data-testid="creation-persona-habit"]').element.value).toBe("每天清晨沿河岸慢跑。");
     expect(wrapper.get('[data-testid="creation-affinity-fire"]').element.checked).toBe(true);
     expect(wrapper.get('[data-testid="creation-affinity-wind"]').element.checked).toBe(true);
     // The budget briefing states the human budget and the seven-axis spans.
@@ -307,13 +407,15 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(lastAction(wrapper, "creation.custom")).toBeNull(); // not auto-emitted on resume
   });
 
-  it("resumes a concept draft: pre-filled concept, background preview with the generated indicator", () => {
-    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_CONCEPT_DRAFT_SAMPLE } });
-    expect(wrapper.get('[data-testid="creation-overlay"]').attributes("data-mode")).toBe("concept");
-    expect(wrapper.get('[data-testid="creation-field-concept"]').element.value).toBe("燈下讀書的年輕學者。");
-    const preview = wrapper.get('[data-testid="creation-background"]');
-    expect(preview.attributes("data-background-generated")).toBe("true");
-    expect(preview.text()).toBe("燈下讀書的年輕學者。");
+  it("the three persona textareas always render in custom mode", async () => {
+    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
+    await switchToCustom(wrapper);
+    // No draft, no proposal: the block renders empty and editable (D5).
+    expect(wrapper.get('[data-testid="creation-persona-personality"]').element.value).toBe("");
+    expect(wrapper.get('[data-testid="creation-persona-life_story"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="creation-persona-habit"]').exists()).toBe(true);
+    // The retired generated indicator never renders.
+    expect(wrapper.find('[data-testid="creation-concept-indicator"]').exists()).toBe(false);
   });
 
   // -- Unavailable -----------------------------------------------------------

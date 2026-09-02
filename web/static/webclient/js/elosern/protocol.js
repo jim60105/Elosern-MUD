@@ -247,6 +247,9 @@
   var CREATION_MAX_DESCRIPTION = 512;
   var CREATION_MAX_EMPHASIS = 256;
   var CREATION_MAX_BACKGROUND = 256;
+  // The shared persona-field bound (mirror of MAX_PERSONA_FIELD_LENGTH and
+  // web.webclient.presentation.creation.MAX_PERSONA_BACKGROUND): the bound
+  // applies per-field to the draft/proposal persona block.
   var CREATION_MAX_PERSONA_BACKGROUND = 600;
   var CREATION_MAX_SUBRACE_KEY = 64;
   var CREATION_MAX_SPECIALTY = 256;
@@ -257,7 +260,12 @@
   var CREATION_AXES = ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power"];
   var CREATION_PRESET_STAGE = "preset_selected";
   var CREATION_CUSTOM_STAGE = "custom_filled";
-  var CREATION_CONCEPT_STAGE = "concept_filled";
+  // The exact wire persona block keys (the three prose fields).
+  var CREATION_PERSONA_KEYS = ["personality", "life_story", "habit"];
+  // The creation panel schema version (mirror of CREATION_SCHEMA_VERSION):
+  // v2 carries the player-owned draft persona key and the optional top-level
+  // transient concept proposal slot (retool-concept-transient-fill D1/D3).
+  var CREATION_SCHEMA_VERSION = 2;
   // Affinity picker bounds (mirror of web.webclient.presentation.creation and
   // the deterministic max_affinity_elements mapping). The race maxima are
   // 2/1/0 for human/beastfolk/elf; the element set is exactly the eight lore
@@ -284,7 +292,7 @@
     context_actions: 5,
     local_map: 1,
     services: 3,
-    creation: 1,
+    creation: 2,
     exploration: 1,
     character: 6,
     lineage: 1,
@@ -2330,7 +2338,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // creation panel v1 validator (mirror of web.webclient.presentation.creation).
+  // creation panel v2 validator (mirror of web.webclient.presentation.creation).
   // ---------------------------------------------------------------------------
 
   function validateCreationPresetCard(value) {
@@ -2613,6 +2621,31 @@
     return value.slice();
   }
 
+  function validateCreationPersona(value) {
+    // One required nullable persona block: null is the explicit "no persona"
+    // value; any other value carries exactly the three prose fields, each a
+    // 1..600 code-point non-blank string.
+    if (value === null) {
+      return null;
+    }
+    if (!isPlainObject(value)) {
+      throw new Error("persona must be null or a JSON object");
+    }
+    requireExactFields(value, "persona", CREATION_PERSONA_KEYS, []);
+    var persona = {};
+    CREATION_PERSONA_KEYS.forEach(function (key) {
+      var text = value[key];
+      if (typeof text !== "string" || !text.trim()) {
+        throw new Error("persona." + key + " must be non-empty text");
+      }
+      if (codePoints(text) > CREATION_MAX_PERSONA_BACKGROUND) {
+        throw new Error("persona." + key + " exceeds its bound");
+      }
+      persona[key] = text;
+    });
+    return persona;
+  }
+
   function validateCreationDraft(value) {
     if (value === null) {
       return value;
@@ -2639,14 +2672,11 @@
       requireExactFields(
         value,
         "custom draft",
-        ["mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background", "background_generated", "affinity_elements"],
+        ["mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background", "affinity_elements", "persona"],
         []
       );
       if (value.stage !== CREATION_CUSTOM_STAGE) {
         throw new Error("unsupported custom draft stage");
-      }
-      if (typeof value.background_generated !== "boolean") {
-        throw new Error("custom draft background_generated must be a boolean");
       }
       requireString(value.display_name, "display_name", CREATION_MAX_DISPLAY_NAME);
       requireInt(value.age, "age", CREATION_AGE_MINIMUM, CREATION_AGE_MAXIMUM);
@@ -2681,46 +2711,8 @@
         subrace: subrace,
         allocations: validateCreationDraftAllocations(value),
         background: background,
-        background_generated: value.background_generated,
         affinity_elements: validateCreationDraftAffinity(value.affinity_elements, race),
-      };
-    }
-    if (value.mode === "concept") {
-      requireExactFields(
-        value,
-        "concept draft",
-        ["mode", "stage", "race", "subrace", "allocations", "background", "background_generated"],
-        []
-      );
-      if (value.stage !== CREATION_CONCEPT_STAGE) {
-        throw new Error("unsupported concept draft stage");
-      }
-      if (typeof value.background_generated !== "boolean") {
-        throw new Error("concept draft background_generated must be a boolean");
-      }
-      var conceptRace = validateIdentifier(value.race, "draft race");
-      if (codePoints(conceptRace) > CREATION_MAX_RACE_KEY) {
-        throw new Error("draft race exceeds its bound");
-      }
-      var conceptSubrace = validateIdentifier(value.subrace, "draft subrace");
-      if (codePoints(conceptSubrace) > CREATION_MAX_SUBRACE_KEY) {
-        throw new Error("draft subrace exceeds its bound");
-      }
-      var conceptBackground = value.background;
-      if (conceptBackground !== null) {
-        conceptBackground = requireString(conceptBackground, "draft background", CREATION_MAX_PERSONA_BACKGROUND);
-        if (!conceptBackground.trim()) {
-          conceptBackground = null;
-        }
-      }
-      return {
-        mode: "concept",
-        stage: CREATION_CONCEPT_STAGE,
-        race: conceptRace,
-        subrace: conceptSubrace,
-        allocations: validateCreationDraftAllocations(value),
-        background: conceptBackground,
-        background_generated: value.background_generated,
+        persona: validateCreationPersona(value.persona),
       };
     }
     throw new Error("draft has an unknown mode");
@@ -2742,15 +2734,50 @@
     return allocations;
   }
 
+  function validateCreationProposal(value) {
+    // The optional top-level transient concept proposal: exactly revision (a
+    // positive session-monotonic sequence number), race, nullable subrace,
+    // the seven axes, and a mandatory three-field persona block.
+    requireExactFields(
+      value,
+      "proposal",
+      ["revision", "race", "subrace", "allocations", "persona"],
+      []
+    );
+    var revision = requireInt(value.revision, "revision", 1, MAX_SAFE_INTEGER);
+    var race = validateIdentifier(value.race, "proposal race");
+    if (codePoints(race) > CREATION_MAX_RACE_KEY) {
+      throw new Error("proposal race exceeds its bound");
+    }
+    var subrace = null;
+    if (value.subrace !== null) {
+      subrace = validateIdentifier(value.subrace, "proposal subrace");
+      if (codePoints(subrace) > CREATION_MAX_SUBRACE_KEY) {
+        throw new Error("proposal subrace exceeds its bound");
+      }
+    }
+    var persona = validateCreationPersona(value.persona);
+    if (persona === null) {
+      throw new Error("proposal persona must be a block");
+    }
+    return {
+      revision: revision,
+      race: race,
+      subrace: subrace,
+      allocations: validateCreationDraftAllocations(value),
+      persona: persona,
+    };
+  }
+
   function validateCreationPanel(payload) {
     requireExactFields(
       payload,
       "creation panel",
       ["schema_version", "available", "kind", "draft", "presets", "custom"],
-      []
+      ["proposal"]
     );
     requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 1) {
+    if (payload.schema_version !== CREATION_SCHEMA_VERSION) {
       throw new Error("unsupported creation schema_version");
     }
     if (payload.available !== true || payload.kind !== "creation") {
@@ -2763,13 +2790,18 @@
     validateCreationCustom(payload.custom);
     var draft = validateCreationDraft(payload.draft);
     var result = {
-      schema_version: 1,
+      schema_version: CREATION_SCHEMA_VERSION,
       available: true,
       kind: "creation",
       draft: draft,
       presets: payload.presets,
       custom: payload.custom,
     };
+    // The proposal key ships only while the session slot holds a proposal;
+    // a null value is never legal (the presenter omits the key).
+    if (payload.proposal !== undefined) {
+      result.proposal = validateCreationProposal(payload.proposal);
+    }
     // Envelope guarantee (design D2): per-field bounds are ceilings, not a
     // guarantee that any combination of them fits, so the validator enforces
     // the serialized byte size directly and fails closed over the envelope.
@@ -4386,6 +4418,8 @@
     CREATION_MAX_LABEL: CREATION_MAX_LABEL,
     CREATION_MAX_EXPLANATION: CREATION_MAX_EXPLANATION,
     CREATION_AXES: CREATION_AXES.slice(),
+    CREATION_SCHEMA_VERSION: CREATION_SCHEMA_VERSION,
+    CREATION_PERSONA_KEYS: CREATION_PERSONA_KEYS.slice(),
     MODES: MODES.slice(),
     OUTCOMES: OUTCOMES.slice(),
     COMBAT_MODES: COMBAT_MODES.slice(),
@@ -4424,6 +4458,8 @@
     validateLocalMapPanel: validateLocalMapPanel,
     validateServicesPanel: validateServicesPanel,
     validateCreationPanel: validateCreationPanel,
+    validateCreationPersona: validateCreationPersona,
+    validateCreationProposal: validateCreationProposal,
     validateLineagePanel: validateLineagePanel,
     LINEAGE_MAX_CHAINS: LINEAGE_MAX_CHAINS,
     LINEAGE_MAX_NODES_PER_CHAIN: LINEAGE_MAX_NODES_PER_CHAIN,

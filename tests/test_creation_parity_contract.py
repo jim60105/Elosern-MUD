@@ -66,9 +66,14 @@ class CreationValidatorParityContract(unittest.TestCase):
         for fragment in ('"hp", "mp", "sp", "atk_phys", "agility", "defense"',):
             self.assertIn(fragment, py_source, f"Python creation missing {fragment!r}")
             self.assertIn(fragment, js_source, f"JS protocol missing {fragment!r}")
-        for fragment in ('"preset_selected"', '"custom_filled"', '"concept_filled"'):
+        for fragment in ('"preset_selected"', '"custom_filled"'):
             self.assertIn(fragment, py_wizard, f"Python wizard missing {fragment!r}")
             self.assertIn(fragment, js_source, f"JS protocol missing {fragment!r}")
+        # The retired concept stage must not resurface on either side
+        # (retool-concept-transient-fill D4).
+        self.assertNotIn('"concept_filled"', py_wizard)
+        self.assertNotIn('"concept_filled"', js_source)
+        self.assertNotIn("concept_filled", js_source)
 
     def test_concept_and_persona_bounds_are_shared_across_the_boundaries(self):
         # The concept input bound and the persona field cap are duplicated at
@@ -115,9 +120,15 @@ class CreationValidatorParityContract(unittest.TestCase):
         self.assertEqual(py_match.group(1), js_match.group(1))
         self.assertEqual(js_match.group(1), "600")
 
-    def test_panel_allowlist_contains_creation_v1(self):
+    def test_panel_allowlist_contains_creation_v2(self):
         js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
-        self.assertIn("creation: 1", js_source)
+        self.assertIn("creation: 2", js_source)
+        py_source = _PY_CREATION.read_text(encoding="utf-8")
+        match = re.search(r"^CREATION_SCHEMA_VERSION\s*=\s*([0-9]+)", py_source, re.MULTILINE)
+        self.assertIsNotNone(match, "Python CREATION_SCHEMA_VERSION missing")
+        js_match = re.search(r"var CREATION_SCHEMA_VERSION\s*=\s*([0-9]+)", js_source)
+        self.assertIsNotNone(js_match, "JS CREATION_SCHEMA_VERSION missing")
+        self.assertEqual(match.group(1), js_match.group(1))
 
     def test_affinity_race_maxima_match_the_deterministic_bound_mapping(self):
         js_source = _JS_PROTOCOL.read_text(encoding="utf-8")

@@ -172,33 +172,37 @@
       background: "",
       concept: "",
       affinityElements: [],
+      // The player-owned persona block (retool-concept-transient-fill D3):
+      // three prose textareas, all-empty or all-filled before submit.
+      persona: { personality: "", life_story: "", habit: "" },
     };
   }
 
   function stateFromDraft(panel, draft) {
     var state = defaultCustomState(panel);
-    if (!draft || (draft.mode !== "custom" && draft.mode !== "concept")) {
+    if (!draft || draft.mode !== "custom") {
       return state;
     }
-    // A concept draft pre-fills the finite controls (race/subrace/allocations)
-    // while the name and both ages stay player-entered; a custom draft
-    // restores every accepted value. The preserved background rides both
-    // draft kinds: ``apply_concept_proposal`` carries a player-authored
-    // background forward into the concept draft, so the restored form must
-    // show it (fix-custom-creation-information-and-background D4).
+    // A custom draft restores every accepted value, including the
+    // player-owned persona block (retool-concept-transient-fill D3: the
+    // concept path never writes a draft, so only custom drafts restore).
     state.raceKey = draft.race || state.raceKey;
     state.subraceKey = draft.subrace || null;
     state.background = draft.background || "";
     state.affinityElements = (draft.affinity_elements || []).slice();
+    if (draft.persona) {
+      state.persona = {
+        personality: draft.persona.personality || "",
+        life_story: draft.persona.life_story || "",
+        habit: draft.persona.habit || "",
+      };
+    }
     var allocations = draft.allocations || {};
     Object.keys(allocations).forEach(function (axis) {
       if (state.allocations[axis] !== undefined) {
         state.allocations[axis] = String(allocations[axis]);
       }
     });
-    if (draft.mode !== "custom") {
-      return state;
-    }
     state.displayName = draft.display_name || "";
     state.age = String(draft.age == null ? "" : draft.age);
     state.apparentAge = String(draft.apparent_age == null ? "" : draft.apparent_age);
@@ -353,10 +357,56 @@
         errors.budget = "配點總和需恰好等於 " + profile.budget + "（目前 " + total + "）。";
       }
     }
+    // The persona block is all-empty or all-filled (retool-concept-transient-
+    // fill D5): a partially-filled triple blocks submit locally; an
+    // all-empty triple ships null with the payload.
+    var persona = personaFields(state);
+    var filled = persona.filter(function (text) {
+      return text !== "";
+    }).length;
+    if (filled !== 0 && filled !== persona.length) {
+      errors.persona = "人設三欄（個性、生平、習慣）需全部填寫或全部留空。";
+    } else {
+      persona.forEach(function (text) {
+        if (Array.from(text).length > 600) {
+          errors.persona = "人設每一欄不得超過 600 字。";
+        }
+      });
+    }
     return {
       valid: Object.keys(errors).length === 0,
       errors: errors,
     };
+  }
+
+  // The trimmed persona prose fields in wire order (empty string when the
+  // field holds only whitespace).
+  function personaFields(state) {
+    var persona = state.persona || {};
+    return ["personality", "life_story", "habit"].map(function (key) {
+      return (persona[key] || "").trim();
+    });
+  }
+
+  // The exact wire persona value: null when every field is empty, otherwise
+  // the three-key object of trimmed text.
+  function personaPayload(state) {
+    var persona = state.persona || {};
+    var keys = ["personality", "life_story", "habit"];
+    var values = keys.map(function (key) {
+      return (persona[key] || "").trim();
+    });
+    var empty = values.every(function (text) {
+      return text === "";
+    });
+    if (empty) {
+      return null;
+    }
+    var block = {};
+    keys.forEach(function (key, index) {
+      block[key] = values[index];
+    });
+    return block;
   }
 
   // The affinity picker geometry for the selected race, derived entirely from
@@ -459,6 +509,7 @@
       background: (state.background || "").trim() || null,
       affinity_elements: state.affinityElements.slice(),
       allocations: allocations,
+      persona: personaPayload(state),
     };
   }
 
@@ -547,6 +598,8 @@
     allocatedTotal: allocatedTotal,
     validateCustom: validateCustom,
     customPayload: customPayload,
+    personaFields: personaFields,
+    personaPayload: personaPayload,
     affinityFor: affinityFor,
     affinityElementKeys: affinityElementKeys,
     affinityMaximum: affinityMaximum,
