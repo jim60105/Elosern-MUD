@@ -174,6 +174,24 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
             "drawer mutations dispatch + confirmation",
         )
 
+    @covers_requirement(
+        "persona-editing::the-character-drawer-shows-and-edits-the-four-persona-sections"
+    )
+    def test_persona_drawer_sections_and_single_action_edit(self):
+        # The drawer renders the persona area as four labelled sections
+        # (個性／生平／習慣／背景) with the localized 未設定 placeholder for
+        # nulls and no structural persona key, and each section's inline
+        # editor submits exactly one character.persona.update action (a blank
+        # draft submits null); the AppClient composition test asserts the one
+        # envelope and the refreshed-panel re-render.
+        _assert_vitest_passes(
+            _run_vitest(
+                TESTS_DIR / "data" / "character_status_drawer.test.js",
+                TESTS_DIR / "app_client_drawers.test.js",
+            ),
+            "persona drawer sections + single-action edit",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

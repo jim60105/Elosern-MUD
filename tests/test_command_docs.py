@@ -158,6 +158,9 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "暱稱": {"syntax": "暱稱 <字串> = [<替換字串>]", "context": "一般"},
     "設定描述": {"syntax": "設定描述 <描述>", "context": "一般"},
     "設定背景": {"syntax": "設定背景 <文字>", "context": "一般（已啟用的角色）"},
+    "設定個性": {"syntax": "設定個性 <文字>", "context": "一般（已啟用的角色）"},
+    "設定生平": {"syntax": "設定生平 <文字>", "context": "一般（已啟用的角色）"},
+    "設定習慣": {"syntax": "設定習慣 <文字>", "context": "一般（已啟用的角色）"},
     "title": {
         "syntax": "title list、title codex、title equip fixed <display|key>、title equip epithet <display>、title accept <1|2|3>、title decline、title remove epithet <display> [confirm]",
         "context": "一般（戰鬥內外皆可用）",
@@ -407,6 +410,34 @@ class CommandDocsContractTests(unittest.TestCase):
         self.assertIn("character concept <構想>", entry["語法"])
         self.assertIn("生成不可用，請手動創角", entry["說明"])
         self.assertIn("18", entry["說明"])
+
+    @covers_requirement("game-command-docs::complete-command-reference")
+    def test_persona_command_family_is_documented(self):
+        # The four persona prose commands are canonical entries covering the
+        # show/set/clear syntax for the active character, matching their
+        # command classes, and never localized-default wrappers.
+        expected_aliases = {
+            "設定背景": {"背景"},
+            "設定個性": {"個性"},
+            "設定生平": {"生平", "背景故事"},
+            "設定習慣": {"習慣"},
+        }
+        localized_keys = set(LOCALIZED_CHARACTER_KEYS) | set(LOCALIZED_ACCOUNT_KEYS) | set(
+            LOCALIZED_XYZGRID_KEYS
+        )
+        for key, aliases in expected_aliases.items():
+            entry = self.entries[key]
+            self.assertEqual(entry["指令"], key)
+            self.assertEqual(parse_aliases(entry["別名"]), aliases)
+            self.assertEqual(
+                entry["語法"].replace("`", ""),
+                EXPECTED_COMMANDS[key]["syntax"],
+            )
+            self.assertEqual(entry["情境"], "一般（已啟用的角色）")
+            section = self._section_text(key)
+            self.assertIn("不帶參數顯示", section)
+            self.assertIn("傳入空白清除", section)
+            self.assertNotIn(key, localized_keys)
 
     @covers_requirement("game-command-docs::complete-command-reference")
     def test_contrib_commands_are_documented(self):

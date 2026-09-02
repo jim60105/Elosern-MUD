@@ -32,6 +32,7 @@ from web.webclient.presentation.character import (
     MAX_LABEL_CODE_POINTS,
     MAX_LAYERS_PER_STAT,
     MAX_PASSIVE_ROWS,
+    MAX_PERSONA_FIELD_CODE_POINTS,
     MAX_SLOT_CODE_POINTS,
     MAX_TRAIT_ROWS,
     MAX_FULL_TITLE_CODE_POINTS,
@@ -170,7 +171,12 @@ def _valid_panel(**overrides):
         },
         "guild": {"rank": None, "merit": 0},
         "wallet": 100,
-        "persona": {"background": None},
+        "persona": {
+            "background": None,
+            "personality": None,
+            "life_story": None,
+            "habit": None,
+        },
         "intimate": None,
     }
     value.update(overrides)
@@ -184,7 +190,79 @@ class CharacterSchemaTests(unittest.TestCase):
         self.assertTrue(normalized["available"])
         self.assertEqual(normalized["kind"], "character")
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    def test_persona_section_is_exactly_the_four_bounded_prose_keys(self):
+        panel = _valid_panel(
+            persona={
+                "background": "渡口成長的灰誓成員",
+                "personality": "沉穩",
+                "life_story": "來自邊境的小村",
+                "habit": "清晨練劍",
+            }
+        )
+        normalized = validate_character(panel)
+        self.assertEqual(
+            normalized["persona"],
+            {
+                "background": "渡口成長的灰誓成員",
+                "personality": "沉穩",
+                "life_story": "來自邊境的小村",
+                "habit": "清晨練劍",
+            },
+        )
+        # Each key is independently nullable and whitespace-nulling.
+        blanked = validate_character(
+            _valid_panel(
+                persona={
+                    "background": "   ",
+                    "personality": None,
+                    "life_story": " 邊境 ",
+                    "habit": None,
+                }
+            )
+        )
+        self.assertEqual(
+            blanked["persona"],
+            {
+                "background": None,
+                "personality": None,
+                "life_story": "邊境",
+                "habit": None,
+            },
+        )
+        # Structural keys never appear; unknown keys and every arity reject.
+        for persona in (
+            {
+                "background": None,
+                "personality": None,
+                "life_story": None,
+                "habit": None,
+                "identity": {},
+            },
+            {
+                "background": None,
+                "personality": None,
+                "life_story": None,
+            },
+            {"background": "只有背景"},
+            {
+                "background": 42,
+                "personality": None,
+                "life_story": None,
+                "habit": None,
+            },
+            {
+                "background": None,
+                "personality": "長" * (MAX_PERSONA_FIELD_CODE_POINTS + 1),
+                "life_story": None,
+                "habit": None,
+            },
+        ):
+            with self.subTest(persona=sorted(persona)):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_character(_valid_panel(persona=persona))
+
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_version_four_payloads_reject_everywhere(self):
         # The transitional v4 tolerance is closed (render-equipment-
         # breakdown-webclient): a v4 payload rejects on the version gate,
@@ -199,7 +277,7 @@ class CharacterSchemaTests(unittest.TestCase):
                 )
             )
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_v5_trait_layer_validation_is_exact(self):
         normalized = validate_character(
             _valid_panel(traits=[_trait(layers=[_layer()])])
@@ -255,7 +333,7 @@ class CharacterSchemaTests(unittest.TestCase):
                 with self.assertRaises(ProtocolValidationError):
                     validate_character(_valid_panel(traits=[contradiction]))
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_v5_equipment_rows_require_the_adjustment_summary(self):
         normalized = validate_character(
             _valid_panel(equipment=[_equipment_row(adjustment="攻擊 −2｜防禦 ＋8")])
@@ -518,7 +596,7 @@ class CharacterSchemaTests(unittest.TestCase):
                 )
             )
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_intimate_field_validation(self):
         # ``intimate: None`` is valid — the section is omitted when the actor has
         # no sexual-state record.
@@ -791,7 +869,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
     def _render(self):
         return self._registry().render("character", _context(self.player))
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_character_renders_true_values_without_mutation(self):
         before_traits = dict(self.player.attributes.get("traits", category="traits"))
         before_wallet = self.player.db.wallet
@@ -845,9 +923,9 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(self.player.db.wallet, before_wallet)
         self.assertEqual(self.player.db.equipment, before_equipment)
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     @covers_requirement(
-        "webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel",
+        "webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel",
         "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel",
     )
     def test_innate_active_skills_are_visible_for_the_first_time(self):
@@ -885,7 +963,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             ["flee"],
         )
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_expanded_state_shows_true_values_and_an_honest_disguise(self):
         self.player.db.disguised_stats = {"atk_phys": 12, "agility": 10}
         payload = self._render()
@@ -901,7 +979,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertNotEqual(atk["current"], 12)
         self.assertEqual(atk["current"], atk["effective"])
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_undisguised_actor_has_empty_displayed_list(self):
         payload = self._render()
         self.assertFalse(payload["disguise"]["active"])
@@ -924,7 +1002,7 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(payload["guild"]["rank"], "F")
         self.assertEqual(payload["guild"]["merit"], 60)
 
-    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
     def test_status_character_parity_on_shared_values(self):
         status = self._registry().render("status", _context(self.player))
         character = self._render()
@@ -937,6 +1015,71 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(
             character["disguise"]["active"], status["disguise_active"]
         )
+
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    def test_persona_renders_four_keys_and_never_structural_keys(self):
+        self.player.db.persona = {
+            "identity": {"public_view": {"name": "甲"}},
+            "personality": "沉穩",
+            "life_story": "",
+            "habit": "  ",
+            "appearance": {},
+            "social_connection": {},
+            "background": "渡口成長的灰誓成員",
+        }
+        payload = self._render()
+        self.assertEqual(
+            payload["persona"],
+            {
+                "background": "渡口成長的灰誓成員",
+                "personality": "沉穩",
+                "life_story": None,
+                "habit": None,
+            },
+        )
+        self.assertNotIn("identity", payload["persona"])
+        self.assertNotIn("appearance", payload["persona"])
+        self.assertNotIn("social_connection", payload["persona"])
+        # No persona record at all renders all-null, never a placeholder.
+        self.player.attributes.remove("persona")
+        payload = self._render()
+        self.assertEqual(
+            payload["persona"],
+            {
+                "background": None,
+                "personality": None,
+                "life_story": None,
+                "habit": None,
+            },
+        )
+
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    def test_structural_or_non_string_persona_values_degrade_to_null(self):
+        self.player.db.persona = {
+            "identity": {},
+            "personality": 42,
+            "life_story": "",
+            "habit": "",
+            "appearance": {},
+            "social_connection": {},
+            "background": "",
+        }
+        payload = self._render()
+        self.assertEqual(payload["persona"]["personality"], None)
+
+    @covers_requirement("webclient-exploration-menu::the-character-panel-is-an-exact-read-only-version-7-panel")
+    def test_over_bound_persona_text_fails_the_panel_closed(self):
+        self.player.db.persona = {
+            "identity": {},
+            "personality": "長" * (MAX_PERSONA_FIELD_CODE_POINTS + 1),
+            "life_story": "",
+            "habit": "",
+            "appearance": {},
+            "social_connection": {},
+            "background": "",
+        }
+        payload = self._render()
+        self.assertFalse(payload["available"])
 
     def test_combat_mode_renders_unavailable_form(self):
         from typeclasses.monsters import Monster

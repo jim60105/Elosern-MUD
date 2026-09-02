@@ -136,7 +136,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
   // `CHARACTER_PANEL_SAMPLE`.
   function characterPanelWithSkillSlice() {
     return {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "character",
       traits: CHARACTER_PANEL_SAMPLE.traits,
@@ -232,7 +232,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         fx.snapshot({
           panels: {
             character: {
-              schema_version: 6,
+              schema_version: 7,
               available: false,
               reason: { code: "character_missing", message: "character not created" },
             },
@@ -265,7 +265,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
         fx.snapshot({
           panels: {
             character: {
-              schema_version: 6,
+              schema_version: 7,
               available: false,
               reason: { code: "no_puppet", message: "你已離開角色" },
             },
@@ -346,5 +346,75 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     const icon = wrapper.find(".hud-drawer__icon");
     expect(icon.exists()).toBe(true);
     expect(wrapper.find(".hud-drawer__subtitle").exists()).toBe(false);
+  });
+
+  // add-persona-edit-surface: one drawer persona edit submits exactly one
+  // character.persona.update envelope through the single store dispatch.
+  it("submits one character.persona.update envelope per drawer persona edit", async () => {
+    const sender = fx.createFakeSender();
+    store.setSender(sender);
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          panels: {
+            status: fx.statusPanel(),
+            exploration: fx.explorationPanel(),
+            context_actions: fx.explorationActions(),
+            character: CHARACTER_PANEL_SAMPLE,
+          },
+        }),
+      ],
+    );
+    await wrapper.vm.$nextTick();
+    store.openHudDrawer("status");
+    await wrapper.vm.$nextTick();
+    await wrapper.get('[data-testid="character-status-drawer__persona-edit--life_story"]').trigger("click");
+    await wrapper
+      .get('[data-testid="character-status-drawer__persona-input--life_story"]')
+      .setValue("  我在渡口寫下的新生平。  ");
+    await wrapper.get('[data-testid="character-status-drawer__persona-submit--life_story"]').trigger("click");
+    expect(sender.sent.actions).toHaveLength(1);
+    const envelope = sender.sent.actions[0];
+    expect(envelope.action_id).toBe("character.persona.update");
+    expect(envelope.payload).toEqual({ field: "life_story", text: "我在渡口寫下的新生平。" });
+    expect(envelope.protocol_version).toBe(1);
+    // Settle the first dispatch so the single in-flight slot frees for the
+    // next edit (the server result settles the mutation).
+    const result = store.receive(
+      1,
+      "ui_action_result",
+      [fx.actionResult({ request_id: "session:1", presentation_revision: 2 })],
+      {},
+    );
+    expect(result.accepted).toBe(true);
+    // The completion publication refreshes the character panel at the
+    // result's revision; the drawer reflects the new text with no reload.
+    const refreshed = {
+      ...CHARACTER_PANEL_SAMPLE,
+      persona: { ...CHARACTER_PANEL_SAMPLE.persona, life_story: "我在渡口寫下的新生平。" },
+    };
+    const update = store.receive(
+      1,
+      "ui_update",
+      [fx.update({ revision: 2, panels: { character: refreshed } })],
+      {},
+    );
+    expect(update.accepted).toBe(true);
+    await wrapper.vm.$nextTick();
+    expect(
+      wrapper.get('[data-testid="character-status-drawer__persona-value--life_story"]').text()
+    ).toBe("我在渡口寫下的新生平。");
+    // A blank submit clears: the same action carries text null.
+    await wrapper.get('[data-testid="character-status-drawer__persona-edit--habit"]').trigger("click");
+    await wrapper.get('[data-testid="character-status-drawer__persona-input--habit"]').setValue("   ");
+    await wrapper.get('[data-testid="character-status-drawer__persona-submit--habit"]').trigger("click");
+    expect(sender.sent.actions).toHaveLength(2);
+    expect(sender.sent.actions[1].payload).toEqual({ field: "habit", text: null });
   });
 });

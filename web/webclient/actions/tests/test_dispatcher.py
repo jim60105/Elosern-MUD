@@ -163,6 +163,7 @@ class RegistryTests(unittest.TestCase):
                     "title.decline",
                     "title.equip",
                     "title.remove",
+                    "character.persona.update",
                 }
             ),
         )

@@ -322,6 +322,39 @@
     "creation.reset": function (payload, display) {
       return label(display && display.actionLabel);
     },
+    // The persona edits replay the typed persona family verbatim
+    // (commands/background.py / commands/persona.py): `設定背景|設定個性|
+    // 設定生平|設定習慣 <文字>`. A null or blank text is the clear — the
+    // typed clear spelling is the command plus trailing whitespace, which
+    // the echo surface can never carry (labels are trimmed), so the clear
+    // emits a display-only `（清除）` notation on the command key: the log
+    // line stays distinguishable from the bare-command READ spelling and
+    // never misrepresents a destructive edit as a read. An unknown field
+    // key stays silent rather than inventing a command.
+    "character.persona.update": function (payload) {
+      var commands = {
+        background: "設定背景",
+        personality: "設定個性",
+        life_story: "設定生平",
+        habit: "設定習慣",
+      };
+      var key = commands[payload && payload.field];
+      if (!key) {
+        return null;
+      }
+      var text = payload.text;
+      if (text === null || text === undefined) {
+        return key + "（清除）";
+      }
+      if (typeof text !== "string") {
+        return null;
+      }
+      if (text.trim() === "") {
+        return key + "（清除）";
+      }
+      var shown = payloadText(text);
+      return shown === null ? key : join([key, shown]);
+    },
   };
 
   function commandLine(actionId, payload, display) {

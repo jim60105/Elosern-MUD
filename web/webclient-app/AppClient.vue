@@ -574,6 +574,13 @@ function onQuestAction(intent) {
   store.dispatchAction(intent.action_id, intent.payload);
 }
 
+// add-persona-edit-surface: one drawer persona edit submits exactly one
+// character.persona.update action with the section's field key and the
+// edited text (null clears).
+function onPersonaEdit(intent) {
+  store.dispatchAction("character.persona.update", { field: intent.field, text: intent.text });
+}
+
 // H4 (task 7.4): the reference drawer layer. The drawer title/subtitle is
 // derived from the single open-drawer name the store publishes.
 const DRAWER_TITLES = {
@@ -891,6 +898,7 @@ onMounted(() => {
         :character="panel('character') || {}"
         :low-hp="store.view.vitals.lowHp"
         @open-skill="() => store.openHudDrawer('skill')"
+        @persona-edit="onPersonaEdit"
       />
       <!-- H4 (R3): when the drawer hosts the keyboard router's current service
            frame, render that frame's rows through the shared row renderer

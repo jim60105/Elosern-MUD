@@ -17,7 +17,7 @@
 // chip per layer IN PAYLOAD ORDER — a pure projection with no sorting,
 // recomputation, or truncation (all ≤ 16 layers render). Layer-free rows
 // render no breakdown element at all.
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { gaugeRatio } from "./vitals.js";
 
 const props = defineProps({
@@ -28,6 +28,11 @@ const props = defineProps({
   // The derived low-HP presentation state (store view.vitals.lowHp).
   lowHp: { type: Boolean, default: false },
 });
+
+// `open-skill` opens the skill drawer; `persona-edit` carries one
+// `{ field, text }` persona edit intent (text null clears the field) that
+// AppClient dispatches as exactly one character.persona.update action.
+const emit = defineEmits(["open-skill", "persona-edit"]);
 
 // Per-severity glyph shapes: the same non-colour-separated set H2's
 // ConditionChips uses, so no two severities differ by colour alone.
@@ -203,7 +208,88 @@ const displayedRows = computed(() => {
 
 const guild = computed(() => (characterAvailable.value ? (props.character?.guild ?? null) : null));
 
-const personaBackground = computed(() => (characterAvailable.value ? (props.character?.persona?.background ?? null) : null));
+// The persona area (add-persona-edit-surface D4): the four editable prose
+// sections in 個性／生平／習慣／背景 order. Each value is the committed
+// panel's verbatim text or null; a null renders the localized 未設定
+// placeholder (display copy only — the payload never carries placeholder
+// text). The structural persona keys (identity, appearance,
+// social_connection) are not part of the wire payload and are never
+// rendered here.
+const PERSONA_SECTIONS = [
+  { key: "personality", label: "個性" },
+  { key: "life_story", label: "生平" },
+  { key: "habit", label: "習慣" },
+  { key: "background", label: "背景" },
+];
+
+const personaSections = computed(() =>
+  PERSONA_SECTIONS.map((section) => ({
+    ...section,
+    value: characterAvailable.value
+      ? (props.character?.persona?.[section.key] ?? null)
+      : null,
+  }))
+);
+
+// Inline editing state: at most one section is open; the draft is seeded
+// from the committed value on open. Submitting emits exactly one
+// `persona-edit` intent ({ field, text }) — AppClient turns it into a
+// single character.persona.update action. A blank draft submits null
+// (clearing); the shared 600-code-point bound is enforced client-side by
+// code-point truncation on input (never the UTF-16-unit `maxlength`, which
+// would reject astral text the server accepts) and re-validated
+// deterministically server-side.
+const PERSONA_FIELD_BOUND = 600;
+const editingField = ref(null);
+const editDraft = ref("");
+// The committed value the open draft was seeded from. If a completion
+// publication refreshes the edited field from elsewhere (e.g. a Telnet
+// edit), the refresh wins: the watcher re-seeds the draft so a stale
+// editor can never overwrite a newer committed value.
+const editBaseline = ref(null);
+
+function committedValue(key) {
+  const section = personaSections.value.find((s) => s.key === key);
+  return section ? section.value : null;
+}
+
+// Code-point truncation: the bound counts Unicode code points (matching
+// world/rules/character_creation.MAX_PERSONA_FIELD_LENGTH), so an astral
+// character consumes ONE unit here, not two.
+function onPersonaInput(event) {
+  const chars = Array.from(event.target.value);
+  if (chars.length > PERSONA_FIELD_BOUND) {
+    editDraft.value = chars.slice(0, PERSONA_FIELD_BOUND).join("");
+  }
+}
+
+watch(
+  () => (editingField.value === null ? null : committedValue(editingField.value)),
+  (value) => {
+    if (editingField.value !== null && value !== editBaseline.value) {
+      editDraft.value = value ?? "";
+      editBaseline.value = value;
+    }
+  }
+);
+
+function openPersonaEdit(section) {
+  editingField.value = section.key;
+  editDraft.value = section.value ?? "";
+  editBaseline.value = section.value;
+}
+
+function cancelPersonaEdit() {
+  editingField.value = null;
+  editDraft.value = "";
+  editBaseline.value = null;
+}
+
+function submitPersonaEdit(section) {
+  const trimmed = editDraft.value.trim();
+  emit("persona-edit", { field: section.key, text: trimmed === "" ? null : trimmed });
+  cancelPersonaEdit();
+}
 
 const intimate = computed(() => (characterAvailable.value ? (props.character?.intimate ?? null) : null));
 
@@ -505,27 +591,78 @@ const INTIMATE_ROWS = [
     <!-- The single drawer-layer wallet moved to the inventory drawer's
          shared header (relocate-inventory-drawer-essentials); the 角色狀態
          body renders no balance of its own (and never a zero). -->
-    <!-- The 背景 section shows the committed persona background; when the
-         `character` panel is unavailable the section stays visible and is
-         marked with the registry-owned reason. -->
-    <section
-      v-if="characterAvailable ? !!personaBackground : true"
-      class="character-status-drawer__section"
-      data-testid="character-status-drawer__persona"
-      aria-label="背景"
-    >
-      <p class="character-status-drawer__section-label">背景</p>
-      <p v-if="personaBackground" class="character-status-drawer__persona-background" data-testid="character-status-drawer__persona-background">
-        {{ personaBackground }}
-      </p>
+    <!-- The persona area (add-persona-edit-surface D4): four labelled
+         sections in 個性／生平／習慣／背景 order. Each shows the committed
+         verbatim text or the localized 未設定 placeholder, plus an inline
+         edit affordance that submits exactly one persona-edit intent
+         ({ field, text }; a blank draft submits null). When the
+         `character` panel is unavailable the area stays visible, is marked
+         with the registry-owned reason, and offers no edit controls. -->
+    <section class="character-status-drawer__section" data-testid="character-status-drawer__persona" aria-label="設定">
       <p
-        v-else
+        v-if="!characterAvailable"
         class="character-status-drawer__section-reason"
         data-testid="character-status-drawer__persona-unavailable"
         :data-reason-code="characterReason?.code"
       >
         {{ characterReason?.message }}
       </p>
+      <template v-else>
+        <div
+          v-for="section in personaSections"
+          :key="section.key"
+          class="character-status-drawer__persona-block"
+          :data-testid="`character-status-drawer__persona--${section.key}`"
+        >
+        <p class="character-status-drawer__section-label">{{ section.label }}</p>
+        <p
+          v-if="section.value !== null"
+          class="character-status-drawer__persona-background"
+          :data-testid="`character-status-drawer__persona-value--${section.key}`"
+        >
+          {{ section.value }}
+        </p>
+        <p v-else class="character-status-drawer__persona-empty" :data-testid="`character-status-drawer__persona-empty--${section.key}`">
+          未設定
+        </p>
+        <button
+          v-if="editingField !== section.key"
+          type="button"
+          class="character-status-drawer__persona-edit"
+          :data-testid="`character-status-drawer__persona-edit--${section.key}`"
+          @click="openPersonaEdit(section)"
+        >
+          編輯{{ section.label }}
+        </button>
+        <div v-else class="character-status-drawer__persona-editor">
+          <textarea
+            rows="3"
+            :aria-label="section.label"
+            @input="onPersonaInput"
+            :data-testid="`character-status-drawer__persona-input--${section.key}`"
+            v-model="editDraft"
+          ></textarea>
+          <div class="character-status-drawer__persona-editor-buttons">
+            <button
+              type="button"
+              class="character-status-drawer__persona-submit"
+              :data-testid="`character-status-drawer__persona-submit--${section.key}`"
+              @click="submitPersonaEdit(section)"
+            >
+              儲存
+            </button>
+            <button
+              type="button"
+              class="character-status-drawer__persona-cancel"
+              :data-testid="`character-status-drawer__persona-cancel--${section.key}`"
+              @click="cancelPersonaEdit"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+        </div>
+</template>
     </section>
   </section>
 </template>
@@ -870,6 +1007,43 @@ const INTIMATE_ROWS = [
   color: var(--paper-300);
   font-size: 0.85em;
   line-height: 1.6;
+}
+
+/* Persona editing (add-persona-edit-surface D4): the unset placeholder is
+   muted display copy; the inline editor reuses the shell's form controls
+   and never relies on colour alone (buttons carry text labels). */
+.character-status-drawer__persona-block {
+  margin-bottom: 0.75rem;
+}
+
+.character-status-drawer__persona-empty {
+  margin: 0;
+  color: var(--paper-500);
+  font-size: 0.85em;
+  font-style: italic;
+}
+
+.character-status-drawer__persona-edit {
+  margin-top: 0.25rem;
+  font-size: 0.8em;
+}
+
+.character-status-drawer__persona-editor textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 0.85em;
+  color: var(--paper-300);
+  background: var(--ink-820);
+  border: 1px solid var(--ink-600);
+  border-radius: 4px;
+  padding: 0.4rem;
+  resize: vertical;
+}
+
+.character-status-drawer__persona-editor-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
 }
 
 /* The design's 親密狀態 disclosure: the native `<details>` header carries the

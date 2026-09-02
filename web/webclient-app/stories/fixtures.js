@@ -252,7 +252,7 @@ export const STATUS_PANEL_MINIMAL_SAMPLE = {
   combat: null,
 };
 
-// The committed `character` v6 payload for the same actor: all eight
+// The committed `character` v7 payload for the same actor: all eight
 // breakdown trait rows — gauges carry a non-null max with `effective == max`
 // (the maximum the layers decompose), statics/counters carry a null max with
 // `current == effective` — each with its server-computed `layers` in payload
@@ -266,7 +266,7 @@ export const STATUS_PANEL_MINIMAL_SAMPLE = {
 // test's serialized sample (web/webclient/presentation/tests/
 // test_character_panel.py); reviewers diff both when either changes.
 export const CHARACTER_PANEL_SAMPLE = {
-  schema_version: 6,
+  schema_version: 7,
   available: true,
   kind: "character",
   traits: [
@@ -401,6 +401,9 @@ export const CHARACTER_PANEL_SAMPLE = {
    wallet: 3240,
    persona: {
      background: "渡口成長起來的灰誓成員，習慣在黃昏開張前巡完整條街。",
+     personality: "沉穩寡言，對生人保持距離。",
+     life_story: "在渡口碼頭長大，十六歲跟著商隊上了路。",
+     habit: "清晨練劍，黃昏沿著主街巡一圈。",
    },
    intimate: {
      arousal: "中等",
@@ -430,7 +433,7 @@ export const CHARACTER_PANEL_UNDISGUISED_SAMPLE = {
   disguise: { active: false, description: "", displayed: [] },
   guild: { rank: null, merit: 0 },
   wallet: 0,
-  persona: { background: null },
+  persona: { background: null, personality: null, life_story: null, habit: null },
   intimate: null,
 };
 

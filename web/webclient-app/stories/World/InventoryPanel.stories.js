@@ -310,7 +310,7 @@ export const CharacterUnavailable = {
   args: {
     services: SERVICES_PANEL_SAMPLE,
     character: {
-      schema_version: 6,
+      schema_version: 7,
       available: false,
       kind: "character",
       reason: { code: "no_puppet", message: "你已離開角色" },

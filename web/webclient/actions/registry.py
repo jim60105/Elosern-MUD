@@ -98,6 +98,10 @@ def build_production_action_registry() -> ActionRegistry:
         validate_flee_payload,
         validate_forfeit_payload,
     )
+    from web.webclient.actions.character_actions import (
+        _character_persona_update_adapter,
+        validate_character_persona_update_payload,
+    )
     from web.webclient.actions.creation_actions import (
         _creation_activate_adapter,
         _creation_concept_adapter,
@@ -432,6 +436,16 @@ def build_production_action_registry() -> ActionRegistry:
             # Removal leaves the equipment slots untouched; only the codex
             # rows change.
             affected_panels=("title_codex",),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="character.persona.update",
+            validate_payload=validate_character_persona_update_payload,
+            adapter=_character_persona_update_adapter,
+            # A persona edit re-renders the character drawer's persona
+            # sections through the character panel.
+            affected_panels=("character",),
         )
     )
     return registry
