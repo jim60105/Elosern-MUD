@@ -37,6 +37,6 @@
 ## 6. 驗證
 
 - [x] 6.1 `uv run --locked python -m tools.observability_lint check` exit 0（凍結清單內）
-- [ ] 6.2 Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.observability commands server.conf`
+- [x] 6.2 Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.observability commands server.conf`（554 tests OK）
 - [x] 6.3 Traceability（刻意時序）：本 change 期間**不標註**兩個新能力的 id——`tools.spec_traceability` 只索引 `openspec/specs/` 主規格，active delta 的 id 會令 `check` 報 `unknown-requirement-id` 而紅。既有主規格 id（`spec-test-traceability::continuous-integration-enforces-both-quality-dimensions`）照常標註於 5.2 的 contract test。兩個新能力的 `covers_requirement` 標註在 archive 同步主規格時同批加入（列入批次 4 收尾/archive 工作），並以 `check` 綠為驗收
 - [x] 6.4 `openspec validate add-observability-lint-gate --strict`
