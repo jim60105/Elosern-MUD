@@ -575,9 +575,12 @@
         if (stack.length === 0) {
           return this.pushMenu(menu);
         }
-        stack[stack.length - 1].menu = menu;
-        stack[stack.length - 1].focusRow = 0;
-        stack[stack.length - 1].focusCol = 0;
+        // Transitional cross-family re-home: the top frame becomes a legacy
+        // copy frame outright. Replacing only `.menu` on a declarative frame
+        // would leave the descriptor authoritative (its reads resolve, never
+        // read `.menu`), so the frame's shape flips here — the follow-up
+        // change deletes this whole path with the legacy shape.
+        stack[stack.length - 1] = { menu: menu, focusRow: 0, focusCol: 0 };
         repeatGuard = null;
         notifyFocus(current());
         return stack.length;

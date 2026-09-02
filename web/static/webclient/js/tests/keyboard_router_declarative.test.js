@@ -242,3 +242,15 @@ test("empty declarative stack reads throw rather than silently recover", () => {
   assert.strictEqual(router.currentItem(), null);
   assert.strictEqual(router.currentMenu(), null);
 });
+
+test("replaceMenu re-homes a declarative top frame into the legacy copy shape", () => {
+  const resolve = () => menuOf(["d"]);
+  const { router } = declRouter(resolve);
+  router.pushFrame({ source: "exploration.root", params: {} });
+  // Cross-family re-home (the transitional combat/creation root path): the
+  // top frame becomes a legacy frame outright, not a descriptor with a
+  // dead .menu property.
+  router.replaceMenu(menuOf(["combat-root"]));
+  assert.strictEqual(router.currentDescriptor(), null);
+  assert.strictEqual(router.currentMenu().items[0].label, "combat-root");
+});
