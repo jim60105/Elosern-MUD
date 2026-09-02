@@ -279,7 +279,12 @@ describe("action-result narrative feedback", () => {
     expect(store.view.dispatch.uncertain).toBe(false);
   });
 
-  it("stays bounded under repeated distinct failures", () => {
+  // 505 real store dispatch/receive cycles under jsdom: locally ~0.4s, but the
+  // CI shard runs jsdom workers beside four parallel Evennia processes and the
+  // default 5000ms vitest deadline is a contention margin, not a contract.
+  // The assertions below remain the contract; only the wall-clock allowance
+  // is test-local.
+  it("stays bounded under repeated distinct failures", { timeout: 30000 }, () => {
     openSession();
     for (let i = 1; i <= 505; i += 1) {
       const requestId = store.dispatchAction("explore.wait", { daypart: "dusk" });
