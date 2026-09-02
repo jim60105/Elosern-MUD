@@ -66,11 +66,15 @@ LLM 生成的 persona 三欄與玩家親寫的 background 屬於同類資料。�
 
 draft 只剩 `preset_selected` 與 `custom_filled` 兩種模式。`custom_filled` 增一個必現、值可為 null 的 `persona` 鍵。值為物件時必恰 `{personality, life_story, habit}` 三鍵，各自為 1 至 600 字非空文字，驗證直接重用既有 `_validate_persona_block`。缺鍵的舊形狀 draft 視為損壞，降級單一草稿槽位（沿用 `_normalize_draft` 的降級慣例）。
 
-### 4.2 `creation.concept`（一次呼叫，零寫入）
+### 4.2 `creation.concept`（一次呼叫，零持久寫入）
 
-payload 維持恰 `{concept}`。adapter 跑既有 guarded pipeline（注入 client、預算驗證、降級標記），成功後不寫任何狀態，回傳 `ui_action_result`（confirmed、code `concept_filled`），其 affected data 攜帶提案四組值：`{race_key, subrace_key, allocations, persona}`。降級與驗證失敗走既有 `concept_unavailable` 穩定拒絕。
+payload 維持恰 `{concept}`。adapter 跑既有 guarded pipeline（注入 client、預算驗證、降級標記），成功後不寫任何持久狀態，降級與驗證失敗走既有 `concept_unavailable` 穩定拒絕。
 
-信封上限方面，最差情況三欄各 600 個中日韓文字約 6 KB，對 `MAX_CANONICAL_JSON_BYTES = 65536` 餘裕充足，並以測試鎖定。
+提案的送達走倉庫現成的 session 瞬態模式（options suggestions 的 `session.ndb.options_state` → `PresentationContext.options_state` → presenter 渲染，本設計與 `FrozenCard`/`OptionsSnapshot` 同構）：adapter 以它依 ABI 收到的 session，把驗證過的提案寫入 `session.ndb.concept_proposal`（不持久化、斷線即滅，正是暫態填入的語意），回傳 confirmed success（code `concept_applied`）並宣告 affected `creation` panel；presenter 從 context 的提案快照渲染出 panel 的 `proposal` 槽，客戶端據此填入表單。`PresentationContext` 依 `options_state` 的既有先例新增提案快照欄位，由 coordinator 在建立 context 時從 session 複製。
+
+提案的生命週期：寫入於套用成功；清除於 `creation.custom` 儲存成功、`creation.reset`、概念再次套用、或 session 結束。自訂儲存前的每次面板重建照樣渲染提案，讓重新連線能重建暫態填入；儲存成功後提案即不再出現。
+
+信封上限方面，最差情況三欄各 600 個中日韓文字約 6 KB，對 `MAX_CANONICAL_JSON_BYTES = 65536` 餘裕充足，並以 worst-case 測試鎖定。
 
 ### 4.3 `creation.custom`
 
@@ -84,7 +88,7 @@ payload 從 8 鍵增為 9 鍵，新增必填 `persona` 鍵，值為 null 或恰�
 
 ### 4.5 creation panel（schema v1 → v2）
 
-draft 的 custom 形狀增 `persona`（物件或 null）；concept 形狀不復存在。presenter、`presentation/creation.py` 驗證器、`protocol.js` 鏡像驗證器同步為 v2。custom 模式不再有任何「非內容指示」，persona 內容本身經 draft 上線。
+available payload 增一個 optional 頂層鍵 `proposal`（僅存在且有未消费的暫態提案時；恰 `{race_key, subrace_key, allocations, persona{personality, life_story, habit}}`，沿用 optional 鍵的既有先例），`schema_version` 升為 2。draft 的 custom 形狀增 `persona`（物件或 null）；concept 形狀不復存在。presenter、`presentation/creation.py` 驗證器、`protocol.js` 鏡像驗證器同步為 v2。custom 模式不再有任何「非內容指示」，persona 內容僅以 proposal（暫態填入來源）與 draft（已儲存值）兩種身份上線，「面板不暴露 persona」的舊斷言據此改寫為「不渲染伺服端草稿 persona 之外的 persona 資料」。
 
 ### 4.6 Vue 表單（`CreationOverlay.vue`）
 
