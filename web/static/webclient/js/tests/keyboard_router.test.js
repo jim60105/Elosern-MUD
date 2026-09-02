@@ -1,5 +1,9 @@
 /*
  * KeyboardRouter DOM-independent tests (foundation section 5.2).
+ *
+ * The router is declarative-only: this harness backs each pushed menu with a
+ * static resolver source, so the geometry/submission semantics under test are
+ * identical while frames carry descriptors, never menus.
  */
 const test = require("node:test");
 const assert = require("node:assert");
@@ -8,7 +12,29 @@ const Router = require("../elosern/keyboard_router.js");
 
 function makeRouter() {
   const events = [];
-  const router = Router.createRouter({ onEvent: (name, payload) => events.push({ name, payload }) });
+  const tables = new Map();
+  let seq = 0;
+  const router = Router.createRouter({
+    onEvent: (name, payload) => events.push({ name, payload }),
+    resolve: (descriptor) => tables.get(descriptor.source) ?? null,
+  });
+  // Test-local legacy-menu convenience: back the menu with a static source
+  // registered BEFORE the push settles the frame.
+  router.pushMenu = (menu, options) => {
+    const source = "menu-" + (seq += 1);
+    tables.set(source, menu);
+    return router.pushFrame({ source, params: {} }, options);
+  };
+  router.replaceMenu = (menu) => {
+    const source = "menu-" + (seq += 1);
+    tables.set(source, menu);
+    return router.replaceFrame({ source, params: {} });
+  };
+  router.reset = (menu) => {
+    const source = "menu-" + (seq += 1);
+    tables.set(source, menu);
+    return router.resetFrame({ source, params: {} });
+  };
   return { router, events };
 }
 

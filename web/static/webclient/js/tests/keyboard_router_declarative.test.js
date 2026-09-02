@@ -1,10 +1,11 @@
 /*
- * Declarative frame-stack tests (webclient-declarative-frame-stack).
+ * Declarative frame-stack tests (webclient-declarative-frame-stack, final
+ * form via webclient-services-combat-creation-frames).
  *
- * Covers the dual frame contract: access-time resolution, the focus-key
+ * Covers the single frame contract: access-time resolution, the focus-key
  * rule, unresolvable cascade pop with opener-key restore, degraded root,
- * suggestions-style root exit, unknown-shape rejection, and the legacy
- * pass-through that keeps unmigrated families byte-for-byte.
+ * suggestions-style root exit, unknown-shape rejection, and the empty-stack
+ * read that throws a programmer error instead of silently recovering.
  */
 const test = require("node:test");
 const assert = require("node:assert");
@@ -205,22 +206,10 @@ test("degraded root without a server reason uses the local fallback line", () =>
 test("unknown frame shapes throw at the push site", () => {
   const { router } = declRouter(() => menuOf(["a"]));
   assert.throws(() => router.pushFrame({ params: {} }), TypeError);
-  assert.throws(() => router.pushMenu(null), TypeError);
-  assert.doesNotThrow(() => router.pushMenu({ items: [] }));
-});
-
-test("legacy frames pass through unchanged beside declarative ones", () => {
-  const resolve = () => menuOf(["d"]);
-  const { router, events } = declRouter(resolve);
-  // Combat/creation families keep using the copy shape (change 4 migrates).
-  router.pushMenu(menuOf(["legacy"]));
-  assert.strictEqual(router.currentMenu().items[0].label, "legacy");
-  router.handle("ArrowDown"); // wrap within single item
-  assert.strictEqual(router.currentItem().label, "legacy");
-  router.pushMenu(menuOf(["legacy2"]));
-  router.popMenu();
-  assert.strictEqual(router.depth(), 1);
-  assert.strictEqual(router.currentDescriptor(), null);
+  assert.throws(() => router.pushFrame(null), TypeError);
+  assert.throws(() => router.pushFrame({ source: "", params: {} }), TypeError);
+  assert.throws(() => router.replaceFrame({ source: 1, params: {} }), TypeError);
+  assert.throws(() => router.resetFrame({ source: null }), TypeError);
 });
 
 test("resetFrame tears down to one declarative root frame", () => {
@@ -234,35 +223,25 @@ test("resetFrame tears down to one declarative root frame", () => {
 });
 
 test("empty declarative stack reads throw rather than silently recover", () => {
+  // The change-4 teardown deletes the wrapped empty-stack reset: an
+  // empty stack is unreachable in a live mode, so a frame-content read
+  // against one is a programmer error and throws.
   const { router } = declRouter(() => menuOf(["a"]));
-  router.reset(); // legacy menu-less reset (no push happened)
+  // A fresh router has never been mounted (the pre-session window).
   assert.strictEqual(router.depth(), 0);
-  // Reads on an empty stack are safe nulls; the empty-stack fuse deletion
-  // lands with the change-4 teardown. Here we only pin the access shape.
-  assert.strictEqual(router.currentItem(), null);
-  assert.strictEqual(router.currentMenu(), null);
-});
-
-test("replaceMenu refuses to downgrade a declarative top frame to a copy", () => {
-  const resolve = () => menuOf(["d"]);
-  const { router } = declRouter(resolve);
-  router.pushFrame({ source: "exploration.root", params: {} });
-  // The transitional seam is copy-onto-copy only: overwriting a declarative
-  // frame with a frozen menu copy would silently kill access-time resolution
-  // (the very failure the declarative stack removes), so it throws and the
-  // frame stays declarative.
-  assert.throws(
-    () => router.replaceMenu(menuOf(["combat-root"])),
-    /must not overwrite a declarative frame/,
-  );
-  assert.deepEqual(router.currentDescriptor(), { source: "exploration.root", params: {} });
-  // An empty stack remains the push-through case, and a legacy top is
-  // replaced copy-for-copy.
-  router.reset();
-  assert.strictEqual(router.depth(), 0);
-  router.replaceMenu(menuOf(["combat-root"]));
-  assert.strictEqual(router.depth(), 1);
+  assert.throws(() => router.currentItem(), /programmer error/);
+  assert.throws(() => router.currentMenu(), /programmer error/);
+  assert.throws(() => router.trail(), /programmer error/);
+  assert.throws(() => router.rootMenu(), /programmer error/);
+  assert.throws(() => router.degradedRoot(), /programmer error/);
+  assert.throws(() => router.focusItemByKey("a"), /programmer error/);
+  // Key presses on an unmounted stack are plain unhandled keys (false):
+  // pre-session key routing must never crash.
+  assert.strictEqual(router.handle("ArrowDown"), false);
+  assert.strictEqual(router.handle("Enter"), false);
+  assert.strictEqual(router.handle("Escape"), false);
   assert.strictEqual(router.currentDescriptor(), null);
-  router.replaceMenu(menuOf(["combat-root-2"]));
-  assert.strictEqual(router.currentMenu().items[0].label, "combat-root-2");
+  // replaceFrame remains the push-through primitive for the first frame.
+  router.replaceFrame({ source: "exploration.root", params: {} });
+  assert.strictEqual(router.depth(), 1);
 });
