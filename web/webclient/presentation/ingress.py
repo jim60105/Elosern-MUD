@@ -15,6 +15,7 @@ from twisted.internet.defer import Deferred
 from web.webclient.presentation.context import (
     FrozenCard,
     OptionsSnapshot,
+    ProposalSnapshot,
     PresentationContext,
 )
 from web.webclient.presentation.coordinator import (
@@ -87,6 +88,9 @@ def _coordinator_for(session: Any, actor: Any) -> PresentationCoordinator:
         coordinator.reset()
         session.ndb.options_state = None
         session.ndb.options_barriers = None
+        # The transient concept proposal belongs to the old puppet exactly
+        # like the options state: the new puppet never sees it.
+        session.ndb.concept_proposal = None
         from web.webclient.actions.dispatcher import retire_sequence
 
         retire_sequence(session)
@@ -124,6 +128,7 @@ def reset_client_sequence(session: Any) -> None:
         session.ndb.elosern_actor_id = None
         session.ndb.options_state = None
         session.ndb.options_barriers = None
+        session.ndb.concept_proposal = None
 
 
 def options_snapshot(session: Any) -> OptionsSnapshot | None:
@@ -183,6 +188,77 @@ def _build_options_snapshot(session: Any, state: Any) -> OptionsSnapshot | None:
     )
 
 
+def proposal_snapshot(session: Any, actor: Any) -> ProposalSnapshot | None:
+    """Return an immutable snapshot of ``session.ndb.concept_proposal``, or ``None``.
+
+    The write side (the ``creation.concept`` adapter) populates the slot as a
+    plain-data dict carrying ``owner_actor_id``, ``revision``, ``race``,
+    ``subrace``, ``allocations``, and ``persona``; this read-side factory
+    deep-copies the content into the frozen :class:`ProposalSnapshot` so a
+    presenter's render is stable and never exposes a live reference. Mirrors
+    :func:`options_snapshot`: an absent slot yields ``None``, a slot owned by
+    a different actor is refused (the proposal never follows a puppet switch),
+    and any malformed or incomplete shape degrades to ``None`` — this factory
+    must never raise on the publication path (retool-concept-transient-fill
+    D1).
+    """
+    ndb = getattr(session, "ndb", None)
+    state = getattr(ndb, "concept_proposal", None) if ndb is not None else None
+    if state is None:
+        return None
+    try:
+        return _build_proposal_snapshot(actor, state)
+    except Exception:
+        log_unavailable("proposal snapshot", "malformed concept_proposal degraded to None")
+        return None
+
+
+def _build_proposal_snapshot(actor: Any, state: Any) -> ProposalSnapshot | None:
+    if not isinstance(state, dict):
+        return None
+    owner = state.get("owner_actor_id")
+    if owner is None or str(getattr(actor, "pk", "")) != str(owner):
+        # An unowned slot (foreign actor or missing binding) never renders.
+        return None
+    revision = state.get("revision")
+    race = state.get("race")
+    subrace = state.get("subrace")
+    allocations = state.get("allocations")
+    persona = state.get("persona")
+    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
+        return None
+    if not isinstance(race, str) or not race:
+        return None
+    if subrace is not None and (not isinstance(subrace, str) or not subrace):
+        return None
+    # A corrupt owned slot must degrade to an omitted proposal, never to an
+    # unavailable panel: gate the content through the panel's own exact
+    # proposal contract (seven axes, three persona keys, the 600-character
+    # bound) so a half-valid dict can never reach ProposalSnapshot and blow up
+    # the downstream creation validator (retool-concept-transient-fill D1).
+    # Imported inside the function: the registry module graph reaches
+    # creation.py, which reaches this module's registry import.
+    from web.webclient.presentation.creation import _validate_proposal
+
+    try:
+        _validate_proposal({
+            "revision": revision,
+            "race": race,
+            "subrace": subrace,
+            "allocations": allocations,
+            "persona": persona,
+        })
+    except Exception:
+        return None
+    return ProposalSnapshot(
+        revision=revision,
+        race=race,
+        subrace=subrace,
+        allocations=MappingProxyType(deepcopy(dict(allocations))),
+        persona=MappingProxyType(deepcopy(dict(persona))),
+    )
+
+
 def build_presentation_context(session: Any, actor: Any) -> PresentationContext:
     """The single factory every publication path builds its context through.
 
@@ -203,6 +279,7 @@ def build_presentation_context(session: Any, actor: Any) -> PresentationContext:
         protocol_version=PROTOCOL_VERSION,
         options_state=options_snapshot(session),
         options_fingerprint=_current_options_fingerprint(actor),
+        proposal=proposal_snapshot(session, actor),
     )
 
 

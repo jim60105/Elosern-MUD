@@ -71,7 +71,7 @@ OVERLAYS_STORY_IDS = {
     "overlays-creationoverlay--default",
     "overlays-creationoverlay--preset-draft",
     "overlays-creationoverlay--custom-draft",
-    "overlays-creationoverlay--concept-draft",
+    "overlays-creationoverlay--proposal",
     "overlays-creationoverlay--unavailable",
 }
 

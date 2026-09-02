@@ -1,6 +1,7 @@
 """Exact ``creation`` schema, presenter, and isolation tests.
 
-Covers the D2 shared bounds, the version-1 payload validation, deterministic
+Covers the D2 shared bounds, the version-2 payload validation (player-owned
+draft persona plus the optional transient proposal slot), deterministic
 preset/profile ordering, the draft shape for both stages, the worst-case
 envelope size, the all-ceilings byte gate, and the isolation of a corrupt
 draft and non-creation modes.
@@ -133,7 +134,7 @@ class CreationPanelValidationTests(unittest.TestCase):
 
     def test_schema_version_kind_and_availability_discriminators(self):
         for mutate, label in (
-            (lambda p: p.update(schema_version=2), "schema_version"),
+            (lambda p: p.update(schema_version=1), "schema_version"),
             (lambda p: p.update(available=False), "available"),
             (lambda p: p.update(kind="services"), "kind"),
         ):
@@ -365,6 +366,10 @@ class CreationPanelValidationTests(unittest.TestCase):
         payload = _valid_payload(draft=draft)
         validated = validate_creation(payload)
         self.assertEqual(validated["draft"]["mode"], "custom")
+        # The serializer always renders the required nullable persona key; a
+        # draft without player persona prose ships an explicit null
+        # (retool-concept-transient-fill D2/D3).
+        self.assertIsNone(validated["draft"]["persona"])
         bad = deepcopy(payload)
         bad["draft"]["age"] = 17
         with self.assertRaises(Exception):
@@ -381,40 +386,48 @@ class CreationPanelValidationTests(unittest.TestCase):
         bad["draft"]["mode"] = "unknown"
         with self.assertRaises(Exception):
             validate_creation(bad)
-
-    def test_draft_concept_stage_shape(self):
-        # The server-side concept draft carries the persona block; the wire
-        # serializer replaces it with the non-content background indicator.
-        draft = {
-            "mode": "concept",
-            "stage": "concept_filled",
-            "race": "human",
-            "subrace": "human_commoner",
-            "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
-            "persona": {"personality": "沉穩", "life_story": "故事", "habit": "習慣"},
-        }
-        payload = _valid_payload(draft=draft)
-        validated = validate_creation(payload)
-        self.assertEqual(validated["draft"]["mode"], "concept")
-        self.assertEqual(validated["draft"]["stage"], "concept_filled")
-        self.assertTrue(validated["draft"]["background_generated"])
-        bad = deepcopy(payload)
-        bad["draft"]["stage"] = "custom_filled"
-        with self.assertRaises(Exception):
-            validate_creation(bad)
-        bad = deepcopy(payload)
-        bad["draft"]["allocations"] = {"hp": 0}
-        with self.assertRaises(Exception):
-            validate_creation(bad)
-        bad = deepcopy(payload)
-        bad["draft"]["background_generated"] = "yes"
-        with self.assertRaises(Exception):
-            validate_creation(bad)
-        # A persona field is not part of the wire concept draft contract.
         bad = deepcopy(payload)
         bad["draft"]["persona"] = {"personality": "沉穩"}
         with self.assertRaises(Exception):
             validate_creation(bad)
+
+    @covers_requirement("concept-transient-fill::persona-rides-the-custom-draft-payload-and-activation")
+    def test_draft_custom_persona_block_round_trips_verbatim(self):
+        draft = {
+            "mode": "custom",
+            "stage": "custom_filled",
+            "display_name": "新角色",
+            "age": 20,
+            "apparent_age": 20,
+            "race": "human",
+            "subrace": "human_commoner",
+            "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
+            "persona": {
+                "personality": "沉穩",
+                "life_story": "來自邊境的小村",
+                "habit": "清晨練劍",
+            },
+        }
+        payload = _valid_payload(draft=draft)
+        validated = validate_creation(payload)
+        self.assertEqual(validated["draft"]["persona"], draft["persona"])
+        for mutate, label in (
+            # A missing prose key, an extra key, blank text, or a field over
+            # the 600-code-point bound all degrade the payload at the gate.
+            (lambda d: d["draft"]["persona"].pop("habit"), "missing key"),
+            (lambda d: d["draft"]["persona"].update(extra="x"), "extra key"),
+            (lambda d: d["draft"]["persona"].update(personality="  "), "blank"),
+            (
+                lambda d: d["draft"]["persona"].update(habit="長" * 601),
+                "over bound",
+            ),
+            (lambda d: d["draft"].update(persona="沉穩"), "non-object"),
+        ):
+            with self.subTest(label=label):
+                bad = deepcopy(payload)
+                mutate(bad)
+                with self.assertRaises(Exception):
+                    validate_creation(bad)
 
     def test_worst_case_realistic_payload_fits_comfortably(self):
         payload = validate_creation(_valid_payload())
@@ -483,7 +496,7 @@ class CreationPanelValidationTests(unittest.TestCase):
             for key in ("fire", "water", "wind", "earth", "lightning", "ice", "light", "dark")
         ]
         payload = {
-            "schema_version": 1,
+            "schema_version": CREATION_SCHEMA_VERSION,
             "available": True,
             "kind": "creation",
             "draft": None,
@@ -518,6 +531,10 @@ class CreationPanelValidationTests(unittest.TestCase):
 
     @covers_requirement("webclient-character-creation-ui::creation-presentation-derives-finite-controls-from-immutable-registries")
     def test_no_persona_or_import_only_field_is_ever_exposed(self):
+        # The descriptor surfaces (custom descriptor, preset cards, profiles)
+        # carry no persona, skill, equipment, inventory, or import-only field.
+        # The draft/proposal data surfaces legitimately carry the
+        # player-owned persona block (retool-concept-transient-fill D3).
         payload = validate_creation(_valid_payload())
         for forbidden in (
             "persona",
@@ -530,7 +547,6 @@ class CreationPanelValidationTests(unittest.TestCase):
             "age",
             "apparent_age",
         ):
-            self.assertNotIn(forbidden, payload)
             self.assertNotIn(forbidden, payload["custom"])
             for card in payload["presets"]:
                 self.assertNotIn(forbidden, card)
@@ -668,7 +684,7 @@ class CreationPanelPresenterTests(EvenniaTest):
         self.assertNotIn("presets", payload)
 
     def test_corrupt_draft_degrades_only_the_draft_slot(self):
-        self.character.creation_draft = {"version": 1, "garbage": True}
+        self.character.creation_draft = {"version": 2, "garbage": True}
         payload = self._render()
         self.assertTrue(payload["available"])
         self.assertIsNone(payload["draft"])
@@ -681,7 +697,7 @@ class CreationPanelPresenterTests(EvenniaTest):
         # A draft that is structurally a custom draft but violates the adult
         # gate (underage) must not take the whole panel unavailable.
         self.character.creation_draft = {
-            "version": 1,
+            "version": 2,
             "mode": "custom",
             "stage": "custom_filled",
             "display_name": "年輕角色",
@@ -690,6 +706,7 @@ class CreationPanelPresenterTests(EvenniaTest):
             "race": "human",
             "subrace": "human_commoner",
             "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
+            "persona": None,
         }
         payload = self._render()
         self.assertTrue(payload["available"])
@@ -724,81 +741,21 @@ class CreationPanelPresenterTests(EvenniaTest):
         self.assertEqual(payload["draft"]["age"], 20)
 
 
-    @covers_requirement("creation-persona-persistence::the-creation-panel-offers-a-concept-field-and-adapter-sharing-the-guarded-pipeline")
-    def test_concept_draft_serializes_finite_controls_without_persona(self):
-        from world.rules.creation_wizard import apply_concept_proposal, draft_fingerprint
-
-        apply_concept_proposal(
-            self.account,
-            self.character,
-            {
-                "race_key": "human",
-                "subrace_key": "human_commoner",
-                "allocations": {
-                    "hp": 50, "mp": 50, "sp": 50,
-                    "atk_phys": 10, "agility": 10, "defense": 11,
-                    "magic_power": 43,
-                },
-                "persona": {
-                    "personality": "沉穩",
-                    "life_story": "來自邊境的小村，靠磨劍維生",
-                    "habit": "清晨練劍",
-                },
-            },
-            expected_fingerprint=draft_fingerprint(self.character),
-        )
+    @covers_requirement("concept-transient-fill::the-creation-panel-renders-the-transient-proposal")
+    def test_slotless_panel_omits_the_proposal_key(self):
         payload = self._render()
-        draft = payload["draft"]
-        self.assertEqual(draft["mode"], "concept")
-        self.assertEqual(draft["stage"], "concept_filled")
-        self.assertEqual(draft["race"], "human")
-        self.assertEqual(draft["allocations"]["hp"], 50)
-        self.assertTrue(draft["background_generated"])
-        # Persona content never reaches the browser: no text, keys, or length
-        # information (creation-persona-persistence D4).
-        serialized = __import__("json").dumps(payload, ensure_ascii=False)
-        for fragment in (
-            "personality", "life_story", "habit", "persona",
-            "沉穩", "來自邊境的小村", "清晨練劍", "600",
-        ):
-            self.assertNotIn(fragment, serialized, fragment)
+        # The key is absent entirely — never present as null.
+        self.assertNotIn("proposal", payload)
 
-    @covers_requirement("creation-persona-persistence::a-server-owned-concept-draft-stores-the-validated-proposal-and-persona-block")
-    def test_custom_draft_with_preserved_persona_never_serializes_it(self):
-        from world.rules.creation_wizard import apply_concept_proposal, draft_fingerprint
+    @covers_requirement("concept-transient-fill::the-creation-panel-renders-the-transient-proposal")
+    def test_pending_proposal_renders_with_its_exact_shape(self):
+        from web.webclient.presentation.context import ProposalSnapshot
 
-        apply_concept_proposal(
-            self.account,
-            self.character,
-            {
-                "race_key": "human",
-                "subrace_key": "human_commoner",
-                "allocations": {
-                    "hp": 50, "mp": 50, "sp": 50,
-                    "atk_phys": 10, "agility": 10, "defense": 11,
-                    "magic_power": 43,
-                },
-                "persona": {
-                    "personality": "沉穩",
-                    "life_story": "來自邊境的小村，靠磨劍維生",
-                    "habit": "清晨練劍",
-                },
-            },
-            expected_fingerprint=draft_fingerprint(self.character),
-        )
-        from world.rules.character_creation import (
-            CharacterCreationRequest,
-        )
-        from world.rules.creation_wizard import save_custom_draft
-
-        save_custom_draft(
-            self.account,
-            self.character,
-            CharacterCreationRequest(
-                mode="custom",
-                display_name="新角色",
-                age=20,
-                apparent_age=20,
+        context = PresentationContext(
+            actor=self.character,
+            protocol_version=1,
+            proposal=ProposalSnapshot(
+                revision=3,
                 race="human",
                 subrace="human_commoner",
                 allocations={
@@ -806,18 +763,53 @@ class CreationPanelPresenterTests(EvenniaTest):
                     "atk_phys": 10, "agility": 10, "defense": 11,
                     "magic_power": 43,
                 },
+                persona={
+                    "personality": "沉穩",
+                    "life_story": "來自邊境的小村，靠磨劍維生",
+                    "habit": "清晨練劍",
+                },
             ),
         )
-        draft = read_draft(self.character)
-        self.assertEqual(draft["mode"], "custom")
-        self.assertIn("persona", draft, "the server-owned block survives the custom save")
-        payload = self._render()
-        serialized = __import__("json").dumps(payload, ensure_ascii=False)
-        self.assertNotIn("personality", serialized)
-        self.assertNotIn("沉穩", serialized)
-        # The non-content indicator follows the preserved persona block, but
-        # the persona itself stays server-side (creation-persona-persistence D4).
-        self.assertTrue(payload["draft"]["background_generated"])
+        payload = self.registry.render("creation", context)
+        proposal = payload["proposal"]
+        self.assertEqual(
+            set(proposal), {"revision", "race", "subrace", "allocations", "persona"}
+        )
+        self.assertEqual(proposal["revision"], 3)
+        self.assertEqual(proposal["persona"]["personality"], "沉穩")
+        # Rendering stays read-only: no draft appeared, nothing persisted.
+        self.assertIsNone(payload["draft"])
+        self.assertIsNone(read_draft(self.character))
+
+    @covers_requirement("concept-transient-fill::the-creation-panel-renders-the-transient-proposal")
+    def test_worst_case_proposal_fits_the_envelope_bound(self):
+        # Three maximum-length persona fields plus the seven axes stay inside
+        # the canonical envelope with room to spare.
+        from web.webclient.presentation.context import ProposalSnapshot
+        from web.webclient.presentation.protocol import json_byte_size
+
+        context = PresentationContext(
+            actor=self.character,
+            protocol_version=1,
+            proposal=ProposalSnapshot(
+                revision=9,
+                race="human",
+                subrace="human_commoner",
+                allocations={
+                    "hp": 50, "mp": 50, "sp": 50,
+                    "atk_phys": 10, "agility": 10, "defense": 11,
+                    "magic_power": 43,
+                },
+                persona={
+                    "personality": "長" * 600,
+                    "life_story": "長" * 600,
+                    "habit": "長" * 600,
+                },
+            ),
+        )
+        payload = self.registry.render("creation", context)
+        self.assertEqual(len(payload["proposal"]["persona"]["personality"]), 600)
+        self.assertLessEqual(json_byte_size(payload), MAX_CANONICAL_JSON_BYTES)
 
 
 if __name__ == "__main__":

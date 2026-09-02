@@ -6,12 +6,14 @@ The five production creation actions are ``creation.preset``,
 each adapter re-resolves the owning account from the authenticated session's
 puppet, verifies that the puppet is an owned ``PlayerCharacter`` still pending
 creation, and calls only the public deterministic creation-wizard APIs
-(``save_preset_draft``, ``save_custom_draft``, ``apply_concept_proposal``,
-``activate_draft``, ``clear_draft``) plus the unchanged onboarding
-relocation/arrival functions. No adapter assigns ``.db`` attributes, traits,
-identity attributes, ``creation_pending``, or the draft directly, and no
-payload accepts an actor, account, session, host, persona, skill, equipment,
-magic-level, or calculated-stat field.
+(``save_preset_draft``, ``save_custom_draft``, ``activate_draft``,
+``clear_draft``) plus the unchanged onboarding relocation/arrival functions.
+``creation.concept`` writes nothing persistent at all: the validated proposal
+lands only in the session-scoped transient slot the presentation layer renders
+onto the creation panel (retool-concept-transient-fill D1). No adapter assigns
+``.db`` attributes, traits, identity attributes, ``creation_pending``, or the
+draft directly, and no payload accepts an actor, account, session, host, skill,
+equipment, magic-level, or calculated-stat field.
 """
 
 from typing import Any
@@ -25,13 +27,14 @@ from world.rules.character_creation import (
     MAX_PERSONA_FIELD_LENGTH,
     CharacterCreationError,
     CharacterCreationRequest,
+    _validate_allocations,
+    _validate_persona_block,
+    resolve_starting_profile,
     max_affinity_elements,
 )
 from world.rules.creation_messages import rejection_code, rejection_message
 from world.rules.creation_wizard import (
-    ConceptDraftStaleError,
     activate_draft,
-    apply_concept_proposal,
     clear_draft,
     draft_fingerprint,
     save_custom_draft,
@@ -72,6 +75,16 @@ AFFECTED_ACTIVATE = ()
 # (``retire_sequence``), and a reconnect-resumed confirmation must still verify
 # against the saved draft.
 FINGERPRINT_NDB_KEY = "elosern_confirmed_draft_fingerprint"
+
+# The session ndb key carrying the transient concept proposal slot (mirrors the
+# ``session.ndb.options_state`` pattern): ``owner_actor_id`` binding, the
+# session-monotonic ``revision``, and the four content keys. Lost with the
+# session, cleared by a successful custom save or reset (retool-concept-
+# transient-fill D1). The revision sequence lives in its own counter key so a
+# consumed slot never restarts it; that counter is only ever lost with the
+# session itself.
+PROPOSAL_NDB_KEY = "concept_proposal"
+PROPOSAL_REVISION_KEY = "concept_proposal_revision"
 
 
 class CreationActionError(ValueError):
@@ -127,12 +140,12 @@ def validate_creation_custom_payload(payload: dict[str, Any]) -> dict[str, Any]:
         raise CreationActionError("creation.custom payload must be an object")
     if set(payload) != {
         "display_name", "age", "apparent_age", "race", "subrace", "allocations",
-        "background", "affinity_elements",
+        "background", "affinity_elements", "persona",
     }:
         raise CreationActionError(
             "creation.custom requires exactly display_name, age, apparent_age, "
-            "race, subrace, allocations, an optional background, and an optional "
-            "affinity_elements"
+            "race, subrace, allocations, an optional background, an optional "
+            "affinity_elements, and a persona (null or the three prose fields)"
         )
     display_name = _require_non_empty_string(
         payload["display_name"], "display_name", MAX_NAME_CODE_POINTS
@@ -157,6 +170,7 @@ def validate_creation_custom_payload(payload: dict[str, Any]) -> dict[str, Any]:
     affinity_elements = _validate_affinity_elements(
         payload["affinity_elements"], race
     )
+    persona = _validate_persona_payload(payload["persona"])
     return {
         "display_name": display_name,
         "age": age,
@@ -166,7 +180,24 @@ def validate_creation_custom_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "allocations": checked_allocations,
         "background": background,
         "affinity_elements": affinity_elements,
+        "persona": persona,
     }
+
+
+def _validate_persona_payload(value: Any) -> dict[str, str] | None:
+    """Validate the required nullable ``persona`` payload key.
+
+    ``None`` passes through (the browser convention ships null when all three
+    textareas are empty); any other value must be exactly the three bounded
+    prose fields through the shared deterministic persona-block validator
+    (retool-concept-transient-fill D3).
+    """
+    if value is None:
+        return None
+    try:
+        return _validate_persona_block(value)
+    except CharacterCreationError as error:
+        raise CreationActionError(f"persona is malformed: {error}") from error
 
 
 def _validate_affinity_elements(value: Any, race: str) -> tuple[str, ...] | None:
@@ -315,6 +346,54 @@ def _pending_owner(actor: Any):
 
 
 # ---------------------------------------------------------------------------
+# Transient concept proposal slot.
+# ---------------------------------------------------------------------------
+
+
+def _store_proposal(session: Any, actor: Any, proposal: Any) -> None:
+    """Overwrite the session's transient proposal slot with a fresh revision.
+
+    The slot is a plain-data dict (never a live object reference) carrying the
+    ``owner_actor_id`` binding — mirroring the options-state owner check — and
+    a session-monotonic ``revision`` so the browser distinguishes a panel
+    rebuild from a fresh apply even when both contents are byte-identical.
+    The sequence lives in its own ``concept_proposal_revision`` counter: a
+    consumed slot (a successful custom save or reset clears it) must never
+    restart the sequence, or a mounted overlay would ignore the next fresh
+    apply whose revision collides with the last applied one.
+    """
+    ndb = getattr(session, "ndb", None)
+    if ndb is None:
+        return
+    previous = getattr(ndb, PROPOSAL_REVISION_KEY, None)
+    revision = previous + 1 if isinstance(previous, int) and not isinstance(previous, bool) else 1
+    setattr(ndb, PROPOSAL_REVISION_KEY, revision)
+    setattr(ndb, PROPOSAL_NDB_KEY, {
+        "owner_actor_id": getattr(actor, "pk", None),
+        "revision": revision,
+        "race": proposal.race_key,
+        "subrace": proposal.subrace_key,
+        "allocations": dict(proposal.allocations),
+        "persona": dict(proposal.persona),
+    })
+
+
+def _clear_proposal(session: Any) -> None:
+    """Idempotently drop the session's transient proposal slot.
+
+    Only the content is consumed: the monotonic revision counter survives so
+    every later apply in the same session still raises the sequence.
+    """
+    ndb = getattr(session, "ndb", None)
+    if ndb is None:
+        return
+    try:
+        delattr(ndb, PROPOSAL_NDB_KEY)
+    except AttributeError:
+        pass
+
+
+# ---------------------------------------------------------------------------
 # Adapters.
 # ---------------------------------------------------------------------------
 
@@ -337,88 +416,91 @@ def _creation_preset_adapter(actor: Any, payload: dict[str, Any], session: Any =
 
 def _creation_custom_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Validate the complete custom form and persist the ``custom_filled`` draft."""
-    del session
     account = _pending_owner(actor)
     if account is None:
         _invalidate_confirmation(actor)
         return _rejected("ownership_rejected")
-    request = CharacterCreationRequest(mode="custom", **payload)
+    persona = payload["persona"]
+    request = CharacterCreationRequest(
+        mode="custom",
+        display_name=payload["display_name"],
+        age=payload["age"],
+        apparent_age=payload["apparent_age"],
+        race=payload["race"],
+        subrace=payload["subrace"],
+        allocations=payload["allocations"],
+        background=payload["background"],
+        affinity_elements=payload["affinity_elements"],
+    )
     try:
-        save_custom_draft(account, actor, request)
+        save_custom_draft(account, actor, request, persona=persona)
     except CharacterCreationError as error:
         _invalidate_confirmation(actor)
         return _rejected(error)
+    # A successful custom save consumes any pending proposal fill: the form
+    # content is now the persisted draft (retool-concept-transient-fill D1).
+    _clear_proposal(session)
     message = "已儲存自訂角色資料。"
     return _confirmed_success("custom_saved", message, AFFECTED_CREATION, actor)
 
 
 def _creation_concept_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> Deferred:
-    """Run the guarded concept seam and save the concept draft (D4).
+    """Run the guarded concept seam with zero persistent writes (D1).
 
     Resolves the owning account synchronously so a tampered or unowned puppet
     rejects before any client or transport work; the Deferred settles after
-    the guarded ``character_creation`` layer resolves. On a valid proposal
-    whose draft fingerprint still matches, the deterministic concept-apply
-    service saves the ``concept_filled`` draft (including the server-owned
-    persona block) and the ``creation`` panel refreshes. On degrade or a
-    stale fingerprint the stable outcome is returned with zero state change.
+    the guarded ``character_creation`` layer resolves. On a valid proposal the
+    adapter re-authorizes the domain state, requires the session still to
+    puppet the admitted actor (a late response after a puppet switch writes
+    nothing), deterministically re-validates the proposal, and stores it in
+    the session-scoped transient slot; the ``creation`` panel refresh carries
+    it. The concept path never reads, writes, or invalidates the
+    activation-confirmation fingerprint: it saves no draft, so it can neither
+    preserve nor manufacture an activation authorization. On degrade the
+    stable unavailable outcome is returned with zero state change.
     """
-    del session
     account = _pending_owner(actor)
     if account is None:
-        _invalidate_confirmation(actor)
         return _rejected("ownership_rejected")
     if not bool(getattr(actor, "creation_pending", False)):
-        _invalidate_confirmation(actor)
         return _rejected("already_complete")
     from server.ai_director_service import request_character_proposal
 
-    fingerprint = draft_fingerprint(actor)
     deferred = request_character_proposal(concept=payload["concept"])
 
     def _on_success(proposal):
         if proposal is None:
             # The single public degraded marker of the guarded layer.
-            _invalidate_confirmation(actor)
             return _rejected("concept_unavailable")
         # Re-authorize current domain state at completion: the character could
         # have been activated or the ownership changed while the proposal was
         # in flight (webclient-action-dispatch ownership contract).
         current_account = _pending_owner(actor)
         if current_account is None:
-            _invalidate_confirmation(actor)
             return _rejected("ownership_rejected")
         if not bool(getattr(actor, "creation_pending", False)):
-            _invalidate_confirmation(actor)
             return _rejected("already_complete")
+        if getattr(session, "puppet", None) is not actor:
+            # The session switched puppets while the proposal was in flight;
+            # writing the slot would let the proposal follow the session onto
+            # a different character.
+            return _rejected("ownership_rejected")
         try:
-            apply_concept_proposal(
-                current_account,
-                actor,
-                {
-                    "race_key": proposal.race_key,
-                    "subrace_key": proposal.subrace_key,
-                    "allocations": dict(proposal.allocations),
-                    "persona": dict(proposal.persona),
-                },
-                expected_fingerprint=fingerprint,
+            profile = resolve_starting_profile(
+                proposal.race_key, proposal.subrace_key
             )
-        except ConceptDraftStaleError:
-            _invalidate_confirmation(actor)
-            return {
-                "outcome": "stale",
-                "code": "concept_stale",
-                "message": rejection_message("concept_stale"),
-            }
-        except CharacterCreationError as error:
-            _invalidate_confirmation(actor)
-            return _rejected(error)
-        message = "構想已套用，請填寫姓名與年齡完成建立。"
-        return _confirmed_success("concept_saved", message, AFFECTED_CREATION, actor)
+            _validate_allocations(profile, proposal.allocations)
+            _validate_persona_block(proposal.persona)
+        except CharacterCreationError:
+            # A structurally invalid proposal is a degraded generative result
+            # from the player's point of view; nothing is written.
+            return _rejected("concept_unavailable")
+        _store_proposal(session, actor, proposal)
+        message = "構想已套用到表單，請檢查後儲存。"
+        return _success("concept_applied", message, AFFECTED_CREATION)
 
     def _on_failure(failure):
         failure.trap(Exception)
-        _invalidate_confirmation(actor)
         return _rejected("concept_unavailable")
 
     deferred.addCallbacks(_on_success, _on_failure)
@@ -472,13 +554,14 @@ def _creation_activate_adapter(actor: Any, payload: dict[str, Any], session: Any
 
 def _creation_reset_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Idempotently clear the staging draft; the character stays pending."""
-    del payload, session
+    del payload
     account = _pending_owner(actor)
     if account is None:
         return _rejected("ownership_rejected")
     if not bool(getattr(actor, "creation_pending", False)):
         return _rejected("already_complete")
     clear_draft(actor)
+    _clear_proposal(session)
     message = "已清除角色草稿。"
     return _success("draft_cleared", message, AFFECTED_CREATION)
 

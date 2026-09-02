@@ -1,4 +1,4 @@
-"""Exact schema-version-1 ``creation`` panel and presenter (webclient-character-creation-ui).
+"""Exact schema-version-2 ``creation`` panel and presenter (webclient-character-creation-ui).
 
 The presenter serializes the frozen no-mutation creation view owned by
 ``world.rules.creation_wizard`` and validates its own output against the exact
@@ -6,8 +6,10 @@ bounded schema (design D2) before returning it to the presentation registry.
 Outside ``creation`` mode it raises :class:`PanelUnavailableError` so the
 registry emits the common unavailable form; a failure confined to one preset,
 profile, or the saved draft degrades only that entry while the panel stays
-schema-valid. No persona, skill, equipment, inventory, magic-level, or
-import-only field is ever exposed.
+schema-valid. Version 2 carries the player-owned draft ``persona`` key and the
+optional top-level transient concept ``proposal`` slot
+(retool-concept-transient-fill); no skill, equipment, inventory, magic-level,
+or import-only field is ever exposed.
 
 The payload shape and the exact shared bounds are mirrored by the client
 validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded by a
@@ -16,7 +18,7 @@ dual-direction parity test.
 
 from typing import Any
 
-from web.webclient.presentation.context import PresentationContext
+from web.webclient.presentation.context import PresentationContext, ProposalSnapshot
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
     MAX_SAFE_INTEGER,
@@ -35,7 +37,6 @@ from world.rules.character_creation import (
     max_affinity_elements,
 )
 from world.rules.creation_wizard import (
-    CONCEPT_STAGE,
     CUSTOM_STAGE,
     PRESET_STAGE,
     AdultBoundsView,
@@ -52,7 +53,7 @@ from world.rules.creation_wizard import (
     read_creation_view,
 )
 
-CREATION_SCHEMA_VERSION = 1
+CREATION_SCHEMA_VERSION = 2
 
 # Exact shared bounds (design D2) -- must stay equal in the JS validator and to
 # the creation-wizard view-builder caps (webclient-character-creation-ui D2).
@@ -84,6 +85,9 @@ MAX_AFFINITY_CHOICES = 8
 MAX_AFFINITY_ELEMENTS = 8
 
 ALLOCATABLE_AXES = ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power")
+
+# The exact wire persona block keys (the three prose fields).
+PERSONA_WIRE_KEYS = ("personality", "life_story", "habit")
 
 
 class CreationPanelError(ProtocolValidationError):
@@ -447,7 +451,7 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
         _require_exact_fields(
             value,
             "custom draft",
-            {"mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background", "background_generated", "affinity_elements"},
+            {"mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background", "affinity_elements", "persona"},
             {},
         )
         if value["stage"] != CUSTOM_STAGE:
@@ -464,10 +468,10 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
         race = _validate_key(value["race"], "draft race", MAX_RACE_KEY_CODE_POINTS)
         subrace = _validate_key(value["subrace"], "draft subrace", MAX_SUBRACE_KEY_CODE_POINTS)
         background = _validate_background(value["background"])
-        background_generated = _require_bool(value, "background_generated")
         affinity_elements = _validate_affinity_elements(
             value["affinity_elements"], race
         )
+        persona = _validate_persona(value["persona"])
         return {
             "mode": "custom",
             "stage": CUSTOM_STAGE,
@@ -478,36 +482,61 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
             "subrace": subrace,
             "allocations": _validate_allocations(value, "custom draft"),
             "background": background,
-            "background_generated": background_generated,
             "affinity_elements": affinity_elements,
-        }
-    if mode == "concept":
-        # The concept draft carries the finite controls, the background flavor,
-        # and the non-content background indicator; the server-owned persona
-        # block is never part of any wire payload (creation-persona-persistence
-        # D4).
-        _require_exact_fields(
-            value,
-            "concept draft",
-            {"mode", "stage", "race", "subrace", "allocations", "background", "background_generated"},
-            {},
-        )
-        if value["stage"] != CONCEPT_STAGE:
-            raise ProtocolValidationError("unsupported concept draft stage")
-        race = _validate_key(value["race"], "draft race", MAX_RACE_KEY_CODE_POINTS)
-        subrace = _validate_key(value["subrace"], "draft subrace", MAX_SUBRACE_KEY_CODE_POINTS)
-        background = _validate_background(value["background"])
-        background_generated = _require_bool(value, "background_generated")
-        return {
-            "mode": "concept",
-            "stage": CONCEPT_STAGE,
-            "race": race,
-            "subrace": subrace,
-            "allocations": _validate_allocations(value, "concept draft"),
-            "background": background,
-            "background_generated": background_generated,
+            "persona": persona,
         }
     raise ProtocolValidationError("draft has an unknown mode")
+
+
+def _validate_persona(value: Any) -> dict[str, str] | None:
+    """Validate one required nullable persona block on the wire.
+
+    ``None`` is the explicit "no persona" value; any other value must carry
+    exactly ``personality``, ``life_story``, and ``habit``, each a 1..600
+    non-empty code-point string (retool-concept-transient-fill D2/D3).
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict) or set(value) != set(PERSONA_WIRE_KEYS):
+        raise ProtocolValidationError(
+            "persona must be null or carry exactly personality, life_story, and habit"
+        )
+    checked: dict[str, str] = {}
+    for key in PERSONA_WIRE_KEYS:
+        text = value[key]
+        if not isinstance(text, str) or not text.strip():
+            raise ProtocolValidationError(f"persona.{key} must be non-empty text")
+        if sum(1 for _ in text) > MAX_PERSONA_FIELD_LENGTH:
+            raise ProtocolValidationError(f"persona.{key} exceeds its bound")
+        checked[key] = text
+    return checked
+
+
+def _validate_proposal(value: Any) -> dict[str, Any]:
+    """Validate the optional top-level transient concept proposal.
+
+    The proposal carries exactly ``revision`` (a positive transient sequence
+    number), ``race``, nullable ``subrace``, the seven allocatable axes, and
+    the three-field persona block (retool-concept-transient-fill D1).
+    """
+    _require_exact_fields(
+        value, "proposal", {"revision", "race", "subrace", "allocations", "persona"}, {}
+    )
+    revision = _require_int(value, "revision", minimum=1, maximum=MAX_SAFE_INTEGER)
+    race = _validate_key(value["race"], "proposal race", MAX_RACE_KEY_CODE_POINTS)
+    subrace = value["subrace"]
+    if subrace is not None:
+        subrace = _validate_key(subrace, "proposal subrace", MAX_SUBRACE_KEY_CODE_POINTS)
+    persona = _validate_persona(value["persona"])
+    if persona is None:
+        raise ProtocolValidationError("proposal persona must be a block")
+    return {
+        "revision": revision,
+        "race": race,
+        "subrace": subrace,
+        "allocations": _validate_allocations(value, "proposal"),
+        "persona": persona,
+    }
 
 
 def validate_creation(payload: Any) -> dict[str, Any]:
@@ -520,7 +549,7 @@ def validate_creation(payload: Any) -> dict[str, Any]:
         payload,
         "creation panel",
         {"schema_version", "available", "kind", "draft", "presets", "custom"},
-        {},
+        {"proposal": "optional"},
     )
     if _require_int(
         payload, "schema_version", minimum=1, maximum=MAX_SAFE_INTEGER
@@ -548,6 +577,10 @@ def validate_creation(payload: Any) -> dict[str, Any]:
         "presets": presets,
         "custom": custom,
     }
+    if "proposal" in payload:
+        # The proposal key is present only while the session slot holds a
+        # proposal; a null value is never legal (the presenter omits the key).
+        result["proposal"] = _validate_proposal(payload["proposal"])
     # Envelope guarantee (design D2): a conforming payload must serialize within
     # the OOB envelope limit. Per-field bounds are ceilings, not a guarantee
     # that any combination of them fits, so the validator enforces the
@@ -665,19 +698,6 @@ def _serialize_draft(draft: dict[str, Any] | None) -> dict[str, Any] | None:
             "stage": PRESET_STAGE,
             "preset_key": draft["preset_key"],
         }
-    if draft["mode"] == "concept":
-        # The persona block never leaves the server: the wire draft carries
-        # only the finite controls, the background flavor, and the non-content
-        # background indicator (creation-persona-persistence D4).
-        return {
-            "mode": "concept",
-            "stage": CONCEPT_STAGE,
-            "race": draft["race"],
-            "subrace": draft["subrace"],
-            "allocations": dict(draft["allocations"]),
-            "background": draft.get("background"),
-            "background_generated": bool(draft.get("persona")),
-        }
     return {
         "mode": "custom",
         "stage": CUSTOM_STAGE,
@@ -688,13 +708,24 @@ def _serialize_draft(draft: dict[str, Any] | None) -> dict[str, Any] | None:
         "subrace": draft["subrace"],
         "allocations": dict(draft["allocations"]),
         "background": draft.get("background"),
-        "background_generated": bool(draft.get("persona")),
         "affinity_elements": list(draft.get("affinity_elements") or []),
+        # The persona block is player-owned data (retool-concept-transient-
+        # fill): the saved draft renders it so a reconnect resumes with the
+        # player's own prose visible and editable.
+        "persona": dict(draft["persona"]) if draft.get("persona") is not None else None,
     }
 
 
-def _serialize(view: CreationView) -> dict[str, Any]:
-    return {
+def _serialize_proposal(proposal: ProposalSnapshot | None) -> dict[str, Any] | None:
+    if proposal is None:
+        return None
+    return proposal.as_dict()
+
+
+def _serialize(
+    view: CreationView, proposal: ProposalSnapshot | None = None
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
         "schema_version": CREATION_SCHEMA_VERSION,
         "available": True,
         "kind": "creation",
@@ -702,6 +733,12 @@ def _serialize(view: CreationView) -> dict[str, Any]:
         "presets": [_serialize_preset_card(card) for card in view.presets],
         "custom": _serialize_custom(view.custom),
     }
+    if proposal is not None:
+        # The proposal key ships only while the session slot holds a snapshot
+        # owned by the rendering puppet; it is never present as null
+        # (retool-concept-transient-fill D1).
+        payload["proposal"] = _serialize_proposal(proposal)
+    return payload
 
 
 def creation_presenter(context: PresentationContext) -> dict[str, Any]:
@@ -714,7 +751,7 @@ def creation_presenter(context: PresentationContext) -> dict[str, Any]:
     if is_in_active_session(actor):
         raise PanelUnavailableError
     view = read_creation_view(actor)
-    return validate_creation(_serialize(view))
+    return validate_creation(_serialize(view, context.proposal))
 
 
 __all__ = [
@@ -744,6 +781,7 @@ __all__ = [
     "MAX_SUBRACES",
     "MAX_SUBRACE_KEY_CODE_POINTS",
     "MIN_NAME_LENGTH",
+    "PERSONA_WIRE_KEYS",
     "creation_presenter",
     "validate_creation",
 ]

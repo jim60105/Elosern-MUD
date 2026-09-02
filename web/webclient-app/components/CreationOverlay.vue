@@ -1,10 +1,13 @@
 <script setup>
 // CreationOverlay (B5 overlays family): the full-viewport character-creation
-// wizard for the committed `creation` v1 panel (web/webclient/presentation/
+// wizard for the committed `creation` v2 panel (web/webclient/presentation/
 // creation.py). Sub-states stay separate and testable (design D-risk): a
 // preset-pick state, the custom form (name/adult/race/subrace/allocation/
-// background/affinity), and the concept state. The adult gate (design D1)
-// rejects BOTH the age and apparent_age fields below the descriptor's 18
+// affinity/background/persona), and the concept state. The v2 panel carries
+// the player-owned draft `persona` block and the optional transient concept
+// `proposal` slot (retool-concept-transient-fill): the slot pre-fills the
+// custom form revision-gated and never auto-submits. The adult gate (design
+// D1) rejects BOTH the age and apparent_age fields below the descriptor's 18
 // minimum before activation. Every action emits the exact OOB `creation.*`
 // envelope — no field is invented; the server remains authoritative.
 import { computed, reactive, ref, watch } from "vue";
@@ -17,7 +20,7 @@ import { computed, reactive, ref, watch } from "vue";
 const ACTION_RESULT_FALLBACK_MESSAGE = "動作未生效，請重試或返回上層。";
 
 const props = defineProps({
-  // The committed `creation` v1 panel payload (the available form, a
+  // The committed `creation` v2 panel payload (the available form, a
   // server-persisted wizard draft, or the registry-owned unavailable form).
   creation: { type: Object, required: true },
   open: { type: Boolean, default: true },
@@ -44,7 +47,7 @@ const draft = computed(() => props.creation.draft);
 // wizard from the server-persisted draft (webclient-character-creation-ui:
 // the server owns the draft — the browser resumes at the saved stage).
 const stageMode = (stage) =>
-  stage === "custom_filled" ? "custom" : stage === "concept_filled" ? "concept" : "preset";
+  stage === "custom_filled" ? "custom" : "preset";
 const mode = ref("preset");
 
 // Form state (custom + concept sub-states).
@@ -55,6 +58,9 @@ const race = ref("human");
 const subrace = ref(null);
 const allocations = reactive({ hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0, magic_power: 0 });
 const background = ref("");
+// The player-owned persona block (retool-concept-transient-fill D3/D5):
+// three always-rendered prose textareas, all-empty or all-filled at submit.
+const persona = reactive({ personality: "", life_story: "", habit: "" });
 const affinitySelected = ref(new Set());
 const conceptText = ref("");
 const selectedPresetKey = ref(null);
@@ -82,7 +88,7 @@ function markFormTouched() {
   }
 }
 watch(
-  [name, age, apparentAge, race, subrace, background, conceptText, allocations],
+  [name, age, apparentAge, race, subrace, background, persona, conceptText, allocations],
   markFormTouched,
   { deep: true, flush: "sync" },
 );
@@ -134,9 +140,10 @@ function syncFromDraft() {
     }
     background.value = d.background ?? "";
     affinitySelected.value = new Set(d.affinity_elements ?? []);
-    if (d.mode === "concept") {
-      conceptText.value = d.background ?? "";
-    }
+    const block = d.persona ?? null;
+    persona.personality = block?.personality ?? "";
+    persona.life_story = block?.life_story ?? "";
+    persona.habit = block?.habit ?? "";
     formTouched.value = false;
   } finally {
     syncingDraft = false;
@@ -145,6 +152,76 @@ function syncFromDraft() {
 
 syncFromDraft();
 watch(() => props.creation.draft, syncFromDraft, { deep: true });
+
+// -- Transient concept proposal fill (retool-concept-transient-fill D1/D5) --
+// The panel's optional `proposal` slot pre-fills the form only when its
+// `revision` is strictly newer than the last applied revision: a panel
+// rebuild re-publishes the same revision and must never discard the player's
+// edits, while a fresh apply of byte-identical content raises the revision
+// and does replace the generated fields. Nothing here auto-submits.
+const lastAppliedRevision = ref(0);
+const reviewPrompt = ref("");
+const proposalNotice = ref("");
+
+function personaFilled() {
+  return [persona.personality, persona.life_story, persona.habit].filter(
+    (text) => text.trim() !== "",
+  ).length;
+}
+
+function applyProposal() {
+  const p = props.creation.proposal;
+  if (!p || typeof p.revision !== "number" || p.revision <= lastAppliedRevision.value) {
+    return;
+  }
+  reviewPrompt.value = "";
+  // A race-changing proposal over locally-typed persona prose shows a
+  // non-blocking review prompt naming the incoming race (design D5 — the
+  // server never overwrites or clears what the player typed).
+  if (p.race !== race.value && personaFilled() > 0) {
+    reviewPrompt.value = `概念提案的種族為「${p.race}」，與目前選擇不同；請確認人設文字是否仍適合。`;
+  }
+  syncingDraft = true;
+  try {
+    race.value = p.race;
+    const info = races.value.find((r) => r.key === p.race);
+    subrace.value =
+      info && Array.isArray(info.subraces) && info.subraces.includes(p.subrace)
+        ? p.subrace
+        : null;
+    if (p.allocations) {
+      for (const axis of Object.keys(allocations)) {
+        if (typeof p.allocations[axis] === "number") {
+          allocations[axis] = p.allocations[axis];
+        }
+      }
+    }
+    persona.personality = p.persona.personality;
+    persona.life_story = p.persona.life_story;
+    persona.habit = p.persona.habit;
+    // The new race may cap the affinity selection; trim as onRaceChange does.
+    const max = affinityMax.value;
+    const keys = [...affinitySelected.value];
+    if (keys.length > max) affinitySelected.value = new Set(keys.slice(0, max));
+  } finally {
+    syncingDraft = false;
+  }
+  lastAppliedRevision.value = p.revision;
+  // The mode switch to the custom form is "on confirm": the notice carries
+  // the button that reveals the filled form.
+  if (mode.value !== "custom") {
+    proposalNotice.value = "概念提案已套用到自訂表單。";
+  }
+}
+
+function openCustomFromProposal() {
+  proposalNotice.value = "";
+  setMode("custom");
+}
+
+// The mount-time fill runs at the end of setup (after the descriptor
+// computeds exist); the watcher covers every later panel delivery.
+watch(() => props.creation.proposal, applyProposal, { deep: true });
 
 // -- Preset state -----------------------------------------------------------
 function setMode(next) {
@@ -201,6 +278,7 @@ const gatePassed = computed(
 const gateError = ref(false);
 const budgetError = ref(false);
 const subraceError = ref(false);
+const personaError = ref(false);
 
 // The legacy `creation-form-message` hook (Phase-0 audit §2.3 REMAP-TO-TESTID):
 // a single form-message element that surfaces a server rejection (result.code /
@@ -214,6 +292,7 @@ const formMessage = computed(() => {
   if (gateError.value) return `年齡與外觀年齡皆須 ≥ ${minimumAge.value}`;
   if (subraceError.value) return "已選擇有血統的種族時，必須先選擇血統";
   if (budgetError.value) return `點數總和 ${allocationTotal.value} 不等於額度 ${currentProfile.value?.budget}`;
+  if (personaError.value) return "人設三欄（個性、生平、習慣）需全部填寫或全部留空";
   return "";
 });
 
@@ -256,6 +335,7 @@ function confirmCustom() {
   gateError.value = false;
   budgetError.value = false;
   subraceError.value = false;
+  personaError.value = false;
   if (!gatePassed.value) {
     gateError.value = true;
     return;
@@ -269,13 +349,20 @@ function confirmCustom() {
     budgetError.value = true;
     return;
   }
+  // Persona local validation is all-empty-or-all-filled (design D5): a
+  // partially-filled triple blocks submission with a localized reason.
+  const filled = personaFilled();
+  if (filled !== 0 && filled !== 3) {
+    personaError.value = true;
+    return;
+  }
   const payload = {
     display_name: name.value,
     age: Number(age.value),
     apparent_age: Number(apparentAge.value),
     race: race.value,
     subrace: subrace.value,
-    // The wire payload always carries the exact eight keys (the server
+    // The wire payload always carries the exact nine keys (the server
     // revalidates the set); blank fields emit their JSON-safe defaults, the
     // same convention as the legacy creation menu.
     background: background.value.trim() !== "" ? background.value.trim() : null,
@@ -289,6 +376,16 @@ function confirmCustom() {
       defense: Number(allocations.defense),
       magic_power: Number(allocations.magic_power),
     },
+    // All-empty ships null; a filled triple ships the trimmed block verbatim
+    // (upload-is-intent — the server stores it without semantic filtering).
+    persona:
+      filled === 0
+        ? null
+        : {
+            personality: persona.personality.trim(),
+            life_story: persona.life_story.trim(),
+            habit: persona.habit.trim(),
+          },
   };
   emit("action", { action_id: "creation.custom", payload });
 }
@@ -345,6 +442,10 @@ function confirmCurrent() {
 function cancelConfirm() {
   emit("cancel-confirm");
 }
+
+// Mount-time proposal fill: a panel that already carries an unconsumed
+// proposal (a same-session remount) pre-fills the form before first paint.
+applyProposal();
 </script>
 
 <template>
@@ -437,6 +538,15 @@ function cancelConfirm() {
             </button>
           </nav>
 
+          <!-- The applied-proposal notice is reachable from every mode: the
+               fill is confirmed into the custom form, not auto-switched. -->
+          <div v-if="proposalNotice" class="creation-proposal-notice" data-testid="creation-proposal-notice">
+            <span>{{ proposalNotice }}</span>
+            <button type="button" class="creation-proposal-open" data-testid="creation-proposal-open" @click="openCustomFromProposal">
+              開啟表單
+            </button>
+          </div>
+
         <div v-if="mode === 'preset'" class="creation-overlay__presets">
           <button
             v-for="card in presets"
@@ -459,13 +569,8 @@ function cancelConfirm() {
         </div>
 
         <div v-else-if="mode === 'custom'" class="creation-overlay__custom">
-          <p
-            v-if="draft && draft.background_generated"
-            class="creation-concept-indicator"
-            role="status"
-            data-testid="creation-concept-indicator"
-          >
-            已套用構想草稿，背景已生成。
+          <p v-if="reviewPrompt" class="creation-proposal-review" role="status" data-testid="creation-proposal-review">
+            {{ reviewPrompt }}
           </p>
           <p
             v-if="budgetBriefing"
@@ -547,6 +652,34 @@ function cancelConfirm() {
             <textarea data-testid="creation-background" rows="3" v-model="background"></textarea>
           </label>
 
+          <label class="creation-overlay__field">
+            <span>個性</span>
+            <textarea
+              data-testid="creation-persona-personality"
+              rows="3"
+              maxlength="600"
+              v-model="persona.personality"
+            ></textarea>
+          </label>
+          <label class="creation-overlay__field">
+            <span>生平</span>
+            <textarea
+              data-testid="creation-persona-life_story"
+              rows="3"
+              maxlength="600"
+              v-model="persona.life_story"
+            ></textarea>
+          </label>
+          <label class="creation-overlay__field">
+            <span>習慣</span>
+            <textarea
+              data-testid="creation-persona-habit"
+              rows="3"
+              maxlength="600"
+              v-model="persona.habit"
+            ></textarea>
+          </label>
+
           <p v-if="formMessage" class="creation-form-message" data-testid="creation-form-message">{{ formMessage }}</p>
           <button type="button" class="creation-custom-confirm" data-testid="creation-submit" @click="confirmCustom">
             確認自訂
@@ -554,14 +687,6 @@ function cancelConfirm() {
         </div>
 
         <div v-else class="creation-overlay__concept">
-          <p
-            v-if="draft?.mode === 'concept' && draft.background"
-            class="creation-background"
-            data-testid="creation-background"
-            :data-background-generated="draft.background_generated ? 'true' : 'false'"
-          >
-            {{ draft.background }}
-          </p>
           <label class="creation-overlay__field">
             <span>角色概念</span>
             <textarea data-testid="creation-field-concept" rows="4" v-model="conceptText"></textarea>

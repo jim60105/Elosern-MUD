@@ -1469,10 +1469,11 @@ export const SERVICES_PANEL_MINIMAL_SAMPLE = {
 };
 
 // B5 (webclient-vue-06-showcase-overlays): full-overlays fixtures. The
-// `creation` panel (schema v1) mirrors web/webclient/presentation/creation.py
+// `creation` panel (schema v2) mirrors web/webclient/presentation/creation.py
 // exactly: presets (at most 8 cards), the custom descriptor (name/adult
 // bounds, races, subraces, profiles, affinity), and the optional saved
-// wizard draft (preset/custom/concept + background + affinity). The adult
+// wizard draft (preset/custom + background + affinity + persona) plus the
+// optional transient concept proposal slot. The adult
 // bounds advertise the 18 minimum on BOTH age and apparent_age (the
 // deterministic adult gate, webclient-character-creation-ui).
 const ELEMENTS = [
@@ -1487,7 +1488,7 @@ const ELEMENTS = [
 ];
 
 export const CREATION_PANEL_SAMPLE = {
-  schema_version: 1,
+  schema_version: 2,
   available: true,
   kind: "creation",
   draft: null,
@@ -1610,8 +1611,9 @@ export const CREATION_PANEL_SAMPLE = {
 };
 
 // The created-draft forms the wizard can resume at reconnect: the
-// server-persisted stages (preset_selected, custom_filled, concept_filled),
-// mirroring the wire shapes in creation.py.
+// server-persisted stages (preset_selected, custom_filled — the concept
+// stage was retired by retool-concept-transient-fill), mirroring the wire
+// shapes in creation.py.
 export const CREATION_PANEL_PRESET_DRAFT_SAMPLE = {
   ...CREATION_PANEL_SAMPLE,
   draft: { mode: "preset", stage: "preset_selected", preset_key: "preset_lantern_scholar" },
@@ -1629,28 +1631,37 @@ export const CREATION_PANEL_CUSTOM_DRAFT_SAMPLE = {
     subrace: null,
     allocations: { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 },
     background: "從渡口學來運貨的年輕人。",
-    background_generated: false,
     affinity_elements: ["fire", "wind"],
+    persona: {
+      personality: "沉穩寡言",
+      life_story: "在霧骨渡口搬運貨物長大的年輕人。",
+      habit: "每天清晨沿河岸慢跑。",
+    },
   },
 };
 
-export const CREATION_PANEL_CONCEPT_DRAFT_SAMPLE = {
+// The session-transient concept proposal slot (retool-concept-transient-fill
+// D1): the optional top-level key a same-session panel carries after a
+// concept apply, with the exact five-key shape including a revision number.
+export const CREATION_PANEL_PROPOSAL_SAMPLE = {
   ...CREATION_PANEL_SAMPLE,
-  draft: {
-    mode: "concept",
-    stage: "concept_filled",
+  proposal: {
+    revision: 1,
     race: "elf",
     subrace: null,
     allocations: { hp: 6, mp: 6, sp: 2, atk_phys: 2, agility: 4, defense: 2, magic_power: 4 },
-    background: "燈下讀書的年輕學者。",
-    background_generated: true,
+    persona: {
+      personality: "沉穩內斂",
+      life_story: "燈下研讀古籍的年輕學者。",
+      habit: "睡前必整理書架。",
+    },
   },
 };
 
 // The `creation` panel unavailable form (registry-owned reason, the common
 // unavailable envelope).
 export const CREATION_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 1,
+  schema_version: 2,
   available: false,
   reason: { code: "creation_unavailable", message: "角色創建目前無法顯示" },
 };

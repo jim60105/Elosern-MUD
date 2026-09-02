@@ -1439,7 +1439,7 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.local_map, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.services, 3);
   assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 2);
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.character, 6);
   assert.equal(Protocol.PANEL_ALLOWLIST.lineage, 1);
@@ -2825,7 +2825,7 @@ test("rejects malformed art panels atomically", () => {
 });
 
 // ---------------------------------------------------------------------------
-// creation panel v1 (mirror of web.webclient.presentation.creation).
+// creation panel v2 (mirror of web.webclient.presentation.creation).
 // ---------------------------------------------------------------------------
 
 function validCreationPanel(overrides) {
@@ -2838,7 +2838,7 @@ function validCreationPanel(overrides) {
   }));
   return deepMerge(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "creation",
       draft: null,
@@ -2938,7 +2938,7 @@ test("accepts a valid creation panel and the common unavailable form", () => {
       "creation",
       Protocol.PANEL_ALLOWLIST.creation,
       {
-        schema_version: 1,
+        schema_version: 2,
         available: false,
         reason: { code: "creation_unavailable", message: "角色建立畫面目前無法顯示" },
       }
@@ -2949,7 +2949,8 @@ test("accepts a valid creation panel and the common unavailable form", () => {
 test("creation panel rejects malformed and unknown-node fields", () => {
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ kind: "services" })));
-  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 2 })));
+  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 1 })));
+  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 3 })));
   const badDraft = validCreationPanel({ draft: { mode: "preset", stage: "custom_filled", preset_key: "x" } });
   assert.throws(() => Protocol.validateCreationPanel(badDraft));
   const personaCard = validCreationPanel();
@@ -2963,92 +2964,93 @@ test("creation panel rejects malformed and unknown-node fields", () => {
   assert.throws(() => Protocol.validateCreationPanel(wrongAxes));
 });
 
-test("creation panel accepts a valid concept draft with the background indicator", () => {
-  const payload = validCreationPanel({
-    draft: {
-      mode: "concept",
-      stage: "concept_filled",
-      race: "human",
-      subrace: "human_commoner",
-      background: null,
-      allocations: {
-        hp: 50,
-        mp: 50,
-        sp: 50,
-        atk_phys: 10,
-        agility: 10,
-        defense: 11,
-        magic_power: 43,
-      },
-      background_generated: true,
-    },
-  });
+test("creation panel v2 carries the draft persona and the proposal slot", () => {
+  const customDraft = {
+    mode: "custom",
+    stage: "custom_filled",
+    display_name: "新角色",
+    age: 20,
+    apparent_age: 20,
+    race: "human",
+    subrace: "human_commoner",
+    background: null,
+    allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
+    affinity_elements: [],
+    persona: { personality: "沉穩", life_story: "來自邊境的小村", habit: "清晨練劍" },
+  };
+  const proposal = {
+    revision: 3,
+    race: "human",
+    subrace: "human_commoner",
+    allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
+    persona: { personality: "沉穩", life_story: "來自邊境的小村", habit: "清晨練劍" },
+  };
+  const payload = validCreationPanel({ draft: customDraft, proposal });
   const validated = Protocol.validateCreationPanel(payload);
-  assert.equal(validated.draft.mode, "concept");
-  assert.equal(validated.draft.stage, "concept_filled");
-  assert.equal(validated.draft.background_generated, true);
-  assert.equal(validated.draft.allocations.hp, 50);
-  const badStage = validCreationPanel({
-    draft: {
-      mode: "concept",
-      stage: "custom_filled",
-      race: "human",
-      subrace: "human_commoner",
-      background: null,
-      allocations: {
-        hp: 50,
-        mp: 50,
-        sp: 50,
-        atk_phys: 10,
-        agility: 10,
-        defense: 11,
-        magic_power: 43,
-      },
-      background_generated: true,
+  assert.equal(validated.schema_version, 2);
+  assert.deepEqual(validated.draft.persona, customDraft.persona);
+  assert.deepEqual(validated.proposal, proposal);
+  // A draft with an explicit null persona is valid.
+  assert.doesNotThrow(() =>
+    Protocol.validateCreationPanel(
+      validCreationPanel({ draft: { ...customDraft, persona: null } })
+    )
+  );
+  // The retired concept draft shape is rejected.
+  assert.throws(() =>
+    Protocol.validateCreationPanel(
+      validCreationPanel({
+        draft: { mode: "concept", stage: "concept_filled", race: "human", subrace: "human_commoner", background: null, allocations: proposal.allocations, background_generated: true },
+      })
+    )
+  );
+  // Malformed persona blocks reject on both the draft and the proposal.
+  assert.throws(() =>
+    Protocol.validateCreationPanel(
+      validCreationPanel({ draft: { ...customDraft, persona: { personality: "沉穩" } } })
+    ),
+    /persona/
+  );
+  assert.throws(() =>
+    Protocol.validateCreationPanel(
+      validCreationPanel({ draft: { ...customDraft, persona: { ...customDraft.persona, habit: "長".repeat(601) } } })
+    ),
+    /persona/
+  );
+  assert.throws(() =>
+    Protocol.validateCreationPanel(
+      validCreationPanel({ draft: { ...customDraft, persona: { ...customDraft.persona, personality: "  " } } })
+    ),
+    /persona/
+  );
+  // The proposal key is present-only: a null value is never legal.
+  assert.throws(() =>
+    Protocol.validateCreationPanel(validCreationPanel({ draft: null, proposal: null }))
+  );
+  // A proposal persona must be a block; a non-positive revision rejects.
+  assert.throws(() =>
+    Protocol.validateCreationPanel(
+      validCreationPanel({ proposal: { ...proposal, persona: null } })
+    ),
+    /persona/
+  );
+  assert.throws(() =>
+    Protocol.validateCreationPanel(validCreationPanel({ proposal: { ...proposal, revision: 0 } }))
+  );
+  assert.throws(() =>
+    Protocol.validateCreationPanel(
+      validCreationPanel({ proposal: { ...proposal, extra: 1 } })
+    ),
+    /unknown/
+  );
+  // A worst-case proposal (three 600-code-point fields) fits the envelope.
+  const worst = validCreationPanel({
+    proposal: {
+      ...proposal,
+      persona: { personality: "長".repeat(600), life_story: "長".repeat(600), habit: "長".repeat(600) },
     },
   });
-  assert.throws(() => Protocol.validateCreationPanel(badStage), /stage/);
-  const badIndicator = validCreationPanel({
-    draft: {
-      mode: "concept",
-      stage: "concept_filled",
-      race: "human",
-      subrace: "human_commoner",
-      background: null,
-      allocations: {
-        hp: 50,
-        mp: 50,
-        sp: 50,
-        atk_phys: 10,
-        agility: 10,
-        defense: 11,
-        magic_power: 43,
-      },
-      background_generated: "yes",
-    },
-  });
-  assert.throws(() => Protocol.validateCreationPanel(badIndicator), /boolean/);
-  const leakedPersona = validCreationPanel({
-    draft: {
-      mode: "concept",
-      stage: "concept_filled",
-      race: "human",
-      subrace: "human_commoner",
-      background: null,
-      allocations: {
-        hp: 50,
-        mp: 50,
-        sp: 50,
-        atk_phys: 10,
-        agility: 10,
-        defense: 11,
-        magic_power: 43,
-      },
-      background_generated: true,
-      persona: { personality: "沉穩" },
-    },
-  });
-  assert.throws(() => Protocol.validateCreationPanel(leakedPersona), /unknown/);
+  assert.doesNotThrow(() => Protocol.validateCreationPanel(worst));
 });
 
 test("creation panel enforces per-field bounds", () => {
@@ -3074,7 +3076,7 @@ test("creation panel enforces per-field bounds", () => {
       subrace: "human_commoner",
       background: null,
       allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0, magic_power: 0 },
-      background_generated: false,
+      persona: null,
       affinity_elements: [],
     },
   });
@@ -3090,11 +3092,16 @@ test("creation panel enforces per-field bounds", () => {
       subrace: "human_commoner",
       background: null,
       allocations: { hp: 0 },
-      background_generated: false,
+      persona: null,
       affinity_elements: [],
     },
   });
   assert.throws(() => Protocol.validateCreationPanel(badAllocations));
+  // A custom draft missing the required persona key rejects (v2 exact-set).
+  const { persona, ...draftWithoutPersona } = underageDraft.draft;
+  assert.throws(() =>
+    Protocol.validateCreationPanel({ ...underageDraft, draft: draftWithoutPersona })
+  );
 });
 
 test("a structurally maximal realistic creation payload fits the envelope", () => {
@@ -3148,7 +3155,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
     (key) => Object.assign({}, affinityElement, { key })
   );
   const payload = {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     kind: "creation",
     draft: null,
@@ -3176,7 +3183,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
 });
 
 test("creation is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 2);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,

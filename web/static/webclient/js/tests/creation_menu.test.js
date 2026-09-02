@@ -28,7 +28,7 @@ function validPanel(overrides) {
     Object.assign({}, axes[k])
   );
   const panel = {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
     kind: "creation",
     draft: null,
@@ -213,6 +213,7 @@ test("exact custom payload production", () => {
   state.raceKey = "elf";
   state.subraceKey = "fionnen";
   state.background = "  在公會登記的新人冒險者  ";
+  state.persona = { personality: "  沉穩  ", life_story: "邊境小村", habit: "清晨練劍" };
   Object.assign(state.allocations, { hp: "0", mp: "0", sp: "0", atk_phys: "12", agility: "12", defense: "13", magic_power: "10" });
   const payload = CreationMenu.customPayload(state);
   assert.deepEqual(payload, {
@@ -224,7 +225,37 @@ test("exact custom payload production", () => {
     background: "在公會登記的新人冒險者",
     affinity_elements: [],
     allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13, magic_power: 10 },
+    persona: { personality: "沉穩", life_story: "邊境小村", habit: "清晨練劍" },
   });
+  // An all-empty triple ships null (the browser convention).
+  state.persona = { personality: "  ", life_story: "", habit: "\n" };
+  assert.equal(CreationMenu.customPayload(state).persona, null);
+});
+
+test("a partially-filled persona blocks advisory validation", () => {
+  const panel = validPanel();
+  const state = CreationMenu.defaultCustomState(panel);
+  state.displayName = "新角色";
+  state.age = "20";
+  state.apparentAge = "20";
+  state.raceKey = "human";
+  state.subraceKey = "human_royal";
+  // Sums to the human profile budget (224) so only the persona rules vary.
+  Object.assign(state.allocations, { hp: "100", mp: "100", sp: "0", atk_phys: "0", agility: "0", defense: "24", magic_power: "0" });
+  // All-empty validates.
+  assert.equal(CreationMenu.validateCustom(panel, state).valid, true);
+  // Exactly one filled field blocks with the all-or-empty reason.
+  state.persona.personality = "沉穩";
+  const partial = CreationMenu.validateCustom(panel, state);
+  assert.equal(partial.valid, false);
+  assert.ok(partial.errors.persona);
+  // All three filled validates again.
+  state.persona.life_story = "邊境小村";
+  state.persona.habit = "清晨練劍";
+  assert.equal(CreationMenu.validateCustom(panel, state).valid, true);
+  // An over-bound field blocks.
+  state.persona.habit = "長".repeat(601);
+  assert.equal(CreationMenu.validateCustom(panel, state).valid, false);
 });
 
 test("saved custom draft restores the form at the saved stage", () => {
@@ -238,6 +269,7 @@ test("saved custom draft restores the form at the saved stage", () => {
       race: "elf",
       subrace: "ciaran",
       allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13, magic_power: 10 },
+      persona: { personality: "沉穩", life_story: "來自邊境的小村", habit: "清晨練劍" },
     },
   });
   const state = CreationMenu.stateFromDraft(panel, panel.draft);
@@ -246,61 +278,33 @@ test("saved custom draft restores the form at the saved stage", () => {
   assert.equal(state.raceKey, "elf");
   assert.equal(state.subraceKey, "ciaran");
   assert.equal(state.allocations.defense, "13");
+  // The player-owned persona block restores verbatim (v2 D3).
+  assert.equal(state.persona.personality, "沉穩");
+  assert.equal(state.persona.life_story, "來自邊境的小村");
+  assert.equal(state.persona.habit, "清晨練劍");
   assert.equal(CreationMenu.profileFor(panel, state.raceKey, state.subraceKey).budget, 437);
 });
 
-test("concept draft pre-fills finite controls without name or ages", () => {
+test("the retired concept draft shape restores nothing", () => {
+  // The transient-fill retool retired server-side concept drafts: a legacy
+  // concept draft must leave the pristine default state untouched.
   const panel = validPanel({
     draft: {
       mode: "concept",
       stage: "concept_filled",
       race: "elf",
       subrace: "fionnen",
-      allocations: {
-        hp: 0,
-        mp: 0,
-        sp: 0,
-        atk_phys: 12,
-        agility: 12,
-        defense: 13,
-      },
+      allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13 },
       background: null,
       background_generated: true,
     },
   });
   const state = CreationMenu.stateFromDraft(panel, panel.draft);
   assert.equal(state.displayName, "");
-  assert.equal(state.age, "");
-  assert.equal(state.apparentAge, "");
-  assert.equal(state.raceKey, "elf");
-  assert.equal(state.subraceKey, "fionnen");
-  assert.equal(state.allocations.atk_phys, "12");
+  assert.equal(state.raceKey, "human");
+  assert.equal(state.subraceKey, null);
+  assert.equal(state.allocations.atk_phys, "");
   assert.equal(CreationMenu.CONCEPT_ACTION, "creation.concept");
-});
-
-test("concept draft restores a preserved background for the continued form", () => {
-  const panel = validPanel({
-    draft: {
-      mode: "concept",
-      stage: "concept_filled",
-      race: "elf",
-      subrace: "fionnen",
-      allocations: {
-        hp: 0,
-        mp: 0,
-        sp: 0,
-        atk_phys: 12,
-        agility: 12,
-        defense: 13,
-      },
-      background: "在公會登記的新人冒險者",
-      background_generated: true,
-    },
-  });
-  const state = CreationMenu.stateFromDraft(panel, panel.draft);
-  assert.equal(state.background, "在公會登記的新人冒險者");
-  const payload = CreationMenu.customPayload(state);
-  assert.equal(payload.background, "在公會登記的新人冒險者");
 });
 
 test("no draft produces the pristine default custom state", () => {
@@ -349,12 +353,13 @@ test("saved custom draft restores the affinity set", () => {
       subrace: "human_royal",
       allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13 },
       background: null,
-      background_generated: false,
+      persona: null,
       affinity_elements: ["fire", "wind"],
     },
   });
   const state = CreationMenu.stateFromDraft(panel, panel.draft);
   assert.deepEqual(state.affinityElements, ["fire", "wind"]);
+  assert.deepEqual(state.persona, { personality: "", life_story: "", habit: "" });
 });
 
 test("confirmation screens gate activation", () => {

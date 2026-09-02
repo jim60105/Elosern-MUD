@@ -289,8 +289,8 @@ def _validate_background(value: Any) -> str | None:
 def _validate_persona_block(value: Any) -> dict[str, str]:
     """Validate one deterministic persona block: exactly the three prose fields.
 
-    The block is the server-owned persona draft carried by the concept draft
-    (creation-persona-persistence D1/D3). Contents are never inspected -- only
+    The block is the player-owned persona block carried by the custom draft
+    (retool-concept-transient-fill D2). Contents are never inspected -- only
     the exact field set, text type, and length cap are checked -- so the
     generative layer's whole-proposal validation stays the content authority
     and the activation write stays deterministic.
@@ -418,8 +418,8 @@ def activate_player_character(
 ) -> CharacterCreationResult:
     """Atomically initialize one existing account-owned pending shell.
 
-    ``persona`` carries the server-owned persona block from the staging draft
-    (creation-persona-persistence D3): when present it is validated
+    ``persona`` carries the player-owned persona block from the custom draft
+    (retool-concept-transient-fill D4): when present it is validated
     deterministically and persisted as the six-key import-card record inside
     the same all-or-nothing transaction; when absent nothing is written.
 
@@ -477,7 +477,7 @@ def activate_player_character(
         if validated.background is not None:
             persona_record["background"] = validated.background
     elif validated.background is not None:
-        # A custom draft with a background but no concept persona block still
+        # A custom draft with a background but a null persona block still
         # persists an import-card-shaped record so the owner can inspect and
         # update the flavor text (creation-persona-persistence D4).
         persona_record = {

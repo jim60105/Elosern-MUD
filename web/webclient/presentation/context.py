@@ -56,6 +56,35 @@ class OptionsSnapshot:
 
 
 @dataclass(frozen=True)
+class ProposalSnapshot:
+    """One immutable read of the session's transient concept proposal slot.
+
+    Copied from ``session.ndb.concept_proposal`` wherever a presentation
+    context is built (mirroring :class:`OptionsSnapshot`); the creation
+    presenter renders only this snapshot, never the raw session. ``revision``
+    is the session-monotonic transient sequence number the browser compares
+    against its last applied revision; the four content keys are deep-copied
+    plain data with no live object reference.
+    """
+
+    revision: int
+    race: str
+    subrace: str | None
+    allocations: Mapping[str, Any]
+    persona: Mapping[str, Any]
+
+    def as_dict(self) -> dict[str, Any]:
+        """Serialize the proposal into its exact wire object."""
+        return {
+            "revision": self.revision,
+            "race": self.race,
+            "subrace": self.subrace,
+            "allocations": dict(self.allocations),
+            "persona": dict(self.persona),
+        }
+
+
+@dataclass(frozen=True)
 class PresentationContext:
     """One authenticated, read-only snapshot of presentation inputs.
 
@@ -72,6 +101,10 @@ class PresentationContext:
             suggestions presenter requires every non-``unavailable`` snapshot
             fingerprint to equal this value, so a stale snapshot can never
             render after the situation changed.
+        proposal: The immutable session concept-proposal snapshot (or
+            ``None``); the creation panel renders it as the optional
+            ``proposal`` key only while the slot holds a proposal for the
+            rendering puppet.
     """
 
     actor: Any
@@ -79,10 +112,12 @@ class PresentationContext:
     session_tag: str | None = field(default=None)
     options_state: OptionsSnapshot | None = field(default=None)
     options_fingerprint: str | None = field(default=None)
+    proposal: ProposalSnapshot | None = field(default=None)
 
 
 __all__ = [
     "FrozenCard",
     "OptionsSnapshot",
+    "ProposalSnapshot",
     "PresentationContext",
 ]

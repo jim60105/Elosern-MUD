@@ -548,15 +548,16 @@ class CustomCreationJourneys(CreationBrowserTest):
 
 
 class ConceptCreationJourneys(CreationBrowserTest):
-    # Task 4.5: keyboard-only concept -> draft -> complete form -> activate at
-    # both supported desktop viewports with a deterministic placeholder. Each
-    # journey boots its own isolated server (the activated character state of
-    # one journey must never leak into the next login).
-    @covers_requirement("creation-persona-persistence::the-creation-panel-offers-a-concept-field-and-adapter-sharing-the-guarded-pipeline")
+    # retool-concept-transient-fill: keyboard-only concept -> transient
+    # proposal fill -> complete form -> activate at both supported desktop
+    # viewports with a deterministic placeholder. Each journey boots its own
+    # isolated server (the activated character state of one journey must never
+    # leak into the next login).
+    @covers_requirement("concept-transient-fill::the-browser-form-pre-fills-from-the-proposal-without-submitting")
     def test_concept_field_journey_to_activation_at_1440x900(self):
         self._concept_journey((1440, 900))
 
-    @covers_requirement("creation-persona-persistence::the-creation-panel-offers-a-concept-field-and-adapter-sharing-the-guarded-pipeline")
+    @covers_requirement("concept-transient-fill::the-browser-form-pre-fills-from-the-proposal-without-submitting")
     def test_concept_field_journey_to_activation_at_1280x720(self):
         self._concept_journey((1280, 720))
 
@@ -578,32 +579,56 @@ class ConceptCreationJourneys(CreationBrowserTest):
         payloads = self._sent_payloads(page, "creation.concept")
         self.assertEqual(payloads, [{"concept": "流浪的精靈劍士"}])
 
-        # The concept draft lands: the panel refresh pre-fills the finite
-        # controls and shows the non-content background indicator.
-        def _concept_draft(state):
+        # The proposal lands transiently on the panel: the draft stays absent
+        # (zero persistent writes) and the panel carries the revisioned slot.
+        def _proposal_panel(state):
             panel = (state.get("panels") or {}).get("creation") or {}
-            draft = panel.get("draft")
-            return bool(draft and draft.get("mode") == "concept")
+            return bool(panel.get("proposal")) and panel.get("draft") is None
 
-        wait_for_store_state(page, _concept_draft, timeout=30000)
+        wait_for_store_state(page, _proposal_panel, timeout=30000)
         panel = self._creation_panel(page)
-        self.assertEqual(panel["draft"]["race"], "human")
-        self.assertNotIn("persona", panel["draft"])
-        self.assertNotIn("personality", panel["draft"])
-        self.assertEqual(page.locator('[data-testid="creation-concept-indicator"]').count(), 1)
-        # The pre-filled race select and allocation fields come from the draft.
+        self.assertIsNone(panel["draft"], "a concept apply never persists a draft")
+        proposal = panel["proposal"]
+        self.assertEqual(
+            sorted(proposal),
+            ["allocations", "persona", "race", "revision", "subrace"],
+        )
+        self.assertEqual(proposal["revision"], 1)
+        self.assertEqual(proposal["race"], "human")
+        # The form is only pre-filled, never auto-submitted.
+        self.assertEqual(sent_action_count(page, "creation.custom"), 0)
+        # The player confirms the notice and the custom form shows the
+        # proposal's finite values pre-filled.
+        page.evaluate("document.querySelector('[data-testid=\"creation-proposal-open\"]').focus()")
+        _press(page, "Enter")
+        self.assertEqual(
+            page.evaluate("() => document.querySelector('[data-testid=\"creation-overlay\"]').getAttribute('data-mode')"),
+            "custom",
+        )
+        # The pre-filled race select and allocation fields come from the proposal.
         self.assertEqual(
             page.evaluate("document.querySelector('[data-testid=\"creation-race\"]').value"),
             "human",
-            "the concept race must be pre-selected",
+            "the proposal race must be pre-selected",
+        )
+        self.assertEqual(
+            page.evaluate("document.querySelector('[data-testid=\"creation-subrace\"]').value"),
+            "human_commoner",
         )
         self.assertEqual(
             page.evaluate("document.querySelector('[data-testid=\"creation-field-hp\"]').value"),
             "50",
         )
+        # The three persona textareas carry the proposal prose, editable.
+        self.assertEqual(
+            page.evaluate("document.querySelector('[data-testid=\"creation-persona-personality\"]').value"),
+            "沉穩",
+        )
+        # The retired generated indicator never renders.
+        self.assertEqual(page.locator('[data-testid="creation-concept-indicator"]').count(), 0)
 
         # Complete the form keyboard-only: name and both adult ages only; the
-        # finite controls are already filled from the concept draft.
+        # finite controls and persona prose are already filled from the proposal.
         page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]').focus()")
         page.keyboard.type("新冒險者")
         _press(page, "Tab")  # name -> actual age
@@ -621,7 +646,15 @@ class ConceptCreationJourneys(CreationBrowserTest):
         payloads = self._sent_payloads(page, "creation.custom")
         self.assertEqual(len(payloads), 1)
         self.assertEqual(payloads[0]["race"], "human")
-        self.assertNotIn("persona", payloads[0])
+        # The player-confirmed proposal prose rides the custom payload.
+        self.assertEqual(
+            payloads[0]["persona"],
+            {
+                "personality": "沉穩",
+                "life_story": "來自邊境的小村，靠磨劍維生",
+                "habit": "清晨練劍",
+            },
+        )
 
         # Confirmation screen, then activation hands off to exploration. The
         # confirmation appears only after the custom save result arrives.
@@ -631,10 +664,10 @@ class ConceptCreationJourneys(CreationBrowserTest):
         self._wait_exploration(page)
         self.assertEqual(sent_action_count(page, "creation.activate"), 1)
         self.assertNotEqual(self._dock_mode(page), "creation")
-        # No persona content ever reached the browser state.
+        # The transient slot is dropped by the custom save: the activation
+        # journey commits it and no stale proposal survives.
         serialized = __import__("json").dumps(store_state(page), ensure_ascii=False)
-        for fragment in ("personality", "life_story", "沉穩", "清晨練劍"):
-            self.assertNotIn(fragment, serialized)
+        self.assertNotIn('"proposal"', serialized)
 
 
 class ResetAndDraftJourneys(CreationBrowserTest):
@@ -702,7 +735,7 @@ class ResetAndDraftJourneys(CreationBrowserTest):
             page,
             {
                 "creation": {
-                    "schema_version": 1,
+                    "schema_version": 2,
                     "available": False,
                     "reason": {"code": "registry_unavailable", "message": reason},
                 }

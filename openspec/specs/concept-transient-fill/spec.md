@@ -1,13 +1,30 @@
-# concept-transient-fill — Delta Spec
+# concept-transient-fill Specification
 
-## ADDED Requirements
+## Purpose
+
+Define the transient concept form-fill contract: the `creation.concept` adapter
+and the Telnet concept command apply a validated generative proposal with zero
+persistent writes through a session-scoped revision-numbered slot, the
+`creation` panel renders that slot, the custom draft, payload, and activation
+carry the player-owned persona block, and the browser pre-fills its editable
+form from the proposal without ever auto-submitting it.
+
+## Requirements
 
 ### Requirement: Concept applies transiently with zero persistent writes
-The `creation.concept` adapter and the Telnet `character concept` command SHALL run the same guarded `character_creation` generative pipeline and, on a validated proposal, write no persistent state: the WebClient adapter SHALL store the validated proposal (race, subrace, allocations, and the persona block) in a session-scoped transient slot mirroring the existing session options-state pattern, return a confirmed success with the stable code `concept_applied`, and declare the `creation` panel affected so the panel refresh carries the proposal. The slot SHALL be overwritten by a later successful apply, cleared when a `creation.custom` save or `creation.reset` succeeds, and lost with the session. The `ui_action_result` envelope SHALL NOT gain a data field, and no draft, trait, identity, or `creation_pending` value SHALL change on any concept outcome.
+The `creation.concept` adapter and the Telnet `character concept` command SHALL run the same guarded `character_creation` generative pipeline and, on a validated proposal, write no persistent state: the WebClient adapter SHALL store the validated proposal (race, subrace, allocations, and the persona block) in a session-scoped transient slot mirroring the existing session options-state pattern, return a plain success with the stable code `concept_applied`, and declare the `creation` panel affected so the panel refresh carries the proposal. Because the concept path writes no draft, no concept outcome SHALL read, write, or invalidate the activation-confirmation fingerprint state — a still-valid earlier save confirmation survives a concept apply untouched, and a concept completion can never authorize activation of a draft it did not save. The slot SHALL bind the actor it was written for (mirroring the options-state owner binding), SHALL NOT render for a different puppet, and SHALL be cleared when the session's puppet changes. The slot SHALL be overwritten by a later successful apply, cleared when a `creation.custom` save or `creation.reset` succeeds, and lost with the session. The `ui_action_result` envelope SHALL NOT gain a data field, and no draft, trait, identity, or `creation_pending` value SHALL change on any concept outcome.
 
 #### Scenario: A successful apply fills only the session slot
 - **WHEN** a pending character submits `creation.concept` and the guarded layer returns a valid proposal
 - **THEN** the adapter writes nothing persistent, stores the proposal with a fresh revision in the session slot, returns `concept_applied`, and the completion `ui_update` for the refreshed `creation` panel (published before the matching result) carries the proposal
+
+#### Scenario: A concept apply never authorizes an unconfirmed draft
+- **WHEN** a session holds a save confirmation for draft X, the persisted draft later changes to Y, and that session completes a concept apply
+- **THEN** the recorded confirmation still names X, and a subsequent `creation.activate` is refused as stale
+
+#### Scenario: The slot never follows a puppet switch
+- **WHEN** a session holds a proposal written for one puppet and then switches puppet (or an in-flight concept completion settles after the switch)
+- **THEN** the slot does not render for the new puppet, and an in-flight completion whose admitted actor is no longer the puppet writes nothing
 
 #### Scenario: Offline concept degrades with no state change
 - **WHEN** the `character_creation` layer is offline and a pending character submits `creation.concept`

@@ -24,10 +24,6 @@ from world.rules.character_creation import (
 )
 from world.rules.creation_wizard import (
     ALLOCATION_AXIS_EXPLANATIONS,
-    ConceptDraftStaleError,
-    apply_concept_proposal,
-    draft_fingerprint,
-    read_draft,
 )
 
 # The concept input bound mirrors the generative layer's prompt-side cap
@@ -268,29 +264,13 @@ class CmdCharacter(Command):
                 self.caller.msg(f"輸入無效：{error} 請重新執行 character create。")
 
 
-def _draft_matches_concept(draft, proposal) -> bool:
-    """True when the stored draft is still the applied concept draft.
-
-    The name/age prompts run after the concept-apply; another session or entry
-    could replace the draft while they are open. Activation must refuse to mix
-    the stale proposal's finite controls with a newer draft's state
-    (creation-persona-persistence D2).
-    """
-    if draft is None or draft.get("mode") != "concept":
-        return False
-    return (
-        draft.get("race") == proposal.race_key
-        and draft.get("subrace") == proposal.subrace_key
-        and draft.get("allocations") == dict(proposal.allocations)
-    )
-
-
 def _proposal_summary(proposal) -> str:
     """Render the proposal summary: race, subrace, allocations, and previews.
 
-    Suggested skills and the persona draft are informational in this change:
-    nothing is persisted, and the player completes the flow through the
-    ordinary activation path.
+    The transient concept flow persists nothing: the summary IS the terminal
+    form fill, the player's completion of the name/age prompts turns the
+    proposal into their own input, and the persona prose activates with the
+    request (retool-concept-transient-fill D6).
     """
     race = RACE_REGISTRY[proposal.race_key]
     subrace = SUBRACE_REGISTRY[proposal.subrace_key]
@@ -308,7 +288,7 @@ def _proposal_summary(proposal) -> str:
         lines.append("建議技能（僅供參考）：無")
     lines.extend(
         [
-            "人設草稿（僅供預覽）：",
+            "人設（將寫入角色檔案，啟動後可另行修改）：",
             f"  性格：{proposal.persona['personality']}",
             f"  人生經歷：{proposal.persona['life_story']}",
             f"  習慣：{proposal.persona['habit']}",
@@ -343,11 +323,6 @@ class CmdCharacterConcept(Command):
         concept = self._reject_invalid_concept()
         if concept is None:
             return
-        # The draft fingerprint is captured before the generative call; the
-        # concept-apply service compares against it so a late response can
-        # never overwrite a draft changed by another session or entry
-        # (creation-persona-persistence D2).
-        self._concept_fingerprint = draft_fingerprint(self.caller)
         deferred = request_character_proposal(concept=concept)
         if deferred.called:
             proposal = self._resolve_fired(deferred)
@@ -443,33 +418,15 @@ class CmdCharacterConcept(Command):
         """Present the proposal and collect the remaining player-entered fields.
 
         A generator driven by the cmdhandler (sync path) or by
-        ``_start_interactive``/``_feed_input`` (async path). The concept draft
-        is saved through the deterministic apply service FIRST (so a mid-flow
-        disconnect resumes from the draft and both Telnet and the WebClient
-        share one apply service), then the summary and prompts collect the
-        display name and both ages through the existing prompts and the
+        ``_start_interactive``/``_feed_input`` (async path). The concept is a
+        transient form-filler (retool-concept-transient-fill D6): nothing is
+        persisted before or during the prompts. The summary and prompts collect
+        the display name and both ages through the existing prompts and the
         deterministic adult gate — the proposal never supplies them — and the
-        activation persists the draft's persona block in the same
-        all-or-nothing transaction.
+        activation writes the proposal's values plus its persona block in the
+        same all-or-nothing transaction, exactly like the browser's save of a
+        proposal-filled form.
         """
-        try:
-            apply_concept_proposal(
-                self.account,
-                self.caller,
-                {
-                    "race_key": proposal.race_key,
-                    "subrace_key": proposal.subrace_key,
-                    "allocations": dict(proposal.allocations),
-                    "persona": dict(proposal.persona),
-                },
-                expected_fingerprint=self._concept_fingerprint,
-            )
-        except ConceptDraftStaleError:  # observability: ignore R2: expected concurrency flow; the player is told to re-run the command
-            self.caller.msg("構想草稿已被修改，請重新執行 character concept。")
-            return
-        except CharacterCreationError as error:  # observability: ignore R2: player-facing recovery; the reason is rendered to the caller and the draft stays retryable
-            self.caller.msg(f"角色建立失敗：{error}")
-            return
         self.caller.msg(_proposal_summary(proposal))
         try:
             name = yield "角色姓名（輸入 cancel 取消）："
@@ -484,16 +441,6 @@ class CmdCharacterConcept(Command):
             else:
                 self.caller.msg(f"輸入無效：{error} 請重新執行 character concept。")
             return
-        draft = read_draft(self.caller)
-        if not _draft_matches_concept(draft, proposal):
-            # Another session or entry replaced the applied concept draft while
-            # the name/age prompts were open; activating with the stale
-            # proposal values would mix old finite controls with whatever the
-            # newer draft carries. Reject instead (creation-persona-persistence
-            # D2).
-            self.caller.msg("構想草稿已被修改，請重新執行 character concept。")
-            return
-        persona = draft.get("persona") if draft is not None else None
         _activate_creation(
             self.account,
             self.caller,
@@ -506,7 +453,7 @@ class CmdCharacterConcept(Command):
                 subrace=proposal.subrace_key,
                 allocations=dict(proposal.allocations),
             ),
-            persona=persona,
+            persona=dict(proposal.persona),
         )
 
 

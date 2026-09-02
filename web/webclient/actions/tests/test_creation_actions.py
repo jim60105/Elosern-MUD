@@ -70,9 +70,30 @@ def custom_payload(**overrides):
         "allocations": balanced_allocations("human", "human_commoner"),
         "background": None,
         "affinity_elements": None,
+        # The nine-key payload always carries the required nullable persona
+        # key; null is the browser convention for "no persona"
+        # (retool-concept-transient-fill D3).
+        "persona": None,
     }
     value.update(overrides)
     return value
+
+
+PERSONA_BLOCK = {
+    "personality": "沉穩",
+    "life_story": "來自邊境的小村",
+    "habit": "清晨練劍",
+}
+
+
+def custom_request(**overrides):
+    """A deterministic request matching ``custom_payload`` (persona excluded)."""
+    fields = {
+        key: value
+        for key, value in custom_payload(**overrides).items()
+        if key != "persona"
+    }
+    return CharacterCreationRequest(mode="custom", **fields)
 
 
 class FakeSession:
@@ -177,10 +198,26 @@ class CreationPayloadValidationTests(unittest.TestCase):
             {**custom_payload(), "allocations": {"hp": 0}},
             {**custom_payload(), "allocations": {axis: True for axis in ALLOCATABLE_AXES}},
             {**custom_payload(), "allocations": {axis: -1 for axis in ALLOCATABLE_AXES}},
+            # The persona key is required (nullable) and exact.
+            {k: v for k, v in custom_payload().items() if k != "persona"},
+            {**custom_payload(), "persona": {"personality": "沉穩"}},
+            {**custom_payload(), "persona": {**PERSONA_BLOCK, "extra": "x"}},
+            {**custom_payload(), "persona": {**PERSONA_BLOCK, "personality": " "}},
+            {**custom_payload(), "persona": {**PERSONA_BLOCK, "habit": "長" * 601}},
+            {**custom_payload(), "persona": "沉穩"},
         ):
             with self.subTest(payload=bad):
                 with self.assertRaises(Exception):
                     validate_creation_custom_payload(bad)
+
+    def test_custom_persona_payload_accepts_null_or_the_exact_block(self):
+        self.assertIsNone(validate_creation_custom_payload(custom_payload())["persona"])
+        self.assertEqual(
+            validate_creation_custom_payload(
+                custom_payload(persona=dict(PERSONA_BLOCK))
+            )["persona"],
+            PERSONA_BLOCK,
+        )
 
     def test_activate_and_reset_payloads_are_exactly_empty(self):
         self.assertEqual(validate_creation_activate_payload({}), {})
@@ -351,8 +388,7 @@ class CreationAdapterTests(CreationActionBase):
         # draft behind; a later creation action must reject as already complete.
         _creation_custom_adapter(self.character, custom_payload())
         activate_player_character(
-            self.account, self.character,
-            CharacterCreationRequest(mode="custom", **custom_payload()),
+            self.account, self.character, custom_request(),
         )
         result = _creation_custom_adapter(self.character, custom_payload())
         self.assertEqual(result["outcome"], "rejected")
@@ -396,8 +432,7 @@ class CreationAdapterTests(CreationActionBase):
     def test_reset_rejects_an_activated_character_without_mutation(self):
         _creation_custom_adapter(self.character, custom_payload())
         activate_player_character(
-            self.account, self.character,
-            CharacterCreationRequest(mode="custom", **custom_payload()),
+            self.account, self.character, custom_request(),
         )
         self.assertFalse(self.character.creation_pending)
         result = _creation_reset_adapter(self.character, {})
@@ -409,7 +444,6 @@ class CreationAdapterTests(CreationActionBase):
         from twisted.internet import defer
 
         from world.rules.character_creation import (
-            CharacterCreationRequest,
             activate_player_character,
         )
 
@@ -424,7 +458,7 @@ class CreationAdapterTests(CreationActionBase):
         # The character is activated (via another entry) while in flight.
         activate_player_character(
             self.account, self.character,
-            CharacterCreationRequest(mode="custom", **custom_payload()),
+            custom_request(),
         )
         held.callback(_proposal())
         result = await_result(deferred)
@@ -463,14 +497,8 @@ class CreationFingerprintBindingTests(CreationActionBase):
         save_custom_draft(
             self.account,
             self.character,
-            CharacterCreationRequest(
-                mode="custom",
-                display_name="較新草稿",
-                age=21,
-                apparent_age=21,
-                race="human",
-                subrace="human_commoner",
-                allocations=balanced_allocations("human", "human_commoner"),
+            custom_request(
+                display_name="較新草稿", age=21, apparent_age=21
             ),
         )
         result = _creation_activate_adapter(self.character, {})
@@ -487,7 +515,7 @@ class CreationFingerprintBindingTests(CreationActionBase):
         save_custom_draft(
             self.account,
             self.character,
-            CharacterCreationRequest(mode="custom", **custom_payload()),
+            custom_request(),
         )
         result = _creation_activate_adapter(self.character, {})
         self.assertEqual(result["outcome"], "rejected")
@@ -542,23 +570,28 @@ class CreationFingerprintBindingTests(CreationActionBase):
         self.assertEqual(result["code"], "no_confirmed_save")
         self.assertTrue(self.character.creation_pending)
 
-    def test_rejected_concept_save_also_invalidates_the_confirmation(self):
+    @covers_requirement("concept-transient-fill::concept-applies-transiently-with-zero-persistent-writes")
+    def test_concept_outcomes_never_touch_the_confirmation_state(self):
+        # The concept path saves no draft, so it neither preserves nor
+        # manufactures an activation authorization: a degraded concept leaves
+        # a still-valid confirmation intact (retool-concept-transient-fill
+        # D1/D7), and activation of the confirmed draft still succeeds.
         from twisted.internet import defer
 
         _creation_custom_adapter(self.character, custom_payload())
-        held = defer.Deferred()
         with patch(
             "server.ai_director_service.request_character_proposal",
-            return_value=held,
+            return_value=defer.succeed(None),
         ):
-            deferred = _creation_concept_adapter(self.character, _concept_payload())
-            held.callback(None)
+            deferred = _creation_concept_adapter(
+                self.character, _concept_payload(), self.fake_session
+            )
             result = await_result(deferred)
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "concept_unavailable")
         activate = _creation_activate_adapter(self.character, {})
-        self.assertEqual(activate["outcome"], "rejected")
-        self.assertEqual(activate["code"], "no_confirmed_save")
+        self.assertEqual(activate["outcome"], "success")
+        self.assertEqual(activate["code"], "activated")
 
 
 class CreationActivateIntegrationTests(CreationActionBase):
@@ -724,14 +757,16 @@ def await_result(d):
 
 
 class CreationConceptTests(CreationActionBase):
-    """The fifth creation action (creation-persona-persistence D4)."""
+    """The transient concept action (retool-concept-transient-fill D1)."""
 
     def _propose(self, proposal):
         from twisted.internet import defer
 
         patch_obj = patch(
             "server.ai_director_service.request_character_proposal",
-            return_value=defer.succeed(proposal),
+            # A fresh fired Deferred per call: a settled Deferred must not be
+            # reused across successive applies.
+            side_effect=lambda **kwargs: defer.succeed(proposal),
         )
         patch_obj.start()
         self.addCleanup(patch_obj.stop)
@@ -742,52 +777,49 @@ class CreationConceptTests(CreationActionBase):
 
         patch_obj = patch(
             "server.ai_director_service.request_character_proposal",
-            return_value=defer.succeed(None),
+            side_effect=lambda **kwargs: defer.succeed(None),
         )
         patch_obj.start()
         self.addCleanup(patch_obj.stop)
         return patch_obj
 
-    @covers_requirement("creation-persona-persistence::the-creation-panel-offers-a-concept-field-and-adapter-sharing-the-guarded-pipeline")
-    def test_concept_submission_fills_the_draft_form(self):
+    def _slot(self):
+        from web.webclient.actions.creation_actions import PROPOSAL_NDB_KEY
+
+        return getattr(self.fake_session.ndb, PROPOSAL_NDB_KEY, None)
+
+    @covers_requirement("concept-transient-fill::concept-applies-transiently-with-zero-persistent-writes")
+    def test_concept_apply_fills_only_the_session_slot(self):
         self._propose(_proposal())
         result = await_result(
-            _creation_concept_adapter(self.character, _concept_payload())
+            _creation_concept_adapter(
+                self.character, _concept_payload(), self.fake_session
+            )
         )
         self.assertEqual(result["outcome"], "success")
-        self.assertEqual(result["code"], "concept_saved")
+        self.assertEqual(result["code"], "concept_applied")
         self.assertEqual(result["affected_panels"], ("creation",))
-        draft = read_draft(self.character)
-        self.assertEqual(draft["mode"], "concept")
-        self.assertEqual(draft["race"], "human")
-        self.assertEqual(draft["allocations"], balanced_allocations("human"))
-        self.assertEqual(
-            draft["persona"],
-            {"personality": "沉穩", "life_story": "來自邊境的小村", "habit": "清晨練劍"},
-        )
+        # Zero persistent writes: no draft, no canonical surface, no persona.
+        self.assertIsNone(read_draft(self.character))
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(self.character.age, None)
         self.assertEqual(self.character.traits.all(), [])
+        self.assertFalse(self.character.attributes.has("persona"))
+        slot = self._slot()
+        self.assertIsNotNone(slot, "the proposal must be stored in the session slot")
+        self.assertEqual(slot["revision"], 1)
+        self.assertEqual(slot["owner_actor_id"], self.character.pk)
+        self.assertEqual(slot["race"], "human")
+        self.assertEqual(slot["subrace"], "human_commoner")
+        self.assertEqual(slot["allocations"], balanced_allocations("human"))
+        self.assertEqual(slot["persona"], PERSONA_BLOCK)
 
-    @covers_requirement("creation-persona-persistence::the-creation-panel-offers-a-concept-field-and-adapter-sharing-the-guarded-pipeline")
-    def test_offline_concept_degrades_without_state_change(self):
-        self._degrade()
-        result = await_result(
-            _creation_concept_adapter(self.character, _concept_payload())
-        )
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "concept_unavailable")
-        self.assertEqual(result["message"], "生成不可用，請手動創角")
-        self.assertIsNone(read_draft(self.character))
-        self.assertTrue(self.character.creation_pending)
-        # The deterministic adapters remain fully usable afterwards.
-        result = _creation_custom_adapter(self.character, custom_payload())
-        self.assertEqual(result["outcome"], "success")
-
-    @covers_requirement("creation-persona-persistence::the-creation-panel-offers-a-concept-field-and-adapter-sharing-the-guarded-pipeline")
-    def test_stale_fingerprint_rejects_the_apply(self):
+    @covers_requirement("concept-transient-fill::concept-applies-transiently-with-zero-persistent-writes")
+    def test_slot_never_follows_a_puppet_switch(self):
         from twisted.internet import defer
 
+        # An in-flight completion whose session stopped puppeting the admitted
+        # actor writes nothing.
         held = defer.Deferred()
         patch_obj = patch(
             "server.ai_director_service.request_character_proposal",
@@ -795,14 +827,95 @@ class CreationConceptTests(CreationActionBase):
         )
         patch_obj.start()
         self.addCleanup(patch_obj.stop)
-        deferred = _creation_concept_adapter(self.character, _concept_payload())
-        # Another entry saves a custom draft while the proposal is in flight.
-        _creation_custom_adapter(self.character, custom_payload())
+        deferred = _creation_concept_adapter(
+            self.character, _concept_payload(), self.fake_session
+        )
+        self.fake_session.puppet = None  # the session went OOC mid-flight
         held.callback(_proposal())
         result = await_result(deferred)
-        self.assertEqual(result["outcome"], "stale")
-        self.assertEqual(result["code"], "concept_stale")
-        self.assertEqual(read_draft(self.character)["mode"], "custom")
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "ownership_rejected")
+        self.assertIsNone(self._slot())
+
+    @covers_requirement("concept-transient-fill::concept-applies-transiently-with-zero-persistent-writes")
+    def test_custom_save_and_reset_clear_the_slot(self):
+        self._propose(_proposal())
+        await_result(
+            _creation_concept_adapter(
+                self.character, _concept_payload(), self.fake_session
+            )
+        )
+        self.assertIsNotNone(self._slot())
+        # A successful custom save consumes the pending fill.
+        result = _creation_custom_adapter(
+            self.character, custom_payload(), self.fake_session
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertIsNone(self._slot())
+        # A later apply is cleared by a successful reset.
+        await_result(
+            _creation_concept_adapter(
+                self.character, _concept_payload(), self.fake_session
+            )
+        )
+        self.assertIsNotNone(self._slot())
+        result = _creation_reset_adapter(self.character, {}, self.fake_session)
+        self.assertEqual(result["outcome"], "success")
+        self.assertIsNone(self._slot())
+
+    @covers_requirement("concept-transient-fill::concept-applies-transiently-with-zero-persistent-writes")
+    def test_revision_keeps_rising_across_consumed_slots(self):
+        # A consumed slot (save/reset cleared it) must never restart the
+        # sequence: a mounted overlay's lastAppliedRevision would otherwise
+        # ignore the next fresh apply at the colliding revision.
+        self._propose(_proposal())
+        await_result(
+            _creation_concept_adapter(
+                self.character, _concept_payload(), self.fake_session
+            )
+        )
+        self.assertEqual(self._slot()["revision"], 1)
+        result = _creation_custom_adapter(
+            self.character, custom_payload(), self.fake_session
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertIsNone(self._slot())
+        await_result(
+            _creation_concept_adapter(
+                self.character, _concept_payload(), self.fake_session
+            )
+        )
+        slot = self._slot()
+        self.assertIsNotNone(slot)
+        self.assertEqual(
+            slot["revision"], 2, "the revision counter survives a consumed slot"
+        )
+        # A reset consumes again; the next apply still rises.
+        _creation_reset_adapter(self.character, {}, self.fake_session)
+        await_result(
+            _creation_concept_adapter(
+                self.character, _concept_payload(), self.fake_session
+            )
+        )
+        self.assertEqual(self._slot()["revision"], 3)
+
+    @covers_requirement("creation-persona-persistence::the-creation-panel-offers-a-concept-field-and-adapter-sharing-the-guarded-pipeline")
+    def test_offline_concept_degrades_without_state_change(self):
+        self._degrade()
+        result = await_result(
+            _creation_concept_adapter(
+                self.character, _concept_payload(), self.fake_session
+            )
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "concept_unavailable")
+        self.assertEqual(result["message"], "生成不可用，請手動創角")
+        self.assertIsNone(read_draft(self.character))
+        self.assertIsNone(self._slot())
+        self.assertTrue(self.character.creation_pending)
+        # The deterministic adapters remain fully usable afterwards.
+        result = _creation_custom_adapter(self.character, custom_payload())
+        self.assertEqual(result["outcome"], "success")
 
     def test_concept_payload_is_exact(self):
         self.assertEqual(
