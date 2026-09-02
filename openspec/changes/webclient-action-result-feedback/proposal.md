@@ -6,7 +6,7 @@ When a dispatched `ui_action` ends non-success, the server-authored Traditional 
 
 - A recognized non-success `ui_action_result` (outcome `rejected` | `stale` | `error`, same request id and epoch — the identity `handleActionResult` already validates) appends the envelope's server-authored `message` to the narrative feed as one `err`-kind line, exactly once per recognized result, through the existing bounded `appendText` path so the full log and markup rules apply unchanged. A message-less non-success falls back to one stable local line.
 - Success results surface nothing; the in-flight/uncertain machinery (revision-gated release — including the `stale` rule holding the lock until the recovery snapshot commits — and the uncertain-result notice) is untouched.
-- Single-surface rule for creation mode: while the creation overlay presents the result, the same result appends no narrative line, keeping one visible statement per failure.
+- Single-surface rule for creation mode: a mounted `CreationOverlay` becomes the presenting surface for every recognized non-success outcome — it renders the message verbatim in one always-reachable result region across all wizard stages (its `formMessage` keeps only the local-validation role), and the same result appends no narrative line, keeping one visible statement per failure.
 - No protocol, dispatcher, server, or player-command changes; `docs/game/commands.md` untouched.
 
 ## Capabilities
@@ -21,6 +21,6 @@ None.
 
 ## Impact
 
-- Code: `web/webclient-app/stores/elosern.js` (`handleActionResult` hook + one append rule); no component change expected (the narrative feed already renders `err` lines).
-- Tests: Vitest store test for append/dedup/creation-exclusion/fallback; one browser method driving a real `stale` admission (tampered `base_revision` over the test transport) and one driving a real domain `rejected` result, asserting the visible line; `covers_requirement` on the browser methods.
+- Code: `web/webclient-app/stores/elosern.js` (`handleActionResult` hook + one append rule, per-in-flight-result dedup) and `web/webclient-app/components/CreationOverlay.vue` (always-reachable verbatim result region; `formMessage` narrowed to local validation).
+- Tests: Vitest store tests for append/dedup (including a foreign result delivered in between)/creation-exclusion/fallback and overlay tests for the verbatim result region; one browser method driving a real `stale` admission (tampered `base_revision` over the test transport) and a real domain `rejected` result (a stale-`current_node` `explore.move`), asserting the visible line with baseline-relative counting and a keyboard-focus assertion; `covers_requirement` on the browser methods.
 - Dependencies: none. All three frame-refresh changes start after this one (shared `stores/elosern.js`); see design doc §9 for the serialized order.

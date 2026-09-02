@@ -9,6 +9,13 @@
 // envelope — no field is invented; the server remains authoritative.
 import { computed, reactive, ref, watch } from "vue";
 
+// The same stable fallback line the store uses for a recognized non-success
+// result with no usable message (webclient-action-result-feedback D-D); the
+// overlay is the presenting surface in creation mode, so the fallback must
+// exist here too. Kept byte-identical to the store constant, pinned by
+// tests/overlays/creation_overlay.test.js.
+const ACTION_RESULT_FALLBACK_MESSAGE = "動作未生效，請重試或返回上層。";
+
 const props = defineProps({
   // The committed `creation` v1 panel payload (the available form, a
   // server-persisted wizard draft, or the registry-owned unavailable form).
@@ -199,15 +206,29 @@ const subraceError = ref(false);
 // a single form-message element that surfaces a server rejection (result.code /
 // result.message) or the first active local validation error. The element is
 // rendered only while a message is active.
+// Local validation messages only. A server action result never renders here:
+// it speaks verbatim through the always-reachable result region below
+// (webclient-action-result-feedback: showing `result.code` would paraphrase
+// the server-authored message).
 const formMessage = computed(() => {
-  const r = props.result;
-  if (r && r.outcome === "rejected") {
-    return r.code || r.message || "";
-  }
   if (gateError.value) return `年齡與外觀年齡皆須 ≥ ${minimumAge.value}`;
   if (subraceError.value) return "已選擇有血統的種族時，必須先選擇血統";
   if (budgetError.value) return `點數總和 ${allocationTotal.value} 不等於額度 ${currentProfile.value?.budget}`;
   return "";
+});
+
+// The overlay's presentation of a recognized non-success result
+// (webclient-action-result-feedback D-C): while the overlay is mounted it is
+// THE surface for the envelope's message, so it renders the message verbatim
+// across every wizard stage (preset/custom/concept/confirm) in one
+// always-reachable region; the stable fallback covers the malformed
+// message-less edge.
+const RESULT_NON_SUCCESS = ["rejected", "stale", "error"];
+const resultMessage = computed(() => {
+  const r = props.result;
+  if (!r || RESULT_NON_SUCCESS.indexOf(r.outcome) === -1) return "";
+  const m = typeof r.message === "string" && r.message.trim() !== "" ? r.message : ACTION_RESULT_FALLBACK_MESSAGE;
+  return m;
 });
 
 function onRaceChange() {
@@ -351,6 +372,15 @@ function cancelConfirm() {
 
     <div class="creation-overlay__body" data-testid="creation-body">
       <template v-if="available">
+        <p
+          v-if="resultMessage"
+          class="creation-result-message"
+          role="alert"
+          data-testid="creation-result-message"
+          :data-outcome="result && result.outcome"
+        >
+          {{ resultMessage }}
+        </p>
         <template v-if="stage && stage.stage === 'confirm'">
           <div class="creation-confirm" data-testid="creation-confirm">
             <div class="creation-confirm-title" data-testid="creation-confirm-title">
@@ -745,6 +775,7 @@ function cancelConfirm() {
   color: var(--paper-300);
 }
 
+.creation-result-message,
 .creation-form-message {
   margin: 0;
   padding: var(--sp-2) var(--sp-3);

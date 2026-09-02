@@ -104,6 +104,7 @@
       "name": "exploration-services",
       "files_a": [
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_stale_and_tampered_submissions_do_nothing",
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_non_success_action_results_speak_once_in_the_narrative",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_no_take_or_drop_control_is_rendered",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_outlet_and_nav_tiles_stay_within_the_pane_at_a_narrow_viewport",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_outlet_partial_last_row_fills_the_pane_at_a_narrower_viewport",

@@ -284,9 +284,12 @@ class PresetCreationJourneys(CreationBrowserTest):
         # with the rejection rendered.
         self.assertEqual(page.locator(".creation-confirm").count(), 0)
         self.assertGreaterEqual(page.locator('[data-testid="creation-body"] .creation-preset-card').count(), 1)
+        # The overlay is the presenting surface for a server result: the
+        # message renders verbatim in the always-reachable result region
+        # (webclient-action-result-feedback), never the bare code.
         self.assertIn(
-            result["code"],
-            page.evaluate("document.querySelector('[data-testid=\"creation-form-message\"]').textContent"),
+            result["message"],
+            page.evaluate("document.querySelector('[data-testid=\"creation-result-message\"]').textContent"),
         )
         self.assertEqual(sent_action_count(page, "creation.activate"), 0)
         self.assertEqual(self._dock_mode(page), "creation")
@@ -438,9 +441,11 @@ class CustomCreationJourneys(CreationBrowserTest):
         # with the rejection rendered.
         self.assertEqual(page.locator(".creation-confirm").count(), 0)
         self.assertIsNotNone(page.locator('[data-testid="creation-submit"]'))
+        # The overlay presents the server message verbatim in the result
+        # region (webclient-action-result-feedback), never the bare code.
         self.assertIn(
-            "markup_delimiter",
-            page.evaluate("document.querySelector('[data-testid=\"creation-form-message\"]').textContent"),
+            result["message"],
+            page.evaluate("document.querySelector('[data-testid=\"creation-result-message\"]').textContent"),
         )
         self.assertEqual(sent_action_count(page, "creation.activate"), 0)
         self.assertEqual(self._dock_mode(page), "creation")

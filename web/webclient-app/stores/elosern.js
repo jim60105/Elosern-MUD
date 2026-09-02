@@ -40,6 +40,16 @@ import LayoutStore from "../lib/layout_store.js";
 
 const NARRATIVE_KINDS = ["in", "out", "sys", "err"];
 const MAX_NARRATIVE_LINES = 500;
+// The one stable fallback line for a recognized non-success action result
+// that carries no usable server message (webclient-action-result-feedback
+// D-D). The protocol validator guarantees a 1..512 code point message, so
+// this exists only for malformed-edge safety and never paraphrases server
+// text.
+const ACTION_RESULT_FALLBACK_MESSAGE = "動作未生效，請重試或返回上層。";
+// The non-success outcomes (mirrors the protocol OUTCOMES vocabulary); a
+// recognized result with one of these speaks once through the narrative
+// feed (webclient-action-result-feedback D-A/D-B).
+const NON_SUCCESS_OUTCOMES = ["rejected", "stale", "error"];
 const MAX_COMMAND_HISTORY = 50;
 // The registered production panel allowlist (mirrors the UMD allowlist in
 // elosern/protocol.js and web/webclient/presentation/protocol.py).
@@ -783,6 +793,18 @@ export const useElosernStore = defineStore("elosern", () => {
     }
   }
 
+  // Whether the creation overlay is the presenting surface: the committed
+  // `creation` panel exists and is not explicitly unavailable — exactly the
+  // mount predicate `AppClient` uses for `CreationOverlay` (duck finding 1:
+  // the overlay's presence, not the creation-dock state `creationPanelOf`).
+  // While it is mounted it renders the action result itself, so the
+  // narrative feed gains no duplicate line (webclient-action-result-feedback
+  // D-C).
+  function creationOverlayPresenting(rs) {
+    const panel = (rs.panels && rs.panels.creation) || null;
+    return !!panel && panel.available !== false;
+  }
+
   // D5: the in-flight lock releases with the tested legacy action-client
   // semantics. A matching `ui_action_result` (same request id, same epoch)
   // sets the declared presentation revision; the lock then releases only
@@ -790,23 +812,50 @@ export const useElosernStore = defineStore("elosern", () => {
   // was declared, unconditionally for a `no_puppet` rejection; a `stale`
   // outcome keeps the lock until the recovery snapshot commits — the
   // `ui_sync` re-request itself is the C3 transport's job).
-  function handleActionResult(prev, rs) {
+  function handleActionResult(rs) {
     if (!inFlight) {
       return;
     }
     const result = rs.lastActionResult;
-    const prevResult = prev ? prev.lastActionResult : null;
-    if (stableStringify(result) === stableStringify(prevResult)) {
-      return;
-    }
     if (!result || result.requestId !== inFlight.requestId) {
       return;
     }
     if (result.epoch !== rs.activeEpoch) {
       return;
     }
-    // A cached duplicate or a result for a foreign request never unlocks.
+    // Recognition/dedup unit: the in-flight request plus its own
+    // handled-result fingerprint (duck findings 2/3). The old global
+    // "changed from previous" equality could both re-append (a foreign
+    // result delivered between two observations of this request's result)
+    // and silence a legitimate match (a result that was already sitting in
+    // the reducer before this dispatch started). A recognized result is
+    // recorded on the in-flight record, so re-delivery / re-observation is
+    // idempotent and foreign results cannot interfere. A cached duplicate
+    // for a foreign request still fails the request-id match above and
+    // never unlocks.
+    const fingerprint = stableStringify(result);
+    if (inFlight.handledResult === fingerprint) {
+      return;
+    }
+    inFlight.handledResult = fingerprint;
     inFlight.presentationRevision = result.presentationRevision;
+    // webclient-action-result-feedback: a recognized non-success result
+    // (rejected / stale / error) speaks exactly once as one narrative error
+    // line carrying the server-authored message verbatim. The match guards
+    // above (changed-from-previous, request id, epoch) are the dedup unit;
+    // the creation overlay, when mounted, already presents the result and
+    // suppresses the line. The lock/uncertain/revision mechanics below are
+    // untouched by the append.
+    if (
+      NON_SUCCESS_OUTCOMES.indexOf(result.outcome) !== -1 &&
+      !creationOverlayPresenting(rs)
+    ) {
+      const message =
+        typeof result.message === "string" && result.message.trim() !== ""
+          ? result.message
+          : ACTION_RESULT_FALLBACK_MESSAGE;
+      appendText("err", message);
+    }
     if (result.outcome === "rejected" && result.code === "no_puppet") {
       // The puppet is gone; no presentation will ever gate this rejection,
       // so the lock is released unconditionally.
@@ -1735,7 +1784,7 @@ export const useElosernStore = defineStore("elosern", () => {
     }
     lastServicesSig = servicesSig;
     handleTransportLifecycle(prev, rs);
-    handleActionResult(prev, rs);
+    handleActionResult(rs);
     releaseIfReady(rs);
     rebuildFocusMenu(prev, rs);
     rebuildCreationDock(prev, rs);
@@ -2116,7 +2165,14 @@ export const useElosernStore = defineStore("elosern", () => {
       action_id: actionId,
       payload: payload === undefined || payload === null ? {} : payload,
     };
-    inFlight = { requestId, presentationRevision: null };
+    inFlight = { requestId, presentationRevision: null, handledResult: null };
+    // `handledResult` is the per-request dedup unit
+    // (webclient-action-result-feedback): the fingerprint of the result this
+    // in-flight dispatch has already recognized. Re-observation (publishView
+    // re-runs, reducer replays of the identical result) never re-appends; a
+    // foreign result cannot erase the record, so a re-delivery of THIS
+    // request's result stays silent even after another request's result
+    // passed through the reducer.
     mutationSubmitted = true;
     lastSubmittedRequestId = requestId;
     // A custom save tracks its request so the result resolution opens the
