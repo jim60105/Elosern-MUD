@@ -194,7 +194,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
 
     def _open_root(self, page, index):
         focus_action_dock(page)
-        page.evaluate("window.__elosernBridge.router.reset()")
+        page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
         page.wait_for_timeout(60)
         for _ in range(index):
             _press(page, "ArrowRight")

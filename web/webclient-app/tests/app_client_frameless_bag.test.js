@@ -113,7 +113,7 @@ describe("frameless 背包 drawer (composition contract)", () => {
     // Hosted-style navigation into the shop surface: the 貨架 frame stays
     // hosted in the 商店 drawer (regression — the frozen hosting surface).
     store.setActiveSubDock("services");
-    store.router.pushMenu(ServiceMenu.buildMenus(SERVICES_PANEL_SAMPLE).menus.root);
+    store.router.pushFrame({ source: "services.root", params: {} });
     expect(store.focusItemByKey("shop")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
     expect(store.focusItemByKey("stock")).toBe(true);
@@ -122,14 +122,22 @@ describe("frameless 背包 drawer (composition contract)", () => {
     let drawer = wrapper.get('[data-testid="hud-drawer"]');
     expect(drawer.find('[data-testid="shop-panel"]').exists()).toBe(true);
     expect(drawer.find('[data-testid="dock-menu"]').exists()).toBe(true);
-    // The hosted drawer's close keeps today's teardown: pop + clear +
-    // re-home back to the exploration root.
+    // The hosted drawer's close follows the declarative contract
+    // (webclient-services-combat-creation-frames): exactly one pop of the
+    // hosted 貨架 frame, the drawer closes once, and the hosted parent
+    // 商店 frame stays current with its sub-dock — no root re-home.
     const hostedDepth = store.router.depth();
     await wrapper.get('[data-testid="hud-drawer-close"]').trigger("click");
     await wrapper.vm.$nextTick();
     expect(store.router.depth()).toBe(hostedDepth - 1);
-    expect(store.view.activeSubDock).toBe(null);
-    expect(store.router.currentMenu().title).toBe("探索");
+    expect(store.view.activeSubDock).toBe("services");
+    expect(store.router.currentDescriptor().source).toBe("services.shop");
+    // The player then escapes the remaining shop levels back to the root
+    // (the bag entry row lives in the root dock).
+    store.router.popMenu();
+    store.router.popMenu();
+    await wrapper.vm.$nextTick();
+    expect(store.router.currentDescriptor().source).toBe("exploration.root");
 
     // The bag opened after that hosted navigation still renders no row
     // region, and its close leaves the router alone (the re-homed root
@@ -147,6 +155,6 @@ describe("frameless 背包 drawer (composition contract)", () => {
     await wrapper.vm.$nextTick();
     expect(wrapper.find('[data-testid="hud-drawer"]').exists()).toBe(false);
     expect(store.router.depth()).toBe(depthBeforeBag);
-    expect(store.router.currentMenu().title).toBe("探索");
+    expect(store.router.currentDescriptor().source).toBe("exploration.root");
   });
 });

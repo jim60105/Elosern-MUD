@@ -259,7 +259,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         openExploration();
         store.setActiveSubDock("services");
         const model = ServiceMenu.buildMenus(SERVICES_PANEL_SAMPLE);
-        store.router.pushMenu(model.menus.board);
+        store.router.pushFrame({ source: "services.board", params: {} });
         const row = model.menus.board.items.find((i) => i.actionId === "guild.quest_accept");
         expect(store.focusItemByKey(row.key)).toBe(true);
         store.focusConfirm("pointer");
@@ -273,7 +273,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         openExploration();
         store.setActiveSubDock("services");
         const model = ServiceMenu.buildMenus(SERVICES_PANEL_SAMPLE);
-        store.router.pushMenu(model.menus.stock);
+        store.router.pushFrame({ source: "services.stock", params: {} });
         const row = model.menus.stock.items.find((i) => i.itemKey === "item_iron_sword");
         expect(store.focusItemByKey(row.key)).toBe(true);
         store.focusConfirm("pointer"); // opens the bounded quantity form

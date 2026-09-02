@@ -24,6 +24,7 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_creation_action_dock,
     install_outbound_recorder,
+    inject_update,
     outbound_messages,
     sent_action_count,
     store_state,
@@ -667,6 +668,60 @@ class ResetAndDraftJourneys(CreationBrowserTest):
         self.assertEqual(sent_action_count(page, "creation.reset"), 1)
         self.assertEqual(sent_action_count(page, "creation.activate"), 0)
         self.assertEqual(self._dock_mode(page), "creation")
+
+    def test_reset_confirm_shows_refreshed_server_text_when_withdrawn(self):
+        """Declarative-frame degradation: the open confirm frame carries no
+        copy — when the committed creation panel is withdrawn, the cascade
+        pops the unresolvable frames and the surviving root presents the
+        server-authored reason verbatim.
+
+        The confirm frame is a descriptor (root + form marker + confirm =
+        depth 3). A partial ``ui_update`` replaces only ``creation`` with its
+        unavailable form (mode stays creation, so no teardown fires): the
+        confirm and form-marker frames pop, the root itself is unresolvable,
+        and the degraded root's marker row shows the server's message — not
+        the local fallback — with no mutation dispatched.
+        """
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+
+        self._focus_dock(page)
+        _press(page, "ArrowDown")  # 自訂角色
+        _press(page, "Enter")  # form marker frame
+        self._wait_draft_name_restored(page)
+        page.evaluate("document.querySelector('[data-testid=\"creation-reset\"]').focus()")
+        _press(page, "Enter")  # open the reset confirmation frame
+        self.assertEqual(page.locator(".creation-confirm").count(), 1)
+        depth_before = page.evaluate("() => window.__elosernBridge.router.depth()")
+        self.assertEqual(depth_before, 3)
+
+        reason = "角色建立服務暫時不可用。"
+        inject_update(
+            page,
+            {
+                "creation": {
+                    "schema_version": 1,
+                    "available": False,
+                    "reason": {"code": "registry_unavailable", "message": reason},
+                }
+            },
+            mode="creation",
+        )
+
+        def _degraded(state):
+            degraded = state.get("degradedRoot")
+            return bool(degraded) and degraded.get("reason") == reason
+
+        wait_for_store_state(page, _degraded, timeout=15000)
+        # The confirm frame is gone (never resurrected from a copy).
+        self.assertEqual(page.locator(".creation-confirm").count(), 0)
+        # Cascade: confirm + form marker popped; the root degrades in place.
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), 1)
+        # Unavailable does not change the mode — creation stays mounted.
+        self.assertEqual(self._dock_mode(page), "creation")
+        # Degradation dispatched nothing.
+        self.assertEqual(sent_action_count(page, "creation.reset"), 0)
 
     @covers_requirement("webclient-character-creation-ui::the-creation-dock-is-keyboard-first-form-capable-and-confirmation-protected")
     def test_escape_from_reset_confirm_returns_to_form_without_mutation(self):

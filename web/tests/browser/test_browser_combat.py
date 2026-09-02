@@ -20,6 +20,7 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
+    inject_update,
     sent_action_count,
     store_state,
     wait_for_presentation_settled,
@@ -359,6 +360,68 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(envelope["action_id"], "combat.cast")
         self.assertEqual(envelope["payload"]["skill_key"], "fire_ball")
         self.assertEqual(envelope["payload"]["target_ids"], [target])
+
+    def test_skill_frame_refreshes_on_panel_update(self):
+        """Declarative-frame freshness mid-fight: the open skill frame
+        re-resolves its rows from the NEXT committed combat panel while the
+        client-local focus key survives — no re-push, no dispatch.
+
+        A partial ``ui_update`` replaces only ``context_actions`` with the
+        same session and a renamed fire_ball label. The frame was never
+        rebuilt from a copy: its next read enumerates the new label, the
+        same-key geometry keeps the fire_ball row focused, the depth is
+        unchanged, and nothing crosses the wire.
+        """
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._engage(page)
+
+        # skills tab -> category frame -> group frame -> skill frame (the
+        # same geometry as test_single_skill_target_flow; fire_ball is the
+        # first skill of the fire group and holds focus).
+        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "Enter")  # open skills -> category frame
+        self._press(page, "Enter")  # elemental_magic -> group frame
+        self._press(page, "Enter")  # fire group -> skill frame (fire_ball focused)
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.currentDescriptor().source"),
+            "combat.group",
+        )
+        depth_before = page.evaluate("() => window.__elosernBridge.router.depth()")
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.currentItem().key"),
+            "fire_ball",
+        )
+        sent_before = len(self._ui_actions(page))
+
+        new_label = "烈焰彈（改標）"
+        panel = self._combat_panel(page)
+        mutated = False
+        for category in panel["skills"]:
+            for group in category["groups"]:
+                for skill in group["skills"]:
+                    if skill["key"] == "fire_ball":
+                        skill["label"] = new_label
+                        mutated = True
+        self.assertTrue(mutated, "fixture must carry fire_ball")
+        inject_update(page, {"context_actions": panel}, mode="combat")
+
+        rows = page.evaluate(
+            "() => window.__elosernBridge.router.currentMenu().items.map("
+            "(i) => ({ key: i.key, label: i.label }))"
+        )
+        fired = [row for row in rows if row["key"] == "fire_ball"]
+        self.assertEqual(len(fired), 1, rows)
+        self.assertEqual(fired[0]["label"], new_label)
+        # Focus tracked by key across the panel replacement.
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.currentItem().key"),
+            "fire_ball",
+        )
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), depth_before)
+        # Resolution is read-side only: the injection dispatched nothing.
+        self.assertEqual(len(self._ui_actions(page)), sent_before)
+        self.assertEqual(sent_action_count(page, "combat.cast"), 0)
 
     @covers_requirement("webclient-combat-menu::combat-target-selection-sends-one-shape-per-targetspec")
     def test_self_skill_submits_no_target_field(self):

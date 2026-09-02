@@ -234,7 +234,7 @@ class ChoicePointsBrowserTest(BrowserAcceptanceTest):
         """Walk through the dock from the plaza to the empty-ground room (the
         scripted transport-failure room, same journey as the surface file)."""
         focus_action_dock(page)
-        page.evaluate("window.__elosernBridge.router.reset()")
+        page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
         page.wait_for_timeout(60)
         page.keyboard.press("Enter")  # Move (the first root row)
         page.wait_for_timeout(80)

@@ -25,6 +25,7 @@ from .browser_base import DEFAULT_VIEWPORT, BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
+    inject_update,
     login_and_open,
     outbound_messages,
     sent_action_count,
@@ -226,6 +227,48 @@ class GuildBoardJourneys(ServicesBrowserTest):
         )
         self.assertEqual(payload, {"definition_key": "introductory_hunt"})
 
+    def test_board_frame_refreshes_on_committed_update(self):
+        """Declarative-frame freshness: an open board frame re-resolves its
+        rows from the NEXT committed panel — no re-push, no copy.
+
+        A partial ``ui_update`` replaces only the ``services`` panel with a
+        renamed offer row. The committed panel is not the frame's data: the
+        board frame's next read enumerates the updated label with the row's
+        payload untouched, and no action is dispatched by the injection.
+        """
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        panel = self._wait_services_available(page)
+        self.assertEqual(panel["pagination"]["board_total"], 1)
+
+        self._open_guild_menu(page)
+        _press(page, "ArrowRight")  # board (second grid column)
+        _press(page, "Enter")  # open the board frame (hosted by the drawer)
+        old_name = panel["guild"]["board"][0]["display_name"]
+        before = page.evaluate("() => window.__elosernBridge.router.depth()")
+        sent_before = len([m for m in outbound_messages(page) if m[0] == "ui_action"])
+
+        updated = self._services_panel(page)
+        new_name = "新增任務委託"
+        updated["guild"]["board"][0]["display_name"] = new_name
+        inject_update(page, {"services": updated})
+
+        rows = page.evaluate(
+            "() => window.__elosernBridge.router.currentMenu().items.map("
+            "(i) => ({ key: i.key, label: i.label, payload: i.payload }))"
+        )
+        offer = [row for row in rows if row["key"] == "board-0"]
+        self.assertEqual(len(offer), 1, rows)
+        self.assertEqual(offer[0]["label"], new_name)
+        self.assertNotEqual(offer[0]["label"], old_name)
+        self.assertEqual(offer[0]["payload"], {"definition_key": "introductory_hunt"})
+        # The frame stayed exactly where it was, and the injection dispatched
+        # nothing.
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), before)
+        self.assertEqual(
+            len([m for m in outbound_messages(page) if m[0] == "ui_action"]), sent_before
+        )
+
 
 class GuildQuestJourneys(ServicesBrowserTest):
     SERVICES_MODE = "guild_active_quest"
@@ -253,6 +296,89 @@ class GuildQuestJourneys(ServicesBrowserTest):
         _press(page, "Enter")  # 確認放棄
         self._wait_panel(page, lambda p: p["guild"]["quests"][0]["state"] == "failed")
         self.assertEqual(sent_action_count(page, "guild.quest_abandon"), 1)
+
+    def test_quest_drawer_closes_with_the_hosted_frame(self):
+        """Drawer coupling: quest loss pops the detail frame to the hosted
+        parent (drawer KEPT); losing the whole hosted surface closes the
+        drawer with its frame gone and its component-local state discarded.
+
+        Injection 1 removes the quest: the quest-detail descriptor becomes
+        unresolvable and pops exactly one level to the hosted `services.quests`
+        frame — the quest drawer stays open. Injection 2 withdraws the whole
+        services panel: the cascade pops every services frame back to the
+        exploration root, and the settle-driven hosting watcher closes the
+        drawer whose hosted frame is gone (the drawer body unmounts, which is
+        where the selection and confirmation state live).
+        """
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        panel = self._wait_services_available(page)
+        self.assertEqual(panel["pagination"]["quest_total"], 1)
+
+        # root -> interact -> target -> keywords -> services.guild -> quests
+        # -> quest-detail, mirroring the abandon journey's navigation up to
+        # the detail frame (the confirmation step is NOT opened).
+        self._open_guild_menu(page)
+        _press(page, "ArrowRight")  # board (second grid column)
+        _press(page, "ArrowDown")  # exam_start (second grid row)
+        _press(page, "ArrowLeft")  # quests (second grid row, first column)
+        _press(page, "Enter")  # quests frame
+        _press(page, "Enter")  # the quest row -> hosted quest-detail frame
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.currentDescriptor().source"),
+            "services.quest-detail",
+        )
+        self.assertEqual(store_state(page)["hudDrawer"], "quest")
+        depth_before = page.evaluate("() => window.__elosernBridge.router.depth()")
+        sent_before = len([m for m in outbound_messages(page) if m[0] == "ui_action"])
+
+        # Injection 1: the quest disappears from the committed panel.
+        updated = self._services_panel(page)
+        updated["guild"]["quests"] = []
+        updated["pagination"]["quest_total"] = 0
+        inject_update(page, {"services": updated})
+
+        # One level down: the hosted parent surface stands, drawer kept.
+        current = page.evaluate(
+            "() => window.__elosernBridge.router.currentDescriptor()"
+        )
+        self.assertEqual(current["source"], "services.quests")
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.depth()"),
+            depth_before - 1,
+        )
+        self.assertEqual(store_state(page)["hudDrawer"], "quest")
+
+        # Injection 2: the whole hosted surface is withdrawn.
+        inject_update(
+            page,
+            {
+                "services": {
+                    "schema_version": 3,
+                    "available": False,
+                    "reason": {
+                        "code": "registry_unavailable",
+                        "message": "服務暫不可用。",
+                    },
+                }
+            },
+        )
+        wait_for_store_state(
+            page,
+            lambda s: s.get("hudDrawer") is None
+            and (s.get("panels") or {}).get("services", {}).get("available") is False,
+        )
+        current = page.evaluate(
+            "() => window.__elosernBridge.router.currentDescriptor()"
+        )
+        self.assertTrue(current["source"].startswith("exploration"), current)
+        # The drawer's frame is gone, so no open drawer renders a service
+        # surface: the body unmounts (discarding its local state with it).
+        self.assertEqual(page.locator('[data-testid="quest-board"]').count(), 0)
+        # Neither pop dispatched anything.
+        self.assertEqual(
+            len([m for m in outbound_messages(page) if m[0] == "ui_action"]), sent_before
+        )
 
 
 class GuildTurninJourneys(ServicesBrowserTest):

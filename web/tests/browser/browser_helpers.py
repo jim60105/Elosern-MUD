@@ -725,3 +725,27 @@ def inject_snapshot(page: Page, panels: dict, mode: str = "exploration") -> None
     )
     if not result.get("accepted"):
         raise AssertionError("injected ui_snapshot was rejected: %r" % (result,))
+
+
+def inject_update(page: Page, panels: dict, mode: str = "exploration") -> None:
+    """Inject one schema-valid partial ``ui_update``, stamped from the live view.
+
+    Same single-evaluate stamping contract as :func:`inject_snapshot`: the
+    epoch, revision, and transport generation are read and consumed inside one
+    ``page.evaluate``, so a server commit racing the injection can never make
+    the precomputed revision stale. A ``ui_update`` replaces exactly the named
+    panels (each completely) and leaves every other committed panel untouched,
+    which is the panel-replacement semantics the declarative-frame freshness
+    proofs drive. Any rejection raises immediately.
+    """
+    result = page.evaluate(
+        "(args) => { const s = window.__elosernBridge.store.view;"
+        " const env = args.envelope;"
+        " env.presentation_epoch = s.epoch;"
+        " env.revision = s.revision + 1;"
+        " return window.__elosernBridge.store.receive("
+        "s.generation, 'ui_update', [env], {}); }",
+        {"envelope": snapshot_envelope("", 0, panels, mode=mode)},
+    )
+    if not result.get("accepted"):
+        raise AssertionError("injected ui_update was rejected: %r" % (result,))

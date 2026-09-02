@@ -8,7 +8,8 @@
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_attack_flow_submits_basic_attack_once",
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_single_skill_target_flow",
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_self_skill_submits_no_target_field",
-        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_none_skill_submits_skill_key_only"
+        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_none_skill_submits_skill_key_only",
+        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_skill_frame_refreshes_on_panel_update"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_area_shorthand_flow",

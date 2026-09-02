@@ -211,6 +211,7 @@
           }
           if (frame.unresolvableAction === "root") {
             stack.splice(1);
+            emit("settle-pop", { depth: stack.length });
             projectFocus(stack[0], frameMenu(stack[0]));
             emit("focus", {
               row: stack[0].focusRow,
@@ -221,6 +222,7 @@
             return;
           }
           stack.pop();
+          emit("settle-pop", { depth: stack.length });
           var parent = stack[stack.length - 1];
           if (parent && frame.openerKey !== undefined && frame.openerKey !== null) {
             parent.focusKey = frame.openerKey;

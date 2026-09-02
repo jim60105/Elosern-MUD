@@ -57,7 +57,7 @@ window.__elosernTransportBind = (consoleHandle) => wireTransport(store, consoleH
 // Stable test hook (the repository's `__`-prefixed harness-hook convention,
 // cf. __elosernWs / __elosernSent): the managed-browser check drives the
 // bridge's façade entry points through this handle. The C4 harness re-map
-// also reads the live keyboard-router instance (depth()/currentItem()/reset())
+// also reads the live keyboard-router instance (depth()/currentItem()/resetFramesToRoot via store)
 // off this handle, so the full bridge handle (facade + store + router + the
 // key-routing uninstall hook) is exposed.
 window.__elosernBridge = {
