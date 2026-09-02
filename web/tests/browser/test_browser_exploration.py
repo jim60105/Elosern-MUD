@@ -23,6 +23,7 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     sent_action_count,
+    outbound_messages,
     store_state,
     wait_for_store_state,
 )
@@ -655,6 +656,87 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                 )
                 wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
         self.fail("three consecutive move dispatches were all answered stale")
+
+    def test_open_move_frame_follows_a_committed_move(self):
+        """The shipped dock path (the user-visible bug, design doc §2): with
+        the 移動 frame open, a committed move must make the RENDERED dock pane
+        list the NEW room's exits, and activating a rendered row must submit
+        the new `exit_ref`/`current_node`. Against the copy-based router this
+        fails red: the open frame keeps the previous room's rows and payloads,
+        so the second activation is answered `stale` and the player sees
+        nothing."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        node_before = store_state(page)["panels"]["local_map"]["current_node"]
+
+        self._open_root(page, 0)  # Move — the submenu frame is now current.
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.depth()"),
+            2,
+            "the move frame did not open",
+        )
+
+        def rendered_exit_rows():
+            # The REAL pane: the dock row region's rendered rows, in DOM
+            # order — not a store copy.
+            return page.evaluate(
+                "() => Array.from("
+                "document.querySelectorAll('#action-dock [data-item-key]'))"
+                ".map((el) => el.getAttribute('data-item-key'))"
+                ".filter((key) => key.startsWith('exit-'))"
+            )
+
+        panel_before = store_state(page)["panels"]["exploration"]
+        self.assertEqual(
+            rendered_exit_rows(),
+            ["exit-" + row["exit_ref"] for row in panel_before["move"]],
+            "the freshly opened pane must match the committed room",
+        )
+
+        # A real admitted move commits a newer snapshot for the whole room.
+        self._wait_admitted_move(page, node_before)
+        wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
+        panel_after = store_state(page)["panels"]["exploration"]
+        node_after = store_state(page)["panels"]["local_map"]["current_node"]
+        self.assertNotEqual(node_after, node_before)
+
+        # The rendered pane follows the commit on its next render (there is
+        # no refresh call on the commit path).
+        after_rows = rendered_exit_rows()
+        self.assertEqual(
+            after_rows,
+            ["exit-" + row["exit_ref"] for row in panel_after["move"]],
+            "the open move pane still renders the superseded room's exits",
+        )
+
+        # Activating a rendered row through the pointer path submits the NEW
+        # state's payload.
+        moves_before = sent_action_count(page, "explore.move")
+        first_key = after_rows[0]
+        page.locator(f"#action-dock [data-item-key=\"{first_key}\"]").click()
+        page.wait_for_function(
+            f"() => window.__elosernSent.filter((m) => m[0] === 'ui_action'"
+            " && m[1][0] && m[1][0].action_id === 'explore.move').length"
+            f" > {moves_before}",
+            timeout=10000,
+        )
+        envelopes = [
+            args[0]
+            for cmdname, args, _kw in outbound_messages(page)
+            if cmdname == "ui_action" and args and args[0].get("action_id") == "explore.move"
+        ]
+        self.assertEqual(len(envelopes), moves_before + 1, "the click did not dispatch exactly one move")
+        self.assertEqual(
+            (envelopes[-1].get("payload") or {}).get("current_node"),
+            node_after,
+            "the activation submitted the superseded room's current_node",
+        )
+        self.assertEqual(
+            (envelopes[-1].get("payload") or {}).get("exit_ref"),
+            panel_after["move"][0]["exit_ref"],
+            "the activation submitted the superseded room's exit_ref",
+        )
 
     @covers_requirement("webclient-frame-resolution::frame-descriptors-resolve-to-committed-state-menus-at-access-time")
     @covers_requirement("webclient-frame-resolution::the-descriptor-registry-implements-the-exploration-family-as-a-finite-table")

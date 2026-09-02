@@ -87,6 +87,7 @@
       "files_a": [
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_keyboard_move_charges_time_and_refreshes_map",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_frame_resolver_follows_committed_state_across_a_real_move",
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_open_move_frame_follows_a_committed_move",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_escape_from_character_panel_returns_keyboard_to_the_exploration_root",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_look_at_room_preserves_the_onboarding_beat",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_look_at_guard_shows_the_affinity_stage_line",
