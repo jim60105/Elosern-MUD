@@ -656,6 +656,10 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                 wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
         self.fail("three consecutive move dispatches were all answered stale")
 
+    @covers_requirement("webclient-frame-resolution::frame-descriptors-resolve-to-committed-state-menus-at-access-time")
+    @covers_requirement("webclient-frame-resolution::the-descriptor-registry-implements-the-exploration-family-as-a-finite-table")
+    @covers_requirement("webclient-frame-resolution::dynamic-rows-and-payloads-are-verbatim-from-the-panel-while-client-owned-navigation-rows-are-reproduced")
+    @covers_requirement("webclient-frame-resolution::an-unresolvable-descriptor-yields-the-shared-degradation-marker-with-the-server-authored-reason")
     def test_frame_resolver_follows_committed_state_across_a_real_move(self):
         """The frame resolver registry derives menus at access time (design
         doc D1): a move frame resolved before a real move names the old room;
