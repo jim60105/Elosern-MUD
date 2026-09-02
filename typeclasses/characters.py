@@ -1,13 +1,12 @@
 """Player character typeclasses from design section 5.2 (entity-traits)."""
 
-import logging
 from typing import Any
 
 from evennia.typeclasses.attributes import AttributeProperty
 
-from .entities import LivingEntity
+from world.observability import log_warn
 
-logger = logging.getLogger(__name__)
+from .entities import LivingEntity
 
 
 def _schedule_action_options_after_move(actor: Any) -> None:
@@ -51,12 +50,11 @@ def _schedule_action_options_committed(actor: Any) -> None:
             actor,
             watchers=watchers_for(actor),
         )
-    except Exception:
-        logger.warning(
-            "action options: relocation trigger failed for %s: %s",
-            getattr(actor, "key", "?"),
-            "scheduling call raised (swallowed)",
-            exc_info=True,
+    except Exception as error:
+        log_warn(
+            "action_options_trigger_failed",
+            context={"char": str(getattr(actor, "pk", "?")), "trigger": "relocation"},
+            exc=error,
         )
 
 
@@ -75,12 +73,11 @@ def _schedule_nomination_on_logout(character: Any) -> None:
         from server.title_nomination_service import schedule_epithet_nomination
 
         schedule_epithet_nomination(character)
-    except Exception:
-        logger.warning(
-            "titles: logout nomination trigger failed for %s: %s",
-            getattr(character, "key", "?"),
-            "scheduling call raised (swallowed)",
-            exc_info=True,
+    except Exception as error:
+        log_warn(
+            "title_nomination_trigger_failed",
+            context={"char": str(getattr(character, "pk", "?")), "trigger": "logout"},
+            exc=error,
         )
 
 

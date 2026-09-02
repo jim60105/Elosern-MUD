@@ -241,6 +241,16 @@ class RepoIntegrationTests(unittest.TestCase):
         report = check_repo(REPO_ROOT)
         self.assertTrue(report.ok, msg=report.violations[:20])
 
+    def test_freeze_manifest_is_drained_empty(self) -> None:
+        # migrate-world-client-observability drains the ratchet to zero:
+        # every production file is facade-clean, so the freeze must be an
+        # empty list (any entry would be a zombie the check rejects, and a
+        # re-introduced legacy import could hide behind it).
+        committed = json.loads(
+            (REPO_ROOT / FREEZE_PATH).read_text(encoding="utf-8")
+        )
+        self.assertEqual(committed, [])
+
     def test_freeze_manifest_equals_generated_r1_inventory(self) -> None:
         from tools.observability_lint import _production_files, _scan_r1, _whitelisted
 

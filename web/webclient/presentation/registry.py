@@ -12,6 +12,8 @@ from dataclasses import dataclass
 import secrets
 from typing import Any
 
+from world.observability import log_error
+
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
     ProtocolValidationError,
@@ -125,21 +127,20 @@ class PresentationRegistry:
         spec = self.spec(panel_name)
         try:
             payload = spec.presenter(context)
-        except PanelUnavailableError:
+        except PanelUnavailableError:  # observability: ignore R2: a declared-unavailable panel is the designed degrade path; the unavailable payload IS the client-visible report
             return self.build_unavailable(panel_name)
-        except Exception:
+        except Exception as error:
             correlation_id = secrets.token_hex(16)
-            try:
-                from evennia.utils.logger import log_trace
-
-                log_trace(
-                    "presentation registry %r: panel %r failed with correlation %s"
-                    % (self.name, panel_name, correlation_id)
-                )
-            except Exception:
-                # Even without a configured logger, presenter failure is
-                # isolated and the correlated unavailable payload still ships.
-                pass
+            log_error(
+                "panel_presenter_failed",
+                context={
+                    "surface": "presentation",
+                    "registry": self.name,
+                    "panel": panel_name,
+                    "correlation_id": correlation_id,
+                },
+                exc=error,
+            )
             return self.build_unavailable(panel_name, internal=True, correlation_id=correlation_id)
         if not isinstance(payload, dict) or payload.get("available") is not True:
             raise ProtocolValidationError(

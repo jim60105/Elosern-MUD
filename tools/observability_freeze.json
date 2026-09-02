@@ -1,12 +1,1 @@
-[
-  "typeclasses/characters.py",
-  "typeclasses/exits.py",
-  "web/webclient/actions/dispatcher.py",
-  "web/webclient/presentation/art_push.py",
-  "web/webclient/presentation/coordinator.py",
-  "web/webclient/presentation/registry.py",
-  "world/quests/deadlines.py",
-  "world/quests/runtime.py",
-  "world/quests/scene_builder.py",
-  "world/quests/transitions.py"
-]
+[]

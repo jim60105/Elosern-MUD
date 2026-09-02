@@ -58,6 +58,22 @@ from world.rules.traits import build_initial_traits, trait_config_for_values
 
 from tools.spec_traceability import covers_requirement
 
+
+def _portrait_callbacks(callbacks):
+    """The captured on-commit callbacks excluding quest-transition events.
+
+    The observability migration schedules one ``quest_transition`` event per
+    changed quest through ``transaction.on_commit``; the portrait-seam
+    contracts below count only the callbacks the seam itself owns.
+    """
+    return [
+        callback
+        for callback in callbacks
+        if not getattr(getattr(callback, "__code__", None), "co_filename", "").endswith(
+            "world/quests/transitions.py"
+        )
+    ]
+
 def _raw(**overrides):
     raw = default_profiles()
     for layer, values in overrides.items():
@@ -497,7 +513,10 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         record, _ = self._accept(_instance_bound_payload())
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
-        self.assertEqual(callbacks, [])
+        # The stage-binding write also schedules its quest_transition event
+        # (observability migration); the portrait seam's contract is that it
+        # schedules NOTHING for a generic occupant.
+        self.assertEqual(_portrait_callbacks(callbacks), [])
         from world.art.store import ArtAssetRecord
 
         self.assertEqual(ArtAssetRecord.objects.count(), 0)
@@ -519,7 +538,7 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
 
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
-        self.assertEqual(len(callbacks), 1)
+        self.assertEqual(len(_portrait_callbacks(callbacks)), 1)
         from world.art.store import ArtAssetRecord
 
         records = ArtAssetRecord.objects.filter(

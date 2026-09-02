@@ -5,7 +5,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
 
-from evennia.utils.logger import log_warn
+from world.observability import log_warn
 
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
@@ -309,7 +309,14 @@ def _notify_quest_completion(
         try:
             observer(entity, record, definition)
         except Exception as error:  # noqa: BLE001 - isolation is the contract
-            log_warn(f"quest completion observer failed: {error}")
+            log_warn(
+                "quest_observer_failed",
+                context={
+                    "char": str(getattr(entity, "pk", None)),
+                    "observer": type(observer).__qualname__,
+                },
+                exc=error,
+            )
 
 
 def fulfill_record_for(

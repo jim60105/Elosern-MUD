@@ -3,7 +3,7 @@
 from typing import Any
 
 from evennia.objects.models import ObjectDB
-from evennia.utils.logger import log_warn
+from world.observability import log_warn
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.clock import ScheduledEvent, SurfaceSnapshot
@@ -45,7 +45,11 @@ def snapshot_quest_deadline_surfaces(
         try:
             records = read_records(player)
         except QuestDataError as error:
-            log_warn(f"quest_deadlines: {player.key}: malformed quest log: {error}")
+            log_warn(
+                "quest_deadlines_malformed_log",
+                context={"char": str(player.pk)},
+                exc=error,
+            )
             continue
         for record in records:
             if record.state is not QuestState.IN_PROGRESS or record.stage_room_id is None:
@@ -79,7 +83,11 @@ def settle_quest_deadlines(start_tick: int, end_tick: int) -> list[ScheduledEven
         try:
             records = read_records(player)
         except QuestDataError as error:
-            log_warn(f"quest_deadlines: {player.key}: malformed quest log: {error}")
+            log_warn(
+                "quest_deadlines_malformed_log",
+                context={"char": str(player.pk)},
+                exc=error,
+            )
             continue
         new_records = list(records)
         pin_operations = []
@@ -100,7 +108,11 @@ def settle_quest_deadlines(start_tick: int, end_tick: int) -> list[ScheduledEven
         try:
             apply_quest_log_replacement(player, new_records, pin_operations)
         except Exception as error:
-            log_warn(f"quest_deadlines: {player.key}: settlement failed: {error}")
+            log_warn(
+                "quest_deadline_settlement_failed",
+                context={"char": str(player.pk)},
+                exc=error,
+            )
             continue
         events.extend(
             ScheduledEvent(
