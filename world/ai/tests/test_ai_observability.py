@@ -21,6 +21,8 @@ from world.ai.guardrail import guarded_call, register_degrade_fallback
 from world.ai.profiles import default_profiles
 from world.ai.schemas import ChatRequestDescriptor
 
+from tools.spec_traceability import covers_requirement
+
 _SCHEMA = {"type": "object"}
 
 
@@ -59,6 +61,7 @@ class LlmCallEventTests(EvenniaTestCase):
     def _events(self, mock):
         return [call for call in mock.call_args_list if call.args and call.args[0] == "llm_call"]
 
+    @covers_requirement('llm-client::llm-calls-and-transport-failures-emit-observability-events')
     def test_successful_call_emits_exactly_one_ok_event(self):
         client = FakeLLMClient()
         client.add_response(lambda d: True, json.dumps({"ok": True}))

@@ -10,6 +10,8 @@ from django.test import override_settings
 from world.observability import log_debug, log_error, log_info, log_warn
 from world.observability import api
 
+from tools.spec_traceability import covers_requirement
+
 
 def _fake_logger() -> SimpleNamespace:
     return SimpleNamespace(
@@ -30,6 +32,7 @@ class RoutingTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    @covers_requirement('observability-logging::facade-is-the-sole-game-code-log-entry-point')
     def test_level_routing(self) -> None:
         log_info("evt_info", context={"a": 1})
         log_warn("evt_warn", context={"a": 1})
@@ -53,6 +56,7 @@ class RoutingTests(unittest.TestCase):
         self.assertIn("tb: ValueError: boom @ ", warn_line)
         self.assertIn("tb: ValueError: boom @ ", info_line)
 
+    @covers_requirement('observability-logging::log-error-captures-the-exception-chain-in-one-line-and-the-full-traceback-separately')
     def test_log_error_double_writes_full_traceback(self) -> None:
         try:
             raise RuntimeError("deep")
@@ -158,6 +162,7 @@ class DebugGateTests(unittest.TestCase):
 
 
 class ContainmentTests(unittest.TestCase):
+    @covers_requirement('observability-logging::the-facade-never-raises')
     def test_logger_failure_degrades_to_stderr(self) -> None:
         broken = SimpleNamespace(
             log_info=mock.Mock(side_effect=RuntimeError("logger down")),

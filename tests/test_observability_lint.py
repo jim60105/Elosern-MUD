@@ -3,12 +3,82 @@
 import ast
 import json
 import shutil
+import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
 
 from tools.observability_lint import FREEZE_PATH, REPO_ROOT, _scan_file, check_repo
+
+from tools.spec_traceability import covers_requirement
+
+
+class CliReportTests(unittest.TestCase):
+    @covers_requirement('observability-lint-gate::the-gate-exposes-a-deterministic-cli-report')
+    def test_check_json_report_is_valid_json_with_correct_exit_code(self) -> None:
+        # The gate's contract surface: `python -m tools.observability_lint
+        # check [--json]` over the real repository, stdlib subprocess only.
+        # The repo is clean and drained, so the pass exit code is 0.
+        proc = subprocess.run(
+            [sys.executable, "-m", "tools.observability_lint", "check", "--json"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        self.assertEqual(proc.returncode, 0, msg=proc.stdout + proc.stderr)
+        report = json.loads(proc.stdout)
+        self.assertIs(report["ok"], True)
+        self.assertEqual(report["summary"]["violations"], 0)
+        self.assertIsInstance(report["summary"]["exemptions"], int)
+        self.assertIsInstance(report["violations"], list)
+
+    def test_human_report_summary_line(self) -> None:
+        proc = subprocess.run(
+            [sys.executable, "-m", "tools.observability_lint", "check"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        self.assertEqual(proc.returncode, 0, msg=proc.stdout + proc.stderr)
+        self.assertRegex(
+            proc.stdout,
+            r"scanned=\d+ frozen=0 violations=0 exemptions=\d+",
+        )
+
+    def test_fail_exit_code_for_a_tree_with_a_violation(self) -> None:
+        # The spec scenario: check --json over a tree with one violation
+        # prints valid JSON naming the file, rule, and line — and exits 1.
+        # main() reads REPO_ROOT from the module, so the tree is steered by
+        # patching that binding rather than by repointing the subprocess cwd.
+        tmp = Path(tempfile.mkdtemp(prefix="obs-cli-"))
+        self.addCleanup(shutil.rmtree, tmp, True)
+        (tmp / "world/rules").mkdir(parents=True)
+        (tmp / "world/rules/debt.py").write_text(
+            "from evennia import logger\n", encoding="utf-8"
+        )
+        (tmp / "tools").mkdir()
+        (tmp / "tools/observability_freeze.json").write_text("[]", encoding="utf-8")
+        import io
+        from contextlib import redirect_stdout
+        from unittest import mock
+
+        from tools.observability_lint import main
+
+        buffer = io.StringIO()
+        with mock.patch("tools.observability_lint.REPO_ROOT", tmp), redirect_stdout(buffer):
+            exit_code = main(["check", "--json"])
+        self.assertEqual(exit_code, 1)
+        parsed = json.loads(buffer.getvalue())
+        self.assertIs(parsed["ok"], False)
+        self.assertEqual(parsed["summary"]["violations"], 1)
+        (violation,) = parsed["violations"]
+        self.assertEqual(violation["rule"], "R1")
+        self.assertEqual(violation["path"], "world/rules/debt.py")
+        self.assertIsInstance(violation["line"], int)
 
 
 def scan(source: str, rel: str = "world/rules/sample.py") -> list[tuple[str, int]]:
@@ -17,6 +87,7 @@ def scan(source: str, rel: str = "world/rules/sample.py") -> list[tuple[str, int
 
 
 class R1Tests(unittest.TestCase):
+    @covers_requirement('observability-lint-gate::the-lint-gate-enforces-the-facade-as-the-sole-log-writer')
     def test_each_bypass_form_is_caught(self) -> None:
         forms = [
             "from evennia import logger\n",
@@ -61,6 +132,7 @@ class R1Tests(unittest.TestCase):
 class R2Tests(unittest.TestCase):
     ADOPT = "from world.observability import log_warn\n\n"
 
+    @covers_requirement('observability-lint-gate::exception-handlers-must-re-raise-log-or-carry-a-reasoned-exemption')
     def test_silent_handler_in_adopter_fails(self) -> None:
         source = self.ADOPT + "try:\n    f()\nexcept Exception:\n    pass\n"
         self.assertIn("R2", [rule for rule, _ in scan(source)])
@@ -131,6 +203,7 @@ class R2Tests(unittest.TestCase):
 class R3Tests(unittest.TestCase):
     ADOPT = "from world.observability import log_info, log_error\n\n"
 
+    @covers_requirement('observability-lint-gate::facade-log-calls-must-carry-context')
     def test_contextless_call_fails(self) -> None:
         self.assertIn("R3", [rule for rule, _ in scan(self.ADOPT + "log_info('e')\n")])
 
@@ -182,6 +255,7 @@ class FreezeRepoTests(unittest.TestCase):
         (tmp / FREEZE_PATH).write_text(json.dumps(freeze), encoding="utf-8")
         return tmp
 
+    @covers_requirement('observability-lint-gate::the-freeze-list-is-a-shrink-only-transition-ratchet')
     def test_frozen_r1_file_passes_but_zombie_fails(self) -> None:
         files = {"world/rules/debt.py": "from evennia import logger\n"}
         report = check_repo(self._repo(files, ["world/rules/debt.py"]))

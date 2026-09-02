@@ -4,11 +4,10 @@ Targets the three delta requirements of ``migrate-rules-maps-observability``:
 ``clock_advance`` + ``rollback_restore_failed`` (world-clock),
 ``combat_round_settled`` + ``settlement_done`` (player-combat-session), and
 ``action_commit`` (action-resolution-pipeline). The delta requirement ids are
-deliberately NOT ``covers_requirement``-annotated yet:
-``tools.spec_traceability`` indexes only main specs, so active-delta ids would
-fail ``check`` with ``unknown-requirement-id``; the annotations land together
-with the archive sync (same intentional timing as add-observability-lint-gate
-task 6.3).
+now ``covers_requirement``-annotated on their establishing tests: the ids
+became main-spec requirements when the change archived and synced (the
+annotation was intentionally withheld while they were active deltas, which
+``tools.spec_traceability`` does not index).
 
 Boundary events fire through ``transaction.on_commit``, so the tests capture
 on-commit callbacks (executed only on real commit) and patch the migrated
@@ -18,6 +17,8 @@ discarded, not that the facade was unreachable.
 
 import unittest
 from unittest.mock import Mock, patch
+
+from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -42,6 +43,7 @@ class ClockBoundaryEventTests(EvenniaTest):
         self.player.race = "human"
         self.player.apply_race_baseline()
 
+    @covers_requirement('world-clock::clock-advance-and-restore-failures-emit-observability-events')
     def test_committed_advance_emits_exactly_one_clock_advance(self):
         clock = get_world_clock()
         before = clock.tick
@@ -116,6 +118,7 @@ class ActionCommitEventTests(EvenniaTest):
         self.entity.race = "human"
         self.entity.apply_race_baseline()
 
+    @covers_requirement('action-resolution-pipeline::successful-commits-emit-an-action-commit-boundary-event')
     def test_committed_effects_emit_action_commit_once(self):
         before = int(self.entity.traits.atk_phys.value)
         effects = [
@@ -170,6 +173,7 @@ class CombatBoundaryEventTests(BattlefieldIsolation, EvenniaTest):
         self.monster = _monster("event wolf", hp=500, atk=1)
         self.monster.location = self.room
 
+    @covers_requirement('player-combat-session::combat-boundaries-emit-observability-events')
     def test_committed_ordinary_round_emits_one_round_boundary(self):
         engage(self.player, self.monster)
         with (

@@ -15,6 +15,8 @@ from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 
 from commands.background import CmdBackground
+
+from tools.spec_traceability import covers_requirement
 from commands.lore import CmdLore
 
 
@@ -30,6 +32,7 @@ class CommandBoundaryEventTests(EvenniaCommandTest):
             for call in emit.call_args_list
         ]
 
+    @covers_requirement('observability-logging::command-execution-emits-boundary-events')
     def test_background_command_emits_one_bracketing_pair(self):
         events = self._events(CmdBackground(), "觀測測試")
         self.assertEqual([name for name, _ in events], ["cmd_in", "cmd_done"])

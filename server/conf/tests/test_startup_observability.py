@@ -22,6 +22,8 @@ from evennia.utils.test_resources import EvenniaTestCase
 import server.conf.at_server_startstop as startup
 from server.conf.at_server_startstop import STARTUP_STEP_ORDER
 
+from tools.spec_traceability import covers_requirement
+
 # Names imported inside at_server_start's body: patch the source modules.
 _BODY_TARGETS = (
     "world.rules.clock.get_world_clock",
@@ -88,6 +90,7 @@ class _StubbedStartup(EvenniaTestCase):
 
 
 class StartupStepEventTests(_StubbedStartup):
+    @covers_requirement('observability-logging::server-startup-emits-lifecycle-events')
     def test_every_catalog_step_emits_exactly_one_timed_event_in_order(self):
         info, warn, error = self._run()
         steps = [

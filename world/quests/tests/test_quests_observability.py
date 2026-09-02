@@ -7,10 +7,10 @@ changed quest at every durable commit of ANY of the three quest-log writers
 on swallowed rollback restores, and NO event for rolled-back operations. The
 deadline-failure path shares the replacement writer (``fail_record`` +
 replacement), so the failed-transition scenario covers it structurally. The
-delta requirement ids are deliberately NOT ``covers_requirement``-annotated
-yet: ``tools.spec_traceability`` indexes only main specs, so active-delta ids
-would fail ``check`` with ``unknown-requirement-id``; the annotations land
-together with the archive sync (same intentional timing as batches 1-3).
+delta requirement id is now ``covers_requirement``-annotated on its
+establishing test: it became a main-spec requirement when the change
+archived and synced (the annotation was intentionally withheld while it was
+an active delta, same as batches 1-3).
 
 Events fire through ``transaction.on_commit``, so tests capture on-commit
 callbacks and patch the migrated module's facade binding; rollback scenarios
@@ -38,6 +38,8 @@ from world.quests.transitions import (
 )
 
 from ._fixtures import QuestRegistryIsolation, quest, register
+
+from tools.spec_traceability import covers_requirement
 
 
 class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
@@ -70,6 +72,7 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(context["stage_to"], "in_progress:0:unbound")
         self.assertEqual(record.state, QuestState.IN_PROGRESS)
 
+    @covers_requirement("quest-lifecycle::quest-lifecycle-transitions-emit-boundary-events")
     def test_stage_advance_emits_stage_from_to_stage_to(self):
         record = accept_quest(self.actor, self.definition.key)
         advanced = replace(record, stage_index=1, stage_room_id=None)

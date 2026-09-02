@@ -82,12 +82,14 @@ support a baseline, waiver, or allowlist that converts a gap into success.
 
 ### Requirement: Continuous integration enforces both quality dimensions
 GitHub Actions MUST run strict OpenSpec validation, complete requirement
-traceability verification, the full project test suite, and aggregate
+traceability verification, the observability lint gate, the full project test
+suite, and aggregate
 first-party code coverage on pushes and pull requests. Package-local project
 tests and top-level repository contract tests MUST have disjoint discovery
 ownership and each test MUST execute exactly once. The workflow MUST fail if
-any test fails, any requirement lacks a test association, aggregate code
-coverage is below 80%, or publication of a successful aggregate report fails.
+any test fails, any requirement lacks a test association, the observability
+lint check reports any violation, aggregate code coverage is below 80%, or
+publication of a successful aggregate report fails.
 The project SHALL target aggregate branch coverage of at least 90% as a
 documented goal; that target MUST NOT be enforced by CI.
 Workflow enablement MUST be blocked until an initial audit proves zero
@@ -101,6 +103,12 @@ requirement gaps without adding product-behavior tests in this change.
 - **WHEN** all tests pass but aggregate measured first-party coverage is below 80%
 - **THEN** the continuous-integration job fails at the coverage report step
 
+#### Scenario: Observability lint regression fails CI
+- **WHEN** a pushed file imports the Evennia logger directly, or a facade
+  adopter file swallows an exception without re-raise, facade log, or
+  reasoned exemption
+- **THEN** the continuous-integration job fails at the observability lint step
+
 #### Scenario: Package and repository tests execute once
 - **WHEN** the quality gate runs the complete project suite
 - **THEN** the Evennia entry point discovers package-local tests only from `commands`, `server`, `typeclasses`, `web`, and `world`
@@ -108,7 +116,7 @@ requirement gaps without adding product-behavior tests in this change.
 - **AND** neither entry point discovers tests owned by the other
 
 #### Scenario: Offline deterministic suite passes all gates
-- **WHEN** strict specs, annotations, tests, and aggregate coverage satisfy their local gates without generative services
+- **WHEN** strict specs, annotations, tests, observability lint, and aggregate coverage satisfy their local gates without generative services
 - **THEN** the continuous-integration job reaches external coverage publication
 
 #### Scenario: Coverage target remains visible without enforcement

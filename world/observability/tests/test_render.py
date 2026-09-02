@@ -4,6 +4,8 @@ import unittest
 
 from world.observability.render import format_exception_chain, render_context, render_line
 
+from tools.spec_traceability import covers_requirement
+
 
 def _raise_inner() -> Exception:
     try:
@@ -73,6 +75,7 @@ class FormatChainTests(unittest.TestCase):
 
 
 class RenderLineTests(unittest.TestCase):
+    @covers_requirement('observability-logging::facade-renders-one-structured-grep-friendly-line')
     def test_line_shape_and_single_line(self) -> None:
         line = render_line(
             "warn", "startup\ndegraded", "mod.func:7", {"room": 3}, "A: x @ f:1"

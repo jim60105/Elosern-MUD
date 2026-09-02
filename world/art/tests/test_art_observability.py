@@ -17,6 +17,8 @@ from evennia.utils.test_resources import EvenniaTest
 
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.queue import ensure, record_key
+
+from tools.spec_traceability import covers_requirement
 from world.art.sd_worker import SDError
 from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
@@ -55,6 +57,7 @@ class ArtWorkerObservabilityTests(EvenniaTest):
         with patch("world.art.worker.resolve_sd_client", return_value=client):
             yield
 
+    @covers_requirement('art-queue-worker::worker-claim-and-settle-emit-boundary-events')
     def test_success_emits_exactly_one_claim_and_settle_pair(self):
         subject = _subject()
         ensure(subject, "desc")
@@ -122,6 +125,7 @@ class ArtWorkerObservabilityTests(EvenniaTest):
         with self._client(FakeSDWebUIClient()):
             self.assertEqual(drain_synchronous(10), 0)
 
+    @covers_requirement('internal-art-worker::named-degradation-codes-carry-the-swallowed-exception-in-the-log')
     def test_internal_error_keeps_code_and_adds_chain_event(self):
         subject = _subject()
         ensure(subject, "desc")

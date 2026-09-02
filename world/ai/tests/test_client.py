@@ -690,6 +690,7 @@ class TransportErrorEventTests(EvenniaTestCase):
     def _client(self):
         return make_client()
 
+    @covers_requirement('llm-client::llm-calls-and-transport-failures-emit-observability-events')
     def test_transport_failure_event_carries_endpoint_and_chain(self):
         client = self._client()
         error = LLMTransportError("connection", "request failed: refused")
