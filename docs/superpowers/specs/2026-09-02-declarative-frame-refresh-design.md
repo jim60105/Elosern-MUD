@@ -82,7 +82,7 @@ frame 的任何消費端（渲染、導航、submit）都透過 store 注入的 
 
 - 身份型描述符（出口、互動目標、關鍵詞、服務列）在已提交面板中解析不到時，堆疊立即 pop 一層，父框以「開啟該子選單那一列」的 focusKey 恢復焦點。連續多個頂端 frame 都解析不到時 cascade 逐層 pop，直到第一個可解析的 frame 為止，全棧皆不可解析則回到根框。堆疊深度有界，cascade 必然終止。
 - 根框自身不可解析（例如 `exploration` 面板進入 unavailable 形態）時沒有上層可回，根框渲染單一 disabled 說明列，內容優先使用伺服器作者的 `reason.message`，沒有則用本機備援字串「畫面狀態已更新，請返回上層」。disabled 項目原本就可聚焦、不可提交，與現行語意一致。
-- 建議表面不参与自動 pop。suggestions 信封有伺服器明確作者的四種運算狀態（`generating` / `ready` / `degraded` / `unavailable`，見 `web/webclient/presentation/options.py:40`），`generating` 是真實的非同步等待態、可能持續數秒。該表面維持既有的原地替換語意，以狀態驅動，不以計時器驅動。
+- 建議表面按狀態分流，不以計時器驅動。suggestions 信封有伺服器明確作者的四種運算狀態（`generating` / `ready` / `degraded` / `unavailable`，見 `web/webclient/presentation/options.py:40`），`generating` 是真實的非同步等待態、可能持續數秒。`generating` / `ready` / `degraded` 三態下開著的建議 frame 永不 pop，維持既有的原地替換與焦點存留語意；`unavailable` 是表面明文規定的無 pane 狀態，若建議 frame 正開啟則確定性地返回根框，不渲染降級說明列，因為該狀態下表面本來就不呈現任何 pane。
 - 例外保護：resolve 擲出例外時一律捕捉，視同該框不可解析（身份框走 pop cascade，根框走 disabled 說明列），文字遊玩與敘事流不受影響。
 - 抖動查證（0.5 秒去抖因此不設）。在現行架構下，「資料切換中」的暫時不可解析狀態在身份表面上不可能發生，論據有三。第一，`web/webclient/actions/` 全數 affected_panels 宣告中沒有任何動作以子集方式更新 `exploration` 或 `local_map`，這兩個面板只會以 full snapshot 整組替換。第二，每個快照由伺服器在同一事件迴圈裡從規範狀態同步渲染全部面板，客戶端 reducer 原子提交並以嚴格遞增 revision 排序作廢亂序（`protocol.js` 的 `not_newer` 閘門），不存在中間提交這種半成品狀態。第三，Evennia 為單執行緒 reactor，WebSocket 傳輸有序，兩次 commit 之間不會插入另一個來源的競態更新。身份只有「存在」與「真的消失」兩種已提交狀態，pop 條件因此不會誤觸。唯一真實的暫時態是建議表面的 `generating`，已由上一條以明確狀態排除；該狀態的持續時間由 AI 生成決定，0.5 秒視窗既蓋不住生成、又會在合法降級時誤跳層，時間性去抖在此無對應的失效模式，設計不引入。
 
@@ -141,3 +141,23 @@ frame 在使用當下派生後，`explore.move` 的 payload（`exit_ref` 加 `cu
 - 協定或伺服器推播路徑變更。「每個動作後推 full snapshot」已是 EvMenu「整塊重發」模式的實作，affected-panel 微最佳化不在本期。
 - 舊 AJAX 客戶端行為。
 - 第二個客戶端狀態 store 或事件匯流排。
+
+## 9. OpenSpec 提案拆分、依賴與實作順序
+
+本設計由四個 OpenSpec change 實作，每個都是單一工程師一個工作日（8 小時）內可完成的提案，全部內容為英文。router 的宣告式切替與三大 frame 家族（探索、服務、戰鬥／建角）拆為兩個切替提案，讓每個提案都保有獨立可驗證的一天工作量；切替期間 router 採過渡性雙 frame 形態，由最後一個提案刪除。
+
+| 順序 | Change | 範圍 | 工作量估計 |
+|---|---|---|---|
+| 1 | `webclient-action-result-feedback` | 非成功 `ui_action_result`（`rejected` / `stale` / `error`）的伺服器訊息以一條 `err` 敘事行呈現，一次且僅一次；建角覆蓋層呈現時不重複（§1 靜默失敗） | 約 3 小時 |
+| 2 | `webclient-frame-resolver-registry` | store 的描述符解析註冊表（§5.5 第 2 項的 derive 端），先實作探索家族有限表、unresolvable 降級標記與純函數契約，不動 router | 約 6 小時 |
+| 3 | `webclient-declarative-frame-stack` | router 宣告式 frame（含過渡雙形態）、焦點鍵追蹤、pop cascade、探索家族 push 點切替、刪除 `rebuildFocusMenu` 簽名閘門與 `replaceSuggestionsFrameInPlace`、建議狀態分流（§5.1–§5.3） | 約 8 小時 |
+| 4 | `webclient-services-combat-creation-frames` | 解析表補齊服務／戰鬥／建角家族、刪除過渡雙形態與剩餘刪除清單（`rehomeFrame`、`dockRawByKey`、空棧保險絲）、抽屜—堆疊耦合規則、teardown 最終形態（§5.2、§5.4–§5.5） | 約 8 小時 |
+
+依賴與程式碼衝突如下。
+
+- 序列化依賴：1 → 2 → 3 → 4。四個提案都觸及 `web/webclient-app/stores/elosern.js`（第 1 個改 `handleActionResult` 區域，第 2 個新增 `stores/frame-resolvers.js` 與 store 接線，第 3、4 個依序切替各自家族的 push 點與刪除清單），不存在可安全並行的批次，必須依序執行，無並行批次建議。
+- 規格依賴：capability `webclient-frame-resolution` 由第 2 個 change 建立；第 3 個以 ADDED 需求擴充它、第 4 個以 ADDED 加 MODIFIED 完成它，因此歸檔順序亦必須是 2 → 3 → 4（每個歸檔前先用 `openspec validate <change> --strict` 與 delta 同步檢查）。第 1 個擴充既有 `webclient-action-dispatch`，無歸檔順序限制。
+- 抽屜與元件共享表面：第 4 個 change 才刪除 `rehomeFrame` 與抽屜手動同步，第 3 個 change 期間未遷移表面仍走過渡形態，故 3 與 4 不可交換順序。
+- 驗證順序：第 1 個以 `stale` 與真實 `rejected` 瀏覽器回歸轉綠；第 2 個以 `__elosernBridge.resolveFrame` 提供瀏覽器證據；第 3 先行提交紅色瀏覽器回歸（三出口南門 fixture）再切替轉綠；第 4 個以抽屜耦合與戰鬥步驟即時性瀏覽器方法收尾。
+
+實作以各 change 的 `tasks.md` 為準；`covers_requirement` 標註一律在對應 delta 歸檔同步進 `openspec/specs/` 後才加，ID 取自 `uv run --locked python -m tools.spec_traceability list`。
