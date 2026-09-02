@@ -2,7 +2,7 @@
 
 **日期：** 2026-09-02
 **狀態：** Approved（待讀者對本文件做最終審閱）
-**範圍：** `world/rules/creation_wizard.py`、`world/rules/character_creation.py`、`world/rules/persona_edit.py`、`web/webclient/actions/creation_actions.py`、`web/webclient/presentation/creation.py`、`web/webclient/presentation/character.py`、`web/webclient-app/components/CreationOverlay.vue`、`web/webclient-app/components/CharacterStatusDrawer.vue`、`web/static/webclient/js/elosern/protocol.js`、`commands/`、`commands/background.py` 命令家族。
+**範圍：** `world/rules/creation_wizard.py`、`world/rules/character_creation.py`、`world/rules/persona_edit.py`、`world/rules/persona.py`、`web/webclient/actions/creation_actions.py`、`web/webclient/presentation/creation.py`、`web/webclient/presentation/character.py`、`web/webclient-app/components/CreationOverlay.vue`、`web/webclient-app/components/CharacterStatusDrawer.vue`、`web/static/webclient/js/elosern/protocol.js`、`typeclasses/npcs.py`、`world/ai/npc_dialogue.py`、`commands/`、`commands/background.py` 命令家族。
 
 本文件是後續 OpenSpec change 實作的依據，並在其與 `creation-persona-persistence`（archive）之 D4 決策衝突時取其優先地位。
 
@@ -158,7 +158,9 @@ JS 層：`protocol.js` Node 鏡像驗證器新案（draft persona、custom 9 鍵
 | `player-character-creation` | modified（啟動 persona 來源改自 custom draft；概念流語意改寫） |
 | `webclient-action-dispatch` | modified（registry 增 `character.persona.update`） |
 | `webclient-oob-protocol` | modified（`ui_action_result` affected data 增 `concept_filled` 形狀） |
-| `persona-store` | 不變（讀側契約不動） |
+| `persona-store` | modified（`flatten` 取得 `identity / appearance / social_connection` 的寬容渲染，見 §11） |
+| `persona-dialogue-injection` | modified（注入欄位選取政策，見 §11.4） |
+| `import-schema` | 不變（persona 驗證維持 verbatim opaque） |
 
 ## 9. 取捨與已接受代價
 
@@ -170,5 +172,41 @@ JS 層：`protocol.js` Node 鏡像驗證器新案（draft persona、custom 9 鍵
 
 - NPC persona 的任何變動（任務場景建立器路徑不動）。
 - 遊戲中由生成系統更新 persona（未來若需要，須另行領取確定性寫入 seam 並另行定義衝突規則）。
-- persona 的 `identity / appearance / social_connection` 鍵的編輯與呈現。
-- prompt 注入側的 persona 組裝規則（`persona-dialogue-injection` 既有契約不動）。
+- persona 的 `identity / appearance / social_connection` 鍵的編輯，以及它們在角色面板的呈現。本變更為它們提供存儲、讀取與 LLM 注入（見 §11），編輯 UI 留待有實際需求後另行變更。
+
+## 11. 三鍵 persona 整合（identity / appearance / social_connection）
+
+### 11.1 由來與查證
+
+這三個鍵源自 `tmp/story_settings/character/` 角色表的既有欄位，五張角色表的結構完全一致（匯入範例把它們壓成字串只是範例精簡，並非原始意圖）。各鍵的真實意義如下。
+
+- `identity`：雙層結構。`public` 是外在公開的身分、職責與頭銜；`hidden` 是不為人所知的真實身分或秘密。分層的用途在於讓不同消費者看到不同深度。
+- `appearance`：可供描述與生成參照的外觀檔。固定子鍵為 `height / weight / measurement / style / overview`，另有 `attire`（場景到服裝的映射）與 `feature`（標誌性配件清單）。角色表的 DNA 與成人欄位屬於狀態系統領域名稱，不進 persona。
+- `social_connection`：以對象名為鍵的字典，每筆含 `relationship` 文字（與本人的關係、情感定位、互動記憶），是對話時「知道誰、怎麼稱呼、什麼態度」的依據。
+
+現行倉庫對這三鍵零消費者（`PersonaStore.flatten` 的預設欄位集不含它們）。本節為它們建立第一個消費者，也就是對話 prompt 注入。
+
+### 11.2 形狀定義（文件層契約）
+
+上述結構以文件層契約定義，不進驗證器，persona 的匯入驗證維持 verbatim opaque。`PersonaStore` 的渲染採寬容策略：字面值照渲染、Mapping 渲染為「子鍵：值」行、清單渲染為列點、未知形狀跳過不抛錯。匯入範例的字串寫法與角色表的巢狀寫法於焉皆可渲染。
+
+### 11.3 flatten 擴充
+
+為 `identity / appearance / social_connection` 新增渲染組與正體中文標籤（公開身分、隱秘身分、外觀、人脈）。每一項受 600 字上限、整塊受 block limit 約束，沿用既有 `_cap` 截斷機制。欄位集參數維持呼叫端可覆寫的現行設計。
+
+### 11.4 注入欄位選取政策（已核准）
+
+- NPC 自己的 persona：全欄提供，含 `identity.hidden`。角色自己的秘密交給角色自己的 LLM 是角色扮演的本意，數值洩漏由既有 no-leak validator 把關。
+- 玩家的 persona 送入 NPC prompt：提供 `identity.public`、`appearance`、`social_connection`。NPC 眼中的玩家僅止於外觀、公開身分、與 NPC 自己的人脈記錄。`identity.hidden` 排除，那層留給未來的敘事者層材料。
+
+### 11.5 編輯界線
+
+三鍵維持排除於建立表單與四鍵編輯白名單之外，結構化欄位不適用單文字欄編輯模型。本變更只開放「存得進、讀得出、進了 LLM prompt」。
+
+### 11.6 測試
+
+純邏輯層：角色表巢狀形狀的渲染、匯入範例字串形狀的相容渲染、單項截斷、整塊截斷、未知形狀跳過。整合層：NPC system message 含隱秘身分的斷言、玩家 persona 塊不含 `identity.hidden` 的斷言、無 persona 玩家的 payload 位元等值（沿用既有場景）。
+
+### 11.7 代價
+
+玩家 persona 塊變大後，NPC 對話 prompt 的 token 成本上升，2000 字的 block limit 可能觸發截斷。緩解方式是呼叫端按 surface 覆寫上下限（`PersonaStore` 建構子已參數化）。
