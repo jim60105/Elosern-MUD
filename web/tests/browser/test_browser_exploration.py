@@ -65,7 +65,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             finally:
                 self.server = None
 
-    def _exploration_panel(self, page):
+    def _live_exploration_panel(self, page):
         # The panels mapping can be observed mid-snapshot-adoption without the
         # exploration key; callers poll, so a missing panel reads as None.
         return store_state(page)["panels"].get("exploration")
@@ -863,9 +863,13 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         )
         # Degradation is data: an unregistered source and a lost identity
         # return the shared marker (null reason; no authored message here).
+        # (services.board is a REGISTERED source since the services/combat/
+        # creation family completed the table — it resolves to the
+        # board-empty frame here; the unregistered-source leg names a
+        # descriptor the table genuinely does not carry.)
         self.assertEqual(
             {"unresolvable": True, "reason": None},
-            page.evaluate("() => window.__elosernBridge.resolveFrame({ source: 'services.board' })"),
+            page.evaluate("() => window.__elosernBridge.resolveFrame({ source: 'nope.unregistered' })"),
         )
         self.assertEqual(
             {"unresolvable": True, "reason": None},
@@ -909,7 +913,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         )
 
     @staticmethod
-    def _exploration_panel(*, move=(), interact=()) -> dict:
+    def _fabricated_exploration_panel(*, move=(), interact=()) -> dict:
         """A schema-valid available exploration panel carrying exactly the
         named rows — the fabricated room a real commit would produce."""
         return {
@@ -979,7 +983,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        accepted = self._inject_panels(page, {"exploration": self._exploration_panel(
+        accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
             move=[self._move_row("ex-a", "北門"), self._move_row("ex-b", "南門"),
                   self._move_row("ex-c", "東門")])})
         self.assertTrue(accepted["accepted"], accepted)
@@ -992,7 +996,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(store_state(page)["focus"]["key"], "exit-ex-b")
 
         # Reordered + extended commit: the same key survives at a new index.
-        accepted = self._inject_panels(page, {"exploration": self._exploration_panel(
+        accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
             move=[self._move_row("ex-c", "東門"), self._move_row("ex-b", "南門"),
                   self._move_row("ex-a", "北門"), self._move_row("ex-d", "西門")])})
         self.assertTrue(accepted["accepted"], accepted)
@@ -1005,7 +1009,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # The focused key vanishes: focus lands on a SURVIVING row (the
         # nearest-row rule itself is pinned at store level; here it must land
         # somewhere real, never on the vanished key).
-        accepted = self._inject_panels(page, {"exploration": self._exploration_panel(
+        accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
             move=[self._move_row("ex-c", "東門"), self._move_row("ex-d", "西門")])})
         self.assertTrue(accepted["accepted"], accepted)
         focused = store_state(page)["focus"]["key"]
@@ -1049,7 +1053,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
-        accepted = self._inject_panels(page, {"exploration": self._exploration_panel(
+        accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
             interact=[self._target(9001, "哨衛士兵"), self._target(9002, "吟遊詩人")])})
         self.assertTrue(accepted["accepted"], accepted)
 
@@ -1066,7 +1070,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
 
         # The committed panel no longer lists 9001: the target frame
         # degrades at the next access and pops exactly one level.
-        accepted = self._inject_panels(page, {"exploration": self._exploration_panel(
+        accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
             interact=[self._target(9002, "吟遊詩人")])})
         self.assertTrue(accepted["accepted"], accepted)
         self.assertEqual(self._depth(page), 2)
@@ -1108,7 +1112,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             },
         }
         accepted = self._inject_panels(page, {
-            "exploration": self._exploration_panel(interact=[self._target(9001, "哨衛士兵")]),
+            "exploration": self._fabricated_exploration_panel(interact=[self._target(9001, "哨衛士兵")]),
             **pinned_context,
         })
         self.assertTrue(accepted["accepted"], accepted)
@@ -1158,7 +1162,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # The panel returns: the SAME root frame re-resolves to content and
         # the degraded presentation clears with the commit.
         accepted = self._inject_panels(page, {
-            "exploration": self._exploration_panel(move=[self._move_row("ex-a", "北門")]),
+            "exploration": self._fabricated_exploration_panel(move=[self._move_row("ex-a", "北門")]),
             **pinned_context,
         })
         self.assertTrue(accepted["accepted"], accepted)
@@ -1513,9 +1517,12 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             "() => Array.from(document.querySelectorAll("
             "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
         )
+        # H3 (design D5): the exploration root includes the 建議 (suggestions)
+        # tab, so the root renders 8 cells (the live fixture commits a
+        # non-`unavailable` suggestions envelope).
         self.assertEqual(
             keys,
-            ["move", "look", "interact", "character", "quests", "inventory", "wait"],
+            ["move", "look", "interact", "character", "quests", "inventory", "wait", "suggestions"],
         )
         self.assertEqual(sent_action_count(page), 0)
         self.assertEqual(
@@ -1531,7 +1538,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         # Interact -> the guard -> 交談 (scripted keywords): two levels deep.
-        panel = self._exploration_panel(page)
+        panel = self._live_exploration_panel(page)
         guard_identity = panel["interact"][0]["identity"]
         self._open_root(page, 2)  # Interact
         _press(page, "Enter")  # the guard (first present target)
@@ -1619,12 +1626,15 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             ["move", "look", "interact", "character", "quests", "inventory", "wait", "suggestions"],
             "the exploration root cells must render after Escape from Quests",
         )
+        # Declarative opener-key restore (webclient-frame-resolution): the
+        # pop returns focus to the key of the row that opened the popped
+        # frame — the root's quests tab — not to `move`.
         self.assertEqual(
             page.evaluate(
                 "window.__elosernBridge.router.currentItem() && "
                 "window.__elosernBridge.router.currentItem().key"
             ),
-            "move",
+            "quests",
         )
 
     @covers_requirement("webclient-contextual-hud::a-fixed-column-count-dock-pane-sizes-its-columns-to-content-never-stretching-to-fill-the-panel")
