@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from django.test import override_settings
+from evennia.utils.test_resources import EvenniaTestCase
 
 from world.observability import log_debug, log_error, log_info, log_warn
 from world.observability import api
@@ -224,6 +225,54 @@ class ContainmentTests(unittest.TestCase):
         with self.assertRaises(KeyboardInterrupt):
             with mock.patch.object(api, "_emit", side_effect=KeyboardInterrupt):
                 log_info("interrupted", context={"a": 1})
+
+
+class RealLoggerPipelineTests(EvenniaTestCase):
+    """End-to-end content assertion over the real sink chain.
+
+    The routing tests above pin the facade's contract with whatever logger
+    object it calls; this proves the other half of the chain — the facade's
+    lazily-acquired REAL Evennia logger accepts the rendered line and the
+    event reaches Twisted's global log pipeline (the same pipeline whose
+    observer writes ``server/logs`` when the server runs). An operator
+    grepping the log for ``event=`` therefore sees the structured line the
+    facade rendered, not a mock echo of it.
+    """
+
+    def test_structured_line_reaches_the_twisted_log_pipeline(self) -> None:
+        from twisted.logger import globalLogPublisher
+
+        captured: list[dict] = []
+        globalLogPublisher.addObserver(captured.append)
+        self.addCleanup(globalLogPublisher.removeObserver, captured.append)
+        log_info("e2e_pipeline_evt", context={"step": "verify"})
+        lines = [
+            str(event.get("line", event.get("log_text", event.get("message"))))
+            for event in captured
+        ]
+        self.assertTrue(
+            any("e2e_pipeline_evt" in line and "step=verify" in line for line in lines),
+            msg=lines,
+        )
+
+    def test_error_line_reaches_the_pipeline_with_its_traceback(self) -> None:
+        from twisted.logger import globalLogPublisher
+
+        captured: list[dict] = []
+        globalLogPublisher.addObserver(captured.append)
+        self.addCleanup(globalLogPublisher.removeObserver, captured.append)
+        try:
+            raise ValueError("pipeline-boom")
+        except ValueError as exc:
+            log_error("e2e_error_evt", exc=exc, context={"k": 1})
+        lines = [
+            str(event.get("line", event.get("log_text", event.get("message"))))
+            for event in captured
+        ]
+        joined = "\n".join(lines)
+        self.assertIn("[error] e2e_error_evt", joined)
+        self.assertIn("tb: ValueError: pipeline-boom @ ", joined)
+        self.assertIn("ValueError: pipeline-boom", joined)  # full-text second write
 
 
 if __name__ == "__main__":
