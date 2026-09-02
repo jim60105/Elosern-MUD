@@ -99,19 +99,25 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 profile 欄位保持未設定（`None`，不會存 0）。無效值讓每個 Evennia 行程在開機時中止，
 錯誤訊息指名變數、原始值與規則。
 
-**範圍說明**：本變更只負責把這 23 個 knob **儲存並驗證**進 `LLM_PROFILES`
-registry；請求體與標頭的實際序列化（`Authorization`／`X-Title`／
-`HTTP-Referer`、取樣參數、reasoning、`max_completion_tokens`）由後續的
-`llm-endpoint-wire-configuration` 變更落地——在此之前，發出的請求仍只帶
-`model`／`messages`／`temperature`／`max_tokens`。
+**序列化語意**：這 23 個 knob 經 `LLM_PROFILES` registry 進入
+`world/ai/client.py` 的請求組裝。請求體依序帶 `model`／`messages`／
+`temperature`，輸出長度欄位在 `max_completion_tokens` 有設定時以該欄位名
+**取代** `max_tokens`（兩者絕不並存），否則帶 `max_tokens`；已設定的取樣
+欄位逐字通過、未設定者完全不出現；reasoning 依 `reasoning_style` 映射
+（`openrouter` → 巢狀 `reasoning` 物件、`vllm` →
+`chat_template_kwargs.enable_thinking`、`off` → 不發送）。標頭部分，非空的
+`api_key`／`app_title`／`app_url` 分別衍生 `Authorization: Bearer …`／
+`X-Title`／`HTTP-Referer`，profile 明設的 `headers` 最後覆寫（同名的明設
+標頭獲勝）。所有可省略欄位未設定時，預設設定的線上位元組與配置前的客戶端
+完全相同。
 
 | 環境變數 | 設定／欄位 | 型別 | 預設值 | 驗證規則／說明 |
 | --- | --- | --- | --- | --- |
 | `LLM_BASE_URL` | `LLM_PROFILES[*].base_url` | URL 字串 | `http://127.0.0.1:11434` | 非空字串；compose 注入 host-gateway 預設 |
 | `LLM_PATH` | `LLM_PROFILES[*].path` | 字串 | `/v1/chat/completions` | 非空字串 |
-| `LLM_API_KEY` | `LLM_PROFILES[*].api_key` | 自由文字 | 空（未設定） | 承載（序列化後由後續變更送 `Authorization: Bearer`）；不出現在 repr／記錄；慣用位置仍是 `secret_settings.py` |
-| `LLM_APP_TITLE` | `LLM_PROFILES[*].app_title` | 自由文字 | 空（未設定） | 非空時存下；序列化後由後續變更送 `X-Title`（OpenRouter 屬性） |
-| `LLM_APP_URL` | `LLM_PROFILES[*].app_url` | 自由文字 | 空（未設定） | 非空時存下；序列化後由後續變更送 `HTTP-Referer` |
+| `LLM_API_KEY` | `LLM_PROFILES[*].api_key` | 自由文字 | 空（未設定） | **憑證規則的唯一範圍例外**：非空時送 `Authorization: Bearer`；不出現在 repr／記錄／錯誤訊息。環境承載會洩漏進 `/proc/<pid>/environ`、`podman compose config` 與 `docker inspect`；緩和：改採 `env_file:` 供鑰並**刪掉 compose 的行內轉發列**（行內 `${LLM_API_KEY:-}` 由環境／專案 `.env` 解析，金鑰仍會進渲染後的 `compose config`；env_file 供鑰時金鑰也仍在容器程序環境），或拒絕此例外、把金鑰留在 `secret_settings.py`（慣用位置，唯一完全離開環境的路徑）。本專案其他任何憑證不得比照 |
+| `LLM_APP_TITLE` | `LLM_PROFILES[*].app_title` | 自由文字 | 空（未設定） | 非空時送 `X-Title`（OpenRouter 屬性） |
+| `LLM_APP_URL` | `LLM_PROFILES[*].app_url` | 自由文字 | 空（未設定） | 非空時送 `HTTP-Referer` |
 | `LLM_MODEL` | `LLM_PROFILES[*].model` | 字串 | `llama3.2` | 非空字串 |
 | `LLM_TEMPERATURE` | `LLM_PROFILES[*].temperature` | float | `0.7` | 有限 float，`0..2`（含端點） |
 | `LLM_FREQUENCY_PENALTY` | `LLM_PROFILES[*].frequency_penalty` | 可省略 float | 省略 | `−2..2`（含端點）；空白＝省略 |
@@ -144,15 +150,26 @@ export LLM_MODEL=meta-llama/Llama-3.2-3B-Instruct
 export LLM_CHARACTER_CREATION_MODEL=qwen2.5-32b-instruct  # 僅該層
 ```
 
-**範例**（OpenRouter；金鑰慣用上屬 `secret_settings.py`，環境承載會洩漏進
-`/proc/<pid>/environ` 與 `compose config`／`docker inspect`，詳見下方政策）：
+**範例**（OpenRouter；金鑰慣用上屬 `secret_settings.py`，環境承載是上表
+點名的範圍例外、會洩漏進 `/proc/<pid>/environ` 與 `podman compose config`／
+`docker inspect`）：
 
 ```sh
 export LLM_BASE_URL=https://openrouter.ai/api/v1
 export LLM_MODEL=meta-llama/llama-3.2-3b-instruct:free
+export LLM_API_KEY=***   # 或留在 secret_settings.py（建議）
 export LLM_APP_TITLE="Elosern MUD"
 export LLM_APP_URL=https://example.test
 ```
+
+**compose 轉發**：compose.yaml 的 evennia 服務除了保留 `LLM_BASE_URL` 的
+host-gateway 預設外，其餘 22 個全域 `LLM_*` knob（含 `LLM_API_KEY`）都以
+`${LLM_X:-}` 空白預設轉進容器——宿主要沒設定的變數會以空字串送達，而空
+字串正是 settings 層的「省略」sentinel，等於不貢獻任何值；compose 檔本身
+永遠不含任何金鑰字面值。注意轉發值是 compose 從環境／專案 `.env` 解析的，
+不是從服務 `env_file:`——行內轉發列在專案 `.env` 有金鑰時會讓金鑰出現在渲染
+後的 `compose config`；要走 env_file-only 緩和必須刪掉該行內列。要把金鑰完全
+留在環境之外，就拒絕此例外並改用 `secret_settings.py`。
 
 ## Evennia launcher／compose／建置變數（不在 settings.py）
 
@@ -182,7 +199,7 @@ export LLM_APP_URL=https://example.test
 | `LLM_PROFILES` 整張地圖 | 結構化的每層地圖（多欄位 wholesale 覆寫）仍以 `secret_settings.py` 為慣用位置；純量調校值改由上述 23 個 `LLM_*` knob（含每層變體）承載 |
 | `ART_SD_CLIENT` | 這是會執行匯入的 dotted path；環境可控制的匯入縫等於讓任何繼承環境在引擎啟動時匯入任意程式碼（匯入注入） |
 | `ART_STORE_ROOT` | 環境打字錯誤會把生成美術靜默搬到持久卷之外的路徑；罕見的非標準佈局請在 `secret_settings.py` 明確設定 |
-| `ART_SD_USERNAME`／`ART_SD_PASSWORD` | 這是憑證；環境變數會洩漏進程序清單與 `compose inspect`。客戶端只在兩者皆非空時送出 Basic auth；密碼永不出現在任何記錄 |
+| `ART_SD_USERNAME`／`ART_SD_PASSWORD` | 這是憑證；環境變數會洩漏進程序清單與 `compose inspect`。客戶端只在兩者皆非空時送出 Basic auth；密碼永不出現在任何記錄。`LLM_API_KEY` 是憑證禁令唯一的範圍例外（見上方 LLM knob 表），本表其余項目與 `SECRET_KEY` 類一律維持禁令 |
 
 ## Bare-metal（非容器）設定步驟
 

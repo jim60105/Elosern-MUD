@@ -17,6 +17,33 @@ services:
     env_file: .env
     environment:
       LLM_BASE_URL: ${LLM_BASE_URL:-http://host.containers.internal:11434}
+      # Optional LLM knobs forward with an empty default, so a host without a
+      # variable set contributes the blank omit-sentinel (settings treats it
+      # as unset) rather than a literal. Project-root .env feeds these
+      # interpolations. LLM_API_KEY stays non-secret in this file: an unset
+      # host value forwards blank (= omit), never a literal key.
+      LLM_PATH: ${LLM_PATH:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_APP_TITLE: ${LLM_APP_TITLE:-}
+      LLM_APP_URL: ${LLM_APP_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-}
+      LLM_FREQUENCY_PENALTY: ${LLM_FREQUENCY_PENALTY:-}
+      LLM_PRESENCE_PENALTY: ${LLM_PRESENCE_PENALTY:-}
+      LLM_TOP_K: ${LLM_TOP_K:-}
+      LLM_TOP_P: ${LLM_TOP_P:-}
+      LLM_REPETITION_PENALTY: ${LLM_REPETITION_PENALTY:-}
+      LLM_MIN_P: ${LLM_MIN_P:-}
+      LLM_TOP_A: ${LLM_TOP_A:-}
+      LLM_REASONING_ENABLED: ${LLM_REASONING_ENABLED:-}
+      LLM_REASONING_EFFORT: ${LLM_REASONING_EFFORT:-}
+      LLM_REASONING_STYLE: ${LLM_REASONING_STYLE:-}
+      LLM_MAX_COMPLETION_TOKENS: ${LLM_MAX_COMPLETION_TOKENS:-}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-}
+      LLM_SUPPORTS_RESPONSE_FORMAT: ${LLM_SUPPORTS_RESPONSE_FORMAT:-}
+      LLM_ENABLED: ${LLM_ENABLED:-}
       SD_WEBUI_BASE_URL: ${SD_WEBUI_BASE_URL:-http://host.containers.internal:7860}
       # Non-interactive superuser creation for a fresh database: the Evennia
       # launcher's `check_database` creates Account #1 from these vars at
