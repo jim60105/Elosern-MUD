@@ -29,13 +29,14 @@
 
 ### D1: 提案送達走 session 瞬態槽，仿 options_state 先例
 
-adapter 依既有三參 ABI 取得 session，把驗證過的提案寫入 `session.ndb.concept_proposal`；coordinator 建立 `PresentationContext` 時依 `options_state` 同款先例深拷貝為提案快照欄；creation presenter 渲染 optional 頂層 `proposal` 鍵。回傳 confirmed success（code `concept_applied`）並宣告 affected `creation`，走既有 panel-update 發布路徑。
+adapter 依既有三參 ABI 取得 session，把驗證過的提案連同 session 內單調遞增的暫態序號 `revision` 寫入 `session.ndb.concept_proposal`；`web/webclient/presentation/ingress.py` 的 `build_presentation_context`（全倉庫所有發布路徑唯一的 context 工廠，現行即在此深拷貝 `options_state`）依同款先例深拷貝為提案快照欄；creation presenter 渲染 optional 頂層 `proposal` 鍵。回傳 confirmed success（code `concept_applied`）並宣告 affected `creation`，走既有 panel-update 發布路徑。
 
 - 替代方案 A（result envelope 加 data 欄）：被否，直接抵觸 `webclient-oob-protocol` 的 exact-envelope 契約，為一個功能重開協定欄位得不償失。
+- 以內容相等去重取代 `revision`：被否，兩次合法套用的內容可能完全相同，內容去重無法區分「面板重建」與「相同內容的新套用」，必棄其一契約。
 - 替代方案 B（persist 於 character.db）：被否，就是現行被退役的草稿機。
 - ndb 的斷線即滅語意正是「暫態填入」；重新連線後提案槽消失等同「進行中的填入遺失」，與已接受代價一致。
 
-生命週期：寫入於套用成功（覆蓋舊提案）；清除於 custom save 成功、`creation.reset`、session 結束。自訂儲存前每次面板重建照常渲染 proposal，讓中斷前已套用未送出的表單可在同 session 內重建。
+生命週期：寫入於套用成功（覆蓋舊提案並递增 `revision`）；清除於 custom save 成功、`creation.reset`、session 結束。自訂儲存前每次面板重建照常渲染 proposal，讓中斷前已套用未送出的表單可在同 session 內重建。`revision` 是傳輸層識別元：客戶端只在 `revision` 大於已套用值時填入，內容完全相同的連續套用也能觸發覆蓋，同時面板重建不覆寫玩家編輯。
 
 ### D2: persona 鍵在 custom draft 為「必現、可 null」
 

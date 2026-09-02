@@ -42,7 +42,7 @@
 
 ### D4: 三新命令逐字複製 `CmdBackground` 三段式
 
-`設定個性`（`個性`）、`設定生平`（`生平`、`背景故事`）、`設定習慣`（`習慣`）掛 `CharacterCmdSet`；實作共用 `CmdBackground` 抽出的基類 `CmdPersonaFieldBase`（欄位鍵為類別屬性），命令文件條目由 drift contract 驗證。
+切法：`commands/background.py` 抽出並匯出基類 `CmdPersonaFieldBase`（三段式：無參顯示現值＋用法、有參設定、空白清除；經 `update_persona_field`；欄位鍵為類別屬性），`CmdBackground` 改為該基類的 `background` 子類且行為、鍵、別名完全不變；新模組 `commands/persona.py` 定義 `設定個性`（`個性`）、`設定生平`（`生平`、`背景故事`）、`設定習慣`（`習慣`）三個子類；`commands/default_cmdsets.py` 的 `CharacterCmdSet.at_cmdset_creation` 保留既有 `self.add(CmdBackground)` 並新增三條 add。命令文件條目由 drift contract 驗證。
 
 ## Risks / Trade-offs
 

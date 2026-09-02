@@ -12,8 +12,8 @@
 ## 2. 注入欄位政策（world/ai/npc_dialogue.py）
 
 - [ ] 2.1 NPC 自身注入：`flatten` 呼叫改點名全欄集 `("personality","life_story","habit","identity","appearance","social_connection")`；空替換位元等值路徑不動。
-- [ ] 2.2 玩家 public view：於 `PersonaStore`（或既有 record 讀取路徑）提供 public-only 視圖——`identity` 為 Mapping 時僅保留 `public` 子鍵的新 record 複製；字串 identity 原樣。呼叫端以該視圖 flatten 同一欄位集構成 `player_persona`。
-- [ ] 2.3 測試（併入本組）：`world/ai/tests/`（或既有 npc_dialogue 測試模組）增——NPC 塊含 隱秘身分 與 公開身分 行、玩家塊含 公開身分 而無 隱秘身分 行與 hidden 值、無 persona 玩家 payload 位元等值案原綠、無 persona NPC system message 位元等值案原綠。掛 `covers_requirement`（`persona-dialogue-injection` 兩條更新要求的 ID）。
+- [ ] 2.2 玩家 public view：於 `PersonaStore`（或既有 record 讀取路徑）提供 public-only 視圖——`identity` 為 Mapping 時僅保留 `public` 子鍵的新 record 複製；字串 identity 原樣。呼叫端以該視圖 flatten 恰 `("identity","appearance","social_connection")` 欄位集構成 `player_persona`（personality／life_story／habit／background 一律不在塊內）。
+- [ ] 2.3 測試（併入本組）：`world/ai/tests/`（或既有 npc_dialogue 測試模組）增——NPC 塊含 隱秘身分 與 公開身分 行、玩家塊含 公開身分 而無 隱秘身分 行與 hidden 值、玩家塊消極斷言無 性格／人生經歷／習慣／背景 標籤與三欄 prose 值且公開欄位存在、無 persona 玩家 payload 位元等值案原綠、無 persona NPC system message 位元等值案原綠。若新建測試模組則同變更註冊 `.github/evennia-shards.json` 並跑 `tests.test_evennia_test_optimization_contract`。掛 `covers_requirement`（`persona-dialogue-injection` 兩條更新要求的 ID）。
 - [ ] 2.4 Focused：`... evennia test --settings test_settings.py --keepdb world.ai`。
 
 ## 3. 校驗與收尾

@@ -28,8 +28,8 @@
 
 ## 5. Telnet 命令家族（commands/）
 
-- [ ] 5.1 `commands/persona.py`：抽 `CmdPersonaFieldBase`（三段式：無參顯示現值＋用法、有參設定、空白清除；經 `update_persona_field`），`設定背景` 行為不動；`設定個性`（`個性`）、`設定生平`（`生平`、`背景故事`）、`設定習慣`（`習慣`）三個子類；掛 `CharacterCmdSet`。
-- [ ] 5.2 `EvenniaCommandTest` 三命令 × 四路徑（顯示、設定、清除、超界）。掛 `covers_requirement`（`persona-editing::the-persona-command-family-mirrors-the-action-on-telnet` 族）。
+- [ ] 5.1 `commands/background.py`：抽 `CmdPersonaFieldBase`（三段式：無參顯示現值＋用法、有參設定、空白清除；經 `update_persona_field`；欄位鍵為類別屬性）並讓 `CmdBackground` 改為 `background` 子類（鍵／別名／行為不變）；新模組 `commands/persona.py` 定義 `設定個性`（`個性`）、`設定生平`（`生平`、`背景故事`）、`設定習慣`（`習慣`）三個子類；`commands/default_cmdsets.py` 保留 `CmdBackground` 掛載並新增三條。
+- [ ] 5.2 `EvenniaCommandTest` 三新命令 × 四路徑（顯示、設定、清除、超界）＋ `commands/tests/test_background.py` 既有 `設定背景` 案作為基類重構的回歸鎖。掛 `covers_requirement`（`persona-editing::the-persona-command-family-mirrors-the-action-on-telnet` 族）。
 
 ## 6. 文件、登記與收尾
 

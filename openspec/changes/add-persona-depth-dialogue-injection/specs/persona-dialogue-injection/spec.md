@@ -18,7 +18,7 @@ The NPC dialogue system message SHALL be rendered from the prompt library's `npc
 - **THEN** `persona=""` is substituted into `{persona}` and the system message is byte-identical to the pre-persona rendering with no persona token or empty block present
 
 ### Requirement: The player's persona feeds the user payload as player.persona
-`build_npc_dialogue_prompt(...)` SHALL accept an optional `player_persona` block and serialize it as `player.persona` beside `player.affinity` when present. The block SHALL be flattened from a public view of the player's persona record that includes `identity` (public layer only), `appearance`, and `social_connection` alongside the three prose fields: when the record's `identity` is a mapping, its `hidden` entry SHALL be excluded from the block by construction before flattening, never by post-hoc text scrubbing; a plain-string `identity` renders as-is. A player without a flattened block SHALL produce a payload byte-identical to today's output. Building the prompt SHALL never create, persist, or mutate a persona record — the block is read-only context.
+`build_npc_dialogue_prompt(...)` SHALL accept an optional `player_persona` block and serialize it as `player.persona` beside `player.affinity` when present. The block SHALL be flattened from a public view of the player's persona record with the field set limited to exactly `identity` (public layer only), `appearance`, and `social_connection`: when the record's `identity` is a mapping, its `hidden` entry SHALL be excluded from the block by construction before flattening, never by post-hoc text scrubbing; a plain-string `identity` renders as-is. The prose fields `personality`, `life_story`, and `habit` and the `background` key SHALL NOT be part of this field set — the NPC reads the player only through appearance, public identity, and the NPC's own social-connection notes. A player without a flattened block SHALL produce a payload byte-identical to today's output. Building the prompt SHALL never create, persist, or mutate a persona record — the block is read-only context.
 
 #### Scenario: A player with persona is recognized by the NPC
 - **WHEN** a prompt is built for a speaking player whose persona record flattens to a block
@@ -27,6 +27,10 @@ The NPC dialogue system message SHALL be rendered from the prompt library's `npc
 #### Scenario: The player's hidden identity never reaches the NPC prompt
 - **WHEN** a prompt is built for a player whose persona `identity` is a mapping containing a `hidden` entry
 - **THEN** `player.persona` contains the 公開身分 line and no 隱秘身分 line or hidden value
+
+#### Scenario: Player prose never reaches the NPC prompt
+- **WHEN** a prompt is built for a player whose persona record carries all of `personality`, `life_story`, `habit`, and `background`
+- **THEN** `player.persona` contains none of the 性格／人生經歷／習慣／背景 labeled sections or their values, while the 公開身分, 外觀, and 人脈 sections are present when set
 
 #### Scenario: A player without persona omits the block
 - **WHEN** a prompt is built for a player with no persona record

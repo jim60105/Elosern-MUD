@@ -88,11 +88,11 @@ payload 從 8 鍵增為 9 鍵，新增必填 `persona` 鍵，值為 null 或恰�
 
 ### 4.5 creation panel（schema v1 → v2）
 
-available payload 增一個 optional 頂層鍵 `proposal`（僅存在且有未消費的暫態提案時；恰 `{race, subrace, allocations, persona{personality, life_story, habit}}`——鍵名與 draft／表單一致，沿用 optional 鍵的既有先例），`schema_version` 升為 2。draft 的 custom 形狀增 `persona`（物件或 null）；concept 形狀不復存在。presenter、`presentation/creation.py` 驗證器、`protocol.js` 鏡像驗證器同步為 v2。custom 模式不再有任何「非內容指示」，persona 內容僅以 proposal（暫態填入來源）與 draft（已儲存值）兩種身份上線，「面板不暴露 persona」的舊斷言據此改寫為「不渲染伺服端草稿 persona 之外的 persona 資料」。
+available payload 增一個 optional 頂層鍵 `proposal`（僅存在且有未消費的暫態提案時；恰 `{revision, race, subrace, allocations, persona{personality, life_story, habit}}`——`revision` 為正整數暫態序號，`allocations` 為 `ALLOCATABLE_AXES` 全七軸，其餘鍵名與 draft／表單一致，沿用 optional 鍵的既有先例），`schema_version` 升為 2。draft 的 custom 形狀增 `persona`（物件或 null）；concept 形狀不復存在。presenter、`presentation/creation.py` 驗證器、`protocol.js` 鏡像驗證器同步為 v2。custom 模式不再有任何「非內容指示」，persona 內容僅以 proposal（暫態填入來源）與 draft（已儲存值）兩種身份上線，「面板不暴露 persona」的舊斷言據此改寫為「不渲染伺服端草稿 persona 之外的 persona 資料」。
 
 ### 4.6 Vue 表單（`CreationOverlay.vue`）
 
-- 收到 panel `proposal` 槽的新值時，把提案值寫入尚未送出的本地表單：race、subrace、allocations、三個 persona textarea（僅在 proposal 值變動時填入，避免面板重建覆寫玩家編輯）。`syncFromDraft` 只認伺服端已接收的值，不看未送出的提案。
+- 收到 panel `proposal` 槽且其 `revision` 大於本地已套用序號時，把提案值寫入尚未送出的本地表單：race、subrace、allocations、三個 persona textarea，並記入該 `revision`（序號區分「面板重建」與「新的套用」：重建不覆寫玩家編輯，內容完全相同的新套用仍一律替換）。`syncFromDraft` 只認伺服端已接收的值，不看未送出的提案。
 - 三個 textarea 於 custom 模式恆渲染，無值時空白供親手填寫。
 - 本地驗證：persona 三欄探「要填就填滿」規則，部分填寫以本地訊息阻擋（與 subrace 錯誤同一機制），不發出 action。
 - 概念套用成功後 dock 由 concept 翻到 custom 的導覽保留，這是 store 本地狀態。
@@ -193,7 +193,7 @@ JS 層：`protocol.js` Node 鏡像驗證器新案（draft persona、custom 9 鍵
 
 ### 11.2 形狀定義（文件層契約）
 
-上述結構以文件層契約定義，不進驗證器，persona 的匯入驗證維持 verbatim opaque。`PersonaStore` 的渲染採寬容策略：字面值照渲染、Mapping 渲染為「子鍵：值」行、清單渲染為列點、未知形狀跳過不抛錯。匯入範例的字串寫法與角色表的巢狀寫法於焉皆可渲染。
+上述結構以文件層契約定義，不進驗證器，persona 的匯入驗證維持 verbatim opaque。`PersonaStore` 的渲染採寬容策略：字面值照渲染、Mapping 渲染為「子鍵：值」行、清單渲染為列點、未知形狀跳過不拋錯。匯入範例的字串寫法與角色表的巢狀寫法於焉皆可渲染。
 
 ### 11.3 flatten 擴充
 
@@ -202,7 +202,7 @@ JS 層：`protocol.js` Node 鏡像驗證器新案（draft persona、custom 9 鍵
 ### 11.4 注入欄位選取政策（已核准）
 
 - NPC 自己的 persona：全欄提供，含 `identity.hidden`。角色自己的秘密交給角色自己的 LLM 是角色扮演的本意，數值洩漏由既有 no-leak validator 把關。
-- 玩家的 persona 送入 NPC prompt：提供 `identity.public`、`appearance`、`social_connection`。NPC 眼中的玩家僅止於外觀、公開身分、與 NPC 自己的人脈記錄。`identity.hidden` 排除，那層留給未來的敘事者層材料。
+- 玩家的 persona 送入 NPC prompt：僅提供 `identity.public`、`appearance`、`social_connection`。NPC 眼中的玩家僅止於外觀、公開身分、與 NPC 自己的人脈記錄。`identity.hidden` 排除，那層留給未來的敘事者層材料；三欄敘事文字（個性／生平／習慣）與 background 同樣不在提供者之列——NPC 不透過這條通道讀玩家的內心獨白。
 
 ### 11.5 編輯界線
 

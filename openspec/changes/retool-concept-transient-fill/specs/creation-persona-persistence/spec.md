@@ -46,7 +46,7 @@ The WebClient creation panel SHALL provide a bounded concept text field, and the
 
 #### Scenario: A concept submission delivers the proposal through the panel
 - **WHEN** a pending character submits `creation.concept` with a bounded concept and the guarded layer returns a valid proposal
-- **THEN** the adapter stores the proposal in the session slot, returns the applied outcome, and the refreshed `creation` panel carries the proposal for the browser to pre-fill
+- **THEN** the adapter stores the proposal in the session slot, returns the applied outcome, and the completion `ui_update` for the refreshed `creation` panel carries the proposal (with its transient revision) for the browser to pre-fill
 
 #### Scenario: Offline concept degrades without state change
 - **WHEN** the `character_creation` layer is offline and a pending character submits `creation.concept`

@@ -41,13 +41,13 @@
 
 ### D2: 預設欄位集不動，深度欄位由呼叫端點名
 
-`flatten()` 預設仍三欄（NPC dialogue 的既有位元等值契約不被本變更動到）。新增欄位集由呼叫端覆寫：NPC 自身注入用 `("personality","life_story","habit","identity","appearance","social_connection")`；玩家注入由呼叫端（NPC 對話路徑）傳入同一欄位集但 `identity` 以 public-only 視圖進入。
+`flatten()` 預設仍三欄（NPC dialogue 的既有位元等值契約不被本變更動到）。新增欄位集由呼叫端覆寫：NPC 自身注入用全欄集 `("personality","life_story","habit","identity","appearance","social_connection")`；玩家注入用恰 `("identity","appearance","social_connection")` 的深度欄位集且 `identity` 以 public-only 視圖進入——玩家自己的個性、生平、習慣與 background 三欄敘事文字＋背景一律不進 NPC prompt（§11.4：NPC 眼中的玩家僅止於外觀、公開身分、人脈）。
 
 - 玩家側 `identity` 的 public-only 實作：`PersonaStore` 提供 `public_view()`——回傳新 record 字典，其中 `identity` 若為 Mapping 則僅保留 `public` 子鍵（字串 identity 原樣保留，無 hidden 可言），其餘鍵照原。渲染走同一寬容規則。玩家塊由呼叫端 `store.public_view().flatten(...)` 語意構成；實作上以 `flatten(record=...)` 的 record 參數或等價內部函式達成，API 形狀實作者定，契約是「玩家塊永不含 identity.hidden」。
 
 ### D3: 注入政策以欄位集常數鎖在 npc_dialogue
 
-NPC 系統訊息：全欄 persona 進 `{persona}`（含 hidden）——角色自己的秘密交給角色自己的 LLM 是角色扮演的本意；數值與機密洩漏由既有 no-leak validator 把關，政策不變。玩家 persona 進 `player.persona`：僅 public 視圖三欄組，`identity.hidden` 排除。無 persona 玩家的 payload 位元等值場景不動。
+NPC 系統訊息：全欄 persona 進 `{persona}`（含 hidden）——角色自己的秘密交給角色自己的 LLM 是角色扮演的本意；數值與機密洩漏由既有 no-leak validator 把關，政策不變。玩家 persona 進 `player.persona`：僅 public 視圖的 `identity`／`appearance`／`social_connection` 三欄，`identity.hidden` 與三欄敘事文字及 background 全數排除。無 persona 玩家的 payload 位元等值場景不動。
 
 ### D4: block limit 風險以呼叫端覆寫緩解
 

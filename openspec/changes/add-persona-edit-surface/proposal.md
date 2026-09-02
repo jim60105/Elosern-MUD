@@ -20,12 +20,12 @@
 ### Modified Capabilities
 - `creation-persona-persistence`: 「後台可自由更新 background」要求以 MODIFIED 升級為四鍵編輯白名單。
 - `webclient-action-dispatch`: registry 恰鍵清單增 `character.persona.update`。
-- `webclient-exploration-menu`: `character` panel schema v5 → v6、`persona` 區塊四鍵。
+- `webclient-exploration-menu`: `character` panel schema version-5 要求由 version-7 要求取代（live code `CHARACTER_SCHEMA_VERSION` 現為 6 → 7）、`persona` 區塊四鍵；伺服器常數、registry 導出版本、unavailable form、JS allowlist 與逐面板版本複核全部同步落 v7。
 - `game-command-docs`: persona 命令家族條目。
 
 ## Impact
 
-- `world/rules/persona_edit.py`、`web/webclient/actions/character_actions.py`、`web/webclient/presentation/character.py`、`web/static/webclient/js/elosern/protocol.js`、`web/webclient-app/components/CharacterStatusDrawer.vue`、`commands/persona.py`（新命令模組）、`commands/default_cmdsets.py`（掛載）、`docs/game/commands.md`、`docs/game/command-reference.md`、`tests/test_command_docs.py`。
+- `world/rules/persona_edit.py`、`web/webclient/actions/character_actions.py`、`web/webclient/presentation/character.py`、`web/static/webclient/js/elosern/protocol.js`、`web/webclient-app/components/CharacterStatusDrawer.vue`、`commands/background.py`（抽出共用基類並保留 `CmdBackground`）、`commands/persona.py`（三個新命令子類）、`commands/default_cmdsets.py`（掛載）、`docs/game/commands.md`、`docs/game/command-reference.md`、`tests/test_command_docs.py`。
 - 測試：persona_edit 純邏輯四鍵×四路徑；action 與 panel presenter 整合案；三命令 `EvenniaCommandTest`；JS 鏡像與 Vitest 四段渲染；`.github/evennia-shards.json` 註冊新測試模組。
 - 邊界：`identity / appearance / social_connection` 三鍵維持排除（§10），本變更只開放四鍵敘事文字。
 - 檔案重疊僅 `protocol.js`／registry 與 change A 的建立面（不同函式），可與 A 錯峰；與 C 無重疊。

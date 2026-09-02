@@ -12,9 +12,9 @@
 ## 2. Actions 與呈現層（web/webclient）
 
 - [ ] 2.1 `web/webclient/actions/creation_actions.py`：`_validate_custom_payload` 改九鍵 exact-set（增必填 `persona`：null 或恰三鍵、各自 1..600 非空）。`_creation_concept_adapter` 改零持久寫入：跑 guarded pipeline → 驗證提案 → 寫 `session.ndb.concept_proposal`（覆蓋式）→ `_confirmed_success("concept_applied", AFFECTED_CREATION)`；降級走既有穩定碼；删 fingerprint／stale 分支。`_creation_custom_adapter` 與 `_creation_reset_adapter` 成功後清 `session.ndb.concept_proposal`。
-- [ ] 2.2 `web/webclient/presentation/context.py`：新增 frozen `ProposalSnapshot`（仿 `OptionsSnapshot`：四鍵、deep-copy）與 `PresentationContext.proposal` 欄位；coordinator/context 建置處從 `session.ndb.concept_proposal` 深拷貝。
+- [ ] 2.2 `web/webclient/presentation/context.py`：新增 frozen `ProposalSnapshot`（仿 `OptionsSnapshot`：`revision` ＋四內容鍵、deep-copy）與 `PresentationContext.proposal` 欄位；`web/webclient/presentation/ingress.py` 的 `build_presentation_context`（所有發布路徑唯一的 context 工廠）加提案快照深拷貝（缺槽／損毀降級為 None，仿 `options_snapshot`）。
 - [ ] 2.3 `web/webclient/presentation/creation.py`：`CREATION_SCHEMA_VERSION` 升 2；draft custom 形狀增 `persona`（null 或三鍵物件）；增 optional 頂層 `proposal` 鍵（僅 slot 有值時）；驗證器同步；worst-case 600×3 persona 的 envelope 上限測試。刪 `background_generated`。
-- [ ] 2.4 更新 `web/webclient/actions/tests/test_creation_actions.py` 與 `web/webclient/presentation/tests/test_creation_panel.py`：九鍵 validator、concept 零寫入＋slot 生命週期（套用／save 清除／reset 清除／再套用覆蓋）、panel v2 proposal 槽渲染與省略、reconnect 無 proposal。掛 traceability ID（`concept-transient-fill::concept-applies-transiently-with-zero-persistent-writes`、`::creation-panel-renders-the-transient-proposal`）。
+- [ ] 2.4 更新 `web/webclient/actions/tests/test_creation_actions.py` 與 `web/webclient/presentation/tests/test_creation_panel.py`：九鍵 validator、concept 零寫入＋slot 生命週期（套用／save 清除／reset 清除／再套用覆蓋且 revision 遞增）、完成序 ui_update 先於 result 且含 proposal、panel v2 proposal 槽渲染與省略、reconnect 無 proposal。掛 traceability ID（`concept-transient-fill::concept-applies-transiently-with-zero-persistent-writes`、`::creation-panel-renders-the-transient-proposal`）。
 - [ ] 2.5 Focused：`... evennia test --settings test_settings.py --keepdb web.webclient.actions web.webclient.presentation`。
 
 ## 3. Wire 鏡像（protocol.js）
@@ -25,8 +25,8 @@
 ## 4. Vue 表單（CreationOverlay.vue）
 
 - [ ] 4.1 persona 三 textarea 恆渲染（刪 `background_generated` 指示與 `#creation-result-message` 相關殘留）；form state 增 persona 欄位；`syncFromDraft` 帶 persona；送出組裝九鍵（全空→null，部分填→本地擋）。
-- [ ] 4.2 proposal 填入：watch panel `proposal`（deep、僅值變動才填，避免 re-render 覆寫玩家編輯）；填入 race/subrace/allocations/persona；切 custom 模式採「確認後切換」；race 不符且本地有 persona 文字 → 非阻擋審視提示（純文案）。
-- [ ] 4.3 Vitest：`web/webclient-app/tests/` 增 proposal 填入、部分填擋送出、re-render 不覆寫、審視提示案例。`npm test`。
+- [ ] 4.2 proposal 填入：watch panel `proposal`，僅當 `revision` > 本地已套用序號時填入並記入該序號（重建不覆寫編輯、相同內容新套用仍覆蓋）；填入 race/subrace/allocations/persona；切 custom 模式採「確認後切換」；race 不符且本地有 persona 文字 → 非阻擋審視提示（純文案）。
+- [ ] 4.3 Vitest：`web/webclient-app/tests/` 增 proposal 填入、同 revision 重建不覆寫編輯、遞增 revision 覆蓋（含內容相同者）、部分填擋送出、審視提示案例。`npm test`。
 - [ ] 4.4 `npm run build`、`npm run build-storybook`、`npm run showcase-coverage`（新 surface 若影響 showcase 清冊則同步）。
 
 ## 5. Telnet 概念流（commands）
