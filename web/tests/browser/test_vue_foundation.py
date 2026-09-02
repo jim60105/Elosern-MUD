@@ -618,6 +618,29 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
             {
                 "status": valid_status_panel("測試起點", "p1"),
                 "context_actions": context_actions,
+                # The declarative frame stack resolves `exploration.root`
+                # against the committed EXPLORATION panel (webclient-frame-
+                # resolution: resolvers read committed panels, and an absent
+                # panel degrades the root to the disabled marker row). The
+                # driven snapshot therefore carries an available exploration
+                # panel with no traversal exits — the root resolves to the
+                # tab bar, and Enter on `move` pushes the move submenu whose
+                # only row is the disabled `move-empty` item.
+                "exploration": {
+                    "schema_version": 1,
+                    "available": True,
+                    "kind": "exploration",
+                    "move": [],
+                    "look": {
+                        "room": {"identity": 94001, "display_name": "測試起點", "room": True},
+                        "entities": [],
+                        "objects": [],
+                    },
+                    "interact": [],
+                    "character": {"available": True},
+                    "quests": {"available": False},
+                    "inventory": {"available": False},
+                },
             },
         )
         # The live C3 transport (bound by base.html) already advanced the
