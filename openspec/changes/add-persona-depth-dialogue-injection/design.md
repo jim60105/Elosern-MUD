@@ -41,13 +41,13 @@
 
 ### D2: 預設欄位集不動，深度欄位由呼叫端點名
 
-`flatten()` 預設仍三欄（NPC dialogue 的既有位元等值契約不被本變更動到）。新增欄位集由呼叫端覆寫：NPC 自身注入用全欄集 `("personality","life_story","habit","identity","appearance","social_connection")`；玩家注入用恰 `("identity","appearance","social_connection")` 的深度欄位集且 `identity` 以 public-only 視圖進入——玩家自己的個性、生平、習慣與 background 三欄敘事文字＋背景一律不進 NPC prompt（§11.4：NPC 眼中的玩家僅止於外觀、公開身分、人脈）。
+`flatten()` 預設仍三欄（NPC dialogue 的既有位元等值契約不被本變更動到）。新增欄位集由呼叫端覆寫——呼叫端即 `typeclasses/npcs.py` 的 `_persona_block()`（現行 `self.persona.flatten(), character.persona.flatten()`），它是全倉庫對話路徑唯一的 flatten 選點：NPC 自身注入用全欄集 `("personality","life_story","habit","identity","appearance","social_connection")`；玩家注入用恰 `("identity","appearance","social_connection")` 的深度欄位集且 `identity` 以 public-only 視圖進入——玩家自己的個性、生平、習慣與 background 三欄敘事文字＋背景一律不進 NPC prompt（§11.4：NPC 眼中的玩家僅止於外觀、公開身分、人脈）。位元等值的範圍：預設欄位集下「值為字串」的記錄輸出逐字不變（現存全部記錄皆字串值）；容器值的散文字段開始渲染屬寬容契約的刻意改變，連帶現形於 look 顯示與 `option_proposal_service` 的 `persona_digest`。
 
-- 玩家側 `identity` 的 public-only 實作：`PersonaStore` 提供 `public_view()`——回傳新 record 字典，其中 `identity` 若為 Mapping 則僅保留 `public` 子鍵（字串 identity 原樣保留，無 hidden 可言），其餘鍵照原。渲染走同一寬容規則。玩家塊由呼叫端 `store.public_view().flatten(...)` 語意構成；實作上以 `flatten(record=...)` 的 record 參數或等價內部函式達成，API 形狀實作者定，契約是「玩家塊永不含 identity.hidden」。
+- 玩家側 `identity` 的 public-only 實作：`PersonaStore` 提供 `public_view()`——回傳一個新的 `PersonaStore`，背後是一層淺拷貝 record，其中 `identity` 若為 Mapping 則僅保留 `public` 子鍵（字串 identity 原樣保留，無 hidden 可言），其餘鍵照原；非 Mapping record 原樣帶入（flatten 仍得 `None`）。渲染走同一寬容規則。呼叫端語意為 `store.public_view().flatten(...)`；「玩家塊永不含 identity.hidden」由 record 拷貝層保證，絕不事後文字清洗。此方法為純讀取（無寫入 API），但 `test_handler_has_no_write_api` 的恰鍵集合須同步納入 `public_view`。
 
-### D3: 注入政策以欄位集常數鎖在 npc_dialogue
+### D3: 注入政策以欄位集常數鎖在 npc_dialogue、由 seam 匯入使用
 
-NPC 系統訊息：全欄 persona 進 `{persona}`（含 hidden）——角色自己的秘密交給角色自己的 LLM 是角色扮演的本意；數值與機密洩漏由既有 no-leak validator 把關，政策不變。玩家 persona 進 `player.persona`：僅 public 視圖的 `identity`／`appearance`／`social_connection` 三欄，`identity.hidden` 與三欄敘事文字及 background 全數排除。無 persona 玩家的 payload 位元等值場景不動。
+NPC 系統訊息：全欄 persona 進 `{persona}`（含 hidden）——角色自己的秘密交給角色自己的 LLM 是角色扮演的本意；數值與機密洩漏由既有 no-leak validator 把關，政策不變。玩家 persona 進 `player.persona`：僅 public 視圖的 `identity`／`appearance`／`social_connection` 三欄，`identity.hidden` 與三欄敘事文字及 background 全數排除。無 persona 玩家的 payload 位元等值場景不動。欄位集常數 `NPC_PERSONA_FIELDS`／`PLAYER_PERSONA_FIELDS` 定義於 `world/ai/npc_dialogue.py`（政策唯一所有人），由 `typeclasses/npcs.py::_persona_block()` 函式內區域匯入後**直接引用常數**（勿複製 tuple，讓 seam 行為測試鎖住單一政策來源）；匯入位置遵循該檔既有 `world.ai.npc_dialogue` 函式內區域匯入慣例。
 
 ### D4: block limit 風險以呼叫端覆寫緩解
 
@@ -58,4 +58,4 @@ NPC 系統訊息：全欄 persona 進 `{persona}`（含 hidden）——角色自
 - [巢狀渲染把 secret 鍵名（hidden）以標籤帶入 NPC 可見文本] → 政策上 NPC 看得到自己的 hidden 是本意；玩家側 public_view 在 record 拷貝層排除，斷言鎖死。
 - [更深嵌套或未知鍵群輸出過長文本] → 單項 `_cap` 600 + 整塊 block limit 雙層截斷，寬容跳過未知形狀。
 - [字串 identity 的匯入範例與巢狀角色表渲染分歧] → 兩形狀皆為一級公民：字串→單節 身分：…；Mapping→公開身分／隱秘身分 兩節。測試各鎖一例。
-- [預設欄位集改動會破壞既有位元等值場景] → D2 明確預設不動；位元等值測試必須原綠。
+- [預設欄位集改動會破壞既有位元等值場景] → D2 明確預設不動；位元等值測試必須原綠。 範圍註記：字串值的既有記錄逐字不變；容器值散文開始渲染是寬容契約的刻意結果（現存無此形狀記錄）。
