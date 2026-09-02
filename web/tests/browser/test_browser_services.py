@@ -227,6 +227,7 @@ class GuildBoardJourneys(ServicesBrowserTest):
         )
         self.assertEqual(payload, {"definition_key": "introductory_hunt"})
 
+    @covers_requirement("webclient-frame-resolution::the-resolver-table-completes-with-the-services-combat-and-creation-families")
     def test_board_frame_refreshes_on_committed_update(self):
         """Declarative-frame freshness: an open board frame re-resolves its
         rows from the NEXT committed panel — no re-push, no copy.
@@ -297,6 +298,8 @@ class GuildQuestJourneys(ServicesBrowserTest):
         self._wait_panel(page, lambda p: p["guild"]["quests"][0]["state"] == "failed")
         self.assertEqual(sent_action_count(page, "guild.quest_abandon"), 1)
 
+    @covers_requirement("webclient-frame-resolution::a-drawer-follows-the-stack-when-its-hosted-frame-pops")
+    @covers_requirement("webclient-frame-resolution::the-resolver-table-completes-with-the-services-combat-and-creation-families")
     def test_quest_drawer_closes_with_the_hosted_frame(self):
         """Drawer coupling: quest loss pops the detail frame to the hosted
         parent (drawer KEPT); losing the whole hosted surface closes the

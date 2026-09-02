@@ -669,6 +669,7 @@ class ResetAndDraftJourneys(CreationBrowserTest):
         self.assertEqual(sent_action_count(page, "creation.activate"), 0)
         self.assertEqual(self._dock_mode(page), "creation")
 
+    @covers_requirement("webclient-frame-resolution::the-resolver-table-completes-with-the-services-combat-and-creation-families")
     def test_reset_confirm_shows_refreshed_server_text_when_withdrawn(self):
         """Declarative-frame degradation: the open confirm frame carries no
         copy — when the committed creation panel is withdrawn, the cascade

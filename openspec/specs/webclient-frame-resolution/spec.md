@@ -5,7 +5,7 @@ TBD - created by archiving change webclient-frame-resolver-registry. Update Purp
 ## Requirements
 ### Requirement: Frame descriptors resolve to committed-state menus at access time
 
-The store SHALL own a frame resolver registry that maps a frame descriptor `{source, params}` to a menu derived from the committed presentation state at the moment of the call. A resolver SHALL read only committed panels (the state the protocol reducer has atomically committed under the revision gate) and SHALL NOT read router frame copies, component state, or any other cached menu data. Resolving the same descriptor twice across two committed states SHALL return menus reflecting each state respectively; resolving the same descriptor twice against one committed state SHALL return deep-equal menus and SHALL NOT mutate store, model, or committed state. Later table waves (combat selection preservation through the existing `rebuildForPanel` seam) SHALL declare any permitted model-state exception as a spec-visible amendment with its own idempotency scenario. A resolver that throws SHALL be caught by the registry and reported as unresolvable rather than propagating to callers.
+The store SHALL own a frame resolver registry that maps a frame descriptor `{source, params}` to a menu derived from the committed presentation state at the moment of the call. A resolver SHALL read only committed panels (the state the protocol reducer has atomically committed under the revision gate) and SHALL NOT read router frame copies, component state, or any other cached menu data. Resolving the same descriptor twice across two committed states SHALL return menus reflecting each state respectively; resolving the same descriptor twice against one committed state SHALL return deep-equal menus and SHALL NOT mutate store, panel, or committed state. The single permitted model-state exception is the combat resolver preserving combat selection (`focusSkillKey`, page, chosen scale, AREA candidates) inside the combat model through the unchanged `CombatMenu.rebuildForPanel` seam; repeat resolution of any combat descriptor against one committed state SHALL be idempotent. A resolver that throws SHALL be caught by the registry and reported as unresolvable rather than propagating to callers.
 
 #### Scenario: Resolution follows committed state
 
@@ -15,12 +15,17 @@ The store SHALL own a frame resolver registry that maps a frame descriptor `{sou
 #### Scenario: Resolution is pure against one committed state
 
 - **WHEN** the same descriptor is resolved twice against the same committed state through the bridge-exposed resolver
-- **THEN** both results are deep-equal and the committed state, router state, and model state are unchanged
+- **THEN** both results are deep-equal and the committed state and router state are unchanged outside the combat model's declared selection fields
 
 #### Scenario: A throwing resolver degrades instead of crashing
 
 - **WHEN** a registered resolver raises on a well-formed descriptor
 - **THEN** `resolve` returns the shared unresolvable marker and no exception reaches the caller
+
+#### Scenario: Combat selection survives a panel replacement idempotently
+
+- **WHEN** the combat panel is replaced and `combat.skill` for the focused skill is resolved twice against the new committed state
+- **THEN** the menu carries the selection state `rebuildForPanel` preserves and the second resolution returns the same menu with no further model change
 
 ### Requirement: The descriptor registry implements the exploration family as a finite table
 
@@ -69,11 +74,9 @@ A descriptor whose identity or index is absent from the committed panel, whose p
 - **WHEN** an unresolvable descriptor's panel carries no authored message
 - **THEN** resolve returns the unresolvable marker with a null reason
 
-
-
 ### Requirement: Router frames store descriptors and a focus key and resolve at access time
 
-The keyboard router SHALL treat each frame as `{descriptor, focusKey}` (plus, during the staged migration only, a transitional legacy `menu` copy that behaves exactly as today's frame until its surface family migrates). For every declarative frame, all menu reads — render, arrow navigation, geometry, breadcrumb, trail, pointer row, and activation payload — SHALL come from resolving the frame's descriptor through the store registry at the moment of the read, never from data captured when the frame was opened. A committed panel update SHALL require no router or store refresh action for any declarative frame to reflect the newer state on its next read. The action dock's derived views (`rootMenu`, breadcrumb trail) SHALL be produced from the frame stack with the same item shapes the components already render, and no commit-driven refresh/rehome/replace function over copied menus SHALL exist for a migrated family.
+The keyboard router SHALL store each frame as `{descriptor, focusKey}` only — the transitional legacy menu-copy shape SHALL no longer exist, and an unknown frame shape or an empty-stack read SHALL throw a programmer error rather than degrade silently. All menu reads — render, arrow navigation, geometry, breadcrumb, trail, pointer row, and activation payload — SHALL come from resolving the frame's descriptor through the store registry at the moment of the read, never from data captured when the frame was opened. A committed panel update SHALL require no router or store refresh action for any open frame to reflect the newer state on its next read. The action dock's derived views (`rootMenu`, `combatMenu`, breadcrumb trail) SHALL be produced from the frame stack with the same item shapes the components already render, and no commit-driven refresh, re-home, replace-as-refresh, copied-row map, or signature gate over menu content SHALL exist anywhere in the client.
 
 #### Scenario: An open move frame follows a committed move
 
@@ -82,8 +85,13 @@ The keyboard router SHALL treat each frame as `{descriptor, focusKey}` (plus, du
 
 #### Scenario: Committing an update issues no refresh call
 
-- **WHEN** a committed snapshot replaces a panel a declarative exploration frame derives from
-- **THEN** the commit path performs no per-frame rebuild, replace, re-home, or signature-comparison step for exploration frames, and the frame's next read already reflects the new panel
+- **WHEN** a committed snapshot replaces a panel named by an open frame of any family
+- **THEN** the commit path performs no per-frame rebuild, replace, re-home, copied-row resync, or signature-comparison step, and the frame's next read already reflects the new panel
+
+#### Scenario: A combat step frame refreshes by resolution
+
+- **WHEN** the skill frame for a focused skill is open and a combat panel update changes that skill's descriptors
+- **THEN** the frame's next read lists the updated rows with focus tracked by key, and the preserved selection state remains intact
 
 ### Requirement: Focus tracks the item key across re-resolution
 
@@ -139,27 +147,32 @@ The suggestions frame SHALL be declarative but status-driven, never timer-driven
 
 ### Requirement: Teardown resets the stack to the mode root from one decision point
 
-Mode switch (exploration / combat / creation), presentation epoch reset, transport loss, and no-puppet detach SHALL each replace the whole descriptor stack with a single-frame stack holding the new mode's root frame — a declarative root descriptor once that mode's family is migrated, the transitional legacy root menu copy otherwise — from the single existing teardown decision point, and the stack SHALL never sit empty in a live mode. Teardown SHALL be the only event that replaces the whole stack; ordinary commits never pop or reset migrated frames.
+Mode switch (exploration / combat / creation), presentation epoch reset, transport loss, and no-puppet detach SHALL each replace the whole descriptor stack with exactly one declarative root frame of the new mode — the `exploration.root`, `combat.root`, or `creation.root` descriptor — from the single existing teardown decision point. The stack SHALL never be empty in a live mode, and the wrapped empty-stack reset fuse SHALL no longer exist: an empty-stack read is a programmer error surfaced by the router, not a runtime re-home. Teardown SHALL remain the only event that replaces the whole stack; ordinary commits SHALL never pop or reset frames.
 
 #### Scenario: Combat adoption resets to the combat root
 
 - **WHEN** a valid committed snapshot switches the mode from exploration to combat while exploration submenus are open
-- **THEN** the stack contains exactly one root frame, the exploration frames and their focus keys are gone, and no exploration row remains activatable
+- **THEN** the stack holds exactly the `combat.root` descriptor, the exploration frames and their focus keys are gone, and no exploration row remains activatable
 
 #### Scenario: Transport loss leaves only the root frame
 
-- **WHEN** the transport is lost while exploration frames are open
-- **THEN** the stack holds only the root frame of the mode and no stale activation can dispatch after reconnect without a fresh player action
+- **WHEN** the transport is lost while frames are open
+- **THEN** the stack holds only the current mode's root descriptor and no stale activation can dispatch after reconnect without a fresh player action, with the stack non-empty at every observable moment after teardown
 
 #### Scenario: Epoch reset leaves only the root frame
 
-- **WHEN** a new transport generation retires the epoch and a fresh-epoch snapshot establishes the new one while exploration submenus are open
-- **THEN** the stack contains exactly one root frame for the new presentation before any player action
+- **WHEN** a new transport generation retires the epoch and a fresh-epoch snapshot establishes the new one while submenus are open
+- **THEN** the stack contains exactly one root descriptor for the new presentation before any player action
 
 #### Scenario: No-puppet detach collapses the stack without a mode change
 
 - **WHEN** a `no_puppet` protocol error detaches the character while exploration submenus are open and neither the mode nor the epoch changes
-- **THEN** the stack collapses to exactly the single root frame and no open submenu row remains activatable
+- **THEN** the stack collapses to exactly the single root descriptor and no open submenu row remains activatable
+
+#### Scenario: Creation mode tears down to its root descriptor
+
+- **WHEN** the presentation epoch resets while creation-mode frames are open
+- **THEN** the stack holds exactly `creation.root` and no prior-frame payload can dispatch without a fresh player action
 
 ### Requirement: Activation payloads read committed state at dispatch time
 
@@ -169,3 +182,37 @@ A row activation SHALL dispatch the server-authored action identifier and payloa
 
 - **WHEN** a player moves and then activates a move row in the refreshed frame
 - **THEN** the submitted `explore.move` carries the new room's `current_node` and the server accepts it, leaving the stale rejection unreachable by normal dock play
+
+### Requirement: The resolver table completes with the services, combat, and creation families
+
+The resolver table SHALL additionally implement, and produce the menus the migrated push sites produce today: services family (panel `services`) — `services.root` `{}`, `services.guild` `{}`, `services.board` `{}`, `services.quests` `{}`, `services.quest-detail` `{questIndex}`, `services.shop` `{}`, `services.stock` `{}`, `services.sell` `{}`, `services.confirm` `{questIndex}` (the abandon-confirmation frame derived from that quest row's server-authored confirm fields); combat family (panel `context_actions` combat form, selection state owned by the combat model) — `combat.root` `{}`, `combat.categories` `{}`, `combat.category` `{categoryIndex}`, `combat.group` `{categoryIndex, groupIndex}`, `combat.skill` `{skillKey}`, `combat.target` `{skillKey}`, `combat.forfeit` `{}`; creation family (panel `creation`) — `creation.root` `{}`, `creation.presets` `{}`, `creation.form` `{view: "custom" | "concept"}` resolving to the wizard's empty marker frame, `creation.confirm` `{kind, presetKey?}`. An out-of-range index or absent key SHALL resolve to the shared unresolvable marker like a lost identity.
+
+#### Scenario: Every completed-table source resolves from a live snapshot
+
+- **WHEN** each newly added source is resolved against a committed snapshot of its owning mode with valid params
+- **THEN** each returns the menu its migrated push site produced, with the same row keys, server-authored payloads, and titles
+
+#### Scenario: A vanished quest degrades like a lost identity
+
+- **WHEN** `services.quest-detail` resolves with a `questIndex` the committed services panel no longer lists
+- **THEN** resolve returns the unresolvable marker, carrying the panel's server-authored reason when present
+
+### Requirement: A drawer follows the stack when its hosted frame pops
+
+A hosted service frame's removal by the unresolvable-pop rule SHALL close its drawer through the single frame-hosting watcher and SHALL discard that drawer's local selection, quantity, and confirmation state exactly as payload loss does today; a pop of a descendant frame that leaves the hosted surface's frame current SHALL leave the drawer and that frame intact; closing a drawer SHALL initiate exactly one `popMenu` of the hosted frame it was presenting. No second frame stack, focus model, or drawer-owned frame state SHALL exist.
+
+#### Scenario: A hosted quest-detail loss closes its drawer
+
+- **WHEN** the quest drawer hosts the quest-detail frame and a committed services update removes that quest
+- **THEN** the frame pops to the hosted parent surface, and if the hosted surface's own frame is removed the quest drawer closes with its selection and confirmation state discarded, leaving no open drawer whose frame is gone
+
+#### Scenario: A descendant pop keeps the drawer
+
+- **WHEN** the abandon-confirmation frame pops back to the hosted quest-detail frame
+- **THEN** the quest drawer stays open presenting the restored frame with opener-row focus
+
+#### Scenario: Closing the drawer pops exactly one level
+
+- **WHEN** the player closes a drawer that hosts a router frame
+- **THEN** exactly one menu level pops, the drawer closes once, and no action is dispatched
+

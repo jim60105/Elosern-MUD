@@ -361,6 +361,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(envelope["payload"]["skill_key"], "fire_ball")
         self.assertEqual(envelope["payload"]["target_ids"], [target])
 
+    @covers_requirement("webclient-frame-resolution::the-resolver-table-completes-with-the-services-combat-and-creation-families")
     def test_skill_frame_refreshes_on_panel_update(self):
         """Declarative-frame freshness mid-fight: the open skill frame
         re-resolves its rows from the NEXT committed combat panel while the
