@@ -23,7 +23,7 @@ AI 開發者產出的 code）都強制可觀測。
 |---|---|---|
 | 痛點範圍 | 全 codebase 通例規範 | 各類異常（AI 降級、rules 回滾、art worker）都被壓成一句話 |
 | 輸出形態 | 結構化 context 尾綴、維持 Evennia logger 純文字檔 | 人類可讀、grep 友好、改動最小；不引入 JSON line 雙軌 |
-| 遷移範圍 | 既有呼叫點一次全部遷移，無凍結期 | 符合 repo「無向後相容層」慣例；避免長期兩種寫法 |
+| 遷移範圍 | 全部既有呼叫點遷移，分 1＋3 個 change 執行（見 §5） | 全量遷移超出單一 change 單一工程師單日容量；凍結清單僅為遷移期臨時機制，最終必須為空 |
 | 實作路線 | 方案 A：自建 log facade ＋ AST 掃描 gate 工具 | repo 刻意無 linter；自寫工具可表達「except 必須含 log 或 re-raise」等 ruff 表達不了的規則；零新增依賴 |
 
 拒絕的替代方案：
@@ -46,12 +46,18 @@ game runtime 元件，與 `world/rules/` 等同層級被 import。
 公開 API（由 `world/observability/__init__.py` 再匯出）：
 
 ```python
-def log_info(event: str, *, context: Mapping[str, object] | None = None) -> None: ...
-def log_warn(event: str, *, context: Mapping[str, object] | None = None) -> None: ...
+def log_info(event: str, *, exc: BaseException | None = None,
+             context: Mapping[str, object] | None = None) -> None: ...
+def log_warn(event: str, *, exc: BaseException | None = None,
+             context: Mapping[str, object] | None = None) -> None: ...
 def log_error(event: str, *, exc: BaseException | None = None,
               context: Mapping[str, object] | None = None) -> None: ...
-def log_debug(event: str, *, context: Mapping[str, object] | None = None) -> None: ...
+def log_debug(event: str, *, exc: BaseException | None = None,
+              context: Mapping[str, object] | None = None) -> None: ...
 ```
+
+`exc` 於四個級別皆可用：任何級別帶 `exc` 都渲染 `tb:` 單行摘要；只有
+`log_error` 另把完整 traceback 全文送 Evennia error log。
 
 輸出單行格式：
 
@@ -72,9 +78,10 @@ def log_debug(event: str, *, context: Mapping[str, object] | None = None) -> Non
   `traceback.format_exception()` 全文送 Evennia `log_err` 進 error log，
   完整棧供深挖，兩者不缺。
 - 級別映射：`log_info`→Evennia `log_info`、`log_warn`→`log_warn`、
-  `log_error`→`log_err`。`log_debug` 由 facade 自行檢查
-  `django.conf.settings.VERBOSE`（facade 內部門檻，Evennia logger 本身
-  不會過濾），未開啟時直接回傳不寫入。
+  `log_error`→`log_err`。`log_debug` 由 facade 以
+  `getattr(settings, "VERBOSE", False)` 閘門（repo settings 未定義
+  VERBOSE，直接屬性存取會 AttributeError；Evennia logger 本身不過濾），
+  未開啟時直接回傳不寫入。
 - 冪等防呆：facade 內部任何失敗（import 失敗、logger 拋錯）退回 stdlib
   `print` 至 stderr。觀測工具自身不能成為故障源；facade 永不向上拋例外。
 - 依賴方向：facade 只依賴 stdlib ＋ Evennia logger，不 import 任何 game
@@ -95,13 +102,17 @@ exit 0/1。無 `list` 子命令（無 registry 可列）。
 
 規則（AST，非字串匹配）：
 
-- **R1 — 唯一寫入點**：範圍內
-  `import evennia.utils.logger`、`from evennia import logger`、
-  `from evennia.utils import logger` 一律違規；`world/observability/`
-  自身是唯一白名單。violation 訊息含檔案:行。
+- **R1 — 唯一寫入點**（列舉全部規避形態）：範圍內
+  `import evennia.utils.logger`、
+  `from evennia.utils.logger import <任何名字>`（含 `log_warn` 等直接函式
+  import）、`from evennia import logger`、`from evennia.utils import
+  logger`（含 alias）與 `import evennia` 後的 `evennia.logger.*` 呼叫一律
+  違規；`world/observability/` 自身是唯一白名單。violation 訊息含檔案:行。
 - **R2 — 例外不得無痕吞掉**：每個 `except`／`except*` 區塊的 body 必須
-  滿足其一：① 含 `raise`（裸 re-raise 或 raise 新例外）② 含 facade log
-  呼叫 ③ 區塊首行是豁免註解（見下）。
+  滿足其一：① body 的 AST 子樹（遞迴尋找、不含巢狀函式定義內部）出現
+  `raise` ② 出現 facade log 呼叫 ③ 或豁免註解（見下）。豁免註解定位以
+  tokenize 判定：R2 在 `except` 頭行行尾或 body 首行之前；R3 在呼叫行
+  行尾或其前一行；R1 在 import 行行尾或其前一行。
 - **R3 — log 必帶 context**：facade 四個函式的呼叫必須帶 `context` kwarg
   且非常數 `None`；`log_error` 另需 `exc=` 或同一 `except` 區塊內有
   `raise`。靜態只驗「有傳」，值內容的深度靠 AGENTS.md 慣例與 review。
@@ -139,12 +150,18 @@ OpenSpec `verify` 階段的對照清單。
 
 ### 4.1 命令流
 
-於 `commands/` 基類層統一實作，一處覆蓋全 repo：
+將全部 `commands/` 下直接繼承 Evennia `Command` 的 production 命令掛到
+repo 基類 `commands/command.py::Command`（Evennia default commands 不在
+範圍），於其 `at_pre_cmd`／`at_post_cmd` 統一實作：
 
 | event | 級別 | context |
 |---|---|---|
 | `cmd_in` | info | `char`（pk）、`cmd`（命令 key）、`args`（截斷） |
-| `cmd_done` | info | `char`、`cmd`、`ms`（耗時）、`outcome`（`ok`／`error`） |
+| `cmd_done` | info | `char`、`cmd`、`ms`（耗時）、`outcome=ok` |
+
+Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func 拋例外
+時直接跳過並轉為 Evennia error report），因此 `cmd_done` 只代表成功；
+異常結束由「`cmd_in` 未配對 `cmd_done`」重建，不虛構 `error` 判定。
 
 ### 4.2 rules 提交點（狀態邊界）
 
@@ -157,7 +174,7 @@ OpenSpec `verify` 階段的對照清單。
 | `clock_advance` | `tick_from`、`tick_to`、`scope` |
 | `quest_transition` | `char`、`quest`、`stage_from`、`stage_to` |
 | `settlement_done` | `char`、`ms`、`notifications`（數量） |
-| `rollback_restore_failed` | `key`、`obj`（warn 級，取代現有裸 `pass`） |
+| `rollback_restore_failed` | `key`、`obj`＋`exc`（warn 級，取代現有裸 `pass`） |
 
 ### 4.3 AI／外部服務邊界
 
@@ -181,22 +198,36 @@ combat 每回合中間值等高頻資料走 `log_debug`，受 Evennia `VERBOSE` 
 
 ## 5. 遷移策略
 
-無凍結期，一次遷移；lint 落地即全 repo 強制。
+遷移量（約 160 處 log 呼叫＋大量吞例外點）超出單一 change 的容量，分四個
+依序實作的 change，每個皆可由單一工程師在一個工作日內完成：
 
-1. facade ＋ lint 工具 ＋ 兩者自身測試先落地；同批完成全量遷移，
-   lint 落地的 commit 即全綠。
-2. 按目錄分批 commit：`world/rules/`（最大，約半數呼叫點）→
-   `world/ai/` ＋ `world/art/` → `world/quests/` ＋ `world/maps/` →
-   `typeclasses/` ＋ `commands/` ＋ `server/` ＋ 其餘。每批跑該目錄
-   focused tests。
-3. 每處遷移不只是換 import：
-   - 補有意義的 context（該處可取得的 room／tick／layer／pk）；
-   - 吞掉的例外改 `log_error(..., exc=error)` 或補豁免註解；
-   - 自由句子改 snake_case event 碼；
-   - 依 §4 事件目錄點亮該子系統的正常路徑。
-4. 現有 patch `evennia.logger.log_warn` 的測試改成 patch facade 函式。
-5. `web/webclient` 下的非瀏覽器 JS／Python 介面若無 log 呼叫則不受影響；
-   有則同規則遷移。
+1. **`add-observability-lint-gate`**：facade ＋ lint 工具＋兩者自身測試、
+   命令流事件（`cmd_in`／`cmd_done`）、生命週期事件、事件目錄落地、
+   AGENTS.md 條目、CI 接入，並遷移 `server/`＋`commands/`。掃到既有
+   code 時以**過渡期凍結清單**（`tools/observability_lint/frozen.json`）
+   豁免尚未遷移的檔案；凍結清單只許縮小——lint 對清單中多餘（已可移除
+   卻未移除）或已遷移檔案残留在清單上的條目報錯。
+2. **`migrate-rules-maps-observability`**：`world/rules/`＋
+   `world/maps/` 呼叫點與提交點事件（§4.2）。
+3. **`migrate-ai-art-server-observability`**：`world/ai/`＋
+   `world/art/`＋`world/prompts/`；AI／SD 邊界事件（§4.3）。
+4. **`migrate-world-client-observability`**：`world/quests/`＋
+   `typeclasses/`＋`web/` 收尾，清空凍結清單，轉為全 repo 永久強制。
+
+批次 2 與 3 目錄不相交，可並行；批次 4 必須最後（依賴 freeze list
+收斂為空）。每個遷移批次的 commit 內 `tools.observability_lint check`
+必須 exit 0。
+
+每處遷移不只是換 import：
+
+- 補有意義的 context（該處可取得的 room／tick／layer／pk）；
+- 吞掉的例外改 `log_error(..., exc=error)` 或補豁免註解；
+- 自由句子改 snake_case event 碼；
+- 依 §4 事件目錄點亮該子系統的正常路徑；
+- 現有 patch `evennia.logger.log_warn` 的測試改成 patch facade 函式。
+
+`web/webclient` 下的 JS／Python 介面若無 log 呼叫則不受影響；有則同規則
+遷移。
 
 ## 6. 錯誤處理
 
