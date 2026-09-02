@@ -635,7 +635,7 @@ def valid_art_panel() -> dict:
 
 
 def valid_character_panel(**overrides) -> dict:
-    """A schema-valid available character panel (schema version 5) for
+    """A schema-valid available character panel (schema version 7) for
     injected snapshots.
 
     Mirrors the exact available character form the server presenter emits
@@ -643,13 +643,14 @@ def valid_character_panel(**overrides) -> dict:
     trait row (``base``/``current``/``max``/``effective``/``layers``; a
     static row's ``current`` equals its ``effective`` and ``max`` is null),
     adjustment-bearing equipment rows, a guild rank/merit, and an integer-
-    copper wallet. The v5 exact-field set includes the nullable ``intimate``
+    copper wallet. The v7 exact-field set includes the nullable ``intimate``
     section (webclient-intimate-status-section); a `None` value is schema-
-    valid. ``overrides`` replace top-level fields for variant cases (e.g. an
-    active disguise).
+    valid, and ``persona`` carries exactly the four prose keys
+    (add-persona-edit-surface). ``overrides`` replace top-level fields for
+    variant cases (e.g. an active disguise).
     """
     panel = {
-        "schema_version": 6,
+        "schema_version": 7,
         "available": True,
         "kind": "character",
         "traits": [
@@ -669,7 +670,7 @@ def valid_character_panel(**overrides) -> dict:
         "disguise": {"active": False, "description": "", "displayed": []},
         "guild": {"rank": "銀牌", "merit": 120},
         "wallet": 3240,
-        "persona": {"background": None},
+        "persona": {"background": None, "personality": None, "life_story": None, "habit": None},
         "intimate": None,
     }
     panel.update(overrides)
