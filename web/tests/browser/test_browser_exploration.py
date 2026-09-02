@@ -418,6 +418,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement("webclient-exploration-menu::explore-engage-delegates-to-the-existing-engage-contract")
+    @covers_requirement("webclient-frame-resolution::teardown-resets-the-stack-to-the-mode-root-from-one-decision-point")
     def test_engage_transitions_to_combat(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -437,6 +438,14 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(
             page.locator("#action-dock").get_attribute("data-mode"),
             "combat",
+        )
+        # Teardown (webclient-declarative-frame-stack): the mode switch
+        # replaced the whole exploration stack (root -> interact -> target)
+        # with exactly one combat root frame.
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.depth()"),
+            1,
+            "the combat adoption did not collapse the frame stack to one root",
         )
 
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
@@ -657,6 +666,8 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                 wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
         self.fail("three consecutive move dispatches were all answered stale")
 
+    @covers_requirement("webclient-frame-resolution::router-frames-store-descriptors-and-a-focus-key-and-resolve-at-access-time")
+    @covers_requirement("webclient-frame-resolution::activation-payloads-read-committed-state-at-dispatch-time")
     def test_open_move_frame_follows_a_committed_move(self):
         """The shipped dock path (the user-visible bug, design doc §2): with
         the 移動 frame open, a committed move must make the RENDERED dock pane
@@ -957,6 +968,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             ".map((el) => el.getAttribute('data-item-key'))"
         )
 
+    @covers_requirement("webclient-frame-resolution::focus-tracks-the-item-key-across-re-resolution")
     def test_focus_follows_the_item_key_across_committed_re_resolution(self):
         """Focus tracks the item KEY (webclient-declarative-frame-stack):
         with the 移動 frame open, a commit that REORDERS the exits keeps the
@@ -1029,6 +1041,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             "the activation submitted a payload from a superseded row",
         )
 
+    @covers_requirement("webclient-frame-resolution::unresolvable-frames-pop-one-level-only-the-root-frame-renders-a-degraded-reason-row")
     def test_identity_loss_pops_one_level_and_restores_opener_focus(self):
         """A target frame whose identity vanishes from the committed panel
         pops EXACTLY one level (never cascades past a surviving parent) and
@@ -1073,6 +1086,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             "the restored opener focus did not reach the rendered pane",
         )
 
+    @covers_requirement("webclient-frame-resolution::unresolvable-frames-pop-one-level-only-the-root-frame-renders-a-degraded-reason-row")
     def test_whole_stack_loss_cascades_to_the_degraded_root_and_recovers(self):
         """A panel withdrawal makes EVERY open exploration frame unresolvable
         at once: the pop cascades in ONE access down to the root frame, the
@@ -1155,6 +1169,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             f"the recovered root lost its entries: {root_keys}",
         )
 
+    @covers_requirement("webclient-frame-resolution::suggestions-frames-are-status-driven-generating-never-pops-unavailable-exits-to-the-root")
     def test_suggestions_frame_is_status_driven(self):
         """The status split: `generating`/`degraded` commits keep the open 建議
         frame and its content follows the commit (no pop, no timer);

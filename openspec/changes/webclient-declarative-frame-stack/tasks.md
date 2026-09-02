@@ -26,7 +26,7 @@
 ## 5. Browser verification and traceability
 
 - [x] 5.1 Green the 1.1 regression plus browser methods for focus-key survival, one-level pop and cascade (identity loss via fabricated committed snapshots over the test transport where live play cannot produce it), unresolvable-root disabled row, and suggestions `unavailable` exit-to-root — within the one-class local budget; the full managed browser suite stays CI
-- [ ] 5.2 After the delta syncs into `openspec/specs/` at archive time: annotate the covering browser methods with `covers_requirement` (IDs from `uv run --locked python -m tools.spec_traceability list`); `tools.spec_traceability check` green
+- [x] 5.2 After the delta syncs into `openspec/specs/` at archive time: annotate the covering browser methods with `covers_requirement` (IDs from `uv run --locked python -m tools.spec_traceability list`); `tools.spec_traceability check` green
 
 ## 6. Gates
 
