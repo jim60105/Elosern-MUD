@@ -33,6 +33,41 @@ from evennia import logger
 
 _SAFE_LOG_PREFIX = "LLM client"
 
+# Verbatim-passthrough sampling knobs (endpoint design §4.2 request order).
+_TOKEN_FIELDS: tuple[str, ...] = (
+    "frequency_penalty",
+    "presence_penalty",
+    "top_k",
+    "top_p",
+    "repetition_penalty",
+    "min_p",
+    "top_a",
+)
+
+
+def _request_headers(profile: LLMProfile) -> dict[str, list[str]]:
+    """Build the wire headers: derived entries first, explicit ones win.
+
+    ``Authorization``/``X-Title``/``HTTP-Referer`` are derived from the
+    profile fields only when those fields are non-empty; the profile's frozen
+    ``headers`` mapping is overlaid last so an explicitly configured header
+    replaces a derived entry (design D-B2; the overlay is exact-case at the
+    mapping level, and Twisted's ``Headers`` then normalizes names
+    case-insensitively, so an explicit header wins on the wire either way).
+    The api key reaches only the derived ``Authorization`` value — never a
+    log line or error string.
+    """
+    headers: dict[str, list[str]] = {}
+    if profile.api_key:
+        headers["Authorization"] = [f"Bearer {profile.api_key}"]
+    if profile.app_title:
+        headers["X-Title"] = [profile.app_title]
+    if profile.app_url:
+        headers["HTTP-Referer"] = [profile.app_url]
+    for name, values in profile.headers.items():
+        headers[name] = list(values)
+    return headers
+
 
 class OpenAICompatClient(LLMClient):
     """Async OpenAI ``/v1/chat/completions`` client governed by one profile."""
@@ -56,6 +91,13 @@ class OpenAICompatClient(LLMClient):
     def _format_request_body(self, descriptor: ChatRequestDescriptor) -> dict:
         """Build the OpenAI ``/v1/chat/completions`` request body.
 
+        Composition follows the endpoint design §4.2 order: base fields, then
+        ``max_completion_tokens`` superseding ``max_tokens`` (C-10), then each
+        configured sampling field verbatim with ``None`` omission, then the
+        reasoning mapping, then the ``response_format`` gate. A profile with
+        no optional endpoint field set produces a byte-identical body to the
+        pre-configuration client (C-5).
+
         ``response_format`` is included only when the profile declares endpoint
         support AND the descriptor declares an output schema (inline or via a
         registered ``schema_id``).
@@ -67,8 +109,16 @@ class OpenAICompatClient(LLMClient):
             "model": self.profile.model,
             "messages": list(descriptor.messages),
             "temperature": self.profile.temperature,
-            "max_tokens": self.profile.max_tokens,
         }
+        if self.profile.max_completion_tokens is not None:
+            body["max_completion_tokens"] = self.profile.max_completion_tokens
+        else:
+            body["max_tokens"] = self.profile.max_tokens
+        for name in _TOKEN_FIELDS:
+            value = getattr(self.profile, name)
+            if value is not None:
+                body[name] = value
+        self._apply_reasoning(body, self.profile)
         if self.profile.supports_response_format and output_schema is not None:
             body["response_format"] = {
                 "type": "json_schema",
@@ -78,6 +128,35 @@ class OpenAICompatClient(LLMClient):
                 },
             }
         return body
+
+    @staticmethod
+    def _apply_reasoning(body: dict, profile: LLMProfile) -> None:
+        """Map the reasoning intent onto the profile's carrier style (D-B1).
+
+        Exhaustive case table, and no empty container is ever emitted: an
+        unset intent (both fields ``None``) and the ``off`` style send
+        nothing; ``openrouter`` nests a ``reasoning`` object carrying the
+        non-``None`` subset of ``enabled``/``effort``; ``vllm`` carries only
+        ``chat_template_kwargs.enable_thinking`` (``effort`` has no vLLM
+        carrier, so an effort-only vllm profile sends nothing).
+        """
+        if profile.reasoning_style == "off":
+            return
+        if profile.reasoning_enabled is None and profile.reasoning_effort is None:
+            return
+        if profile.reasoning_style == "vllm":
+            if profile.reasoning_enabled is not None:
+                body["chat_template_kwargs"] = {
+                    "enable_thinking": profile.reasoning_enabled
+                }
+            return
+        reasoning: dict = {}
+        if profile.reasoning_enabled is not None:
+            reasoning["enabled"] = profile.reasoning_enabled
+        if profile.reasoning_effort is not None:
+            reasoning["effort"] = profile.reasoning_effort
+        if reasoning:
+            body["reasoning"] = reasoning
 
     def _parse_response(self, result):
         """Parse a ``(status_code, body)`` result into the generated text."""
@@ -92,14 +171,35 @@ class OpenAICompatClient(LLMClient):
             raise LLMTransportError("malformed", "response body is not valid JSON") from exc
         errors = validate_chat_completion_envelope(payload)
         if errors:
-            raise LLMTransportError("malformed", "; ".join(errors))
+            # Envelope-validation messages quote the offending instance
+            # value, and a hostile endpoint may echo a request header (the
+            # bearer key) back inside it — scrub before it becomes observable.
+            raise LLMTransportError(
+                "malformed", self._scrub_key("; ".join(errors))
+            )
         return payload["choices"][0]["message"]["content"]
+
+    def _scrub_key(self, message: str) -> str:
+        """Central credential scrub for every dynamically formed error.
+
+        Fail-closed for the api-key non-disclosure invariant: any string that
+        can reach a caller or the safe log path passes through here, so no
+        endpoint- or transport-controlled text can carry the key out.
+        """
+        if self.profile.api_key:
+            return message.replace(self.profile.api_key, "[redacted]")
+        return message
 
     def _handle_llm_error(self, failure):
         """Map connection failures to a safe ``LLMTransportError`` errback."""
         failure.trap(Exception)
         message = failure.getErrorMessage() or failure.type.__name__
-        raise LLMTransportError("connection", f"request failed: {message}")
+        # Transport error text is not header-controlled in practice, but the
+        # api-key invariant is fail-closed: the message is endpoint-adjacent,
+        # so it goes through the same central scrub.
+        raise LLMTransportError(
+            "connection", f"request failed: {self._scrub_key(message)}"
+        )
 
     def _on_timeout(self, result, timeout):
         """Translate a ``Deferred.addTimeout`` cancellation to a transport error."""
@@ -126,7 +226,7 @@ class OpenAICompatClient(LLMClient):
         d = self.agent.request(
             b"POST",
             bytes(url, "utf-8"),
-            headers=Headers(self.profile.headers),
+            headers=Headers(_request_headers(self.profile)),
             bodyProducer=StringProducer(json.dumps(request_body)),
         )
         d = d.addCallback(self._handle_llm_response_body)

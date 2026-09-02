@@ -6,6 +6,7 @@ import unittest
 
 import yaml
 
+from server.conf.llm_knobs import llm_global_env_names
 from tools.spec_traceability import covers_requirement
 
 
@@ -170,6 +171,54 @@ class ContainerContractTests(unittest.TestCase):
             "server/conf/secret_settings.py",
         }
         self.assertTrue(required <= patterns, f"missing ignore patterns: {sorted(required - patterns)}")
+
+    @covers_requirement(
+        "settings-environment-overrides::compose-forwards-optional-llm-knobs-without-host-or-literal-leakage"
+    )
+    def test_compose_forwards_optional_llm_knobs_with_blank_defaults(self):
+        compose = yaml.safe_load(_read("compose.yaml"))
+        environment = compose["services"]["evennia"]["environment"]
+        global_names = set(llm_global_env_names())
+
+        # Every LLM_-prefixed environment entry must be a declared knob —
+        # a stale or misspelled forward cannot hide from the set check.
+        self.assertEqual(
+            {name for name in environment if name.startswith("LLM_")},
+            global_names,
+            "compose LLM environment must be exactly the declared knob set",
+        )
+
+        # LLM_BASE_URL keeps its host-gateway default; every other optional
+        # global knob forwards through an empty-default interpolation so an
+        # unset host variable arrives as the blank omit-sentinel.
+        self.assertIn("host.containers.internal", environment["LLM_BASE_URL"])
+        forwarded = {
+            name: value
+            for name, value in environment.items()
+            if name.startswith("LLM_") and name != "LLM_BASE_URL"
+        }
+        self.assertEqual(
+            set(forwarded),
+            global_names - {"LLM_BASE_URL"},
+            "every optional LLM knob must be forwarded",
+        )
+        for name, value in forwarded.items():
+            self.assertEqual(
+                value,
+                "${%s:-}" % name,
+                msg=f"{name} must forward with an empty default",
+            )
+        # The compose file itself never carries a secret literal.
+        self.assertEqual(forwarded["LLM_API_KEY"], "${LLM_API_KEY:-}")
+        key_lines = [
+            line
+            for line in _read("compose.yaml").splitlines()
+            if re.match(r"^\s*LLM_API_KEY\s*:", line)
+            and not re.match(r"^\s*LLM_API_KEY:\s*\$\{LLM_API_KEY:-\}\s*$", line)
+        ]
+        self.assertEqual(
+            key_lines, [], "no non-empty LLM_API_KEY literal may exist in compose.yaml"
+        )
 
 
 class EvenniaSkeletonContractTests(unittest.TestCase):

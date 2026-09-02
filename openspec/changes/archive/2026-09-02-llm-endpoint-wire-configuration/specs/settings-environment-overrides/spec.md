@@ -58,8 +58,10 @@ env-overridable; the `ART_SD_*` table in `docs/gm/prompts.md` SHALL reference th
 The guide SHALL state the scoped `LLM_API_KEY` credential exception: its environment-
 delivery leak vectors (process listings via `/proc/<pid>/environ`, `podman compose config`,
 `docker inspect`) and its mitigations (compose `env_file:` instead of inline `environment:`
-entries; or declining the exception and keeping the key in `secret_settings.py`), and SHALL
-keep every other credential under the standing prohibition.
+entries — keeping the key out of the compose file and the rendered `compose config` output,
+while noting the key still lands in the container's process environment; or declining the
+exception and keeping the key in `secret_settings.py`, which keeps it out of the environment
+entirely), and SHALL keep every other credential under the standing prohibition.
 
 #### Scenario: No dead variables are advertised
 - **WHEN** the active entries of `.env.example` are parsed and each key is checked against the
@@ -92,7 +94,8 @@ keep every other credential under the standing prohibition.
 `compose.yaml` SHALL forward the optional `LLM_*` knobs (other than `LLM_BASE_URL`, which
 keeps its host-gateway default) using empty-default interpolation (`${LLM_X:-}`), so a host
 without a variable set contributes the blank omit-sentinel rather than a literal string,
-and no secret value SHALL ever be written into the compose file itself.
+and no secret value SHALL ever be written into the compose file itself — the `LLM_API_KEY`
+forwarding line carries the empty default only, never a literal key.
 
 #### Scenario: An unset host knob arrives blank
 - **WHEN** the compose configuration is rendered with `LLM_TOP_P` unset on the host
@@ -101,4 +104,5 @@ and no secret value SHALL ever be written into the compose file itself.
 
 #### Scenario: No key default exists in compose
 - **WHEN** `compose.yaml` is inspected
-- **THEN** no `LLM_API_KEY` line carries a non-empty literal default
+- **THEN** the only `LLM_API_KEY:` line is `LLM_API_KEY: ${LLM_API_KEY:-}`, and no
+  `LLM_API_KEY` line carries a non-empty literal default
