@@ -263,6 +263,7 @@ class PresetCreationJourneys(CreationBrowserTest):
         self.assertEqual(sent_action_count(page, "creation.reset"), 0)
 
     @covers_requirement("creation-activation-gating::activation-confirmation-follows-a-successful-save")
+    @covers_requirement("webclient-action-dispatch::a-non-success-action-result-surfaces-its-message-exactly-once")
     def test_rejected_preset_save_stays_on_the_list_without_confirmation(self):
         page = self._login_creation()
         install_outbound_recorder(page)

@@ -690,6 +690,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             arg=[message, json.dumps(baseline)],
         )
 
+    @covers_requirement("webclient-action-dispatch::a-non-success-action-result-surfaces-its-message-exactly-once")
     def test_non_success_action_results_speak_once_in_the_narrative(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
