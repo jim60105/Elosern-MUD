@@ -18,11 +18,11 @@ LLM 輸出結構（`world/ai/character_creation.py` 的 `PERSONA_FIELDS`）產�
 
 其一，`background` 並非 persona 之外的東西，它就是 persona record（import-card 形狀）裡的一個鍵，與三欄敘事文字同類、共用同一個 600 字上限常數 `MAX_PERSONA_FIELD_LENGTH`。
 
-其二，客戶端上傳玩家選擇值已有成熟管道。allocations、年齡、種族等數值一律經伺服端以不可變 registry 重驗（`preflight_character_creation`），authority-like 拒絕清單針對的是身份綁定與伺服器推导值（actor、account、session、host、skill、equipment、magic level、calculated stats）。背景 textarea 本身就是「有界自由文字上傳、伺服端重驗」的現成先例，persona 三欄走同一管道在工程上完全成立。
+其二，客戶端上傳玩家選擇值已有成熟管道。allocations、年齡、種族等數值一律經伺服端以不可變 registry 重驗（`preflight_character_creation`），authority-like 拒絕清單針對的是身份綁定與伺服器推導值（actor、account、session、host、skill、equipment、magic level、calculated stats）。背景 textarea 本身就是「有界自由文字上傳、伺服端重驗」的現成先例，persona 三欄走同一管道在工程上完全成立。
 
 其三，玩家角色的 persona 只在建立啟動時被 LLM 寫入一次。全部寫入者為：匯入載入器（`world/imports/loader.py`）、建立啟動（`activate_player_character`）、玩家編輯（`world/rules/persona_edit.py`，僅 `background` 鍵）、任務場景建立器（僅 NPC，資料來自作者撰寫的任務 JSON）。`world/ai/` 依架構不變詞永不寫入，因此交還玩家編輯不會與生成系統發生寫入競爭。
 
-archive 文件本身也承認了这个洞：`creation-persona-persistence` design.md 的 Open Questions 把「瀏覽器是否應讓玩家在啟動前檢視並編輯生成的 persona 區塊」列為延後事項。本設計就是對該問題的回答。
+archive 文件本身也承認了這個洞：`creation-persona-persistence` design.md 的 Open Questions 把「瀏覽器是否應讓玩家在啟動前檢視並編輯生成的 persona 區塊」列為延後事項。本設計就是對該問題的回答。
 
 ## 2. 設計原則
 
@@ -32,7 +32,7 @@ LLM 生成的 persona 三欄與玩家親寫的 background 屬於同類資料。�
 
 ### 2.2 概念功能：暫態填入器
 
-概念只做一件事：呼叫 LLM 產生一份提案，把提案值填入客戶端尚未送出的表單。填入完成，概念的职责即結束。提案不落地為伺服器草稿，送出後的驗證由表單驗證器承接，與概念無關。
+概念只做一件事：呼叫 LLM 產生一份提案，把提案值填入客戶端尚未送出的表單。填入完成，概念的職責即結束。提案不落地為伺服器草稿，送出後的驗證由表單驗證器承接，與概念無關。
 
 這個切分廢除了「概念草稿機」的全部狀態：`concept_filled` 草稿階段、指紋比對（compare-and-swap）、種族比對承接規則、late-response 防護。概念在伺服器端變得無狀態。
 
@@ -48,7 +48,7 @@ LLM 生成的 persona 三欄與玩家親寫的 background 屬於同類資料。�
 
 ## 3. 退役清單
 
-下列既有機制全數刪除，無相容層（本專案尚無正式发布使用者）。
+下列既有機制全數刪除，無相容層（本專案尚無正式發布使用者）。
 
 | 退役項目 | 位置 |
 |---|---|
@@ -88,7 +88,7 @@ draft 的 custom 形狀增 `persona`（物件或 null）；concept 形狀不復�
 
 ### 4.6 Vue 表單（`CreationOverlay.vue`）
 
-- 收到 `concept_filled` 結果時，把提案值寫入尚未送出的本地表單：race、subrace、allocations、三個 persona textarea。`syncFromDraft` 只认伺服端已接收的值，不看未送出的提案。
+- 收到 `concept_filled` 結果時，把提案值寫入尚未送出的本地表單：race、subrace、allocations、三個 persona textarea。`syncFromDraft` 只認伺服端已接收的值，不看未送出的提案。
 - 三個 textarea 於 custom 模式恆渲染，無值時空白供親手填寫。
 - 本地驗證：persona 三欄探「要填就填滿」規則，部分填寫以本地訊息阻擋（與 subrace 錯誤同一機制），不發出 action。
 - 概念套用成功後 dock 由 concept 翻到 custom 的導覽保留，這是 store 本地狀態。
@@ -106,7 +106,7 @@ draft 的 custom 形狀增 `persona`（物件或 null）；concept 形狀不復�
 
 ### 5.2 character panel（schema v6 → v7）
 
-`persona` 區塊從恰 `{background}` 擴為恰 `{background, personality, life_story, habit}`，各自可為 null 且上限 600 字。`character_presenter` 從 `actor.persona` 逐鍵取值，沿用既有「非字串轉 None、純空白轉 None」清洗。`protocol.js` 鏡像驗證器同步。`CharacterStatusDrawer.vue` 的背景區塊升級為四段顯示（個性、生平、習慣、背景），空值走既有「未設定」占位樣式。
+`persona` 區塊從恰 `{background}` 擴為恰 `{background, personality, life_story, habit}`，各自可為 null 且上限 600 字。`character_presenter` 從 `actor.persona` 逐鍵取值，沿用既有「非字串轉 None、純空白轉 None」清洗。`protocol.js` 鏡像驗證器同步。`CharacterStatusDrawer.vue` 的背景區塊升級為四段顯示（個性、生平、習慣、背景），空值走既有「未設定」佔位樣式。
 
 ### 5.3 新 action `character.persona.update`
 
@@ -162,7 +162,7 @@ JS 層：`protocol.js` Node 鏡像驗證器新案（draft persona、custom 9 鍵
 
 ## 9. 取捨與已接受代價
 
-1. 概念進行中斷線會遺失進行中的填入，玩家需要重按套用。換得的是概念在伺服器端完全無狀態，删除了 CAS、承接比對、確認失效三組機制。
+1. 概念進行中斷線會遺失進行中的填入，玩家需要重按套用。換得的是概念在伺服器端完全無狀態，刪除了 CAS、承接比對、確認失效三組機制。
 2. 伺服端放棄對 persona 語意的最後防堵（種族與生平矛盾的自動清理）。換得的是「上傳即意圖」模型的一致性，玩家看得見自己送出的內容，矛盾的把關交還給看得見內容的玩家，UI 提供審視提示。
 3. 兩個 panel schema 版本、九鍵 custom payload、四鍵白名單命令家族同時變動，變更面大，但每處都是既有精確模式（exact-fields、穩定拒絕碼、三段式命令）的機械性擴充。
 
