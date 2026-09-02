@@ -13,6 +13,7 @@ from evennia import DefaultScript
 from evennia.utils.create import create_script
 from evennia.utils.search import search_script
 
+from world.observability import log_info, log_warn
 from world.rules.buffs import BUFF_DEFINITIONS, tick_buffs
 from world.rules.progression import grant_study_practice_xp
 from world.rules.sexual_state import (
@@ -435,7 +436,6 @@ def _restore_advance_location(obj: Any, target_pk: int) -> None:
     vanished target is skipped with a bounded diagnostic.
     """
     from evennia.objects.models import ObjectDB
-    from evennia.utils.logger import log_warn
 
     # A deleted instance that survived eviction stays in the cache under its
     # ORIGINAL pk key (Django nulls ``pk`` only after the collector finishes,
@@ -449,8 +449,13 @@ def _restore_advance_location(obj: Any, target_pk: int) -> None:
     target = ObjectDB.objects.filter(id=target_pk).first()
     if target is None:
         log_warn(
-            f"clock advance could not restore {obj} to room #{target_pk}: "
-            "the room vanished after rollback"
+            "rollback_restore_failed",
+            context={
+                "stage": "advance_location",
+                "obj": str(obj),
+                "key": f"location:#{target_pk}",
+                "reason": "room vanished after rollback",
+            },
         )
         return
     obj.location = target
@@ -471,8 +476,6 @@ def _restore_registry_attribute(
     ``deepcopy`` cannot copy; Evennia's ``attributes.add`` re-encodes through
     ``dbserialize`` and handles them natively.
     """
-    from evennia.utils.logger import log_warn
-
     existed, value = snapshot
     try:
         if existed:
@@ -482,9 +485,18 @@ def _restore_registry_attribute(
     except Exception as error:
         try:
             obj.attributes.reset_cache()
-        except Exception:
+        except Exception:  # observability: ignore R2: cache invalidation is best-effort; the restore failure itself is logged below
             pass
-        log_warn(f"clock advance could not restore {key!r} on {obj}: {error}")
+        log_warn(
+            "rollback_restore_failed",
+            exc=error,
+            context={
+                "stage": "advance_registry_attribute",
+                "obj": str(obj),
+                "key": key,
+                "category": category,
+            },
+        )
 
 
 def _restore_advance_registry(
@@ -530,10 +542,14 @@ def _restore_advance_registry(
                 else:
                     obj.location = None
             except Exception as error:
-                from evennia.utils.logger import log_warn
-
                 log_warn(
-                    f"clock advance could not restore the location of {obj}: {error}"
+                    "rollback_restore_failed",
+                    exc=error,
+                    context={
+                        "stage": "advance_location",
+                        "obj": str(obj),
+                        "key": "location",
+                    },
                 )
     for entity in entities:
         if not hasattr(entity, "attributes"):
@@ -543,19 +559,25 @@ def _restore_advance_registry(
 
 def _refresh_advance_entity_caches(entity: Any) -> None:
     """Drop stale in-memory trait/sexual caches so the next read matches the DB."""
-    from evennia.utils.logger import log_warn
-
     try:
         entity.traits.trait_data = entity.attributes.get(
             "traits", default={}, category="traits"
         )
         entity.traits._cache.clear()
     except Exception as error:
-        log_warn(f"clock advance could not refresh trait caches on {entity}: {error}")
+        log_warn(
+            "rollback_restore_failed",
+            exc=error,
+            context={"stage": "trait_caches", "obj": str(entity), "key": "traits"},
+        )
     try:
         entity.__dict__.pop("sexual", None)
     except Exception as error:
-        log_warn(f"clock advance could not drop cached sexual state on {entity}: {error}")
+        log_warn(
+            "rollback_restore_failed",
+            exc=error,
+            context={"stage": "sexual_cache", "obj": str(entity), "key": "sexual"},
+        )
 
 
 @dataclass
@@ -578,6 +600,7 @@ class WorldClock:
         scope = tuple(entities)
         registry = build_advance_snapshot_registry(self, seconds, source, scope)
         tick_snapshot = _snapshot_clock_tick(self)
+        tick_from = self.tick
         try:
             with transaction.atomic():
                 events = _run_stages(self, seconds, source, scope)
@@ -585,6 +608,21 @@ class WorldClock:
                 persist = getattr(self, "_persist", None)
                 if persist is not None:
                     persist(self.tick)
+                # Boundary event fires only on the OUTERMOST durable commit:
+                # advance() runs nested inside item/combat transactions, so a
+                # savepoint exit alone must not leave a clock_advance line
+                # behind a rollback (on_commit callbacks are discarded then).
+                tick_to = self.tick
+                transaction.on_commit(
+                    lambda: log_info(
+                        "clock_advance",
+                        context={
+                            "tick_from": tick_from,
+                            "tick_to": tick_to,
+                            "scope": len(scope),
+                        },
+                    )
+                )
         except Exception:
             _restore_clock_tick(self, tick_snapshot)
             _restore_advance_registry(registry, scope)

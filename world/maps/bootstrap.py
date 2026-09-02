@@ -8,9 +8,9 @@ from evennia.contrib.grid.wilderness.wilderness import (
     create_wilderness,
 )
 from evennia.utils.create import create_object
-from evennia.utils.logger import log_warn
 from evennia.utils.search import search_object
 
+from world.observability import log_warn
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import GridRoom, Room
 from world.lore.wilderness_entry import OPPOSITE_DIRECTION, WILDERNESS_ENTRY_REGISTRY
@@ -89,8 +89,12 @@ def sync_service_interiors() -> None:
     store_exterior = _find_exterior(GENERAL_STORE_EXTERIOR_XYZ)
     if guild_exterior is None or store_exterior is None:
         log_warn(
-            "sync_service_interiors: an exterior grid room is missing; "
-            "skipping service interiors."
+            "bootstrap_service_exterior_missing",
+            context={
+                "guild_hall_exterior": GUILD_HALL_EXTERIOR_XYZ,
+                "general_store_exterior": GENERAL_STORE_EXTERIOR_XYZ,
+                "action": "skip_service_interiors",
+            },
         )
         return
 
@@ -154,8 +158,8 @@ def sync_limbo() -> None:
     if not limbo:
         if not legacy:
             log_warn(
-                f"sync_limbo: no starting room keyed {LIMBO_KEY!r} found; "
-                "skipping the starting-room sync."
+                "bootstrap_limbo_room_missing",
+                context={"room_key": LIMBO_KEY, "action": "skip_starting_room_sync"},
             )
             return
         room = legacy[0]
@@ -164,13 +168,21 @@ def sync_limbo() -> None:
         room = limbo[0]
         if len(limbo) > 1:
             log_warn(
-                f"sync_limbo: {len(limbo)} rooms keyed {LIMBO_KEY!r} exist; "
-                f"using dbref #{room.id} as the starting room."
+                "bootstrap_limbo_duplicate_rooms",
+                context={
+                    "room_key": LIMBO_KEY,
+                    "room_count": len(limbo),
+                    "chosen_dbref": room.id,
+                },
             )
         if legacy:
             log_warn(
-                f"sync_limbo: a legacy room keyed {LIMBO_LEGACY_KEY!r} coexists with the "
-                f"canonical {LIMBO_KEY!r} room; leaving the legacy room in place."
+                "bootstrap_limbo_legacy_room_coexists",
+                context={
+                    "legacy_room_key": LIMBO_LEGACY_KEY,
+                    "canonical_room_key": LIMBO_KEY,
+                    "action": "leave_legacy_room_in_place",
+                },
             )
     room.aliases.add(LIMBO_ALIAS)
     room.db.desc = LIMBO_DESC
@@ -235,15 +247,18 @@ def sync_grid() -> None:
 
     limbo = Room.objects.filter(db_key=LIMBO_KEY)
     if not limbo:
-        log_warn(f"sync_grid: no room keyed {LIMBO_KEY!r} found; skipping the bridging exits.")
+        log_warn(
+            "bootstrap_grid_limbo_room_missing",
+            context={"room_key": LIMBO_KEY, "action": "skip_bridging_exits"},
+        )
         return
     limbo = limbo[0]
 
     south_gate = grid.get_room(SOUTH_GATE_XYZ).first()
     if south_gate is None:
         log_warn(
-            f"sync_grid: South Gate room at {SOUTH_GATE_XYZ} not found; "
-            "skipping the bridging exits."
+            "bootstrap_grid_south_gate_missing",
+            context={"xyz": SOUTH_GATE_XYZ, "action": "skip_bridging_exits"},
         )
         return
 
@@ -296,9 +311,13 @@ def _provision_gate_exit(anchor_key: str, gate) -> None:
     gate_room = GridRoom.objects.filter_xyz((*gate.grid_xy, gate.z_map_key)).first()
     if gate_room is None:
         log_warn(
-            f"sync_wilderness: destination room {(gate.grid_xy, gate.z_map_key)} "
-            f"for gate {gate.return_direction!r} of anchor {anchor_key!r} not found; "
-            "skipping that gate exit."
+            "bootstrap_gate_destination_room_missing",
+            context={
+                "xyz": (*gate.grid_xy, gate.z_map_key),
+                "gate_direction": gate.return_direction,
+                "anchor_key": anchor_key,
+                "action": "skip_gate_exit",
+            },
         )
         return
 
@@ -309,8 +328,12 @@ def _provision_gate_exit(anchor_key: str, gate) -> None:
         # Multiple WildernessGateExit rows on one room are ambiguous; never
         # guess which one to heal.
         log_warn(
-            f"sync_wilderness: multiple WildernessGateExit rows exist on "
-            f"{gate_room.key!r}; leaving them in place for gate {gate.return_direction!r}."
+            "bootstrap_gate_ambiguous_exits",
+            context={
+                "room_key": gate_room.key,
+                "gate_direction": gate.return_direction,
+                "action": "leave_exits_in_place",
+            },
         )
         return
     if gate_exits:
@@ -327,8 +350,12 @@ def _provision_gate_exit(anchor_key: str, gate) -> None:
         # A non-project exit already occupies the gate key; do not create a
         # second ambiguous exit or claim provisioning succeeded.
         log_warn(
-            f"sync_wilderness: an exit keyed {GATE_EXIT_KEY!r} exists on "
-            f"{gate_room.key!r} but is not a WildernessGateExit; leaving it in place."
+            "bootstrap_gate_key_occupied_by_other_exit",
+            context={
+                "exit_key": GATE_EXIT_KEY,
+                "room_key": gate_room.key,
+                "action": "leave_exit_in_place",
+            },
         )
         return
 

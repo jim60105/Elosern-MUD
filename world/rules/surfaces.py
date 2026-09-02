@@ -10,7 +10,7 @@ restored to their pre-operation values so no caller serves a stale read.
 from copy import deepcopy
 from typing import Any, Mapping
 
-from evennia.utils.logger import log_warn
+from world.observability import log_warn
 
 
 def attribute_snapshot(obj: Any, key: str, category: str | None = None) -> tuple[bool, Any]:
@@ -50,9 +50,13 @@ def restore_attribute_best_effort(
     except Exception as error:
         try:
             obj.attributes.reset_cache()
-        except Exception:
+        except Exception:  # observability: ignore R2: cache invalidation is best-effort; the restore failure itself is logged below
             pass
-        log_warn(f"could not restore {key!r} on {obj}: {error}")
+        log_warn(
+            "rollback_restore_failed",
+            exc=error,
+            context={"stage": "attribute", "obj": str(obj), "key": key, "category": category},
+        )
 
 
 def snapshot_attributes(obj: Any, keys: tuple[str, ...]) -> dict[str, tuple[bool, Any]]:
@@ -78,7 +82,11 @@ def restore_traits(obj: Any, snapshot: tuple[bool, Any]) -> None:
         )
         obj.traits._cache.clear()
     except Exception as error:
-        log_warn(f"could not refresh trait caches on {obj}: {error}")
+        log_warn(
+            "rollback_restore_failed",
+            exc=error,
+            context={"stage": "trait_caches", "obj": str(obj), "key": "traits"},
+        )
 
 
 def read_counter_trait(obj: Any, key: str) -> int:

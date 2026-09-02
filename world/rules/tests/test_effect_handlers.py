@@ -103,7 +103,7 @@ class EffectRegistryTests(unittest.TestCase):
             apply=lambda: applied.append(True),
         )
         with self.assertRaises(Exception) as caught:
-            _commit([effect])
+            _commit([effect], char="tester", action="test_skill")
         self.assertEqual(caught.exception.reason, RejectReason.UNSNAPSHOTTED_EFFECT_SURFACE)
         self.assertEqual(applied, [])
         self.assertEqual(
@@ -161,7 +161,7 @@ class LandedEffectHandlerTests(EvenniaTest):
             replace(effect, surfaces=frozenset({"buffs"}))
             for effect in effects
         ]
-        _commit(effects)
+        _commit(effects, char="tester", action="test_skill")
         self.assertIn("paralysis", self.entity.buffs.all)
 
     def test_self_buff_apply_targets_the_caster_without_a_target(self):
@@ -176,7 +176,7 @@ class LandedEffectHandlerTests(EvenniaTest):
             replace(effect, surfaces=frozenset({"buffs"}))
             for effect in effects
         ]
-        _commit(effects)
+        _commit(effects, char="tester", action="test_skill")
         self.assertIn("focus", self.entity.buffs.all)
 
     def test_conferred_growth_rate_uses_landed_buff_seam(self):
@@ -191,7 +191,7 @@ class LandedEffectHandlerTests(EvenniaTest):
             replace(effect, surfaces=frozenset({"buffs"}))
             for effect in effects
         ]
-        _commit(effects)
+        _commit(effects, char="tester", action="test_skill")
         self.assertEqual(growth_rate_multiplier(self.entity), 0.5)
 
     def test_malformed_handler_result_is_a_named_rejection(self):
@@ -234,7 +234,7 @@ class DamagingBuffSourceIdentityTests(EvenniaTestCase):
             replace(effect, surfaces=frozenset({"buffs"}))
             for effect in effects
         ]
-        _commit(effects)
+        _commit(effects, char="tester", action="test_skill")
         return effects
 
     @covers_requirement("buff-handler-integration::damaging-rate-buffs-persist-a-validated-effect-source-identity-in-the-buff-cache")
@@ -352,7 +352,7 @@ class CleanseHandlerTests(EvenniaTest):
             replace(effect, surfaces=frozenset({"buffs"}))
             for effect in effects
         ]
-        _commit(effects)
+        _commit(effects, char="tester", action="test_skill")
         return effects
 
     @covers_requirement("cleanse-effect-handler::cleanse-status-removes-every-active-debuff-polarity-buff-from-the-target")
@@ -439,7 +439,7 @@ class CleanseHandlerTests(EvenniaTest):
             )
         )
         with self.assertRaises(CommitFailed):
-            _commit(effects)
+            _commit(effects, char="tester", action="test_skill")
         self.assertIn("poisoned", self.entity.buffs.all)
 
     def test_cleanse_resolves_end_to_end_through_the_action_resolver(self):

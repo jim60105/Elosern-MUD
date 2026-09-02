@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
 from django.db import transaction
-from evennia.utils.logger import log_warn
 
 from typeclasses.npcs import NPC
+from world.observability import log_warn
 from world.quests.transitions import restore_quest_log, snapshot_quest_log
 from world.rules.action import ActionRequest, ActionResult, ActionResolver
 from world.rules.affinity import AffinitySource, apply_affinity_change
@@ -221,9 +221,18 @@ def _restore_attribute_direct(
     except Exception as error:
         try:
             obj.attributes.reset_cache()
-        except Exception:
+        except Exception:  # observability: ignore R2: cache invalidation is best-effort; the restore failure itself is logged below
             pass
-        log_warn(f"cast settlement could not restore {key!r} on {obj}: {error}")
+        log_warn(
+            "rollback_restore_failed",
+            exc=error,
+            context={
+                "stage": "cast_registry_attribute",
+                "obj": str(obj),
+                "key": key,
+                "category": category,
+            },
+        )
 
 
 def _restore_settlement_state(
@@ -260,7 +269,13 @@ def _restore_settlement_state(
                     obj.location = None
             except Exception as error:
                 log_warn(
-                    f"cast settlement could not restore the location of {obj}: {error}"
+                    "rollback_restore_failed",
+                    exc=error,
+                    context={
+                        "stage": "cast_location",
+                        "obj": str(obj),
+                        "key": "location",
+                    },
                 )
         if entry.battlefield is not None:
             try:
@@ -270,7 +285,13 @@ def _restore_settlement_state(
                     obj.knocked_out = set(knocked_out)
             except Exception as error:
                 log_warn(
-                    f"cast settlement could not restore the battlefield {obj}: {error}"
+                    "rollback_restore_failed",
+                    exc=error,
+                    context={
+                        "stage": "cast_battlefield",
+                        "obj": str(obj),
+                        "key": "battlefield",
+                    },
                 )
     for entry in snapshot.objects.values():
         if entry.refresh_caches:

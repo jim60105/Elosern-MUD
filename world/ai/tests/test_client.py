@@ -557,7 +557,7 @@ class WireHeaderTests(unittest.TestCase):
                 clock = Clock()
                 client = OpenAICompatClient(profile, reactor=clock)
                 client.agent = StubAgent(outcome)
-                with patch("world.ai.client.logger.log_info") as logged:
+                with patch("world.ai.client.log_warn") as logged:
                     d = client.get_response(
                         ChatRequestDescriptor(
                             messages=({"role": "user", "content": "u"},)
@@ -573,7 +573,10 @@ class WireHeaderTests(unittest.TestCase):
                             repr(failure.value),
                             failure.getErrorMessage(),
                             *[
-                                " ".join(str(arg) for arg in call.args)
+                                " ".join(
+                                    str(arg)
+                                    for arg in (*call.args, *call.kwargs.values())
+                                )
                                 for call in logged.call_args_list
                             ],
                         ]
@@ -595,7 +598,7 @@ class WireHeaderTests(unittest.TestCase):
         ).encode()
         client = OpenAICompatClient(wire_profile(api_key=secret), reactor=Clock())
         client.agent = StubAgent(FakeResponse(200, hostile))
-        with patch("world.ai.client.logger.log_info") as logged:
+        with patch("world.ai.client.log_warn") as logged:
             d = client.get_response(
                 ChatRequestDescriptor(messages=({"role": "user", "content": "u"},))
             )
@@ -607,7 +610,9 @@ class WireHeaderTests(unittest.TestCase):
                     repr(failure.value),
                     failure.getErrorMessage(),
                     *[
-                        " ".join(str(arg) for arg in call.args)
+                        " ".join(
+                            str(arg) for arg in (*call.args, *call.kwargs.values())
+                        )
                         for call in logged.call_args_list
                     ],
                 ]

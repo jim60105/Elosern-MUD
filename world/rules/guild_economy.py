@@ -14,8 +14,8 @@ outcome is settled (fix-startup-session-restore-order D1).
 """
 
 from evennia.utils.create import create_object
-from evennia.utils.logger import log_warn
 
+from world.observability import log_warn
 from typeclasses.components import (
     GuildExaminer,
     GuildStaff,
@@ -77,16 +77,16 @@ def sync_service_content() -> None:
     general_store = _room_by_tag(GENERAL_STORE_TAG)
     if guild_hall is None or general_store is None:
         log_warn(
-            "sync_guild_economy: service interiors are missing; "
-            "running sync_service_interiors first."
+            "guild_economy_service_interiors_missing",
+            context={"action": "sync_service_interiors_first"},
         )
         sync_service_interiors()
         guild_hall = _room_by_tag(GUILD_HALL_TAG)
         general_store = _room_by_tag(GENERAL_STORE_TAG)
         if guild_hall is None or general_store is None:
             log_warn(
-                "sync_guild_economy: service interiors still missing; "
-                "skipping service content."
+                "guild_economy_service_interiors_still_missing",
+                context={"action": "skip_service_content"},
             )
             return
 
@@ -123,7 +123,10 @@ def _initialize_merchant_stock() -> None:
         shop_key = merchant.shop_key
         shop_config = catalog.shop_configs.get(shop_key)
         if shop_config is None:
-            log_warn(f"sync_guild_economy: merchant {host.key} has unknown shop {shop_key!r}")
+            log_warn(
+                "guild_economy_unknown_shop",
+                context={"host": host.key, "shop_key": shop_key},
+            )
             continue
         current = dict(merchant.merchant_stock or {})
         changed = False
@@ -166,4 +169,12 @@ def restore_persisted_sessions() -> None:
         try:
             restore_active_session(player)
         except Exception as error:
-            log_warn(f"guild_economy: could not restore session for {player.key}: {error}")
+            log_warn(
+                "rollback_restore_failed",
+                exc=error,
+                context={
+                    "stage": "guild_economy_session",
+                    "obj": str(player),
+                    "key": "active_combat",
+                },
+            )

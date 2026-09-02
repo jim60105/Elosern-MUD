@@ -19,7 +19,6 @@ at_server_cold_stop()
 
 import importlib
 import time
-from functools import partial
 
 from world.observability import log_error, log_info, log_warn
 
@@ -98,10 +97,15 @@ def _startup_step(
     level the pre-refactor site logged (prompt library at error, registration
     skips at warn). Any other exception propagates unlogged, exactly as
     before the refactor. The wrapper never re-orders steps.
+
+    A step callable may also self-report a tolerated skip by returning
+    ``False`` (the registration seams do this, so a direct call keeps the
+    pre-refactor swallow-and-warn contract); the wrapper then emits no
+    ``startup_step`` success event for it.
     """
     started = _startup_clock()
     try:
-        run()
+        result = run()
     except Exception as exc:
         classes = tolerant_on() if callable(tolerant_on) else tolerant_on
         if not isinstance(exc, classes):
@@ -117,6 +121,8 @@ def _startup_step(
                 "reason": f"{type(exc).__name__}: {exc}",
             },
         )
+        return
+    if result is False:
         return
     log_info(
         "startup_step",
@@ -150,6 +156,30 @@ def _conflict_classes(*, schema: bool = False, profile: bool = False):
     return tuple(classes)
 
 
+def _tolerant_register(name: str, register, *, schema: bool = False, profile: bool = False) -> bool:
+    """Register one guardrail layer, preserving the seam-level tolerance contract.
+
+    The registration seams are called both from ``at_server_start`` (through
+    ``_startup_step``) and directly by guarded tests that assert a foreign
+    leftover registration never raises. The tolerance therefore lives here, at
+    the seam: a tolerated conflict class is swallowed with a structured
+    ``startup_step_degraded`` warn (``step``, ``reason``, exception chain), and
+    ``False`` is returned so the wrapper skips its success event. Anything else
+    propagates unchanged.
+    """
+    classes = _conflict_classes(schema=schema, profile=profile)
+    try:
+        register()
+    except classes as exc:
+        log_warn(
+            "startup_step_degraded",
+            exc=exc,
+            context={"step": name, "reason": f"{type(exc).__name__}: {exc}"},
+        )
+        return False
+    return True
+
+
 def _register_narrator_layer():
     """Register the narrator layer's guardrail hooks with the template renderer.
 
@@ -168,8 +198,11 @@ def _register_narrator_layer():
     from world.ai.narrator import register_narrator
     from world.rules.event_log import render_plain_text
 
-    register_narrator(
-        lambda event_logs: "\n".join(render_plain_text(log) for log in event_logs)
+    return _tolerant_register(
+        "register_narrator_layer",
+        lambda: register_narrator(
+            lambda event_logs: "\n".join(render_plain_text(log) for log in event_logs)
+        ),
     )
 
 
@@ -186,7 +219,9 @@ def _register_npc_dialogue_layer():
     """
     from world.ai.npc_dialogue import register_npc_dialogue
 
-    register_npc_dialogue()
+    return _tolerant_register(
+        "register_npc_dialogue_layer", register_npc_dialogue, schema=True
+    )
 
 
 def _register_scenario_director_layer():
@@ -203,7 +238,9 @@ def _register_scenario_director_layer():
     """
     from world.ai.scenario_director import register_scenario_director
 
-    register_scenario_director()
+    return _tolerant_register(
+        "register_scenario_director_layer", register_scenario_director, schema=True
+    )
 
 
 def _register_character_creation_layer():
@@ -216,12 +253,14 @@ def _register_character_creation_layer():
     registration (a conflicting fallback/validator, or a conflicting output
     schema) must never abort server startup; the proposal gate still fails
     loudly on a non-character_creation registration, so correctness is
-    preserved. The tolerated conflict-class handling lives in the
-    ``_startup_step`` wrapper.
+    preserved. The tolerance lives in ``_tolerant_register`` so direct seam
+    calls keep the same boot-tolerant contract.
     """
     from world.ai.character_creation import register_character_creation
 
-    register_character_creation()
+    return _tolerant_register(
+        "register_character_creation_layer", register_character_creation, schema=True
+    )
 
 
 def _register_scene_flavor_layer():
@@ -242,7 +281,7 @@ def _register_scene_flavor_layer():
     """
     from world.ai.scene_flavor import register_scene_flavor
 
-    register_scene_flavor()
+    return _tolerant_register("register_scene_flavor_layer", register_scene_flavor)
 
 
 def _register_action_options_layer():
@@ -263,7 +302,9 @@ def _register_action_options_layer():
     """
     from world.ai.action_options import register_action_options
 
-    register_action_options()
+    return _tolerant_register(
+        "register_action_options_layer", register_action_options, schema=True, profile=True
+    )
 
 
 def _register_title_nomination_layer():
@@ -279,7 +320,9 @@ def _register_title_nomination_layer():
     """
     from world.ai.title_nomination import register_title_nomination
 
-    register_title_nomination()
+    return _tolerant_register(
+        "register_title_nomination_layer", register_title_nomination, schema=True
+    )
 
 
 def _register_nomination_triggers():
@@ -322,9 +365,6 @@ def at_server_start():
 
     # Per-layer tolerated registration-conflict classes, resolved lazily at
     # first failure exactly like the pre-refactor helper-local imports.
-    reg_conflict = partial(_conflict_classes)
-    reg_conflict_schema = partial(_conflict_classes, schema=True)
-    reg_conflict_all = partial(_conflict_classes, schema=True, profile=True)
 
     # Deterministic startup owns the world-clock singleton; presentation reads
     # only through read_world_clock() and must never create it.
@@ -378,49 +418,32 @@ def at_server_start():
         degrade_level="error",
     )
 
-    # Guardrail-layer registrations: boot-tolerant for their tolerated
-    # conflict classes, fail-loud for anything else (pre-refactor semantics).
+    # Guardrail-layer registrations: each seam is boot-tolerant for its
+    # conflict classes via ``_tolerant_register`` (emitting its own
+    # ``startup_step_degraded`` warn and reporting False); any other error
+    # propagates unlogged, exactly as pre-refactor.
+    _startup_step("register_narrator_layer", _register_narrator_layer, fail_loud=False)
     _startup_step(
-        "register_narrator_layer",
-        _register_narrator_layer,
-        fail_loud=False,
-        tolerant_on=reg_conflict,
-    )
-    _startup_step(
-        "register_npc_dialogue_layer",
-        _register_npc_dialogue_layer,
-        fail_loud=False,
-        tolerant_on=reg_conflict_schema,
+        "register_npc_dialogue_layer", _register_npc_dialogue_layer, fail_loud=False
     )
     _startup_step(
         "register_scenario_director_layer",
         _register_scenario_director_layer,
         fail_loud=False,
-        tolerant_on=reg_conflict_schema,
     )
     _startup_step(
         "register_character_creation_layer",
         _register_character_creation_layer,
         fail_loud=False,
-        tolerant_on=reg_conflict_schema,
     )
+    _startup_step("register_scene_flavor_layer", _register_scene_flavor_layer, fail_loud=False)
     _startup_step(
-        "register_scene_flavor_layer",
-        _register_scene_flavor_layer,
-        fail_loud=False,
-        tolerant_on=reg_conflict,
-    )
-    _startup_step(
-        "register_action_options_layer",
-        _register_action_options_layer,
-        fail_loud=False,
-        tolerant_on=reg_conflict_all,
+        "register_action_options_layer", _register_action_options_layer, fail_loud=False
     )
     _startup_step(
         "register_title_nomination_layer",
         _register_title_nomination_layer,
         fail_loud=False,
-        tolerant_on=reg_conflict_schema,
     )
     # Nomination triggers: any failure here can never take the deterministic
     # game offline (pre-refactor caught Exception broadly).

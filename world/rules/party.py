@@ -20,8 +20,8 @@ left untouched.
 from typing import Any
 
 from django.db import transaction
-from evennia.utils.logger import log_warn
 
+from world.observability import log_warn
 from world.maps.wilderness_provider import WILDERNESS_NAME
 
 PARTY_MAX_COMPANIONS = 4
@@ -142,7 +142,7 @@ def bound_owner_of(npc: Any) -> Any | None:
         return None
     try:
         player = _resolve_live_object(int(member))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # observability: ignore R2: a malformed backref reads as no owner; logging would fire on every hot-path lookup
         return None
     if not isinstance(player, PlayerCharacter):
         return None
@@ -169,7 +169,7 @@ def live_companions(player: Any) -> list[Any]:
     for entry in raw:
         try:
             dbid = int(entry)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError):  # observability: ignore R2: malformed entries degrade to skipped per the entry-isolation contract; logging would fire on every hook
             # A non-numeric leftover entry is skipped, never a raise.
             continue
         try:
@@ -180,7 +180,7 @@ def live_companions(player: Any) -> list[Any]:
             if member is not None and int(member) != int(player.pk):
                 continue
             companions.append(obj)
-        except Exception:
+        except Exception:  # observability: ignore R2: per-entry isolation on a traversal-hook hot path; degrades to skipping that companion
             continue
     return companions
 
@@ -207,7 +207,7 @@ def combat_companions(player: Any) -> list[Any]:
         try:
             if npc.location is player.location and _stored_trait_value(npc.traits.hp) > 1:
                 companions.append(npc)
-        except Exception:
+        except Exception:  # observability: ignore R2: a companion whose stored traits fail to parse is excluded from engagement, never a raise
             continue
     return companions
 
@@ -268,7 +268,7 @@ def follow_companions(
                 npc, source_location, wilderness_source_coordinates
             ):
                 companions.append(npc)
-        except Exception:
+        except Exception:  # observability: ignore R2: co-location probe isolation on a traversal-hook hot path; degrades to leaving that companion behind
             continue
     if not companions:
         return
@@ -290,7 +290,7 @@ def follow_companions(
                 moved = enter_wilderness(
                     npc, coordinates=wilderness_coordinates, name=wilderness_name
                 )
-        except Exception:
+        except Exception:  # observability: ignore R2: a failed move degrades visibly to the left-behind notification below
             moved = False
         if not moved:
             left_behind.append(npc)
@@ -305,9 +305,9 @@ def follow_companions(
     except Exception as error:
         # A failed notification must never break the player's traversal.
         log_warn(
-            "party follow: failed to notify the player about left-behind "
-            "companions ({error}); companion moves already applied.",
-            error=error,
+            "party_follow_notification_failed",
+            exc=error,
+            context={"obj": str(player), "left_behind": len(left_behind)},
         )
 
 
@@ -332,7 +332,11 @@ def _reobserve_quest_arrival(player: Any, *, destination_had_companion: bool) ->
     try:
         observe_room_entry(player.location, player)
     except Exception as error:
-        log_warn(f"party follow: quest arrival re-observation failed ({error})")
+        log_warn(
+            "party_follow_quest_reobservation_failed",
+            exc=error,
+            context={"obj": str(player), "key": "location"},
+        )
 
 
 def _companion_co_located(

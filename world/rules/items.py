@@ -25,8 +25,8 @@ from typing import Any, Literal
 import yaml
 
 from django.db import transaction
-from evennia.utils.logger import log_warn
 
+from world.observability import log_warn
 from world.lore.items import ITEM_REGISTRY, ItemEffectKey
 from world.quests.transitions import restore_quest_log, snapshot_quest_log
 from world.rules.buffs import (
@@ -302,18 +302,40 @@ class ItemTouchedJournal:
                 _flush_deleted_instance(self.mirror)
             except Exception as error:
                 log_warn(
-                    f"item journal could not flush mirror {self.mirror_pk}: {error}"
+                    "rollback_restore_failed",
+                    exc=error,
+                    context={
+                        "stage": "item_journal_mirror_flush",
+                        "obj": str(actor),
+                        "key": str(self.mirror_pk),
+                    },
                 )
         try:
             contents_cache = getattr(actor, "contents_cache", None)
             if contents_cache is not None:
                 contents_cache.init()
         except Exception as error:
-            log_warn(f"item journal could not reset contents cache: {error}")
+            log_warn(
+                "rollback_restore_failed",
+                exc=error,
+                context={
+                    "stage": "item_journal_contents_cache",
+                    "obj": str(actor),
+                    "key": "contents_cache",
+                },
+            )
         try:
             _refresh_advance_entity_caches(actor)
         except Exception as error:
-            log_warn(f"item journal could not refresh entity caches: {error}")
+            log_warn(
+                "rollback_restore_failed",
+                exc=error,
+                context={
+                    "stage": "item_journal_entity_caches",
+                    "obj": str(actor),
+                    "key": "traits",
+                },
+            )
 
 
 @dataclass(frozen=True)
@@ -466,7 +488,7 @@ def preflight_item_use(
         # consumed, no event is logged, and no world clock advances.
         try:
             debuffs = _active_debuff_keys(request.actor)
-        except TypeError:
+        except TypeError:  # observability: ignore R2: a malformed trait set is a validation rejection returned to the caller as malformed_traits
             return _rejected(ItemUseReason.MALFORMED_TRAITS)
         if not debuffs:
             return _rejected(ItemUseReason.NO_DEBUFFS)

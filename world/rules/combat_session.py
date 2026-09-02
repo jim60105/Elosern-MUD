@@ -9,6 +9,7 @@ overwhelm compression), and the accumulated round time settles exactly once at
 a terminal outcome through ``settle_combat_result``.
 """
 
+import time
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from types import SimpleNamespace
@@ -18,6 +19,7 @@ from evennia.objects.models import ObjectDB
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
+from world.observability import log_info, log_warn
 from world.rules.action import (
     ActionRequest,
     ActionResolver,
@@ -35,7 +37,7 @@ from world.rules.combat import (
     is_battle_over,
     run_round,
 )
-from world.rules.clock import get_world_clock, settle_combat_result
+from world.rules.clock import get_world_clock, read_world_clock, settle_combat_result
 from world.rules.items import ItemUseRequest, preflight_item_use
 from world.rules.monster_behaviour import monster_behaviour_policy
 from world.rules.overwhelm import classify_overwhelm, resolve_overwhelm
@@ -366,7 +368,7 @@ def is_in_active_session(actor: Any) -> bool:
     """Return whether ``actor`` carries a valid active combat session."""
     try:
         return read_session(actor) is not None
-    except CombatSessionError:
+    except CombatSessionError:  # observability: ignore R2: the predicate deliberately reports an unreadable session as inactive; the caller branches on the bool
         return False
 
 
@@ -796,6 +798,30 @@ def _restore_round_touched(
         restore_relations_surfaces(relations_before)
 
 
+def _primary_opponent_id(battlefield: Battlefield, record: CombatSessionRecord) -> Any:
+    """Return one deterministic opponent identity for a round boundary event.
+
+    The durable record's ``enemy_ids`` are session-stable dbrefs (never empty
+    for an engaged session); the lowest pk labels multi-foe encounters
+    deterministically. A record without enemies is unexpected and reported as
+    ``None``.
+    """
+    if record.enemy_ids:
+        return min(record.enemy_ids)
+    return None
+
+
+def _current_tick() -> int | None:
+    """Read the world-clock tick for a boundary event without creating state.
+
+    Uses the non-creating ``read_world_clock`` accessor: telemetry must never
+    create the clock Script (``get_world_clock`` would); an absent clock is
+    reported as ``None``.
+    """
+    clock = read_world_clock()
+    return clock.tick if clock is not None else None
+
+
 def _scan_friendly_fire(
     actor: Any,
     battlefield: Battlefield,
@@ -1105,6 +1131,8 @@ def _submit_request(
     grant_notifications: list[str] = []
     simulated, nonlethal_keys = _session_policy(battlefield, record)
     dedupe_before = snapshot_practice_dedupe()
+    hp_before = _stored_trait_value(actor.traits.hp)
+    opponent = _primary_opponent_id(battlefield, record)
     try:
         with transaction.atomic():
             # Shared outer transaction (fix-combat-settlement-recovery D1):
@@ -1154,6 +1182,28 @@ def _submit_request(
                     notifications_sink=grant_notifications,
                 )
                 gained = 1
+                # Boundary event for a committed ordinary round only: the
+                # on_commit callback fires once the OUTERMOST transaction
+                # commits and is discarded if this unit rolls back, so a
+                # rolled-back round never leaves a boundary line behind. The
+                # overwhelm-compression branch is deliberately excluded (it is
+                # not one ordinary round).
+                # Every value is snapshotted NOW, at the round's durable
+                # boundary: a nested caller's later work must not shift the
+                # tick/HP this line describes, and the callback itself does
+                # zero computation so it can never raise after a commit.
+                boundary = {
+                    "char": str(actor.pk),
+                    "opponent": opponent,
+                    "tick": _current_tick(),
+                    "hp_before": hp_before,
+                    "hp_after": _stored_trait_value(actor.traits.hp),
+                }
+                transaction.on_commit(
+                    lambda boundary=boundary: log_info(
+                        "combat_round_settled", context=boundary
+                    )
+                )
 
             notifications = _scan_friendly_fire(actor, battlefield, logs)
             notifications += _scan_sexual_coercion(actor, battlefield, logs)
@@ -1173,7 +1223,9 @@ def _submit_request(
                 rounds_elapsed=record.rounds_elapsed + gained,
             )
             _persist(actor, new_record)
-            result = _continue_or_settle(actor, new_record, battlefield, logs)
+            result = _continue_or_settle(
+                actor, new_record, battlefield, logs, notification_count=len(notifications)
+            )
     except Exception:
         # The outer transaction rolled the database back; restore the item
         # journals first (they cover the actually-deleted mirrors and the
@@ -1271,6 +1323,8 @@ def _continue_or_settle(
     record: CombatSessionRecord,
     battlefield: Battlefield,
     logs,
+    *,
+    notification_count: int = 0,
 ) -> dict[str, Any]:
     outcome = _terminal_outcome(actor, battlefield, record)
     if outcome is None:
@@ -1289,6 +1343,8 @@ def settle_session(
     battlefield: Battlefield | None,
     outcome: str,
     logs=(),
+    *,
+    notification_count: int = 0,
 ) -> dict[str, Any]:
     """Settle accumulated round time once and clear session state (D-6).
 
@@ -1311,6 +1367,7 @@ def settle_session(
     from django.db import transaction
 
     exam_result = None
+    started = time.monotonic()
     with transaction.atomic():
         if record.mode == "guild_exam":
             from world.rules.guild_exams import settle_exam_outcome
@@ -1355,6 +1412,23 @@ def settle_session(
             # candidate (exam-simulated-battle-redesign D3). Opponent deletion
             # stays post-commit so a rolled-back settlement keeps it alive.
             _restore_exam_participants(actor, record, battlefield)
+        # Boundary event fires only on the OUTERMOST durable commit: a
+        # settlement reached inside a round's transaction is a savepoint, and
+        # a rolled-back attempt must emit nothing (spec scenario).
+        settled_ms = int((time.monotonic() - started) * 1000)
+        # Context snapshotted at the boundary; callback carries only
+        # primitives (see the round-boundary note above).
+        boundary = {
+            "char": str(actor.pk),
+            "outcome": outcome,
+            "ms": settled_ms,
+            "notifications": notification_count,
+        }
+        transaction.on_commit(
+            lambda boundary=boundary: log_info(
+                "settlement_done", context=boundary
+            )
+        )
     if record.mode == "guild_exam":
         _delete_exam_opponent(actor, record)
     return {
@@ -1420,15 +1494,17 @@ def _delete_exam_opponent(actor: Any, record: CombatSessionRecord) -> None:
     keeps the opponent alive for exactly one retry. An already-missing
     opponent (or a delete error) is logged and never raises.
     """
-    from evennia.utils.logger import log_warn
-
     opponent = _find_exam_opponent(actor, record)
     if opponent is None:
         return
     try:
         opponent.delete()
     except Exception as error:
-        log_warn(f"guild_exam: could not delete opponent {opponent}: {error}")
+        log_warn(
+            "guild_exam_opponent_delete_failed",
+            exc=error,
+            context={"char": str(actor.key), "obj": str(opponent), "exam": record.exam_id},
+        )
 
 
 def _settle_with_restore(
@@ -1485,7 +1561,7 @@ def forfeit(actor: Any) -> dict[str, Any]:
     battlefield = None
     try:
         battlefield = reconstruct_battlefield(actor, record)
-    except CombatSessionError:
+    except CombatSessionError:  # observability: ignore R2: forfeit deliberately settles without a battlefield when participants are unreconstructable
         battlefield = None
     outcome = "defeat" if record.mode == "hostile" else "exam_failed"
     return _settle_with_restore(actor, record, battlefield, outcome)
@@ -1507,8 +1583,6 @@ def restore_active_session(actor: Any) -> None:
     restoration or settlement failures propagate with the durable record
     intact for retry.
     """
-    from evennia.utils.logger import log_warn
-
     try:
         record = read_session(actor)
     except CombatSessionError as error:
@@ -1516,7 +1590,9 @@ def restore_active_session(actor: Any) -> None:
         # skip-safety registration is the only key gating the actor's skips,
         # and untrusted ids must never drive participant cleanup.
         log_warn(
-            f"combat_session: clearing unparseable session for {actor.key}: {error}"
+            "combat_session_unparseable_cleared",
+            exc=error,
+            context={"char": str(actor.key)},
         )
         clear_session(actor, None, None)
         return
@@ -1524,8 +1600,11 @@ def restore_active_session(actor: Any) -> None:
         return
     if record.settled_tick is not None:
         log_warn(
-            f"combat_session: skipping settlement of already-settled session "
-            f"{record.session_id} (settled at tick {record.settled_tick})"
+            "combat_session_already_settled",
+            context={
+                "session": record.session_id,
+                "settled_tick": record.settled_tick,
+            },
         )
         clear_session(actor, None, record)
         return
@@ -1533,7 +1612,9 @@ def restore_active_session(actor: Any) -> None:
         battlefield = reconstruct_battlefield(actor, record)
     except CombatSessionError as error:
         log_warn(
-            f"combat_session: terminating invalid session for {actor.key}: {error}"
+            "combat_session_terminated_invalid",
+            exc=error,
+            context={"char": str(actor.key), "session": record.session_id},
         )
         _settle_with_restore(
             actor,

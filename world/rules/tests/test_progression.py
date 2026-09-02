@@ -118,7 +118,7 @@ class ProgressionTests(EvenniaTestCase):
             ),
         ]
         with self.assertRaises(CommitFailed):
-            _commit(effects)
+            _commit(effects, char="tester", action="test_skill")
         self.assertIsNone(entity.db.skill_proficiency)
 
     @covers_requirement("skill-lineage::successful-active-resolution-accruses-lineage-practice-xp")
