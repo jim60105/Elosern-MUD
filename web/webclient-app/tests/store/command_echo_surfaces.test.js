@@ -204,6 +204,20 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "title accept 2",
     },
     {
+      id: "character drawer: persona field edit row (payload-only)",
+      ids: ["character.persona.update"],
+      prepare() {
+        openExploration();
+        // The drawer persona edit intent (AppClient.onPersonaEdit forwards
+        // {field, text}; the echo replays the typed Telnet family line).
+        store.dispatchAction("character.persona.update", {
+          field: "personality",
+          text: "沉穩",
+        });
+      },
+      expected: "設定個性 沉穩",
+    },
+    {
       id: "ballot menu: decline row (payload-only)",
       ids: ["title.decline"],
       prepare() {

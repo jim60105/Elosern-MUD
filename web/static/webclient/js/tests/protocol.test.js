@@ -1441,7 +1441,7 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.creation, 2);
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.character, 6);
+  assert.equal(Protocol.PANEL_ALLOWLIST.character, 7);
   assert.equal(Protocol.PANEL_ALLOWLIST.lineage, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.title_ballot, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.title_codex, 1);
@@ -3594,7 +3594,7 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
 
 test("exploration and character are in the production panel allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.character, 6);
+  assert.equal(Protocol.PANEL_ALLOWLIST.character, 7);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
@@ -3634,7 +3634,7 @@ function validCharacterTraitRow(overrides) {
 function validCharacterPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "character",
       traits: [
@@ -3677,7 +3677,7 @@ function validCharacterPanel(overrides) {
       disguise: { active: false, description: "", displayed: [] },
       guild: { rank: null, merit: 0 },
       wallet: 100,
-      persona: { background: null },
+      persona: { background: null, personality: null, life_story: null, habit: null },
       intimate: null,
     },
     overrides || {}
@@ -3701,17 +3701,17 @@ function characterCategoryGroup(keys) {
 }
 
 test("validates the character panel available/unavailable discriminator", () => {
-  // The unavailable fixture carries the registered version (6), and the real
+  // The unavailable fixture carries the registered version (7), and the real
   // validatePanel dispatch path is exercised. The transitional character v4
   // tolerance is closed (render-equipment-breakdown-webclient): only the
-  // registered version 6 is accepted on both forms.
+  // registered version 7 is accepted on both forms.
   assert.deepEqual(
     Protocol.validatePanel(
       "character",
       Protocol.PANEL_ALLOWLIST.character,
-      unavailableStatusPanel({ schema_version: 6 })
+      unavailableStatusPanel({ schema_version: 7 })
     ),
-    unavailableStatusPanel({ schema_version: 6 })
+    unavailableStatusPanel({ schema_version: 7 })
   );
   assert.throws(() =>
     Protocol.validatePanel(
@@ -3734,7 +3734,19 @@ test("validates the character panel available/unavailable discriminator", () => 
       unavailableStatusPanel({ schema_version: 5 })
     )
   );
+  assert.throws(() =>
+    Protocol.validatePanel(
+      "character",
+      Protocol.PANEL_ALLOWLIST.character,
+      unavailableStatusPanel({ schema_version: 6 })
+    )
+  );
   assert.doesNotThrow(() => Protocol.validateCharacterPanel(validCharacterPanel()));
+  // The normalized result carries the registered version 7 (not a stale 6).
+  assert.equal(
+    Protocol.validateCharacterPanel(validCharacterPanel()).schema_version,
+    7
+  );
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ kind: "status" })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 1 })));
@@ -3742,6 +3754,7 @@ test("validates the character panel available/unavailable discriminator", () => 
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 3 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 4 })));
   assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 5 })));
+  assert.throws(() => Protocol.validateCharacterPanel(validCharacterPanel({ schema_version: 6 })));
   // A legacy v4 trait row smuggled under version 6 rejects on the exact
   // breakdown-shape rules.
   assert.throws(() =>
@@ -3778,7 +3791,7 @@ test("a character unavailable snapshot at the registered version is accepted ato
   const store = Protocol.createStore();
   store.beginTransport(1);
   const status = validStatusPanel();
-  const unavailable = unavailableStatusPanel({ schema_version: 6 });
+  const unavailable = unavailableStatusPanel({ schema_version: 7 });
   const accepted = snapshot({ panels: { status: status, character: unavailable } });
   const result = store.receive(1, "ui_snapshot", [accepted], {});
   assert.equal(result.accepted, true);
@@ -3794,7 +3807,7 @@ test("a character unavailable snapshot at the registered version is accepted ato
     panels: { status: differentStatus, character: unavailableStatusPanel({ schema_version: 2 }) },
   });
   assert.equal(store.receive(1, "ui_snapshot", [stale], {}).reason, "invalid");
-  assert.equal(store.getState().phase, "active", "the version-6 state remains committed");
+  assert.equal(store.getState().phase, "active", "the version-7 state remains committed");
   assert.deepEqual(store.getState().panels.status, status, "status panel untouched");
   assert.deepEqual(store.getState().panels.character, unavailable, "character panel untouched");
 });
@@ -4070,23 +4083,64 @@ test("character panel v3 validates the category-grouped skill shape", () => {
   );
 });
 
-test("character panel v3 persona.background round-trips bounded text", () => {
-  const withBackground = Protocol.validateCharacterPanel(
-    validCharacterPanel({ persona: { background: "  在公會登記的新人冒險者  " } })
+test("character panel v7 persona round-trips the four bounded prose keys", () => {
+  const four = {
+    background: "  在公會登記的新人冒險者  ",
+    personality: "沉穩",
+    life_story: "來自邊境的小村",
+    habit: "清晨練劍",
+  };
+  const withPersona = Protocol.validateCharacterPanel(
+    validCharacterPanel({ persona: four })
   );
-  assert.equal(withBackground.persona.background, "在公會登記的新人冒險者");
-  const without = Protocol.validateCharacterPanel(
-    validCharacterPanel({ persona: { background: null } })
-  );
-  assert.equal(without.persona.background, null);
+  assert.deepEqual(withPersona.persona, {
+    background: "在公會登記的新人冒險者",
+    personality: "沉穩",
+    life_story: "來自邊境的小村",
+    habit: "清晨練劍",
+  });
+  // Each key is independently nullable and whitespace-nulling.
   const blank = Protocol.validateCharacterPanel(
-    validCharacterPanel({ persona: { background: "   " } })
+    validCharacterPanel({
+      persona: { background: "   ", personality: null, life_story: " 邊境 ", habit: null },
+    })
   );
-  assert.equal(blank.persona.background, null);
+  assert.deepEqual(blank.persona, {
+    background: null,
+    personality: null,
+    life_story: "邊境",
+    habit: null,
+  });
+  // The section is exactly the four keys: structural keys never render.
   assert.throws(() =>
     Protocol.validateCharacterPanel(
       validCharacterPanel({
-        persona: { background: "x".repeat(Protocol.CHARACTER_MAX_BACKGROUND + 1) },
+        persona: { background: null, personality: null, life_story: null, habit: null, identity: {} },
+      })
+    ),
+    /persona/
+  );
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        persona: { background: null, personality: null, life_story: null },
+      })
+    ),
+    /persona/
+  );
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        persona: { background: null, personality: null, life_story: null, habit: null, extra: 1 },
+      })
+    ),
+    /persona/
+  );
+  // Bound at the shared 600-code-point cap, per key.
+  assert.throws(() =>
+    Protocol.validateCharacterPanel(
+      validCharacterPanel({
+        persona: { background: null, personality: null, life_story: null, habit: "x".repeat(Protocol.CHARACTER_MAX_PERSONA + 1) },
       })
     ),
     /exceeds/

@@ -1,5 +1,6 @@
 {
   "registeredMutationActionIds": [
+    "character.persona.update",
     "combat.cast",
     "combat.flee",
     "combat.forfeit",

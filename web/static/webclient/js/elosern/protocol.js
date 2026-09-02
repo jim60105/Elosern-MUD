@@ -294,7 +294,7 @@
     services: 3,
     creation: 2,
     exploration: 1,
-    character: 6,
+    character: 7,
     lineage: 1,
     title_ballot: 1,
     title_codex: 1,
@@ -3453,18 +3453,34 @@
     return value;
   }
 
-  var CHARACTER_MAX_BACKGROUND = 600;
+  var CHARACTER_MAX_PERSONA = 600;
+  var CHARACTER_PERSONA_FIELDS = [
+    "background",
+    "personality",
+    "life_story",
+    "habit",
+  ];
 
   function validateCharacterPersona(value) {
-    requireExactFields(value, "persona", ["background"], []);
-    if (value.background === null) {
-      return { background: null };
+    // The four editable persona prose keys (persona-editing D3): each is
+    // independently nullable, whitespace-nulling, and bounded at the shared
+    // 600-code-point cap. Structural keys never appear in this section.
+    requireExactFields(value, "persona", CHARACTER_PERSONA_FIELDS, []);
+    var result = {};
+    for (var i = 0; i < CHARACTER_PERSONA_FIELDS.length; i++) {
+      var field = CHARACTER_PERSONA_FIELDS[i];
+      if (value[field] === null) {
+        result[field] = null;
+        continue;
+      }
+      var text = requireString(
+        value[field],
+        "persona." + field,
+        CHARACTER_MAX_PERSONA
+      );
+      result[field] = text.trim() ? text.trim() : null;
     }
-    var background = requireString(value.background, "persona.background", CHARACTER_MAX_BACKGROUND);
-    if (!background.trim()) {
-      return { background: null };
-    }
-    return { background: background.trim() };
+    return result;
   }
 
   // Nullable intimate section of the character panel (webclient-intimate-status-section).
@@ -3499,7 +3515,7 @@
     };
   }
 
-  // Exact available character panel v6 schema (design D10: skill category
+  // Exact available character panel v7 schema (design D10: skill category
   // grouping + the intimate-status section; expose-stat-breakdown-read-model
   // added the breakdown trait rows and the adjustment-bearing equipment
   // rows; render-equipment-breakdown-webclient closed the transitional v4
@@ -3536,7 +3552,7 @@
         throw new Error("full_title must be non-empty when present");
       }
     }
-    if (payload.schema_version !== 6) {
+    if (payload.schema_version !== 7) {
       throw new Error("unsupported character schema_version");
     }
     if (payload.available !== true || payload.kind !== "character") {
@@ -3590,7 +3606,7 @@
 
     var intimate = validateCharacterIntimate(payload.intimate);
     var result = {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "character",
       traits: payload.traits,
@@ -3614,10 +3630,10 @@
   }
 
   function validateCharacterPanel(payload) {
-    // Version gate (mirror of the server validator): 6 is the only accepted
-    // schema version (title-system character-panel full title).
+    // Version gate (mirror of the server validator): 7 is the only accepted
+    // schema version (persona-editing four-key persona section).
     requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 6) {
+    if (payload.schema_version !== 7) {
       throw new Error("unsupported character schema_version");
     }
     return validateCharacterAvailablePanel(payload);
@@ -4395,7 +4411,8 @@
     CHARACTER_MAX_LABEL: CHARACTER_MAX_LABEL,
     CHARACTER_MAX_DESCRIPTION: CHARACTER_MAX_DESCRIPTION,
     CHARACTER_MAX_SLOT: CHARACTER_MAX_SLOT,
-    CHARACTER_MAX_BACKGROUND: CHARACTER_MAX_BACKGROUND,
+    CHARACTER_MAX_PERSONA: CHARACTER_MAX_PERSONA,
+    CHARACTER_PERSONA_FIELDS: CHARACTER_PERSONA_FIELDS.slice(),
     CREATION_MAX_PRESETS: CREATION_MAX_PRESETS,
     CREATION_MAX_RACES: CREATION_MAX_RACES,
     CREATION_MAX_SUBRACES: CREATION_MAX_SUBRACES,

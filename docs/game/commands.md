@@ -97,6 +97,9 @@
 | [`character concept`](/game/command-reference?id=character-concept) | 依角色構想生成提案，再完成建立。 |
 | [`設定描述`](/game/command-reference?id=設定描述) | 設定你的個人描述。 |
 | [`設定背景`](/game/command-reference?id=設定背景) | 設定或檢視你的背景（風味文字）。 |
+| [`設定個性`](/game/command-reference?id=設定個性) | 設定或檢視你的個性（風味文字）。 |
+| [`設定生平`](/game/command-reference?id=設定生平) | 設定或檢視你的生平（背景故事，風味文字）。 |
+| [`設定習慣`](/game/command-reference?id=設定習慣) | 設定或檢視你的習慣（風味文字）。 |
 | [`title`](/game/command-reference?id=title) | 檢視稱號冊（list/codex）、更換掛上的稱號或異名、回覆異名提名投票，並以兩步確認移除異名。 |
 | [`暱稱`](/game/command-reference?id=暱稱) | 建立或檢視個人暱稱。 |
 

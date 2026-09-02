@@ -3,8 +3,7 @@
 Define the creation-persona persistence slice: the player-owned persona block
 that rides the custom draft, payload, and activation into the import-card
 persona record written inside the all-or-nothing activation transaction, the
-background field's journey through the same slice, the owner's post-activation
-background updates, and the `creation.concept` action sharing the guarded
+background field's journey through the same slice, and the `creation.concept` action sharing the guarded
 generative pipeline while applying its proposal transiently with zero
 persistent writes (retool-concept-transient-fill retired the server-owned
 concept draft stage and its fingerprint-protected apply service).
@@ -30,28 +29,6 @@ When the custom draft carries a non-null persona block, `activate_player_charact
 - **WHEN** a pending character activates with a draft whose persona is null and that has no background
 - **THEN** `entity.db.persona` remains absent and activation behaves exactly as before
 
-### Requirement: The owner can freely update the background after activation
-A post-activation deterministic `world.rules` service SHALL be the sole writer of an active
-character's persona `background` field. It SHALL accept a bounded text value (an empty value
-explicitly clears the field by removing the key), validate the bound deterministically, create the
-import-card-shaped persona record when none exists, preserve every existing persona key (including
-unknown keys) while writing or clearing only `background`, and SHALL NOT alter traits, identity
-attributes, the three prose fields, or the world clock.
-
-#### Scenario: Updating the background changes only that field
-- **WHEN** an active character's owner submits a bounded background update
-- **THEN** `entity.db.persona["background"]` equals the new text, the six import-card keys (and any
-  prose fields) are unchanged, and no trait, identity, or clock state changes
-
-#### Scenario: Clearing the background removes the key
-- **WHEN** an active character's owner submits an empty background update
-- **THEN** the persona record's `background` key is removed (or never created) and no other state
-  changes
-
-#### Scenario: Updating on a character without a persona record creates the card
-- **WHEN** an active character has no persona record and the owner submits a bounded background
-- **THEN** the service creates the import-card-shaped record with the six keys (empty containers
-  for the non-prose keys) and the `background` key, and no other state changes
 
 ### Requirement: The background survives the draft, concept, custom-save, and activation journey
 The `background` SHALL be a first-class custom-draft field: `save_custom_draft` validates and stores it, the draft normalizer accepts it with its bound and includes it in the draft fingerprint. Activation SHALL merge the background into the persona record together with any custom-draft persona block — the six import-card keys are written first, then `background` when the draft carries one — inside the same all-or-nothing transaction.

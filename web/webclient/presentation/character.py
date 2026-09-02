@@ -1,12 +1,12 @@
-"""Exact schema-version-6 ``character`` panel and presenter (webclient-exploration-menu).
+"""Exact schema-version-7 ``character`` panel and presenter (webclient-exploration-menu).
 
 The presenter serializes the read-only expanded character surface opened by the
 exploration dock's Character root. It shares the same canonical
 trait/equipment/disguise source the compact ``status`` panel builds from
 through ``world.rules.status_query`` so the two panels can never drift apart,
 and it never substitutes a disguised value for a true trait. Version 2 added
-the display-only ``persona`` section carrying the character's own background
-flavor text; it is never used to infer any mechanical value. Version 3 adds
+the display-only ``persona`` section; it is never used to infer any mechanical
+value. Version 3 adds
 the ``actives`` field and regroups both ``actives`` and ``passives`` by the
 skill-category taxonomy — which makes the innate
 ``flee`` and ``basic_attack`` skills visible out of combat. Version 4 adds the
@@ -24,8 +24,11 @@ breakdown shape ``{key, label, base, current, max, effective, layers}`` —
 server-formatted ``adjustment`` summary to equipment rows. Version 6 (title-fixed-core
 D6) adds the optional ``full_title`` row: the composed 稱號　異名 the client
 addresses the player by, omitted entirely while both title slots are empty.
-Version 6 is the only accepted schema version: the validator accepts v6 exactly
-and rejects every other version.
+Version 7 (persona-editing) widens the ``persona`` section from exactly
+``background`` to exactly the four editable prose keys
+(``background``/``personality``/``life_story``/``habit``), each nullable and
+bounded by the shared persona-field cap. Version 7 is the only accepted schema
+version: the validator accepts v7 exactly and rejects every other version.
 
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
@@ -61,6 +64,10 @@ from world.lore.sexual_vocab import (
     SHAME_LEVELS,
     WETNESS_LEVELS,
 )
+from world.rules.character_creation import (
+    MAX_PERSONA_FIELD_LENGTH,
+    PERSONA_PROSE_KEYS,
+)
 from world.rules.equipment_effects import equipment_adjustment_text
 from world.rules.progression import freeform_scale_entries_for
 from world.rules.status_query import (
@@ -73,7 +80,7 @@ from world.rules.status_query import (
 from world.rules.titles import MAX_FULL_TITLE_CODE_POINTS
 from world.skills.registry import SKILL_REGISTRY, SkillCategory
 
-CHARACTER_SCHEMA_VERSION = 6
+CHARACTER_SCHEMA_VERSION = 7
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_TRAIT_ROWS = 32
@@ -96,10 +103,14 @@ MAX_SLOT_CODE_POINTS = 32
 # The equipment adjustment summary bound (P3 formatter output; 「｜」-joined
 # segments of the fixed vocabulary).
 MAX_ADJUSTMENT_CODE_POINTS = MAX_DESCRIPTION_CODE_POINTS
-# The display-only persona background bound mirrors the persona-field cap
+# The display-only persona prose bound mirrors the persona-field cap
 # (``world.rules.character_creation.MAX_PERSONA_FIELD_LENGTH``); the parity
 # contract pins the JS validator to this same number.
-MAX_PERSONA_BACKGROUND_CODE_POINTS = 600
+MAX_PERSONA_FIELD_CODE_POINTS = MAX_PERSONA_FIELD_LENGTH
+# The exact four display-only persona prose keys, in drawer display order
+# (personality, life_story, habit, background). The panel section and the JS
+# validator mirror this tuple.
+PERSONA_PROSE_FIELDS = (*PERSONA_PROSE_KEYS, "background")
 # The composed full title bound is owned by ``world.rules.titles`` (the
 # producer bounds composition at it); the JS validator mirrors this number in
 # the parity contract.
@@ -418,22 +429,32 @@ def _validate_guild(value: Any) -> dict[str, Any]:
 def _validate_persona(value: Any) -> dict[str, Any]:
     """Validate the display-only ``persona`` section of the character panel.
 
-    Carries exactly ``background`` (a nullable bounded string from the
-    character's persona record). The section is presentation data and is never
-    used to infer any mechanical value.
+    Carries exactly the four editable prose keys (each a nullable bounded
+    string from the character's persona record). The section is presentation
+    data and is never used to infer any mechanical value; the structural keys
+    (``identity``/``appearance``/``social_connection``) never appear.
     """
-    _require_exact_fields(value, "persona", {"background"}, {})
-    background = value["background"]
-    if background is None:
-        return {"background": None}
-    if not isinstance(background, str):
-        raise ProtocolValidationError("persona.background must be text or null")
-    text = background.strip()
-    if not text:
-        return {"background": None}
-    if sum(1 for _ in text) > MAX_PERSONA_BACKGROUND_CODE_POINTS:
-        raise ProtocolValidationError("persona.background exceeds its bound")
-    return {"background": text}
+    _require_exact_fields(
+        value, "persona", set(PERSONA_PROSE_FIELDS), {}
+    )
+    cleaned: dict[str, Any] = {}
+    for field in PERSONA_PROSE_FIELDS:
+        entry = value[field]
+        if entry is None:
+            cleaned[field] = None
+            continue
+        if not isinstance(entry, str):
+            raise ProtocolValidationError(f"persona.{field} must be text or null")
+        text = entry.strip()
+        if not text:
+            cleaned[field] = None
+            continue
+        if sum(1 for _ in text) > MAX_PERSONA_FIELD_CODE_POINTS:
+            raise ProtocolValidationError(
+                f"persona.{field} exceeds its bound"
+            )
+        cleaned[field] = text
+    return cleaned
 
 
 def _validate_intimate_level(
@@ -502,7 +523,7 @@ def _validate_full_title(payload: dict[str, Any]) -> str | None:
 
 
 def _validate_available(payload: Any) -> dict[str, Any]:
-    """Validate one exact available version-6 character payload."""
+    """Validate one exact available version-7 character payload."""
     _require_exact_fields(
         payload,
         "character panel",
@@ -603,7 +624,7 @@ def _validate_available(payload: Any) -> dict[str, Any]:
 
 
 def validate_character(payload: Any) -> dict[str, Any]:
-    """Validate one exact available version-6 ``character`` payload.
+    """Validate one exact available version-7 ``character`` payload.
 
     Returns a normalized payload or raises :class:`CharacterPanelError`. The
     common unavailable form is NOT accepted here; the registry handles it.
@@ -713,9 +734,9 @@ def _serialize_active_skill_groups(keys: tuple[str, ...], actor: Any) -> list[di
 
 
 def _serialize(
-    model: CharacterReadModel, background: str | None, actor: Any
+    model: CharacterReadModel, persona: dict[str, Any], actor: Any
 ) -> dict[str, Any]:
-    """Serialize the frozen read model into the v6 available payload.
+    """Serialize the frozen read model into the v7 available payload.
 
     Trait rows come from ``model.breakdown`` (the single assembly the whole
     read shares); labels stay the shared ``TRAIT_LABELS`` map; equipment rows
@@ -768,7 +789,7 @@ def _serialize(
         },
         "guild": {"rank": model.guild_rank, "merit": model.guild_merit},
         "wallet": model.wallet,
-        "persona": {"background": background},
+        "persona": persona,
         "intimate": _serialize_intimate(model.intimate),
     }
     # The composed live full title; omitted when empty so pre-onboarding
@@ -787,12 +808,15 @@ def character_presenter(context: PresentationContext) -> dict[str, Any]:
         model = build_character_read_model(actor)
     except StatusQueryError:
         raise PanelUnavailableError
-    background = actor.persona.get("background")
-    if background is not None and not isinstance(background, str):
-        background = None
-    if background is not None and not background.strip():
-        background = None
-    return validate_character(_serialize(model, background, actor))
+    persona: dict[str, Any] = {}
+    for field in PERSONA_PROSE_FIELDS:
+        value = actor.persona.get(field)
+        if value is not None and not isinstance(value, str):
+            value = None
+        if value is not None and not value.strip():
+            value = None
+        persona[field] = value
+    return validate_character(_serialize(model, persona, actor))
 
 
 __all__ = [
@@ -807,7 +831,7 @@ __all__ = [
     "MAX_LAYERS_PER_STAT",
     "MAX_ADJUSTMENT_CODE_POINTS",
     "MAX_PASSIVE_ROWS",
-    "MAX_PERSONA_BACKGROUND_CODE_POINTS",
+    "MAX_PERSONA_FIELD_CODE_POINTS",
     "MAX_SLOT_CODE_POINTS",
     "MAX_TRAIT_ROWS",
     "TRAIT_LABELS",

@@ -24,7 +24,7 @@ import {
 // renders no doll and no wallet figure.
 
 const CHARACTER_UNAVAILABLE = {
-  schema_version: 6,
+  schema_version: 7,
   available: false,
   kind: "character",
   reason: { code: "no_puppet", message: "你已離開角色" },
@@ -149,10 +149,23 @@ describe("CharacterStatusDrawer", () => {
   it("marks every drawer section with a labelled small-caps heading", () => {
     const w = mountDrawer();
     const labels = w.findAll(".character-status-drawer__section-label");
-    expect(labels).toHaveLength(7);
+    // add-persona-edit-surface: the persona area's own four section labels
+    // (個性／生平／習慣／背景) follow the original six.
+    expect(labels).toHaveLength(10);
     // DOM order (設計稿 #dr-status): vitals, traits, guild counters,
-    // conditions, disguise, intimate status, persona.
-    expect(labels.map((el) => el.text())).toEqual(["生命量", "屬性", "計數 · 公會", "狀態", "偽裝", "親密狀態", "背景"]);
+    // conditions, disguise, intimate status, then the four persona sections.
+    expect(labels.map((el) => el.text())).toEqual([
+      "生命量",
+      "屬性",
+      "計數 · 公會",
+      "狀態",
+      "偽裝",
+      "親密狀態",
+      "個性",
+      "生平",
+      "習慣",
+      "背景",
+    ]);
   });
 
   it("renders every section in the 設計稿 DOM order", () => {
@@ -328,5 +341,128 @@ describe("CharacterStatusDrawer full-title line", () => {
     expect(
       w.find('[data-testid="character-status-drawer__full-title"]').exists(),
     ).toBe(false);
+  });
+
+  // --- persona sections (add-persona-edit-surface) -------------------------
+
+  it("renders the four persona sections with verbatim values and 未設定 placeholders", () => {
+    const w = mountDrawer();
+    // CHARACTER_PANEL_SAMPLE carries all four populated values verbatim.
+    expect(w.get('[data-testid="character-status-drawer__persona-value--personality"]').text()).toBe(
+      CHARACTER_PANEL_SAMPLE.persona.personality
+    );
+    expect(w.get('[data-testid="character-status-drawer__persona-value--life_story"]').text()).toBe(
+      CHARACTER_PANEL_SAMPLE.persona.life_story
+    );
+    expect(w.get('[data-testid="character-status-drawer__persona-value--habit"]').text()).toBe(
+      CHARACTER_PANEL_SAMPLE.persona.habit
+    );
+    expect(w.get('[data-testid="character-status-drawer__persona-value--background"]').text()).toBe(
+      CHARACTER_PANEL_SAMPLE.persona.background
+    );
+    // A null value renders the localized placeholder, never an empty block.
+    const sparse = mountDrawer({
+      character: {
+        ...CHARACTER_PANEL_SAMPLE,
+        persona: { background: "只有背景", personality: null, life_story: null, habit: null },
+      },
+    });
+    expect(sparse.get('[data-testid="character-status-drawer__persona-value--background"]').text()).toBe("只有背景");
+    for (const key of ["personality", "life_story", "habit"]) {
+      expect(sparse.find(`[data-testid="character-status-drawer__persona-value--${key}"]`).exists()).toBe(false);
+      expect(sparse.get(`[data-testid="character-status-drawer__persona-empty--${key}"]`).text()).toBe("未設定");
+    }
+    // The structural persona keys never render anywhere in the body.
+    expect(sparse.html()).not.toContain("identity");
+    expect(sparse.html()).not.toContain("social_connection");
+  });
+
+  it("opens one inline editor and submits exactly one persona-edit intent", async () => {
+    const w = mountDrawer();
+    await w.get('[data-testid="character-status-drawer__persona-edit--habit"]').trigger("click");
+    // The editor textarea is seeded with the committed value.
+    const input = w.get('[data-testid="character-status-drawer__persona-input--habit"]');
+    expect(input.element.value).toBe(CHARACTER_PANEL_SAMPLE.persona.habit);
+    await input.setValue("  我改過的習慣  ");
+    await w.get('[data-testid="character-status-drawer__persona-submit--habit"]').trigger("click");
+    // Exactly one intent, trimmed, for the edited field.
+    const events = w.emitted("persona-edit");
+    expect(events).toHaveLength(1);
+    expect(events[0][0]).toEqual({ field: "habit", text: "我改過的習慣" });
+    // The editor closes after submitting.
+    expect(w.find('[data-testid="character-status-drawer__persona-input--habit"]').exists()).toBe(false);
+  });
+
+  it("submits null when the draft is blank and closes on cancel", async () => {
+    const w = mountDrawer();
+    await w.get('[data-testid="character-status-drawer__persona-edit--background"]').trigger("click");
+    await w.get('[data-testid="character-status-drawer__persona-input--background"]').setValue("   ");
+    await w.get('[data-testid="character-status-drawer__persona-submit--background"]').trigger("click");
+    const events = w.emitted("persona-edit");
+    expect(events).toHaveLength(1);
+    expect(events[0][0]).toEqual({ field: "background", text: null });
+    // Cancel path: reopening then cancelling emits nothing.
+    await w.get('[data-testid="character-status-drawer__persona-edit--personality"]').trigger("click");
+    await w.get('[data-testid="character-status-drawer__persona-cancel--personality"]').trigger("click");
+    expect(w.emitted("persona-edit")).toHaveLength(1);
+    expect(w.find('[data-testid="character-status-drawer__persona-input--personality"]').exists()).toBe(false);
+  });
+
+  it("bounds the draft at 600 code points, counting astral characters as one", async () => {
+    const w = mountDrawer();
+    await w.get('[data-testid="character-status-drawer__persona-edit--personality"]').trigger("click");
+    const input = w.get('[data-testid="character-status-drawer__persona-input--personality"]');
+    // 601 astral code points (each 2 UTF-16 units): the code-point bound
+    // truncates to 600 code points, where a UTF-16-unit maxlength would
+    // have cut at 300.
+    await input.setValue("😀".repeat(601));
+    const kept = Array.from(input.element.value).length;
+    expect(kept).toBe(600);
+    await w.get('[data-testid="character-status-drawer__persona-submit--personality"]').trigger("click");
+    const events = w.emitted("persona-edit");
+    expect(events).toHaveLength(1);
+    expect(Array.from(events[0][0].text).length).toBe(600);
+  });
+
+  it("re-seeds an open editor when a refresh changes the edited field", async () => {
+    const w = mountDrawer();
+    await w.get('[data-testid="character-status-drawer__persona-edit--habit"]').trigger("click");
+    const input = w.get('[data-testid="character-status-drawer__persona-input--habit"]');
+    await input.setValue("我還沒提交的草稿");
+    // A completion publication refreshes habit from elsewhere (e.g. Telnet).
+    await w.setProps({
+      character: {
+        ...CHARACTER_PANEL_SAMPLE,
+        persona: { ...CHARACTER_PANEL_SAMPLE.persona, habit: "遠端改過的習慣" },
+      },
+    });
+    // The newer committed value wins over the stale draft.
+    expect(input.element.value).toBe("遠端改過的習慣");
+    await w.get('[data-testid="character-status-drawer__persona-submit--habit"]').trigger("click");
+    const events = w.emitted("persona-edit");
+    expect(events).toHaveLength(1);
+    expect(events[0][0]).toEqual({ field: "habit", text: "遠端改過的習慣" });
+  });
+
+  it("keeps an untouched open editor stable when other fields refresh", async () => {
+    const w = mountDrawer();
+    await w.get('[data-testid="character-status-drawer__persona-edit--habit"]').trigger("click");
+    const input = w.get('[data-testid="character-status-drawer__persona-input--habit"]');
+    await input.setValue("我的草稿");
+    await w.setProps({
+      character: {
+        ...CHARACTER_PANEL_SAMPLE,
+        persona: { ...CHARACTER_PANEL_SAMPLE.persona, personality: "遠端改的個性" },
+      },
+    });
+    // Only the edited field participates in the refresh check.
+    expect(input.element.value).toBe("我的草稿");
+  });
+
+  it("offers no persona edit affordance when the character panel is unavailable", () => {
+    const w = mountDrawer({ character: CHARACTER_UNAVAILABLE });
+    expect(w.find('[data-testid="character-status-drawer__persona-edit--background"]').exists()).toBe(false);
+    expect(w.findAll('[data-testid^="character-status-drawer__persona-edit--"]').length).toBe(0);
+    expect(w.findAll('[data-testid^="character-status-drawer__persona-empty--"]').length).toBe(0);
   });
 });

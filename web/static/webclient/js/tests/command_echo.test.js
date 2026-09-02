@@ -397,6 +397,43 @@ test("title.decline resolves to the typed decline command", () => {
   assert.strictEqual(Echo.commandLine("title.decline", {}, null), "title decline");
 });
 
+test("character.persona.update echoes the typed persona command per field", () => {
+  const fields = {
+    background: "設定背景",
+    personality: "設定個性",
+    life_story: "設定生平",
+    habit: "設定習慣",
+  };
+  for (const [field, command] of Object.entries(fields)) {
+    assert.strictEqual(
+      Echo.commandLine("character.persona.update", { field, text: "清晨練劍" }, {}),
+      command + " 清晨練劍"
+    );
+    // A null or blank text is the clear: a display-only （清除） notation,
+    // never the bare command key (which is the READ spelling).
+    assert.strictEqual(
+      Echo.commandLine("character.persona.update", { field, text: null }, {}),
+      command + "（清除）"
+    );
+    assert.strictEqual(
+      Echo.commandLine("character.persona.update", { field, text: "   " }, {}),
+      command + "（清除）"
+    );
+  }
+});
+
+test("character.persona.update stays silent on an unknown field or bad text", () => {
+  assert.strictEqual(
+    Echo.commandLine("character.persona.update", { field: "identity", text: "結構鍵" }, {}),
+    null
+  );
+  assert.strictEqual(
+    Echo.commandLine("character.persona.update", { field: "habit", text: 42 }, {}),
+    null
+  );
+  assert.strictEqual(Echo.commandLine("character.persona.update", {}, {}), null);
+});
+
 test("title.equip resolves both kinds from the payload identifier", () => {
   assert.strictEqual(
     Echo.commandLine("title.equip", { kind: "fixed", identifier: "g_f_rank" }, null),
@@ -524,6 +561,7 @@ const COVERAGE_MANIFEST = require("./command_echo_coverage_manifest.json");
 
 const REGISTERED_MUTATION_ACTIONS = {
   "combat.cast": { payload: { skill_key: "wind_blade" }, display: { skillLabel: "風刃術" } },
+  "character.persona.update": { payload: { field: "habit", text: "清晨練劍" }, display: {} },
   "combat.flee": { payload: {}, display: { actionLabel: "逃跑" } },
   "combat.forfeit": { payload: {}, display: {} },
   "creation.activate": { payload: {}, display: { presetKey: "elf_mage" } },

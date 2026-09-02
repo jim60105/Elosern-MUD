@@ -26,6 +26,11 @@ from commands.art import (
     CmdArtStatus,
 )
 from commands.background import CmdBackground
+from commands.persona import (
+    CmdPersonaHabit,
+    CmdPersonaLifeStory,
+    CmdPersonaPersonality,
+)
 from commands.combat import (
     CmdCombatActions,
     CmdCombatForfeit,
@@ -193,6 +198,9 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdLeave)
         self.add(CmdLore)
         self.add(CmdBackground)
+        self.add(CmdPersonaPersonality)
+        self.add(CmdPersonaLifeStory)
+        self.add(CmdPersonaHabit)
         self.add(CmdTitle)
         self.add(CmdLineage)
         self.add(ProjectXYZGridCmdSet)
