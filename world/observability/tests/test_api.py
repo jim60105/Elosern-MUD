@@ -87,6 +87,50 @@ def _call_log_info(event: str) -> None:
     log_info(event, context={"a": 1})
 
 
+class LazyBindingTests(unittest.TestCase):
+    """The facade must not capture evennia.logger at import time.
+
+    ``evennia.logger`` is None until ``evennia._init()``. The contract is
+    static (no module-level Evennia import in the facade sources) plus
+    behavioural (a failed pre-init bind is never cached, so a later emit
+    still writes).
+    """
+
+    def test_facade_sources_have_no_module_level_evennia_import(self) -> None:
+        import ast
+        from pathlib import Path
+
+        for name in ("api.py", "render.py", "__init__.py"):
+            path = Path(api.__file__).parent / name
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in tree.body:  # module level only
+                roots: list[str] = []
+                if isinstance(node, ast.Import):
+                    roots = [alias.name for alias in node.names]
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    roots = [node.module]
+                for root in roots:
+                    self.assertFalse(
+                        root == "evennia" or root.startswith("evennia."),
+                        f"{name} binds Evennia at import time",
+                    )
+
+    def test_failed_pre_init_bind_is_not_cached(self) -> None:
+        # A failed bind (Evennia not initialised / logger unimportable) must
+        # fall back to stderr AND leave the cache unset, so a later emission
+        # after evennia._init() can still bind successfully.
+        with (
+            mock.patch.object(api, "_evennia_logger", None),
+            mock.patch("builtins.__import__", side_effect=ImportError("pre-init")),
+            mock.patch("sys.stderr", new_callable=io.StringIO) as stderr,
+        ):
+            log_info("pre_init_evt", context={"a": 1})
+            # Assert inside the window: patch.object restores the pre-test
+            # cache value on exit.
+            self.assertIsNone(api._evennia_logger)
+        self.assertIn("[info] pre_init_evt", stderr.getvalue())
+
+
 class DebugGateTests(unittest.TestCase):
     def setUp(self) -> None:
         self.logger = _fake_logger()

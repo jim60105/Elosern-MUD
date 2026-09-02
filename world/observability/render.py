@@ -36,6 +36,9 @@ def render_value(value: object) -> str:
         text = repr(value)
     except Exception:
         return "<unrenderable>"
+    # A custom __repr__ may embed newlines; the one-line contract holds for
+    # every rendering path, so normalize before truncation.
+    text = _single_line(text)
     if len(text) > VALUE_TRUNCATE_AT:
         text = text[:VALUE_TRUNCATE_AT]
     return text

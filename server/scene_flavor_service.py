@@ -23,6 +23,8 @@ it to the ``PlayerCharacter``s present in the room.
 from twisted.internet import defer
 from typing import Any
 
+from world.observability import log_warn
+
 
 _SCENE_FLAVOR_KEYS = frozenset(("scene_sentence", "quest_context", "room_name", "region"))
 
@@ -139,19 +141,25 @@ def schedule_scene_flavor(room: Any, flavor_context: Any, *, client: Any = None)
     applies the flavor through the deterministic core and pushes it to present
     players; its failure path logs and resolves to nothing.
     """
-    from evennia import logger
-
     try:
         validated = _validate_flavor_context(flavor_context)
         if client is None:
             client = _build_scene_flavor_client()
         d = _run_scene_flavor(room, validated, client)
     except Exception as error:  # noqa: BLE001 - bounded, never propagates (design D5)
-        logger.log_warn(f"scene flavor scheduling failed: {error}")
+        log_warn(
+            "scene_flavor_schedule_failed",
+            exc=error,
+            context={"room": getattr(room, "pk", 0) or 0},
+        )
         return None
 
     def _log_failure(failure) -> None:
-        logger.log_warn(f"scene flavor generation failed: {failure.getErrorMessage()}")
+        log_warn(
+            "scene_flavor_generation_failed",
+            exc=failure.value,
+            context={"room": room.pk, "reason": failure.getErrorMessage()},
+        )
 
     d.addErrback(_log_failure)
     return d

@@ -1,9 +1,4 @@
 [
-  "commands/character_creation.py",
-  "server/conf/at_server_startstop.py",
-  "server/option_proposal_service.py",
-  "server/scene_flavor_service.py",
-  "server/title_nomination_service.py",
   "typeclasses/characters.py",
   "typeclasses/exits.py",
   "web/webclient/actions/dispatcher.py",

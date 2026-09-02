@@ -231,7 +231,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         message_mock = Mock()
         self.char1.msg = message_mock
         try:
-            with patch("commands.character_creation.logger.log_trace") as log_trace:
+            with patch("commands.character_creation.log_error") as log_trace:
                 command = CmdCreationRequired()
                 command.caller = self.char1
                 command.session = self.session

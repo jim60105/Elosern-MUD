@@ -16,27 +16,27 @@
 
 ## 3. 正常路徑事件（本 change 範圍）
 
-- [ ] 3.1 `commands/command.py::Command` 基類 `at_pre_cmd`/`at_post_cmd` 發 `cmd_in`/`cmd_done`（args 截斷 200、ms、outcome 不可判定時不謊報 ok）
-- [ ] 3.2 以 `rg "from evennia import Command" commands/` 產出完整盤點清單（實測含 action、art、background、combat、economy、guild、invite、items、leave、lineage、lore、scene、skip、talk、title、character_creation、localized/general 等檔），**全部**改挂 `commands.command.Command`；完成標準＝該搜尋於 `commands/` production 檔回空
-- [ ] 3.3 `commands/tests/test_command_observability.py`（`EvenniaCommandTest`）：經命令處理器（非直接 `.func()`）執行兩個來自不同模組的命令，各恰一對 `cmd_in`/`cmd_done`、含 actor pk、命令 key、ms；`cmd_done` 僅 `outcome=ok`
-- [ ] 3.4 `server/conf/at_server_startstop.py`：以 design D7 的有序步驟目錄逐一包 `_startup_step(name, fn)`（保留原始調用語義、嚴禁改序）：成功發 `startup_step`（step、ms）；fail-loud 步驟失敗發 facade `log_error(exc=…)` 後 **re-raise**；boot-tolerant 步驟保留容忍但發結構化 degrade（step context）；prompt library 失敗發 `log_error(exc=…)`＋degrade context
-- [ ] 3.4b 同批改寫既有 source-order guard 測試（`world/rules/tests/test_guild_economy_guards.py`、`world/maps/tests/test_bootstrap.py`、`test_limbo_room.py`、`world/quests/tests/test_deadlines.py` 的 `inspect.getsource` 字串斷言）為對 `_startup_step` 記錄器的行為式順序斷言；`test_instance_stage_wiring.py`、`test_degrade.py` 全程跑 `at_server_start` 者驗證不破
-- [ ] 3.4c `server/conf/tests/test_startup_observability.py`：patch 全部 startup 操作＋固定時鐘，斷言目錄內每步恰一條 `startup_step`、序完全一致；一個 fail-loud 失敗案例顯示事件＋例外仍傳播
+- [x] 3.1 `commands/command.py::Command` 基類 `at_pre_cmd`/`at_post_cmd` 發 `cmd_in`/`cmd_done`（args 截斷 200、ms、outcome 不可判定時不謊報 ok）
+- [x] 3.2 以 `rg "from evennia import Command" commands/` 產出完整盤點清單（實測含 action、art、background、combat、economy、guild、invite、items、leave、lineage、lore、scene、skip、talk、title、character_creation、localized/general 等檔），**全部**改挂 `commands.command.Command`；完成標準＝該搜尋於 `commands/` production 檔回空
+- [x] 3.3 `commands/tests/test_command_observability.py`（`EvenniaCommandTest`）：經命令處理器（非直接 `.func()`）執行兩個來自不同模組的命令，各恰一對 `cmd_in`/`cmd_done`、含 actor pk、命令 key、ms；`cmd_done` 僅 `outcome=ok`
+- [x] 3.4 `server/conf/at_server_startstop.py`：以 design D7 的有序步驟目錄逐一包 `_startup_step(name, fn)`（保留原始調用語義、嚴禁改序）：成功發 `startup_step`（step、ms）；fail-loud 步驟失敗發 facade `log_error(exc=…)` 後 **re-raise**；boot-tolerant 步驟保留容忍但發結構化 degrade（step context）；prompt library 失敗發 `log_error(exc=…)`＋degrade context
+- [x] 3.4b 同批改寫既有 source-order guard 測試（`world/rules/tests/test_guild_economy_guards.py`、`world/maps/tests/test_bootstrap.py`、`test_limbo_room.py`、`world/quests/tests/test_deadlines.py` 的 `inspect.getsource` 字串斷言）為對 `_startup_step` 記錄器的行為式順序斷言；`test_instance_stage_wiring.py`、`test_degrade.py` 全程跑 `at_server_start` 者驗證不破
+- [x] 3.4c `server/conf/tests/test_startup_observability.py`：patch 全部 startup 操作＋固定時鐘，斷言目錄內每步恰一條 `startup_step`、序完全一致；一個 fail-loud 失敗案例顯示事件＋例外仍傳播
 
 ## 4. server/ 與 commands/ 遷移
 
-- [ ] 4.1 遷移 4 檔 server service 模組＋`at_server_startstop.py` 全部 log 呼叫：event 改 snake_case、補 context、吞例外改 `log_error(exc=…)` 或豁免註解
-- [ ] 4.2 遷移 `commands/` 內唯一 log 站點（`character_creation.py`）；基類改挂（3.2）不屬 log 遷移、不受凍結清單影響
-- [ ] 4.3 `server/conf/tests/test_scene_flavor_service.py` 改 patch facade
+- [x] 4.1 遷移 4 檔 server service 模組＋`at_server_startstop.py` 全部 log 呼叫：event 改 snake_case、補 context、吞例外改 `log_error(exc=…)` 或豁免註解
+- [x] 4.2 遷移 `commands/` 內唯一 log 站點（`character_creation.py`）；基類改挂（3.2）不屬 log 遷移、不受凍結清單影響
+- [x] 4.3 `server/conf/tests/test_scene_flavor_service.py` 改 patch facade
 
 ## 5. 規範與 CI
 
-- [ ] 5.1 `AGENTS.md` 新增 Observability 條目（六規則＋慣例 context 鍵＋事件目錄指向設計文件）
-- [ ] 5.2 `.github/workflows/quality-gate.yml` preflight 加 "Run observability lint" 步驟（command 固定為 `uv run --locked python -m tools.observability_lint check`）；同批改 `tests/test_quality_gate_contract.py`：步驟名稱與該精確 command 字串都進 contract 斷言
+- [x] 5.1 `AGENTS.md` 新增 Observability 條目（六規則＋慣例 context 鍵＋事件目錄指向設計文件）
+- [x] 5.2 `.github/workflows/quality-gate.yml` preflight 加 "Run observability lint" 步驟（command 固定為 `uv run --locked python -m tools.observability_lint check`）；同批改 `tests/test_quality_gate_contract.py`：步驟名稱與該精確 command 字串都進 contract 斷言
 
 ## 6. 驗證
 
-- [ ] 6.1 `uv run --locked python -m tools.observability_lint check` exit 0（凍結清單內）
+- [x] 6.1 `uv run --locked python -m tools.observability_lint check` exit 0（凍結清單內）
 - [ ] 6.2 Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.observability commands server.conf`
-- [ ] 6.3 Traceability（刻意時序）：本 change 期間**不標註**兩個新能力的 id——`tools.spec_traceability` 只索引 `openspec/specs/` 主規格，active delta 的 id 會令 `check` 報 `unknown-requirement-id` 而紅。既有主規格 id（`spec-test-traceability::continuous-integration-enforces-both-quality-dimensions`）照常標註於 5.2 的 contract test。兩個新能力的 `covers_requirement` 標註在 archive 同步主規格時同批加入（列入批次 4 收尾/archive 工作），並以 `check` 綠為驗收
-- [ ] 6.4 `openspec validate add-observability-lint-gate --strict`
+- [x] 6.3 Traceability（刻意時序）：本 change 期間**不標註**兩個新能力的 id——`tools.spec_traceability` 只索引 `openspec/specs/` 主規格，active delta 的 id 會令 `check` 報 `unknown-requirement-id` 而紅。既有主規格 id（`spec-test-traceability::continuous-integration-enforces-both-quality-dimensions`）照常標註於 5.2 的 contract test。兩個新能力的 `covers_requirement` 標註在 archive 同步主規格時同批加入（列入批次 4 收尾/archive 工作），並以 `check` 綠為驗收
+- [x] 6.4 `openspec validate add-observability-lint-gate --strict`

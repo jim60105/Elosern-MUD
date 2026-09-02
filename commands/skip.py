@@ -9,7 +9,7 @@ the deterministic command tests can keep patching it.
 
 import re
 
-from evennia import Command
+from commands.command import Command
 
 from world.rules.clock import (
     AdvanceSource,

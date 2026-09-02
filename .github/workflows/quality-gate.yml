@@ -46,6 +46,9 @@ jobs:
       - name: Validate static requirement traceability
         run: uv run --locked python -m tools.spec_traceability check
 
+      - name: Run observability lint
+        run: uv run --locked python -m tools.observability_lint check
+
       - name: Run Node DOM-independent test suite
         run: node --test web/static/webclient/js/tests/*.test.js
 

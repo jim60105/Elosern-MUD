@@ -108,6 +108,25 @@ class R2Tests(unittest.TestCase):
         )
         self.assertIn("R2", [rule for rule, _ in scan(source)])
 
+    def test_package_form_import_is_an_adopter(self) -> None:
+        # ``from world import observability`` reaches the same facade; the
+        # file must be inside R2/R3 scope, not escape it.
+        source = (
+            "from world import observability\n\n"
+            "try:\n    f()\nexcept Exception:\n    pass\n"
+        )
+        rules = [rule for rule, _ in scan(source)]
+        self.assertIn("R2", rules)
+        aliased = (
+            "from world import observability as obs\n\nobs.log_info('e')\n"
+        )
+        self.assertIn("R3", [rule for rule, _ in scan(aliased)])
+        satisfied = (
+            "from world import observability as obs\n\n"
+            "obs.log_info('e', context={'a': 1})\n"
+        )
+        self.assertEqual(scan(satisfied), [])
+
 
 class R3Tests(unittest.TestCase):
     ADOPT = "from world.observability import log_info, log_error\n\n"
@@ -201,6 +220,20 @@ class FreezeRepoTests(unittest.TestCase):
         messages = " ".join(item.message for item in report.violations)
         self.assertIn("non-existent path", messages)
         self.assertIn("duplicate entry", messages)
+
+    def test_out_of_scope_existing_entry_is_a_violation(self) -> None:
+        # An existing file outside the scanned production set (tests, tools)
+        # can never carry detectable R1 debt — freezing it defeats the
+        # shrink-only ratchet, so it must fail.
+        files = {
+            "world/rules/debt.py": "from evennia import logger\n",
+            "tests/helpers/fixture.py": "x = 1\n",
+        }
+        report = check_repo(
+            self._repo(files, ["world/rules/debt.py", "tests/helpers/fixture.py"])
+        )
+        messages = " ".join(item.message for item in report.violations)
+        self.assertIn("not a scanned production file", messages)
 
 
 class RepoIntegrationTests(unittest.TestCase):

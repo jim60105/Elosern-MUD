@@ -6,7 +6,7 @@ On a ``guild_staff`` dialogue host the keyword ``回報`` is an action keyword:
 ``dialogue_turn_in`` service. Every other keyword resolves exactly as before.
 """
 
-from evennia import Command
+from commands.command import Command
 
 from typeclasses.components import GuildStaff
 from typeclasses.npcs import NPC

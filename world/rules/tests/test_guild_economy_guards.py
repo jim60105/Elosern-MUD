@@ -50,22 +50,26 @@ class NoGenerativeImportTests(unittest.TestCase):
                 self.assertNotIn("requests", source.lower())
 
     def test_startup_composition_root_calls_quest_after_map(self):
-        from server.conf.at_server_startstop import at_server_start
+        from server.conf.at_server_startstop import STARTUP_STEP_ORDER
 
-        source = inspect.getsource(at_server_start)
-        self.assertLess(source.index("sync_quest_runtime()"), source.index("sync_guild_economy()"))
-        self.assertLess(source.index("sync_grid()"), source.index("sync_guild_economy()"))
+        self.assertLess(
+            STARTUP_STEP_ORDER.index("sync_quest_runtime"),
+            STARTUP_STEP_ORDER.index("sync_guild_economy"),
+        )
+        self.assertLess(
+            STARTUP_STEP_ORDER.index("sync_grid"),
+            STARTUP_STEP_ORDER.index("sync_guild_economy"),
+        )
 
     def test_startup_restores_sessions_before_wilderness_sync(self):
         # Persisted combat sessions must be restored before wilderness
         # population reconciliation so a defeated population monster is never
         # deleted or respawned before its committed outcome settles (F10).
-        from server.conf.at_server_startstop import at_server_start
+        from server.conf.at_server_startstop import STARTUP_STEP_ORDER
 
-        source = inspect.getsource(at_server_start)
         self.assertLess(
-            source.index("restore_persisted_sessions()"),
-            source.index("sync_wilderness()"),
+            STARTUP_STEP_ORDER.index("restore_persisted_sessions"),
+            STARTUP_STEP_ORDER.index("sync_wilderness"),
         )
 
     def test_startup_registers_every_clock_source_before_session_restoration(self):
@@ -74,18 +78,20 @@ class NoGenerativeImportTests(unittest.TestCase):
         # caravan, shop-hours, and NPC-schedule stages all run before session
         # restoration, and restoration still precedes wilderness sync
         # (fix-startup-clock-source-order D1).
-        from server.conf.at_server_startstop import at_server_start
+        from server.conf.at_server_startstop import STARTUP_STEP_ORDER
 
-        source = inspect.getsource(at_server_start)
         for sync in (
-            "sync_service_interiors()",
-            "sync_quest_runtime()",
-            "sync_guild_economy()",
-            "sync_guard_npc()",
-            "sync_npc_schedules()",
+            "sync_service_interiors",
+            "sync_quest_runtime",
+            "sync_guild_economy",
+            "sync_guard_npc",
+            "sync_npc_schedules",
         ):
             with self.subTest(sync=sync):
-                self.assertLess(source.index(sync), source.index("restore_persisted_sessions()"))
+                self.assertLess(
+                    STARTUP_STEP_ORDER.index(sync),
+                    STARTUP_STEP_ORDER.index("restore_persisted_sessions"),
+                )
 
     @covers_requirement("player-combat-session::startup-restores-combat-sessions-before-wilderness-population-reconciliation")
     @covers_requirement("player-combat-session::startup-combat-restoration-advances-time-only-after-every-deterministic-clock-source-is-registered")
@@ -158,11 +164,16 @@ class NoGenerativeImportTests(unittest.TestCase):
         )
 
     def test_schedule_sync_runs_after_guard_npc_sync(self):
-        from server.conf.at_server_startstop import at_server_start
+        from server.conf.at_server_startstop import STARTUP_STEP_ORDER
 
-        source = inspect.getsource(at_server_start)
-        self.assertLess(source.index("sync_guard_npc()"), source.index("sync_npc_schedules()"))
-        self.assertLess(source.index("sync_guild_economy()"), source.index("sync_npc_schedules()"))
+        self.assertLess(
+            STARTUP_STEP_ORDER.index("sync_guard_npc"),
+            STARTUP_STEP_ORDER.index("sync_npc_schedules"),
+        )
+        self.assertLess(
+            STARTUP_STEP_ORDER.index("sync_guild_economy"),
+            STARTUP_STEP_ORDER.index("sync_npc_schedules"),
+        )
 
 
 class CommandSetRegistrationTests(unittest.TestCase):

@@ -1,6 +1,6 @@
 """Player-facing guild registration, board, quest-log, and turn-in commands."""
 
-from evennia import Command
+from commands.command import Command
 
 from typeclasses.components import GuildStaff
 from world.quests.describe import describe_objective, describe_quest_detail

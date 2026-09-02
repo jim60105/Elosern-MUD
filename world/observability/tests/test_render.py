@@ -43,6 +43,16 @@ class RenderContextTests(unittest.TestCase):
 
         self.assertEqual(render_context({"k": Broken()}), "k=<unrenderable>")
 
+    def test_repr_with_newlines_stays_single_line(self) -> None:
+        class Snake:
+            def __repr__(self) -> str:
+                return "first\nsecond\r\nthird"
+
+        text = render_context({"k": Snake()})
+        self.assertNotIn("\n", text)
+        self.assertNotIn("\r", text)
+        self.assertIn("\\n", text)
+
 
 class FormatChainTests(unittest.TestCase):
     def test_chain_outermost_first_with_cause(self) -> None:

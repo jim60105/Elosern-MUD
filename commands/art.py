@@ -11,7 +11,7 @@ root (design D8).
 """
 
 from django.conf import settings
-from evennia import Command
+from commands.command import Command
 import urllib.parse
 
 from world.art.adult import PortraitRejected

@@ -3,7 +3,6 @@
 
 from tools.spec_traceability import covers_requirement
 
-import inspect
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -103,8 +102,12 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
 
     @covers_requirement("limbo-room::sync-limbo-converges-the-starting-room-idempotently-at-server-start")
     def test_at_server_start_calls_sync_limbo_before_sync_grid(self):
-        source = inspect.getsource(at_server_start)
-        self.assertLess(source.index("sync_limbo()"), source.index("sync_grid()"))
+        from server.conf.at_server_startstop import STARTUP_STEP_ORDER
+
+        self.assertLess(
+            STARTUP_STEP_ORDER.index("sync_limbo"),
+            STARTUP_STEP_ORDER.index("sync_grid"),
+        )
 
     @covers_requirement("limbo-room::sync-limbo-converges-the-starting-room-idempotently-at-server-start")
     def test_at_server_start_renames_legacy_room_and_bridges_it(self):

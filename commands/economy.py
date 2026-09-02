@@ -1,6 +1,6 @@
 """Player-facing shop stock, buy, and sell commands."""
 
-from evennia import Command
+from commands.command import Command
 
 from typeclasses.components import Merchant
 from world.rules.economy import (

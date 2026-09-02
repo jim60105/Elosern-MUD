@@ -9,7 +9,7 @@ materialization commits before the move; every rejection is a named,
 side-effect-free message.
 """
 
-from evennia import Command
+from commands.command import Command
 
 from django.db import transaction
 

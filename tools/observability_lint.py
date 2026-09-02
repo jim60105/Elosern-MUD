@@ -135,6 +135,14 @@ class _FacadeBindings(ast.NodeVisitor):
                     self.call_names |= set(FACADE_FUNCTIONS)
                 elif alias.name == "api":
                     self.module_aliases.add(alias.asname or "api")
+            return
+        # ``from world import observability [as a]`` reaches the same public
+        # facade and must not escape adopter detection or call recognition.
+        if node.module == "world":
+            for alias in node.names:
+                if alias.name == "observability":
+                    self.adopter = True
+                    self.module_aliases.add(alias.asname or "observability")
 
 
 class _RaiseScan(ast.NodeVisitor):
@@ -469,6 +477,22 @@ def _load_freeze(root: Path) -> tuple[list[str], list[Violation]]:
 def check_repo(root: Path) -> LintReport:
     freeze, violations = _load_freeze(root)
     frozen = set(freeze)
+    production = {
+        path.relative_to(root).as_posix() for path in _production_files(root)
+    }
+    for index, entry in enumerate(freeze):
+        # Only scanned production files can hold R1 debt; an entry elsewhere
+        # (tests, tools, other trees) is an undetectable permanent zombie and
+        # defeats the shrink-only ratchet.
+        if entry not in production:
+            violations.append(
+                Violation(
+                    "freeze",
+                    FREEZE_PATH,
+                    index + 1,
+                    f"entry is not a scanned production file: {entry}",
+                )
+            )
     exemptions = 0
     scanned = 0
     for path in _production_files(root):

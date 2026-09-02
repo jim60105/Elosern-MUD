@@ -7,7 +7,7 @@ available in and out of combat and mutates nothing — building the view is a
 pure read, and malformed stored proficiency prints one fixed unavailable line.
 """
 
-from evennia import Command
+from commands.command import Command
 
 from world.rules.lineage_query import LineageQueryError, build_lineage_view
 

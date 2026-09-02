@@ -42,12 +42,13 @@ resolves to nothing. It writes only ephemeral cache and presentation state,
 never canonical game state.
 """
 
-import logging
 import time
 from collections import OrderedDict
 from typing import Any
 
 from twisted.internet import defer
+
+from world.observability import log_warn
 
 # Mirrors the layer's caps (world.ai.action_options.MAX_OPTIONSET_CACHE_ENTRIES
 # / NEGATIVE_MEMO_TTL): the parity is pinned by a test so the two cannot drift.
@@ -63,8 +64,6 @@ _PROMPT_AFFORDANCE_RANKS = {
     "explore.move": 1,
     "explore.look": 2,
 }
-
-logger = logging.getLogger(__name__)
 
 
 class _OfflineStubClient:
@@ -179,13 +178,6 @@ _pending: dict[str, _PendingGeneration] = {}
 _chains: dict[str, _GenerationChain] = {}
 _generation_counters: dict[str, int] = {}
 _clock = time.monotonic
-
-
-def _log(message: str) -> None:
-    try:
-        logger.warning("action options: %s" % message)
-    except Exception:
-        pass
 
 
 def _clock_now() -> float:
@@ -721,18 +713,23 @@ def _deliver_guarded(
     try:
         _deliver(subscriber, actor, status, displayed, clear_barrier=clear_barrier)
     except Exception as error:
-        _log(
-            "delivery to session %s failed: %s: %s"
-            % (getattr(subscriber.session, "sessid", "?"), type(error).__name__, error)
+        log_warn(
+            "action_options_delivery_failed",
+            exc=error,
+            context={
+                "char": getattr(actor, "pk", 0) or 0,
+                "sessid": getattr(subscriber.session, "sessid", 0) or 0,
+            },
         )
 
 
 def _terminal_generation_error(failure: Any) -> Any:
     """Log a generation Deferred that still errbacks after routing."""
-    try:
-        _log("generation terminal failure: %s" % failure.getErrorMessage())
-    except Exception:
-        pass
+    log_warn(
+        "action_options_generation_terminal",
+        exc=failure.value,
+        context={"reason": failure.getErrorMessage()},
+    )
     return failure
 
 
@@ -777,7 +774,11 @@ def _run_generation(generation: _PendingGeneration, client: Any, context: Any, a
             context, client, fingerprint=fingerprint_value
         )
     except Exception as error:
-        _log("generation failed: %s: %s" % (type(error).__name__, error))
+        log_warn(
+            "action_options_generation_failed",
+            exc=error,
+            context={"char": getattr(actor, "pk", 0) or 0, "fingerprint": fingerprint_value},
+        )
         outcome = None
     if isinstance(outcome, action_options.OptionSet):
         _complete_ready(generation, actor, fingerprint_value, outcome)
@@ -864,9 +865,13 @@ def _start_successor(
             return
         fresh_fingerprint, _vocab, eligible, npcs, monsters, objectives = situation
         if fresh_fingerprint != fingerprint_value:
-            _log(
-                "successor handoff: the situation moved on; settling queued "
-                "watchers degraded"
+            log_warn(
+                "action_options_successor_situation_stale",
+                context={
+                    "char": getattr(successor.actor, "pk", 0) or 0,
+                    "fingerprint": fingerprint_value,
+                    "reason": "situation moved on; queued watchers settled degraded",
+                },
             )
             _complete_degraded(
                 successor,
@@ -891,7 +896,14 @@ def _start_successor(
         successor.deferred.addErrback(_terminal_generation_error)
         successor.deferred.addBoth(lambda _: _settle_active(fingerprint_value, successor))
     except Exception as error:
-        _log("successor handoff failed: %s: %s" % (type(error).__name__, error))
+        log_warn(
+            "action_options_successor_handoff_failed",
+            exc=error,
+            context={
+                "char": getattr(successor.actor, "pk", 0) or 0,
+                "fingerprint": fingerprint_value,
+            },
+        )
         try:
             _complete_degraded(
                 successor,
@@ -900,8 +912,15 @@ def _start_successor(
                 memoize=False,
                 clear_barrier=False,
             )
-        except Exception:
-            pass
+        except Exception as degrade_error:
+            log_warn(
+                "action_options_successor_degrade_failed",
+                exc=degrade_error,
+                context={
+                    "char": getattr(successor.actor, "pk", 0) or 0,
+                    "fingerprint": fingerprint_value,
+                },
+            )
         chain.successor = None
 
 
@@ -933,7 +952,13 @@ def schedule_action_options(
     try:
         situation = _derive_situation(actor)
         if situation is None:
-            _log("scheduling skipped: no location at trigger time")
+            log_warn(
+                "action_options_schedule_skipped",
+                context={
+                    "char": getattr(actor, "pk", 0) or 0,
+                    "reason": "no location at trigger time",
+                },
+            )
             return None
         fingerprint_value, _vocab, eligible, npcs, monsters, objectives = situation
         new_subscribers: list[_PendingSubscriber] = []
@@ -957,7 +982,11 @@ def schedule_action_options(
             # the failure was never observed at the client boundary, so no
             # memo. Leaving a deferred-less generation in _pending would strand
             # every watcher in "generating" for the life of the process.
-            _log("preflight failed: %s: %s" % (type(error).__name__, error))
+            log_warn(
+                "action_options_preflight_failed",
+                exc=error,
+                context={"char": getattr(actor, "pk", 0) or 0, "fingerprint": fingerprint_value},
+            )
             _pending.pop(fingerprint_value, None)
             _complete_degraded(generation, actor, fingerprint_value, memoize=False)
             return None
@@ -974,7 +1003,11 @@ def schedule_action_options(
         generation.deferred.addBoth(lambda _: _settle_active(fingerprint_value, generation))
         return generation.deferred
     except Exception as error:
-        _log("scheduling failed: %s: %s" % (type(error).__name__, error))
+        log_warn(
+            "action_options_scheduling_failed",
+            exc=error,
+            context={"char": getattr(actor, "pk", 0) or 0},
+        )
         return None
 
 
@@ -1042,5 +1075,12 @@ def evict(session: Any, actor: Any) -> bool:
         )
         return True
     except Exception as error:
-        _log("evict failed: %s: %s" % (type(error).__name__, error))
+        log_warn(
+            "action_options_evict_failed",
+            exc=error,
+            context={
+                "char": getattr(actor, "pk", 0) or 0,
+                "sessid": getattr(session, "sessid", 0) or 0,
+            },
+        )
         return False

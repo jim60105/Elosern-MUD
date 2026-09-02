@@ -2,7 +2,6 @@
 
 from tools.spec_traceability import covers_requirement
 
-import inspect
 import unittest
 from unittest.mock import patch
 
@@ -22,7 +21,6 @@ from world.quests.runtime import (
     to_storage,
 )
 from world.rules.clock import AdvanceSource, get_world_clock, register_event_source
-from server.conf.at_server_startstop import at_server_start
 
 from ._fixtures import (
     QuestRegistryIsolation,
@@ -160,11 +158,21 @@ class DeadlineSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
         # session restoration and wilderness reconciliation, so a recovery
         # advance settles with ``quest_deadlines`` registered
         # (fix-startup-clock-source-order D1).
-        source = inspect.getsource(at_server_start)
-        self.assertIn("sync_quest_runtime()", source)
-        self.assertLess(source.index("sync_all()"), source.index("sync_quest_runtime()"))
-        self.assertLess(source.index("sync_grid()"), source.index("sync_quest_runtime()"))
-        self.assertLess(source.index("sync_quest_runtime()"), source.index("sync_wilderness()"))
+        from server.conf.at_server_startstop import STARTUP_STEP_ORDER
+
+        self.assertIn("sync_quest_runtime", STARTUP_STEP_ORDER)
+        self.assertLess(
+            STARTUP_STEP_ORDER.index("sync_all"),
+            STARTUP_STEP_ORDER.index("sync_quest_runtime"),
+        )
+        self.assertLess(
+            STARTUP_STEP_ORDER.index("sync_grid"),
+            STARTUP_STEP_ORDER.index("sync_quest_runtime"),
+        )
+        self.assertLess(
+            STARTUP_STEP_ORDER.index("sync_quest_runtime"),
+            STARTUP_STEP_ORDER.index("sync_wilderness"),
+        )
 
 
 class StartupRecoveryDeadlineTests(QuestRegistryIsolation, EvenniaTest):

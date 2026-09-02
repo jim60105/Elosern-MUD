@@ -23,7 +23,7 @@ delete surface). Malformed stored title state presents the same fixed
 unavailable line and changes nothing.
 """
 
-from evennia import Command
+from commands.command import Command
 
 from world.lore.titles import FIXED_TITLE_REGISTRY
 from world.rules.event_log import render_plain_text

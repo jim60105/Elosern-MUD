@@ -194,14 +194,14 @@ class SceneFlavorServiceTests(EvenniaTestCase):
         client = FakeLLMClient()
         with (
             override_settings(LLM_PROFILES=_raw()),
-            patch("evennia.logger.log_warn") as log_warn,
+            patch("server.scene_flavor_service.log_warn") as log_warn,
         ):
             d = schedule_scene_flavor(self.room, _context(), client=client)
             await_result(d)
         self.assertIsNone(self.room.db.scene_flavor)
         self.assertEqual(len(client.calls), 0)
         logged = " ".join(str(call.args[0]) for call in log_warn.call_args_list)
-        self.assertIn("scene flavor generation failed", logged)
+        self.assertIn("scene_flavor_generation_failed", logged)
 
     @covers_requirement("scene-flavor::instance-quest-scenes-schedule-one-post-commit-flavor-generation")
     def test_client_construction_failure_logs_and_returns_normally(self):
