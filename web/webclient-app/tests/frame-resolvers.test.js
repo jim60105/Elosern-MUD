@@ -402,3 +402,360 @@ describe("frame resolver — (legacy) the degradation marker", () => {
     });
   });
 });
+
+// --- webclient-services-combat-creation-frames: the completed table ---------
+
+import ServiceMenu from "../lib/service_menu.js";
+import CombatMenu from "../lib/combat_menu.js";
+import CreationMenu from "../lib/creation_menu.js";
+
+function guildSurface() {
+  return {
+    registration: {
+      enabled: true,
+      action_id: "guild.register",
+      label: "登記公會",
+      disabled_reason: null,
+    },
+    board: [
+      {
+        definition_key: "q-wolves",
+        display_name: "狼患",
+        objective_summary: "清除商路狼群",
+        reward_summary: "報酬 500 銅",
+        accept: { enabled: true, action_id: "guild.quest_accept", label: "接取", disabled_reason: null },
+      },
+    ],
+    quests: [
+      {
+        quest_id: "q-1",
+        display_name: "商路巡視",
+        state: "active",
+        detail: "沿商路巡視一輪。",
+        abandon: { enabled: true, action_id: "guild.quest_abandon", label: "放棄", disabled_reason: null },
+        turnin: { enabled: false, action_id: "guild.quest_turnin", label: "回報", disabled_reason: { code: "incomplete", message: "目標尚未完成。" } },
+      },
+      {
+        quest_id: "q-2",
+        display_name: "失落的貨箱",
+        state: "active",
+        detail: "找回遺失的貨箱。",
+        abandon: { enabled: false, action_id: "guild.quest_abandon", label: "放棄", disabled_reason: { code: "locked", message: "此任務無法放棄。" } },
+        turnin: { enabled: true, action_id: "guild.quest_turnin", label: "回報", disabled_reason: null },
+      },
+    ],
+    rank: null,
+  };
+}
+
+function shopSurface() {
+  return {
+    open: true,
+    stock: [
+      {
+        item_key: "potion",
+        display_name: "治療藥水",
+        buy_copper: 50,
+        stock: 4,
+        buy: { enabled: true, action_id: "shop.buy", quantity: { min: 1, max: 9 }, disabled_reason: null },
+      },
+    ],
+    sellable: [
+      {
+        item_key: "pelt",
+        display_name: "獸皮",
+        sell_copper: 12,
+        held: 3,
+        sell: { enabled: true, action_id: "shop.sell", quantity: { min: 1, max: 3 }, disabled_reason: null },
+      },
+    ],
+  };
+}
+
+function servicesPanel(overrides = {}) {
+  return {
+    schema_version: 1,
+    available: true,
+    guild: guildSurface(),
+    shop: shopSurface(),
+    ...overrides,
+  };
+}
+
+function servicesState(panel = servicesPanel()) {
+  return committedState({ mode: "exploration", panels: { services: panel } });
+}
+
+describe("frame resolver — the services family", () => {
+  it("every services source resolves to the builder menu verbatim", () => {
+    const resolver = resolverFor(servicesState());
+    const model = ServiceMenu.buildMenus(servicesPanel());
+    for (const key of ["root", "guild", "board", "quests", "shop", "stock", "sell"]) {
+      expect(resolver.resolve({ source: `services.${key}` })).toEqual(model.menus[key]);
+    }
+  });
+
+  it("quest-detail resolves by the row index the quest rows carry", () => {
+    const resolver = resolverFor(servicesState());
+    const model = ServiceMenu.buildMenus(servicesPanel());
+    const menu = resolver.resolve({ source: "services.quest-detail", params: { questIndex: 1 } });
+    expect(menu).toEqual(ServiceMenu.questMenuFor(model, servicesPanel().guild.quests[1]));
+    expect(menu.items.map((i) => i.key)).toEqual([
+      "quest-detail",
+      "quest-abandon-q-2",
+      "quest-turnin-q-2",
+    ]);
+  });
+
+  it("an out-of-range questIndex is the identity-loss marker", () => {
+    const resolver = resolverFor(servicesState());
+    expect(resolver.resolve({ source: "services.quest-detail", params: { questIndex: 9 } })).toEqual({
+      unresolvable: true,
+      reason: null,
+    });
+    expect(resolver.resolve({ source: "services.quest-detail", params: {} })).toEqual({
+      unresolvable: true,
+      reason: null,
+    });
+  });
+
+  it("the confirm frame derives from the composed quest row's server fields", () => {
+    const resolver = resolverFor(servicesState());
+    // q-1: the enabled abandon row carries the confirm fields.
+    expect(resolver.resolve({ source: "services.confirm", params: { questIndex: 0 } })).toEqual(
+      ServiceMenu.confirmMenu("確認放棄", "guild.quest_abandon", { quest_id: "q-1" }, null)
+    );
+    // q-2: the disabled abandon row has no confirmation → degrade, no fabrication.
+    expect(resolver.resolve({ source: "services.confirm", params: { questIndex: 1 } })).toEqual({
+      unresolvable: true,
+      reason: null,
+    });
+  });
+
+  it("a vanished quest degrades like a lost identity, keeping any server reason", () => {
+    const panel = servicesPanel();
+    const resolver = resolverFor(servicesState(panel));
+    expect(resolver.resolve({ source: "services.quest-detail", params: { questIndex: 0 } }).items).toBeTruthy();
+    // A committed update removes the quest: the open frame degrades.
+    panel.guild.quests = [];
+    expect(resolver.resolve({ source: "services.quest-detail", params: { questIndex: 0 } })).toEqual({
+      unresolvable: true,
+      reason: null,
+    });
+  });
+
+  it("an unavailable services panel reports its server message verbatim", () => {
+    const resolver = resolverFor(
+      servicesState({ available: false, reason: { code: "offline", message: "服務目前不可用。" } })
+    );
+    expect(resolver.resolve({ source: "services.guild" })).toEqual({
+      unresolvable: true,
+      reason: "服務目前不可用。",
+    });
+    expect(resolver.resolve({ source: "services.quest-detail", params: { questIndex: 0 } })).toEqual({
+      unresolvable: true,
+      reason: "服務目前不可用。",
+    });
+  });
+});
+
+function combatFixturePanel(overrides = {}) {
+  const skill = (extra) =>
+    Object.assign(
+      {
+        key: "fire_ball",
+        label: "火球術",
+        description: "凝聚火焰魔力。",
+        cost: { mp: 20 },
+        target_spec: "single",
+        element: "fire",
+        enabled: true,
+        disabled_reason: null,
+        targets: [7],
+        shorthands: [],
+          // A freeform-scale skill: the scale step exists so the resolver's
+          // selection-preservation path (rebuildForPanel) is exercised.
+          freeform_scales: [
+            { scale: 1, label: "1", mp_cost: 20 },
+            { scale: 2, label: "2", mp_cost: 40 },
+          ],
+      },
+      extra
+    );
+  return {
+    schema_version: 5,
+    available: true,
+    kind: "combat",
+    session: { session_id: "hostile:1:0", mode: "hostile", round: 1, state: "ready", reason: null },
+    participants: [
+      { identity: 7, token: "e1", display_name: "哥布林", team: "foes", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null },
+    ],
+    root_actions: ["attack", "skills", "items", "defend", "flee"],
+    secondary_actions: ["forfeit"],
+    skills: [
+      {
+        category: "elemental_magic",
+        label: "元素魔法",
+        groups: [{ group: "fire", label: "火", skills: [skill({}), skill({ key: "wind_blade", label: "風刃術", target_spec: "area", targets: [7], shorthands: ["all"] })] }],
+      },
+    ],
+    suggestions: { status: "unavailable" },
+    ...overrides,
+  };
+}
+
+function combatState(panel = combatFixturePanel()) {
+  return committedState({ mode: "combat", panels: { context_actions: panel } });
+}
+
+describe("frame resolver — the combat family (declared model-state exception)", () => {
+  it("every combat source resolves from a live combat snapshot", () => {
+    const panel = combatFixturePanel();
+    const resolver = resolverFor(combatState(panel));
+    const model = CombatMenu.buildMenus(panel, {});
+    expect(resolver.resolve({ source: "combat.root" })).toEqual(model.menus.root);
+    expect(resolver.resolve({ source: "combat.categories" })).toEqual(model.menus.categories);
+    expect(resolver.resolve({ source: "combat.forfeit" })).toEqual(model.menus.forfeit);
+    expect(resolver.resolve({ source: "combat.category", params: { categoryIndex: 0 } })).toEqual(
+      CombatMenu.openCategory(model, 0)
+    );
+    expect(resolver.resolve({ source: "combat.group", params: { categoryIndex: 0, groupIndex: 0 } })).toEqual(
+      CombatMenu.openGroup(model, 0, 0)
+    );
+    expect(resolver.resolve({ source: "combat.skill", params: { skillKey: "fire_ball" } })).toEqual(
+      CombatMenu.openSkill(model, "fire_ball")
+    );
+    expect(resolver.resolve({ source: "combat.target", params: { skillKey: "fire_ball" } })).toEqual(
+      CombatMenu.openSkillTargets(model, "fire_ball")
+    );
+  });
+
+  it("repeat resolution against one committed state is idempotent", () => {
+    const resolver = resolverFor(combatState());
+    const first = resolver.resolve({ source: "combat.skill", params: { skillKey: "wind_blade" } });
+    const model = resolver.combatModel();
+    const before = JSON.stringify({ focus: model.focusSkillKey, skills: model.skills });
+    const second = resolver.resolve({ source: "combat.skill", params: { skillKey: "wind_blade" } });
+    expect(second).toEqual(first);
+    expect(JSON.stringify({ focus: model.focusSkillKey, skills: model.skills })).toBe(before);
+  });
+
+  it("selection survives a panel replacement through rebuildForPanel", () => {
+    const panel = combatFixturePanel();
+    const state = combatState(panel);
+    const resolver = resolverFor(state);
+    resolver.resolve({ source: "combat.root" });
+    const model = resolver.combatModel();
+    // Client-local selections (the store's combat interactions).
+    model.focusSkillKey = "fire_ball";
+    CombatMenu.chooseScale(model, "fire_ball", 2);
+    CombatMenu.toggleArea(model, "wind_blade", 7);
+    // A panel replacement (round advances) preserves the still-valid scale.
+    const replaced = combatFixturePanel();
+    replaced.session.round = 2;
+    state.panels.context_actions = replaced;
+    const target = resolver.resolve({ source: "combat.target", params: { skillKey: "fire_ball" } });
+    expect(target.items[0].payload.scale).toBe(2);
+    // Shipped rebuildForPanel semantics (its own docstring): a panel
+    // replacement keeps the still-valid scale and DETERMINISTICALLY resets
+    // the AREA candidates to their default (no selection = all candidates).
+    expect(resolver.combatModel().skillByKey.wind_blade.selected).toEqual([]);
+    // Second resolution: idempotent, no further model change.
+    expect(resolver.resolve({ source: "combat.target", params: { skillKey: "fire_ball" } })).toEqual(target);
+  });
+
+  it("a non-combat committed state clears the model — re-adoption starts fresh", () => {
+    const state = combatState();
+    const resolver = resolverFor(state);
+    resolver.resolve({ source: "combat.root" });
+    CombatMenu.chooseScale(resolver.combatModel(), "fire_ball", 2);
+    // Leaving combat (an exploration-form panel commits).
+    state.mode = "exploration";
+    state.panels.context_actions = explorationPanel();
+    expect(resolver.resolve({ source: "combat.root" })).toEqual({ unresolvable: true, reason: null });
+    // A byte-identical combat panel is re-adopted: no stale selection.
+    state.mode = "combat";
+    delete state.panels.context_actions;
+    const fresh = combatFixturePanel();
+    state.panels.context_actions = fresh;
+    const target = resolver.resolve({ source: "combat.target", params: { skillKey: "fire_ball" } });
+    // Fresh adoption starts at the default scale 1 — NOT the previous ×2.
+    expect(target.items[0].payload.scale).toBe(1);
+    expect(resolver.combatModel().focusSkillKey).toBe(null);
+  });
+
+  it("an absent skill key degrades like a lost identity", () => {
+    const resolver = resolverFor(combatState());
+    expect(resolver.resolve({ source: "combat.skill", params: { skillKey: "vanished" } })).toEqual({
+      unresolvable: true,
+      reason: null,
+    });
+    expect(resolver.resolve({ source: "combat.category", params: { categoryIndex: 4 } })).toEqual({
+      unresolvable: true,
+      reason: null,
+    });
+  });
+});
+
+function creationPanelFixture(overrides = {}) {
+  return {
+    schema_version: 1,
+    available: true,
+    presets: [{ key: "sword", display_name: "見習劍士", race_description: "人類", emphasis: "力量", background: "商隊護衛" }],
+    custom: { races: [], affinity_elements: [], point_pool: 0 },
+    draft: null,
+    ...overrides,
+  };
+}
+
+describe("frame resolver — the creation family", () => {
+  it("root and presets resolve to the builder menus", () => {
+    const panel = creationPanelFixture();
+    const resolver = resolverFor(committedState({ mode: "creation", panels: { creation: panel } }));
+    const model = CreationMenu.buildMenus(panel);
+    expect(resolver.resolve({ source: "creation.root" })).toEqual(model.menus.root);
+    expect(resolver.resolve({ source: "creation.presets" })).toEqual(model.menus.presets);
+  });
+
+  it("form frames resolve to the shared empty marker frame", () => {
+    const resolver = resolverFor(committedState({ mode: "creation", panels: { creation: creationPanelFixture() } }));
+    expect(resolver.resolve({ source: "creation.form", params: { view: "custom" } })).toEqual({
+      items: [],
+      focusKey: null,
+    });
+    expect(resolver.resolve({ source: "creation.form", params: { view: "concept" } })).toEqual({
+      items: [],
+      focusKey: null,
+    });
+    expect(resolver.resolve({ source: "creation.form", params: { view: "bogus" } })).toEqual({
+      unresolvable: true,
+      reason: null,
+    });
+  });
+
+  it("confirm frames carry the stage's exact server-facing items", () => {
+    const resolver = resolverFor(committedState({ mode: "creation", panels: { creation: creationPanelFixture() } }));
+    expect(resolver.resolve({ source: "creation.confirm", params: { kind: "preset", presetKey: "sword" } })).toEqual(
+      CreationMenu.activateConfirm("sword")
+    );
+    expect(resolver.resolve({ source: "creation.confirm", params: { kind: "custom" } })).toEqual(
+      CreationMenu.activateConfirm(null)
+    );
+    expect(resolver.resolve({ source: "creation.confirm", params: { kind: "reset" } })).toEqual(
+      CreationMenu.confirmMenu("確認清除角色草稿？此操作無法回復。", CreationMenu.RESET_ACTION, {}, CreationMenu.RESET_DISPLAY)
+    );
+    expect(resolver.resolve({ source: "creation.confirm", params: {} })).toEqual({
+      unresolvable: true,
+      reason: null,
+    });
+  });
+
+  it("an absent creation panel degrades every creation source", () => {
+    const resolver = resolverFor(committedState({ mode: "creation", panels: {} }));
+    expect(resolver.resolve({ source: "creation.root" })).toEqual({ unresolvable: true, reason: null });
+    expect(resolver.resolve({ source: "creation.confirm", params: { kind: "custom" } })).toEqual({
+      unresolvable: true,
+      reason: null,
+    });
+  });
+});

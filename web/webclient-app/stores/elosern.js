@@ -33,6 +33,7 @@ import CombatMenu from "../lib/combat_menu.js";
 import CreationMenu from "../lib/creation_menu.js";
 import ServiceMenu from "../lib/service_menu.js";
 import CommandEcho from "../lib/command_echo.js";
+import stableStringify from "../lib/stable_stringify.js";
 import { createFrameResolver } from "./frame-resolvers.js";
 import { actionIntentForItem, dockItemKeys } from "../components/dock-items.js";
 import { gaugeRatio, isLowHp } from "../components/vitals.js";
@@ -64,30 +65,6 @@ const PANEL_ALLOWLIST = [
   "character",
   "title_ballot",
 ];
-
-// Stable JSON with sorted keys: content comparison that is insensitive to
-// key order, so committed panels can be compared across reducer commits. A
-// `seen` set makes it safe on the reactive (proxied) view objects: a cycle
-// is rendered as `~` instead of recursing forever.
-function stableStringify(value, seen) {
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value);
-  }
-  seen = seen || new Set();
-  if (seen.has(value)) {
-    return "~";
-  }
-  seen.add(value);
-  let s;
-  if (Array.isArray(value)) {
-    s = "[" + value.map((item) => stableStringify(item, seen)).join(",") + "]";
-  } else {
-    const keys = Object.keys(value).sort();
-    s = "{" + keys.map((key) => JSON.stringify(key) + ":" + stableStringify(value[key], seen)).join(",") + "}";
-  }
-  seen.delete(value);
-  return s;
-}
 
 // Display conversion of the committed `server_time` (unit conversion at
 // display only, mirroring the B1 TopBar `timeLabel` fixture shape).
