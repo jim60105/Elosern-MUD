@@ -14,6 +14,25 @@ The resolver table SHALL additionally implement, and produce the menus the migra
 - **WHEN** `services.quest-detail` resolves with a `questIndex` the committed services panel no longer lists
 - **THEN** resolve returns the unresolvable marker, carrying the panel's server-authored reason when present
 
+### Requirement: A drawer follows the stack when its hosted frame pops
+
+A hosted service frame's removal by the unresolvable-pop rule SHALL close its drawer through the single frame-hosting watcher and SHALL discard that drawer's local selection, quantity, and confirmation state exactly as payload loss does today; a pop of a descendant frame that leaves the hosted surface's frame current SHALL leave the drawer and that frame intact; closing a drawer SHALL initiate exactly one `popMenu` of the hosted frame it was presenting. No second frame stack, focus model, or drawer-owned frame state SHALL exist.
+
+#### Scenario: A hosted quest-detail loss closes its drawer
+
+- **WHEN** the quest drawer hosts the quest-detail frame and a committed services update removes that quest
+- **THEN** the frame pops to the hosted parent surface, and if the hosted surface's own frame is removed the quest drawer closes with its selection and confirmation state discarded, leaving no open drawer whose frame is gone
+
+#### Scenario: A descendant pop keeps the drawer
+
+- **WHEN** the abandon-confirmation frame pops back to the hosted quest-detail frame
+- **THEN** the quest drawer stays open presenting the restored frame with opener-row focus
+
+#### Scenario: Closing the drawer pops exactly one level
+
+- **WHEN** the player closes a drawer that hosts a router frame
+- **THEN** exactly one menu level pops, the drawer closes once, and no action is dispatched
+
 ## MODIFIED Requirements
 
 ### Requirement: Frame descriptors resolve to committed-state menus at access time
@@ -58,25 +77,6 @@ The keyboard router SHALL store each frame as `{descriptor, focusKey}` only — 
 
 - **WHEN** the skill frame for a focused skill is open and a combat panel update changes that skill's descriptors
 - **THEN** the frame's next read lists the updated rows with focus tracked by key, and the preserved selection state remains intact
-
-### Requirement: A drawer follows the stack when its hosted frame pops
-
-A hosted service frame's removal by the unresolvable-pop rule SHALL close its drawer through the single frame-hosting watcher and SHALL discard that drawer's local selection, quantity, and confirmation state exactly as payload loss does today; a pop of a descendant frame that leaves the hosted surface's frame current SHALL leave the drawer and that frame intact; closing a drawer SHALL initiate exactly one `popMenu` of the hosted frame it was presenting. No second frame stack, focus model, or drawer-owned frame state SHALL exist.
-
-#### Scenario: A hosted quest-detail loss closes its drawer
-
-- **WHEN** the quest drawer hosts the quest-detail frame and a committed services update removes that quest
-- **THEN** the frame pops to the hosted parent surface, and if the hosted surface's own frame is removed the quest drawer closes with its selection and confirmation state discarded, leaving no open drawer whose frame is gone
-
-#### Scenario: A descendant pop keeps the drawer
-
-- **WHEN** the abandon-confirmation frame pops back to the hosted quest-detail frame
-- **THEN** the quest drawer stays open presenting the restored frame with opener-row focus
-
-#### Scenario: Closing the drawer pops exactly one level
-
-- **WHEN** the player closes a drawer that hosts a router frame
-- **THEN** exactly one menu level pops, the drawer closes once, and no action is dispatched
 
 ### Requirement: Teardown resets the stack to the mode root from one decision point
 
