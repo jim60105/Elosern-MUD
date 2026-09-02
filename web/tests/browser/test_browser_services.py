@@ -140,9 +140,30 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
         """
         focus_action_dock(page)
         if surface_key == "inventory":
-            # Move, Look, Interact, Character, Quests, Inventory
-            for _ in range(5):
-                _press(page, "ArrowRight")
+            # Navigate to the Inventory tab by the store's committed focus
+            # KEY: the declarative root's tab set is capability-driven (H3
+            # design D5 appends the 建議 tab when the suggestions envelope is
+            # not `unavailable`) and a drawer-close pop restores focus to the
+            # opener's key, so focus may start on any root tab). Step by
+            # computed index delta — the tab row wraps, so step toward the
+            # target in whichever direction is nearer and assert arrival.
+            layout = page.evaluate(
+                """() => ({
+                  keys: Array.from(document.querySelectorAll(
+                    '#action-dock [data-item-key]')).map(
+                      (el) => el.getAttribute('data-item-key')),
+                  focus: window.__elosernBridge.store.view.focus.key,
+                })"""
+            )
+            target = layout["keys"].index("inventory")
+            start = layout["keys"].index(layout["focus"])
+            step = "ArrowRight" if target >= start else "ArrowLeft"
+            for _ in range(abs(target - start)):
+                _press(page, step)
+            focused = page.evaluate(
+                "() => window.__elosernBridge.store.view.focus.key"
+            )
+            assert focused == "inventory", focused
             _press(page, "Enter")
             return self._services_panel(page)
         # guild/shop: Interact -> first target -> navigate service entry.
@@ -637,6 +658,28 @@ class ShopJourneys(ServicesBrowserTest):
         page.locator('[data-testid="hud-drawer-close"]').click()
         page.wait_for_timeout(120)
         wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
+        # Declarative pop (webclient-frame-resolution): closing the drawer
+        # pops exactly the hosted shop frame; the exploration frames opened
+        # on the way in (Interact -> target) remain and the pop restores
+        # focus to the navigate row. Keyboard back to the exploration root
+        # (Escape pops without dispatching) before using the 背包 entry.
+        sent_before_rehome = sent_action_count(page)
+        deadline_depth = time.monotonic() + 10
+        while (
+            page.evaluate("() => window.__elosernBridge.router.depth()") > 1
+            and time.monotonic() < deadline_depth
+        ):
+            _press(page, "Escape", wait_ms=120)
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.depth()"),
+            1,
+            "Escape must pop back to the exploration root",
+        )
+        self.assertEqual(
+            sent_action_count(page),
+            sent_before_rehome,
+            "Escape re-homing to the root dispatches no action",
+        )
 
         def _frame_state():
             return page.evaluate(
