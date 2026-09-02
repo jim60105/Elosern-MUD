@@ -222,8 +222,12 @@ def _validate_allocations(parsed: Any) -> list[str]:
         span = upper - lower
         if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= span:
             return [f"allocation for {axis} must be an integer from 0 to {span}"]
-    if sum(allocations[axis] for axis in ALLOCATABLE_AXES) != _allocation_budget(race_key, subrace_key):
-        return ["allocations must sum exactly to the race's allocation budget"]
+    budget = _allocation_budget(race_key, subrace_key)
+    if sum(allocations[axis] for axis in ALLOCATABLE_AXES) != budget:
+        # The prompt intentionally carries no numbers (design D2), so the
+        # retry feedback is the model's only route to a convergent fix: name
+        # the exact budget like the per-axis band messages name their bound.
+        return [f"allocations must sum exactly to the allocation budget {budget}"]
     return []
 
 
