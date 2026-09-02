@@ -192,6 +192,84 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(wrapper.emitted("cancel-confirm")).toBeTruthy();
   });
 
+  // -- Server-result presentation (webclient-action-result-feedback) --------
+  // While the overlay is mounted it is THE presenting surface for a
+  // recognized non-success result: the message renders verbatim in one
+  // always-reachable result region on every stage (the store suppresses the
+  // narrative line for the same result), never the code, and a success
+  // result shows nothing.
+  const REJECTED = {
+    requestId: "session:1",
+    epoch: "a".repeat(22),
+    outcome: "rejected",
+    code: "name_taken",
+    message: "這個名字已經有人使用了。",
+    presentationRevision: 1,
+  };
+
+  it("renders a rejected result verbatim on the preset stage (message, not code)", () => {
+    const wrapper = mount(CreationOverlay, {
+      props: { creation: CREATION_PANEL_SAMPLE, result: REJECTED },
+    });
+    const region = wrapper.get('[data-testid="creation-result-message"]');
+    expect(region.text()).toBe("這個名字已經有人使用了。");
+    expect(region.attributes("data-outcome")).toBe("rejected");
+    // The code is never the presented text.
+    expect(region.text()).not.toContain("name_taken");
+  });
+
+  it("renders a stale result verbatim on the custom stage", async () => {
+    const wrapper = mount(CreationOverlay, {
+      props: {
+        creation: CREATION_PANEL_SAMPLE,
+        result: { ...REJECTED, outcome: "stale", code: "stale", message: "畫面狀態已更新，請重新操作" },
+      },
+    });
+    await switchToCustom(wrapper);
+    expect(wrapper.get('[data-testid="creation-result-message"]').text()).toBe(
+      "畫面狀態已更新，請重新操作",
+    );
+  });
+
+  it("renders the result region on the confirm stage too (always reachable)", () => {
+    const wrapper = mount(CreationOverlay, {
+      props: {
+        creation: CREATION_PANEL_SAMPLE,
+        result: { ...REJECTED, outcome: "error", code: "internal", message: "伺服器發生錯誤。" },
+        stage: {
+          stage: "confirm",
+          confirmItems: [{ key: "confirm-creation.activate", label: "確認啟用？", actionId: "creation.activate" }],
+          confirmLabel: "確認啟用？",
+          confirmAction: "creation.activate",
+          pendingPresetKey: "human_wanderer",
+        },
+      },
+    });
+    expect(wrapper.get('[data-testid="creation-confirm"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="creation-result-message"]').text()).toBe("伺服器發生錯誤。");
+  });
+
+  it("shows the stable fallback line for a message-less non-success", () => {
+    const wrapper = mount(CreationOverlay, {
+      props: { creation: CREATION_PANEL_SAMPLE, result: { ...REJECTED, message: "   " } },
+    });
+    // Byte-identical to the store's narrative fallback constant.
+    expect(wrapper.get('[data-testid="creation-result-message"]').text()).toBe(
+      "動作未生效，請重試或返回上層。",
+    );
+  });
+
+  it("renders no result region and no form message for a successful result", () => {
+    const wrapper = mount(CreationOverlay, {
+      props: {
+        creation: CREATION_PANEL_SAMPLE,
+        result: { ...REJECTED, outcome: "success", code: "completed", message: "完成" },
+      },
+    });
+    expect(wrapper.find('[data-testid="creation-result-message"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="creation-form-message"]').exists()).toBe(false);
+  });
+
   it("the reset button requests the destructive confirmation (no direct creation.reset)", () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     wrapper.get('[data-testid="creation-reset"]').trigger("click");

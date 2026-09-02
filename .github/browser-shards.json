@@ -8,7 +8,8 @@
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_attack_flow_submits_basic_attack_once",
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_single_skill_target_flow",
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_self_skill_submits_no_target_field",
-        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_none_skill_submits_skill_key_only"
+        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_none_skill_submits_skill_key_only",
+        "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_skill_frame_refreshes_on_panel_update"
       ],
       "files_b": [
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_area_shorthand_flow",
@@ -86,10 +87,16 @@
       "name": "exploration-a",
       "files_a": [
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_keyboard_move_charges_time_and_refreshes_map",
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_frame_resolver_follows_committed_state_across_a_real_move",
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_open_move_frame_follows_a_committed_move",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_escape_from_character_panel_returns_keyboard_to_the_exploration_root",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_look_at_room_preserves_the_onboarding_beat",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_look_at_guard_shows_the_affinity_stage_line",
-        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_scripted_keyword_dialogue_completes"
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_scripted_keyword_dialogue_completes",
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_focus_follows_the_item_key_across_committed_re_resolution",
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_identity_loss_pops_one_level_and_restores_opener_focus",
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_whole_stack_loss_cascades_to_the_degraded_root_and_recovers",
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_suggestions_frame_is_status_driven"
       ],
       "files_b": [
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_freeform_dialogue_degrades_offline_through_the_command_line",
@@ -104,6 +111,7 @@
       "name": "exploration-services",
       "files_a": [
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_stale_and_tampered_submissions_do_nothing",
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_non_success_action_results_speak_once_in_the_narrative",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_no_take_or_drop_control_is_rendered",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_outlet_and_nav_tiles_stay_within_the_pane_at_a_narrow_viewport",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_outlet_partial_last_row_fills_the_pane_at_a_narrower_viewport",

@@ -16,6 +16,23 @@ const assert = require("node:assert/strict");
 const CombatMenu = require("../elosern/combat_menu.js");
 const KeyboardRouter = require("../elosern/keyboard_router.js");
 
+// The router is declarative-only: back each menu under test with a static
+// resolver source so the submission semantics stay identical.
+function menuRouter(emitted) {
+  const tables = new Map();
+  let seq = 0;
+  const router = KeyboardRouter.createRouter({
+    onEvent: (name, payload) => emitted.push([name, payload]),
+    resolve: (descriptor) => tables.get(descriptor.source) ?? null,
+  });
+  router.pushMenu = (menu) => {
+    const source = "menu-" + (seq += 1);
+    tables.set(source, menu);
+    return router.pushFrame({ source, params: {} });
+  };
+  return router;
+}
+
 function validSkill(overrides) {
   return Object.assign(
     {
@@ -134,7 +151,7 @@ test("forfeit confirmation menu requires explicit confirm to send", () => {
   assert.equal(forfeit.items[1].actionId, null);
 
   const emitted = [];
-  const router = KeyboardRouter.createRouter({ onEvent: (name, payload) => emitted.push([name, payload]) });
+  const router = menuRouter(emitted);
   router.pushMenu(combat.menus.root);
   router.pushMenu(forfeit);
   router.press(KeyboardRouter.ESCAPE);
@@ -195,7 +212,7 @@ test("disabled skill stays focusable but never sends a packet", () => {
   assert.equal(menu.items[0].disabledReason.code, "insufficient_resource");
 
   const emitted = [];
-  const router = KeyboardRouter.createRouter({ onEvent: (name, payload) => emitted.push([name, payload]) });
+  const router = menuRouter(emitted);
   router.pushMenu(menu);
   router.press(KeyboardRouter.ENTER);
   assert.ok(emitted.some(([name]) => name === "disabled"));
@@ -297,7 +314,7 @@ test("repeated Enter is suppressed and in-flight locking blocks submit", () => {
   const combat = CombatMenu.buildMenus(readyPanel(), {});
   const menu = CombatMenu.openSkill(combat, "fire_ball");
   const emitted = [];
-  const router = KeyboardRouter.createRouter({ onEvent: (name, payload) => emitted.push([name, payload]) });
+  const router = menuRouter(emitted);
   router.pushMenu(menu);
   router.press(KeyboardRouter.ENTER);
   router.press(KeyboardRouter.ENTER, true); // held repeat
@@ -315,7 +332,7 @@ test("Escape pops one level without ending combat", () => {
   const combat = CombatMenu.buildMenus(readyPanel(), {});
   const menu = CombatMenu.openSkill(combat, "fire_ball");
   const emitted = [];
-  const router = KeyboardRouter.createRouter({ onEvent: (name, payload) => emitted.push([name, payload]) });
+  const router = menuRouter(emitted);
   router.pushMenu(combat.menus.root);
   router.pushMenu(menu);
   assert.equal(router.depth(), 2);

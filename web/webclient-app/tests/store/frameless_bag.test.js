@@ -65,7 +65,10 @@ describe("frameless 背包 drawer (store contract)", () => {
     // The open touched nothing: no push, no sub-dock switch, no surface.
     expect(store.router.depth()).toBe(depthBefore);
     expect(trailTitles(store.router)).toEqual(trailBefore);
-    expect(store.router.currentMenu()).toBe(currentBefore);
+    // Declarative frames re-resolve per access (webclient-declarative-frame-
+    // stack): the open is unchanged in content (deep-equal), not in object
+    // identity — the drawer-open row must not mutate the frame.
+    expect(store.router.currentMenu()).toEqual(currentBefore);
     expect(store.view.activeSubDock).toBe(null);
     expect(store.currentFrameIsServiceFrame()).toBe(false);
   });
@@ -76,7 +79,7 @@ describe("frameless 背包 drawer (store contract)", () => {
     // mounted in production): the services sub-dock is active with its root
     // frame current, and its 背包 row is the raw model row.
     store.setActiveSubDock("services");
-    store.router.pushMenu(ServiceMenu.buildMenus(SERVICES_PANEL_SAMPLE).menus.root);
+    store.router.pushFrame({ source: "services.root", params: {} });
     const depthBefore = store.router.depth();
     const trailBefore = trailTitles(store.router);
     expect(store.focusItemByKey("inventory")).toBe(true);
@@ -129,7 +132,7 @@ describe("frameless 背包 drawer (store contract)", () => {
     store.setSender(fx.createFakeSender());
     openSession();
     store.setActiveSubDock("services");
-    store.router.pushMenu(ServiceMenu.buildMenus(SERVICES_PANEL_SAMPLE).menus.root);
+    store.router.pushFrame({ source: "services.root", params: {} });
     expect(store.focusItemByKey("shop")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
     expect(store.router.currentMenu().title).toBe("商店");
@@ -164,7 +167,7 @@ describe("frameless 背包 drawer (store contract)", () => {
     // a service-titled frame is current while the bag drawer is open (no
     // production handler records a service surface for this state).
     store.setActiveSubDock("services");
-    store.router.pushMenu(ServiceMenu.buildMenus(SERVICES_PANEL_SAMPLE).menus.shop);
+    store.router.pushFrame({ source: "services.shop", params: {} });
     expect(store.currentFrameIsServiceFrame()).toBe(true);
     expect(store.openHudDrawer("inventory")).toBe(true);
     const depthBefore = store.router.depth();

@@ -14,6 +14,8 @@ deterministic; no remote, LLM, or image service is involved.
 
 from __future__ import annotations
 
+import json
+
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
@@ -21,6 +23,7 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     sent_action_count,
+    outbound_messages,
     store_state,
     wait_for_store_state,
 )
@@ -83,7 +86,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
 
     def _reset_root(self, page):
         focus_action_dock(page)
-        page.evaluate("window.__elosernBridge.router.reset()")
+        page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
         page.wait_for_timeout(60)
 
     def _open_root(self, page, index):
@@ -415,6 +418,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement("webclient-exploration-menu::explore-engage-delegates-to-the-existing-engage-contract")
+    @covers_requirement("webclient-frame-resolution::teardown-resets-the-stack-to-the-mode-root-from-one-decision-point")
     def test_engage_transitions_to_combat(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -434,6 +438,14 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(
             page.locator("#action-dock").get_attribute("data-mode"),
             "combat",
+        )
+        # Teardown (webclient-declarative-frame-stack): the mode switch
+        # replaced the whole exploration stack (root -> interact -> target)
+        # with exactly one combat root frame.
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.depth()"),
+            1,
+            "the combat adoption did not collapse the frame stack to one root",
         )
 
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
@@ -578,6 +590,819 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(
             store_state(page)["panels"]["local_map"]["current_node"],
             map_before,
+        )
+
+    def _err_line_texts(self, page):
+        """The rendered narrative err lines, in feed order."""
+        return page.evaluate(
+            """() => Array.from(
+                 document.querySelectorAll(
+                   '[data-testid="narrative-feed"] [data-line-kind="err"]'),
+                 (n) => n.textContent)"""
+        )
+
+    def _tamper_sender(self, page, tamper):
+        """Wrap the live transport sender so dispatched envelopes pass through
+        ``tamper`` (shallow-cloned; the store's envelope is never mutated in
+        place). The caller stores ``window.__elosernOriginalSender`` first and
+        restores it with ``_restore_sender``."""
+        page.evaluate(
+            """(tamperSource) => {
+              const store = window.__elosernBridge.store;
+              const original = window.__elosernOriginalSender;
+              if (!original || typeof original.sendAction !== "function") {
+                throw new Error("no stashed original sender");
+              }
+              const tamper = new Function("return " + tamperSource)();
+              store.setSender({
+                sendText: (text) => original.sendText(text),
+                sendSync: () => original.sendSync(),
+                sendAction: (envelope) => original.sendAction(tamper(envelope)),
+              });
+            }""",
+            tamper,
+        )
+
+    def _restore_sender(self, page):
+        page.evaluate(
+            "() => window.__elosernBridge.store.setSender(window.__elosernOriginalSender)"
+        )
+
+    def _dispatch_move(self, page):
+        """Dispatch one explore.move for the first exit through the store."""
+        return page.evaluate(
+            """() => {
+              const s = window.__elosernBridge.store.view;
+              const row = s.panels.exploration.move[0];
+              return window.__elosernBridge.store.dispatchAction('explore.move', {
+                exit_ref: row.exit_ref,
+                current_node: s.panels.local_map.current_node,
+              });
+            }"""
+        )
+
+    def _wait_admitted_move(self, page, node_before):
+        """Dispatch real moves until one is admitted (a presentation revision
+        can advance between the view read and admission; the dispatcher then
+        answers stale — the same bounded retry the move journey uses)."""
+        for _attempt in range(3):
+            request_id = self._dispatch_move(page)
+            self.assertIsNotNone(request_id)
+            try:
+                wait_for_store_state(
+                    page,
+                    lambda s: (s.get("panels") or {}).get("local_map", {}).get("current_node")
+                    != node_before,
+                    timeout=10000,
+                )
+                return
+            except AssertionError:
+                last = store_state(page).get("lastActionResult") or {}
+                self.assertEqual(
+                    last.get("outcome"),
+                    "stale",
+                    "the move was neither admitted nor rejected as stale",
+                )
+                wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
+        self.fail("three consecutive move dispatches were all answered stale")
+
+    @covers_requirement("webclient-frame-resolution::router-frames-store-descriptors-and-a-focus-key-and-resolve-at-access-time")
+    @covers_requirement("webclient-frame-resolution::activation-payloads-read-committed-state-at-dispatch-time")
+    def test_open_move_frame_follows_a_committed_move(self):
+        """The shipped dock path (the user-visible bug, design doc §2): with
+        the 移動 frame open, a committed move must make the RENDERED dock pane
+        list the NEW room's exits, and activating a rendered row must submit
+        the new `exit_ref`/`current_node`. Against the copy-based router this
+        fails red: the open frame keeps the previous room's rows and payloads,
+        so the second activation is answered `stale` and the player sees
+        nothing."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        node_before = store_state(page)["panels"]["local_map"]["current_node"]
+
+        self._open_root(page, 0)  # Move — the submenu frame is now current.
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.depth()"),
+            2,
+            "the move frame did not open",
+        )
+
+        def rendered_exit_rows():
+            # The REAL pane: the dock row region's rendered rows, in DOM
+            # order — not a store copy.
+            return page.evaluate(
+                "() => Array.from("
+                "document.querySelectorAll('#action-dock [data-item-key]'))"
+                ".map((el) => el.getAttribute('data-item-key'))"
+                ".filter((key) => key.startsWith('exit-'))"
+            )
+
+        panel_before = store_state(page)["panels"]["exploration"]
+        self.assertEqual(
+            rendered_exit_rows(),
+            ["exit-" + row["exit_ref"] for row in panel_before["move"]],
+            "the freshly opened pane must match the committed room",
+        )
+
+        # A real admitted move commits a newer snapshot for the whole room.
+        self._wait_admitted_move(page, node_before)
+        wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
+        panel_after = store_state(page)["panels"]["exploration"]
+        node_after = store_state(page)["panels"]["local_map"]["current_node"]
+        self.assertNotEqual(node_after, node_before)
+
+        # The rendered pane follows the commit on its next render (there is
+        # no refresh call on the commit path).
+        after_rows = rendered_exit_rows()
+        self.assertEqual(
+            after_rows,
+            ["exit-" + row["exit_ref"] for row in panel_after["move"]],
+            "the open move pane still renders the superseded room's exits",
+        )
+
+        # Activating a rendered row through the pointer path submits the NEW
+        # state's payload.
+        moves_before = sent_action_count(page, "explore.move")
+        first_key = after_rows[0]
+        page.locator(f"#action-dock [data-item-key=\"{first_key}\"]").click()
+        page.wait_for_function(
+            f"() => window.__elosernSent.filter((m) => m[0] === 'ui_action'"
+            " && m[1][0] && m[1][0].action_id === 'explore.move').length"
+            f" > {moves_before}",
+            timeout=10000,
+        )
+        envelopes = [
+            args[0]
+            for cmdname, args, _kw in outbound_messages(page)
+            if cmdname == "ui_action" and args and args[0].get("action_id") == "explore.move"
+        ]
+        self.assertEqual(len(envelopes), moves_before + 1, "the click did not dispatch exactly one move")
+        self.assertEqual(
+            (envelopes[-1].get("payload") or {}).get("current_node"),
+            node_after,
+            "the activation submitted the superseded room's current_node",
+        )
+        self.assertEqual(
+            (envelopes[-1].get("payload") or {}).get("exit_ref"),
+            panel_after["move"][0]["exit_ref"],
+            "the activation submitted the superseded room's exit_ref",
+        )
+
+    @covers_requirement("webclient-frame-resolution::frame-descriptors-resolve-to-committed-state-menus-at-access-time")
+    @covers_requirement("webclient-frame-resolution::the-descriptor-registry-implements-the-exploration-family-as-a-finite-table")
+    @covers_requirement("webclient-frame-resolution::dynamic-rows-and-payloads-are-verbatim-from-the-panel-while-client-owned-navigation-rows-are-reproduced")
+    @covers_requirement("webclient-frame-resolution::an-unresolvable-descriptor-yields-the-shared-degradation-marker-with-the-server-authored-reason")
+    def test_frame_resolver_follows_committed_state_across_a_real_move(self):
+        """The frame resolver registry derives menus at access time (design
+        doc D1): a move frame resolved before a real move names the old room;
+        re-resolving after the committed snapshot names the new room's exits
+        with the new current_node and no stale row."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        node_before = store_state(page)["panels"]["local_map"]["current_node"]
+
+        def resolve_move_menu():
+            return page.evaluate(
+                "() => window.__elosernBridge.resolveFrame({ source: 'exploration.move' })"
+            )
+
+        before = resolve_move_menu()
+        self.assertFalse(before.get("unresolvable", False), f"move frame did not resolve: {before}")
+        panel_before = store_state(page)["panels"]["exploration"]
+        before_keys = [item["key"] for item in before["items"] if item["key"].startswith("exit-")]
+        self.assertEqual(
+            before_keys,
+            ["exit-" + row["exit_ref"] for row in panel_before["move"]],
+            "the resolved frame is exactly the committed room's exit rows",
+        )
+        self.assertTrue(
+            all(
+                (item.get("payload") or {}).get("current_node") == node_before
+                for item in before["items"]
+                if item.get("actionId") == "explore.move"
+            ),
+            "every enabled row carries the committed current_node",
+        )
+
+        # A real move commits a newer snapshot (bounded admission retry).
+        self._wait_admitted_move(page, node_before)
+        wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
+        node_after = store_state(page)["panels"]["local_map"]["current_node"]
+        self.assertNotEqual(node_after, node_before)
+
+        after = resolve_move_menu()
+        self.assertFalse(after.get("unresolvable", False), f"move frame did not re-resolve: {after}")
+        panel_after = store_state(page)["panels"]["exploration"]
+        after_keys = [item["key"] for item in after["items"] if item["key"].startswith("exit-")]
+        self.assertEqual(
+            after_keys,
+            ["exit-" + row["exit_ref"] for row in panel_after["move"]],
+            "the re-resolved frame names the NEW room's exits",
+        )
+        after_labels = {item["label"] for item in after["items"] if item["key"].startswith("exit-")}
+        before_labels = {item["label"] for item in before["items"] if item["key"].startswith("exit-")}
+        self.assertNotEqual(
+            after_labels,
+            before_labels,
+            "no row of the superseded room survived the re-resolve",
+        )
+        self.assertTrue(
+            all(
+                (item.get("payload") or {}).get("current_node") == node_after
+                for item in after["items"]
+                if item.get("actionId") == "explore.move"
+            ),
+            "the re-resolved payloads carry the new committed current_node",
+        )
+
+        # The finite table: every exploration source resolves against the live
+        # committed snapshot (suggestions degrade iff its envelope status is
+        # `unavailable`, the no-pane rule), and resolution is pure: two calls
+        # agree deeply and nothing else in the committed state moved.
+        state = store_state(page)
+        status = ((state["panels"].get("context_actions") or {}).get("suggestions") or {}).get("status")
+        sources = [
+            "exploration.root",
+            "exploration.move",
+            "exploration.look",
+            "exploration.interact",
+            "exploration.wait",
+            "exploration.suggestions",
+        ]
+        for source in sources:
+            menu = page.evaluate(
+                "(source) => window.__elosernBridge.resolveFrame({ source })", source
+            )
+            if source == "exploration.suggestions" and status == "unavailable":
+                self.assertTrue(menu.get("unresolvable", False))
+            else:
+                self.assertFalse(
+                    menu.get("unresolvable", False), f"{source} did not resolve: {menu}"
+                )
+                self.assertTrue(isinstance(menu.get("items"), list) and menu["items"])
+        identities = [row["identity"] for row in state["panels"]["exploration"]["interact"]]
+        if identities:
+            target_menu = page.evaluate(
+                "(id) => window.__elosernBridge.resolveFrame("
+                "{ source: 'exploration.target', params: { identity: id } })",
+                identities[0],
+            )
+            self.assertFalse(target_menu.get("unresolvable", False))
+        # Purity: a second resolve deep-equals the first and the committed
+        # state is byte-identical across the resolution storm.
+        state_before_json = json.dumps(store_state(page), sort_keys=True)
+        first = page.evaluate("() => window.__elosernBridge.resolveFrame({ source: 'exploration.root' })")
+        second = page.evaluate("() => window.__elosernBridge.resolveFrame({ source: 'exploration.root' })")
+        self.assertEqual(first, second, "double resolution against one committed state differs")
+        self.assertEqual(
+            json.dumps(store_state(page), sort_keys=True),
+            state_before_json,
+            "resolution mutated committed state",
+        )
+        # Degradation is data: an unregistered source and a lost identity
+        # return the shared marker (null reason; no authored message here).
+        self.assertEqual(
+            {"unresolvable": True, "reason": None},
+            page.evaluate("() => window.__elosernBridge.resolveFrame({ source: 'services.board' })"),
+        )
+        self.assertEqual(
+            {"unresolvable": True, "reason": None},
+            page.evaluate(
+                "() => window.__elosernBridge.resolveFrame("
+                "{ source: 'exploration.target', params: { identity: 'nonexistent-identity' } })"
+            ),
+        )
+
+    # --- declarative-frame-stack browser verification (task 5.1) -----------
+    #
+    # These methods verify the shipped stack (router + store + dock DOM)
+    # against COMMITTED state the live fixture cannot arrange: a fabricated
+    # `ui_update` through the bridge's `store.receive` is the same reducer
+    # entry the real transport feeds (the options-surface file pioneered the
+    # seam), so the stack settles exactly as it does after a server push —
+    # identity loss, panel withdrawal, and suggestions status flips included.
+
+    def _inject_panels(self, page, panels: dict) -> dict:
+        """Commit one schema-valid ``ui_update`` for ``panels`` at the
+        current revision + 1. The envelope is assembled IN-PAGE from the
+        fresh view so no real push can slip a revision between read and
+        receive; the injected revision then back-stops the next real push
+        (``not_newer``) until the server's revision passes it."""
+        return page.evaluate(
+            """(panels) => {
+              const s = window.__elosernBridge.store.view;
+              const envelope = {
+                protocol_version: 1,
+                presentation_epoch: s.epoch,
+                revision: s.revision + 1,
+                mode: s.mode,
+                layout_version: s.layoutVersion ?? 1,
+                panels,
+                server_time: s.serverTime,
+              };
+              return window.__elosernBridge.store.receive(
+                s.generation, 'ui_update', [envelope], {});
+            }""",
+            panels,
+        )
+
+    @staticmethod
+    def _exploration_panel(*, move=(), interact=()) -> dict:
+        """A schema-valid available exploration panel carrying exactly the
+        named rows — the fabricated room a real commit would produce."""
+        return {
+            "schema_version": 1,
+            "available": True,
+            "kind": "exploration",
+            "move": list(move),
+            "look": {
+                "room": {"identity": 94001, "display_name": "巡邏室", "room": True},
+                "entities": [],
+                "objects": [],
+            },
+            "interact": list(interact),
+            "character": {"available": True},
+            "quests": {"available": False},
+            "inventory": {"available": False},
+        }
+
+    @staticmethod
+    def _move_row(exit_ref: str, label: str) -> dict:
+        return {
+            "exit_ref": exit_ref,
+            "label": label,
+            "destination": "grid:altoria:3:3",
+            "enabled": True,
+            "disabled_reason": None,
+        }
+
+    @staticmethod
+    def _target(identity: int, name: str) -> dict:
+        return {
+            "identity": identity,
+            "display_name": name,
+            "portrait_ref": None,
+            "affordances": [
+                {
+                    "kind": "action",
+                    "action_id": "explore.engage",
+                    "label": "戰鬥",
+                    "enabled": True,
+                    "disabled_reason": None,
+                }
+            ],
+        }
+
+    def _depth(self, page) -> int:
+        return page.evaluate("() => window.__elosernBridge.router.depth()")
+
+    def _pane_keys(self, page) -> list[str]:
+        """Every rendered row identity inside the dock (tab-bar tabs and
+        pane rows share the `data-item-key` seam; the legacy suggestion
+        cards render without one)."""
+        return page.evaluate(
+            "() => Array.from("
+            "document.querySelectorAll('#action-dock [data-item-key]'))"
+            ".map((el) => el.getAttribute('data-item-key'))"
+        )
+
+    @covers_requirement("webclient-frame-resolution::focus-tracks-the-item-key-across-re-resolution")
+    def test_focus_follows_the_item_key_across_committed_re_resolution(self):
+        """Focus tracks the item KEY (webclient-declarative-frame-stack):
+        with the 移動 frame open, a commit that REORDERS the exits keeps the
+        focus on the same key at its new index, and a commit that drops the
+        focused exit lands focus on a surviving row — never on the frozen
+        copy's old row. Activation then submits the NEW committed payload."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+
+        accepted = self._inject_panels(page, {"exploration": self._exploration_panel(
+            move=[self._move_row("ex-a", "北門"), self._move_row("ex-b", "南門"),
+                  self._move_row("ex-c", "東門")])})
+        self.assertTrue(accepted["accepted"], accepted)
+
+        self._open_root(page, 0)  # 移動 frame opens at depth 2.
+        self.assertEqual(self._depth(page), 2)
+        self.assertTrue(
+            page.evaluate("() => window.__elosernBridge.store.focusItemByKey('exit-ex-b')")
+        )
+        self.assertEqual(store_state(page)["focus"]["key"], "exit-ex-b")
+
+        # Reordered + extended commit: the same key survives at a new index.
+        accepted = self._inject_panels(page, {"exploration": self._exploration_panel(
+            move=[self._move_row("ex-c", "東門"), self._move_row("ex-b", "南門"),
+                  self._move_row("ex-a", "北門"), self._move_row("ex-d", "西門")])})
+        self.assertTrue(accepted["accepted"], accepted)
+        self.assertEqual(
+            store_state(page)["focus"]["key"],
+            "exit-ex-b",
+            "the same-key focus did not survive the re-resolution",
+        )
+
+        # The focused key vanishes: focus lands on a SURVIVING row (the
+        # nearest-row rule itself is pinned at store level; here it must land
+        # somewhere real, never on the vanished key).
+        accepted = self._inject_panels(page, {"exploration": self._exploration_panel(
+            move=[self._move_row("ex-c", "東門"), self._move_row("ex-d", "西門")])})
+        self.assertTrue(accepted["accepted"], accepted)
+        focused = store_state(page)["focus"]["key"]
+        self.assertIn(
+            focused,
+            ("exit-ex-c", "exit-ex-d"),
+            "the lost-key fallback did not land on a surviving row",
+        )
+        self.assertEqual(self._depth(page), 2, "the move frame did not stay open")
+
+        # Activating the focused row submits the NEW committed row's payload.
+        self.assertTrue(
+            page.evaluate("() => window.__elosernBridge.store.focusConfirm('keyboard')")
+        )
+        # The proof is the OUTBOUND envelope only: the fabricated exit_ref
+        # cannot be accepted by the server (its own result/lock behaviour is
+        # covered elsewhere), so the recorder — written synchronously at
+        # dispatch — is the assertion source, not the in-flight gate.
+        page.wait_for_function(
+            "() => window.__elosernSent.filter((m) => m[0] === 'ui_action'"
+            " && m[1][0] && m[1][0].action_id === 'explore.move').length === 1",
+            timeout=10000,
+        )
+        moves = [
+            args[0]
+            for cmdname, args, _kw in outbound_messages(page)
+            if cmdname == "ui_action" and args and args[0].get("action_id") == "explore.move"
+        ]
+        self.assertEqual(len(moves), 1, "the activation dispatched exactly one move")
+        self.assertEqual(
+            (moves[0].get("payload") or {}).get("exit_ref"),
+            focused[len("exit-"):],
+            "the activation submitted a payload from a superseded row",
+        )
+
+    @covers_requirement("webclient-frame-resolution::unresolvable-frames-pop-one-level-only-the-root-frame-renders-a-degraded-reason-row")
+    def test_identity_loss_pops_one_level_and_restores_opener_focus(self):
+        """A target frame whose identity vanishes from the committed panel
+        pops EXACTLY one level (never cascades past a surviving parent) and
+        restores focus toward the vanished target's former row."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        accepted = self._inject_panels(page, {"exploration": self._exploration_panel(
+            interact=[self._target(9001, "哨衛士兵"), self._target(9002, "吟遊詩人")])})
+        self.assertTrue(accepted["accepted"], accepted)
+
+        self._open_root(page, 2)  # 互動 frame (depth 2)
+        self.assertTrue(
+            page.evaluate("() => window.__elosernBridge.store.focusItemByKey('target-9001')")
+        )
+        page.evaluate("() => window.__elosernBridge.store.focusConfirm('keyboard')")
+        self.assertEqual(self._depth(page), 3, "the target frame did not open")
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.currentDescriptor()"),
+            {"source": "exploration.target", "params": {"identity": 9001}},
+        )
+
+        # The committed panel no longer lists 9001: the target frame
+        # degrades at the next access and pops exactly one level.
+        accepted = self._inject_panels(page, {"exploration": self._exploration_panel(
+            interact=[self._target(9002, "吟遊詩人")])})
+        self.assertTrue(accepted["accepted"], accepted)
+        self.assertEqual(self._depth(page), 2)
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.currentDescriptor()"),
+            {"source": "exploration.interact", "params": {}},
+        )
+        # Opener focus is restored toward the vanished row: the only
+        # surviving target row carries the keyboard focus — committed view
+        # AND the rendered pane's aria-selected cell.
+        self.assertEqual(store_state(page)["focus"]["key"], "target-9002")
+        self.assertEqual(
+            page.locator(
+                '#action-dock [data-item-key="target-9002"][aria-selected="true"]'
+            ).count(),
+            1,
+            "the restored opener focus did not reach the rendered pane",
+        )
+
+    @covers_requirement("webclient-frame-resolution::unresolvable-frames-pop-one-level-only-the-root-frame-renders-a-degraded-reason-row")
+    def test_whole_stack_loss_cascades_to_the_degraded_root_and_recovers(self):
+        """A panel withdrawal makes EVERY open exploration frame unresolvable
+        at once: the pop cascades in ONE access down to the root frame, the
+        root degrades into the single disabled marker row with the
+        server-authored reason verbatim, activating it submits nothing, and a
+        returning panel re-resolves the SAME root frame back to content."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        # Pin the suggestions status to `generating` so the legacy section
+        # renders no keyed rows and the pane-key assertions stay exact.
+        pinned_context = {
+            "context_actions": {
+                "schema_version": 5,
+                "available": True,
+                "kind": "exploration",
+                "affordances": [],
+                "suggestions": {"status": "generating"},
+            },
+        }
+        accepted = self._inject_panels(page, {
+            "exploration": self._exploration_panel(interact=[self._target(9001, "哨衛士兵")]),
+            **pinned_context,
+        })
+        self.assertTrue(accepted["accepted"], accepted)
+
+        self._open_root(page, 2)  # 互動 -> 對象 (depth 3)
+        self.assertTrue(
+            page.evaluate("() => window.__elosernBridge.store.focusItemByKey('target-9001')")
+        )
+        page.evaluate("() => window.__elosernBridge.store.focusConfirm('keyboard')")
+        self.assertEqual(self._depth(page), 3)
+
+        withdrawn = "這片區域暫時無法操作"
+        accepted = self._inject_panels(page, {
+            "exploration": {
+                "schema_version": 1,
+                "available": False,
+                "reason": {"code": "exploration.unavailable", "message": withdrawn},
+            },
+            **pinned_context,
+        })
+        self.assertTrue(accepted["accepted"], accepted)
+
+        # ONE access settles the WHOLE cascade: depth 1, degraded root.
+        self.assertEqual(self._depth(page), 1)
+        self.assertEqual(
+            store_state(page)["degradedRoot"],
+            {
+                "key": "degraded-root",
+                "reason": withdrawn,
+                "fallback": "畫面狀態已更新，請返回上層",
+            },
+        )
+        # The pane presents exactly the single disabled marker row with the
+        # server message verbatim — no stale submenu row survives.
+        self.assertEqual(self._pane_keys(page), ["degraded-root"])
+        self.assertIn(
+            withdrawn,
+            page.locator('#action-dock [data-item-key="degraded-root"]').inner_text(),
+        )
+        # It submits nothing.
+        sent_before = sent_action_count(page)
+        self.assertFalse(
+            page.evaluate("() => window.__elosernBridge.store.focusConfirm('keyboard')")
+        )
+        self.assertEqual(sent_action_count(page), sent_before)
+
+        # The panel returns: the SAME root frame re-resolves to content and
+        # the degraded presentation clears with the commit.
+        accepted = self._inject_panels(page, {
+            "exploration": self._exploration_panel(move=[self._move_row("ex-a", "北門")]),
+            **pinned_context,
+        })
+        self.assertTrue(accepted["accepted"], accepted)
+        self.assertIsNone(store_state(page)["degradedRoot"])
+        root_keys = self._pane_keys(page)
+        self.assertTrue(
+            {"move", "look", "interact", "character", "wait"} <= set(root_keys),
+            f"the recovered root lost its entries: {root_keys}",
+        )
+
+    @covers_requirement("webclient-frame-resolution::suggestions-frames-are-status-driven-generating-never-pops-unavailable-exits-to-the-root")
+    def test_suggestions_frame_is_status_driven(self):
+        """The status split: `generating`/`degraded` commits keep the open 建議
+        frame and its content follows the commit (no pop, no timer);
+        `unavailable` — the options-surface no-pane rule — exits the WHOLE
+        stack to the exploration root WITHOUT any reason row."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+
+        def context_actions(suggestions: dict) -> dict:
+            return {
+                "context_actions": {
+                    "schema_version": 5,
+                    "available": True,
+                    "kind": "exploration",
+                    "affordances": [],
+                    "suggestions": suggestions,
+                },
+            }
+
+        # A known `generating` envelope, then the 建議 tab opens the frame.
+        accepted = self._inject_panels(page, context_actions({"status": "generating"}))
+        self.assertTrue(accepted["accepted"], accepted)
+        self.assertIn("suggestions", self._pane_keys(page))
+        page.locator('#action-dock [data-item-key="suggestions"]').click()
+        self.assertEqual(self._depth(page), 2)
+        self.assertEqual(
+            page.evaluate("() => window.__elosernBridge.router.currentDescriptor()"),
+            {"source": "exploration.suggestions", "params": {}},
+        )
+        self.assertEqual(
+            page.locator('#action-dock [data-item-key="suggestions-generating"]').count(),
+            1,
+            "the generating muted row did not render",
+        )
+
+        # A fresh `generating` commit: the frame STAYS (generating never
+        # pops), the muted row still carries the focus.
+        accepted = self._inject_panels(page, context_actions({"status": "generating"}))
+        self.assertTrue(accepted["accepted"], accepted)
+        self.assertEqual(self._depth(page), 2)
+        self.assertEqual(store_state(page)["focus"]["key"], "suggestions-generating")
+
+        # `degraded` with zero cards is still resolvable: the frame stays and
+        # its CONTENT follows the commit (the dismiss control appears).
+        accepted = self._inject_panels(
+            page, context_actions({"status": "degraded", "cards": []})
+        )
+        self.assertTrue(accepted["accepted"], accepted)
+        self.assertEqual(self._depth(page), 2)
+        self.assertIn(
+            "action-options.dismiss",
+            self._pane_keys(page),
+            "the frame content did not follow the committed status change",
+        )
+
+        # `unavailable`: no pane may exist — the whole stack exits to the
+        # root, and NO degraded marker/reason row is rendered.
+        accepted = self._inject_panels(page, context_actions({"status": "unavailable"}))
+        self.assertTrue(accepted["accepted"], accepted)
+        self.assertEqual(self._depth(page), 1)
+        state = store_state(page)
+        self.assertIsNone(state["degradedRoot"], "the exit rendered a reason row")
+        self.assertNotIn(
+            "suggestions",
+            self._pane_keys(page),
+            "the unavailable root still lists the 建議 entry",
+        )
+
+    def _dock_holds_focus(self, page):
+        """True when #action-dock (or a focusable descendant) is the active
+        element — element identity, not a text marker (duck finding)."""
+        return page.evaluate(
+            """() => { const dock = document.getElementById('action-dock');
+                       const el = document.activeElement;
+                       return !!dock && !!el
+                         && (el === dock || dock.contains(el)); }"""
+        )
+
+    def _wait_non_success_line(self, page, message, baseline):
+        """Wait until the err-line multiset grew by exactly [message] over
+        ``baseline`` (baseline-relative counting: pre-existing lines, the
+        dispatch's own in-kind echo, and mutation echoes are all excluded --
+        only the recognized result may add an err line)."""
+        page.wait_for_function(
+            """([message, baselineJson]) => {
+                 const baseline = JSON.parse(baselineJson);
+                 const lines = Array.from(
+                   document.querySelectorAll(
+                     '[data-testid="narrative-feed"] [data-line-kind="err"]'),
+                   (n) => n.textContent);
+                 const counts = new Map();
+                 for (const l of baseline) counts.set(l, (counts.get(l) || 0) + 1);
+                 for (const l of lines) counts.set(l, (counts.get(l) || 0) - 1);
+                 // added = actual-minus-baseline multiset diff (negative
+                 // remaining count per occurrence of an unseen line).
+                 const added = lines.filter((l) => (counts.get(l) || 0) < 0
+                   && ((counts.set(l, counts.get(l) + 1), true)));
+                 return added.length === 1 && added[0].includes(message);
+               }""",
+            arg=[message, json.dumps(baseline)],
+        )
+
+    @covers_requirement("webclient-action-dispatch::a-non-success-action-result-surfaces-its-message-exactly-once")
+    def test_non_success_action_results_speak_once_in_the_narrative(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        # The stale admission needs a positive committed revision so the
+        # decremented base_revision stays schema-valid (a negative one would
+        # follow the malformed-envelope protocol-error path instead).
+        wait_for_store_state(page, lambda s: (s.get("revision") or 0) > 0)
+        node_before = store_state(page)["panels"]["local_map"]["current_node"]
+        page.evaluate(
+            "() => { window.__elosernOriginalSender = window.__elosernBridge.store.getSender(); }"
+        )
+
+        # (a) A real stale admission through the store's own dispatch path:
+        # the sender wrapper sends the envelope with a superseded
+        # base_revision; the dispatcher answers outcome `stale`.
+        self._tamper_sender(
+            page,
+            "(e) => Object.assign({}, e, { base_revision: e.base_revision - 1 })",
+        )
+        dispatch_base = page.evaluate("() => window.__elosernBridge.store.view.revision")
+        err_baseline = self._err_line_texts(page)
+        request_id = page.evaluate(
+            "() => window.__elosernBridge.store.dispatchAction('explore.wait', { daypart: 'dusk' })"
+        )
+        self.assertIsNotNone(request_id)
+        # The wire envelope really carried the decremented revision.
+        tampered = [
+            args[0]
+            for cmdname, args, _kw in page.evaluate("window.__elosernSent || []")
+            if cmdname == "ui_action" and args and args[0].get("request_id") == request_id
+        ]
+        self.assertEqual(len(tampered), 1)
+        self.assertEqual(tampered[0]["base_revision"], dispatch_base - 1)
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("lastActionResult") or {}).get("requestId") == request_id,
+            timeout=20000,
+        )
+        self._restore_sender(page)
+        result = store_state(page)["lastActionResult"]
+        self.assertEqual(result["outcome"], "stale", f"expected stale, got {result}")
+        message = result["message"]
+        # The message renders verbatim and exactly once over the baseline err
+        # multiset -- no second line, no accompanying mutation echo.
+        self._wait_non_success_line(page, message, err_baseline)
+        err_lines = [t for t in self._err_line_texts(page) if message in t]
+        self.assertEqual(err_lines[0].strip(), message)
+        self.assertEqual(page.locator('[role="dialog"]').count(), 0)
+        self.assertEqual(sent_action_count(page, "explore.wait"), 1)
+        self.assertEqual(
+            store_state(page)["panels"]["local_map"]["current_node"],
+            node_before,
+            "the stale admission performed no traversal",
+        )
+        # The stale lock releases once the recovery revision commits.
+        wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
+
+        # (b) A real domain rejection: a genuine move commits the new room;
+        # then a valid re-move whose sender wrapper replaces only
+        # payload.current_node with the pre-move node reaches the exploration
+        # adapter's stale-location rejection.
+        self._wait_admitted_move(page, node_before)
+        moved_node = store_state(page)["panels"]["local_map"]["current_node"]
+        wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
+
+        # Keyboard focus is held by the dock; a rendered result must not move
+        # or steal it (no modal steals focus either).
+        focus_action_dock(page)
+        self.assertTrue(self._dock_holds_focus(page), "the dock did not take focus")
+        self._tamper_sender(
+            page,
+            """(e) => Object.assign({}, e, {
+                 payload: Object.assign({}, e.payload, { current_node: %r })
+               })"""
+            % node_before,
+        )
+        # Admission itself can race a revision advance (answered stale before
+        # the adapter runs); retry the tampered dispatch until the adapter's
+        # domain rejection lands, bounded. Stale retries append their own
+        # (different) message, so the domain-message baseline is captured
+        # right before the final accepted attempt.
+        result = None
+        for _attempt in range(3):
+            err_baseline = self._err_line_texts(page)
+            request_id = self._dispatch_move(page)
+            self.assertIsNotNone(request_id)
+            wait_for_store_state(
+                page,
+                lambda s: (s.get("lastActionResult") or {}).get("requestId") == request_id,
+                timeout=20000,
+            )
+            result = store_state(page)["lastActionResult"]
+            if result["outcome"] != "stale":
+                self._wait_non_success_line(page, result.get("message", ""), err_baseline)
+                break
+            stale_message = result.get("message", "")
+            wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
+            # Settle the stale line's DOM append before re-capturing so the
+            # next attempt's baseline multiset already contains it.
+            page.wait_for_function(
+                """(message) => message !== "" && Array.from(
+                     document.querySelectorAll(
+                       '[data-testid="narrative-feed"] [data-line-kind="err"]'),
+                     (n) => n.textContent).some((t) => t.includes(message))""",
+                arg=stale_message,
+            )
+            err_baseline = self._err_line_texts(page)
+        self._restore_sender(page)
+        self.assertIsNotNone(result)
+        self.assertEqual(
+            result["outcome"], "rejected", f"expected domain rejection, got {result}"
+        )
+        self.assertEqual(result["code"], "stale_location")
+        message = "你的位置已經改變，請重新操作。"
+        self.assertEqual(result["message"], message)
+        err_lines = [t for t in self._err_line_texts(page) if message in t]
+        self.assertEqual(len(err_lines), 1)
+        self.assertEqual(err_lines[0].strip(), message)
+        # The player keeps keyboard focus without any modal.
+        self.assertEqual(page.locator('[role="dialog"]').count(), 0)
+        self.assertTrue(
+            self._dock_holds_focus(page),
+            "the rendered result moved keyboard focus out of the dock",
+        )
+        # The rejected move relocated nobody.
+        self.assertEqual(
+            store_state(page)["panels"]["local_map"]["current_node"],
+            moved_node,
         )
 
     @covers_requirement("webclient-exploration-menu::exploration-browser-acceptance-is-keyboard-only-and-desktop-bounded")

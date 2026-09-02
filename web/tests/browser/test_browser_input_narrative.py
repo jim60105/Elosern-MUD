@@ -754,7 +754,7 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
 
     def _reset_root(self, page):
         focus_action_dock(page)
-        page.evaluate("window.__elosernBridge.router.reset()")
+        page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
         page.wait_for_timeout(60)
 
     def _open_root(self, page, index):

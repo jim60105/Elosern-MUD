@@ -136,26 +136,47 @@ function suggestionsEnvelope(status, cards) {
 // ---------------------------------------------------------------- trail
 
 test("router.trail() lists every stacked frame title in push order", () => {
-  const router = KeyboardRouter.createRouter({ onEvent: () => {} });
-  router.reset({
-    items: [KeyboardRouter.menuItem("戰鬥", true), KeyboardRouter.menuItem("技能", true)],
-    grid: true,
-    gridCols: 2,
-    title: "戰鬥",
+  // Declarative-only router: static sources carry the titles.
+  const tables = new Map([
+    [
+      "combat.root",
+      {
+        items: [KeyboardRouter.menuItem("戰鬥", true), KeyboardRouter.menuItem("技能", true)],
+        grid: true,
+        gridCols: 2,
+        title: "戰鬥",
+      },
+    ],
+    [
+      "combat.category",
+      {
+        items: [KeyboardRouter.menuItem("元素魔法", true)],
+        grid: true,
+        gridCols: 1,
+        title: "元素魔法",
+      },
+    ],
+  ]);
+  const router = KeyboardRouter.createRouter({
+    onEvent: () => {},
+    resolve: (descriptor) => tables.get(descriptor.source) ?? null,
   });
-  router.pushMenu({
-    items: [KeyboardRouter.menuItem("元素魔法", true)],
-    grid: true,
-    gridCols: 1,
-    title: "元素魔法",
-  });
+  router.resetFrame({ source: "combat.root", params: {} });
+  router.pushFrame({ source: "combat.category", params: { categoryIndex: 0 } });
   assert.deepEqual(router.trail(), ["戰鬥", "元素魔法"]);
   assert.equal(router.depth(), 2);
   router.press(KeyboardRouter.ESCAPE);
   assert.deepEqual(router.trail(), ["戰鬥"]);
   assert.equal(router.depth(), 1);
-  router.reset();
-  assert.deepEqual(router.trail(), []);
+  // An emptied stack is a programmer error: the read throws.
+  assert.throws(() => {
+    // Simulate the (unreachable-in-live) empty state via a fresh router.
+    const bare = KeyboardRouter.createRouter({
+      onEvent: () => {},
+      resolve: () => null,
+    });
+    bare.trail();
+  }, /programmer error/);
 });
 
 // ---------------------------------------------------------------- titles

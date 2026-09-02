@@ -57,13 +57,18 @@ window.__elosernTransportBind = (consoleHandle) => wireTransport(store, consoleH
 // Stable test hook (the repository's `__`-prefixed harness-hook convention,
 // cf. __elosernWs / __elosernSent): the managed-browser check drives the
 // bridge's façade entry points through this handle. The C4 harness re-map
-// also reads the live keyboard-router instance (depth()/currentItem()/reset())
+// also reads the live keyboard-router instance (depth()/currentItem()/resetFramesToRoot via store)
 // off this handle, so the full bridge handle (facade + store + router + the
 // key-routing uninstall hook) is exposed.
 window.__elosernBridge = {
   store,
   facade: bridge.facade,
   router: bridge.router,
+  // The declarative-frame derivation seam (webclient-frame-resolver-registry):
+  // resolves a frame descriptor against the committed state at call time.
+  // Test seam only — the shipped dock still drives copy frames until the
+  // cutover changes land.
+  resolveFrame: (descriptor) => store.resolveFrame(descriptor),
   uninstall: bridge.uninstall,
   // Test hook: the SceneBackdrop instance (its exposed interface, with
   // setPriorImage). The root component (AppClient) registers its

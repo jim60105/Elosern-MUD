@@ -302,8 +302,13 @@ describe("store dispatch + focus", () => {
       );
       expect(store.view.focus.key).toBe("look");
 
-      // A changed panel (the inventory surface disappears) resets the frame
-      // focus to the first root item.
+      // Declarative frame semantics (webclient-declarative-frame-stack): a
+      // changed panel RE-RESOLVES the open frame — the focus key survives
+      // whenever the re-derived rows still carry it (the inventory surface
+      // disappearing removes a different row, not the focused one). The old
+      // copy reset the whole frame to the first item on any content change;
+      // that reset is gone by design (design D3: the frame is a descriptor,
+      // focus is a key, and re-resolution preserves it).
       store.receive(
         1,
         "ui_update",
@@ -318,7 +323,7 @@ describe("store dispatch + focus", () => {
         ],
         {},
       );
-      expect(store.view.focus.key).toBe("move");
+      expect(store.view.focus.key).toBe("look");
      });
 
     it("routes a confirmed action item through the single dispatch entry", () => {

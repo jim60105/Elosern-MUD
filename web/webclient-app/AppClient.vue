@@ -220,6 +220,22 @@ watch(
 // This is the single source the preserved keyboard router and the visible
 // DockMenu both consume, so pointer and keyboard parity is maintained.
 const dockItems = computed(() => {
+  // The degraded exploration root (webclient-declarative-frame-stack): the
+  // root frame itself is unresolvable, so the pane presents the router's
+  // single disabled marker-reason row (server-authored reason verbatim,
+  // local fallback otherwise); it submits nothing.
+  const degraded = store.view.degradedRoot;
+  if (degraded) {
+    return [
+      {
+        key: degraded.key || "degraded-root",
+        label: degraded.reason || degraded.fallback,
+        enabled: false,
+        navigation: true,
+        surface: "degraded-root",
+      },
+    ];
+  }
   const p = panel("context_actions");
   if (!p || p.available !== true) {
     return [];
@@ -781,7 +797,7 @@ onMounted(() => {
       </template>
       <template #action-dock>
         <ActionDock
-          v-if="rootItems.length > 0 || !!store.view.suggestions || (store.view.mode === 'creation' && panelAvailable('creation'))"
+          v-if="rootItems.length > 0 || !!store.view.degradedRoot || !!store.view.suggestions || (store.view.mode === 'creation' && panelAvailable('creation'))"
           :mode="store.view.mode || 'exploration'"
           :root-items="rootItems"
           :focused-key="store.view.focus.key"
@@ -793,7 +809,7 @@ onMounted(() => {
         >
           <div class="dock-pane-host">
              <DockMenu
-               v-if="dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain') && !drawerHostsServiceFrame"
+               v-if="dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain' && !store.view.degradedRoot) && !drawerHostsServiceFrame"
                :items="dockItems"
               :focused-key="store.view.focus.key"
               :id-prefix="rowPrefix"
