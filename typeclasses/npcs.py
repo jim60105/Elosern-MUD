@@ -204,12 +204,22 @@ class LLMNPC(NPC):
     def _persona_block(self, character: Any) -> tuple[str | None, str | None]:
         """Read-only persona blocks for the NPC and the speaking player.
 
-        Both come from ``PersonaStore.flatten()`` (already bounded by the
-        handler's contract); ``None`` when the record is absent or
-        content-free. This never creates, persists, or mutates a persona
-        record on either entity.
+        The NPC block flattens the full depth field set so the character sees
+        its own hidden identity; the player block is flattened from
+        ``PersonaStore.public_view()`` over exactly the public depth fields,
+        so the player's hidden identity layer, prose fields, and background
+        are excluded by construction (persona-depth-dialogue-injection D2/D3).
+        Both use the policy constants owned by ``world.ai.npc_dialogue`` and
+        are already bounded by the handler's contract; ``None`` when the
+        record is absent or content-free. This never creates, persists, or
+        mutates a persona record on either entity.
         """
-        return self.persona.flatten(), character.persona.flatten()
+        from world.ai.npc_dialogue import NPC_PERSONA_FIELDS, PLAYER_PERSONA_FIELDS
+
+        return (
+            self.persona.flatten(NPC_PERSONA_FIELDS),
+            character.persona.public_view().flatten(PLAYER_PERSONA_FIELDS),
+        )
 
     def _no_leak_secrets(self, character: Any) -> frozenset[str]:
         """Build the per-call no-leak secret set as plain decimal strings.

@@ -112,7 +112,7 @@ class PersonaStoreTests(unittest.TestCase):
             for name in dir(PersonaStore)
             if not name.startswith("_")
         }
-        self.assertEqual(public, {"flatten", "get"})
+        self.assertEqual(public, {"flatten", "get", "public_view"})
 
     @covers_requirement("persona-store::personastore-is-a-read-only-handler-over-the-verbatim-persona-record")
     def test_module_never_assigns_a_persistent_attribute(self):
@@ -197,8 +197,10 @@ class PersonaStoreTests(unittest.TestCase):
         self.assertEqual(block, "性格：Calm.\n習慣：Notes.")
 
     @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
-    def test_flatten_treats_non_string_fields_as_absent(self):
-        for value in (None, 42, ["a", "b"], {"nested": 1}):
+    def test_scalar_non_string_fields_are_treated_as_absent(self):
+        # Tolerant rendering keeps scalar shapes (None, numbers, booleans)
+        # absent; container values now render (persona-store delta).
+        for value in (None, 42, 3.5, True):
             with self.subTest(value=value):
                 record = {"personality": "Calm.", "habit": value}
                 block = PersonaStore(_FakeEntity(record)).flatten()
@@ -260,6 +262,237 @@ class PersonaStoreTests(unittest.TestCase):
             PersonaStore(_FakeEntity(record)).flatten(),
             "性格：Calm.\n習慣：Notes.",
         )
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_nested_identity_mapping_renders_public_and_hidden_lines(self):
+        record = {"identity": {"public": "退役騎士", "hidden": "叛逃貴族"}}
+        block = PersonaStore(_FakeEntity(record)).flatten(("identity",))
+        self.assertEqual(block, "身分：\n公開身分：退役騎士\n隱秘身分：叛逃貴族")
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_string_identity_renders_single_labeled_section(self):
+        record = {"identity": "暗影谷村的年輕黑暗精靈"}
+        block = PersonaStore(_FakeEntity(record)).flatten(("identity",))
+        self.assertEqual(block, "身分：暗影谷村的年輕黑暗精靈")
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_appearance_renders_declared_subkey_order_with_stringify_and_dashes(self):
+        record = {
+            "appearance": {
+                "feature": ["左眼下淚痣", "銀髮"],
+                "height": "165cm",
+                "attire": {"日常": "旅行斗篷"},
+                "weight": "49kg",
+            }
+        }
+        block = PersonaStore(_FakeEntity(record)).flatten(("appearance",))
+        self.assertEqual(
+            block,
+            "外觀：\n"
+            "height：165cm\n"
+            "weight：49kg\n"
+            "attire：{'日常': '旅行斗篷'}\n"
+            "feature：\n- 左眼下淚痣\n- 銀髮",
+        )
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_social_connection_entries_key_by_counterparty_name(self):
+        record = {"social_connection": {"悠奈": {"relationship": "舊識"}, "黛莉雅": "宿敵"}}
+        block = PersonaStore(_FakeEntity(record)).flatten(("social_connection",))
+        self.assertEqual(
+            block,
+            "人脈：\n悠奈：{'relationship': '舊識'}\n黛莉雅：宿敵",
+        )
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_unknown_subkeys_follow_declared_keys_with_raw_labels(self):
+        record = {"identity": {"hidden": "祕", "public": "表", "origin": "暗影谷"}}
+        block = PersonaStore(_FakeEntity(record)).flatten(("identity",))
+        self.assertEqual(block, "身分：\n公開身分：表\n隱秘身分：祕\norigin：暗影谷")
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_scalar_subkeys_and_items_are_skipped_without_raising(self):
+        record = {
+            "identity": {"public": "表", "hidden": None, "rank": 3, "active": True},
+            "appearance": {"feature": [None, 42, True, "刀疤"]},
+        }
+        block = PersonaStore(_FakeEntity(record)).flatten(("identity", "appearance"))
+        self.assertEqual(block, "身分：\n公開身分：表\n外觀：\nfeature：\n- 刀疤")
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_deeper_nesting_stringifies_as_final_fallback(self):
+        record = {"appearance": {"attire": {"戰鬥": {"head": "兜帽"}}}}
+        block = PersonaStore(_FakeEntity(record)).flatten(("appearance",))
+        self.assertEqual(block, "外觀：\nattire：{'戰鬥': {'head': '兜帽'}}")
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_top_level_list_field_renders_dashed_items(self):
+        record = {"habit": ["清晨練劍", "夜讀"]}
+        block = PersonaStore(_FakeEntity(record)).flatten()
+        self.assertEqual(block, "習慣：\n- 清晨練劍\n- 夜讀")
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_mapping_with_no_renderable_entries_produces_no_section(self):
+        record = {"identity": {}, "appearance": {"rank": 3}, "personality": "Calm."}
+        block = PersonaStore(_FakeEntity(record)).flatten(
+            ("identity", "appearance", "personality")
+        )
+        self.assertEqual(block, "性格：Calm.")
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_nested_section_is_capped_deterministically(self):
+        record = {
+            "identity": {"public": "x" * (FIELD_LIMIT * 2), "hidden": "y" * 100}
+        }
+        store = PersonaStore(_FakeEntity(record))
+        block = store.flatten(("identity",))
+        self.assertIsNotNone(block)
+        self.assertLessEqual(len(block), FIELD_LIMIT)
+        self.assertTrue(block.endswith("…"))
+        self.assertEqual(block, store.flatten(("identity",)))
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_default_field_set_ignores_structural_keys(self):
+        record = {
+            "personality": "Calm.",
+            "identity": {"public": "表", "hidden": "祕"},
+            "appearance": {"height": "165cm"},
+            "social_connection": {"悠奈": "舊識"},
+        }
+        block = PersonaStore(_FakeEntity(record)).flatten()
+        self.assertEqual(block, "性格：Calm.")
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_worst_case_record_truncates_deterministically_at_block_limit(self):
+        record = {
+            "personality": "性" * FIELD_LIMIT,
+            "life_story": "事" * FIELD_LIMIT,
+            "habit": "慣" * FIELD_LIMIT,
+            "identity": {"public": "公" * FIELD_LIMIT, "hidden": "隱" * FIELD_LIMIT},
+            "appearance": {
+                "height": "高" * 50,
+                "weight": "重" * 50,
+                "measurement": "量" * 50,
+                "style": "風" * 50,
+                "overview": "觀" * 50,
+                "attire": {"日常": "服" * 100},
+                "feature": ["特" * 40, "徵" * 40],
+            },
+            "social_connection": {
+                f"對象{i}": {"relationship": "舊識", "note": "備" * 80}
+                for i in range(10)
+            },
+        }
+        fields = (
+            "personality",
+            "life_story",
+            "habit",
+            "identity",
+            "appearance",
+            "social_connection",
+        )
+        store = PersonaStore(_FakeEntity(record))
+        block = store.flatten(fields)
+        self.assertIsNotNone(block)
+        self.assertEqual(len(block), BLOCK_LIMIT)
+        self.assertTrue(block.endswith("…"))
+        self.assertEqual(block, store.flatten(fields))
+
+    @covers_requirement("persona-store::personastore-is-a-read-only-handler-over-the-verbatim-persona-record")
+    def test_public_view_drops_hidden_identity_without_mutating_the_record(self):
+        record = {
+            "identity": {"public": "旅行商人", "hidden": "落魄王族"},
+            "personality": "溫柔",
+        }
+        store = PersonaStore(_FakeEntity(record))
+        view = store.public_view()
+        self.assertIsNot(view, store)
+        self.assertIsInstance(view, PersonaStore)
+        rendered = view.flatten(("identity", "personality"))
+        self.assertEqual(rendered, "身分：\n公開身分：旅行商人\n性格：溫柔")
+        self.assertNotIn("落魄王族", rendered)
+        self.assertEqual(
+            record,
+            {
+                "identity": {"public": "旅行商人", "hidden": "落魄王族"},
+                "personality": "溫柔",
+            },
+        )
+
+    @covers_requirement("persona-store::personastore-is-a-read-only-handler-over-the-verbatim-persona-record")
+    def test_public_view_keeps_string_identity_and_degrades_malformed_records(self):
+        store = PersonaStore(_FakeEntity({"identity": "流浪劍士"}))
+        self.assertEqual(store.public_view().flatten(("identity",)), "身分：流浪劍士")
+        for value in (None, "not a dict", [1, 2], 42):
+            with self.subTest(value=value):
+                self.assertIsNone(
+                    PersonaStore(_FakeEntity(value)).public_view().flatten()
+                )
+
+    @covers_requirement("persona-store::personastore-is-a-read-only-handler-over-the-verbatim-persona-record")
+    def test_public_view_carries_the_store_bounds(self):
+        record = {"identity": {"public": "公" * 50, "hidden": "隱" * 50}}
+        store = PersonaStore(_FakeEntity(record), field_limit=20, block_limit=30)
+        view = store.public_view()
+        block = view.flatten(("identity",))
+        self.assertIsNotNone(block)
+        self.assertLessEqual(len(block), 30)
+        self.assertTrue(block.endswith("…"))
+        self.assertNotIn("隱", block)
+
+    @covers_requirement("persona-store::personastore-is-a-read-only-handler-over-the-verbatim-persona-record")
+    def test_public_view_of_hidden_only_identity_renders_nothing(self):
+        record = {"identity": {"hidden": "祕密"}}
+        view = PersonaStore(_FakeEntity(record)).public_view()
+        self.assertIsNone(view.flatten(("identity",)))
+
+    @covers_requirement("persona-store::personastore-is-a-read-only-handler-over-the-verbatim-persona-record")
+    def test_public_view_prunes_nested_hidden_entries_at_any_depth(self):
+        record = {
+            "identity": {
+                "public": {"hidden": "巢狀祕密", "role": "商人", "ties": [{"hidden": "深", "k": "v"}]},
+            }
+        }
+        block = PersonaStore(_FakeEntity(record)).public_view().flatten(("identity",))
+        self.assertEqual(
+            block, "身分：\n公開身分：{'role': '商人', 'ties': [{'k': 'v'}]}"
+        )
+        self.assertNotIn("巢狀祕密", block)
+        self.assertNotIn("深", block)
+
+    @covers_requirement("persona-store::personastore-is-a-read-only-handler-over-the-verbatim-persona-record")
+    def test_public_view_is_an_independent_snapshot_of_later_mutations(self):
+        record = {"identity": {"public": {"role": "商人"}}}
+        view = PersonaStore(_FakeEntity(record)).public_view()
+        # A writer adding a hidden entry to the shared nested container after
+        # the view was taken must not surface through the already-built view.
+        record["identity"]["public"]["hidden"] = "後植入"
+        block = view.flatten(("identity",))
+        self.assertEqual(block, "身分：\n公開身分：{'role': '商人'}")
+        self.assertNotIn("後植入", block)
+
+    @covers_requirement("persona-store::personastore-is-a-read-only-handler-over-the-verbatim-persona-record")
+    def test_public_view_drops_cycle_backreferences_without_raising(self):
+        inner: dict = {"public": "表", "hidden": "環"}
+        identity = {"public": inner}
+        inner["loop"] = identity  # self-referential opaque shape
+        store = PersonaStore(_FakeEntity({"identity": identity}))
+        block = store.public_view().flatten(("identity",))
+        self.assertIsNotNone(block)
+        self.assertIn("公開身分", block)
+        self.assertNotIn("環", block)
+        # The NPC-side tolerant path must also survive a cyclic value: the
+        # stringify fallback relies on repr's cycle marker, never a raise.
+        self.assertIsNotNone(store.flatten(("identity",)))
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_exotic_numeric_list_items_are_skipped(self):
+        from decimal import Decimal
+        from fractions import Fraction
+
+        record = {"appearance": {"feature": [Decimal("1.5"), Fraction(1, 2), 1 + 2j, None, "刀疤"]}}
+        block = PersonaStore(_FakeEntity(record)).flatten(("appearance",))
+        self.assertEqual(block, "外觀：\nfeature：\n- 刀疤")
 
 
 class PersonaLookDisplayTests(unittest.TestCase):

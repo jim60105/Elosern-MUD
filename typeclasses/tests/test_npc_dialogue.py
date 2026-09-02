@@ -398,8 +398,19 @@ class LLMNPCSeamTests(EvenniaTest):
             "personality": "沉穩",
             "life_story": "曾在邊境服役",
             "habit": "清晨練劍",
+            "identity": {"public": "邊境退役騎士", "hidden": "叛逃的貴族私生子"},
+            "appearance": {"height": "185cm", "feature": ["左臉疤痕"]},
+            "social_connection": {"悠奈": {"relationship": "舊識"}},
         }
-        self.player.db.persona = {"personality": "溫柔", "life_story": "商人世家"}
+        self.player.db.persona = {
+            "personality": "溫柔",
+            "life_story": "商人世家",
+            "habit": "夜間閱讀",
+            "background": "流浪藥劑師",
+            "identity": {"public": "旅行商人", "hidden": "落魄王族"},
+            "appearance": {"height": "165cm"},
+            "social_connection": {"黛莉雅": "舊識"},
+        }
         npc_before = dict(self.npc.db.persona)
         player_before = dict(self.player.db.persona)
         client = FakeLLMClient()
@@ -408,10 +419,28 @@ class LLMNPCSeamTests(EvenniaTest):
             await_result(self.npc.at_talked_to("你好", self.player, client))
         system = client.calls[0].messages[0]["content"]
         parsed = json.loads(client.calls[0].messages[-1]["content"])
+        # The NPC sees its own full persona, hidden identity included.
         self.assertIn("性格：沉穩", system)
         self.assertIn("人生經歷：曾在邊境服役", system)
         self.assertIn("習慣：清晨練劍", system)
-        self.assertEqual(parsed["player"]["persona"], "性格：溫柔\n人生經歷：商人世家")
+        self.assertIn("公開身分：邊境退役騎士", system)
+        self.assertIn("隱秘身分：叛逃的貴族私生子", system)
+        self.assertIn("外觀：", system)
+        self.assertIn("height：185cm", system)
+        self.assertIn("人脈：", system)
+        self.assertIn("悠奈：{'relationship': '舊識'}", system)
+        # The player block is the public depth view only: the hidden identity
+        # layer, the prose fields, and background never reach the NPC prompt.
+        persona_block = parsed["player"]["persona"]
+        self.assertIn("公開身分：旅行商人", persona_block)
+        self.assertIn("外觀：", persona_block)
+        self.assertIn("人脈：", persona_block)
+        self.assertNotIn("隱秘身分", persona_block)
+        self.assertNotIn("落魄王族", persona_block)
+        for label in ("性格：", "人生經歷：", "習慣：", "背景："):
+            self.assertNotIn(label, persona_block)
+        for value in ("溫柔", "商人世家", "夜間閱讀", "流浪藥劑師"):
+            self.assertNotIn(value, persona_block)
         self.assertNotIn("{persona}", system)
         self.assertEqual(dict(self.npc.db.persona), npc_before)
         self.assertEqual(dict(self.player.db.persona), player_before)

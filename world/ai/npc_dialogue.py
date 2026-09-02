@@ -79,6 +79,24 @@ MAX_INTENT_KEY_LENGTH = 64
 # field. The composed full title is the always-on ``epithet`` section.
 MAX_IDENTITY_ENTRIES = 5
 
+# Persona injection field-set policy (persona-depth-dialogue-injection D3):
+# the speaking NPC flattens its full persona — including its hidden identity,
+# the character's own secret for its own LLM — while the NPC reads the player
+# only through the public identity layer, appearance, and social-connection
+# notes; the player's prose fields and background never reach the prompt.
+# ``typeclasses/npcs.py::_persona_block`` imports and applies these constants
+# directly, and builds the player block from ``PersonaStore.public_view()`` so
+# identity.hidden is excluded by construction.
+NPC_PERSONA_FIELDS: tuple[str, ...] = (
+    "personality",
+    "life_story",
+    "habit",
+    "identity",
+    "appearance",
+    "social_connection",
+)
+PLAYER_PERSONA_FIELDS: tuple[str, ...] = ("identity", "appearance", "social_connection")
+
 # The eight whitelisted intent kinds (design §7.4).
 NPC_INTENT_KINDS = (
     "give_item",

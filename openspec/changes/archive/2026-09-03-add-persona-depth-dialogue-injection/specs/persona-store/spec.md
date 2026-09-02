@@ -1,31 +1,6 @@
-# persona-store Specification
+# persona-store — Delta Spec
 
-## Purpose
-Define the read-only `PersonaStore` handler that exposes an entity's verbatim persona record
-(keyed retrieval and bounded prompt-block flattening) and its mount on `LivingEntity.persona`.
-## Requirements
-### Requirement: PersonaStore is a read-only handler over the verbatim persona record
-`world/rules/persona.py` SHALL provide a `PersonaStore` class constructed from a `LivingEntity`
-that reads the raw record from `entity.db.persona` and exposes keyed retrieval plus prompt-block
-flattening. The handler SHALL have no write API, SHALL import no state-mutating module, and SHALL
-never modify traits, attributes beyond the single persona record, or the world clock.
-
-#### Scenario: The handler reads the verbatim record
-- **WHEN** a `PersonaStore` is constructed for an entity whose `entity.db.persona` is a dict with
-  the fields `personality`, `life_story`, and `habit`
-- **THEN** the handler's retrieval returns those field values exactly as stored, with no
-  transformation, addition, or removal of content
-
-#### Scenario: Keyed retrieval follows a defined contract
-- **WHEN** `get(field)` is called for a field that exists in the record
-- **THEN** the handler returns that field's value verbatim (the raw stored value, whether text,
-  number, or container); `get(field)` for a missing key, a non-mapping record, or a missing
-  record SHALL return `None` and never raise
-
-#### Scenario: The handler has no write surface
-- **WHEN** the public surface of `PersonaStore` is inspected
-- **THEN** it contains no method that assigns `entity.db.persona`, traits, or any other persistent
-  attribute, and the module's source contains no import of a state-mutating module
+## MODIFIED Requirements
 
 ### Requirement: Flatten produces one bounded, labeled prompt block
 `PersonaStore.flatten(fields=("personality", "life_story", "habit"))` SHALL return a single string with one labeled section per present field in the declared field order (e.g. 性格：… / 人生經歷：… / 習慣：…, and 背景：… for a `background` field), each field string capped and the combined block capped at a total bound. A missing record, a non-mapping record, or a record with none of the requested fields renderable SHALL return `None` and never raise. The default field set (and therefore the default NPC dialogue injection path) remains the three prose fields; `background` is included only when explicitly requested. Rendering SHALL be tolerant of stored shapes: a non-empty string renders verbatim after capping; a Mapping renders as one `子鍵：值` line per renderable entry in declared-key order for known key groups (`identity` → public then hidden; `appearance` → height, weight, measurement, style, overview, attire, feature) with unrecognized sub-keys following, using the localized sub-key labels where defined and the raw key otherwise; a list or tuple renders as dash-prefixed item lines; deeper nesting stringifies as a final fallback; a value of any other shape (number, boolean, null) is skipped without raising. The structural keys SHALL carry localized labels — `identity` as 身分 (a Mapping rendering its public and hidden entries as 公開身分 and 隱秘身分 lines, a plain string rendering as a single 身分 section), `appearance` as 外觀, and `social_connection` as 人脈 with each entry keyed by its counterparty name — and every rendered section SHALL pass through the same per-field and whole-block caps as the prose fields. `PersonaStore` SHALL additionally expose a read-only `public_view()` returning a new store over a copy of the record in which a mapping-valued `identity` is rebuilt into an independent hidden-free snapshot: every `hidden`-keyed mapping entry is pruned at any depth, every nested container is freshly copied (so later mutation of the stored record cannot re-introduce hidden content), and cycle back-references are dropped from the copy (a string-valued `identity` and any non-mapping record pass through verbatim), so callers flatten a hidden-free view by construction without mutating or re-reading the stored record.
@@ -77,48 +52,3 @@ never modify traits, attributes beyond the single persona record, or the world c
 #### Scenario: Public view prunes nested hidden entries and resists later mutation
 - **WHEN** a record's `identity` nests a mapping or list below its `public` layer that itself holds a `hidden` entry, and the stored record's nested containers are mutated toward hidden keys after `public_view()` was taken
 - **THEN** no hidden-keyed value at any depth appears in the view's flattened block, the view output is unchanged by those later mutations, and cyclic containers degrade to a dropped branch instead of raising
-
-### Requirement: LivingEntity.persona mounts the PersonaStore handler
-`LivingEntity.persona` SHALL be a `lazy_property` returning a `PersonaStore` instance, replacing
-the placeholder `AttributeProperty(default=None)`. Raw storage SHALL remain at `entity.db.persona`,
-and `world/imports/loader.py` SHALL continue to write it verbatim without modification.
-
-#### Scenario: The persona attribute returns a handler
-- **WHEN** a freshly created `LivingEntity` (or any subclass) is inspected
-- **THEN** `entity.persona` is a `PersonaStore` instance backed by the `entity.db.persona` record
-
-#### Scenario: The loader storage path is unchanged
-- **WHEN** a validated import record's persona is stored
-- **THEN** it lands verbatim at `entity.db.persona` through the existing loader code, with no
-  change to `world/imports/loader.py`
-
-#### Scenario: An entity without persona behaves like the former placeholder
-- **WHEN** a freshly created character without any persona record calls `flatten()`
-- **THEN** the result is `None` and no game behavior differs from the pre-change state
-
-### Requirement: The look appearance path renders a living entity's persona block
-The in-game 「看」 surface (shared by the text command and the WebClient look action) SHALL append a
-living entity's flattened persona block (including the `背景：` section when the record carries a
-background) when the player looks at themself, at another player character, or at an NPC, using the
-same code path for all three. Looking at the room or at an object SHALL NOT append any persona
-block. A record without any of the rendered fields renders nothing, so entities without a persona
-(e.g. monsters) are unchanged; the onboarding look beat and the displayed-stats block are
-unaffected.
-
-#### Scenario: Looking at yourself shows the persona block
-- **WHEN** an active character whose persona record has content uses 「看 自己」
-- **THEN** the output contains the persona block (including `背景：` when present) after the
-  description and displayed-stats block
-
-#### Scenario: Looking at another player character shows that character's persona block
-- **WHEN** a player looks at another present player character whose persona record has content
-- **THEN** the output contains the target's persona block (including `背景：` when present) and not
-  the looker's own block
-
-#### Scenario: Looking at an NPC shows the NPC's persona block
-- **WHEN** a player looks at a present NPC whose `entity.db.persona` record has content
-- **THEN** the output contains that NPC's persona block (including `背景：` when present)
-
-#### Scenario: Looking at the room or an object omits any persona block
-- **WHEN** the actor looks at the room or at an object
-- **THEN** no persona block is appended to those outputs
