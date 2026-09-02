@@ -10,7 +10,7 @@
 
 ## 2. Action 與 registry（web/webclient）
 
-- [ ] 2.1 `web/webclient/actions/character_actions.py`：新增 `character.persona.update` 驗證器（恰 `{field, text}`、四鍵白名單、text null 或 trim 後 1..600）與 adapter（本人 puppet、已啟動、探索模式；直呼 `update_persona_field`；成功 `persona_updated`＋繁中訊息＋affected `character`；非白名單／超界穩定拒絕；清除未設定欄 no-op success）。
+- [ ] 2.1 新增模組 `web/webclient/actions/character_actions.py`：`character.persona.update` 驗證器（恰 `{field, text}`、四鍵白名單、text null 或 trim 後 1..600）與 adapter（本人 puppet、已啟動、探索模式；直呼 `update_persona_field`；成功 `persona_updated`＋繁中訊息＋affected `character`；非白名單／超界穩定拒絕；清除未設定欄 no-op success）。
 - [ ] 2.2 `web/webclient/actions/registry.py`：註冊新 action；registry 測試的恰鍵清單同步。
 - [ ] 2.3 整合測試：happy path 刷新 panel、`field: "identity"` 拒絕、超界拒絕、no-op 清除、pending／非本人拒絕。掛 `covers_requirement`（`persona-editing::the-character-persona-update-action-edits-one-persona-field` 族）。
 - [ ] 2.4 Focused：`... evennia test --settings test_settings.py --keepdb web.webclient.actions`。

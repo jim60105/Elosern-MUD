@@ -88,7 +88,7 @@ payload 從 8 鍵增為 9 鍵，新增必填 `persona` 鍵，值為 null 或恰�
 
 ### 4.5 creation panel（schema v1 → v2）
 
-available payload 增一個 optional 頂層鍵 `proposal`（僅存在且有未消费的暫態提案時；恰 `{race_key, subrace_key, allocations, persona{personality, life_story, habit}}`，沿用 optional 鍵的既有先例），`schema_version` 升為 2。draft 的 custom 形狀增 `persona`（物件或 null）；concept 形狀不復存在。presenter、`presentation/creation.py` 驗證器、`protocol.js` 鏡像驗證器同步為 v2。custom 模式不再有任何「非內容指示」，persona 內容僅以 proposal（暫態填入來源）與 draft（已儲存值）兩種身份上線，「面板不暴露 persona」的舊斷言據此改寫為「不渲染伺服端草稿 persona 之外的 persona 資料」。
+available payload 增一個 optional 頂層鍵 `proposal`（僅存在且有未消費的暫態提案時；恰 `{race, subrace, allocations, persona{personality, life_story, habit}}`——鍵名與 draft／表單一致，沿用 optional 鍵的既有先例），`schema_version` 升為 2。draft 的 custom 形狀增 `persona`（物件或 null）；concept 形狀不復存在。presenter、`presentation/creation.py` 驗證器、`protocol.js` 鏡像驗證器同步為 v2。custom 模式不再有任何「非內容指示」，persona 內容僅以 proposal（暫態填入來源）與 draft（已儲存值）兩種身份上線，「面板不暴露 persona」的舊斷言據此改寫為「不渲染伺服端草稿 persona 之外的 persona 資料」。
 
 ### 4.6 Vue 表單（`CreationOverlay.vue`）
 
