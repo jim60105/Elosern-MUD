@@ -34,6 +34,7 @@ import CreationMenu from "../lib/creation_menu.js";
 import ExplorationMenu from "../lib/exploration_menu.js";
 import ServiceMenu from "../lib/service_menu.js";
 import CommandEcho from "../lib/command_echo.js";
+import { createFrameResolver } from "./frame-resolvers.js";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "../components/dock-items.js";
 import { gaugeRatio, isLowHp } from "../components/vitals.js";
 import LayoutStore from "../lib/layout_store.js";
@@ -147,6 +148,12 @@ export const useElosernStore = defineStore("elosern", () => {
   // D1: the preserved reducer is the store core (CJS-interop import; the UMD
   // source and its Node gate are never edited).
   const reducer = Protocol.createStore();
+
+  // The declarative-frame resolver registry (webclient-frame-resolver-registry
+  // D-A): menus derived from the reducer's committed state at call time. The
+  // cutover changes route their push sites through it; this seam stays the
+  // single derivation entry (`resolveFrame` below, bridge-exposed).
+  const frameResolver = createFrameResolver({ getState: () => reducer.getState() });
 
   // D5: client-local dispatch bookkeeping (the tested legacy action-client
   // semantics; the transport send is an attachable seam).
@@ -2378,6 +2385,9 @@ export const useElosernStore = defineStore("elosern", () => {
      markNarrativeSeen,
     clearUncertain,
     getSender,
+    // The declarative-frame derivation seam (frame-resolvers.js): resolve a
+    // `{source, params}` descriptor against the committed state right now.
+    resolveFrame: (descriptor) => frameResolver.resolve(descriptor),
     refreshView,
     // The live keyboard-router instance (C4 harness re-map): the managed
     // browser suite reads `depth()` / `currentItem()` off it; the store owns

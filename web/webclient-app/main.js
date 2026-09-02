@@ -64,6 +64,11 @@ window.__elosernBridge = {
   store,
   facade: bridge.facade,
   router: bridge.router,
+  // The declarative-frame derivation seam (webclient-frame-resolver-registry):
+  // resolves a frame descriptor against the committed state at call time.
+  // Test seam only — the shipped dock still drives copy frames until the
+  // cutover changes land.
+  resolveFrame: (descriptor) => store.resolveFrame(descriptor),
   uninstall: bridge.uninstall,
   // Test hook: the SceneBackdrop instance (its exposed interface, with
   // setPriorImage). The root component (AppClient) registers its

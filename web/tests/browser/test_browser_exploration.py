@@ -656,6 +656,128 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                 wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
         self.fail("three consecutive move dispatches were all answered stale")
 
+    def test_frame_resolver_follows_committed_state_across_a_real_move(self):
+        """The frame resolver registry derives menus at access time (design
+        doc D1): a move frame resolved before a real move names the old room;
+        re-resolving after the committed snapshot names the new room's exits
+        with the new current_node and no stale row."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        node_before = store_state(page)["panels"]["local_map"]["current_node"]
+
+        def resolve_move_menu():
+            return page.evaluate(
+                "() => window.__elosernBridge.resolveFrame({ source: 'exploration.move' })"
+            )
+
+        before = resolve_move_menu()
+        self.assertFalse(before.get("unresolvable", False), f"move frame did not resolve: {before}")
+        panel_before = store_state(page)["panels"]["exploration"]
+        before_keys = [item["key"] for item in before["items"] if item["key"].startswith("exit-")]
+        self.assertEqual(
+            before_keys,
+            ["exit-" + row["exit_ref"] for row in panel_before["move"]],
+            "the resolved frame is exactly the committed room's exit rows",
+        )
+        self.assertTrue(
+            all(
+                (item.get("payload") or {}).get("current_node") == node_before
+                for item in before["items"]
+                if item.get("actionId") == "explore.move"
+            ),
+            "every enabled row carries the committed current_node",
+        )
+
+        # A real move commits a newer snapshot (bounded admission retry).
+        self._wait_admitted_move(page, node_before)
+        wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
+        node_after = store_state(page)["panels"]["local_map"]["current_node"]
+        self.assertNotEqual(node_after, node_before)
+
+        after = resolve_move_menu()
+        self.assertFalse(after.get("unresolvable", False), f"move frame did not re-resolve: {after}")
+        panel_after = store_state(page)["panels"]["exploration"]
+        after_keys = [item["key"] for item in after["items"] if item["key"].startswith("exit-")]
+        self.assertEqual(
+            after_keys,
+            ["exit-" + row["exit_ref"] for row in panel_after["move"]],
+            "the re-resolved frame names the NEW room's exits",
+        )
+        after_labels = {item["label"] for item in after["items"] if item["key"].startswith("exit-")}
+        before_labels = {item["label"] for item in before["items"] if item["key"].startswith("exit-")}
+        self.assertNotEqual(
+            after_labels,
+            before_labels,
+            "no row of the superseded room survived the re-resolve",
+        )
+        self.assertTrue(
+            all(
+                (item.get("payload") or {}).get("current_node") == node_after
+                for item in after["items"]
+                if item.get("actionId") == "explore.move"
+            ),
+            "the re-resolved payloads carry the new committed current_node",
+        )
+
+        # The finite table: every exploration source resolves against the live
+        # committed snapshot (suggestions degrade iff its envelope status is
+        # `unavailable`, the no-pane rule), and resolution is pure: two calls
+        # agree deeply and nothing else in the committed state moved.
+        state = store_state(page)
+        status = ((state["panels"].get("context_actions") or {}).get("suggestions") or {}).get("status")
+        sources = [
+            "exploration.root",
+            "exploration.move",
+            "exploration.look",
+            "exploration.interact",
+            "exploration.wait",
+            "exploration.suggestions",
+        ]
+        for source in sources:
+            menu = page.evaluate(
+                "(source) => window.__elosernBridge.resolveFrame({ source })", source
+            )
+            if source == "exploration.suggestions" and status == "unavailable":
+                self.assertTrue(menu.get("unresolvable", False))
+            else:
+                self.assertFalse(
+                    menu.get("unresolvable", False), f"{source} did not resolve: {menu}"
+                )
+                self.assertTrue(isinstance(menu.get("items"), list) and menu["items"])
+        identities = [row["identity"] for row in state["panels"]["exploration"]["interact"]]
+        if identities:
+            target_menu = page.evaluate(
+                "(id) => window.__elosernBridge.resolveFrame("
+                "{ source: 'exploration.target', params: { identity: id } })",
+                identities[0],
+            )
+            self.assertFalse(target_menu.get("unresolvable", False))
+        # Purity: a second resolve deep-equals the first and the committed
+        # state is byte-identical across the resolution storm.
+        state_before_json = json.dumps(store_state(page), sort_keys=True)
+        first = page.evaluate("() => window.__elosernBridge.resolveFrame({ source: 'exploration.root' })")
+        second = page.evaluate("() => window.__elosernBridge.resolveFrame({ source: 'exploration.root' })")
+        self.assertEqual(first, second, "double resolution against one committed state differs")
+        self.assertEqual(
+            json.dumps(store_state(page), sort_keys=True),
+            state_before_json,
+            "resolution mutated committed state",
+        )
+        # Degradation is data: an unregistered source and a lost identity
+        # return the shared marker (null reason; no authored message here).
+        self.assertEqual(
+            {"unresolvable": True, "reason": None},
+            page.evaluate("() => window.__elosernBridge.resolveFrame({ source: 'services.board' })"),
+        )
+        self.assertEqual(
+            {"unresolvable": True, "reason": None},
+            page.evaluate(
+                "() => window.__elosernBridge.resolveFrame("
+                "{ source: 'exploration.target', params: { identity: 'nonexistent-identity' } })"
+            ),
+        )
+
     def _dock_holds_focus(self, page):
         """True when #action-dock (or a focusable descendant) is the active
         element — element identity, not a text marker (duck finding)."""
