@@ -92,7 +92,7 @@ available payload 增一個 optional 頂層鍵 `proposal`（僅存在且有未�
 
 ### 4.6 Vue 表單（`CreationOverlay.vue`）
 
-- 收到 `concept_filled` 結果時，把提案值寫入尚未送出的本地表單：race、subrace、allocations、三個 persona textarea。`syncFromDraft` 只認伺服端已接收的值，不看未送出的提案。
+- 收到 panel `proposal` 槽的新值時，把提案值寫入尚未送出的本地表單：race、subrace、allocations、三個 persona textarea（僅在 proposal 值變動時填入，避免面板重建覆寫玩家編輯）。`syncFromDraft` 只認伺服端已接收的值，不看未送出的提案。
 - 三個 textarea 於 custom 模式恆渲染，無值時空白供親手填寫。
 - 本地驗證：persona 三欄探「要填就填滿」規則，部分填寫以本地訊息阻擋（與 subrace 錯誤同一機制），不發出 action。
 - 概念套用成功後 dock 由 concept 翻到 custom 的導覽保留，這是 store 本地狀態。
@@ -143,9 +143,9 @@ payload 恰 `{field, text}`。`field` 必屬四鍵白名單，`text` 為 null �
 
 純邏輯層（`unittest`）：`_normalize_draft` 對 custom persona 鍵的四類情形（缺鍵損壞降級、null 合法、非恰三鍵拒絕、超界降級）；`validate_creation_custom_payload` 的 9 鍵；`update_persona_field` 四鍵乘以（設定、清除、保留未知鍵、600 界線）；`activate_player_character` 自 custom draft 寫入 persona 與無 persona 僅寫 background 兩路徑。
 
-Evennia 整合層：三個新命令各四路徑（顯示、設定、清除、超界）的 `EvenniaCommandTest`；`creation.concept` adapter 回傳 `concept_filled` data 形狀且零狀態變更的斷言；`creation` v2 與 `character` v7 兩個 presenter 驗證。
+Evennia 整合層：三個新命令各四路徑（顯示、設定、清除、超界）的 `EvenniaCommandTest`；`creation.concept` adapter 回傳 `concept_applied`、panel 渲染 proposal 槽且零持久狀態變更的斷言；`creation` v2 與 `character` v7 兩個 presenter 驗證。
 
-JS 層：`protocol.js` Node 鏡像驗證器新案（draft persona、custom 9 鍵、character v7、`ui_action_result` 的 affected data）；Vitest 覆蓋 `CreationOverlay` 的概念填入、textarea 預填、編輯後 9 鍵 payload、部分填寫本地阻擋，以及 `CharacterStatusDrawer` 四段渲染。
+JS 層：`protocol.js` Node 鏡像驗證器新案（draft persona、custom 9 鍵、character v7、creation panel 的 optional `proposal` 槽）；Vitest 覆蓋 `CreationOverlay` 的概念填入、textarea 預填、編輯後 9 鍵 payload、部分填寫本地阻擋，以及 `CharacterStatusDrawer` 四段渲染。
 
 瀏覽器層：單一 Playwright class 走完整旅程（概念 → 表單編輯 → 啟動 → drawer 顯示），全量瀏覽器套件歸 CI。
 
@@ -161,7 +161,7 @@ JS 層：`protocol.js` Node 鏡像驗證器新案（draft persona、custom 9 鍵
 | `webclient-character-creation-ui` | modified（draft 兩模式、custom payload 9 鍵、creation panel v2） |
 | `player-character-creation` | modified（啟動 persona 來源改自 custom draft；概念流語意改寫） |
 | `webclient-action-dispatch` | modified（registry 增 `character.persona.update`） |
-| `webclient-oob-protocol` | modified（`ui_action_result` affected data 增 `concept_filled` 形狀） |
+| `webclient-oob-protocol` | 不變（exact `ui_action_result` envelope 不增 data 欄；提案改經 `creation` panel 的 optional `proposal` 槽送達，見 §4.2） |
 | `persona-store` | modified（`flatten` 取得 `identity / appearance / social_connection` 的寬容渲染，見 §11） |
 | `persona-dialogue-injection` | modified（注入欄位選取政策，見 §11.4） |
 | `import-schema` | 不變（persona 驗證維持 verbatim opaque） |
