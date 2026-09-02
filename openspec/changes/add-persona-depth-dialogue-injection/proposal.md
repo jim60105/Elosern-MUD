@@ -8,7 +8,7 @@
 
 - `PersonaStore` 渲染採寬容策略：字面值照渲染、Mapping 渲染為「子鍵：值」行、清單渲染為列點、未知形狀跳過不拋錯——匯入範例的字串寫法與角色表的巢狀寫法於焉皆可渲染。
 - `flatten` 新增渲染組與正體中文標籤：`identity`（巢狀時拆 公開身分／隱秘身分 兩節、字串時單節 身分）、`appearance`（外觀）、`social_connection`（人脈）。每一項受 600 字上限、整塊受 block limit 約束，沿用 `_cap` 截斷。欄位集參數維持呼叫端可覆寫。
-- 注入欄位選取政策：NPC 自己的 persona 全欄進 system message（含 `identity.hidden`——角色自己的秘密交給角色自己的 LLM，數值洩漏由既有 no-leak validator 把關）；送入 NPC prompt 的玩家 persona 僅供 `identity.public`、`appearance`、`social_connection`，`identity` 先經 `PersonaStore.public_view()` 拷貝剔除 hidden 層再渲染——by construction 排除，絕不事後文字清洗。
+- 注入欄位選取政策：NPC 自己的 persona 全欄進 system message（含 `identity.hidden`——角色自己的秘密交給角色自己的 LLM，數值洩漏由既有 no-leak validator 把關）；送入 NPC prompt 的玩家 persona 僅供 `identity.public`、`appearance`、`social_connection`，`identity` 先經 `PersonaStore.public_view()` 遞迴重建為深度剔除 hidden 的獨立快照再渲染——by construction 排除，絕不事後文字清洗。
 - 三鍵維持排除於建立表單與編輯白名單（結構化欄位不適用單文字欄編輯模型）；本變更只開放「存得進、讀得出、進了 LLM prompt」。
 
 ## Capabilities

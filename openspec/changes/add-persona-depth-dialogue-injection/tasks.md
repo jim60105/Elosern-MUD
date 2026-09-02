@@ -21,4 +21,4 @@
 - [x] 3.1 worst-case 尺寸檢查：最大 persona record（三 prose 600×3＋identity 兩層 600×2＋appearance 全子鍵＋長 social_connection 清單）渲染後 ≤ block limit（截斷路徑為預期行為時以斷言鎖截斷發生且確定性）。
 - [x] 3.2 `uv run --locked python -m tools.spec_traceability check`；`openspec validate add-persona-depth-dialogue-injection --strict`。
 - [x] 3.3 消極檢查：`rg "identity.hidden" world/ai/` 確認玩家側路徑無 hidden 引用；`rg "class PersonaStore" -A5 world/rules/persona.py` 確認寫入 API 仍為零（read-only handler 契約）。
-- [ ] 3.4 終局：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --noinput --parallel 16 commands server typeclasses world` 一次（觸面在 world 與 typeclasses；commands/server 迴歸鎖住 look／persona_digest 預設路徑）。
+- [x] 3.4 終局：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --noinput --parallel 16 commands server typeclasses world` 一次（觸面在 world 與 typeclasses；commands/server 迴歸鎖住 look／persona_digest 預設路徑）。

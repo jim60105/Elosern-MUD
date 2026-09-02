@@ -21,6 +21,7 @@ loader, the ``world.rules`` deterministic services (activation and
 ``world.rules.persona_edit``), or the scene-builder characterization seam.
 """
 
+import numbers
 from collections.abc import Mapping
 from types import SimpleNamespace
 from typing import Any
@@ -68,6 +69,45 @@ _SUBKEY_LABELS = {
     "identity": {"public": "公開身分", "hidden": "隱秘身分"},
 }
 
+# Sentinel marking a subtree that the public-view prune must omit (a cycle
+# back-reference); a module-private object, never stored on any record.
+_DROP = object()
+
+
+def _hidden_free_copy(value: Any, seen: frozenset[int]) -> Any:
+    """Rebuild a hidden-free, cycle-safe copy of an opaque persona subtree.
+
+    Every mapping is copied with its ``hidden``-keyed entries pruned at any
+    depth, and every list or tuple is rebuilt element-wise, so the result
+    shares no mutable container with the source and can never be re-poisoned
+    by later mutations of the stored record. A cycle back-reference yields
+    ``_DROP`` for that branch (the reference target's copy is already under
+    construction); scalars pass through untouched.
+    """
+    if isinstance(value, Mapping):
+        if id(value) in seen:
+            return _DROP
+        seen = seen | {id(value)}
+        copy = {}
+        for key, item in value.items():
+            if key == "hidden":
+                continue
+            copied = _hidden_free_copy(item, seen)
+            if copied is not _DROP:
+                copy[key] = copied
+        return copy
+    if isinstance(value, (list, tuple)):
+        if id(value) in seen:
+            return _DROP
+        seen = seen | {id(value)}
+        items = []
+        for item in value:
+            copied = _hidden_free_copy(item, seen)
+            if copied is not _DROP:
+                items.append(copied)
+        return items
+    return value
+
 
 class PersonaStore:
     """Read-only handler over an entity's verbatim persona record.
@@ -109,11 +149,14 @@ class PersonaStore:
         return record.get(field)
 
     def public_view(self) -> "PersonaStore":
-        """Return a read-only store over a hidden-free copy of the record.
+        """Return a read-only store over an independent hidden-free copy.
 
         When the record is a mapping whose ``identity`` value is itself a
-        mapping, the copy's ``identity`` keeps only the non-``hidden``
-        sub-entries, so a block built through this view excludes the hidden
+        mapping, the copy holds a rebuilt identity subtree: ``hidden``-keyed
+        entries are pruned at any depth, every nested container is a fresh
+        copy (so later mutation of the stored record cannot re-introduce a
+        hidden value), and cycle back-references are dropped from the copy.
+        A block built through this view therefore excludes the hidden
         identity layer by construction rather than by post-hoc text
         scrubbing. A string-valued ``identity`` has no hidden layer and
         passes through verbatim; a missing or non-mapping record is carried
@@ -126,9 +169,7 @@ class PersonaStore:
             sanitized = dict(record)
             identity = sanitized.get("identity")
             if isinstance(identity, Mapping):
-                sanitized["identity"] = {
-                    key: value for key, value in identity.items() if key != "hidden"
-                }
+                sanitized["identity"] = _hidden_free_copy(identity, frozenset())
             view = sanitized
         holder = SimpleNamespace(db=SimpleNamespace(persona=view))
         return PersonaStore(
@@ -149,6 +190,10 @@ class PersonaStore:
         capped at a total bound. A missing record, a non-mapping record, or a
         record with none of the requested fields renderable yields ``None``;
         this never raises.
+
+        At configured bounds smaller than a label, the deterministic
+        truncation may consume the label itself; the contract is only to
+        bound the output, so callers are expected to pick usable bounds.
         """
         sections = []
         for field in fields:
@@ -211,13 +256,18 @@ class PersonaStore:
         return lines
 
     def _render_items(self, sequence: Any) -> list[str]:
-        """Render sequence items as dash-prefixed lines, skipping scalars."""
+        """Render sequence items as dash-prefixed lines, skipping scalars.
+
+        ``None`` and any number shape (int, float, bool, complex, Decimal,
+        Fraction — anything the ``numbers`` hierarchy classifies) contribute
+        no line; containers stringify as the final fallback.
+        """
         lines: list[str] = []
         for item in sequence:
             if isinstance(item, str):
                 if item:
                     lines.append(f"- {self._cap(item)}")
-            elif isinstance(item, bool) or item is None or isinstance(item, (int, float)):
+            elif item is None or isinstance(item, numbers.Number):
                 continue
             else:
                 lines.append(f"- {self._cap(str(item))}")

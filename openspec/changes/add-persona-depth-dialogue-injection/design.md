@@ -43,7 +43,7 @@
 
 `flatten()` 預設仍三欄（NPC dialogue 的既有位元等值契約不被本變更動到）。新增欄位集由呼叫端覆寫——呼叫端即 `typeclasses/npcs.py` 的 `_persona_block()`（現行 `self.persona.flatten(), character.persona.flatten()`），它是全倉庫對話路徑唯一的 flatten 選點：NPC 自身注入用全欄集 `("personality","life_story","habit","identity","appearance","social_connection")`；玩家注入用恰 `("identity","appearance","social_connection")` 的深度欄位集且 `identity` 以 public-only 視圖進入——玩家自己的個性、生平、習慣與 background 三欄敘事文字＋背景一律不進 NPC prompt（§11.4：NPC 眼中的玩家僅止於外觀、公開身分、人脈）。位元等值的範圍：預設欄位集下「值為字串」的記錄輸出逐字不變（現存全部記錄皆字串值）；容器值的散文字段開始渲染屬寬容契約的刻意改變，連帶現形於 look 顯示與 `option_proposal_service` 的 `persona_digest`。
 
-- 玩家側 `identity` 的 public-only 實作：`PersonaStore` 提供 `public_view()`——回傳一個新的 `PersonaStore`，背後是一層淺拷貝 record，其中 `identity` 若為 Mapping 則僅保留 `public` 子鍵（字串 identity 原樣保留，無 hidden 可言），其餘鍵照原；非 Mapping record 原樣帶入（flatten 仍得 `None`）。渲染走同一寬容規則。呼叫端語意為 `store.public_view().flatten(...)`；「玩家塊永不含 identity.hidden」由 record 拷貝層保證，絕不事後文字清洗。此方法為純讀取（無寫入 API），但 `test_handler_has_no_write_api` 的恰鍵集合須同步納入 `public_view`。
+- 玩家側 `identity` 的 public-only 實作：`PersonaStore` 提供 `public_view()`——回傳一個新的 `PersonaStore`，背後是淺拷貝 record，其中 `identity` 若為 Mapping 則遞迴重建為獨立快照——任意深度的 `hidden` 鍵映射條目一律剪除、巢狀容器全部換成新拷貝（之後記錄被改動也無法把 hidden 灌回已建立的視圖）、循環參照以丢棄該分支降級（字串 identity 原樣保留，無 hidden 可言），其餘鍵照原；非 Mapping record 原樣帶入（flatten 仍得 `None`）。渲染走同一寬容規則。呼叫端語意為 `store.public_view().flatten(...)`；「玩家塊永不含 identity.hidden」由 record 拷貝層保證，絕不事後文字清洗。persona 記錄是 verbatim opaque 的——`hidden` 可能藏在巢狀容器裡被字串化帶出，故剪除必須是深層且快照必須獨立（rubber-duck 阻斷缺陷 #1 的決策）。此方法為純讀取（無寫入 API），但 `test_handler_has_no_write_api` 的恰鍵集合須同步納入 `public_view`。
 
 ### D3: 注入政策以欄位集常數鎖在 npc_dialogue、由 seam 匯入使用
 

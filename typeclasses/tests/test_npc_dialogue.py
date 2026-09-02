@@ -425,6 +425,10 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertIn("習慣：清晨練劍", system)
         self.assertIn("公開身分：邊境退役騎士", system)
         self.assertIn("隱秘身分：叛逃的貴族私生子", system)
+        self.assertIn("外觀：", system)
+        self.assertIn("height：185cm", system)
+        self.assertIn("人脈：", system)
+        self.assertIn("悠奈：{'relationship': '舊識'}", system)
         # The player block is the public depth view only: the hidden identity
         # layer, the prose fields, and background never reach the NPC prompt.
         persona_block = parsed["player"]["persona"]

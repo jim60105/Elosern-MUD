@@ -446,6 +446,54 @@ class PersonaStoreTests(unittest.TestCase):
         view = PersonaStore(_FakeEntity(record)).public_view()
         self.assertIsNone(view.flatten(("identity",)))
 
+    @covers_requirement("persona-store::personastore-is-a-read-only-handler-over-the-verbatim-persona-record")
+    def test_public_view_prunes_nested_hidden_entries_at_any_depth(self):
+        record = {
+            "identity": {
+                "public": {"hidden": "巢狀祕密", "role": "商人", "ties": [{"hidden": "深", "k": "v"}]},
+            }
+        }
+        block = PersonaStore(_FakeEntity(record)).public_view().flatten(("identity",))
+        self.assertEqual(
+            block, "身分：\n公開身分：{'role': '商人', 'ties': [{'k': 'v'}]}"
+        )
+        self.assertNotIn("巢狀祕密", block)
+        self.assertNotIn("深", block)
+
+    @covers_requirement("persona-store::personastore-is-a-read-only-handler-over-the-verbatim-persona-record")
+    def test_public_view_is_an_independent_snapshot_of_later_mutations(self):
+        record = {"identity": {"public": {"role": "商人"}}}
+        view = PersonaStore(_FakeEntity(record)).public_view()
+        # A writer adding a hidden entry to the shared nested container after
+        # the view was taken must not surface through the already-built view.
+        record["identity"]["public"]["hidden"] = "後植入"
+        block = view.flatten(("identity",))
+        self.assertEqual(block, "身分：\n公開身分：{'role': '商人'}")
+        self.assertNotIn("後植入", block)
+
+    @covers_requirement("persona-store::personastore-is-a-read-only-handler-over-the-verbatim-persona-record")
+    def test_public_view_drops_cycle_backreferences_without_raising(self):
+        inner: dict = {"public": "表", "hidden": "環"}
+        identity = {"public": inner}
+        inner["loop"] = identity  # self-referential opaque shape
+        store = PersonaStore(_FakeEntity({"identity": identity}))
+        block = store.public_view().flatten(("identity",))
+        self.assertIsNotNone(block)
+        self.assertIn("公開身分", block)
+        self.assertNotIn("環", block)
+        # The NPC-side tolerant path must also survive a cyclic value: the
+        # stringify fallback relies on repr's cycle marker, never a raise.
+        self.assertIsNotNone(store.flatten(("identity",)))
+
+    @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
+    def test_exotic_numeric_list_items_are_skipped(self):
+        from decimal import Decimal
+        from fractions import Fraction
+
+        record = {"appearance": {"feature": [Decimal("1.5"), Fraction(1, 2), 1 + 2j, None, "刀疤"]}}
+        block = PersonaStore(_FakeEntity(record)).flatten(("appearance",))
+        self.assertEqual(block, "外觀：\nfeature：\n- 刀疤")
+
 
 class PersonaLookDisplayTests(unittest.TestCase):
     """The shared look appearance path appends a living entity's persona block.
