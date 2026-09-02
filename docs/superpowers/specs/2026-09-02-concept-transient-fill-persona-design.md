@@ -160,6 +160,7 @@ JS 層：`protocol.js` Node 鏡像驗證器新案（draft persona、custom 9 鍵
 | `creation-persona-persistence` | 改寫（概念降為暫態填入器；草稿階段、CAS、承接、指示文字諸要求退役） |
 | `webclient-character-creation-ui` | modified（draft 兩模式、custom payload 9 鍵、creation panel v2） |
 | `player-character-creation` | modified（啟動 persona 來源改自 custom draft；概念流語意改寫） |
+| `character-creation-ux` | modified（Telnet `character concept` 條目改寫為暫態填入器語意） |
 | `webclient-action-dispatch` | modified（registry 增 `character.persona.update`） |
 | `webclient-oob-protocol` | 不變（exact `ui_action_result` envelope 不增 data 欄；提案改經 `creation` panel 的 optional `proposal` 槽送達，見 §4.2） |
 | `persona-store` | modified（`flatten` 取得 `identity / appearance / social_connection` 的寬容渲染，見 §11） |
