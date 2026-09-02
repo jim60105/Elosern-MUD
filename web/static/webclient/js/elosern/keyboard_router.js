@@ -575,11 +575,18 @@
         if (stack.length === 0) {
           return this.pushMenu(menu);
         }
-        // Transitional cross-family re-home: the top frame becomes a legacy
-        // copy frame outright. Replacing only `.menu` on a declarative frame
-        // would leave the descriptor authoritative (its reads resolve, never
-        // read `.menu`), so the frame's shape flips here — the follow-up
+        // The transitional seam is copy-onto-copy only. Overwriting a
+        // declarative top with a frozen menu copy is precisely the
+        // access-time-resolution loss this change exists to remove, so a
+        // cross-family downgrade is rejected loudly instead of silently
+        // freezing the frame; every legitimate transitional call site (the
+        // combat sig gate, the creation dock, the empty-stack fuse) owns a
+        // legacy top — the store's publish order keeps the combat gate off
+        // the mode-change pass, which the teardown owns. The follow-up
         // change deletes this whole path with the legacy shape.
+        if (isDeclarative(stack[stack.length - 1])) {
+          throw new Error("replaceMenu must not overwrite a declarative frame");
+        }
         stack[stack.length - 1] = { menu: menu, focusRow: 0, focusCol: 0 };
         repeatGuard = null;
         notifyFocus(current());

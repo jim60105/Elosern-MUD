@@ -243,14 +243,26 @@ test("empty declarative stack reads throw rather than silently recover", () => {
   assert.strictEqual(router.currentMenu(), null);
 });
 
-test("replaceMenu re-homes a declarative top frame into the legacy copy shape", () => {
+test("replaceMenu refuses to downgrade a declarative top frame to a copy", () => {
   const resolve = () => menuOf(["d"]);
   const { router } = declRouter(resolve);
   router.pushFrame({ source: "exploration.root", params: {} });
-  // Cross-family re-home (the transitional combat/creation root path): the
-  // top frame becomes a legacy frame outright, not a descriptor with a
-  // dead .menu property.
+  // The transitional seam is copy-onto-copy only: overwriting a declarative
+  // frame with a frozen menu copy would silently kill access-time resolution
+  // (the very failure the declarative stack removes), so it throws and the
+  // frame stays declarative.
+  assert.throws(
+    () => router.replaceMenu(menuOf(["combat-root"])),
+    /must not overwrite a declarative frame/,
+  );
+  assert.deepEqual(router.currentDescriptor(), { source: "exploration.root", params: {} });
+  // An empty stack remains the push-through case, and a legacy top is
+  // replaced copy-for-copy.
+  router.reset();
+  assert.strictEqual(router.depth(), 0);
   router.replaceMenu(menuOf(["combat-root"]));
+  assert.strictEqual(router.depth(), 1);
   assert.strictEqual(router.currentDescriptor(), null);
-  assert.strictEqual(router.currentMenu().items[0].label, "combat-root");
+  router.replaceMenu(menuOf(["combat-root-2"]));
+  assert.strictEqual(router.currentMenu().items[0].label, "combat-root-2");
 });

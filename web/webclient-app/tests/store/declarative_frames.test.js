@@ -365,5 +365,82 @@ describe("declarative frame stack (store contract)", () => {
       });
       expect(store.view.focus.key).toBe("move");
     });
+
+    // The named teardown triggers beyond the mode switch. The no-puppet case
+    // is the sharp one: the reducer retains mode AND epoch on a `no_puppet`
+    // protocol error, so a stack would survive the character leaving unless
+    // the detach transition is its own teardown event.
+    it("a no_puppet detach at depth 2 collapses the stack to the root frame", () => {
+      openExploration(store);
+      expect(store.focusConfirm("keyboard")).toBe(true); // depth 2
+      expect(store.router.depth()).toBe(2);
+
+      const result = store.receive(1, "ui_protocol_error", [fx.protocolError()], {});
+      expect(result.accepted).toBe(true);
+      expect(store.view.phase).toBe("detached");
+
+      // One frame, still the declarative exploration root (the mode did not
+      // change). With the panels cleared the root degrades in place to the
+      // marker-reason row instead of sitting empty.
+      expect(store.router.depth()).toBe(1);
+      expect(store.router.currentDescriptor()).toEqual({
+        source: "exploration.root",
+        params: {},
+      });
+      expect(store.view.degradedRoot).not.toBeNull();
+    });
+
+    it("an epoch-reset snapshot with an open submenu yields exactly one root frame", () => {
+      openExploration(store);
+      expect(store.focusConfirm("keyboard")).toBe(true); // depth 2 (move)
+      store.focusEscape(); // back to the root frame
+      expect(store.router.depth()).toBe(1);
+      expect(store.focusItemByKey("wait")).toBe(true);
+      expect(store.focusConfirm("keyboard")).toBe(true); // depth 2 (wait)
+      expect(store.router.depth()).toBe(2);
+
+      // The production epoch-reset path: a fresh transport generation
+      // retires the active epoch, and the new-epoch snapshot establishes
+      // the new one — the store sees `epochChanged` on that commit.
+      store.beginTransport(2);
+      const result = store.receive(
+        2,
+        "ui_snapshot",
+        [
+          fx.snapshot({
+            revision: 1,
+            presentation_epoch: fx.EPOCH_B,
+            panels: {
+              status: fx.statusPanel(),
+              exploration: fx.explorationPanel(),
+              local_map: fx.localMapPanel(),
+              context_actions: fx.explorationActions(),
+            },
+          }),
+        ],
+        {},
+      );
+      expect(result.accepted).toBe(true);
+      expect(store.router.depth()).toBe(1);
+      expect(store.router.currentDescriptor()).toEqual({
+        source: "exploration.root",
+        params: {},
+      });
+      expect(store.view.focus.key).toBe("move");
+    });
+
+    it("a transport loss at depth 2 yields exactly one root frame", () => {
+      openExploration(store);
+      expect(store.focusConfirm("keyboard")).toBe(true); // depth 2
+      expect(store.router.depth()).toBe(2);
+
+      store.setConnected(false);
+
+      expect(store.router.depth()).toBe(1);
+      expect(store.router.currentDescriptor()).toEqual({
+        source: "exploration.root",
+        params: {},
+      });
+    });
   });
 });

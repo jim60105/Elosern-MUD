@@ -974,6 +974,11 @@ export const useElosernStore = defineStore("elosern", () => {
   // root descriptor; the unmigrated combat/creation families keep the legacy
   // root copy. Called by the wrapped `router.reset` (synchronous) and by the
   // combat signature gate's re-home path (the commit-driven safety net).
+  // The legacy branches never downgrade a declarative top frame to a copy
+  // (the router rejects that outright): a family switch off a declarative
+  // root replaces the whole stack with the single legacy root frame — the
+  // same shape the mode teardown yields — while an already-legacy top is
+  // re-homed copy-for-copy so an open legacy submenu keeps its level.
   function rehomeFrame(rs) {
     const panel = (rs.panels && rs.panels.context_actions) || null;
     if (panel && panel.kind === "combat") {
@@ -982,18 +987,27 @@ export const useElosernStore = defineStore("elosern", () => {
         : {};
       combat = CombatMenu.rebuildForPanel(combat, panel, previous);
       combatRootSig = stableStringify(combat.menus.root.items);
-      router.replaceMenu({
+      const combatRoot = {
         items: combat.menus.root.items,
         grid: true,
         gridCols: combat.menus.root.gridCols,
         title: combat.menus.root.title || "戰鬥",
-      });
+      };
+      if (router.currentDescriptor() !== null) {
+        router.reset(combatRoot);
+      } else {
+        router.replaceMenu(combatRoot);
+      }
       return;
     }
     // Creation mode: the preserved legacy dock owns the root frame; the
     // router copy is rebuilt from the committed creation menus.
     if (rs.mode === "creation" && creation && creation.menus) {
-      router.replaceMenu(creation.menus.menus.root);
+      if (router.currentDescriptor() !== null) {
+        router.reset(creation.menus.menus.root);
+      } else {
+        router.replaceMenu(creation.menus.menus.root);
+      }
       return;
     }
     // Exploration mode: the declarative root descriptor. Resolution happens
@@ -1010,9 +1024,18 @@ export const useElosernStore = defineStore("elosern", () => {
   // or an emptied stack — rebuilds the root frame. Focus position lives in
   // the legacy frame itself.
   let combatRootSig = null;
-  function syncCombatRootFrame(rs) {
+  function syncCombatRootFrame(prev, rs) {
     const panel = (rs.panels && rs.panels.context_actions) || null;
     if (!panel || panel.kind !== "combat") {
+      return;
+    }
+    // A mode change into combat is owned by the teardown pass in
+    // `syncHudDrawer` below, which runs later in the same publish and
+    // replaces the whole stack with the fresh combat root copy. Re-homing
+    // here would `replaceMenu` onto the still-mounted exploration
+    // declarative top frame — the transitional cross-family downgrade the
+    // router now refuses outright.
+    if (!!prev && prev.mode !== rs.mode) {
       return;
     }
     const previous = combat
@@ -1563,8 +1586,14 @@ export const useElosernStore = defineStore("elosern", () => {
       const modeChanged = !!prev && prev.mode !== rs.mode;
       const epochChanged = !!prev && prev.epoch !== rs.activeEpoch;
       const transportLost = !!prev && prev.connected && !rs.connected;
+      // No-puppet detach is a teardown event in its own right: the reducer
+      // retains the epoch and the mode on a `no_puppet` protocol error, so
+      // the three transitions above never fire for it. Without this
+      // condition a depth >1 exploration stack would survive the character
+      // leaving the puppet.
+      const detached = !!prev && prev.phase !== "detached" && rs.phase === "detached";
 
-      if (modeChanged || epochChanged || transportLost) {
+      if (modeChanged || epochChanged || transportLost || detached) {
         // A committed mode change out of exploration, an epoch reset, or a
         // transport loss each close the services-backed drawers and discard
         // local selection, quantity, and confirmation state (the quantity
@@ -1573,7 +1602,7 @@ export const useElosernStore = defineStore("elosern", () => {
         if (d === "quest" || d === "shop" || d === "inventory") {
           hudDrawer.value = null;
         }
-        if (transportLost || epochChanged) {
+        if (transportLost || epochChanged || detached) {
           if (hudDrawer.value) {
             hudDrawer.value = null;
           }
@@ -1820,7 +1849,7 @@ export const useElosernStore = defineStore("elosern", () => {
     handleTransportLifecycle(prev, rs);
     handleActionResult(rs);
     releaseIfReady(rs);
-    syncCombatRootFrame(rs);
+    syncCombatRootFrame(prev, rs);
     rebuildCreationDock(prev, rs);
     syncRouterGates();
     syncHudDrawer(prev, rs);

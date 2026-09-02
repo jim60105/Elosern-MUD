@@ -80,6 +80,16 @@ Mode switch (exploration / combat / creation), presentation epoch reset, transpo
 - **WHEN** the transport is lost while exploration frames are open
 - **THEN** the stack holds only the root frame of the mode and no stale activation can dispatch after reconnect without a fresh player action
 
+#### Scenario: Epoch reset leaves only the root frame
+
+- **WHEN** a new transport generation retires the epoch and a fresh-epoch snapshot establishes the new one while exploration submenus are open
+- **THEN** the stack contains exactly one root frame for the new presentation before any player action
+
+#### Scenario: No-puppet detach collapses the stack without a mode change
+
+- **WHEN** a `no_puppet` protocol error detaches the character while exploration submenus are open and neither the mode nor the epoch changes
+- **THEN** the stack collapses to exactly the single root frame and no open submenu row remains activatable
+
 ### Requirement: Activation payloads read committed state at dispatch time
 
 A row activation SHALL dispatch the server-authored action identifier and payload derived from the resolve that produced the currently rendered frame, so a frame that has already re-resolved submits the new state's payload. The server-side stale guards (`stale_location` rejection, `base_revision` admission gate) SHALL remain unchanged as backstops against multi-session and event races, not as the user-facing freshness mechanism.
