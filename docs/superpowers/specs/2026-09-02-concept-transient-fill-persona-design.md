@@ -70,9 +70,9 @@ draft 只剩 `preset_selected` 與 `custom_filled` 兩種模式。`custom_filled
 
 payload 維持恰 `{concept}`。adapter 跑既有 guarded pipeline（注入 client、預算驗證、降級標記），成功後不寫任何持久狀態，降級與驗證失敗走既有 `concept_unavailable` 穩定拒絕。
 
-提案的送達走倉庫現成的 session 瞬態模式（options suggestions 的 `session.ndb.options_state` → `PresentationContext.options_state` → presenter 渲染，本設計與 `FrozenCard`/`OptionsSnapshot` 同構）：adapter 以它依 ABI 收到的 session，把驗證過的提案寫入 `session.ndb.concept_proposal`（不持久化、斷線即滅，正是暫態填入的語意），回傳 confirmed success（code `concept_applied`）並宣告 affected `creation` panel；presenter 從 context 的提案快照渲染出 panel 的 `proposal` 槽，客戶端據此填入表單。`PresentationContext` 依 `options_state` 的既有先例新增提案快照欄位，由 coordinator 在建立 context 時從 session 複製。
+提案的送達走倉庫現成的 session 瞬態模式（options suggestions 的 `session.ndb.options_state` → `PresentationContext.options_state` → presenter 渲染，本設計與 `FrozenCard`/`OptionsSnapshot` 同構）：adapter 以它依 ABI 收到的 session，把驗證過的提案連同一個 session 內單調遞增的暫態序號寫入 `session.ndb.concept_proposal`（不持久化、斷線即滅，正是暫態填入的語意），回傳 confirmed success（code `concept_applied`）並宣告 affected `creation` panel；presenter 從 context 的提案快照渲染出 panel 的 `proposal` 槽，客戶端據此填入表單。`PresentationContext` 依 `options_state` 的既有先例新增提案快照欄位，由 `web/webclient/presentation/ingress.py` 的 `build_presentation_context`——全倉庫所有發布路徑（全量快照、dispatcher 完成、內部錯誤、stale、push）唯一的 context 工廠——在建立 context 時從 session 深拷貝；只改 dataclass 而漏掉這個工廠，每一張重建的 panel 都會是空槽。序號是傳輸層識別元而非遊戲狀態：內容完全相同的連續套用產生不同序號，客戶端據以區分「面板重建」與「新的套用」，「重建不覆寫編輯」與「重新套用一律替換」兩條契約才得以兼顧。
 
-提案的生命週期：寫入於套用成功；清除於 `creation.custom` 儲存成功、`creation.reset`、概念再次套用、或 session 結束。自訂儲存前的每次面板重建照樣渲染提案，讓重新連線能重建暫態填入；儲存成功後提案即不再出現。
+提案的生命週期：寫入於套用成功（覆蓋舊提案並使序號遞增）；清除於 `creation.custom` 儲存成功、`creation.reset`、概念再次套用、或 session 結束。自訂儲存前的每次面板重建照樣渲染提案，讓重新連線能重建暫態填入；儲存成功後提案即不再出現。
 
 信封上限方面，最差情況三欄各 600 個中日韓文字約 6 KB，對 `MAX_CANONICAL_JSON_BYTES = 65536` 餘裕充足，並以 worst-case 測試鎖定。
 
@@ -166,6 +166,31 @@ JS 層：`protocol.js` Node 鏡像驗證器新案（draft persona、custom 9 鍵
 | `persona-store` | modified（`flatten` 取得 `identity / appearance / social_connection` 的寬容渲染，見 §11） |
 | `persona-dialogue-injection` | modified（注入欄位選取政策，見 §11.4） |
 | `import-schema` | 不變（persona 驗證維持 verbatim opaque） |
+
+### 8.1 Change 對應與依賴
+
+上表衝擊分派到三個 change（以下縮寫：A = `retool-concept-transient-fill`、B = `add-persona-edit-surface`、C = `add-persona-depth-dialogue-injection`）：
+
+| Change | 設計章節 | 定位 | 前置依賴 |
+|---|---|---|---|
+| A `retool-concept-transient-fill` | §2–§4、§9.1–§9.2 | 根因修復：概念降為暫態填入器、persona 入 custom draft／payload／啟動、creation panel v2 proposal 槽、Telnet 暫態流、退役清單 | 無 |
+| C `add-persona-depth-dialogue-injection` | §11 | `identity / appearance / social_connection` 的第一個消費者（宽容渲染＋對話注入） | 無 |
+| B `add-persona-edit-surface` | §5 | 啟動後四鍵檢視與編輯（寫入服務、`character.persona.update`、character panel v7、命令家族、drawer） | A |
+
+依賴邊僅一條：**A → B**；C 與兩者皆獨立。
+
+- B 依賴 A，理由在三層：
+  1. 規格層——A 與 B 的 delta 同指 `creation-persona-persistence`（A REMOVED／MODIFIED 概念草稿、CAS、承接、指示文字與啟動／background 諸要求；B REMOVED「後台可自由更新 background」並移交新能力 `persona-editing`）。歸檔流程會把 delta 同步進主規格，B 的 delta 必須對照 A 同步後的狀態撰寫與驗證，歸檔順序因此硬性 A 先 B 後。
+  2. 檔案層——兩變更长 `web/static/webclient/js/elosern/protocol.js`（A：creation panel v2 與九鍵 payload 鏡像；B：character panel v7 與 `character.persona.update` payload 鏡像），registry 恰鍵清單與測試亦相疊（A 改 concept 行為、B registry 增一條）。
+  3. 語意層——B 的 panel v7 四段顯示與四鍵編輯白名單覆蓋的正是 A 交還玩家的欄位；A 未落地時 B 沒有可編輯的生成 persona。
+- C 獨立之故：檔案（`world/rules/persona.py` 渲染器、`world/ai/npc_dialogue.py` 欄位選取）與主規格（`persona-store`、`persona-dialogue-injection`）皆與 A／B 不相交；§11.5 把三鍵排除於編輯白名單之外，C 連對 B 也无耦合。
+
+### 8.2 實作與歸檔順序
+
+1. **批次一（完全平行）**：A 與 C 同時進行，無任何交錯點。
+2. **批次二**：B。其任務群 1（`persona_edit.py` 寫入服務與純邏輯測試，與 A 檔案不相交、且 traceability 指向新能力要求）可提前動工；任務群 2 起（protocol.js 鏡像、character panel v7、registry、drawer）必須等 A 對應任務群合併後再動，以避開上述檔案與規格兩處衝突。
+3. 每個 change 內部依其 `tasks.md` 的群組順序推進（A：draft／規則 → actions／presenter → protocol.js → Vue → Telnet → 文件與登記；B、C 同理）。
+4. **歸檔**：A → B 為硬順序，C 時機自由；每次歸檔都把 delta 同步進 `openspec/specs/` 並跑 `openspec validate --all --strict`。
 
 ## 9. 取捨與已接受代價
 
