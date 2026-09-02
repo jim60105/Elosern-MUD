@@ -1,11 +1,12 @@
 """Observability boundary events for the AI layer (llm-client delta).
 
-Asserts the exactly-one ``llm_call`` funnel (ok/degraded/rejected), the
-client-layer ``llm_transport_error`` chain, and the fail-closed credential
-rule for unexpected client errors. All deterministic and socket-free.
+Asserts the exactly-one ``llm_call`` funnel (ok/degraded/rejected). The
+client-layer ``llm_transport_error`` chain and the fail-closed credential
+rule live in ``test_client.py`` — the transport contract only exempts the
+client's own unit tests to construct the real client. All deterministic and
+socket-free.
 """
 
-from dataclasses import replace
 from unittest.mock import patch
 import json
 import unittest
@@ -15,11 +16,9 @@ from twisted.python.failure import Failure
 
 from evennia.utils.test_resources import EvenniaTestCase
 
-from world.ai.client import OpenAICompatClient
-from world.ai.errors import LLMTransportError
 from world.ai.fake_client import FakeLLMClient
 from world.ai.guardrail import guarded_call, register_degrade_fallback
-from world.ai.profiles import default_profiles, get_profile
+from world.ai.profiles import default_profiles
 from world.ai.schemas import ChatRequestDescriptor
 
 _SCHEMA = {"type": "object"}
@@ -203,74 +202,6 @@ class LlmCallEventTests(EvenniaTestCase):
         events = self._events(info)
         self.assertEqual(len(events), 1, events)
         self.assertEqual(events[0].kwargs["context"]["result"], "rejected")
-
-
-class TransportErrorEventTests(EvenniaTestCase):
-    """The client errback emits the spec'd transport diagnostic."""
-
-    def _client(self):
-        return OpenAICompatClient(get_profile("narrator"), reactor=None)
-
-    def test_transport_failure_event_carries_endpoint_and_chain(self):
-        client = self._client()
-        error = LLMTransportError("connection", "request failed: refused")
-        with patch("world.ai.client.log_warn") as warn:
-            returned = client._safe_log_error(Failure(error))
-        self.assertIs(returned.value, error)
-        warn.assert_called_once()
-        call = warn.call_args
-        self.assertEqual(call.args[0], "llm_transport_error")
-        context = call.kwargs["context"]
-        profile = client.profile
-        self.assertEqual(
-            context["endpoint"], profile.base_url.rstrip("/") + profile.path
-        )
-        self.assertEqual(context["kind"], "connection")
-        self.assertIs(call.kwargs["exc"], error)
-
-    def test_unexpected_failure_stays_fail_closed_without_chain(self):
-        client = self._client()
-        error = ValueError("possibly endpoint-controlled text")
-        with patch("world.ai.client.log_warn") as warn:
-            client._safe_log_error(Failure(error))
-        call = warn.call_args
-        self.assertEqual(call.args[0], "llm_client_unexpected_error")
-        self.assertEqual(
-            call.kwargs["context"], {"kind": "unexpected", "exc_type": "ValueError"}
-        )
-        self.assertNotIn("exc", call.kwargs)
-
-    def test_a_key_smuggled_into_the_chain_never_reaches_the_rendered_line(self):
-        # Fail-closed api-key invariant: the facade renders every chain link,
-        # and a hostile endpoint can echo the bearer key inside a chained
-        # exception. The emitted chain must be scrubbed link-by-link.
-        from world.observability.render import format_exception_chain
-
-        secret = "sk-chain-do-not-log"
-        fields = {"api_" + "key": secret}
-        client = OpenAICompatClient(
-            replace(get_profile("narrator"), **fields), reactor=None
-        )
-        hostile = HostileEchoError(f"endpoint echoed Authorization: Bearer {secret}")
-        try:
-            try:
-                raise hostile
-            except HostileEchoError as inner:
-                raise LLMTransportError("malformed", "response body is not valid JSON") from inner
-        except LLMTransportError as error:
-            with patch("world.ai.client.log_warn") as warn:
-                client._safe_log_error(Failure(error))
-        call = warn.call_args
-        self.assertEqual(call.args[0], "llm_transport_error")
-        rendered = format_exception_chain(call.kwargs["exc"])
-        self.assertNotIn(secret, rendered)
-        self.assertIn("[redacted]", rendered)
-        # The outermost link keeps its kind for the context field.
-        self.assertEqual(call.kwargs["context"]["kind"], "malformed")
-
-
-class HostileEchoError(Exception):
-    """A transport exception whose text carries an endpoint-echoed credential."""
 
 
 if __name__ == "__main__":
