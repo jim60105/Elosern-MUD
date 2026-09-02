@@ -5,7 +5,7 @@
 ## What Changes
 
 - 新增 `world/observability/` log facade：`log_info`／`log_warn`／`log_error`／`log_debug`，統一單行結構化輸出（`event | mod.func:line | k=v | tb:` ），自動附 caller 資訊，永不拋例外。
-- 新增 `tools/observability_lint.py`（與 `tools/spec_traceability.py` 同構）：AST 規則 R1（唯一寫入點）、R2（except 不得無痕吞例外）、R3（log 必帶 context），豁免註解與只許縮小的過渡凍結清單 `tools/observability_freeze.json`。
+- 新增 `tools/observability_lint.py`（與 `tools/spec_traceability.py` 同構）：AST 規則 R1（唯一寫入點）、R2（except 不得無痕吞例外；作用域＝已匯入 facade 的檔案，legacy error-hygiene 債務顯式延後）、R3（log 必帶 context），豁免註解與只許縮小的過渡凍結清單 `tools/observability_freeze.json`（由掃描生成＝R1 import 債務檔集合，條目只壓 R1）。
 - 命令基類統一發出 `cmd_in`／`cmd_done` 事件；`at_server_startstop.py` 生命週期步驟發 `startup_step`——正常路徑開始留痕。
 - 遷移 `server/`＋`commands/` 的既有 log 呼叫與吞例外點到 facade（其餘目錄由後續三個遷移 change 接手，暫列凍結清單）。
 - `AGENTS.md` 新增 Observability 規範條目；`quality-gate.yml` preflight 接入 lint 步驟（同批改 `tests/test_quality_gate_contract.py` contract）。

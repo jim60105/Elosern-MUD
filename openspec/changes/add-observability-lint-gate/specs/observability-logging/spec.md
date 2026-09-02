@@ -52,14 +52,32 @@ the Evennia error log.
 
 ### Requirement: The facade never raises
 
-A facade call MUST NOT raise under any circumstance, including internal
-import failure or logger failure; on internal failure it MUST fall back to
-writing the rendered line to stderr via the standard library.
+A facade call MUST NOT propagate operational (`Exception`) failures —
+including caller-frame lookup, context rendering, exception formatting,
+Evennia-logger import failure, or logger write failure. Each stage is
+guarded: on any internal failure the facade MUST fall back to writing a
+best-effort rendered line to stderr via the standard library, and even if
+the fallback itself fails the facade call MUST return normally. Django
+settings unavailability counts as `VERBOSE` false (debug writes nothing)
+and never triggers the fallback. `BaseException` (interrupt/signal) is not
+swallowed.
 
 #### Scenario: Logger failure degrades to stderr
 
 - **WHEN** the Evennia logger raises during a facade call
 - **THEN** the caller sees no exception and the line appears on stderr
+
+#### Scenario: Broken context rendering still emits a line
+
+- **WHEN** a context value's `repr` raises
+- **THEN** the facade call returns without raising and some line (possibly
+  degraded) reaches the logger or stderr
+
+#### Scenario: Unconfigured settings does not emit debug noise
+
+- **WHEN** `log_debug` is called in a process without configured Django
+  settings
+- **THEN** nothing is written to any sink and nothing is raised
 
 ### Requirement: Command execution emits boundary events
 
@@ -86,14 +104,32 @@ MUST NOT fabricate an error outcome it cannot observe.
 
 ### Requirement: Server startup emits lifecycle events
 
-Each server-startup registration and synchronization step MUST log a
+Each server-startup step in the composition-root catalog MUST log a
 `startup_step` info event with `step` and `ms` context on success, and MUST
 log through the facade (not a swallowed free-text warning) on failure or
 degradation, so the startup log alone answers which subsystems came up
-healthy and which degraded.
+healthy and which degraded. Fail-loud steps keep propagate-on-failure
+semantics (log with `exc` then re-raise); boot-tolerant steps keep their
+tolerance but log structured degradation with `step` context. The catalog
+is the ordered list of startup operations named in the change design.
+Wrapping MUST NOT re-order steps, and existing startup-order guard tests
+MUST be migrated to behavioral assertions in the same change.
+
+#### Scenario: Every catalog step logs exactly one success event
+
+- **WHEN** server startup runs with all operations stubbed and a fixed
+  clock
+- **THEN** the log contains exactly one `startup_step` event per catalog
+  step, in catalog order, each with `step` and `ms`
 
 #### Scenario: Degraded startup is visible in the log
 
 - **WHEN** a guardrail layer registration is skipped at server start
 - **THEN** a facade event identifies the failed step and the reason in
   context
+
+#### Scenario: A failing fail-loud step still aborts startup
+
+- **WHEN** a fail-loud synchronization step raises
+- **THEN** the step logs a facade error with `exc` and the exception keeps
+  propagating so the server does not partially boot

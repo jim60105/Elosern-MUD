@@ -27,8 +27,9 @@ requirement gaps without adding product-behavior tests in this change.
 
 #### Scenario: Observability lint regression fails CI
 
-- **WHEN** a pushed file imports the Evennia logger directly or swallows an
-  exception without re-raise, facade log, or reasoned exemption
+- **WHEN** a pushed file imports the Evennia logger directly, or a facade
+  adopter file swallows an exception without re-raise, facade log, or
+  reasoned exemption
 - **THEN** the continuous-integration job fails at the observability lint step
 
 #### Scenario: Package and repository tests execute once

@@ -32,7 +32,10 @@ reported as violations, never skipped.
 
 ### Requirement: Exception handlers must re-raise, log, or carry a reasoned exemption
 
-R2 SHALL require every `except` body to contain, anywhere in its AST
+R2 SHALL apply to scanned files that import `world.observability` (module or
+named API import — a "facade adopter"), including frozen adopters. In every
+adopter file R2 SHALL require every `except` body to contain, anywhere in
+its AST
 subtree (recursively, excluding nested function/lambda definitions), a
 `raise` (bare re-raise, a new raise, or `raise ... from`), or a facade log
 call — or to carry an exemption comment
@@ -44,9 +47,23 @@ the three SHALL be a violation.
 
 #### Scenario: A bare swallowed exception fails the gate
 
-- **WHEN** a scanned file contains `except Exception:` whose body is only
-  `pass`
+- **WHEN** a scanned non-frozen facade-adopter file contains
+  `except Exception:` whose body is only `pass`
 - **THEN** the check reports an R2 violation at that handler
+
+#### Scenario: Legacy non-adopter files are outside R2 during the ratchet
+
+- **WHEN** a scanned file neither imports the facade nor is frozen and
+  contains a silent `except: pass`
+- **THEN** the check reports no violation for that handler (its logging debt
+  is drained when its migration batch adopts the facade)
+
+#### Scenario: A frozen file that adopts the facade is still held to R2/R3
+
+- **WHEN** a frozen file (R1-debt inventory) also imports the facade and
+  contains a silent handler and a contextless facade call
+- **THEN** the check reports R2 and R3 violations despite the freeze entry
+  (freeze suppresses R1 only)
 
 #### Scenario: A raise nested in a with-block satisfies R2
 
@@ -77,18 +94,27 @@ the call line (trailing comment or the immediately preceding line).
 
 ### Requirement: The freeze list is a shrink-only transition ratchet
 
-The gate SHALL read `tools/observability_freeze.json`; files named there are
-exempt while unmigrated. The list SHALL only shrink: an entry naming a file
-that no longer exists, or that no longer has any violation, SHALL itself be
-reported as a violation. The final migration batch SHALL drive the list to
-empty.
+The gate SHALL read `tools/observability_freeze.json`, seeded at gate landing
+with exactly the generated set of production files carrying Evennia-logger
+import debt (the R1 inventory). A frozen entry suppresses R1 for that file
+only; R2/R3 continue to apply whenever the file imports the facade. The list
+SHALL only shrink: an entry naming a file that no longer exists, or that no
+longer has any R1 violation, SHALL itself be reported as a violation. The
+final migration batch SHALL drive the list to empty.
 
 #### Scenario: A zombie freeze entry fails the gate
 
-- **WHEN** a frozen file has been migrated and no longer violates any rule
+- **WHEN** a frozen file has been migrated and no longer has R1 import debt
   but remains listed
 - **THEN** the check reports a freeze-list violation for the stale entry and
   exits non-zero
+
+#### Scenario: The seeded freeze equals the generated R1 inventory
+
+- **WHEN** the committed freeze manifest is compared against a fresh scan at
+  gate landing
+- **THEN** it equals the generated R1-debt file set exactly, with no
+  duplicates and no non-existent paths
 
 #### Scenario: Migrated files must be removed from the list to pass
 
