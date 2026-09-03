@@ -166,3 +166,31 @@ byte-identical。
 - 玩家稱號系統任何改動。
 - NPC 稱號的 runtime 變更、多語言、顏色/markup。
 - 命名池/自動取名（已明確拒絕）。
+
+## 10. 提案拆解與實作批次順序（2026-09-03 提案落地）
+
+設計以三個 OpenSpec change 交付（`openspec/changes/`），每件單人一個工作日內：
+
+| # | Change | 範圍 | 主要落點 |
+|---|---|---|---|
+| 1 | `npc-title-identity-core` | 驗證器＋`NPC.npc_title`＋組合器＋opt-in 顯示路由（房間列／看標題／探索面板）＋緊湊列純姓名釘樁＋prompt `title` 欄位＋生產者清單迴歸案 | `world/rules/npc_identity.py`、`typeclasses/npcs.py`、`typeclasses/objects.py`、`web/webclient/presentation/exploration.py` |
+| 2 | `npc-title-import-pipeline` | `CHARACTER_SCHEMA_V1` 必填 `title`、loader 落庫、姓名對既有 NPC 唯一 gate、範例卡＋GM 文件、匯入邊界事件 | `world/imports/`、`docs/gm/characters.md` |
+| 3 | `npc-title-authored-identities` | blueprint `npc_req` 必填 `display_name`＋`title`（姓名成為 spawn `key`）、`SHOP_REGISTRY`／`GUILD_BRANCH_REGISTRY`／`GUILD_RANK_REGISTRY` 作者身分＋載入 fail-closed、guild host／考官生成、legacy host 一次性 cleanup、批次收尾的 main-spec 整合 sync | `world/quests/`、`world/ai/`、`world/lore/{shops,guild}.py`、`world/rules/{npc_identity,guild_economy,guild_exams}.py` |
+
+**依賴與批次順序**：
+
+- **Batch A**：change 1 先行——它定義 `validate_npc_title`、`NPC.npc_title`、組合器，並建立
+  capability `npc-identity-titles`；2 與 3 都匯入它的產物。
+- **Batch B**：changes 2 與 3 並行——檔案零交集（2 只動 `world/imports/`；3 對
+  `npc_identity.py` 僅檔尾 append `validate_npc_name`）。
+- **main-spec 整合**：`openspec/specs/npc-identity-titles/spec.md` 只有單一寫入者＝批次最後
+  落地者（建議順序下為 change 3），單次依序 sync 三件 delta、一次取 canonical ID、統一掛
+  `covers_requirement`；各 change 單獨歸檔時才自行 sync。
+- 進行中的 namegen 系列 change（`npc-namegen-lore-registry` 等）與本三件檔案零交集、無契約
+  相依。
+
+**Rubber-duck 複審（一次、全部 artifacts 完成後）已折入**：(a) onboarding 南門守衛刻意豁免
+（註定隨新手教學移除，見 change 3 design D7a）＋生產者清單迴歸案釘死清單；(b) import schema
+移除 raw `maxLength`，驗證器為唯一長度真相；(c) blueprint 姓名唯一性收緊為整份 blueprint
+無例外；(d) host 稱號 backfill 改為一次性 legacy cleanup（無 runtime 寫入後門）；(e) sync 時序
+改為批次單一寫入者契約。

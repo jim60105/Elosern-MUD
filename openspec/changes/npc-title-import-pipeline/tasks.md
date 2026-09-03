@@ -1,6 +1,6 @@
 # npc-title-import-pipeline — Tasks
 
-**前置**：`npc-title-identity-core` 必須先落地（`world/rules/npc_identity.py` 的 `validate_npc_title`／`MAX_NPC_TITLE_CODE_POINTS` 與 `NPC.npc_title` 都由它提供），且其 delta 已 sync 進 `openspec/specs/npc-identity-titles/spec.md`。在那之前本 change 不可開工。
+**前置**：`npc-title-identity-core` 必須先落地（`world/rules/npc_identity.py` 的 `validate_npc_title`／`MAX_NPC_TITLE_CODE_POINTS` 與 `NPC.npc_title` 都由它提供）。在那之前本 change 不可開工。主規格的 sync 採批次整合契約（見第 6 組 6.2），本 change 的開工不以 sync 為前置。
 
 實作順序即分組順序：schema ＋語意檢查 → 參考卡與文件（讓既有測試回綠）→ loader 落庫 → 重名 gate → 觀測性 → 收尾。每組做完先跑該組 focused 測試再勾選；全程不跑 CI shard 指令、不跑格式化／lint 工具（觀測性 lint 除外，它是 gate 不是格式化工具）。
 
@@ -53,8 +53,8 @@
 ## 6. 登記、可追溯性與收尾
 
 - [ ] 6.1 `.github/evennia-shards.json` 不需改動（本 change 不新增測試模組，全部加進既有模組）。以 `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract` 確認契約仍綠。
-- [ ] 6.2 依 `.agents/skills/openspec-sync-specs` 把本 change 的 delta 同步進 `openspec/specs/npc-identity-titles/spec.md`（該主規格由 `npc-title-identity-core` 先建立；本 change 只追加自己的 requirement，不改寫既有段落），再以 `uv run --locked python -m tools.spec_traceability list` 取 canonical requirement ID——ID 一律以工具輸出為準，不手工拼。
-- [ ] 6.3 掛 `covers_requirement` 標註（參數必須是字面值 ID，`from tools.spec_traceability import covers_requirement`）：必填 `title` 欄位契約→1.5／1.6；loader 落庫與非 NPC 規則→3.2；既有 NPC 重名 gate→4.3／4.4；CLI 檔案作用域→4.6；參考卡與 GM 文件→2.6；邊界事件→5.2；既有匯入契約不變→3.3。跑 `uv run --locked python -m tools.spec_traceability check` 至零錯誤、本 change 的七條 requirement 全覆蓋。
+- [ ] 6.2 **批次整合契約**（與 change 1 的 6.2 同文）：`openspec/specs/npc-identity-titles/spec.md` 只有單一寫入者——批次最後落地的那個 change（建議順序下為 `npc-title-authored-identities`），由它依序 sync 三件 delta（core → import → authored）。三件一起走時本 change **不自行 sync、不掛 covers_requirement、不跑覆蓋 check**；僅當本 change 在批次之外單獨實作／歸檔時，才依 `.agents/skills/openspec-sync-specs` 追加自己的 requirement 並以 `uv run --locked python -m tools.spec_traceability list` 取 canonical ID（ID 一律以工具輸出為準，不手工拼）後執行 6.3。
+- [ ] 6.3 掛 `covers_requirement` 標註（參數必須是字面值 ID，`from tools.spec_traceability import covers_requirement`；僅單獨執行時）：必填 `title` 欄位契約→1.5／1.6；loader 落庫與非 NPC 規則→3.2；既有 NPC 重名 gate→4.3／4.4；CLI 檔案作用域→4.6；參考卡與 GM 文件→2.6；邊界事件→5.2；既有匯入契約不變→3.3。跑 `uv run --locked python -m tools.spec_traceability check` 至零錯誤、本 change 的七條 requirement 全覆蓋。
 - [ ] 6.4 消極檢查：`docs/game/commands.md`／`docs/game/command-reference.md` 零改動（無命令面變更），`tests/test_command_docs.py` 綠；未觸及 `world/rules/npc_identity.py`（前置 change 的檔案）、`typeclasses/`、`web/`；未觸及 `world/lore/names.py`／`world/rules/namegen.py`（namegen 系列 change 的檔案）；未新增任何相容層、`schema_version` 分支或遷移程式碼。
 - [ ] 6.5 `openspec validate npc-title-import-pipeline --strict` 與 `openspec validate --all --strict` 皆通過；`git diff --check` 乾淨。
 - [ ] 6.6 終局驗證一次：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --noinput --parallel 16 world.imports world.quests world.skills world.rules typeclasses`（涵蓋匯入本體，加上會呼叫 `instantiate_character` 的相鄰套件）。

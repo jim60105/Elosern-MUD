@@ -28,22 +28,23 @@ existing adult-invariant revalidation does.
 - **THEN** `db.display_name` still carries the same authored value for the art-subject consumer
 
 ### Requirement: The blueprint author face enforces occupant name uniqueness
-Within one stage, two `npc_req` entries SHALL NOT declare the same `display_name`. Across stages
-of one blueprint, the same `display_name` SHALL be allowed only when the entries denote the same
-authored character — identical `title` and identical remaining characterization — mirroring the
-existing shared-`stable_key` agreement rule and sharing its identity-tuple comparison.
+Any two `npc_req` entries within one blueprint — in the same stage or across stages — SHALL NOT
+declare the same `display_name`. Because the authored name becomes the spawned occupant's `key`
+and each quest materialization spawns fresh occupants with no cross-stage identity reuse, even an
+identical-characterization duplicate could live as two same-`key` entities, so the name rule is
+blueprint-wide uniqueness, stricter than the existing shared-`stable_key` agreement rule it is
+implemented alongside.
 
 #### Scenario: Same-stage duplicate names are rejected
 - **WHEN** one stage declares two `npc_req` entries whose `display_name` values are identical
 - **THEN** the blueprint is rejected before compilation with a named diagnostic
 
-#### Scenario: The same character may reappear across stages
-- **WHEN** two stages declare the same `display_name` with identical title and characterization
-- **THEN** the blueprint validates
-
-#### Scenario: Same name with different characterization is rejected
-- **WHEN** two stages declare the same `display_name` with different titles or ages
-- **THEN** the blueprint is rejected before compilation
+#### Scenario: Cross-stage duplicate names are rejected
+- **WHEN** two stages of one blueprint declare the same `display_name`, even with identical title
+  and characterization
+- **THEN** the blueprint is rejected before compilation — the authored name is unique across the
+  whole blueprint; shared portrait identity remains the mechanism for one character appearing in
+  multiple scenes
 
 ### Requirement: Shop and guild registries author host and examiner identities validated at load
 `ShopDefinition` and `GuildBranch` SHALL each carry required `host_name` and `host_title` fields,
@@ -73,9 +74,10 @@ without mutating the shipped registries.
 `sync_guild_economy` SHALL locate a service host by the `service_id` recorded on its service
 component — never by display `key`. A missing host SHALL be created once under the registry's
 authored `host_name` as its `key` with the authored `host_title` persisted as its NPC title. An
-existing host SHALL never be renamed, even if the registry name later changes; its title SHALL be
-backfilled only while its stored title is empty, preserving the creation-time immutability of a
-title that was already assigned.
+existing host located by its service anchor SHALL never be renamed and SHALL never have its title
+written at sync time — a host that predates authored identities is stale development state the
+unreleased project discards rather than backfills at runtime: the batch's one-time cleanup task
+deletes legacy-keyed hosts so the next sync recreates them under the full authored identity.
 
 #### Scenario: First sync creates the authored host
 - **WHEN** `sync_guild_economy` runs with no existing host for a service component
@@ -87,10 +89,10 @@ title that was already assigned.
   registry `host_name`
 - **THEN** the same NPC is reused, no second host exists, and its `key` is unchanged
 
-#### Scenario: A titleless host is backfilled once
-- **WHEN** a pre-existing host whose title is empty is found by its service anchor
-- **THEN** the registry title is written exactly once and a non-empty stored title is never
-  overwritten
+#### Scenario: A legacy titleless host is discarded, not backfilled
+- **WHEN** a pre-existing host located by its service anchor carries no authored title
+- **THEN** the sync never writes a title into it; the one-time legacy-host cleanup removes it so
+  the next sync recreates it under the full authored identity
 
 ### Requirement: Exam examiners carry their authored identity
 The examination opponent spawn SHALL use the rank's authored `examiner_name` and SHALL persist the

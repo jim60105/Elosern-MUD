@@ -117,11 +117,23 @@ def _sync_service_host(service_id, name, title, room, component_specs) -> NPC:
 
 設計 §5 說「沿用既有 key 冪等重用邏輯：既存 host 不改名」，§3.2 說「guild host／examiner 走 registry 固定 key，天然冪等」。這裡的「固定 key」指的是 **registry 的固定識別碼**（`service_id`／`shop_key`），不是 NPC 的顯示 `key`——一旦 NPC 的 `key` 變成作者姓名，再用 `db_key` 當重用錨就會在下次啟動找不到自己造的 host、每次啟動多生一隻。因此重用錨改為元件上的 `service_id`（元件 `DBField`，與作者姓名完全脫鉤）。
 
-三條性質因此同時成立：(1) 重複啟動不產生第二隻 host；(2) 既存 host **永不改名**（找到就沿用，即使 registry 的 `host_name` 後來被改）；(3) 稱號只在既存 host 的稱號為空時補寫，非空時不覆寫——這維持 change 1 的「稱號建立後不可變」（補空是把未設定的欄位設定起來，不是改寫已賦值的稱號），也維持該函式既有的「找到就把缺的補齊」語義（它今天就會補 location／race／成年身分／缺少的元件）。
+三條性質因此同時成立：(1) 重複啟動不產生第二隻 host；(2) 既存 host **永不改名**（找到就沿用，即使 registry 的 `host_name` 後來被改）；(3) sync **永不補寫稱號**（rubber-duck 複審後收緊：runtime 往既存實體寫稱號就是「建立後可變」的第一個後門，且它實質是遷移行為，抵觸「無相容層、無遷移」）。前功能時代的 ASCII-key host 是髒開發狀態：本 change 以一個**一次性 cleanup**（刪除 `altoria_guild_master`／`altoria_merchant` 舊 key host；由啟動同步或明確的 dev 指令執行一次）把它們丟掉，下一次同步即以完整作者身分重建——這是未發布專案的 clean cutover，不是遷移。既有「找到就把缺的補齊」語義維持用於 location／race／成年身分／元件（非稱號欄位）。
 
 掃描成本：一次 `NPC.objects.all_family()` 走訪，與同檔既有的 `_initialize_merchant_stock` 同形，且只在啟動同步時各跑一次。
 
 替代方案：(a) 直接以作者姓名當 `db_key` 查覆——被否決：registry 改名即產生孤兒 host ＋ 第二隻 host。(b) 保留 `db_key=service_id` 當 key、把姓名塞進別的欄位——被否決：顯示層讀 `key`，公會長會繼續叫 `altoria_guild_master`。
+
+### D7a. 生產路徑清單與 onboarding guard 豁免（rubber-duck BLOCKER 處置）
+
+非測試生產碼的全部 `create_object(NPC, ...)` 落點（全 repo 驗證）：
+
+1. `world/imports/loader.py` — change 2。
+2. `world/quests/scene_builder.py`（經 `_spawn_occupants`）— 本 change。
+3. `world/rules/guild_economy.py`（兩隻 host）— 本 change。
+4. `world/rules/guild_exams.py`（考官）— 本 change。
+5. `world/rules/onboarding.py::sync_guard_npc`（`GUARD_NPC_KEY = "南門守衛"`）— **刻意豁免**。該守衛是新手教學的一部分，使用者已決定整體移除 onboarding 教學；為註定刪除的 NPC 設計 registry 條目與載入驗證違反「不留將死之抽象」，且 AGENTS.md 明文「deliberate skip is preferable to a fake implementation」。豁免的範圍與失效條件寫進本 change 的 proposal／specs 敘述，讓不變式缺口保持可見；移除 onboarding 的那個 change 落地時豁免自然消失。在此之前，該守衛是唯一一具以退化狀態（純姓名）呈現的生產 NPC。
+
+測試端 `create_object(NPC, ...)` 不納入不變式（見 change 1 對 default `""` 的 storage-default 定性）；change 1 收尾的生產者清單審查確保清單與程式碼同步。
 
 ### D8. 考官：建立點是 `_spawn_opponent`（設計文字校正），去衝突後綴改為條件式
 
@@ -169,7 +181,7 @@ log_info("guild_exam_opponent_created", context={"char": opponent.key, "rank": t
 - **既有測試大面積轉紅**（`npc_req` 字面 dict 缺欄、斷言場景 NPC key 為「XX的YY」、斷言考官 key 為 `guild-examiner-*`）→ 這是必填欄位與改名的必然結果，不是缺陷；tasks 逐檔列出已知落點，實作時先搜尋再補。
 - **blueprint 姓名與 registry 姓名的跨面碰撞未檢查**（D4 延後項）→ 已知缺口：作者若把場景佔用者取名成與公會長相同，世界上會出現兩隻同 `key` 的 NPC（不同房間，指令目標解析各自在自己的房間內進行，戰場 roster 也是房間內組成，因此**不會**觸發 F08 類碰撞）。影響限於敘事一致性，且兩個作者面都是人工編輯的少量資料。留給後續 change，或在本 change 若提早完成時追加。
 - **（已消除）跨 stage 同名佔用者同時存活** → D4 收緊為整份 blueprint 姓名唯一後，此風險在作者面即被拒絕。
-- **既有開發資料庫裡的 host 不會改名** → D7 的刻意行為（設計明文）。那隻 host 會繼續叫 `altoria_guild_master`；稱號則會在下次啟動同步時補上。要看到作者姓名需要重建資料庫，tasks 註明。
+- **既有開發資料庫裡的 legacy host** → D7：一次性 cleanup 刪除舊 key host，下次同步以作者身分重建；不寫入任何 runtime 補稱號路徑。既有資料庫不需要重建，重啟即完成切換。
 - **玩家的指令目標字串改變** → 場景佔用者從「攻擊 盜匪」變成「攻擊 黑鬍」，考官從 `guild-examiner-F-12` 變成人名。這正是本功能的目的（設計 §4.5 保證指令仍只匹配純 `key`，玩家永遠不必打稱號）；`docs/game/` 的命令文件不受影響（無命令面變更）。
 - **`characterization.py` 的純度契約被修訂** → D3 已說明理由與環風險核算；實作時同批更新該模組 docstring，避免下一位讀者以為是違規。
 - **一天預算** → 若超時，優先保住 registry 面（第 2／3 組：兩隻 host 與七位考官，玩家每一局都會遇到），把 blueprint 面（第 4／5 組）獨立成後續 change 並在 tasks 記錄；兩者之間沒有程式碼相依。

@@ -32,13 +32,18 @@
 - [ ] 3.1 `world/rules/guild_economy.py::_sync_service_host` 改為 design D7 形狀：以元件
   `service_id` 錨找既有 host（`_host_by_service_id`，走 NPC family 掃描，與
   `_initialize_merchant_stock` 同形）；缺則 `create_object(NPC, key=validate_npc_name(host_name))`
-  ＋ `host.npc_title = validate_npc_title(host_title)`；既存永不改名、稱號僅空值補寫；其餘
+  ＋ `host.npc_title = validate_npc_title(host_title)`；既存永不改名、**永不補寫稱號**
+  （runtime 寫稱號即違反不可變契約，design D7 第 3 條）；其餘
   既有更新語義（location／race／成年身分／補元件）原封不動。
+- [ ] 3.1b 一次性 legacy cleanup：刪除前功能時代以 `altoria_guild_master`／`altoria_merchant`
+  為 `key` 且無稱號的 host（下一次同步即以完整作者身分重建）。放在啟動同步的一次性分支或明確的
+  dev-only cleanup 指令，不新增任何持續運行的遷移路徑（未發布、零使用者、clean cutover）。
 - [ ] 3.2 呼叫端（shop host 與 guild-branch host 兩條同步線）從 `SHOP_REGISTRY.host_name/host_title`
   與 `GuildBranch.host_name/host_title` 供給參數；`log_info("guild_service_host_created", ...)`
   僅實際建立時發（context：`char`、`shop`、`service`；design D10）。
 - [ ] 3.3 `world/rules/tests/test_guild_config.py`／`test_guild_economy_sync.py`：首建帶作者姓名＋稱號、
-  re-sync 不重複不改名（模擬 registry 改名）、空稱號補寫一次、非空不覆寫、建立事件僅一次
+  re-sync 不重複不改名（模擬 registry 改名）、**稱號永不被 sync 改寫**（對既存無稱號 host
+  斷言 sync 後仍為空）、建立事件僅一次、legacy cleanup 刪除舊 host 且下次同步重建完整身分
   （patch `world.rules.guild_economy.log_info`）。
   Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_guild_economy_sync`
 
@@ -57,9 +62,8 @@
 - [ ] 5.1 `world/quests/characterization.py`：`display_name` 必填、新增 `title` 必填（結構層維持
   `str | None`，必填由本驗證器執行，design D5）；規則以函式內延遲匯入委派
   `validate_npc_name`／`validate_npc_title`（design D3），`MAX_DISPLAY_NAME_LENGTH` 常數來源改指
-  `MAX_NPC_NAME_CODE_POINTS`；同 stage `display_name` 唯一、跨 stage 同名須 identity tuple
-  （title＋其餘 characterization）全同（`duplicate_display_name_errors`，與
-  `duplicate_stable_key_errors` 共用比較，design D4）；同批修訂模組 docstring 的純度契約。
+  `MAX_NPC_NAME_CODE_POINTS`；`duplicate_display_name_errors` 對**整份 blueprint 的所有
+  `npc_req`** 檢查姓名唯一（同 stage 與跨 stage 皆拒，design D4）；同批修訂模組 docstring 的純度契約。
 - [ ] 5.2 `world/quests/compile.py`：`StageNpcCharacterization.title`、canonical digest 帶 `title`、
   `_characterization_from_payload` 對缺 `title` 的 payload 具名 `QuestCompileError`（design D5/Risks）。
 - [ ] 5.3 `world/quests/scene_builder.py`：`_spawn_npc` 的 prototype `key` 改用作者 `display_name`
@@ -73,7 +77,8 @@
 - [ ] 5.6 `world/quests/tests/test_characterization.py`／`test_compile_blueprint.py`／
   `test_scene_builder.py`／`test_generated_quest_store.py` 與
   `world/ai/tests/test_scenario_director_validation.py`／`test_scenario_director_proposals.py`：
-  缺欄拒（兩層同決策）、stage 內重名拒、跨 stage 同角允／異角拒、digest 因 title 分異、
+  缺欄拒（兩層同決策）、同 stage 與跨 stage 重名皆拒（含 characterization 全同的反向案）、
+  digest 因 title 分異、
   還原缺 `title` 具名失敗、spawn `key`＋`npc_title` 落庫、偽造 requirement 缺欄回滾零殘留。
   Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.quests world.ai`
 
@@ -81,10 +86,14 @@
 
 - [ ] 6.1 `openspec validate npc-title-authored-identities --strict` 通過；
   `openspec validate --all --strict` 僅剩既有 namegen 空殼的兩筆失敗。
-- [ ] 6.2 實作落地後依序 sync 三個前置／本 change 的 delta 進 `openspec/specs/`（順序：
-  npc-title-identity-core → 本 change），以
-  `uv run --locked python -m tools.spec_traceability list` 取 canonical ID，
-  將本 change requirement 的 `covers_requirement` 標記掛到第 2–5 組的錨定測試上。
+- [ ] 6.2 **批次收尾整合**（三份提案約定的唯一 main-spec 寫入點，見 change 1／2 tasks 6.2）：
+  本 change 為批次最後落地者時，依序把三件 delta 單次 sync 進
+  `openspec/specs/npc-identity-titles/spec.md`（順序：`npc-title-identity-core` →
+  `npc-title-import-pipeline` → 本 change，用 `.agents/skills/openspec-sync-specs`），
+  然後以 `uv run --locked python -m tools.spec_traceability list` **一次**取 canonical ID，
+  依 change 1／2／3 各自 tasks 6.3 的錨定映射，把全部 `covers_requirement` 標註一次掛齊，
+  跑 `uv run --locked python -m tools.spec_traceability check` 至零錯誤、全 capability 覆蓋。
+  若本 change 反而先落地：等待前置批次整合完成，只在單獨歸檔場景才自行 sync。
 - [ ] 6.3 確認 `.github/evennia-shards.json` 不需變動（本 change 不新增測試模組）；
   `git diff --check` 乾淨。
 
@@ -92,5 +101,7 @@
 
 - blueprint 姓名對三份 registry 作者姓名的跨面碰撞檢查、以及對資料庫既有 NPC 的查覆
   （design D4 已知缺口）。
+- `world/rules/onboarding.py::sync_guard_npc` 的守衛補名／補稱號——**刻意豁免**：該守衛屬於即將
+  整體移除的新手教學，為註定刪除的 NPC 造 registry 是死抽象（design D7a）。守衛在過渡期以純姓名
+  呈現；移除 onboarding 的 change 落地時豁免自然消失。
 - LLM 系統訊息模板（`prompts/npc_dialogue.yaml`）加 `{title}` 佔位符（由 change 1 的後續承接）。
-- 既有開發資料庫舊 host 的改名（設計明文：既存 host 永不改名；要看到作者姓名請重建資料庫）。

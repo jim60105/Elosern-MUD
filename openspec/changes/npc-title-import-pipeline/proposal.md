@@ -6,7 +6,7 @@
 
 ## What Changes
 
-- `CHARACTER_SCHEMA_V1`（`world/imports/schema.py`）新增**必填** `title`：`{"type": "string", "minLength": 1, "maxLength": MAX_NPC_TITLE_CODE_POINTS}`，上界常量直接從 `world.rules.npc_identity` 匯入（沿用 `key` 從 `world/art/subjects.py` 取常量的既有慣例）。字元集規則（空白／控制字元／`|`）**不**在 schema 複製一份 regex，由語意層唯一驗證器 `validate_npc_title` 執行。**BREAKING**（對現有角色卡）：直接改 v1，無相容層、無遷移、無 `schema_version` 2（未發布、零使用者）。
+- `CHARACTER_SCHEMA_V1`（`world/imports/schema.py`）新增**必填** `title`：`{"type": "string", "minLength": 1}` ＋ 英文 description（文字提及 strip 後上界與 `validate_npc_title`）。**不**加 `maxLength`：raw 長度檢查檢查未 strip 的原字串、驗證器檢查 strip 後的形，兩者對 `" " * 40 + "衛"` 會給相反決定，等於把「單一驗證器」契約劈成兩半（rubber-duck 複審 findings）。字元集規則（空白／控制字元／`|`）同樣**不**在 schema 複製 regex，長度與字元集一律由語意層唯一驗證器 `validate_npc_title` 執行。**BREAKING**（對現有角色卡）：直接改 v1，無相容層、無遷移、無 `schema_version` 2（未發布、零使用者）。
 - `world/imports/validate.py` 新增語意檢查 `_check_npc_title`：把 `validate_npc_title` 的例外轉成 record 級 `Issue("title", ...)`，訊息為穩定英文 identifier，與既有 `Issue` 診斷同形；`validate.py` 不新增任何 DB 存取，離線 CLI 維持純檔案檢查。
 - `world/imports/loader.py::_instantiate_validated_character` 在驗證後寫 `entity.npc_title = validate_npc_title(record["title"])`（fail-closed 的第二道，且回傳的是 strip 後的正規形）。**只在 `isinstance(entity, NPC)` 時寫**：`npc_title` 是 `NPC` 上的 `AttributeProperty`，寫到 `PlayerCharacter` 上只會產生一個重載即消失的普通實例屬性（靜默資料遺失）。
 - 姓名全世界唯一（設計 §3.2 不變式 2 的 import 面）：批次內重複 `key` 既有檢查不動（`_flag_duplicate_keys`），新增**對既有 DB NPC 的重名檢查**，落點在 `loader.py`（不在 `validate.py`）。命中即整批拒絕、零實體落庫，診斷掛在該筆 record 上（`ImportRejected.report` 與既有 `render_report` 形狀不變）。
@@ -33,6 +33,6 @@
 - 測試觸面（全部加進既有模組，**不新增測試檔** → `.github/evennia-shards.json` 不動）：`world/imports/tests/test_schema.py`、`test_validation_semantics.py`、`test_loader_trait_values.py`、`test_batch_all_or_nothing.py`、`test_reference_example.py`。
 - 連帶修正：任何**不經** `world/imports/tests/helpers.py::example_record()` 而以字面 dict 組角色卡的既有測試會因必填 `title` 轉紅，需補欄（實作第一步即全 repo 搜尋確認；目前已知的匯入測試全部走 `example_record()`，其他套件的 `instantiate_character` 呼叫端亦然）。
 - 觀測性：`world/imports/loader.py` 成為 facade adopter（該檔無 `except` 區塊，R2 零影響）；`tools/observability_freeze.json` 為空清單、不動。
-- 依賴：**嚴格前置 `npc-title-identity-core`**。本 change 匯入的 `validate_npc_title`／`MAX_NPC_TITLE_CODE_POINTS` 與寫入的 `NPC.npc_title` 都由它定義；主規格 capability `npc-identity-titles` 也必須先由它 sync 進 `openspec/specs/`，本 change 的 `covers_requirement` 標註才有 canonical ID 可取。
+- 依賴：**嚴格前置 `npc-title-identity-core`**。本 change 匯入的 `validate_npc_title`／`MAX_NPC_TITLE_CODE_POINTS` 與寫入的 `NPC.npc_title` 都由它定義。主規格 capability 的 sync 採**批次整合契約**：三件一起走時由批次最後落地者（建議順序下為 authored change）單次依序 sync 三件 delta；本 change 只在單獨實作／歸檔時才自行 sync 後取 canonical ID（詳 tasks 6.2）。
 - 與 change 3（blueprint `npc_req`、`SHOP_REGISTRY`／`GUILD_RANK_REGISTRY` 作者供給）**檔案零交集**：本 change 只動 `world/imports/`；change 3 動 `world/ai/director_templates.py`、`world/quests/`、`world/rules/guild_economy.py`／`guild_exams.py`。兩者只在同一份 delta spec 檔上相鄰（各自追加 requirement 區塊）。
 - 與進行中的 namegen 系列（`world/lore/names.py`、`world/rules/namegen.py`、creation UI）檔案零交集：本 change 不規定姓名從何而來，只規定作者供給的姓名進 DB 前必須唯一。
