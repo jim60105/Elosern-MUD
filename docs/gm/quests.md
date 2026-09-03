@@ -15,7 +15,7 @@
 | `ESCORT` | `RoomLocator` 目的地 | 護衛對象與玩家抵達目標房間。 |
 | `ACQUIRE` | 已登錄的 `item_key` | 受確定性背包計畫加入該物品。 |
 
-`RoomLocator` 可指向 `ANCHOR`、`GRID` 或 `BOUND_INSTANCE`。錨點使用已存在的 `anchor_key`；網格地點使用 `(x, y, z)`，其中 `z` 必須是已登錄的地圖鍵；綁定實例地點不攜帶靜態座標，必須在接取後由受控執行期繫結。現有任務目標不能指向普通 `Room`，因為它不會回報任務到達事件。
+`RoomLocator` 可指向 `ANCHOR`、`GRID` 或 `BOUND_INSTANCE`。錨點使用已存在的 `anchor_key`；網格地點使用 `(x, y, z)`，其中 `z` 必須是已登錄的地圖鍵；綁定執行個體地點不攜帶靜態座標，必須在接取後由受控執行期繫結。現有任務目標不能指向普通 `Room`，因為它不會回報任務到達事件。
 
 ## 定義一個任務
 
@@ -53,7 +53,7 @@ QUEST_CATALOG = (INTRODUCTORY_HUNT, ROADSIDE_CLEARANCE)
 
 `DEFEAT` 目標不得同時使用 `monster_tier` 與 `requires_bound_targets`。`REACH` 與 `ESCORT` 不能附帶擊敗選擇器。`ACQUIRE` 只能引用 `world/lore/items.py` 的物品鍵，不能同時提供目的地或擊敗選擇器。任務驗證會拒絕未知魔物階級、物品鍵、錨點與網格地圖鍵。
 
-若任務包含綁定實例房間、指定目標或受保護護衛對象，請使用 `world/quests/binding.py` 的受控 API 與對應整合測試。不要自行把資料庫參照寫入 `quest_log`。這類任務需要房間、實體與任務紀錄在同一交易中完成繫結。
+若任務包含綁定執行個體房間、指定目標或受保護護衛對象，請使用 `world/quests/binding.py` 的受控 API 與對應整合測試。不要自行把資料庫參照寫入 `quest_log`。這類任務需要房間、實體與任務紀錄在同一交易中完成繫結。
 
 ## 設定公會任務板與報酬
 

@@ -73,7 +73,7 @@ ItemDefinition(
 ),
 ```
 
-`EquipmentModifierKey` 是封閉列舉：成員名是物品 key 的大寫、值就是物品 key 本身，且每個成員必須恰好綁定一個 `effects` 條目。所以新裝備要同时在三個地方對齊：列舉成員、registry 條目、`equipment_effects.yaml` 條目，少一邊載入即爆。
+`EquipmentModifierKey` 是封閉列舉：成員名是物品 key 的大寫、值就是物品 key 本身，且每個成員必須恰好綁定一個 `effects` 條目。所以新裝備要同時在三個地方對齊：列舉成員、registry 條目、`equipment_effects.yaml` 條目，少一邊載入即爆。
 
 構造時會被拒絕的寫法（全部在 `__post_init__` 攔下）：
 
@@ -201,9 +201,9 @@ uv run --locked python -m tools.spec_traceability check
 
 | 錯誤 | 後果 |
 |---|---|
-| 把治療量、價格寫進 `ItemDefinition` | 違反「身份與數值分離」，consumer 端会開始複製常數；registry 驗證与規格稽核都会擋下 |
+| 把治療量、價格寫進 `ItemDefinition` | 違反「身份與數值分離」，consumer 端會開始複製常數；registry 驗證與規格稽核都會擋下 |
 | 用 `kind` 或名稱推測行為 | 行為只認 `use_mechanics`／`equipment_slot`，前端與規則都有對應測試釘住 |
-| 新 effect 只加 YAML 不扩 `ItemEffectKey`（或反之） | 載入器雙向封閉檢查直接失敗 |
+| 新 effect 只加 YAML 不擴 `ItemEffectKey`（或反之） | 載入器雙向封閉檢查直接失敗 |
 | 新裝備只加 registry 沒加 `equipment_effects.yaml` 條目（或反之） | `EquipmentEffectsRulebookError`，啟動即爆；`modifier_key` 三處對齊見 Step 2b |
 | 百分比欄寫成裸數字或平值欄寫成字串 | 數值種類由欄位決定，`agility` 以外不容許另一種形態；`bool` 也不算整數 |
 | 商店 `buy_copper` 超出價格帶 | `guild_config` 載入失敗，啟動即爆；注意 `sell_copper` 不受價格帶約束 |

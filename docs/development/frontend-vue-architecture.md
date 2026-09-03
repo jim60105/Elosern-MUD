@@ -8,7 +8,7 @@
 
 ## 背景脈絡：遷移過程必須保留的現狀限制
 
-Elosern 網頁客戶端由 Django 與 Evennia 範本組合 `web/templates/webclient/{base.html, webclient.html}` 提供服務。在 Vue 遷移完成後（C4 切換，並於 D1 定案），`base.html` 會載入 Evennia 提供的 `evennia.js` WebSocket 傳輸層、Vite 建置的 Vue 3 SPA 組合包（`web/static/webclient/app/dist/index.js`）、無相依套件的原生文字主控台（`js/text_console.js`，D10 離線備用機制），以及 `$(document).ready` 的 shim（`js/jquery_ready_shim.js`，提供 evennia.js 在啟動時所需的單一 jQuery 介面）。已停用的舊版 jQuery 與 GoldenLayout 檢視檔案及其無效 CSS 已在 D1 刪除。保留的獨立於 DOM 邏輯位於 `web/static/webclient/js/elosern/*`（協定 reducer、鍵盤路由器、敘事標記管線、指令回顯、局部地圖模型、抉擇點與選項卡邏輯、美術焦點）；Vue 應用程式透過 Vite 的 CommonJS 互通機制，經由 `webclient-app/lib/*` ESM 包裝器重新匯出這些邏輯。Vue 的 `AppShell` 掛載至 `#main-sub`；`#messagewindow` 則維持作為降級的文字備用方案。
+Elosern 網頁客戶端由 Django 與 Evennia 範本組合 `web/templates/webclient/{base.html, webclient.html}` 提供服務。在 Vue 遷移完成後（C4 切換，並於 D1 定案），`base.html` 會載入 Evennia 提供的 `evennia.js` WebSocket 傳輸層、Vite 建置的 Vue 3 SPA 組合包（`web/static/webclient/app/dist/index.js`）、無相依套件的原生文字主控台（`js/text_console.js`，D10 離線備用機制），以及 `$(document).ready` 的 shim（`js/jquery_ready_shim.js`，提供 evennia.js 在啟動時所需的單一 jQuery 介面）。已停用的舊版 jQuery 與 GoldenLayout 檢視檔案及其無效 CSS 已在 D1 刪除。保留的獨立於 DOM 邏輯位於 `web/static/webclient/js/elosern/*`（協定 reducer、鍵盤路由器、敘事標記管線、指令回顯、局部地圖模型、抉擇點與分頁標籤邏輯、美術焦點）；Vue 應用程式透過 Vite 的 CommonJS 互通機制，經由 `webclient-app/lib/*` ESM 包裝器重新匯出這些邏輯。Vue 的 `AppShell` 掛載至 `#main-sub`；`#messagewindow` 則維持作為降級的文字備用方案。
 
 - **離線不變量：** 頁面絕不為執行期 UI 相依套件發出遠端請求。每個執行期資產均由專案來源端提供服務。
 - **獨立於 DOM 的邏輯為單一事實來源。** `js/elosern/*` UMD 模組強制執行精確的 OOB 契約（鏡像對應 `web/webclient/presentation/protocol.py`），並由無相依套件的 `node --test web/static/webclient/js/tests/*.test.js` 閘門涵蓋。

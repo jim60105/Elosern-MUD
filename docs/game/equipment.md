@@ -117,4 +117,4 @@
 - 受洗聖水（120 銅，單次使用消耗品）會移除你身上所有負面狀態，走的是光明教會的淨化途徑。
 - 若角色的裝備記錄損毀，戰鬥與預覽會退回基礎值進行，並拒絕新的穿脫操作，直到記錄修復為止。
 
-延伸阅读：[裝備戰鬥效果設計規格](/superpowers/specs/2026-08-29-equipment-combat-effects-design)、[指令總覽](/game/commands)。
+延伸閱讀：[裝備戰鬥效果設計規格](/superpowers/specs/2026-08-29-equipment-combat-effects-design)、[指令總覽](/game/commands)。

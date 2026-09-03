@@ -677,8 +677,8 @@
   <div class="feed m-explore">
     <div class="feed-inner"><div class="head"><span>敘述</span><button class="more" data-openlog>完整日誌 ↑</button></div>
       <div class="log">
-        <p>晨霧貼著灰河的水面爬行，渡口的木栈浸在冷水裡，發出沉悶的咯吱聲。對岸停著一艘破舊渡船，船頭懸著一盏將熄的燈。</p>
-        <p>碼頭弓著背的老太——擺渡人<em>灰婆婆</em>——正用蒲扇趕著蚊蟲。你身後，商隊最後兩頭騾子不安地刨地，領队在霧裡朝你招手。</p>
+        <p>晨霧貼著灰河的水面爬行，渡口的木棧浸在冷水裡，發出沉悶的咯吱聲。對岸停著一艘破舊渡船，船頭懸著一盞將熄的燈。</p>
+        <p>碼頭弓著背的老太——擺渡人<em>灰婆婆</em>——正用蒲扇趕著蚊蟲。你身後，商隊最後兩頭騾子不安地刨地，領隊在霧裡朝你招手。</p>
         <p class="sys">渡口有 <em>1</em> 名可互動的人物，並察覺到 <em>1</em> 處可疑痕跡。</p>
       </div>
     </div>
@@ -895,7 +895,7 @@
       <button class="affbtn" data-act="explore.look:破渡船"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>查看船身</button>
     </div></div>
     <div class="pane" data-pane="interact:商隊"><div class="targethead">對 <b>商隊</b>：</div><div class="aff">
-      <button class="affbtn primary" data-act="explore.talk_scripted"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>問領队箱櫃</button>
+      <button class="affbtn primary" data-act="explore.talk_scripted"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>問領隊箱櫃</button>
       <button class="affbtn" data-dr="quest"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5h6v4H9zM5 9h14v10H5z"/></svg>相關任務</button>
     </div></div>
     <div class="pane" data-pane="interact:同伴"><div class="targethead">隊伍中的 <b>同伴</b>：</div><div class="aff">
@@ -1068,7 +1068,7 @@
       <div class="itgrid">
         <div class="it r-r" tabindex="0" data-tip="醫療藥水|消耗品|生命 +60|3 份"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3h4v4l3 9a3 3 0 0 1-3 4H10a3 3 0 0 1-3-4l3-9V3z"/></svg><span class="n">3</span></div>
         <div class="it r-l" tabindex="0" data-tip="煙霧彈|消耗品|施放後短時隱形|1 份"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/></svg><span class="n">1</span></div>
-        <div class="it r-u" tabindex="0" data-tip="皮箭|箭矢|基本远程|12 支"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20 20 4M20 4h-6M20 4v6"/></svg><span class="n">12</span></div>
+        <div class="it r-u" tabindex="0" data-tip="皮箭|箭矢|基本遠程|12 支"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20 20 4M20 4h-6M20 4v6"/></svg><span class="n">12</span></div>
         <div class="it r-c" tabindex="0" data-tip="燭|工具|照明"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 4h4v5M12 9v4M12 13l-3 3v4h6v-4l-3-3"/></svg><span class="n">2</span></div>
         <div class="it r-c"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 4h12v16H6z"/></svg></div><div class="it r-u"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/></svg></div><div class="it r-c"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="8" width="14" height="9" rx="1"/></svg></div><div class="it r-e"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 4 7l8 10 8-10-8-4Z"/></svg></div>
       </div>
@@ -1218,7 +1218,7 @@
         <text x="660" y="318" fill="#8d8370" font-size="11" text-anchor="middle" font-family="Noto Sans TC">碼頭</text>
         <text x="250" y="382" fill="#f2ecdf" font-size="12" text-anchor="middle" font-family="Noto Sans TC">渡口（你）</text>
       </svg>
-      <!-- 網格圖版面（覆蓋層尺度），渲染 layer=wilderness payload（Evennia Wilderness contrib）：點陣節距 60（1 座標格），現在節點＝原點置中、軸十字穿過（+y=北，配頁首「北↑ 東→」）；八向鄰格為 contrib 既有出口、照真實相對位置落點（NW 封鎖＝虛線）；径向暈影＝知識邊界。
+      <!-- 網格圖版面（覆蓋層尺度），渲染 layer=wilderness payload（Evennia Wilderness contrib）：點陣節距 60（1 座標格），現在節點＝原點置中、軸十字穿過（+y=北，配頁首「北↑ 東→」）；八向鄰格為 contrib 既有出口、照真實相對位置落點（NW 封鎖＝虛線）；徑向暈影＝知識邊界。
            超出可見範圍的已知地點（remembered，真實座標）依壓縮前 dx/dy 射線與安全邊界求交，落在畫布邊緣以菱形記憶標記＋淡色方向射線呈現——只指真實方向、不帶距離/角度數字：
            東部大平原・商都（東，grandia）、北關・石門城（北，altoria 門戶）、菌絲深窖・地下洞窟（西南）。此即使用者所求「荒野中連接兩座城市／地下洞窟，在座標軸地圖上以 marker 顯示其相對方向」。城市節點為 landmark（金環）、洞窟為記憶（ink 環）。 -->
       <svg class="lay-grid" viewBox="0 0 800 520" preserveAspectRatio="xMidYMid slice">
@@ -1311,7 +1311,7 @@
     </div>
     <div class="pane on" data-pane="help-general">
       <div class="hentry"><span class="hk">看</span><span class="ha">look / l / ls</span><div class="hd">觀察位置或活物。看活物額外顯示其當前戰鬥數值（攻/敏/防/魔階/生命）。</div></div>
-      <div class="hentry"><span class="hk">前往</span><span class="ha">goto / path</span><div class="hd">沿最短路徑自動移動；<code>path &lt;地點&gt;</code> 只看路不走；無參顯示当前路線。</div></div>
+      <div class="hentry"><span class="hk">前往</span><span class="ha">goto / path</span><div class="hd">沿最短路徑自動移動；<code>path &lt;地點&gt;</code> 只看路不走；無參顯示當前路線。</div></div>
       <div class="hentry"><span class="hk">說明</span><span class="ha">help / ?</span><div class="hd">無參顯示分類索引，支援 <code>主題/子主題/次主題…</code> 多層查詢。</div></div>
       <div class="hentry"><span class="hk">rest / sleep / wait</span><span class="ha">時間跳躍</span><div class="hd">活動戰鬥或同室有存活魔物時會被安全門拒絕。</div></div>
     </div>
@@ -1562,7 +1562,7 @@
     if(cat==='elemental'){ return n==='火風暴'||n==='癒春之泉'?'area': ['疾風突進'].indexOf(n)>=0?'self':'single'; }
     return 'single';
   }
-  function descFor(n){ return '（示例描述）'+n; }
+  function descFor(n){ return '（範例描述）'+n; }
   $$('#skcats .skcat').forEach(function(b){b.addEventListener('click',function(){renderSkill(b.dataset.cat);});});
 
   /* attack panes: token single-select */
