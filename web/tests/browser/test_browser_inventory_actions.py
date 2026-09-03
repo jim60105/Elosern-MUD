@@ -207,6 +207,12 @@ class InventoryActionJourneys(_ItemActionBase, ServicesBrowserTest):
         _wait_inp_line(page, 2, "equip plain_sword", exact=True)
 
         # Use: the confirmation-protected use echoes the typed `use <key>`.
+        # The echo prints at dispatch, while the unequip's in-flight slot only
+        # clears when its committed panel revision arrives — the store gate
+        # drops any dispatch issued before then. Wait for the committed
+        # unequip (row back to unequipped) before opening the use
+        # confirmation, exactly as the equip/unequip pairs above do.
+        self._wait_row(page, "plain_sword", lambda row: row["equipped"] is False)
         self._keyboard_activate_tile(page, "healing_potion")
         self._keyboard_confirm_dialog(page)
         self.assertEqual(sent_action_count(page, "inventory.use"), 1)

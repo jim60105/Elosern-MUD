@@ -456,12 +456,25 @@ const servicesConfirm = computed(() => {
 // `explore.wait` rest item (the legacy `openRestForm` behavior).
 const restFormOpen = ref(false);
 const restFormError = ref(null);
+// webclient-action-feedback (busy-drop feedback): dispatchAction returns null
+// when the single-writer gate refuses the dispatch (an in-flight action, a
+// locked mutation phase, or a disconnected session). Surfaces that fire and
+// forget would otherwise silently swallow the player's deliberate activation,
+// so every ignored-return dispatch routes through this helper, which leaves a
+// visible busy toast at the client boundary instead of dropping it silently.
+// Return-bearing seams (the concept apply) keep calling the store directly.
+function dispatchIntent(actionId, payload, display) {
+  if (store.dispatchAction(actionId, payload, display) === null) {
+    store.pushToast({ title: "目前無法執行此操作，請稍後再試。", tone: "info" });
+  }
+}
+
 function onRestFormSubmit(seconds) {
   restFormOpen.value = false;
   restFormError.value = null;
   // One dispatch through the single store entry (the bounded `explore.wait`
   // payload the server validates).
-  store.dispatchAction("explore.wait", { seconds });
+  dispatchIntent("explore.wait", { seconds });
 }
 
 function onRestFormClose() {
@@ -475,32 +488,32 @@ function onRestFormError(message) {
 // Panel action intents (C4: every surface's emitted intent routes through
 // the single store dispatch entry — no component mutates state directly).
 function onShopBuy(intent) {
-  store.dispatchAction(intent.action_id, intent.payload);
+  dispatchIntent(intent.action_id, intent.payload);
 }
 
 function onShopSell(intent) {
-  store.dispatchAction(intent.action_id, intent.payload);
+  dispatchIntent(intent.action_id, intent.payload);
 }
 
 // Inventory row-action intents (add-inventory-item-actions, task 6.3): both
 // the confirmed item use and the direct equipment toggle route through the
 // single store dispatch entry — one deliberate activation, one dispatch.
 function onInventoryItemAction(intent) {
-  store.dispatchAction(intent.action_id, intent.payload);
+  dispatchIntent(intent.action_id, intent.payload);
 }
 
 // The pending 異名提名 ballot (title-epithet-nomination): the menu's
 // accept/decline intents ride the same single dispatch entry as the shop
 // and quest surfaces.
 function onTitleBallotAction(intent) {
-  store.dispatchAction(intent.action_id, intent.payload);
+  dispatchIntent(intent.action_id, intent.payload);
 }
 
 // The 稱號冊 window (title-codex-removal): equip/remove/ballot intents ride
 // the same single dispatch entry; the rules writer re-validates every gate
 // at execution, so the window forwards without client-side rules.
 function onTitleCodexAction(intent) {
-  store.dispatchAction(intent.action_id, intent.payload);
+  dispatchIntent(intent.action_id, intent.payload);
 }
 
 const titleBallotPanel = computed(() => panel("title_ballot"));
@@ -522,7 +535,7 @@ function onMapMove(moveData) {
     model?.currentNode ?? null,
     moveData.destination ?? null
   );
-  store.dispatchAction(
+  dispatchIntent(
     "explore.move",
     {
       exit_ref: moveData.exit_ref,
@@ -560,7 +573,7 @@ function onOverlayClose() {
 }
 
 function onCreationAction(intent) {
-  store.dispatchAction(intent.action_id, intent.payload);
+  dispatchIntent(intent.action_id, intent.payload);
 }
 
 // The return-bearing dispatch seam (retool-concept-fill-navigation D1a): the
@@ -579,14 +592,14 @@ function onCreationCancelConfirm() {
 }
 
 function onQuestAction(intent) {
-  store.dispatchAction(intent.action_id, intent.payload);
+  dispatchIntent(intent.action_id, intent.payload);
 }
 
 // add-persona-edit-surface: one drawer persona edit submits exactly one
 // character.persona.update action with the section's field key and the
 // edited text (null clears).
 function onPersonaEdit(intent) {
-  store.dispatchAction("character.persona.update", { field: intent.field, text: intent.text });
+  dispatchIntent("character.persona.update", { field: intent.field, text: intent.text });
 }
 
 // H4 (task 7.4): the reference drawer layer. The drawer title/subtitle is
@@ -682,7 +695,7 @@ function onHudDrawerClose() {
 
 function onAction(intent) {
   // One dispatch intent per activation; the store is the single writer.
-  store.dispatchAction(intent.action_id, intent.payload);
+  dispatchIntent(intent.action_id, intent.payload);
 }
 
 // DockMenu pointer activation follows the same router confirmation path as
@@ -712,7 +725,7 @@ function onSubmitCommand(text) {
 function onChoiceAction(intent) {
   // The narrative stream-end choice-point card/dismiss intents (C4): the
   // same single dispatch entry as the dock (store is the sole writer).
-  store.dispatchAction(intent.action_id, intent.payload);
+  dispatchIntent(intent.action_id, intent.payload);
 }
 
 // Register the SceneBackdrop instance (its exposed interface) on the window
