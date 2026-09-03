@@ -5,8 +5,10 @@
 ### Requirement: roll_name maps sex to the given pool of a pack and composes the Chinese display name
 `world/rules/namegen.py` SHALL expose `roll_name(pack_key: str, sex: str | None, rng: Random) -> str`
 that looks up `NAME_PACK_REGISTRY[pack_key]` and selects the given pool by `sex`: `"female"` →
-pool `"f"`, `"male"` → pool `"m"`, `"other"` → pool `"u"`, and an empty string or `None` → a pool
-chosen randomly from `"m"`, `"f"`, `"u"` via `rng`. It SHALL return
+pool `"f"`, `"male"` → pool `"m"`, `"other"` → pool `"u"`, and an empty string, `None`, or any
+value outside `SEX_VALUES` → a pool chosen randomly from `"m"`, `"f"`, `"u"` via `rng` (design D2:
+unrecognised values are treated exactly like unspecified ones; this layer validates nothing).
+It SHALL return
 `compose_display_name(given, surname)` — the `given.zh・surname.zh` composition owned by
 `world/lore/names.py` — picking both parts from the selected pack via `rng`, and SHALL NOT define
 its own separator constant or concatenate parts itself. The original-language `NamePart.text`
@@ -19,11 +21,13 @@ SHALL never appear in the returned name.
   (respectively `"m"`) pool, and the full result matches the `given.zh・surname.zh` form with the
   U+30FB separator
 
-#### Scenario: other prefers the u pool and empty or None picks a pool at random
-- **WHEN** `roll_name` is called with `sex` `"other"`, and separately with `""` and `None`
+#### Scenario: other prefers the u pool and empty, None, or unrecognised values pick a pool at random
+- **WHEN** `roll_name` is called with `sex` `"other"`, and separately with `""`, `None`, and a
+  value outside `SEX_VALUES` such as `"unspecified"`
 - **THEN** the `"other"` call always draws its given part from the pack's `"u"` pool, and the
-  empty／`None` calls draw from one of the three pools according to `rng`, reproducibly for the
-  same seed
+  other calls draw from one of the three pools according to `rng` — the random pool selection
+  offers the pool candidates `("m", "f", "u")` to `rng` exactly once per call, reproducibly for
+  the same seed
 
 #### Scenario: Composed output is Chinese renderings only
 - **WHEN** `roll_name` returns a name for any pack and any sex value
@@ -47,7 +51,10 @@ with `race_key=None` — never participate in the random fallback.
 - **WHEN** `roll_name_for_race` is called with `None`, an unknown race key such as `"dragonborn"`,
   or any key absent from `NAME_PACK_BY_RACE`
 - **THEN** the result comes from one of the race-bound packs, chosen reproducibly via `rng`, and
-  across the full seed space never comes from `fantasy-dwarf` or `fantasy-halfling`
+  across the full seed space never comes from `fantasy-dwarf` or `fantasy-halfling`. The fallback
+  SHALL offer `rng` exactly the sorted distinct values of `NAME_PACK_BY_RACE` as the choice
+  candidates, so every bound pack is selectable and the choice index is decoupled from the
+  mapping's literal insertion order.
 
 ### Requirement: Unknown pack keys raise KeyError and empty filtered pools fall back to the full given pool
 `roll_name` SHALL propagate `KeyError` unchanged when `pack_key` is not a key of
