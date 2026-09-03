@@ -4,7 +4,8 @@ Each panel's wire schema version is defined in four places that must never
 diverge: the presenter module's ``<PANEL>_SCHEMA_VERSION`` constant, the
 production registry's ``schema_version=<CONST>`` registration reference, the
 client ``PANEL_ALLOWLIST`` mirror in ``protocol.js``, and the client's
-per-panel available-form re-check literal. This contract extracts all four
+per-panel available-form re-check value (a literal or a reference to the
+mirrored top-level constant). This contract extracts all four
 from source text (top-level discovery runs without Evennia settings, so game
 modules cannot be imported here) and asserts they are numerically equal,
 mirroring the existing bounds parity contracts.
@@ -118,10 +119,22 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
         boundary = re.search(r"\n  function [a-zA-Z_]+\(payload\)", remainder)
         if boundary is not None:
             remainder = remainder[: boundary.start()]
-        match = re.search(r"payload\.schema_version !== (\d+)", remainder)
+        # The re-check is a numeric literal or an identifier reference to the
+        # mirrored top-level constant (e.g. ``!== CREATION_SCHEMA_VERSION``);
+        # both spellings are intended forms of the same mirror.
+        match = re.search(r"payload\.schema_version !== ([0-9]+|[A-Z][A-Z0-9_]*)", remainder)
         if match is None:
             return None
-        return int(match.group(1))
+        token = match.group(1)
+        if token.isdigit():
+            return int(token)
+        # Resolve the identifier against its module-scope var declaration (the
+        # protocol module body is IIFE-indented by two spaces) so a function
+        # -local shadow at deeper indentation can never satisfy it.
+        var_match = re.search(
+            rf"^ {{0,2}}var {token}\s*=\s*([0-9]+)\s*;", js_source, re.MULTILINE
+        )
+        return int(var_match.group(1)) if var_match is not None else None
 
 
 if __name__ == "__main__":
