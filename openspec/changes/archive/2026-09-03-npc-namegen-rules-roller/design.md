@@ -34,7 +34,7 @@
 候選取自映射值（種族綁定的唯一真相，與 registry 掃描等價——lore spec 已綁定「每個綁定包 `race_key` 等於其種族鍵」）再 `sorted()`，使 `rng.choice` 的索引基準與 mapping 的字面插入順序解耦：重放契約不因上游改寫 `NAME_PACK_BY_RACE` 的字面順序而漂移。dwarf／halfling 因不在映射值中而天然被排除，符合設計 §4「不參予隨機兜底」。
 
 ### D5：registry 於呼叫時查表；`KeyError` 原樣傳播
-`roll_name` 以 `NAME_PACK_REGISTRY[pack_key]`（模組屬性、呼叫時解析）取包，不捕獲——`KeyError` 是程式內常量錯誤，吞掉會把錯包名字靜態送進玩家視野；讓呼叫端 traceback 直指來源。查表延到呼叫時（而非 import 時抓 bundle）另有一個工程好處：測試可以 `patch` `world.lore.names` 的模組屬性餵合成 registry 驗證 KeyError／兜底語意。
+`roll_name` 以 `NAME_PACK_REGISTRY[pack_key]` 取包，不捕獲——`KeyError` 是程式內常量錯誤，吞掉會把錯包名字靜態送進玩家視野；讓呼叫端 traceback 直指來源。本模組以頂層 `from world.lore.names import ...` 綁定符號（與 repo 慣例一致）；由於 registry 是不可變凍結常量，測試的可測性不依賴 patch 模組屬性——空池退回以合成 `NamePack` 直呼 `_roll_from_pack`（D3），兜底候選集以記錄 `choice` 入參的注入式 RNG 直測 `_pick_pack_for_race`。
 
 ### D6：合成只經 lore 的 `compose_display_name`；本層零合成常量
 分隔符 `・`（U+30FB）是 lore change D7 裁定的「registry 內唯一合成常量」；`namegen.py` 自帶分隔符或字串串接會分裂該契約。given 與 surname 皆為 `NamePart`，輸出天然不含 `text`。
