@@ -129,9 +129,23 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
 
     @covers_requirement("scenario-director::the-scenario-director-name-inspiration-reads-the-namegen-rule-layer-without-crossing-the-single-writer-boundary")
     def test_prompt_construction_leaves_no_state_behind(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
         before = repr(NAME_PACK_REGISTRY)
-        system, user = build_scenario_prompt(_context())
+        with CaptureQueriesContext(connection) as queries:
+            system, user = build_scenario_prompt(_context())
         self.assertEqual(repr(NAME_PACK_REGISTRY), before)
+        self.assertEqual(
+            [
+                query["sql"]
+                for query in queries.captured_queries
+                if query["sql"].lstrip().upper().startswith(
+                    ("INSERT", "UPDATE", "DELETE")
+                )
+            ],
+            [],
+        )
         # The rolled names exist only inside the returned message strings.
         self.assertIn(_expected_bank(user["content"]), system["content"])
         self.assertNotIn("・", user["content"])

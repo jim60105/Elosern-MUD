@@ -198,6 +198,35 @@ class AiTransportBoundaryTests(unittest.TestCase):
                         f"{module_path} must not reference {fragment}",
                     )
 
+    @covers_requirement("scenario-director::the-scenario-director-name-inspiration-reads-the-namegen-rule-layer-without-crossing-the-single-writer-boundary")
+    def test_read_only_allowlist_is_exactly_the_two_pure_rule_modules(self):
+        # The delta contract is "exactly", not "contains": every future
+        # widening of the exemption table has to pass (and show up in) here.
+        self.assertEqual(
+            READ_ONLY_RULE_MODULES,
+            ("world.quests.characterization", "world.rules.namegen"),
+        )
+
+    @covers_requirement("scenario-director::the-scenario-director-name-inspiration-reads-the-namegen-rule-layer-without-crossing-the-single-writer-boundary")
+    def test_scan_exempts_the_named_rule_modules_and_still_bans_the_rest(self):
+        exempted = (
+            "from world.rules.namegen import roll_name_for_race",
+            "import world.rules.namegen",
+            "import world.quests.characterization",
+        )
+        for source in exempted:
+            with self.subTest(source=source):
+                self.assertEqual(_imports_state_writer(ast.parse(source)), [])
+        banned = (
+            ("from world.rules.character_creation import _validate_name", ["world.rules.character_creation"]),
+            ("import world.rules.combat", ["world.rules.combat"]),
+            ("import world.quests.scene_builder", ["world.quests.scene_builder"]),
+        )
+
+        for source, expected in banned:
+            with self.subTest(source=source):
+                self.assertEqual(_imports_state_writer(ast.parse(source)), expected)
+
 
 class DeterministicPathBanTests(unittest.TestCase):
     @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")

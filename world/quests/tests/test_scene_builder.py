@@ -883,39 +883,51 @@ class SceneBuilderNamegenBackfillTests(SceneBuilderTestBase):
         info.assert_not_called()
 
     @covers_requirement("scene-builder::the-occupant-spawn-path-backfills-a-missing-display-name-deterministically-through-the-namegen-rule-layer")
-    def test_missing_race_reaches_the_rule_layer_as_none(self):
-        # Force the "prototype race absent" branch: a wrapper characterization
-        # seam clears npc.race after the tier assignment, and a recording roll
-        # captures exactly what the backfill seam passes to the rule layer.
+    def test_absent_or_empty_race_reaches_the_rule_layer_as_none(self):
+        # Force the "prototype race absent" branches: a wrapper characterization
+        # seam clears npc.race to None (never set) or the empty string (the
+        # real AttributeProperty corner) after the tier assignment, and a
+        # recording roll captures exactly what the backfill seam passes on.
         from world.quests import scene_builder
 
-        calls: list[tuple] = []
         original_apply = scene_builder._apply_characterization
         original_roll = scene_builder.roll_name_for_race
 
-        def clearing_apply(npc, requirement, position):
-            original_apply(npc, requirement, position)
-            npc.race = None
+        for marker, absent in (("none", None), ("empty", "")):
+            with self.subTest(race=absent):
+                calls: list[tuple] = []
 
-        def recording_roll(race, sex, rng):
-            calls.append((race, sex))
-            return original_roll(race, sex, rng)
+                def clearing_apply(npc, requirement, position, _absent=absent):
+                    original_apply(npc, requirement, position)
+                    npc.race = _absent
 
-        record, compiled = self._accept(_instance_bound_payload())
-        with (
-            self.captureOnCommitCallbacks(execute=True),
-            patch.object(scene_builder, "_apply_characterization", clearing_apply),
-            patch.object(scene_builder, "roll_name_for_race", recording_roll),
-        ):
-            result = materialize_stage(
-                self.player, record.quest_id, origin_room=self.anchor
-            )
-        npc = self._room_npc(result)
-        self.assertEqual(calls, [(None, "other")])
-        self.assertEqual(
-            npc.db.display_name,
-            _expected_backfill_name(compiled.definition.key, 0, "bandit", None, "other"),
-        )
+                def recording_roll(race, sex, rng):
+                    calls.append((race, sex))
+                    return original_roll(race, sex, rng)
+
+                actor = create_object(PlayerCharacter, key=f"scene-race-{marker}")
+                actor.race = "human"
+                actor.apply_race_baseline()
+                actor.location = self.anchor
+                compiled = compile_quest_blueprint(_instance_bound_payload())
+                register_generated_quest(compiled)
+                record = accept_quest(actor, compiled.definition.key)
+                with (
+                    self.captureOnCommitCallbacks(execute=True),
+                    patch.object(scene_builder, "_apply_characterization", clearing_apply),
+                    patch.object(scene_builder, "roll_name_for_race", recording_roll),
+                ):
+                    result = materialize_stage(
+                        actor, record.quest_id, origin_room=self.anchor
+                    )
+                npc = self._room_npc(result)
+                self.assertEqual(calls, [(None, "other")])
+                self.assertEqual(
+                    npc.db.display_name,
+                    _expected_backfill_name(
+                        compiled.definition.key, 0, "bandit", None, "other"
+                    ),
+                )
 
     @covers_requirement("scene-builder::every-display-name-backfill-emits-an-observability-info-event")
     def test_committed_backfill_logs_exactly_one_five_key_event(self):
