@@ -34,7 +34,7 @@ traceability 掛點契約：四條 requirement 屬未同步 delta ID，實作期
 
 ## Post-sync traceability（archive sync 時執行，不在本 change 實作期）
 
-- [ ] P1 delta sync 進 `openspec/specs/npc-name-generation/spec.md` 後，以
+- [x] P1 delta sync 進 `openspec/specs/npc-name-generation/spec.md` 後，以
   `uv run --locked python -m tools.spec_traceability list` 取四條 canonical ID，標註
   `world/rules/tests/test_namegen.py`：`test_fixed_seed_replays_identical_names` 與
   `test_module_holds_no_rng_state_of_its_own` → replay；`test_sex_selects_mapped_pool_and_output_is_zh_only`
@@ -43,4 +43,4 @@ traceability 掛點契約：四條 requirement 屬未同步 delta ID，實作期
   `test_end_to_end_fallback_never_uses_spare_packs` → race-fallback；
   `test_unknown_pack_key_propagates_keyerror_verbatim` 與
   `test_empty_filtered_pool_falls_back_to_full_given_pool` → error-semantics。
-- [ ] P2 `uv run --locked python -m tools.spec_traceability check` 四條全覆蓋、零錯誤。
+- [x] P2 `uv run --locked python -m tools.spec_traceability check` 四條全覆蓋、零錯誤。

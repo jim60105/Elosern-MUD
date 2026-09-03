@@ -4,7 +4,7 @@ Pure-logic module (npc-namegen-rules-roller, design D1): no database access,
 no Evennia imports, no module-level or global RNG. Every random decision goes
 through the caller-injected ``rng`` so consumers own the replay strategy —
 the creation dice inject an unseeded ``Random`` instance while the NPC flow
-crc32-seeded instance for blueprint-rebuild reproducibility.
+injects a crc32-seeded one for blueprint-rebuild reproducibility.
 
 Registry reads target the frozen constants of ``world.lore.names``; testability
 never relies on patching them (empty-pool fallback tests call ``_roll_from_pack``

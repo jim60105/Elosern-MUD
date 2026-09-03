@@ -1,15 +1,10 @@
-"""Pure-logic tests for the rules-layer name rollers (unittest, no Evennia).
-
-Traceability annotations are deferred to the archive-sync stage: the
-`npc-name-generation` delta IDs are not in the main index yet, and early
-`@covers_requirement` claims are unknown-requirement-id errors (precedent
-`npc-namegen-lore-registry` task 4.1).
-"""
+"""Pure-logic tests for the rules-layer name rollers (unittest, no Evennia)."""
 
 import inspect
 from random import Random
 from unittest import TestCase
 
+from tools.spec_traceability import covers_requirement
 import world.rules.namegen as namegen
 from world.lore.names import (
     NAME_PACK_BY_RACE,
@@ -60,7 +55,7 @@ def _segments(name: str) -> tuple[str, str]:
 class RollNameReplayTest(TestCase):
     """Fixed-seed determinism and the no-global-RNG contract."""
 
-
+    @covers_requirement("npc-name-generation::rolling-is-a-pure-function-of-the-injected-rng-for-replayability")
     def test_fixed_seed_replays_identical_names(self):
         calls = [
             (key, sex)
@@ -82,7 +77,7 @@ class RollNameReplayTest(TestCase):
                         roll_name_for_race(key, sex, second),
                     )
 
-
+    @covers_requirement("npc-name-generation::rolling-is-a-pure-function-of-the-injected-rng-for-replayability")
     def test_module_holds_no_rng_state_of_its_own(self):
         source = inspect.getsource(namegen)
         self.assertNotIn("Random()", source)
@@ -101,7 +96,7 @@ class RollNameReplayTest(TestCase):
 
 class RollNameSexPoolTest(TestCase):
     """sex→pool mapping, random-pool normalisation, and output shape."""
-
+    @covers_requirement("npc-name-generation::roll-name-maps-sex-to-the-given-pool-of-a-pack-and-composes-the-chinese-display-name")
     def test_sex_selects_mapped_pool_and_output_is_zh_only(self):
         pack = NAME_PACK_REGISTRY["fantasy-human"]
         for sex, pool in (("female", "f"), ("male", "m"), ("other", "u")):
@@ -111,7 +106,7 @@ class RollNameSexPoolTest(TestCase):
                     given, surname = _segments(name)
                     self.assertIn(given, _pool_zh(pack, pool))
                     self.assertIn(surname, _surname_zh(pack))
-
+    @covers_requirement("npc-name-generation::roll-name-maps-sex-to-the-given-pool-of-a-pack-and-composes-the-chinese-display-name")
     def test_every_pack_output_is_zh_only_for_any_sex(self):
         # Corpus fact behind the contract: part .text is ASCII, .zh never is,
         # so "output contains no ASCII" pins "no text leaks" for every pack.
@@ -124,7 +119,7 @@ class RollNameSexPoolTest(TestCase):
                     self.assertIn(given, _all_given_zh(pack))
                     self.assertIn(surname, _surname_zh(pack))
                     self.assertFalse(name.isascii())
-
+    @covers_requirement("npc-name-generation::roll-name-maps-sex-to-the-given-pool-of-a-pack-and-composes-the-chinese-display-name")
     def test_unspecified_and_unrecognised_sex_pick_a_random_pool_once(self):
         pack = NAME_PACK_REGISTRY["fantasy-human"]
         union = _all_given_zh(pack)
@@ -153,7 +148,7 @@ class RollNameSexPoolTest(TestCase):
 class RollNameForRaceTest(TestCase):
     """Race resolution through NAME_PACK_BY_RACE and the bound-pack fallback."""
 
-
+    @covers_requirement("npc-name-generation::roll-name-for-race-resolves-via-name-pack-by-race-with-a-bound-packs-only-random-fallback")
     def test_bound_races_roll_from_their_mapped_pack(self):
         for race, pack_key in NAME_PACK_BY_RACE.items():
             with self.subTest(race=race):
@@ -165,7 +160,7 @@ class RollNameForRaceTest(TestCase):
                     self.assertIn(given, _all_given_zh(pack))
                     self.assertIn(surname, _surname_zh(pack))
 
-
+    @covers_requirement("npc-name-generation::roll-name-for-race-resolves-via-name-pack-by-race-with-a-bound-packs-only-random-fallback")
     def test_fallback_candidates_are_exactly_the_sorted_bound_packs(self):
         expected = tuple(sorted(set(NAME_PACK_BY_RACE.values())))
         self.assertEqual(_BOUND_PACK_KEYS, expected)
@@ -177,7 +172,7 @@ class RollNameForRaceTest(TestCase):
                     self.assertEqual(recorder.choice_calls[-1], expected)
                     self.assertEqual(picked.key, pack_key)
 
-
+    @covers_requirement("npc-name-generation::roll-name-for-race-resolves-via-name-pack-by-race-with-a-bound-packs-only-random-fallback")
     def test_end_to_end_fallback_never_uses_spare_packs(self):
         bound = set(_BOUND_PACK_KEYS)
         bound_given = {
@@ -211,13 +206,13 @@ class RollNameForRaceTest(TestCase):
 class ErrorSemanticsTest(TestCase):
     """KeyError propagation and the empty-pool full-given fallback."""
 
-
+    @covers_requirement("npc-name-generation::unknown-pack-keys-raise-keyerror-and-empty-filtered-pools-fall-back-to-the-full-given-pool")
     def test_unknown_pack_key_propagates_keyerror_verbatim(self):
         with self.assertRaises(KeyError) as caught:
             roll_name("fantasy-dragonkin", "female", Random(1))
         self.assertEqual(caught.exception.args, ("fantasy-dragonkin",))
 
-
+    @covers_requirement("npc-name-generation::unknown-pack-keys-raise-keyerror-and-empty-filtered-pools-fall-back-to-the-full-given-pool")
     def test_empty_filtered_pool_falls_back_to_full_given_pool(self):
         part = lambda text, zh: NamePart(text=text, zh=zh, meaning_zh="")  # noqa: E731
         synthetic = NamePack(
