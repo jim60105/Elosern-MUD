@@ -267,6 +267,202 @@
 }
 
 /*
+ * Shared control layer.
+ *
+ * The 設計稿's control primitives (docs/design/elosern-redesign/index.html:
+ * the `.btn` / `.btn.primary` pair, the `.tabs` segmented tray and the
+ * `.closebtn` icon square) lifted into the token sheet so every surface
+ * reuses ONE button treatment and ONE in-panel tab treatment instead of
+ * re-authoring chrome per component. A component adds layout around these
+ * classes (width, grid placement, order); it never restates the chrome.
+ *
+ * Emphasis ladder, one step per surface:
+ *   .ui-btn            neutral — the default action weight
+ *   .ui-btn--primary   the single decisive action (seal-red gradient fill)
+ *   .ui-btn--danger    destructive but secondary (seal ink, no seal fill)
+ *   .ui-btn--ghost     chrome-level, low emphasis (close, dismiss)
+ */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: var(--sp-2) var(--sp-4);
+  color: var(--paper-100);
+  background: var(--ink-780);
+  border: 1px solid var(--ink-600);
+  border-radius: 9px;
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
+  line-height: 1.25;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    filter var(--motion-fast) var(--ease-standard);
+}
+
+.ui-btn:hover:enabled {
+  color: var(--paper-50);
+  background: var(--ink-700);
+  border-color: var(--paper-700);
+}
+
+.ui-btn--primary {
+  color: #fff;
+  background: linear-gradient(180deg, var(--seal-500), var(--seal-700));
+  border-color: var(--seal-400);
+  font-weight: 600;
+}
+
+.ui-btn--primary:hover:enabled {
+  color: #fff;
+  background: linear-gradient(180deg, var(--seal-500), var(--seal-700));
+  border-color: var(--seal-400);
+  filter: brightness(1.08);
+}
+
+.ui-btn--danger {
+  color: var(--seal-400);
+  background: var(--ink-820);
+  border-color: var(--seal-700);
+}
+
+.ui-btn--danger:hover:enabled {
+  color: var(--paper-50);
+  background: var(--seal-700);
+  border-color: var(--seal-500);
+}
+
+.ui-btn--ghost {
+  color: var(--paper-300);
+  background: transparent;
+  border-color: var(--ink-600);
+}
+
+.ui-btn--ghost:hover:enabled {
+  color: var(--paper-50);
+  background: var(--ink-780);
+  border-color: var(--seal-500);
+}
+
+.ui-btn--sm {
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-3);
+}
+
+/* Opt-in only: a control fills its row because the layout asks for it,
+   never because a flex parent stretched a bare <button>. */
+.ui-btn--block {
+  display: flex;
+  width: 100%;
+}
+
+.ui-btn:disabled,
+.ui-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  filter: none;
+  cursor: not-allowed;
+}
+
+/* The draft's `.closebtn`: a square icon control at chrome weight. */
+.ui-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--paper-300);
+  background: var(--ink-780);
+  border: 1px solid var(--ink-600);
+  border-radius: 9px;
+  cursor: pointer;
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+
+.ui-icon-btn:hover:enabled {
+  color: var(--paper-50);
+  border-color: var(--seal-500);
+}
+
+/*
+ * In-panel segmented tabs (the draft's `.tabs` tray). Deliberately distinct
+ * from the action dock's seal-filled tab bar: the dock owns the global
+ * navigation weight, a panel's own sub-navigation recedes into the tray.
+ */
+.ui-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: var(--sp-1);
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: var(--sp-1);
+  background: var(--ink-820);
+  border: 1px solid var(--ink-600);
+  border-radius: 9px;
+}
+
+.ui-tabs__tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-height: 30px;
+  padding: var(--sp-1) var(--sp-4);
+  color: var(--paper-500);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
+}
+
+.ui-tabs__tab:hover:enabled {
+  color: var(--paper-100);
+  background: var(--ink-780);
+}
+
+.ui-tabs__tab.is-active {
+  color: var(--paper-50);
+  background: var(--ink-700);
+  font-weight: 600;
+}
+
+/* Not color alone (design D5): the selected tab also carries a seal underline,
+   so the selection survives a monochrome or colorblind rendering. */
+.ui-tabs__tab.is-active::after {
+  content: "";
+  position: absolute;
+  right: var(--sp-3);
+  bottom: 3px;
+  left: var(--sp-3);
+  height: 2px;
+  border-radius: 2px;
+  background: var(--seal-500);
+}
+
+.ui-tabs__tab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/*
  * Reduced motion: disable nonessential motion at the token level.
  *
  * H5 (webclient-hud-05-overlays-and-command-line, task 7.6): the
