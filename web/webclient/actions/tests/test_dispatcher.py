@@ -149,6 +149,7 @@ class RegistryTests(unittest.TestCase):
                     "creation.preset",
                     "creation.custom",
                     "creation.concept",
+                    "creation.roll_name",
                     "creation.activate",
                     "creation.reset",
                     "explore.move",
