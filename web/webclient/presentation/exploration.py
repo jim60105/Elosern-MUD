@@ -68,6 +68,7 @@ from world.rules.map_knowledge import (
     KnowledgeError,
     decode_node,
 )
+from world.rules.npc_identity import npc_display_name
 from world.rules.service_view import build_services_view
 
 EXPLORATION_SCHEMA_VERSION = 1
@@ -88,6 +89,18 @@ ACTION_IDS = (
 )
 SURFACES = ("guild", "shop")
 ENTITY_KINDS = ("character", "npc", "monster")
+
+
+def _bounded_entity_name(obj: Any) -> str:
+    """Bounded entity-row name: NPC full identity where one exists (D5).
+
+    Players and monsters degrade to their plain key inside the composer, and
+    a malformed title degrades there too, so both row kinds can call this
+    unconditionally. The slice (never a raise) bounds even corrupt stored
+    titles for the wire, mirroring ``_bounded_display_name``; that shared
+    helper stays the plain-key source for room, move, and object rows.
+    """
+    return npc_display_name(obj)[:MAX_DISPLAY_NAME_CODE_POINTS]
 
 
 class ExplorationPanelError(ProtocolValidationError):
@@ -503,7 +516,7 @@ def _look_entities(actor: Any) -> list[dict[str, Any]]:
         entities.append(
             {
                 "identity": int(obj.pk),
-                "display_name": _bounded_display_name(obj),
+                "display_name": _bounded_entity_name(obj),
                 "kind": _entity_kind(obj),
                 "portrait_ref": None,
             }
@@ -617,7 +630,7 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
                 )
         target: dict[str, Any] = {
             "identity": int(obj.pk),
-            "display_name": _bounded_display_name(obj),
+            "display_name": _bounded_entity_name(obj),
             "portrait_ref": None,
             "affordances": affordances[:MAX_AFFORDANCES],
         }

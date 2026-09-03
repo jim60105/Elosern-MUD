@@ -133,7 +133,7 @@ def _sync_service_host(service_id, name, title, room, component_specs) -> NPC:
 4. `world/rules/guild_exams.py`（考官）— 本 change。
 5. `world/rules/onboarding.py::sync_guard_npc`（`GUARD_NPC_KEY = "南門守衛"`）— **刻意豁免**。該守衛是新手教學的一部分，使用者已決定整體移除 onboarding 教學；為註定刪除的 NPC 設計 registry 條目與載入驗證違反「不留將死之抽象」，且 AGENTS.md 明文「deliberate skip is preferable to a fake implementation」。豁免的範圍與失效條件寫進本 change 的 proposal／specs 敘述，讓不變式缺口保持可見；移除 onboarding 的那個 change 落地時豁免自然消失。在此之前，該守衛是唯一一具以退化狀態（純姓名）呈現的生產 NPC。
 
-測試端 `create_object(NPC, ...)` 不納入不變式（見 change 1 對 default `""` 的 storage-default 定性）；change 1 收尾的生產者清單審查確保清單與程式碼同步。
+測試端 `create_object(NPC, ...)` 不納入不變式（見 change 1 對 default `""` 的 storage-default 定性）；生產者清單是設計文件的人工維護清單，由評審對帳（change 1 的靜態掃描迴歸案已因假保衛判定撤除，見該 change tasks 6.4b）。
 
 ### D8. 考官：建立點是 `_spawn_opponent`（設計文字校正），去衝突後綴改為條件式
 

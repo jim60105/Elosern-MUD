@@ -14,7 +14,7 @@
 - **registry 載入 fail closed**（設計 §6）：`world/lore/shops.py` 與 `world/lore/guild.py` 在 module 載入時驗證自己的作者欄位（缺欄＝dataclass `TypeError`；違規值＝具名 `ValueError`），並檢查三份 registry 之間的作者姓名互不重複。先例：`world/lore/titles.py` 於 module 載入時驗證出貨 rows、`world/lore/wilderness_entry.py` 的 `validate_wilderness_entries()`。
 - **觀測性**（設計 §8）：`guild_economy` 的 host 建立與 `guild_exams` 的考官建立各補一個 `log_info` 邊界事件，`context` 依設計帶 `char`／`shop`／`rank`。
 - 無玩家命令新增／改名／改語法 → `docs/game/commands.md`、`docs/game/command-reference.md` 不動。無相容層、無資料遷移（未發布、零使用者）。
-- **生產 NPC 路徑清單與 onboarding 豁免**（design D7a）：非測試碼的全部 `create_object(NPC, ...)` 落點共五處——loader（change 2）、SceneBuilder／guild host／考官（本 change）、`world/rules/onboarding.py::sync_guard_npc`。南門守衛屬於**即將整體移除的新手教學**，為註定刪除的 NPC 造 registry 是死抽象：本 change **刻意豁免**它（AGENTS.md：deliberate skip is preferable to a fake implementation），過渡期該守衛以純姓名呈現；移除 onboarding 的 change 落地時豁免自然消失。change 1 的生產者清單迴歸案讓清單與程式碼同步。
+- **生產 NPC 路徑清單與 onboarding 豁免**（design D7a）：非測試碼的全部 `create_object(NPC, ...)` 落點共五處——loader（change 2）、SceneBuilder／guild host／考官（本 change）、`world/rules/onboarding.py::sync_guard_npc`。南門守衛屬於**即將整體移除的新手教學**，為註定刪除的 NPC 造 registry 是死抽象：本 change **刻意豁免**它（AGENTS.md：deliberate skip is preferable to a fake implementation），過渡期該守衛以純姓名呈現；移除 onboarding 的 change 落地時豁免自然消失。清單為設計文件的人工維護清單，由評審對帳（change 1 階段的靜態掃描迴歸案經 rubber-duck 判定為假保衛而撤除——loader 以變數派發 typeclass，文字正則掃不到）。
 
 ## Capabilities
 

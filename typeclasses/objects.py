@@ -75,8 +75,14 @@ class ObjectParent:
         characters = self.filter_visible(
             self.contents_get(content_type="character"), looker, **kwargs
         )
+        # NPC identity titles (npc-title-identity-core D3): this is one of the
+        # two surfaces that opt into 「姓名　稱號」. The merge form (not a bare
+        # keyword) keeps an appearance pass that already injected the flag
+        # from raising duplicate-keyword. Non-NPC characters ignore it and
+        # render their plain names unchanged.
         character_names = [
-            char.get_display_name(looker, **kwargs) for char in characters
+            char.get_display_name(looker, **{**kwargs, "full_identity": True})
+            for char in characters
         ]
         if not character_names:
             return ""

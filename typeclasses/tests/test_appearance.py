@@ -5,7 +5,7 @@ from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
 from typeclasses.rooms import InstanceRoom, Room
 
@@ -533,3 +533,192 @@ class TitleAppearanceLineTests(EvenniaTest):
         grant_starter_pair(self.target)
         self.target.attributes.add("title_collection", "damaged")
         self.assertEqual(self.char1.at_look(self.target), baseline)
+
+
+class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
+    """The two opt-in surfaces render 「姓名　稱號」; every other path stays plain.
+
+    npc-title-identity-core: room character line and look header are the only
+    text surfaces carrying the flag (D3/D4); the webclient ``explore.look``
+    shares the appearance framework, so header parity across entry paths is
+    the localized-appearance contract, not an extra feature.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.room1.key = "南門廣場"
+        self.room1.save()
+        self.char1.location = self.room1
+        self.char2.location = self.room1
+        self.titled = create_object(
+            "typeclasses.npcs.NPC", key="塞提斯", location=self.room1
+        )
+        self.titled.npc_title = "南門守衛"
+        self.plain = create_object(
+            "typeclasses.npcs.NPC", key="布魯諾", location=self.room1
+        )
+        self.monster = create_object(
+            "typeclasses.monsters.Monster", key="野狼", location=self.room1
+        )
+
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
+    def test_room_character_line_composes_the_npc_only(self):
+        appearance = self.char1.at_look(self.room1)
+        self.assertIn("人物：", appearance)
+        self.assertIn("塞提斯　南門守衛", appearance)
+        self.assertIn("布魯諾", appearance)
+        self.assertIn("野狼", appearance)
+        # Untitled NPC, the player, and the monster render no separator.
+        for name in ("布魯諾", "野狼", self.char2.key):
+            self.assertNotIn(f"{name}\u3000", appearance)
+        self.assertNotIn("南門守衛南門", appearance)
+
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces', 'npc-identity-titles::the-existing-appearance-and-exploration-contracts-are-unchanged')
+    def test_look_header_is_composed_on_every_entry_path(self):
+        from commands.localized.general import CmdLook
+        from evennia.utils import ansi
+
+        text = self.char1.at_look(self.titled)
+        self.assertIn("塞提斯　南門守衛", text)
+        from web.webclient.actions.exploration_actions import _look_adapter
+
+        with patch.object(self.char1, "msg") as msg:
+            result = _look_adapter(self.char1, {"target_id": int(self.titled.pk)})
+        self.assertEqual(result["outcome"], "success")
+        webclient = str(msg.call_args[0][0])
+        # Same object, same looker, same framework: the headers must be equal.
+        self.assertEqual(text, webclient)
+        # Third path: the real 「看 <目標>」 command resolves by the plain key
+        # and renders the same appearance (the localized-appearance contract
+        # names all three entry paths, not just the two seams above).
+        command = self.call(CmdLook(), "塞提斯", msg=None)
+        self.assertIn("塞提斯　南門守衛", command)
+        # self.call strips ANSI (noansi default); normalize the seam string the
+        # same way so the three paths compare on identical rendered text.
+        self.assertEqual(ansi.parse_ansi(text, strip_ansi=True).strip(), command)
+
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
+    def test_untitled_and_plain_targets_keep_their_headers(self):
+        self.assertIn("布魯諾", self.char1.at_look(self.plain))
+        self.assertNotIn("\u3000", self.char1.at_look(self.plain))
+        self.assertNotIn("\u3000", self.char1.at_look(self.monster))
+        self.assertNotIn("\u3000", self.char1.at_look(self.char2))
+
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
+    def test_explicit_flag_off_keeps_the_header_plain(self):
+        appearance = self.titled.return_appearance(self.char1, full_identity=False)
+        self.assertNotIn("南門守衛", appearance)
+        self.assertIn("塞提斯", appearance)
+
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
+    def test_looking_at_an_npc_carrying_characters_raises_nothing(self):
+        # The flag injected for the header rides **kwargs into this same
+        # appearance pass's character line; the merge form in
+        # get_display_characters must survive the already-present key (D3).
+        self.plain.npc_title = "馬伕"
+        self.plain.location = self.titled
+        appearance = self.char1.at_look(self.titled)
+        self.assertIn("塞提斯　南門守衛", appearance)
+        self.assertIn("布魯諾　馬伕", appearance)
+
+
+class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
+    """Process text (move/say/whisper/get/give) names the NPC by plain key only.
+
+    Each case renders once with the title stored and once with it removed and
+    asserts byte equality — the untitled rendering is the frozen baseline, and
+    no title may ever leak into an echo.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.room1.key = "南門廣場"
+        self.room1.save()
+        self.char1.location = self.room1
+        self.npc = create_object("typeclasses.npcs.NPC", key="塞提斯", location=self.room1)
+
+    def _texts(self, msg_mock):
+        texts = []
+        for call in msg_mock.call_args_list:
+            payload = call.args[0] if call.args else call.kwargs.get("text")
+            if isinstance(payload, tuple):
+                payload = payload[0]
+            texts.append(str(payload))
+        return texts
+
+    def _both_ways(self, emit, receiver=None):
+        """Capture ``emit`` once titled, once untitled; assert plain equality."""
+        receiver = receiver if receiver is not None else self.char1
+        self.npc.npc_title = "南門守衛"
+        with patch.object(receiver, "msg") as titled_msg:
+            emit()
+        titled = self._texts(titled_msg)
+        del self.npc.npc_title
+        with patch.object(receiver, "msg") as plain_msg:
+            emit()
+        plain = self._texts(plain_msg)
+        self.assertEqual(titled, plain)
+        self.assertTrue(titled, "the echo captured no message at all")
+        for text in titled:
+            self.assertNotIn("南門守衛", text)
+            self.assertNotIn("\u3000", text)
+
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
+    def test_movement_announcements_stay_plain(self):
+        def move_round_trip():
+            self.npc.move_to(self.room2)
+            self.npc.move_to(self.room1)
+
+        self._both_ways(move_round_trip)
+
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
+    def test_say_location_echo_stays_plain(self):
+        def say():
+            self.npc.at_say(
+                "這裡有動靜。", msg_self=None, msg_location="{object} 說：「{speech}」"
+            )
+
+        self._both_ways(say)
+
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
+    def test_whisper_receiver_echo_stays_plain(self):
+        def whisper():
+            self.npc.at_say(
+                "秘密。",
+                msg_self=None,
+                msg_receivers="{object} 悄聲對你說：「{speech}」",
+                msg_location=None,
+                receivers=[self.char1],
+                whisper=True,
+            )
+
+        self._both_ways(whisper)
+
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
+    def test_pickup_echo_stays_plain(self):
+        # The localized 拿 command's room echo is the observed surface (the
+        # at_get hook itself is silent in Evennia 6.1).
+        from commands.localized import CmdGet
+
+        coin = create_object("typeclasses.objects.Object", key="銅幣", location=self.room1)
+
+        def pickup():
+            coin.location = self.room1
+            self.call(CmdGet(), "銅幣", caller=self.npc)
+
+        self._both_ways(pickup)
+
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
+    def test_give_echo_stays_plain(self):
+        # The receiver's echo renders the giver's display name (the localized
+        # 給 command emits no third-party broadcast; at_give is silent).
+        from commands.localized import CmdGive
+
+        coin = create_object("typeclasses.objects.Object", key="銅幣", location=self.npc)
+        self.char2.location = self.room1
+
+        def give():
+            coin.location = self.npc
+            self.call(CmdGive(), f"銅幣 = {self.char2.key}", caller=self.npc)
+
+        self._both_ways(give, receiver=self.char2)
