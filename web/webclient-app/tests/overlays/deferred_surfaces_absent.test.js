@@ -39,16 +39,49 @@ import { CREATION_PANEL_SAMPLE, LOCAL_MAP_SAMPLE, localMapModelFor } from "../..
 // below stay banned in the authored view layer until the read model exists.
 const APP_ROOT = join(process.cwd(), "web/webclient-app");
 
+// Concurrent showcase-evidence gates create transient story trees under
+// stories/ (mkdtemp tmp directories) and delete them when done. A scan that
+// walks stories/ concurrently can therefore observe an entry vanish between
+// enumeration and stat/read; an ENOENT on a transient path means "absent",
+// not a scan failure. Anything else rethrows.
+function readdirSafe(dir) {
+  try {
+    return readdirSync(dir);
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+function isDirectorySafe(path) {
+  try {
+    return statSync(path).isDirectory();
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+function readSourceSafe(path) {
+  try {
+    return readFileSync(path, "utf-8");
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 function collectStoryTitles(dir) {
   const titles = [];
-  for (const entry of readdirSync(dir)) {
+  for (const entry of readdirSafe(dir)) {
     const path = join(dir, entry);
-    if (statSync(path).isDirectory()) {
+    if (isDirectorySafe(path)) {
       titles.push(...collectStoryTitles(path));
       continue;
     }
     if (!entry.endsWith(".stories.js")) continue;
-    const source = readFileSync(path, "utf-8");
+    const source = readSourceSafe(path);
+    if (source === null) continue;
     const match = source.match(/title:\s*["'`]([^"'`]+)["'`]/);
     if (match) titles.push(match[1]);
   }
@@ -136,9 +169,9 @@ const SOURCE_DIRS = [
 
 function collectSources(dir) {
   const files = [];
-  for (const entry of readdirSync(dir)) {
+  for (const entry of readdirSafe(dir)) {
     const path = join(dir, entry);
-    if (statSync(path).isDirectory()) {
+    if (isDirectorySafe(path)) {
       files.push(...collectSources(path));
       continue;
     }
@@ -305,7 +338,8 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
     for (const surface of DEFERRED_SURFACES) {
       for (const prefix of surface.testidPrefixes) {
         for (const file of files) {
-          const source = readFileSync(file, "utf-8");
+          const source = readSourceSafe(file);
+          if (source === null) continue;
           if (source.includes(`data-testid="${prefix}`) || source.includes(`data-testid=\`${prefix}`)) {
             found.push({ surface: surface.name, prefix, file });
           }

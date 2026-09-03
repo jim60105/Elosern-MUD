@@ -356,7 +356,14 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
             r'(?:^|\n)\s*(?:import\s+(?:[\w${},*\s]+\s+from\s+)?|export\s+[\w{},*\s]+\s+from\s+)["\']([^"\']+)["\']'
         )
         for path in story_files:
-            source = path.read_text(encoding="utf-8")
+            try:
+                source = path.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                # Concurrent coverage-gate probes create and delete transient
+                # story trees under stories/ (mkdtemp tmp directories). A file
+                # that vanishes between glob and read was never an authored
+                # story; skipping it keeps the contract deterministic.
+                continue
             for module in import_re.findall(source):
                 self.assertTrue(
                     module.startswith(("./", "../")) or module == "vue",

@@ -38,17 +38,47 @@ if (frozen && required.length === 0) {
 
 const storyFiles = [];
 
+// Concurrent showcase-evidence gates create transient story trees under the
+// app root (mkdtemp tmp directories) and delete them when done. A scan that
+// walks the tree concurrently can therefore observe an entry vanish between
+// enumeration and stat/read; an ENOENT on a transient path means the file is
+// gone (not a required story), never a scan failure. Anything else rethrows.
+function readdirSafe(dir) {
+  try {
+    return readdirSync(dir);
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+function statSafe(path) {
+  try {
+    return statSync(path);
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 function collectStoryFiles(dir) {
-  for (const entry of readdirSync(dir)) {
+  for (const entry of readdirSafe(dir)) {
     const path = join(dir, entry);
-    const stat = statSync(path);
+    const stat = statSafe(path);
+    if (stat === null) continue;
     if (stat.isDirectory()) {
       if (entry === "node_modules" || entry.startsWith(".")) continue;
       collectStoryFiles(path);
       continue;
     }
     if (!entry.endsWith(".stories.js")) continue;
-    const source = readFileSync(path, "utf-8");
+    let source;
+    try {
+      source = readFileSync(path, "utf-8");
+    } catch (error) {
+      if (error.code === "ENOENT") continue;
+      throw error;
+    }
     const match = source.match(/title:\s*["'`]([^"'`]+)["'`]/);
     if (!match) continue;
     storyFiles.push({ title: match[1], source });
