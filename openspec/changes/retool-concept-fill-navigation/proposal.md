@@ -25,6 +25,6 @@
 
 ## Impact
 
-- `web/webclient-app/components/CreationOverlay.vue`（applyProposal、載入態、導航釘住、banner 退役）、`web/webclient-app/components/AppClient.vue`（新增 `:dispatch="store.view.dispatch"` 綁定，失敗比對用 `submittedRequestId`）。store 不動。
+- `web/webclient-app/components/CreationOverlay.vue`（applyProposal、載入態、導航釘住、banner 退役）、`AppClient.vue`（新增 `:dispatch="store.view.dispatch"` 失敗比對與 `:push-toast="store.pushToast"` 成功確認寫入兩條綁定）。store 不動。
 - 測試：Vitest `creation_overlay` 案擴充（五欄映射、載入態進出、自動跳轉、重建不跳）、`web/webclient-app/tests/` dock 重置案；既有引用 `creation-proposal-notice`／`creation-proposal-open` 的測試同步退役；一個瀏覽器概念旅程 class（離線降級路徑驗證載入態清除）。
 - 前置：`bump-creation-panel-proposal-v3`（wire 先有新鍵）、`add-action-feedback-toasts`（toast 佇列 API）。與 `prefill-telnet-concept-from-proposal` 檔案不相交，可平行。

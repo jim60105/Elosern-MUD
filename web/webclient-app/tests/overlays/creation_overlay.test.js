@@ -164,13 +164,16 @@ describe("CreationOverlay (B5 overlays family)", () => {
   });
 
   // -- Transient proposal fill (retool-concept-transient-fill) --------------
-  it("a proposal fills the form on confirm without submitting anything", async () => {
+  it("a proposal fills the form silently without submitting anything (banner retired)", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_PROPOSAL_SAMPLE } });
-    // The fill lands immediately; the mode switch waits for the player.
-    expect(wrapper.get('[data-testid="creation-proposal-notice"]').exists()).toBe(true);
-    wrapper.get('[data-testid="creation-proposal-open"]').trigger("click");
+    // retool-concept-fill-navigation retired the in-form notice and its
+    // 開啟表單 button: the fill lands immediately and the tab stays where
+    // the player left it (no navigation, no confirmation outside a pending
+    // apply). Opening the custom tab is a plain tab click.
+    expect(wrapper.find('[data-testid="creation-proposal-notice"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="creation-overlay"]').attributes("data-mode")).toBe("preset");
+    wrapper.get('[data-testid="creation-mode-custom"]').trigger("click");
     await nextTick();
-    expect(wrapper.get('[data-testid="creation-overlay"]').attributes("data-mode")).toBe("custom");
     expect(wrapper.get('[data-testid="creation-field-hp"]').element.value).toBe("6");
     expect(wrapper.get('[data-testid="creation-field-mp"]').element.value).toBe("6");
     expect(wrapper.get('[data-testid="creation-persona-personality"]').element.value).toBe("沉穩內斂");
@@ -183,7 +186,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
 
   it("a rebuild at the same revision never overwrites player edits", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_PROPOSAL_SAMPLE } });
-    wrapper.get('[data-testid="creation-proposal-open"]').trigger("click");
+    wrapper.get('[data-testid="creation-mode-custom"]').trigger("click");
     await nextTick();
     wrapper.get('[data-testid="creation-persona-personality"]').setValue("我改過的個性");
     await nextTick();

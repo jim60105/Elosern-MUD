@@ -563,6 +563,13 @@ function onCreationAction(intent) {
   store.dispatchAction(intent.action_id, intent.payload);
 }
 
+// The return-bearing dispatch seam (retool-concept-fill-navigation D1a): the
+// concept apply needs the admission result (requestId / null) to gate its
+// loading state; every other creation intent keeps the fire-and-forget route.
+function onCreationDispatch(intent) {
+  return store.dispatchAction(intent.action_id, intent.payload);
+}
+
 function onCreationRequestReset() {
   store.requestCreationReset();
 }
@@ -985,6 +992,9 @@ onMounted(() => {
       :creation="panel('creation')"
       :result="store.view.lastActionResult"
       :stage="store.view.creationView"
+      :dispatch="onCreationDispatch"
+      :dispatch-state="store.view.dispatch"
+      :push-toast="store.pushToast"
       @action="onCreationAction"
       @request-reset="onCreationRequestReset"
       @cancel-confirm="onCreationCancelConfirm"

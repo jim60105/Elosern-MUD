@@ -32,6 +32,20 @@ const props = defineProps({
   // null outside creation mode, otherwise the dock stage the keyboard router
   // and the confirmation screens mirror (root/presets/custom/confirm).
   stage: { type: Object, default: null },
+  // A return-bearing dispatch callback (AppClient wraps `store.dispatchAction`):
+  // returns the requestId when the mutation is admitted, null when the
+  // single-mutation-in-flight gate rejects it. The concept apply sets its
+  // loading state ONLY after admission, so a gate-rejected apply never
+  // sticks a spinner (retool-concept-fill-navigation D1). Without the prop
+  // (standalone mounts/tests) the apply falls back to the `action` event.
+  dispatch: { type: Function, default: null },
+  // The store's `view.dispatch` slice ({inFlight, submittedRequestId}): the
+  // failure-match correlation and the global-gate release safety net (D1).
+  dispatchState: { type: Object, default: null },
+  // The action-feedback queue API (add-action-feedback-toasts). The form is
+  // the SOLE writer of the concept-apply success confirmation toast (D3);
+  // the store writes only failure crits.
+  pushToast: { type: Function, default: null },
 });
 
 const emit = defineEmits(["action", "close", "request-reset", "cancel-confirm"]);
@@ -41,6 +55,31 @@ const reason = computed(() => props.creation.reason?.message ?? "");
 const presets = computed(() => (Array.isArray(props.creation.presets) ? props.creation.presets : []));
 const custom = computed(() => props.creation.custom);
 const draft = computed(() => props.creation.draft);
+
+// In-flight concept apply (retool-concept-fill-navigation D1): the local
+// loading window from an ADMITTED dispatch until the request settles (fresh
+// proposal applied, matching non-success result, or the global dispatch gate
+// releases without a matching settlement). Reconnect/remount resets it to
+// false naturally.
+const conceptPending = ref(false);
+// The stage object of the publish whose completion navigation this overlay
+// just performed (D3 completion-publish pin): while `props.stage` IS that
+// object, its stale root value must not overwrite the completion tab. One
+// publish exactly — every later publish mirrors normally, keeping the
+// keyboard-router mirror alive.
+// `undefined` is the never-matching sentinel: the latch only ever records a
+// real stage object, so a null `stage` prop (outside creation mode / in
+// standalone mounts) can never be mistaken for a consumed completion publish.
+let latchedStage = undefined;
+
+// The apply button is frozen while this request waits AND while any other
+// mutation holds the store's single-dispatch gate (a gate-held apply could
+// never be admitted; freezing the control matches the affordance).
+const applyFrozen = computed(
+  () =>
+    conceptPending.value ||
+    Boolean(props.dispatchState && props.dispatchState.inFlight !== null),
+);
 
 // The wizard resumes from the draft's own stage; without a draft it opens
 // the preset state. Live snapshot updates to the `creation` prop re-sync the
@@ -110,7 +149,17 @@ function syncFromDraft() {
     // draft, e.g. a stale-save rejection) or the player has typed into the
     // local form (a pointer-opened form must survive a no-draft snapshot too).
     const stage = props.stage ? props.stage.stage : null;
-    if (stage !== "custom" && stage !== "concept" && !formTouched.value) {
+    // The in-flight pin and the completion-publish pin (D2/D3): during a
+    // pending apply — and for the single publish whose completion this
+    // overlay already navigated — the store's stage signal never moves the
+    // presented tab. Field sync below stays untouched.
+    if (
+      stage !== "custom" &&
+      stage !== "concept" &&
+      !formTouched.value &&
+      !conceptPending.value &&
+      props.stage !== latchedStage
+    ) {
       mode.value = "preset";
       selectedPresetKey.value = null;
     }
@@ -122,7 +171,9 @@ function syncFromDraft() {
     // pre-filled custom form shows; a resumed concept draft (no stage flip) keeps
     // the concept field (stageMode maps concept_filled -> concept).
     const stage = props.stage ? props.stage.stage : null;
-    mode.value = stage === "custom" ? "custom" : stageMode(d.stage);
+    if (!conceptPending.value && props.stage !== latchedStage) {
+      mode.value = stage === "custom" ? "custom" : stageMode(d.stage);
+    }
     if (d.mode === "preset") {
       selectedPresetKey.value = d.preset_key ?? null;
       return;
@@ -161,7 +212,6 @@ watch(() => props.creation.draft, syncFromDraft, { deep: true });
 // and does replace the generated fields. Nothing here auto-submits.
 const lastAppliedRevision = ref(0);
 const reviewPrompt = ref("");
-const proposalNotice = ref("");
 
 function personaFilled() {
   return [persona.personality, persona.life_story, persona.habit].filter(
@@ -199,29 +249,92 @@ function applyProposal() {
     persona.personality = p.persona.personality;
     persona.life_story = p.persona.life_story;
     persona.habit = p.persona.habit;
+    // Transient-fill fields (retool-concept-fill-navigation D4): an absent
+    // key never encodes as null — it leaves the local value untouched; a
+    // present key replaces it. The generation layer already clamped ages
+    // into the adult band and truncated texts, so the local gates stay as
+    // a second line of defence, never re-normalised here.
+    if (typeof p.display_name === "string" && p.display_name !== "") {
+      name.value = p.display_name;
+    }
+    if (typeof p.background === "string" && p.background !== "") {
+      background.value = p.background;
+    }
+    if (typeof p.age === "number") {
+      age.value = p.age;
+    }
+    if (typeof p.apparent_age === "number") {
+      apparentAge.value = p.apparent_age;
+    }
+    if (Array.isArray(p.affinity_elements)) {
+      // Affinity is written only from the (already-assigned) new race's
+      // registered element keys and capped to its maximum (the wire may
+      // carry a different race's legal set).
+      const registered = new Set(affinityElements.value.map((el) => el.key));
+      const capped = p.affinity_elements.filter((key) => registered.has(key)).slice(0, affinityMax.value);
+      affinitySelected.value = new Set(capped);
+    } else {
     // The new race may cap the affinity selection; trim as onRaceChange does.
-    const max = affinityMax.value;
-    const keys = [...affinitySelected.value];
-    if (keys.length > max) affinitySelected.value = new Set(keys.slice(0, max));
+      const max = affinityMax.value;
+      const keys = [...affinitySelected.value];
+      if (keys.length > max) affinitySelected.value = new Set(keys.slice(0, max));
+    }
   } finally {
     syncingDraft = false;
   }
   lastAppliedRevision.value = p.revision;
-  // The mode switch to the custom form is "on confirm": the notice carries
-  // the button that reveals the filled form.
-  if (mode.value !== "custom") {
-    proposalNotice.value = "概念提案已套用到自訂表單。";
+  // Completion of a concept apply (D1/D3): settle the loading window, and
+  // when the player is still on the concept tab, navigate to the custom tab
+  // and confirm exactly once through the action-feedback queue (the form is
+  // the sole writer of the success toast; the store stays silent on
+  // success). A mount-time fill lands outside the concept tab, so it never
+  // navigates or confirms. The completion-publish pin records THIS stage
+  // object: its (stale) root value must not overwrite the navigation the
+  // later-registered stage watcher would otherwise mirror within the same
+  // flush.
+  if (conceptPending.value) conceptPending.value = false;
+  if (mode.value === "concept") {
+    if (props.stage) latchedStage = props.stage;
+    setMode("custom");
+    if (typeof props.pushToast === "function") {
+      props.pushToast({ title: "概念提案已套用到自訂表單", tone: "info" });
+    }
   }
-}
-
-function openCustomFromProposal() {
-  proposalNotice.value = "";
-  setMode("custom");
 }
 
 // The mount-time fill runs at the end of setup (after the descriptor
 // computeds exist); the watcher covers every later panel delivery.
 watch(() => props.creation.proposal, applyProposal, { deep: true });
+
+// Failure settlement (D1): this request's non-success result settles the
+// loading window. The guard comes first — a standalone mount carrying a
+// foreign result and no dispatch state must never deref.
+const NON_SUCCESS_OUTCOMES = ["rejected", "stale", "error"];
+watch(
+  () => props.result,
+  (r) => {
+    if (!conceptPending.value || !props.dispatchState || !r) return;
+    if (
+      NON_SUCCESS_OUTCOMES.indexOf(r.outcome) !== -1 &&
+      r.requestId === props.dispatchState.submittedRequestId
+    ) {
+      conceptPending.value = false;
+    }
+  },
+);
+
+// Global-gate safety net (D1c): a synchronous sender failure or a lost
+// mutation releases the store gate WITHOUT any settlement this overlay can
+// observe; the release itself settles the loading window (never a
+// premature clear — during a healthy wait the gate stays held until the
+// result commits and its presentation revision is reached).
+watch(
+  () => props.dispatchState,
+  (d) => {
+    if (!conceptPending.value) return;
+    if (!d || d.inFlight === null) conceptPending.value = false;
+  },
+);
 
 // -- Preset state -----------------------------------------------------------
 function setMode(next) {
@@ -392,7 +505,20 @@ function confirmCustom() {
 
 // -- Concept state -----------------------------------------------------------
 function applyConcept() {
-  emit("action", { action_id: "creation.concept", payload: { concept: conceptText.value } });
+  // Admission-gated pending (retool-concept-fill-navigation D1a): with the
+  // return-bearing dispatch prop, pending flips ONLY when the store admits
+  // the mutation — a gate-rejected apply never creates a waiting state.
+  // Without the prop (standalone mounts/tests) the emit path sets pending
+  // optimistically; the gate-release safety net still settles it.
+  if (typeof props.dispatch === "function") {
+    if (props.dispatch({ action_id: "creation.concept", payload: { concept: conceptText.value } }) === null) {
+      return;
+    }
+    conceptPending.value = true;
+  } else {
+    conceptPending.value = true;
+    emit("action", { action_id: "creation.concept", payload: { concept: conceptText.value } });
+  }
 }
 
 // -- Frame actions -----------------------------------------------------------
@@ -419,6 +545,23 @@ watch(
   (s) => {
     const value = s ? s.stage : null;
     if (value === null || value === lastStage) {
+      return;
+    }
+    // The in-flight pin and the completion-publish pin (D2/D3): while a
+    // concept apply is pending, the store's stage signal never moves the
+    // presented tab (a republish — including the dispatch's own re-emitted
+    // root — must not kick the player off the concept tab); and the stage
+    // object of the publish whose completion navigation this overlay already
+    // performed is recognized as stale, so it cannot overwrite the landing
+    // on the custom tab. The pin is exactly one publish: any later publish
+    // (new object identity) mirrors normally, keeping keyboard navigation
+    // intact.
+    if (conceptPending.value) {
+      lastStage = value;
+      return;
+    }
+    if (s === latchedStage) {
+      lastStage = value;
       return;
     }
     lastStage = value;
@@ -537,15 +680,6 @@ applyProposal();
               概念
             </button>
           </nav>
-
-          <!-- The applied-proposal notice is reachable from every mode: the
-               fill is confirmed into the custom form, not auto-switched. -->
-          <div v-if="proposalNotice" class="creation-proposal-notice" data-testid="creation-proposal-notice">
-            <span>{{ proposalNotice }}</span>
-            <button type="button" class="creation-proposal-open" data-testid="creation-proposal-open" @click="openCustomFromProposal">
-              開啟表單
-            </button>
-          </div>
 
         <div v-if="mode === 'preset'" class="creation-overlay__presets">
           <button
@@ -689,9 +823,29 @@ applyProposal();
         <div v-else class="creation-overlay__concept">
           <label class="creation-overlay__field">
             <span>角色概念</span>
-            <textarea data-testid="creation-field-concept" rows="4" v-model="conceptText"></textarea>
+            <textarea
+              data-testid="creation-field-concept"
+              rows="4"
+              :disabled="conceptPending"
+              v-model="conceptText"
+            ></textarea>
           </label>
-          <button type="button" class="creation-concept-apply" data-testid="creation-concept-submit" @click="applyConcept">
+          <div
+            v-if="conceptPending"
+            class="creation-concept-loading"
+            role="status"
+            data-testid="creation-concept-loading"
+          >
+            <span class="creation-concept-spinner" aria-hidden="true"></span>
+            <p class="creation-concept-loading-text">概念生成中，請稍候…</p>
+          </div>
+          <button
+            type="button"
+            class="creation-concept-apply"
+            data-testid="creation-concept-submit"
+            :disabled="applyFrozen"
+            @click="applyConcept"
+          >
             套用概念
           </button>
         </div>
@@ -911,6 +1065,34 @@ applyProposal();
   font-size: var(--text-sm);
 }
 
+.creation-concept-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-5) 0;
+}
+
+.creation-concept-spinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 4px solid var(--line);
+  border-top-color: var(--gold-400);
+  animation: concept-spin 0.9s linear infinite;
+}
+
+@keyframes concept-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.creation-concept-loading-text {
+  margin: 0;
+  color: var(--paper-300);
+  font-size: var(--text-sm);
+}
 
 
 .creation-overlay__footer {
