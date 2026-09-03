@@ -233,7 +233,7 @@ describe("map layout variants (B4 world family, map-02)", () => {
           const text = el.text().toLowerCase();
           const testid = (el.attributes("data-testid") || "").toLowerCase();
           return (
-            /layout|variant|lattice|graph|径|徑|radial|网格|網格/.test(text) ||
+            /layout|variant|lattice|graph|徑|radial|網格/.test(text) ||
             /layout|variant|lattice|graph/.test(testid)
           );
         });

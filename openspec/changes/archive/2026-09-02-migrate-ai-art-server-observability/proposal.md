@@ -1,6 +1,6 @@
 ## Why
 
-AI／SD 是全 repo 最依賴「事後看 log 診斷」的邊界：LLM transport 錯誤、guardrail 拒絕、schema 降級目前只留一句自由句子，看不到 layer、profile、延遲、降級原因；art worker 把 http 失敗吞成 `sd_internal_error` 字串代碼碼後不回任何棧。設計源頭：`docs/superpowers/specs/2026-09-02-observability-logging-design.md` §4.3、§5 批次 3。依賴 `add-observability-lint-gate`。與 `migrate-rules-maps-observability` 目錄不相交，可並行。
+AI／SD 是全 repo 最依賴「事後看 log 診斷」的邊界：LLM transport 錯誤、guardrail 拒絕、schema 降級目前只留一句自由句子，看不到 layer、profile、延遲、降級原因；art worker 把 http 失敗吞成 `sd_internal_error` 字串程式碼碼後不回任何棧。設計源頭：`docs/superpowers/specs/2026-09-02-observability-logging-design.md` §4.3、§5 批次 3。依賴 `add-observability-lint-gate`。與 `migrate-rules-maps-observability` 目錄不相交，可並行。
 
 ## What Changes
 

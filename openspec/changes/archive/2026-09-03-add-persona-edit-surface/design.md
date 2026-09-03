@@ -42,11 +42,11 @@
 
 ### D4: 三新命令逐字複製 `CmdBackground` 三段式
 
-切法：`commands/background.py` 抽出並匯出基類 `CmdPersonaFieldBase`（三段式：無參顯示現值＋用法、有參設定、空白清除；經 `update_persona_field`；欄位鍵為類別屬性），`CmdBackground` 改為該基類的 `background` 子類且行為、鍵、別名完全不變；新模組 `commands/persona.py` 定義 `設定個性`（`個性`）、`設定生平`（`生平`、`背景故事`）、`設定習慣`（`習慣`）三個子類；`commands/default_cmdsets.py` 的 `CharacterCmdSet.at_cmdset_creation` 保留既有 `self.add(CmdBackground)` 並新增三條 add。命令文件條目由 drift contract 驗證。
+切法：`commands/background.py` 抽出並匯出基底類別 `CmdPersonaFieldBase`（三段式：無參顯示現值＋用法、有參設定、空白清除；經 `update_persona_field`；欄位鍵為類別屬性），`CmdBackground` 改為該基底類別的 `background` 子類別別且行為、鍵、別名完全不變；新模組 `commands/persona.py` 定義 `設定個性`（`個性`）、`設定生平`（`生平`、`背景故事`）、`設定習慣`（`習慣`）三個子類別別；`commands/default_cmdsets.py` 的 `CharacterCmdSet.at_cmdset_creation` 保留既有 `self.add(CmdBackground)` 並新增三條 add。命令文件條目由 drift contract 驗證。
 
 ## Risks / Trade-offs
 
 - [spec v5 vs code v6 落差] → 本 delta 直接鎖定 v7 並在 delta 頭注明「v6 為既有未同步版本」；archive 追溯歸 title-system 變更。
-- [玩家把 600 字上限當硬界線在 UI 攔截，伺服端却以 trim 後計] → 雙端以同一「trim 後 1..600 code points」規則鏡像，Vitest＋Node 鏡像案各鎖一條。
+- [玩家把 600 字上限當硬界線在 UI 攔截，伺服端卻以 trim 後計] → 雙端以同一「trim 後 1..600 code points」規則鏡像，Vitest＋Node 鏡像案各鎖一條。
 - [四段 drawer 區塊撐爆 drawer 滾動] → 純 CSS 摺疊展示，非協定面；Vitest 斷言四段 DOM 存在即可。
 - [unknown persona keys 被編輯路徑抹除] → D1 保留其餘鍵不變為顯式 scenario，含未知鍵的 record 編輯後仍含該鍵。

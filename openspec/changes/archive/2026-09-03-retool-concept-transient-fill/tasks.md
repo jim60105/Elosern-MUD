@@ -1,6 +1,6 @@
 # retool-concept-transient-fill — Tasks
 
-實作順序即分組順序：contract（draft/規則）→ actions/presenter → wire（JS 鏡像）→ Vue → Telnet → 文件與登记。每組做完先跑該組 focused 測試再勾選；全程不跑 CI shard 指令。
+實作順序即分組順序：contract（draft/規則）→ actions/presenter → wire（JS 鏡像）→ Vue → Telnet → 文件與登記。每組做完先跑該組 focused 測試再勾選；全程不跑 CI shard 指令。
 
 ## 1. Draft 與規則層（world/rules）
 
@@ -11,7 +11,7 @@
 
 ## 2. Actions 與呈現層（web/webclient）
 
-- [x] 2.1 `web/webclient/actions/creation_actions.py`：`_validate_custom_payload` 改九鍵 exact-set（增必填 `persona`：null 或恰三鍵、各自 1..600 非空）。`_creation_concept_adapter` 改零持久寫入：跑 guarded pipeline → 驗證提案 → （完成時 `session.puppet` 仍是准入 actor 才）寫 `session.ndb.concept_proposal`（覆蓋式，含 `owner_actor_id` 綁定）→ `_success("concept_applied", AFFECTED_CREATION)`——概念路徑完全不讀寫 `FINGERPRINT_NDB_KEY`；降級走既有穩定碼；删 fingerprint／stale 分支。`_creation_custom_adapter` 與 `_creation_reset_adapter` 成功後清 `session.ndb.concept_proposal`。
+- [x] 2.1 `web/webclient/actions/creation_actions.py`：`_validate_custom_payload` 改九鍵 exact-set（增必填 `persona`：null 或恰三鍵、各自 1..600 非空）。`_creation_concept_adapter` 改零持久寫入：跑 guarded pipeline → 驗證提案 → （完成時 `session.puppet` 仍是准入 actor 才）寫 `session.ndb.concept_proposal`（覆蓋式，含 `owner_actor_id` 綁定）→ `_success("concept_applied", AFFECTED_CREATION)`——概念路徑完全不讀寫 `FINGERPRINT_NDB_KEY`；降級走既有穩定碼；刪 fingerprint／stale 分支。`_creation_custom_adapter` 與 `_creation_reset_adapter` 成功後清 `session.ndb.concept_proposal`。
 - [x] 2.2 `web/webclient/presentation/context.py`：新增 frozen `ProposalSnapshot`（仿 `OptionsSnapshot`：`revision` ＋四內容鍵＋owner 驗證、deep-copy）與 `PresentationContext.proposal` 欄位；`web/webclient/presentation/ingress.py` 的 `build_presentation_context`（所有發布路徑唯一的 context 工廠）加提案快照深拷貝（缺槽／損毀／owner 不符降級為 None，仿 `options_snapshot`），並在換偶／sequence 重置路徑清 `concept_proposal`。
 - [x] 2.3 `web/webclient/presentation/creation.py`：`CREATION_SCHEMA_VERSION` 升 2；draft custom 形狀增 `persona`（null 或三鍵物件）；增 optional 頂層 `proposal` 鍵（僅 slot 有值時）；驗證器同步；worst-case 600×3 persona 的 envelope 上限測試。刪 `background_generated`。
 - [x] 2.4 更新 `web/webclient/actions/tests/test_creation_actions.py` 與 `web/webclient/presentation/tests/test_creation_panel.py`：九鍵 validator、concept 零寫入＋slot 生命週期（套用／save 清除／reset 清除／再套用覆蓋且 revision 遞增）、完成序 ui_update 先於 result 且含 proposal、panel v2 proposal 槽渲染與省略、reconnect 無 proposal。掛 traceability ID（`concept-transient-fill::concept-applies-transiently-with-zero-persistent-writes`、`::creation-panel-renders-the-transient-proposal`）。
@@ -34,7 +34,7 @@
 - [x] 5.1 `commands/character_creation.py`：`CmdCharacterConcept` 改暫態流——guarded pipeline 成功後顯示提案摘要（含三欄 persona 文字）、以互動提示收名字＋兩年齡、過成年閘後直接以提案值＋persona 啟動；刪 `apply_concept_proposal` 呼叫與 concept 提示狀態。語法／別名不變。
 - [x] 5.2 更新 `commands/tests/test_command_branch_behaviour.py` 的 concept 分支案：摘要→補欄→啟動、離線降級、成年閘不可繞過。
 
-## 6. 文件、登记與收尾
+## 6. 文件、登記與收尾
 
 - [x] 6.1 `docs/game/commands.md` 與 `docs/game/command-reference.md`：概念流描述更新（無「存草稿」措辭；命令鍵／別名不動）、確認 `設定背景` 條目不受影響；`tests.test_command_docs` 綠。
 - [x] 6.2 若 1/2/5 組新增測試模組：同變更更新 `.github/evennia-shards.json`，跑 `tests.test_evennia_test_optimization_contract`。

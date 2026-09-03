@@ -40,7 +40,7 @@ describe("NarrativeFeed (B1 core family)", () => {
           {
             kind: "out",
             text:
-              "<span class=\"color-203\">石板</span> <span style=\"color: #e06b6b;\">紅</span> 广场",
+              "<span class=\"color-203\">石板</span> <span style=\"color: #e06b6b;\">紅</span> 廣場",
           },
         ],
       },

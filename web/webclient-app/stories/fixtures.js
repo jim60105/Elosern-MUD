@@ -18,7 +18,7 @@ export const NARRATIVE_SAMPLE = [
       "<span class=\"color-033\">石板廣場</span> 夜色沉靜。" +
       "<span class=\"color-208 bgcolor-236\">霧燈</span> 在街角閃爍。",
   },
-  { kind: "err", text: "冷風刮過後頸——有什麼東西在暗處移動。" },
+  { kind: "err", text: "冷風颳過後頸——有什麼東西在暗處移動。" },
   {
     kind: "out",
     text:
@@ -1387,7 +1387,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
           kind: "ammunition",
           icon_key: "ammunition",
           rarity: "common",
-          summary: "基本远程箭矢。",
+          summary: "基本遠程箭矢。",
         },
       },
       {

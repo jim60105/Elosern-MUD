@@ -121,11 +121,11 @@ describe("frame resolver — committed-state following and purity", () => {
     state.panels.exploration = {
       schema_version: 1,
       available: false,
-      reason: { code: "scene_lost", message: "這片區域暂时不可用。" },
+      reason: { code: "scene_lost", message: "這片區域暫時不可用。" },
     };
     const resolver = resolverFor(state);
     const result = resolver.resolve({ source: "exploration.move" });
-    expect(result).toEqual({ unresolvable: true, reason: "這片區域暂时不可用。" });
+    expect(result).toEqual({ unresolvable: true, reason: "這片區域暫時不可用。" });
   });
 });
 

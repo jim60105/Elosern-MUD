@@ -7,7 +7,7 @@
 - 將 `world/rules/` 全部既有 log 呼叫遷移至 `world.observability` facade：snake_case event 碼、補 context（char／room／tick／key）、吞掉的 restore 失敗改 `rollback_restore_failed` warn 事件或豁免註解；同步收縮 `tools/observability_freeze.json`。
 - 將 `world/maps/`（bootstrap、wilderness_population）呼叫點遷移至 facade。
 - rules 提交點依事件目錄發 info 事件：`action_commit`、`combat_round_settled`、`clock_advance`、`settlement_done`（`quest_transition` 由批次 4 的 world/quests 落地）。
-- 新增事件断言測試並登記 `.github/evennia-shards.json`。
+- 新增事件斷言測試並登記 `.github/evennia-shards.json`。
 
 ## Capabilities
 

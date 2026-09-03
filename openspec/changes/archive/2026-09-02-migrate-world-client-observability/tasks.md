@@ -6,7 +6,7 @@
 
 - [x] 1.1 遷移 `world/quests/transitions.py`、`scene_builder.py`、`deadlines.py`、`runtime.py` log 呼叫與 restore 吞點（`rollback_restore_failed` warn 或豁免註解附理由）
 - [x] 1.2 `transitions.py` 成功收尾發 `quest_transition`（char、quest、stage_from、stage_to）；回滾不發
-- [x] 1.3 事件断言測試（含回滾不發事件）＋shards 登記；凍結清單移除四檔
+- [x] 1.3 事件斷言測試（含回滾不發事件）＋shards 登記；凍結清單移除四檔
 
 ## 2. Typeclasses／web
 
@@ -24,7 +24,7 @@
 
 - [x] 4.1 `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.quests typeclasses web.webclient`
 - [x] 4.2 Traceability：`quest-lifecycle` 新需求 id 以 `covers_requirement` 標註於 1.3 測試；`check` 綠
-- [x] 4.3 人工時間線驗收（設計文件 §9.4）：開 server 走數個命令＋一次戰鬥或 quest transition，`server/logs/` 可重建時間線；结果記錄於 change 備註
+- [x] 4.3 人工時間線驗收（設計文件 §9.4）：開 server 走數個命令＋一次戰鬥或 quest transition，`server/logs/` 可重建時間線；結果記錄於 change 備註
 - [x] 4.4 `openspec validate migrate-world-client-observability --strict`
 
 ## Notes

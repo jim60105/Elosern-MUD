@@ -43,7 +43,7 @@ Reuse of existing items is the default (basic gear is shareable: e.g. `leather_a
 |---|---|---|---|---|
 | `wooden_club` | 木製棍棒 | weapon_main | mundane_weapon | human_laborer starter weapon |
 | `gilded_saber` | 鍍金軍刀 | weapon_main | mundane_weapon | human_royal |
-| `great_axe` | 双手巨斧 | weapon_main | mundane_weapon | bearkin heavy fighter |
+| `great_axe` | 雙手巨斧 | weapon_main | mundane_weapon | bearkin heavy fighter |
 | `ashen_scimitar` | 灰燼彎刀 | weapon_main | mundane_weapon | ciaran blade tradition |
 | `steel_fang_dagger` | 鋼牙短刀 | weapon_main | mundane_weapon | catkin/tigerkin shared main-hand dagger |
 | `prism_charm` | 三稜晶符 | accessory | magic_accessory | eolas magical aptitude |

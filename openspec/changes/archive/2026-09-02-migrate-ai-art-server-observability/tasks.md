@@ -7,7 +7,7 @@
 - [x] 1.1 `world/ai/client.py`：遷移 log 呼叫；transport 失敗點發 `llm_transport_error`（endpoint、exc）
 - [x] 1.2 `world/ai/guardrail.py`：guarded 呼叫收尾發恰好一條 `llm_call`（layer、profile、ms、result、reason）；重試細節走 `log_debug`
 - [x] 1.3 `world/ai/action_options.py` 降級診斷改 facade event＋context
-- [x] 1.4 `world/ai/tests/test_guardrail.py` 改 patch facade；新增事件断言測試（成功恰好一條、degraded 雙事件鏈）＋shards 登記
+- [x] 1.4 `world/ai/tests/test_guardrail.py` 改 patch facade；新增事件斷言測試（成功恰好一條、degraded 雙事件鏈）＋shards 登記
 - [x] 1.5 凍結清單移除 `world/ai/` 三檔
 
 ## 2. Art 邊界

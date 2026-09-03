@@ -24,6 +24,6 @@
 - 修改：`world/quests/` 4 檔、`typeclasses/characters.py`、`typeclasses/exits.py`、`web/webclient/` 4 檔、`tools/observability_freeze.json`（清空）。
 - 測試改 patch facade：`typeclasses/tests/test_npc_dialogue.py`、`web/webclient/actions/tests/test_dialogue_composition.py`、`web/webclient/presentation/tests/test_art_push.py`。
 - 新測試模組 → `.github/evennia-shards.json`；`tests/test_quality_gate_contract.py` 加凍結清單為空的 contract。
-  該 contract test 是 `observability-lint-gate`「凍結清單為收斂式 ratchet」需求的回歸断言，
+  該 contract test 是 `observability-lint-gate`「凍結清單為收斂式 ratchet」需求的回歸斷言，
   以該需求的正式 id 標註 traceability，不新增主 spec 需求。
 - 無向後相容需求；無 player-facing 命令變更。

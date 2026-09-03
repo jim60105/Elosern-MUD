@@ -114,7 +114,7 @@ _COUNTER_ROW = FixedTitleDef(
     _COUNTER_ROW_KEY,
     "受矚者",
     TitleCategory.ROMANCE,
-    "众人的目光落在你身上，你已不再闪避。",
+    "眾人的目光落在你身上，你已不再閃避。",
     "累積足夠的被觀看次數即可獲得。",
     TitlePredicate(
         family=TitlePredicateFamily.COUNTER_THRESHOLD, counter="watched_count", threshold=1
@@ -1306,11 +1306,11 @@ class EpithetNominationRulesTests(EvenniaTest):
 
     @covers_requirement("title-system::the-ballot-persists-unchanged-until-consent")
     def test_persist_round_trips_the_ballot(self):
-        self.assertTrue(self._persist(("火焰之心", "烧毁匪寨"), ("新月", "月下救人")))
+        self.assertTrue(self._persist(("火焰之心", "燒毀匪寨"), ("新月", "月下救人")))
         self.assertEqual(
             read_pending_ballot(self.entity),
             (
-                {"display": "火焰之心", "basis": "烧毁匪寨"},
+                {"display": "火焰之心", "basis": "燒毀匪寨"},
                 {"display": "新月", "basis": "月下救人"},
             ),
         )

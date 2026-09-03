@@ -36,7 +36,7 @@ adapter 依既有三參 ABI 取得 session，把驗證過的提案連同 session
 - 替代方案 B（persist 於 character.db）：被否，就是現行被退役的草稿機。
 - ndb 的斷線即滅語意正是「暫態填入」；重新連線後提案槽消失等同「進行中的填入遺失」，與已接受代價一致。
 
-延遲 Deferred 完成時，callback 除了既有 pending/ownership 重驗，還須確認 `session.puppet` 仍是准入時的 actor 才寫槽——換偶後的晚到回應寫入即被拒。生命週期：寫入於套用成功（覆蓋舊提案並递增 `revision`）；清除於 custom save 成功、`creation.reset`、換偶、session 結束。自訂儲存前每次面板重建照常渲染 proposal，讓中斷前已套用未送出的表單可在同 session 內重建。`revision` 是傳輸層識別元：客戶端只在 `revision` 大於已套用值時填入，內容完全相同的連續套用也能觸發覆蓋，同時面板重建不覆寫玩家編輯。
+延遲 Deferred 完成時，callback 除了既有 pending/ownership 重驗，還須確認 `session.puppet` 仍是准入時的 actor 才寫槽——換偶後的晚到回應寫入即被拒。生命週期：寫入於套用成功（覆蓋舊提案並遞增 `revision`）；清除於 custom save 成功、`creation.reset`、換偶、session 結束。自訂儲存前每次面板重建照常渲染 proposal，讓中斷前已套用未送出的表單可在同 session 內重建。`revision` 是傳輸層識別元：客戶端只在 `revision` 大於已套用值時填入，內容完全相同的連續套用也能觸發覆蓋，同時面板重建不覆寫玩家編輯。
 
 ### D2: persona 鍵在 custom draft 為「必現、可 null」
 
@@ -56,13 +56,13 @@ adapter 依既有三參 ABI 取得 session，把驗證過的提案連同 session
 
 ### D5: 伺服端放棄 persona 語意防堵
 
-換種族不覆蓋、不拒絕、不清空——玩家看得見自己送出的內容，上传即意圖；UI 在概念提案的種族／血統與目前選擇不同時顯示審視提示（純文案）。現行「race 不同即清空 persona」規則整體消失。
+換種族不覆蓋、不拒絕、不清空——玩家看得見自己送出的內容，上傳即意圖；UI 在概念提案的種族／血統與目前選擇不同時顯示審視提示（純文案）。現行「race 不同即清空 persona」規則整體消失。
 
 - 替代方案（保留換種族清空，即使 persona 可見）：被否，等於伺服端覆蓋玩家剛打的字，抵觸上傳即意圖模型。
 
 ### D6: Telnet 概念流同步降為暫態
 
-`character concept` 改為：跑 guarded pipeline → 顯示提案摘要（含 persona 三欄文字）→ 以互動提示收名字與兩個年齡（過成年閘）→ 以提案值加親打欄位直接啟動。概念摘要就是終端版的「填入表單」，玩家的確認回應即将提案視為自己的輸入。命令語法與別名不變，命令文件不動。
+`character concept` 改為：跑 guarded pipeline → 顯示提案摘要（含 persona 三欄文字）→ 以互動提示收名字與兩個年齡（過成年閘）→ 以提案值加親打欄位直接啟動。概念摘要就是終端版的「填入表單」，玩家的確認回應即將提案視為自己的輸入。命令語法與別名不變，命令文件不動。
 
 ## Risks / Trade-offs
 

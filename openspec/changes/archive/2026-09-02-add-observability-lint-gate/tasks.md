@@ -16,17 +16,17 @@
 
 ## 3. 正常路徑事件（本 change 範圍）
 
-- [x] 3.1 `commands/command.py::Command` 基類 `at_pre_cmd`/`at_post_cmd` 發 `cmd_in`/`cmd_done`（args 截斷 200、ms、outcome 不可判定時不謊報 ok）
-- [x] 3.2 以 `rg "from evennia import Command" commands/` 產出完整盤點清單（實測含 action、art、background、combat、economy、guild、invite、items、leave、lineage、lore、scene、skip、talk、title、character_creation、localized/general 等檔），**全部**改挂 `commands.command.Command`；完成標準＝該搜尋於 `commands/` production 檔回空
+- [x] 3.1 `commands/command.py::Command` 基底類別 `at_pre_cmd`/`at_post_cmd` 發 `cmd_in`/`cmd_done`（args 截斷 200、ms、outcome 不可判定時不謊報 ok）
+- [x] 3.2 以 `rg "from evennia import Command" commands/` 產出完整盤點清單（實測含 action、art、background、combat、economy、guild、invite、items、leave、lineage、lore、scene、skip、talk、title、character_creation、localized/general 等檔），**全部**改掛 `commands.command.Command`；完成標準＝該搜尋於 `commands/` production 檔回空
 - [x] 3.3 `commands/tests/test_command_observability.py`（`EvenniaCommandTest`）：經命令處理器（非直接 `.func()`）執行兩個來自不同模組的命令，各恰一對 `cmd_in`/`cmd_done`、含 actor pk、命令 key、ms；`cmd_done` 僅 `outcome=ok`
-- [x] 3.4 `server/conf/at_server_startstop.py`：以 design D7 的有序步驟目錄逐一包 `_startup_step(name, fn)`（保留原始調用語義、嚴禁改序）：成功發 `startup_step`（step、ms）；fail-loud 步驟失敗發 facade `log_error(exc=…)` 後 **re-raise**；boot-tolerant 步驟保留容忍但發結構化 degrade（step context）；prompt library 失敗發 `log_error(exc=…)`＋degrade context
+- [x] 3.4 `server/conf/at_server_startstop.py`：以 design D7 的有序步驟目錄逐一包 `_startup_step(name, fn)`（保留原始呼叫語義、嚴禁改序）：成功發 `startup_step`（step、ms）；fail-loud 步驟失敗發 facade `log_error(exc=…)` 後 **re-raise**；boot-tolerant 步驟保留容忍但發結構化 degrade（step context）；prompt library 失敗發 `log_error(exc=…)`＋degrade context
 - [x] 3.4b 同批改寫既有 source-order guard 測試（`world/rules/tests/test_guild_economy_guards.py`、`world/maps/tests/test_bootstrap.py`、`test_limbo_room.py`、`world/quests/tests/test_deadlines.py` 的 `inspect.getsource` 字串斷言）為對 `_startup_step` 記錄器的行為式順序斷言；`test_instance_stage_wiring.py`、`test_degrade.py` 全程跑 `at_server_start` 者驗證不破
 - [x] 3.4c `server/conf/tests/test_startup_observability.py`：patch 全部 startup 操作＋固定時鐘，斷言目錄內每步恰一條 `startup_step`、序完全一致；一個 fail-loud 失敗案例顯示事件＋例外仍傳播
 
 ## 4. server/ 與 commands/ 遷移
 
 - [x] 4.1 遷移 4 檔 server service 模組＋`at_server_startstop.py` 全部 log 呼叫：event 改 snake_case、補 context、吞例外改 `log_error(exc=…)` 或豁免註解
-- [x] 4.2 遷移 `commands/` 內唯一 log 站點（`character_creation.py`）；基類改挂（3.2）不屬 log 遷移、不受凍結清單影響
+- [x] 4.2 遷移 `commands/` 內唯一 log 站點（`character_creation.py`）；基底類別改掛（3.2）不屬 log 遷移、不受凍結清單影響
 - [x] 4.3 `server/conf/tests/test_scene_flavor_service.py` 改 patch facade
 
 ## 5. 規範與 CI

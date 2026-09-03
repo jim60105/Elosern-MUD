@@ -525,7 +525,7 @@ class CmdColorTest(_CmdColorTest):
     用法：
       色彩 ansi | xterm256 | truecolor
 
-    印出色彩對照表與遊戲內可用的色彩代碼，並測試你的客戶端支援程度。
+    印出色彩對照表與遊戲內可用的色彩程式碼，並測試你的客戶端支援程度。
     """
 
     key = "色彩"

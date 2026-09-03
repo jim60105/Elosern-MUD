@@ -1,4 +1,4 @@
-"""Player-facing ``title`` command: browse the title册, swap slots, answer ballots.
+"""Player-facing ``title`` command: browse the title冊, swap slots, answer ballots.
 
 ``title list`` shows the current composed full title, every guild fixed-title
 row (banked rows marked, locked rows carrying their authored ``hint_zh``),
@@ -7,7 +7,7 @@ nomination ballot (change G). ``title codex`` (change H) renders the full
 codex view — the fixed/epithet blocks with the server-computed removal flags
 and the 「提名中」 section — from the same pure read model as the OOB panel.
 ``title equip fixed`` and ``title equip epithet`` swap one occupied slot for
-another (D8): both slots always hold a value once the 册 is non-empty, there
+another (D8): both slots always hold a value once the 冊 is non-empty, there
 is no unequip surface, and an unknown, unbanked, or wrong-kind display fails
 with one stable rejection that never enumerates candidates or hints at what
 the player is missing. ``title accept <1|2|3>`` and ``title decline`` answer
@@ -73,7 +73,7 @@ _REMOVAL_GATE_LINES = {
 
 
 class CmdTitle(Command):
-    """Browse the title册, swap slots, answer ballots, remove epithets."""
+    """Browse the title冊, swap slots, answer ballots, remove epithets."""
 
     key = "title"
     help_category = "General"

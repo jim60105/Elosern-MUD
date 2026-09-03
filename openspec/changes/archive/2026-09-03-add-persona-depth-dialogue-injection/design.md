@@ -34,16 +34,16 @@
 - list/tuple → 列點（`- 項`）序列。
 - 其他形狀（數字、布林、None）→ 跳過該欄／該子鍵，不拋錯。
 
-欄位标签映射：`personality`→性格、`life_story`→人生經歷、`habit`→習慣、`background`→背景、`identity`→身分（渲染時子鍵映射 公開身分／隱秘身分）、`appearance`→外觀、`social_connection`→人脈。單項受 600 字 `_cap`、整塊受 block limit——截斷在渲染後字串上做，行為與現行一致。
+欄位標籤映射：`personality`→性格、`life_story`→人生經歷、`habit`→習慣、`background`→背景、`identity`→身分（渲染時子鍵映射 公開身分／隱秘身分）、`appearance`→外觀、`social_connection`→人脈。單項受 600 字 `_cap`、整塊受 block limit——截斷在渲染後字串上做，行為與現行一致。
 
 - 替代方案（pydantic-style 驗證器）：違背 verbatim opaque 契約，且匯入範例的字串寫法會被自己拒收。否。
-- 替代方案（渲染器住 `world/ai/`）：prompt 組裝层不該管 record 形狀；PersonaStore 本就是 record 渲染的單一位置。
+- 替代方案（渲染器住 `world/ai/`）：prompt 組裝層不該管 record 形狀；PersonaStore 本就是 record 渲染的單一位置。
 
 ### D2: 預設欄位集不動，深度欄位由呼叫端點名
 
 `flatten()` 預設仍三欄（NPC dialogue 的既有位元等值契約不被本變更動到）。新增欄位集由呼叫端覆寫——呼叫端即 `typeclasses/npcs.py` 的 `_persona_block()`（現行 `self.persona.flatten(), character.persona.flatten()`），它是全倉庫對話路徑唯一的 flatten 選點：NPC 自身注入用全欄集 `("personality","life_story","habit","identity","appearance","social_connection")`；玩家注入用恰 `("identity","appearance","social_connection")` 的深度欄位集且 `identity` 以 public-only 視圖進入——玩家自己的個性、生平、習慣與 background 三欄敘事文字＋背景一律不進 NPC prompt（§11.4：NPC 眼中的玩家僅止於外觀、公開身分、人脈）。位元等值的範圍：預設欄位集下「值為字串」的記錄輸出逐字不變（現存全部記錄皆字串值）；容器值的散文字段開始渲染屬寬容契約的刻意改變，連帶現形於 look 顯示與 `option_proposal_service` 的 `persona_digest`。
 
-- 玩家側 `identity` 的 public-only 實作：`PersonaStore` 提供 `public_view()`——回傳一個新的 `PersonaStore`，背後是淺拷貝 record，其中 `identity` 若為 Mapping 則遞迴重建為獨立快照——任意深度的 `hidden` 鍵映射條目一律剪除、巢狀容器全部換成新拷貝（之後記錄被改動也無法把 hidden 灌回已建立的視圖）、循環參照以丢棄該分支降級（字串 identity 原樣保留，無 hidden 可言），其餘鍵照原；非 Mapping record 原樣帶入（flatten 仍得 `None`）。渲染走同一寬容規則。呼叫端語意為 `store.public_view().flatten(...)`；「玩家塊永不含 identity.hidden」由 record 拷貝層保證，絕不事後文字清洗。persona 記錄是 verbatim opaque 的——`hidden` 可能藏在巢狀容器裡被字串化帶出，故剪除必須是深層且快照必須獨立（rubber-duck 阻斷缺陷 #1 的決策）。此方法為純讀取（無寫入 API），但 `test_handler_has_no_write_api` 的恰鍵集合須同步納入 `public_view`。
+- 玩家側 `identity` 的 public-only 實作：`PersonaStore` 提供 `public_view()`——回傳一個新的 `PersonaStore`，背後是淺拷貝 record，其中 `identity` 若為 Mapping 則遞迴重建為獨立快照——任意深度的 `hidden` 鍵映射條目一律剪除、巢狀容器全部換成新拷貝（之後記錄被改動也無法把 hidden 灌回已建立的視圖）、循環參照以丟棄該分支降級（字串 identity 原樣保留，無 hidden 可言），其餘鍵照原；非 Mapping record 原樣帶入（flatten 仍得 `None`）。渲染走同一寬容規則。呼叫端語意為 `store.public_view().flatten(...)`；「玩家塊永不含 identity.hidden」由 record 拷貝層保證，絕不事後文字清洗。persona 記錄是 verbatim opaque 的——`hidden` 可能藏在巢狀容器裡被字串化帶出，故剪除必須是深層且快照必須獨立（rubber-duck 阻斷缺陷 #1 的決策）。此方法為純讀取（無寫入 API），但 `test_handler_has_no_write_api` 的恰鍵集合須同步納入 `public_view`。
 
 ### D3: 注入政策以欄位集常數鎖在 npc_dialogue、由 seam 匯入使用
 

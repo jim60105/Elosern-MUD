@@ -2,9 +2,9 @@
 
 順序：renderer（PersonaStore）→ 欄位政策（npc_dialogue）→ 截斷／成本校驗。每組做完先跑該組 focused 測試再勾選。本變更與 A／B 檔案不相交，可平行執行。
 
-## 1. PersonaStore 宽容渲染（world/rules/persona.py）
+## 1. PersonaStore 寬容渲染（world/rules/persona.py）
 
-- [x] 1.1 實作宽容渲染器：非空字串照渲染；Mapping → 「子鍵：值」行（已知鍵群宣告順序：`identity`→public,hidden；`appearance`→height,weight,measurement,style,overview,attire,feature；未知子鍵排後、以原鍵名為標籤）；list/tuple → `- 項` 列點；更深巢狀以字串化收尾；數字／布林／None 跳過不拋錯。
+- [x] 1.1 實作寬容渲染器：非空字串照渲染；Mapping → 「子鍵：值」行（已知鍵群宣告順序：`identity`→public,hidden；`appearance`→height,weight,measurement,style,overview,attire,feature；未知子鍵排後、以原鍵名為標籤）；list/tuple → `- 項` 列點；更深巢狀以字串化收尾；數字／布林／None 跳過不拋錯。
 - [x] 1.2 標籤映射擴充：`identity`→身分（Mapping 渲染 公開身分／隱秘身分 兩行、字串渲染單節 身分：…）、`appearance`→外觀、`social_connection`→人脈（以對象名為行鍵）；每節經 `_cap` 600、整塊經 block limit。
 - [x] 1.3 `world/rules/tests/test_persona.py` 純邏輯案：巢狀 identity 兩行、字串 identity 單節、appearance 固定子鍵順序＋attire/feature、social_connection 對象名行、清單列點、未知形狀跳過、更深巢狀字串化收尾、單項截斷、整塊截斷、預設欄位集對字串值輸出不變、`public_view()` 剔除 hidden／字串 identity 原樣／記錄不被改動。同步重寫兩條舊契約迴歸鎖：`test_flatten_treats_non_string_fields_as_absent`（None／數字／布林仍跳過；清單／Mapping 改斷言渲染——本 delta 的 MODIFIED 契約）、`test_handler_has_no_write_api` 恰鍵集合納入 `public_view`。掛 `covers_requirement`（`persona-store::flatten-produces-one-bounded-labeled-prompt-block`；ID 隨 requirement 標題不變）。
 - [x] 1.4 Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_persona`。

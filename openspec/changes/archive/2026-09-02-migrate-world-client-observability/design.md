@@ -11,7 +11,7 @@ facade 與 lint gate 已上線，rules/maps 與 ai/art 邊界事件已點亮。�
 1. **`quest_transition` 發點選 `world/quests/transitions.py` 的成功收尾**：transition 的 apply 與 cache 復原都在此完成；bind/abandon 等 lifecycle 操作各自發對應 event（同一 event 名、stage context 表達差異），不在每個 caller 重複發。
 2. **凍結清單清空是硬收尾**：本 change 合併後清單必須為空；加一條 contract test 斷言 `tools/observability_freeze.json` 無條目，防止回歸。
 3. **`web/` 站點多為 presentation 降級路徑**：遷移時 event 碼帶 surface 標識（如 `art_push_unavailable`），context 帶 char pk＋surface 名。
-4. **typeclasses 站點屬生命週期雜項**：按实际語義選 info/warn，不新增事件族。
+4. **typeclasses 站點屬生命週期雜項**：按實際語義選 info/warn，不新增事件族。
 
 ## Risks / Trade-offs
 

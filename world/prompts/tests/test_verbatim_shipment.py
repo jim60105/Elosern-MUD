@@ -68,8 +68,8 @@ _SCENE_BUILDER_SYSTEM = (
 _ACTION_OPTIONS_SYSTEM = (
     "你是《伊洛瑟恩大陸》的遊戲企劃，負責為單人冒險的主角規劃接下來可以採取的行動。"
     "請以正體中文，從底下提供的行動清單中挑選 3 到 5 個主角現在就能執行的行動，做成建議卡片。"
-    "每張卡片只有兩種形式：known_action 卡片必須採用清單中給定的行動代碼（action_code），"
-    "不得自創或改寫代碼與參數；freeform 卡片只能用來表達主角對在場人物說得出口、且合理的台詞。"
+    "每張卡片只有兩種形式：known_action 卡片必須採用清單中給定的行動程式碼（action_code），"
+    "不得自創或改寫程式碼與參數；freeform 卡片只能用來表達主角對在場人物說得出口、且合理的台詞。"
     "鐵律：卡片標籤（label）與說明（hint）中不得出現任何數字，也不得洩漏隱藏數值、真實屬性或好感度；"
     "不得虛構目標，卡片只能引用現場確實存在的人物、地點與物品；"
     "結構欄位（如 npc_index、params）不受此限，必須依照指定的 JSON 格式輸出。"
@@ -84,7 +84,7 @@ _ACTION_OPTIONS_USER = (
     "近期脈絡：{narrative_tail}\n"
     "可執行行動（每個行動附有 action_code 與參數）：{affordances}\n"
     "請依照系統提示的規則，以正體中文輸出 JSON 行動建議。"
-    'known_action 卡片格式為 {"action_code": "清單中的代碼", '
+    'known_action 卡片格式為 {"action_code": "清單中的程式碼", '
     '"label": "正體中文標籤", "params": {"參數": 值}, "hint": "正體中文說明"}；'
     'freeform 卡片格式為 {"npc_index": 0, "label": "對該人物說的話", '
     '"hint": "正體中文說明"}。重申鐵律：label 與 hint 中不得出現任何數字，'

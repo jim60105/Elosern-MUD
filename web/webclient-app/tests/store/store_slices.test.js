@@ -118,7 +118,7 @@ describe("store view slices", () => {
     expect(store.unreadCount).toBe(2);
     store.markNarrativeSeen();
     expect(store.unreadCount).toBe(0);
-    store.appendText("out", "冷風刮過後頸。");
+    store.appendText("out", "冷風颳過後頸。");
     expect(store.unreadCount).toBe(1);
   });
 

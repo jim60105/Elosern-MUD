@@ -33,7 +33,7 @@ linked in D1) `docs/development/frontend-vue-architecture.md`.
   fixture**, so the bundle, its styles, and its self-hosted fonts are proven to load from the origin offline
   while the production default remains legacy (the Vue production flip is C4).
 
-- **D3 — Design system as tokens + self-hosted fonts.** Extract the 设计稿 into CSS custom properties
+- **D3 — Design system as tokens + self-hosted fonts.** Extract the 設計稿 into CSS custom properties
   (palette, single accent, ramps, spacing, motion) + subsetted local `.woff2`; reduced-motion and
   not-color-only enforced at the token/utility level so they are testable.
 

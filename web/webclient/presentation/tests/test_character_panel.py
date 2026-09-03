@@ -317,7 +317,7 @@ class CharacterSchemaTests(unittest.TestCase):
                         current=7.5,
                         max=None,
                         effective=7.5,
-                        layers=[_layer(kind="flat", amount=-2.5, source="condition", name="剧毒")],
+                        layers=[_layer(kind="flat", amount=-2.5, source="condition", name="劇毒")],
                     )
                 ]
             )
