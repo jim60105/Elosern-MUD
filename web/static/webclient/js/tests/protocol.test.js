@@ -1562,7 +1562,7 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.local_map, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.services, 3);
   assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 3);
+  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 4);
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.character, 7);
   assert.equal(Protocol.PANEL_ALLOWLIST.lineage, 1);
@@ -2961,7 +2961,7 @@ function validCreationPanel(overrides) {
   }));
   return deepMerge(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "creation",
       draft: null,
@@ -3048,6 +3048,11 @@ function validCreationPanel(overrides) {
             ],
           },
         },
+        sex: [
+          { key: "female", label: "女性" },
+          { key: "male", label: "男性" },
+          { key: "other", label: "其他" },
+        ],
       },
     },
     overrides
@@ -3061,7 +3066,7 @@ test("accepts a valid creation panel and the common unavailable form", () => {
       "creation",
       Protocol.PANEL_ALLOWLIST.creation,
       {
-        schema_version: 3,
+        schema_version: 4,
         available: false,
         reason: { code: "creation_unavailable", message: "角色建立畫面目前無法顯示" },
       }
@@ -3073,6 +3078,8 @@ test("creation panel rejects malformed and unknown-node fields", () => {
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ kind: "services" })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 1 })));
+  // v3 is the pre-sex version: hard cutover, the exact gate rejects it.
+  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 3 })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 2 })));
   const badDraft = validCreationPanel({ draft: { mode: "preset", stage: "custom_filled", preset_key: "x" } });
   assert.throws(() => Protocol.validateCreationPanel(badDraft));
@@ -3087,7 +3094,7 @@ test("creation panel rejects malformed and unknown-node fields", () => {
   assert.throws(() => Protocol.validateCreationPanel(wrongAxes));
 });
 
-test("creation panel v3 carries the draft persona and the proposal slot", () => {
+test("creation panel v4 carries the draft persona, sex, and the proposal slot", () => {
   const customDraft = {
     mode: "custom",
     stage: "custom_filled",
@@ -3099,6 +3106,7 @@ test("creation panel v3 carries the draft persona and the proposal slot", () => 
     background: null,
     allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
     affinity_elements: [],
+    sex: "other",
     persona: { personality: "沉穩", life_story: "來自邊境的小村", habit: "清晨練劍" },
   };
   const proposal = {
@@ -3110,7 +3118,8 @@ test("creation panel v3 carries the draft persona and the proposal slot", () => 
   };
   const payload = validCreationPanel({ draft: customDraft, proposal });
   const validated = Protocol.validateCreationPanel(payload);
-  assert.equal(validated.schema_version, 3);
+  assert.equal(validated.schema_version, 4);
+  assert.equal(validated.draft.sex, "other");
   assert.deepEqual(validated.draft.persona, customDraft.persona);
   assert.deepEqual(validated.proposal, proposal);
   // A draft with an explicit null persona is valid.
@@ -3298,6 +3307,7 @@ test("creation panel enforces per-field bounds", () => {
       allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0, magic_power: 0 },
       persona: null,
       affinity_elements: [],
+      sex: "other",
     },
   });
   assert.throws(() => Protocol.validateCreationPanel(underageDraft));
@@ -3314,6 +3324,7 @@ test("creation panel enforces per-field bounds", () => {
       allocations: { hp: 0 },
       persona: null,
       affinity_elements: [],
+      sex: "other",
     },
   });
   assert.throws(() => Protocol.validateCreationPanel(badAllocations));
@@ -3321,6 +3332,57 @@ test("creation panel enforces per-field bounds", () => {
   const { persona, ...draftWithoutPersona } = underageDraft.draft;
   assert.throws(() =>
     Protocol.validateCreationPanel({ ...underageDraft, draft: draftWithoutPersona })
+  );
+});
+
+test("custom.sex mirrors the server vocabulary and the draft gate requires it", () => {
+  const base = validCreationPanel();
+  const validated = Protocol.validateCreationPanel(base);
+  assert.deepEqual(validated.custom.sex, [
+    { key: "female", label: "女性" },
+    { key: "male", label: "男性" },
+    { key: "other", label: "其他" },
+  ]);
+  const reordered = validCreationPanel();
+  reordered.custom.sex.reverse();
+  assert.throws(() => Protocol.validateCreationPanel(reordered));
+  const fabricated = validCreationPanel();
+  fabricated.custom.sex[0] = { key: "dwarf", label: "女性" };
+  assert.throws(() => Protocol.validateCreationPanel(fabricated));
+  const extraField = validCreationPanel();
+  extraField.custom.sex[0].default = true;
+  assert.throws(() => Protocol.validateCreationPanel(extraField));
+  assert.throws(() =>
+    Protocol.validateCreationPanel({
+      ...validCreationPanel(),
+      custom: { ...validCreationPanel().custom, sex: [] },
+    })
+  );
+  // Draft sex: required concrete member (v2-shaped drafts never validate).
+  const draft = {
+    mode: "custom",
+    stage: "custom_filled",
+    display_name: "新角色",
+    age: 20,
+    apparent_age: 20,
+    race: "human",
+    subrace: "human_commoner",
+    background: null,
+    allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0, magic_power: 0 },
+    affinity_elements: [],
+    persona: null,
+    sex: "female",
+  };
+  const carrier = Protocol.validateCreationPanel(validCreationPanel({ draft }));
+  assert.equal(carrier.draft.sex, "female");
+  assert.throws(() =>
+    Protocol.validateCreationPanel(
+      validCreationPanel({ draft: { ...draft, sex: "nope" } })
+    )
+  );
+  const { sex, ...draftWithoutSex } = draft;
+  assert.throws(() =>
+    Protocol.validateCreationPanel(validCreationPanel({ draft: draftWithoutSex }))
   );
 });
 
@@ -3375,7 +3437,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
     (key) => Object.assign({}, affinityElement, { key })
   );
   const payload = {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     kind: "creation",
     draft: null,
@@ -3396,6 +3458,10 @@ test("creation payload maximizing every string field fails the byte gate", () =>
         beastfolk: { maximum: 1, elements: affinityElements },
         elf: { maximum: 0, elements: affinityElements },
       },
+      sex: Protocol.CREATION_SEX_VALUES.map((key) => ({
+        key,
+        label: "x".repeat(Protocol.CREATION_MAX_LABEL),
+      })),
     },
   };
   assert.ok(Protocol.jsonByteSize(payload) > Protocol.MAX_CANONICAL_JSON_BYTES);
@@ -3403,7 +3469,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
 });
 
 test("creation is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 3);
+  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 4);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,

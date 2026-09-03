@@ -97,6 +97,12 @@ const race = ref("human");
 const subrace = ref(null);
 const allocations = reactive({ hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0, magic_power: 0 });
 const background = ref("");
+// Mirror of world/lore/sex.py DEFAULT_SEX (key only — the option labels are
+// server-owned prose shipped in `custom.sex`). Kept byte-identical to the
+// creation_menu.js DEFAULT_SEX_KEY and pinned by
+// tests/test_creation_parity_contract.py (namegen-creation-ui D11).
+const SEX_DEFAULT_KEY = "other";
+const sex = ref(SEX_DEFAULT_KEY);
 // The player-owned persona block (retool-concept-transient-fill D3/D5):
 // three always-rendered prose textareas, all-empty or all-filled at submit.
 const persona = reactive({ personality: "", life_story: "", habit: "" });
@@ -127,7 +133,7 @@ function markFormTouched() {
   }
 }
 watch(
-  [name, age, apparentAge, race, subrace, background, persona, conceptText, allocations],
+  [name, age, apparentAge, race, subrace, background, persona, conceptText, allocations, sex],
   markFormTouched,
   { deep: true, flush: "sync" },
 );
@@ -183,6 +189,7 @@ function syncFromDraft() {
     apparentAge.value = d.apparent_age ?? 18;
     race.value = d.race ?? "human";
     subrace.value = d.subrace ?? null;
+    sex.value = d.sex ?? SEX_DEFAULT_KEY;
     zeroAllocations();
     if (d.allocations) {
       for (const axis of Object.keys(allocations)) {
@@ -313,7 +320,23 @@ const NON_SUCCESS_OUTCOMES = ["rejected", "stale", "error"];
 watch(
   () => props.result,
   (r) => {
-    if (!conceptPending.value || !props.dispatchState || !r) return;
+    if (!props.dispatchState || !r) return;
+    // Name-roll settlement (namegen-creation-ui D6): the backfill happens
+    // ONLY for the request this overlay submitted, with a success outcome
+    // and a usable data slot; anything else just settles the in-flight
+    // state and never touches the name the player may have typed since.
+    if (rollPending.value && r.requestId === rollRequestId.value) {
+      rollPending.value = false;
+      if (
+        r.outcome === "success" &&
+        r.data &&
+        typeof r.data.display_name === "string" &&
+        r.data.display_name !== ""
+      ) {
+        name.value = r.data.display_name;
+      }
+    }
+    if (!conceptPending.value) return;
     if (
       NON_SUCCESS_OUTCOMES.indexOf(r.outcome) !== -1 &&
       r.requestId === props.dispatchState.submittedRequestId
@@ -331,8 +354,10 @@ watch(
 watch(
   () => props.dispatchState,
   (d) => {
-    if (!conceptPending.value) return;
-    if (!d || d.inFlight === null) conceptPending.value = false;
+    if (!d || d.inFlight === null) {
+      conceptPending.value = false;
+      rollPending.value = false;
+    }
   },
 );
 
@@ -354,6 +379,9 @@ const races = computed(() => (Array.isArray(custom.value?.races) ? custom.value.
 
 const raceInfo = computed(() => races.value.find((r) => r.key === race.value));
 const hasSubraces = computed(() => Array.isArray(raceInfo.value?.subraces));
+// The gender select renders the server descriptor verbatim; no label literal
+// exists in this component (webclient-character-creation-ui D4).
+const sexOptions = computed(() => (Array.isArray(custom.value?.sex) ? custom.value.sex : []));
 const subraceOptions = computed(() => {
   const list = raceInfo.value?.subraces ?? [];
   const registry = custom.value?.subraces ?? {};
@@ -499,6 +527,10 @@ function confirmCustom() {
             life_story: persona.life_story.trim(),
             habit: persona.habit.trim(),
           },
+    // The optional tenth key: the mirrored default is omitted (the server
+    // normalizes identically); any explicit non-default selection ships
+    // verbatim (namegen-creation-ui D2/D11).
+    ...(sex.value && sex.value !== SEX_DEFAULT_KEY ? { sex: sex.value } : {}),
   };
   emit("action", { action_id: "creation.custom", payload });
 }
@@ -520,6 +552,42 @@ function applyConcept() {
     emit("action", { action_id: "creation.concept", payload: { concept: conceptText.value } });
   }
 }
+
+// -- Name roll ---------------------------------------------------------------
+// The dice button shares the store's single-mutation gate: like the concept
+// apply, the loading state flips ONLY after admission (a gate-held click
+// never shows a spinner and never double-dispatches, retool-concept-fill-
+// navigation D1a semantics reused).
+const rollPending = ref(false);
+const rollRequestId = ref(null);
+
+function rollName() {
+  const payload = {
+    race: race.value ?? null,
+    subrace: subrace.value ?? null,
+    // The DISPLAYED selection is always sent: the select model is a concrete
+    // key (D11), so a fresh roll carries the mirrored default.
+    sex: sex.value ?? null,
+  };
+  if (typeof props.dispatch === "function") {
+    const requestId = props.dispatch({ action_id: "creation.roll_name", payload });
+    if (requestId === null) return;
+    rollPending.value = true;
+    rollRequestId.value = requestId;
+  } else {
+    rollPending.value = true;
+    rollRequestId.value = null;
+    emit("action", { action_id: "creation.roll_name", payload });
+  }
+}
+
+// Shared dispatch gate: any in-flight mutation (this roll, a save, a concept
+// apply) disables the dice button through the store's dispatch slice.
+const rollDisabled = computed(
+  () =>
+    rollPending.value ||
+    Boolean(props.dispatchState && props.dispatchState.inFlight !== null),
+);
 
 // -- Frame actions -----------------------------------------------------------
 // Activation and the destructive reset always traverse the confirmation
@@ -705,15 +773,37 @@ applyProposal();
             {{ budgetBriefing }}
           </p>
 
+          <div class="creation-overlay__field">
+            <label class="creation-overlay__name-line" for="creation-name-input">
+              <span>名稱</span>
+              <span class="creation-overlay__name-row">
+                <input
+                  id="creation-name-input"
+                  type="text"
+                  data-testid="creation-field-displayName"
+                  :minlength="custom?.name?.min_length ?? 1"
+                  :maxlength="custom?.name?.max_length ?? 64"
+                  v-model="name"
+                />
+                <button
+                  type="button"
+                  class="creation-roll-button"
+                  data-testid="creation-roll-name"
+                  aria-label="擲名"
+                  :disabled="rollDisabled"
+                  @click="rollName"
+                >
+                  🎲
+                </button>
+              </span>
+            </label>
+          </div>
+
           <label class="creation-overlay__field">
-            <span>名稱</span>
-            <input
-              type="text"
-              data-testid="creation-field-displayName"
-              :minlength="custom?.name?.min_length ?? 1"
-              :maxlength="custom?.name?.max_length ?? 64"
-              v-model="name"
-            />
+            <span>性別</span>
+            <select data-testid="creation-sex" v-model="sex">
+              <option v-for="option in sexOptions" :key="option.key" :value="option.key">{{ option.label }}</option>
+            </select>
           </label>
 
           <label class="creation-overlay__field">
@@ -910,6 +1000,25 @@ applyProposal();
   gap: var(--sp-3);
   padding: var(--sp-4) var(--sp-6);
   overflow: auto;
+}
+
+/* The display-name row pairs the input with the dice button (🎲) at its
+   right; the gender select rides directly below the name field. */
+.creation-overlay__name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.creation-overlay__name-line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.creation-roll-button {
+  flex: none;
+  line-height: 1;
 }
 
 /* The mode switch is the shared segmented tray (`.ui-tabs`); it only needs to

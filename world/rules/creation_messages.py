@@ -46,6 +46,7 @@ CREATION_REASON_MESSAGES: dict[str, str] = {
     "duplicate_affinity_element": "屬性親和不能重複選擇同一個元素。",
     "over_bound_affinity": "屬性親和超出該種族允許的上限。",
     "elf_affinity_rejected": "精靈的屬性親和由子種族決定，不能自行選擇。",
+    "unknown_sex": "性別不是可用的選項。",
 }
 
 # Exact message fragments emitted by the deterministic service, mapped to
@@ -81,6 +82,7 @@ _MESSAGE_CODE_MATCHES: tuple[tuple[str, str], ...] = (
     ("subrace affinity seed contains duplicate element", "duplicate_affinity_element"),
     ("affinity_elements contains unknown element", "unknown_affinity_element"),
     ("affinity_elements contains duplicate element", "duplicate_affinity_element"),
+    ("sex must be one of", "unknown_sex"),
 )
 
 

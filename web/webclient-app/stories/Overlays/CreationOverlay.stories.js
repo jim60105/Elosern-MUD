@@ -10,7 +10,7 @@ import {
 } from "../fixtures.js";
 
 // CreationOverlay (B5 overlays family): the full-viewport character-creation
-// wizard for the committed `creation` v2 panel — preset pick, custom form
+// wizard for the committed `creation` v4 panel — preset pick, custom form
 // (adult gate on BOTH the age and apparent_age fields, design D1), the
 // concept branch (transient proposal fill, retool-concept-transient-fill),
 // and the server-persisted wizard draft. Every action emits the exact
@@ -117,6 +117,25 @@ export const Proposal = {
 export const ProposalTransientFill = {
   render: (args) => renderAfterSteps(args, [click("creation-mode-custom")]),
   args: { creation: CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE },
+};
+
+// The custom form with the server-declared gender select and the dice roll
+// in flight (namegen-creation-ui): 女性 is picked, the 🎲 dispatch was
+// admitted, and the settled success result backfills the name field — the
+// story freezes the in-flight window, the component test proves the
+// request-id-matched backfill.
+export const CustomSexRoll = {
+  render: (args) =>
+    renderAfterSteps(args, [
+      click("creation-mode-custom"),
+      fill("creation-sex", "female"),
+      click("creation-roll-name"),
+    ]),
+  args: {
+    creation: CREATION_PANEL_SAMPLE,
+    dispatch: () => "story-roll-1",
+    result: null,
+  },
 };
 
 // The confirmation screen (the legacy creation dock contract): the

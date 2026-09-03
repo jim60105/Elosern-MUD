@@ -9,6 +9,7 @@ assertion that no canonical surface changes on rejection, and the all-or-
 nothing ``activate_draft`` outer transaction.
 """
 
+from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import patch
 import unittest
@@ -1032,3 +1033,280 @@ class CreationConceptTests(CreationActionBase):
         self.assertFalse(self.character.attributes.has("persona"))
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(self.character.traits.all(), [])
+
+
+class RollNamePayloadValidationTests(unittest.TestCase):
+    """Structural gate for the exact ``creation.roll_name`` payload (D5)."""
+
+    def test_exact_three_keys_with_nulls_and_identifiers(self):
+        from web.webclient.actions.creation_actions import (
+            validate_creation_roll_name_payload,
+        )
+
+        valid = {
+            "race": "human",
+            "subrace": "human_commoner",
+            "sex": "female",
+        }
+        self.assertEqual(
+            validate_creation_roll_name_payload(valid), dict(valid)
+        )
+        self.assertEqual(
+            validate_creation_roll_name_payload(
+                {"race": None, "subrace": None, "sex": None}
+            ),
+            {"race": None, "subrace": None, "sex": None},
+        )
+
+    def test_malformed_payloads_raise(self):
+        from web.webclient.actions.creation_actions import (
+            CreationActionError,
+            validate_creation_roll_name_payload,
+        )
+
+        for bad in (
+            {},
+            {"race": "human", "subrace": None},
+            {"race": "human", "subrace": None, "sex": None, "actor": 1},
+            {"race": "", "subrace": None, "sex": None},
+            {"race": "r" * 65, "subrace": None, "sex": None},
+            {"race": 5, "subrace": None, "sex": None},
+            {"race": "human", "subrace": None, "sex": True},
+            "not-a-dict",
+        ):
+            with self.subTest(payload=bad):
+                with self.assertRaises(CreationActionError):
+                    validate_creation_roll_name_payload(bad)
+
+
+class NameRollActionTests(CreationActionBase):
+    """The result-only name roll: semantic gate, zero writes, bound packs."""
+
+    RACE = "human"
+    SUBRACE = "human_commoner"
+
+    def _roll(self, race=RACE, subrace=SUBRACE, sex="female"):
+        from web.webclient.actions.creation_actions import (
+            _creation_roll_name_adapter,
+        )
+
+        return _creation_roll_name_adapter(
+            self.character, {"race": race, "subrace": subrace, "sex": sex}
+        )
+
+    @staticmethod
+    def _bound_parts():
+        from world.lore.names import NAME_PACK_BY_RACE, NAME_PACK_REGISTRY
+
+        bound = set(NAME_PACK_BY_RACE.values())
+        parts: set[str] = set()
+        unbound_only: set[str] = set()
+        for key, pack in NAME_PACK_REGISTRY.items():
+            pool = {part.zh for part in pack.surnames}
+            for entries in pack.given.values():
+                pool.update(part.zh for part in entries)
+            if key in bound:
+                parts |= pool
+            else:
+                unbound_only |= pool
+        return parts, unbound_only - parts
+
+    def _assert_result_only_frames(self, marker_index_start: int) -> None:
+        for entry in self.fake_session.sent[marker_index_start:]:
+            self.assertNotIn(
+                "ui_snapshot", entry, "a name roll must not publish a snapshot"
+            )
+            self.assertNotIn(
+                "ui_update", entry, "a name roll must not publish an update"
+            )
+
+    def _attribute_snapshot(self):
+        return {
+            key: (
+                self.character.attributes.has(key),
+                deepcopy(self.character.attributes.get(key))
+                if self.character.attributes.has(key)
+                else None,
+            )
+            for key in (
+                "age", "apparent_age", "race", "subrace", "sex",
+                "creation_pending", "creation_draft", "skills", "persona",
+                "affinity_elements",
+            )
+        }
+
+    @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
+    def test_valid_roll_returns_name_with_zero_writes_and_no_publish(self):
+        from world.rules.character_creation import _validate_name
+
+        before_attributes = self._attribute_snapshot()
+        frames_before = len(self.fake_session.sent)
+        self._dispatch(
+            self._envelope(
+                "creation.roll_name",
+                {"race": "human", "subrace": "human_commoner", "sex": "female"},
+                request_id="roll-1",
+            )
+        )
+        result = self._last_result()
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "name_rolled")
+        name = result["data"]["display_name"]
+        self.assertEqual(_validate_name(name), name)
+        self.assertNotIn("no_presentation", result)
+        self.assertEqual(self._attribute_snapshot(), before_attributes)
+        self.assertIsNone(read_draft(self.character))
+        self.assertTrue(self.character.creation_pending)
+        self._assert_result_only_frames(frames_before)
+
+    @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
+    def test_activated_character_cannot_roll(self):
+        import web.webclient.actions.creation_actions as actions
+
+        _creation_custom_adapter(self.character, custom_payload())
+        activate_player_character(self.account, self.character, custom_request())
+        self.assertFalse(self.character.creation_pending)
+
+        def spy(*args, **kwargs):
+            raise AssertionError("the roller must never be reached")
+
+        calls: list = []
+        with patch.object(actions, "roll_name_for_race", spy):
+            frames_before = len(self.fake_session.sent)
+            result = self._roll("human", "human_commoner", "female")
+            calls.append(result)
+        (result,) = calls
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "already_complete")
+        self.assertNotIn("data", result)
+        self._assert_result_only_frames(frames_before)
+
+    @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
+    def test_dirty_inputs_reject_before_the_roller(self):
+        import web.webclient.actions.creation_actions as actions
+        from world.rules.creation_messages import rejection_code
+
+        calls: list = []
+
+        def spy(*args, **kwargs):
+            calls.append(args)
+            raise AssertionError("the roller must never be reached")
+
+        cases = {
+            ("dragonborn", None, None): "unknown_race",
+            ("dragonborn", "human_commoner", None): "unknown_race",
+            ("elf", "human_commoner", None): "incompatible_subrace",
+            ("elf", "not_a_subrace", None): "unknown_subrace",
+            (None, "human_commoner", None): "incompatible_subrace",
+            ("human", "human_commoner", "nope"): "unknown_sex",
+        }
+        with patch.object(actions, "roll_name_for_race", spy):
+            for (race, subrace, sex), expected_code in cases.items():
+                with self.subTest(race=race, subrace=subrace, sex=sex):
+                    frames_before = len(self.fake_session.sent)
+                    result = self._roll(race, subrace, sex)
+                    self.assertEqual(result["outcome"], "rejected")
+                    self.assertEqual(result["code"], expected_code)
+                    self.assertEqual(
+                        rejection_code(result["code"]), expected_code
+                    )
+                    self.assertNotIn("data", result)
+                    self.assertTrue(result["no_presentation"])
+                    self._assert_result_only_frames(frames_before)
+        self.assertEqual(calls, [], "rejected rolls must not reach the roller")
+
+    @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
+    def test_unselected_race_falls_back_only_to_bound_packs(self):
+        parts, unbound_only = self._bound_parts()
+        from world.lore.names import NAME_SEPARATOR
+
+        names = {
+            self._roll(None, None, None)["data"]["display_name"]
+            for _ in range(60)
+        }
+        self.assertTrue(names)
+        for name in names:
+            given, separator, surname = name.partition(NAME_SEPARATOR)
+            self.assertTrue(separator)
+            self.assertIn(given, parts, name)
+            self.assertIn(surname, parts, name)
+            self.assertNotIn(given, unbound_only, name)
+            self.assertNotIn(surname, unbound_only, name)
+
+    @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
+    def test_roller_receives_the_module_singleton_rng(self):
+        import web.webclient.actions.creation_actions as actions
+
+        seen: list = []
+
+        def spy(race, sex, rng):
+            seen.append(rng)
+            return "測試名"
+
+        with patch.object(actions, "roll_name_for_race", spy):
+            self._roll()
+            self._roll()
+        self.assertEqual(len(seen), 2)
+        self.assertIs(seen[0], seen[1])
+        self.assertIs(seen[0], actions._ROLL_NAME_RNG)
+
+    @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
+    def test_sex_channel_flows_from_custom_save_to_activation(self):
+        self._dispatch(
+            self._envelope(
+                "creation.custom",
+                custom_payload(sex="female"),
+                request_id="custom-sex-1",
+            )
+        )
+        self.assertEqual(self._last_result()["outcome"], "success")
+        self.assertEqual(read_draft(self.character)["sex"], "female")
+        self._dispatch(
+            self._envelope("creation.activate", {}, request_id="activate-sex-1")
+        )
+        self.assertFalse(self.character.creation_pending)
+        self.assertEqual(self.character.sex, "female")
+        self.assertIsNone(read_draft(self.character))
+
+    @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
+    def test_dirty_sex_rejected_by_the_deterministic_service(self):
+        frames_before = len(self.fake_session.sent)
+        self._dispatch(
+            self._envelope(
+                "creation.custom",
+                custom_payload(sex="nope"),
+                request_id="custom-dirty-1",
+            )
+        )
+        result = self._last_result()
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "unknown_sex")
+        self.assertIsNone(read_draft(self.character))
+        self.assertTrue(self.character.creation_pending)
+
+    @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
+    @covers_requirement("webclient-oob-protocol::result-and-protocol-error-envelopes-are-exact-and-non-overlapping")
+    def test_roll_result_round_trips_the_wire_validator(self):
+        from web.webclient.presentation.protocol import validate_ui_action_result
+
+        self._dispatch(
+            self._envelope(
+                "creation.roll_name",
+                {"race": None, "subrace": None, "sex": "male"},
+                request_id="roll-wire-1",
+            )
+        )
+        result = self._last_result()
+        self.assertEqual(result["outcome"], "success")
+        # The captured frame IS the wire envelope; the server-side mirror of
+        # the JS validator must accept it unchanged (data slot consumption).
+        envelope = next(
+            entry["ui_action_result"][0][0]
+            for entry in reversed(self.fake_session.sent)
+            if "ui_action_result" in entry
+        )
+        validated = validate_ui_action_result(envelope)
+        self.assertEqual(validated["outcome"], "success")
+        self.assertEqual(
+            validated["data"], {"display_name": result["data"]["display_name"]}
+        )

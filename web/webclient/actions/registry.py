@@ -80,8 +80,9 @@ def build_production_action_registry() -> ActionRegistry:
     ``combat.flee``, ``combat.forfeit``), the seven service adapters
     (``guild.register``, ``guild.quest_accept``, ``guild.quest_abandon``,
     ``guild.quest_turnin``, ``guild.exam_start``, ``shop.buy``, ``shop.sell``),
-    the five creation adapters (``creation.preset``, ``creation.custom``,
-    ``creation.concept``, ``creation.activate``, ``creation.reset``), and the
+    the six creation adapters (``creation.preset``, ``creation.custom``,
+    ``creation.concept``, ``creation.roll_name``, ``creation.activate``,
+    ``creation.reset``), and the
     eight exploration adapters (``explore.move``, ``explore.look``,
     ``explore.talk_scripted``, ``explore.talk_freeform``, ``explore.party_invite``,
     ``explore.party_leave``, ``explore.engage``, ``explore.wait``), the two
@@ -108,11 +109,13 @@ def build_production_action_registry() -> ActionRegistry:
         _creation_custom_adapter,
         _creation_preset_adapter,
         _creation_reset_adapter,
+        _creation_roll_name_adapter,
         validate_creation_activate_payload,
         validate_creation_concept_payload,
         validate_creation_custom_payload,
         validate_creation_preset_payload,
         validate_creation_reset_payload,
+        validate_creation_roll_name_payload,
     )
     from web.webclient.actions.exploration_actions import (
         _engage_adapter,
@@ -293,6 +296,18 @@ def build_production_action_registry() -> ActionRegistry:
             validate_payload=validate_creation_concept_payload,
             adapter=_creation_concept_adapter,
             affected_panels=("creation",),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="creation.roll_name",
+            validate_payload=validate_creation_roll_name_payload,
+            adapter=_creation_roll_name_adapter,
+            # The affected-panels value is never consulted: the adapter's
+            # result carries the D10 ``no_presentation`` flag on every
+            # outcome, so a name roll publishes nothing. An empty tuple
+            # here only names the contract ("no panels owned").
+            affected_panels=(),
         )
     )
     registry.register(

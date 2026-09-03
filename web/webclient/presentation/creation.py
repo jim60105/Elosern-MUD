@@ -1,4 +1,4 @@
-"""Exact schema-version-2 ``creation`` panel and presenter (webclient-character-creation-ui).
+"""Exact schema-version-4 ``creation`` panel and presenter (webclient-character-creation-ui).
 
 The presenter serializes the frozen no-mutation creation view owned by
 ``world.rules.creation_wizard`` and validates its own output against the exact
@@ -9,7 +9,10 @@ profile, or the saved draft degrades only that entry while the panel stays
 schema-valid. Version 2 carries the player-owned draft ``persona`` key and the
 optional top-level transient concept ``proposal`` slot
 (retool-concept-transient-fill); no skill, equipment, inventory, magic-level,
-or import-only field is ever exposed.
+or import-only field is ever exposed. Version 3 widened the transient
+``proposal`` slot (bump-creation-panel-proposal-v3); version 4 adds the
+server-labelled ``custom.sex`` option list and the required draft ``sex``
+member (namegen-creation-ui).
 
 The payload shape and the exact shared bounds are mirrored by the client
 validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded by a
@@ -32,6 +35,7 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.lore.elements import ELEMENT_REGISTRY
+from world.lore.sex import SEX_VALUES
 from world.rules.character_creation import (
     MAX_PERSONA_FIELD_LENGTH,
     max_affinity_elements,
@@ -50,10 +54,15 @@ from world.rules.creation_wizard import (
     RaceAffinityBoundsView,
     RaceOptionView,
     SubraceView,
+    SexOptionView,
     read_creation_view,
 )
 
-CREATION_SCHEMA_VERSION = 3
+# Bumped to 4 for the sex-carrying custom descriptor and custom draft
+# (namegen-creation-ui D3): the option list, the required draft ``sex``
+# member, and the mirrored JS validator all move together; a stale v3 panel
+# or draft is rejected by the exact-schema gate on both ends.
+CREATION_SCHEMA_VERSION = 4
 
 # Exact shared bounds (design D2) -- must stay equal in the JS validator and to
 # the creation-wizard view-builder caps (webclient-character-creation-ui D2).
@@ -77,6 +86,9 @@ MAX_SUBRACE_KEY_CODE_POINTS = 64
 MAX_SPECIALTY_CODE_POINTS = 256
 MAX_LABEL_CODE_POINTS = 128
 MAX_EXPLANATION_CODE_POINTS = 256
+# The sex option list mirrors ``SEX_VALUES`` exactly (at most one entry per
+# member); the ceiling is a structural bound that must never bind real data.
+MAX_SEX_OPTIONS = 8
 # The exact eight lore element choices and their Chinese labels. The bound
 # mapping (human 2 / beastfolk 1 / elf 0) is derived from the deterministic
 # ``max_affinity_elements`` so the panel cannot drift from custom creation.
@@ -293,7 +305,7 @@ def _validate_custom(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "custom",
-        {"name", "adult", "races", "subraces", "profiles", "affinity"},
+        {"name", "adult", "races", "subraces", "profiles", "affinity", "sex"},
         {},
     )
     name = _validate_name(value["name"])
@@ -314,6 +326,7 @@ def _validate_custom(value: Any) -> dict[str, Any]:
         raise ProtocolValidationError("profiles must not be empty")
     profiles = [_validate_profile(entry) for entry in profiles]
     affinity = _validate_affinity(value["affinity"])
+    sex = _validate_sex_options(value["sex"])
     return {
         "name": name,
         "adult": adult,
@@ -321,7 +334,35 @@ def _validate_custom(value: Any) -> dict[str, Any]:
         "subraces": subraces,
         "profiles": profiles,
         "affinity": affinity,
+        "sex": sex,
     }
+
+
+def _validate_sex_options(value: Any) -> list[dict[str, Any]]:
+    """Validate the server-labelled sex option list (namegen-creation-ui D4).
+
+    The list mirrors ``SEX_VALUES`` exactly -- one entry per member, registry
+    order, each carrying exactly ``{key, label}`` with a non-empty label. The
+    labels are server-owned Traditional Chinese prose; the browser renders
+    them verbatim.
+    """
+    if not isinstance(value, list) or not 1 <= len(value) <= MAX_SEX_OPTIONS:
+        raise ProtocolValidationError(
+            f"sex must be a non-empty list of at most {MAX_SEX_OPTIONS} options"
+        )
+    options = []
+    for entry in value:
+        _require_exact_fields(entry, "sex option", {"key", "label"}, {})
+        key = _validate_key(entry["key"], "sex key", MAX_SUBRACE_KEY_CODE_POINTS)
+        label = _require_str(entry, "label", maximum=MAX_LABEL_CODE_POINTS)
+        if not label.strip():
+            raise ProtocolValidationError("sex label must be non-empty")
+        options.append({"key": key, "label": label})
+    if [option["key"] for option in options] != list(SEX_VALUES):
+        raise ProtocolValidationError(
+            "sex options must be exactly the sex vocabulary in registry order"
+        )
+    return options
 
 
 def _validate_affinity_element(value: Any) -> dict[str, Any]:
@@ -455,7 +496,7 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
         _require_exact_fields(
             value,
             "custom draft",
-            {"mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background", "affinity_elements", "persona"},
+            {"mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background", "affinity_elements", "persona", "sex"},
             {},
         )
         if value["stage"] != CUSTOM_STAGE:
@@ -476,6 +517,12 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
             value["affinity_elements"], race
         )
         persona = _validate_persona(value["persona"])
+        # The draft stores the concrete normalized member (namegen-creation-
+        # ui D2/D3): mirror the wizard normalizer's vocabulary gate so a
+        # tampered stored sex value degrades the draft slot, not the panel.
+        sex = value["sex"]
+        if sex not in SEX_VALUES:
+            raise ProtocolValidationError("draft sex is not a vocabulary member")
         return {
             "mode": "custom",
             "stage": CUSTOM_STAGE,
@@ -488,6 +535,7 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
             "background": background,
             "affinity_elements": affinity_elements,
             "persona": persona,
+            "sex": sex,
         }
     raise ProtocolValidationError("draft has an unknown mode")
 
@@ -737,6 +785,10 @@ def _serialize_affinity(affinity: AffinityView) -> dict[str, Any]:
     }
 
 
+def _serialize_sex_option(option: SexOptionView) -> dict[str, Any]:
+    return {"key": option.key, "label": option.label}
+
+
 def _serialize_custom(custom: CustomFormView) -> dict[str, Any]:
     return {
         "name": _serialize_name(custom.name),
@@ -745,6 +797,7 @@ def _serialize_custom(custom: CustomFormView) -> dict[str, Any]:
         "subraces": _serialize_subraces(custom.subraces),
         "profiles": [_serialize_profile(profile) for profile in custom.profiles],
         "affinity": _serialize_affinity(custom.affinity),
+        "sex": [_serialize_sex_option(option) for option in custom.sex],
     }
 
 
@@ -768,6 +821,9 @@ def _serialize_draft(draft: dict[str, Any] | None) -> dict[str, Any] | None:
         "allocations": dict(draft["allocations"]),
         "background": draft.get("background"),
         "affinity_elements": list(draft.get("affinity_elements") or []),
+        # The wizard normalizer guarantees a concrete member on every v3
+        # custom draft it accepts; serialize it verbatim for restore.
+        "sex": draft["sex"],
         # The persona block is player-owned data (retool-concept-transient-
         # fill): the saved draft renders it so a reconnect resumes with the
         # player's own prose visible and editable.
@@ -837,6 +893,7 @@ __all__ = [
     "MAX_PROPOSAL_NAME_CODE_POINTS",
     "MAX_RACES",
     "MAX_RACE_KEY_CODE_POINTS",
+    "MAX_SEX_OPTIONS",
     "MAX_SPECIALTY_CODE_POINTS",
     "MAX_SUBRACES",
     "MAX_SUBRACE_KEY_CODE_POINTS",

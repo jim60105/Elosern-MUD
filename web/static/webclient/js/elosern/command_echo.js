@@ -97,7 +97,13 @@
   // controls with no game action and no typed equivalent. `commandLine`
   // checks this list first, so the declaration and the silence share one
   // code path.
-  var SILENT_PRESENTATION_CONTROLS = ["options.dismiss"];
+  var SILENT_PRESENTATION_CONTROLS = [
+    // The name-roll button has no typed-command equivalent (the corpus name
+    // arrives through the result slot, not an input line): declared silent
+    // rather than fabricating a command (namegen-creation-ui D5/D8).
+    "creation.roll_name",
+    "options.dismiss",
+  ];
 
   function isSilentPresentationControl(actionId) {
     return SILENT_PRESENTATION_CONTROLS.indexOf(actionId) !== -1;

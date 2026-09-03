@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import CreationOverlay from "../../components/CreationOverlay.vue";
 import {
   CREATION_PANEL_SAMPLE,
@@ -86,7 +86,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
     });
   });
 
-  it("the custom payload always carries the exact nine keys (blank background and no affinity emit JSON-safe defaults)", async () => {
+  it("the custom payload carries the nine required keys when the default sex stands (blank background and no affinity emit JSON-safe defaults)", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);
     wrapper.get('[data-testid="creation-field-displayName"]').setValue("無名者");
@@ -110,6 +110,31 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(event.payload.background).toBeNull();
     expect(event.payload.affinity_elements).toEqual([]);
     expect(event.payload.persona).toBeNull();
+  });
+
+  it("an explicit non-default sex ships as the optional tenth payload key", async () => {
+    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
+    await switchToCustom(wrapper);
+    wrapper.get('[data-testid="creation-field-displayName"]').setValue("無名者");
+    wrapper.get('[data-testid="creation-field-age"]').setValue(21);
+    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(21);
+    setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 });
+    wrapper.get('[data-testid="creation-sex"]').setValue("female");
+    wrapper.get('[data-testid="creation-submit"]').trigger("click");
+    const event = lastAction(wrapper, "creation.custom");
+    expect(Object.keys(event.payload).sort()).toEqual([
+      "affinity_elements",
+      "age",
+      "allocations",
+      "apparent_age",
+      "background",
+      "display_name",
+      "persona",
+      "race",
+      "sex",
+      "subrace",
+    ]);
+    expect(event.payload.sex).toBe("female");
   });
 
   it("the adult gate rejects age below 18 (gate error, no creation.custom)", async () => {
@@ -405,6 +430,8 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(wrapper.get('[data-testid="creation-persona-habit"]').element.value).toBe("每天清晨沿河岸慢跑。");
     expect(wrapper.get('[data-testid="creation-affinity-fire"]').element.checked).toBe(true);
     expect(wrapper.get('[data-testid="creation-affinity-wind"]').element.checked).toBe(true);
+    // The saved concrete sex member restores into the select.
+    expect(wrapper.get('[data-testid="creation-sex"]').element.value).toBe("male");
     // The budget briefing states the human budget and the seven-axis spans.
     expect(wrapper.get('[data-testid="creation-budget-briefing"]').text()).toContain("28");
     expect(lastAction(wrapper, "creation.custom")).toBeNull(); // not auto-emitted on resume
@@ -501,4 +528,155 @@ describe("CreationOverlay (B5 overlays family)", () => {
     });
     expect(wrapper.find('[data-testid="creation-overlay"]').exists()).toBe(false);
   });
+
+  // -- Sex select + name roll (namegen-creation-ui D6) -----------------------
+  it("the sex select renders the server descriptor verbatim with the default preselected", async () => {
+    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
+    await switchToCustom(wrapper);
+    const select = wrapper.get('[data-testid="creation-sex"]');
+    expect(select.findAll("option").map((option) => [option.attributes("value"), option.text()])).toEqual([
+      ["female", "女性"],
+      ["male", "男性"],
+      ["other", "其他"],
+    ]);
+    expect(select.element.value).toBe("other");
+  });
+
+  it("the fresh-form roll dispatches the displayed selection through the admitted gate", async () => {
+    const dispatchState = { inFlight: null, submittedRequestId: null };
+    const dispatch = vi.fn((intent) => {
+      if (dispatchState.inFlight !== null) return null;
+      dispatchState.inFlight = "r-1";
+      dispatchState.submittedRequestId = "r-1";
+      return "r-1";
+    });
+    const wrapper = mount(CreationOverlay, {
+      props: { creation: CREATION_PANEL_SAMPLE, dispatch, dispatchState },
+    });
+    await switchToCustom(wrapper);
+    await wrapper.get('[data-testid="creation-roll-name"]').trigger("click");
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith({
+      action_id: "creation.roll_name",
+      payload: { race: "human", subrace: null, sex: "other" },
+    });
+    // In flight: the button is disabled (own pending state) and a second
+    // click dispatches nothing; the shared gate (released via new props
+    // identity) also keeps it disabled.
+    expect(wrapper.get('[data-testid="creation-roll-name"]').attributes("disabled")).toBeDefined();
+    await wrapper.setProps({ dispatchState: { ...dispatchState } });
+    await wrapper.get('[data-testid="creation-roll-name"]').trigger("click");
+    expect(dispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("a matched success result backfills the name field exactly once", async () => {
+    const dispatchState = { inFlight: null, submittedRequestId: null };
+    const wrapper = mount(CreationOverlay, {
+      props: {
+        creation: CREATION_PANEL_SAMPLE,
+        dispatch: () => {
+          dispatchState.inFlight = "r-7";
+          dispatchState.submittedRequestId = "r-7";
+          return "r-7";
+        },
+        dispatchState,
+      },
+    });
+    await switchToCustom(wrapper);
+    wrapper.get('[data-testid="creation-field-displayName"]').setValue("自己打的");
+    await wrapper.get('[data-testid="creation-roll-name"]').trigger("click");
+    await wrapper.setProps({
+      result: {
+        requestId: "r-7",
+        epoch: "a".repeat(22),
+        outcome: "success",
+        code: "name_rolled",
+        message: "已擲出一個候選名字。",
+        presentationRevision: 1,
+        data: { display_name: "加斯帕・斯諾" },
+      },
+    });
+    expect(wrapper.get('[data-testid="creation-field-displayName"]').element.value).toBe(
+      "加斯帕・斯諾",
+    );
+    // A replayed identical result never re-backfills over later edits: the
+    // in-flight flag already settled, and a foreign id would not match.
+    wrapper.get('[data-testid="creation-field-displayName"]').setValue("玩家覆寫");
+    await wrapper.setProps({
+      result: {
+        requestId: "r-OTHER",
+        epoch: "a".repeat(22),
+        outcome: "success",
+        code: "name_rolled",
+        message: "別人的結果",
+        presentationRevision: 2,
+        data: { display_name: "不該回填" },
+      },
+    });
+    expect(wrapper.get('[data-testid="creation-field-displayName"]').element.value).toBe("玩家覆寫");
+  });
+
+  it("a foreign or non-success roll result settles without touching the name", async () => {
+    const dispatchState = { inFlight: null, submittedRequestId: null };
+    const wrapper = mount(CreationOverlay, {
+      props: {
+        creation: CREATION_PANEL_SAMPLE,
+        dispatch: () => {
+          dispatchState.inFlight = "r-7";
+          dispatchState.submittedRequestId = "r-7";
+          return "r-7";
+        },
+        dispatchState,
+      },
+    });
+    await switchToCustom(wrapper);
+    wrapper.get('[data-testid="creation-field-displayName"]').setValue("不動名");
+    await wrapper.get('[data-testid="creation-roll-name"]').trigger("click");
+    await wrapper.setProps({
+      result: {
+        requestId: "r-OTHER",
+        epoch: "a".repeat(22),
+        outcome: "success",
+        code: "name_rolled",
+        message: "別人在擲名",
+        presentationRevision: 1,
+        data: { display_name: "不該出現" },
+      },
+    });
+    expect(wrapper.get('[data-testid="creation-field-displayName"]').element.value).toBe("不動名");
+    await wrapper.setProps({
+      result: {
+        requestId: "r-7",
+        epoch: "a".repeat(22),
+        outcome: "rejected",
+        code: "unknown_race",
+        message: "找不到這個種族。",
+        presentationRevision: 1,
+      },
+    });
+    expect(wrapper.get('[data-testid="creation-field-displayName"]').element.value).toBe("不動名");
+    // Settled: the store releases the shared gate and the button re-enables.
+    await wrapper.setProps({ dispatchState: { inFlight: null, submittedRequestId: "r-7" } });
+    expect(wrapper.get('[data-testid="creation-roll-name"]').attributes("disabled")).toBeUndefined();
+  });
+
+  it("the roll sends the displayed non-default sex", async () => {
+    const dispatch = vi.fn(() => "r-2");
+    const wrapper = mount(CreationOverlay, {
+      props: {
+        creation: CREATION_PANEL_SAMPLE,
+        dispatch,
+        dispatchState: { inFlight: null, submittedRequestId: null },
+      },
+    });
+    await switchToCustom(wrapper);
+    wrapper.get('[data-testid="creation-sex"]').setValue("male");
+    wrapper.get('[data-testid="creation-race"]').setValue("elf");
+    wrapper.get('[data-testid="creation-roll-name"]').trigger("click");
+    expect(dispatch).toHaveBeenCalledWith({
+      action_id: "creation.roll_name",
+      payload: { race: "elf", subrace: null, sex: "male" },
+    });
+  });
+
 });

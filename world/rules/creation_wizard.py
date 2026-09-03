@@ -26,6 +26,7 @@ from django.db import transaction
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
+from world.lore.sex import DEFAULT_SEX, SEX_VALUES
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
     _CREATION_ATTRIBUTE_KEYS,
@@ -51,8 +52,11 @@ from world.rules.surfaces import (
 # the custom draft's ``persona`` key required (nullable): the concept becomes a
 # transient form-filler with no server draft (retool-concept-transient-fill),
 # so any draft carrying the retired concept stage or missing the persona key
-# degrades through the normalizer's existing corruption path.
-DRAFT_VERSION = 2
+# degrades through the normalizer's existing corruption path. Version 3 made
+# the custom draft's ``sex`` key required (a concrete normalized member,
+# namegen-creation-ui D2): a v2 draft missing the key degrades the same way,
+# and with zero released players no migration is written.
+DRAFT_VERSION = 3
 PRESET_STAGE = "preset_selected"
 CUSTOM_STAGE = "custom_filled"
 
@@ -63,6 +67,7 @@ MAX_PRESETS = 8
 MAX_RACES = 8
 MAX_SUBRACES = 16
 MAX_PROFILES = 16
+MAX_SEX_OPTIONS = 8
 
 # Custom-form bounds (design D2): identical to the command wizard's name rules
 # and the deterministic adult gate. The display-name bound mirrors the shared
@@ -201,6 +206,21 @@ class AffinityView:
 
 
 @dataclass(frozen=True)
+class SexOptionView:
+    """One sex choice in the custom form, server-labelled (design D4)."""
+
+    key: str
+    label: str
+
+
+# Player-facing Traditional Chinese labels for the sex vocabulary. The keys
+# live in ``world.lore.sex`` (single source); the option list is DERIVED from
+# ``SEX_VALUES`` order so labels can never drift from the vocabulary, and the
+# browser renders them verbatim (no label literal in client code).
+_SEX_LABELS: dict[str, str] = {"female": "女性", "male": "男性", "other": "其他"}
+
+
+@dataclass(frozen=True)
 class CustomFormView:
     """The complete custom-form descriptor built from immutable registries."""
 
@@ -210,6 +230,7 @@ class CustomFormView:
     subraces: dict[str, SubraceView]
     profiles: tuple[ProfileView, ...]
     affinity: AffinityView
+    sex: tuple[SexOptionView, ...]
 
 
 @dataclass(frozen=True)
@@ -315,6 +336,13 @@ def _affinity_view() -> AffinityView:
     return AffinityView(bounds)
 
 
+def _sex_options() -> tuple[SexOptionView, ...]:
+    """Derive the sex descriptor entirely from the sex vocabulary."""
+    return tuple(
+        SexOptionView(key=key, label=_SEX_LABELS[key]) for key in SEX_VALUES
+    )
+
+
 def build_custom_form() -> CustomFormView:
     """Compose the custom-form descriptor entirely from immutable registries."""
     races: list[RaceOptionView] = []
@@ -344,6 +372,7 @@ def build_custom_form() -> CustomFormView:
         subraces=subraces,
         profiles=_profiles(),
         affinity=_affinity_view(),
+        sex=_sex_options(),
     )
 
 
@@ -513,6 +542,14 @@ def _normalize_draft(storage: Any) -> dict[str, Any] | None:
             normalized["persona"] = persona
         else:
             normalized["persona"] = None
+        # The sex key is REQUIRED in the version-3 custom shape and stores
+        # the concrete normalized member (namegen-creation-ui D2): a missing
+        # key is a legacy v2 draft and degrades like any other corruption;
+        # an out-of-vocabulary value means the stored draft was tampered with.
+        sex = storage.get("sex")
+        if sex not in SEX_VALUES:
+            return None
+        normalized["sex"] = sex
         return normalized
     return None
 
@@ -564,6 +601,7 @@ def _request_from_draft(draft: dict[str, Any]) -> CharacterCreationRequest:
         allocations=dict(draft["allocations"]),
         background=draft.get("background"),
         affinity_elements=tuple(draft.get("affinity_elements") or ()),
+        sex=draft.get("sex"),
     )
 
 
@@ -622,6 +660,10 @@ def save_custom_draft(
         "subrace": validated.subrace,
         "allocations": dict(request.allocations),
         "persona": persona_block,
+        # The preflight already normalized None → DEFAULT_SEX, so the draft
+        # always stores one concrete member (design D2: draft stores exactly
+        # what the server accepted).
+        "sex": validated.sex,
     }
     if validated.affinity_elements:
         storage["affinity_elements"] = list(validated.affinity_elements)
@@ -720,6 +762,7 @@ __all__ = [
     "RaceAffinityBoundsView",
     "RaceOptionView",
     "SubraceView",
+    "SexOptionView",
     "activate_draft",
     "build_custom_form",
     "build_preset_cards",

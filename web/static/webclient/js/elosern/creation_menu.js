@@ -27,12 +27,20 @@
   var CUSTOM_ACTION = "creation.custom";
   var CONCEPT_ACTION = "creation.concept";
   var ACTIVATE_ACTION = "creation.activate";
+  var ROLL_NAME_ACTION = "creation.roll_name";
   var RESET_ACTION = "creation.reset";
   // The reset control has no typed command and the creation panel carries no
   // reset label to read; this bounded client-owned control label is the echo's
   // form-(b) exception (complete-ui-command-echo D7), pinned by the Node
   // suite exactly like the combat flee row's button label.
   var RESET_DISPLAY = { actionLabel: "清除草稿" };
+
+  // Mirror of world/lore/sex.py DEFAULT_SEX (key only — labels are
+  // server-owned prose from the panel `custom.sex` descriptor). Pinned by
+  // tests/test_creation_parity_contract.py; the select model is always a
+  // concrete key so the visible selection, the roll payload, and the
+  // custom-payload omission rule share one source (namegen-creation-ui D11).
+  var DEFAULT_SEX_KEY = "other";
 
   // -------------------------------------------------------------------------
   // Root and preset menus.
@@ -175,6 +183,10 @@
       // The player-owned persona block (retool-concept-transient-fill D3):
       // three prose textareas, all-empty or all-filled before submit.
       persona: { personality: "", life_story: "", habit: "" },
+      // The sex select model is ALWAYS a concrete key (namegen-creation-ui
+      // D11): the fresh form displays the mirrored default, matching the
+      // option the browser preselects.
+      sexKey: DEFAULT_SEX_KEY,
     };
   }
 
@@ -206,6 +218,8 @@
     state.displayName = draft.display_name || "";
     state.age = String(draft.age == null ? "" : draft.age);
     state.apparentAge = String(draft.apparent_age == null ? "" : draft.apparent_age);
+    // A v3 draft always carries the concrete normalized member.
+    state.sexKey = draft.sex || DEFAULT_SEX_KEY;
     return state;
   }
 
@@ -500,7 +514,7 @@
       var value = parseInt(state.allocations[axis], 10);
       allocations[axis] = isNaN(value) ? 0 : value;
     });
-    return {
+    var payload = {
       display_name: (state.displayName || "").trim(),
       age: parseInt(state.age, 10) || 0,
       apparent_age: parseInt(state.apparentAge, 10) || 0,
@@ -510,6 +524,25 @@
       affinity_elements: state.affinityElements.slice(),
       allocations: allocations,
       persona: personaPayload(state),
+    };
+    // The optional tenth key (namegen-creation-ui D2): the mirrored default
+    // is omitted — the server normalizes it identically — while any explicit
+    // non-default selection ships verbatim.
+    if (state.sexKey && state.sexKey !== DEFAULT_SEX_KEY) {
+      payload.sex = state.sexKey;
+    }
+    return payload;
+  }
+
+  // The exact wire payload for `creation.roll_name`: the panel's current
+  // race/subrace selection with nulls for unmade choices, and the DISPLAYED
+  // sex (a fresh form sends the mirrored default, matching the visible
+  // selection). Membership is the server's semantic gate, not this function's.
+  function rollNamePayload(state) {
+    return {
+      race: state.raceKey || null,
+      subrace: state.subraceKey || null,
+      sex: state.sexKey || null,
     };
   }
 
@@ -576,7 +609,9 @@
     PRESET_ACTION: PRESET_ACTION,
     CUSTOM_ACTION: CUSTOM_ACTION,
     CONCEPT_ACTION: CONCEPT_ACTION,
+    ROLL_NAME_ACTION: ROLL_NAME_ACTION,
     ACTIVATE_ACTION: ACTIVATE_ACTION,
+    DEFAULT_SEX_KEY: DEFAULT_SEX_KEY,
     RESET_ACTION: RESET_ACTION,
     RESET_DISPLAY: RESET_DISPLAY,
     rootItems: rootItems,
@@ -598,6 +633,7 @@
     allocatedTotal: allocatedTotal,
     validateCustom: validateCustom,
     customPayload: customPayload,
+    rollNamePayload: rollNamePayload,
     personaFields: personaFields,
     personaPayload: personaPayload,
     affinityFor: affinityFor,

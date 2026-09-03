@@ -8,6 +8,7 @@
     "creation.concept",
     "creation.custom",
     "creation.preset",
+    "creation.roll_name",
     "creation.reset",
     "explore.engage",
     "explore.look",
@@ -33,6 +34,7 @@
     "title.remove"
   ],
   "silentPresentationControlIds": [
+    "creation.roll_name",
     "options.dismiss"
   ]
 }

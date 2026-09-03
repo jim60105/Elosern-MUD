@@ -139,6 +139,10 @@ The production action registry SHALL register exactly `creation.preset`, `creati
 - **WHEN** a pending character submits `creation.roll_name` with a valid race, subrace, and sex (or nulls)
 - **THEN** the adapter returns outcome `success` with `data.display_name` from `roll_name_for_race`, no draft, trait, identity, `creation_pending`, or session-slot value changes, and no panel refresh is emitted
 
+#### Scenario: An activated character cannot roll names
+- **WHEN** `creation.roll_name` is submitted for an owned character whose `creation_pending` flag is no longer set
+- **THEN** the adapter rejects with the established `already_complete` code and Traditional Chinese message, the roller is never invoked, no result `data` slot is emitted, and no panel refresh is published
+
 #### Scenario: An unregistered roll-name race is rejected instead of falling back
 - **WHEN** `creation.roll_name` is submitted with a structurally valid 1..64-character `race` key that is not a `RACE_REGISTRY` member
 - **THEN** the adapter rejects with a stable validation code and Traditional Chinese message, the roller is never invoked, and no result `data` slot is emitted

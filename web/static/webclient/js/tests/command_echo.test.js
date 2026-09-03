@@ -540,6 +540,7 @@ test("combat.cast with empty or non-array targetLabels falls back like before", 
 
 test("options.dismiss is a declared silent presentation control", () => {
   assert.ok(Echo.SILENT_PRESENTATION_CONTROLS.indexOf("options.dismiss") !== -1);
+  assert.ok(Echo.SILENT_PRESENTATION_CONTROLS.indexOf("creation.roll_name") !== -1);
   assert.strictEqual(Echo.isSilentPresentationControl("options.dismiss"), true);
   assert.strictEqual(
     Echo.commandLine("options.dismiss", {}, { npcLabel: "老闆" }),
@@ -569,6 +570,7 @@ const REGISTERED_MUTATION_ACTIONS = {
   "creation.custom": { payload: {}, display: {} },
   "creation.preset": { payload: { preset_key: "elf_mage" }, display: {} },
   "creation.reset": { payload: {}, display: { actionLabel: "清除草稿" } },
+  "creation.roll_name": null,
   "explore.engage": { payload: {}, display: { targetLabel: "哥布林" } },
   "explore.look": { payload: { room: true }, display: { room: true } },
   "explore.move": { payload: { exit_ref: "e1", current_node: "n1" }, display: { exitLabel: "北門" } },

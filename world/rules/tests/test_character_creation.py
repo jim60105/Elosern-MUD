@@ -11,6 +11,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
+from world.lore.sex import DEFAULT_SEX
 from world.lore.races import SUBRACE_REGISTRY
 from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
 from world.rules.character_creation import (
@@ -825,3 +826,100 @@ class PersonaActivationTests(EvenniaTest):
             self.assertTrue(self.character.creation_pending)
             self.assertEqual(self.character.traits.all(), [])
             self.assertFalse(self.character.attributes.has("persona"))
+
+
+class SexCreationTests(EvenniaTest):
+    """Optional sex channel: normalize, persist, reject, roll back
+    (namegen-creation-ui D1)."""
+
+    def setUp(self):
+        super().setUp()
+        self.account = create_account(
+            "creator", "creator@example.test", "testpassword", typeclass=Account
+        )
+        self.character = create_object(PlayerCharacter, key="creator-shell")
+        self.account.at_post_create_character(self.character)
+
+    def request(self, **overrides):
+        values = {
+            "mode": "custom",
+            "display_name": "  新角色  ",
+            "age": 20,
+            "apparent_age": 20,
+            "race": "human",
+            "subrace": "human_commoner",
+            "allocations": balanced_allocations("human", "human_commoner"),
+        }
+        values.update(overrides)
+        return CharacterCreationRequest(**values)
+
+    @covers_requirement("player-character-creation::character-creation-enforces-adult-identity-and-registry-compatibility")
+    def test_custom_sex_persists_on_the_activated_entity(self):
+        activate_player_character(
+            self.account, self.character, self.request(sex="female")
+        )
+        self.assertEqual(self.character.sex, "female")
+        self.assertEqual(self.character.attributes.get("sex"), "female")
+
+    @covers_requirement("player-character-creation::character-creation-offers-preset-and-custom-modes")
+    def test_omitted_or_null_sex_normalizes_to_the_default(self):
+        for value in ({"sex": None}, {}):
+            with self.subTest(value=value):
+                character = create_object(PlayerCharacter, key="shell-default")
+                self.account.at_post_create_character(character)
+                checked = preflight_character_creation(
+                    self.account, character, self.request(**value)
+                )
+                self.assertEqual(checked.sex, DEFAULT_SEX)
+                activate_player_character(
+                    self.account, character, self.request(**value)
+                )
+                self.assertEqual(character.sex, DEFAULT_SEX)
+                self.assertEqual(character.attributes.get("sex"), DEFAULT_SEX)
+
+    @covers_requirement("player-character-creation::character-creation-enforces-adult-identity-and-registry-compatibility")
+    def test_sex_outside_the_vocabulary_is_rejected_without_mutation(self):
+        for value in ("x", "Female", "horse", 5):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(
+                    CharacterCreationError, "sex must be one of"
+                ):
+                    activate_player_character(
+                        self.account, self.character, self.request(sex=value)
+                    )
+        self.assertTrue(self.character.creation_pending)
+        # The shell's AttributeProperty default persists at object creation;
+        # the rejection must leave that prior value untouched.
+        self.assertEqual(self.character.attributes.get("sex"), DEFAULT_SEX)
+        self.assertEqual(self.character.traits.all(), [])
+
+    @covers_requirement("player-character-creation::character-creation-enforces-adult-identity-and-registry-compatibility")
+    def test_preset_activation_persists_the_default_sex(self):
+        # The preset catalog declares no sex channel; activation still writes
+        # the normalized member so creation and import paths converge.
+        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+
+        preset_key = next(iter(PLAYER_PRESET_REGISTRY))
+        activate_player_character(
+            self.account, self.character,
+            CharacterCreationRequest(mode="preset", preset_key=preset_key),
+        )
+        self.assertEqual(self.character.sex, DEFAULT_SEX)
+        self.assertEqual(self.character.attributes.get("sex"), DEFAULT_SEX)
+
+    @covers_requirement("player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation")
+    def test_sex_write_failure_rolls_back_the_whole_activation(self):
+        def fail(stage):
+            if stage == "sex":
+                raise RuntimeError("injected")
+
+        with self.assertRaisesRegex(RuntimeError, "injected"):
+            activate_player_character(
+                self.account, self.character, self.request(sex="male"),
+                write_observer=fail,
+            )
+        self.assertTrue(self.character.creation_pending)
+        # Rollback restores the pre-activation snapshot: the creation-time
+        # AttributeProperty default, not the rejected write's "male".
+        self.assertEqual(self.character.attributes.get("sex"), DEFAULT_SEX)
+        self.assertEqual(self.character.traits.all(), [])

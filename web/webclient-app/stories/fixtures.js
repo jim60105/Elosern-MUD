@@ -1472,11 +1472,11 @@ export const SERVICES_PANEL_MINIMAL_SAMPLE = {
 };
 
 // B5 (webclient-vue-06-showcase-overlays): full-overlays fixtures. The
-// `creation` panel (schema v3) mirrors web/webclient/presentation/creation.py
+// `creation` panel (schema v4) mirrors web/webclient/presentation/creation.py
 // exactly: presets (at most 8 cards), the custom descriptor (name/adult
-// bounds, races, subraces, profiles, affinity), and the optional saved
-// wizard draft (preset/custom + background + affinity + persona) plus the
-// optional transient concept proposal slot. The adult
+// bounds, races, subraces, profiles, affinity, sex), and the optional saved
+// wizard draft (preset/custom + background + affinity + persona + sex) plus
+// the optional transient concept proposal slot. The adult
 // bounds advertise the 18 minimum on BOTH age and apparent_age (the
 // deterministic adult gate, webclient-character-creation-ui).
 const ELEMENTS = [
@@ -1491,7 +1491,7 @@ const ELEMENTS = [
 ];
 
 export const CREATION_PANEL_SAMPLE = {
-  schema_version: 3,
+  schema_version: 4,
   available: true,
   kind: "creation",
   draft: null,
@@ -1610,6 +1610,13 @@ export const CREATION_PANEL_SAMPLE = {
       beastfolk: { maximum: 1, elements: ELEMENTS },
       elf: { maximum: 0, elements: ELEMENTS },
     },
+    // Server-labelled sex options in SEX_VALUES order (namegen-creation-ui
+    // D4); the browser renders these labels verbatim.
+    sex: [
+      { key: "female", label: "女性" },
+      { key: "male", label: "男性" },
+      { key: "other", label: "其他" },
+    ],
   },
 };
 
@@ -1635,6 +1642,7 @@ export const CREATION_PANEL_CUSTOM_DRAFT_SAMPLE = {
     allocations: { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 },
     background: "從渡口學來運貨的年輕人。",
     affinity_elements: ["fire", "wind"],
+    sex: "male",
     persona: {
       personality: "沉穩寡言",
       life_story: "在霧骨渡口搬運貨物長大的年輕人。",
@@ -1690,7 +1698,7 @@ export const CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE = {
 // The `creation` panel unavailable form (registry-owned reason, the common
 // unavailable envelope).
 export const CREATION_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 3,
+  schema_version: 4,
   available: false,
   reason: { code: "creation_unavailable", message: "角色創建目前無法顯示" },
 };

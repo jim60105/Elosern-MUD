@@ -117,7 +117,7 @@ class CreationWizardTests(EvenniaTest):
             self.assertEqual(int(clock_after.tick), tick_before)
         self.assertEqual(view.draft["mode"], "custom")
         self.assertEqual(view.draft["display_name"], "新角色")
-        # The version-2 custom draft always carries the required persona key;
+        # The version-3 custom draft always carries the required persona key;
         # a save without a persona stores the explicit null
         # (retool-concept-transient-fill D2).
         self.assertIsNone(view.draft["persona"])
@@ -319,13 +319,13 @@ class CreationWizardTests(EvenniaTest):
         # the creation panel unavailable.
         bases = {
             "unknown preset": {
-                "version": 2,
+                "version": 3,
                 "mode": "preset",
                 "stage": "preset_selected",
                 "preset_key": "nope",
             },
             "underage age": {
-                "version": 2,
+                "version": 3,
                 "mode": "custom",
                 "stage": "custom_filled",
                 "display_name": "角色",
@@ -335,9 +335,10 @@ class CreationWizardTests(EvenniaTest):
                 "subrace": "human_commoner",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
                 "persona": None,
+                "sex": "other",
             },
             "unknown race": {
-                "version": 2,
+                "version": 3,
                 "mode": "custom",
                 "stage": "custom_filled",
                 "display_name": "角色",
@@ -347,9 +348,10 @@ class CreationWizardTests(EvenniaTest):
                 "subrace": "human_commoner",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
                 "persona": None,
+                "sex": "other",
             },
             "incompatible subrace": {
-                "version": 2,
+                "version": 3,
                 "mode": "custom",
                 "stage": "custom_filled",
                 "display_name": "角色",
@@ -359,9 +361,10 @@ class CreationWizardTests(EvenniaTest):
                 "subrace": "foxkin",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
                 "persona": None,
+                "sex": "other",
             },
             "wrong axes": {
-                "version": 2,
+                "version": 3,
                 "mode": "custom",
                 "stage": "custom_filled",
                 "display_name": "角色",
@@ -373,7 +376,7 @@ class CreationWizardTests(EvenniaTest):
                 "persona": None,
             },
             "out of range allocation": {
-                "version": 2,
+                "version": 3,
                 "mode": "custom",
                 "stage": "custom_filled",
                 "display_name": "角色",
@@ -383,12 +386,13 @@ class CreationWizardTests(EvenniaTest):
                 "subrace": "human_commoner",
                 "allocations": {**{axis: 0 for axis in ALLOCATABLE_AXES}, "hp": 20000},
                 "persona": None,
+                "sex": "other",
             },
             # The persona key is required (nullable) in v2: a missing key is a
             # legacy shape and a malformed block is corruption; both degrade
             # the draft slot only (retool-concept-transient-fill D2).
             "missing persona key": {
-                "version": 2,
+                "version": 3,
                 "mode": "custom",
                 "stage": "custom_filled",
                 "display_name": "角色",
@@ -397,9 +401,38 @@ class CreationWizardTests(EvenniaTest):
                 "race": "human",
                 "subrace": "human_commoner",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
+                "sex": "other",
+            },
+            # The sex key is required (concrete member) in v3 (namegen-
+            # creation-ui D2): a legacy v2-shaped draft missing it and a
+            # tampered out-of-vocabulary value both degrade the slot only.
+            "missing sex key": {
+                "version": 3,
+                "mode": "custom",
+                "stage": "custom_filled",
+                "display_name": "角色",
+                "age": 20,
+                "apparent_age": 20,
+                "race": "human",
+                "subrace": "human_commoner",
+                "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
+                "persona": None,
+            },
+            "sex out of vocabulary": {
+                "version": 3,
+                "mode": "custom",
+                "stage": "custom_filled",
+                "display_name": "角色",
+                "age": 20,
+                "apparent_age": 20,
+                "race": "human",
+                "subrace": "human_commoner",
+                "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
+                "persona": None,
+                "sex": "nope",
             },
             "malformed persona block": {
-                "version": 2,
+                "version": 3,
                 "mode": "custom",
                 "stage": "custom_filled",
                 "display_name": "角色",
@@ -409,6 +442,7 @@ class CreationWizardTests(EvenniaTest):
                 "subrace": "human_commoner",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
                 "persona": {"personality": "沉穩"},
+                "sex": "other",
             },
         }
         for label, storage in bases.items():
@@ -419,7 +453,7 @@ class CreationWizardTests(EvenniaTest):
                 self.assertTrue(self.character.creation_pending)
                 self.assertEqual(self.character.traits.all(), [])
 
-    # -- v2 persona/background round-trip and stage retirement ----------------
+    # -- persona/background round-trip and stage retirement (v3 shapes) ------
 
     @covers_requirement(
         "concept-transient-fill::persona-rides-the-custom-draft-payload-and-activation",
@@ -521,3 +555,75 @@ class CreationWizardTests(EvenniaTest):
                     read_draft(self.character),
                     "a rejected persona save must not create a draft",
                 )
+
+    # -- sex channel (namegen-creation-ui D2) ---------------------------------
+
+    @covers_requirement(
+        "webclient-character-creation-ui::creation-presentation-derives-finite-controls-from-immutable-registries"
+    )
+    def test_form_descriptor_carries_server_labelled_sex_options(self):
+        view = read_creation_view(self.character)
+        self.assertEqual(
+            [(option.key, option.label) for option in view.custom.sex],
+            [("female", "女性"), ("male", "男性"), ("other", "其他")],
+        )
+        for option in view.custom.sex:
+            self.assertEqual(
+                {field for field in vars(option)}, {"key", "label"}
+            )
+
+    def test_sex_round_trips_through_the_saved_draft(self):
+        save_custom_draft(
+            self.account, self.character, self.custom_request(sex="male")
+        )
+        draft = read_draft(self.character)
+        self.assertEqual(draft["sex"], "male")
+        reloaded = PlayerCharacter.objects.get(id=self.character.id)
+        self.assertEqual(read_draft(reloaded)["sex"], "male")
+
+    def test_saved_draft_without_sex_stores_the_normalized_default(self):
+        save_custom_draft(self.account, self.character, self.custom_request())
+        from world.lore.sex import DEFAULT_SEX
+
+        self.assertEqual(read_draft(self.character)["sex"], DEFAULT_SEX)
+
+    def test_sex_outside_the_vocabulary_is_rejected_leaving_prior_draft(self):
+        save_custom_draft(
+            self.account, self.character, self.custom_request(sex="female")
+        )
+        before = read_draft(self.character)
+        with self.assertRaises(CharacterCreationError) as ctx:
+            save_custom_draft(
+                self.account, self.character, self.custom_request(sex="nope")
+            )
+        self.assertEqual(rejection_code(ctx.exception), "unknown_sex")
+        self.assertEqual(read_draft(self.character), before)
+
+    def test_v2_custom_draft_without_sex_loads_as_absent(self):
+        # Hard cutover: the sex-carrying version 3 gate makes every stored v2
+        # custom draft (persona required, sex absent) read as no draft.
+        self.character.creation_draft = {
+            "version": 2,
+            "mode": "custom",
+            "stage": CUSTOM_STAGE,
+            "display_name": "舊角色",
+            "age": 20,
+            "apparent_age": 20,
+            "race": "human",
+            "subrace": "human_commoner",
+            "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
+            "persona": None,
+        }
+        self.assertIsNone(read_draft(self.character))
+        self.assertTrue(self.character.creation_pending)
+
+    @covers_requirement(
+        "webclient-character-creation-ui::the-server-owns-the-persisted-creation-wizard-draft"
+    )
+    def test_activation_from_draft_persists_the_saved_sex(self):
+        save_custom_draft(
+            self.account, self.character, self.custom_request(sex="female")
+        )
+        activate_draft(self.account, self.character)
+        self.assertEqual(self.character.sex, "female")
+        self.assertIsNone(read_draft(self.character))

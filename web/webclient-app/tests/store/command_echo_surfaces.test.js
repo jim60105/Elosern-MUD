@@ -609,6 +609,22 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
     },
     {
+      // The name roll is a UI-only convenience: no typed-command equivalent,
+      // declared silent, dispatched with its exact wire payload.
+      id: "EXPECTED SILENCE: creation.roll_name dice control",
+      ids: ["creation.roll_name"],
+      silence: true,
+      prepare() {
+        openExploration();
+        enterCreation();
+        store.dispatchAction("creation.roll_name", {
+          race: "human",
+          subrace: null,
+          sex: "other",
+        });
+      },
+    },
+    {
       id: "blocked duplicate dispatch (in flight) adds no second line",
       ids: ["explore.wait"],
       prepare() {
@@ -657,7 +673,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         `${actionId} must have a behavioral table row (silent controls included)`,
       ).toBe(true);
     }
-    expect(SILENT_IDS).toEqual(["options.dismiss"]);
+    expect(SILENT_IDS).toEqual(["creation.roll_name", "options.dismiss"]);
   });
 
   it("a fill never overrides an explicitly provided descriptor field", () => {

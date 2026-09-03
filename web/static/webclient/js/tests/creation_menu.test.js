@@ -28,7 +28,7 @@ function validPanel(overrides) {
     Object.assign({}, axes[k])
   );
   const panel = {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     kind: "creation",
     draft: null,
@@ -75,6 +75,11 @@ function validPanel(overrides) {
         { race: "human", subrace: "human_commoner", budget: 224, axes: humanAxes },
         { race: "elf", subrace: "fionnen", budget: 437, axes: humanAxes },
         { race: "elf", subrace: "ciaran", budget: 437, axes: humanAxes },
+      ],
+      sex: [
+        { key: "female", label: "女性" },
+        { key: "male", label: "男性" },
+        { key: "other", label: "其他" },
       ],
       affinity: {
         human: {
@@ -375,4 +380,61 @@ test("buildMenus exposes root and preset menus from the panel", () => {
   const model = CreationMenu.buildMenus(validPanel());
   assert.equal(model.menus.root.items.length, 3);
   assert.equal(model.menus.presets.items.length, 2);
+});
+
+// -- sex channel (namegen-creation-ui D5/D11) --------------------------------
+
+test("the custom state carries a concrete default sex key", () => {
+  const panel = validPanel();
+  const state = CreationMenu.defaultCustomState(panel);
+  assert.equal(state.sexKey, CreationMenu.DEFAULT_SEX_KEY);
+  assert.equal(CreationMenu.DEFAULT_SEX_KEY, "other");
+});
+
+test("customPayload omits the default sex and ships a non-default choice", () => {
+  const panel = validPanel();
+  const fresh = CreationMenu.defaultCustomState(panel);
+  const baseline = CreationMenu.customPayload(fresh);
+  assert.equal(Object.prototype.hasOwnProperty.call(baseline, "sex"), false);
+  fresh.sexKey = "female";
+  assert.equal(CreationMenu.customPayload(fresh).sex, "female");
+});
+
+test("stateFromDraft restores the saved sex and defaults a legacy-less draft", () => {
+  const panel = validPanel();
+  const draft = {
+    mode: "custom",
+    stage: "custom_filled",
+    display_name: "露芙",
+    age: 22,
+    apparent_age: 22,
+    race: "elf",
+    subrace: "ciaran",
+    allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13, magic_power: 10 },
+    persona: null,
+    sex: "female",
+  };
+  assert.equal(CreationMenu.stateFromDraft(panel, draft).sexKey, "female");
+  const { sex, ...legacy } = draft;
+  assert.equal(
+    CreationMenu.stateFromDraft(panel, legacy).sexKey,
+    CreationMenu.DEFAULT_SEX_KEY
+  );
+});
+
+test("rollNamePayload ships the displayed selection with nulls for unmade choices", () => {
+  const panel = validPanel();
+  const state = CreationMenu.defaultCustomState(panel);
+  assert.deepEqual(CreationMenu.rollNamePayload(state), {
+    race: "human",
+    subrace: null,
+    sex: CreationMenu.DEFAULT_SEX_KEY,
+  });
+  state.raceKey = null;
+  state.sexKey = "male";
+  assert.deepEqual(CreationMenu.rollNamePayload(state), {
+    race: null,
+    subrace: null,
+    sex: "male",
+  });
 });
