@@ -137,7 +137,10 @@ class CharacterCreationPromptTests(unittest.TestCase):
             self.assertIn(segment, SKILL_REGISTRY)
         self.assertEqual(build_race_catalog(), build_race_catalog())
 
-    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    @covers_requirement(
+        "generative-character-concept::proposals-are-validated-deterministically-against-the-registries",
+        "generative-character-concept::the-concept-prompt-requests-the-expanded-blueprint-and-the-race-affinity-bound",
+    )
     def test_race_catalog_carries_only_the_annotated_affinity_numbers(self):
         import re
 
@@ -154,7 +157,10 @@ class CharacterCreationPromptTests(unittest.TestCase):
         stripped = re.sub(r"，親附上限：\d+）", "", catalog)
         self.assertEqual(re.findall(r"\d", stripped), [])
 
-    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    @covers_requirement(
+        "generative-character-concept::proposals-are-validated-deterministically-against-the-registries",
+        "generative-character-concept::the-concept-prompt-requests-the-expanded-blueprint-and-the-race-affinity-bound",
+    )
     def test_race_catalog_names_the_element_keys(self):
         from world.lore.elements import ELEMENT_REGISTRY
 
@@ -163,7 +169,10 @@ class CharacterCreationPromptTests(unittest.TestCase):
         for key in ELEMENT_REGISTRY:
             self.assertIn(key, element_line)
 
-    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    @covers_requirement(
+        "generative-character-concept::proposals-are-validated-deterministically-against-the-registries",
+        "generative-character-concept::the-concept-prompt-requests-the-expanded-blueprint-and-the-race-affinity-bound",
+    )
     def test_prompt_template_requests_the_expanded_blueprint_without_adult_wording(self):
         # The authored template (before player-concept interpolation) must name
         # the five transient fields, instruct the affinity bound, and carry no
