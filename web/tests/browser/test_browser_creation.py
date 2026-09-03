@@ -313,11 +313,23 @@ class CustomCreationJourneys(CreationBrowserTest):
         # through the text/numeric fields exactly as a keyboard-only player does.
         page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]').focus()")
         page.keyboard.type("新冒險者")
-        _press(page, "Tab")  # name -> actual age
+        _press(page, "Tab")  # name -> name-roll button (namegen-creation-ui)
+        self.assertEqual(
+            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
+            "creation-roll-name",
+            "Tab must move focus from the name field to the name-roll button",
+        )
+        _press(page, "Tab")  # roll button -> sex select
+        self.assertEqual(
+            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
+            "creation-sex",
+            "Tab must move focus from the roll button to the sex select",
+        )
+        _press(page, "Tab")  # sex select -> actual age
         self.assertEqual(
             page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
             "creation-field-age",
-            "Tab must move focus from the name field to the age field",
+            "Tab must move focus from the sex select to the age field",
         )
         page.keyboard.type("24")
         _press(page, "Tab")  # actual age -> apparent age
@@ -785,7 +797,7 @@ class ResetAndDraftJourneys(CreationBrowserTest):
             page,
             {
                 "creation": {
-                    "schema_version": 3,
+                    "schema_version": 4,
                     "available": False,
                     "reason": {"code": "registry_unavailable", "message": reason},
                 }

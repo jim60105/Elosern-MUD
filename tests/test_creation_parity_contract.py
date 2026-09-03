@@ -39,6 +39,7 @@ _CREATION_CONSTANTS = (
     ("MAX_LABEL_CODE_POINTS", "CREATION_MAX_LABEL"),
     ("MAX_EXPLANATION_CODE_POINTS", "CREATION_MAX_EXPLANATION"),
     ("MAX_AFFINITY_CHOICES", "CREATION_MAX_AFFINITY_ELEMENTS"),
+    ("MAX_SEX_OPTIONS", "CREATION_MAX_SEX_OPTIONS"),
 )
 
 
@@ -120,16 +121,16 @@ class CreationValidatorParityContract(unittest.TestCase):
         self.assertEqual(py_match.group(1), js_match.group(1))
         self.assertEqual(js_match.group(1), "600")
 
-    def test_panel_allowlist_contains_creation_v3(self):
+    def test_panel_allowlist_contains_creation_v4(self):
         js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
-        self.assertIn("creation: 3", js_source)
+        self.assertIn("creation: 4", js_source)
         py_source = _PY_CREATION.read_text(encoding="utf-8")
         match = re.search(r"^CREATION_SCHEMA_VERSION\s*=\s*([0-9]+)", py_source, re.MULTILINE)
         self.assertIsNotNone(match, "Python CREATION_SCHEMA_VERSION missing")
         js_match = re.search(r"var CREATION_SCHEMA_VERSION\s*=\s*([0-9]+)", js_source)
         self.assertIsNotNone(js_match, "JS CREATION_SCHEMA_VERSION missing")
         self.assertEqual(match.group(1), js_match.group(1))
-        self.assertEqual(js_match.group(1), "3")
+        self.assertEqual(js_match.group(1), "4")
 
     def test_proposal_display_name_bound_matches_across_the_validators(self):
         # The v3 transient-fill display-name bound must stay equal between the
@@ -182,3 +183,42 @@ class CreationValidatorParityContract(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+_JS_CREATION_MENU = REPO_ROOT / "web/static/webclient/js/elosern/creation_menu.js"
+
+
+class CreationSexVocabularyParityContract(unittest.TestCase):
+    """The sex vocabulary keys are mirrored (never the labels) and pinned.
+
+    world/lore/sex.py owns ``SEX_VALUES``/``DEFAULT_SEX``; the browser must
+    agree on the KEYS it dispatches (custom payload omission rule, roll
+    payload, select model) while all label prose stays server-owned through
+    the panel ``custom.sex`` descriptor (namegen-creation-ui D11).
+    """
+
+    def test_sex_values_and_default_mirror_across_python_and_js(self):
+        from world.lore.sex import DEFAULT_SEX, SEX_VALUES
+
+        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        js_values = re.search(
+            r"var CREATION_SEX_VALUES = \[([^\]]*)\];", js_source
+        )
+        self.assertIsNotNone(js_values, "JS CREATION_SEX_VALUES missing")
+        parsed = [
+            entry.strip().strip('"')
+            for entry in js_values.group(1).split(",")
+            if entry.strip()
+        ]
+        self.assertEqual(parsed, list(SEX_VALUES))
+        js_default = re.search(
+            r'var CREATION_SEX_DEFAULT = "([a-z_]+)"', js_source
+        )
+        self.assertIsNotNone(js_default, "JS CREATION_SEX_DEFAULT missing")
+        self.assertEqual(js_default.group(1), DEFAULT_SEX)
+        menu_source = _JS_CREATION_MENU.read_text(encoding="utf-8")
+        menu_default = re.search(
+            r'var DEFAULT_SEX_KEY = "([a-z_]+)"', menu_source
+        )
+        self.assertIsNotNone(menu_default, "menu DEFAULT_SEX_KEY missing")
+        self.assertEqual(menu_default.group(1), DEFAULT_SEX)
