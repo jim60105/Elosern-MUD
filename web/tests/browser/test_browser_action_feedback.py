@@ -4,17 +4,20 @@ The Vitest suite is outside the spec-traceability index, so the two main-spec
 requirements of the new `webclient-action-feedback` capability are evidenced
 here, driving the real queue in a managed browser (the precedent for this
 Python evidence-bridge pattern is `web/webclient/tests/test_vue_showcase_evidence.py`).
-Requirement mapping (canonical IDs are slug-derived from the delta-spec titles;
-the `covers_requirement` annotations are applied at the archive sync that
-enters these IDs into the traceability index — the same procedure
-test_vue_showcase_evidence.py documents):
+The canonical IDs are slug-derived from the change's delta-spec titles; the
+``covers_requirement`` annotations below were applied at this change's
+archive sync, when the capability entered the traceability index (the same
+procedure test_vue_showcase_evidence.py documents):
 
 - webclient-action-feedback::the-client-owns-a-bounded-action-feedback-toast-queue
     -> queue bounds/FIFO/click-dismiss/auto-dismiss/reload-empty journeys
 - webclient-action-feedback::the-concept-apply-surfaces-exactly-one-confirmation-or-one-failure-toast
     -> the real-server `creation.concept` rejection journey (verbatim crit
        above the mounted creation overlay, overlay result region and feed
-       channels unchanged)
+       channels unchanged). The requirement's success-confirmation branch is
+       written by `retool-concept-fill-navigation` (A3) through the store's
+       `pushToast` entry point; its own tests join this ID's evidence at that
+       change's archive.
 
 Each journey boots its own dedicated isolated server (deterministic offline
 fixtures; no LLM or image service involved). The failure journey dispatches a
@@ -24,6 +27,8 @@ rejected envelope carrying a server-authored message.
 """
 
 from __future__ import annotations
+
+from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import wait_for_store_state
@@ -121,6 +126,9 @@ class ActionFeedbackBrowserTest(BrowserAcceptanceTest):
 
     # -- journeys ---------------------------------------------------------------
 
+    @covers_requirement(
+        "webclient-action-feedback::the-concept-apply-surfaces-exactly-one-confirmation-or-one-failure-toast"
+    )
     def test_failed_concept_surfaces_one_crit_toast_above_the_overlay(self):
         """One recognized concept failure = exactly one crit toast, verbatim,
         painted above the mounted creation overlay; the overlay result region
@@ -180,6 +188,9 @@ class ActionFeedbackBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(self._toast_nodes(page).count(), 0)
 
+    @covers_requirement(
+        "webclient-action-feedback::the-client-owns-a-bounded-action-feedback-toast-queue"
+    )
     def test_queue_bounds_order_dismiss_and_reload(self):
         """Cap 4 with FIFO eviction, monotonic ids, click dismisses exactly
         one entry, and a reload shows an empty queue (client-local state is
