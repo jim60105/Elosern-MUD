@@ -282,7 +282,13 @@ any actor in exploration mode independently of any service host, so the bag SHAL
 only as the count of rows actually shipped and never as a claim about untruncated holdings. The intimate/adult status collapsible is likewise NOT among the deferred surfaces: it is backed by the
 `character` panel's `intimate` field (`webclient-exploration-menu`'s version-4 character-panel
 requirement), and its completeness and absence-when-`null` behaviour are governed by
-`webclient-contextual-hud`'s character-status drawer requirement, not this deferred-surface list. On completion of the contextual HUD redesign the required-component manifest SHALL
+`webclient-contextual-hud`'s character-status drawer requirement, not this deferred-surface list. The
+client-local action-feedback toast queue (`webclient-action-feedback`) is likewise NOT among the deferred
+surfaces: it presents only client-composed or verbatim server-authored action messages rather than a
+backend read model, so its `ToastQueue` component and `feedback-` test-id family are built and
+manifest-listed, while the deferred event-log Toasts surface remains deferred by its own identity — the
+game-event toast queue bound to a not-yet-existing `event-log` read model, asserted absent by its
+`event-log-`/`toast-` test-id binding — and is distinct from the action-feedback queue. On completion of the contextual HUD redesign the required-component manifest SHALL
 be re-frozen at the complete redesign set and the component-coverage gate SHALL enforce that frozen set.
 
 #### Scenario: Creation gate rejects both underage fields
@@ -308,6 +314,10 @@ be re-frozen at the complete redesign set and the component-coverage gate SHALL 
 #### Scenario: Deferred surfaces are absent, not mocked
 - **WHEN** the complete component set is enumerated
 - **THEN** no Party panel, event-log Toasts surface, authored game-help browser, or persistent objective tracker is present and none presents invented data
+
+#### Scenario: The action-feedback queue is built while the event-log queue stays deferred
+- **WHEN** the complete component set and the deferred-surface assertion are enumerated
+- **THEN** the client-local `ToastQueue` with its `feedback-` test-id family is present and manifest-listed, while the `event-log-`/`toast-` bound game-event queue remains named in the deferred-surface assertion waiting on the `event-log` read model
 
 #### Scenario: The intimate/adult status collapsible is no longer deferred
 - **WHEN** the complete component set and its deferred-surface assertion are enumerated

@@ -23,8 +23,10 @@ function extractRule(css, selector) {
   return match ? match[0] : "";
 }
 
-// (b) the four full-screen surfaces and the drawer scrim, each with its
-// expected shared-tier declaration (the scrim derives from the modal tier).
+// (b) the full-screen surfaces, the drawer scrim, and the action-feedback
+// toast queue, each with its expected shared-tier declaration (the scrim
+// derives from the modal tier; the queue rides one step above it, the
+// `.inventory-confirm` precedent, so it outranks every product overlay).
 const SURFACE_RULES = [
   ["components/HudDrawer.vue", ".hud-drawer-scrim", "z-index: calc(var(--z-surface-modal) - 100)"],
   ["components/HudDrawer.vue", ".hud-drawer", "z-index: var(--z-surface-modal)"],
@@ -32,6 +34,7 @@ const SURFACE_RULES = [
   ["components/SceneBackdrop.vue", ".scene-backdrop .scene-backdrop__fullview", "z-index: var(--z-surface-modal)"],
   ["components/FullLogOverlay.vue", ".fulllog-overlay", "z-index: var(--z-surface-modal)"],
   ["components/InventoryPanel.vue", ".inventory-confirm", "z-index: calc(var(--z-surface-modal) + 100)"],
+  ["components/ToastQueue.vue", ".toasts", "z-index: calc(var(--z-surface-modal) + 100)"],
 ];
 
 describe("z-index scale (fix-webclient-hud-integration-gaps)", () => {

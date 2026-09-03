@@ -355,6 +355,7 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `dock-detail`, `hud-drawer-close` (the shared `DockMenu` detail pane probed by the bag-hosting assertions, and the H4 `HudDrawer` close control newly targeted by the add-inventory-item-actions and bag-drawer journeys) | item-actions | REMAP-TO-TESTID |
 | `lineage-panel`, `lineage-panel-header`, `lineage-panel-unavailable`, `lineage-node-<suffix>` (prefix `lineage-node`: `lineage-node-fire_ball`, `lineage-node-tip`, `lineage-node-meter-<skill_key>`, `lineage-node-prereq-<prereq_key>`), `lineage-chain-<suffix>` (prefix `lineage-chain`: `lineage-chain-toggle-fire_arrow`, `lineage-chain-meter-fire_arrow`, `lineage-chain-nodes-fire_arrow`) (血脈面板：面板主體、標頭、每個血脈節點與其熟練度提示、每條前置邊的鏈條計量器；added by the add-skill-lineage-panel change) | lineage-panel | REMAP-TO-TESTID |
 | `title-codex-panel`, `title-codex-<suffix>` (prefix `title-codex`: `title-codex-header`, `title-codex-preview`, `title-codex-star`, `title-codex-tab-epithet`, `title-codex-tab-ballot`, `title-codex-ballot-<i>`, `title-codex-ballot-accept-<i>`, `title-codex-epithet-equip-<i>`, `title-codex-epithet-remove-<i>`, `title-codex-fixed-equip-<rank_key>`, `title-codex-fixed-locked-<rank_key>`, `title-codex-removal-card`, `title-codex-removal-cancel`, `title-codex-removal-confirm`) (頭銜法典視窗：固定頭銜列、星等、綽號提名分頁、提名投票分頁與移除確認卡片；added by the feat/title-codex-removal work) | epithet-nomination | REMAP-TO-TESTID |
+| `feedback-toast-queue`, `feedback-toast-<id>` (prefix `feedback-toast`: the client-local action-feedback toast queue's container and per-entry testids — `title-codex`-style late addition; the queue rides the shared modal tier + 100 so it outranks every product overlay, second only to the reserved `--z-offline`; the event-log-backed game-event toast variant remains deferred and its `toast-`/`event-log-` bindings stay banned in the authored view layer; added by the add-action-feedback-toasts change) | action-feedback | REMAP-TO-TESTID |
 
 **CSS class hooks the managed browser suite targets**（重新對應至穩定掛鉤，無主要需求文字命名這些項目，故無規格增量）：
 
@@ -527,6 +528,11 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 ---
 
 ## 6. 修訂記錄
+
+### action-feedback — 2026-09-03（add-action-feedback-toasts）
+
+- **§2.3 新 family：** 加入 `feedback-toast-queue` / `feedback-toast-<id>`（動作回饋 toast 佇列）。此佇列是純客戶端本地 surface（store 為唯一寫入者、不讀任何 OOB panel 欄位），凍結測試對 toast 的禁令同步**縮窄而非解除**：仍延後的是由 `event_log` 讀模型餵食的遊戲事件 toast 佇列，其 `toast-`／`event-log-` testid 綁定在 authored view layer 持續缺席（`deferred_surfaces_absent.test.js` 的來源級掃描不變）；`feedback-` 前綴自此合法並由該測試正向斷言其存在與純 props 綁定。層級契約：`.toasts` 採 `calc(var(--z-surface-modal) + 100)`（與 `.inventory-confirm` 同層、AppClient 根節點最後一個子節點），凌駕所有產品 overlay，僅次於保留的 `--z-offline`。
+- **§5 完整性聲明維持成立：** 本變更只新增掛鉤，未退役或重新命名任何既有識別碼；§1／§2／§3 其餘章節不受影響。
 
 ### A1.1 — 2026-08-20（封存後，同步 rubber-duck 審查）
 

@@ -65,7 +65,8 @@
       "files_b": [
         "web.tests.browser.test_browser_creation.CreationDispatchJourneys",
         "web.tests.browser.test_browser_creation.PointerCreationJourneys",
-        "web.tests.browser.test_browser_creation.ReconnectCreationJourney"
+        "web.tests.browser.test_browser_creation.ReconnectCreationJourney",
+        "web.tests.browser.test_browser_action_feedback.ActionFeedbackBrowserTest"
       ]
     },
     {
