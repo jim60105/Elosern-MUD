@@ -11,6 +11,7 @@ from world.imports.schema import MAX_ENTITY_KEY_LENGTH
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY, StatModifiers
+from world.lore.sex import DEFAULT_SEX, SEX_VALUES
 from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
 from world.rules.surfaces import (
     restore_attributes,
@@ -25,7 +26,7 @@ _CREATION_ATTRIBUTE_KEYS = (
     "age", "apparent_age", "race", "subrace", "creation_pending",
     "skill_proficiency", "skills", "skill_grants", "equipment",
     "inventory", "wallet", "quest_log", "guild_rank", "persona",
-    "portrait_policy", "affinity_elements",
+    "portrait_policy", "affinity_elements", "sex",
 )
 
 # The single deterministic race-bound mapping every identity channel and the
@@ -174,6 +175,7 @@ class CharacterCreationRequest:
     preset_key: str | None = None
     background: str | None = None
     affinity_elements: tuple[str, ...] | None = None
+    sex: str | None = None
 
 
 @dataclass(frozen=True)
@@ -196,6 +198,7 @@ class _ValidatedCreation:
     values: dict[str, int]
     background: str | None = None
     affinity_elements: tuple[str, ...] = ()
+    sex: str = DEFAULT_SEX
 
 
 def resolve_starting_profile(race_key: str, subrace_key: str | None = None) -> StartingProfile:
@@ -245,6 +248,26 @@ def _validate_name(value: Any) -> str:
 def _validate_adult(value: Any, field: str) -> int:
     if type(value) is not int or value < 18:
         raise CharacterCreationError(f"{field} must be an integer of at least 18")
+    return value
+
+
+def _validate_sex(value: Any) -> str:
+    """Validate the optional creation sex channel into one concrete member.
+
+    An omitted or ``None`` sex normalizes to ``DEFAULT_SEX`` (the same
+    accept-the-default convention as the optional background); any other
+    value must be an exact ``SEX_VALUES`` member. Membership is checked here,
+    not at the wire layer (namegen-creation-ui design D2): the WebClient
+    adapter forwards bounded strings verbatim so every entry point --
+    including the Telnet wizard, which never collects a sex -- converges on
+    this single normalizer before persistence.
+    """
+    if value is None:
+        return DEFAULT_SEX
+    if not isinstance(value, str) or value not in SEX_VALUES:
+        raise CharacterCreationError(
+            "sex must be one of: " + ", ".join(SEX_VALUES)
+        )
     return value
 
 
@@ -383,9 +406,10 @@ def preflight_character_creation(
         if request.mode == "custom"
         else None
     )
+    checked_sex = _validate_sex(request.sex)
     return _ValidatedCreation(
         valid_name, valid_age, valid_apparent_age, race, subrace, values,
-        background, checked_affinity,
+        background, checked_affinity, checked_sex,
     )
 
 
@@ -462,6 +486,10 @@ def activate_player_character(
         "guild_rank": None,
         "creation_pending": False,
         "affinity_elements": list(_resolved_affinity_elements(validated)),
+        # Creation and the character importer converge on one concrete
+        # ``SEX_VALUES`` member here (namegen-creation-ui D2); the wizard
+        # draft is normalized through the same validator before it is stored.
+        "sex": validated.sex,
     }
     persona_record = None
     if persona is not None:

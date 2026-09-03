@@ -25,7 +25,7 @@
 **Non-Goals**
 
 - NPC 生成流接線(設計 §6,屬後續 change)。
-- result envelope `data` 槽的擴充本身(`dispatcher._normalize_result`／`_send_action_result`、`validate_ui_action_result`、JS `validateActionResult`、store 透傳)——屬前置 change `oob-result-data-slot`,本 change 一行不動。
+- result envelope `data` 槽的擴充本身(`_normalize_result` 的欄位集、`_send_action_result` 的 envelope 構造、`validate_ui_action_result`、JS `validateActionResult`、store 透傳)——屬前置 change `oob-result-data-slot`,本 change 不動。唯一例外是 D10 的 dispatcher 完成通道分支:它只讀取 adapter 傳回的內部旗標,不改變任何上線訊息形狀。
 - Telnet 創建精靈加 sex 提示(`character-creation-ux` 不動;Telnet 流不收集 sex,activation 走 `DEFAULT_SEX`)。
 - 擲名歷史、重擲冷卻、語料前端可見性(語料零進前端)。
 - preset 模式的 sex 自訂(preset 目錄無 sex 欄,preset 激活恆 `DEFAULT_SEX`)。
@@ -38,7 +38,7 @@
 
 ### D2 — sex 形態:wire 選填可 null,入站即歸一,draft/activation 恆為具體成員
 
-`creation.custom` payload 的 `sex` 為選填鍵:`sex ∈ SEX_VALUES` 或缺鍵/null → 歸一為 `DEFAULT_SEX`(同 `background` 缺鍵→空的既有慣例)。`_normalize_draft` 的 custom 形狀存**歸一後的具體成員值**(required key、值必為 `SEX_VALUES` 成員)——「draft 存伺服器接受的原值」,還原路徑不需再歸一。`CharacterCreationRequest` 加尾位 `sex: str | None = None`(Telnet 精靈構造不帶 sex → 預設 None → 同樣歸一);`_ValidatedCreation` 帶具體 `sex`;activation 寫 `attribute_values["sex"] = validated.sex`,`_CREATION_ATTRIBUTE_KEYS` 加 `"sex"` 進 rollback 快照。preset 模式不收集 sex,激活恆寫 `DEFAULT_SEX`。
+`creation.custom` payload 的 `sex` 為選填鍵:`sex ∈ SEX_VALUES` 或缺鍵/null → 歸一為 `DEFAULT_SEX`(同 `background` 缺鍵→空的既有慣例)。邊界(2026-09-03 修訂,依 delta spec「A custom submission with an unknown sex is rejected」scenario 與 `age` 既有慣例):結構層只收缺鍵 / null / 1..64 字串,不做成員資格檢查;非成員字串放行到規則層,由 `_validate_sex` 以穩定代碼 `unknown_sex` 在 preflight 拒絕(零寫入)。`_normalize_draft` 的 custom 形狀存**歸一後的具體成員值**(required key、值必為 `SEX_VALUES` 成員)——「draft 存伺服器接受的原值」,還原路徑不需再歸一。`CharacterCreationRequest` 加尾位 `sex: str | None = None`(Telnet 精靈構造不帶 sex → 預設 None → 同樣歸一);`_ValidatedCreation` 帶具體 `sex`;activation 寫 `attribute_values["sex"] = validated.sex`,`_CREATION_ATTRIBUTE_KEYS` 加 `"sex"` 進 rollback 快照。preset 模式不收集 sex,激活恆寫 `DEFAULT_SEX`。
 (Telnet 語意不變:設計 §5.1 只要求規則層接受 None→DEFAULT_SEX;entity 預設本就是 other,寫入具體值使創建與 loader 行為對稱。)
 
 ### D3 — `DRAFT_VERSION` 2→3,cutover 不遷移
@@ -64,8 +64,8 @@ sex 進 draft 形狀後,舊 v2 draft 缺 `sex` 鍵會被 `_normalize_draft` 拒�
 `CreationOverlay.vue` 姓名 `<input>` 右側 🎲 按鈕(`data-testid="creation-roll-name"`,同層 aria-label 中文「擲名」),姓名欄**下方**性別 `<select>`(`data-testid="creation-sex"`):
 - 按鈕點按 → `creation_menu.js` 純邏輯 `rollNamePayload(state)` 造 `{race, subrace, sex}`(未選 Race → 該鍵 null)→ dispatch `creation.roll_name`;沿用既有單在飛閘門(在飛期間按鈕與提交閘門同形禁用)。
 - 結果收斂同概念流模式:watch store 最新 `ui_action_result`,僅 `requestId === submittedRequestId` 且 `outcome === "success"` 且帶 `data.display_name` 時回填 `name` 輸入框;非 success/錯 id 只結算在飛態不改欄。回填後玩家可手動改寫;最終仍由 `creation.custom` 經 `_validate_name` 為準。
-- `creation_menu.js`:`customPayload()` 加 `sex`(未選/預設 → 不帶鍵,靠伺服器歸一;選了就帶);draft→state 還原讀 `draft.sex`;擲名 payload 純函數進 UMD(可 node --test)。
-- `protocol.js`:`CREATION_SCHEMA_VERSION = 4`;`custom` 驗證加 `sex` 欄(≤8 項 `{key,label}`);`creation.custom` payload 驗證加選填 `sex ∈ SEX_VALUES ∪ {null}`;`validateUiMessage` 的 action payload 表加 `creation.roll_name` 三鍵形(null 或 1..64 識別字;sex null 或成員)。`validateActionResult` 的 success 條件 `data` 驗證已由前置 change 落地,本 change 不動。
+- `creation_menu.js`:`customPayload()` 加 `sex`(sexKey 為鏡像預設或 null → 不帶鍵,靠伺服器歸一;選了非預設就帶);`defaultCustomState()` 的 `sexKey` 初始化為鏡像常數 `DEFAULT_SEX_KEY`(D11);draft→state 還原讀 `draft.sex`;`rollNamePayload(state)` 純函數進 UMD(可 node --test),恆送目前顯示選中的 key(新表單即預設 key,與可見選中項一致)。
+- `protocol.js`:`CREATION_SCHEMA_VERSION = 4`;`PANEL_ALLOWLIST.creation = 4`;`custom` 驗證加 `sex` 欄(≤8 項 `{key,label}`);`validateCreationDraft` custom 分支加必填 `sex ∈ SEX_VALUES`;匯出 `CREATION_SEX_VALUES`/`CREATION_SEX_DEFAULT` 鏡像常數(僅 key、不含標籤,由 `tests/test_creation_parity_contract.py` 雙端釘選)。出站 `ui_action` payload 無客戶端驗證表(研究發現:原稿引用的 `validateUiMessage` action 表不存在,JS 只驗證入站訊息;roll_name payload 與既有 `creation.custom` 同樣由伺服端 registry 驗證)。`validateActionResult` 的 success 條件 `data` 驗證已由前置 change 落地,本 change 不動。
 
 ### D7 — 測試落點與 shard(不新增模組)
 
@@ -78,6 +78,31 @@ sex/roll 契約全部補進既有模組:`world.rules.tests.test_character_creati
 ### D9 — 追溯
 
 新 requirement 文字內以代號引用既有符號(`SEX_VALUES`、`DEFAULT_SEX`、`roll_name_for_race`、`creation.roll_name`、`data` 槽、`creation-roll-name` testid),與 D7 測試一一對映;`tools.spec_traceability list`/`check` 沿用上游 change 的驗證流程。
+### D10 — dispatcher result-only 完成通道(研究發現的必要修正)
+
+現況 `_complete_action` 對每個完成的 action 必定出版:`affected_panels` 缺失/空 → 全量快照,
+非空 → 該面板更新;`panel_update` 無內容去重。因此「`creation.roll_name` 不刷 panel」的契約
+(spec scenario「no panel refresh is emitted」)在不改 dispatcher 的前提下不可實作。修正:完成
+通道讀取 adapter 結果的內部布林旗標 `no_presentation`(僅 success/rejected 可帶),為真時跳過
+出版、直接以當前 revision 送結果;`_normalize_result` 維持既有欄位白名單,旗標永不上線。重複
+請求的 busy-result 已是「送結果不出版」的現成先例,客戶端 `releaseIfReady` 對「結果
+presentation_revision == 已提交 revision」立即放行,reducer 收到結果即 notify,不需要新出版。
+既有動作全部不帶旗標,出版路徑零行為變動。
+
+### D11 — sex 的客戶端形態:鏡像常數、真實選中值、無 null-model select
+
+研究發現:原生 `<select v-model>` 配 null 模型無法可靠表示「預選 DEFAULT_SEX」(瀏覽器首項
+fallback 與 Vue 模型會分岔),且 prop 面板不帶 default 欄。定案(比照 `CREATION_AXES`/八元素詞
+彙既有鏡像慣例):
+- 鏡像常數住在 `protocol.js`(`CREATION_SEX_VALUES`、`CREATION_SEX_DEFAULT`,僅 key)與
+  `creation_menu.js`(`DEFAULT_SEX_KEY`)、`CreationOverlay.vue`(`SEX_DEFAULT_KEY`,比照
+  `ACTION_RESULT_FALLBACK_MESSAGE` 的 byte-identical 註解釘選先例);三個鏡像一律由
+  `tests/test_creation_parity_contract.py` 的正則釘選對照 `world/lore/sex.py`(該檔才是既有
+  雙端釘選場所;`test_webclient_contract.py` 與 `ui_contract.test.js` 無此職責)。
+- 模型恒為具體 key:`defaultCustomState().sexKey = DEFAULT_SEX_KEY`;overlay `sex = ref` 初始
+  `SEX_DEFAULT_KEY`,`syncFromDraft` 讀 `d.sex ?? 預設`;下拉的可見選中項、`rollNamePayload`
+  送出的 sex、`customPayload` 的省略判斷三者永遠同源。
+- `customPayload()`:sexKey 等於預設 → 不帶鍵(伺服器歸一,語意與顯式預設等價);非預設 → 帶鍵。
 
 ## Risks / Trade-offs
 
