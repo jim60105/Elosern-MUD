@@ -28,7 +28,7 @@ function validPanel(overrides) {
     Object.assign({}, axes[k])
   );
   const panel = {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     kind: "creation",
     draft: null,
@@ -75,6 +75,11 @@ function validPanel(overrides) {
         { race: "human", subrace: "human_commoner", budget: 224, axes: humanAxes },
         { race: "elf", subrace: "fionnen", budget: 437, axes: humanAxes },
         { race: "elf", subrace: "ciaran", budget: 437, axes: humanAxes },
+      ],
+      sex: [
+        { key: "female", label: "女性" },
+        { key: "male", label: "男性" },
+        { key: "other", label: "其他" },
       ],
       affinity: {
         human: {

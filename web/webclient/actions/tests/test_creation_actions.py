@@ -1160,6 +1160,28 @@ class NameRollActionTests(CreationActionBase):
         self._assert_result_only_frames(frames_before)
 
     @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
+    def test_activated_character_cannot_roll(self):
+        import web.webclient.actions.creation_actions as actions
+
+        _creation_custom_adapter(self.character, custom_payload())
+        activate_player_character(self.account, self.character, custom_request())
+        self.assertFalse(self.character.creation_pending)
+
+        def spy(*args, **kwargs):
+            raise AssertionError("the roller must never be reached")
+
+        calls: list = []
+        with patch.object(actions, "roll_name_for_race", spy):
+            frames_before = len(self.fake_session.sent)
+            result = self._roll("human", "human_commoner", "female")
+            calls.append(result)
+        (result,) = calls
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "already_complete")
+        self.assertNotIn("data", result)
+        self._assert_result_only_frames(frames_before)
+
+    @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
     def test_dirty_inputs_reject_before_the_roller(self):
         import web.webclient.actions.creation_actions as actions
         from world.rules.creation_messages import rejection_code

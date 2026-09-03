@@ -534,6 +534,11 @@ def _creation_roll_name_adapter(
     account = _pending_owner(actor)
     if account is None:
         return _rejected_result_only("ownership_rejected")
+    # Creation-mode boundary (design D5): the roll is a creation-surface
+    # action, so the same pending gate the sibling write adapters enforce
+    # applies here — an activated character may not summon dice.
+    if not bool(getattr(actor, "creation_pending", False)):
+        return _rejected_result_only("already_complete")
     race = payload["race"]
     subrace = payload["subrace"]
     sex = payload["sex"]
