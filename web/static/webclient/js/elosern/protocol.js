@@ -51,9 +51,34 @@
   var MAX_CONDITION_COUNT = 32;
   var MAX_CONDITION_LABEL = 128;
   var MAX_MODIFIER_KEYS = 16;
+  // Adapter data slot (ui_action_result success only). Must match
+  // web.webclient.presentation.protocol.MAX_RESULT_DATA_FIELDS and
+  // MAX_RESULT_DATA_BYTES and RESULT_DATA_STANDARD_RESERVE: eight fields, and
+  // a canonical-JSON byte budget reserving the exact worst-case seven-field
+  // success envelope (2,345 bytes; the 512-code-point message may be 2,048
+  // UTF-8 bytes) plus the 8-byte ,"data": delimiter, so an emitted envelope
+  // can never exceed MAX_CANONICAL_JSON_BYTES.
+  var RESULT_DATA_STANDARD_RESERVE = 2345 + 8;
+  var MAX_RESULT_DATA_FIELDS = 8;
+  var MAX_RESULT_DATA_BYTES = MAX_CANONICAL_JSON_BYTES - RESULT_DATA_STANDARD_RESERVE;
 
   var MODES = ["creation", "exploration", "combat"];
   var OUTCOMES = ["success", "rejected", "stale", "error"];
+  // State-identity and diagnostic key names an adapter data slot must never
+  // carry at any nesting level (dot-segment heads included), mirroring
+  // web.webclient.presentation.protocol.FORBIDDEN_RESULT_DATA_KEYS.
+  var FORBIDDEN_RESULT_DATA_KEYS = [
+    "actor",
+    "session",
+    "epoch",
+    "revision",
+    "presentation_epoch",
+    "presentation_revision",
+    "correlation_id",
+    "exception",
+    "traceback",
+    "local_path",
+  ];
   var COMBAT_MODES = ["hostile", "guild_exam"];
   var PROTOCOL_ERROR_CODES = [
     "unsupported_version",
@@ -570,6 +595,74 @@
     if (typeof value !== "string" || !CORRELATION_RE.test(value)) {
       throw new Error(
         "correlation_id must be exactly 32 lowercase hexadecimal characters"
+      );
+    }
+    return value;
+  }
+
+  function isForbiddenResultDataKey(name) {
+    var segments = String(name).split(".");
+    for (var i = 0; i < segments.length; i++) {
+      if (FORBIDDEN_RESULT_DATA_KEYS.indexOf(segments[i]) !== -1) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Mirror of web.webclient.presentation.protocol._validate_result_data.
+  function validateResultData(value) {
+    if (!isPlainObject(value)) {
+      throw new Error("data must be a JSON object");
+    }
+    var keys = Object.keys(value);
+    if (keys.length > MAX_RESULT_DATA_FIELDS) {
+      throw new Error(
+        "data exceeds the maximum of " + MAX_RESULT_DATA_FIELDS + " fields"
+      );
+    }
+    var rejectReserved = function (name) {
+      validateIdentifier(name, "data field name");
+      if (isForbiddenResultDataKey(name)) {
+        throw new Error("data field name '" + name + "' carries a reserved state key");
+      }
+    };
+    var walk = function (node) {
+      if (Array.isArray(node)) {
+        for (var j = 0; j < node.length; j++) {
+          walk(node[j]);
+        }
+        return;
+      }
+      if (node === null || node === undefined) {
+        return;
+      }
+      var kind = typeof node;
+      if (kind === "object") {
+        // Dates, RegExps, Maps, and class instances reach the wire as `{}` or
+        // worse; the Python validator rejects them as unsupported types.
+        if (Object.prototype.toString.call(node) !== "[object Object]") {
+          throw new Error("data contains an unsupported JSON value type");
+        }
+        var nodeKeys = Object.keys(node);
+        for (var k = 0; k < nodeKeys.length; k++) {
+          rejectReserved(nodeKeys[k]);
+          walk(node[nodeKeys[k]]);
+        }
+        return;
+      }
+      if (kind !== "string" && kind !== "number" && kind !== "boolean") {
+        throw new Error("data contains an unsupported JSON value type");
+      }
+    };
+    walk(value);
+    // Depth 1 is the slot's own position inside the envelope, mirroring the
+    // Python check so a data leaf can never sit deeper than MAX_DEPTH
+    // measured from the envelope root.
+    checkGlobalSafety(value, 1);
+    if (utf8Bytes(canonicalJson(value)) > MAX_RESULT_DATA_BYTES) {
+      throw new Error(
+        "data canonical JSON exceeds " + MAX_RESULT_DATA_BYTES + " bytes"
       );
     }
     return value;
@@ -4320,7 +4413,7 @@
       payload,
       "ui_action_result",
       ["protocol_version", "presentation_epoch", "request_id", "outcome", "code", "message", "presentation_revision"],
-      ["correlation_id"]
+      ["correlation_id", "data"]
     );
     requireInt(payload.protocol_version, "protocol_version", 1, 1);
     validateEpoch(payload.presentation_epoch);
@@ -4337,7 +4430,11 @@
     } else if (Object.prototype.hasOwnProperty.call(payload, "correlation_id")) {
       throw new Error("correlation_id is forbidden for a non-error result");
     }
-    return {
+    var hasData = Object.prototype.hasOwnProperty.call(payload, "data");
+    if (hasData && payload.outcome !== "success") {
+      throw new Error("data is forbidden for a non-success result");
+    }
+    var result = {
       protocolVersion: PROTOCOL_VERSION,
       epoch: payload.presentation_epoch,
       requestId: payload.request_id,
@@ -4347,6 +4444,10 @@
       presentationRevision: payload.presentation_revision,
       correlationId: correlationId,
     };
+    if (hasData) {
+      result.data = validateResultData(payload.data);
+    }
+    return result;
   }
 
   function validateProtocolError(payload) {
@@ -4393,6 +4494,9 @@
     MAX_PANEL_COUNT: MAX_PANEL_COUNT,
     MAX_LAYOUT_VERSION: MAX_LAYOUT_VERSION,
     MAX_MESSAGE_CODE_POINTS: MAX_MESSAGE_CODE_POINTS,
+    MAX_RESULT_DATA_FIELDS: MAX_RESULT_DATA_FIELDS,
+    MAX_RESULT_DATA_BYTES: MAX_RESULT_DATA_BYTES,
+    RESULT_DATA_STANDARD_RESERVE: RESULT_DATA_STANDARD_RESERVE,
     EPOCH_LENGTH: EPOCH_LENGTH,
     MAX_RETIRED_EPOCHS: MAX_RETIRED_EPOCHS,
     MAX_ACTOR_NAME: MAX_ACTOR_NAME,

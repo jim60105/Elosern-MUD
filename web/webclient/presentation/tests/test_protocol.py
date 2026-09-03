@@ -11,6 +11,7 @@ from web.webclient.presentation.protocol import (
     MAX_LIST_ITEMS,
     MAX_SAFE_INTEGER,
     MAX_STRING_CODE_POINTS,
+    MAX_RESULT_DATA_BYTES,
     OUTCOMES,
     PROTOCOL_ERROR_CODES,
     PROTOCOL_VERSION,
@@ -289,6 +290,122 @@ class ResultEnvelopeTests(unittest.TestCase):
             validate_ui_action_result(_result(message="x" * 513))
         with self.assertRaises(ProtocolValidationError):
             validate_ui_action_result(_result(code="UPPER"))
+
+    @covers_requirement(
+        "webclient-oob-protocol::result-and-protocol-error-envelopes-are-exact-and-non-overlapping"
+    )
+    def test_success_may_carry_a_bounded_data_slot(self):
+        payload = _result(data={"display_name": "加斯帕・斯諾", "rank": 3})
+        result = validate_ui_action_result(payload)
+        self.assertEqual(result["data"], {"display_name": "加斯帕・斯諾", "rank": 3})
+        # A success result without the slot keeps the normalized shape exact.
+        plain = validate_ui_action_result(_result())
+        self.assertNotIn("data", plain)
+        # Eight fields is the ceiling; nine is rejected.
+        eight = {f"key_{index}": index for index in range(8)}
+        self.assertEqual(validate_ui_action_result(_result(data=eight))["data"], eight)
+        nine = {f"key_{index}": index for index in range(9)}
+        with self.assertRaises(ProtocolValidationError):
+            validate_ui_action_result(_result(data=nine))
+
+    @covers_requirement(
+        "webclient-oob-protocol::result-and-protocol-error-envelopes-are-exact-and-non-overlapping"
+    )
+    def test_non_success_results_forbid_the_data_slot(self):
+        for outcome in ("rejected", "stale"):
+            with self.subTest(outcome=outcome):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_ui_action_result(_result(outcome=outcome, data={"k": 1}))
+        # The busy spelling of rejected (code busy) is covered by the rejected
+        # row; the error outcome with a valid correlation ID is pinned too.
+        with self.assertRaises(ProtocolValidationError):
+            validate_ui_action_result(
+                _result(
+                    outcome="error",
+                    code="internal_error",
+                    correlation_id="a" * 32,
+                    data={"k": 1},
+                )
+            )
+
+    @covers_requirement(
+        "webclient-oob-protocol::result-and-protocol-error-envelopes-are-exact-and-non-overlapping"
+    )
+    def test_data_slot_shape_and_bound_violations_reject(self):
+        for bad in ([{"k": 1}], "text", 7, None, True):
+            with self.subTest(bad=repr(bad)):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_ui_action_result(_result(data=bad))
+        # Field-name shape at the top level.
+        for bad_key in ("UPPER", "", "x" * 65, "has space"):
+            with self.subTest(bad_key=bad_key):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_ui_action_result(_result(data={bad_key: 1}))
+        # Reserved state keys: top-level, dot-composite, nested, in lists.
+        for bad_key in (
+            "actor", "epoch", "presentation_revision", "correlation_id",
+            "local_path", "traceback", "session.id",
+        ):
+            with self.subTest(reserved=bad_key):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_ui_action_result(_result(data={bad_key: "x"}))
+        with self.assertRaises(ProtocolValidationError):
+            validate_ui_action_result(_result(data={"ok": {"revision": 7}}))
+        with self.assertRaises(ProtocolValidationError):
+            validate_ui_action_result(_result(data={"ok": [{"epoch": "e"}]}))
+        # Depth boundary pair relative to the envelope root: the slot sits at
+        # depth 1, so the deepest leaf at envelope depth 12 is legal (ten list
+        # levels below the slot value) and one level deeper is rejected.
+        validate_ui_action_result(_result(data={"k": _nested(10)}))
+        with self.assertRaises(JSONSafetyError):
+            validate_ui_action_result(_result(data={"k": _nested(11)}))
+        # Strings keep the global code-point ceiling.
+        with self.assertRaises(ProtocolValidationError):
+            validate_ui_action_result(
+                _result(data={"k": "x" * (MAX_STRING_CODE_POINTS + 1)})
+            )
+        # Aggregate bytes: individually safe items whose canonical size alone
+        # exceeds the result-data budget are rejected.
+        oversized = {"k": ["x" * 2000 for _ in range(34)]}
+        self.assertGreater(json_byte_size(oversized), MAX_RESULT_DATA_BYTES)
+        with self.assertRaises(JSONSafetyError):
+            validate_ui_action_result(_result(data=oversized))
+        # A budget-legal slot cannot push the whole envelope over the cap.
+        legal_slot = {f"k{index}": "x" * 2000 for index in range(8)}
+        envelope = _result(data=legal_slot)
+        self.assertLessEqual(json_byte_size(envelope), MAX_CANONICAL_JSON_BYTES)
+        check_envelope(envelope)
+
+        # Exact-budget boundary: a slot at exactly MAX_RESULT_DATA_BYTES
+        # canonical bytes, paired with every standard field at its own worst
+        # case (512 four-byte-code-point message = 2,048 UTF-8 bytes), still
+        # fits the wire cap; one canonical byte over budget is rejected.
+        exact: dict[str, object] = {"x": ["a" * 2048] * 30, "y": ""}
+        exact["y"] = "a" * (MAX_RESULT_DATA_BYTES - json_byte_size(exact))
+        self.assertEqual(json_byte_size(exact), MAX_RESULT_DATA_BYTES)
+        worst = _result(
+            data=exact,
+            request_id="r" * 64,
+            code="c" * 64,
+            message="\U0010ffff" * 512,
+            presentation_revision=MAX_SAFE_INTEGER,
+        )
+        self.assertLessEqual(json_byte_size(worst), MAX_CANONICAL_JSON_BYTES)
+        check_envelope(worst)
+        validated = validate_ui_action_result(worst)
+        self.assertEqual(json_byte_size(validated["data"]), MAX_RESULT_DATA_BYTES)
+        over = dict(exact)
+        over["y"] = over["y"] + "a"  # type: ignore[index]
+        with self.assertRaises(JSONSafetyError):
+            validate_ui_action_result(_result(data=over))
+
+
+def _nested(levels: int) -> list:
+    """Return a self-nested list of ``levels`` depth (``_nested(1)`` is ``[[]]``)."""
+    value: list = []
+    for _ in range(levels):
+        value = [value]
+    return value
 
 
 class ProtocolErrorTests(unittest.TestCase):

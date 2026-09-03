@@ -311,4 +311,46 @@ describe("action-result narrative feedback", () => {
     expect(errs[errs.length - 1]).toBe("另一項操作正在進行中（505）");
     expect(errs).not.toContain("另一項操作正在進行中（1）");
   });
+
+  // oob-result-data-slot: the mirrored validator's success-only `data` slot
+  // must reach the requesting view intact, and a result whose slot is
+  // illegal must be withheld wholesale (never surfaced with a dirty key).
+  it("surfaces a legal success data slot to the requesting view", () => {
+    openSession();
+    dispatchWait();
+    const accepted = store.receive(
+      1,
+      "ui_action_result",
+      [
+        fx.actionResult({
+          request_id: "session:1",
+          presentation_revision: 0,
+          data: { display_name: "加斯帕・斯諾" },
+        }),
+      ],
+      {},
+    );
+    expect(accepted.accepted).toBe(true);
+    expect(store.view.lastActionResult.data).toEqual({ display_name: "加斯帕・斯諾" });
+    // A success result speaks no narrative line.
+    expect(errLines()).toEqual([]);
+  });
+
+  it("withholds a result whose data slot is illegal", () => {
+    openSession();
+    dispatchWait();
+    const rejected = store.receive(
+      1,
+      "ui_action_result",
+      [
+        {
+          ...fx.actionResult({ request_id: "session:1", presentation_revision: 0 }),
+          data: { actor: "char:1" },
+        },
+      ],
+      {},
+    );
+    expect(rejected.accepted).toBe(false);
+    expect(store.view.lastActionResult).toBe(null);
+  });
 });

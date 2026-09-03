@@ -23,6 +23,7 @@ account APIs.
 
 from collections import OrderedDict
 from dataclasses import dataclass, field
+import json
 import secrets
 from typing import Any
 
@@ -42,6 +43,7 @@ from web.webclient.presentation.protocol import (
     UI_ACTION_RESULT,
     ProtocolValidationError,
     check_envelope,
+    _validate_result_data,
     validate_ui_action,
 )
 from web.webclient.presentation.registry import PresentationRegistry
@@ -483,8 +485,9 @@ def _normalize_result(value: dict[str, Any]) -> dict[str, Any]:
 
     Any field that would violate the exact result envelope (unknown outcome,
     unstable or oversized code, empty or oversized message, malformed
-    correlation ID) is replaced by a safe generic internal error so the
-    browser can never be asked to accept an out-of-schema result.
+    correlation ID, a malformed or misplaced adapter data slot) is replaced by
+    a safe generic internal error so the browser can never be asked to accept
+    an out-of-schema result.
     """
     from web.webclient.presentation.protocol import (
         _validate_identifier,
@@ -498,6 +501,10 @@ def _normalize_result(value: dict[str, Any]) -> dict[str, Any]:
     message = value.get("message")
     correlation_id = value.get("correlation_id")
     if outcome not in ("success", "rejected", "stale", "error"):
+        return _internal_result(None)
+    # An adapter data slot is contractually success-only; its mere presence on
+    # any other outcome is an out-of-schema adapter result.
+    if "data" in value and outcome != "success":
         return _internal_result(None)
     try:
         code = _validate_identifier(code, "code")
@@ -515,6 +522,14 @@ def _normalize_result(value: dict[str, Any]) -> dict[str, Any]:
     }
     if outcome == "error":
         result["correlation_id"] = correlation_id
+    if "data" in value:
+        try:
+            validated = _validate_result_data(value["data"])
+        except ProtocolValidationError:  # observability: ignore R2: an adapter data slot over the exact bound is an out-of-schema adapter result; the internal-error envelope IS the report
+            return _internal_result(None)
+        # Own the slot: the completed-result cache replays this dict, so it
+        # must be a private JSON snapshot, never the adapter's mutable object.
+        result["data"] = json.loads(json.dumps(validated, ensure_ascii=False))
     return result
 
 
@@ -587,6 +602,8 @@ def _send_action_result(
     }
     if "correlation_id" in result:
         envelope["correlation_id"] = result["correlation_id"]
+    if "data" in result:
+        envelope["data"] = result["data"]
     session.msg(**{UI_ACTION_RESULT: ((envelope,), {})})
 
 
