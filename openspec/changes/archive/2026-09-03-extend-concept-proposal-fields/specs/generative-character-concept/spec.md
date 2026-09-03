@@ -78,16 +78,19 @@ submission.
 - **THEN** validation rejects the whole proposal with a named error and the proposal is retried or
   degraded rather than partially normalised
 
+## ADDED Requirements
+
 ### Requirement: The concept prompt requests the expanded blueprint and the race-affinity bound
 The `character_creation.system` prompt SHALL render a blueprint contract that names all ten
 contract fields including `display_name`, `age`, `apparent_age`, `background`, and
 `affinity_elements`, SHALL instruct that `affinity_elements` must not exceed the chosen race's
 listed bound and must be empty for an elf, and SHALL bound `background` to 600 characters. The
-prompt SHALL NOT state any adult-age constraint or otherwise instruct the model about the 18-year
-floor: adult enforcement is server-side clamping, and the prompt carries no age-related
-instruction beyond naming the field. The registry-derived race catalog SHALL name each race's
-affinity input bound so the model can respect it without inventing numbers, and SHALL stay within
-its existing bounded length with the established truncation marker.
+authored prompt template (before player-concept interpolation) SHALL NOT state any adult-age
+constraint or otherwise instruct the model about the 18-year floor: adult enforcement is
+server-side clamping, and the template carries no age-related instruction beyond naming the field.
+The registry-derived race catalog SHALL name each race's affinity input bound and the registered
+element keys so the model can respect them without inventing values, and SHALL stay within its
+existing bounded length with the established truncation marker.
 
 #### Scenario: The blueprint names the expanded fields
 - **WHEN** the `character_creation.system` prompt is rendered
@@ -95,13 +98,19 @@ its existing bounded length with the established truncation marker.
   `affinity_elements` alongside the existing five keys, and contains no sentence forbidding an age
   field
 
-#### Scenario: The prompt states no adult-age rule
-- **WHEN** the rendered prompt is inspected
-- **THEN** it contains no age minimum, no adult wording, and no instruction to leave the age to the
-  player
+#### Scenario: The prompt template states no adult-age rule
+- **WHEN** the authored prompt template (before player-concept interpolation) is inspected
+- **THEN** it names no age minimum, no adult wording, and no instruction to leave the age to the
+  player, and retains no blanket prohibition that would contradict the `background` or age fields
+  it now requests
 
 #### Scenario: The race catalog names affinity bounds
 - **WHEN** `build_race_catalog()` renders
 - **THEN** every race entry names its affinity input bound (human 2, beastfolk 1, elf 0) derived
   from the shared bound mapping rather than a duplicated literal, and the catalog respects its
   bounded maximum length
+
+#### Scenario: The race catalog names the element keys
+- **WHEN** `build_race_catalog()` renders
+- **THEN** the catalog names every registered element key as the only values `affinity_elements`
+  may carry, and the element line stays inside the catalog's bounded maximum length
