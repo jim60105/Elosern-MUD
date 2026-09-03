@@ -3,14 +3,18 @@
 The ``character_creation`` layer maps a player's free-form character concept to
 a validated frozen ``CharacterProposal`` through the shared
 validation-retry-degrade guardrail (design §7.5). The proposal carries only
-existing registry keys (race/subrace/skill) plus the seven allocation values and
-a three-field persona draft; it never carries an age or any other mechanical
-number, so the deterministic adult gate stays the only age authority. When the
-layer is disabled, the transport fails, the prompt key is unavailable, or the
-validation retries are exhausted, ``generate_character_proposal`` resolves to
-``None`` -- the single public degraded marker -- so the command can return the
-stable offline message and the deterministic creation wizard remains fully
-usable.
+existing registry keys (race/subrace/skill/element) plus the seven allocation
+values, a three-field persona draft, and five optional transient-fill fields
+(``display_name``, ``age``, ``apparent_age``, ``background``,
+``affinity_elements``) that the consumers may offer as editable defaults. An
+out-of-bounds transient-fill value is normalised in place on the validated
+proposal (clamped, truncated, or trimmed to the race bound) instead of
+discarding the reply; the deterministic adult gate at activation stays the
+final authority on every submission. When the layer is disabled, the transport
+fails, the prompt key is unavailable, or the validation retries are exhausted,
+``generate_character_proposal`` resolves to ``None`` -- the single public
+degraded marker -- so the command can return the stable offline message and the
+deterministic creation wizard remains fully usable.
 
 Boundary contract (``tests/test_ai_transport_contract.py``): this module imports
 no state writer, no typeclass, no live transport, and no socket. It reads only
@@ -18,8 +22,10 @@ the immutable ``world.lore`` and ``world.skills`` registries and consumes the
 client through the injected protocol exactly like ``npc_dialogue.py``. The
 allocation-band derivation mirrors
 ``world/rules/character_creation.resolve_starting_profile`` against the same
-lore registries; the deterministic preflight at activation remains the final
-authority over every proposal value.
+lore registries, and the transient-fill bounds mirror the rule-layer constants
+as local values (see the transport-boundary mirror note below); the
+deterministic preflight at activation remains the final authority over every
+proposal value.
 """
 
 from __future__ import annotations
@@ -45,6 +51,7 @@ from world.ai.schemas.registry import (
     register_output_schema,
 )
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
+from world.lore.elements import ELEMENT_REGISTRY
 from world.prompts.loader import PromptUnavailableError, render_prompt
 from world.skills.registry import SKILL_REGISTRY
 
@@ -62,6 +69,16 @@ MAX_CONCEPT_LENGTH = 500
 MAX_CATALOG_LENGTH = 2000
 MAX_PERSONA_FIELD_LENGTH = 600
 MAX_SUGGESTED_SKILLS = 8
+
+# Transient-fill bounds. These mirror ``world/rules`` values
+# (``creation_wizard.AGE_MINIMUM``/``AGE_MAXIMUM`` and
+# ``character_creation._AFFINITY_INPUT_BOUNDS``) as local constants because the
+# transport-boundary contract forbids importing ``world.rules`` here; the
+# precedent is ``ALLOCATABLE_AXES`` above and a parity test locks every value.
+ADULT_AGE_MINIMUM = 18
+AGE_MAXIMUM_BOUND = 10000
+MAX_DISPLAY_NAME_CODE_POINTS = 64
+_AFFINITY_INPUT_BOUNDS: dict[str, int] = {"human": 2, "beastfolk": 1, "elf": 0}
 
 # The persona draft's exact field set; a proposal with any other shape fails
 # the whole proposal (design D2).
@@ -83,10 +100,18 @@ class CharacterProposal:
     """A validated frozen concept-to-proposal mapping.
 
     Every key is a real registry key or an in-band allocation value; the
-    persona draft is the only free-form text. The proposal carries no age and
-    no number outside ``allocations``. ``subrace_key`` is always a registered
-    subrace belonging to ``race_key`` (every race has at least one subrace, so
-    a null subrace is a whole-proposal failure).
+    persona draft is free-form persona text and ``background`` a concise
+    transient narrative. ``subrace_key`` is always a registered subrace
+    belonging to ``race_key`` (every race has at least one subrace, so a null
+    subrace is a whole-proposal failure).
+
+    The five transient-fill fields are optional proposals the consumers may
+    surface as editable defaults. An absent field (``None``) means the LLM
+    offered nothing for it and each consumer keeps its own local default (an
+    empty name, the wizard's starting age); it never means "empty string" or
+    "zero". ``affinity_elements`` distinguishes absent (``None``, LLM silent)
+    from the neutral empty tuple (the LLM named a set that normalisation
+    trimmed to empty, or the race forbids player-picked affinity).
     """
 
     race_key: str
@@ -94,6 +119,11 @@ class CharacterProposal:
     allocations: Mapping[str, int]
     suggested_skills: tuple[str, ...]
     persona: Mapping[str, str]
+    display_name: str | None = None
+    age: int | None = None
+    apparent_age: int | None = None
+    background: str | None = None
+    affinity_elements: tuple[str, ...] | None = None
 
 
 CHARACTER_CREATION_OUTPUT_SCHEMA: dict[str, Any] = {
@@ -116,6 +146,15 @@ CHARACTER_CREATION_OUTPUT_SCHEMA: dict[str, Any] = {
                 "habit": {"type": "string"},
             },
         },
+        # The five transient-fill keys are optional: a wrong-typed value is a
+        # structural failure handled by this schema's retry path, while an
+        # in-range-typed but out-of-bounds value is normalised after
+        # validation (design D1).
+        "display_name": {"type": "string"},
+        "age": {"type": "integer"},
+        "apparent_age": {"type": "integer"},
+        "background": {"type": "string"},
+        "affinity_elements": {"type": "array", "items": {"type": "string"}},
     },
 }
 
@@ -130,13 +169,28 @@ def _degrade_fallback() -> object:
 def _validate_shape(parsed: Any) -> list[str]:
     if not isinstance(parsed, Mapping):
         return ["character proposal must be a JSON object"]
-    extra = sorted(set(parsed) - {"race_key", "subrace_key", "allocations", "suggested_skills", "persona"})
+    extra = sorted(
+        set(parsed)
+        - {
+            "race_key",
+            "subrace_key",
+            "allocations",
+            "suggested_skills",
+            "persona",
+            "display_name",
+            "age",
+            "apparent_age",
+            "background",
+            "affinity_elements",
+        }
+    )
     if extra:
         return [
             "character proposal carries unexpected field(s) "
             + ", ".join(repr(name) for name in extra)
-            + "; only race_key, subrace_key, allocations, suggested_skills, "
-            "and persona are allowed (no age, no other numbers)"
+            + "; only the ten contract fields race_key, subrace_key, "
+            "allocations, suggested_skills, persona, display_name, age, "
+            "apparent_age, background, and affinity_elements are allowed"
         ]
     return []
 
@@ -278,16 +332,87 @@ def _cap_string(value: str) -> str:
     return value[: MAX_CONCEPT_LENGTH - len(_TRUNCATION_MARKER)] + _TRUNCATION_MARKER
 
 
+def _clamp_age(value: int) -> int:
+    """Clamp one proposed age into the generation-policy band (design D1).
+
+    The lower bound mirrors the deterministic adult gate; the upper bound
+    mirrors the wizard's age ceiling. Normalisation never appends an error and
+    never consumes a retry — the activation preflight remains the final
+    authority.
+    """
+    if value < ADULT_AGE_MINIMUM:
+        return ADULT_AGE_MINIMUM
+    if value > AGE_MAXIMUM_BOUND:
+        return AGE_MAXIMUM_BOUND
+    return value
+
+
+def _normalize_text(value: str, bound: int) -> str | None:
+    """Strip and bound one transient text field; trimming to empty is absent."""
+    stripped = value.strip()
+    if not stripped:
+        return None
+    return stripped[:bound]
+
+
+def _normalize_affinity(value: Any, race_key: str) -> tuple[str, ...]:
+    """Trim one proposed affinity set to the registry and the race bound.
+
+    Unknown and duplicate keys are dropped in order; the result is truncated
+    to ``_AFFINITY_INPUT_BOUNDS[race_key]`` (an elf's bound is 0, so its set
+    is always emptied — an elf's affinity is subrace-seeded). A present list
+    always normalises to a tuple (possibly empty), never to ``None``.
+    """
+    seen: dict[str, None] = {}
+    for key in value:
+        if key in ELEMENT_REGISTRY:
+            seen.setdefault(key, None)
+    bound = _AFFINITY_INPUT_BOUNDS.get(race_key, 0)
+    return tuple(list(seen)[:bound])
+
+
+def _normalize_transient_fields(parsed: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalise the five transient-fill fields of a fully validated proposal.
+
+    Runs only after every structural validator has passed, so every value
+    seen here is type-correct; out-of-bounds values are corrected in place
+    instead of discarding the proposal (design D1). An absent key normalises to
+    ``None`` so consumers keep their own local defaults.
+    """
+    normalized: dict[str, Any] = {}
+    if "display_name" in parsed:
+        normalized["display_name"] = _normalize_text(
+            parsed["display_name"], MAX_DISPLAY_NAME_CODE_POINTS
+        )
+    if "age" in parsed:
+        normalized["age"] = _clamp_age(parsed["age"])
+    if "apparent_age" in parsed:
+        normalized["apparent_age"] = _clamp_age(parsed["apparent_age"])
+    if "background" in parsed:
+        normalized["background"] = _normalize_text(
+            parsed["background"], MAX_PERSONA_FIELD_LENGTH
+        )
+    if "affinity_elements" in parsed:
+        normalized["affinity_elements"] = _normalize_affinity(
+            parsed["affinity_elements"], parsed["race_key"]
+        )
+    return normalized
+
+
 def build_race_catalog() -> str:
     """Render a bounded registry-derived race/subrace/skill brief for the prompt.
 
     Deterministic: identical registries always produce byte-identical output,
-    and the brief carries no numbers (the LLM must not infer bands or budgets).
+    except the per-race affinity input bound annotated on every race entry
+    (the LLM must not infer allocation bands or budgets from any other number).
+    The bounded element-key line names the only values ``affinity_elements``
+    may carry.
     The catalog is hard-bounded with an explicit truncation marker; the
     deterministic proposal validation is unaffected by a truncated catalog.
     """
     race_entries = "、".join(
-        f"{key}（{race.description}）" for key, race in RACE_REGISTRY.items()
+        f"{key}（{race.description}，親附上限：{_AFFINITY_INPUT_BOUNDS.get(key, 0)}）"
+        for key, race in RACE_REGISTRY.items()
     )
     subrace_entries = "、".join(
         f"{key}（{subrace.display_name_zh}，所屬種族 {subrace.race_key}）"
@@ -296,6 +421,7 @@ def build_race_catalog() -> str:
     skill_entries = "、".join(SKILL_REGISTRY)
     catalog = (
         f"種族：{race_entries}\n子種族：{subrace_entries}\n"
+        f"元素鍵值：{'、'.join(ELEMENT_REGISTRY)}\n"
         f"可建議技能鍵值：{skill_entries}"
     )
     if len(catalog) <= MAX_CATALOG_LENGTH:
@@ -446,10 +572,16 @@ def generate_character_proposal(client: Any, *, concept: str):
     if text is _CHARACTER_CREATION_DEGRADED:
         return None
     parsed = json.loads(text)
+    transient = _normalize_transient_fields(parsed)
     return CharacterProposal(
         race_key=parsed["race_key"],
         subrace_key=parsed["subrace_key"],
         allocations={axis: parsed["allocations"][axis] for axis in ALLOCATABLE_AXES},
         suggested_skills=tuple(parsed["suggested_skills"]),
         persona={field: parsed["persona"][field] for field in PERSONA_FIELDS},
+        display_name=transient.get("display_name"),
+        age=transient.get("age"),
+        apparent_age=transient.get("apparent_age"),
+        background=transient.get("background"),
+        affinity_elements=transient.get("affinity_elements"),
     )

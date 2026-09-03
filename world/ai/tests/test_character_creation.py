@@ -4,9 +4,10 @@ Covers prompt construction (deterministic, bounded, registry-derived race
 catalog, entity-key-only), the guarded proposal entry point, the deterministic
 proposal validation (registry membership, subrace compatibility, in-band
 allocations with exact budget, registered suggested skills, exact three-field
-bounded persona, no age and no extra numeric fields), whole-proposal rejection
-with appended-error retries, degrade-to-``None`` behaviour, registration
-semantics, and the startup wiring.
+bounded persona), the transient-fill normalisation matrix (clamp/truncate/trim
+instead of discarding the reply), whole-proposal rejection with appended-error
+retries, degrade-to-``None`` behaviour, registration semantics, and the startup
+wiring.
 """
 
 import json
@@ -137,12 +138,62 @@ class CharacterCreationPromptTests(unittest.TestCase):
         self.assertEqual(build_race_catalog(), build_race_catalog())
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
-    def test_race_catalog_never_carries_mechanical_numbers(self):
+    def test_race_catalog_carries_only_the_annotated_affinity_numbers(self):
         import re
 
         catalog = build_race_catalog()
-        digits = re.findall(r"\d", catalog)
-        self.assertEqual(digits, [])
+        # The single sanctioned numbers are the per-race affinity input bounds
+        # annotated on every race entry; no other mechanical number appears.
+        from world.ai.character_creation import _AFFINITY_INPUT_BOUNDS
+
+        for race_key, bound in _AFFINITY_INPUT_BOUNDS.items():
+            description = RACE_REGISTRY[race_key].description
+            self.assertIn(
+                f"{race_key}（{description}，親附上限：{bound}）", catalog
+            )
+        stripped = re.sub(r"，親附上限：\d+）", "", catalog)
+        self.assertEqual(re.findall(r"\d", stripped), [])
+
+    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    def test_race_catalog_names_the_element_keys(self):
+        from world.lore.elements import ELEMENT_REGISTRY
+
+        catalog = build_race_catalog()
+        element_line = catalog.partition("元素鍵值：")[2].partition("\n")[0]
+        for key in ELEMENT_REGISTRY:
+            self.assertIn(key, element_line)
+
+    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    def test_prompt_template_requests_the_expanded_blueprint_without_adult_wording(self):
+        # The authored template (before player-concept interpolation) must name
+        # the five transient fields, instruct the affinity bound, and carry no
+        # adult-age wording. The rendered system message embeds the player's
+        # concept, so this reads the source template directly.
+        from pathlib import Path
+
+        import yaml
+
+        from world.prompts.loader import _prompt_root
+
+        path = Path(_prompt_root()) / "character_creation.yaml"
+        template = yaml.safe_load(path.read_text(encoding="utf-8"))["prompts"][
+            "character_creation.system"
+        ]
+        for field in (
+            "display_name",
+            "age",
+            "apparent_age",
+            "background",
+            "affinity_elements",
+        ):
+            self.assertIn(field, template)
+        self.assertIn("親附上限", template)
+        self.assertIn("精靈必須留空", template)
+        self.assertIn("600 字以內", template)
+        self.assertNotIn("18", template)
+        self.assertNotIn("成年", template)
+        self.assertNotIn("年齡一律由玩家自己輸入", template)
+        self.assertNotIn("不得加入年齡欄位", template)
 
 
 class CharacterCreationProposalTests(unittest.TestCase):
@@ -338,17 +389,14 @@ class CharacterCreationProposalTests(unittest.TestCase):
         self.assertIn("exactly the seven starting axes", client.calls[1].messages[-1]["content"])
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
-    def test_age_field_is_rejected(self):
+    def test_age_field_is_accepted_and_delivered(self):
         client = FakeLLMClient()
-        client.add_response(
-            lambda d: len(d.messages) == 2,
-            _proposal_text(age=30),
-        )
-        client.add_response(lambda d: len(d.messages) == 3, _proposal_text())
+        client.add_response(lambda d: True, _proposal_text(age=30))
         result = self._run(client)
         self.assertEqual(result.race_key, "human")
-        self.assertEqual(len(client.calls), 2)
-        self.assertIn("unexpected field(s)", client.calls[1].messages[-1]["content"])
+        self.assertEqual(result.age, 30)
+        self.assertIsNone(result.apparent_age)
+        self.assertEqual(len(client.calls), 1)
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_extra_numeric_field_is_rejected(self):
@@ -433,7 +481,9 @@ class CharacterCreationProposalTests(unittest.TestCase):
     @covers_requirement("generative-character-concept::the-character-creation-layer-is-registered-in-the-guardrail-with-retry-and-degrade")
     def test_retry_exhaustion_degrades_within_the_budget(self):
         client = FakeLLMClient()
-        client.add_response(lambda d: True, _proposal_text(age=30))
+        # A boolean age is a type error the output schema rejects on every
+        # attempt: structurally invalid output keeps the retry path intact.
+        client.add_response(lambda d: True, _proposal_text(age=True))
         result = self._run(client, character_creation={"max_retries": 2})
         self.assertIsNone(result)
         self.assertEqual(len(client.calls), 3)
@@ -477,6 +527,198 @@ class CharacterCreationProposalTests(unittest.TestCase):
 
 
 class AllocationParityTests(unittest.TestCase):
+    """The layer's registry-derived bands/budget must match the preflight's.
+
+    The layer cannot import ``world.rules`` (transport-boundary contract), so
+    the band arithmetic is re-derived from the same lore registries. This test
+    pins every race/subrace combination against the authoritative
+    ``resolve_starting_profile`` so a future registry or rules change cannot
+    make the layer accept a proposal the activation preflight would reject.
+    """
+
+    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    def test_bands_and_budget_match_the_deterministic_preflight_for_every_profile(self):
+        from world.ai.character_creation import _allocation_budget, _race_bands
+        from world.rules.character_creation import resolve_starting_profile
+
+        for race_key in RACE_REGISTRY:
+            subrace_keys = [
+                key for key, subrace in SUBRACE_REGISTRY.items()
+                if subrace.race_key == race_key
+            ]
+            for subrace_key in subrace_keys:
+                with self.subTest(race=race_key, subrace=subrace_key):
+                    profile = resolve_starting_profile(race_key, subrace_key)
+                    self.assertEqual(
+                        _race_bands(race_key, subrace_key),
+                        profile.bounds_dict(),
+                    )
+                    self.assertEqual(
+                        _allocation_budget(race_key, subrace_key),
+                        profile.budget,
+                    )
+
+
+class TransientFillParityTests(unittest.TestCase):
+    """The layer's transient-fill bounds must mirror the authoritative rules.
+
+    The transport-boundary contract forbids importing ``world.rules`` from the
+    layer, so the bounds are local mirrors (the ``ALLOCATABLE_AXES`` precedent).
+    These assertions lock every mirrored value against the rule layer.
+    """
+
+    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    def test_transient_fill_bounds_mirror_the_rule_layer(self):
+        from world.rules import creation_wizard
+        from world.rules import character_creation as rules_creation
+
+        self.assertEqual(
+            character_creation.ADULT_AGE_MINIMUM, creation_wizard.AGE_MINIMUM
+        )
+        self.assertEqual(
+            character_creation.AGE_MAXIMUM_BOUND, creation_wizard.AGE_MAXIMUM
+        )
+        self.assertEqual(
+            character_creation._AFFINITY_INPUT_BOUNDS,
+            rules_creation._AFFINITY_INPUT_BOUNDS,
+        )
+        self.assertEqual(
+            set(character_creation._AFFINITY_INPUT_BOUNDS), set(RACE_REGISTRY)
+        )
+
+
+def _in_band_allocations(race_key: str, subrace_key: str) -> dict[str, int]:
+    """Greedily spend a race's full allocation budget inside its bands."""
+    from world.ai.character_creation import _allocation_budget, _race_bands
+
+    bands = _race_bands(race_key, subrace_key)
+    remaining = _allocation_budget(race_key, subrace_key)
+    allocations: dict[str, int] = {}
+    for axis in ALLOCATABLE_AXES:
+        span = bands[axis][1] - bands[axis][0]
+        take = min(span, remaining)
+        allocations[axis] = take
+        remaining -= take
+    assert remaining == 0
+    return allocations
+
+
+class TransientFillNormalizationTests(unittest.TestCase):
+    """Out-of-bounds transient-fill values normalise, never discard the reply."""
+
+    def setUp(self):
+        _reset_all()
+        register_character_creation()
+
+    def tearDown(self):
+        _reset_all()
+
+    def _run(self, client, **profiles):
+        with override_settings(LLM_PROFILES=_raw(**profiles)):
+            d = generate_character_proposal(client, concept="流浪的精靈劍士")
+            return await_result(d)
+
+    def _once(self, **payload_overrides):
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _proposal_text(**payload_overrides))
+        return self._run(client), client
+
+    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    def test_ages_clamp_to_the_band_without_consuming_a_retry(self):
+        cases = [
+            ({"age": 17, "apparent_age": 10}, 18, 18),
+            ({"age": 10001, "apparent_age": 99999}, 10000, 10000),
+            ({"age": 18, "apparent_age": 10000}, 18, 10000),
+            ({"age": 30, "apparent_age": 25}, 30, 25),
+        ]
+        for payload, age, apparent in cases:
+            with self.subTest(**payload):
+                result, client = self._once(**payload)
+                self.assertEqual(result.age, age)
+                self.assertEqual(result.apparent_age, apparent)
+                self.assertEqual(len(client.calls), 1)
+
+    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    def test_transient_text_is_truncated_or_collapses_to_absent(self):
+        from world.ai.character_creation import MAX_DISPLAY_NAME_CODE_POINTS
+
+        result, client = self._once(
+            display_name="名" * (MAX_DISPLAY_NAME_CODE_POINTS + 1),
+            background="景" * (MAX_PERSONA_FIELD_LENGTH + 1),
+        )
+        self.assertEqual(
+            result.display_name, "名" * MAX_DISPLAY_NAME_CODE_POINTS
+        )
+        self.assertEqual(result.background, "景" * MAX_PERSONA_FIELD_LENGTH)
+        self.assertEqual(len(client.calls), 1)
+
+        result, _ = self._once(display_name="   ", background=" \n ")
+        self.assertIsNone(result.display_name)
+        self.assertIsNone(result.background)
+
+    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    def test_affinity_is_trimmed_to_the_registry_and_the_race_bound(self):
+        result, _ = self._once(affinity_elements=["fire", "unknown", "fire", "water"])
+        self.assertEqual(result.affinity_elements, ("fire", "water"))
+
+        result, _ = self._once(affinity_elements=["unknown", "ghost"])
+        self.assertEqual(result.affinity_elements, ())
+
+        beastfolk = {
+            "race_key": "beastfolk",
+            "subrace_key": "catkin",
+            "allocations": _in_band_allocations("beastfolk", "catkin"),
+        }
+        result, _ = self._once(**beastfolk, affinity_elements=["fire", "water"])
+        self.assertEqual(result.affinity_elements, ("fire",))
+
+        elf = {
+            "race_key": "elf",
+            "subrace_key": "fionnen",
+            "allocations": _in_band_allocations("elf", "fionnen"),
+        }
+        result, _ = self._once(**elf, affinity_elements=["fire", "water", "wind"])
+        self.assertEqual(result.affinity_elements, ())
+
+    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    def test_absent_transient_fields_normalise_to_none(self):
+        result, client = self._once()
+        self.assertIsNone(result.display_name)
+        self.assertIsNone(result.age)
+        self.assertIsNone(result.apparent_age)
+        self.assertIsNone(result.background)
+        self.assertIsNone(result.affinity_elements)
+        self.assertEqual(len(client.calls), 1)
+
+    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    def test_wrong_typed_transient_fields_take_the_retry_path(self):
+        for label, payload in [
+            ("boolean age", {"age": True}),
+            ("non-list affinity", {"affinity_elements": "fire"}),
+            ("non-string name", {"display_name": 42}),
+        ]:
+            with self.subTest(label):
+                client = FakeLLMClient()
+                client.add_response(
+                    lambda d: len(d.messages) == 2, _proposal_text(**payload)
+                )
+                client.add_response(lambda d: len(d.messages) == 3, _proposal_text())
+                result = self._run(client)
+                self.assertEqual(len(client.calls), 2)
+                self.assertIsNotNone(result)
+                self.assertIsNone(result.age)
+
+    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
+    def test_elf_affinity_bound_annotation_still_empties_a_valid_elf_set(self):
+        elf = {
+            "race_key": "elf",
+            "subrace_key": "fionnen",
+            "allocations": _in_band_allocations("elf", "fionnen"),
+        }
+        result, client = self._once(**elf, affinity_elements=["fire"])
+        self.assertEqual(result.race_key, "elf")
+        self.assertEqual(result.affinity_elements, ())
+        self.assertEqual(len(client.calls), 1)
     """The layer's registry-derived bands/budget must match the preflight's.
 
     The layer cannot import ``world.rules`` (transport-boundary contract), so
