@@ -2,16 +2,35 @@
 
 
 import json
+import zlib
+from random import Random
 import unittest
 
 from world.ai.scenario_director import (
     MAX_CONTEXT_FIELD_LENGTH,
     MAX_TOTAL_SIZE,
+    SCENARIO_DIRECTOR_OUTPUT_SCHEMA,
+    _VALIDATORS,
     build_scenario_prompt,
 )
 from world.ai.tests._director_helpers import _context
+from world.lore.names import NAME_PACK_REGISTRY
+from world.rules.namegen import roll_name_for_race
 
 from tools.spec_traceability import covers_requirement
+
+
+# Independent recomputation of the namegen-npc-flow D1 bank: pinned seed
+# source, pinned count, pinned separator — a production drift in any of the
+# three fails these tests, not just a change in the names themselves.
+_BANK_COUNT = 6
+
+
+def _expected_bank(bounded_user_text: str) -> str:
+    rng = Random(zlib.crc32(bounded_user_text.encode("utf-8")))
+    return "、".join(
+        roll_name_for_race(None, "", rng) for _ in range(_BANK_COUNT)
+    )
 
 
 
@@ -52,3 +71,67 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
         self.assertIn("capital_altoria", user["content"])
         self.assertNotIn("<", user["content"])
         self.assertNotIn("object at", user["content"])
+
+    @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
+    def test_system_carries_the_full_context_seeded_bank_with_guidance(self):
+        system, user = build_scenario_prompt(_context())
+        bank = _expected_bank(user["content"])
+        self.assertEqual(len(bank.split("、")), _BANK_COUNT)
+        self.assertIn(bank, system["content"])
+        self.assertEqual(system["content"].count(bank), 1)
+        self.assertIn("僅供靈感", system["content"])
+        self.assertIn("建議填寫 display_name", system["content"])
+        self.assertIn("仍為選填", system["content"])
+
+    @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
+    def test_contexts_normalizing_to_one_bounded_text_share_one_bank(self):
+        # The seed is the FINAL bounded text: raw contexts that differ only
+        # past the cap boundary must render byte-identical prompts, pinning
+        # the seed source to the serialized (not raw) context.
+        over = _context(note="字" * (MAX_CONTEXT_FIELD_LENGTH + 50))
+        exact = _context(note="字" * MAX_CONTEXT_FIELD_LENGTH)
+        first = build_scenario_prompt(over)
+        second = build_scenario_prompt(exact)
+        self.assertEqual(first[1]["content"], second[1]["content"])
+        self.assertEqual(first[0]["content"], second[0]["content"])
+
+    @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
+    def test_output_contract_is_unchanged_by_the_injection(self):
+        npc_req = (
+            SCENARIO_DIRECTOR_OUTPUT_SCHEMA["properties"]["stages"]["items"]
+            ["properties"]["npc_req"]["items"]
+        )
+        self.assertNotIn("display_name", npc_req["required"])
+        self.assertEqual(
+            npc_req["properties"]["display_name"]["type"], ["string", "null"]
+        )
+        system, user = build_scenario_prompt(_context())
+        for name in _expected_bank(user["content"]).split("、"):
+            self.assertNotIn(name, json.dumps(SCENARIO_DIRECTOR_OUTPUT_SCHEMA, ensure_ascii=False))
+
+    @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
+    def test_validators_accept_missing_and_bank_external_display_names(self):
+        def _payload(npc_req: dict) -> dict:
+            base_npc = {"role": "向導", "tier": "bandit"}
+            return {
+                "stages": [
+                    {
+                        "index": 0,
+                        "objective": {"kind": "defeat", "quantity": 1},
+                        "npc_req": [dict(base_npc, **npc_req)],
+                    }
+                ]
+            }
+
+        validate = _VALIDATORS["npc_characterization"]
+        self.assertEqual(validate(_payload({})), [])
+        self.assertEqual(validate(_payload({"display_name": "非庫名・自取"})), [])
+
+    @covers_requirement("scenario-director::the-scenario-director-name-inspiration-reads-the-namegen-rule-layer-without-crossing-the-single-writer-boundary")
+    def test_prompt_construction_leaves_no_state_behind(self):
+        before = repr(NAME_PACK_REGISTRY)
+        system, user = build_scenario_prompt(_context())
+        self.assertEqual(repr(NAME_PACK_REGISTRY), before)
+        # The rolled names exist only inside the returned message strings.
+        self.assertIn(_expected_bank(user["content"]), system["content"])
+        self.assertNotIn("・", user["content"])

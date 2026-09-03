@@ -246,7 +246,17 @@ class SceneSpawnLineageSeedTests(SceneBuilderIsolation, EvenniaTest):
 
         requirement = SimpleNamespace(archetype="forest_path", characterizations=())
         with patch.object(scene_builder, "spawn", deep_skill_spawn):
-            npc = _spawn_npc(self.room, requirement, "bandit", "bandit", None, 0)
+            npc = _spawn_npc(
+                self.room,
+                requirement,
+                "bandit",
+                "bandit",
+                None,
+                0,
+                definition_key="test-lineage-def",
+                stage_index=0,
+                quest_id="test-lineage-quest",
+            )
         self.assertLessEqual(
             {"fire_arrow", "fire_ball", "scorching_wave", "firestorm"},
             set(npc.db.skills["active"]),
@@ -266,7 +276,17 @@ class SceneSpawnLineageSeedTests(SceneBuilderIsolation, EvenniaTest):
         from types import SimpleNamespace
 
         requirement = SimpleNamespace(archetype="forest_path", characterizations=())
-        npc = _spawn_npc(self.room, requirement, "bandit", "bandit", None, 0)
+        npc = _spawn_npc(
+            self.room,
+            requirement,
+            "bandit",
+            "bandit",
+            None,
+            0,
+            definition_key="test-lineage-def",
+            stage_index=0,
+            quest_id="test-lineage-quest",
+        )
         # The scene_npc prototype carries no skills: spawn must not fabricate
         # any proficiency state.
         self.assertIsNone(npc.db.skills)

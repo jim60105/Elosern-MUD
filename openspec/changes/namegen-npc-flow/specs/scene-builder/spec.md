@@ -45,15 +45,21 @@ occupants SHALL NOT receive namegen names.
 ### Requirement: Every display-name backfill emits an observability info event
 The scene-builder backfill seam SHALL emit one `world.observability` `log_info` event with the
 event id `npc_name_fallback` (snake_case, named-import facade) each time it writes a rolled name,
-with a context dict carrying the quest identity and the slot coordinates (at least `quest`,
-`definition_key`, `stage`, and `role`). The event SHALL be a plain logger write — never a state
-write — and SHALL NOT be emitted for an occupant whose authored display name was applied.
+through `transaction.on_commit` scheduling, with a context dict carrying the quest identity, the
+slot coordinates, and the result (`quest`, `definition_key`, `stage`, `role`, `name`). The event
+SHALL be a plain logger write — never a state write — and SHALL NOT be emitted for an occupant
+whose authored display name was applied, nor for a materialization whose transaction rolls back.
 
 #### Scenario: A backfilled NPC logs exactly one named event
 - **WHEN** an NPC is backfilled during materialization
 - **THEN** exactly one `npc_name_fallback` info event is logged whose context names the quest,
-  definition key, stage index, and role of the backfilled slot
+  definition key, stage index, role, and the rolled `name` of the backfilled slot
 
 #### Scenario: An authored-name occupant logs no backfill event
 - **WHEN** an occupant keeps its authored `display_name`
 - **THEN** no `npc_name_fallback` event is emitted for it
+
+#### Scenario: A rolled-back materialization logs no backfill event
+- **WHEN** a materialization that backfilled a name fails and rolls its transaction back
+- **THEN** the scheduled `npc_name_fallback` callback never runs and the log holds no event for
+  that slot

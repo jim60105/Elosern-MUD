@@ -37,7 +37,14 @@ FORBIDDEN_FRAGMENTS = ("ollama", "llm_client", "world.ai")
 # bound helper (blueprint-portrait-policy D3). ``world/ai`` imports it read-only
 # exactly as it already imports the ``world.lore`` registries, and it never
 # mutates state, so it is exempt from the state-writer ban.
-READ_ONLY_RULE_MODULES = ("world.quests.characterization",)
+# ``world.rules.namegen`` is the deterministic name-roller pure-function layer
+# (npc-namegen-lore-registry/rules-roller D1/D5, consumed by namegen-npc-flow
+# D6): no DB, no Evennia import, no module-level state; the AI layer reads it
+# exactly like the lore registries and writes nothing through it. The exemption
+# covers this module's own import surface — the scan is a direct-import prefix
+# check by design; any future module claiming the exemption must show the same
+# side-effect-free property, and the claim itself is the review point.
+READ_ONLY_RULE_MODULES = ("world.quests.characterization", "world.rules.namegen")
 
 DETERMINISTIC_PACKAGES = ("world/rules", "world/maps", "world/quests", "world/art", "commands")
 

@@ -19,11 +19,14 @@ spawned occupants (D5).
 """
 
 from dataclasses import dataclass
+from functools import partial
+from random import Random
 from typing import Any
+import zlib
 
 from django.db import transaction
 
-from world.observability import log_warn
+from world.observability import log_info, log_warn
 from evennia.objects.models import ObjectDB
 from evennia.prototypes.spawner import spawn
 
@@ -46,6 +49,7 @@ from world.quests.runtime import (
     find_record,
     read_records,
 )
+from world.rules.namegen import roll_name_for_race
 from world.rules.progression import apply_lineage_auto_seed
 from world.rules.traits import (
     build_initial_traits,
@@ -268,6 +272,26 @@ def _apply_characterization(
         npc.db.persona = record
 
 
+def _log_name_fallback(
+    quest_id: str, definition_key: str, stage_index: int, role: str, name: str
+) -> None:
+    """Emit the backfill boundary event; scheduled via ``transaction.on_commit``.
+
+    A named module-level target (not a lambda) so the portrait-seam test
+    filter can exclude this callback precisely from its scheduling counts.
+    """
+    log_info(
+        "npc_name_fallback",
+        context={
+            "quest": quest_id,
+            "definition_key": definition_key,
+            "stage": stage_index,
+            "role": role,
+            "name": name,
+        },
+    )
+
+
 def _spawn_npc(
     room: InstanceRoom,
     requirement: Any,
@@ -275,6 +299,10 @@ def _spawn_npc(
     tier_key: str,
     disposition: str | None,
     position: int,
+    *,
+    definition_key: str,
+    stage_index: int,
+    quest_id: str,
 ) -> NPC:
     tier = NPC_TIER_REGISTRY[tier_key]
     # The tier's four bands (three physical + magic_power) drive the whole
@@ -303,6 +331,28 @@ def _spawn_npc(
     npc._apply_trait_config(config)
     npc.db.disposition = disposition
     _apply_characterization(npc, requirement, position)
+    # namegen-npc-flow D3: every scene NPC leaves this seam named. An authored
+    # display name (LLM blueprint or the hand-written template pool, e.g. the
+    # black-beard template) was already applied by the characterization seam,
+    # so only a still-nameless occupant — generic role-based, or a position
+    # past the carried characterizations — gets the deterministic backfill.
+    # The seed coordinates are the definition identity, the stage index, and
+    # the role, so rebuilding the same blueprint names the same slot the same
+    # name; race/sex come from the landed prototype, with empty values reading
+    # as None so the rule layer applies its random-pack/random-pool fallback.
+    if npc.db.display_name is None:
+        name = roll_name_for_race(
+            npc.race or None,
+            npc.sex or None,
+            Random(zlib.crc32(f"{definition_key}:{stage_index}:{role}".encode("utf-8"))),
+        )
+        npc.db.display_name = name
+        # Boundary info fires only on the OUTERMOST durable commit (clock.py
+        # advance precedent): a rolled-back materialization must never leave
+        # a trace claiming a name for an NPC that does not exist (design D4).
+        transaction.on_commit(
+            partial(_log_name_fallback, quest_id, definition_key, stage_index, role, name)
+        )
     # The shared lineage auto-seed (use-driven-skill-lineage DC6): a spawned
     # NPC that owns a deep skill gets its prerequisite chain closed and each
     # unsatisfied edge seeded to exactly the required proficiency, so its
@@ -342,11 +392,25 @@ def _spawn_occupants(
     room: InstanceRoom,
     requirement: Any,
     objective: Any,
+    *,
+    definition_key: str,
+    stage_index: int,
+    quest_id: str,
 ) -> tuple[Any, ...]:
     occupants: list[Any] = []
     for position, (role, tier_key, disposition) in enumerate(requirement.npc_reqs):
         occupants.append(
-            _spawn_npc(room, requirement, role, tier_key, disposition, position)
+            _spawn_npc(
+                room,
+                requirement,
+                role,
+                tier_key,
+                disposition,
+                position,
+                definition_key=definition_key,
+                stage_index=stage_index,
+                quest_id=quest_id,
+            )
         )
     if objective.kind is ObjectiveKind.DEFEAT and objective.monster_tier is not None:
         for position in range(objective.quantity):
@@ -556,7 +620,14 @@ def _materialize_instance(actor, record, definition, requirement, origin_room):
 
             room = _spawn_scene_room(actor, origin_room, requirement)
             objective = definition.stages[record.stage_index].objective
-            occupants = _spawn_occupants(room, requirement, objective)
+            occupants = _spawn_occupants(
+                room,
+                requirement,
+                objective,
+                definition_key=definition.key,
+                stage_index=record.stage_index,
+                quest_id=record.quest_id,
+            )
             bound = _bind_stage(actor, record, room, objective, occupants)
             flavor_context = build_flavor_context(requirement, definition, room, origin_room)
             return SceneMaterialization(room, bound, flavor_context=flavor_context)
