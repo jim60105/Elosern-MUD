@@ -51,6 +51,38 @@ MAX_CORRELATION_ID = 32
 CORRELATION_ID_LENGTH = 32
 MAX_LAYOUT_VERSION = 65_535
 
+# Adapter data slot (ui_action_result success only): a result value is not a
+# panel, so it caps at eight fields. The byte budget is the global canonical
+# envelope ceiling minus the reserve RESULT_DATA_STANDARD_RESERVE, the exact
+# worst-case serialized size of a seven-field success envelope at its field
+# maximums (2,345 bytes: a 512-code-point message of 4-byte code points is
+# 2,048 UTF-8 bytes alone) plus the 8-byte `,"data":` delimiter. A
+# budget-legal slot therefore can never push an emitted envelope over
+# MAX_CANONICAL_JSON_BYTES; the bound tests pin both terms.
+RESULT_DATA_STANDARD_RESERVE = 2_345 + 8
+MAX_RESULT_DATA_FIELDS = 8
+MAX_RESULT_DATA_BYTES = MAX_CANONICAL_JSON_BYTES - RESULT_DATA_STANDARD_RESERVE
+
+# State-identity and diagnostic key names an adapter data slot must never
+# carry, at any nesting level. The forbidden-content guarantee is enforced as
+# (1) this recursive reserved-key rule, (2) JSON-safety rejecting live objects
+# and exceptions structurally, and (3) the reserved rule matching dot-segment
+# heads so ``session.id``-style nesting cannot smuggle a reserved head either.
+FORBIDDEN_RESULT_DATA_KEYS = frozenset(
+    {
+        "actor",
+        "session",
+        "epoch",
+        "revision",
+        "presentation_epoch",
+        "presentation_revision",
+        "correlation_id",
+        "exception",
+        "traceback",
+        "local_path",
+    }
+)
+
 # Epoch form: exactly 22 URL-safe ASCII characters from 128 random bits.
 EPOCH_LENGTH = 22
 
@@ -416,13 +448,62 @@ def validate_ui_update(payload: Any, *, known_panels: set[str] | None = None) ->
     )
 
 
+def _validate_result_data(value: Any) -> dict[str, Any]:
+    """Validate one adapter ``data`` slot, returning the validated object.
+
+    The slot must be a plain object of at most ``MAX_RESULT_DATA_FIELDS``
+    fields with 1..64-character lowercase identifier names. Reserved state
+    keys are forbidden at every nesting level, both as object keys and as the
+    dot-segment heads of composite keys, so no shape smuggles one in. Values
+    are JSON-safe within the global bound table, checked on the whole object
+    at envelope depth 1 so a data leaf can never sit deeper than
+    ``MAX_DEPTH`` measured from the envelope root, and the canonical
+    serialization of the object must fit the result-data byte budget.
+    """
+    if not isinstance(value, dict):
+        raise ProtocolValidationError("data must be a JSON object")
+    if len(value) > MAX_RESULT_DATA_FIELDS:
+        raise ProtocolValidationError(
+            f"data exceeds the maximum of {MAX_RESULT_DATA_FIELDS} fields"
+        )
+
+    def reject_reserved(name: Any) -> None:
+        _validate_identifier(name, "data field name")
+        if name in FORBIDDEN_RESULT_DATA_KEYS or any(
+            segment in FORBIDDEN_RESULT_DATA_KEYS for segment in name.split(".")
+        ):
+            raise ProtocolValidationError(
+                f"data field name {name!r} carries a reserved state key"
+            )
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for key, child in node.items():
+                reject_reserved(key)
+                walk(child)
+        elif isinstance(node, (list, tuple)):
+            for child in node:
+                walk(child)
+
+    walk(value)
+    # Depth 1 is the slot's own position inside the envelope; the recursion
+    # below enforces the global depth, count, and string ceilings on every
+    # nested value relative to the envelope root.
+    check_json_safety(value, depth=1)
+    if json_byte_size(value) > MAX_RESULT_DATA_BYTES:
+        raise JSONSafetyError(
+            f"data canonical JSON exceeds {MAX_RESULT_DATA_BYTES} bytes"
+        )
+    return value
+
+
 def validate_ui_action_result(payload: Any) -> dict[str, Any]:
     """Validate an exact version-1 ``ui_action_result`` envelope."""
     _require_exact_fields(
         payload,
         UI_ACTION_RESULT,
         {"protocol_version", "presentation_epoch", "request_id", "outcome", "code", "message", "presentation_revision"},
-        {"correlation_id": "conditional"},
+        {"correlation_id": "conditional", "data": "conditional"},
     )
     if _require_int(payload, "protocol_version", minimum=1, maximum=1) != PROTOCOL_VERSION:
         raise ProtocolValidationError("unsupported protocol_version")
@@ -443,7 +524,15 @@ def validate_ui_action_result(payload: Any) -> dict[str, Any]:
         raise ProtocolValidationError(
             "correlation_id is forbidden for a non-error result"
         )
-    return {
+    data = None
+    has_data = "data" in payload
+    if has_data:
+        if outcome != "success":
+            raise ProtocolValidationError(
+                "data is forbidden for a non-success result"
+            )
+        data = _validate_result_data(payload["data"])
+    result: dict[str, Any] = {
         "protocol_version": PROTOCOL_VERSION,
         "presentation_epoch": epoch,
         "request_id": request_id,
@@ -453,6 +542,9 @@ def validate_ui_action_result(payload: Any) -> dict[str, Any]:
         "presentation_revision": presentation_revision,
         "correlation_id": correlation_id,
     }
+    if has_data:
+        result["data"] = data
+    return result
 
 
 def validate_ui_protocol_error(payload: Any) -> dict[str, Any]:

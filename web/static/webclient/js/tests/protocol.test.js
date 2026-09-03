@@ -448,6 +448,129 @@ test("validates exact ui_action_result envelopes", () => {
   assert.throws(() => Protocol.validateActionResult(actionResult({ extra: 1 })));
 });
 
+// Pair the server matrix in web.webclient.presentation.tests.test_protocol's
+// ResultEnvelopeTests: the mirrored browser validator must accept/reject 1:1.
+function nested(levels) {
+  let value = [];
+  for (let index = 0; index < levels; index += 1) {
+    value = [value];
+  }
+  return value;
+}
+
+test("ui_action_result data slot accepts the server-legal shapes", () => {
+  const valid = Protocol.validateActionResult(
+    actionResult({ data: { display_name: "加斯帕・斯諾", rank: 3 } })
+  );
+  assert.deepEqual(valid.data, { display_name: "加斯帕・斯諾", rank: 3 });
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(Protocol.validateActionResult(actionResult()), "data"),
+    false
+  );
+  const eight = {};
+  for (let index = 0; index < 8; index += 1) {
+    eight["key_" + index] = index;
+  }
+  assert.deepEqual(Protocol.validateActionResult(actionResult({ data: eight })).data, eight);
+  // Depth boundary pair: the slot sits at envelope depth 1, so ten list
+  // levels below the slot value (deepest leaf at depth 12) is legal.
+  assert.doesNotThrow(() => Protocol.validateActionResult(actionResult({ data: { k: nested(10) } })));
+});
+
+test("ui_action_result data slot rejects the server-illegal shapes", () => {
+  const nine = {};
+  for (let index = 0; index < 9; index += 1) {
+    nine["key_" + index] = index;
+  }
+  const rejects = [
+    // Nine fields.
+    { data: nine },
+    // Non-success outcomes.
+    { outcome: "rejected", code: "denied", data: { k: 1 } },
+    { outcome: "stale", code: "stale", data: { k: 1 } },
+    { outcome: "error", code: "internal_error", correlation_id: "b".repeat(32), data: { k: 1 } },
+    // Non-object slots.
+    { data: [{ k: 1 }] },
+    { data: "text" },
+    { data: 7 },
+    { data: true },
+    // Field-name shape.
+    { data: { UPPER: 1 } },
+    { data: { "has space": 1 } },
+    { data: { ["x".repeat(65)]: 1 } },
+    // Reserved state keys: top-level, dot-composite, nested, and in lists.
+    { data: { actor: "x" } },
+    { data: { epoch: "x" } },
+    { data: { presentation_revision: 1 } },
+    { data: { correlation_id: "b".repeat(32) } },
+    { data: { local_path: "/tmp/x" } },
+    { data: { "session.id": "1" } },
+    { data: { ok: { revision: 7 } } },
+    { data: { ok: [{ epoch: "e" }] } },
+    // Depth: one level past the boundary (deepest leaf at envelope depth 13).
+    { data: { k: nested(11) } },
+    // String ceiling.
+    { data: { k: "x".repeat(2049) } },
+    // Aggregate bytes: individually safe items over the result-data budget.
+    { data: { k: new Array(34).fill("x".repeat(2000)) } },
+  ];
+  for (const overrides of rejects) {
+    assert.throws(
+      () => Protocol.validateActionResult(actionResult(overrides)),
+      undefined,
+      JSON.stringify(Object.keys(overrides))
+    );
+  }
+});
+
+test("a budget-legal data slot keeps the whole envelope wire-legal", () => {
+  const legalSlot = {};
+  for (let index = 0; index < 8; index += 1) {
+    legalSlot["k" + index] = "x".repeat(2000);
+  }
+  const store = connectedStore(EPOCH_A, 1);
+  const result = store.receive(
+    1,
+    "ui_action_result",
+    [actionResult({ presentation_epoch: EPOCH_A, data: legalSlot })],
+    {}
+  );
+  assert.equal(result.accepted, true, "whole-envelope safety and the slot budget agree");
+  assert.equal(store.getState().lastActionResult.data.k0.length, 2000);
+});
+
+test("an exact-budget data slot paired with worst-case standard fields stays wire-legal", () => {
+  // Boundary pair mirroring the Python ResultEnvelopeTests: a slot at exactly
+  // MAX_RESULT_DATA_BYTES canonical bytes with every standard field at its own
+  // worst case (a 512-code-point message of 4-byte code points) must pass the
+  // whole-envelope check and the reducer's receive gate; one byte over budget
+  // is rejected at the slot level.
+  const exact = { x: new Array(30).fill("a".repeat(2048)), y: "" };
+  exact.y = "a".repeat(Protocol.MAX_RESULT_DATA_BYTES - Protocol.jsonByteSize(exact));
+  assert.equal(Protocol.jsonByteSize(exact), Protocol.MAX_RESULT_DATA_BYTES);
+  const worst = actionResult({
+    presentation_epoch: EPOCH_A,
+    request_id: "r".repeat(64),
+    code: "c".repeat(64),
+    message: "\u{10FFFF}".repeat(512),
+    presentation_revision: Protocol.MAX_SAFE_INTEGER,
+    data: exact,
+  });
+  assert.ok(Protocol.jsonByteSize(worst) <= Protocol.MAX_CANONICAL_JSON_BYTES);
+  assert.doesNotThrow(() => {
+    Protocol.checkEnvelope(worst);
+    return Protocol.validateActionResult(worst);
+  });
+  const store = connectedStore(EPOCH_A, 1);
+  const accepted = store.receive(1, "ui_action_result", [worst], {});
+  assert.equal(accepted.accepted, true);
+  const over = actionResult({
+    presentation_epoch: EPOCH_A,
+    data: { ...exact, y: exact.y + "a" },
+  });
+  assert.throws(() => Protocol.validateActionResult(over));
+});
+
 test("validates exact ui_protocol_error envelopes", () => {
   assert.doesNotThrow(() => Protocol.validateProtocolError(protocolError()));
   assert.doesNotThrow(() =>

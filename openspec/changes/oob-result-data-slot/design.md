@@ -32,10 +32,29 @@
 - (拒) 無限界 `Any` payload——exact-envelope 契約是本 capability 的存在理由，無界槽把 65 KB/nesting 防護讓渡給 adapter 誠實。
 界額（8 鍵）取自「一個結果值不是面板」原則：超過即該走 panel，不該塞結果槽。
 
+（實作補充）全域 byte 界由 `check_envelope` 對整個 envelope 執行、
+`check_json_safety` 本身不查 byte；為讓「驗證過的槽」保證「發得出的
+envelope」不超限，槽自帶固定 byte 預算
+`MAX_RESULT_DATA_BYTES = MAX_CANONICAL_JSON_BYTES -
+RESULT_DATA_STANDARD_RESERVE`。預留額是七個標準欄位 Worst case 的**精確**
+序列化尺寸 2,345 bytes（512 code points 的 message 全用 4-byte 碼點即
+2,048 UTF-8 bytes）再加 `,"data":` 分隔符 8 bytes，共 2,353，並對整個
+`data` object 一次算 `json_byte_size`；雙端以「恰好用滿預算＋最差標準欄位
+仍 ≤65,536、多一 byte 即槽層拒收」的邊界測釘死（rubber-duck 發現 2 KB
+近似值會漏 304 bytes，故改精確額）。depth 界以槽所在深度 1 起算（`check_json_safety(data,
+depth=1)`／JS `checkGlobalSafety(value, 1)`），data 葉節點依 envelope 根不超過
+MAX_DEPTH=12。「不攜帶狀態鍵」採可驗證形态：保留鍵清單
+（actor/session/epoch/revision/presentation_epoch/presentation_revision/
+correlation_id/exception/traceback/local_path）在**每一層**遞迴檢查，含 dot
+複合鍵的任一段；live object／exception 由 JSON-safety 型別檢查結構性擋掉
+（JS 側另以 typeof／`[object Object]` 檢查補齊 Date／Map 等非 JSON 型別）。
+
 ### D2 — 伺服器端：正規化層驗證、emitter 條件掛鍵、validator 鏡像
 
 - `_normalize_result`：`outcome == "success"` 時接受選填 `data`，逐界驗證（object、≤8 鍵、鍵 1..64 小寫識別字、值 JSON-safe 且沿全域界）；**驗證失敗不吞成內部錯誤**——非 success 帶 `data`、或 `data` 超界，屬於 adapter 契約違反，走既有「out-of-schema adapter result → `_internal_result`」路徑（瀏覽器永遠不會看到 out-of-schema 結果）。非 success 結果一律丟棄 adapter 誤帶的 `data` 前先判形：其存在本身就是 schema 違反 → 同樣走內部錯誤路徑，與 `correlation_id` 的既有處理對稱。
-- `_send_action_result`：僅當正規化結果實際含 `data` 時掛鍵——既有 adapter 的結果 dict 無此鍵，envelope 逐鍵不變（回歸測釘死）。
+- `_send_action_result`：僅當正規化結果實際含 `data` 時掛鍵——既有 adapter 的結果 dict 無此鍵，envelope 逐鍵不變（回歸測釘死）。 正規化層驗證通過後對槽取私有 JSON 快照（`json.loads(json.dumps(...))`）再放入
+  結果 dict：完成結果快取以 dict 參考重放，快照切斷 adapter 事後改寫原物件
+  污染重放的通路（deferred adapter 重放測釘死）。
 - `validate_ui_action_result`：`_require_exact_fields` 的條件表加 `"data": "conditional"`；`outcome == "success"` 時逐界驗證，非 success 出現即 `ProtocolValidationError`；返回 dict 只在存在時帶正規化 `data`。
 請求端（`ui_action`）與 error envelope 完全不動。
 
