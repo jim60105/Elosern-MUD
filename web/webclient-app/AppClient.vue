@@ -35,6 +35,7 @@ import OverlayHost from "./components/OverlayHost.vue";
 import HelpOverlay from "./components/HelpOverlay.vue";
 import LineagePanel from "./components/LineagePanel.vue";
 import TitleCodexPanel from "./components/TitleCodexPanel.vue";
+import ToastQueue from "./components/ToastQueue.vue";
 
 const store = useElosernStore();
 
@@ -1000,6 +1001,12 @@ onMounted(() => {
       @close="closeFullLog(true)"
       @choice-action="onChoiceAction"
     />
+
+    <!-- The action-feedback toast queue (webclient-action-feedback D2): the
+         LAST child of the client root so equal-tier surfaces stack above the
+         overlays; the component owns its fixed modal-tier z-index. Always
+         mounted — it renders nothing while the store's queue is empty. -->
+    <ToastQueue :toasts="store.view.toasts" @dismiss="store.dismissToast" />
   </div>
 </template>
 

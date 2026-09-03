@@ -20,7 +20,7 @@
 //   dispatch entry routes every mutation (dispatch-only, one mutation in
 //   flight) with the tested lock semantics.
 
-import { computed, ref } from "vue";
+import { computed, onScopeDispose, ref } from "vue";
 import { defineStore } from "pinia";
 
 import Protocol from "../lib/protocol.js";
@@ -52,6 +52,15 @@ const ACTION_RESULT_FALLBACK_MESSAGE = "動作未生效，請重試或返回上�
 // feed (webclient-action-result-feedback D-A/D-B).
 const NON_SUCCESS_OUTCOMES = ["rejected", "stale", "error"];
 const MAX_COMMAND_HISTORY = 50;
+// The action-feedback toast queue (webclient-action-feedback D1): client-local
+// view state — never persisted, never part of the protocol reducer snapshot.
+// The bounded lifetime and FIFO cap mirror the redesign draft's queue
+// (5200 ms, at most four entries).
+const TOAST_LIFETIME_MS = 5200;
+const TOAST_QUEUE_MAX = 4;
+// The frozen tone vocabulary (webclient-action-feedback): an unknown tone is
+// rejected, not coerced (the openHudDrawer precedent).
+const TOAST_TONES = new Set(["info", "crit"]);
 // The registered production panel allowlist (mirrors the UMD allowlist in
 // elosern/protocol.js and web/webclient/presentation/protocol.py).
 const PANEL_ALLOWLIST = [
@@ -592,6 +601,72 @@ export const useElosernStore = defineStore("elosern", () => {
       "services.sell": "shop",
     };
 
+  // The client-local toast queue (webclient-action-feedback D1). Declared
+  // above the initial view because `initialView()` calls `buildView`, which
+  // reads it (TDZ). The array is the ONE mutable reactive proxy: `buildView`
+  // exposes the same reference on every publish, so pushes and dismisses
+  // re-render consumers without a republish — and `handleActionResult`
+  // pushes DURING a publish, where a nested republish would recurse.
+  const toasts = ref([]); // [{id, title, sub?, tone}]
+  // Per-entry auto-dismiss timers (internal bookkeeping; never reaches the
+  // entry shape or the view).
+  const toastTimers = new Map();
+  let toastIdCounter = 0;
+
+  // Push one toast, returning its id; a malformed entry is rejected, not
+  // coerced. A full queue evicts the oldest entries first (FIFO). Every
+  // pushed toast self-dismisses after TOAST_LIFETIME_MS unless clicked away
+  // earlier.
+  function pushToast(entry) {
+    const item = entry || {};
+    if (typeof item.title !== "string" || item.title.trim() === "") {
+      console.warn("pushToast: missing or blank title rejected (not coerced)");
+      return null;
+    }
+    if (!TOAST_TONES.has(item.tone)) {
+      console.warn(`pushToast: unknown tone "${item.tone}" rejected (not coerced)`);
+      return null;
+    }
+    const toast = { id: ++toastIdCounter, title: item.title, tone: item.tone };
+    if (typeof item.sub === "string" && item.sub.trim() !== "") {
+      toast.sub = item.sub;
+    }
+    toasts.value.push(toast);
+    while (toasts.value.length > TOAST_QUEUE_MAX) {
+      dismissToast(toasts.value[0].id);
+    }
+    toastTimers.set(toast.id, setTimeout(() => dismissToast(toast.id), TOAST_LIFETIME_MS));
+    return toast.id;
+  }
+
+  // Remove one toast by id (also cancels its pending timer). Returns whether
+  // an entry was removed; an unknown id is a no-op.
+  function dismissToast(id) {
+    const timer = toastTimers.get(id);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      toastTimers.delete(id);
+    }
+    const index = toasts.value.findIndex((toast) => toast.id === id);
+    if (index === -1) {
+      return false;
+    }
+    toasts.value.splice(index, 1);
+    return true;
+  }
+
+  // Scope-dispose teardown: a disposed store must leave no timer that can
+  // fire into it later. The queue is client-local, so its entries die with
+  // the store instance alongside their timers (transport resets, by
+  // contrast, deliberately KEEP the queue — toasts survive a reconnect).
+  onScopeDispose(() => {
+    for (const timer of toastTimers.values()) {
+      clearTimeout(timer);
+    }
+    toastTimers.clear();
+    toasts.value.length = 0;
+  });
+
   const view = ref(initialView());
   const narrative = ref([]);
   const commandHistory = ref([]);
@@ -962,6 +1037,31 @@ export const useElosernStore = defineStore("elosern", () => {
           ? result.message
           : ACTION_RESULT_FALLBACK_MESSAGE;
       appendText("err", message);
+    }
+    // The action-feedback crit toast (webclient-action-feedback D3): a
+    // recognized non-success `creation.concept` result ALSO speaks exactly
+    // once, above the overlay. This branch shares the narrative line's
+    // recognition/dedup unit and non-success outcome test above, but NOT its
+    // `!creationOverlayPresenting` presentation gate — a concept failure
+    // necessarily lands while the creation overlay is mounted, so applying
+    // the overlay gate to the toast channel would silence it everywhere it
+    // matters. The channel is action-scoped by the in-flight `actionId`
+    // (custom/preset results, including their stale exception, never reach
+    // it). The overlay result region and narrative behavior above are
+    // unchanged (toasts are additive). A success result pushes NOTHING here:
+    // the success-confirmation info toast's sole writer is the form layer
+    // (`retool-concept-fill-navigation`'s `applyProposal` via `pushToast`).
+    if (
+      NON_SUCCESS_OUTCOMES.indexOf(result.outcome) !== -1 &&
+      inFlight.actionId === CreationMenu.CONCEPT_ACTION
+    ) {
+      pushToast({
+        title:
+          typeof result.message === "string" && result.message.trim() !== ""
+            ? result.message
+            : ACTION_RESULT_FALLBACK_MESSAGE,
+        tone: "crit",
+      });
     }
     if (result.outcome === "rejected" && result.code === "no_puppet") {
       // The puppet is gone; no presentation will ever gate this rejection,
@@ -1848,6 +1948,11 @@ export const useElosernStore = defineStore("elosern", () => {
         // browser harness).
         mutationSubmitted,
       },
+
+      // The live client-local toast queue (webclient-action-feedback D1): the
+      // same reactive array reference on every publish; the reducer's
+      // committed snapshot never carries it and nothing persists it.
+      toasts: toasts.value,
     };
   }
 
@@ -2253,7 +2358,7 @@ export const useElosernStore = defineStore("elosern", () => {
       action_id: actionId,
       payload: payload === undefined || payload === null ? {} : payload,
     };
-    inFlight = { requestId, presentationRevision: null, handledResult: null };
+    inFlight = { requestId, actionId, presentationRevision: null, handledResult: null };
     // `handledResult` is the per-request dedup unit
     // (webclient-action-result-feedback): the fingerprint of the result this
     // in-flight dispatch has already recognized. Re-observation (publishView
@@ -2261,6 +2366,9 @@ export const useElosernStore = defineStore("elosern", () => {
     // foreign result cannot erase the record, so a re-delivery of THIS
     // request's result stays silent even after another request's result
     // passed through the reducer.
+    // `actionId` (webclient-action-feedback D3): the local correlation the
+    // concept crit trigger reads; the exposed `view.dispatch.inFlight` copy
+    // keeps its frozen two-field shape.
     mutationSubmitted = true;
     lastSubmittedRequestId = requestId;
     // A custom save tracks its request so the result resolution opens the
@@ -2471,6 +2579,11 @@ export const useElosernStore = defineStore("elosern", () => {
      markNarrativeSeen,
     clearUncertain,
     getSender,
+    // The action-feedback toast queue API (webclient-action-feedback): the
+    // store is the sole writer; `retool-concept-fill-navigation`'s overlay
+    // pushes its success confirmation through this entry point.
+    pushToast,
+    dismissToast,
     // The declarative-frame derivation seam (frame-resolvers.js): resolve a
     // `{source, params}` descriptor against the committed state right now.
     resolveFrame: (descriptor) => frameResolver.resolve(descriptor),

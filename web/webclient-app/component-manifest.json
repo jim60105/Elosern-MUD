@@ -40,7 +40,8 @@
     "Overlays/SettingsOverlay",
     "Overlays/HelpOverlay",
     "Overlays/OverlayHost",
-    "Overlays/CreationOverlay"
+    "Overlays/CreationOverlay",
+    "Feedback/ToastQueue"
   ],
   "frozen": true
 }

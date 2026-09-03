@@ -8,7 +8,7 @@ WebClient 目前沒有 toast 系統：動作結果的非成功訊息在創角 ov
 
 - 新元件 `web/webclient-app/components/ToastQueue.vue`：右上錨定堆疊（對齊 redesign `.toasts` 規格），逐條含標題與可選副行，`tone: "crit"` 用 seal 紅左緣；點擊關閉；入場復用 `elosern-toast-in`；testid 前綴 `feedback-`。
 - Pinia store（`stores/elosern.js`）新增 toast 佇列切片：條目 `{ id, title, sub?, tone }`、FIFO 上限 4（超出最舊立即出列）、預設 5200 ms 自動淡出、`pushToast`/`dismissToast` 寫入介面；不持久化、不進敘事 feed。
-- 第一期觸發點僅 `creation.concept`，採單寫入者契約：非成功 → crit toast（伺服端訊息逐字作 title），由 store 在結果認可時寫入；成功 → info toast「概念提案已套用」，由 `retool-concept-fill-navigation` 的 `applyProposal()` 在套用提案時經 `pushToast` 寫入（store 不推成功 toast，無跨切片抑制協議）。既有敘事 feed 非成功單行語意（webclient-action-result-feedback）與 overlay result 區契約**不變**——toast 是疊加的可發現性，不取代任何既有通道。
+- 第一期觸發點僅 `creation.concept`，採單寫入者契約：非成功 → crit toast（伺服端訊息逐字作 title），由 store 在結果認可時寫入；成功 → info toast「概念提案已套用到自訂表單」，由 `retool-concept-fill-navigation` 的 `applyProposal()` 在套用提案時經 `pushToast` 寫入（store 不推成功 toast，無跨切片抑制協議）。既有敘事 feed 非成功單行語意（webclient-action-result-feedback）與 overlay result 區契約**不變**——toast 是疊加的可發現性，不取代任何既有通道。
 - 凍結契約改寫（非稀釋）：`deferred_surfaces_absent.test.js` 的 toast 禁令重述為「禁的是無資料綁定的後端讀取模型 surface」；`feedback-` testid 合法、遊戲事件 toast（`toast-` 前綴 + event-log 綁定）在讀模型落地前仍禁；`DEFERRED_TITLE_PATTERNS` 移除 `/Toasts?/i`；`event-log-`／`companion-`／`objective-` 缺席斷言原樣保留。
 - `ToastQueue.vue` 進 Storybook showcase 必需清單（manifest 重凍結）與 `docs/development/webclient-vue-frozen-contract-audit.md` 同步。**範圍決策（使用者已確認）**：遊戲事件 toast（升級／任務／解鎖／金錢）所需的伺服端事件匯流排與 `event-log` OOB panel 不在本期；佇列介面預留事件插入點。
 

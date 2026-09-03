@@ -14,6 +14,7 @@ import NarrativeFeed from "../../components/NarrativeFeed.vue";
 import OverlayHost from "../../components/OverlayHost.vue";
 import SettingsOverlay from "../../components/SettingsOverlay.vue";
 import SkillDetailPane from "../../components/SkillDetailPane.vue";
+import ToastQueue from "../../components/ToastQueue.vue";
 import { CREATION_PANEL_SAMPLE, LOCAL_MAP_SAMPLE, localMapModelFor } from "../../stories/fixtures.js";
 
 // B5 (webclient-vue-06-showcase-overlays): the deferred-surfaces-absent and
@@ -27,6 +28,15 @@ import { CREATION_PANEL_SAMPLE, LOCAL_MAP_SAMPLE, localMapModelFor } from "../..
 // `character` panel's `intimate` field (schema version 4), so it is removed
 // from the deferred-surface list; its presence/absence behaviour is governed
 // by the `webclient-contextual-hud` character-status drawer requirement.
+//
+// add-action-feedback-toasts (webclient-action-feedback): the toast BAN is
+// narrowed, not dropped. The deferred item is the EVENT-LOG read-model-backed
+// game-event toast queue (roadmap §7 — "Event toasts — not backed" was about
+// the missing `event_log` panel, never an architectural ban on the component);
+// the action-feedback queue that landed with that change is a legitimate
+// client-local surface bound only to store state, and it identifies itself by
+// the `feedback-` testid prefix. The `toast-`/`event-log-` testid bindings
+// below stay banned in the authored view layer until the read model exists.
 const APP_ROOT = join(process.cwd(), "web/webclient-app");
 
 function collectStoryTitles(dir) {
@@ -61,7 +71,6 @@ const DEFERRED_TITLE_PATTERNS = [
   /\bParty\b/i,
   /\bIntimate\b/i,
   /\bEventLog\b/i,
-  /\bToasts?\b/i,
   /\bCompanions?\b/i,
   /\bObjectives?\b/i,
    // H2 additions: the head-card identity line and the minimap's unbacked
@@ -102,8 +111,11 @@ const DEFERRED_SURFACES = [
     testidPrefixes: ["companion-", "party-"],
   },
   {
-    name: "event-log toasts",
-    waitsOn: "the `event_log` read model (the toast queue)",
+    // Disambiguated by add-action-feedback-toasts: what remains deferred is
+    // the game-event queue fed by the `event_log` read model — the client-
+    // local action-feedback queue (`feedback-` prefixed) is built and allowed.
+    name: "event-log game-event toast queue",
+    waitsOn: "the `event_log` read model (the game-event toast queue)",
     testidPrefixes: ["event-log-", "toast-"],
   },
   {
@@ -150,8 +162,10 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
     // and `Overlays/OverlayHost` (39 → 41). H6 (webclient-hud-06-remap-and-
     // finalize, task 4.2 + 5.2) removes the dead `Data/CharacterPanel` view
     // code, re-freezing the set at 40. The improve-webclient-map-overlay-scale
-    // change adds `World/MapLattice` to the required set (40 → 41).
-    expect(manifest.required).toHaveLength(41);
+    // change adds `World/MapLattice` to the required set (40 → 41). The
+    // add-action-feedback-toasts change adds the action-feedback queue
+    // (`Feedback/ToastQueue`, 41 → 42).
+    expect(manifest.required).toHaveLength(42);
    // The four full overlays complete the required set (B5's new family).
    for (const title of [
      "Overlays/MapOverlay",
@@ -169,6 +183,7 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
       "Data/EquipmentDoll",
       "Data/CharacterStatusDrawer",
       "World/MapLattice",
+     "Feedback/ToastQueue",
     ]) {
       expect(manifest.required).toContain(title);
     }
@@ -298,6 +313,47 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
       }
     }
     expect(found, `deferred-surface testids present in source: ${JSON.stringify(found)}`).toEqual([]);
+  });
+
+  // add-action-feedback-toasts (delta spec: "The action-feedback queue is
+  // built while the event-log queue stays deferred"): the built surface is
+  // asserted positively, and its bindings are client-local by construction —
+  // the component imports nothing beyond Vue and renders only its props, so
+  // no OOB field can reach it. The absence half (the `toast-`/`event-log-`
+  // bindings above) is unchanged.
+  it("the action-feedback queue is built with client-local bindings only", () => {
+    const wrapper = mount(ToastQueue, {
+      props: {
+        toasts: [
+          { id: 1, title: "概念提案已套用到自訂表單", tone: "info" },
+          { id: 2, title: "概念服務目前無法使用", sub: "貓人見習者", tone: "crit" },
+        ],
+      },
+    });
+    expect(wrapper.find('[data-testid="feedback-toast-queue"]').exists()).toBe(true);
+    const entries = wrapper.findAll('[data-testid^="feedback-toast-"]');
+    // The queue container itself carries the prefix-family testid; entries
+    // add two more.
+    expect(entries).toHaveLength(3);
+    const crit = wrapper.find('[data-testid="feedback-toast-2"]');
+    expect(crit.classes()).toContain("crit");
+    expect(crit.find(".tt").text()).toContain("概念服務目前無法使用");
+    expect(crit.find(".ts").text()).toContain("貓人見習者");
+    expect(wrapper.find('[data-testid="feedback-toast-1"]').classes()).not.toContain("crit");
+    // Click dismisses that entry (the component only emits; the store owns
+    // the queue).
+    crit.trigger("click");
+    expect(wrapper.emitted("dismiss")).toEqual([[2]]);
+    // Client-local by construction: the component imports nothing but Vue.
+    const source = readFileSync(join(APP_ROOT, "components/ToastQueue.vue"), "utf-8");
+    const imports = [...source.matchAll(/^import .*?from ["']([^"']+)["']/gm)].map((m) => m[1]);
+    // `script setup` needs even fewer imports than that (defineProps/
+    // defineEmits are compiler macros) — the honest contract is "no import
+    // from anywhere but Vue": no store, no protocol, no fixture module can
+    // reach the component, so no OOB field can be rendered.
+    for (const specifier of imports) {
+      expect(specifier, `ToastQueue imports ${specifier} (must stay Vue-only)`).toBe("vue");
+    }
   });
 });
 

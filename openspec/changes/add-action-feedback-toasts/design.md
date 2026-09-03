@@ -26,7 +26,7 @@ result 物件按 `protocol.js` 契約自帶 `request_id`/`outcome`/`code`/`messa
 
 ### D1: 佇列是 store 切片，元件被動渲染
 
-`stores/elosern.js` 維護 `toasts` 陣列（客戶端本地，不入 `reducer` 提交快照、不持久化）與 `pushToast`/`dismissToast`；`view` 切片暴露唯讀 `toasts`。自動消失用 `setTimeout`（store 驅動便於無 UI 測試——測試直接呼叫 `pushToast` 後跑假時鐘斷言出列）。上限 4、FIFO、`tone ∈ {"info","crit"}`。
+`stores/elosern.js` 維護 `toasts` 陣列（客戶端本地，不入 `reducer` 提交快照、不持久化）與 `pushToast`/`dismissToast`；`view` 切片暴露唯讀 `toasts`。自動消失用 `setTimeout`（store 驅動便於無 UI 測試——測試直接呼叫 `pushToast` 後跑假時鐘斷言出列）。上限 4、FIFO、`tone ∈ {"info","crit"}`。佇列與計時器是純本地生命週期：`onScopeDispose` 在 store 銷毀時清除全部待觸發計時器並清空佇列，防跨案延遲回呼；epoch／transport 重置則刻意不清佇列（toast 應存活重連）。
 
 - 替代方案（元件本地佇列 + provide/inject）：被否——違反「store 是 view 狀態唯一寫入者」；多處 `pushToast` 需求（overlay、store 內部結果處理）需要單一入口。
 
@@ -42,7 +42,7 @@ result 物件按 `protocol.js` 契約自帶 `request_id`/`outcome`/`code`/`messa
 - **成功**確認 toast 由 `retool-concept-fill-navigation` 的 `CreationOverlay.applyProposal()` 在套用新 revision 且載入態（`conceptPending`）存活時經 `pushToast` 寫入——只有套用时點同時知道「落地成功＋導航脈絡」，revision 守門天然冪等、天然單次。
 - 原「store 推通用成功 info＋overlay 事後抑制」方案作廢：store 在 result commit 時同步推播，overlay 無法追溯抑制；`creationOverlayPresenting` 只測面板掛載，測不出「完成於概念頁」。兩條 toast 各自單點寫入、零抑制協議。
 - 邊界（已接受）：成功結果送達但表單从未套用（overlay 未掛載）時無成功 toast——成功語境（提案填入表單）確實未發生，feed/result 區通道不受影響。
-- **觸發集恆等式**：crit toast 的觸發集與 feed-line 的觸發集逐字相同（同去重、同非成功判準），差別僅在呈现層。`creation.custom`／`creation.preset` 的 `stale` 例外維持 feed-only（確認面板為自有結果 surface），toast 同樣排除——兩通道由同一分支決定，不容各寫各的判準。
+- **觸發恆等式（精確表述，rubber-duck 複審 F9）**：crit toast 與 feed 行共享同一認可／去重單位（`inFlight.handledResult` 指紋＋同 request／同 epoch 守門；指紋設於兩分支之前且之上）與同一非成功 outcome 判準；但 feed 通道的 `!creationOverlayPresenting` 抑制條件是 **feed 專屬的呈現層抑制**（webclient-action-result-feedback D-C），toast 通道刻意不復用該閘——concept 失敗必然發生在 overlay 掛載期間，復用閘即令目標場景零 toast（spec scenario「A toast survives the creation overlay」）。toast 通道改以 action 鍵縮窄：僅 `creation.concept`（本地 `inFlight.actionId` 擴充），`creation.custom`／`creation.preset`（含其 `stale` 例外）天然不進 toast 通道；兩通道的認可都在同一指紋去重分支內完成，不容各寫各的判準。
 
 - 替代方案（store 寫全部成功／失敗 toast）：被否——需要跨切片抑制協議與「完成於概念頁」判定，兩者在 store 層都拿不到可靠信號。
 
@@ -80,4 +80,5 @@ toast 佇列與計數器皆為 store-local 純顯示態——不進 `getState()`
 | 概念成功確認 toast（唯一寫入點） | retool-concept-fill-navigation（`applyProposal()`） | ToastQueue 渲染 |
 | 概念失敗 crit toast（唯一寫入點） | add-action-feedback-toasts（`handleActionResult`） | ToastQueue 渲染 |
 | `creation.view.stage`（「完成於概念頁」判定） | 現有 store | CreationOverlay（A3 導航） |
-| `toastIn` 動畫 keyframe | bump（tokens.css） | ToastQueue.vue |
+| `elosern-toast-in` 動畫 keyframe | `tokens.css`（既有孤兒，收編為有消費者） | ToastQueue.vue |
+| 本地 `inFlight` 記錄（擴充 `actionId`：`{requestId, actionId, presentationRevision, handledResult}`；`view.dispatch.inFlight` 暴露形狀維持凍結兩欄） | add-action-feedback-toasts（store） | A5 concept crit 門（A3 不得重複擴充） |
