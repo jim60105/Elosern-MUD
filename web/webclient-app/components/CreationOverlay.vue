@@ -606,11 +606,12 @@ applyProposal();
       <h2 class="creation-overlay__title" data-testid="creation-overlay-title">角色創建</h2>
       <button
         type="button"
-        class="creation-overlay__close"
+        class="ui-btn ui-btn--ghost ui-btn--sm creation-overlay__close"
         data-testid="creation-overlay-close"
         @click="close"
       >
-        ✕ 關閉
+        <span aria-hidden="true">✕</span>
+        關閉
       </button>
     </header>
 
@@ -633,7 +634,7 @@ applyProposal();
             <div class="creation-confirm-actions">
               <button
                 type="button"
-                class="creation-confirm-ok"
+                class="ui-btn ui-btn--primary"
                 data-testid="creation-confirm-ok"
                 @click="confirmCurrent"
               >
@@ -641,7 +642,7 @@ applyProposal();
               </button>
               <button
                 type="button"
-                class="creation-confirm-cancel"
+                class="ui-btn"
                 data-testid="creation-confirm-cancel"
                 @click="cancelConfirm"
               >
@@ -651,11 +652,12 @@ applyProposal();
           </div>
         </template>
         <template v-else>
-          <nav class="creation-overlay__modes">
+          <nav class="ui-tabs creation-overlay__modes" aria-label="建角方式">
             <button
               type="button"
-              class="creation-overlay__mode"
+              class="ui-tabs__tab creation-overlay__mode"
               :class="{ 'is-active': mode === 'preset' }"
+              :aria-pressed="mode === 'preset'"
               data-testid="creation-mode-preset"
               @click="setMode('preset')"
             >
@@ -663,8 +665,9 @@ applyProposal();
             </button>
             <button
               type="button"
-              class="creation-overlay__mode"
+              class="ui-tabs__tab creation-overlay__mode"
               :class="{ 'is-active': mode === 'custom' }"
+              :aria-pressed="mode === 'custom'"
               data-testid="creation-mode-custom"
               @click="setMode('custom')"
             >
@@ -672,8 +675,9 @@ applyProposal();
             </button>
             <button
               type="button"
-              class="creation-overlay__mode"
+              class="ui-tabs__tab creation-overlay__mode"
               :class="{ 'is-active': mode === 'concept' }"
+              :aria-pressed="mode === 'concept'"
               data-testid="creation-mode-concept"
               @click="setMode('concept')"
             >
@@ -815,9 +819,6 @@ applyProposal();
           </label>
 
           <p v-if="formMessage" class="creation-form-message" data-testid="creation-form-message">{{ formMessage }}</p>
-          <button type="button" class="creation-custom-confirm" data-testid="creation-submit" @click="confirmCustom">
-            確認自訂
-          </button>
         </div>
 
         <div v-else class="creation-overlay__concept">
@@ -839,20 +840,40 @@ applyProposal();
             <span class="creation-concept-spinner" aria-hidden="true"></span>
             <p class="creation-concept-loading-text">概念生成中，請稍候…</p>
           </div>
+        </div>
+
+        <!-- One action bar for the whole wizard (never a bare stretched
+             button inside the form column): the destructive reset sits at the
+             leading edge, the mode's single decisive action at the trailing
+             edge, and the bar sticks to the bottom of the scrolling body so
+             the primary action is reachable from any scroll position. -->
+        <footer class="creation-overlay__footer">
           <button
             type="button"
-            class="creation-concept-apply"
+            class="ui-btn ui-btn--danger creation-reset"
+            data-testid="creation-reset"
+            @click="requestReset"
+          >
+            重設
+          </button>
+          <button
+            v-if="mode === 'custom'"
+            type="button"
+            class="ui-btn ui-btn--primary creation-custom-confirm"
+            data-testid="creation-submit"
+            @click="confirmCustom"
+          >
+            確認自訂
+          </button>
+          <button
+            v-else-if="mode === 'concept'"
+            type="button"
+            class="ui-btn ui-btn--primary creation-concept-apply"
             data-testid="creation-concept-submit"
             :disabled="applyFrozen"
             @click="applyConcept"
           >
-            套用概念
-          </button>
-        </div>
-
-        <footer class="creation-overlay__footer">
-          <button type="button" class="creation-reset" data-testid="creation-reset" @click="requestReset">
-            重設
+            {{ conceptPending ? "生成中…" : "套用概念" }}
           </button>
         </footer>
         </template>
@@ -892,15 +913,8 @@ applyProposal();
   font-size: 20px;
 }
 
-.creation-overlay__close {
-  color: var(--paper-300);
-  background: var(--ink-860);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  padding: var(--sp-1) var(--sp-3);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
+/* Chrome and controls come from the shared control layer in styles/tokens.css
+   (`.ui-btn`, `.ui-tabs`); the rules below add only layout. */
 
 .creation-overlay__body {
   flex: 1;
@@ -911,25 +925,11 @@ applyProposal();
   overflow: auto;
 }
 
+/* The mode switch is the shared segmented tray (`.ui-tabs`); it only needs to
+   stop stretching inside the body's flex column. */
 .creation-overlay__modes {
-  display: flex;
-  gap: var(--sp-2);
-}
-
-.creation-overlay__mode {
-  color: var(--paper-300);
-  background: var(--ink-860);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  padding: var(--sp-1) var(--sp-3);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.creation-overlay__mode.is-active {
-  color: var(--paper-50);
-  background: var(--ink-700);
-  border-color: var(--seal-500);
+  flex: none;
+  overflow-x: auto;
 }
 
 .creation-overlay__presets {
@@ -1095,19 +1095,25 @@ applyProposal();
 }
 
 
+/* The sticky action bar: pulled out to the body's padding edges so it reads
+   as a bar, and pinned to the bottom of the scroll box. `margin-top: auto`
+   keeps it at the foot of a short form instead of floating mid-panel. */
 .creation-overlay__footer {
+  position: sticky;
+  bottom: calc(-1 * var(--sp-4));
+  z-index: 1;
   display: flex;
+  align-items: center;
   gap: var(--sp-2);
+  margin: auto calc(-1 * var(--sp-6)) calc(-1 * var(--sp-4));
+  padding: var(--sp-3) var(--sp-6);
+  background: var(--ink-900);
+  border-top: var(--line);
 }
 
-.creation-reset {
-  color: var(--paper-50);
-  background: var(--seal-600);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  padding: var(--sp-2) var(--sp-4);
-  font-size: var(--text-sm);
-  cursor: pointer;
+/* The decisive action sits at the trailing edge, opposite the reset. */
+.creation-overlay__footer .ui-btn--primary {
+  margin-left: auto;
 }
 
 .creation-confirm {
@@ -1131,23 +1137,6 @@ applyProposal();
   gap: var(--sp-2);
 }
 
-.creation-confirm-ok,
-.creation-confirm-cancel {
-  color: var(--paper-50);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  padding: var(--sp-2) var(--sp-4);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.creation-confirm-ok {
-  background: var(--seal-600);
-}
-
-.creation-confirm-cancel {
-  background: var(--ink-820);
-}
 
 .creation-unavailable-reason {
   margin: 0;
