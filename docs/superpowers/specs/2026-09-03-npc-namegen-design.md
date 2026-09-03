@@ -7,7 +7,7 @@
 
 遊戲目前沒有系統化的姓名來源。角色創建的自訂表單要求玩家自己想名字；
 NPC 側只有 `BlueprintNpcReq.display_name` 這個選填欄位，LLM 沒填時名字就缺失，
-離線模板路徑僅有一個硬編碼的「黑鬍」。後果是 LLM 離線時 NPC 無名可用，
+離線模板路徑僅有一個寫死的「黑鬍」。後果是 LLM 離線時 NPC 無名可用，
 在線時名字風格又完全依賴模型自由發揮。
 
 本設計以已 vendor 化的 CC BY 4.0 語料（`third_party/fantasy-namegen/`，
@@ -22,12 +22,12 @@ NPC 側只有 `BlueprintNpcReq.display_name` 這個選填欄位，LLM 沒填時�
 | 決策 | 選擇 | 理由 |
 |---|---|---|
 | 語料承載 | `world/lore/names.py` module-level 凍結 registry，import 時解析 vendored JSON | 與 `RACE_REGISTRY` 同契約（來源即真相、import 即完成）；204 KB 七檔，import 成本可忽略 |
-| 種族映射 | human→human 包、elf→elf 包、beastfolk→orc 包；dwarf／halfling 入 registry 但不綁族 | 三包對上現有 `RACE_REGISTRY` 三族；粗嚳音韻以 orc 包最接近兽人系；兩包留給未來新族 |
+| 種族映射 | human→human 包、elf→elf 包、beastfolk→orc 包；dwarf／halfling 入 registry 但不綁族 | 三包對上現有 `RACE_REGISTRY` 三族；粗嚳音韻以 orc 包最接近獸人系；兩包留給未來新族 |
 | 顯示名形式 | 純正體中文譯名（「加斯帕・斯諾」），經 translit 表組成 | 已驗證 translit 表對全部 1,274 個零件零缺漏、全部單詞無需拆詞；中文世界觀一致 |
 | 骰子語料位置 | 伺服器端，走 OOB `ui_action` 往返 | SPA 維持 view-layer only；語料只在伺服器一份，不進前端 bundle |
-| 骰子上下文 | 讀表單的種族與性別欄 | 行為直覺，且與 NPC 側共用同一規則函式 |
+| 骰子脈絡 | 讀表單的種族與性別欄 | 行為直覺，且與 NPC 側共用同一規則函式 |
 | 性別欄位 | 自訂表單新增「性別」下拉（女性／男性／其他），隨 payload 持久化到 `entity.sex` | `SEX_VALUES` registry 已存在、import 載入側已寫 `entity.sex`，創建側是缺口，一併補齊 |
-| NPC 整合 | 方案 A＋靈感化 B：prompt 階段注入「僅供靈感」建議名，spawn 階段對缺失名確定性補名；validator 與 schema 必填性不動 | 只用 A 時名字風格可能與 LLM 敘事脫節；只用 B 時 LLM 仍可能自創名。灵感定位讓 LLM 可依性別／背景調整（用戶核定），離線時兜底補名仍保證可玩 |
+| NPC 整合 | 方案 A＋靈感化 B：prompt 階段注入「僅供靈感」建議名，spawn 階段對缺失名確定性補名；validator 與 schema 必填性不動 | 只用 A 時名字風格可能與 LLM 敘事脫節；只用 B 時 LLM 仍可能自創名。靈感定位讓 LLM 可依性別／背景調整（用戶核定），離線時兜底補名仍保證可玩 |
 | RNG 策略 | UI 骰用模組級無種子 `Random()`；NPC 側用 `Random(crc32("definition.key:stage:role"))` | 玩家擲名本質是輸入的另一種形式，無需重放；NPC 名要與藍圖同種子可重放 |
 
 拒絕的替代方案：把語料 bundle 進前端（SPA 契約禁止語料層、且 204 KB 進
@@ -125,10 +125,10 @@ RNG 來源分兩條、不共用：
 （2026-09-03 修訂，見 OpenSpec `namegen-npc-flow` design D1。）原稿要求逐
 stage NPC 槽位以 `crc32(f"{definition_key}:{stage}:{role}")` 擲靈感名，但該
 種子座標在 prompt 組裝時點不可計算：`build_scenario_prompt(context)` 只收請求
-上下文，blueprint 與 `definition_key` 都是 LLM 輸出之後才存在的資料。逐槽位
+脈絡，blueprint 與 `definition_key` 都是 LLM 輸出之後才存在的資料。逐槽位
 注入改為 two-pass LLM 呼叫又被「schema／validator 不動」的核定範圍排除。
 
-修訂為上下文種子靈感名庫：對 `_bounded_context(context)` 的序列化文字算
+修訂為脈絡種子靈感名庫：對 `_bounded_context(context)` 的序列化文字算
 `zlib.crc32` 作種子，`roll_name_for_race(None, "", Random(seed))` 擲固定
 N=6 個名字組成靈感庫，經 `scenario_director.system` 新增的 `{name_inspiration}`
 佔位符注入 system 訊息。同 context 必得同一庫，守住「同輸入位元組相同
@@ -185,7 +185,7 @@ rules。`world/ai/` 全程不落地任何狀態，靈感名由 prompt 組合器�
 
 | 情境 | 行為 |
 |---|---|
-| translit 缺詞（上游同步後） | import 時不變量 1 直接炸出，附缺詞清單；執行期永不发生 |
+| translit 缺詞（上游同步後） | import 時不變量 1 直接炸出，附缺詞清單；執行期永不發生 |
 | 池過濾為空 | 退回該包全池（不死） |
 | 不存在的 pack_key | `KeyError`，不吞 |
 | `creation.roll_name` 帶無效 race／sex | 規則層以既有 validation 錯誤回 `ui_protocol_error`，前端顯示既有錯誤通道訊息 |

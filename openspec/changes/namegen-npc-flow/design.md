@@ -24,13 +24,13 @@
 
 ## Decisions
 
-### D1：prompt 側以「上下文種子靈感名庫」實現靈感注入；逐槽位原式種子留給 spawn 側
+### D1：prompt 側以「脈絡種子靈感名庫」實現靈感注入；逐槽位原式種子留給 spawn 側
 
-設計 §6.1 寫的 prompt 側種子 `crc32(f"{definition_key}:{stage}:{role}")` 在請求時點**不可計算**：`build_scenario_prompt(context)` 的輸入只有請求上下文（requested_type／allowed_rank／issuer_branch／anchor／note），該時點 LLM 尚未輸出、blueprint 不存在，`definition_key` 更是 `compile_quest_blueprint` 之後才存在的內容摘要（sha256 over canonical fields）。可選解法：
+設計 §6.1 寫的 prompt 側種子 `crc32(f"{definition_key}:{stage}:{role}")` 在請求時點**不可計算**：`build_scenario_prompt(context)` 的輸入只有請求脈絡（requested_type／allowed_rank／issuer_branch／anchor／note），該時點 LLM 尚未輸出、blueprint 不存在，`definition_key` 更是 `compile_quest_blueprint` 之後才存在的內容摘要（sha256 over canonical fields）。可選解法：
 
 - **two-pass（拒絕）**：先叫 LLM 產結構、再逐槽位擲名回填、再叫 LLM 補敘事——雙倍 transport 成本、改動 guardrail 管線形態，且違反「schema／validator 不動」。
 - **改需求為 spawn-only（拒絕）**：丟掉 prompt 階段的風格錨定，設計 §2 已核定「方案 A＋靈感化 B」雙管。
-- **上下文種子靈感名庫（採用）**：對 `_bounded_context(context)` 的序列化文字算 `zlib.crc32` 作種子，`roll_name_for_race(None, "", Random(seed))` 擲固定 N 個（N=6）名字，組成一段文字注入 system 訊息。性質：同 context 必得同名庫（守住「同輸入位元組相同 prompt」契約——`_bounded_context` 本身確定，注入源也確定）；不同 context 自然換名庫。靈感定位（僅供靈感、可依性別／背景改寫、建議填寫 `display_name`）由 YAML 文字承載，LLM 有權改寫——用戶核定決策。
+- **脈絡種子靈感名庫（採用）**：對 `_bounded_context(context)` 的序列化文字算 `zlib.crc32` 作種子，`roll_name_for_race(None, "", Random(seed))` 擲固定 N 個（N=6）名字，組成一段文字注入 system 訊息。性質：同 context 必得同名庫（守住「同輸入位元組相同 prompt」契約——`_bounded_context` 本身確定，注入源也確定）；不同 context 自然換名庫。靈感定位（僅供靈感、可依性別／背景改寫、建議填寫 `display_name`）由 YAML 文字承載，LLM 有權改寫——用戶核定決策。
 
 spawn 側仍用設計原式 `crc32(f"{definition.key}:{stage_index}:{role}")`：該時點三要素俱在，同藍圖重建必得同名的重放契約完整保留。兩側種子不同源是**刻意**的：prompt 名只是靈感（LLM 常會改寫），spawn 名是最終落地名（必須逐槽位穩定）。
 
@@ -52,9 +52,9 @@ characterization 為 `None` 時 `_apply_characterization` 現行 early-return，
 
 `scene_builder.py` 已有 `from world.observability import log_warn`；改為同列 `log_info, log_warn`。補名成功後發 `log_info("npc_name_fallback", context={"quest": quest_id, "definition_key": definition_key, "stage": stage_index, "role": role, "name": name})`（snake_case event id、context dict、依 facade 規範的 `action_commit` 級 info 事件）。事件在原子交易內發出無害（`log_info` 只寫 logger，不落 DB 狀態）；回滾時最多留一條補名 trace，不產生可觀測的錯誤狀態。
 
-### D5：schema、validator、上下文鍵零變動
+### D5：schema、validator、脈絡鍵零變動
 
-`SCENARIO_DIRECTOR_OUTPUT_SCHEMA` 的 `display_name` 維持 `{"type": ["string", "null"]}` 選填；`_VALIDATORS` 十六條不動；`_CONTEXT_KEYS`／`_CONTEXT_DROP_ORDER` 不動（靈感庫不進 user 上下文、不佔 `MAX_TOTAL_SIZE`，只進 system 訊息）。指引文字明文「建議填寫 display_name、風格可參考建議名、依敘事需要調整」，不新增任何驗證規則——LLM 回超長／非法字元走既有 `MAX_NAME_LENGTH`／validator 路徑（設計 §8）。
+`SCENARIO_DIRECTOR_OUTPUT_SCHEMA` 的 `display_name` 維持 `{"type": ["string", "null"]}` 選填；`_VALIDATORS` 十六條不動；`_CONTEXT_KEYS`／`_CONTEXT_DROP_ORDER` 不動（靈感庫不進 user 脈絡、不佔 `MAX_TOTAL_SIZE`，只進 system 訊息）。指引文字明文「建議填寫 display_name、風格可參考建議名、依敘事需要調整」，不新增任何驗證規則——LLM 回超長／非法字元走既有 `MAX_NAME_LENGTH`／validator 路徑（設計 §8）。
 
 ### D6：`world.rules.namegen` 入 `READ_ONLY_RULE_MODULES` 放行；單寫者邊界論證
 
@@ -67,8 +67,8 @@ characterization 為 `None` 時 `_apply_characterization` 現行 early-return，
 ## Risks / Trade-offs
 
 - [靈感名庫與 spawn 兜底名不同源，prompt inject 的「逐槽位對位」語意弱化為「風格樣本池」] → 設計 §6.1 的原式在請求時點不可計算（D1），這是可達成的最貼近實現；槽位級最終名仍由 spawn 原式種子保證重放。未來若要多候選綁 archetype（§10 範圍外項），本 D1 的 bank 形態可直接擴充而不改種子策略。
-- [上下文種子對 `_bounded_context` 文字雜湊，note 一字之差即換名庫] → 可接受：灵感庫非承諾名字，只需確定性；同 context 重放同庫由 spec scenario 釘死。
-- [`READ_ONLY_RULE_MODULES` 放行被未來瀨用（放行表变胖）] → 放行清單逐條附註釋與來源 change 名；新增條目本身就是評審點。
+- [脈絡種子對 `_bounded_context` 文字雜湊，note 一字之差即換名庫] → 可接受：靈感庫非承諾名字，只需確定性；同 context 重放同庫由 spec scenario 釘死。
+- [`READ_ONLY_RULE_MODULES` 放行被未來瀨用（放行表變胖）] → 放行清單逐條附註釋與來源 change 名；新增條目本身就是評審點。
 - [補名事件在回滾交易內仍會寫 logger] → 只多一條 trace 行，觀測上不承諾「有事件必有 NPC」；測試只斷言提交路徑的事件內容。
 - [`npc.sex` 預設 `"other"` 使 generic 佔用者偏向 u 池] → 與規則層 sex 語意一致（other→u 池優先），u 池為中性名池，正是要的行為。
 

@@ -22,11 +22,11 @@
 
 ### Modified Capabilities
 
-（無。）本 change 只讀 `namegen-corpus-registry` 定義的 registry 契約，不改其任何 requirement；`lore-registries`、`lore-startup-sync`、`entity-sex-vocabulary` 的既有条款均不受觸及（sex 詞彙以呼叫端傳入字串值消費，`namegen.py` 不改寫 `world/lore/sex.py`）。
+（無。）本 change 只讀 `namegen-corpus-registry` 定義的 registry 契約，不改其任何 requirement；`lore-registries`、`lore-startup-sync`、`entity-sex-vocabulary` 的既有條款均不受觸及（sex 詞彙以呼叫端傳入字串值消費，`namegen.py` 不改寫 `world/lore/sex.py`）。
 
 ## Impact
 
 - 新增 `world/rules/namegen.py`、`world/rules/tests/test_namegen.py`；修改 `.github/evennia-shards.json`（shard 2 `rules-b` 的 labels 增一列）。
-- **依賴順序**：必須在 `npc-namegen-lore-registry` 實作落地後始可動工——本 change import 其 `NAME_PACK_REGISTRY`／`NAME_PACK_BY_RACE`／`compose_display_name`（`NAME_SEPARATOR` 經 helper 间接使用，`namegen.py` 不自帶分隔符常量）與 `NamePart`／`NamePack` 欄位契約（`given` 鍵恰 `m`／`f`／`u`、`race_key: str | None`）。下游 `namegen-creation-ui`（無種子骰）與 `namegen-npc-flow`（crc32 種子＋`action_commit` 事件）都在本 change 之後，各自持有任何 RNG 策略與觀察性。
+- **依賴順序**：必須在 `npc-namegen-lore-registry` 實作落地後始可動工——本 change import 其 `NAME_PACK_REGISTRY`／`NAME_PACK_BY_RACE`／`compose_display_name`（`NAME_SEPARATOR` 經 helper 間接使用，`namegen.py` 不自帶分隔符常量）與 `NamePart`／`NamePack` 欄位契約（`given` 鍵恰 `m`／`f`／`u`、`race_key: str | None`）。下游 `namegen-creation-ui`（無種子骰）與 `namegen-npc-flow`（crc32 種子＋`action_commit` 事件）都在本 change 之後，各自持有任何 RNG 策略與觀察性。
 - 依賴方向符合單向契約：`rules/namegen` 只讀 `lore`，無 DB、無 Evennia import，不寫任何狀態（`world/ai/` 無關）。
 - 語料零變動：`third_party/fantasy-namegen/` 不動，不重新抓上游。

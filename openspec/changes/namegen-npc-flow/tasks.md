@@ -20,7 +20,7 @@
 
 ## 4. 測試
 
-- [ ] 4.1 scene_builder 測（擴充 `world/quests/tests/test_scene_builder.py`，`EvenniaTest`）：(a) `display_name=None` 佔用者補名且以同 `definition.key:stage_index:role` 種子重放必得同名（對照直接呼叫 `roll_name_for_race` 的预期值）；(b) characterization 帶 `display_name`（含模擬「黑鬍」）時不覆寫、不擲名；(c) 無 characterization 的 generic 佔用者有名、race 取 tier 的 `race_key`、race 缺席時走隨機包仍產出合成名；(d) 回滾路径無殘留
+- [ ] 4.1 scene_builder 測（擴充 `world/quests/tests/test_scene_builder.py`，`EvenniaTest`）：(a) `display_name=None` 佔用者補名且以同 `definition.key:stage_index:role` 種子重放必得同名（對照直接呼叫 `roll_name_for_race` 的預期值）；(b) characterization 帶 `display_name`（含模擬「黑鬍」）時不覆寫、不擲名；(c) 無 characterization 的 generic 佔用者有名、race 取 tier 的 `race_key`、race 缺席時走隨機包仍產出合成名；(d) 回滾路徑無殘留
 - [ ] 4.2 observability 事件測（併入 4.1 module 或 `test_quests_observability.py` 風格）：補名路徑以 `patch("world.quests.scene_builder.log_info")` 斷言恰一條 `npc_name_fallback`、context 含 quest／definition_key／stage／role；authored 名路徑零事件
 - [ ] 4.3 prompt 組裝測（擴充 `world/ai/tests/test_scenario_director_prompts.py`）：(a) system 訊息含靈感名（斷言渲染後含庫中至少一個名字與「僅供靈感」指引措辭）；(b) 同 context 兩次呼叫位元組相同（含庫）；(c) schema 必填性不動——`SCENARIO_DIRECTOR_OUTPUT_SCHEMA` 的 `npc_req.display_name` 仍為選填型別、不含 inspiration 名單；(d) validator 不變——不帶 `display_name` 與帶非庫名的 blueprint 仍照既有測試通過守欄
 - [ ] 4.4 prompt-library 側測（`world/prompts/tests/`，依既有 loader 測試形態）：`scenario_director.system` allowlist 恰為 `name_inspiration`；shipped YAML 含 token 與指引句；`{name_inspiraton}` 錯字被 loader 拒絕

@@ -19,11 +19,11 @@
 
 ### Modified Capabilities
 
-- `webclient-oob-protocol`：「Result and protocol-error envelopes are exact and non-overlapping」一条——`ui_action_result` 的 exact 鍵集合加 success 條件性 `data` 槽，鏡像驗證器（伺服器端與瀏覽器）雙邊接受合法 `data`、拒絕非 success／非 object／超界 `data`；新增兩個 scenario（success 可帶 adapter data 槽、非 success 不可帶）。
+- `webclient-oob-protocol`：「Result and protocol-error envelopes are exact and non-overlapping」一條——`ui_action_result` 的 exact 鍵集合加 success 條件性 `data` 槽，鏡像驗證器（伺服器端與瀏覽器）雙邊接受合法 `data`、拒絕非 success／非 object／超界 `data`；新增兩個 scenario（success 可帶 adapter data 槽、非 success 不可帶）。
 
 ## Impact
 
 - `web/webclient/actions/dispatcher.py`（`_normalize_result`、`_send_action_result`）、`web/webclient/presentation/protocol.py`（`validate_ui_action_result`）。
 - `web/static/webclient/js/elosern/protocol.js`（`validateActionResult`）、`web/webclient-app/stores/elosern.js`（result 視圖 `data` 透傳）。
 - 測試全部擴充既有已註冊模組：`web.webclient.actions.tests.test_dispatcher`（success 掛鍵送達／非 success 出現即拒／`data` 非 object／9 鍵／超界走驗證失敗路徑／既有無 `data` 結果逐鍵不變）、`web.webclient.presentation.tests.test_protocol`（`validate_ui_action_result` 接受/拒絕矩陣）、JS `node --test` `protocol.test.js`（雙向 parity）、Vitest store 結果路徑（透傳不吞 `data`）。`.github/evennia-shards.json` 無需變動（無新 test module）。
-- **依賴順序**：本 change 無上游代碼依賴（純協議層擴充），但必須排在 `namegen-creation-ui` 之前动工——四級前置鏈為 `npc-namegen-lore-registry` → `npc-namegen-rules-roller` → `oob-result-data-slot` → `namegen-creation-ui`。第一個（也是本 change 唯一動機性）消費端 `creation.roll_name` 的註冊、adapter 與前端回填屬 `namegen-creation-ui`；本 change 只交付 envelope 能力與鏡像驗證，registry 裡不出現任何具體 consumer action。
+- **依賴順序**：本 change 無上游程式碼依賴（純協議層擴充），但必須排在 `namegen-creation-ui` 之前動工——四級前置鏈為 `npc-namegen-lore-registry` → `npc-namegen-rules-roller` → `oob-result-data-slot` → `namegen-creation-ui`。第一個（也是本 change 唯一動機性）消費端 `creation.roll_name` 的註冊、adapter 與前端回填屬 `namegen-creation-ui`；本 change 只交付 envelope 能力與鏡像驗證，registry 裡不出現任何具體 consumer action。

@@ -1,14 +1,14 @@
 # oob-result-data-slot — Tasks
 
-前置條件：無上游代碼依賴（純 OOB 協議層擴充）。實作順序：伺服器端 → 前端鏡像 → 測試 → 收尾。每組做完先跑該組 focused 驗證再勾選；全程不跑 CI shard 指令。工作量預估：後端 + 前端鏡像 + 測試約 5–6 小時，單一工程師一個工作日內。
+前置條件：無上游程式碼依賴（純 OOB 協議層擴充）。實作順序：伺服器端 → 前端鏡像 → 測試 → 收尾。每組做完先跑該組 focused 驗證再勾選；全程不跑 CI shard 指令。工作量預估：後端 + 前端鏡像 + 測試約 5–6 小時，單一工程師一個工作日內。
 
 ## 1. 伺服器端：正規化、emitter、validator
 
 - [ ] 1.1 `web/webclient/presentation/protocol.py`：新增私有 `_validate_result_data(value)`——`data` 須為 dict、≤8 鍵、鍵名 1..64 小寫識別字（沿用 `_validate_identifier` 形）、值為 JSON-safe 標量/object/list 且遞迴沿用全域界（nesting、字串 cp、safe-integer）；違規拋 `ProtocolValidationError`。`validate_ui_action_result` 的 `_require_exact_fields` 條件表加 `"data": "conditional"`：`outcome == "success"` 且鍵存在 → 驗證並把正規化 `data` 放進返回 dict；鍵缺席 → 返回 dict 不帶 `data`；非 `success` 且鍵存在 → 拋錯（對稱於 `correlation_id` 的既有拒法）。
 - [ ] 1.2 `web/webclient/actions/dispatcher.py::_normalize_result`：success 結果讀選填 `data`，以 1.1 驗證器驗證；缺席 → 結果 dict 不帶鍵；違規（非 object、超界）或非 success 誤帶 `data` → 走既有 `_internal_result(None)` 路徑（out-of-schema adapter result 的既有處置，不吞、不部分接受）。
-- [ ] 1.3 `web/webclient/actions/dispatcher.py::_send_action_result`：僅當正規化結果含 `data` 時在 envelope 掛鍵；無鍵時输出一份與現行完全相同的 envelope（回歸基線）。
+- [ ] 1.3 `web/webclient/actions/dispatcher.py::_send_action_result`：僅當正規化結果含 `data` 時在 envelope 掛鍵；無鍵時輸出一份與現行完全相同的 envelope（回歸基線）。
 
-## 2. 前端鏡像：protocol.js + store 透传
+## 2. 前端鏡像：protocol.js + store 透傳
 
 - [ ] 2.1 `web/static/webclient/js/elosern/protocol.js::validateActionResult`：實作與 1.1 逐規則相同的驗證——success+合法 object `data` 接受並保留；非 success 出現 `data` 拒；非 object／>8 鍵／鍵形不符／值超全域界拒。返回物件只在存在時帶 `data`。
 - [ ] 2.2 `web/webclient-app/stores/elosern.js`：result 鏡像驗證後的視圖透傳 `data`——若既有 normalize 逐白名單撿鍵，白名單加 `data`；鏡像驗證拒絕的 result 走既有 out-of-schema 處置，髒 `data` 絕不發佈。
