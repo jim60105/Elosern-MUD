@@ -99,7 +99,7 @@
   命令因此不存在。收藏為空的窗口只剩「角色已建立、尚未完成公會註冊」的啟始段，
   而 §6.5 的啟始授予正是在該窗口收尾。
 
-`compose_title`（純函數，`world/rules/titles.py`）：
+`compose_title`（純函式，`world/rules/titles.py`）：
 
 ```python
 def compose_title(fixed: str | None, epithet: str | None) -> str:
@@ -126,7 +126,7 @@ class FixedTitleDef:
 ```
 
 Registry 載入驗證：key 唯一；`hint_zh` 非空（未解鎖列必須永遠可呈現）；謂詞只引用
-存在的 registry 面（元素、怪物階層、任務 key、位階 key、性經驗類型）。
+存在的 registry 面（元素、怪物階層、任務 key、位階 key、性經驗型別）。
 
 ### 6.2 謂詞家族（逐筆內容列屬後續內容工作）
 
@@ -164,7 +164,7 @@ Registry 載入驗證：key 唯一；`hint_zh` 非空（未解鎖列必須永遠
 
 ### 6.5 D8 — 啟始授予（教學環節）
 
-啟始身份必須決定論可玩，因此不押注 LLM 投票：教學環節的公會註冊事務
+啟始身份必須決定論可玩，因此不押注 LLM 投票：教學環節的公會註冊交易
 （`register_guild_member`）一次授予兩個條目——
 
 - 固定稱號「F級冒險者」（既有的位階配對，D3）；
@@ -339,7 +339,7 @@ title decline                         # 待決投票
   字可再次入票；固定稱號無刪除介面（結構斷言）；刪除不存在的異名回穩定拒絕；
   `title_epithet_removed` 寫入 EventLog。
 - **槽位不變與啟始授予**：固定授予／異名採納在空槽自動裝備、非空槽只入庫；公會
-  註冊事務一次入庫「F級冒險者」＋「南門新客」且全銜即刻為二者合成；重複註冊冪等
+  註冊交易一次入庫「F級冒險者」＋「南門新客」且全銜即刻為二者合成；重複註冊冪等
   no-op；任何 mutator 序列之後都不存在「收藏非空且槽為空」的狀態（invariant 測
   試）。
 - **Evennia 整合**：固定授予與觸發行動原子提交、強制交易中失敗時完整還原；公會考試

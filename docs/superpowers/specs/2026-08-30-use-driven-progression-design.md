@@ -182,7 +182,7 @@ practice_xp += SKILL_PRACTICE_XP_PER_USE
 - 物理與魔法的對稱是徹底的：`basic_attack` 給自己累計、劍技用一下就累計，累計公
   式中沒有任何一處讀取 school。
 - 明確的反向測試。一場完整戰鬥（含擊殺）除了實際使用之外不改變任何熟練度；公會考
-  試不累計（考試上下文已有 nonlethal 標記，`nonlethal` 時跳過累計，與舊擊殺 XP 檢
+  試不累計（考試脈絡已有 nonlethal 標記，`nonlethal` 時跳過累計，與舊擊殺 XP 檢
   查相同的隔離，如今覆蓋所有成長介面）。
 
 ## 9. D5 — 技能系譜圖是使用門檻
@@ -259,7 +259,7 @@ def can_use_skill(entity, skill) -> bool:
   ownership）；受門檻限制的是使用。匯入的宗師級角色擁有深層技能，如何取得可施用
   的熟練度見下方 auto-seed。
 - 五個 `cost_tiers` 階層保留為選單與稱號 registry 階層謂詞用的資料標籤，不再承載門
-  槛值。
+  檻值。
 - **Freeform 規模階梯改錨**（progression.yaml 常數）：資格仍需該元素精通（對已持有
   的 `<element>_mastery` 做 key 檢查，例如火焰精通 `fire_mastery`）；之後允許的
   scale 讀該技能自身熟練度：0.25 無條件、0.5 ≥1、1.0 ≥3、2.0 ≥6、4.0 ≥10。與 D6

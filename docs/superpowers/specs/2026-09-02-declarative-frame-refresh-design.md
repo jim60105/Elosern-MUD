@@ -47,7 +47,7 @@ Evennia 沒有標準的伺服器推播面板更新協定。隨附的 Web 客戶�
 frame := { descriptor: {source: string, params: object}, focusKey: string|null }
 ```
 
-frame 的任何消費端（渲染、導航、submit）都透過 store 注入的 `resolve(descriptor) → menu`，在使用當下從已提交面板推導。客戶端可變的持久狀態縮減為描述符堆疊與焦點/選取鍵，選單資料只存在於已提交快照一處。這把 store 既有不變量 D2（「訂閱者只看到已提交狀態」）延伸到原本違反它的 frame 層，過期 frame 的整類 bug 自此在架構層面不可能發生，未來新面板只需新增一個解析來源，不需要撰寫刷新邏輯。
+frame 的任何消費端（渲染、導航、submit）都透過 store 注入的 `resolve(descriptor) → menu`，在使用當下從已提交面板推導。客戶端可變的持久狀態縮減為描述符堆疊與焦點/選取鍵，選單資料只存在於已提交快照一處。這把 store 既有不變量 D2（「訂閱者只看到已提交狀態」）延伸到原本違反它的 frame 層，過期 frame 的整類 bug 自此在架構層面不可能發生，未來新面板只需新增一個解析來源，不需要撰寫重新整理邏輯。
 
 ### D2 — 拒絕：全樹簽名＋原地重建
 
@@ -134,7 +134,7 @@ frame 在使用當下派生後，`explore.move` 的 payload（`exit_ref` 加 `cu
 3. 閘門依序為 `node --test web/static/webclient/js/tests/*.test.js`（無相依 Node gate）、`npm test`（Vitest）、`uv run --locked python -m tools.spec_traceability check`。完整 managed browser 套件與 `tools.spec_traceability verify --evidence` 維持 CI 所有。
 4. Vitest 的 store 層回歸包含四項，開 Move frame 時快照提交則清單更新且焦點以 key 追蹤、目標 identity 消失則自動 pop 一層且焦點回到父框對應列、整棧不可解析時 cascade 回根框、suggestions 進入 `generating` 暫時態不觸發 pop，以及 mode 切換時以根描述符 teardown。
 
-驗收標準是任何已提交面板更新後，開著的每個 frame 在下一次渲染或按鍵時必然反映已提交內容，且客戶端程式碼中不存在任何 frame 專屬的刷新函式。
+驗收標準是任何已提交面板更新後，開著的每個 frame 在下一次渲染或按鍵時必然反映已提交內容，且客戶端程式碼中不存在任何 frame 專屬的重新整理函式。
 
 ## 8. 非目標
 
@@ -149,7 +149,7 @@ frame 在使用當下派生後，`explore.move` 的 payload（`exit_ref` 加 `cu
 | 順序 | Change | 範圍 | 工作量估計 |
 |---|---|---|---|
 | 1 | `webclient-action-result-feedback` | 非成功 `ui_action_result`（`rejected` / `stale` / `error`）的伺服器訊息以一條 `err` 敘事行呈現，一次且僅一次；建角覆蓋層呈現時不重複（§1 靜默失敗） | 約 3 小時 |
-| 2 | `webclient-frame-resolver-registry` | store 的描述符解析註冊表（§5.5 第 2 項的 derive 端），先實作探索家族有限表、unresolvable 降級標記與純函數契約，不動 router | 約 6 小時 |
+| 2 | `webclient-frame-resolver-registry` | store 的描述符解析註冊表（§5.5 第 2 項的 derive 端），先實作探索家族有限表、unresolvable 降級標記與純函式契約，不動 router | 約 6 小時 |
 | 3 | `webclient-declarative-frame-stack` | router 宣告式 frame（含過渡雙形態）、焦點鍵追蹤、pop cascade、探索家族 push 點切替、刪除 `rebuildFocusMenu` 簽名閘門與 `replaceSuggestionsFrameInPlace`、建議狀態分流（§5.1–§5.3） | 約 8 小時 |
 | 4 | `webclient-services-combat-creation-frames` | 解析表補齊服務／戰鬥／建角家族、刪除過渡雙形態與剩餘刪除清單（`rehomeFrame`、`dockRawByKey`、空棧保險絲）、抽屜—堆疊耦合規則、teardown 最終形態（§5.2、§5.4–§5.5） | 約 8 小時 |
 

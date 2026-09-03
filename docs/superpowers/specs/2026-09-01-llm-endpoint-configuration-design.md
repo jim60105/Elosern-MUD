@@ -67,7 +67,7 @@
 單一表格是唯一真相來源：宣告式 knob 清單（23 列：`(profile 欄位, env 後綴, 轉換器,
 界線, 預設)`）住在新模組 `server/conf/llm_knobs.py`（匯入安全、零環境讀取），附純函式
 `llm_env_names()` 產生全部 184 個名稱（23 全域 + 23×7 每層）。`server/conf/settings.py`
-匯入並使用它、匯出 `LLM_ENV_NAMES = frozenset(llm_env_names())`。没有任何 knob 是每層
+匯入並使用它、匯出 `LLM_ENV_NAMES = frozenset(llm_env_names())`。沒有任何 knob 是每層
 手寫的，表面不可能漂移；而測試 bootstrap 與庫存契約都能在匯入生產 settings 之前直接
 消費同一個惰性定義（兩者的 AST 抽取都看不見迴圈生成的名稱）。
 
@@ -216,7 +216,7 @@ bearer 塞進 headers 會癱瘓 `api_key` 的 `repr=False` 保護）；錯誤點
 | 領域 | 測試 |
 |---|---|
 | Profiles（`world/ai/tests/test_profiles.py`） | 每個新欄位的界線矩陣（區間內、邊界、超界、非有限、錯型別）；`reasoning_style`／`reasoning_effort` 閉集驗證；`None` 預設值缺席；`repr(profile)` 不含 `api_key`；注入 `defaults` 的合併；`action_options` 必要旗標失敗路徑 |
-| Client（`world/ai/tests/test_client.py`） | Request body 序列化矩陣：每個取樣欄位的出現／缺席；`max_completion_tokens` 取代 `max_tokens`；三種 reasoning 形态 × enabled/effort 組合；新 knob 全未設定時 body 與今日_payload_逐位元組相容（回歸）；有／無 `api_key`、`app_title`、`app_url` 的 header 矩陣；錯誤路徑字串絕不含金鑰 |
+| Client（`world/ai/tests/test_client.py`） | Request body 序列化矩陣：每個取樣欄位的出現／缺席；`max_completion_tokens` 取代 `max_tokens`；三種 reasoning 形態 × enabled/effort 組合；新 knob 全未設定時 body 與今日_payload_逐位元組相容（回歸）；有／無 `api_key`、`app_title`、`app_url` 的 header 矩陣；錯誤路徑字串絕不含金鑰 |
 | Settings（`server/conf/tests/`） | 每個 knob 的 fail-closed 開機錯誤（點名變數、原始值、規則）；全域—每層優先序；空白 ⇒ 預設；三態 reasoning-enabled 的未設 vs false；`test_settings.py` sanitize 清單涵蓋每個生成名稱 |
 | 庫存契約（`test_env_overrides.py`） | `.env.example` 金鑰 ↔ settings.py AST env 讀取（生成的名稱全部可解析）；`EXTERNAL_READERS` 不再列 `OLLAMA_BASE_URL`；AST 讀者學會識得生成的 knob 迴圈，庫存檢查不得假陰錯 |
 | 容器（`tests/test_container_contract.py`） | `LLM_BASE_URL` 存在且帶 host-gateway 預設；`OLLAMA_BASE_URL` 不存在 |
