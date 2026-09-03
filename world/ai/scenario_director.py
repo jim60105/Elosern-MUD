@@ -13,8 +13,10 @@ template pool that also fits the request context, never to invalid output or
 
 Boundary contract (``tests/test_ai_transport_contract.py``): this module imports
 no state writer, no typeclass, no live transport, and no socket. It reads only
-the immutable ``world.lore`` registries and consumes the client through the
-injected protocol exactly like ``narrator.py`` and ``npc_dialogue.py``. The
+the immutable ``world.lore`` registries and the side-effect-free
+``world.rules.namegen`` pure rollers (documented read-only-rule exemption,
+namegen-npc-flow design D6), and consumes the client through the injected
+protocol exactly like ``narrator.py`` and ``npc_dialogue.py``. The
 request context is plain data supplied by the future composition root; this
 module never reads player state.
 """
@@ -23,6 +25,8 @@ from __future__ import annotations
 
 import json
 import re
+import zlib
+from random import Random
 from dataclasses import dataclass, fields, is_dataclass
 from enum import StrEnum
 from typing import Any
@@ -49,6 +53,7 @@ from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.prompts.loader import PromptUnavailableError, render_prompt
+from world.rules.namegen import roll_name_for_race
 from world.quests.characterization import (
     characterize_errors,
     duplicate_stable_key_errors,
@@ -1056,6 +1061,31 @@ def _bounded_context(context: Any) -> str:
     return text
 
 
+# Name-inspiration bank (namegen-npc-flow design D1): a fixed count so the
+# same bounded context always renders a byte-identical system message. The
+# separator matches the catalogue's 正體中文 listing idiom.
+_INSPIRATION_COUNT = 6
+_INSPIRATION_SEPARATOR = "、"
+
+
+def _name_inspirations(bounded_context_text: str) -> str:
+    """Roll the deterministic name-inspiration bank for one bounded context.
+
+    The seed is the crc32 of the FINAL serialized (capped and key-dropped)
+    user-message text, not the raw context dict, so contexts that normalize
+    to the same bounded text share the same bank (spec: context-seeded bank).
+    Every roll goes through the read-only ``world.rules.namegen`` layer with
+    one ``Random`` instance drawn in order, which keeps the bank sequence
+    stable; an empty sex string routes the rule layer to its random pool,
+    which is exactly the inspiration-only intent (no declared sex exists at
+    prompt time). The names are style anchors, never commitments.
+    """
+    rng = Random(zlib.crc32(bounded_context_text.encode("utf-8")))
+    return _INSPIRATION_SEPARATOR.join(
+        roll_name_for_race(None, "", rng) for _ in range(_INSPIRATION_COUNT)
+    )
+
+
 def build_scenario_prompt(
     context: dict[str, Any],
 ) -> tuple[dict[str, str], dict[str, str]]:
@@ -1063,14 +1093,24 @@ def build_scenario_prompt(
 
     The system message fixes the director role in 伊洛瑟恩大陸, the 正體中文
     language, the no-invention fidelity rule, and the ``QuestBlueprint`` JSON
-    output contract with contiguous stage indices. The user message serializes
-    the request context (requested type, allowed rank, issuer branch, anchor,
-    and an optional note) with stable sorted JSON and ``ensure_ascii=False``.
-    Identical input always produces byte-identical prompts with no live entity
-    references.
+    output contract with contiguous stage indices, and carries a deterministic
+    name-inspiration bank rendered into the library text's ``{name_inspiration}``
+    placeholder. The user message serializes the request context (requested
+    type, allowed rank, issuer branch, anchor, and an optional note) with
+    stable sorted JSON and ``ensure_ascii=False``. Identical input always
+    produces byte-identical prompts with no live entity references; the bank
+    is seeded from the serialized user text, so the inspiration names exist
+    only inside the returned strings and mutate no state.
     """
-    system = {"role": "system", "content": render_prompt("scenario_director.system")}
-    user = {"role": "user", "content": _bounded_context(context)}
+    user_text = _bounded_context(context)
+    system = {
+        "role": "system",
+        "content": render_prompt(
+            "scenario_director.system",
+            name_inspiration=_name_inspirations(user_text),
+        ),
+    }
+    user = {"role": "user", "content": user_text}
     return system, user
 
 

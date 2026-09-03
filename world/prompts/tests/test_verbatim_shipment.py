@@ -39,6 +39,9 @@ _SCENARIO_DIRECTOR_SYSTEM = (
     '{"copper": 100, "items": [{"item_key": "healing_potion", "quantity": 1}], '
     '"merit": 25}, "failure": {"deadline_hours": 72, "conditions": []}}。'
     "stage 的 index 必須從 0 開始連續遞增。"
+    "每個 npc_req 建議填寫 display_name；以下名字僅供靈感，"
+    "可直接採用或依角色的性別、背景與語氣改寫（display_name 仍為選填）："
+    "{name_inspiration}。"
 )
 _NPC_DIALOGUE_TEMPLATE = (
     "{persona}"
@@ -109,8 +112,11 @@ class VerbatimShipmentTests(unittest.TestCase):
 
     @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
     def test_scenario_director_system_message_is_shipped_verbatim(self):
-        system = render_prompt("scenario_director.system")
-        self.assertEqual(system, _SCENARIO_DIRECTOR_SYSTEM)
+        bank = "加斯帕・斯諾、貝莎・鐵砧"
+        system = render_prompt("scenario_director.system", name_inspiration=bank)
+        self.assertEqual(
+            system, _SCENARIO_DIRECTOR_SYSTEM.replace("{name_inspiration}", bank)
+        )
         self.assertIn("QuestBlueprint", system)
         self.assertIn("不得編造", system)
 
@@ -275,7 +281,7 @@ class LibrarySourceTests(unittest.TestCase):
     def test_scenario_director_renders_from_the_library_solely(self):
         from world.ai.scenario_director import build_scenario_prompt
 
-        system, _ = build_scenario_prompt(
+        system, user = build_scenario_prompt(
             {
                 "requested_type": "討伐",
                 "allowed_rank": "F",
@@ -283,7 +289,20 @@ class LibrarySourceTests(unittest.TestCase):
                 "anchor": "capital_altoria",
             }
         )
-        self.assertEqual(system["content"], render_prompt("scenario_director.system"))
+        # The full equality against the library text with the independently
+        # recomputed context-seeded bank: nothing may be appended to, rewritten
+        # in, or dropped from the system prompt outside the YAML template.
+        from random import Random
+        import zlib
+
+        from world.rules.namegen import roll_name_for_race
+
+        rng = Random(zlib.crc32(user["content"].encode("utf-8")))
+        bank = "、".join(roll_name_for_race(None, "", rng) for _ in range(6))
+        self.assertEqual(
+            system["content"],
+            render_prompt("scenario_director.system", name_inspiration=bank),
+        )
 
     @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
     def test_npc_dialogue_renders_from_the_library_solely(self):

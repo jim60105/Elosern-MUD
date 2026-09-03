@@ -145,13 +145,20 @@ schema 指示同步加一句：`display_name` 建議填寫，風格可參考建�
 
 ### 6.2 Spawn 階段：兜底補名
 
-`world/quests/scene_builder.py` 的 `_apply_characterization()` 在
-`display_name is None` 分支呼叫 `roll_name_for_race(race_key, sex,
-Random(crc32(f"{definition.key}:{stage_index}:{role}")))` 並寫
-`npc.db.display_name`。
-`race_key` 從 NPC 原型取，取不到時傳 None 走隨機包；`sex` 同取原型預設。
-LLM 已填名字的佔用者完全不動（「黑鬍」等模板名路徑不受影響）。種子座標與
-prompt 階段一致，離線模板重跑必得同名。
+（2026-09-03 修訂，見 OpenSpec `namegen-npc-flow` design D3／D4。）補名
+seam 在 `world/quests/scene_builder.py::_spawn_npc()`：`_apply_characterization()`
+套用 authored 名「之後」檢查 `npc.db.display_name is None`，僅對無名者呼叫
+`roll_name_for_race(race_key, sex, Random(crc32(f"{definition.key}:{stage_index}:{role}")))`
+並寫 `npc.db.display_name`，隨後以 `transaction.on_commit` 排程
+`npc_name_fallback` info 事件（回滾零殘留 trace）。放 here 而非
+`_apply_characterization` 內部：該函式對 generic／越界佔用者會 early-return，
+塞進去會漏補或逼出雙寫點。`race_key`／`sex` 從 NPC 原型取（空字串歸一為
+None，走規則層隨機包／隨機池）。LLM 已填名字的佔用者完全不動（「黑鬍」等
+模板名路徑不受影響）。
+
+注意兩側種子「刻意」不同源：prompt 階段是上下文種子的靈感名庫（§6.1，僅供
+靈感、可被 LLM 改寫），spawn 階段是 definition.key:stage_index:role 的槽位
+種子（最終落地名、同藍圖重放必得同名）。
 
 ## 7. 資料流總覽
 
@@ -172,10 +179,10 @@ creation_wizard    prompts/registry.py（靈感名）
    ▼                LLM 填 display_name（可改寫靈感名）
 CreationOverlay 回填        │
   → creation.custom        ▼
-  → _validate_name    scene_builder._apply_characterization
-  → entity.sex             │ None 時兜底補名
+  → _validate_name    scene_builder._spawn_npc（_apply_characterization 後）
+  → entity.sex             │ display_name 仍 None 時兜底補名
                            ▼
-                      npc.db.display_name
+                      npc.db.display_name ＋ on_commit 事件
 ```
 
 單向依賴：`lore` 不依賴任何人；`rules/namegen` 只讀 lore；兩個消費端只呼叫

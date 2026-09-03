@@ -36,7 +36,7 @@ def _build() -> dict[str, PromptSpec]:
     specs = (
         PromptSpec("narrator.system", "narrator.yaml"),
         PromptSpec("npc_dialogue.system", "npc_dialogue.yaml", ("name", "desc", "location", "persona")),
-        PromptSpec("scenario_director.system", "scenario_director.yaml"),
+        PromptSpec("scenario_director.system", "scenario_director.yaml", ("name_inspiration",)),
         PromptSpec("npc.thinking", "npc.yaml", ("name",)),
         PromptSpec("art.style", "art.yaml"),
         PromptSpec(

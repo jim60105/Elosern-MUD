@@ -50,7 +50,7 @@ characterization 為 `None` 時 `_apply_characterization` 現行 early-return，
 
 ### D4：觀察性事件 `npc_name_fallback`，facade named import
 
-`scene_builder.py` 已有 `from world.observability import log_warn`；改為同列 `log_info, log_warn`。補名成功後發 `log_info("npc_name_fallback", context={"quest": quest_id, "definition_key": definition_key, "stage": stage_index, "role": role, "name": name})`（snake_case event id、context dict、依 facade 規範的 `action_commit` 級 info 事件）。事件在原子交易內發出無害（`log_info` 只寫 logger，不落 DB 狀態）；回滾時最多留一條補名 trace，不產生可觀測的錯誤狀態。
+`scene_builder.py` 已有 `from world.observability import log_warn`；改為同列 `log_info, log_warn`。補名成功後以 `transaction.on_commit(lambda: log_info("npc_name_fallback", context={...}))` 排程事件，context 五鍵 `{"quest": quest_id, "definition_key": definition_key, "stage": stage_index, "role": role, "name": name}`（snake_case event id、context dict、依 facade 規範的 `action_commit` 級 info 事件）。採 commit 後排程（rubber-duck M1）：與 `world/rules/clock.py::WorldClock.advance` 的 `clock_advance` 同一慣例——boundary info 只在最外層提交後落地，回滾的 materialization 不留下宣稱不存在 NPC 的假陽性 trace。測試以 `captureOnCommitCallbacks(execute=True)` 斷言提交路徑恰一條事件、回滾路徑零事件。
 
 ### D5：schema、validator、脈絡鍵零變動
 
@@ -69,7 +69,7 @@ characterization 為 `None` 時 `_apply_characterization` 現行 early-return，
 - [靈感名庫與 spawn 兜底名不同源，prompt inject 的「逐槽位對位」語意弱化為「風格樣本池」] → 設計 §6.1 的原式在請求時點不可計算（D1），這是可達成的最貼近實現；槽位級最終名仍由 spawn 原式種子保證重放。未來若要多候選綁 archetype（§10 範圍外項），本 D1 的 bank 形態可直接擴充而不改種子策略。
 - [脈絡種子對 `_bounded_context` 文字雜湊，note 一字之差即換名庫] → 可接受：靈感庫非承諾名字，只需確定性；同 context 重放同庫由 spec scenario 釘死。
 - [`READ_ONLY_RULE_MODULES` 放行被未來瀨用（放行表變胖）] → 放行清單逐條附註釋與來源 change 名；新增條目本身就是評審點。
-- [補名事件在回滾交易內仍會寫 logger] → 只多一條 trace 行，觀測上不承諾「有事件必有 NPC」；測試只斷言提交路徑的事件內容。
+- [事件改 `transaction.on_commit` 排程後回滾零殘留 trace] → 副作用是測試必須用 `captureOnCommitCallbacks(execute=True)` 或置於已提交外層，沿用 portrait pipeline 測既有形態。
 - [`npc.sex` 預設 `"other"` 使 generic 佔用者偏向 u 池] → 與規則層 sex 語意一致（other→u 池優先），u 池為中性名池，正是要的行為。
 
 ## Open Questions

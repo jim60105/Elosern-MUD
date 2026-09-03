@@ -221,7 +221,9 @@ class ValidLoadTests(unittest.TestCase):
     @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
     def test_double_braced_tokens_and_json_braces_pass_through(self):
         load_prompt_library(str(REPO_PROMPTS))
-        scenario = render_prompt("scenario_director.system")
+        scenario = render_prompt(
+            "scenario_director.system", name_inspiration="加斯帕・斯諾"
+        )
         self.assertIn('{"name": "…"', scenario)
         self.assertIn('"item_key": "healing_potion"', scenario)
         dialogue = render_prompt(
@@ -576,6 +578,49 @@ class LoadLifecycleTests(unittest.TestCase):
             self.assertEqual(render_prompt("narrator.system"), "測試旁白。")
             reset_prompt_library()
             self.assertIn("伊洛瑟恩大陸", render_prompt("narrator.system"))
+
+
+class ScenarioDirectorNameInspirationTests(PromptFixture):
+    """The namegen-npc-flow placeholder contract for scenario_director.system."""
+
+    @covers_requirement("prompt-library::the-scenario-director-key-is-registered-with-the-name-inspiration-placeholder-and-carries-the-naming-guidance")
+    def test_key_allowlist_is_exactly_name_inspiration(self):
+        spec = PROMPT_SPECS["scenario_director.system"]
+        self.assertEqual(spec.allowed_placeholders, ("name_inspiration",))
+
+    @covers_requirement("prompt-library::the-scenario-director-key-is-registered-with-the-name-inspiration-placeholder-and-carries-the-naming-guidance")
+    def test_shipped_text_carries_token_and_inspiration_guidance(self):
+        library = self.load()
+        text = library.texts["scenario_director.system"]
+        self.assertIn("{name_inspiration}", text)
+        self.assertIn("僅供靈感", text)
+        self.assertIn("建議填寫 display_name", text)
+        self.assertIn("仍為選填", text)
+
+    @covers_requirement("prompt-library::the-scenario-director-key-is-registered-with-the-name-inspiration-placeholder-and-carries-the-naming-guidance")
+    def test_typo_placeholder_outside_allowlist_is_rejected(self):
+        self.write_file(
+            "scenario_director.yaml",
+            "schema_version: 1\nprompts:\n  scenario_director.system: 任務 {name_inspiraton}。\n",
+        )
+        library = self.load()
+        error = library.errors["scenario_director.system"]
+        self.assertIn("unknown placeholder", error.problem)
+        self.assertIn("name_inspiraton", error.problem)
+        self.assertNotIn("scenario_director.system", library.texts)
+
+    @covers_requirement("prompt-library::the-scenario-director-key-is-registered-with-the-name-inspiration-placeholder-and-carries-the-naming-guidance")
+    def test_text_without_the_token_still_loads_and_renders(self):
+        # A key renders with the tokens it declares: an admin rewrite that
+        # drops the placeholder is valid, and passing the value anyway is the
+        # consumer's business, not a load failure.
+        self.write_file(
+            "scenario_director.yaml",
+            "schema_version: 1\nprompts:\n  scenario_director.system: 任務企劃。\n",
+        )
+        library = self.load()
+        self.assertEqual(library.texts["scenario_director.system"], "任務企劃。")
+        self.assertEqual(render_prompt("scenario_director.system"), "任務企劃。")
 
 
 if __name__ == "__main__":
