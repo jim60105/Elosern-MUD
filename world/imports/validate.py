@@ -21,6 +21,7 @@ from world.art.subjects import (
 from world.imports.schema import CHARACTER_SCHEMA_V1, WORLD_SCHEMA_V1
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
+from world.rules.npc_identity import validate_npc_title
 
 
 @dataclass(frozen=True)
@@ -122,6 +123,28 @@ def _digit_only_key_issues(record: dict[str, Any]) -> list[Issue]:
         return []
     if is_reserved_player_stable_key(key):
         return [Issue("key", _DIGIT_ONLY_RESERVED_MESSAGE)]
+    return []
+
+
+def _check_npc_title(record: dict[str, Any]) -> list[Issue]:
+    """Reject a title the shared NPC-title validator refuses.
+
+    The structural phase already rejects a missing or non-string title; this
+    semantic check owns everything the validator decides on the stripped form
+    (empty, over the code-point bound, internal whitespace, control
+    characters, the markup delimiter). The exception message is a stable
+    English identifier (npc-identity-titles), so it becomes the Issue message
+    verbatim. Deliberately catching ``ValueError``: ``NPCTitleError``
+    subclasses it, and this conversion returns a diagnosis to the caller
+    (rejecting the whole record), so it is not a silent swallow.
+    """
+    title = record.get("title")
+    if not isinstance(title, str):
+        return []
+    try:
+        validate_npc_title(title)
+    except ValueError as error:
+        return [Issue("title", str(error))]
     return []
 
 
@@ -443,6 +466,7 @@ def validate_character(record: dict[str, Any]) -> RecordReport:
     record = normalize_lineage_record(record)
     report.record = record
     report.rejections.extend(_check_entity_key_contract(record))
+    report.rejections.extend(_check_npc_title(record))
     report.rejections.extend(_check_disguised_stats_subset(record))
     report.rejections.extend(_check_race_subrace(record))
     magic_rejections, magic_warnings = _check_magic_power_band(record)
