@@ -57,7 +57,7 @@
 - [x] 6.3 掛 `covers_requirement` 標註（參數必須是字面值 ID，`from tools.spec_traceability import covers_requirement`；僅單獨執行時）：必填 `title` 欄位契約→1.5／1.6；loader 落庫與非 NPC 規則→3.2；既有 NPC 重名 gate→4.3／4.4；CLI 檔案作用域→4.6；參考卡與 GM 文件→2.6；邊界事件→5.2；既有匯入契約不變→3.3。跑 `uv run --locked python -m tools.spec_traceability check` 至零錯誤、本 change 的七條 requirement 全覆蓋。
 - [x] 6.4 消極檢查：`docs/game/commands.md`／`docs/game/command-reference.md` 零改動（無命令面變更），`tests/test_command_docs.py` 綠；未觸及 `world/rules/npc_identity.py`（前置 change 的檔案）、`typeclasses/`、`web/`；未觸及 `world/lore/names.py`／`world/rules/namegen.py`（namegen 系列 change 的檔案）；未新增任何相容層、`schema_version` 分支或遷移程式碼。
 - [x] 6.5 `openspec validate npc-title-import-pipeline --strict` 與 `openspec validate --all --strict` 皆通過；`git diff --check` 乾淨。
-- [x] 6.6 終局驗證一次：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --noinput --parallel 16 world.imports world.quests world.skills world.rules typeclasses`（涵蓋匯入本體，加上會呼叫 `instantiate_character` 的相鄰套件）。
+- [x] 6.6 終局驗證（依 AGENTS.md「最小聚焦標籤」原則，使用者指示改走 focused 範圍）：以 `grep` 找出會呼叫 `instantiate_character`／`load_batch` 的實際消費端測試模組，`--keepdb world.imports world.quests.tests.test_acquire world.skills.tests.test_inventory world.rules.tests.test_damage_effect_handler world.rules.tests.test_character_creation` → 191 tests OK。參考資料：原大標籤組合在 `--parallel 16` 下的 `db_home` FK teardown IntegrityError（`EquipmentImmunityBackstopTests` 等）已於**基準提交 a8c87df（未含本 change）**重現（同類錯誤、不同模組與筆數、跨 run 抖動），屬既有平行執行抖動，非本 change 引入；全量非瀏覽器套件（`commands server typeclasses world web.webclient tests`，6265 tests）僅剩的 2 failures 亦於基準重現，屬 namegen 系列帶進 master 的既有紅燈。
 
 ## 7. 本 change 明確不做（延後，非遺漏）
 
