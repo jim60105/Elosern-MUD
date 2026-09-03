@@ -290,12 +290,24 @@
   var CREATION_CUSTOM_STAGE = "custom_filled";
   // The exact wire persona block keys (the three prose fields).
   var CREATION_PERSONA_KEYS = ["personality", "life_story", "habit"];
+  // The sex vocabulary mirror (world/lore/sex.py). Keys only -- the option
+  // LABELS are server-owned Traditional Chinese prose shipped in the panel's
+  // `custom.sex` descriptor; no label literal lives in this bundle. The
+  // pinned dual-direction comparison lives in
+  // tests/test_creation_parity_contract.py.
+  var CREATION_SEX_VALUES = ["female", "male", "other"];
+  var CREATION_SEX_DEFAULT = "other";
+  // Structural ceiling for the option list (mirror of MAX_SEX_OPTIONS); the
+  // vocabulary itself is pinned exactly, the bound must never bind real data.
+  var CREATION_MAX_SEX_OPTIONS = 8;
   // The creation panel schema version (mirror of CREATION_SCHEMA_VERSION):
   // v3 widens the optional transient concept proposal slot with the five
   // optional transient-fill keys (bump-creation-panel-proposal-v3), on top of
   // the v2 player-owned draft persona key (retool-concept-transient-fill
   // D1/D3).
-  var CREATION_SCHEMA_VERSION = 3;
+  // v4 adds the server-labelled `custom.sex` option list and the required
+  // draft `sex` member (namegen-creation-ui).
+  var CREATION_SCHEMA_VERSION = 4;
   // Affinity picker bounds (mirror of web.webclient.presentation.creation and
   // the deterministic max_affinity_elements mapping). The race maxima are
   // 2/1/0 for human/beastfolk/elf; the element set is exactly the eight lore
@@ -322,7 +334,7 @@
     context_actions: 5,
     local_map: 1,
     services: 3,
-    creation: 3,
+    creation: 4,
     exploration: 1,
     character: 7,
     lineage: 1,
@@ -2615,7 +2627,7 @@
     requireExactFields(
       value,
       "custom",
-      ["name", "adult", "races", "subraces", "profiles", "affinity"],
+      ["name", "adult", "races", "subraces", "profiles", "affinity", "sex"],
       []
     );
     validateCreationName(value.name);
@@ -2630,7 +2642,37 @@
     }
     value.profiles.forEach(validateCreationProfile);
     validateCreationAffinity(value.affinity);
+    validateCreationSex(value.sex);
     return value;
+  }
+
+  function validateCreationSex(value) {
+    // Mirror of web.webclient.presentation.creation._validate_sex_options:
+    // the list is exactly the sex vocabulary, in registry order, each option
+    // carrying exactly {key, label} with a non-empty bounded label.
+    if (
+      !Array.isArray(value) ||
+      value.length === 0 ||
+      value.length > CREATION_MAX_SEX_OPTIONS
+    ) {
+      throw new Error("sex must be a non-empty bounded option list");
+    }
+    var keys = [];
+    value.forEach(function (entry) {
+      requireExactFields(entry, "sex option", ["key", "label"], []);
+      var key = validateIdentifier(entry.key, "sex key");
+      if (codePoints(key) > CREATION_MAX_SUBRACE_KEY) {
+        throw new Error("sex key exceeds its bound");
+      }
+      requireString(entry.label, "sex label", CREATION_MAX_LABEL);
+      if (!entry.label.trim()) {
+        throw new Error("sex label must be non-empty");
+      }
+      keys.push(key);
+    });
+    if (keys.join(",") !== CREATION_SEX_VALUES.join(",")) {
+      throw new Error("sex options must be exactly the sex vocabulary in order");
+    }
   }
 
   function validateCreationAffinity(value) {
@@ -2770,7 +2812,7 @@
       requireExactFields(
         value,
         "custom draft",
-        ["mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background", "affinity_elements", "persona"],
+        ["mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background", "affinity_elements", "persona", "sex"],
         []
       );
       if (value.stage !== CREATION_CUSTOM_STAGE) {
@@ -2799,6 +2841,11 @@
           background = null;
         }
       }
+      // The draft stores the concrete normalized member (mirror of the
+      // wizard normalizer and _validate_draft; namegen-creation-ui D2/D3).
+      if (CREATION_SEX_VALUES.indexOf(value.sex) === -1) {
+        throw new Error("draft sex is not a vocabulary member");
+      }
       return {
         mode: "custom",
         stage: CREATION_CUSTOM_STAGE,
@@ -2811,6 +2858,7 @@
         background: background,
         affinity_elements: validateCreationDraftAffinity(value.affinity_elements, race),
         persona: validateCreationPersona(value.persona),
+        sex: value.sex,
       };
     }
     throw new Error("draft has an unknown mode");
@@ -4602,6 +4650,9 @@
     CREATION_AXES: CREATION_AXES.slice(),
     CREATION_SCHEMA_VERSION: CREATION_SCHEMA_VERSION,
     CREATION_PERSONA_KEYS: CREATION_PERSONA_KEYS.slice(),
+    CREATION_SEX_VALUES: CREATION_SEX_VALUES.slice(),
+    CREATION_SEX_DEFAULT: CREATION_SEX_DEFAULT,
+    CREATION_MAX_SEX_OPTIONS: CREATION_MAX_SEX_OPTIONS,
     MODES: MODES.slice(),
     OUTCOMES: OUTCOMES.slice(),
     COMBAT_MODES: COMBAT_MODES.slice(),
