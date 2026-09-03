@@ -5,7 +5,7 @@ from evennia import CmdSet
 from evennia.commands.cmdhandler import CMD_NOMATCH, CMD_NOINPUT
 from world.observability import log_error, log_warn
 from evennia.utils.evmenu import InputCmdSet
-from evennia.utils.utils import inherits_from
+from evennia.utils.utils import inherits_from, strip_control_sequences
 
 from commands.command import Command
 from commands.localized import CmdHelp, CmdQuit
@@ -114,6 +114,12 @@ def _activate_creation(
     no state change. ``persona`` carries the server-owned persona block from
     the concept draft when one exists; the activation persists it in the
     import-card shape inside the same all-or-nothing transaction.
+
+    A concept proposal rides the request as a transient form-filler: its
+    background and affinity elements arrive as ordinary custom-request fields
+    (an absent proposal field is ``None``, which the custom validator
+    normalises to no background / neutral affinity), and the preflight stays
+    the sole authority over them.
     """
     try:
         result = activate_player_character(
@@ -132,6 +138,12 @@ def _activate_creation(
     # ``finalize_player_portrait``, so a rolled-back creation never writes a
     # policy or emits a job (fix-creation-finalization-safety D3).
     relocate_to_starting_location(caller)
+    # Release a concept prompt chain a competing surface may have opened on
+    # this shell (the async rack's ndb slot survives its cmdset eviction;
+    # the stale continuation itself self-cleans through its release check on
+    # any further input, and the sync rack self-cleans via CmdGetInput).
+    if hasattr(caller.ndb, "concept_prompt"):
+        del caller.ndb.concept_prompt
     caller.msg(
         f"角色 {result.display_name} 已建立，初始魔力為 {result.magic_power}。"
     )
@@ -271,6 +283,12 @@ def _proposal_summary(proposal) -> str:
     form fill, the player's completion of the name/age prompts turns the
     proposal into their own input, and the persona prose activates with the
     request (retool-concept-transient-fill D6).
+
+    The five transient-fill fields ride the summary so the player reads every
+    value the flow is about to adopt before completing the prompts
+    (prefill-telnet-concept-from-proposal D3). An absent field is worded
+    distinctly from an explicitly neutral one: ``（未提案…）`` versus the
+    normalized empty affinity set's ``（無）``.
     """
     race = RACE_REGISTRY[proposal.race_key]
     subrace = SUBRACE_REGISTRY[proposal.subrace_key]
@@ -286,16 +304,103 @@ def _proposal_summary(proposal) -> str:
         lines.append("建議技能（僅供參考）：" + "、".join(proposal.suggested_skills))
     else:
         lines.append("建議技能（僅供參考）：無")
+    if proposal.affinity_elements is None:
+        affinity_text = "（未提案）"
+    elif not proposal.affinity_elements:
+        affinity_text = "（無）"
+    else:
+        affinity_text = "、".join(
+            ELEMENT_REGISTRY[key].display_name_zh
+            for key in proposal.affinity_elements
+        )
+    lines.extend(
+        [
+            "姓名："
+            + (
+                _terminal_safe(proposal.display_name)
+                if proposal.display_name is not None
+                else "（未提案，將由你輸入）"
+            ),
+            "實際年齡："
+            + (
+                str(proposal.age)
+                if proposal.age is not None
+                else "（未提案，將由你輸入）"
+            ),
+            "外表年齡："
+            + (
+                str(proposal.apparent_age)
+                if proposal.apparent_age is not None
+                else "（未提案，將由你輸入）"
+            ),
+            "背景："
+            + (
+                _terminal_safe(proposal.background)
+                if proposal.background is not None
+                else "（未提案，將留空）"
+            ),
+            "元素親和：" + affinity_text,
+        ]
+    )
     lines.extend(
         [
             "人設（將寫入角色檔案，啟動後可另行修改）：",
-            f"  性格：{proposal.persona['personality']}",
-            f"  人生經歷：{proposal.persona['life_story']}",
-            f"  習慣：{proposal.persona['habit']}",
-            "接下來請輸入角色姓名與年齡以完成建立：",
+            f"  性格：{_terminal_safe(proposal.persona['personality'])}",
+            f"  人生經歷：{_terminal_safe(proposal.persona['life_story'])}",
+            f"  習慣：{_terminal_safe(proposal.persona['habit'])}",
+            "接下來請確認或輸入角色姓名與年齡以完成建立：",
         ]
     )
     return "\n".join(lines)
+
+
+def _terminal_safe(value: str) -> str:
+    """Render proposal-derived text inertly on the telnet surfaces.
+
+    LLM reply text is data, never presentation: the generative normaliser
+    trims and truncates but does not sanitize, so the summary and prompts
+    neutralise terminal control sequences, collapse any residual C0 control
+    (CR/LF/tab) to spaces, and double Every Evennia ``|`` markup escape
+    before interpolation. Activation keeps the untouched normalised value;
+    only rendering is inert-ified.
+    """
+    text = strip_control_sequences(value)
+    text = "".join(ch if ch >= " " else " " for ch in text)
+    return text.replace("|", "||")
+
+
+def _name_prompt(default: str | None) -> str:
+    """Render the name prompt, prefilled when the proposal carries a value."""
+    if default is None:
+        return "角色姓名（輸入 cancel 取消）："
+    return (
+        f"角色姓名（預設：{_terminal_safe(default)}，Enter 採納，"
+        "cancel 取消）："
+    )
+
+
+def _age_prompt(label: str, default: int | None) -> str:
+    """Render one age prompt, prefilled when the proposal carries a value."""
+    if default is None:
+        return f"{label}（至少 18，可輸入 cancel 取消）："
+    return (
+        f"{label}（預設：{default}，Enter 採納，至少 18，"
+        "可輸入 cancel 取消）："
+    )
+
+
+def _collect_age(reply: str, label: str, default: int | None) -> int:
+    """Resolve one age reply: an empty reply accepts the prefilled default.
+
+    With no default the existing ``_integer`` authority stays fully in charge
+    (empty input remains its format-error outcome); a non-empty reply always
+    goes through ``_integer``, so the ``cancel`` parse and the deterministic
+    adult gate keep their exact current semantics
+    (prefill-telnet-concept-from-proposal D1/D2).
+    """
+    if default is not None and not reply.strip():
+        return default
+    return _integer(reply, label)
 
 
 class CmdCharacterConcept(Command):
@@ -420,21 +525,72 @@ class CmdCharacterConcept(Command):
         A generator driven by the cmdhandler (sync path) or by
         ``_start_interactive``/``_feed_input`` (async path). The concept is a
         transient form-filler (retool-concept-transient-fill D6): nothing is
-        persisted before or during the prompts. The summary and prompts collect
-        the display name and both ages through the existing prompts and the
-        deterministic adult gate — the proposal never supplies them — and the
-        activation writes the proposal's values plus its persona block in the
-        same all-or-nothing transaction, exactly like the browser's save of a
-        proposal-filled form.
+        persisted before or during the prompts. The name and both ages are
+        collected as proposal-prefilled defaults
+        (prefill-telnet-concept-from-proposal D1/D2): each prompt names the proposal's
+        normalised value for its field, an empty reply accepts that default,
+        and any non-empty reply overrides it — with the deterministic adult
+        gate staying the final authority over either source. A prompt whose
+        proposal field is absent stays a mandatory input; for the name, an
+        empty or whitespace-only reply re-prompts the same prompt instead of
+        proceeding to an activation doomed to be rejected. The activation
+        writes the proposal's values — race, subrace, allocations, persona
+        block, background, affinity — plus the accepted-or-entered name and
+        ages in the same all-or-nothing transaction, exactly like the
+        browser's save of a proposal-filled form.
         """
         self.caller.msg(_proposal_summary(proposal))
+
+        def _released() -> bool:
+            # A competing surface (browser activation) may complete the
+            # character while a prompt chain is open. The next reply then
+            # releases the continuation quietly: the sync rack self-cleans
+            # after feeding (CmdGetInput), and the async feeder's
+            # StopIteration path removes the prompt cmdset — either way a
+            # stale chain never keeps consuming the player's commands or
+            # resumes toward an activation doomed by the pending gate.
+            return not bool(getattr(self.caller, "creation_pending", False))
+
         try:
-            name = yield "角色姓名（輸入 cancel 取消）："
-            if name.strip().lower() == "cancel":
-                self.caller.msg("已取消角色建立。")
+            name_prompt = _name_prompt(proposal.display_name)
+            while True:
+                reply = yield name_prompt
+                # A programmatically driven generator (test harness, headless
+                # send) can deliver None where the live racks always deliver a
+                # string; a missing reply is an Enter.
+                reply = reply if isinstance(reply, str) else ""
+                if _released():
+                    return
+                if reply.strip().lower() == "cancel":
+                    self.caller.msg("已取消角色建立。")
+                    return
+                if reply.strip():
+                    # Pass the raw reply on: the rules-layer display-name
+                    # validator owns stripping, exactly as before the
+                    # prefill flow existed.
+                    name = reply
+                    break
+                if proposal.display_name is not None:
+                    name = proposal.display_name
+                    break
+                # Mandatory name with a blank reply: re-prompt in place —
+                # an empty Enter must never doom the whole activation.
+            age_reply = yield _age_prompt("實際年齡", proposal.age)
+            if _released():
                 return
-            age = _integer((yield "實際年齡（至少 18，可輸入 cancel 取消）："), "實際年齡")
-            apparent_age = _integer((yield "外表年齡（至少 18，可輸入 cancel 取消）："), "外表年齡")
+            age = _collect_age(
+                age_reply if isinstance(age_reply, str) else "",
+                "實際年齡",
+                proposal.age,
+            )
+            apparent_reply = yield _age_prompt("外表年齡", proposal.apparent_age)
+            if _released():
+                return
+            apparent_age = _collect_age(
+                apparent_reply if isinstance(apparent_reply, str) else "",
+                "外表年齡",
+                proposal.apparent_age,
+            )
         except CharacterCreationError as error:  # observability: ignore R2: player-facing recovery; cancel and invalid-input outcomes reach the caller
             if str(error) == "角色建立已取消":
                 self.caller.msg("已取消角色建立。")
@@ -452,6 +608,8 @@ class CmdCharacterConcept(Command):
                 race=proposal.race_key,
                 subrace=proposal.subrace_key,
                 allocations=dict(proposal.allocations),
+                background=proposal.background,
+                affinity_elements=proposal.affinity_elements,
             ),
             persona=dict(proposal.persona),
         )
