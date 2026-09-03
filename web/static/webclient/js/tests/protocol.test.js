@@ -1439,7 +1439,7 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.local_map, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.services, 3);
   assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 2);
+  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 3);
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.character, 7);
   assert.equal(Protocol.PANEL_ALLOWLIST.lineage, 1);
@@ -2825,7 +2825,7 @@ test("rejects malformed art panels atomically", () => {
 });
 
 // ---------------------------------------------------------------------------
-// creation panel v2 (mirror of web.webclient.presentation.creation).
+// creation panel v3 (mirror of web.webclient.presentation.creation).
 // ---------------------------------------------------------------------------
 
 function validCreationPanel(overrides) {
@@ -2838,7 +2838,7 @@ function validCreationPanel(overrides) {
   }));
   return deepMerge(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "creation",
       draft: null,
@@ -2938,7 +2938,7 @@ test("accepts a valid creation panel and the common unavailable form", () => {
       "creation",
       Protocol.PANEL_ALLOWLIST.creation,
       {
-        schema_version: 2,
+        schema_version: 3,
         available: false,
         reason: { code: "creation_unavailable", message: "角色建立畫面目前無法顯示" },
       }
@@ -2950,7 +2950,7 @@ test("creation panel rejects malformed and unknown-node fields", () => {
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ kind: "services" })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 1 })));
-  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 3 })));
+  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 2 })));
   const badDraft = validCreationPanel({ draft: { mode: "preset", stage: "custom_filled", preset_key: "x" } });
   assert.throws(() => Protocol.validateCreationPanel(badDraft));
   const personaCard = validCreationPanel();
@@ -2964,7 +2964,7 @@ test("creation panel rejects malformed and unknown-node fields", () => {
   assert.throws(() => Protocol.validateCreationPanel(wrongAxes));
 });
 
-test("creation panel v2 carries the draft persona and the proposal slot", () => {
+test("creation panel v3 carries the draft persona and the proposal slot", () => {
   const customDraft = {
     mode: "custom",
     stage: "custom_filled",
@@ -2987,7 +2987,7 @@ test("creation panel v2 carries the draft persona and the proposal slot", () => 
   };
   const payload = validCreationPanel({ draft: customDraft, proposal });
   const validated = Protocol.validateCreationPanel(payload);
-  assert.equal(validated.schema_version, 2);
+  assert.equal(validated.schema_version, 3);
   assert.deepEqual(validated.draft.persona, customDraft.persona);
   assert.deepEqual(validated.proposal, proposal);
   // A draft with an explicit null persona is valid.
@@ -3051,6 +3051,103 @@ test("creation panel v2 carries the draft persona and the proposal slot", () => 
     },
   });
   assert.doesNotThrow(() => Protocol.validateCreationPanel(worst));
+});
+
+test("creation proposal v3 carries the optional transient-fill keys", () => {
+  const proposal = {
+    revision: 3,
+    race: "human",
+    subrace: "human_commoner",
+    allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
+    persona: { personality: "沉穩", life_story: "來自邊境的小村", habit: "清晨練劍" },
+  };
+  const fill = {
+    display_name: "莉雅",
+    age: 25,
+    apparent_age: 22,
+    background: "邊境孤女，隨商隊長大",
+    affinity_elements: ["fire", "water"],
+  };
+  const validated = Protocol.validateCreationPanel(
+    validCreationPanel({ proposal: { ...proposal, ...fill } })
+  );
+  assert.deepEqual(validated.proposal, { ...proposal, ...fill });
+  // Absent optional keys stay absent — never null-valued copies.
+  const bare = Protocol.validateCreationPanel(validCreationPanel({ proposal }));
+  for (const key of Object.keys(fill)) {
+    assert.ok(!(key in bare.proposal));
+  }
+  // A carried EMPTY affinity set (the normalized elf value) round-trips.
+  const emptied = Protocol.validateCreationPanel(
+    validCreationPanel({ proposal: { ...proposal, affinity_elements: [] } })
+  );
+  assert.deepEqual(emptied.proposal.affinity_elements, []);
+  // Every transient-fill key rejects a null value.
+  for (const key of Object.keys(fill)) {
+    assert.throws(
+      () =>
+        Protocol.validateCreationPanel(
+          validCreationPanel({ proposal: { ...proposal, [key]: null } })
+        ),
+      `proposal ${key} must not accept null`
+    );
+  }
+  // Bound violations reject on the mirrored validator.
+  const rejects = [
+    { age: 17 },
+    { age: 10001 },
+    { age: 25.5 },
+    { age: "25" },
+    { age: true },
+    { apparent_age: 17 },
+    { display_name: "" },
+    { display_name: "莉".repeat(65) },
+    { background: "" },
+    { background: "長".repeat(601) },
+    { affinity_elements: ["fire", "water", "wind", "earth", "lightning", "ice", "light", "dark", "fire"] },
+    { affinity_elements: ["wood"] },
+    { affinity_elements: ["fire", "fire"] },
+    { affinity_elements: "fire" },
+  ];
+  for (const bad of rejects) {
+    assert.throws(
+      () =>
+        Protocol.validateCreationPanel(
+          validCreationPanel({ proposal: { ...proposal, ...bad } })
+        ),
+      `proposal must reject ${JSON.stringify(bad)}`
+    );
+  }
+  // The v3 all-ceilings proposal — 3×600 persona, a 600 background, a 64
+  // four-byte-scalar name, both ages, and an eight-element affinity set —
+  // still fits the canonical envelope.
+  assert.doesNotThrow(() =>
+    Protocol.validateCreationPanel(
+      validCreationPanel({
+        proposal: {
+          ...proposal,
+          persona: {
+            personality: "😀".repeat(600),
+            life_story: "😀".repeat(600),
+            habit: "😀".repeat(600),
+          },
+          display_name: "😀".repeat(64),
+          age: 10000,
+          apparent_age: 10000,
+          background: "😀".repeat(600),
+          affinity_elements: ["fire", "water", "wind", "earth", "lightning", "ice", "light", "dark"],
+        },
+      })
+    )
+  );
+  // Contract pin: the transient-fill prose fields are bounded NON-EMPTY
+  // (1..N code points), deliberately not NON-BLANK like the persona block —
+  // whitespace-only values keep passing on both mirrors.
+  const blank = Protocol.validateCreationPanel(
+    validCreationPanel({ proposal: { ...proposal, display_name: " ", background: "  " } })
+  );
+  assert.equal(blank.proposal.display_name, " ");
+  assert.equal(blank.proposal.background, "  ");
 });
 
 test("creation panel enforces per-field bounds", () => {
@@ -3155,7 +3252,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
     (key) => Object.assign({}, affinityElement, { key })
   );
   const payload = {
-    schema_version: 2,
+    schema_version: 3,
     available: true,
     kind: "creation",
     draft: null,
@@ -3183,7 +3280,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
 });
 
 test("creation is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 2);
+  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 3);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,

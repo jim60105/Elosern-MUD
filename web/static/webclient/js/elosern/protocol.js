@@ -244,6 +244,9 @@
   var CREATION_MAX_PRESET_KEY = 64;
   var CREATION_MAX_DISPLAY_NAME = 128;
   var CREATION_MAX_RACE_KEY = 64;
+  // The proposal transient-fill display-name bound (mirror of
+  // web.webclient.presentation.creation.MAX_PROPOSAL_NAME_CODE_POINTS).
+  var CREATION_MAX_PROPOSAL_NAME = 64;
   var CREATION_MAX_DESCRIPTION = 512;
   var CREATION_MAX_EMPHASIS = 256;
   var CREATION_MAX_BACKGROUND = 256;
@@ -263,9 +266,11 @@
   // The exact wire persona block keys (the three prose fields).
   var CREATION_PERSONA_KEYS = ["personality", "life_story", "habit"];
   // The creation panel schema version (mirror of CREATION_SCHEMA_VERSION):
-  // v2 carries the player-owned draft persona key and the optional top-level
-  // transient concept proposal slot (retool-concept-transient-fill D1/D3).
-  var CREATION_SCHEMA_VERSION = 2;
+  // v3 widens the optional transient concept proposal slot with the five
+  // optional transient-fill keys (bump-creation-panel-proposal-v3), on top of
+  // the v2 player-owned draft persona key (retool-concept-transient-fill
+  // D1/D3).
+  var CREATION_SCHEMA_VERSION = 3;
   // Affinity picker bounds (mirror of web.webclient.presentation.creation and
   // the deterministic max_affinity_elements mapping). The race maxima are
   // 2/1/0 for human/beastfolk/elf; the element set is exactly the eight lore
@@ -292,7 +297,7 @@
     context_actions: 5,
     local_map: 1,
     services: 3,
-    creation: 2,
+    creation: 3,
     exploration: 1,
     character: 7,
     lineage: 1,
@@ -2737,12 +2742,15 @@
   function validateCreationProposal(value) {
     // The optional top-level transient concept proposal: exactly revision (a
     // positive session-monotonic sequence number), race, nullable subrace,
-    // the seven axes, and a mandatory three-field persona block.
+    // the seven axes, and a mandatory three-field persona block, plus five
+    // optional transient-fill keys present only when the validated proposal
+    // carried a value — an absent key is never encoded as null
+    // (bump-creation-panel-proposal-v3 D1).
     requireExactFields(
       value,
       "proposal",
       ["revision", "race", "subrace", "allocations", "persona"],
-      []
+      ["display_name", "age", "apparent_age", "background", "affinity_elements"]
     );
     var revision = requireInt(value.revision, "revision", 1, MAX_SAFE_INTEGER);
     var race = validateIdentifier(value.race, "proposal race");
@@ -2760,13 +2768,65 @@
     if (persona === null) {
       throw new Error("proposal persona must be a block");
     }
-    return {
+    var checked = {
       revision: revision,
       race: race,
       subrace: subrace,
       allocations: validateCreationDraftAllocations(value),
       persona: persona,
     };
+    if (value.display_name !== undefined) {
+      var displayName = value.display_name;
+      if (typeof displayName !== "string" || !displayName) {
+        throw new Error("proposal display_name must be non-empty text");
+      }
+      if (codePoints(displayName) > CREATION_MAX_PROPOSAL_NAME) {
+        throw new Error("proposal display_name exceeds its bound");
+      }
+      checked.display_name = displayName;
+    }
+    if (value.age !== undefined) {
+      checked.age = requireInt(value.age, "age", CREATION_AGE_MINIMUM, CREATION_AGE_MAXIMUM);
+    }
+    if (value.apparent_age !== undefined) {
+      checked.apparent_age = requireInt(
+        value.apparent_age,
+        "apparent_age",
+        CREATION_APPARENT_AGE_MINIMUM,
+        CREATION_APPARENT_AGE_MAXIMUM
+      );
+    }
+    if (value.background !== undefined) {
+      var background = value.background;
+      if (typeof background !== "string" || !background) {
+        throw new Error("proposal background must be non-empty text");
+      }
+      if (codePoints(background) > CREATION_MAX_PERSONA_BACKGROUND) {
+        throw new Error("proposal background exceeds its bound");
+      }
+      checked.background = background;
+    }
+    if (value.affinity_elements !== undefined) {
+      var elements = value.affinity_elements;
+      if (!Array.isArray(elements) || elements.length > CREATION_MAX_AFFINITY_ELEMENTS) {
+        throw new Error(
+          "proposal affinity_elements must be a list of at most " +
+          CREATION_MAX_AFFINITY_ELEMENTS + " element keys"
+        );
+      }
+      var seen = {};
+      elements.forEach(function (entry) {
+        if (CREATION_AFFINITY_ELEMENTS.indexOf(entry) === -1) {
+          throw new Error("proposal affinity_elements has unknown element " + entry);
+        }
+        if (seen[entry]) {
+          throw new Error("proposal affinity_elements duplicates element " + entry);
+        }
+        seen[entry] = true;
+      });
+      checked.affinity_elements = elements.slice();
+    }
+    return checked;
   }
 
   function validateCreationPanel(payload) {
@@ -4433,6 +4493,7 @@
     CREATION_MAX_SUBRACE_KEY: CREATION_MAX_SUBRACE_KEY,
     CREATION_MAX_SPECIALTY: CREATION_MAX_SPECIALTY,
     CREATION_MAX_LABEL: CREATION_MAX_LABEL,
+    CREATION_MAX_PROPOSAL_NAME: CREATION_MAX_PROPOSAL_NAME,
     CREATION_MAX_EXPLANATION: CREATION_MAX_EXPLANATION,
     CREATION_AXES: CREATION_AXES.slice(),
     CREATION_SCHEMA_VERSION: CREATION_SCHEMA_VERSION,

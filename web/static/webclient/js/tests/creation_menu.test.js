@@ -28,7 +28,7 @@ function validPanel(overrides) {
     Object.assign({}, axes[k])
   );
   const panel = {
-    schema_version: 2,
+    schema_version: 3,
     available: true,
     kind: "creation",
     draft: null,

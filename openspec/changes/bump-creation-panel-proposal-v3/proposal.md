@@ -9,7 +9,7 @@
 - `_store_proposal`（`web/webclient/actions/creation_actions.py`）寫入 session 槽時帶上提案的五個正規化欄位（缺席欄位不寫鍵）。
 - `ProposalSnapshot`（`web/webclient/presentation/context.py`）增五個 optional 欄位與序列化；`build_presentation_context` 深拷貝路徑同步。
 - `creation` panel schema **v2 → v3**（**BREAKING**，無相容層）：`proposal` 槽物件增五個 optional 鍵，驗證器精確校驗（年齡 18..10000、名字 ≤64、背景 ≤600、親和為已註冊元素鍵清單且 ≤8、缺席鍵合法）；worst-case envelope 測試重鎖（persona 1.8 KB + 背景 600 + 名字 64 + 兩 int + 八元素鍵 < 65536 bytes）。
-- `web/static/webclient/js/elosern/protocol.js` 鏡像驗證器同步 v3；legacy `creation_menu.js` 的 panel 驗證鏡像同步（其 form state 不讀新鍵——消費屬下一變更）。
+- `web/static/webclient/js/elosern/protocol.js` 鏡像驗證器同步 v3。查證修正：`creation_menu.js` 根本沒有 panel 驗證器（它只還原已驗證面板），本變更對其零改動；Vue 端為無驗證消費者。
 
 ## Capabilities
 
@@ -24,6 +24,6 @@
 
 ## Impact
 
-- `web/webclient/actions/creation_actions.py`（`_store_proposal`）、`web/webclient/presentation/context.py`（`ProposalSnapshot`）、`web/webclient/presentation/ingress.py`（深拷貝欄位）、`web/webclient/presentation/creation.py`（v3 + 驗證器）、`web/static/webclient/js/elosern/protocol.js`、`web/static/webclient/js/creation_menu.js`。
+- `web/webclient/actions/creation_actions.py`（`_store_proposal`）、`web/webclient/presentation/context.py`（`ProposalSnapshot`）、`web/webclient/presentation/ingress.py`（深拷貝欄位）、`web/webclient/presentation/creation.py`（v3 + 驗證器）、`web/static/webclient/js/elosern/protocol.js`。
 - 測試：`web/webclient/actions/tests/test_creation_actions.py`、`web/webclient/presentation/tests/test_creation_panel.py`、Node 鏡像案、既有瀏覽器 creation 測試的 panel 形狀斷言。
 - 前置：`extend-concept-proposal-fields`（提案物件先有新欄位可讀）。與 `add-action-feedback-toasts` 不相交。Vue 表單在本變更中不讀新鍵，panel v3 對現行 Vue 為向後相容的鍵增加（鏡像驗證器放行缺席）。

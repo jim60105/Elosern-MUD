@@ -29,7 +29,7 @@
 
 ### D2: schema v3 是硬切
 
-鏡像驗證器拒絕 v2 payload（`unsupported creation schema_version` 路徑既有）；無相容層（未發布）。`creation_menu.js`（legacy 面板驗證鏡像）同步 v3 常量與 proposal 槽鍵集合，但其 form state 不讀新鍵——新鍵的第一個消費者是 `CreationOverlay.vue`（下一變更）。`CreationOverlay.applyProposal` 只讀既有鍵，v3 加鍵對現行 Vue 為純鍵增加、不破壞。
+鏡像驗證器拒絕 v2 payload（`unsupported creation schema_version` 路徑既有）；無相容層（未發布）。查證修正：`creation_menu.js` 并无 panel 驗證器（它只還原已驗證面板、驗證 client form state），本變更對其零改動；面板驗證鏡像只有 `protocol.js` 一處，Vue 端為無驗證消費者。新鍵的第一個消費者是 `CreationOverlay.vue`（下一變更）。`CreationOverlay.applyProposal` 只讀既有鍵，v3 加鍵對現行 Vue 為純鍵增加、不破壞。
 
 ### D3: worst-case envelope 重鎖
 

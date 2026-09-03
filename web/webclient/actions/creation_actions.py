@@ -357,6 +357,10 @@ def _store_proposal(session: Any, actor: Any, proposal: Any) -> None:
     ``owner_actor_id`` binding — mirroring the options-state owner check — and
     a session-monotonic ``revision`` so the browser distinguishes a panel
     rebuild from a fresh apply even when both contents are byte-identical.
+    The five optional transient-fill fields ride along only when the
+    normalized proposal carried a value: an absent field is expressed as the
+    key not existing (never null), so consumers keep their local defaults
+    (bump-creation-panel-proposal-v3 D1).
     The sequence lives in its own ``concept_proposal_revision`` counter: a
     consumed slot (a successful custom save or reset clears it) must never
     restart the sequence, or a mounted overlay would ignore the next fresh
@@ -368,14 +372,25 @@ def _store_proposal(session: Any, actor: Any, proposal: Any) -> None:
     previous = getattr(ndb, PROPOSAL_REVISION_KEY, None)
     revision = previous + 1 if isinstance(previous, int) and not isinstance(previous, bool) else 1
     setattr(ndb, PROPOSAL_REVISION_KEY, revision)
-    setattr(ndb, PROPOSAL_NDB_KEY, {
+    slot: dict[str, Any] = {
         "owner_actor_id": getattr(actor, "pk", None),
         "revision": revision,
         "race": proposal.race_key,
         "subrace": proposal.subrace_key,
         "allocations": dict(proposal.allocations),
         "persona": dict(proposal.persona),
-    })
+    }
+    # Absent (None) transient-fill values write no key at all; a carried
+    # affinity set — including the normalized empty set (elf) — ships as a
+    # plain list.
+    for key in ("display_name", "age", "apparent_age", "background"):
+        value = getattr(proposal, key, None)
+        if value is not None:
+            slot[key] = value
+    affinity = getattr(proposal, "affinity_elements", None)
+    if affinity is not None:
+        slot["affinity_elements"] = list(affinity)
+    setattr(ndb, PROPOSAL_NDB_KEY, slot)
 
 
 def _clear_proposal(session: Any) -> None:

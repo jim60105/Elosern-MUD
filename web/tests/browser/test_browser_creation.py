@@ -737,7 +737,7 @@ class ResetAndDraftJourneys(CreationBrowserTest):
             page,
             {
                 "creation": {
-                    "schema_version": 2,
+                    "schema_version": 3,
                     "available": False,
                     "reason": {"code": "registry_unavailable", "message": reason},
                 }

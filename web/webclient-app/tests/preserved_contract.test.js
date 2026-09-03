@@ -63,11 +63,11 @@ describe("H1 preserved DOM contract (design D6)", () => {
     ];
   }
 
-  // A minimal valid `creation` panel (the exact schema v2 shape the
+  // A minimal valid `creation` panel (the exact schema v3 shape the
   // protocol validator accepts — a slotless panel carries no proposal key).
   function creationPanel() {
     return {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "creation",
       draft: null,
