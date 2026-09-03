@@ -2,9 +2,9 @@
 
 **日期：** 2026-09-03
 **狀態：** Approved（待讀者對本文件做最終審閱）
-**範圍：** `world/ai/character_creation.py`、`prompts/character_creation.yaml`、`web/webclient/actions/creation_actions.py`、`web/webclient/presentation/creation.py`、`web/static/webclient/js/elosern/protocol.js`、`web/webclient-app/`（`stores/elosern.js`、`components/CreationOverlay.vue`、新元件 `ToastQueue.vue`、AppClient/AppShell 掛載、frozen 契約測試、Storybook showcase）、`commands/character_creation.py`（Telnet concept 流預設值）、`docs/superpowers/specs/2026-09-02-concept-transient-fill-persona-design.md`（年龄決策修訂）、主規格 `webclient-character-creation-ui`、`character-creation-ux`，新能力 `webclient-action-feedback`。
+**範圍：** `world/ai/character_creation.py`、`prompts/character_creation.yaml`、`web/webclient/actions/creation_actions.py`、`web/webclient/presentation/creation.py`、`web/static/webclient/js/elosern/protocol.js`、`web/webclient-app/`（`stores/elosern.js`、`components/CreationOverlay.vue`、新元件 `ToastQueue.vue`、AppClient/AppShell 掛載、frozen 契約測試、Storybook showcase）、`commands/character_creation.py`（Telnet concept 流預設值）、`docs/superpowers/specs/2026-09-02-concept-transient-fill-persona-design.md`（年齡決策修訂）、主規格 `webclient-character-creation-ui`、`character-creation-ux`，新能力 `webclient-action-feedback`。
 
-本文件是後續 OpenSpec change（暫名 `extend-concept-proposal-and-add-toast-feedback`）的實作依據，並在年龄決策上修訂 `retool-concept-transient-fill` 設計（2026-09-02）的對應條款。
+本文件是五個 OpenSpec change（清單與批次見 §8）的實作依據，並在年齡決策上修訂 `retool-concept-transient-fill` 設計（2026-09-02）的對應條款。
 
 ---
 
@@ -45,10 +45,12 @@
 - 掛載層級：`AppClient.vue`（或 AppShell 等價層）根節點、z-index 高於 creation overlay——創角期間的 toast 必須可見。
 - testid 前綴 `feedback-`（`feedback-toast-<id>`、佇列 `feedback-toast-queue`）。
 
-### 3.3 觸發點（本期）
+### 3.3 觸發點（本期）與寫入者所有權
 
-1. `creation.concept` 成功（結果 code `concept_applied`）：info toast「概念提案已套用」。
-2. `creation.concept` 非成功（rejected／stale／error）：crit toast，title 為伺服端訊息逐字（如 LLM 離線的「概念服務目前無法使用」類訊息）。overlay 自身的 result 區照舊顯示（overlay 仍是 presenting surface 契約不變）。
+單一寫入者契約：每種語氣恰好一個寫入點，零跨切片抑制協議。
+
+1. `creation.concept` 成功（結果 code `concept_applied`）：info toast「概念提案已套用到自訂表單」，**唯一寫入者是表單層**——`CreationOverlay.applyProposal()` 在套用新 revision 且 `conceptPending` 存活時經 `pushToast` 推播。只有套用时點同時知道「落地成功＋導航脈絡」；revision＋pending 雙守門天然單次。store 對成功結果刻意不推（result commit 時同步推播無法被 overlay 追溯抑制；`creationOverlayPresenting` 測不出「完成於概念頁」）。
+2. `creation.concept` 非成功（rejected／stale／error）：crit toast，title 為伺服端訊息逐字（如 LLM 離線的「概念服務目前無法使用」類訊息），**唯一寫入者是 store 的 `handleActionResult`**（`inFlight.handledResult` 指紋去重）。overlay 自身的 result 區照舊顯示（overlay 仍是 presenting surface 契約不變）。
 3. 佇列介面預留：未來 `event-log` 讀模型落地時，由 store 的 reducer 路徑把遊戲事件推入同一佇列，元件零改動。
 
 ### 3.4 凍結契約的改寫（不是迴避）
@@ -64,18 +66,20 @@
 ### 4.1 送出中的大載入態
 
 - `CreationOverlay.vue` 新增本地 `conceptPending` 狀態：`applyConcept()` 送出時設真；概念頁籤區塊進入載入態——概念 textarea 與「套用概念」按鈕 `disabled`，區塊中央顯示大 spinner 與「概念生成中，請稍候…」（本地文案）。
-- 清除條件（二者其一先到）：新的 proposal revision 送達（`applyProposal()` 套用路徑）；或本次 request 的任何非成功 result（rejected／stale／error）。重複點擊由 disabled 抵擋，傳輸層的 single-mutation-in-flight 仍是底線防線。
+- 清除條件（二者其一先到）：新的 proposal revision 送達（`applyProposal()` 套用路徑）；或 `props.result.requestId === props.dispatch.submittedRequestId && outcome !== "success"`（overlay 新增 `:dispatch` prop 綁 `store.view.dispatch`；傳輸層 single-mutation-in-flight 保證 pending 期間 submitted id 必屬本次概念，舊 result 快取重播因 id 不符而無效）。重複點擊由 disabled 抵擋，傳輸層的 single-mutation-in-flight 仍是底線防線。
 - 重新整理／斷線使 in-flight 失蹤時，`conceptPending` 由 result 缺席自然過期：overlay 掛載時重置（本地 ref 初值即假，天然正確）。
 
 ### 4.2 完成後自動跳自訂頁籤
 
-- `applyProposal()` 成功套用新 revision 後：`setMode("custom")`，玩家直接看見填好的表單；同時推 info toast。
+- `applyProposal()` 成功套用新 revision 後：`setMode("custom")`，玩家直接看見填好的表單；同時經 `pushToast` prop（AppClient 綁定 store API）推 info 確認 toast（§3.3 寫入者契約：此 toast 唯一寫入點即在此）。
 - 移除 `proposalNotice` banner、其「開啟表單」按鈕與 `openCustomFromProposal()`（用戶判定無意義）；`creation-proposal-notice`／`creation-proposal-open` testid 同場退役。
 - 重連重建場景（面板帶未消費 proposal 重掛）：照舊填入表單，但不自動跳轉、不重複 toast——跳轉只屬於「本次點擊的完成時刻」。
 
-### 4.3 stage 踢回根因修復
+### 4.3 踢回根因修復（overlay 層釘住）
 
-`rebuildCreationDock`（`stores/elosern.js:1564-1583`）的 root 重置分支增加條件：**面板 draft 為 null 且帶未消費 `proposal` 槽時不重置 dock view**。提案送達从此不動導航；導航由 overlay 完成態明確負責（§4.2）。既有分支（preset draft→presets confirm、custom draft→custom、其餘→root）逐字不動，Telnet 與 confirm 流不受影響。
+查證（rubber-duck 複審）：`creationPanelSignature` 只序列化 presets／races／draft，**不含 `proposal` 槽**——「提案送達→簽名變動→`rebuildCreationDock` root 重置」這條原始假設在靜態上不成立，store 層 skip 條件在目標場景根本不被評估，屬無效修復。真實踢回路徑（stage watcher 值變動／draft deep-watch／router settle 副作用）以 instrumentation 在瀏覽器重現釘死後留檔為回歸測試依據。
+
+修復選在 causally robust 的 overlay 層：`conceptPending === true`（載入態存活）期間，stage watcher 與 `syncFromDraft()` 對 `mode` early-return——無論哪條 store 路徑發出導航信號，頁籤在 in-flight 窗口內不動；完成導航由 `applyProposal()` 明確執行（§4.2）。「proposal-only 面板不重置 dock stage」仍是指定契約，由 panelSig 不含 proposal 的既有事實＋pin 測試釘住，`stores/elosern.js` 零改動。
 
 ## 5. 提案契約五欄擴充（D3）
 
@@ -91,7 +95,7 @@
 | `background` | `str` | 精簡背景故事（繁體中文） | 去首尾空白；超 `MAX_PERSONA_FIELD_LENGTH`(600) 截斷；空 → 缺席 |
 | `affinity_elements` | `tuple[str, ...]` | **依所選種族的親附上限選取，精靈不得選取**（上限寫進 `race_catalog`，見 §5.2） | 剔除未知鍵 → 去重 → 依 `max_affinity_elements(race_key)` 截斷；`race_key == "elf"` → 清空；清空後為空tuple |
 
-- 夾取／截斷全部發生在既有語義驗證器的**正規化阶段**：驗證器回傳正規化後的值，guardrail 不改 retry 語義、不向 LLM 回報夾取。
+- 夾取／截斷全部發生在既有語義驗證器的**正規化階段**：驗證器回傳正規化後的值，guardrail 不改 retry 語義、不向 LLM 回報夾取。
 - 結構輸出 schema（`CHARACTER_CREATION_OUTPUT_SCHEMA`）把五鍵列為 optional；`_validate_shape` 的 unknown-key 黑名單同步放行五鍵。
 - 「不棄回覆」邊界：既有整體性失敗條件（persona 恰三鍵、allocations 七軸預算總和、race/subrace registry 成員資格）不變——那些是結構完整性；五欄界外值是單欄缺陷，一律正規化而非失敗。
 
@@ -149,7 +153,7 @@
 | LLM 回過量／精靈 affinity | 截斷／清空，提案照常送達 |
 | LLM 回未知元素鍵 | 剔除後照常 |
 | `display_name`／`background` 超界 | 截斷；全空白 → 缺席 |
-| 結構性失敗（persona 缺鍵、allocations 超預算、假種族鍵） | 既有 retry → 降級 `concept_unavailable`（不变） |
+| 結構性失敗（persona 缺鍵、allocations 超預算、假種族鍵） | 既有 retry → 降級 `concept_unavailable`（不變） |
 | 概念進行中 LLM 離線／重試耗盡 | `concept_unavailable` 穩定拒絕 + crit toast + overlay result 區；載入態清除 |
 | 載入中斷線 | 重連後 `conceptPending` 隨 overlay 重掛而清，玩家重按（既已接受代價） |
 | 提案送達但玩家已手動跳頁籤 | revision 守門照常填入，跳轉只在「完成於概念頁籤時」才執行（mode 檢查） |
@@ -160,19 +164,51 @@
 - 整合（Evennia）：`creation.concept` adapter → panel v3 `proposal` 槽含五鍵；presenter 驗證器 v3；Telnet concept 預設值流。
 - Node／Vitest：`protocol.js` 鏡像 v3 新案（缺席鍵、夾取值通過）；`CreationOverlay` 的五欄映射、自動跳 custom、載入態進出、重連不重複跳轉；`ToastQueue` 佇列上限／FIFO／自動消失／點擊關閉；`deferred_surfaces_absent` 改寫案（`feedback-` 合法、事件 toast 仍禁）。
 - 瀏覽器（Playwright 單 class）：概念旅程——輸入概念 → 套用 → 載入態出現 → 自動跳自訂頁籤且名字/背景/年齡/親和已填 → toast 可見 → 儲存啟動。
+- Python 證據橋：`webclient-action-feedback` 的兩條 requirement 經 `web/tests/browser/test_browser_action_feedback.py`（Playwright 受管瀏覽器驅動真實佇列旅程）掛 `covers_requirement`——Vitest 不在 `spec_traceability` 索引內，倉庫先例是 `test_vue_showcase_evidence.py` 型證據橋；Vitest 保留為快速迴歸層。
 - 契約：新能力 `webclient-action-feedback` 與 modified `webclient-character-creation-ui`、`character-creation-ux` 每條 requirement 掛 `covers_requirement`；`tools.spec_traceability check` 綠；新測試模組註冊 `.github/evennia-shards.json`；命令文件兩式同步、`tests/test_command_docs.py` 綠；Storybook showcase manifest 重凍結。
 
 ## 8. OpenSpec 衝擊
 
 | 既有 capability | 動作 |
 |---|---|
-| `webclient-character-creation-ui` | modified（panel v3 proposal 槽、載入態、自動跳轉、stage-reset 條件、banner 退役） |
-| `character-creation-ux` | modified（Telnet concept 預設值流；提示詞年齡翻案記錄） |
-| `player-character-creation` | modified（提案欄位集合擴充語義） |
-| 新能力 `webclient-action-feedback` | added（ToastQueue 佇列、tone、觸發契約、凍結測試改寫） |
+| `generative-character-concept` | modified（A1：提案十欄契約＋正規化不棄回覆＋提示詞翻案；A4：Telnet 命令預設值流與背景／親和承載） |
+| `concept-transient-fill` | modified（A2：panel `proposal` 槽五鍵；A3：表單五欄填入＋完成自動跳轉） |
+| `webclient-character-creation-ui` | modified（A2：panel schema v3；A3：載入態、dock 不導航、banner 退役） |
+| `character-creation-ux` | modified（A4：Telnet concept 預設值流） |
+| `webclient-component-showcase` | modified（A5：manifest 增 ToastQueue、延後清單消歧義） |
+| 新能力 `webclient-action-feedback`（A5） | added（ToastQueue 佇列、tone、concept 觸發契約、凍結測試改寫） |
 | `webclient-oob-protocol` | 不變（proposal 槽在 `creation` panel 內，無新信封） |
+| `player-character-creation` | 不變（激活／draft／custom payload 契約不動；正規化後提案值天然過既有閘） |
 
-單一 change 實作（`extend-concept-proposal-and-add-toast-feedback`），內部任務群順序：AI 契約與正規化 → actions/presenter v3 → protocol.js 鏡像 → store toast 切片 + ToastQueue 元件 → Vue 表單／載入態／導航 → Telnet → 凍結測試/showcase/文件 → traceability 登記。
+落地序列化：A5（toasts）先落地；A3 經查證不改 `stores/elosern.js`（釘住在 overlay 層），僅在 `AppClient.vue` 新增 `:dispatch`／`:push-toast` 綁定（與 A5 的 ToastQueue 掛載為不同區塊），須於 A5 落地後 rebase。
+
+本設計分拆為五個 change，每個皆可由單一工程師在一個工作天內實作。
+
+| Change | 設計章節 | 定位 | 前置依賴 |
+|---|---|---|---|
+| `extend-concept-proposal-fields` | §5.1–§5.2 | 生成層契約擴充：`CharacterProposal` 五欄、正規化不棄回覆、提示詞翻案 | 無 |
+| `bump-creation-panel-proposal-v3` | §5.3 | 線路：session 槽／`ProposalSnapshot`／panel `proposal` 槽 v2→v3、JS 鏡像 | `extend-concept-proposal-fields` |
+| `retool-concept-fill-navigation` | §4、§5.4 | 前端：五欄映射、概念載入態、完成自動跳轉、in-flight 頁籤釘住修復、banner 退役 | `bump-creation-panel-proposal-v3`、`add-action-feedback-toasts` |
+| `prefill-telnet-concept-from-proposal` | §5.5 | Telnet：提案預設值流、請求攜帶背景／親和 | `extend-concept-proposal-fields` |
+| `add-action-feedback-toasts` | §3 | ToastQueue 基礎設施、concept 觸發、凍結測試改寫、showcase 重凍結 | 無 |
+
+依賴邊三條：**A1→A2→A3**（提案欄位逐段上線：生成層 → wire → 前端）、**A5→A3**（overlay 完成 toast 需佇列 API）、**A1→A4**（Telnet 讀同一份正規化提案）。
+
+檔案衝突點（並行時須知的序列化邊界）：
+
+- `protocol.js`：僅 A2 觸碰（A3 不改 wire 驗證器，只改 Vue 映射）。
+- `stores/elosern.js`：僅 A5 觸碰（toast 切片、`handleActionResult` 觸發）——A3 經查證零改動（釘住修復在 overlay 層）。
+- `AppClient.vue`：A5（ToastQueue 掛載）與 A3（`CreationOverlay` 的 `:dispatch`／`:push-toast` 綁定）同檔不同區塊——A3 於 A5 合併後 rebase。
+- `CreationOverlay.vue`：僅 A3 觸碰。
+- 主規格 `concept-transient-fill`：A2（panel 槽條目）與 A3（pre-fill 條目）各 delta 不同 Requirement，歸檔順序 A2 先 A3 後。
+- `webclient-character-creation-ui`：A2（panel 面板條目 v3）／A3（dock 條目）／同 delta 不同 Requirement，歸檔順序 A2 先 A3 後。
+
+實作與歸檔批次：
+
+1. **批次一（完全平行）**：`extend-concept-proposal-fields` ∥ `add-action-feedback-toasts`（檔案零重疊）。
+2. **批次二**：`bump-creation-panel-proposal-v3`（僅等 A1）∥ `prefill-telnet-concept-from-proposal`（僅等 A1，與 A2 檔案零重疊）。
+3. **批次三**：`retool-concept-fill-navigation`（等 A2、A5）。
+4. 歸檔順序：A1 → A2 → A3 硬序（規格同步鏈），A5 時機自由但須先於 A3 歸檔（`concept-transient-fill` pre-fill 條目引用 toast 語意的 change 先落地），A4 時機自由；每次歸檔同步 delta 進 `openspec/specs/` 並跑 `openspec validate --all --strict`。
 
 ## 9. 取捨與已接受代價
 
