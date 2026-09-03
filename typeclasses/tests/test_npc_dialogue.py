@@ -16,6 +16,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
+
 from django.test import override_settings
 from twisted.internet import defer
 
@@ -36,8 +38,6 @@ from world.ai.schemas.registry import _OUTPUT_SCHEMAS
 from world.onboarding.guide_dialogue import GUILD_STAFF_DIALOGUE_KEY
 from world.rules.affinity import apply_affinity_change
 from world.rules.npc_intents import is_stale_context
-
-from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -787,16 +787,19 @@ class NPCTitleDialogueContextTests(EvenniaTest):
         super().setUp()
         self.npc = create_object(LLMNPC, key="塞提斯", location=self.room1)
 
+    @covers_requirement('npc-identity-titles::the-npc-dialogue-context-carries-the-title-as-read-only-data')
     def test_titled_npc_context_carries_the_title(self):
         self.npc.npc_title = "南門守衛"
         context = self.npc._npc_context()
         self.assertEqual(context["title"], "南門守衛")
         self.assertEqual(sorted(context), ["desc", "location", "name", "title"])
 
+    @covers_requirement('npc-identity-titles::the-npc-dialogue-context-carries-the-title-as-read-only-data')
     def test_untitled_npc_context_carries_an_empty_title(self):
         context = self.npc._npc_context()
         self.assertEqual(context["title"], "")
 
+    @covers_requirement('npc-identity-titles::the-npc-dialogue-context-carries-the-title-as-read-only-data')
     def test_building_the_context_persists_nothing(self):
         before = {attr.key for attr in self.npc.attributes.all()}
         self.npc._npc_context()
@@ -805,6 +808,7 @@ class NPCTitleDialogueContextTests(EvenniaTest):
         self.assertEqual(after, before)
         self.assertNotIn("npc_title", after)
 
+    @covers_requirement('npc-identity-titles::the-npc-dialogue-context-carries-the-title-as-read-only-data')
     def test_the_title_never_reaches_the_rendered_system_message(self):
         from world.ai.npc_dialogue import _system_message
 

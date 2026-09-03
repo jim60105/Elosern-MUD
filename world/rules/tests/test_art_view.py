@@ -9,6 +9,8 @@ entities and actors; no Evennia session or database is required.
 from types import SimpleNamespace
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.rules.art_view import (
     MAX_PORTRAIT_CATALOG,
@@ -176,6 +178,7 @@ class ArtViewSelectionTests(unittest.TestCase):
             list(range(1, MAX_PORTRAIT_CATALOG + 1)),
         )
 
+    @covers_requirement('npc-identity-titles::compact-presentation-rows-keep-the-plain-npc-name')
     def test_titled_entity_catalog_entry_stays_plain_key(self):
         # npc-title-identity-core compact-row pin: a stored title on the
         # entity (the fake carries the attribute the real NPC persists) must

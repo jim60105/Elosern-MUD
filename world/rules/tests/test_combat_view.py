@@ -264,6 +264,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         }
         self.assertEqual(before, after)
 
+    @covers_requirement('npc-identity-titles::compact-presentation-rows-keep-the-plain-npc-name')
     def test_titled_npc_participant_row_stays_plain_name(self):
         # npc-title-identity-core compact-row pin: the combat panel renders
         # the plain key even when the participant carries a title, so a later

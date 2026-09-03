@@ -561,6 +561,7 @@ class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
             "typeclasses.monsters.Monster", key="野狼", location=self.room1
         )
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_room_character_line_composes_the_npc_only(self):
         appearance = self.char1.at_look(self.room1)
         self.assertIn("人物：", appearance)
@@ -572,6 +573,7 @@ class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
             self.assertNotIn(f"{name}\u3000", appearance)
         self.assertNotIn("南門守衛南門", appearance)
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces', 'npc-identity-titles::the-existing-appearance-and-exploration-contracts-are-unchanged')
     def test_look_header_is_composed_on_every_entry_path(self):
         from commands.localized.general import CmdLook
         from evennia.utils import ansi
@@ -595,17 +597,20 @@ class NPCTitleAppearanceTests(EvenniaCommandTestMixin, EvenniaTest):
         # same way so the three paths compare on identical rendered text.
         self.assertEqual(ansi.parse_ansi(text, strip_ansi=True).strip(), command)
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_untitled_and_plain_targets_keep_their_headers(self):
         self.assertIn("布魯諾", self.char1.at_look(self.plain))
         self.assertNotIn("\u3000", self.char1.at_look(self.plain))
         self.assertNotIn("\u3000", self.char1.at_look(self.monster))
         self.assertNotIn("\u3000", self.char1.at_look(self.char2))
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_explicit_flag_off_keeps_the_header_plain(self):
         appearance = self.titled.return_appearance(self.char1, full_identity=False)
         self.assertNotIn("南門守衛", appearance)
         self.assertIn("塞提斯", appearance)
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_looking_at_an_npc_carrying_characters_raises_nothing(self):
         # The flag injected for the header rides **kwargs into this same
         # appearance pass's character line; the merge form in
@@ -658,6 +663,7 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
             self.assertNotIn("南門守衛", text)
             self.assertNotIn("\u3000", text)
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_movement_announcements_stay_plain(self):
         def move_round_trip():
             self.npc.move_to(self.room2)
@@ -665,6 +671,7 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
 
         self._both_ways(move_round_trip)
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_say_location_echo_stays_plain(self):
         def say():
             self.npc.at_say(
@@ -673,6 +680,7 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
 
         self._both_ways(say)
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_whisper_receiver_echo_stays_plain(self):
         def whisper():
             self.npc.at_say(
@@ -686,6 +694,7 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
 
         self._both_ways(whisper)
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_pickup_echo_stays_plain(self):
         # The localized 拿 command's room echo is the observed surface (the
         # at_get hook itself is silent in Evennia 6.1).
@@ -699,6 +708,7 @@ class NPCTitleEchoRegressionTests(EvenniaCommandTestMixin, EvenniaTest):
 
         self._both_ways(pickup)
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_give_echo_stays_plain(self):
         # The receiver's echo renders the giver's display name (the localized
         # 給 command emits no third-party broadcast; at_give is silent).

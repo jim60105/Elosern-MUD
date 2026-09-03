@@ -10,6 +10,8 @@ never materializes a storage row. Validator cases are pure
 
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
@@ -45,6 +47,7 @@ class BreakingStr:
 class ValidateNPCTitleTests(unittest.TestCase):
     """The single validator every authored title write path validates against."""
 
+    @covers_requirement('npc-identity-titles::npc-titles-are-validated-single-line-plain-text')
     def test_legal_title_round_trips_stripped(self):
         self.assertEqual(validate_npc_title(" 南門守衛 "), "南門守衛")
         self.assertEqual(
@@ -52,40 +55,47 @@ class ValidateNPCTitleTests(unittest.TestCase):
             "雜貨店老闆",
         )
 
+    @covers_requirement('npc-identity-titles::npc-titles-are-validated-single-line-plain-text')
     def test_boundary_lengths_are_decided_exactly(self):
         at_bound = "守" * MAX_NPC_TITLE_CODE_POINTS
         self.assertEqual(validate_npc_title(at_bound), at_bound)
         with self.assertRaises(NPCTitleError):
             validate_npc_title(at_bound + "守")
 
+    @covers_requirement('npc-identity-titles::npc-titles-are-validated-single-line-plain-text')
     def test_internal_whitespace_and_separator_are_rejected(self):
         for value in ("南門 守衛", f"南門{_FULL_WIDTH_SPACE}守衛", "南門\t守衛"):
             with self.subTest(value=value):
                 with self.assertRaises(NPCTitleError):
                     validate_npc_title(value)
 
+    @covers_requirement('npc-identity-titles::npc-titles-are-validated-single-line-plain-text')
     def test_control_and_nonprintable_characters_are_rejected(self):
         for value in ("南門\x00守衛", "南門\x1b守衛", "南門\u200b守衛"):
             with self.subTest(value=value):
                 with self.assertRaises(NPCTitleError):
                     validate_npc_title(value)
 
+    @covers_requirement('npc-identity-titles::npc-titles-are-validated-single-line-plain-text')
     def test_markup_delimiter_is_rejected(self):
         with self.assertRaises(NPCTitleError):
             validate_npc_title("|r南門守衛|n")
 
+    @covers_requirement('npc-identity-titles::npc-titles-are-validated-single-line-plain-text')
     def test_non_text_values_are_rejected(self):
         for value in (None, 42, True, False, 3.5, ["南門守衛"], {"t": "南門守衛"}):
             with self.subTest(value=value):
                 with self.assertRaises(NPCTitleError):
                     validate_npc_title(value)
 
+    @covers_requirement('npc-identity-titles::npc-titles-are-validated-single-line-plain-text')
     def test_empty_and_whitespace_only_values_are_rejected(self):
         for value in ("", "   ", _FULL_WIDTH_SPACE, " \t\u3000 "):
             with self.subTest(value=value):
                 with self.assertRaises(NPCTitleError):
                     validate_npc_title(value)
 
+    @covers_requirement('npc-identity-titles::npc-titles-are-validated-single-line-plain-text')
     def test_rejection_messages_are_stable_english_identifiers(self):
         cases = {
             123: "npc title must be text",
@@ -117,6 +127,7 @@ class NPCTitleComposerTests(EvenniaTest):
         # never persist a storage row (the composer is a pure read).
         self.assertIsNone(entity.attributes.get("npc_title", return_obj=True))
 
+    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
     def test_titled_npc_composes_with_full_width_separator(self):
         self.npc.npc_title = "南門守衛"
         self.assertEqual(npc_display_name(self.npc), "塞提斯　南門守衛")
@@ -126,12 +137,14 @@ class NPCTitleComposerTests(EvenniaTest):
             [0x3000],
         )
 
+    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
     def test_untitled_npc_degrades_to_plain_name(self):
         self._assert_no_title_row(self.npc)
         self.assertEqual(npc_title_value(self.npc), "")
         self.assertEqual(npc_display_name(self.npc), "塞提斯")
         self._assert_no_title_row(self.npc)
 
+    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
     def test_player_and_monster_never_compose(self):
         player = create_object(PlayerCharacter, key="冒險者")
         for entity in (player, create_object(Monster, key="哥布林")):
@@ -139,6 +152,7 @@ class NPCTitleComposerTests(EvenniaTest):
                 self.assertEqual(npc_title_value(entity), "")
                 self.assertEqual(npc_display_name(entity), entity.key)
 
+    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
     def test_player_and_monster_carrying_a_stray_title_row_never_compose(self):
         monster = create_object(Monster, key="哥布林")
         monster.db.npc_title = "深林領主"
@@ -149,6 +163,7 @@ class NPCTitleComposerTests(EvenniaTest):
         self.assertEqual(npc_title_value(player), "")
         self.assertEqual(npc_display_name(player), "冒險者二")
 
+    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
     def test_malformed_stored_state_degrades_without_raising(self):
         for stored in (123, None, True, ["南門守衛"], "   ", _FULL_WIDTH_SPACE):
             with self.subTest(stored=repr(stored)):
@@ -156,6 +171,7 @@ class NPCTitleComposerTests(EvenniaTest):
                 self.assertEqual(npc_title_value(self.npc), "")
                 self.assertEqual(npc_display_name(self.npc), "塞提斯")
 
+    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
     def test_corrupt_stored_strings_degrade_instead_of_rendering(self):
         # A stored string failing the validator's content rules could never
         # come from an authored path; rendering it would emit Evennia markup
@@ -173,6 +189,7 @@ class NPCTitleComposerTests(EvenniaTest):
                 self.assertEqual(npc_title_value(self.npc), "")
                 self.assertEqual(npc_display_name(self.npc), "塞提斯")
 
+    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
     def test_overlong_stored_title_is_content_legal_and_still_composes(self):
         # Length is deliberately NOT part of the render filter: the overlong
         # row is the documented degraded state the display bounds truncate,
@@ -183,11 +200,13 @@ class NPCTitleComposerTests(EvenniaTest):
             npc_display_name(self.npc), f"塞提斯{_FULL_WIDTH_SPACE}{'壞' * 200}"
         )
 
+    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
     def test_a_raising_title_accessor_degrades_to_the_plain_name(self):
         broken = create_object(RaisingTitleNPC, key="炸裂")
         self.assertEqual(npc_title_value(broken), "")
         self.assertEqual(npc_display_name(broken), "炸裂")
 
+    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
     def test_an_unreadable_key_degrades_instead_of_composing_ambiguity(self):
         # No key attribute, a raising key accessor, and a key whose __str__
         # raises all yield "" — never 「　稱號」-style leading-separator junk.
@@ -211,17 +230,20 @@ class NPCTitleComposerTests(EvenniaTest):
         titled.key = ""
         self.assertEqual(npc_display_name(titled), "")
 
+    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
     def test_stored_title_is_read_back_stripped(self):
         # Only authored paths write through validate_npc_title, but a value
         # that arrives with surrounding whitespace still composes cleanly.
         self.npc.db.npc_title = " 南門守衛 "
         self.assertEqual(npc_display_name(self.npc), "塞提斯　南門守衛")
 
+    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
     def test_llmnpc_subclass_composes(self):
         llm_npc = create_object(LLMNPC, key="米拉")
         llm_npc.npc_title = "酒館女合夥人"
         self.assertEqual(npc_display_name(llm_npc), "米拉　酒館女合夥人")
 
+    @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity', 'npc-identity-titles::the-webclient-exploration-panel-renders-the-npc-full-identity-on-entity-and-interact-rows')
     def test_boundary_composition_stays_under_panel_bound(self):
         npc = create_object(NPC, key="長" * 64)
         npc.npc_title = "守" * MAX_NPC_TITLE_CODE_POINTS

@@ -152,6 +152,7 @@ class GridFollowTests(EvenniaTest):
         expected = FOLLOW_LOST_MESSAGE.format(names="stuck")
         self.assertEqual(follow_lines(msg), [expected])
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_follow_lost_names_a_titled_companion_by_plain_key(self):
         # NPC identity titles are display-routing only: the notification is
         # byte-identical with a title stored (npc-title-identity-core).

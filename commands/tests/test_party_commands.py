@@ -85,6 +85,7 @@ class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         _reset_all()
         super().tearDown()
 
+    @covers_requirement('npc-identity-titles::command-and-search-targeting-matches-the-plain-npc-key-only')
     def test_titled_npc_resolves_by_plain_key_only(self):
         # npc-title-identity-core D8: targeting never learns the title. The
         # composed string is not a key, alias, or search hit; the plain name

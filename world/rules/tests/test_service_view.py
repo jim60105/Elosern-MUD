@@ -257,6 +257,7 @@ class HostResolutionTests(ServiceRegistryIsolation):
         self.assertIsNone(view.guild)
         self.assertIsNotNone(view.shop)
 
+    @covers_requirement('npc-identity-titles::compact-presentation-rows-keep-the-plain-npc-name')
     def test_titled_host_rows_stay_plain_key(self):
         # npc-title-identity-core compact-row pin: guild and shop host rows
         # render the plain key even when the host entity carries a title.

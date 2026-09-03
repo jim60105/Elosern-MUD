@@ -1507,6 +1507,7 @@ class NPCTitlePanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
     def _interact_rows(self, payload, pk):
         return [row for row in payload["interact"] if row["identity"] == pk]
 
+    @covers_requirement('npc-identity-titles::the-webclient-exploration-panel-renders-the-npc-full-identity-on-entity-and-interact-rows')
     def test_titled_npc_reads_with_title_on_both_row_kinds(self):
         npc = create_object(NPC, key="塞提斯", location=self.room1)
         npc.npc_title = "南門守衛"
@@ -1523,6 +1524,7 @@ class NPCTitlePanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
         )
         validate_exploration(payload)
 
+    @covers_requirement('npc-identity-titles::the-webclient-exploration-panel-renders-the-npc-full-identity-on-entity-and-interact-rows')
     def test_non_entity_rows_keep_the_plain_key_source(self):
         from web.webclient.presentation.affordances import _bounded_display_name
 
@@ -1557,6 +1559,7 @@ class NPCTitlePanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
         )
         validate_exploration(payload)
 
+    @covers_requirement('npc-identity-titles::the-webclient-exploration-panel-renders-the-npc-full-identity-on-entity-and-interact-rows')
     def test_untitled_and_malformed_titles_keep_the_panel_available(self):
         untitled = create_object(NPC, key="布魯諾", location=self.room1)
         broken = create_object(NPC, key="米拉", location=self.room1)
@@ -1589,6 +1592,7 @@ class NPCTitlePanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
                     self.assertNotIn("|", interact["display_name"])
         validate_exploration(payload)
 
+    @covers_requirement('npc-identity-titles::the-webclient-exploration-panel-renders-the-npc-full-identity-on-entity-and-interact-rows', 'npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
     def test_composed_bounds_hold_for_legal_and_overlong_titles(self):
         long_npc = create_object(NPC, key="長" * 64, location=self.room1)
         long_npc.npc_title = "守" * 32

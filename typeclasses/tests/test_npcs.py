@@ -67,22 +67,26 @@ class NPCTitleDisplayTests(EvenniaTestCase):
         super().setUp()
         self.npc = create_object(NPC, key="塞提斯")
 
+    @covers_requirement('npc-identity-titles::the-npc-title-is-a-creation-time-attribute-with-no-runtime-write-surface')
     def test_new_npc_title_reads_empty_without_materializing_a_row(self):
         self.assertEqual(self.npc.npc_title, "")
         self.assertIsNone(self.npc.attributes.get("npc_title", return_obj=True))
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_display_name_without_the_flag_stays_byte_identical_plain_name(self):
         self.npc.npc_title = validate_npc_title("南門守衛")
         plain = self.npc.get_display_name(self.npc)
         self.assertEqual(plain, "塞提斯")
         self.assertEqual(self.npc.get_display_name(self.npc, full_identity=False), plain)
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_full_identity_flag_composes_name_and_title(self):
         self.npc.npc_title = validate_npc_title("南門守衛")
         self.assertEqual(
             self.npc.get_display_name(self.npc, full_identity=True), "塞提斯　南門守衛"
         )
 
+    @covers_requirement('npc-identity-titles::full-identity-appears-only-on-opt-in-text-display-surfaces')
     def test_flag_is_inert_for_player_and_monster(self):
         entities = (
             create_object(PlayerCharacter, key="冒險者甲"),
@@ -105,6 +109,7 @@ class NPCTitleWriteSurfaceAbsenceTests(EvenniaTestCase):
     seed through it. Mirrors the title-system fixed-title delete-surface pin.
     """
 
+    @covers_requirement('npc-identity-titles::the-npc-title-is-a-creation-time-attribute-with-no-runtime-write-surface')
     def test_npc_interface_exposes_no_title_mutating_callable(self):
         offenders = {
             name
@@ -124,6 +129,7 @@ class NPCTitleWriteSurfaceAbsenceTests(EvenniaTestCase):
         }
         self.assertEqual(verb_offenders, set())
 
+    @covers_requirement('npc-identity-titles::the-npc-title-is-a-creation-time-attribute-with-no-runtime-write-surface')
     def test_registered_command_surface_has_no_npc_title_command(self):
         merged = {
             command.key: command
