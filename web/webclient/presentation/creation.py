@@ -53,7 +53,7 @@ from world.rules.creation_wizard import (
     read_creation_view,
 )
 
-CREATION_SCHEMA_VERSION = 2
+CREATION_SCHEMA_VERSION = 3
 
 # Exact shared bounds (design D2) -- must stay equal in the JS validator and to
 # the creation-wizard view-builder caps (webclient-character-creation-ui D2).
@@ -88,6 +88,10 @@ ALLOCATABLE_AXES = ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_p
 
 # The exact wire persona block keys (the three prose fields).
 PERSONA_WIRE_KEYS = ("personality", "life_story", "habit")
+# The proposal transient-fill display-name bound (mirror of the generative
+# layer's MAX_DISPLAY_NAME_CODE_POINTS and the custom-form name cap; distinct
+# from the preset-card MAX_DISPLAY_NAME_CODE_POINTS above).
+MAX_PROPOSAL_NAME_CODE_POINTS = 64
 
 
 class CreationPanelError(ProtocolValidationError):
@@ -517,10 +521,29 @@ def _validate_proposal(value: Any) -> dict[str, Any]:
 
     The proposal carries exactly ``revision`` (a positive transient sequence
     number), ``race``, nullable ``subrace``, the seven allocatable axes, and
-    the three-field persona block (retool-concept-transient-fill D1).
+    the three-field persona block (retool-concept-transient-fill D1), plus
+    five optional transient-fill keys present only when the validated
+    generative proposal carried a value (bump-creation-panel-proposal-v3 D1):
+    ``display_name`` (1..64 code points), ``age``/``apparent_age`` (integers
+    in the adult band — the generative layer clamps, so a bound violation on
+    the wire is a bug-level structural rejection), ``background`` (1..600
+    code points), and ``affinity_elements`` (a list of at most
+    ``MAX_AFFINITY_ELEMENTS`` distinct registered element keys; the race bound
+    is the generative layer's authority, the wire accepts the structural
+    ceiling). An absent optional key is expressed as the key not existing —
+    a null value is never legal.
     """
     _require_exact_fields(
-        value, "proposal", {"revision", "race", "subrace", "allocations", "persona"}, {}
+        value,
+        "proposal",
+        {"revision", "race", "subrace", "allocations", "persona"},
+        {
+            "display_name": "optional",
+            "age": "optional",
+            "apparent_age": "optional",
+            "background": "optional",
+            "affinity_elements": "optional",
+        },
     )
     revision = _require_int(value, "revision", minimum=1, maximum=MAX_SAFE_INTEGER)
     race = _validate_key(value["race"], "proposal race", MAX_RACE_KEY_CODE_POINTS)
@@ -530,13 +553,49 @@ def _validate_proposal(value: Any) -> dict[str, Any]:
     persona = _validate_persona(value["persona"])
     if persona is None:
         raise ProtocolValidationError("proposal persona must be a block")
-    return {
+    checked: dict[str, Any] = {
         "revision": revision,
         "race": race,
         "subrace": subrace,
         "allocations": _validate_allocations(value, "proposal"),
         "persona": persona,
     }
+    for key, maximum in (
+        ("display_name", MAX_PROPOSAL_NAME_CODE_POINTS),
+        ("background", MAX_PERSONA_FIELD_LENGTH),
+    ):
+        if key in value:
+            text = value[key]
+            if not isinstance(text, str) or not text:
+                raise ProtocolValidationError(f"proposal {key} must be non-empty text")
+            if sum(1 for _ in text) > maximum:
+                raise ProtocolValidationError(f"proposal {key} exceeds its bound")
+            checked[key] = text
+    for key in ("age", "apparent_age"):
+        if key in value:
+            checked[key] = _require_int(
+                value, key, minimum=AGE_MINIMUM, maximum=AGE_MAXIMUM
+            )
+    if "affinity_elements" in value:
+        elements = value["affinity_elements"]
+        if not isinstance(elements, list) or len(elements) > MAX_AFFINITY_ELEMENTS:
+            raise ProtocolValidationError(
+                f"proposal affinity_elements must be a list of at most "
+                f"{MAX_AFFINITY_ELEMENTS} element keys"
+            )
+        seen: set[str] = set()
+        for element in elements:
+            if element not in AFFINITY_ELEMENT_KEYS:
+                raise ProtocolValidationError(
+                    f"proposal affinity_elements has unknown element {element!r}"
+                )
+            if element in seen:
+                raise ProtocolValidationError(
+                    f"proposal affinity_elements duplicates element {element!r}"
+                )
+            seen.add(element)
+        checked["affinity_elements"] = list(elements)
+    return checked
 
 
 def validate_creation(payload: Any) -> dict[str, Any]:
@@ -775,6 +834,7 @@ __all__ = [
     "MAX_PRESET_KEY_CODE_POINTS",
     "MAX_PRESETS",
     "MAX_PROFILES",
+    "MAX_PROPOSAL_NAME_CODE_POINTS",
     "MAX_RACES",
     "MAX_RACE_KEY_CODE_POINTS",
     "MAX_SPECIALTY_CODE_POINTS",

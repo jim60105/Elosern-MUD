@@ -292,6 +292,34 @@ class ProposalSnapshotGateTests(EvenniaTestCase):
         self.assertEqual(snapshot.revision, 1)
         self.assertEqual(snapshot.persona["personality"], "沉穩")
 
+    def test_transient_fill_keys_snapshot_and_absent_stay_none(self):
+        from web.webclient.presentation.ingress import proposal_snapshot
+
+        snapshot = proposal_snapshot(
+            self._session(
+                _proposal_state(
+                    "1",
+                    display_name="咪咪",
+                    age=20,
+                    apparent_age=18,
+                    background="貓婆婆收養的孤女",
+                    affinity_elements=["fire"],
+                )
+            ),
+            SimpleNamespace(pk="1"),
+        )
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot.display_name, "咪咪")
+        self.assertEqual(snapshot.age, 20)
+        self.assertEqual(snapshot.apparent_age, 18)
+        self.assertEqual(snapshot.background, "貓婆婆收養的孤女")
+        self.assertEqual(snapshot.affinity_elements, ("fire",))
+
+        bare = proposal_snapshot(self._session(_proposal_state("1")), SimpleNamespace(pk="1"))
+        self.assertIsNotNone(bare)
+        for key in ("display_name", "age", "apparent_age", "background", "affinity_elements"):
+            self.assertIsNone(getattr(bare, key))
+
     def test_aliens_owner_slot_is_refused(self):
         from web.webclient.presentation.ingress import proposal_snapshot
 
@@ -353,6 +381,14 @@ class ProposalSnapshotGateTests(EvenniaTestCase):
                     "life_story": "來自邊境的小村",
                     "habit": "清晨練劍",
                 },
+            ),
+            "null transient-fill value": _proposal_state("1", age=None),
+            "out-of-band transient-fill age": _proposal_state("1", age=17),
+            "unknown transient-fill element": _proposal_state(
+                "1", affinity_elements=["wood"]
+            ),
+            "duplicate transient-fill elements": _proposal_state(
+                "1", affinity_elements=["fire", "fire"]
             ),
         }
         for label, state in cases.items():

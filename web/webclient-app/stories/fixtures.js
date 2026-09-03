@@ -1472,7 +1472,7 @@ export const SERVICES_PANEL_MINIMAL_SAMPLE = {
 };
 
 // B5 (webclient-vue-06-showcase-overlays): full-overlays fixtures. The
-// `creation` panel (schema v2) mirrors web/webclient/presentation/creation.py
+// `creation` panel (schema v3) mirrors web/webclient/presentation/creation.py
 // exactly: presets (at most 8 cards), the custom descriptor (name/adult
 // bounds, races, subraces, profiles, affinity), and the optional saved
 // wizard draft (preset/custom + background + affinity + persona) plus the
@@ -1491,7 +1491,7 @@ const ELEMENTS = [
 ];
 
 export const CREATION_PANEL_SAMPLE = {
-  schema_version: 2,
+  schema_version: 3,
   available: true,
   kind: "creation",
   draft: null,
@@ -1664,7 +1664,7 @@ export const CREATION_PANEL_PROPOSAL_SAMPLE = {
 // The `creation` panel unavailable form (registry-owned reason, the common
 // unavailable envelope).
 export const CREATION_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 2,
+  schema_version: 3,
   available: false,
   reason: { code: "creation_unavailable", message: "角色創建目前無法顯示" },
 };

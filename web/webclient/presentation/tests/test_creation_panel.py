@@ -1,7 +1,8 @@
 """Exact ``creation`` schema, presenter, and isolation tests.
 
-Covers the D2 shared bounds, the version-2 payload validation (player-owned
-draft persona plus the optional transient proposal slot), deterministic
+Covers the D2 shared bounds, the version-3 payload validation (player-owned
+draft persona plus the optional transient proposal slot with its five
+transient-fill keys), deterministic
 preset/profile ordering, the draft shape for both stages, the worst-case
 envelope size, the all-ceilings byte gate, and the isolation of a corrupt
 draft and non-creation modes.
@@ -21,6 +22,7 @@ from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.creation import (
+    AFFINITY_ELEMENT_KEYS,
     AGE_MAXIMUM,
     AGE_MINIMUM,
     APPARENT_AGE_MAXIMUM,
@@ -37,6 +39,7 @@ from web.webclient.presentation.creation import (
     MAX_PRESET_KEY_CODE_POINTS,
     MAX_PRESETS,
     MAX_PROFILES,
+    MAX_PROPOSAL_NAME_CODE_POINTS,
     MAX_RACES,
     MAX_RACE_KEY_CODE_POINTS,
     MAX_SPECIALTY_CODE_POINTS,
@@ -62,7 +65,7 @@ from world.rules.creation_wizard import (
 )
 
 
-def _valid_payload(draft=None, custom=None, presets=None):
+def _valid_payload(draft=None, custom=None, presets=None, proposal=None):
     """A schema-valid creation payload derived from the immutable registries."""
     view = CreationView(
         presets=build_preset_cards() if presets is None else presets,
@@ -71,7 +74,12 @@ def _valid_payload(draft=None, custom=None, presets=None):
     )
     from web.webclient.presentation.creation import _serialize
 
-    return _serialize(view)
+    payload = _serialize(view)
+    if proposal is not None:
+        # The wire dict rides directly for validation tests; the presenter
+        # path serializes the snapshot itself.
+        payload["proposal"] = proposal
+    return payload
 
 
 def _set_presets_count(count):
@@ -135,6 +143,7 @@ class CreationPanelValidationTests(unittest.TestCase):
     def test_schema_version_kind_and_availability_discriminators(self):
         for mutate, label in (
             (lambda p: p.update(schema_version=1), "schema_version"),
+            (lambda p: p.update(schema_version=2), "legacy schema_version 2"),
             (lambda p: p.update(available=False), "available"),
             (lambda p: p.update(kind="services"), "kind"),
         ):
@@ -586,6 +595,127 @@ class CreationPanelValidationTests(unittest.TestCase):
             validate_creation(bad_payload)
 
 
+def _proposal_wire(**overrides):
+    """A valid base proposal wire object carrying the given transient fill."""
+    proposal = {
+        "revision": 2,
+        "race": "human",
+        "subrace": "human_commoner",
+        "allocations": {
+            "hp": 50, "mp": 50, "sp": 50,
+            "atk_phys": 10, "agility": 10, "defense": 11,
+            "magic_power": 43,
+        },
+        "persona": {
+            "personality": "沉穩",
+            "life_story": "來自邊境的小村",
+            "habit": "清晨練劍",
+        },
+    }
+    proposal.update(overrides)
+    return proposal
+
+
+class ProposalTransientFillValidationTests(unittest.TestCase):
+    """The v3 proposal slot's five optional transient-fill keys.
+
+    Presence-only semantics: a carried value round-trips exactly, an absent
+    key stays absent (never a null-valued copy), and every bound violation or
+    null is a structural rejection (bump-creation-panel-proposal-v3 D1).
+    """
+
+    def _validate(self, proposal):
+        return validate_creation(_valid_payload(proposal=proposal))["proposal"]
+
+    def _rejects(self, proposal):
+        with self.assertRaises(Exception):
+            self._validate(proposal)
+
+    @covers_requirement(
+        "concept-transient-fill::the-creation-panel-renders-the-transient-proposal"
+    )
+    def test_carried_transient_fill_keys_round_trip(self):
+        fill = {
+            "display_name": "莉雅",
+            "age": 25,
+            "apparent_age": 22,
+            "background": "邊境孤女，隨商隊长大",
+            "affinity_elements": ["fire", "water"],
+        }
+        proposal = self._validate(_proposal_wire(**fill))
+        for key, value in fill.items():
+            self.assertEqual(proposal[key], value)
+
+    @covers_requirement(
+        "concept-transient-fill::the-creation-panel-renders-the-transient-proposal"
+    )
+    def test_absent_keys_stay_absent_not_null(self):
+        proposal = self._validate(_proposal_wire())
+        for key in (
+            "display_name",
+            "age",
+            "apparent_age",
+            "background",
+            "affinity_elements",
+        ):
+            self.assertNotIn(key, proposal)
+
+    @covers_requirement(
+        "concept-transient-fill::the-creation-panel-renders-the-transient-proposal"
+    )
+    def test_null_valued_transient_fill_keys_reject(self):
+        for key in (
+            "display_name",
+            "age",
+            "apparent_age",
+            "background",
+            "affinity_elements",
+        ):
+            with self.subTest(key=key):
+                self._rejects(_proposal_wire(**{key: None}))
+
+    def test_bound_violations_reject(self):
+        cases = {
+            "underage age": _proposal_wire(age=17),
+            "over-bound age": _proposal_wire(age=10001),
+            "boolean age": _proposal_wire(age=True),
+            "underage apparent_age": _proposal_wire(apparent_age=17),
+            "float age": _proposal_wire(age=25.5),
+            "empty display_name": _proposal_wire(display_name=""),
+            "over-long display_name": _proposal_wire(
+                display_name="莉" * (MAX_PROPOSAL_NAME_CODE_POINTS + 1)
+            ),
+            "empty background": _proposal_wire(background=""),
+            "over-long background": _proposal_wire(background="長" * 601),
+            "too many elements": _proposal_wire(
+                affinity_elements=list(AFFINITY_ELEMENT_KEYS) + ["fire"]
+            ),
+            "unknown element": _proposal_wire(affinity_elements=["wood"]),
+            "duplicate element": _proposal_wire(affinity_elements=["fire", "fire"]),
+            "non-list affinity": _proposal_wire(affinity_elements={"fire": 1}),
+            "unknown key": _proposal_wire(eye_color="琥珀"),
+        }
+        for label, proposal in cases.items():
+            with self.subTest(label=label):
+                self._rejects(proposal)
+
+    def test_carried_empty_affinity_list_round_trips(self):
+        # The normalized elf affinity value is a carried EMPTY set; only an
+        # absent (None) value may omit the key.
+        proposal = self._validate(_proposal_wire(affinity_elements=[]))
+        self.assertEqual(proposal["affinity_elements"], [])
+
+    def test_whitespace_only_prose_is_non_empty_not_non_blank(self):
+        # Contract pin: the transient-fill prose fields are bounded NON-EMPTY
+        # (1..N code points), deliberately not NON-BLANK like the persona
+        # block — whitespace-only values must keep passing in both mirrors.
+        proposal = self._validate(
+            _proposal_wire(display_name=" ", background="  ")
+        )
+        self.assertEqual(proposal["display_name"], " ")
+        self.assertEqual(proposal["background"], "  ")
+
+
 class CreationPanelPresenterTests(EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -782,9 +912,90 @@ class CreationPanelPresenterTests(EvenniaTest):
         self.assertIsNone(read_draft(self.character))
 
     @covers_requirement("concept-transient-fill::the-creation-panel-renders-the-transient-proposal")
+    def test_snapshot_transient_fill_keys_render_and_absent_ones_omit(self):
+        from web.webclient.presentation.context import ProposalSnapshot
+
+        def snapshot(**fill):
+            return PresentationContext(
+                actor=self.character,
+                protocol_version=1,
+                proposal=ProposalSnapshot(
+                    revision=4,
+                    race="beastfolk",
+                    subrace="catkin",
+                    allocations={
+                        "hp": 50, "mp": 50, "sp": 50,
+                        "atk_phys": 10, "agility": 10, "defense": 11,
+                        "magic_power": 43,
+                    },
+                    persona={
+                        "personality": "好奇",
+                        "life_story": "貓人少女",
+                        "habit": "午後打盹",
+                    },
+                    **fill,
+                ),
+            )
+
+        carried = self.registry.render("creation", snapshot(
+            display_name="咪咪",
+            age=20,
+            apparent_age=18,
+            background="貓婆婆收養的孤女",
+            affinity_elements=("fire",),
+        ))["proposal"]
+        self.assertEqual(carried["display_name"], "咪咪")
+        self.assertEqual(carried["age"], 20)
+        self.assertEqual(carried["apparent_age"], 18)
+        self.assertEqual(carried["background"], "貓婆婆收養的孤女")
+        self.assertEqual(carried["affinity_elements"], ["fire"])
+
+        absent = self.registry.render("creation", snapshot())["proposal"]
+        for key in (
+            "display_name",
+            "age",
+            "apparent_age",
+            "background",
+            "affinity_elements",
+        ):
+            self.assertNotIn(key, absent)
+
+    def test_snapshot_affinity_is_a_copy_not_a_live_slot_reference(self):
+        # The frozen snapshot must survive a later mutation of the source
+        # slot: proposal_snapshot deep-copies the affinity list into a tuple.
+        from types import SimpleNamespace
+
+        from web.webclient.presentation.ingress import proposal_snapshot
+
+        slot = {
+            "owner_actor_id": "1",
+            "revision": 1,
+            "race": "human",
+            "subrace": "human_commoner",
+            "allocations": {
+                "hp": 50, "mp": 50, "sp": 50,
+                "atk_phys": 10, "agility": 10, "defense": 11,
+                "magic_power": 43,
+            },
+            "persona": {
+                "personality": "沉穩",
+                "life_story": "來自邊境的小村",
+                "habit": "清晨練劍",
+            },
+            "affinity_elements": ["fire"],
+        }
+        session = SimpleNamespace(ndb=SimpleNamespace(concept_proposal=slot))
+        snapshot = proposal_snapshot(session, SimpleNamespace(pk="1"))
+        self.assertIsNotNone(snapshot)
+        slot["affinity_elements"].append("water")
+        self.assertEqual(snapshot.as_dict()["affinity_elements"], ["fire"])
+
+    @covers_requirement("concept-transient-fill::the-creation-panel-renders-the-transient-proposal")
     def test_worst_case_proposal_fits_the_envelope_bound(self):
-        # Three maximum-length persona fields plus the seven axes stay inside
-        # the canonical envelope with room to spare.
+        # The v3 all-ceilings proposal — three maximum-length persona fields,
+        # a maximum background, a maximum display name (four-byte scalars, the
+        # true UTF-8 worst case), both ages, and an eight-element affinity
+        # set — stays inside the canonical envelope with room to spare.
         from web.webclient.presentation.context import ProposalSnapshot
         from web.webclient.presentation.protocol import json_byte_size
 
@@ -801,14 +1012,24 @@ class CreationPanelPresenterTests(EvenniaTest):
                     "magic_power": 43,
                 },
                 persona={
-                    "personality": "長" * 600,
-                    "life_story": "長" * 600,
-                    "habit": "長" * 600,
+                    "personality": "😀" * 600,
+                    "life_story": "😀" * 600,
+                    "habit": "😀" * 600,
                 },
+                display_name="😀" * MAX_PROPOSAL_NAME_CODE_POINTS,
+                age=10000,
+                apparent_age=10000,
+                background="😀" * 600,
+                affinity_elements=tuple(AFFINITY_ELEMENT_KEYS),
             ),
         )
         payload = self.registry.render("creation", context)
         self.assertEqual(len(payload["proposal"]["persona"]["personality"]), 600)
+        # Four-byte scalars make the maximum name a true 256-UTF-8-byte value.
+        self.assertEqual(
+            json_byte_size("😀" * MAX_PROPOSAL_NAME_CODE_POINTS),
+            4 * MAX_PROPOSAL_NAME_CODE_POINTS + 2,
+        )
         self.assertLessEqual(json_byte_size(payload), MAX_CANONICAL_JSON_BYTES)
 
 

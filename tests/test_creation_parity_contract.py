@@ -120,15 +120,32 @@ class CreationValidatorParityContract(unittest.TestCase):
         self.assertEqual(py_match.group(1), js_match.group(1))
         self.assertEqual(js_match.group(1), "600")
 
-    def test_panel_allowlist_contains_creation_v2(self):
+    def test_panel_allowlist_contains_creation_v3(self):
         js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
-        self.assertIn("creation: 2", js_source)
+        self.assertIn("creation: 3", js_source)
         py_source = _PY_CREATION.read_text(encoding="utf-8")
         match = re.search(r"^CREATION_SCHEMA_VERSION\s*=\s*([0-9]+)", py_source, re.MULTILINE)
         self.assertIsNotNone(match, "Python CREATION_SCHEMA_VERSION missing")
         js_match = re.search(r"var CREATION_SCHEMA_VERSION\s*=\s*([0-9]+)", js_source)
         self.assertIsNotNone(js_match, "JS CREATION_SCHEMA_VERSION missing")
         self.assertEqual(match.group(1), js_match.group(1))
+        self.assertEqual(js_match.group(1), "3")
+
+    def test_proposal_display_name_bound_matches_across_the_validators(self):
+        # The v3 transient-fill display-name bound must stay equal between the
+        # Python presenter validator and the mirrored browser validator.
+        py_source = _PY_CREATION.read_text(encoding="utf-8")
+        js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
+        py_match = re.search(
+            r"^MAX_PROPOSAL_NAME_CODE_POINTS\s*=\s*([0-9]+)", py_source, re.MULTILINE
+        )
+        js_match = re.search(
+            r"var CREATION_MAX_PROPOSAL_NAME\s*=\s*([0-9]+)", js_source
+        )
+        self.assertIsNotNone(py_match, "Python MAX_PROPOSAL_NAME_CODE_POINTS missing")
+        self.assertIsNotNone(js_match, "JS CREATION_MAX_PROPOSAL_NAME missing")
+        self.assertEqual(py_match.group(1), js_match.group(1))
+        self.assertEqual(js_match.group(1), "64")
 
     def test_affinity_race_maxima_match_the_deterministic_bound_mapping(self):
         js_source = _JS_PROTOCOL.read_text(encoding="utf-8")

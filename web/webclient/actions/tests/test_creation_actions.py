@@ -837,6 +837,65 @@ class CreationConceptTests(CreationActionBase):
         self.assertEqual(result["code"], "ownership_rejected")
         self.assertIsNone(self._slot())
 
+    @covers_requirement("concept-transient-fill::the-creation-panel-renders-the-transient-proposal")
+    def test_slot_carries_carried_transient_fill_and_omits_absent(self):
+        # The v3 slot mirrors the proposal: carried values ship (affinity as a
+        # plain list, the normalized empty elf set included); absent values
+        # write no key at all — never null (bump-creation-panel-proposal-v3).
+        self._propose(
+            _proposal(
+                display_name="咪咪",
+                age=20,
+                apparent_age=18,
+                background="貓婆婆收養的孤女",
+                affinity_elements=("fire",),
+            )
+        )
+        await_result(
+            _creation_concept_adapter(
+                self.character, _concept_payload(), self.fake_session
+            )
+        )
+        slot = self._slot()
+        self.assertEqual(slot["display_name"], "咪咪")
+        self.assertEqual(slot["age"], 20)
+        self.assertEqual(slot["apparent_age"], 18)
+        self.assertEqual(slot["background"], "貓婆婆收養的孤女")
+        self.assertEqual(slot["affinity_elements"], ["fire"])
+
+        self._propose(_proposal())
+        await_result(
+            _creation_concept_adapter(
+                self.character, _concept_payload(), self.fake_session
+            )
+        )
+        slot = self._slot()
+        for key in (
+            "display_name",
+            "age",
+            "apparent_age",
+            "background",
+            "affinity_elements",
+        ):
+            self.assertNotIn(key, slot)
+
+        # A carried EMPTY affinity set (the normalized elf value) is a value:
+        # it ships as the empty list, it is not omitted.
+        self._propose(
+            _proposal(
+                race_key="elf",
+                subrace_key="fionnen",
+                allocations=balanced_allocations("elf", "fionnen"),
+                affinity_elements=(),
+            )
+        )
+        await_result(
+            _creation_concept_adapter(
+                self.character, _concept_payload(), self.fake_session
+            )
+        )
+        self.assertEqual(self._slot()["affinity_elements"], [])
+
     @covers_requirement("concept-transient-fill::concept-applies-transiently-with-zero-persistent-writes")
     def test_custom_save_and_reset_clear_the_slot(self):
         self._propose(_proposal())

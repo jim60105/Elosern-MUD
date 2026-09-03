@@ -231,6 +231,14 @@ def _build_proposal_snapshot(actor: Any, state: Any) -> ProposalSnapshot | None:
         return None
     if subrace is not None and (not isinstance(subrace, str) or not subrace):
         return None
+    # The five optional transient-fill keys ride the gate only when present;
+    # absent slots simply omit them. Presence is key existence: a null value
+    # is corruption the exact contract rejects, never a silent absence
+    # (bump-creation-panel-proposal-v3 D1).
+    transient_fill: dict[str, Any] = {}
+    for key in ("display_name", "age", "apparent_age", "background", "affinity_elements"):
+        if key in state:
+            transient_fill[key] = deepcopy(state[key])
     # A corrupt owned slot must degrade to an omitted proposal, never to an
     # unavailable panel: gate the content through the panel's own exact
     # proposal contract (seven axes, three persona keys, the 600-character
@@ -241,13 +249,15 @@ def _build_proposal_snapshot(actor: Any, state: Any) -> ProposalSnapshot | None:
     from web.webclient.presentation.creation import _validate_proposal
 
     try:
-        _validate_proposal({
+        gate = {
             "revision": revision,
             "race": race,
             "subrace": subrace,
             "allocations": allocations,
             "persona": persona,
-        })
+        }
+        gate.update(transient_fill)
+        _validate_proposal(gate)
     except Exception:
         return None
     return ProposalSnapshot(
@@ -256,6 +266,15 @@ def _build_proposal_snapshot(actor: Any, state: Any) -> ProposalSnapshot | None:
         subrace=subrace,
         allocations=MappingProxyType(deepcopy(dict(allocations))),
         persona=MappingProxyType(deepcopy(dict(persona))),
+        display_name=transient_fill.get("display_name"),
+        age=transient_fill.get("age"),
+        apparent_age=transient_fill.get("apparent_age"),
+        background=transient_fill.get("background"),
+        affinity_elements=(
+            tuple(transient_fill["affinity_elements"])
+            if "affinity_elements" in transient_fill
+            else None
+        ),
     )
 
 

@@ -9,19 +9,44 @@ authoritative adult gate, and the atomic exploration hand-off after activation.
 ## Requirements
 
 ### Requirement: The creation panel is an exact read-only creation-mode panel
-The production presentation registry SHALL register `creation` schema version 2. Its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `draft`, `presets`, `custom`, and the optional `proposal`; `available` SHALL be true and `kind` SHALL be `creation`. `schema_version` SHALL be integer 2. The `proposal` key SHALL be present only while the authenticated session holds a transient concept proposal and SHALL carry exactly the shape defined by the transient-fill contract; the presenter SHALL render it from an immutable session snapshot copy. The presenter SHALL derive every finite control and preview from immutable registries and the deterministic starting-profile resolver, SHALL emit no live object reference and no filesystem path, and SHALL NOT mutate `creation_pending`, the wizard draft, the session proposal slot, traits, identity attributes, location, or world time. The whole panel SHALL use the registered common unavailable form outside `creation` mode and when the global prerequisite fails; a failure confined to one field, preset, or profile SHALL NOT fabricate a value.
+The production presentation registry SHALL register `creation` schema version 3. Its available
+payload SHALL contain exactly `schema_version`, `available`, `kind`, `draft`, `presets`, `custom`,
+and the optional `proposal`; `available` SHALL be true and `kind` SHALL be `creation`.
+`schema_version` SHALL be integer 3. The `proposal` key SHALL be present only while the
+authenticated session holds a transient concept proposal and SHALL carry exactly the shape defined
+by the transient-fill contract (the base `revision`/`race`/`subrace`/`allocations`/`persona` keys
+plus the optional `display_name`, `age`, `apparent_age`, `background`, and `affinity_elements`
+transient-fill keys); the presenter SHALL render it from an immutable session snapshot copy. The
+presenter SHALL derive every finite control and preview from immutable registries and the
+deterministic starting-profile resolver, SHALL emit no live object reference and no filesystem
+path, and SHALL NOT mutate `creation_pending`, the wizard draft, the session proposal slot, traits,
+identity attributes, location, or world time. The whole panel SHALL use the registered common
+unavailable form outside `creation` mode and when the global prerequisite fails; a failure confined
+to one field, preset, or profile SHALL NOT fabricate a value.
 
 #### Scenario: A pending character receives the creation panel
 - **WHEN** a puppeted WebClient session with `creation_pending` true receives a full snapshot
-- **THEN** `creation` reports `available` true, `kind` `creation`, schema version 2, the preset cards, the custom-form descriptor, and the current server-persisted draft while a before/after comparison of canonical game state is unchanged
+- **THEN** `creation` reports `available` true, `kind` `creation`, schema version 3, the preset
+  cards, the custom-form descriptor, and the current server-persisted draft while a before/after
+  comparison of canonical game state is unchanged
 
 #### Scenario: Activated and combat characters do not receive the creation panel
 - **WHEN** the active puppet is not creation-pending or is in an active combat session
-- **THEN** `creation` uses its schema-valid unavailable form and contains no preset card, field, draft, or proposal
+- **THEN** `creation` uses its schema-valid unavailable form and contains no preset card, field,
+  draft, or proposal
 
 #### Scenario: Creation presentation stays read-only
-- **WHEN** the creation panel is built for a pending character with a saved draft, a pending session proposal, and a disguise-independent empty trait set
-- **THEN** `creation_pending`, the wizard draft, the session proposal slot, identity attributes, traits, and world time are byte-for-byte unchanged and no skill, equipment, inventory, or import-schema field is exposed
+- **WHEN** the creation panel is built for a pending character with a saved draft, a pending session
+  proposal, and a disguise-independent empty trait set
+- **THEN** `creation_pending`, the wizard draft, the session proposal slot, identity attributes,
+  traits, and world time are byte-for-byte unchanged and no skill, equipment, inventory, or
+  import-schema field is exposed
+
+#### Scenario: A schema version 2 payload is rejected
+- **WHEN** a `creation` panel payload declares `schema_version` 2 or any other version
+- **THEN** exact-schema validation rejects it on both the presenter and the mirrored browser
+  validator rather than accepting a stale shape
+
 
 ### Requirement: Creation presentation derives finite controls from immutable registries
 The `presets` array SHALL contain at most 8 preset cards, each with exactly `key` (1..64), `display_name` (1..128), `race` (1..64), `race_description` (1..512), nullable `subrace`, `emphasis` (1..256), and `background` (1..256), derived from `PLAYER_PRESET_REGISTRY` and the race registry rather than duplicated literals. The `custom` object SHALL contain exactly `name`, `adult`, `races`, `subraces`, `profiles`, and `affinity`. `name` SHALL contain exactly `min_length` 1 and `max_length` 64, mirroring the deterministic display-name bound (the shared entity-key contract). `adult` SHALL contain exactly `age_minimum` 18, `age_maximum` 10000, `apparent_age_minimum` 18, and `apparent_age_maximum` 10000. `races` SHALL be a list of at most 8 race options, each with exactly `key` (1..64), `description` (1..512), and `subraces` (a list of subrace keys or a single null). `subraces` SHALL map at most 16 subrace keys to exactly `display_name_zh`, `common_name_zh`, and `specialty`, each 1..256 code points. `profiles` SHALL contain at most 16 entries, one per race/subrace combination, each with exactly `race`, `subrace` (null or a key), `budget`, and `axes`; each axis SHALL contain exactly `axis`, `label`, `explanation`, `minimum`, and `maximum`, with `axis` from `hp`, `mp`, `sp`, `atk_phys`, `agility`, `defense`, or `magic_power`, integer `budget`/`minimum`/`maximum` within JavaScript-safe range, and the seven-axis set matching `resolve_starting_profile`. `affinity` SHALL map each race key (`human`, `beastfolk`, `elf`) to exactly `maximum` (integer `2`, `1`, and `0` respectively) and `elements` (exactly the eight lore element choices, each with `key` and `label`, derived from `ELEMENT_REGISTRY`). The `custom` descriptor SHALL NOT contain persona, skill, equipment, inventory, starting-magic, or import-only fields merely because a character-card schema defines them; persona prose values appear only inside `draft.persona` and the transient `proposal` payload, never in control metadata.

@@ -65,6 +65,10 @@ class ProposalSnapshot:
     is the session-monotonic transient sequence number the browser compares
     against its last applied revision; the four content keys are deep-copied
     plain data with no live object reference.
+    The five transient-fill fields are optional: ``None`` means the proposal
+    never carried a value and the wire object omits the key entirely (never
+    null); a carried ``affinity_elements`` is stored as a copied tuple so a
+    later mutation of the session slot can never alter this frozen snapshot.
     """
 
     revision: int
@@ -72,16 +76,31 @@ class ProposalSnapshot:
     subrace: str | None
     allocations: Mapping[str, Any]
     persona: Mapping[str, Any]
+    display_name: str | None = None
+    age: int | None = None
+    apparent_age: int | None = None
+    background: str | None = None
+    affinity_elements: tuple[str, ...] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         """Serialize the proposal into its exact wire object."""
-        return {
+        wire: dict[str, Any] = {
             "revision": self.revision,
             "race": self.race,
             "subrace": self.subrace,
             "allocations": dict(self.allocations),
             "persona": dict(self.persona),
         }
+        # Absent transient-fill values are expressed as the key not existing;
+        # a carried affinity tuple serializes to a freshly allocated list
+        # (bump-creation-panel-proposal-v3 D1).
+        for key in ("display_name", "age", "apparent_age", "background"):
+            value = getattr(self, key)
+            if value is not None:
+                wire[key] = value
+        if self.affinity_elements is not None:
+            wire["affinity_elements"] = list(self.affinity_elements)
+        return wire
 
 
 @dataclass(frozen=True)
