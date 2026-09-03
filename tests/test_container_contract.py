@@ -172,6 +172,28 @@ class ContainerContractTests(unittest.TestCase):
         }
         self.assertTrue(required <= patterns, f"missing ignore patterns: {sorted(required - patterns)}")
 
+    @covers_requirement("namegen-corpus-registry::the-vendored-name-corpus-ships-in-the-runtime-image")
+    def test_vendored_name_corpus_is_baked_into_the_runtime_image(self):
+        # world/lore/names.py parses third_party/fantasy-namegen at import
+        # time, so a missing corpus turns every container start into a crash.
+        layout = _stage(_read("Containerfile"), "app-layout")
+        # Line-anchored on an ACTIVE instruction: a commented-out COPY must
+        # not satisfy the contract.
+        self.assertRegex(
+            layout,
+            r"(?m)^[ \t]*COPY[ \t]+--chown=root:0[ \t]+third_party/[ \t]+/app/third_party/[ \t]*$",
+            "the app-layout stage must bake the vendored name corpus",
+        )
+        ignored = [
+            line.strip()
+            for line in _read(".containerignore").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        self.assertFalse(
+            [line for line in ignored if "third_party" in line],
+            "the build context must include the vendored name corpus",
+        )
+
     @covers_requirement(
         "settings-environment-overrides::compose-forwards-optional-llm-knobs-without-host-or-literal-leakage"
     )
