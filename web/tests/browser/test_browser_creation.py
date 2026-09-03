@@ -688,13 +688,27 @@ class ConceptCreationJourneys(CreationBrowserTest):
 
         # Complete the form keyboard-only: the transient fields now arrive
         # pre-filled, so the journey only verifies the Tab order from the
-        # name field onward and re-firms the ages before submitting.
+        # name field onward (name -> name-roll button -> sex -> age, the
+        # namegen-creation-ui contract shared with the custom journey) and
+        # re-firms the ages before submitting.
         page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]').focus()")
-        _press(page, "Tab")  # name -> actual age
+        _press(page, "Tab")  # name -> name-roll button (namegen-creation-ui)
+        self.assertEqual(
+            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
+            "creation-roll-name",
+            "Tab must move focus from the name field to the name-roll button",
+        )
+        _press(page, "Tab")  # roll button -> sex select
+        self.assertEqual(
+            page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
+            "creation-sex",
+            "Tab must move focus from the roll button to the sex select",
+        )
+        _press(page, "Tab")  # sex select -> actual age
         self.assertEqual(
             page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
             "creation-field-age",
-            "Tab must move focus from the name field to the age field",
+            "Tab must move focus from the sex select to the age field",
         )
         page.evaluate("document.querySelector('[data-testid=\"creation-submit\"]').focus()")
         _press(page, "Enter")
