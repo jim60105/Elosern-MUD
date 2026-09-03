@@ -144,6 +144,9 @@ class CreationPanelValidationTests(unittest.TestCase):
         for mutate, label in (
             (lambda p: p.update(schema_version=1), "schema_version"),
             (lambda p: p.update(schema_version=2), "legacy schema_version 2"),
+            # v3 is the pre-sex version; the exact gate must reject it on both
+            # ends (namegen-creation-ui "A stale schema version is rejected").
+            (lambda p: p.update(schema_version=3), "legacy schema_version 3"),
             (lambda p: p.update(available=False), "available"),
             (lambda p: p.update(kind="services"), "kind"),
         ):
@@ -152,6 +155,52 @@ class CreationPanelValidationTests(unittest.TestCase):
                 mutate(payload)
                 with self.assertRaises(CreationPanelError):
                     validate_creation(payload)
+
+    @covers_requirement("webclient-character-creation-ui::creation-presentation-derives-finite-controls-from-immutable-registries")
+    def test_custom_descriptor_ships_server_labelled_sex_options(self):
+        payload = validate_creation(_valid_payload())
+        self.assertEqual(payload["schema_version"], 4)
+        self.assertEqual(
+            payload["custom"]["sex"],
+            [
+                {"key": "female", "label": "女性"},
+                {"key": "male", "label": "男性"},
+                {"key": "other", "label": "其他"},
+            ],
+        )
+
+    def test_sex_descriptor_mirrors_the_vocabulary_exactly(self):
+        base = _valid_payload()
+        with self.subTest("missing"):
+            bad = deepcopy(base)
+            del bad["custom"]["sex"]
+            with self.assertRaises(Exception):
+                validate_creation(bad)
+        with self.subTest("reordered"):
+            bad = deepcopy(base)
+            bad["custom"]["sex"].reverse()
+            with self.assertRaises(Exception):
+                validate_creation(bad)
+        with self.subTest("fabricated member"):
+            bad = deepcopy(base)
+            bad["custom"]["sex"][0] = {"key": "dwarf", "label": "女性"}
+            with self.assertRaises(Exception):
+                validate_creation(bad)
+        with self.subTest("extra field on option"):
+            bad = deepcopy(base)
+            bad["custom"]["sex"][0]["default"] = True
+            with self.assertRaises(Exception):
+                validate_creation(bad)
+        with self.subTest("empty vocabulary"):
+            bad = deepcopy(base)
+            bad["custom"]["sex"] = []
+            with self.assertRaises(Exception):
+                validate_creation(bad)
+        with self.subTest("label over bound"):
+            bad = deepcopy(base)
+            bad["custom"]["sex"][0]["label"] = "x" * (MAX_LABEL_CODE_POINTS + 1)
+            with self.assertRaises(Exception):
+                validate_creation(bad)
 
     def test_preset_card_bounds(self):
         with self.assertRaises(Exception):
@@ -371,6 +420,7 @@ class CreationPanelValidationTests(unittest.TestCase):
             "race": "human",
             "subrace": "human_commoner",
             "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
+            "sex": "other",
         }
         payload = _valid_payload(draft=draft)
         validated = validate_creation(payload)
@@ -411,6 +461,7 @@ class CreationPanelValidationTests(unittest.TestCase):
             "race": "human",
             "subrace": "human_commoner",
             "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
+            "sex": "other",
             "persona": {
                 "personality": "沉穩",
                 "life_story": "來自邊境的小村",
@@ -446,6 +497,51 @@ class CreationPanelValidationTests(unittest.TestCase):
             MAX_CANONICAL_JSON_BYTES // 3,
             f"realistic creation payload must be far below the envelope: {size} bytes",
         )
+
+    def test_draft_sex_member_round_trips(self):
+        draft = {
+            "mode": "custom",
+            "stage": "custom_filled",
+            "display_name": "新角色",
+            "age": 20,
+            "apparent_age": 20,
+            "race": "human",
+            "subrace": "human_commoner",
+            "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
+            "persona": None,
+            "sex": "male",
+        }
+        validated = validate_creation(_valid_payload(draft=draft))
+        self.assertEqual(validated["draft"]["sex"], "male")
+
+    def test_draft_without_or_tampered_sex_is_rejected(self):
+        # The wizard normalizer only ever emits a concrete member, so a wire
+        # draft with a tampered or missing sex key is a hostile DB edit; the
+        # panel mirror rejects it like every other malformed draft field. The
+        # serializer is exercised through a valid draft and the wire dict is
+        # mutated afterwards.
+        base = {
+            "mode": "custom",
+            "stage": "custom_filled",
+            "display_name": "新角色",
+            "age": 20,
+            "apparent_age": 20,
+            "race": "human",
+            "subrace": "human_commoner",
+            "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
+            "persona": None,
+            "sex": "other",
+        }
+        with self.subTest("tampered member"):
+            payload = _valid_payload(draft=base)
+            payload["draft"]["sex"] = "nope"
+            with self.assertRaises(Exception):
+                validate_creation(payload)
+        with self.subTest("missing key (v2 shape)"):
+            payload = _valid_payload(draft=base)
+            del payload["draft"]["sex"]
+            with self.assertRaises(Exception):
+                validate_creation(payload)
 
     def test_all_ceilings_payload_is_rejected_by_the_byte_gate(self):
         # Maximize every string field and every count at once. Per-field bounds
@@ -528,6 +624,10 @@ class CreationPanelValidationTests(unittest.TestCase):
                     "beastfolk": {"maximum": 1, "elements": list(affinity_elements)},
                     "elf": {"maximum": 0, "elements": list(affinity_elements)},
                 },
+                "sex": [
+                    {"key": key, "label": "x" * MAX_LABEL_CODE_POINTS}
+                    for key in ("female", "male", "other")
+                ],
             },
         }
         self.assertGreater(
@@ -743,6 +843,44 @@ class CreationPanelPresenterTests(EvenniaTest):
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(self.character.traits.all(), [])
 
+    @covers_requirement("webclient-character-creation-ui::creation-presentation-derives-finite-controls-from-immutable-registries")
+    def test_panel_sex_descriptor_ships_server_labels_in_vocabulary_order(self):
+        payload = self._render()
+        self.assertEqual(
+            [(option["key"], option["label"]) for option in payload["custom"]["sex"]],
+            [("female", "女性"), ("male", "男性"), ("other", "其他")],
+        )
+        for option in payload["custom"]["sex"]:
+            self.assertEqual(set(option), {"key", "label"})
+
+    @covers_requirement("webclient-character-creation-ui::the-server-owns-the-persisted-creation-wizard-draft")
+    def test_saved_draft_sex_renders_in_the_panel(self):
+        from world.rules.character_creation import CharacterCreationRequest
+        from world.rules.creation_wizard import save_custom_draft
+
+        save_custom_draft(
+            self.account,
+            self.character,
+            CharacterCreationRequest(
+                mode="custom",
+                display_name="性選角色",
+                age=20,
+                apparent_age=20,
+                race="human",
+                subrace="human_commoner",
+                allocations={
+                    "hp": 50, "mp": 50, "sp": 50,
+                    "atk_phys": 10, "agility": 10, "defense": 11,
+                    "magic_power": 43,
+                },
+                sex="female",
+            ),
+        )
+        payload = self._render()
+        self.assertEqual(payload["draft"]["sex"], "female")
+        # The read model stays side-effect free with the new channel.
+        self.assertTrue(self.character.creation_pending)
+
     @covers_requirement("webclient-character-creation-ui::the-creation-panel-is-an-exact-read-only-creation-mode-panel")
     def test_activated_character_receives_only_the_unavailable_form(self):
         from world.rules.character_creation import (
@@ -814,7 +952,7 @@ class CreationPanelPresenterTests(EvenniaTest):
         self.assertNotIn("presets", payload)
 
     def test_corrupt_draft_degrades_only_the_draft_slot(self):
-        self.character.creation_draft = {"version": 2, "garbage": True}
+        self.character.creation_draft = {"version": 3, "garbage": True}
         payload = self._render()
         self.assertTrue(payload["available"])
         self.assertIsNone(payload["draft"])

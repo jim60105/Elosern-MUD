@@ -366,6 +366,15 @@ def _publish_completion(
     outcome = value.get("outcome")
     affected = value.get("affected_panels")
     context = build_presentation_context(session, actor)
+    # Result-only completion (namegen-creation-ui D10): an adapter that
+    # declares ``no_presentation`` on a success/rejected outcome ships its
+    # result without a snapshot or panel update. Every adapter already
+    # publishes one way or the other, so a dice-roll that must not re-sync
+    # the player's unsaved form edits had no channel; the duplicate-request
+    # busy result is the established send-result-without-publish precedent.
+    # The flag is internal: ``_normalize_result`` never copies it into the
+    # wire envelope, and existing adapters (which never set it) are unchanged.
+    result_only = bool(value.get("no_presentation")) and outcome in ("success", "rejected")
     if not isinstance(affected, (tuple, list, set)):
         affected = None
     if affected is not None:
@@ -375,7 +384,9 @@ def _publish_completion(
             # full recovery snapshot instead of raising mid-publication.
             affected = None
     try:
-        if outcome in ("stale", "error") or not affected:
+        if result_only:
+            pass
+        elif outcome in ("stale", "error") or not affected:
             _publish_presentation(session, coordinator, context, None)
         else:
             _publish_presentation(session, coordinator, context, tuple(affected))

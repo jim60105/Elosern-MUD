@@ -1,8 +1,9 @@
 """Exact creation action payload validators and narrow adapters.
 
-The five production creation actions are ``creation.preset``,
-``creation.custom``, ``creation.concept``, ``creation.activate``, and
-``creation.reset``. Each validator enforces an exact bounded payload shape;
+The six production creation actions are ``creation.preset``,
+``creation.custom``, ``creation.concept``, ``creation.roll_name``,
+``creation.activate``, and ``creation.reset``. Each validator enforces an
+exact bounded payload shape;
 each adapter re-resolves the owning account from the authenticated session's
 puppet, verifies that the puppet is an owned ``PlayerCharacter`` still pending
 creation, and calls only the public deterministic creation-wizard APIs
@@ -16,12 +17,15 @@ draft directly, and no payload accepts an actor, account, session, host, skill,
 equipment, magic-level, or calculated-stat field.
 """
 
+from random import Random
 from typing import Any
 
 from twisted.internet.defer import Deferred
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.elements import ELEMENT_REGISTRY
+from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
+from world.lore.sex import SEX_VALUES
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
     MAX_PERSONA_FIELD_LENGTH,
@@ -40,6 +44,7 @@ from world.rules.creation_wizard import (
     save_custom_draft,
     save_preset_draft,
 )
+from world.rules.namegen import roll_name_for_race
 
 # Wire limits (equal to the deterministic bounds and the panel contract). The
 # display-name limit mirrors the shared entity-key contract
@@ -85,6 +90,13 @@ FINGERPRINT_NDB_KEY = "elosern_confirmed_draft_fingerprint"
 # session itself.
 PROPOSAL_NDB_KEY = "concept_proposal"
 PROPOSAL_REVISION_KEY = "concept_proposal_revision"
+
+# The module-level unseeded RNG for ``creation.roll_name`` (design D5): a UI
+# dice name is another form of typed input -- no replay semantics, so no
+# seed -- and keeping the single instance here confines unseeded randomness
+# to exactly this one action path. NPC-flow seeds are constructed per call by
+# the deterministic core, never here.
+_ROLL_NAME_RNG = Random()
 
 
 class CreationActionError(ValueError):
@@ -138,14 +150,14 @@ def validate_creation_custom_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Validate the exact ``creation.custom`` payload (the complete form)."""
     if not isinstance(payload, dict):
         raise CreationActionError("creation.custom payload must be an object")
-    if set(payload) != {
+    if set(payload) - {"sex"} != {
         "display_name", "age", "apparent_age", "race", "subrace", "allocations",
         "background", "affinity_elements", "persona",
     }:
         raise CreationActionError(
-            "creation.custom requires exactly display_name, age, apparent_age, "
-            "race, subrace, allocations, an optional background, an optional "
-            "affinity_elements, and a persona (null or the three prose fields)"
+            "creation.custom requires the nine fields display_name, age, "
+            "apparent_age, race, subrace, allocations, background, "
+            "affinity_elements, and persona, plus an optional sex"
         )
     display_name = _require_non_empty_string(
         payload["display_name"], "display_name", MAX_NAME_CODE_POINTS
@@ -171,6 +183,13 @@ def validate_creation_custom_payload(payload: dict[str, Any]) -> dict[str, Any]:
         payload["affinity_elements"], race
     )
     persona = _validate_persona_payload(payload["persona"])
+    # Sex is the optional tenth key (design D2): the structural layer accepts
+    # omission, null, or any bounded string; membership is decided by the
+    # deterministic ``_validate_sex`` in preflight -- the same wire-bounds /
+    # rules-authority split as the age fields.
+    sex: str | None = None
+    if "sex" in payload and payload["sex"] is not None:
+        sex = _require_non_empty_string(payload["sex"], "sex", MAX_KEY_CODE_POINTS)
     return {
         "display_name": display_name,
         "age": age,
@@ -181,6 +200,7 @@ def validate_creation_custom_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "background": background,
         "affinity_elements": affinity_elements,
         "persona": persona,
+        "sex": sex,
     }
 
 
@@ -265,6 +285,34 @@ def validate_creation_reset_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if payload:
         raise CreationActionError("creation.reset requires an empty payload")
     return {}
+
+
+def validate_creation_roll_name_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate the exact ``creation.roll_name`` payload.
+
+    Structural layer only (design D5): exactly the three keys ``race``,
+    ``subrace``, ``sex``; each is null or a 1..64-character non-empty string.
+    Registry/vocabulary membership is the adapter's semantic gate, so a
+    structurally valid but unknown value still reaches the roller-free
+    rejection path with its stable code.
+    """
+    if not isinstance(payload, dict):
+        raise CreationActionError("creation.roll_name payload must be an object")
+    if set(payload) != {"race", "subrace", "sex"}:
+        raise CreationActionError(
+            "creation.roll_name requires exactly race, subrace, and sex (each "
+            "null or a bounded identifier)"
+        )
+    checked: dict[str, str | None] = {}
+    for field in ("race", "subrace", "sex"):
+        value = payload[field]
+        if value is None:
+            checked[field] = None
+        else:
+            checked[field] = _require_non_empty_string(
+                value, field, MAX_KEY_CODE_POINTS
+            )
+    return checked
 
 
 # ---------------------------------------------------------------------------
@@ -446,6 +494,9 @@ def _creation_custom_adapter(actor: Any, payload: dict[str, Any], session: Any =
         allocations=payload["allocations"],
         background=payload["background"],
         affinity_elements=payload["affinity_elements"],
+        # ``.get`` for forward-compat with direct test callers of the
+        # adapter; the registry validator always emits the key.
+        sex=payload.get("sex"),
     )
     try:
         save_custom_draft(account, actor, request, persona=persona)
@@ -457,6 +508,55 @@ def _creation_custom_adapter(actor: Any, payload: dict[str, Any], session: Any =
     _clear_proposal(session)
     message = "已儲存自訂角色資料。"
     return _confirmed_success("custom_saved", message, AFFECTED_CREATION, actor)
+
+
+def _rejected_result_only(reason: Any) -> dict[str, Any]:
+    """Reject a name roll without any completion presentation (design D10).
+
+    A rejected dice click must not publish either: a snapshot or panel
+    refresh would re-sync the form to the last SAVED draft and silently wipe
+    the player's unsaved edits exactly like a rolled name refresh would.
+    """
+    return {**_rejected(reason), "no_presentation": True}
+
+
+def _creation_roll_name_adapter(
+    actor: Any, payload: dict[str, Any], session: Any = None
+) -> dict[str, Any]:
+    """Roll one display name through the rule layer with zero persistent writes.
+
+    The semantic gate (design D5) rejects dirty input before the roller is
+    ever touched: the panel offers a closed vocabulary, so an out-of-registry
+    race/subrace or out-of-vocabulary sex is tampering, not an unmade choice.
+    The rule-layer random-pack fallback stays reserved for the genuine
+    no-race-yet case (``race`` and ``subrace`` both null).
+    """
+    account = _pending_owner(actor)
+    if account is None:
+        return _rejected_result_only("ownership_rejected")
+    race = payload["race"]
+    subrace = payload["subrace"]
+    sex = payload["sex"]
+    if race is not None and race not in RACE_REGISTRY:
+        return _rejected_result_only("unknown_race")
+    if subrace is not None:
+        if race is None:
+            return _rejected_result_only("incompatible_subrace")
+        entry = SUBRACE_REGISTRY.get(subrace)
+        if entry is None:
+            return _rejected_result_only("unknown_subrace")
+        if entry.race_key != race:
+            return _rejected_result_only("incompatible_subrace")
+    if sex is not None and sex not in SEX_VALUES:
+        return _rejected_result_only("unknown_sex")
+    display_name = roll_name_for_race(race, sex, _ROLL_NAME_RNG)
+    return {
+        "outcome": "success",
+        "code": "name_rolled",
+        "message": "已擲出一個候選名字。",
+        "data": {"display_name": display_name},
+        "no_presentation": True,
+    }
 
 
 def _creation_concept_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> Deferred:
@@ -597,4 +697,5 @@ __all__ = [
     "validate_creation_custom_payload",
     "validate_creation_preset_payload",
     "validate_creation_reset_payload",
+    "validate_creation_roll_name_payload",
 ]
