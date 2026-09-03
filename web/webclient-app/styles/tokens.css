@@ -394,6 +394,12 @@
   border-color: var(--seal-500);
 }
 
+.ui-icon-btn:disabled,
+.ui-icon-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /*
  * In-panel segmented tabs (the draft's `.tabs` tray). Deliberately distinct
  * from the action dock's seal-filled tab bar: the dock owns the global

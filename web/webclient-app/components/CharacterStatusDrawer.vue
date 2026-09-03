@@ -628,7 +628,7 @@ const INTIMATE_ROWS = [
         <button
           v-if="editingField !== section.key"
           type="button"
-          class="character-status-drawer__persona-edit"
+          class="ui-btn ui-btn--sm character-status-drawer__persona-edit"
           :data-testid="`character-status-drawer__persona-edit--${section.key}`"
           @click="openPersonaEdit(section)"
         >
@@ -645,7 +645,7 @@ const INTIMATE_ROWS = [
           <div class="character-status-drawer__persona-editor-buttons">
             <button
               type="button"
-              class="character-status-drawer__persona-submit"
+              class="ui-btn ui-btn--sm ui-btn--primary character-status-drawer__persona-submit"
               :data-testid="`character-status-drawer__persona-submit--${section.key}`"
               @click="submitPersonaEdit(section)"
             >
@@ -653,7 +653,7 @@ const INTIMATE_ROWS = [
             </button>
             <button
               type="button"
-              class="character-status-drawer__persona-cancel"
+              class="ui-btn ui-btn--sm character-status-drawer__persona-cancel"
               :data-testid="`character-status-drawer__persona-cancel--${section.key}`"
               @click="cancelPersonaEdit"
             >
@@ -1010,8 +1010,10 @@ const INTIMATE_ROWS = [
 }
 
 /* Persona editing (add-persona-edit-surface D4): the unset placeholder is
-   muted display copy; the inline editor reuses the shell's form controls
-   and never relies on colour alone (buttons carry text labels). */
+   muted display copy; the inline editor reuses the shared control layer
+   (`ui-btn` / `ui-btn--primary` from styles/tokens.css) and never relies on
+   colour alone (buttons carry text labels). The rules below add layout
+   only; they never restate the control chrome. */
 .character-status-drawer__persona-block {
   margin-bottom: 0.75rem;
 }
@@ -1025,7 +1027,6 @@ const INTIMATE_ROWS = [
 
 .character-status-drawer__persona-edit {
   margin-top: 0.25rem;
-  font-size: 0.8em;
 }
 
 .character-status-drawer__persona-editor textarea {

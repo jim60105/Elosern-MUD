@@ -61,7 +61,7 @@ function dismiss() {
       />
       <button
         type="button"
-        class="suggestions-dismiss"
+        class="ui-btn ui-btn--sm ui-btn--ghost suggestions-dismiss"
         data-testid="choicepoint-dismiss"
         @click="dismiss"
       >✕ 清除建議</button>
@@ -88,15 +88,10 @@ function dismiss() {
   font-size: 0.9em;
 }
 
+/* The dismiss control's chrome is the shared `.ui-btn--ghost` control layer
+   (styles/tokens.css); this rule adds layout only, per the control-layer
+   contract (a component never restates the chrome). */
 .suggestions-dismiss {
   align-self: flex-end;
-  padding: 2px var(--sp-2);
-  color: var(--paper-300);
-  background: none;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-family: var(--f-sans);
-  font-size: 0.8em;
-  cursor: pointer;
 }
 </style>

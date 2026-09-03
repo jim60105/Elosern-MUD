@@ -183,7 +183,7 @@ function onCardAction(intent) {
           <span class="suggestions-title">AI 建議</span>
           <button
             type="button"
-            class="suggestions-dismiss"
+            class="ui-btn ui-btn--sm ui-btn--ghost suggestions-dismiss"
             data-testid="suggestions-dismiss"
             @click="emit('action', { action_id: 'options.dismiss', payload: {} })"
           >✕ 清除建議</button>

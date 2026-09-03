@@ -82,7 +82,9 @@
   function buildDismissButton(onClick) {
     var button = document.createElement("button");
     button.type = "button";
-    button.className = "suggestions-dismiss";
+    // Same shared control layer as the Vue surfaces (tokens.css `.ui-btn--ghost`);
+    // `suggestions-dismiss` stays as the layout/contract hook.
+    button.className = "ui-btn ui-btn--sm ui-btn--ghost suggestions-dismiss";
     button.appendChild(document.createTextNode("✕ 清除建議"));
     if (typeof onClick === "function") {
       button.addEventListener("click", function () {

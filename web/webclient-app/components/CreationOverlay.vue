@@ -787,7 +787,7 @@ applyProposal();
                 />
                 <button
                   type="button"
-                  class="creation-roll-button"
+                  class="ui-icon-btn creation-roll-button"
                   data-testid="creation-roll-name"
                   aria-label="擲名"
                   :disabled="rollDisabled"
@@ -1016,8 +1016,9 @@ applyProposal();
   gap: var(--sp-1);
 }
 
+/* The name-line roll control (the dice button): the shared `.ui-icon-btn`
+   chrome from styles/tokens.css; this rule adds typographic layout only. */
 .creation-roll-button {
-  flex: none;
   line-height: 1;
 }
 
