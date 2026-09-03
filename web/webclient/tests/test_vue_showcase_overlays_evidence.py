@@ -95,7 +95,9 @@ DEFERRED_TITLE_PATTERNS = (
 # H1–H3 HUD wave keys (HudFrame, SceneBackdrop, FullLogOverlay, RestForm,
 # DockTabBar, DockBreadcrumb, SkillDetailPane, CharacterHead, VitalsTrack,
 # ConditionChips, ParticipantFrame) and the `World/MapLattice` key the
-# improve-webclient-map-overlay-scale change added to the frozen set.
+# improve-webclient-map-overlay-scale change added to the frozen set. The
+# Feedback/ToastQueue key from the add-action-feedback-toasts change joins
+# it at the manifest's refreeze at 42.
 PREVIOUS_MANIFEST_KEYS = {
     "Core/AppShell",
     "Core/TopBar",
@@ -133,6 +135,9 @@ PREVIOUS_MANIFEST_KEYS = {
     "World/LoreDrawer",
     "World/InventoryPanel",
     "World/MapLattice",
+    # The client-local action-feedback toast queue joined the frozen set
+    # when add-action-feedback-toasts refroze the manifest at 42.
+    "Feedback/ToastQueue",
 }
 
 

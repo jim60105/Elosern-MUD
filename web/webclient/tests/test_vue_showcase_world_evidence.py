@@ -99,7 +99,9 @@ WORLD_FAMILY_STORY_IDS = {
 # waves added eleven more keys (HudFrame, SceneBackdrop, FullLogOverlay,
 # RestForm, DockTabBar, DockBreadcrumb, SkillDetailPane, CharacterHead,
 # VitalsTrack, ConditionChips, ParticipantFrame), which this baseline now
-# carries as well.
+# carries as well. The Feedback/ToastQueue key from the
+# add-action-feedback-toasts change joins it at the manifest's refreeze
+# at 42.
 PREVIOUS_MANIFEST_KEYS = {
     "Core/AppShell",
     "Core/TopBar",
@@ -135,6 +137,9 @@ PREVIOUS_MANIFEST_KEYS = {
     "Overlays/MapOverlay",
     "Overlays/SettingsOverlay",
     "Overlays/OverlayHost",
+    # The client-local action-feedback toast queue joined the frozen set
+    # when add-action-feedback-toasts refroze the manifest at 42.
+    "Feedback/ToastQueue",
 }
 
 
