@@ -4,7 +4,7 @@
 **狀態：** Approved（待讀者對本文件做最終審閱）
 **範圍：** `world/ai/character_creation.py`、`prompts/character_creation.yaml`、`web/webclient/actions/creation_actions.py`、`web/webclient/presentation/creation.py`、`web/static/webclient/js/elosern/protocol.js`、`web/webclient-app/`（`stores/elosern.js`、`components/CreationOverlay.vue`、新元件 `ToastQueue.vue`、AppClient/AppShell 掛載、frozen 契約測試、Storybook showcase）、`commands/character_creation.py`（Telnet concept 流預設值）、`docs/superpowers/specs/2026-09-02-concept-transient-fill-persona-design.md`（年齡決策修訂）、主規格 `webclient-character-creation-ui`、`character-creation-ux`，新能力 `webclient-action-feedback`。
 
-本文件是五個 OpenSpec change（清單與批次見 §8）的實作依據，並在年齡決策上修訂 `retool-concept-transient-fill` 設計（2026-09-02）的對應條款。
+本文件是五個 OpenSpec change（編號 A1–A5，索引見 §8.1）的實作依據，並在年齡決策上修訂 `retool-concept-transient-fill` 設計（2026-09-02）的對應條款。
 
 ---
 
@@ -169,6 +169,22 @@
 
 ## 8. OpenSpec 衝擊
 
+本設計分拆為五個 change，全文一律以 A1–A5 編號指稱，每個皆可由單一工程師在一個工作天內實作。
+
+### 8.1 Change 索引
+
+| 編號 | Change | 設計章節 | 定位 | 前置依賴 |
+|---|---|---|---|---|
+| A1 | `extend-concept-proposal-fields` | §5.1–§5.2 | 生成層契約擴充：`CharacterProposal` 五欄、正規化不棄回覆、提示詞翻案 | 無 |
+| A2 | `bump-creation-panel-proposal-v3` | §5.3 | 線路：session 槽／`ProposalSnapshot`／panel `proposal` 槽 v2→v3、JS 鏡像 | A1 |
+| A3 | `retool-concept-fill-navigation` | §4、§5.4 | 前端：五欄映射、概念載入態、完成自動跳轉、in-flight 頁籤釘住修復、banner 退役 | A2、A5 |
+| A4 | `prefill-telnet-concept-from-proposal` | §5.5 | Telnet：提案預設值流、請求攜帶背景／親和 | A1 |
+| A5 | `add-action-feedback-toasts` | §3 | ToastQueue 基礎設施、concept 觸發、凍結測試改寫、showcase 重凍結 | 無 |
+
+依賴邊三條：**A1→A2→A3**（提案欄位逐段上線：生成層 → wire → 前端）、**A5→A3**（overlay 完成 toast 需佇列 API）、**A1→A4**（Telnet 讀同一份正規化提案）。
+
+### 8.2 Capability 衝擊
+
 | 既有 capability | 動作 |
 |---|---|
 | `generative-character-concept` | modified（A1：提案十欄契約＋正規化不棄回覆＋提示詞翻案；A4：Telnet 命令預設值流與背景／親和承載） |
@@ -182,19 +198,7 @@
 
 落地序列化：A5（toasts）先落地；A3 經查證不改 `stores/elosern.js`（釘住在 overlay 層），僅在 `AppClient.vue` 新增 `:dispatch`／`:push-toast` 綁定（與 A5 的 ToastQueue 掛載為不同區塊），須於 A5 落地後 rebase。
 
-本設計分拆為五個 change，每個皆可由單一工程師在一個工作天內實作。
-
-| Change | 設計章節 | 定位 | 前置依賴 |
-|---|---|---|---|
-| `extend-concept-proposal-fields` | §5.1–§5.2 | 生成層契約擴充：`CharacterProposal` 五欄、正規化不棄回覆、提示詞翻案 | 無 |
-| `bump-creation-panel-proposal-v3` | §5.3 | 線路：session 槽／`ProposalSnapshot`／panel `proposal` 槽 v2→v3、JS 鏡像 | `extend-concept-proposal-fields` |
-| `retool-concept-fill-navigation` | §4、§5.4 | 前端：五欄映射、概念載入態、完成自動跳轉、in-flight 頁籤釘住修復、banner 退役 | `bump-creation-panel-proposal-v3`、`add-action-feedback-toasts` |
-| `prefill-telnet-concept-from-proposal` | §5.5 | Telnet：提案預設值流、請求攜帶背景／親和 | `extend-concept-proposal-fields` |
-| `add-action-feedback-toasts` | §3 | ToastQueue 基礎設施、concept 觸發、凍結測試改寫、showcase 重凍結 | 無 |
-
-依賴邊三條：**A1→A2→A3**（提案欄位逐段上線：生成層 → wire → 前端）、**A5→A3**（overlay 完成 toast 需佇列 API）、**A1→A4**（Telnet 讀同一份正規化提案）。
-
-檔案衝突點（並行時須知的序列化邊界）：
+### 8.3 檔案衝突點（並行時須知的序列化邊界）
 
 - `protocol.js`：僅 A2 觸碰（A3 不改 wire 驗證器，只改 Vue 映射）。
 - `stores/elosern.js`：僅 A5 觸碰（toast 切片、`handleActionResult` 觸發）——A3 經查證零改動（釘住修復在 overlay 層）。
@@ -203,11 +207,11 @@
 - 主規格 `concept-transient-fill`：A2（panel 槽條目）與 A3（pre-fill 條目）各 delta 不同 Requirement，歸檔順序 A2 先 A3 後。
 - `webclient-character-creation-ui`：A2（panel 面板條目 v3）／A3（dock 條目）／同 delta 不同 Requirement，歸檔順序 A2 先 A3 後。
 
-實作與歸檔批次：
+### 8.4 實作與歸檔批次
 
-1. **批次一（完全平行）**：`extend-concept-proposal-fields` ∥ `add-action-feedback-toasts`（檔案零重疊）。
-2. **批次二**：`bump-creation-panel-proposal-v3`（僅等 A1）∥ `prefill-telnet-concept-from-proposal`（僅等 A1，與 A2 檔案零重疊）。
-3. **批次三**：`retool-concept-fill-navigation`（等 A2、A5）。
+1. **批次一（完全平行）**：A1（`extend-concept-proposal-fields`）∥ A5（`add-action-feedback-toasts`）——檔案零重疊。
+2. **批次二**：A2（`bump-creation-panel-proposal-v3`，僅等 A1）∥ A4（`prefill-telnet-concept-from-proposal`，僅等 A1，與 A2 檔案零重疊）。
+3. **批次三**：A3（`retool-concept-fill-navigation`，等 A2、A5）。
 4. 歸檔順序：A1 → A2 → A3 硬序（規格同步鏈），A5 時機自由但須先於 A3 歸檔（`concept-transient-fill` pre-fill 條目引用 toast 語意的 change 先落地），A4 時機自由；每次歸檔同步 delta 進 `openspec/specs/` 並跑 `openspec validate --all --strict`。
 
 ## 9. 取捨與已接受代價
