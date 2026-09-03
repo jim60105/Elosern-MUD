@@ -264,6 +264,27 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         }
         self.assertEqual(before, after)
 
+    def test_titled_npc_participant_row_stays_plain_name(self):
+        # npc-title-identity-core compact-row pin: the combat panel renders
+        # the plain key even when the participant carries a title, so a later
+        # change cannot widen this surface silently.
+        from typeclasses.npcs import NPC
+        from world.rules.party import join_party
+
+        companion = create_object(NPC, key="塞提斯", location=self.room)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        companion.traits.hp.base = 100
+        companion.traits.hp.current = 100
+        companion.npc_title = "南門守衛"
+        join_party(companion, self.player)
+        engage(self.player, self.monster)
+        view = build_combat_view(self.player)
+        row = next(p for p in view.participants if p.identity == companion.pk)
+        self.assertEqual(row.display_name, "塞提斯")
+        self.assertNotIn("\u3000", row.display_name)
+        self.assertNotIn("南門守衛", row.display_name)
+
     def test_no_session_raises_view_error(self):
         with self.assertRaises(CombatViewError):
             build_combat_view(self.player)

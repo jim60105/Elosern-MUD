@@ -176,6 +176,17 @@ class ArtViewSelectionTests(unittest.TestCase):
             list(range(1, MAX_PORTRAIT_CATALOG + 1)),
         )
 
+    def test_titled_entity_catalog_entry_stays_plain_key(self):
+        # npc-title-identity-core compact-row pin: a stored title on the
+        # entity (the fake carries the attribute the real NPC persists) must
+        # not reach the portrait catalog entry.
+        host = _entity(40, name="塞提斯", dialogue=True)
+        host.npc_title = "南門守衛"
+        room = _room([host], scene_archetype="city_street")
+        view = build_art_view(_actor(room))
+        self.assertEqual(view.entities[0].display_name, "塞提斯")
+        self.assertNotIn("\u3000", view.entities[0].display_name)
+
     def test_combat_roster_cap_is_bounded_by_the_shared_query(self):
         player = _entity(1, name="hero")
         enemies = [

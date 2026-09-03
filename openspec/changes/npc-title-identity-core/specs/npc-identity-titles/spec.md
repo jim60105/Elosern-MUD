@@ -4,7 +4,7 @@
 
 ### Requirement: NPC titles are validated single-line plain text
 
-The deterministic core SHALL expose one validator, `world.rules.npc_identity.validate_npc_title(value)`, as the single place every NPC-title write path validates against. It SHALL accept only a `str` whose stripped form contains 1 to 32 code points and SHALL return that stripped form. It SHALL reject, by raising, a non-`str` value (including `bool`), a value whose stripped form is empty, a stripped form longer than 32 code points, any value containing a whitespace character — including the full-width space U+3000 that the composer uses as its separator — any control character, and the Evennia markup delimiter `|`. Rejection messages SHALL be stable English identifiers carrying no player-facing prose.
+The deterministic core SHALL expose one validator, `world.rules.npc_identity.validate_npc_title(value)`, as the single place every NPC-title write path validates against. It SHALL first normalize the value by stripping surrounding whitespace (of any kind, U+3000 included), and every acceptance decision below SHALL be made on that stripped form, which it SHALL return. It SHALL accept only a `str` (a `bool` is not a `str` and is rejected) whose stripped form contains 1 to 32 code points. It SHALL reject, by raising, a non-`str` value, a stripped form that is empty, a stripped form longer than 32 code points, a stripped form containing any internal whitespace character — including the full-width space U+3000 that the composer reserves as its separator — a stripped form containing any control character, and a stripped form containing the Evennia markup delimiter `|`. Rejection messages SHALL be stable English identifiers carrying no player-facing prose.
 
 #### Scenario: A legal title round-trips stripped
 
@@ -16,10 +16,10 @@ The deterministic core SHALL expose one validator, `world.rules.npc_identity.val
 - **WHEN** `validate_npc_title` is called with a 32-code-point title and again with a 33-code-point title
 - **THEN** the 32-code-point value is accepted and the 33-code-point value is rejected
 
-#### Scenario: Separator, whitespace, control, and markup characters are rejected
+#### Scenario: Internal separator, whitespace, control, and markup characters are rejected
 
-- **WHEN** `validate_npc_title` is called with a title containing an ASCII space, with one containing the full-width space U+3000, with one containing a control character, and with one containing `|`
-- **THEN** every one of them is rejected
+- **WHEN** `validate_npc_title` is called with a title containing an internal ASCII space, with one containing an internal full-width space U+3000, with one containing a control character, and with one containing `|`
+- **THEN** every one of them is rejected, while a value differing from a legal title only by surrounding whitespace is accepted and normalized
 
 #### Scenario: Non-text and empty values are rejected
 
@@ -28,7 +28,7 @@ The deterministic core SHALL expose one validator, `world.rules.npc_identity.val
 
 ### Requirement: The NPC title is a creation-time attribute with no runtime write surface
 
-The `NPC` typeclass SHALL declare a persistent `npc_title` attribute through `AttributeProperty` with the default `""`. The default is a storage default for entities no authored creation path produced (test fixtures, transient scaffolds) — a degraded state the composer renders as the plain name, NOT a supported production creation shape: every production NPC path (import loader, SceneBuilder occupants, registry-backed hosts and examiners) is fail-closed at its own author face, owned by the later changes in this batch, and the typeclass deliberately provides no create-time title parameter because title validation belongs to those authored paths. This capability SHALL NOT introduce any runtime write surface for it: no setter method, no helper that assigns it, no player or staff command, and no generative or dialogue-intent path SHALL be able to change an NPC's title after creation. The only writers SHALL be authored creation paths, which validate through `validate_npc_title` before assigning.
+The `NPC` typeclass SHALL declare a persistent `npc_title` attribute through `AttributeProperty` with the default `""`, materialized lazily (no storage row exists until a write path assigns one). The default is a storage default for entities no authored creation path produced (test fixtures, transient scaffolds) — a degraded state the composer renders as the plain name, NOT a supported production creation shape: every production NPC path (import loader, SceneBuilder occupants, registry-backed hosts and examiners) is fail-closed at its own author face, owned by the later changes in this batch, and the typeclass deliberately provides no create-time title parameter because title validation belongs to those authored paths. This capability SHALL NOT introduce any runtime write surface for it: no setter method, no helper that assigns it, no player or staff command, and no generative or dialogue-intent path SHALL be able to change an NPC's title after creation. The only writers SHALL be authored creation paths, which validate through `validate_npc_title` before assigning. The guarantee is the absence of a title-specific write API on this capability's surfaces; Evennia's generic attribute access (`entity.db.npc_title = ...`) remains framework infrastructure deliberately outside the claim — tests seed malformed stored state through it.
 
 #### Scenario: An untitled NPC is a degraded storage state, not a production path
 
@@ -43,7 +43,7 @@ The `NPC` typeclass SHALL declare a persistent `npc_title` attribute through `At
 
 ### Requirement: A single deterministic composer renders the NPC full identity
 
-`world.rules.npc_identity` SHALL be the only place the NPC full identity is composed. `npc_title_value(entity)` SHALL return the entity's stored title as a `str`, and SHALL return `""` for an entity that is not an `NPC`, for a missing or empty title, and for stored content that is not a non-empty string. `npc_display_name(entity)` SHALL return `姓名` + U+3000 + `稱號` when a title is present, and the plain key otherwise. Both functions SHALL be pure reads that never write, never log, and never raise: malformed stored state SHALL degrade to the plain key so no presentation surface becomes unavailable over one title field. The separator constant SHALL be held by this module itself and SHALL NOT be imported from the player title system, which this capability leaves entirely unchanged.
+`world.rules.npc_identity` SHALL be the only place the NPC full identity is composed. `npc_title_value(entity)` SHALL return the entity's stored title as a `str`, and SHALL return `""` for an entity that is not an `NPC`, for a missing or empty title, for stored content that is not a non-empty string, for a stored string whose stripped form violates the validator's content rules (internal whitespace, control or non-printable characters, or the markup delimiter — such a row could never come from an authored path, and rendering it would put Evennia markup or a separator-ambiguous identity on screen), and for a title accessor that raises; a stored string that is content-legal but overlong SHALL still be returned, since length corruption is the documented degraded state the display bounds truncate rather than a render hazard. `npc_display_name(entity)` SHALL return `姓名` + U+3000 + `稱號` when both a renderable title and a readable plain key are present, the plain key when the title degrades, and `""` only when even the key is unreadable — never a separator-led composition. Both functions SHALL be pure reads that never write, never log, and never raise: malformed stored state SHALL degrade to the plain key so no presentation surface becomes unavailable over one title field, with accessor failure contained by narrow safe-read boundaries. The separator constant SHALL be held by this module itself and SHALL NOT be imported from the player title system, which this capability leaves entirely unchanged.
 
 #### Scenario: A titled NPC composes with the full-width separator
 
@@ -62,8 +62,13 @@ The `NPC` typeclass SHALL declare a persistent `npc_title` attribute through `At
 
 #### Scenario: Malformed stored state degrades instead of raising
 
-- **WHEN** `npc_display_name` is called for an NPC whose stored title is a non-string value, a whitespace-only string, or absent
+- **WHEN** `npc_display_name` is called for an NPC whose stored title is a non-string value, a whitespace-only string, a string containing markup, internal whitespace or U+3000, or a control character, or whose title accessor raises, or when the title is absent
 - **THEN** it returns the plain key and raises nothing
+
+#### Scenario: An unreadable name never composes an ambiguous identity
+
+- **WHEN** `npc_display_name` is called for an entity whose `key` is missing, raises, or renders empty while a title is stored
+- **THEN** it returns `""` — never 「　稱號」 with a leading separator — and raises nothing
 
 ### Requirement: Full identity appears only on opt-in text display surfaces
 

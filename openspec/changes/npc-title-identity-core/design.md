@@ -124,6 +124,6 @@ def _bounded_entity_name(obj) -> str:
 - **重複關鍵字 `TypeError`** → D3 的合併形式；並以「NPC 的 appearance 內含人物列」的路徑實測（`return_appearance` 注入旗標後再進 `get_display_characters`）。
 - **echo 意外變成全名** → 以 byte-identical 迴歸測試釘住移動／說話／給予 echo 與 `FOLLOW_LOST_MESSAGE`：帶稱號的 NPC 在這些訊息裡必須只出現純姓名。
 - **緊湊列日後被順手改成全名** → 對 `combat_view` participants、`art_view` 目錄、`service_view` host 列各補一條「必須是純姓名」的斷言測試，讓未來的改動撞到紅燈而非默默通過。
-- **稱號欄資料損壞讓整塊面板 unavailable** → `npc_display_name` 契約是永不 raise：非字串、空白、缺屬性一律退化為純姓名；驗證只發生在寫入端（change 2／3）。
+- **稱號欄資料損壞讓整塊面板 unavailable** → `npc_display_name` 契約是永不 raise：非字串、全空白、內容腐損的字串（含 markup／內部空白／控制字元——渲染它們會把 Evennia markup 或含糊識別放上螢幕）、稱號存取器 raise、乃至 `key` 存取器 raise，一律退化為純姓名（或 key 亦不可讀時的空字串，絕不產出「　稱號」式含糊識別）；超長但內容合法的字串刻意仍渲染，由顯示邊界截斷（文件化的退化態）。存取器退化由具名收斂的 safe-read `except` 邊界承擔（本模組非 facade adopter，R2 不適用，每個邊界仍附理由註解自我文件）。驗證只發生在寫入端（change 2／3）。
 - **與 namegen 系列 change 的相鄰性** → 兩條線都碰 NPC 身分，但檔案不相交（namegen 動 `world/lore/names.py`、`world/rules/namegen.py`、creation UI；本 change 動 `world/rules/npc_identity.py`、`typeclasses/npcs.py`、`typeclasses/objects.py`、`exploration.py`）。唯一的概念交會點是「NPC 的 `key` 從哪來」，而本 change 對此不作任何規定。若兩者同時在 `typeclasses/npcs.py` 落地，衝突面僅為屬性宣告區的相鄰行。
-- **觀測性**：本 change 不新增持久化寫入、外部 I/O 或跨系統工作流，顯示組合為純讀取，因此不新增 `world.observability` 事件（設計 §8 的 guild host／examiner boundary event 隨作者供給 change 落地）。`world/rules/npc_identity.py` 不含 `except` 區塊以外的容錯路徑；退化判斷以顯式取值檢查完成，不靠捕捉例外，故不觸發 R2 規則。
+- **觀測性**：本 change 不新增持久化寫入、外部 I/O 或跨系統工作流，顯示組合為純讀取，因此不新增 `world.observability` 事件（設計 §8 的 guild host／examiner boundary event 隨作者供給 change 落地）。`world/rules/npc_identity.py` 非 facade adopter（不匯入 facade），觀測性 R2（靜默吞例外）規則本就不適用於它；其容錯路徑是顯式取值檢查，外加實作期 rubber-duck 折入的兩個具名 safe-read `except` 邊界（稱號存取器、`key` 存取器），每個邊界附 `# observability: ignore R2: <reason>` 註解自我文件，讓宣稱「永不 raise」與實作一致。

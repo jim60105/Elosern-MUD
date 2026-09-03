@@ -173,7 +173,7 @@ byte-identical。
 
 | # | Change | 範圍 | 主要落點 |
 |---|---|---|---|
-| 1 | `npc-title-identity-core` | 驗證器＋`NPC.npc_title`＋組合器＋opt-in 顯示路由（房間列／看標題／探索面板）＋緊湊列純姓名釘樁＋prompt `title` 欄位＋生產者清單迴歸案 | `world/rules/npc_identity.py`、`typeclasses/npcs.py`、`typeclasses/objects.py`、`web/webclient/presentation/exploration.py` |
+| 1 | `npc-title-identity-core` | 驗證器＋`NPC.npc_title`（lazy、autocreate=False）＋組合器＋opt-in 顯示路由（房間列／看標題／探索面板）＋緊湊列純姓名釘樁＋prompt `title` 欄位 | `world/rules/npc_identity.py`、`typeclasses/npcs.py`、`typeclasses/objects.py`、`web/webclient/presentation/exploration.py` |
 | 2 | `npc-title-import-pipeline` | `CHARACTER_SCHEMA_V1` 必填 `title`、loader 落庫、姓名對既有 NPC 唯一 gate、範例卡＋GM 文件、匯入邊界事件 | `world/imports/`、`docs/gm/characters.md` |
 | 3 | `npc-title-authored-identities` | blueprint `npc_req` 必填 `display_name`＋`title`（姓名成為 spawn `key`）、`SHOP_REGISTRY`／`GUILD_BRANCH_REGISTRY`／`GUILD_RANK_REGISTRY` 作者身分＋載入 fail-closed、guild host／考官生成、legacy host 一次性 cleanup、批次收尾的 main-spec 整合 sync | `world/quests/`、`world/ai/`、`world/lore/{shops,guild}.py`、`world/rules/{npc_identity,guild_economy,guild_exams}.py` |
 
@@ -189,8 +189,17 @@ byte-identical。
 - 進行中的 namegen 系列 change（`npc-namegen-lore-registry` 等）與本三件檔案零交集、無契約
   相依。
 
-**Rubber-duck 複審（一次、全部 artifacts 完成後）已折入**：(a) onboarding 南門守衛刻意豁免
-（註定隨新手教學移除，見 change 3 design D7a）＋生產者清單迴歸案釘死清單；(b) import schema
+**提案期 Rubber-duck 複審（一次、全部 artifacts 完成後）已折入**：(a) onboarding 南門守衛刻意豁免
+（註定隨新手教學移除，見 change 3 design D7a），並會以生產者清單迴歸案釘死清單；(b) import schema
 移除 raw `maxLength`，驗證器為唯一長度真相；(c) blueprint 姓名唯一性收緊為整份 blueprint
 無例外；(d) host 稱號 backfill 改為一次性 legacy cleanup（無 runtime 寫入後門）；(e) sync 時序
 改為批次單一寫入者契約。
+
+**實作期 Rubber-duck 複審（change 1 計畫審）已折入**：(f) 撤除該生產者清單靜態掃描迴歸案——
+`world/imports/loader.py` 以 `create_object(typeclass, ...)` 變數派發，文字正則無法誠實清點
+建立路徑，假保衛撤除（AGENTS.md：deliberate skip is preferable to a fake implementation），
+本節 §5 的五點清單自此為**人工維護清單**，新建立路徑由評審對帳；(g) 驗證器規範文字改為
+「strip 正規化後、對 strip 形做任何拒絕」，與「前後空白被接受並正規化」的情境一致；(h)
+`NPC.npc_title` 以 `AttributeProperty(autocreate=False)` 宣告（Evennia 6.1 預位讀取缺屬性會
+就地落庫，牴觸組合器純讀取契約），且「無 runtime 寫入面」宣稱明確限縮為「無稱號專屬寫入
+API」——generic `.db` 存取是框架基礎設施，測試以其製造損壞態。

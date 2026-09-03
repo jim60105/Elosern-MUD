@@ -257,6 +257,39 @@ class HostResolutionTests(ServiceRegistryIsolation):
         self.assertIsNone(view.guild)
         self.assertIsNotNone(view.shop)
 
+    def test_titled_host_rows_stay_plain_key(self):
+        # npc-title-identity-core compact-row pin: guild and shop host rows
+        # render the plain key even when the host entity carries a title.
+        staff = FakeHost("公會長", 10, guild_staff(), location=None)
+        staff.npc_title = "白銀之手會長"
+        staff_room = FakeRoom(staff)
+        staff.location = staff_room
+        with patch(
+            "world.rules.service_view.read_world_clock",
+            return_value=SimpleNamespace(tick=TICK_NOON),
+        ):
+            guild_view = build_services_view(
+                actor(location=staff_room, registration=registration())
+            )
+        self.assertIsNotNone(guild_view.host)
+        self.assertEqual(guild_view.host.display_name, "公會長")
+        self.assertNotIn("\u3000", guild_view.host.display_name)
+
+        store = FakeHost("商人", 11, merchant(), location=None)
+        store.npc_title = "南門行商"
+        store_room = FakeRoom(store)
+        store.location = store_room
+        with patch(
+            "world.rules.service_view.read_world_clock",
+            return_value=SimpleNamespace(tick=TICK_NOON),
+        ):
+            shop_view = build_services_view(
+                actor(location=store_room, wallet=1000)
+            )
+        self.assertIsNotNone(shop_view.host)
+        self.assertEqual(shop_view.host.display_name, "商人")
+        self.assertNotIn("\u3000", shop_view.host.display_name)
+
     @covers_requirement("webclient-service-menus::service-presentation-resolves-hosts-per-service-class-and-a-stable-player-summary")
     def test_ambiguous_guild_hosts_close_only_the_guild_surface(self):
         room = FakeRoom(

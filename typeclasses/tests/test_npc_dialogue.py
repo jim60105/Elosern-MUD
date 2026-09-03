@@ -775,5 +775,49 @@ class TitleDialogueContextTests(EvenniaTest):
         self.assertEqual(sorted(payload["player"]), ["disguised_stats", "name"])
 
 
+class NPCTitleDialogueContextTests(EvenniaTest):
+    """The speaking NPC's own title is read-only dialogue data (D7).
+
+    ``_npc_context`` gains a ``title`` key carrying the stored title; the
+    system-message renderer reads only name/desc/location, so every rendered
+    prompt stays byte-identical until a later change adds a {title} slot.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.npc = create_object(LLMNPC, key="塞提斯", location=self.room1)
+
+    def test_titled_npc_context_carries_the_title(self):
+        self.npc.npc_title = "南門守衛"
+        context = self.npc._npc_context()
+        self.assertEqual(context["title"], "南門守衛")
+        self.assertEqual(sorted(context), ["desc", "location", "name", "title"])
+
+    def test_untitled_npc_context_carries_an_empty_title(self):
+        context = self.npc._npc_context()
+        self.assertEqual(context["title"], "")
+
+    def test_building_the_context_persists_nothing(self):
+        before = {attr.key for attr in self.npc.attributes.all()}
+        self.npc._npc_context()
+        self.npc._npc_context()
+        after = {attr.key for attr in self.npc.attributes.all()}
+        self.assertEqual(after, before)
+        self.assertNotIn("npc_title", after)
+
+    def test_the_title_never_reaches_the_rendered_system_message(self):
+        from world.ai.npc_dialogue import _system_message
+
+        untitled = dict(self.npc._npc_context())
+        self.npc.npc_title = "南門守衛"
+        titled = dict(self.npc._npc_context())
+        self.assertEqual(titled["title"], "南門守衛")
+        untitled["title"] = titled["title"]  # isolate: same keys, only data differs
+        baseline = _system_message({k: v for k, v in titled.items() if k != "title"})
+        self.assertEqual(_system_message(titled), baseline)
+        self.assertEqual(_system_message(untitled), baseline)
+        self.assertNotIn("南門守衛", _system_message(titled))
+
+
 if __name__ == "__main__":
     unittest.main()

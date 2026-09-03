@@ -152,6 +152,20 @@ class GridFollowTests(EvenniaTest):
         expected = FOLLOW_LOST_MESSAGE.format(names="stuck")
         self.assertEqual(follow_lines(msg), [expected])
 
+    def test_follow_lost_names_a_titled_companion_by_plain_key(self):
+        # NPC identity titles are display-routing only: the notification is
+        # byte-identical with a title stored (npc-title-identity-core).
+        rejecting = create_object(SelectiveRejectingRoom, key="Rejecting", location=None)
+        rejecting.rejected_keys = ("stuck",)
+        door = create_object(Exit, key="trap", location=self.room1, destination=rejecting)
+        stuck = self._companion("stuck")
+        stuck.npc_title = "南門守衛"
+        with patch.object(self.char1, "msg") as msg:
+            door.at_traverse(self.char1, rejecting)
+        self.assertIs(stuck.location, self.room1)
+        expected = FOLLOW_LOST_MESSAGE.format(names="stuck")
+        self.assertEqual(follow_lines(msg), [expected])
+
     def test_multiple_failures_are_named_in_one_notification(self):
         rejecting = create_object(SelectiveRejectingRoom, key="Rejecting", location=None)
         rejecting.rejected_keys = ("stuck-a", "stuck-b")
