@@ -16,6 +16,7 @@ from world.lore.sexual_vocab import (
     SHAME_LEVELS,
     WETNESS_LEVELS,
 )
+from world.rules.npc_identity import MAX_NPC_TITLE_CODE_POINTS
 
 _DRAFT = "https://json-schema.org/draft/2020-12/schema"
 _NONNEGATIVE = {"type": "integer", "minimum": 0}
@@ -56,6 +57,7 @@ CHARACTER_SCHEMA_V1 = {
         "schema_version",
         "key",
         "display_name",
+        "title",
         "age",
         "apparent_age",
         "race",
@@ -81,6 +83,26 @@ CHARACTER_SCHEMA_V1 = {
         "schema_version": {"const": 1},
         "key": dict(_ENTITY_KEY_RULES),
         "display_name": {"type": "string", "minLength": 1},
+        # The rule set is deliberately NOT duplicated here as a pattern or a
+        # maxLength keyword: the bound applies to the validator's STRIPPED
+        # form, and a raw maxLength would reject values the validator
+        # canonicalizes and accepts (splitting the single-validator contract
+        # that npc-identity-titles declares). Length and character rules are
+        # enforced solely by ``validate_npc_title`` in the semantic phase.
+        "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": (
+                "REQUIRED single-line plain-text NPC title (南門守衛, 雜貨店老闆). "
+                "The full rule set -- 1 to "
+                f"{MAX_NPC_TITLE_CODE_POINTS} code points after stripping, no "
+                "whitespace (including the full-width space U+3000), no control "
+                "characters, no '|' -- is enforced semantically by "
+                "world.rules.npc_identity.validate_npc_title, the single "
+                "validator every NPC-title write path shares. The field takes "
+                "effect only for NPC imports."
+            ),
+        },
         "age": {
             "type": "integer",
             "minimum": 18,

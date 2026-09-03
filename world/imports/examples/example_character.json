@@ -3,6 +3,7 @@
   "schema_version": 1,
   "key": "human_reference",
   "display_name": "人類參考角色",
+  "title": "參考範例",
   "age": 22,
   "apparent_age": 22,
   "race": "human",

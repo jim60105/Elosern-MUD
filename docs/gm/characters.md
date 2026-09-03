@@ -12,6 +12,7 @@
 | --- | --- |
 | `key` | 非空白的穩定物件識別。 |
 | `display_name` | 非空白顯示名稱。此版本要求它存在；目前載入器仍以 `key` 建立 Evennia 物件。 |
+| `title` | NPC 稱號（職稱／異名）：單行純文字；驗證與落庫前會先去除首尾空白，**限制套用在去除首尾空白後的正規形上**：1–32 個碼點、不得含任何空白（含全形空格 U+3000）、控制字元或 `\|`。完整規則由 `world.rules.npc_identity.validate_npc_title` 唯一執行。**只對 NPC 匯入生效**；以 `PlayerCharacter` 為目標時此欄為惰性，不會被持久化。 |
 | `age`、`apparent_age` | 皆為整數且至少 `18`。 |
 | `race`、`subrace` | 必須分別存在於種族與亞種登錄表，亞種須屬於指定種族。 |
 | `sex` | 必須是 `female`、`male` 或 `other` 其中之一。 |
@@ -24,12 +25,15 @@
 
 `stats` 可提供 `hp`、`mp`、`sp`、`atk_phys`、`agility`、`defense`、`magic_power` 與 `guild_merit`。未提供的特質會以種族基準補足。`hp` 至少為 `1`；其餘數值為非負整數。若值落在種族建議區間外，驗證器會提出警告；`magic_power` 超過種族魔力帶上界、未知種族、錯誤亞種、未知技能與不合格的結構會直接拒絕匯入。
 
+NPC 在遊戲中的顯示姓名來自 `key`（`display_name` 目前仍不被載入器使用）：要讓人物列顯示中文姓名，就把 `key` 寫成中文。房間人物列與探索面板會把 `key` 與 `title` 以全形空格組成「姓名　稱號」。
+
 ```json
 {
   "record_type": "character",
   "schema_version": 1,
   "key": "altoria_scout",
   "display_name": "阿爾托利亞斥候",
+  "title": "城郊斥候",
   "age": 24,
   "apparent_age": 24,
   "race": "human",
@@ -60,6 +64,8 @@ uv run --locked -m world.imports.validate path/to/character.json
 ```
 
 批次資料應全部通過驗證後再載入。`load_batch()` 會先驗證整批檔案，並在資料庫交易中建立全部角色；其中任一檔案失敗時，該批次不會留下部分建立的角色。
+
+驗證的責任線：CLI 只檢查檔案本身與批次內的一致性（含批次內重名）；**與資料庫既有 NPC 的重名由 `load_batch()` 在載入時整批把關**，CLI 不做這件事，也不會把它回報為降級檢查。
 
 ## 匯入 NPC
 

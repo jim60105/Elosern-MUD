@@ -14,7 +14,9 @@ from world.imports.schema import (
     MAX_ENTITY_KEY_LENGTH,
     WORLD_SCHEMA_V1,
 )
+from world.imports.schema import MAX_NPC_TITLE_CODE_POINTS
 from world.imports.tests.helpers import example_record
+from world.imports.validate import _structural_issues
 
 
 class SchemaTests(TestCase):
@@ -244,6 +246,47 @@ class SchemaTests(TestCase):
             )
         )
         del record["affinity_elements"]
+        self.assertFalse(
+            list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
+        )
+
+
+class TitleFieldSchemaTests(TestCase):
+    """npc-title-import-pipeline: required title, single-validator rule split."""
+
+    @covers_requirement("npc-identity-titles::an-imported-character-record-carries-a-required-authored-title")
+    def test_title_is_required_and_names_the_field_when_missing(self):
+        self.assertIn("title", CHARACTER_SCHEMA_V1["required"])
+        record = example_record()
+        del record["title"]
+        issues = _structural_issues(record, CHARACTER_SCHEMA_V1)
+        self.assertTrue(
+            any(issue.field == "title" and "required" in issue.message for issue in issues)
+        )
+
+    def test_title_must_be_a_non_empty_string(self):
+        for bad in ("", 5, None):
+            with self.subTest(title=bad):
+                record = example_record()
+                record["title"] = bad
+                self.assertTrue(
+                    list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
+                )
+
+    def test_title_property_carries_only_type_minlength_and_description(self):
+        title = CHARACTER_SCHEMA_V1["properties"]["title"]
+        self.assertEqual(set(title), {"type", "minLength", "description"})
+        text = title["description"]
+        self.assertIn("validate_npc_title", text)
+        self.assertIn(str(MAX_NPC_TITLE_CODE_POINTS), text)
+        # The doc-title keyword lives at the schema's own top level.
+        self.assertEqual(CHARACTER_SCHEMA_V1["title"], "CHARACTER_SCHEMA_V1")
+
+    def test_raw_overlong_padding_passes_the_structural_phase(self):
+        # The validator canonicalizes and accepts this value; a raw maxLength
+        # would reject it -- the equivalence contract forbids that.
+        record = example_record()
+        record["title"] = " " * 40 + "衛"
         self.assertFalse(
             list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
         )
