@@ -314,16 +314,31 @@ PRE_SPLIT_ANNOTATIONS = {
         ]
     },
     "ScenarioDirectorPromptTests": {
+        "test_contexts_normalizing_to_one_bounded_text_share_one_bank": [
+            "scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful"
+        ],
         "test_identical_contexts_produce_byte_identical_prompts": [
             "scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful"
         ],
+        "test_output_contract_is_unchanged_by_the_injection": [
+            "scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful"
+        ],
         "test_oversized_context_is_bounded_and_valid": [
+            "scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful"
+        ],
+        "test_prompt_construction_leaves_no_state_behind": [
+            "scenario-director::the-scenario-director-name-inspiration-reads-the-namegen-rule-layer-without-crossing-the-single-writer-boundary"
+        ],
+        "test_system_carries_the_full_context_seeded_bank_with_guidance": [
             "scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful"
         ],
         "test_system_message_names_the_blueprint_contract_and_fidelity": [
             "scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful"
         ],
         "test_user_message_carries_keys_and_no_live_objects": [
+            "scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful"
+        ],
+        "test_validators_accept_missing_and_bank_external_display_names": [
             "scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful"
         ]
     },
