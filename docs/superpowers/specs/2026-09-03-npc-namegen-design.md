@@ -5,7 +5,7 @@
 
 ## 1. 問題陳述
 
-遊戲目前沒有系統化的姓名來源。角色創建的自訂表单要求玩家自己想名字；
+遊戲目前沒有系統化的姓名來源。角色創建的自訂表單要求玩家自己想名字；
 NPC 側只有 `BlueprintNpcReq.display_name` 這個選填欄位，LLM 沒填時名字就缺失，
 離線模板路徑僅有一個硬編碼的「黑鬍」。後果是 LLM 離線時 NPC 無名可用，
 在線時名字風格又完全依賴模型自由發揮。
@@ -14,7 +14,7 @@ NPC 側只有 `BlueprintNpcReq.display_name` 這個選填欄位，LLM 沒填時�
 上游 <https://inknomu.com/namegen/fantasy>，174 個姓氏、1,100 個名字、
 1,261 筆中文譯名對照）為基礎，建立確定性的姓名產生器，供兩個消費端使用：
 
-1. 角色創建 UI 自訂表单姓名欄旁的骰子按鈕。
+1. 角色創建 UI 自訂表單姓名欄旁的骰子按鈕。
 2. NPC 生成流程（LLM 靈感來源＋離線兜底補名）。
 
 ## 2. 決策摘要
@@ -26,7 +26,7 @@ NPC 側只有 `BlueprintNpcReq.display_name` 這個選填欄位，LLM 沒填時�
 | 顯示名形式 | 純正體中文譯名（「加斯帕・斯諾」），經 translit 表組成 | 已驗證 translit 表對全部 1,274 個零件零缺漏、全部單詞無需拆詞；中文世界觀一致 |
 | 骰子語料位置 | 伺服器端，走 OOB `ui_action` 往返 | SPA 維持 view-layer only；語料只在伺服器一份，不進前端 bundle |
 | 骰子上下文 | 讀表單的種族與性別欄 | 行為直覺，且與 NPC 側共用同一規則函式 |
-| 性別欄位 | 自訂表单新增「性別」下拉（女性／男性／其他），隨 payload 持久化到 `entity.sex` | `SEX_VALUES` registry 已存在、import 載入側已寫 `entity.sex`，創建側是缺口，一併補齊 |
+| 性別欄位 | 自訂表單新增「性別」下拉（女性／男性／其他），隨 payload 持久化到 `entity.sex` | `SEX_VALUES` registry 已存在、import 載入側已寫 `entity.sex`，創建側是缺口，一併補齊 |
 | NPC 整合 | 方案 A＋靈感化 B：prompt 階段注入「僅供靈感」建議名，spawn 階段對缺失名確定性補名；validator 與 schema 必填性不動 | 只用 A 時名字風格可能與 LLM 敘事脫節；只用 B 時 LLM 仍可能自創名。灵感定位讓 LLM 可依性別／背景調整（用戶核定），離線時兜底補名仍保證可玩 |
 | RNG 策略 | UI 骰用模組級無種子 `Random()`；NPC 側用 `Random(crc32("definition.key:stage:role"))` | 玩家擲名本質是輸入的另一種形式，無需重放；NPC 名要與藍圖同種子可重放 |
 
@@ -122,9 +122,18 @@ RNG 來源分兩條、不共用：
 
 ### 6.1 Prompt 階段：靈感名
 
-`world/prompts/registry.py` 組 scenario-director prompt 時，對每個 stage NPC
-需求槽位先以 `roll_name_for_race(None, "", Random(crc32(f"{definition_key}:{stage}:{role}")))`
-擲一個靈感名，註明「僅供靈感」：
+（2026-09-03 修訂，見 OpenSpec `namegen-npc-flow` design D1。）原稿要求逐
+stage NPC 槽位以 `crc32(f"{definition_key}:{stage}:{role}")` 擲靈感名，但該
+種子座標在 prompt 組裝時點不可計算：`build_scenario_prompt(context)` 只收請求
+上下文，blueprint 與 `definition_key` 都是 LLM 輸出之後才存在的資料。逐槽位
+注入改為 two-pass LLM 呼叫又被「schema／validator 不動」的核定範圍排除。
+
+修訂為上下文種子靈感名庫：對 `_bounded_context(context)` 的序列化文字算
+`zlib.crc32` 作種子，`roll_name_for_race(None, "", Random(seed))` 擲固定
+N=6 個名字組成靈感庫，經 `scenario_director.system` 新增的 `{name_inspiration}`
+佔位符注入 system 訊息。同 context 必得同一庫，守住「同輸入位元組相同
+prompt」契約；靈感定位不變（僅供靈感、可依性別／背景改寫）。
+`world/prompts/registry.py` 組 scenario-director prompt 時注入，格式：
 
 > suggested_name（僅供靈感）：加斯帕・斯諾 － 可直接採用，或依角色性別、
 > 背景、語氣調整；建議填寫 display_name
@@ -212,3 +221,32 @@ rules。`world/ai/` 全程不落地任何狀態，靈感名由 prompt 組合器�
 - 玩家替 NPC 提名、staff 端 namegen 收藏匣命令。
 - prompt 注入多候選名或依 archetype 綁包（留作後續 tweak，與本設計不互斥）。
 - 上游語料自動同步（明確禁止：僅手動重抓並更新 THIRD_PARTY_NOTICES 日期）。
+
+## 11. 實作批次建議（OpenSpec change 拆分與並行順序）
+
+本設計由五個 OpenSpec change 承載（各自 ≤8 小時單人工作包、各自
+`openspec validate --strict` 通過）：
+
+| # | change | 範圍 | 前置 |
+|---|---|---|---|
+| A | `npc-namegen-lore-registry` | `world/lore/names.py` 凍結 registry＋鏡射 | 無 |
+| B | `npc-namegen-rules-roller` | `world/rules/namegen.py` 擲名純函式 | A |
+| C | `oob-result-data-slot` | `ui_action_result` 條件性 `data` 槽（server emitter／validator＋JS mirror） | 無 |
+| D | `namegen-creation-ui` | 性別下拉、🎲 骰子、`creation.roll_name`、`entity.sex` | B、C |
+| E | `namegen-npc-flow` | prompt 靈感名庫＋spawn 兜底補名＋觀察事件 | B |
+
+批次建議：
+
+- Batch 1（完全並行）：A、C。兩者零檔案重疊（lore／sync vs
+  dispatcher／protocol），可交兩名工程師同時做。
+- Batch 2（完全並行）：B、之後的 D／E 皆吃 B，故 B 單獨先行；若人力只有一名，
+  順序 A→B→(C 與 E 並行)→D 亦可，C 唯一被 D 依賴。
+- Batch 3（完全並行）：D、E。檔案面零重疊（creation 鏈 vs scene_builder／
+  prompts／scenario_director），共用契約僅 B 的 `roll_name_for_race`。
+- 衝突熱點：D 與 E 都會碰 observability 事件與 shards 判斷，但各自擴充既有
+  已註冊 test module（D：test_creation_*／test_dispatcher／test_protocol；
+  E：test_scene_builder*／prompt 測），`.github/evennia-shards.json` 預期零
+  改動；若任一 change 實作中需要新增 test module，須在同 change 內更新 manifest
+  並重跑 ownership contract，避免雙主。
+- 驗收面：A/B 落地後離線模板 NPC 即已有兜底名（E 的 spawn 分支）；C/D 落地後
+  自訂表單有骰子；E 的 prompt 分支最後落地才完整實現 §6 雙管設計。
