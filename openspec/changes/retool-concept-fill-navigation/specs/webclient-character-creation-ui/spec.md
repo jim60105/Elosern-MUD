@@ -16,12 +16,16 @@ the form owns are claimed by the form and none reach the bridge's fall-through t
 the capture listener SHALL be removed when the form closes. While a concept apply is in
 flight the concept tab SHALL present a prominent in-progress state — a visible large
 spinner with an explicit waiting message — and SHALL disable the concept input and the
-concept-apply button until a fresh proposal revision is applied or a result carrying the
-submitted request id with a non-success outcome settles the request; through the whole
+concept-apply button until a fresh proposal revision is applied, a result carrying the
+submitted request id with a non-success outcome settles the request, or the global
+dispatch gate releases without a matching settlement (the safety net for a synchronous
+transport failure or a lost mutation; the in-progress state SHALL only ever be entered
+after the dispatch was admitted, so a gate-rejected apply never shows it); through the whole
 in-flight window no store publish or draft re-sync SHALL move the presented tab — the tab
 is pinned while the loading state is alive. The browser SHALL present no other completion
-affordance for a settled apply beyond the custom-tab switch (the confirmation/failure
-toast is surfaced by the action-feedback slice, not the form). The final activation and the
+affordance for a settled apply beyond the custom-tab switch (the confirmation toast is
+surfaced through the action-feedback queue by the form's apply path, and the failure toast
+by the action-feedback result slice — not by any form-embedded banner). The final activation and the
 destructive custom reset SHALL each require an explicit confirmation panel. Disabled entries
 SHALL remain focusable with their explanation and SHALL submit nothing. Validation messages
 SHALL be associated with the field they concern and announced through the accessible live
@@ -83,6 +87,13 @@ No canonical service or creation state SHALL be stored in localStorage.
   concept input and apply button are disabled so no second concept is submitted, and the
   waiting state clears exactly when a fresh proposal is applied or a non-success result
   bearing the submitted request id settles the request
+
+#### Scenario: A synchronously failed dispatch never sticks the waiting state
+- **WHEN** a concept dispatch is admitted but its transport send fails synchronously (the
+  store releases its mutation gate without ever emitting an action result), or the gate
+  releases while no proposal has arrived
+- **THEN** the waiting state clears with the concept tab restored to an editable form, and
+  an apply rejected by the single-in-flight gate never enters the waiting state at all
 
 #### Scenario: The concept tab stays pinned through in-flight republishes
 - **WHEN** a concept apply is in flight and the store commits panel updates or draft

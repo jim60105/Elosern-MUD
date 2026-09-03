@@ -593,16 +593,33 @@ class ConceptCreationJourneys(CreationBrowserTest):
         proposal = panel["proposal"]
         self.assertEqual(
             sorted(proposal),
-            ["allocations", "persona", "race", "revision", "subrace"],
+            [
+                "affinity_elements",
+                "age",
+                "allocations",
+                "apparent_age",
+                "background",
+                "display_name",
+                "persona",
+                "race",
+                "revision",
+                "subrace",
+            ],
         )
         self.assertEqual(proposal["revision"], 1)
         self.assertEqual(proposal["race"], "human")
         # The form is only pre-filled, never auto-submitted.
         self.assertEqual(sent_action_count(page, "creation.custom"), 0)
-        # The player confirms the notice and the custom form shows the
-        # proposal's finite values pre-filled.
-        page.evaluate("document.querySelector('[data-testid=\"creation-proposal-open\"]').focus()")
-        _press(page, "Enter")
+        # retool-concept-fill-navigation: the loading state settled at the
+        # completion moment, the form auto-landed on the custom tab (no
+        # in-form notice, no confirmation click), and exactly one info toast
+        # confirmed the apply through the action-feedback queue.
+        self.assertEqual(page.locator('[data-testid="creation-concept-loading"]').count(), 0)
+        info_toasts = page.locator(
+            '[data-testid="feedback-toast-queue"] .toast[data-tone="info"]'
+        )
+        self.assertEqual(info_toasts.count(), 1)
+        self.assertIn("概念提案已套用到自訂表單", info_toasts.first.inner_text())
         self.assertEqual(
             page.evaluate("() => document.querySelector('[data-testid=\"creation-overlay\"]').getAttribute('data-mode')"),
             "custom",
@@ -626,28 +643,59 @@ class ConceptCreationJourneys(CreationBrowserTest):
             page.evaluate("document.querySelector('[data-testid=\"creation-persona-personality\"]').value"),
             "沉穩",
         )
+        # The five transient-fill fields land from the proposal (issue set
+        # 3-6): name, both ages, background, and the affinity checkboxes.
+        self.assertEqual(
+            page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]').value"),
+            "燈下學徒",
+        )
+        self.assertEqual(
+            page.evaluate("document.querySelector('[data-testid=\"creation-field-age\"]').value"),
+            "30",
+        )
+        self.assertEqual(
+            page.evaluate("document.querySelector('[data-testid=\"creation-field-apparentAge\"]').value"),
+            "27",
+        )
+        self.assertEqual(
+            page.evaluate("document.querySelector('[data-testid=\"creation-background\"]').value"),
+            "在燈下抄書長大的見習劍士。",
+        )
+        self.assertEqual(
+            page.evaluate(
+                "() => [...document.querySelectorAll('[data-testid^=\"creation-affinity-\"]')]"
+                ".filter((el) => el.checked).map((el) => el.getAttribute('data-testid'))"
+            ),
+            ["creation-affinity-fire", "creation-affinity-wind"],
+        )
         # The retired generated indicator never renders.
         self.assertEqual(page.locator('[data-testid="creation-concept-indicator"]').count(), 0)
+        # The retired in-form proposal notice and its button are gone.
+        self.assertEqual(page.locator('[data-testid="creation-proposal-notice"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="creation-proposal-open"]').count(), 0)
 
-        # Complete the form keyboard-only: name and both adult ages only; the
-        # finite controls and persona prose are already filled from the proposal.
+        # Complete the form keyboard-only: the transient fields now arrive
+        # pre-filled, so the journey only verifies the Tab order from the
+        # name field onward and re-firms the ages before submitting.
         page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]').focus()")
-        page.keyboard.type("新冒險者")
         _press(page, "Tab")  # name -> actual age
         self.assertEqual(
             page.evaluate("document.activeElement && document.activeElement.getAttribute('data-testid')"),
             "creation-field-age",
             "Tab must move focus from the name field to the age field",
         )
-        page.keyboard.type("24")
-        _press(page, "Tab")  # actual age -> apparent age
-        page.keyboard.type("24")
         page.evaluate("document.querySelector('[data-testid=\"creation-submit\"]').focus()")
         _press(page, "Enter")
         self.assertEqual(sent_action_count(page, "creation.custom"), 1)
         payloads = self._sent_payloads(page, "creation.custom")
         self.assertEqual(len(payloads), 1)
         self.assertEqual(payloads[0]["race"], "human")
+        # The pre-filled transient values ride the custom payload unchanged.
+        self.assertEqual(payloads[0]["display_name"], "燈下學徒")
+        self.assertEqual(payloads[0]["age"], 30)
+        self.assertEqual(payloads[0]["apparent_age"], 27)
+        self.assertEqual(payloads[0]["background"], "在燈下抄書長大的見習劍士。")
+        self.assertEqual(payloads[0]["affinity_elements"], ["fire", "wind"])
         # The player-confirmed proposal prose rides the custom payload.
         self.assertEqual(
             payloads[0]["persona"],

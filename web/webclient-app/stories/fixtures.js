@@ -1661,6 +1661,32 @@ export const CREATION_PANEL_PROPOSAL_SAMPLE = {
   },
 };
 
+// The expanded v3 proposal shape (bump-creation-panel-proposal-v3 +
+// retool-concept-fill-navigation): the five-key persona payload plus the
+// five transient-fill keys. The race is human so the affinity cap (2) is
+// visible, and the wire carries three elements — the form must keep only
+// the first two (registered keys, cap-trimmed). The ages and prose are the
+// generation layer's already-normalized values (adult-clamped, truncated).
+export const CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE = {
+  ...CREATION_PANEL_SAMPLE,
+  proposal: {
+    revision: 1,
+    race: "human",
+    subrace: null,
+    allocations: { hp: 6, mp: 4, sp: 4, atk_phys: 4, agility: 4, defense: 3, magic_power: 3 },
+    persona: {
+      personality: "沉穩內斂",
+      life_story: "燈下研讀古籍的年輕學者。",
+      habit: "睡前必整理書架。",
+    },
+    display_name: "莉雅",
+    age: 26,
+    apparent_age: 24,
+    background: "燈下抄書的女學徒。",
+    affinity_elements: ["fire", "wind", "water"],
+  },
+};
+
 // The `creation` panel unavailable form (registry-owned reason, the common
 // unavailable envelope).
 export const CREATION_PANEL_UNAVAILABLE_SAMPLE = {

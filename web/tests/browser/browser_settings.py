@@ -193,6 +193,14 @@ def _browser_concept_proposal(client=None, *, concept):
                 "life_story": "來自邊境的小村，靠磨劍維生",
                 "habit": "清晨練劍",
             },
+            # The v3 transient-fill keys (bump-creation-panel-proposal-v3):
+            # already-normalized values as the guarded layer would emit them
+            # (adult ages, in-band texts, human affinity bound of 2).
+            display_name="燈下學徒",
+            age=30,
+            apparent_age=27,
+            background="在燈下抄書長大的見習劍士。",
+            affinity_elements=("fire", "wind"),
         )
     )
 
