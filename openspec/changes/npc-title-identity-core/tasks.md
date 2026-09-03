@@ -7,8 +7,8 @@
 ## 1. 確定性核心 `world/rules/npc_identity.py`
 
 - [ ] 1.1 新建模組，英文 docstring 說明它是 NPC 全名的唯一組合點。模組私有常量 `_FULL_WIDTH_SPACE = "　"`（自持，**不**從 `world/rules/titles.py` 匯入）與 `MAX_NPC_TITLE_CODE_POINTS = 32`。module scope 不匯入任何 typeclass、不匯入 logger（本模組不產 log）。
-- [ ] 1.2 `validate_npc_title(value) -> str`：非 `str`（含 `bool`）、strip 後為空、strip 後 code points 不在 1..32、含任何 `str.isspace()` 字元（含 U+3000）、含控制字元（`unicodedata.category(...).startswith("C")` 或 `not char.isprintable()`）、含 `|` → 各自以穩定英文訊息 raise（沿用 `world/rules/character_creation.py::_validate_name` 的訊息風格與檢查順序）；通過回 strip 後字串。例外型別沿用專案慣例（`ValueError` 子類，於本模組宣告具名例外）。
-- [ ] 1.3 `npc_title_value(entity) -> str`：函式內 `from typeclasses.npcs import NPC` 延遲匯入（先例 `world/rules/party.py::live_companion_ids`）；非 `NPC` 實例、缺屬性、非字串、strip 後為空 → `""`；否則回 strip 後字串。純讀取，不觸發任何持久化。
+- [ ] 1.2 `validate_npc_title(value) -> str`：非 `str`（含 `bool`）、strip 後為空、strip 後 code points 不在 1..32、含任何 `str.isspace()` 字元（含 U+3000）、含控制字元（`unicodedata.category(...).startswith("C")` 或 `not char.isprintable()`）、含 `|` → 各自以穩定英文訊息 raise（沿用 `world/rules/character_creation.py::_validate_name` 的訊息風格與檢查順序）；通過回 strip 後字串。例外型別沿用專案慣例（`ValueError` 子類別，於本模組宣告具名例外）。
+- [ ] 1.3 `npc_title_value(entity) -> str`：函式內 `from typeclasses.npcs import NPC` 延遲匯入（先例 `world/rules/party.py::live_companion_ids`）；非 `NPC` 執行個體、缺屬性、非字串、strip 後為空 → `""`；否則回 strip 後字串。純讀取，不觸發任何持久化。
 - [ ] 1.4 `npc_display_name(entity) -> str`：`title = npc_title_value(entity)`；`key = str(getattr(entity, "key", "") or "")`；有 title 回 `f"{key}{_FULL_WIDTH_SPACE}{title}"`，否則回 `key`。**永不 raise**：所有退化以顯式取值檢查完成，不靠 `except`（避免觸發觀測性 R2 規則）。
 - [ ] 1.5 新測試模組 `world/rules/tests/test_npc_identity.py`：`validate_npc_title` 以 `unittest.TestCase` 純邏輯案覆蓋——合法值 strip round-trip、32／33 邊界、ASCII 空白、U+3000、控制字元、`|`、`None`／int／bool／`""`／全空白各自被拒。
 - [ ] 1.6 同模組 `EvenniaTest` 案：`npc_display_name` 對「塞提斯」＋「南門守衛」回 `"塞提斯　南門守衛"`（斷言分隔符為單一 U+3000）；未設稱號回純 `key`；玩家角色與 `Monster` 回純 `key` 且 `npc_title_value` 為 `""`；稱號存成非字串／全空白／缺屬性時回純 `key` 且不擲例外。

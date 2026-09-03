@@ -149,7 +149,7 @@ if _key_taken_by_other(opponent):          # 任何其他實體（含玩家）�
     opponent.key = f"{rank.examiner_name}-{opponent.pk}"
 ```
 
-即：**作者姓名優先，被佔用時才附加 `-{pk}`**。兩條既有 scenario 的保證原封不動——玩家legally 取了同名時考試照樣開得起來（對手改用後綴形），兩場同階級考試同時進行時兩隻對手的 key 仍互異——而 audit finding F08（roster／skip-safety 以 `str(entity.key)` 為鍵）的修補不被回退。requirement 原文改述為這個條件式規則。
+即：**作者姓名優先，被佔用時才附加 `-{pk}`**。兩條既有 scenario 的保證原封不動——玩家合法取了同名時考試照樣開得起來（對手改用後綴形），兩場同階級考試同時進行時兩隻對手的 key 仍互異——而 audit finding F08（roster／skip-safety 以 `str(entity.key)` 為鍵）的修補不被回退。requirement 原文改述為這個條件式規則。
 
 替代方案：(a) 永遠附加 `-{pk}`——被否決：房間人物列會印「雷加·鐵拳-12　F 級考官」，作者供給等於白做。(b) 永不附加，改為把 roster 改成以 dbref 為鍵——被否決：archived change 的 phase-6 驗證已結論「roster identity 遷移要動每一個 roster-key 消費端＋`Battlefield.__post_init__` 斷言」，遠超本 change 的一天預算，且與 NPC 稱號無關。
 

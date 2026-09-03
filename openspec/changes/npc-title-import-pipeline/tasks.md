@@ -28,7 +28,7 @@
 
 ## 3. Loader 落庫與非 NPC 型別規則
 
-- [ ] 3.1 `world/imports/loader.py::_instantiate_validated_character`：在 `entity.sex = ...` 之後、trait 套用之前（或緊接身分欄位區）加入設計 D3 的寫入——`if isinstance(entity, NPC): entity.npc_title = validate_npc_title(record["title"])`，附英文註解說明「只有 NPC 宣告了這個 `AttributeProperty`，寫到別的 typeclass 只會產生重載即消失的實例屬性」。
+- [ ] 3.1 `world/imports/loader.py::_instantiate_validated_character`：在 `entity.sex = ...` 之後、trait 套用之前（或緊接身分欄位區）加入設計 D3 的寫入——`if isinstance(entity, NPC): entity.npc_title = validate_npc_title(record["title"])`，附英文註解說明「只有 NPC 宣告了這個 `AttributeProperty`，寫到別的 typeclass 只會產生重載即消失的執行個體屬性」。
 - [ ] 3.2 `world/imports/tests/test_loader_trait_values.py` 增測：匯入帶稱號記錄後 `entity.npc_title` 等於該稱號；`" 南門守衛 "` 落庫為 `"南門守衛"`；以 `typeclass=PlayerCharacter` 匯入同一張卡時記錄仍必須帶合法 `title`，但實體上 `attributes.get("npc_title")` 為 `None`（無持久化）。
 - [ ] 3.3 同檔增測：既有 verbatim 斷言（traits／persona／sexual／skills／equipment／inventory／affinity／age／portrait_policy）在新增欄位後全部不變。
 - [ ] 3.4 端到端顯示串接測（放 `world/imports/tests/test_loader_trait_values.py` 或既有 appearance 測試模組，擇一，不新增測試檔）：匯入的 NPC 經 `npc_display_name` 得到「姓名　稱號」，未經任何顯示層改動。
@@ -39,7 +39,7 @@
 - [ ] 4.1 `world/imports/loader.py` 新增模組私有 `_flag_existing_npc_names(report)`（或等價形狀）：收集報告內 character records 的 `key`，以 `NPC.objects.filter_family(db_key__in=sorted(keys)).values_list("db_key", flat=True)` 查覆（設計 D5：`NPC.objects.filter` 是 typeclass-path 精確比對，會漏掉 `LLMNPC`），命中者在對應 `RecordReport.rejections` 追加 `Issue("key", ...)`，訊息為穩定英文 identifier。
 - [ ] 4.2 `load_batch`：在 `transaction.atomic()` 內、任何 `_instantiate_validated_character` 之前呼叫該檢查；有命中即 `raise ImportRejected(report)`（交易回滾、零實體）。`instantiate_character` 單筆入口套用同一個檢查。**不**重用既有實體、不改名、不覆寫（設計 D6）。
 - [ ] 4.3 `world/imports/tests/test_batch_all_or_nothing.py` 增測：先建一隻同名 `NPC`，再載入含該 key 的兩筆批次 → `ImportRejected`，報告中該筆帶 `key` rejection，另一筆也未建立；既有 NPC 的 key／`npc_title`／其他欄位不變。
-- [ ] 4.4 同檔增測：既有實體是 `LLMNPC`（子類）時同樣被拒（釘住 `filter_family` 的家族覆蓋）；以 `typeclass=PlayerCharacter` 載入同樣被拒；既有同名者是 `PlayerCharacter`／`Monster`／房間／物件時**不**被此 gate 拒。
+- [ ] 4.4 同檔增測：既有實體是 `LLMNPC`（子類別）時同樣被拒（釘住 `filter_family` 的家族覆蓋）；以 `typeclass=PlayerCharacter` 載入同樣被拒；既有同名者是 `PlayerCharacter`／`Monster`／房間／物件時**不**被此 gate 拒。
 - [ ] 4.5 同檔增測：批次內重複 key 的既有拒絕行為不變，且與新 gate 並存（兩筆重複 key 且其中之一又撞既有 NPC 時仍整批拒）。
 - [ ] 4.6 CLI 責任線測（`world/imports/tests/test_batch_all_or_nothing.py`）：撞名的記錄檔經 `validate_batch` 全綠、`main([...])` 回 0，但同一檔進 `load_batch` 被拒；`report.degraded_checks` 未新增任何條目。
 - [ ] 4.7 Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.imports.tests.test_batch_all_or_nothing world.imports.tests.test_import_portrait_seam`。

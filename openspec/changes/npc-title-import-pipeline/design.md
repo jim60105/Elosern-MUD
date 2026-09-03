@@ -85,7 +85,7 @@ def _check_npc_title(record: dict[str, Any]) -> list[Issue]:
 
 替代方案：讓 `validate_npc_title` 回傳 `(ok, message)` 而非 raise——被否決：change 1 的 requirement 已定死它「失敗即 raise」，改簽名等於改前置 change 的契約。
 
-### D3. loader 寫入用驗證器回傳值，且只對 `NPC` 實例寫
+### D3. loader 寫入用驗證器回傳值，且只對 `NPC` 執行個體寫
 
 ```python
 if isinstance(entity, NPC):
@@ -98,7 +98,7 @@ if isinstance(entity, NPC):
 兩個決定：
 
 1. **寫驗證器的回傳值**而不是 `record["title"]`：回傳的是 strip 後的正規形，且這是建立點的 fail-closed 第二道（設計 §3.2 不變式 1「任一生產路徑缺欄即拒絕建立」）。`load_batch` 已先驗證，所以這條在正常流程恆不觸發；一旦有人繞過驗證直接呼叫 `_instantiate_validated_character`，它會 raise 並讓外層交易回滾，而不是把髒值落庫。驗證器是純函式且冪等，「照驗證過的內容建構」的既有原則不受影響。
-2. **只對 `NPC` 實例寫**：loader 的 `typeclass` 參數容許 `PlayerCharacter`（`import-loader` 既有 requirement）。稱號欄位在 `PlayerCharacter` 上沒有 `AttributeProperty` 描述子，賦值只會落在 Python 實例上、重載即消失。與其靜默遺失，不如明文不寫——設計 §3.2 不變式 4 本來就規定玩家在任何顯示路徑退化為純姓名。角色卡仍必填 `title`（schema 沒有、也無法有「目標型別」這個判別依據；`typeclass` 是 loader 的呼叫參數，不是記錄內容），玩家角色卡的 `title` 是惰性欄位，並以測試釘住「匯入 `PlayerCharacter` 後不存在 `npc_title` 屬性」。
+2. **只對 `NPC` 執行個體寫**：loader 的 `typeclass` 參數容許 `PlayerCharacter`（`import-loader` 既有 requirement）。稱號欄位在 `PlayerCharacter` 上沒有 `AttributeProperty` 描述子，賦值只會落在 Python 執行個體上、重載即消失。與其靜默遺失，不如明文不寫——設計 §3.2 不變式 4 本來就規定玩家在任何顯示路徑退化為純姓名。角色卡仍必填 `title`（schema 沒有、也無法有「目標型別」這個判別依據；`typeclass` 是 loader 的呼叫參數，不是記錄內容），玩家角色卡的 `title` 是惰性欄位，並以測試釘住「匯入 `PlayerCharacter` 後不存在 `npc_title` 屬性」。
 
 替代方案：對非 NPC 改寫 `entity.db.npc_title`——被否決：那會在玩家身上種一個 change 1 宣告「只有 NPC 有」的屬性，且無任何讀取者。
 
@@ -116,7 +116,7 @@ if isinstance(entity, NPC):
 
 替代方案：(a) 在 `validate_batch` 加一個 `DegradedCheck`（「DB 重名檢查未執行」）——被否決：`DegradedCheck` 的語義是「這個檢查本該跑但跑不了」（例如 skill registry 缺席），而 CLI 的檔案作用域是**定義好的邊界**不是降級，每次執行都印一條 banner 只會讓真正的降級訊號失去意義。(b) 讓 `validate_batch` 收一個可選的 `existing_names` 參數由 loader 注入——被否決：把 DB 語義倒灌進純函式模組，還多一個只有一個呼叫端的參數。
 
-### D5. 「既有 NPC」的查詢用 `filter_family`，並以子類測試釘住
+### D5. 「既有 NPC」的查詢用 `filter_family`，並以子類別測試釘住
 
 ```python
 existing = set(
@@ -124,15 +124,15 @@ existing = set(
 )
 ```
 
-理由：Evennia 的 `TypeclassManager.filter` 會**強制加上 `db_typeclass_path=<本類路徑>`**（`evennia/typeclasses/managers.py`），所以 `NPC.objects.filter(db_key=...)` 精確比對 typeclass path，會**漏掉 `LLMNPC`**——而 LLMNPC 正是最可能與匯入 NPC 撞名的那一種。`filter_family` 才是「本類＋所有子類」的正確 API。
+理由：Evennia 的 `TypeclassManager.filter` 會**強制加上 `db_typeclass_path=<本類路徑>`**（`evennia/typeclasses/managers.py`），所以 `NPC.objects.filter(db_key=...)` 精確比對 typeclass path，會**漏掉 `LLMNPC`**——而 LLMNPC 正是最可能與匯入 NPC 撞名的那一種。`filter_family` 才是「本類＋所有子類別」的正確 API。
 
-`filter_family` 以 `cls.__subclasses__()` 展開，只看得到**已被匯入**的子類。目前 `NPC` 的唯一子類 `LLMNPC` 與 `NPC` 同住 `typeclasses/npcs.py`，而 loader 在 module scope 就 `from typeclasses.npcs import NPC`，所以家族恆完整。這個保證是「同檔宣告」帶來的，不是巧合可依賴的——因此加一條迴歸測試：建立一隻同名 `LLMNPC`，匯入必須被拒。未來若有人把 NPC 子類搬到別的模組而未匯入，這條測試會紅。
+`filter_family` 以 `cls.__subclasses__()` 展開，只看得到**已被匯入**的子類別。目前 `NPC` 的唯一子類別 `LLMNPC` 與 `NPC` 同住 `typeclasses/npcs.py`，而 loader 在 module scope 就 `from typeclasses.npcs import NPC`，所以家族恆完整。這個保證是「同檔宣告」帶來的，不是巧合可依賴的——因此加一條迴歸測試：建立一隻同名 `LLMNPC`，匯入必須被拒。未來若有人把 NPC 子類別搬到別的模組而未匯入，這條測試會紅。
 
-比較對象：`evennia.search_object(key, exact=True)` 也會回傳 typeclass 實例，但它同時比對 aliases，會把「別名撞名」也變成拒絕理由——那是本 change 未定義、也不該偷渡的語義。
+比較對象：`evennia.search_object(key, exact=True)` 也會回傳 typeclass 執行個體，但它同時比對 aliases，會把「別名撞名」也變成拒絕理由——那是本 change 未定義、也不該偷渡的語義。
 
 ### D6. 碰撞語義：fail closed，不重用、不改名、不覆寫
 
-匯入記錄的 `key` 等於某隻既有 NPC（含子類）的 `key` → 該筆 record 得到一條指名 `key` 的 rejection，整批拒絕、零實體落庫。**不**重用既有實體、**不**自動改名、**不**覆寫既有 NPC 的任何欄位。
+匯入記錄的 `key` 等於某隻既有 NPC（含子類別）的 `key` → 該筆 record 得到一條指名 `key` 的 rejection，整批拒絕、零實體落庫。**不**重用既有實體、**不**自動改名、**不**覆寫既有 NPC 的任何欄位。
 
 不在此規則內（明文不拒）：撞上既有 `PlayerCharacter`、`Monster`、房間或物件的 key。設計 §3.2 的不變式是「NPC 姓名全世界唯一」，把它擴張成「跨所有實體型別唯一」會在沒有設計授權的情況下改變既有匯入行為。
 
@@ -164,7 +164,7 @@ log_info("import_batch_committed", context={"records": ..., "typeclass": typecla
 ## Risks / Trade-offs
 
 - **既有測試因必填 `title` 轉紅** → 匯入套件的角色卡固定走 `world/imports/tests/helpers.py::example_record()`（讀參考 JSON），補了範例檔就自動綠；其他套件（`world/quests`、`world/skills`、`world/rules`）呼叫 `instantiate_character` 的測試同樣走該 helper。實作第一步仍以全 repo 搜尋 `"record_type"` 字面量確認沒有手寫角色卡遺漏，並在 tasks 列為明確步驟。
-- **`filter_family` 只看已匯入的子類** → D5 的 `LLMNPC` 重名迴歸測試釘住；子類與 `NPC` 同檔宣告使家族恆完整。
+- **`filter_family` 只看已匯入的子類別** → D5 的 `LLMNPC` 重名迴歸測試釘住；子類別與 `NPC` 同檔宣告使家族恆完整。
 - **交易內多一次 DB 查詢** → 一次 `db_key__in` 查詢，key 集合等於批次大小（角色卡批次是個位數到數十）；相較每筆 `create_object` 的多次寫入可忽略。
 - **`PlayerCharacter` 角色卡必填卻不落庫的稱號** → D3 明文＋測試釘住；GM 文件在欄位表註記「此欄只對 NPC 生效」。
 - **CLI 與 `load_batch` 檢查面不同** → 刻意的責任線（D4），寫進 GM 文件的驗證章節；`load_batch` 內部仍會先跑完整 `validate_batch`，所以 CLI 通過的檔案在載入時只可能多出「與既有 NPC 重名」這一種新拒絕理由。

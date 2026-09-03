@@ -8,9 +8,9 @@
 
 - `CHARACTER_SCHEMA_V1`（`world/imports/schema.py`）新增**必填** `title`：`{"type": "string", "minLength": 1}` ＋ 英文 description（文字提及 strip 後上界與 `validate_npc_title`）。**不**加 `maxLength`：raw 長度檢查檢查未 strip 的原字串、驗證器檢查 strip 後的形，兩者對 `" " * 40 + "衛"` 會給相反決定，等於把「單一驗證器」契約劈成兩半（rubber-duck 複審 findings）。字元集規則（空白／控制字元／`|`）同樣**不**在 schema 複製 regex，長度與字元集一律由語意層唯一驗證器 `validate_npc_title` 執行。**BREAKING**（對現有角色卡）：直接改 v1，無相容層、無遷移、無 `schema_version` 2（未發布、零使用者）。
 - `world/imports/validate.py` 新增語意檢查 `_check_npc_title`：把 `validate_npc_title` 的例外轉成 record 級 `Issue("title", ...)`，訊息為穩定英文 identifier，與既有 `Issue` 診斷同形；`validate.py` 不新增任何 DB 存取，離線 CLI 維持純檔案檢查。
-- `world/imports/loader.py::_instantiate_validated_character` 在驗證後寫 `entity.npc_title = validate_npc_title(record["title"])`（fail-closed 的第二道，且回傳的是 strip 後的正規形）。**只在 `isinstance(entity, NPC)` 時寫**：`npc_title` 是 `NPC` 上的 `AttributeProperty`，寫到 `PlayerCharacter` 上只會產生一個重載即消失的普通實例屬性（靜默資料遺失）。
+- `world/imports/loader.py::_instantiate_validated_character` 在驗證後寫 `entity.npc_title = validate_npc_title(record["title"])`（fail-closed 的第二道，且回傳的是 strip 後的正規形）。**只在 `isinstance(entity, NPC)` 時寫**：`npc_title` 是 `NPC` 上的 `AttributeProperty`，寫到 `PlayerCharacter` 上只會產生一個重載即消失的普通執行個體屬性（靜默資料遺失）。
 - 姓名全世界唯一（設計 §3.2 不變式 2 的 import 面）：批次內重複 `key` 既有檢查不動（`_flag_duplicate_keys`），新增**對既有 DB NPC 的重名檢查**，落點在 `loader.py`（不在 `validate.py`）。命中即整批拒絕、零實體落庫，診斷掛在該筆 record 上（`ImportRejected.report` 與既有 `render_report` 形狀不變）。
-- 明確定義碰撞語義：匯入記錄的 `key` 撞上既有 NPC（含 `LLMNPC` 等子類）→ **fail closed 整批拒**，不重用、不改名、不覆寫；撞上既有玩家角色、房間或物件 → 不因此拒（本不變式只約束 NPC 姓名）；批次目標型別是 `PlayerCharacter` 時同樣套用（世界上不會有兩個實體回應同一個 NPC 姓名）。
+- 明確定義碰撞語義：匯入記錄的 `key` 撞上既有 NPC（含 `LLMNPC` 等子類別）→ **fail closed 整批拒**，不重用、不改名、不覆寫；撞上既有玩家角色、房間或物件 → 不因此拒（本不變式只約束 NPC 姓名）；批次目標型別是 `PlayerCharacter` 時同樣套用（世界上不會有兩個實體回應同一個 NPC 姓名）。
 - `world/imports/examples/example_character.json` 補 `title`；`docs/gm/characters.md` 的必填欄位表、內嵌 JSON 範例與驗證章節同步（補一句：離線 CLI 不檢查與 DB 既有 NPC 的重名，該檢查在 `load_batch()` 執行）。
 - 觀測性：`loader.py` 新增兩個邊界事件 `import_batch_committed`（info）與 `import_batch_rejected`（warn），走 `world.observability` facade。設計 §8 說「import loader 已有 `action_commit` 類語義」——實際上 `world/imports/loader.py` 目前一行 log 都沒有，這是目錄（觀測性設計 §4.2）在持久化提交邊界留下的真實缺口，由本 change 補上。`validate.py` **不**匯入 facade（它的兩個既有 `except` 區塊會因此進入 R2 作用域）。
 - 無玩家命令新增／改名／改語法 → `docs/game/commands.md`、`docs/game/command-reference.md` 不動。
