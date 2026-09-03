@@ -484,6 +484,7 @@ class CustomCreationJourneys(CreationBrowserTest):
                   subrace: "human_commoner",
                   background: null,
                   affinity_elements: null,
+                  persona: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
                 },
               }], {});
@@ -532,6 +533,7 @@ class CustomCreationJourneys(CreationBrowserTest):
                   subrace: "human_commoner",
                   background: null,
                   affinity_elements: null,
+                  persona: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
                 },
               }], {});
@@ -858,6 +860,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
                   subrace: "human_commoner",
                   background: null,
                   affinity_elements: null,
+                  persona: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
                 },
               }], {});
@@ -894,6 +897,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
                   subrace: 'human_commoner',
                   background: null,
                   affinity_elements: null,
+                  persona: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
                     },
                   }], {});
@@ -955,6 +959,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
                   subrace: "human_commoner",
                   background: null,
                   affinity_elements: null,
+                  persona: null,
                   allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
                 },
               }], {});
