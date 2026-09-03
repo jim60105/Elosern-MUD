@@ -78,6 +78,9 @@ COPY --chown=root:0 commands/ /app/commands/
 COPY --chown=root:0 typeclasses/ /app/typeclasses/
 COPY --chown=root:0 world/ /app/world/
 COPY --chown=root:0 tools/ /app/tools/
+# Vendored CC BY name corpus: world/lore/names.py parses it at import time, so
+# the runtime tree must carry it (npc-namegen-lore-registry D8).
+COPY --chown=root:0 third_party/ /app/third_party/
 # Admin-facing prompt data: baked defaults survive image-only runs; the compose
 # bind mount below overrides them read-only. World-readable so an external art
 # worker can reuse the shipped fragments (design D11, unchanged worker contract).
