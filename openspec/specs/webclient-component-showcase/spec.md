@@ -250,8 +250,11 @@ The showcase required-set manifest SHALL include deterministic offline stories a
 
 ### Requirement: The full overlays are complete, the deferred surfaces are absent, and the manifest is frozen
 The full overlays `MapOverlay`, `SettingsOverlay`, `HelpOverlay`, and `CreationOverlay` SHALL be complete,
-and SHALL each be reachable from a real control in the running application — a built, tested,
-manifest-listed overlay that nothing imports is not complete.
+and SHALL each have a live mount path in the running application — a built, tested,
+manifest-listed overlay that nothing imports is not complete. The map, settings, and help overlays SHALL
+each be opened from a real control in the live surface tree; the creation overlay SHALL instead be mounted
+by the running client on the committed `creation` panel's availability predicate, because creation mode is
+entered by the server's snapshot rather than by a player-operated trigger.
 The settings overlay SHALL expose the narrative prose scale, the reduced-motion preference, the
 text-to-HTML narrative toggle, and the colourblind-safe status palette as **client-local presentation
 state**. It SHALL NOT dispatch a `ui_action` for any of them: `options.dismiss` — the suggestions
@@ -266,7 +269,12 @@ does not implement, so a control with no outcome — a typeface choice the desig
 faces do not support, an audio level with no audio subsystem, an interface-scale slider, or a key
 remapping — SHALL NOT be rendered. The creation overlay SHALL implement a presets/custom/concept wizard
 with the adult gate applied to BOTH the age and the apparent_age fields and an activate transition, and
-SHALL emit `creation.*`. The `MapOverlay` SHALL re-render its available/unavailable branch whenever the
+SHALL emit `creation.*`. Because its presence is owned by the committed `creation` panel and creation mode
+presents no surface behind it, the creation overlay SHALL render no client-side dismissal control: no
+close, exit, or hide-the-surface affordance in its header or body, and no such control SHALL be wired to a
+handler that only stops rendering the overlay. This bars the dismissal affordance only — the wizard's own
+in-surface actions (the presets/custom/concept tab switch, the draft reset, the confirmation screen's
+cancel, and the activate transition) each carry a real outcome and are unaffected. The `MapOverlay` SHALL re-render its available/unavailable branch whenever the
 `local_map` OOB read model is updated, so a replaced payload never leaves a stale state; because the
 overlay is mounted in the running client, this SHALL hold against live read-model replacement and not
 only against a story's args. A surface with no backing OOB read model today — a dedicated Party/companion panel, the
@@ -303,9 +311,13 @@ be re-frozen at the complete redesign set and the component-coverage gate SHALL 
 - **WHEN** the settings overlay's controls are enumerated
 - **THEN** every rendered control changes an outcome the client implements, and no typeface choice, audio level, interface-scale slider, or key-remapping control is present
 
-#### Scenario: Every full overlay is reachable from a control
-- **WHEN** the running application is enumerated for overlay entry points
-- **THEN** each of the map, settings, help, and creation overlays is opened by a real control in the live surface tree, and none is present in the bundle without a trigger
+#### Scenario: Every full overlay has a live mount path
+- **WHEN** the running application is enumerated for overlay mount paths
+- **THEN** each of the map, settings, and help overlays is opened by a real control in the live surface tree, the creation overlay is mounted on the committed `creation` panel's availability predicate, and none is present in the bundle without a live mount path
+
+#### Scenario: The creation overlay renders no dismissal control
+- **WHEN** the mounted creation overlay's chrome is enumerated
+- **THEN** no close, exit, or dismiss control is rendered in its header or body, and the overlay stops rendering only when the committed `creation` panel stops being available
 
 #### Scenario: The map overlay tracks read-model updates
 - **WHEN** an OOB update replaces the `local_map` read-model payload while the mounted overlay is open
