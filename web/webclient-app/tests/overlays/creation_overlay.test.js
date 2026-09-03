@@ -495,13 +495,6 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(wrapper.get('[data-testid="creation-overlay"]').attributes("data-mode")).toBe("preset");
   });
 
-  it("the close button emits close", () => {
-    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
-    wrapper.get('[data-testid="creation-overlay-close"]').trigger("click");
-    expect(wrapper.emitted("close")).toBeTruthy();
-    expect(wrapper.emitted("close").length).toBe(1);
-  });
-
   it("open=false hides the overlay", () => {
     const wrapper = mount(CreationOverlay, {
       props: { creation: CREATION_PANEL_SAMPLE, open: false },

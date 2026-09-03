@@ -358,9 +358,9 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
 });
 
 // H6 (task 4.4): every full overlay has a real trigger in the live surface
-// tree, so a built-but-unreachable overlay fails the unit gate the way
-// Map/Settings/Help did in B5.
-describe("H6 overlay reachability: every full overlay has a live trigger", () => {
+// tree or a committed panel predicate, so a built-but-unreachable overlay
+// fails the unit gate the way Map/Settings/Help did in B5.
+describe("H6 overlay reachability: every full overlay has a live mount path", () => {
   it("the minimap island's expand control opens the map overlay", async () => {
     const wrapper = mount(LocalMap, { props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) } });
     const expand = wrapper.get('[data-testid="local-map__expand"]');
@@ -392,13 +392,23 @@ describe("H6 overlay reachability: every full overlay has a live trigger", () =>
     expect(wrapper.emitted("open-full-log")).toBeTruthy();
   });
 
-  it("the creation overlay renders its own testids and a labelled close control", () => {
+  it("the creation overlay renders its own testids and no dismissal control", () => {
     const wrapper = mount(CreationOverlay, {
       props: { creation: CREATION_PANEL_SAMPLE },
     });
     expect(wrapper.find('[data-testid="creation-overlay"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="creation-body"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="creation-overlay-close"]').exists()).toBe(true);
+    // The creation overlay's presence is owned by the committed `creation` panel predicate;
+    // creation mode presents no surface behind it, so a close control has no outcome and
+    // must not be rendered. Assert both the specific absent testid and that the header
+    // renders no button at all. The body may contain wizard action buttons (reset, confirm,
+    // cancel), but must not contain any dismissal-specific control.
+    expect(wrapper.find('[data-testid="creation-overlay-close"]').exists()).toBe(false);
+    expect(wrapper.find('.creation-overlay__header button').exists()).toBe(false);
+    // Guard the body: no testid that names a close/exit/dismiss affordance.
+    expect(wrapper.find('[data-testid*="close"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid*="exit"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid*="dismiss"]').exists()).toBe(false);
   });
 
   it("the overlay host mounts the named overlay body (the real trigger-to-overlay path)", () => {

@@ -48,7 +48,7 @@ const props = defineProps({
   pushToast: { type: Function, default: null },
 });
 
-const emit = defineEmits(["action", "close", "request-reset", "cancel-confirm"]);
+const emit = defineEmits(["action", "request-reset", "cancel-confirm"]);
 
 const available = computed(() => props.creation.available === true);
 const reason = computed(() => props.creation.reason?.message ?? "");
@@ -530,10 +530,6 @@ function requestReset() {
   emit("request-reset");
 }
 
-function close() {
-  emit("close");
-}
-
 // The store-driven creation dock stage mirrors the wizard's mode so keyboard
 // and pointer share one flow: root/presets -> preset, custom -> custom,
 // concept -> concept, confirm -> the confirmation screen overlays the body.
@@ -604,15 +600,6 @@ applyProposal();
   >
     <header class="creation-overlay__header">
       <h2 class="creation-overlay__title" data-testid="creation-overlay-title">角色創建</h2>
-      <button
-        type="button"
-        class="ui-btn ui-btn--ghost ui-btn--sm creation-overlay__close"
-        data-testid="creation-overlay-close"
-        @click="close"
-      >
-        <span aria-hidden="true">✕</span>
-        關閉
-      </button>
     </header>
 
     <div class="creation-overlay__body" data-testid="creation-body">
