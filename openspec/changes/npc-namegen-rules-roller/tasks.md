@@ -22,6 +22,7 @@ traceability 掛點契約：四條 requirement 屬未同步 delta ID，實作期
 - [x] 2.4 KeyError 案：`roll_name("fantasy-dragonkin", "female", Random(1))` 以 `assertRaises(KeyError)` 斷言且 `caught.exception.args == ("fantasy-dragonkin",)`（原樣傳播、非重包裝），無名字回傳。
 - [x] 2.5 空池退回案：以 `NamePack` 直建合成包（`u` 池為 `()`、`m`／`f` 非空），直呼 `_roll_from_pack(synthetic, "other", rng)` → 斷言 given 落 `m ∪ f`、回傳合法合成名不擲；同包 sex `"female"` 正常路徑不受影響。→ error-semantics requirement。
 - [x] 2.6 無全域 RNG 案：靜態斷言 `world.rules.namegen` 模組內無 `Random()` 實例化、無對 `random` 模組級 `choice`／`randint` 的呼叫（`inspect.getsource` 掃描）；以 recording RNG 斷言隨機決策只經注入實例的 `choice`，且兩個相同初始種子的獨立實例互不影響、多次呼叫序列逐項相同。→ replay requirement。
+- [x] 2.8（shipping review 加固）跨包輸出形態案：全部五包 × 五種 sex 固定種子擲，斷言兩段皆屬該包 `zh` 池且輸出非 ASCII（語料事實：零件 `text` 恆 ASCII、`zh` 恆非 ASCII，實測驗證）；`[]`（未雜湊）sex 走隨機池路徑不擲 `TypeError`。掛 2.1／2.2 對應 requirement（P1 時標）。focused 同 2.7。
 - [x] 2.7 Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_namegen`。
 
 ## 3. 登記與收尾

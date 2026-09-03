@@ -102,7 +102,6 @@ class RollNameReplayTest(TestCase):
 class RollNameSexPoolTest(TestCase):
     """sex→pool mapping, random-pool normalisation, and output shape."""
 
-
     def test_sex_selects_mapped_pool_and_output_is_zh_only(self):
         pack = NAME_PACK_REGISTRY["fantasy-human"]
         for sex, pool in (("female", "f"), ("male", "m"), ("other", "u")):
@@ -113,6 +112,18 @@ class RollNameSexPoolTest(TestCase):
                     self.assertIn(given, _pool_zh(pack, pool))
                     self.assertIn(surname, _surname_zh(pack))
 
+    def test_every_pack_output_is_zh_only_for_any_sex(self):
+        # Corpus fact behind the contract: part .text is ASCII, .zh never is,
+        # so "output contains no ASCII" pins "no text leaks" for every pack.
+        for pack_key in _PACK_KEYS:
+            pack = NAME_PACK_REGISTRY[pack_key]
+            for sex in ("female", "male", "other", "", None):
+                with self.subTest(pack=pack_key, sex=sex):
+                    name = roll_name(pack_key, sex, Random(11))
+                    given, surname = _segments(name)
+                    self.assertIn(given, _all_given_zh(pack))
+                    self.assertIn(surname, _surname_zh(pack))
+                    self.assertFalse(name.isascii())
 
     def test_unspecified_and_unrecognised_sex_pick_a_random_pool_once(self):
         pack = NAME_PACK_REGISTRY["fantasy-human"]
@@ -130,6 +141,13 @@ class RollNameSexPoolTest(TestCase):
                 given, surname = _segments(name)
                 self.assertIn(given, union)
                 self.assertIn(surname, _surname_zh(pack))
+        # Unhashable non-str junk joins the unspecified path, never TypeError.
+        recorder = RecordingRandom(4)
+        name = roll_name("fantasy-human", [], recorder)
+        self.assertEqual(recorder.choice_calls[0], ("m", "f", "u"))
+        given, surname = _segments(name)
+        self.assertIn(given, union)
+        self.assertIn(surname, _surname_zh(pack))
 
 
 class RollNameForRaceTest(TestCase):

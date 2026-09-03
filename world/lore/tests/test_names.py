@@ -92,6 +92,8 @@ class NamePackRegistryTests(unittest.TestCase):
             given.pop("f")
         with self.assertRaises(TypeError):
             given.setdefault("u", ())
+        with self.assertRaises(TypeError):
+            given |= {"m": ()}  # dict's in-place union must not slip through
         # The mirror path must still rebuild the type through deepcopy.
         from copy import deepcopy
 

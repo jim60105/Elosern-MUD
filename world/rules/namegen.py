@@ -41,7 +41,9 @@ def _roll_from_pack(pack: NamePack, sex: str | None, rng: Random) -> str:
     generator never dies; the surname pool is not sex-filtered and needs none.
     """
 
-    pool_key = _SEX_POOL.get(sex)
+    # Non-str values (even unhashable ones) join the unspecified path: this
+    # layer validates nothing and must never die on a caller's bad input.
+    pool_key = _SEX_POOL.get(sex) if isinstance(sex, str) else None
     if pool_key is None:
         pool_key = rng.choice(_GIVEN_POOLS)
     parts = pack.given[pool_key]

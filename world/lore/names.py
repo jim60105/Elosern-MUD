@@ -101,7 +101,10 @@ class FrozenDict(dict):
     def _immutable(self, *args, **kwargs):
         raise TypeError("name-corpus mapping is frozen")
 
+    # __ior__ must be listed too: dict's in-place union would otherwise slip
+    # past every named mutator and break the frozen-registry invariant.
     __setitem__ = __delitem__ = setdefault = update = pop = popitem = clear = _immutable
+    __ior__ = _immutable
 
 
 def _read_corpus(root: Path) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
