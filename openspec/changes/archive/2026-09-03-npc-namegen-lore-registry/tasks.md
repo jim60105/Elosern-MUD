@@ -32,5 +32,5 @@
 
 ## Post-sync traceability（archive sync 時執行，不在本 change 實作期）
 
-- [ ] P1 delta sync 進 `openspec/specs/namegen-corpus-registry/spec.md` 後，以 `uv run --locked python -m tools.spec_traceability list` 取六條 canonical ID，依對應關係標註既有測試：registry 凍結＋覆蓋＋zh 渲染 → `test_names.py` 對應 pure 案；種族綁定 → binding 案；三不變量 → fail-fast 案（含 injected-invalid 案）；`・` 合成 → 合成格式案；鏡射 → `NamePackMirrorTests`；映像烘焙 → `test_container_contract.py::test_vendored_name_corpus_is_baked_into_the_runtime_image`。
-- [ ] P2 `tools.spec_traceability check` 六條全覆蓋、零錯誤。
+- [x] P1 delta sync 進 `openspec/specs/namegen-corpus-registry/spec.md` 後，以 `uv run --locked python -m tools.spec_traceability list` 取六條 canonical ID，依對應關係標註既有測試：registry 凍結＋覆蓋＋zh 渲染 → `test_names.py` 對應 pure 案；種族綁定 → binding 案；三不變量 → fail-fast 案（含 injected-invalid 案）；`・` 合成 → 合成格式案；鏡射 → `NamePackMirrorTests`；映像烘焙 → `test_container_contract.py::test_vendored_name_corpus_is_baked_into_the_runtime_image`。
+- [x] P2 `tools.spec_traceability check` 六條全覆蓋、零錯誤。

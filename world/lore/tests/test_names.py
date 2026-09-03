@@ -5,18 +5,14 @@ coverage against the vendored JSON, the import-time invariant fail-fast paths
 through the injectable builder, and the 「名・姓」 composition. The
 ``EvenniaTestCase`` class pins the ``sync_all`` mirror of the new
 ``name_packs`` category.
-
-No ``@covers_requirement`` annotations yet on purpose: the
-``namegen-corpus-registry`` IDs enter the main index only when this change's
-delta specs sync at archive time, and ``tools.spec_traceability check``
-rejects unknown IDs before that (repository precedent:
-``2026-08-15-fix-movement-settlement-atomicity`` task 4.1). Archive adds them.
 """
 
 import json
 from pathlib import Path
 import types
 import unittest
+
+from tools.spec_traceability import covers_requirement
 
 from evennia.utils.search import search_script
 from evennia.utils.test_resources import EvenniaTestCase
@@ -72,6 +68,7 @@ def _minimal_payloads(
 
 
 class NamePackRegistryTests(unittest.TestCase):
+    @covers_requirement("namegen-corpus-registry::name-pack-registry-freezes-the-vendored-corpus-at-import-time")
     def test_registry_is_a_frozen_mapping_of_the_five_vendored_packs(self):
         self.assertIsInstance(NAME_PACK_REGISTRY, types.MappingProxyType)
         self.assertEqual(set(NAME_PACK_REGISTRY), set(_PACK_KEYS))
@@ -84,6 +81,7 @@ class NamePackRegistryTests(unittest.TestCase):
             for pool in pack.given.values():
                 self.assertTrue(pool, pack.key)
 
+    @covers_requirement("namegen-corpus-registry::name-pack-registry-freezes-the-vendored-corpus-at-import-time")
     def test_registry_rejects_mutation_below_the_top_level(self):
         given = NAME_PACK_REGISTRY["fantasy-human"].given
         with self.assertRaises(TypeError):
@@ -110,6 +108,7 @@ class NamePackRegistryTests(unittest.TestCase):
         self.assertIsInstance(cloned, FrozenDict)
         self.assertIsNot(cloned, given)
 
+    @covers_requirement("namegen-corpus-registry::name-pack-registry-freezes-the-vendored-corpus-at-import-time")
     def test_registry_content_matches_the_vendored_corpus_array_by_array(self):
         packs, translit = _load_source_corpus()
         total = 0
@@ -136,6 +135,7 @@ class NamePackRegistryTests(unittest.TestCase):
         # the corpus, same as the spec's stated count.
         self.assertEqual(total, 1274)
 
+    @covers_requirement("namegen-corpus-registry::name-pack-registry-freezes-the-vendored-corpus-at-import-time")
     def test_every_part_has_a_chinese_rendering_without_raw_text_leakage(self):
         _packs, translit = _load_source_corpus()
         for pack in NAME_PACK_REGISTRY.values():
@@ -149,6 +149,7 @@ class NamePackRegistryTests(unittest.TestCase):
                 )
                 self.assertIsInstance(part.meaning_zh, str)
 
+    @covers_requirement("namegen-corpus-registry::race-binding-maps-the-three-playable-races-and-leaves-the-spare-packs-unbound")
     def test_race_binding_maps_three_races_and_leaves_spares_unbound(self):
         self.assertIsInstance(NAME_PACK_BY_RACE, types.MappingProxyType)
         self.assertEqual(
@@ -162,11 +163,13 @@ class NamePackRegistryTests(unittest.TestCase):
             self.assertIsNone(NAME_PACK_REGISTRY[spare].race_key, spare)
             self.assertNotIn(spare, NAME_PACK_BY_RACE.values())
 
+    @covers_requirement("namegen-corpus-registry::name-pack-registry-is-mirrored-into-lorerecord-scripts-idempotently")
     def test_name_packs_category_is_wired_into_the_sync_mirror(self):
         self.assertIs(_ALL_REGISTRIES["name_packs"], NAME_PACK_REGISTRY)
 
 
 class NameCorpusInvariantTests(unittest.TestCase):
+    @covers_requirement("namegen-corpus-registry::registry-load-enforces-the-corpus-invariants-at-import-time")
     def test_translit_gap_raises_and_names_the_missing_words(self):
         payloads, translit = _minimal_payloads()
         del translit["Givm"]
@@ -177,12 +180,14 @@ class NameCorpusInvariantTests(unittest.TestCase):
         self.assertIn("Givm", message)
         self.assertIn("Surn", message)
 
+    @covers_requirement("namegen-corpus-registry::registry-load-enforces-the-corpus-invariants-at-import-time")
     def test_missing_or_extra_pack_raises(self):
         payloads, translit = _minimal_payloads()
         payloads.pop("fantasy-orc")
         with self.assertRaises(NameCorpusError):
             _build_registry(payloads, translit, _race_bindings_stub())
 
+    @covers_requirement("namegen-corpus-registry::registry-load-enforces-the-corpus-invariants-at-import-time")
     def test_empty_pool_or_surnames_raises(self):
         for mutate, fragment in (
             (lambda p: p["fantasy-elf"]["given"]["f"].clear(), "pool"),
@@ -194,6 +199,7 @@ class NameCorpusInvariantTests(unittest.TestCase):
                 with self.assertRaises(NameCorpusError):
                     _build_registry(payloads, translit, _race_bindings_stub())
 
+    @covers_requirement("namegen-corpus-registry::registry-load-enforces-the-corpus-invariants-at-import-time")
     def test_unknown_race_key_or_unregistered_pack_binding_raises(self):
         payloads, translit = _minimal_payloads()
         with self.assertRaises(NameCorpusError):
@@ -201,11 +207,16 @@ class NameCorpusInvariantTests(unittest.TestCase):
         with self.assertRaises(NameCorpusError):
             _build_registry(payloads, translit, {"human": "fantasy-goblin"})
 
+    @covers_requirement("namegen-corpus-registry::registry-load-enforces-the-corpus-invariants-at-import-time")
     def test_overlong_composed_name_raises_through_the_builder(self):
         payloads, translit = _minimal_payloads(given_zh="名" * 64)
         with self.assertRaises(NameCorpusError):
             _build_registry(payloads, translit, _race_bindings_stub())
 
+    @covers_requirement(
+        "namegen-corpus-registry::registry-load-enforces-the-corpus-invariants-at-import-time",
+        "namegen-corpus-registry::display-names-compose-from-chinese-renderings-with-the-middle-dot-separator",
+    )
     def test_real_corpus_longest_composition_passes_the_validator(self):
         from world.rules.character_creation import _validate_name
 
@@ -228,15 +239,18 @@ def _race_bindings_stub() -> dict[str, str]:
 
 
 class DisplayCompositionTests(unittest.TestCase):
+    @covers_requirement("namegen-corpus-registry::display-names-compose-from-chinese-renderings-with-the-middle-dot-separator")
     def test_separator_is_the_katakana_middle_dot(self):
         self.assertEqual(NAME_SEPARATOR, "・")
         self.assertEqual(ord(NAME_SEPARATOR), 0x30FB)
 
+    @covers_requirement("namegen-corpus-registry::display-names-compose-from-chinese-renderings-with-the-middle-dot-separator")
     def test_composition_is_given_separator_surname(self):
         given = NamePart(text="Gaspar", zh="加斯帕", meaning_zh="")
         surname = NamePart(text="Snow", zh="斯諾", meaning_zh="")
         self.assertEqual(compose_display_name(given, surname), "加斯帕・斯諾")
 
+    @covers_requirement("namegen-corpus-registry::display-names-compose-from-chinese-renderings-with-the-middle-dot-separator")
     def test_composed_names_never_contain_raw_corpus_text(self):
         pack = NAME_PACK_REGISTRY["fantasy-human"]
         given_parts = pack.given["m"] + pack.given["f"] + pack.given["u"]
@@ -251,6 +265,7 @@ class DisplayCompositionTests(unittest.TestCase):
 
 
 class NamePackMirrorTests(EvenniaTestCase):
+    @covers_requirement("namegen-corpus-registry::name-pack-registry-is-mirrored-into-lorerecord-scripts-idempotently")
     def test_sync_all_mirrors_the_five_name_packs_idempotently(self):
         sync_all()
         first = {}

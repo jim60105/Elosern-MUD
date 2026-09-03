@@ -172,6 +172,7 @@ class ContainerContractTests(unittest.TestCase):
         }
         self.assertTrue(required <= patterns, f"missing ignore patterns: {sorted(required - patterns)}")
 
+    @covers_requirement("namegen-corpus-registry::the-vendored-name-corpus-ships-in-the-runtime-image")
     def test_vendored_name_corpus_is_baked_into_the_runtime_image(self):
         # world/lore/names.py parses third_party/fantasy-namegen at import
         # time, so a missing corpus turns every container start into a crash.
