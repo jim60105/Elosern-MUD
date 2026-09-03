@@ -94,7 +94,7 @@
 | 指令 | 說明 |
 | --- | --- |
 | [`character`](/game/command-reference?id=character) | 建立角色或使用預設角色。 |
-| [`character concept`](/game/command-reference?id=character-concept) | 依角色構想生成提案，再完成建立。 |
+| [`character concept`](/game/command-reference?id=character-concept) | 依角色構想生成提案，提案值預填姓名與年齡，Enter 採納或輸入覆寫，再完成建立。 |
 | [`設定描述`](/game/command-reference?id=設定描述) | 設定你的個人描述。 |
 | [`設定背景`](/game/command-reference?id=設定背景) | 設定或檢視你的背景（風味文字）。 |
 | [`設定個性`](/game/command-reference?id=設定個性) | 設定或檢視你的個性（風味文字）。 |

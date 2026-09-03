@@ -37,3 +37,11 @@
 ### D3: 摘要擴充與請求組裝
 
 `_proposal_summary` 在 persona 段落前插「姓名／實際年齡／外表年齡／背景／元素親和」行（缺席顯示「（未提案，將由你輸入／留空）」）。`_activate_creation` 呼叫點增 `background=proposal.background`、`affinity_elements=proposal.affinity_elements`（缺席 `None` 直傳——custom 驗證器把 `None` 標準化為中性 `()`）。
+
+### D4: 過期續作就地釋放（防線，跨面啟動競態）
+
+啟動成功路徑（`_activate_creation`）清除殘留的 `caller.ndb.concept_prompt`；prompt generator 在每次送出回覆後檢查 `creation_pending`，轉為非待建（其它面完成啟動）時靜默收尾、不再嘗試啟動；async feeder（`_CmdConceptPrompt.func`）餵食前同樣檢查。prompt 機架本身不動——只加防線：webclient 面啟動不會拆掉 Telnet 側掛起的 generator，若玩家回頭在殘留 prompt 輸入，舊行為會再走一次啟動（整段失敗或覆寫已啟動角色）；現行語意為第一筆遊蕩輸入即釋放鏈條、恢復正常指令路由。不改變任何 spec 場景（「SHALL NOT modify state」語意保留）。
+
+### D5: 摘要與提示的終端安全渲染
+
+`_terminal_safe` 先 `strip_control_sequences`（ANSI/ESC），再將殘留 C0 控制字元（含 `\n`、`\r`、`\t`）替換為空格，最後把 `|` 雙寫（Evennia markup 跳脫）。摘要與姓名提示渲染提案文字一律經它——提案背景與姓名取自模型輸出，若含換行或 markup 會撕裂多行摘要或注入 markup 指令。純函數測試直接鎖渲染契約（無 ESC、無換行、markup 只以 `||` 形式出現）。
