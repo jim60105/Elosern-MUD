@@ -55,6 +55,17 @@ class GuildNPCIdentityTests(unittest.TestCase):
         self.assertIn("invalid host_name", str(caught.exception))
 
     @covers_requirement("npc-identity-titles::shop-and-guild-registries-author-host-and-examiner-identities-validated-at-load")
+    def test_missing_identity_fields_reject_construction(self):
+        # Examiner/host identity fields are required without defaults.
+        import dataclasses
+
+        fields = {field.name: None for field in dataclasses.fields(GuildRank)}
+        fields.pop("examiner_name")
+        fields.pop("examiner_title")
+        with self.assertRaises(TypeError):
+            GuildRank(**fields)
+
+    @covers_requirement("npc-identity-titles::shop-and-guild-registries-author-host-and-examiner-identities-validated-at-load")
     def test_shipped_rows_load_clean(self):
         # The module-level call already ran at import; an explicit re-run is a
         # no-op proof that every shipped row passes both shared validators.

@@ -286,7 +286,15 @@ def _instance_bound_payload(**overrides):
                     "xyz": None,
                     "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
                 },
-                "npc_req": [{"role": "bandit", "tier": "bandit", "disposition": None}],
+                "npc_req": [
+                    {
+                        "role": "bandit",
+                        "tier": "bandit",
+                        "disposition": None,
+                        "display_name": "黑鬍",
+                        "title": "林間盜匪首領",
+                    }
+                ],
             }
         ],
         "reward": {"copper": 50, "items": [], "merit": 25},

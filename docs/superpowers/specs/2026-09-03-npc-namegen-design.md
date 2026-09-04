@@ -15,7 +15,8 @@ NPC 側只有 `BlueprintNpcReq.display_name` 這個選填欄位，LLM 沒填時�
 1,261 筆中文譯名對照）為基礎，建立確定性的姓名產生器，供兩個消費端使用：
 
 1. 角色創建 UI 自訂表單姓名欄旁的骰子按鈕。
-2. NPC 生成流程（LLM 靈感來源＋離線兜底補名）。
+2. NPC 生成流程（LLM 靈感來源）。spawn 兜底補名已由
+   `npc-title-authored-identities`（2026-09-04）明文撤回，見 §6.2。
 
 ## 2. 決策摘要
 
@@ -27,7 +28,7 @@ NPC 側只有 `BlueprintNpcReq.display_name` 這個選填欄位，LLM 沒填時�
 | 骰子語料位置 | 伺服器端，走 OOB `ui_action` 往返 | SPA 維持 view-layer only；語料只在伺服器一份，不進前端 bundle |
 | 骰子脈絡 | 讀表單的種族與性別欄 | 行為直覺，且與 NPC 側共用同一規則函式 |
 | 性別欄位 | 自訂表單新增「性別」下拉（女性／男性／其他），隨 payload 持久化到 `entity.sex` | `SEX_VALUES` registry 已存在、import 載入側已寫 `entity.sex`，創建側是缺口，一併補齊 |
-| NPC 整合 | 方案 A＋靈感化 B：prompt 階段注入「僅供靈感」建議名，spawn 階段對缺失名確定性補名；validator 與 schema 必填性不動 | 只用 A 時名字風格可能與 LLM 敘事脫節；只用 B 時 LLM 仍可能自創名。靈感定位讓 LLM 可依性別／背景調整（用戶核定），離線時兜底補名仍保證可玩 |
+| NPC 整合 | 方案 A＋靈感化 B：prompt 階段注入「僅供靈感」建議名；validator 與 schema 必填性不動。**（2026-09-04 撤回）spawn 階段對缺失名確定性補名的 B 後半段由 `npc-title-authored-identities` 撤回**：該 change 將 `display_name`／`title` 改為 blueprint 兩層驗證必填，補名 seam 在生產上不可達，連同其 `npc_name_fallback` 事件一併刪除（其 design D11）。靈感定位讓 LLM 可依性別／背景調整（用戶核定）的部分不動 | 只用 A 時名字風格可能與 LLM 敘事脫節；靈感定位讓語料風格錨定與 LLM 敘事自由共存。可玩性改由「必填身份欄＋驗證失敗即重試／拒絕提案」保證，不再需要兜底名 |
 | RNG 策略 | UI 骰用模組級無種子 `Random()`；NPC 側用 `Random(crc32("definition.key:stage:role"))` | 玩家擲名本質是輸入的另一種形式，無需重放；NPC 名要與藍圖同種子可重放 |
 
 拒絕的替代方案：把語料 bundle 進前端（SPA 契約禁止語料層、且 204 KB 進
@@ -143,7 +144,15 @@ schema 指示同步加一句：`display_name` 建議填寫，風格可參考建�
 定位為靈感，讓語料風格錨定與 LLM 敘事自由共存；擲名不綁性別或需求時，
 模型有權改寫。
 
-### 6.2 Spawn 階段：兜底補名
+### 6.2 Spawn 階段：兜底補名（已撤回）
+
+> **2026-09-04 撤回（`npc-title-authored-identities` design D11）**：本節描述的
+> spawn 兜底補名 seam（`scene_builder._spawn_npc` 的 `roll_name_for_race` 補名
+> 分支）與 `npc_name_fallback` 事件**已實作後又被刪除**。該 change 把
+> `display_name` 與 `title` 升為 blueprint 兩層驗證（guardrail＋compile）必填，
+> SceneBuilder 並在 materialization 前對缺身份者 fail-closed 回滾，補名分支在
+> 生產上不可達；保留死碼違反 clean-cutover 契約。以下原文保留作歷史紀錄，
+> **不得**作為重新引入補名的依據。§6.1 靈感名路徑不受影響、仍有效。
 
 （2026-09-03 修訂，見 OpenSpec `namegen-npc-flow` design D3／D4。）補名
 seam 在 `world/quests/scene_builder.py::_spawn_npc()`：`_apply_characterization()`
@@ -179,10 +188,10 @@ creation_wizard    prompts/registry.py（靈感名）
    ▼                LLM 填 display_name（可改寫靈感名）
 CreationOverlay 回填        │
   → creation.custom        ▼
-  → _validate_name    scene_builder._spawn_npc（_apply_characterization 後）
-  → entity.sex             │ display_name 仍 None 時兜底補名
-                           ▼
-                      npc.db.display_name ＋ on_commit 事件
+  → _validate_name    scene_builder._spawn_npc
+  → entity.sex             │ display_name 必填（兩層驗證 fail-closed；
+                           ▼  spawn 兜底補名已撤回，D11）
+                      npc.key ＋ db.display_name ＋ npc_title
 ```
 
 單向依賴：`lore` 不依賴任何人；`rules/namegen` 只讀 lore；兩個消費端只呼叫
@@ -197,7 +206,7 @@ rules。`world/ai/` 全程不落地任何狀態，靈感名由 prompt 組合器�
 | 不存在的 pack_key | `KeyError`，不吞 |
 | `creation.roll_name` 帶無效 race／sex | 規則層以既有 validation 錯誤回 `ui_protocol_error`，前端顯示既有錯誤通道訊息 |
 | LLM 回傳超長或含非法字元的名字 | 走既有 `MAX_NAME_LENGTH` 與 validator 路徑，本設計不新增規則 |
-| `display_name` 缺失（LLM 未填或離線） | spawn 兜底補名，必然有名 |
+| `display_name` 缺失（LLM 未填或離線） | （已撤回，`npc-title-authored-identities` D11）欄位為兩層驗證必填：guardrail 具名拒並重試；compile／materialization 對殘缺者 fail-closed 回滾，不會有生出來沒名的 NPC |
 
 ## 9. 測試與契約同步
 
@@ -208,8 +217,8 @@ rules。`world/ai/` 全程不落地任何狀態，靈感名由 prompt 組合器�
 - `creation_wizard` 面板測試（Evennia 級）：`custom.sex` 欄存在；
   `creation.roll_name` 行動往返；`creation.custom` 帶／不帶 `sex` 的驗證與
   `entity.sex` 落地。
-- `scene_builder` 測試：`display_name=None` 補名且同種子重放同名；有名字時
-  不覆寫；靈感名出現在 prompt 組裝輸出且不影響 schema 必填性。
+- `scene_builder` 測試：（補名分支已撤回，D11）靈感名出現在 prompt 組裝輸出；
+  `display_name` 為必填，缺身份的提案在 guardrail／compile 被具名拒絕。
 - 前端：`creation_menu.js` 純邏輯測試（roll payload 形狀、result 回填、sex
   欄進出 draft）；Vitest 元件測（🎲 按鈕、性別下拉渲染與選擇）；新元件抽檔時
   補 Storybook story 與 showcase coverage。
@@ -240,7 +249,7 @@ rules。`world/ai/` 全程不落地任何狀態，靈感名由 prompt 組合器�
 | B | `npc-namegen-rules-roller` | `world/rules/namegen.py` 擲名純函式 | A |
 | C | `oob-result-data-slot` | `ui_action_result` 條件性 `data` 槽（server emitter／validator＋JS mirror） | 無 |
 | D | `namegen-creation-ui` | 性別下拉、🎲 骰子、`creation.roll_name`、`entity.sex` | B、C |
-| E | `namegen-npc-flow` | prompt 靈感名庫＋spawn 兜底補名＋觀察事件 | B |
+| E | `namegen-npc-flow` | prompt 靈感名庫＋spawn 兜底補名＋觀察事件（補名與事件後由 `npc-title-authored-identities` D11 撤回） | B |
 
 批次建議：
 
@@ -255,5 +264,5 @@ rules。`world/ai/` 全程不落地任何狀態，靈感名由 prompt 組合器�
   E：test_scene_builder*／prompt 測），`.github/evennia-shards.json` 預期零
   改動；若任一 change 實作中需要新增 test module，須在同 change 內更新 manifest
   並重跑 ownership contract，避免雙主。
-- 驗收面：A/B 落地後離線模板 NPC 即已有兜底名（E 的 spawn 分支）；C/D 落地後
+- 驗收面：（兜底名分支已撤回，D11）模板 NPC 的名字由 authored 必填身份供給；C/D 落地後
   自訂表單有骰子；E 的 prompt 分支最後落地才完整實現 §6 雙管設計。

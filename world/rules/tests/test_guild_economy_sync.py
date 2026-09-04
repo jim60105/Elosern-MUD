@@ -26,6 +26,7 @@ from world.lore.guild import GUILD_BRANCH_REGISTRY, GuildBranch
 from world.lore.shops import SHOP_REGISTRY
 from world.rules.guild_economy import (
     GUILD_SERVICE_KEY,
+    ServiceAnchorIntegrityError,
     _cleanup_legacy_service_hosts,
     MERCHANT_SERVICE_KEY,
     sync_service_content,
@@ -225,6 +226,47 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         legacy.refresh_from_db()
         # Reused as-is: no runtime title write, no second authored host.
         self.assertEqual(legacy.npc_title, "")
+        self.assertEqual(NPC.objects.filter(db_key=GUILD_HOST_NAME).count(), 0)
+
+    def test_unrelated_npc_sharing_a_retired_key_survives_cleanup(self):
+        # Deletion anchors on the legacy identity shape (retired key + anchor
+        # component + no title), never the key alone: an unrelated NPC that
+        # merely carries a retired ASCII key is never destroyed.
+        unrelated = create_object(NPC, key=GUILD_SERVICE_KEY, location=self._guild_hallish())
+        _cleanup_legacy_service_hosts()
+        unrelated.refresh_from_db()  # still alive
+        self.assertIsNone(unrelated.npc_title or None)
+
+    def test_ambiguous_titled_same_anchor_host_is_kept_with_warning(self):
+        # A same-key titled host with the anchor component is ambiguous
+        # residue; cleanup refuses to guess and names the condition instead.
+        host = self._anchored_legacy_host(GUILD_SERVICE_KEY)
+        host.npc_title = "手工頭銜"
+        host.save()
+        with patch("world.rules.guild_economy.log_warn") as warned:
+            _cleanup_legacy_service_hosts()
+        host.refresh_from_db()  # kept for manual repair
+        events = [
+            call for call in warned.call_args_list
+            if call.args and call.args[0] == "guild_service_host_legacy_cleanup_ambiguous"
+        ]
+        self.assertEqual(len(events), 1)
+
+    @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
+    def test_duplicate_service_anchors_fail_closed_before_mutation(self):
+        # Two live NPCs claiming one service anchor violate the single-host
+        # invariant: sync raises the named integrity error and creates nothing.
+        first = self._anchored_legacy_host("分身公會管理人一")
+        second = create_object(NPC, key="分身公會管理人二", location=self._guild_hallish())
+        second.components.add(
+            GuildStaff.create(
+                second, service_id=GUILD_SERVICE_KEY, branch_key="guild_branch_altoria"
+            )
+        )
+        with self.assertRaises(ServiceAnchorIntegrityError):
+            sync_service_content()
+        first.refresh_from_db()
+        second.refresh_from_db()  # untouched fail-closed, no arbitrary pick
         self.assertEqual(NPC.objects.filter(db_key=GUILD_HOST_NAME).count(), 0)
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")

@@ -60,29 +60,50 @@ def validate_shop_npc_identities(
             raise ValueError(f"shop {definition.key} has an invalid host_title: {error}") from error
 
 
-def validate_shipped_identity_uniqueness() -> None:
-    """Cross-registry authored-name uniqueness for the shipped rows (design D4).
+def validate_registry_identity_uniqueness(
+    shop_rows: dict[str, ShopDefinition] | None = None,
+    branch_rows=None,
+    rank_rows=None,
+) -> None:
+    """Cross-registry authored-name uniqueness over all three name sources (D4).
 
-    Runs here rather than in ``guild.py`` to keep the guild registry importable
-    without the shop module; the shared checker itself is pure and callable
-    with explicit entries from tests.
+    Pure checker callable with explicit row mappings (shop, guild-branch and
+    rank rows are read for their authored ``host_name``/``examiner_name``);
+    defaults to the shipped registries. Every authored name across the three
+    registries must be distinct; a collision raises ``NPCNameError`` naming
+    both holders. Cycle-safe: the guild registries are imported function-
+    locally, so ``guild.py`` can (and does) run the same check through this
+    function at its own load time.
     """
-    from .guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
+    if shop_rows is None:
+        shop_rows = SHOP_REGISTRY
+    if branch_rows is None or rank_rows is None:
+        from .guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
+
+        if branch_rows is None:
+            branch_rows = GUILD_BRANCH_REGISTRY
+        if rank_rows is None:
+            rank_rows = GUILD_RANK_REGISTRY
     from world.rules.npc_identity import validate_unique_npc_names
 
     entries: list[tuple[str, str]] = [
         (f"shop:{definition.key}", definition.host_name)
-        for definition in SHOP_REGISTRY.values()
+        for definition in shop_rows.values()
     ]
     entries += [
         (f"guild_branch:{branch.key}", branch.host_name)
-        for branch in GUILD_BRANCH_REGISTRY.values()
+        for branch in branch_rows.values()
     ]
     entries += [
         (f"guild_rank:{rank.key}", rank.examiner_name)
-        for rank in GUILD_RANK_REGISTRY.values()
+        for rank in rank_rows.values()
     ]
     validate_unique_npc_names(entries)
+
+
+def validate_shipped_identity_uniqueness() -> None:
+    """Run the cross-registry uniqueness checker over the shipped rows (D4)."""
+    validate_registry_identity_uniqueness()
 
 
 validate_shop_npc_identities()

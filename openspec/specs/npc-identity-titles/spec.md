@@ -338,8 +338,9 @@ This capability SHALL add the import-side title behavior without changing the re
 
 ### Requirement: Blueprint scene occupants spawn under the authored name with the authored title
 The SceneBuilder SHALL spawn every stage occupant whose `key` is the entry's authored
-`display_name` (validated through the shared name rule) and SHALL persist the entry's authored
-`title` (validated through the shared title rule) as the NPC title. The existing
+`display_name` in the shared name validator's normalized (stripped) form, and SHALL persist the
+entry's authored `title` in the shared title validator's normalized form as the NPC title; the
+`db.display_name` write SHALL carry the same normalized name. The existing
 `db.display_name` write SHALL be preserved so the portrait-subject reader keeps reading the same
 value. If any occupant lacks a characterization, its `display_name`, or its `title` at spawn time,
 the SceneBuilder SHALL raise `SceneBuilderSpawnError` and roll back the whole materialization
@@ -356,6 +357,11 @@ existing adult-invariant revalidation does.
   invalid
 - **THEN** `SceneBuilderSpawnError` is raised and no room, entity, or exit from that
   materialization persists
+
+#### Scenario: Surrounding whitespace never reaches the entity key
+- **WHEN** an otherwise-valid authored identity carries surrounding whitespace when the
+  materialization revalidator strips and accepts it
+- **THEN** the spawned NPC's `key` and `db.display_name` are the stripped form
 
 #### Scenario: The portrait subject name keeps its source
 - **WHEN** an occupant spawns under its authored name
@@ -411,7 +417,12 @@ authored `host_name` as its `key` with the authored `host_title` persisted as it
 existing host located by its service anchor SHALL never be renamed and SHALL never have its title
 written at sync time — a host that predates authored identities is stale development state the
 unreleased project discards rather than backfills at runtime: the batch's one-time cleanup task
-deletes legacy-keyed hosts so the next sync recreates them under the full authored identity.
+deletes legacy-keyed hosts so the next sync recreates them under the full authored identity. The
+cleanup SHALL anchor deletion on the retired host's identity shape (retired key + matching anchor
+component + no authored title), never the key alone: an unrelated same-key NPC SHALL survive, and
+a same-key titled host carrying the anchor SHALL be kept with a named warning for manual repair.
+Locating an anchor claimed by more than one live host SHALL fail closed with a named integrity
+error before any mutation.
 
 #### Scenario: First sync creates the authored host
 - **WHEN** `sync_guild_economy` runs with no existing host for a service component
@@ -427,6 +438,15 @@ deletes legacy-keyed hosts so the next sync recreates them under the full author
 - **WHEN** a pre-existing host located by its service anchor carries no authored title
 - **THEN** the sync never writes a title into it; the one-time legacy-host cleanup removes it so
   the next sync recreates it under the full authored identity
+
+#### Scenario: An unrelated NPC sharing a retired key survives cleanup
+- **WHEN** the cleanup runs while an NPC carries a retired ASCII key but not the matching anchor
+  component
+- **THEN** the NPC is not deleted
+
+#### Scenario: Duplicate service anchors fail closed
+- **WHEN** two live NPCs carry service components with the same `service_id` and sync runs
+- **THEN** a named integrity error is raised and no host is created, renamed, or deleted
 
 ### Requirement: Exam examiners carry their authored identity
 The examination opponent spawn SHALL use the rank's authored `examiner_name` and SHALL persist the

@@ -14,7 +14,7 @@ NPC-title 批次的最後一件。
   （digest 欄位清單含必填 `title`、field-less scenario 改寫）。
 - [x] 0.3 design D11／proposal 同步折入（REMOVED 範圍、prompt 文案改寫、設計文件作廢標註、
   前置落地狀態校正）。
-- [ ] 0.4 `docs/superpowers/specs/2026-09-03-npc-namegen-design.md`：§6.2 spawn 兜底段落明文標註
+- [x] 0.4 `docs/superpowers/specs/2026-09-03-npc-namegen-design.md`：§6.2 spawn 兜底段落明文標註
   由本 change 撤回（§2 決策表「NPC 整合」列與 §9 測試預期同步；§6.1 靈感庫不動）。設計文件勝出
   規則要求撤回必須明文。
 - [x] 0.5 新增 `specs/prompt-library/spec.md`：MODIFIED `The scenario-director key is registered
@@ -38,9 +38,9 @@ NPC-title 批次的最後一件。
 - [x] 2.2 `world/lore/guild.py`：`GuildRank` 新增必填 `examiner_name`／`examiner_title`（七列各補作者值），
   `GuildBranch` 新增必填 `host_name`／`host_title`（`guild_branch_altoria` 補作者值）；
   同檔 row validator＋載入驗證（design D9 先例：`world/lore/titles.py`）。
-- [ ] 2.3 實作跨 registry 作者姓名唯一性純檢查（shops＋guild branches＋ranks 三組姓名互不重複，
+- [x] 2.3 實作跨 registry 作者姓名唯一性純檢查（shops＋guild branches＋ranks 三組姓名互不重複，
   違規具名 `ValueError`），由兩檔載入流程呼叫（design D9）。
-- [ ] 2.4 `world/lore/tests/test_guild.py` 與 shops 對應測試：缺欄 `TypeError`、違規值具名
+- [x] 2.4 `world/lore/tests/test_guild.py` 與 shops 對應測試：缺欄 `TypeError`、違規值具名
   `ValueError`、跨 registry 重名拒、出貨 registries 載入-clean 斷言；確認 `world/lore/sync.py`
   的 `asdict` 鏡射自動帶新欄且冪等（`GUILD_RANK_REGISTRY` 已在鏡射清單；`SHOP_REGISTRY` 不在，不動）。
   Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.lore.tests.test_guild`

@@ -38,7 +38,7 @@ from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.maps.instance import register_owned_entity, spawn_instance_room
 from world.quests.binding import bind_stage_runtime
 from world.quests.characterization import characterize_errors, race_lifespan_upper_bound
-from world.rules.npc_identity import validate_npc_title
+from world.rules.npc_identity import validate_npc_name, validate_npc_title
 from world.quests.compile import scene_requirements_for
 from world.quests.definitions import DestinationKind, ObjectiveKind, RoomLocator
 from world.quests.runtime import (
@@ -244,7 +244,9 @@ def _apply_characterization(
     if characterization is None:
         return
     if characterization.display_name is not None:
-        npc.db.display_name = characterization.display_name
+        # Store the validator's normalized (stripped) form, matching the key
+        # the spawner used (producer contract shared with the import loader).
+        npc.db.display_name = validate_npc_name(characterization.display_name)
     if characterization.title is not None:
         # Store the validator's normalized (stripped) form, the same producer
         # contract the import loader follows (change 2).
@@ -299,12 +301,14 @@ def _spawn_npc(
     )
 
     # The authored display name IS the entity key (design §3.2, D2): every
-    # accepted characterization carries it (revalidation above fails closed).
+    # accepted characterization carries it (revalidation above fails closed),
+    # persisted in the validator's normalized form so surrounding whitespace
+    # can never leak into the entity key.
     characterizations = getattr(requirement, "characterizations", ())
     characterization = characterizations[position]
     prototype = {
         "prototype_parent": "scene_npc",
-        "key": characterization.display_name,
+        "key": validate_npc_name(characterization.display_name),
         "location": room,
     }
     _validate_occupant_parent(prototype)

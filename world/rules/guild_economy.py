@@ -46,18 +46,30 @@ def _room_by_tag(tag):
     return rooms[0] if rooms else None
 
 
+class ServiceAnchorIntegrityError(RuntimeError):
+    """Two live NPCs claim one service anchor; sync refuses to guess."""
+
+
 def _find_service_host(service_id: str, component_slot: str) -> NPC | None:
     """Locate the host owning the service component with this ``service_id``.
 
     The component anchor — never the display ``key`` — is the reuse identity,
     so a registry name change can never orphan or duplicate a host (design
-    D3). Scan shape follows ``_initialize_merchant_stock``.
+    D3). Scan shape follows ``_initialize_merchant_stock``. More than one live
+    host on one anchor violates the single-host invariant; sync fails closed
+    on the named integrity error instead of mutating an arbitrary pick.
     """
-    for host in NPC.objects.all_family():
-        component = host.components.get(component_slot)
-        if component is not None and component.service_id == service_id:
-            return host
-    return None
+    matches = [
+        host
+        for host in NPC.objects.all_family()
+        if (component := host.components.get(component_slot)) is not None
+        and component.service_id == service_id
+    ]
+    if len(matches) > 1:
+        raise ServiceAnchorIntegrityError(
+            f"service anchor {service_id!r} is claimed by {len(matches)} hosts"
+        )
+    return matches[0] if matches else None
 
 
 def _sync_service_host(service_id, host_name, host_title, room, component_specs) -> NPC:
@@ -107,12 +119,32 @@ def _cleanup_legacy_service_hosts() -> None:
     One-time cleanup for the unreleased development database (clean cutover,
     no backfill): the next sync recreates these hosts under their full authored
     identity. Idempotent — once removed, later syncs find nothing.
+
+    Deletion is anchored on the retired host's *identity shape*, never the key
+    alone: the NPC must still be titleless and carry the anchor component whose
+    ``service_id`` equals the retired key (exactly what the pre-feature sync
+    created). An unrelated NPC that merely shares a retired key (no component)
+    is left untouched, and a titled same-key NPC is ambiguous residue the
+    cleanup refuses to guess about (named warning, manual repair).
     """
+    anchor_slots = {
+        GUILD_SERVICE_KEY: GuildStaff.get_component_slot(),
+        MERCHANT_SERVICE_KEY: Merchant.get_component_slot(),
+    }
     for legacy_key in _LEGACY_HOST_KEYS:
         for host in NPC.objects.filter(db_key=legacy_key):
+            component = host.components.get(anchor_slots[legacy_key])
+            if component is None or component.service_id != legacy_key:
+                continue  # Not the retired service host — unrelated same-key NPC.
+            if host.npc_title:
+                log_warn(
+                    "guild_service_host_legacy_cleanup_ambiguous",
+                    context={"char": legacy_key, "service": legacy_key},
+                )
+                continue
             log_info(
                 "guild_service_host_legacy_cleanup",
-                context={"char": legacy_key},
+                context={"char": legacy_key, "service": legacy_key},
             )
             host.delete()
 

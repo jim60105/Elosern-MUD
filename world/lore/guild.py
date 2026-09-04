@@ -94,4 +94,12 @@ def validate_guild_npc_identities(
 
 
 # Shipped rows must be valid the moment the module loads (titles.py precedent).
+# The cross-registry name check runs here too (not only from shops.py): the
+# function-local import is cycle-safe because shops.py reaches the guild
+# registries function-locally as well, so loading either registry validates
+# the whole authored-name set (design D4/D9).
 validate_guild_npc_identities()
+
+from world.lore.shops import validate_registry_identity_uniqueness  # noqa: E402
+
+validate_registry_identity_uniqueness(branch_rows=GUILD_BRANCH_REGISTRY, rank_rows=GUILD_RANK_REGISTRY)

@@ -602,6 +602,18 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
 
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
     @covers_requirement("npc-identity-titles::blueprint-scene-occupants-spawn-under-the-authored-name-with-the-authored-title")
+    def test_surrounding_whitespace_never_reaches_the_entity_key(self):
+        # Validators strip before deciding, so an otherwise-valid authored
+        # identity may carry surrounding whitespace; the spawner and the
+        # persisted display_name both take the normalized form.
+        npc = self._spawned_npc(
+            self._characterized(display_name="  黑鬍  ", title=" 林間盜匪首領 ")
+        )
+        self.assertEqual(npc.key, "黑鬍")
+        self.assertEqual(npc.db.display_name, "黑鬍")
+        self.assertEqual(npc.npc_title, "林間盜匪首領")
+
+    @covers_requirement("npc-identity-titles::blueprint-scene-occupants-spawn-under-the-authored-name-with-the-authored-title")
     def test_full_characterization_is_materialized_fully(self):
         npc = self._spawned_npc(
             self._characterized(
