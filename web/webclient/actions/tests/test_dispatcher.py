@@ -141,6 +141,7 @@ class RegistryTests(unittest.TestCase):
                     "guild.quest_accept",
                     "guild.quest_abandon",
                     "guild.quest_turnin",
+                    "guild.quest_track",
                     "guild.exam_start",
                     "shop.buy",
                     "shop.sell",

@@ -53,7 +53,10 @@ def settle_to_messages(result: dict[str, Any]) -> tuple[tuple[str, ...], str]:
 # webclient-align-04: a settlement round can move a participating companion's
 # HP, so the party panel re-rides the same partial update as its companion
 # neighbours instead of waiting for the next full snapshot.
-AFFECTED_PANELS = ("status", "context_actions", "art", "party")
+# webclient-align-06: a settlement round can also advance a tracked quest
+# (DEFEAT planner), and the objectives panel always publishes together with
+# its paired services rows, so both ride the same partial update.
+AFFECTED_PANELS = ("status", "context_actions", "art", "party", "services", "objectives")
 
 
 def settle_to_oob_result(result: dict[str, Any]) -> dict[str, Any]:

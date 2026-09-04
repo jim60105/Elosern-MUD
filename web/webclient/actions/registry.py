@@ -77,9 +77,10 @@ def build_production_action_registry() -> ActionRegistry:
     and exploration adapters.
 
     The registry contains exactly the three combat adapters (``combat.cast``,
-    ``combat.flee``, ``combat.forfeit``), the seven service adapters
+    ``combat.flee``, ``combat.forfeit``), the eight service adapters
     (``guild.register``, ``guild.quest_accept``, ``guild.quest_abandon``,
-    ``guild.quest_turnin``, ``guild.exam_start``, ``shop.buy``, ``shop.sell``),
+    ``guild.quest_turnin``, ``guild.quest_track``, ``guild.exam_start``,
+    ``shop.buy``, ``shop.sell``),
     the six creation adapters (``creation.preset``, ``creation.custom``,
     ``creation.concept``, ``creation.roll_name``, ``creation.activate``,
     ``creation.reset``), and the
@@ -147,6 +148,7 @@ def build_production_action_registry() -> ActionRegistry:
         _inventory_use_adapter,
         _quest_abandon_adapter,
         _quest_accept_adapter,
+        _quest_track_adapter,
         _quest_turnin_adapter,
         _sell_adapter,
         validate_buy_payload,
@@ -156,6 +158,7 @@ def build_production_action_registry() -> ActionRegistry:
         validate_inventory_use_payload,
         validate_quest_abandon_payload,
         validate_quest_accept_payload,
+        validate_quest_track_payload,
         validate_quest_turnin_payload,
         validate_sell_payload,
     )
@@ -208,7 +211,7 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="guild.quest_accept",
             validate_payload=validate_quest_accept_payload,
             adapter=_quest_accept_adapter,
-            affected_panels=("services",),
+            affected_panels=("services", "objectives"),
         )
     )
     registry.register(
@@ -216,7 +219,7 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="guild.quest_abandon",
             validate_payload=validate_quest_abandon_payload,
             adapter=_quest_abandon_adapter,
-            affected_panels=("services",),
+            affected_panels=("services", "objectives"),
         )
     )
     registry.register(
@@ -224,7 +227,15 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="guild.quest_turnin",
             validate_payload=validate_quest_turnin_payload,
             adapter=_quest_turnin_adapter,
-            affected_panels=("status", "services"),
+            affected_panels=("status", "services", "objectives"),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="guild.quest_track",
+            validate_payload=validate_quest_track_payload,
+            adapter=_quest_track_adapter,
+            affected_panels=("services", "objectives"),
         )
     )
     registry.register(

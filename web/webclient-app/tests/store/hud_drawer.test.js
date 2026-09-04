@@ -13,7 +13,7 @@ import * as fx from "./protocol_fixtures.js";
 // service frame) so `ServiceMenu.buildMenus` yields a valid `menus.quests`.
 function servicesPanel() {
   return {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     kind: "services",
     host: null,
@@ -62,6 +62,7 @@ function servicesPanel() {
             disabled_reason: { code: "incomplete", message: "目標尚未完成" },
             quantity: null,
           },
+          tracked: false,
         },
       ],
       rank: null,

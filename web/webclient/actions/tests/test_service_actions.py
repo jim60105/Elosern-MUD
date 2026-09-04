@@ -24,13 +24,16 @@ from typeclasses.rooms import Room
 from web.webclient.actions.dispatcher import handle_ui_action
 from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.actions.service_actions import (
+    ServiceActionError,
     _buy_adapter,
     _exam_start_adapter,
     _guild_register_adapter,
     _quest_abandon_adapter,
     _quest_accept_adapter,
+    _quest_track_adapter,
     _quest_turnin_adapter,
     _sell_adapter,
+    validate_quest_track_payload,
 )
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import attach_coordinator
@@ -224,7 +227,7 @@ class ServiceAdapterTests(ServiceActionBase):
         self._register()
         result = _quest_accept_adapter(self.player, {"definition_key": "introductory_hunt"})
         self.assertEqual(result["outcome"], "success")
-        self.assertEqual(result["affected_panels"], ("services",))
+        self.assertEqual(result["affected_panels"], ("services", "objectives"))
         records = read_records(self.player)
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].definition_key, "introductory_hunt")
@@ -383,6 +386,64 @@ class ServiceAdapterTests(ServiceActionBase):
         result = _buy_adapter(self.player, {"item_key": "meal", "quantity": 1})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_merchant")
+
+
+    def test_validate_quest_track_payload(self):
+        valid = validate_quest_track_payload({"quest_id": "q:1", "tracked": True})
+        self.assertEqual(valid, {"quest_id": "q:1", "tracked": True})
+        with self.assertRaises(ServiceActionError):
+            validate_quest_track_payload({"quest_id": "q:1", "tracked": True, "extra": 1})
+        with self.assertRaises(ServiceActionError):
+            validate_quest_track_payload({"quest_id": "q:1"})
+        with self.assertRaises(ServiceActionError):
+            validate_quest_track_payload({"quest_id": "q:1", "tracked": "yes"})
+        with self.assertRaises(ServiceActionError):
+            validate_quest_track_payload({"quest_id": "", "tracked": True})
+
+    def test_quest_track_success_anywhere(self):
+        self._register()
+        record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        # Stand in the store (no GuildStaff host) — tracking is host-independent.
+        self.player.location = self.store
+        result = _quest_track_adapter(
+            self.player, {"quest_id": record.quest_id, "tracked": True}
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "tracked")
+        self.assertEqual(result["affected_panels"], ("services", "objectives"))
+        self.assertTrue(read_records(self.player)[0].tracked)
+
+        # Untrack succeeds.
+        untrack_res = _quest_track_adapter(
+            self.player, {"quest_id": record.quest_id, "tracked": False}
+        )
+        self.assertEqual(untrack_res["outcome"], "success")
+        self.assertEqual(untrack_res["code"], "untracked")
+        self.assertFalse(read_records(self.player)[0].tracked)
+
+    def test_quest_track_rejects_terminal_quest(self):
+        self._register()
+        record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        _quest_abandon_adapter(self.player, {"quest_id": record.quest_id})
+        result = _quest_track_adapter(
+            self.player, {"quest_id": record.quest_id, "tracked": True}
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "quest_transition")
+
+    def test_quest_track_rejects_beyond_cap(self):
+        from world.quests.tests._fixtures import quest, register
+        from world.quests.runtime import accept_quest
+        defs = [register(quest(f"cap_test_{i}")) for i in range(4)]
+        records = [accept_quest(self.player, d.key) for d in defs]
+        for r in records[:3]:
+            res = _quest_track_adapter(self.player, {"quest_id": r.quest_id, "tracked": True})
+            self.assertEqual(res["outcome"], "success")
+
+        # 4th track is rejected with stable cap code
+        res4 = _quest_track_adapter(self.player, {"quest_id": records[3].quest_id, "tracked": True})
+        self.assertEqual(res4["outcome"], "rejected")
+        self.assertEqual(res4["code"], "quest_track_limit")
 
     def test_tampered_host_like_payload_rejected_by_validator(self):
         from web.webclient.actions.service_actions import validate_buy_payload
@@ -608,3 +669,45 @@ class ServiceDispatchTests(ServiceActionBase):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "insufficient_funds")
         self.assertEqual(result["presentation_revision"], coordinator.revision)
+
+    @covers_requirement(
+        "webclient-objectives-panel::objectives-presentation-stays-current-across-quest-and-tracking-seams",
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
+    )
+    def test_track_action_publishes_services_and_objectives_together(self):
+        self._register()
+        record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        coordinator = self._coordinator()
+
+        handle_ui_action(
+            self.session,
+            self.player,
+            self._envelope(
+                coordinator,
+                "guild.quest_track",
+                {"quest_id": record.quest_id, "tracked": True},
+            ),
+            self.action_registry,
+            self.registry,
+        )
+
+        result = self._last_result()
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "tracked")
+
+        # An affected-panel ui_update was emitted
+        updates = [call for call in self.session.sent if "ui_update" in call]
+        self.assertTrue(updates)
+        last_panels = updates[-1]["ui_update"][0][0]["panels"]
+        self.assertIn("services", last_panels)
+        self.assertIn("objectives", last_panels)
+
+        # Services row carries tracked: True
+        guild_quests = last_panels["services"]["guild"]["quests"]
+        self.assertEqual(len(guild_quests), 1)
+        self.assertTrue(guild_quests[0]["tracked"])
+
+        # Objectives panel carries the tracked row
+        obj_rows = last_panels["objectives"]["rows"]
+        self.assertEqual(len(obj_rows), 1)
+        self.assertEqual(obj_rows[0]["quest_id"], record.quest_id)

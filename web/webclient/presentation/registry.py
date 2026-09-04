@@ -183,6 +183,10 @@ def build_production_registry() -> PresentationRegistry:
         LOCAL_MAP_SCHEMA_VERSION,
         local_map_presenter,
     )
+    from web.webclient.presentation.objectives import (
+        OBJECTIVES_SCHEMA_VERSION,
+        objectives_presenter,
+    )
     from web.webclient.presentation.party import (
         PARTY_SCHEMA_VERSION,
         party_presenter,
@@ -243,6 +247,16 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=PARTY_SCHEMA_VERSION,
             unavailable_reason=("party_unavailable", "隊伍資訊目前無法顯示"),
             presenter=party_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="objectives",
+            schema_version=OBJECTIVES_SCHEMA_VERSION,
+            # The delta pins the panel to the registered COMMON unavailable
+            # form (shared reason and semantics), not a bespoke reason.
+            unavailable_reason=UNAVAILABLE_REASON,
+            presenter=objectives_presenter,
         )
     )
     registry.register(

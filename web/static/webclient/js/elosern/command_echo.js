@@ -229,6 +229,14 @@
       var id = payload && payload.quest_id;
       return isNonEmpty(id) ? join(["guild turnin", id]) : null;
     },
+    "guild.quest_track": function (payload) {
+      var id = payload && payload.quest_id;
+      var tracked = payload && payload.tracked;
+      if (!isNonEmpty(id) || typeof tracked !== "boolean") {
+        return null;
+      }
+      return join([tracked ? "guild track" : "guild untrack", id]);
+    },
     "guild.exam_start": function (payload) {
       var rank = payload && payload.target_rank;
       return isNonEmpty(rank) ? join(["guild exam", rank]) : "guild exam";

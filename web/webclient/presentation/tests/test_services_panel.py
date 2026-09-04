@@ -195,6 +195,7 @@ def _all_ceilings_payload():
             "detail": _max_string(MAX_DETAIL_CODE_POINTS),
             "abandon": _action("guild.quest_abandon"),
             "turnin": _action("guild.quest_turnin", enabled=False),
+            "tracked": False,
         }
         for _ in range(MAX_QUEST_ROWS)
     ]
@@ -330,6 +331,7 @@ def _realistic_maximal_payload():
             "detail": "討伐低階魔物\n狀態：進行中\n階段：1\n目標：討伐 1 隻低階魔物\n進度：0 / 1\n獎勵：銅 50、功績 25、治療藥水 × 2",
             "abandon": _action("guild.quest_abandon", label="放棄"),
             "turnin": _action("guild.quest_turnin", label="回報", enabled=False),
+            "tracked": False,
         }
         for index in range(MAX_QUEST_ROWS)
     ]
@@ -457,6 +459,7 @@ class ServicesSchemaTests(unittest.TestCase):
             "detail": "詳情",
             "abandon": _action("guild.quest_abandon"),
             "turnin": _action("guild.quest_turnin", enabled=False),
+            "tracked": False,
         }
         guild = _valid_guild(quests=[quest for _ in range(MAX_QUEST_ROWS + 1)])
         with self.assertRaises(ProtocolValidationError):
@@ -528,6 +531,7 @@ class ServicesSchemaTests(unittest.TestCase):
             "detail": "獎" * (MAX_DETAIL_CODE_POINTS + 1),
             "abandon": _action("guild.quest_abandon"),
             "turnin": _action("guild.quest_turnin", enabled=False),
+            "tracked": False,
         }
         guild = _valid_guild(quests=[quest])
         with self.assertRaises(ProtocolValidationError):
@@ -973,6 +977,7 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
             "detail": "詳情",
             "abandon": self._action("guild.quest_abandon"),
             "turnin": self._action("guild.quest_turnin", enabled=False),
+            "tracked": False,
         }
         value.update(overrides)
         return value

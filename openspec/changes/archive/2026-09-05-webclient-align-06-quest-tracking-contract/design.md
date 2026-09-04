@@ -28,11 +28,13 @@ carry integer copper (`describe_reward`).
   validates the whole log before writing, enforces cap 3, and rejects non-`in_progress`
   targets with `QuestTransitionError`.
 - `guild.quest_track` service action riding the exact-payload/allowlist/dispatch contract.
-- `services` schema v4: quest rows gain `tracked`; the QuestBoard ships 追蹤/取消追蹤.
+- `services` schema v4: quest rows gain `tracked`.
 - New `objectives` panel disclosing exactly the `tracked && in_progress` rows in quest-log
   order (cap 3 by construction) with describe-seam prose, reward copper integer, and the
   deadline line — host-independent, so the tracker works everywhere.
-- `ObjectiveTracker.vue`: draft-exact island, display-only.
+- Client protocol mirrors only (UMD + Vue panel allowlists, services v4 validators, the
+  command-echo entry): every client SURFACE (tracker island, QuestBoard 追蹤/取消追蹤
+  toggle, showcase) is owned by webclient-align-09-objective-tracker-ui.
 
 **Non-Goals:**
 - No `選修` tag (no backing field; the draft's `.mode-combat .obj .opt` rule then has nothing to
@@ -60,9 +62,9 @@ carry integer copper (`describe_reward`).
   acquire/planner/room_observation/transitions) and the new `set_quest_tracked` mark the
   holder's presentation dirty for BOTH `services` and `objectives` (services rows carry the
   toggle state; the island needs the list) — same coordinator rhythm as change 04's party.
-- **Toggle UI:** QuestBoard quest-log rows render 追蹤 (enabled, `in_progress`, untracked) /
-  取消追蹤 (tracked) dispatching `guild.quest_track {quest_id, tracked}` under the existing
-  dispatch contract (no confirmation gate — non-destructive presentation of one's own log).
+- **Toggle UI (delegated):** QuestBoard quest-log rows rendering 追蹤/取消追蹤 that dispatch
+  `guild.quest_track {quest_id, tracked}` (no confirmation gate — non-destructive
+  presentation of one's own log) is change 09's decision; only the wire contract lives here.
 
 ## Risks / Trade-offs
 

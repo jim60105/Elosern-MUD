@@ -40,6 +40,7 @@ _PANEL_MODULES = (
     ("context_actions", "combat_panel.py"),
     ("local_map", "local_map.py"),
     ("party", "party.py"),
+    ("objectives", "objectives.py"),
     ("services", "services.py"),
     ("creation", "creation.py"),
     ("exploration", "exploration.py"),

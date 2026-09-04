@@ -37,6 +37,10 @@ class QuestState(StrEnum):
     FAILED = "failed"
 
 
+# The closed cap on simultaneously tracked in-progress quests. The tracking
+# operation enforces it; the ``objectives`` panel validator mirrors it.
+MAX_TRACKED_QUESTS = 3
+
 _RECORD_FIELDS = frozenset(
     {
         "quest_id",
@@ -50,6 +54,7 @@ _RECORD_FIELDS = frozenset(
         "objective_target_ids",
         "protected_entity_ids",
         "failure_reason",
+        "tracked",
     }
 )
 
@@ -69,6 +74,7 @@ class QuestRecord:
     objective_target_ids: tuple[int, ...]
     protected_entity_ids: tuple[int, ...]
     failure_reason: str | None
+    tracked: bool = False
 
 
 def to_storage(record: QuestRecord) -> dict[str, Any]:
@@ -85,6 +91,7 @@ def to_storage(record: QuestRecord) -> dict[str, Any]:
         "objective_target_ids": list(record.objective_target_ids),
         "protected_entity_ids": list(record.protected_entity_ids),
         "failure_reason": record.failure_reason,
+        "tracked": record.tracked,
     }
 
 
@@ -104,7 +111,9 @@ def from_storage(data: dict[str, Any]) -> QuestRecord:
     unknown = set(data) - _RECORD_FIELDS
     if unknown:
         raise QuestDataError(f"quest-log entry has unknown fields {sorted(unknown)}")
-    missing = _RECORD_FIELDS - set(data)
+    # ``tracked`` is the one optional-with-default key: an entry written
+    # before the field existed loads as untracked without being rewritten.
+    missing = (_RECORD_FIELDS - {"tracked"}) - set(data)
     if missing:
         raise QuestDataError(f"quest-log entry is missing fields {sorted(missing)}")
     quest_id = data["quest_id"]
@@ -136,6 +145,9 @@ def from_storage(data: dict[str, Any]) -> QuestRecord:
             "persisted objective_target_ids and protected_entity_ids overlap; "
             "a bound target can never be a protected entity"
         )
+    tracked = data.get("tracked", False)
+    if not isinstance(tracked, bool):
+        raise QuestDataError(f"record field 'tracked' must be a boolean, got {tracked!r}")
     return QuestRecord(
         quest_id=quest_id,
         definition_key=definition_key,
@@ -148,6 +160,7 @@ def from_storage(data: dict[str, Any]) -> QuestRecord:
         objective_target_ids=objective_target_ids,
         protected_entity_ids=protected_entity_ids,
         failure_reason=failure_reason,
+        tracked=tracked,
     )
 
 
@@ -404,3 +417,40 @@ def abandon_quest(actor: Any, quest_id: str) -> QuestRecord:
     new_records = [failed if candidate.quest_id == quest_id else candidate for candidate in current]
     apply_quest_log_replacement(actor, new_records, pin_operations)
     return failed
+
+
+def set_quest_tracked(actor: Any, quest_id: str, tracked: bool) -> QuestRecord:
+    """Set the tracking flag on exactly one record of ``actor``'s quest log.
+
+    The whole log is read and validated before any write (D-2 discipline).
+    Tracking true is rejected for a non-active record and when the holder
+    already carries :data:`MAX_TRACKED_QUESTS` tracked active records;
+    untracking is always permitted. A rejection raises before the log is
+    touched, leaving it byte-for-byte unchanged; a request that already
+    matches the stored flag is an idempotent success with zero writes.
+    """
+    if not isinstance(tracked, bool):
+        raise QuestDataError(f"tracked must be a boolean, got {tracked!r}")
+    current = read_records(actor)
+    record = find_record(current, quest_id)
+    if record is None:
+        raise QuestNotFound(quest_id)
+    if record.tracked == tracked:
+        return record
+    if tracked:
+        if record.state is not QuestState.IN_PROGRESS:
+            raise QuestTransitionError("quest is not in progress")
+        active_tracked = sum(
+            1
+            for candidate in current
+            if candidate.tracked and candidate.state is QuestState.IN_PROGRESS
+        )
+        if active_tracked >= MAX_TRACKED_QUESTS:
+            raise QuestTransitionError("quest_track_limit")
+    updated = replace(record, tracked=tracked)
+    new_records = [
+        updated if candidate.quest_id == quest_id else candidate
+        for candidate in current
+    ]
+    apply_quest_log_replacement(actor, new_records)
+    return updated

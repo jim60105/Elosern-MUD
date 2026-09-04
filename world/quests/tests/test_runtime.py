@@ -16,14 +16,17 @@ from world.quests.runtime import (
     QuestDataError,
     QuestNotFound,
     QuestState,
+    QuestTransitionError,
     abandon_quest,
     accept_quest,
     definition_for,
     fail_record,
+    find_record,
     from_storage,
     fulfill_record_for,
     read_records,
     register_quest_completion_observer,
+    set_quest_tracked,
     to_storage,
 )
 from world.quests.transitions import apply_quest_log_replacement
@@ -398,3 +401,131 @@ class QuestCompletionObserverTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class QuestTrackingTests(QuestRegistryIsolation, EvenniaTest):
+    """The bounded ``tracked`` flag: storage default, cap, and rejections."""
+
+    def setUp(self):
+        super().setUp()
+        self.player = create_object(PlayerCharacter, key="tracking-player")
+        register_catalog()
+
+    @staticmethod
+    def _json_default(obj):
+        if hasattr(obj, "items"):
+            return dict(obj.items())
+        if hasattr(obj, "__iter__") and not isinstance(obj, (str, bytes)):
+            return list(obj)
+        raise TypeError(f"Unserializable: {type(obj)}")
+
+    def _dump_log(self):
+        return json.dumps(self.player.db.quest_log or [], default=self._json_default)
+
+    def _accept(self, key: str):
+        registered = register(quest(key))
+        return accept_quest(self.player, registered.key)
+
+    def test_record_round_trips_with_tracked(self):
+        record = self._accept("tracked_rt")
+        tracked = set_quest_tracked(self.player, record.quest_id, True)
+        self.assertTrue(tracked.tracked)
+        stored = json.dumps(to_storage(tracked))
+        restored = from_storage(json.loads(stored))
+        self.assertEqual(restored, tracked)
+        self.assertTrue(restored.tracked)
+
+    def test_legacy_entry_without_key_loads_untracked(self):
+        entry = {
+            "quest_id": "legacy:1",
+            "definition_key": "introductory_hunt",
+            "state": "in_progress",
+            "stage_index": 0,
+            "stage_progress": 0,
+            "deadline_tick": None,
+            "accepted_tick": 10,
+            "stage_room_id": None,
+            "objective_target_ids": [],
+            "protected_entity_ids": [],
+            "failure_reason": None,
+        }
+        raw = list(self.player.db.quest_log or [])
+        self.player.db.quest_log = [*raw, dict(entry)]
+        records = read_records(self.player)
+        self.assertFalse(records[-1].tracked)
+        # The strict reader never rewrites the stored entry.
+        self.assertNotIn("tracked", dict(self.player.db.quest_log[-1]))
+
+    def test_stored_non_boolean_tracked_is_rejected(self):
+        with self.assertRaises(QuestDataError):
+            from_storage({**to_storage(self._accept("badflag")), "tracked": "yes"})
+
+    def test_accept_never_tracks(self):
+        record = self._accept("no_auto_track")
+        self.assertFalse(record.tracked)
+        self.assertFalse(read_records(self.player)[0].tracked)
+
+    @covers_requirement("quest-lifecycle::tracking-state-is-bounded-deterministic-quest-state")
+    def test_tracking_three_succeeds_and_round_trips(self):
+        ids = [self._accept(f"track_{index}").quest_id for index in range(3)]
+        for quest_id in ids:
+            set_quest_tracked(self.player, quest_id, True)
+        stored_ids = {
+            entry["quest_id"]
+            for entry in self.player.db.quest_log
+            if entry["tracked"]
+        }
+        self.assertEqual(stored_ids, set(ids))
+
+    def test_fourth_tracked_quest_is_refused_without_writes(self):
+        ids = [self._accept(f"cap_{index}").quest_id for index in range(3)]
+        for quest_id in ids:
+            set_quest_tracked(self.player, quest_id, True)
+        fourth = self._accept("cap_4th")
+        before = self._dump_log()
+        with self.assertRaises(QuestTransitionError) as caught:
+            set_quest_tracked(self.player, fourth.quest_id, True)
+        self.assertEqual(caught.exception.args[0], "quest_track_limit")
+        self.assertEqual(self._dump_log(), before)
+        self.assertFalse(find_record(read_records(self.player), fourth.quest_id).tracked)
+
+    def test_terminal_records_cannot_be_tracked(self):
+        record = self._accept("terminal_track")
+        failed = abandon_quest(self.player, record.quest_id)
+        with self.assertRaises(QuestTransitionError):
+            set_quest_tracked(self.player, failed.quest_id, True)
+        self.assertEqual(json.dumps(self.player.db.quest_log[-1]["tracked"]), "false")
+
+    def test_untracking_is_idempotent_and_never_blocked(self):
+        record = self._accept("untrack_me")
+        set_quest_tracked(self.player, record.quest_id, False)  # already false
+        before = self._dump_log()
+        same = set_quest_tracked(self.player, record.quest_id, False)
+        self.assertFalse(same.tracked)
+        self.assertEqual(self._dump_log(), before)
+        set_quest_tracked(self.player, record.quest_id, True)
+        once = self._dump_log()
+        again = set_quest_tracked(self.player, record.quest_id, True)
+        self.assertTrue(again.tracked)
+        self.assertEqual(self._dump_log(), once)
+        released = set_quest_tracked(self.player, record.quest_id, False)
+        self.assertFalse(released.tracked)
+
+    def test_tracking_unknown_quest_raises_not_found(self):
+        self._accept("known_only")
+        with self.assertRaises(QuestNotFound):
+            set_quest_tracked(self.player, "nope:1", True)
+
+    def test_non_boolean_request_is_rejected_before_any_read(self):
+        record = self._accept("bool_guard")
+        before = self._dump_log()
+        with self.assertRaises(QuestDataError):
+            set_quest_tracked(self.player, record.quest_id, 1)
+        self.assertEqual(self._dump_log(), before)
+
+    def test_untrack_still_permitted_on_terminal_records(self):
+        record = self._accept("terminal_untrack")
+        set_quest_tracked(self.player, record.quest_id, True)
+        failed = abandon_quest(self.player, record.quest_id)
+        self.assertTrue(failed.tracked)  # the flag rides the record
+        released = set_quest_tracked(self.player, failed.quest_id, False)
+        self.assertFalse(released.tracked)

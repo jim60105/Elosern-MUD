@@ -21,6 +21,7 @@
     "guild.exam_start",
     "guild.quest_abandon",
     "guild.quest_accept",
+    "guild.quest_track",
     "guild.quest_turnin",
     "guild.register",
     "inventory.toggle_equip",

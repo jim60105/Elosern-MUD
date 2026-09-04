@@ -1175,7 +1175,7 @@ export const ART_PANEL_UNAVAILABLE_SAMPLE = {
 // present). Every entry mirrors the exact bounded schema; the integer
 // copper currency is display-formatted, never float money.
 export const SERVICES_PANEL_SAMPLE = {
-  schema_version: 3,
+  schema_version: 4,
   available: true,
   kind: "services",
   host: { identity: "host_altoria", display_name: "霧骨渡口的服務門戶" },
@@ -1229,6 +1229,7 @@ export const SERVICES_PANEL_SAMPLE = {
         detail: "老周把三袋糧食交給你，要求天亮前送到磨坊。",
         abandon: { action_id: "guild.quest_abandon", label: "放棄任務", enabled: true, disabled_reason: null, quantity: null },
         turnin: { action_id: "guild.quest_turnin", label: "交派任務", enabled: false, disabled_reason: { code: "quest_not_ready", message: "任務目標尚未完成" }, quantity: null },
+        tracked: true,
       },
     ],
     rank: {
@@ -1439,7 +1440,7 @@ export const SERVICES_PANEL_PRESENTATION_SAMPLE = {
 // `{available: false, reason}` envelope (webclient-oob-protocol), carrying
 // the panel-stable reason — no invented sections or default values.
 export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 3,
+  schema_version: 4,
   available: false,
   reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
 };
@@ -1447,7 +1448,7 @@ export const SERVICES_PANEL_UNAVAILABLE_SAMPLE = {
 // The reduced services payload: no host, no guild/shop/inventory sections
 // (all null with zero pagination totals), a bare player summary.
 export const SERVICES_PANEL_MINIMAL_SAMPLE = {
-  schema_version: 3,
+  schema_version: 4,
   available: true,
   kind: "services",
   host: null,

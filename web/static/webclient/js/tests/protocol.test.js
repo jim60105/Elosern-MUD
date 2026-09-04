@@ -1556,12 +1556,13 @@ test("the unavailable forms differ only in schema_version", () => {
 });
 
 test("mirrors every registered panel schema version in the allowlist", () => {
-  // The allowlist must cover all twelve registered panels so an unmirrored
+  // The allowlist must cover all thirteen registered panels so an unmirrored
   // panel can never slip through the registered-version gate.
   assert.equal(Protocol.PANEL_ALLOWLIST.status, 2);
   assert.equal(Protocol.PANEL_ALLOWLIST.local_map, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.party, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.services, 3);
+  assert.equal(Protocol.PANEL_ALLOWLIST.objectives, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.services, 4);
   assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.creation, 4);
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
@@ -1571,8 +1572,8 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.title_codex, 1);
   assert.equal(
     Object.keys(Protocol.PANEL_ALLOWLIST).length,
-    12,
-    "PANEL_ALLOWLIST must list exactly the twelve registered panels"
+    13,
+    "PANEL_ALLOWLIST must list exactly the thirteen registered panels"
   );
 });
 
@@ -2187,6 +2188,7 @@ function validServicesQuestRow(overrides) {
         enabled: false,
         disabled_reason: { code: "quest_transition", message: "這個任務目前無法進行此操作。" },
       }),
+      tracked: false,
     },
     overrides || {}
   );
@@ -2223,7 +2225,7 @@ function validServicesSellableRow(overrides) {
 function validServicesPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "services",
       host: null,
@@ -2289,7 +2291,7 @@ test("validates the services panel available/unavailable discriminator", () => {
     validServicesPanel()
   );
   const unavailable = {
-    schema_version: 3,
+    schema_version: 4,
     available: false,
     reason: { code: "services_unavailable", message: "服務選單目前無法顯示" },
   };
@@ -2530,6 +2532,7 @@ test("services payload maximizing every string field fails the byte gate", () =>
         enabled: false,
         disabled_reason: { code: "quest_transition", message: max64 },
       }),
+      tracked: true,
     });
   }
   for (let i = 0; i < Protocol.SERVICES_MAX_STOCK_ROWS; i++) {
@@ -2812,7 +2815,7 @@ test("services v3 validates inventory row actions exactly", () => {
 });
 
 test("services is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.services, 3);
+  assert.equal(Protocol.PANEL_ALLOWLIST.services, 4);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
@@ -5318,4 +5321,124 @@ test("title_codex unavailable form validates through the common discriminator", 
     Protocol.validatePanel("title_codex", Protocol.PANEL_ALLOWLIST.title_codex, unavailable),
     unavailable
   );
+});
+
+function validObjectivesRow(overrides) {
+  return Object.assign(
+    {
+      quest_id: "introductory_hunt:1",
+      display_name: "討伐低階魔物",
+      objective_line: "討伐 1 隻低階魔物",
+      stage_index: 0,
+      stage_total: 1,
+      stage_progress: 0,
+      objective_quantity: 1,
+      reward_copper: 50,
+      deadline_line: "期限：剩餘 72 小時",
+    },
+    overrides || {}
+  );
+}
+
+function validObjectivesPanel(rows) {
+  return { schema_version: 1, available: true, rows: rows || [validObjectivesRow()] };
+}
+
+test("objectives available form validates and empty rows is legal", () => {
+  assert.deepEqual(Protocol.validateObjectivesPanel(validObjectivesPanel()), validObjectivesPanel());
+  assert.deepEqual(Protocol.validateObjectivesPanel(validObjectivesPanel([])), {
+    schema_version: 1,
+    available: true,
+    rows: [],
+  });
+  // null reward and null deadline are legal
+  assert.doesNotThrow(() =>
+    Protocol.validateObjectivesPanel(
+      validObjectivesPanel([validObjectivesRow({ reward_copper: null, deadline_line: null })])
+    )
+  );
+});
+
+test("objectives validator mirrors the server drift rejections", () => {
+  for (const bad of [
+    // prototype pollution
+    validObjectivesPanel([
+      JSON.parse(
+        '{"quest_id":"q:1","display_name":"a","objective_line":"b","stage_index":0,"stage_total":1,"stage_progress":0,"objective_quantity":1,"reward_copper":null,"deadline_line":null,"__proto__":{}}'
+      ),
+    ]),
+    // fourth row rejected (at most 3)
+    validObjectivesPanel([
+      validObjectivesRow({ quest_id: "q:1" }),
+      validObjectivesRow({ quest_id: "q:2" }),
+      validObjectivesRow({ quest_id: "q:3" }),
+      validObjectivesRow({ quest_id: "q:4" }),
+    ]),
+    // missing row key
+    validObjectivesPanel([
+      {
+        quest_id: "q:1",
+        display_name: "a",
+        objective_line: "b",
+        stage_index: 0,
+        stage_total: 1,
+        stage_progress: 0,
+        objective_quantity: 1,
+        reward_copper: null,
+      },
+    ]),
+    // unknown row key
+    validObjectivesPanel([Object.assign(validObjectivesRow(), { extra: 1 })]),
+    // duplicate quest IDs
+    validObjectivesPanel([
+      validObjectivesRow({ quest_id: "q:1" }),
+      validObjectivesRow({ quest_id: "q:1" }),
+    ]),
+    // negative or non-int progress / quantity
+    validObjectivesPanel([validObjectivesRow({ stage_progress: -1 })]),
+    validObjectivesPanel([validObjectivesRow({ stage_progress: "0" })]),
+    validObjectivesPanel([validObjectivesRow({ objective_quantity: 0 })]),
+    validObjectivesPanel([validObjectivesRow({ reward_copper: -1 })]),
+    validObjectivesPanel([validObjectivesRow({ reward_copper: "10" })]),
+    // empty or blank strings
+    validObjectivesPanel([validObjectivesRow({ quest_id: "" })]),
+    validObjectivesPanel([validObjectivesRow({ display_name: "   " })]),
+    validObjectivesPanel([validObjectivesRow({ objective_line: "" })]),
+    validObjectivesPanel([validObjectivesRow({ deadline_line: "   " })]),
+    // version drift
+    { schema_version: 2, available: true, rows: [] },
+    // non-bool available
+    { schema_version: 1, available: "yes", rows: [] },
+    { schema_version: 1, available: false, rows: [] },
+  ]) {
+    assert.throws(() => Protocol.validateObjectivesPanel(bad));
+  }
+});
+
+test("objectives is in the production panel allowlist and rejects atomically", () => {
+  assert.equal(Protocol.PANEL_ALLOWLIST.objectives, 1);
+  const envelope = {
+    protocol_version: 1,
+    presentation_epoch: VALID_EPOCH,
+    revision: 5,
+    mode: "exploration",
+    panels: {
+      objectives: { schema_version: 1, available: true, rows: "not-a-list" },
+    },
+    layout_version: 1,
+    server_time: serverTime(),
+  };
+  assert.throws(() => Protocol.validateSnapshot(envelope));
+  envelope.panels = { objectives: validObjectivesPanel() };
+  envelope.revision = 6;
+  assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
+  envelope.panels = {
+    objectives: {
+      schema_version: 1,
+      available: false,
+      reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
+    },
+  };
+  envelope.revision = 7;
+  assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
 });
