@@ -41,7 +41,7 @@
 | 「南門新客」異名 | 保留；取得時機從公會註冊改掛為「回報第一個公會任務」，flavor 改成不依附守衛目送的敘述 | 舊掛點（公會註冊）是教學語意的殘留；新語意＝「完成第一次回報的新面孔」。授予仍走稱號系統正規寫者 `bank_epithet` |
 | HelpOverlay | 保留元件，只刪殭屍 `guide` prop（查證：前端早已靜態吃 `lib/controls-reference.js`，`AppClient.vue:999` 傳 `:guide="{}"`；後端從未 OOB 推送 guide 內容） | 其本質是操作教學／按鍵說明，正是新的教學語意；不砍玩家的說明入口 |
 | `home` 政策 | 首次成功通過城市閘門時，把 `character.home` 從虛境改設為抵達閘房 | 查證：settings 無 `DEFAULT_HOME`，角色 `home` 預設＝出生地＝虛境；`home` 指令（CmdHome）會把玩家送進被硬閘拒絕的房間。首次過閘 re-home 讓 `home` 存留且語意正確（家在正式遊戲起點城），無指令面變動 |
-| `guild_staff` 對話 | 對話表迁入 `world/rules/dialogue.py` 唯讀 runtime | 「回報」關鍵字掛的是可回報任務清單（公會功能，非教學功能）；runtime 文件本來就宣稱擁有該例外語意 |
+| `guild_staff` 對話 | 對話表遷入 `world/rules/dialogue.py` 唯讀 runtime | 「回報」關鍵字掛的是可回報任務清單（公會功能，非教學功能）；runtime 文件本來就宣稱擁有該例外語意 |
 | 種族→城市選擇 | 不實作，只釘 registry 縫合點 | 其他城市尚不存在；出生固定虛境，YAGNI |
 
 拒絕的替代方案：
@@ -118,13 +118,13 @@
 ## 4. 虛境單向城市閘門
 
 Evennia 事實：`Exit` 是獨立持久物件，`create_object(Exit, ...)` 只建你給的
-那一條；没有任何「自動成對反向」機制（`@dig` 是建檔wizard指令的便利行為，
+那一條；沒有任何「自動成對反向」機制（`@dig` 是建檔wizard指令的便利行為，
 與程式端無關）。因此單向通道＝只建去程。第二層保證目前是**缺口而非現況**：
 查證 master 的 `typeclasses/rooms.py`，`Room`（虛境房間的 typeclass）是裸
 `pass` 類別，並無任何入口閘——上游 Evennia 文件中的 Limbo 範例行為不存在於
 本倉庫。本設計因此要求把硬閘**補成真實作**：虛境同步（`sync_limbo()`）對
 虛境房間宣告式收斂一道入口閘（Evennia 的房間入口權限語意＝目的地 "get"
-lock 檢查；實作位置以安裝的 Evennia 6.1.0 源碼為準，在 `at_pre_object_receive`
+lock 檢查；實作位置以安裝的 Evennia 6.1.0 原始碼為準，在 `at_pre_object_receive`
 與 lock 兩者中選確定性較高者），拒絕任何 character 進入虛境，拒絕文案走
 zh-tw 本地化框。單向性由「去程只從虛境側建立＋虛境入口硬閘」兩層共同保證。
 
@@ -156,10 +156,10 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType({
 - 刪除 `EXIT_TO_LIMBO` 常數與其 `_ensure_exit` 呼叫。
 - 新增冪等清除：每次同步刪除「位於城市側房間、destination 為虛境」方向的
   既有 Exit 物件（把舊 `離開王都`／`回虛境` 當髒資料清掉）。這是同步器對
-  自己所管出口的宣告式收敛，與 `_ensure_exit` 對稱，不是向後相容 shim。
+  自己所管出口的宣告式收斂，與 `_ensure_exit` 對稱，不是向後相容 shim。
 - registry 列的閘房不存在時 `log_warn`＋skip（現行 bootstrap 模式）。
 
-未來加城市＝registry 加一列（虛境同時挂多條單向出口）。種族→出口的出生
+未來加城市＝registry 加一列（虛境同時掛多條單向出口）。種族→出口的出生
 導流不在本設計範圍（其他城市尚不存在）。
 
 `home` 政策（rubber-duck 查證的 production 漏洞）：settings 無
@@ -179,8 +179,8 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType({
 模組）目前 import 自 `world/onboarding/guide_dialogue`：
 
 - `GUILD_STAFF_DIALOGUE_KEY`、`GUILD_STAFF_TURNIN_KEYWORD`、
-  `GUILD_STAFF_RESPONSES` 與其 `DialogueDefinition` 整段迁入
-  `world/rules/dialogue.py`（該模块 docstring 早已宣稱擁有 guild_staff 回報
+  `GUILD_STAFF_RESPONSES` 與其 `DialogueDefinition` 整段遷入
+  `world/rules/dialogue.py`（該模組 docstring 早已宣稱擁有 guild_staff 回報
   例外語意），刪除跨包 import。
 - `OnboardingGuide` component 從 `resolve_dialogue_component` 移除，只留
   `ScriptedDialogue`。
@@ -199,7 +199,7 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType({
 新語意：異名是「回報第一個公會任務」的記述，不是「註冊」的記述。遷移：
 
 - 拆散 `grant_starter_pair`：公會註冊只發 F 階稱號（`grant_rank_title`
-  留在原位）；函數退役。
+  留在原位）；函式退役。
 - 新增 `grant_first_quest_epithet(actor)`（同模組、同 `bank_epithet`
   正規寫者），由公會任務**回報（reward claim）事務**呼叫；觸發條件＝
   claim 前 `guild_reward_claims` 為空（第一次回報）。`bank_epithet` 的
@@ -263,7 +263,7 @@ stories／fixtures／測試中的 `guide` 輸入。無需主規格 delta
 
 ## 11. 提案拆包、依賴與實作批次
 
-本設計由三個 OpenSpec change 承接（皆單人 8 小時内規模、
+本設計由三個 OpenSpec change 承接（皆單人 8 小時內規模、
 `openspec validate --strict` 綠；原規劃的第四個 HelpOverlay change 經查證
 只剩死 prop，併入 change A）。rubber-duck 同步審查一次，5 項 BLOCKER
 （`home` 漏洞、死 import、殭屍 help 條目、`EXIT_TO_CITY` 測試引入者、
@@ -287,7 +287,7 @@ renamed requirement 的 stale traceability 錨點）已全部修入 artifacts。
   `.github/evennia-shards.json` 歸 A 專屬（B/C 只擴充既有測試模組，
   不碰 shards）。
 - 建議批次：**批次 1**＝A ∥ B 可平行動工；**批次 2**＝C，必須等 A
-  合併後 rebase，對「移除後結果形状」實作（tasks 已內含 rebase 前置
+  合併後 rebase，對「移除後結果形狀」實作（tasks 已內含 rebase 前置
   條件）。「出生虛境→過閘→`home`」整合測試排在 A 落地後。
 
 實作依既有慣例：worktree→rubber-duck→focused 測試→merge `--no-ff`。
