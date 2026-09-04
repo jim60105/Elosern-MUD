@@ -44,6 +44,7 @@ describe("map layout variants (B4 world family, map-02)", () => {
     maxHeight: null,
     fillWidth: true,
     overlayChrome: true,
+    markerNames: true,
   };
 
   it("draws the same committed content in both layouts (model-selected)", () => {

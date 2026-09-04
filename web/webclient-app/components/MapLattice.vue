@@ -52,6 +52,8 @@ const props = defineProps({
   // draws the teardrop location pin above the current marker. Off on the
   // minimap island; only the overlay passes it.
   overlayChrome: { type: Boolean, default: false },
+  markerNames: { type: Boolean, default: false },
+  edgeMarkers: { type: Object, default: null },
   // Layout variant (webclient-map-02-layout-variants D2/D3): "lattice" draws
   // the model's rank-compressed grid placement, "graph" draws the model's
   // radial (D1) placement. Both surfaces pass `model.layoutVariant` — the
@@ -118,13 +120,13 @@ function latticePos(node) {
     y: (Math.max(1, rows.value) - 1 - node.row) * props.rowPitch + props.rowPitch / 2,
   };
 }
-const edgeMarkers = computed(() => {
+const localEdgeMarkers = computed(() => {
   if (isGraph.value || rememberedList.value.length === 0) {
-    return { markers: [], gutter: 0 };
+    return { markers: [], gutter: 0, width: 0, height: 0 };
   }
   const current = nodes.value.find((node) => node.visibility === "current");
   if (!current) {
-    return { markers: [], gutter: 0 };
+    return { markers: [], gutter: 0, width: 0, height: 0 };
   }
   return LocalMap.edgeMarkersFor(nodes.value, rememberedList.value, {
     canvasWidth: Math.max(1, cols.value) * props.colPitch,
@@ -137,8 +139,109 @@ const edgeMarkers = computed(() => {
     // label's worst-case box (labelMax + 1 full-width glyphs at the 11px
     // canvas font, which does not scale with the markers).
     nameWidth: props.overlayChrome ? (props.labelMax + 1) * 11 : 0,
-    nameHeight: props.overlayChrome ? 16 : 0,
+    nameHeight: props.markerNames ? 16 : 0,
   });
+});
+
+const activeEdgeMarkers = computed(() => props.edgeMarkers || localEdgeMarkers.value);
+
+function fitMarkerName(label, budget) {
+  if (!label || budget < 3) return "";
+  const chars = Array.from(label);
+  if (chars.length <= budget) return label;
+  const parenIdx = label.lastIndexOf("（");
+  if (parenIdx !== -1 && label.endsWith("）") && parenIdx < label.length - 1) {
+    const qualifier = label.slice(parenIdx);
+    const qualifierChars = Array.from(qualifier);
+    if (budget >= 2 + qualifierChars.length) {
+      const headBudget = budget - 1 - qualifierChars.length;
+      const headChars = Array.from(label.slice(0, parenIdx)).slice(0, headBudget);
+      return headChars.join("") + "…" + qualifier;
+    }
+  }
+  const tailLen = Math.min(chars.length - 2, budget - 2);
+  const headLen = Math.max(1, budget - 1 - tailLen);
+  return chars.slice(0, headLen).join("") + "…" + chars.slice(chars.length - tailLen).join("");
+}
+
+const fittedEdgeMarkers = computed(() => {
+  const markers = activeEdgeMarkers.value.markers || [];
+  if (!props.markerNames || markers.length === 0) {
+    return markers.map((m) => ({
+      ...m,
+      visibleName: "",
+      glyphs: [],
+    }));
+  }
+  if (props.overlayChrome) {
+    return markers.map((m) => ({
+      ...m,
+      visibleName: m.name,
+      glyphs: [],
+    }));
+  }
+
+  const reach = Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale;
+  const namePad = 18;
+  const inset = Math.max(19, 2 * reach + namePad + 1);
+  const slotMinH = 2 * reach + 1;
+  const slotMinV = 2 * reach + 1 + 16;
+  const outerWidth = activeEdgeMarkers.value.width;
+  const outerHeight = activeEdgeMarkers.value.height;
+
+  const bySide = { top: [], bottom: [], left: [], right: [] };
+  markers.forEach((m) => {
+    if (bySide[m.side]) bySide[m.side].push(m);
+  });
+
+  const spanBySide = {};
+  for (const side of ["top", "bottom", "left", "right"]) {
+    const group = bySide[side];
+    if (group.length === 0) continue;
+    const horizontal = side === "top" || side === "bottom";
+    const outerLength = horizontal ? outerWidth : outerHeight;
+    const slotMin = horizontal ? slotMinH : slotMinV;
+    const usable = Math.max(outerLength - 2 * inset, group.length * slotMin);
+    spanBySide[side] = usable / group.length;
+  }
+
+  const fittedList = markers.map((m) => {
+    const span = spanBySide[m.side] || 0;
+    const budget = Math.floor(span / 13);
+    const fitted = fitMarkerName(m.name, budget);
+    return {
+      ...m,
+      visibleName: fitted,
+      glyphs: Array.from(fitted),
+    };
+  });
+
+  const nameCounts = new Map();
+  fittedList.forEach((m) => {
+    if (m.visibleName) {
+      nameCounts.set(m.visibleName, (nameCounts.get(m.visibleName) || 0) + 1);
+    }
+  });
+
+  const ambiguousNames = new Set();
+  nameCounts.forEach((count, name) => {
+    if (count > 1) {
+      const collisions = fittedList.filter((m) => m.visibleName === name);
+      const distinctOriginals = new Set(collisions.map((c) => c.name));
+      if (distinctOriginals.size > 1) {
+        ambiguousNames.add(name);
+      }
+    }
+  });
+
+  fittedList.forEach((m) => {
+    if (ambiguousNames.has(m.visibleName)) {
+      m.visibleName = "";
+      m.glyphs = [];
+    }
+  });
+
+  return fittedList;
 });
 
 // The drawn placement follows the model: a graph payload whose nodes the
@@ -166,12 +269,12 @@ const graphCanvasHeight = computed(() =>
 const canvasWidth = computed(() =>
   radial.value
     ? graphCanvasWidth.value
-    : Math.max(1, cols.value) * props.colPitch + 2 * edgeMarkers.value.gutter,
+    : Math.max(1, cols.value) * props.colPitch + 2 * activeEdgeMarkers.value.gutter,
 );
 const canvasHeight = computed(() =>
   radial.value
     ? graphCanvasHeight.value
-    : Math.max(1, rows.value) * props.rowPitch + LABEL_BAND + 2 * edgeMarkers.value.gutter,
+    : Math.max(1, rows.value) * props.rowPitch + LABEL_BAND + 2 * activeEdgeMarkers.value.gutter,
 );
 // The crowding fix decouples column pitch and row pitch: the row pitch
 // clears the marker height, the label line, and a strictly-positive gap
@@ -218,7 +321,7 @@ function nodePos(node) {
     return { x: placed.x * props.markerScale, y: placed.y * props.markerScale };
   }
   const core = latticePos(node);
-  const gutter = edgeMarkers.value.gutter;
+  const gutter = activeEdgeMarkers.value.gutter;
   return { x: core.x + gutter, y: core.y + gutter };
 }
 
@@ -232,21 +335,34 @@ function markerOutset() {
   return Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale + 2;
 }
 function markerNameX(marker) {
-  // Vertical-edge names hang OUTWARD beside the diamond (anchored at the
-  // outer tip, text running away from the canvas); horizontal-edge names
-  // sit centred above/below it.
-  if (marker.side === "left") return -markerOutset();
-  if (marker.side === "right") return markerOutset();
-  return 0;
+  if (props.overlayChrome) {
+    if (marker.side === "left") return -markerOutset();
+    if (marker.side === "right") return markerOutset();
+    return 0;
+  }
+  if (marker.side === "top" || marker.side === "bottom") return 0;
+  const reach = Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale;
+  const bandCenter = reach + 9;
+  return marker.side === "left" ? -bandCenter : bandCenter;
 }
 function markerNameY(marker) {
-  if (marker.side === "top") return -(markerOutset() + MARKER_NAME_ASCENT);
-  if (marker.side === "bottom") return markerOutset() + MARKER_NAME_ASCENT;
-  return 4; // vertically centred beside the diamond on the vertical edges
+  if (props.overlayChrome) {
+    if (marker.side === "top") return -(markerOutset() + MARKER_NAME_ASCENT);
+    if (marker.side === "bottom") return markerOutset() + MARKER_NAME_ASCENT;
+    return 4;
+  }
+  const reach = Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale;
+  if (marker.side === "top") return -(reach + 4);
+  if (marker.side === "bottom") return reach + 14;
+  const k = marker.glyphs?.length || 1;
+  return -((k - 1) * 13) / 2 + 4;
 }
 function markerNameAnchor(marker) {
-  if (marker.side === "left") return "end";
-  if (marker.side === "right") return "start";
+  if (props.overlayChrome) {
+    if (marker.side === "left") return "end";
+    if (marker.side === "right") return "start";
+    return "middle";
+  }
   return "middle";
 }
 // The overlay pin's anchor (design D4): the CURRENT placement's current-node
@@ -413,7 +529,7 @@ const latticeStyle = computed(() => {
          each marker shows its (truncated) place name and carries it as the
          accessible name. -->
     <g
-      v-for="marker in edgeMarkers.markers"
+      v-for="marker in fittedEdgeMarkers"
       :key="`edge-marker-${marker.id}`"
       class="local-map__edge-marker"
       :data-testid="`local-map__edge-marker--${marker.id}`"
@@ -422,6 +538,7 @@ const latticeStyle = computed(() => {
       :aria-label="overlayChrome ? marker.name : null"
       :aria-hidden="overlayChrome ? null : 'true'"
     >
+      <title>{{ marker.name }}</title>
       <rect
         class="local-map__edge-marker-diamond"
         :x="-MARKER_DIAMOND_HALF * markerScale"
@@ -435,13 +552,36 @@ const latticeStyle = computed(() => {
         class="local-map__edge-marker-landmark"
         :r="MARKER_LANDMARK_R * markerScale"
       />
-      <text
-        v-if="overlayChrome"
-        class="local-map__edge-marker-name"
-        :x="markerNameX(marker)"
-        :y="markerNameY(marker)"
-        :text-anchor="markerNameAnchor(marker)"
-      >{{ truncatedLabel(marker.name) }}</text>
+      <template v-if="markerNames">
+        <text
+          v-if="overlayChrome"
+          class="local-map__edge-marker-name"
+          :x="markerNameX(marker)"
+          :y="markerNameY(marker)"
+          :text-anchor="markerNameAnchor(marker)"
+        >{{ marker.visibleName }}</text>
+        <text
+          v-else-if="marker.visibleName && (marker.side === 'top' || marker.side === 'bottom')"
+          class="local-map__edge-marker-name--island"
+          :x="markerNameX(marker)"
+          :y="markerNameY(marker)"
+          :text-anchor="markerNameAnchor(marker)"
+        >{{ marker.visibleName }}</text>
+        <text
+          v-else-if="marker.visibleName && (marker.side === 'left' || marker.side === 'right')"
+          class="local-map__edge-marker-name--island"
+          :x="markerNameX(marker)"
+          :y="markerNameY(marker)"
+          :text-anchor="markerNameAnchor(marker)"
+        >
+          <tspan
+            v-for="(glyph, i) in marker.glyphs"
+            :key="i"
+            :x="markerNameX(marker)"
+            :dy="i === 0 ? 0 : 13"
+          >{{ glyph }}</tspan>
+        </text>
+      </template>
     </g>
     <g
       v-for="node in drawnNodes"
@@ -573,6 +713,12 @@ const latticeStyle = computed(() => {
   border: var(--line);
   border-radius: var(--radius-sm);
   overflow: visible;
+}
+
+.local-map__edge-marker-name--island {
+  font-family: var(--f-mono);
+  font-size: var(--text-sm);
+  fill: var(--paper-500);
 }
 
 /* The draft mapcanvas framing (webclient-map-01-draft-chrome D4): the

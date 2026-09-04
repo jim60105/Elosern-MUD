@@ -21,6 +21,7 @@
 // - The readout states only `座標 x,y` on coordinate-bearing layers
 //   (grid/wilderness); nothing on coordinate-free layers.
 import { computed, onMounted, onUpdated, ref } from "vue";
+import LocalMap from "../lib/local_map.js";
 import MapLattice from "./MapLattice.vue";
 
 const props = defineProps({
@@ -46,6 +47,54 @@ const remembered = computed(() => (Array.isArray(props.localMap.remembered) ? pr
 const showsOrientation = computed(
   () => props.localMap.layoutVariant === "lattice",
 );
+const isGraph = computed(
+  () => (props.localMap.layoutVariant || "lattice") === "graph",
+);
+const showsRememberedList = computed(
+  () => isGraph.value && remembered.value.length > 0,
+);
+
+const OCTANT_WORDS = ["北", "東北", "東", "東南", "南", "西南", "西", "西北"];
+
+const islandEdgeMarkers = computed(() => {
+  if (isGraph.value || remembered.value.length === 0) {
+    return { markers: [], gutter: 0, width: 0, height: 0 };
+  }
+  const current = nodes.value.find((node) => node.visibility === "current");
+  if (!current || typeof current.x !== "number" || typeof current.y !== "number") {
+    return { markers: [], gutter: 0, width: 0, height: 0 };
+  }
+  const cols = props.localMap.cols ?? 0;
+  const rows = props.localMap.rows ?? 0;
+  return LocalMap.edgeMarkersFor(nodes.value, remembered.value, {
+    canvasWidth: Math.max(1, cols) * 58,
+    canvasHeight: Math.max(1, rows) * 44 + 14,
+    current: {
+      x: (current.col ?? 0) * 58 + 29,
+      y: (Math.max(1, rows) - 1 - (current.row ?? 0)) * 44 + 22,
+    },
+    markerHalf: 9,
+    nameWidth: 0,
+    nameHeight: 16,
+  });
+});
+
+const markerMirrorList = computed(() => {
+  if (isGraph.value || islandEdgeMarkers.value.markers.length === 0) return [];
+  const payloadIndexById = new Map();
+  remembered.value.forEach((node, idx) => {
+    payloadIndexById.set(node.id, idx);
+  });
+  const items = islandEdgeMarkers.value.markers.map((marker) => ({
+    id: marker.id,
+    label: marker.name,
+    octant: marker.octant,
+    payloadIndex: payloadIndexById.get(marker.id) ?? 0,
+    octantWord: OCTANT_WORDS[marker.octant] ?? "",
+  }));
+  items.sort((a, b) => a.octant - b.octant || a.payloadIndex - b.payloadIndex);
+  return items;
+});
 
 // Coordinate readout (design D6): the island's position statement is the
 // current node's two payload integers on the closed coordinate-bearing set
@@ -130,20 +179,13 @@ function measureCanvasBudget() {
   if (!anchor) return;
   const budget = anchorHeightBudget(anchor);
   if (!budget) return;
-  // 4 island sections (meta, canvas, remembered list when non-empty,
-  // detail) separated by 8px (--sp-2) gaps. Fixed chrome (25px): 18px
-  // island padding (9px top + 9px bottom), the canvas element's 2px
-  // border, the meta row's 4px margin-bottom outside its own bounding
-  // box, and 1px of rounding slack so the island never needs to scroll
-  // a required surface. The island's own 1px border-box border is
-  // deliberately not reserved: reserving it (rubber-duck run 2) cost
-  // the canvas 2px and regressed the dense-lattice >=2px separation
-  // contract, while the resulting <=1px scroll range stays inside the
-  // +1px sub-pixel tolerance the browser budget tests enforce.
-  //
-  // The detail element's padding-top (--sp-1, 4px) is included in its
-  // getBoundingClientRect().height, so no adjustment is needed here.
-  const gapCount = 2 + (remembered.value.length > 0 ? 1 : 0);
+  // Sections actually laid out (design D6): meta and canvas are always laid
+  // out; at most one of {graph-variant remembered list, coordinate readout}
+  // is laid out.
+  let laidOutSections = 2;
+  if (showsRememberedList.value) laidOutSections += 1;
+  if (detail.value !== "") laidOutSections += 1;
+  const gapCount = laidOutSections - 1;
   const others =
     sectionHeight(metaEl.value) +
     sectionHeight(rememberedEl.value) +
@@ -252,25 +294,34 @@ function onIslandClick(event) {
         :fill-width="true"
         :max-upscale="2"
         :show-legend="false"
+        :marker-names="true"
+        :edge-markers="islandEdgeMarkers"
         @move="(p) => emit('move', p)"
       />
 
-      <!-- The spec's bounded, focusable remembered-remote-node list (outside
-           the coordinate canvas): each entry keeps its non-color diamond
-           state indicator. Clicking or focusing the item gives it natural
-           focus without emitting a travel action — `[tabindex]` is in the
-           onIslandClick guard so no open-map emits. The node's name stays
-           the visible text of its own list item (design D3). -->
-      <ul v-if="remembered.length" class="local-map__remembered" data-testid="local-map-remembered" ref="rememberedEl">
+      <!-- Assistive technology mirror for edge direction markers (design D1):
+           visually-hidden, non-focusable list ordered by octant then payload index,
+           one entry per drawn marker. -->
+      <ul
+        v-if="markerMirrorList.length"
+        class="visually-hidden"
+        aria-label="已知的地圖出入口"
+        data-testid="local-map-edge-markers-mirror"
+      >
+        <li v-for="marker in markerMirrorList" :key="marker.id">
+          {{ marker.label }}，{{ marker.octantWord }}
+        </li>
+      </ul>
+
+      <!-- The graph variant's bounded remembered list (design D4): scoped to
+           coordinate-free layers (interior/instance), plain non-focusable text,
+           no tabindex, no activation. Clicks bubble to onIslandClick. -->
+      <ul v-if="showsRememberedList" class="local-map__remembered" data-testid="local-map-remembered" ref="rememberedEl">
         <li
           v-for="node in remembered"
           :key="node.id"
           class="local-map__node local-map__node--remembered"
           :data-testid="`local-map__node--${node.id}`"
-          :data-node="node.id"
-          :data-node-id="node.id"
-          :data-visibility="node.visibility"
-          tabindex="0"
         >
           <svg
             class="local-map__marker local-map__marker--remembered"
@@ -481,7 +532,6 @@ function onIslandClick(event) {
   border-radius: var(--radius-sm);
   color: var(--paper-300);
   font-size: var(--text-sm);
-  cursor: pointer;
 }
 
 .local-map__remembered .local-map__marker--remembered rect {
@@ -498,5 +548,17 @@ function onIslandClick(event) {
   font-family: var(--f-mono);
   font-size: 11px;
   pointer-events: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>

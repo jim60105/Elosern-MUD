@@ -137,34 +137,44 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
-    def test_remembered_remote_node_focus_shows_name_without_travel_action(self):
+    def test_remembered_remote_node_presentation_and_accessibility(self):
         page = self.logged_in_page()
         self._wait_local_map_available(page)
-        # The seeded fixture recorded 北門 (2,4), which is outside the visual
-        # range from 南門, so the grid layer carries a remembered remote node.
-        # H2 re-map: the remembered list items are selected through their
-        # `data-visibility` data hook (the preserved `data-node-id` family).
-        remembered = page.locator('[data-testid="local-map-remembered"] [data-visibility="remembered"]')
-        self.assertGreaterEqual(remembered.count(), 1)
-        remembered.first.click()
-        wait_for_store_state(
-            page,
-            lambda s: bool(s.get("connected")),
-            dom_readiness={
-                "selector": '[data-testid="local-map-detail"]',
-                "predicate": (
-                    "() => { const d = document.querySelector('[data-testid=\"local-map-detail\"]'); "
-                    "return (d && d.textContent || '').indexOf('已探索') !== -1; }"
-                ),
-                "description": "map detail shows the explored state",
-            },
-            timeout=30000,
+        # On the lattice variant (grid/wilderness), remembered places render as
+        # named edge markers and no remembered list is rendered beneath the map.
+        self.assertEqual(
+            page.locator('[data-testid="local-map-remembered"]').count(),
+            0,
+            "lattice variant renders no remembered list",
         )
-        detail = page.locator('[data-testid="local-map-detail"]').inner_text()
-        self.assertIn("已探索", detail)
-        self.assertIn("北門", detail)
-        # No travel control appears for a remembered remote node.
-        self.assertEqual(page.locator('[data-testid="local-map-detail"] button').count(), 0)
+        edge_markers = page.locator('[data-testid^="local-map__edge-marker--"]')
+        self.assertGreaterEqual(edge_markers.count(), 1)
+        # Assistive technology mirror is present
+        mirror = page.locator('[data-testid="local-map-edge-markers-mirror"]')
+        self.assertEqual(mirror.count(), 1)
+
+        # Exactly one tab stop on the island
+        tab_stops = page.evaluate(
+            "() => document.querySelectorAll('.local-map button, .local-map a, .local-map [tabindex]:not([tabindex=\"-1\"])').length"
+        )
+        self.assertEqual(tab_stops, 1)
+
+        # On the graph variant (interior), the remembered list is present
+        interior_payload = {
+            "schema_version": 1,
+            "available": True,
+            "layer": "interior",
+            "current_node": "room:hall",
+            "title": "公會內部",
+            "nodes": [
+                {"id": "room:hall", "label": "大廳", "x": 0, "y": 0, "visibility": "current", "current": True},
+                {"id": "room:vault", "label": "地下金庫", "x": 0, "y": 1, "visibility": "remembered"},
+            ],
+        }
+        self._inject_panel(page, interior_payload)
+        page.wait_for_selector('[data-testid="local-map-remembered"]', timeout=15000)
+        self.assertEqual(page.locator('[data-testid="local-map-remembered"]').count(), 1)
+        self.assertEqual(page.locator('[data-testid="local-map-edge-markers-mirror"]').count(), 0)
 
     @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
     def test_unknown_nodes_never_appear_in_the_dom(self):
@@ -650,10 +660,13 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     lambda s: (s.get("localMapModel") or {}).get("rows") == 48,
                     timeout=30000,
                 )
-                # The remembered list renders as a bounded, focusable list
-                # outside the coordinate canvas (16 items).
-                remembered_items = page.locator('[data-testid="local-map-remembered"] li')
-                self.assertEqual(remembered_items.count(), 16)
+                # Lattice variant renders 16 edge markers, no remembered list
+                self.assertEqual(
+                    page.locator('[data-testid="local-map-remembered"]').count(),
+                    0,
+                )
+                edge_markers = page.locator('[data-testid^="local-map__edge-marker--"]')
+                self.assertEqual(edge_markers.count(), 16)
 
                 # The anchor must not need to scroll: the dynamic canvas cap
                 # reserved space for the remembered list.
@@ -672,7 +685,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 # contract), so a <=1px scroll range is the accepted
                 # residual; a real overflow fails this bound.
                 self.assertLessEqual(fit["scroll"], fit["client"] + 1)
-                for testid in ("local-map__title", "local-map-detail", "local-map-remembered"):
+                for testid in ("local-map__title", "local-map-detail"):
                     self.assertTrue(
                         page.locator(f'[data-testid="{testid}"]').is_visible(),
                         f"{testid} must stay visible without scrolling at {viewport}",
