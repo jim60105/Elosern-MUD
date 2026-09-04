@@ -632,7 +632,10 @@ def register_title_planner() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Guild pairing grants (D3/D8 §6.5).
+# Guild title grants (D3/D8 §6.5).
+#
+# Registration grants the F-rank fixed title only; the starter epithet moved
+# to the claim path (``grant_first_quest_epithet``, quest-reward-settlement).
 # ---------------------------------------------------------------------------
 
 
@@ -654,23 +657,23 @@ def grant_rank_title(actor: Any, rank: str) -> tuple[str, ...]:
     return ()
 
 
-def grant_starter_pair(actor: Any) -> tuple[str, ...]:
-    """Grant the F-rank title plus the starter epithet (D8 §6.5).
+def grant_first_quest_epithet(actor: Any) -> tuple[str, ...]:
+    """Bank the starter epithet at the actor's first guild reward claim.
 
-    Both grants ride ``register_adventurer``'s transaction; both auto-equip
-    their empty slots, so the registration-complete full title is
-    「F級冒險者　南門新客」. Re-registration no-ops through the two dedupe
-    rules.
+    Called inside ``turn_in_quest``'s claim transaction
+    (quest-reward-settlement). A real bank returns its OOB notification line
+    and auto-equips an empty epithet slot through the regular ``bank_epithet``
+    writer; a duplicate display is a silent no-op returning nothing, so any
+    replayed or repeated invocation is inert.
     """
     from world.lore.titles import STARTER_EPITHET
 
-    lines = list(grant_rank_title(actor, "F"))
     tick = get_world_clock().tick
     if bank_epithet(
         actor, STARTER_EPITHET.display, STARTER_EPITHET.origin_basis, tick
     ):
-        lines.append(f"獲得異名：{STARTER_EPITHET.display}")
-    return tuple(lines)
+        return (f"獲得異名：{STARTER_EPITHET.display}",)
+    return ()
 
 
 # ---------------------------------------------------------------------------

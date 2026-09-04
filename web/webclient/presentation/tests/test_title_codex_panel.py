@@ -49,7 +49,8 @@ from world.rules.titles import (
     TITLE_COLLECTION_KEY,
     bank_epithet,
     bank_fixed,
-    grant_starter_pair,
+    grant_first_quest_epithet,
+    grant_rank_title,
 )
 
 # Distinguishes "no actor passed" from an explicit None actor.
@@ -380,7 +381,8 @@ class TitleCodexPresenterTests(EvenniaTestCase):
         self.assertEqual(payload["equipped"], {"fixed": None, "epithet": None})
 
     def test_granted_state_renders_verbatim_rows_and_flags(self):
-        grant_starter_pair(self.player)
+        grant_rank_title(self.player, "F")
+        grant_first_quest_epithet(self.player)
         bank_epithet(self.player, "破城先鋒", "率先破門。", 500)
         payload = self._render()
         self.assertEqual(payload["full_title"], "F級冒險者　南門新客")
@@ -445,5 +447,6 @@ class TitleCodexPresenterTests(EvenniaTestCase):
         )
 
     def test_presenter_directly_matches_the_registry_render(self):
-        grant_starter_pair(self.player)
+        grant_rank_title(self.player, "F")
+        grant_first_quest_epithet(self.player)
         self.assertEqual(title_codex_presenter(self._context()), self._render())

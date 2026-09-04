@@ -46,7 +46,8 @@ from world.rules.titles import (
     bank_epithet,
     decline_records,
     declined_digest,
-    grant_starter_pair,
+    grant_first_quest_epithet,
+    grant_rank_title,
     persist_nomination_ballot,
     read_pending_ballot,
     read_title_state,
@@ -290,7 +291,8 @@ class TitleCodexAdapterTests(EvenniaTestCase):
         self.player.msg = lambda text, **kwargs: self.messages.append(text)
 
     def _bank_pair(self):
-        grant_starter_pair(self.player)
+        grant_rank_title(self.player, "F")
+        grant_first_quest_epithet(self.player)
         bank_epithet(self.player, "破城先鋒", "率先破門。", 500)
 
     def test_equip_fixed_banks_then_swaps_with_the_equip_affected_pair(self):
@@ -368,7 +370,7 @@ class TitleCodexAdapterTests(EvenniaTestCase):
         sole.race = "human"
         sole.apply_race_baseline()
         sole.msg = lambda text, **kwargs: None
-        grant_starter_pair(sole)
+        grant_first_quest_epithet(sole)
         result = _title_remove_adapter(sole, {"display": "南門新客"})
         self.assertEqual(result["code"], REMOVAL_LAST_CODE)
         self.assertEqual(self.messages, [])

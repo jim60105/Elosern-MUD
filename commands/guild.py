@@ -326,6 +326,8 @@ class CmdGuildTurnIn(_GuildCommandBase):
             f"你回報了任務 {result['quest_id']}，獲得 {result['copper']} 銅、"
             f"功績 {result['merit']} 與道具 {result['items']}。"
         )
+        for line in result.get("title_notifications", ()):
+            self.caller.msg(line)
 
 
 class CmdGuildMerit(_GuildCommandBase):

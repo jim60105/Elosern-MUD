@@ -287,6 +287,33 @@ class ServiceAdapterTests(ServiceActionBase):
         self.assertEqual(result["code"], "no_completed_record")
         self.assertEqual(self.player.db.wallet, before)
 
+    @covers_requirement("quest-reward-settlement::the-first-ever-reward-claim-grants-the-starter-epithet-atomically")
+    def test_turnin_echoes_the_first_claim_epithet_then_stays_silent(self):
+        self._register()
+        from world.quests.runtime import accept_quest, definition_for, fulfill_record, to_storage
+
+        messages: list[str] = []
+        with patch.object(self.player, "msg", side_effect=lambda text, **kw: messages.append(text)):
+            accept_guild_offer(self.player, self.staff, "introductory_hunt")
+            record = read_records(self.player)[0]
+            completed = fulfill_record(record, definition_for(record))
+            self.player.db.quest_log = [to_storage(completed)]
+            result = _quest_turnin_adapter(self.player, {"quest_id": completed.quest_id})
+            self.assertEqual(result["code"], "claimed")
+            # Ordered echo: reward summary first, then the grant line.
+            self.assertIn("你回報了任務", messages[0])
+            self.assertEqual(messages[-1], "獲得異名：南門新客")
+            self.assertNotIn("你的第一個日子在這裡圓滿結束", "\n".join(messages))
+            # A later distinct successful claim pays and stays title-silent.
+            second = accept_quest(self.player, "introductory_hunt")
+            second_completed = fulfill_record(second, definition_for(second))
+            self.player.db.quest_log = [to_storage(second_completed)]
+            messages.clear()
+            result = _quest_turnin_adapter(self.player, {"quest_id": second_completed.quest_id})
+            self.assertEqual(result["code"], "claimed")
+        self.assertTrue(any("你回報了任務" in text for text in messages))
+        self.assertFalse(any("獲得異名" in text for text in messages))
+
     def test_buy_success_exact_copper(self):
         self._register()
         self.player.location = self.store

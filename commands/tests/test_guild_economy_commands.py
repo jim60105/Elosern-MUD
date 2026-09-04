@@ -74,7 +74,29 @@ class GuildCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
             self.char1,
             [completed if r.quest_id == record.quest_id else r for r in records],
         )
-        self.call(CmdGuildTurnIn(), record.quest_id, "你回報了任務")
+        output = self.call(CmdGuildTurnIn(), record.quest_id, "你回報了任務")
+        self.assertIn("獲得異名：南門新客", output)
+        # The retired onboarding welcome must never resurface on a claim.
+        self.assertNotIn("你的第一個日子在這裡圓滿結束", output)
+        # A later distinct successful claim pays normally and stays title-silent.
+        from world.quests.runtime import accept_quest
+
+        second = accept_quest(self.char1, "introductory_hunt")
+        second_completed = fulfill_record(
+            second, QUEST_DEFINITION_REGISTRY["introductory_hunt"]
+        )
+        records = read_records(self.char1)
+        apply_quest_log_replacement(
+            self.char1,
+            [
+                second_completed if r.quest_id == second.quest_id else r
+                for r in records
+            ],
+        )
+        output = self.call(
+            CmdGuildTurnIn(), second_completed.quest_id, "你回報了任務"
+        )
+        self.assertNotIn("獲得異名", output)
 
     def test_absent_staff_rejects(self):
         self.char1.location = create_object(Room, key="empty")

@@ -344,6 +344,8 @@ def _quest_turnin_adapter(actor: Any, payload: dict[str, Any], session: Any = No
         f"功績 {result['merit']} 與道具 {result['items']}。"
     )
     actor.msg(message)
+    for line in result.get("title_notifications", ()):
+        actor.msg(line)
     return _success("claimed", message, AFFECTED_TURNIN)
 
 

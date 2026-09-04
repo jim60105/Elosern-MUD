@@ -87,6 +87,27 @@ class GuildRegistrationTests(EvenniaTestCase):
         record = self._register(staff=self.staff)
         self.assertEqual(record["branch_key"], self.staff.components.get(GuildStaff.get_component_slot()).branch_key)
 
+    def test_registration_notifies_the_f_rank_title_line_only(self):
+        # The starter epithet is NOT part of the registration payload; it
+        # rides the first reward claim (quest-reward-settlement).
+        record = self._register(staff=self.staff)
+        self.assertEqual(record["title_notifications"], ["獲得稱號：F級冒險者"])
+        from world.rules.titles import read_title_state
+
+        collection, _ = read_title_state(self.player)
+        self.assertEqual([entry["kind"] for entry in collection], ["fixed"])
+
+    def test_rejected_registration_grants_no_title(self):
+        other_room = create_object(Room, key="other lobby")
+        remote = _attach_staff(create_object(NPC, key="remote staff 2", location=other_room))
+        with self.assertRaises(GuildError):
+            self._register(staff=remote)
+        from world.rules.titles import read_title_state
+
+        self.assertEqual(
+            read_title_state(self.player), ([], {"fixed": None, "epithet": None})
+        )
+
     def test_registration_is_atomic_on_rank_write_failure(self):
         original = (
             self.player.db.guild_registration,
@@ -119,10 +140,15 @@ class GuildRegistrationTests(EvenniaTestCase):
     def test_repeat_registration_preserves_historical_values(self):
         first = self._register(staff=self.staff)
         self.player.db.disguised_stats = {"atk_phys": 88}
+        from world.rules.titles import read_title_state
+
+        titles_before = read_title_state(self.player)
         second = self._register(staff=self.staff)
         # The stored record is preserved verbatim; only the (empty) grant
         # notification channel differs, proving the repeat banks no title.
         self.assertEqual(second["title_notifications"], [])
+        # Title state is byte-identical across the repeat.
+        self.assertEqual(read_title_state(self.player), titles_before)
         self.assertEqual(
             {key: value for key, value in second.items() if key != "title_notifications"},
             {key: value for key, value in first.items() if key != "title_notifications"},

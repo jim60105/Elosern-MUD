@@ -111,7 +111,12 @@ class FixedTitleDef:
 
 @dataclass(frozen=True, slots=True)
 class StarterEpithet:
-    """The deterministic starter epithet (D8 §6.5): display plus basis."""
+    """The deterministic first-quest epithet: display plus origin basis.
+
+    Granted by the actor's first guild reward claim
+    (``world/rules/titles.py::grant_first_quest_epithet``), not at
+    registration.
+    """
 
     display: str
     origin_basis: str
@@ -119,7 +124,7 @@ class StarterEpithet:
 
 STARTER_EPITHET = StarterEpithet(
     "南門新客",
-    "你在南門守衛的目送下踏入阿爾托利亞，成為公會的新面孔。",
+    "你在公會完成第一次任務回報，成為阿爾托利亞冒險者中的新面孔。",
 )
 
 

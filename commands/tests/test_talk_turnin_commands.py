@@ -95,10 +95,41 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         quest_id = self._complete_intro_hunt()
         output = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}")
         self.assertIn("你回報了任務", output)
+        # First-ever claim echoes the starter-epithet grant on this surface.
+        self.assertIn("獲得異名：南門新客", output)
+        self.assertNotIn("你的第一個日子在這裡圓滿結束", output)
         self.assertEqual(self.char1.db.wallet, 50)
         second = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}")
         self.assertIn("無法回報任務", second)
         self.assertEqual(self.char1.db.wallet, 50)
+
+    @covers_requirement("quest-reward-settlement::the-first-ever-reward-claim-grants-the-starter-epithet-atomically")
+    def test_talk_turnin_later_claims_stay_title_silent(self):
+        from commands.guild import CmdGuildAccept
+
+        self.call(CmdGuildAccept(), "introductory_hunt", "你接取了任務")
+        quest_id = self._complete_intro_hunt()
+        first = self.call(
+            CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}"
+        )
+        self.assertIn("獲得異名：南門新客", first)
+        from world.quests.runtime import accept_quest
+
+        second_record = accept_quest(self.char1, "introductory_hunt")
+        completed = fulfill_record(
+            second_record, QUEST_DEFINITION_REGISTRY["introductory_hunt"]
+        )
+        records = read_records(self.char1)
+        apply_quest_log_replacement(
+            self.char1,
+            [completed if r.quest_id == second_record.quest_id else r for r in records],
+        )
+        second = self.call(
+            CmdsTalk(),
+            f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {completed.quest_id}",
+        )
+        self.assertIn("你回報了任務", second)
+        self.assertNotIn("獲得異名", second)
 
     @covers_requirement("guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host")
     def test_talk_turnin_keyword_without_reportable_quests_says_so(self):
