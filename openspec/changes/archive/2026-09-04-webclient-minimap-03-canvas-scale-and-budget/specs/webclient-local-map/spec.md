@@ -89,9 +89,13 @@ The island SHALL carry the payload's `title`, and its header SHALL stay a single
 - **WHEN** a grid-layer payload places two or more nodes in adjacent lattice cells (sharing a row or a column), each carrying a label at the renderer's normal truncation length
 - **THEN** the rendered bounding box of each node's marker and label does not intersect the bounding box of any other node's marker or label, and the connector edge between two adjacent nodes remains visually distinguishable rather than being fully covered by their markers
 
-#### Scenario: A scaled lattice never reintroduces overlap
-- **WHEN** the island's caps scale the whole SVG canvas down proportionally (a wide or tall in-view lattice) or the fill-width rule scales it up proportionally (a sparse payload narrower than the island's content box)
-- **THEN** the pre-scale geometry already satisfies the non-overlap invariant, so the uniformly scaled render remains free of marker/label collisions in either direction
+#### Scenario: A densely populated lattice scales down without reintroducing overlap
+- **WHEN** the in-view lattice is wide or tall enough that the island's `max-width` or `max-height` cap scales the whole SVG canvas down proportionally
+- **THEN** the pre-scale geometry already satisfies the non-overlap invariant, so the uniformly scaled render remains free of marker/label collisions
+
+#### Scenario: A sparse lattice scaled up never reintroduces overlap
+- **WHEN** the fill-width rule scales the whole SVG canvas up proportionally, because the payload's natural canvas is narrower than the island's content box
+- **THEN** the pre-scale geometry already satisfies the non-overlap invariant, so the uniformly scaled render remains free of marker/label collisions in the upward direction too — the scale is uniform through the viewBox, so every marker, label, and gutter offset keeps its proportion
 
 #### Scenario: A long remembered list keeps required island content in view
 - **WHEN** the payload combines a tall in-view lattice with a long remembered-node list (up to the model's 64-node bound)
