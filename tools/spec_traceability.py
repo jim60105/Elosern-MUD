@@ -224,7 +224,7 @@ def discover_associations(
     """Find statically declared test associations without importing tests."""
     associations: list[Association] = []
     errors: list[VerificationError] = []
-    excluded = {".git", ".venv", "openspec"}
+    excluded = {".git", ".venv", ".worktrees", "openspec"}
     paths = sorted(
         path
         for path in repo_root.rglob("test_*.py")

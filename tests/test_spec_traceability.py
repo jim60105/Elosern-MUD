@@ -86,6 +86,19 @@ class StaticAnnotationTests(unittest.TestCase):
         self.assertEqual(report.errors[0].code, "unknown-requirement-id")
         self.assertEqual(report.uncovered, ("sample::useful-behavior",))
 
+    def test_stale_annotations_in_worktrees_are_ignored(self):
+        # Linked git worktrees keep copies of older test files whose anchored
+        # slugs may no longer exist on the current branch; they must not
+        # produce unknown-requirement-id errors for the main checkout.
+        stale = ANNOTATED_TEST.replace("sample::useful-behavior", "sample::old-name")
+        with fixture_repository(SPEC, ANNOTATED_TEST) as root:
+            worktree_test = root / ".worktrees" / "feature" / "sample" / "tests" / "test_sample.py"
+            worktree_test.parent.mkdir(parents=True)
+            worktree_test.write_text(stale, encoding="utf-8")
+            report = verify(root)
+        self.assertTrue(report.ok)
+        self.assertEqual(report.covered, ("sample::useful-behavior",))
+
     def test_dynamic_argument_is_rejected(self):
         source = ANNOTATED_TEST.replace(
             '@covers_requirement("sample::useful-behavior")',
