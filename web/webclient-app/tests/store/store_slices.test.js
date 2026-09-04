@@ -16,11 +16,14 @@ const PANEL_ALLOWLIST = [
   "status",
   "context_actions",
   "local_map",
+  "party",
   "services",
   "creation",
   "exploration",
   "character",
+  "lineage",
   "title_ballot",
+  "title_codex",
 ];
 
 function openActiveSession(store) {

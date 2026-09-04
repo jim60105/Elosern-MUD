@@ -1875,6 +1875,25 @@ def _stored_trait_value(trait: Any) -> float:
     return data.get("value", (data.get("base", 0) + data.get("mod", 0)) * data.get("mult", 1))
 
 
+def stored_gauge_pair(entity: Any, key: str) -> tuple[int, int]:
+    """The entity's stored gauge as a clamped ``(current, maximum)`` int pair.
+
+    A read-only rules/presentation helper: it resolves the gauge from stored
+    trait state only (never a time-advancing accessor), clamps both terms to
+    zero, and falls back to the computed stored value when a gauge carries no
+    stored maximum. Shared by ``combat_view`` participant rows and the
+    ``party`` presentation panel so companion HP can never drift between the
+    two surfaces.
+    """
+    trait = getattr(entity.traits, key)
+    maximum = getattr(trait, "max", None)
+    if maximum is None:
+        maximum = getattr(trait, "max_value", None)
+    if maximum is None:
+        maximum = _stored_trait_value(trait)
+    return max(int(_stored_trait_value(trait)), 0), max(int(maximum), 0)
+
+
 def _attribute_snapshot(
     entity: Any,
     key: str,

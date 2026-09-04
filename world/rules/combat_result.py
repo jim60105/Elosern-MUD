@@ -50,7 +50,10 @@ def settle_to_messages(result: dict[str, Any]) -> tuple[tuple[str, ...], str]:
 # The panels an admitted combat action may update after settlement. The art
 # panel is included so a combat result that changes the participant roster or
 # session state replaces the portrait catalog in the same ui_update.
-AFFECTED_PANELS = ("status", "context_actions", "art")
+# webclient-align-04: a settlement round can move a participating companion's
+# HP, so the party panel re-rides the same partial update as its companion
+# neighbours instead of waiting for the next full snapshot.
+AFFECTED_PANELS = ("status", "context_actions", "art", "party")
 
 
 def settle_to_oob_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -67,7 +70,7 @@ def settle_to_oob_result(result: dict[str, Any]) -> dict[str, Any]:
     to exploration, so every mode-relevant panel (exploration, character,
     services, local_map, status, context_actions, art) must be replaced with
     post-settlement canonical state. Non-terminal rounds keep the small
-    three-panel update.
+    four-panel update.
     """
     if result["outcome"] == "rejected":
         reason = result.get("reason")

@@ -328,11 +328,19 @@
 
   // The registered production panel allowlist. Each key maps to its exact
   // schema version; unknown panel names reject the whole presentation message.
+  // Party panel bounds (mirror of web.webclient.presentation.party,
+  // webclient-align-04): at most four companion rows reusing the NPC
+  // display-name bound; bond_stage is a canonical stage NAME string.
+  var PARTY_SCHEMA_VERSION = 1;
+  var PARTY_MAX_ROWS = 4;
+  var PARTY_MAX_DISPLAY_NAME = 128;
+
   var PANEL_ALLOWLIST = {
     art: 1,
     status: 2,
     context_actions: 5,
     local_map: 1,
+    party: 1,
     services: 3,
     creation: 4,
     exploration: 1,
@@ -4311,6 +4319,81 @@
     return result;
   }
 
+  // Party panel validator (mirror of web.webclient.presentation.party).
+  // Rows reuse the NPC wire vocabulary; the raw affinity number can never
+  // appear because bond_stage is a bounded non-empty string; HP fields are
+  // zero-clamped bounds with NO current/maximum cross assertion (traits are
+  // truth — the Python validator documents the same rule).
+  function validatePartySlot(value, index) {
+    var name = "party slot " + index;
+    requireExactFields(
+      value,
+      name,
+      ["identity", "display_name", "portrait_ref", "hp_current", "hp_maximum", "bond_stage"],
+      []
+    );
+    var identity = requireInt(value.identity, "identity", 1, MAX_SAFE_INTEGER);
+    var displayName = requireString(value.display_name, "display_name", PARTY_MAX_DISPLAY_NAME);
+    if (displayName.length === 0) {
+      throw new Error("slot display_name must be non-empty");
+    }
+    if (value.portrait_ref !== null) {
+      throw new Error("portrait_ref must be null in this schema version");
+    }
+    var hpCurrent = requireInt(value.hp_current, "hp_current", 0, MAX_SAFE_INTEGER);
+    var hpMaximum = requireInt(value.hp_maximum, "hp_maximum", 0, MAX_SAFE_INTEGER);
+    var bondStage = requireString(value.bond_stage, "bond_stage", PARTY_MAX_DISPLAY_NAME);
+    if (bondStage.length === 0) {
+      throw new Error("slot bond_stage must be a non-empty stage name");
+    }
+    return {
+      identity: identity,
+      display_name: displayName,
+      portrait_ref: null,
+      hp_current: hpCurrent,
+      hp_maximum: hpMaximum,
+      bond_stage: bondStage,
+    };
+  }
+
+  function validatePartyPanel(payload) {
+    requireExactFields(payload, "party panel", ["schema_version", "available", "slots"], []);
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== PARTY_SCHEMA_VERSION) {
+      throw new Error("unsupported party schema_version");
+    }
+    if (payload.available !== true) {
+      throw new Error("party panel must be available");
+    }
+    var slots = payload.slots;
+    if (!Array.isArray(slots)) {
+      throw new Error("party slots must be a list");
+    }
+    if (slots.length > PARTY_MAX_ROWS) {
+      throw new Error("party slots must hold at most " + PARTY_MAX_ROWS + " rows");
+    }
+    var normalized = [];
+    var seen = {};
+    for (var i = 0; i < slots.length; i++) {
+      var row = validatePartySlot(slots[i], i + 1);
+      if (Object.prototype.hasOwnProperty.call(seen, row.identity)) {
+        throw new Error("party slot identities must be unique");
+      }
+      seen[row.identity] = true;
+      normalized.push(row);
+    }
+    var result = {
+      schema_version: PARTY_SCHEMA_VERSION,
+      available: true,
+      slots: normalized,
+    };
+    // Envelope guarantee mirrors the Python validator's closing check.
+    if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("party payload exceeds the OOB envelope limit");
+    }
+    return result;
+  }
+
   // Panel discriminator dispatch: the unavailable form is common to every
   // registered panel; the available form is validated against its schema.
   function validateUnavailablePanel(payload, schemaVersion) {
@@ -4380,6 +4463,9 @@
     }
     if (name === "local_map") {
       return validateLocalMapPanel(payload);
+    }
+    if (name === "party") {
+      return validatePartyPanel(payload);
     }
     if (name === "services") {
       return validateServicesPanel(payload);
@@ -4690,6 +4776,10 @@
     OPTIONS_MAX_PARAM_STRING: OPTIONS_MAX_PARAM_STRING,
     validateLocalMapPanel: validateLocalMapPanel,
     validateServicesPanel: validateServicesPanel,
+    validatePartyPanel: validatePartyPanel,
+    PARTY_SCHEMA_VERSION: PARTY_SCHEMA_VERSION,
+    PARTY_MAX_ROWS: PARTY_MAX_ROWS,
+    PARTY_MAX_DISPLAY_NAME: PARTY_MAX_DISPLAY_NAME,
     validateCreationPanel: validateCreationPanel,
     validateCreationPersona: validateCreationPersona,
     validateCreationProposal: validateCreationProposal,

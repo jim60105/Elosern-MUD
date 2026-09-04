@@ -197,16 +197,10 @@ class CombatView:
         return self.session.state == "recovery"
 
 
-def _stored_hp(entity: Any, key: str) -> int:
-    from world.rules.action import _stored_trait_value
+def _stored_hp(entity: Any, key: str) -> tuple[int, int]:
+    from world.rules.action import stored_gauge_pair
 
-    trait = getattr(entity.traits, key)
-    maximum = getattr(trait, "max", None)
-    if maximum is None:
-        maximum = getattr(trait, "max_value", None)
-    if maximum is None:
-        maximum = _stored_trait_value(trait)
-    return max(int(_stored_trait_value(trait)), 0), max(int(maximum), 0)
+    return stored_gauge_pair(entity, key)
 
 
 def _participant_state(entity: Any, identity: int, record: Any) -> str:
