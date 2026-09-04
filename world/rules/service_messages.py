@@ -59,6 +59,7 @@ SERVICE_REASON_MESSAGES: dict[str, str] = {
     "quest_data_error": "任務記錄有誤。",
     "quest_already_active": "這個任務已經在進行中了。",
     "quest_transition": "這個任務目前無法進行此操作。",
+    "quest_track_limit": "你最多只能同時追蹤三個任務。",
     # Reward claims.
     "unregistered": "你尚未註冊為冒險者。",
     "no_completed_record": "沒有可以回報的已完成任務。",
@@ -165,6 +166,9 @@ def rejection_code(reason: Any) -> str:
     if isinstance(reason, (QuestAlreadyActive,)):
         return "quest_already_active"
     if isinstance(reason, (QuestTransitionError,)):
+        inner = reason.args[0] if reason.args else None
+        if isinstance(inner, str) and inner in SERVICE_REASON_MESSAGES:
+            return inner
         return "quest_transition"
     if isinstance(reason, str) and reason in SERVICE_REASON_MESSAGES:
         return reason

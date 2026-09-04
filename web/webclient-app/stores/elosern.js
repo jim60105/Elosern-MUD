@@ -69,6 +69,7 @@ const PANEL_ALLOWLIST = [
   "context_actions",
   "local_map",
   "party",
+  "objectives",
   "services",
   "creation",
   "exploration",

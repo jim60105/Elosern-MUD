@@ -21,6 +21,8 @@ from world.quests.runtime import (
     QuestAlreadyActive,
     QuestDataError,
     QuestNotFound,
+    QuestTransitionError,
+    set_quest_tracked,
 )
 from world.rules.combat_result import emit_settlement, settle_to_oob_result
 from world.rules.combat_session import (
@@ -60,13 +62,16 @@ MAX_RANK_KEY_CODE_POINTS = 8
 MAX_QUANTITY = 1000
 MIN_QUANTITY = 1
 
-# Stable panels each admitted service action may publish.
+# Stable panels each admitted service action may publish. Every quest write
+# seam publishes the ``objectives`` panel beside its paired ``services`` rows
+# (webclient-align-06: the tracker island must never lag the quest log).
 AFFECTED_REGISTER = ("status", "services")
-AFFECTED_ACCEPT = ("services",)
-AFFECTED_ABANDON = ("services",)
-AFFECTED_TURNIN = ("status", "services")
+AFFECTED_ACCEPT = ("services", "objectives")
+AFFECTED_ABANDON = ("services", "objectives")
+AFFECTED_TURNIN = ("status", "services", "objectives")
 AFFECTED_EXAM = ("status", "services", "context_actions")
 AFFECTED_TRADE = ("status", "services")
+AFFECTED_TRACK = ("services", "objectives")
 
 
 class ServiceActionError(ValueError):
@@ -131,6 +136,19 @@ def validate_quest_turnin_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {"quest_id": _require_non_empty_string(
         body["quest_id"], "quest_id", MAX_KEY_CODE_POINTS
     )}
+
+
+def validate_quest_track_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate the exact ``guild.quest_track`` payload (quest ID plus flag)."""
+    if not isinstance(payload, dict):
+        raise ServiceActionError("payload must be an object")
+    if set(payload) != {"quest_id", "tracked"}:
+        raise ServiceActionError("guild.quest_track accepts exactly quest_id and tracked")
+    quest_id = _require_non_empty_string(payload["quest_id"], "quest_id", MAX_KEY_CODE_POINTS)
+    tracked = payload["tracked"]
+    if not isinstance(tracked, bool):
+        raise ServiceActionError("tracked must be a boolean")
+    return {"quest_id": quest_id, "tracked": tracked}
 
 
 def validate_exam_start_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -349,6 +367,31 @@ def _quest_turnin_adapter(actor: Any, payload: dict[str, Any], session: Any = No
     return _success("claimed", message, AFFECTED_TURNIN)
 
 
+def _quest_track_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
+    """Flip the tracking flag on exactly one of the holder's own records.
+
+    Host-independent by contract (webclient-align-06): tracking truth is
+    player state, so NO staff host and NO schedule gate is consulted — the
+    lifecycle operation itself is the only authority, and it validates the
+    whole log before writing.
+    """
+    del session
+    quest_id = payload["quest_id"]
+    tracked = payload["tracked"]
+    try:
+        record = set_quest_tracked(actor, quest_id, tracked)
+    except (QuestNotFound, QuestDataError, QuestTransitionError) as error:
+        return _rejected(error)
+    if tracked:
+        message = f"你已開始追蹤任務 {record.quest_id}。"
+    else:
+        message = f"你已取消追蹤任務 {record.quest_id}。"
+    actor.msg(message)
+    return _success(
+        "tracked" if tracked else "untracked", message, AFFECTED_TRACK
+    )
+
+
 def _exam_start_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Start the examination for the exact server-derived next rank only."""
     del session
@@ -499,6 +542,7 @@ __all__ = [
     "validate_inventory_use_payload",
     "validate_quest_abandon_payload",
     "validate_quest_accept_payload",
+    "validate_quest_track_payload",
     "validate_quest_turnin_payload",
     "validate_sell_payload",
 ]

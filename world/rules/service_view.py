@@ -1,4 +1,4 @@
-"""Frozen no-mutation read model for the version-3 services panel.
+"""Frozen no-mutation read model for the version-4 services panel.
 
 The services panel (WebClient ``services``) is built exclusively by this
 module from canonical guild, quest, shop, wallet, inventory, rank, and merit
@@ -180,6 +180,7 @@ class QuestRowView:
     detail: str
     abandon: ActionDescriptorView
     turnin: ActionDescriptorView
+    tracked: bool
 
 
 @dataclass(frozen=True)
@@ -481,6 +482,7 @@ def _build_quests(
                     quantity_min=None,
                     quantity_max=None,
                 ),
+                tracked=bool(record.tracked),
             )
         )
         if len(rows) >= MAX_QUEST_ROWS:

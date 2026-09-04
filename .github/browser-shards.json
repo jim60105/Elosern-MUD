@@ -268,7 +268,8 @@
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_reference_drawer_close_focus_and_absent_surfaces",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_reference_drawer_recession_mark_lifecycle",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_caption_wider_and_no_anchor_overlap",
-        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_minimap_island_single_affordance_keyboard_and_movement"
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_minimap_island_single_affordance_keyboard_and_movement",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_digit_keys_pick_the_first_four_rows_of_the_current_frame"
       ],
       "files_b": [
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_combat_skills_bounded_master_detail",

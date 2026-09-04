@@ -582,6 +582,7 @@ const REGISTERED_MUTATION_ACTIONS = {
   "guild.exam_start": { payload: { target_rank: "正式會員" }, display: {} },
   "guild.quest_abandon": { payload: { quest_id: "quest_1" }, display: {} },
   "guild.quest_accept": { payload: { definition_key: "escort" }, display: {} },
+  "guild.quest_track": { payload: { quest_id: "quest_1", tracked: true }, display: {} },
   "guild.quest_turnin": { payload: { quest_id: "quest_1" }, display: {} },
   "guild.register": { payload: {}, display: {} },
   "inventory.toggle_equip": { payload: { item_key: "leather_vest" }, display: {} },

@@ -218,6 +218,7 @@
     "guild.quest_accept",
     "guild.quest_abandon",
     "guild.quest_turnin",
+    "guild.quest_track",
     "guild.exam_start",
     "shop.buy",
     "shop.sell",
@@ -335,13 +336,24 @@
   var PARTY_MAX_ROWS = 4;
   var PARTY_MAX_DISPLAY_NAME = 128;
 
+  // Objectives panel bounds (mirror of web.webclient.presentation.objectives,
+  // webclient-align-06): at most three tracked quest rows; the row cap mirrors
+  // world.quests.runtime.MAX_TRACKED_QUESTS.
+  var OBJECTIVES_SCHEMA_VERSION = 1;
+  var OBJECTIVES_MAX_ROWS = 3;
+  var OBJECTIVES_MAX_QUEST_ID = 64;
+  var OBJECTIVES_MAX_DISPLAY_NAME = 128;
+  var OBJECTIVES_MAX_OBJECTIVE_LINE = 128;
+  var OBJECTIVES_MAX_DEADLINE_LINE = 64;
+
   var PANEL_ALLOWLIST = {
     art: 1,
     status: 2,
     context_actions: 5,
     local_map: 1,
     party: 1,
-    services: 3,
+    objectives: 1,
+    services: 4,
     creation: 4,
     exploration: 1,
     character: 7,
@@ -2033,6 +2045,7 @@
         "detail",
         "abandon",
         "turnin",
+        "tracked",
       ],
       []
     );
@@ -2079,6 +2092,7 @@
     if (turnin.action_id !== "guild.quest_turnin") {
       throw new Error("quest turnin must be guild.quest_turnin");
     }
+    requireBool(value.tracked, "tracked");
     return value;
   }
 
@@ -2322,7 +2336,7 @@
       []
     );
     requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 3) {
+    if (payload.schema_version !== 4) {
       throw new Error("unsupported services schema_version");
     }
     if (payload.available !== true || payload.kind !== "services") {
@@ -2393,7 +2407,7 @@
     validateServicesPaginationTotals(pagination, guild, shop, inventory);
 
     var result = {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "services",
       host: payload.host,
@@ -4420,6 +4434,113 @@
     return result;
   }
 
+  // Objectives panel validator (mirror of
+  // web.webclient.presentation.objectives, webclient-align-06). At most three
+  // tracked quest rows in quest-log order; reward_copper is a non-negative
+  // integer or null; same surrogate guards as the party mirror.
+  function validateObjectivesRow(value, index) {
+    var name = "objective row " + index;
+    requireExactFields(
+      value,
+      name,
+      [
+        "quest_id",
+        "display_name",
+        "objective_line",
+        "stage_index",
+        "stage_total",
+        "stage_progress",
+        "objective_quantity",
+        "reward_copper",
+        "deadline_line",
+      ],
+      []
+    );
+    var questId = requireString(value.quest_id, "quest_id", OBJECTIVES_MAX_QUEST_ID);
+    if (!questId.trim() || hasLoneSurrogate(questId)) {
+      throw new Error(name + " quest_id must be non-empty");
+    }
+    var displayName = requireString(
+      value.display_name,
+      "display_name",
+      OBJECTIVES_MAX_DISPLAY_NAME
+    );
+    if (!displayName.trim() || hasLoneSurrogate(displayName)) {
+      throw new Error(name + " display_name must be non-empty");
+    }
+    var objectiveLine = requireString(
+      value.objective_line,
+      "objective_line",
+      OBJECTIVES_MAX_OBJECTIVE_LINE
+    );
+    if (!objectiveLine.trim() || hasLoneSurrogate(objectiveLine)) {
+      throw new Error(name + " objective_line must be non-empty");
+    }
+    requireInt(value.stage_index, "stage_index", 0, MAX_SAFE_INTEGER);
+    requireInt(value.stage_total, "stage_total", 1, MAX_SAFE_INTEGER);
+    requireInt(value.stage_progress, "stage_progress", 0, MAX_SAFE_INTEGER);
+    requireInt(value.objective_quantity, "objective_quantity", 1, MAX_SAFE_INTEGER);
+    if (value.reward_copper !== null) {
+      requireInt(value.reward_copper, "reward_copper", 0, MAX_SAFE_INTEGER);
+    }
+    if (value.deadline_line !== null) {
+      var deadline = requireString(
+        value.deadline_line,
+        "deadline_line",
+        OBJECTIVES_MAX_DEADLINE_LINE
+      );
+      if (!deadline.trim() || hasLoneSurrogate(deadline)) {
+        throw new Error(name + " deadline_line must be non-empty when set");
+      }
+    }
+    return value;
+  }
+
+  function validateObjectivesPanel(payload) {
+    requireExactFields(
+      payload,
+      "objectives panel",
+      ["schema_version", "available", "rows"],
+      []
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== OBJECTIVES_SCHEMA_VERSION) {
+      throw new Error("unsupported objectives schema_version");
+    }
+    if (payload.available !== true) {
+      throw new Error("objectives panel must be available");
+    }
+    var rows = payload.rows;
+    if (!Array.isArray(rows)) {
+      throw new Error("objectives rows must be a list");
+    }
+    if (rows.length > OBJECTIVES_MAX_ROWS) {
+      throw new Error(
+        "objectives rows must hold at most " + OBJECTIVES_MAX_ROWS + " entries"
+      );
+    }
+    var normalized = [];
+    var seen = {};
+    for (var i = 0; i < rows.length; i++) {
+      var row = validateObjectivesRow(rows[i], i + 1);
+      if (Object.prototype.hasOwnProperty.call(seen, row.quest_id)) {
+        throw new Error("objective quest_ids must be unique");
+      }
+      seen[row.quest_id] = true;
+      normalized.push(row);
+    }
+    var result = {
+      schema_version: OBJECTIVES_SCHEMA_VERSION,
+      available: true,
+      rows: normalized,
+    };
+    // Envelope guarantee mirrors the Python validator's closing check.
+    if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("objectives payload exceeds the OOB envelope limit");
+    }
+    return result;
+  }
+
   // Panel discriminator dispatch: the unavailable form is common to every
   // registered panel; the available form is validated against its schema.
   function validateUnavailablePanel(payload, schemaVersion) {
@@ -4492,6 +4613,9 @@
     }
     if (name === "party") {
       return validatePartyPanel(payload);
+    }
+    if (name === "objectives") {
+      return validateObjectivesPanel(payload);
     }
     if (name === "services") {
       return validateServicesPanel(payload);
@@ -4803,8 +4927,11 @@
     validateLocalMapPanel: validateLocalMapPanel,
     validateServicesPanel: validateServicesPanel,
     validatePartyPanel: validatePartyPanel,
+    validateObjectivesPanel: validateObjectivesPanel,
     PARTY_SCHEMA_VERSION: PARTY_SCHEMA_VERSION,
     PARTY_MAX_ROWS: PARTY_MAX_ROWS,
+    OBJECTIVES_SCHEMA_VERSION: OBJECTIVES_SCHEMA_VERSION,
+    OBJECTIVES_MAX_ROWS: OBJECTIVES_MAX_ROWS,
     PARTY_MAX_DISPLAY_NAME: PARTY_MAX_DISPLAY_NAME,
     validateCreationPanel: validateCreationPanel,
     validateCreationPersona: validateCreationPersona,

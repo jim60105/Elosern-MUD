@@ -500,8 +500,8 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "wait until dusk",
     },
     {
-      id: "guild rows: register / abandon / turnin / exam (payload-only)",
-      ids: ["guild.register", "guild.quest_abandon", "guild.quest_turnin", "guild.exam_start"],
+      id: "guild rows: register / abandon / turnin / track / exam (payload-only)",
+      ids: ["guild.register", "guild.quest_abandon", "guild.quest_turnin", "guild.quest_track", "guild.exam_start"],
       prepare() {
         openExploration();
         store.dispatchAction("guild.register", {});
@@ -513,9 +513,12 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         store.dispatchAction("guild.quest_turnin", { quest_id: "q_1042" });
         store.receive(1, "ui_action_result", [fx.actionResult({ request_id: "session:3" })], {});
         store.receive(1, "ui_update", [fx.update({ revision: 4 })], {});
+        store.dispatchAction("guild.quest_track", { quest_id: "q_1042", tracked: true });
+        store.receive(1, "ui_action_result", [fx.actionResult({ request_id: "session:4" })], {});
+        store.receive(1, "ui_update", [fx.update({ revision: 5 })], {});
         store.dispatchAction("guild.exam_start", { target_rank: "B" });
       },
-      expected: ["guild register", "guild abandon q_1042", "guild turnin q_1042", "guild exam B"],
+      expected: ["guild register", "guild abandon q_1042", "guild turnin q_1042", "guild track q_1042", "guild exam B"],
     },
     {
       id: "creation preset card (payload-only preset command)",

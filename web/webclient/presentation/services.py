@@ -1,4 +1,4 @@
-"""Exact schema-version-3 ``services`` panel and presenter (webclient-service-menus).
+"""Exact schema-version-4 ``services`` panel and presenter (webclient-service-menus).
 
 The presenter serializes the frozen no-mutation services view owned by
 ``world.rules.service_view`` and validates its own output against the exact
@@ -48,7 +48,7 @@ from world.rules.service_view import (
     build_services_view,
 )
 
-SERVICES_SCHEMA_VERSION = 3
+SERVICES_SCHEMA_VERSION = 4
 
 # Exact shared bounds (design D4) -- must stay equal in the JS validator.
 MAX_BOARD_ROWS = 12
@@ -75,6 +75,7 @@ REGISTER_ACTION = "guild.register"
 ACCEPT_ACTION = "guild.quest_accept"
 ABANDON_ACTION = "guild.quest_abandon"
 TURNIN_ACTION = "guild.quest_turnin"
+TRACK_ACTION = "guild.quest_track"
 EXAM_ACTION = "guild.exam_start"
 BUY_ACTION = "shop.buy"
 SELL_ACTION = "shop.sell"
@@ -86,6 +87,7 @@ _SERVICE_ACTIONS = frozenset(
         ACCEPT_ACTION,
         ABANDON_ACTION,
         TURNIN_ACTION,
+        TRACK_ACTION,
         EXAM_ACTION,
         BUY_ACTION,
         SELL_ACTION,
@@ -250,6 +252,7 @@ def _validate_quest_row(value: Any) -> dict[str, Any]:
             "detail",
             "abandon",
             "turnin",
+            "tracked",
         },
         {},
     )
@@ -286,6 +289,7 @@ def _validate_quest_row(value: Any) -> dict[str, Any]:
         raise ProtocolValidationError("quest abandon must be guild.quest_abandon")
     if turnin["action_id"] != TURNIN_ACTION:
         raise ProtocolValidationError("quest turnin must be guild.quest_turnin")
+    tracked = _require_bool(value, "tracked")
     return {
         "quest_id": quest_id,
         "definition_key": definition_key,
@@ -298,6 +302,7 @@ def _validate_quest_row(value: Any) -> dict[str, Any]:
         "detail": detail,
         "abandon": abandon,
         "turnin": turnin,
+        "tracked": tracked,
     }
 
 
@@ -723,6 +728,7 @@ def _serialize_quest_row(row: QuestRowView) -> dict[str, Any]:
         "detail": row.detail,
         "abandon": _serialize_action(row.abandon),
         "turnin": _serialize_action(row.turnin),
+        "tracked": row.tracked,
     }
 
 
@@ -892,6 +898,7 @@ __all__ = [
     "SELL_ACTION",
     "SERVICES_SCHEMA_VERSION",
     "ServicesPanelError",
+    "TRACK_ACTION",
     "TURNIN_ACTION",
     "services_presenter",
     "validate_services",
