@@ -5,6 +5,14 @@
 // matrix row (absent in combat, present in exploration) and the focus-rescue
 // contract (a focused element inside a mode-hidden surface loses focus to
 // the action dock, not to the document body).
+//
+// webclient-align-01-dock-chrome adds the dock-band ownership guard: the
+// full-width painted band (gradient, hairline top border, upward shadow,
+// padding) belongs to the stage's dock ANCHOR (the draft's `.dockwrap`), and
+// the centered content container keeps only layout (the draft's `.dock`) —
+// the assertion that no unpainted gutter can exist beside the band.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import AppShell from "../components/AppShell.vue";
@@ -13,6 +21,21 @@ import LocalMap from "../components/LocalMap.vue";
 import * as fx from "./store/protocol_fixtures.js";
 
 import { h } from "vue";
+
+const APP_ROOT = join(process.cwd(), "web/webclient-app");
+
+function styleBlock(file) {
+  const source = readFileSync(join(APP_ROOT, file), "utf-8");
+  const match = source.match(/<style[^>]*>[\s\S]*<\/style>/);
+  return match ? match[0] : "";
+}
+
+function extractRule(css, selector) {
+  const escaped = selector.replace(/([.{}#&[\]()])/g, "\\$&");
+  const re = new RegExp(escaped + "\\s*\\{[\\s\\S]*?\\}", "m");
+  const match = re.exec(css);
+  return match ? match[0] : "";
+}
 
 describe("HudFrame mode × surface visibility matrix (H1)", () => {
   let wrapper;
@@ -93,5 +116,40 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     await explore.vm.$nextTick();
     // The feed stays visible in combat, so focus is not rescued.
     expect(document.activeElement).toBe(feedEl);
+  });
+});
+
+describe("dock band ownership (webclient-align-01-dock-chrome)", () => {
+  it("paints the full-width band on the dock anchor, not the content column", () => {
+    // Source-level ownership guard (the z-index-scale precedent): the
+    // painted band's declarations must live on the full-width anchor rule
+    // in HudFrame.vue and be ABSENT from the centered `.action-dock` rule.
+    // The real-browser gutter/paint proof lives in
+    // web/tests/browser/test_browser_contextual_hud.py.
+    const anchorRule = extractRule(
+      styleBlock("components/HudFrame.vue"),
+      ".elosern-stage [data-anchor=\"dock\"]",
+    );
+    expect(anchorRule, "the dock anchor rule exists").not.toBe("");
+    expect(anchorRule).toContain("left: 0");
+    expect(anchorRule).toContain("right: 0");
+    // The draft's `.dockwrap` values, verbatim.
+    expect(anchorRule).toContain("linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel))");
+    expect(anchorRule).toContain("border-top: var(--line)");
+    expect(anchorRule).toContain("box-shadow: 0 -14px 34px -24px #000");
+    expect(anchorRule).toContain("padding: 11px 18px 12px");
+
+    const dockRule = extractRule(
+      styleBlock("components/ActionDock.vue"),
+      ".action-dock",
+    );
+    expect(dockRule, "the content column rule exists").not.toBe("");
+    expect(dockRule).toContain("max-width: 1180px");
+    expect(dockRule).toContain("margin: 0 auto");
+    // The content column paints nothing: no background, border, or shadow.
+    expect(dockRule).not.toContain("linear-gradient");
+    expect(dockRule).not.toContain("box-shadow");
+    expect(dockRule).not.toContain("border-top");
+    expect(dockRule).not.toContain("background");
   });
 });

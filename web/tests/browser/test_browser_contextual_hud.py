@@ -850,8 +850,16 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::the-action-dock-renders-as-a-floating-panel-in-the-stage-s-dock-anchor"
     )
     def test_action_dock_floating_panel_persists_across_modes(self):
-        """The action dock is one centred floating panel in the dock anchor."""
-        for viewport in ((1440, 900), (1280, 720)):
+        """The dock band paints the full stage width; the content column is
+        centred inside it (webclient-align-01-dock-chrome).
+
+        The painted chrome (the draft's `.dockwrap` gradient, hairline top
+        border, upward shadow, and padding) belongs to the full-width dock
+        ANCHOR; `#action-dock` is the centred max-width-1180 content column
+        (the draft's `.dock`) and paints nothing itself. Verified across the
+        scenario's viewport range (1280x720 through 1920x1080).
+        """
+        for viewport in ((1280, 720), (1600, 900), (1920, 1080)):
             page = self.logged_in_page(viewport)
             exploration = _exploration_panel([_interact_target(11, "小販")])
             _inject_snapshot(
@@ -886,12 +894,41 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                     dockLeft: d.left, dockWidth: d.width, dockHeight: d.height,
                     anchorLeft: a.left, anchorWidth: a.width, anchorHeight: a.height,
                     maxWidth: style.maxWidth,
-                    borderTop: style.borderTopWidth,
-                    boxShadow: style.boxShadow,
-                    anchorHeightComputed: anchorStyle.height,
+                    dockBackgroundImage: style.backgroundImage,
+                    dockBorderTopWidth: style.borderTopWidth,
+                    dockBoxShadow: style.boxShadow,
+                    borderTopWidth: anchorStyle.borderTopWidth,
+                    backgroundImage: anchorStyle.backgroundImage,
+                    boxShadow: anchorStyle.boxShadow,
+                    padTop: parseFloat(anchorStyle.paddingTop),
+                    padBottom: parseFloat(anchorStyle.paddingBottom),
                     viewportWidth: window.innerWidth,
                   };
                 }"""
+            )
+            # The band spans the full stage width with no unpainted gutter:
+            # the anchor starts at x=0 and paints the draft's gradient,
+            # hairline top border, and upward shadow across that width.
+            self.assertEqual(geometry["anchorLeft"], 0.0)
+            self.assertAlmostEqual(
+                geometry["anchorWidth"],
+                float(geometry["viewportWidth"]),
+                places=1,
+                msg=f"the band spans the full stage width at {viewport}",
+            )
+            self.assertIn(
+                "gradient",
+                geometry["backgroundImage"],
+                f"the band paints the draft's gradient at {viewport}",
+            )
+            self.assertTrue(
+                geometry["borderTopWidth"].startswith("1px"),
+                "the band carries the --line hairline top border",
+            )
+            self.assertIn(
+                "rgb(0, 0, 0)",
+                geometry["boxShadow"],
+                "the band carries the draft's upward shadow (#000)",
             )
             # The panel is horizontally centred within the anchor.
             self.assertLess(
@@ -900,17 +937,27 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 4.0,
                 f"the dock must be centred within the dock anchor at {viewport}",
             )
-            self.assertTrue(
-                geometry["borderTop"].startswith("1px"),
-                "the floating panel carries the --line top border",
+            self.assertLessEqual(
+                geometry["dockWidth"],
+                min(1180.0, geometry["anchorWidth"]),
+                f"the content column stays inside max-width 1180 at {viewport}",
             )
-            self.assertIn("rgba", geometry["boxShadow"], "the panel carries an upward shadow")
-            # The panel's height equals the anchor's height (both driven by --dock-h).
+            self.assertEqual(geometry["maxWidth"], "1180px")
+            # The content column paints nothing: the band owns the chrome.
+            self.assertEqual(geometry["dockBackgroundImage"], "none")
+            self.assertEqual(geometry["dockBorderTopWidth"], "0px")
+            self.assertEqual(geometry["dockBoxShadow"], "none")
+            # The band's border-box height is the --dock-h token (the anchor
+            # is border-box: height = token); the content column fills the
+            # band's padded content box (vertical padding + border subtract).
             self.assertAlmostEqual(
                 geometry["dockHeight"],
-                float(geometry["anchorHeightComputed"].replace("px", "")),
+                geometry["anchorHeight"]
+                - geometry["padTop"]
+                - geometry["padBottom"]
+                - 1.0,
                 places=1,
-                msg=f"the dock height must equal the anchor height (the --dock-h token) at {viewport}",
+                msg=f"the content column fills the band's padded box at {viewport}",
             )
             # The panel stays inside the anchor's box.
             self.assertGreaterEqual(geometry["dockLeft"], geometry["anchorLeft"])

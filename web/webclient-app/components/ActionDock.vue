@@ -1,10 +1,13 @@
 <script setup>
 // ActionDock (H3 webclient-hud-03-action-dock, task 4.1/4.8): the
-// non-closable bottom action surface, re-chromed as the floating panel inside
-// H1's `dock` anchor (HudFrame `data-anchor="dock"`): `max-width:1180px`
-// centred, the draft's upward gradient, a `--line` top border, the upward
-// shadow, and the fixed-bar / crumb / scrolling-pane layout. The preserved
-// `#action-dock` element keeps its `tabindex`, `data-mode`, and the
+// non-closable bottom action surface: the centered content column inside
+// H1's `dock` anchor (HudFrame `data-anchor="dock"`). Since
+// webclient-align-01-dock-chrome the visual band (the draft's upward
+// gradient, the `--line` top border, the upward shadow, and the band
+// padding) is owned by the full-width anchor element itself (the draft's
+// `.dockwrap`); this container keeps only `max-width:1180px` centering and
+// the fixed-bar / crumb / scrolling-pane layout (the draft's `.dock`). The
+// preserved `#action-dock` element keeps its `tabindex`, `data-mode`, and the
 // listbox composite role (the row container carrying `data-testid="dock-menu"`
 // moves between the tab bar (depth 1) and the pane (depth ≥ 2).
 //
@@ -83,27 +86,12 @@ function onPaneActivate(payload) {
     <div v-if="guidancePrefix" class="action-dock__guidance" data-testid="action-dock-guidance">
       {{ guidancePrefix }}
     </div>
-    <!-- The shortcut legend (the B2 Node-contract hook `action-dock-description`),
-         reactive to `guidancePrefix`. Carried by ActionDock so the Node gate
-         reads it from this file even when the tab bar is absent. The visible
-         copy is the tab bar's trailing hint, so this element is the visually
-         hidden duplicate: the `visually-hidden` class plus `aria-hidden` keep
-         it in the DOM (the gate reads `inner_text()`/`textContent`) but remove
-         it from both the visual layout and the accessibility narration order. -->
-    <div
-      class="visually-hidden action-dock__description"
-      data-testid="action-dock-description"
-      aria-hidden="true"
-    >
-      {{ guidancePrefix ? guidancePrefix + "　" : "" }}方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列
-    </div>
     <DockTabBar
       v-if="showChrome"
       :items="rootItems"
       :focused-key="focusedKey"
       :view="view"
       :depth="depth"
-      :guidance-prefix="guidancePrefix"
       @tab-click="onTabClick"
     />
     <DockBreadcrumb
@@ -132,8 +120,11 @@ function onPaneActivate(payload) {
 </template>
 
 <style scoped>
-/* The floating panel (task 4.1): centred, bounded width, the draft's
-   upward gradient, the `--line` top border, and the upward shadow. */
+/* The content column (the draft's `.dock`): centred, bounded width, and the
+   vertical layout only. webclient-align-01-dock-chrome moved the band chrome
+   (gradient, top border, shadow, padding) onto the full-width dock anchor in
+   `HudFrame.vue` — the painted band spans the whole stage; gutters never
+   exist. */
 .action-dock {
   max-width: 1180px;
   margin: 0 auto;
@@ -141,32 +132,12 @@ function onPaneActivate(payload) {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  background: linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel));
-  border-top: var(--line);
-  border-radius: 0 0 12px 12px;
-  box-shadow: 0 -14px 34px -24px rgba(0, 0, 0, 0.9);
   font-family: var(--f-sans);
 }
 
 .action-dock:focus {
   outline: 2px solid var(--gold-400);
   outline-offset: 2px;
-}
-
-/* The hidden legend copy: the same sr-only clip definition duplicated
-   independently in `DockMenuItem.vue` and `DockMenu.vue` — Vue's scoped CSS
-   does not cross component boundaries, so this component must carry its
-   own rule or the class name alone is an inert no-op. */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 /* The scrolling pane (task 4.1): bounded height with internal scroll. */

@@ -779,21 +779,26 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             page = self.logged_in_page(viewport)
             dock = page.locator("#action-dock")
             self.assertTrue(dock.is_visible())
-            # The floating panel's `--line` top border (H3 re-chrome):
-            # `border-top: var(--line)` = `1px solid var(--ink-700)`.
-            frame = dock.evaluate(
+            # webclient-align-01-dock-chrome: the painted band (the draft's
+            # `.dockwrap` chrome) lives on the full-width dock anchor — the
+            # `--line` top border (`1px solid var(--ink-700)`) is drawn there.
+            frame = page.locator('[data-testid="anchor-dock"]').evaluate(
                 """el => {
                   const style = getComputedStyle(el);
                   return { borderTop: style.borderTopColor,
-                           background: style.backgroundColor };
+                           backgroundImage: style.backgroundImage };
                 }"""
             )
             self.assertEqual(frame["borderTop"], "rgb(44, 38, 52)")
-            # H3 re-chrome: the shortcut legend moved to the always-rendered
-            # `action-dock-description` line (the `action-dock-guidance` line
-            # only renders when a per-surface prefix is committed).
+            self.assertIn(
+                "gradient",
+                frame["backgroundImage"],
+                "the full-width band paints the draft's upward gradient",
+            )
+            # The shortcut legend is the tab bar's trailing hint carrying the
+            # draft's markup (the single `action-dock-description` element).
             description = page.locator('[data-testid="action-dock-description"]').inner_text()
-            for keyword in ("方向鍵選擇", "Enter 確認", "Esc 返回", "/ 聚焦指令列"):
+            for keyword in ("數字鍵 1–4", "Enter 執行", "Esc 返回"):
                 self.assertIn(keyword, description)
             # The root is now the tab bar (H3): one row of tabs (the root
             # frame's items as tabs). The tab count varies 5-8 with
@@ -866,44 +871,62 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     )
     def test_dock_shortcut_legend_renders_once_with_real_behaviour_wording(self):
         """The dock's shortcut legend renders as exactly one visible instance,
-        and names only the keyboard behaviour the client actually implements
-        (H5: the ``/`` key *focuses* the permanently present command line —
-        it no longer opens or closes a drawer).
+        carries the reference draft's wording and ``<kbd>`` structure, and is
+        the only element carrying the legend's test hook
+        (webclient-align-01-dock-chrome).
 
-        The Node-contract copy (``action-dock-description``) is kept in the
-        DOM for the gate but is the visually hidden duplicate: 1x1 clipped,
-        out of the accessibility tree (``aria-hidden``). The visible copy is
-        the tab bar's trailing hint.
+        The old visually-hidden ``action-dock-description`` duplicate was
+        deleted: the tab bar's trailing hint IS the hook. The legend names
+        only implemented behaviour (1–4 pick cards, Enter activates, Esc pops
+        one frame); the ``/`` focus binding stays implemented but the
+        reference's legend does not advertise it, so neither does this one.
         """
         page = self.logged_in_page()
         focus_action_dock(page)
-        desc = page.locator('[data-testid="action-dock-description"]')
         hint = page.locator(".dock-tab-bar__hint")
-        # Exactly one visible instance: the tab-bar hint is visible; the
-        # description copy is the hidden duplicate.
-        self.assertEqual(hint.count(), 1, "the tab-bar carries the visible legend")
-        self.assertTrue(hint.first.is_visible(), "the tab-bar hint is the visible legend")
-        self.assertEqual(desc.count(), 1, "the hidden description copy remains in the DOM")
-        self.assertEqual(desc.first.get_attribute("aria-hidden"), "true")
-        # Assert the rendered state (computed clip/size), not merely the
-        # class name, per the change's acceptance check.
-        desc_style = desc.first.evaluate(
+        # Exactly one legend element, and it carries the test hook.
+        self.assertEqual(
+            hint.count(), 1, "the tab bar carries exactly one legend"
+        )
+        self.assertEqual(
+            page.locator('[data-testid="action-dock-description"]').count(), 1,
+            "exactly one element carries the legend hook",
+        )
+        self.assertTrue(
+            page.locator('[data-testid="action-dock-description"]').first.is_visible(),
+            "the hook-bearing element IS the visible legend",
+        )
+        self.assertEqual(
+            page.locator(".action-dock__description").count(), 0,
+            "the visually-hidden duplicate is gone",
+        )
+        # The reference draft's wording (index.html line 855).
+        hint_text = hint.first.inner_text()
+        self.assertEqual(hint_text, "數字鍵 1–4 · Enter 執行 · Esc 返回")
+        self.assertNotIn("/ 聚焦指令列", hint_text)
+        self.assertNotIn("方向鍵選擇", hint_text)
+        # The draft's <kbd> structure: exactly two styled kbd elements.
+        kbd = page.locator(".dock-tab-bar__hint kbd")
+        self.assertEqual(kbd.count(), 2, "the legend renders two kbd elements")
+        self.assertEqual(
+            [kbd.nth(0).inner_text(), kbd.nth(1).inner_text()],
+            ["Enter", "Esc"],
+        )
+        kbd_style = kbd.first.evaluate(
             """el => {
               const s = getComputedStyle(el);
-              return { position: s.position, width: s.width,
-                       height: s.height, clip: s.clip };
+              return { background: s.backgroundColor,
+                       borderBottomWidth: s.borderBottomWidth };
             }"""
         )
-        self.assertEqual(desc_style["position"], "absolute")
-        self.assertEqual(desc_style["width"], "1px")
-        self.assertEqual(desc_style["height"], "1px")
-        self.assertIn("0px", desc_style["clip"])
-        # The two copies stay byte-identical in text content.
-        self.assertEqual(desc.first.inner_text(), hint.first.inner_text())
-        # The visible legend names the command line's real focus behaviour.
-        hint_text = hint.first.inner_text()
-        self.assertIn("/ 聚焦指令列", hint_text)
-        self.assertNotIn("/ 開啟指令", hint_text)
+        self.assertEqual(
+            kbd_style["background"], "rgb(34, 29, 41)",
+            "the kbd carries the --ink-780 ground",
+        )
+        self.assertEqual(
+            kbd_style["borderBottomWidth"], "2px",
+            "the kbd carries the draft's 2px bottom border",
+        )
 
     @covers_requirement(
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable"

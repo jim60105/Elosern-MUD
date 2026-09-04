@@ -28,9 +28,6 @@ const props = defineProps({
   // only while it is the active row container (depth 1); at depth ≥ 2 the
   // pane container takes over the hook (task 1.1).
   depth: { type: Number, default: 1 },
-  // The per-surface guidance prefix (the B2 `action-dock-description` legend
-  // carries it, e.g. "附近動作" → "附近動作　方向鍵選擇…").
-  guidancePrefix: { type: String, default: null },
 });
 
 const emit = defineEmits(["tab-click"]);
@@ -135,13 +132,16 @@ function onTabClick(tab) {
       <span class="dock-tab-bar__label">{{ tab.label }}</span>
       <span v-if="tab.showBadge" class="dock-tab-bar__badge">{{ tab.badgeCount }}</span>
     </button>
-    <!-- The shortcut legend in the trailing hint slot (task 4.7), preserving
-         the `action-dock-description` hook on the element that carries it. -->
-    <!-- The trailing hint shows the shortcut legend. The `action-dock-description`
-         hook is carried by ActionDock (the Node-contract gate), so the hint keeps
-         the class only (no duplicate testid). -->
-    <span class="dock-tab-bar__hint">
-      {{ guidancePrefix ? guidancePrefix + "　" : "" }}方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列
+    <!-- The shortcut legend (webclient-align-01-dock-chrome): the draft's
+         `.dock .hint` markup — `數字鍵 1–4 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd>
+         返回` with styled `<kbd>` elements. It is the single visible legend and
+         the only element carrying the `action-dock-description` hook (the old
+         visually-hidden duplicate was deleted). The text names only
+         implemented behaviour (1–4 pick cards, Enter activates, Esc pops one
+         frame); the `/` focus binding stays implemented but the draft's legend
+         does not advertise it, and the legend stays truthful to the reference. -->
+    <span class="dock-tab-bar__hint" data-testid="action-dock-description">
+      數字鍵 1–4 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回
     </span>
   </div>
 </template>
@@ -226,7 +226,19 @@ function onTabClick(tab) {
   margin-left: auto;
   font-size: 11px;
   color: var(--paper-700);
-  font-family: var(--f-mono);
+  font-family: var(--f-sans);
   white-space: nowrap;
+}
+
+/* The legend's `<kbd>` treatment, verbatim from the reference draft's
+   `.dock .hint kbd` rule. */
+.dock-tab-bar__hint kbd {
+  font-family: var(--f-mono);
+  background: var(--ink-780);
+  border: 1px solid var(--ink-600);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 4px;
+  color: var(--paper-300);
 }
 </style>

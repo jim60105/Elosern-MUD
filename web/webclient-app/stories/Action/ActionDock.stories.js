@@ -11,9 +11,10 @@ import {
 
 // ActionDock: the non-closable bottom action surface. Props: mode (the
 // preserved #action-dock data-mode), guidancePrefix (per-surface guidance
-// prefix; the shared shortcut legend is always appended), suggestions (the
-// committed context_actions v5 suggestions envelope). Slot: the active menu
-// frame (a DockMenu). Event: action (the exact OOB action intent for a card
+// prefix, rendered on its own line and by the breadcrumb; the shortcut
+// legend is the tab bar's static draft hint), suggestions (the committed
+// context_actions v5 suggestions envelope). Slot: the active menu frame (a
+// DockMenu). Event: action (the exact OOB action intent for a card
 // activation or the dismiss control).
 
 const renderDock = (args) => ({

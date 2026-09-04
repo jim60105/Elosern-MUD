@@ -169,13 +169,23 @@ defineExpose({ menuOpen });
   z-index: 3;
 }
 
-/* dock: the floating action dock, sized from the shared --dock-h token. */
+/* dock: the full-width band (the draft's `.dockwrap`), sized from the shared
+   --dock-h token. webclient-align-01-dock-chrome: the band chrome (the
+   upward gradient, the `--line` hairline top border, the upward shadow, and
+   the band padding) lives here on the full-width anchor — never on the
+   centered content container — so no stage background can ever show beside
+   the band at any viewport width. The values match the reference draft
+   (`docs/design/elosern-redesign/index.html`) verbatim. */
 .elosern-stage [data-anchor="dock"] {
   left: 0;
   right: 0;
   bottom: var(--command-line-h);
   height: var(--dock-h);
   z-index: 5;
+  background: linear-gradient(0deg, #0c0a0e, #141019 70%, var(--panel));
+  border-top: var(--line);
+  box-shadow: 0 -14px 34px -24px #000;
+  padding: 11px 18px 12px;
 }
 
 /* command-line: the persistent command line (H5 upgrades the chrome). */
