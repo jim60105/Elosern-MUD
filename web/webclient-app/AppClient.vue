@@ -36,6 +36,8 @@ import HelpOverlay from "./components/HelpOverlay.vue";
 import LineagePanel from "./components/LineagePanel.vue";
 import TitleCodexPanel from "./components/TitleCodexPanel.vue";
 import ToastQueue from "./components/ToastQueue.vue";
+import PartyStrip from "./components/PartyStrip.vue";
+import PartyDrawer from "./components/PartyDrawer.vue";
 
 const store = useElosernStore();
 
@@ -611,6 +613,7 @@ const DRAWER_TITLES = {
   quest: "任務",
   lore: "世界圖鑑",
   status: "角色狀態",
+  party: "同伴 · 隊伍",
 };
 const drawerTitle = computed(() => DRAWER_TITLES[store.view.hudDrawer] || "");
 
@@ -682,6 +685,12 @@ const inventoryWalletSubtitle = computed(() => {
   }
   return `錢袋 ${formatCopper(wallet)} 銅`;
 });
+
+const partyReason = computed(() => {
+  const p = panel("party");
+  return p?.reason?.message || "隊伍資訊目前無法顯示";
+});
+
 // The skill drawer's footer: the client's own `/cast` syntax as static,
 // client-local presentation copy (no OOB field carries it).
 const SKILL_CAST_HINT = "施放入口：cast <技法>[@威力]=<代號>";
@@ -773,6 +782,13 @@ onMounted(() => {
           :low-hp="store.view.vitals.lowHp"
           :revision="store.view.revision"
           :epoch="store.view.epoch"
+        />
+        <PartyStrip
+          v-if="store.partyAvailable && store.view.mode !== 'creation'"
+          :slots="store.partySlots"
+          :combat-participants="store.combatParticipants"
+          :art-panel="panel('art')"
+          @open-drawer="() => store.openHudDrawer('party')"
         />
         <!-- H3 (task 6.3): the art catalog strip is absent while the
              participant frame is mounted (combat mode); the frame owns the
@@ -871,8 +887,8 @@ onMounted(() => {
       v-if="store.view.hudDrawer"
       :open="true"
       :title="drawerTitle"
-      :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : '')"
-      :icon="store.view.hudDrawer === 'inventory' ? 'inventory' : (store.view.hudDrawer === 'skill' ? 'skills' : null)"
+      :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : (store.view.hudDrawer === 'party' ? `${(store.partySlots || []).length} / 4` : ''))"
+      :icon="store.view.hudDrawer === 'inventory' ? 'inventory' : (store.view.hudDrawer === 'skill' ? 'skills' : (store.view.hudDrawer === 'party' ? 'party' : null))"
       :drawer-key="store.view.hudDrawer"
       :body-class="drawerHostsServiceFrame ? 'hud-drawer__body--dock' : ''"
       @close="onHudDrawerClose"
@@ -911,6 +927,18 @@ onMounted(() => {
         :low-hp="store.view.vitals.lowHp"
         @open-skill="() => store.openHudDrawer('skill')"
         @persona-edit="onPersonaEdit"
+      />
+      <PartyDrawer
+        v-else-if="store.view.hudDrawer === 'party'"
+        :slots="store.partySlots"
+        :combat-participants="store.combatParticipants"
+        :art-panel="panel('art')"
+        :interact-targets="store.explorationInteract"
+        :mode="store.view.mode || 'exploration'"
+        :available="store.partyAvailable"
+        :reason="partyReason"
+        @action="onAction"
+        @close="onHudDrawerClose"
       />
       <!-- H4 (R3): when the drawer hosts the keyboard router's current service
            frame, render that frame's rows through the shared row renderer

@@ -101,10 +101,8 @@ function collectStoryTitles(dir) {
 // claims the draft makes: the companion strip, the head card's
 // race/subrace/class/faction line, and any minimap bearing or distance.
 const DEFERRED_TITLE_PATTERNS = [
-  /\bParty\b/i,
   /\bIntimate\b/i,
   /\bEventLog\b/i,
-  /\bCompanions?\b/i,
   /\bObjectives?\b/i,
    // H2 additions: the head-card identity line and the minimap's unbacked
    // figures (roadmap §2.4 — no race/class/faction field or bearing/distance
@@ -138,11 +136,6 @@ const DEFERRED_TITLE_PATTERNS = [
 // list. Each deferred surface is named with the OOB read model it waits on,
 // so a regression that builds an unbacked surface fails at the unit gate.
 const DEFERRED_SURFACES = [
-  {
-    name: "companion/party panel",
-    waitsOn: "the `party` read model (party payload)",
-    testidPrefixes: ["companion-", "party-"],
-  },
   {
     // Disambiguated by add-action-feedback-toasts: what remains deferred is
     // the game-event queue fed by the `event_log` read model — the client-
@@ -199,7 +192,9 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
     // add-action-feedback-toasts change adds the action-feedback queue
     // (`Feedback/ToastQueue`, 41 → 42). webclient-align-03-narrative-feed
     // removes ChoicePointBlock (42 → 41).
-    expect(manifest.required).toHaveLength(41);
+    // webclient-align-05-party-hud adds Overlays/PartyStrip and
+    // Overlays/PartyDrawer (41 → 43).
+    expect(manifest.required).toHaveLength(43);
    // The four full overlays complete the required set (B5's new family).
    for (const title of [
      "Overlays/MapOverlay",
@@ -207,6 +202,8 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
      "Overlays/HelpOverlay",
      "Overlays/OverlayHost",
      "Overlays/CreationOverlay",
+     "Overlays/PartyStrip",
+     "Overlays/PartyDrawer",
      "Core/CommandLine",
      "Core/QuickWordChips",
      "Action/DockTabBar",
@@ -311,18 +308,26 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
     expect(titles.filter((title) => /\bBag\b/i.test(title))).toEqual([]);
   });
 
-  it("reserves no party/companion drawer, intimate collapsible, item-rarity affordance or discovered-lore compendium (task 8.4)", () => {
-    // H4 (task 8.4): the reference-drawer layer is the closed set of six
-    // drawers. The deferred surfaces are NOT reserved in the drawer layer.
-    const DRAWER_NAMES = ["skill", "inventory", "shop", "quest", "lore", "status"];
-    const DEFERRED_SURFACES = ["party", "companion", "intimate", "rarity", "codex"];
+  it("documents the party quickbar and drawer are now backed by the party read model, so the party/companion deferred patterns are retired", () => {
+    // webclient-align-05-party-hud: the party surfaces are NO LONGER deferred —
+    // the `party` read model (webclient-party-panel) backs the four-slot party listing.
+    // `Overlays/PartyStrip` and `Overlays/PartyDrawer` render that listing.
+    expect(manifest.required).toContain("Overlays/PartyStrip");
+    expect(manifest.required).toContain("Overlays/PartyDrawer");
+  });
+
+  it("reserves no intimate collapsible, item-rarity affordance or discovered-lore compendium (task 8.4)", () => {
+    // H4 (task 8.4): the reference-drawer layer is the closed set of seven
+    // drawers (including party). The deferred surfaces are NOT reserved in the drawer layer.
+    const DRAWER_NAMES = ["skill", "inventory", "shop", "quest", "lore", "status", "party"];
+    const DEFERRED_SURFACES = ["intimate", "rarity", "codex"];
     // None of the deferred surfaces is in the six-drawer set.
     for (const deferred of DEFERRED_SURFACES) {
       expect(DRAWER_NAMES, `drawer set reserves "${deferred}"`).not.toContain(deferred);
     }
     // And none of them appears in the required-component set.
     for (const title of manifest.required) {
-      for (const word of ["Party", "Companion", "Intimate", "Rarity", "Codex", "Compendium"]) {
+      for (const word of ["Intimate", "Rarity", "Codex", "Compendium"]) {
         const re = new RegExp(`\\b${word}\\b`, "i");
         expect(re.test(title), `required component ${title} reserves a deferred surface (${word})`).toBe(false);
       }

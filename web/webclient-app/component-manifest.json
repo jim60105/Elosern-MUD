@@ -40,6 +40,8 @@
     "Overlays/HelpOverlay",
     "Overlays/OverlayHost",
     "Overlays/CreationOverlay",
+    "Overlays/PartyStrip",
+    "Overlays/PartyDrawer",
     "Feedback/ToastQueue"
   ],
   "frozen": true

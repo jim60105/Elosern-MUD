@@ -517,4 +517,111 @@ describe("store view slices", () => {
     expect(r2.accepted).toBe(true);
     expect(store.view.statusSlice.locationLabel).toBe("西風酒館");
   });
+
+  it("derives partyAvailable and partySlots reactively from committed party panel (webclient-align-05-party-hud)", () => {
+    openActiveSession(store);
+    // Initial snapshot has no party panel
+    expect(store.view.partyAvailable).toBe(false);
+    expect(store.partyAvailable).toBe(false);
+    expect(store.view.partySlots).toEqual([]);
+    expect(store.partySlots).toEqual([]);
+
+    // Commit party panel with slots
+    const partyData = {
+      schema_version: 1,
+      available: true,
+      slots: [
+        {
+          identity: 101,
+          display_name: "蕾娜",
+          portrait_ref: null,
+          hp_current: 180,
+          hp_maximum: 220,
+          bond_stage: "親睦",
+        },
+      ],
+    };
+    const r1 = store.receive(
+      1,
+      "ui_update",
+      [fx.update({ revision: 2, panels: { party: partyData } })],
+      {},
+    );
+    expect(r1.accepted).toBe(true);
+    expect(store.view.partyAvailable).toBe(true);
+    expect(store.partyAvailable).toBe(true);
+    expect(store.view.partySlots).toHaveLength(1);
+    expect(store.partySlots[0].display_name).toBe("蕾娜");
+
+    // Commit unavailable party panel
+    const r2 = store.receive(
+      1,
+      "ui_update",
+      [
+        fx.update({
+          revision: 3,
+          panels: {
+            party: {
+              schema_version: 1,
+              available: false,
+              reason: { code: "party_unavailable", message: "隊伍資訊目前無法顯示" },
+            },
+          },
+        }),
+      ],
+      {},
+    );
+    expect(r2.accepted).toBe(true);
+    expect(store.view.partyAvailable).toBe(false);
+    expect(store.partyAvailable).toBe(false);
+    expect(store.view.partySlots).toEqual([]);
+  });
+
+  it("derives combatParticipants when context_actions is kind: combat (webclient-align-05-party-hud)", () => {
+    openActiveSession(store);
+    // In exploration mode (context_actions is kind: exploration)
+    expect(store.view.combatParticipants).toEqual([]);
+    expect(store.combatParticipants).toEqual([]);
+
+    // Switch to combat mode with participants
+    const combatActions = fx.combatActions({
+      participants: [
+        {
+          identity: 101,
+          token: "a2",
+          display_name: "蕾娜",
+          team: "party",
+          state: "active",
+          hp_current: 180,
+          hp_maximum: 220,
+          portrait_ref: null,
+        },
+        {
+          identity: 201,
+          token: "e1",
+          display_name: "哥布林",
+          team: "foes",
+          state: "active",
+          hp_current: 50,
+          hp_maximum: 50,
+          portrait_ref: null,
+        },
+      ],
+    });
+    const r = store.receive(
+      1,
+      "ui_update",
+      [fx.update({ revision: 2, mode: "combat", panels: { context_actions: combatActions } })],
+      {},
+    );
+    expect(r.accepted).toBe(true);
+    expect(store.view.combatParticipants).toHaveLength(2);
+    expect(store.combatParticipants[0].token).toBe("a2");
+  });
+
+  it("derives explorationInteract from committed exploration panel (webclient-align-05-party-hud)", () => {
+    openActiveSession(store);
+    expect(Array.isArray(store.view.explorationInteract)).toBe(true);
+    expect(Array.isArray(store.explorationInteract)).toBe(true);
+  });
 });

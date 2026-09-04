@@ -47,6 +47,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     quest: "quest-board",
     lore: "lore-drawer",
     status: "character-status-drawer",
+    party: "party-drawer",
   };
 
   it("renders no reference surface in the DOM while every drawer is closed", async () => {
@@ -118,7 +119,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(wrapper.text()).not.toContain("1,200");
     // Every other drawer renders no balance of its own — neither a wallet
     // node nor a `錢袋` line (the character-status drawer included).
-    for (const name of ["skill", "shop", "quest", "lore", "status"]) {
+    for (const name of ["skill", "shop", "quest", "lore", "status", "party"]) {
       store.openHudDrawer(name);
       await wrapper.vm.$nextTick();
       const other = wrapper.get('[data-testid="hud-drawer"]');
@@ -416,5 +417,163 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     await wrapper.get('[data-testid="character-status-drawer__persona-submit--habit"]').trigger("click");
     expect(sender.sent.actions).toHaveLength(2);
     expect(sender.sent.actions[1].payload).toEqual({ field: "habit", text: null });
+  });
+
+  it("renders the party quickbar on panel-left when party panel is available", async () => {
+    mountAppClient();
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          mode: "exploration",
+          panels: {
+            status: fx.statusPanel(),
+            party: {
+              schema_version: 1,
+              available: true,
+              slots: [
+                {
+                  identity: 101,
+                  display_name: "蕾娜",
+                  portrait_ref: null,
+                  hp_current: 180,
+                  hp_maximum: 220,
+                  bond_stage: "親睦",
+                },
+              ],
+            },
+          },
+        }),
+      ],
+    );
+    await wrapper.vm.$nextTick();
+
+    // PartyStrip renders in #panel-left
+    expect(wrapper.find('[data-testid="party-strip"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="party-strip__count"]').text()).toBe("1 / 4");
+
+    // Clicking the strip opens the party drawer
+    await wrapper.get('[data-testid="party-strip"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(store.view.hudDrawer).toBe("party");
+    expect(wrapper.find('[data-testid="party-drawer"]').exists()).toBe(true);
+    expect(wrapper.get('.hud-drawer__title').text()).toBe("同伴 · 隊伍");
+    expect(wrapper.get('.hud-drawer__subtitle').text()).toBe("1 / 4");
+  });
+
+  it("hides the party quickbar in creation mode or when party panel is unavailable", async () => {
+    mountAppClient();
+    store.beginTransport(1);
+    store.setConnected(true);
+
+    // Unavailable party panel
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          mode: "exploration",
+          panels: {
+            status: fx.statusPanel(),
+            party: {
+              schema_version: 1,
+              available: false,
+              reason: { code: "party_unavailable", message: "隊伍資訊目前無法顯示" },
+            },
+          },
+        }),
+      ],
+    );
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="party-strip"]').exists()).toBe(false);
+
+    // Creation mode
+    store.receive(
+      1,
+      "ui_update",
+      [
+        fx.update({
+          revision: 2,
+          mode: "creation",
+          panels: {
+            party: {
+              schema_version: 1,
+              available: true,
+              slots: [],
+            },
+          },
+        }),
+      ],
+    );
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="party-strip"]').exists()).toBe(false);
+  });
+
+  it("closes open party drawer when party panel becomes unavailable or mode switches to creation", async () => {
+    mountAppClient();
+    store.beginTransport(1);
+    store.setConnected(true);
+
+    // Initial state with available party panel
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          mode: "exploration",
+          panels: {
+            status: fx.statusPanel(),
+            party: {
+              schema_version: 1,
+              available: true,
+              slots: [
+                {
+                  identity: 101,
+                  display_name: "蕾娜",
+                  portrait_ref: null,
+                  hp_current: 180,
+                  hp_maximum: 220,
+                  bond_stage: "親睦",
+                },
+              ],
+            },
+          },
+        }),
+      ],
+    );
+    await wrapper.vm.$nextTick();
+
+    // Open party drawer
+    store.openHudDrawer("party");
+    await wrapper.vm.$nextTick();
+    expect(store.view.hudDrawer).toBe("party");
+    expect(wrapper.find('[data-testid="party-drawer"]').exists()).toBe(true);
+
+    // Commit an update where party panel becomes unavailable
+    store.receive(
+      1,
+      "ui_update",
+      [
+        fx.update({
+          revision: 2,
+          panels: {
+            party: {
+              schema_version: 1,
+              available: false,
+              reason: { code: "party_unavailable", message: "隊伍資訊目前無法顯示" },
+            },
+          },
+        }),
+      ],
+    );
+    await wrapper.vm.$nextTick();
+
+    // The party drawer must be closed and unmounted
+    expect(store.view.hudDrawer).toBe(null);
+    expect(wrapper.find('[data-testid="party-drawer"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="hud-drawer"]').exists()).toBe(false);
   });
 });

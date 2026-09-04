@@ -121,6 +121,8 @@ describe("H4 store reference-drawer controller", () => {
     expect(store.view.hudDrawer).toBe("status");
     expect(store.openHudDrawer("lore")).toBe(true);
     expect(store.view.hudDrawer).toBe("lore");
+    expect(store.openHudDrawer("party")).toBe(true);
+    expect(store.view.hudDrawer).toBe("party");
   });
 
   it("hosts a current service frame in its drawer (task 4.3): pushing the 任務記錄 frame opens the quest drawer", () => {
@@ -150,6 +152,27 @@ describe("H4 store reference-drawer controller", () => {
     expect(store.router.depth()).toBe(depthAtServiceFrame - 1);
   });
 
+  it("closeHudDrawer on party drawer is frameless and leaves router depth and activeSubDock untouched", () => {
+    openSession();
+    store.setActiveSubDock("services");
+    const initialDepth = store.router.depth();
+    const initialDescriptor = store.router.currentDescriptor();
+
+    // Open party drawer
+    expect(store.openHudDrawer("party")).toBe(true);
+    expect(store.view.hudDrawer).toBe("party");
+
+    // Close with popFrame: true
+    const ok = store.closeHudDrawer({ popFrame: true });
+    expect(ok).toBe(true);
+    expect(store.view.hudDrawer).toBe(null);
+
+    // Frameless guarantee: activeSubDock and router stack are not mutated
+    expect(store.view.activeSubDock).toBe("services");
+    expect(store.router.depth()).toBe(initialDepth);
+    expect(store.router.currentDescriptor()).toEqual(initialDescriptor);
+  });
+
   it("a mode change to combat closes the services drawers and leaves the status drawer openable (task 4.4)", () => {
     openSession();
     store.openHudDrawer("quest");
@@ -174,5 +197,8 @@ describe("H4 store reference-drawer controller", () => {
     // …and the status drawer is still openable in combat.
     expect(store.openHudDrawer("status")).toBe(true);
     expect(store.view.hudDrawer).toBe("status");
+    // …and the party drawer is still openable in combat.
+    expect(store.openHudDrawer("party")).toBe(true);
+    expect(store.view.hudDrawer).toBe("party");
   });
 });

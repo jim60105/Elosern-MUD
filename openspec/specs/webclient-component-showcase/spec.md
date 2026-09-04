@@ -272,7 +272,7 @@ in-surface actions (the presets/custom/concept tab switch, the draft reset, the 
 cancel, and the activate transition) each carry a real outcome and are unaffected. The `MapOverlay` SHALL re-render its available/unavailable branch whenever the
 `local_map` OOB read model is updated, so a replaced payload never leaves a stale state; because the
 overlay is mounted in the running client, this SHALL hold against live read-model replacement and not
-only against a story's args. A surface with no backing OOB read model today — a dedicated Party/companion panel, the
+only against a story's args. A surface with no backing OOB read model today — the
 event-log Toasts surface, the design draft's category-to-entry
 game-help browser (the `help` command's output reaches the client only as narrative text; no committed
 panel carries it), and a persistent objective tracker — MUST NOT be built or mocked to look real, and each
@@ -286,6 +286,10 @@ only as the count of rows actually shipped and never as a claim about untruncate
 `character` panel's `intimate` field (`webclient-exploration-menu`'s version-4 character-panel
 requirement), and its completeness and absence-when-`null` behaviour are governed by
 `webclient-contextual-hud`'s character-status drawer requirement, not this deferred-surface list. The
+party quickbar and the 同伴 · 隊伍 drawer are likewise NOT among the deferred surfaces: they are backed by
+the `party` panel read model (`webclient-party-panel`), and their rendering and mutation behaviour is
+governed by `webclient-contextual-hud`'s party quickbar and party drawer requirements, not this
+deferred-surface list. The
 client-local action-feedback toast queue (`webclient-action-feedback`) is likewise NOT among the deferred
 surfaces: it presents only client-composed or verbatim server-authored action messages rather than a
 backend read model, so its `ToastQueue` component and `feedback-` test-id family are built and
@@ -320,7 +324,11 @@ be re-frozen at the complete redesign set and the component-coverage gate SHALL 
 
 #### Scenario: Deferred surfaces are absent, not mocked
 - **WHEN** the complete component set is enumerated
-- **THEN** no Party panel, event-log Toasts surface, authored game-help browser, or persistent objective tracker is present and none presents invented data
+- **THEN** no event-log Toasts surface, authored game-help browser, or persistent objective tracker is present and none presents invented data
+
+#### Scenario: The party surfaces are no longer deferred
+- **WHEN** the complete component set and its deferred-surface assertion are enumerated
+- **THEN** the party quickbar and the 同伴 · 隊伍 drawer are absent from the deferred-surface list, because they now have a backing OOB read model (the `party` panel), their components are manifest-listed with deterministic offline stories, and their behaviour is asserted by `webclient-contextual-hud`'s party requirements instead
 
 #### Scenario: The action-feedback queue is built while the event-log queue stays deferred
 - **WHEN** the complete component set and the deferred-surface assertion are enumerated
