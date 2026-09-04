@@ -147,9 +147,13 @@ Coordinate-free payloads SHALL render no edge direction markers, because a radia
 - **WHEN** a grid-layer payload places two or more nodes in adjacent lattice cells (sharing a row or a column), each carrying a label at the renderer's normal truncation length
 - **THEN** the rendered bounding box of each node's marker and label does not intersect the bounding box of any other node's marker or label, and the connector edge between two adjacent nodes remains visually distinguishable rather than being fully covered by their markers
 
-#### Scenario: A scaled lattice never reintroduces overlap
-- **WHEN** the island's caps scale the whole SVG canvas down proportionally (a wide or tall in-view lattice)
-- **THEN** the pre-scale geometry already satisfies the non-overlap invariant, so the uniformly scaled render remains free of marker/label collisions, and no payload produces a scale above 1 in the other direction because the island's fill is taken as coordinate margin rather than as magnification
+#### Scenario: A densely populated lattice scales down without reintroducing overlap
+- **WHEN** the in-view lattice is wide or tall enough that the island's `max-width` or `max-height` cap scales the whole SVG canvas down proportionally
+- **THEN** the pre-scale geometry already satisfies the non-overlap invariant, so the uniformly scaled render remains free of marker/label collisions
+
+#### Scenario: A sparse lattice scaled up never reintroduces overlap
+- **WHEN** the payload's natural canvas is narrower than the island's content box, so an earlier revision of this surface would have scaled the whole SVG up to fill it
+- **THEN** no scale above 1 is produced at all: the island's fill is taken as symmetric coordinate margin around the node core rather than as magnification, so the drawn scale is `min(maxWidth / W, maxHeight / H) ≤ 1` and the upward direction of the non-overlap question cannot arise
 
 #### Scenario: A long remembered list keeps required island content in view
 - **WHEN** a graph-variant payload combines a tall in-view placement with a long remembered-node list (up to the model's 64-node bound)
