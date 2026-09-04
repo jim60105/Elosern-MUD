@@ -1,7 +1,7 @@
 # 移除 onboarding 與虛境單向通道設計（Onboarding Removal & One-Way Limbo Design）
 
 日期：2026-09-04
-狀態：已核准（待實作）
+狀態：已核准（已提案；三個 OpenSpec change 見 §11）
 
 ## 1. 問題陳述
 
@@ -39,7 +39,8 @@
 | 石板／石碑教學內容 | 不做，留給遊戲資料重設計 | 純遊戲資料工作，與本次移除正交 |
 | `introductory_hunt` 任務 | 保留為普通公會任務，只拆「完成→`set_onboarded`＋歡迎訊息」鉤子 | 任務資料本身正常；教學語意只存在於鉤子 |
 | 「南門新客」異名 | 保留；取得時機從公會註冊改掛為「回報第一個公會任務」，flavor 改成不依附守衛目送的敘述 | 舊掛點（公會註冊）是教學語意的殘留；新語意＝「完成第一次回報的新面孔」。授予仍走稱號系統正規寫者 `bank_epithet` |
-| HelpOverlay | 保留元件，內容來源改前端靜態 `lib/controls-reference.js`；後端 guide 內容推送退役 | 其本質是操作教學／按鍵說明，正是新的教學語意；不砍玩家的說明入口 |
+| HelpOverlay | 保留元件，只刪殭屍 `guide` prop（查證：前端早已靜態吃 `lib/controls-reference.js`，`AppClient.vue:999` 傳 `:guide="{}"`；後端從未 OOB 推送 guide 內容） | 其本質是操作教學／按鍵說明，正是新的教學語意；不砍玩家的說明入口 |
+| `home` 政策 | 首次成功通過城市閘門時，把 `character.home` 從虛境改設為抵達閘房 | 查證：settings 無 `DEFAULT_HOME`，角色 `home` 預設＝出生地＝虛境；`home` 指令（CmdHome）會把玩家送進被硬閘拒絕的房間。首次過閘 re-home 讓 `home` 存留且語意正確（家在正式遊戲起點城），無指令面變動 |
 | `guild_staff` 對話 | 對話表迁入 `world/rules/dialogue.py` 唯讀 runtime | 「回報」關鍵字掛的是可回報任務清單（公會功能，非教學功能）；runtime 文件本來就宣稱擁有該例外語意 |
 | 種族→城市選擇 | 不實作，只釘 registry 縫合點 | 其他城市尚不存在；出生固定虛境，YAGNI |
 
@@ -69,6 +70,8 @@
   `guide_progress`、`onboarding_beat`、`first_arrival_seen`。
 - startup：`server/conf/at_server_startstop.py` 的 `sync_guard_npc` 步驟與
   `STARTUP_STEP_ORDER` 條目。
+- `world/help_entries.py` 的 `新手引導`（aliases `onboarding`／`新手指引`）
+  help 條目——內容直接指南門守衛（rubber-duck 查證：現行仍在 production）。
 - 呼叫點修剪：
   - `commands/character_creation.py`：建立後 relocate＋arrival 刪除。
   - `typeclasses/accounts.py`：`maybe_play_arrival`。
@@ -159,6 +162,15 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType({
 未來加城市＝registry 加一列（虛境同時挂多條單向出口）。種族→出口的出生
 導流不在本設計範圍（其他城市尚不存在）。
 
+`home` 政策（rubber-duck 查證的 production 漏洞）：settings 無
+`DEFAULT_HOME` 覆寫，角色 `home` 預設即出生地＝虛境，`home` 指令會試圖把
+玩家送回被硬閘永遠拒絕的房間。修法：在共用的移動成功邊界
+（`after_successful_movement`，`typeclasses/exits.py`）偵測「抵達房間匹配
+`CITY_GATE_REGISTRY` 某列的 `gate_xyz` 且 `character.home` 仍為虛境房間」時，
+把 `home` 改設為抵達閘房——單一寫者、只在成功路徑（放在會 raise 的步驟
+之後）、非玩家物件與非虛境 home 一律 no-op。無指令面變動，故
+`docs/game/commands.md` 無需改。
+
 ## 5. guild_staff 對話遷移
 
 `DIALOGUE_TABLE` 兩條目：`south_gate_guard`（守衛教學，隨子系統死）與
@@ -202,16 +214,18 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType({
 
 ## 7. HelpOverlay 改靜態
 
-- 前端：`HelpOverlay.vue` 內容來源改為既有 `lib/controls-reference.js`
-  靜態資料；stories／fixtures／測試跟著改吃靜態輸入。
-- 後端：guide 內容 OOB 推送管線退役。
-- Storybook showcase 覆蓋清單（frozen required-set manifest）若引用
-  onboarding 來源，在同批更新。
+查證後的實際範圍比原設計更小：`HelpOverlay.vue` 已直接渲染
+`lib/controls-reference.js` 的靜態操作參考，`AppClient.vue:999` 傳的是
+`:guide="{}"`——`guide` prop 是死碼；後端從未透過 OOB 推送 guide 內容。
+因此只剩死碼修剪：刪 `guide` prop 與其 template 區塊，及
+stories／fixtures／測試中的 `guide` 輸入。無需主規格 delta
+（`webclient-contextual-hud` 早已規定說明面為誠實靜態內容）。
 
 ## 8. 錯誤處理
 
 - 出口不存在：Evennia 原生 "You can't go that way" 路徑，不新增訊息。
-- 企圖進入虛境：`at_pre_object_receive` 既有拒絕文案保留。
+- 企圖進入虛境：由 §4 新增的 `LimboRoom` 入口硬閘拒絕，拒絕文案走
+  zh-tw 本地化框（查證：master 無既有閘，故本條是新增行為而非保留）。
 - sync 時閘房缺失：`log_warn`（事件 `bootstrap_grid_gate_missing`，
   context 帶 `map_id`／`xyz`／`action`）＋skip，該列跳過、其他列繼續。
 - 觀測事件目錄：`sync_guard_npc` 相關 startup step 事件退役；新增事件依
@@ -224,7 +238,10 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType({
   character_creation（出生留虛境）、talk／dialogue（guild_staff 遷移後
   「回報」仍解析任務清單）、guild（無 `set_onboarded` 仍能完成
   `introductory_hunt`）、titles（註冊不發異名、首次回報發異名、重複回報
-  不重發）、webclient exploration／creation、help overlay。
+  不重發）、webclient exploration／creation、help overlay、
+  虛境硬閘（出口走法與 `move_to` 皆拒；非 character／superuser 依所選
+  機制的真實語意測，不寫虛構宣稱）、`home` 政策整合案（出生虛境→過閘→
+  `home`→落在閘房）、reconnect 保持持久位置不瞬移。
 - 全量非瀏覽器 Evennia suite 一次（`--parallel 16 --noinput`）。
 - `uv run --locked python -m tools.spec_traceability check`：0 uncovered／
   0 errors——onboarding-guide 規格退役後其 requirement 退出索引；修剪後
@@ -243,3 +260,34 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType({
 - 玩家稱號系統（`world/rules/titles.py`）機器本體——不動
   `bank_epithet`／`bank_fixed`／dedupe／裝備槽機制；僅改
   `STARTER_EPITHET` 的 flavor 文字與授予鉤子掛點（§6）。
+
+## 11. 提案拆包、依賴與實作批次
+
+本設計由三個 OpenSpec change 承接（皆單人 8 小時内規模、
+`openspec validate --strict` 綠；原規劃的第四個 HelpOverlay change 經查證
+只剩死 prop，併入 change A）。rubber-duck 同步審查一次，5 項 BLOCKER
+（`home` 漏洞、死 import、殭屍 help 條目、`EXIT_TO_CITY` 測試引入者、
+renamed requirement 的 stale traceability 錨點）已全部修入 artifacts。
+
+| Change | 範圍 | 主規格 delta | tasks |
+|---|---|---|---|
+| `remove-onboarding-tutorial` | §3 全部刪除＋呼叫點修剪＋測試遷移表＋shards＋`新手引導` help 條目退役＋Vue 死 prop 修剪＋reconnect 回歸測試；renamed 規格的 `@covers_requirement` 重錨 | `onboarding-guide` 整體退役＋13 份 hook 修剪 delta | 42 |
+| `limbo-one-way-city-gates` | §4 全部：`city_gates.py` registry、`sync_grid` 去程化＋宣告式清除、NEW `LimboRoom` 硬閘（`sync_limbo` 收斂 typeclass）、`home` re-anchor 寫者 | NEW `limbo-one-way-gates`＋`grid-room-sync`、`limbo-room`、`sample-city-altoria` 三份 MODIFIED | 26 |
+| `first-quest-starter-epithet` | §6 全部：`grant_starter_pair` 退役、首次回報事務內 `grant_first_quest_epithet`、flavor 改寫、三表面通知行 | `title-system`、`guild-registration`、`quest-reward-settlement` | 22 |
+
+依賴與檔案歸屬（已寫入各 proposal 的 Impact）：
+
+- 主規格能力零重疊：14＋4＋3 份 delta 無一份雙主。
+- 共同擁有的原始碼檔：`guild.py::turn_in_quest` 閉包＋三個 echo 檔
+  （`commands/talk.py`、`commands/guild.py`、
+  `web/webclient/actions/service_actions.py`）由 A、C 先後改；
+  `typeclasses/exits.py` 由 A（刪 observer 行）、B（尾端加 re-home 行）
+  改，additive 不相交 hunk。`world/maps/bootstrap.py`＋
+  `world/maps/tests/` 歸 B 專屬；`at_server_startstop.py`＋
+  `.github/evennia-shards.json` 歸 A 專屬（B/C 只擴充既有測試模組，
+  不碰 shards）。
+- 建議批次：**批次 1**＝A ∥ B 可平行動工；**批次 2**＝C，必須等 A
+  合併後 rebase，對「移除後結果形状」實作（tasks 已內含 rebase 前置
+  條件）。「出生虛境→過閘→`home`」整合測試排在 A 落地後。
+
+實作依既有慣例：worktree→rubber-duck→focused 測試→merge `--no-ff`。
