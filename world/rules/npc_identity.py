@@ -22,6 +22,7 @@ degraded state that the display bounds truncate.
 """
 
 import unicodedata
+from collections.abc import Sequence
 from typing import Any
 
 # The full-width separator between the name and the title (「姓名　稱號」).
@@ -124,6 +125,26 @@ def validate_npc_name(value: Any) -> str:
     if "|" in name:
         raise NPCNameError("npc name contains an Evennia markup delimiter")
     return name
+
+
+def validate_unique_npc_names(entries: Sequence[tuple[str, str]]) -> None:
+    """Reject authored NPC names that repeat across labeled registry rows.
+
+    ``entries`` is a sequence of ``(label, name)`` pairs, one per authored NPC
+    identity across the shop, guild-branch, and guild-rank registries (labels
+    are registry-qualified keys for the error message). Names are compared in
+    their already-validated (stripped) forms; any duplicate raises
+    :class:`NPCNameError` naming both holders. Pure and stdlib-only so every
+    owning lore module can run it at import time and tests can call it with
+    explicit rows.
+    """
+    seen: dict[str, str] = {}
+    for label, name in entries:
+        if name in seen:
+            raise NPCNameError(
+                f"npc name {name!r} authored by {label} duplicates {seen[name]}"
+            )
+        seen[name] = label
 
 
 def _title_is_plain_text(title: str) -> bool:

@@ -26,6 +26,7 @@ from world.rules.npc_identity import (
     npc_display_name,
     npc_title_value,
     validate_npc_name,
+    validate_unique_npc_names,
     validate_npc_title,
 )
 
@@ -324,3 +325,17 @@ class NPCTitleComposerTests(EvenniaTest):
         composed = npc_display_name(npc)
         self.assertEqual(len(composed), 64 + 1 + MAX_NPC_TITLE_CODE_POINTS)
         self.assertLessEqual(len(composed), 128)
+
+
+class ValidateUniqueNPCNamesTests(unittest.TestCase):
+    """Cross-registry authored-name uniqueness checker (design D4)."""
+
+    def test_unique_entries_pass(self):
+        validate_unique_npc_names([("shop:a", "甲"), ("guild_rank:b", "乙")])
+
+    def test_duplicate_names_are_rejected_naming_both_holders(self):
+        with self.assertRaises(NPCNameError) as caught:
+            validate_unique_npc_names([("shop:a", "甲"), ("guild_rank:b", "甲")])
+        message = str(caught.exception)
+        self.assertIn("shop:a", message)
+        self.assertIn("guild_rank:b", message)

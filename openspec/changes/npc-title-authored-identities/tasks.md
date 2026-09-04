@@ -32,10 +32,10 @@ NPC-title 批次的最後一件。
 
 ## 2. Registry authored identities (lore)
 
-- [ ] 2.1 `world/lore/shops.py`：`ShopDefinition` 新增**無預設值**必填欄 `host_name`／`host_title`，
+- [x] 2.1 `world/lore/shops.py`：`ShopDefinition` 新增**無預設值**必填欄 `host_name`／`host_title`，
   補齊 `altoria_general_store` 列的作者值（zh-TW 姓名＋職稱），模組尾端以延遲匯入的
   `validate_npc_name`／`validate_npc_title` 對純函式 row validator 跑載入驗證（違規 → 具名 `ValueError`）。
-- [ ] 2.2 `world/lore/guild.py`：`GuildRank` 新增必填 `examiner_name`／`examiner_title`（七列各補作者值），
+- [x] 2.2 `world/lore/guild.py`：`GuildRank` 新增必填 `examiner_name`／`examiner_title`（七列各補作者值），
   `GuildBranch` 新增必填 `host_name`／`host_title`（`guild_branch_altoria` 補作者值）；
   同檔 row validator＋載入驗證（design D9 先例：`world/lore/titles.py`）。
 - [ ] 2.3 實作跨 registry 作者姓名唯一性純檢查（shops＋guild branches＋ranks 三組姓名互不重複，
