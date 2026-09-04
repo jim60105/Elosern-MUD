@@ -326,7 +326,8 @@ export const useElosernStore = defineStore("elosern", () => {
     // drawer is open at a time (structural: a single value). Unknown names
     // are rejected, not coerced. The store is the single writer and owns the
     // teardown on a mode change, an epoch reset, or a transport loss.
-    const HUD_DRAWER_NAMES = new Set(["skill", "inventory", "shop", "quest", "lore", "status"]);
+    const HUD_DRAWER_NAMES = new Set(["skill", "inventory", "shop", "quest", "lore", "status", "party"]);
+    const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "party"]);
     const hudDrawer = ref(null);
 
     function openHudDrawer(name) {
@@ -346,12 +347,12 @@ export const useElosernStore = defineStore("elosern", () => {
       if (hudDrawer.value === null) {
         return false;
       }
-      // make-inventory-drawer-frameless: the 背包 drawer never hosts a router
-      // frame, so closing it leaves the router alone — no menu level is
-      // popped and the action dock is never re-homed, whatever frame is
-      // current at close time. Every other drawer keeps the teardown below
-      // byte-for-byte.
-      if (hudDrawer.value === "inventory") {
+      // make-inventory-drawer-frameless + webclient-align-05-party-hud: the
+      // 背包 and 同伴 drawers never host a router frame, so closing them
+      // leaves the router alone — no menu level is popped and the action
+      // dock is never re-homed, whatever frame is current at close time.
+      // Every other drawer keeps the teardown below byte-for-byte.
+      if (FRAMELESS_DRAWER_NAMES.has(hudDrawer.value)) {
         hudDrawer.value = null;
         publishView();
         return true;
@@ -1759,6 +1760,9 @@ export const useElosernStore = defineStore("elosern", () => {
         if (d === "quest" || d === "shop" || d === "inventory") {
           hudDrawer.value = null;
         }
+        if (rs.mode === "creation" && d === "party") {
+          hudDrawer.value = null;
+        }
         if (transportLost || epochChanged || detached) {
           if (hudDrawer.value) {
             hudDrawer.value = null;
@@ -1801,6 +1805,17 @@ export const useElosernStore = defineStore("elosern", () => {
         if (drawerName && hudDrawer.value !== drawerName) {
           hudDrawer.value = drawerName;
         }
+      }
+
+      // webclient-align-05-party-hud: on a committed transition where party
+      // data becomes unavailable, or mode transitions into creation, close the party drawer.
+      const prevPartyPanel = (prev && prev.panels && prev.panels.party) || null;
+      const nextPartyPanel = (rs.panels && rs.panels.party) || null;
+      const partyBecameUnavailable =
+        !!prevPartyPanel && prevPartyPanel.available === true && (!nextPartyPanel || nextPartyPanel.available !== true);
+
+      if (hudDrawer.value === "party" && (partyBecameUnavailable || rs.mode === "creation")) {
+        hudDrawer.value = null;
       }
     }
 
@@ -1847,6 +1862,26 @@ export const useElosernStore = defineStore("elosern", () => {
           }
         : { hp: null, mp: null, sp: null, lowHp: false };
 
+    // Party read model (webclient-align-05-party-hud): committed party slots
+    // from the available `party` panel (empty array when unavailable or absent).
+    const partyPanel = (rs.panels && rs.panels.party) || null;
+    const partyAvailable = !!partyPanel && partyPanel.available === true;
+    const partySlots = partyAvailable && Array.isArray(partyPanel.slots) ? partyPanel.slots : [];
+
+    // Combat participants (webclient-align-05-party-hud): committed combat participants
+    // when context_actions is kind: 'combat' (empty array otherwise).
+    const combatParticipants = panel && panel.kind === "combat" && Array.isArray(panel.participants)
+      ? panel.participants
+      : [];
+
+    // Committed exploration interact targets (webclient-align-05-party-hud):
+    // exposed so the party drawer can resolve invite/leave preconditions.
+    const explorationPanel = (rs.panels && rs.panels.exploration) || null;
+    const explorationInteract =
+      explorationPanel && explorationPanel.available !== false && Array.isArray(explorationPanel.interact)
+        ? explorationPanel.interact
+        : [];
+
     return {
       generation: rs.generation,
       phase: rs.phase,
@@ -1876,6 +1911,10 @@ export const useElosernStore = defineStore("elosern", () => {
        drawerRequest,
        drawerCloseRequest,
        restFormRequest,
+      partyAvailable,
+      partySlots,
+      combatParticipants,
+      explorationInteract,
         activeSubDock: activeSubDock.value,
         // H4 (task 4.1): the single open-drawer name (null | skill | inventory
         // | shop | quest | lore | status); at most one drawer is open at a
@@ -2612,6 +2651,11 @@ export const useElosernStore = defineStore("elosern", () => {
     publishView();
   }
 
+  const partyAvailable = computed(() => !!view.value.partyAvailable);
+  const partySlots = computed(() => view.value.partySlots || []);
+  const combatParticipants = computed(() => view.value.combatParticipants || []);
+  const explorationInteract = computed(() => view.value.explorationInteract || []);
+
   // Expose the attached transport seam so the C2 browser-bridge can route the
   // OOB entry points (ui_sync requests, reconnect resync) through the same
   // sender C3 will later attach (the store's sender is the single transport
@@ -2657,6 +2701,10 @@ export const useElosernStore = defineStore("elosern", () => {
      resetFramesToRoot,
      markNarrativeSeen,
     clearUncertain,
+    partyAvailable,
+    partySlots,
+    combatParticipants,
+    explorationInteract,
     getSender,
     // The action-feedback toast queue API (webclient-action-feedback): the
     // store is the sole writer; `retool-concept-fill-navigation`'s overlay

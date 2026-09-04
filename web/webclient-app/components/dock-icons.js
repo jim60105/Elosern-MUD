@@ -20,6 +20,8 @@ export const GLYPHS = {
   // combat `items` tab carries — one backpack glyph for 背包 semantics
   // across the dock tab and the drawer head (align-drawer-chrome-symbols).
   inventory: "M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2",
+  // The reference's 同伴 · 隊伍 drawer head icon (index.html:1040).
+  party: "M2 20c0-4 3.5-6 7-6M14 20c0-3 2-5 5-5 M9 4.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z M16 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
   wait: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 4v7l5 3-1.5 2.4L11 14V7h2z",
   suggestions: "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
   // The reference's own get-icon (the command line's 拿 chip,
