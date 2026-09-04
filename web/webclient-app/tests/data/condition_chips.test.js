@@ -126,9 +126,9 @@ describe("ConditionChips (H2 conditions island)", () => {
     expect(w.findAll(".disclosure-row")).toHaveLength(2);
   });
 
-  it("renders the 無條件 empty state when the committed list is empty", () => {
+  it("renders no condition island when the committed list is empty", () => {
     const w = mountChips({ conditions: [] });
-    expect(w.get('[data-testid="status-panel__conditions-empty"]').text()).toBe("無條件");
-    expect(w.findAll('[data-testid^="status-panel__condition--"]')).toHaveLength(0);
+    expect(w.find('[data-testid="status-panel__conditions"]').exists()).toBe(false);
+    expect(w.find('[data-testid="status-panel__conditions-empty"]').exists()).toBe(false);
   });
 });

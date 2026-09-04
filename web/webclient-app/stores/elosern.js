@@ -27,7 +27,6 @@ import Protocol from "../lib/protocol.js";
 import KeyboardRouter from "../lib/keyboard_router.js";
 import NarrativeMarkup from "../lib/narrative_markup.js";
 import LocalMap from "../lib/local_map.js";
-import ChoicePointLogic from "../lib/choicepoint.js";
 import OptionCards from "../lib/option_cards.js";
 import CombatMenu from "../lib/combat_menu.js";
 import CreationMenu from "../lib/creation_menu.js";
@@ -1809,8 +1808,6 @@ export const useElosernStore = defineStore("elosern", () => {
     const panels = rs.panels || {};
     const panel = panels.context_actions || null;
     const suggestions = panel && panel.suggestions ? panel.suggestions : null;
-    const prevChoiceState = prev && prev.choicePoint ? prev.choicePoint.state : "absent";
-    const choiceState = ChoicePointLogic.nextChoicePointState(prevChoiceState, suggestions);
     // Pre-session totality: before the first publish mounts the root
     // descriptor the stack is empty (the mount point is `settleFrameStack`),
     // where frame-content reads would throw. `mounted` guards every read.
@@ -1901,7 +1898,6 @@ export const useElosernStore = defineStore("elosern", () => {
       suggestions,
       suggestionsView: OptionCards.buildOptionsView(panel || {}),
       suggestionsSignature: OptionCards.suggestionsSignature(suggestions),
-      choicePoint: { state: choiceState, suggestions },
        localMapModel: panels.local_map
          ? {
              ...LocalMap.reducePanel(panels.local_map),

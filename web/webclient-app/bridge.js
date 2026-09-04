@@ -32,7 +32,6 @@
 
 import Protocol from "./lib/protocol.js";
 import KeyboardRouter from "./lib/keyboard_router.js";
-import StreamEndBlock from "./lib/stream_end_block.js";
 import LayoutStore from "./lib/layout_store.js";
 
 // The claimed-when-consumed key set (webclient-desktop-shell keyboard
@@ -56,27 +55,6 @@ function isEditable(target) {
 }
 
 export function createWindowBridge(store) {
-  // The narrative stream-end block is owned by the preserved controller:
-  // `mount`/`replace` keep at most one block at the stream end; the
-  // scroll/unread decision is the controller's single owner.
-  let blockController = null;
-
-  function getBlockController() {
-    if (!blockController) {
-      const container = document.querySelector('[data-testid="narrative-feed"]');
-      blockController = StreamEndBlock.createStreamEndBlock(container, {
-        atBottom: () =>
-          !!container && container.scrollTop + container.clientHeight + 2 >= container.scrollHeight,
-        scrollToBottom: () => {
-          if (container) {
-            container.scrollTop = container.scrollHeight;
-          }
-        },
-      });
-    }
-    return blockController;
-  }
-
   // The single narrative/choice-point append path (façade note §1):
   // `appendInput` echoes one `.inp` line through the store's send path; the
   // `display` descriptor never leaks into the wire payload (the store builds
@@ -85,14 +63,14 @@ export function createWindowBridge(store) {
     appendInput(text, display) {
       return store.sendText(text);
     },
-    mountChoicePoint(block) {
-      return getBlockController().mount(block);
+    mountChoicePoint(_block) {
+      return false;
     },
-    replaceChoicePoint(block) {
-      return getBlockController().replace(block);
+    replaceChoicePoint(_block) {
+      return false;
     },
     unmountChoicePoint() {
-      return getBlockController().unmount();
+      return false;
     },
   };
 

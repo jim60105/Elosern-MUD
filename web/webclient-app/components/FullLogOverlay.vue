@@ -9,7 +9,6 @@
 // webclient-desktop-shell: the complete log is reachable in one action).
 import { h, ref } from "vue";
 import NarrativeMarkup from "../lib/narrative_markup.js";
-import ChoicePointBlock from "./ChoicePointBlock.vue";
 import { renderNarrativeTokens } from "./narrative-renderer.js";
 import { createFocusTrap } from "./focus-trap.js";
 
@@ -19,11 +18,8 @@ export default {
     // The full retained narrative line stream (the store's `narrative`
     // slice, unbounded).
     lines: { type: Array, default: () => [] },
-    // The committed `context_actions.suggestions` envelope: the stream-end
-    // choice-point block renders after the lines, exactly like the feed.
-    suggestions: { type: Object, default: null },
   },
-  emits: ["close", "choice-action"],
+  emits: ["close"],
   setup(props, { emit, expose }) {
     const overlayEl = ref(null);
     // The opener (the active element before the overlay took focus). When the
@@ -75,12 +71,6 @@ export default {
         // recessed background (design D5).
         trap.onKeydown(event);
       }
-    }
-
-    function onChoiceAction(intent) {
-      // The stream-end choice-point card/dismiss intents route through the
-      // same single dispatch entry as the dock (store is the sole writer).
-      emit("choice-action", intent);
     }
 
     expose({ focusSelf });
@@ -156,10 +146,6 @@ export default {
             "關閉",
           ),
           ...props.lines.flatMap((line, index) => lineNodes(line, index)),
-          h(ChoicePointBlock, {
-            suggestions: props.suggestions,
-            onAction: onChoiceAction,
-          }),
         ],
       );
   },
@@ -228,9 +214,26 @@ export default {
   color: var(--paper-500);
 }
 
-.fulllog-overlay .narrative-line.sys,
-.fulllog-overlay .narrative-line.err {
+.fulllog-overlay .narrative-line em,
+.fulllog-overlay .narrative-line .em {
+  font-style: normal;
+  color: var(--gold-400);
+}
+
+.fulllog-overlay .narrative-line.sys {
+  font-family: var(--f-sans);
+  font-size: calc(13px * var(--prose-scale));
   color: var(--paper-500);
+  font-style: normal;
+}
+
+.fulllog-overlay .narrative-line.sys::before {
+  content: "◈ ";
+  color: var(--seal-500);
+}
+
+.fulllog-overlay .narrative-line.err {
+  color: var(--seal-400);
   font-style: italic;
 }
 

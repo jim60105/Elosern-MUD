@@ -1,7 +1,7 @@
 {
   "shards": [
     {
-      "index": 1,
+      "index": 0,
       "name": "combat-a",
       "files_a": [
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_focus_stays_on_action_dock_in_combat",
@@ -21,7 +21,7 @@
       ]
     },
     {
-      "index": 2,
+      "index": 1,
       "name": "combat-b",
       "files_a": [
         "web.tests.browser.test_browser_combat.CombatMenuBrowserTest.test_area_explicit_multi_selection",
@@ -41,7 +41,7 @@
       ]
     },
     {
-      "index": 3,
+      "index": 2,
       "name": "combat-rejection",
       "files_a": [
         "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_tampered_target_rejects_without_round",
@@ -56,7 +56,7 @@
       ]
     },
     {
-      "index": 4,
+      "index": 3,
       "name": "creation",
       "files_a": [
         "web.tests.browser.test_browser_creation.PresetCreationJourneys",
@@ -70,7 +70,7 @@
       ]
     },
     {
-      "index": 5,
+      "index": 4,
       "name": "layout-reconnect",
       "files_a": [
         "web.tests.browser.test_browser_layout.LayoutMigrationTest",
@@ -84,7 +84,7 @@
       ]
     },
     {
-      "index": 6,
+      "index": 5,
       "name": "exploration-a",
       "files_a": [
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_keyboard_move_charges_time_and_refreshes_map",
@@ -107,7 +107,7 @@
       ]
     },
     {
-      "index": 7,
+      "index": 6,
       "name": "exploration-services",
       "files_a": [
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_stale_and_tampered_submissions_do_nothing",
@@ -129,7 +129,7 @@
       ]
     },
     {
-      "index": 8,
+      "index": 7,
       "name": "services",
       "files_a": [
         "web.tests.browser.test_browser_services.GuildDialogueTurninJourneys",
@@ -147,7 +147,7 @@
       ]
     },
     {
-      "index": 9,
+      "index": 8,
       "name": "pointer",
       "files_a": [
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_exploration_root_and_submenu_submission",
@@ -163,7 +163,7 @@
       ]
     },
     {
-      "index": 10,
+      "index": 9,
       "name": "art",
       "files_a": [
         "web.tests.browser.test_browser_art.ArtDoneSceneTest.test_done_scene_renders_same_origin_image",
@@ -182,7 +182,7 @@
       ]
     },
     {
-      "index": 11,
+      "index": 10,
       "name": "art-harness-shell",
       "files_a": [
         "web.tests.browser.test_browser_art.ArtMissingSceneTest.test_missing_scene_uses_the_placeholder_and_play_continues",
@@ -201,28 +201,19 @@
       ]
     },
     {
-      "index": 12,
+      "index": 11,
       "name": "options-surface",
       "files_a": [
         "web.tests.browser.test_browser_options_surface"
       ],
       "files_b": [
         "web.tests.browser.test_browser_shell.ShellAcceptanceTest",
-        "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest"
-      ]
-    },
-    {
-      "index": 13,
-      "name": "options-choicepoints",
-      "files_a": [
-        "web.tests.browser.test_browser_choicepoints"
-      ],
-      "files_b": [
+        "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest",
         "web.tests.browser.test_browser_actions.ActionLockingTest"
       ]
     },
     {
-      "index": 14,
+      "index": 12,
       "name": "vue-foundation",
       "files_a": [
         "web.tests.browser.test_vue_foundation.VueFoundationBrowserTest.test_vue_bundle_loads_from_origin_offline",
@@ -237,7 +228,7 @@
       ]
     },
     {
-      "index": 15,
+      "index": 13,
       "name": "vue-transport",
       "files_a": [
         "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_live_transport_round_trips_and_store_adopts_snapshot",
@@ -251,7 +242,7 @@
       ]
     },
     {
-      "index": 16,
+      "index": 14,
       "name": "wait-helper",
       "files_a": [
         "web.tests.browser.test_browser_wait_helper.WaitForStoreStateTest.test_store_gate_returns_when_predicate_true",
@@ -265,7 +256,7 @@
       ]
     },
     {
-      "index": 17,
+      "index": 15,
       "name": "contextual-hud",
       "files_a": [
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_destructive_combat_confirmation_two_step_panel",

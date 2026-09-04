@@ -85,3 +85,26 @@ export const WithUnread = {
   render: renderFeed,
   args: { lines: OVERFLOW_LINES },
 };
+
+export const CombatMode = {
+  render: renderFeed,
+  args: {
+    mode: "combat",
+    lines: [
+      { kind: "out", text: "你與蕾娜、幽 被三隻霧骨狼包圍。先攻 你 17 → 狼群 12。" },
+      { kind: "out", text: "第一頭從側翼竄出——它的眼睛在霧裡燃著幽藍的火。" },
+      { kind: "sys", text: "你有 2 個可用技能，背包 1 瓶煙霧彈。" },
+    ],
+  },
+};
+
+export const SemanticLines = {
+  render: renderFeed,
+  args: {
+    mode: "exploration",
+    lines: [
+      { kind: "out", text: "晨霧貼著灰河的水面爬行，渡口的木棧浸在冷水裡。" },
+      { kind: "sys", text: "渡口有 1 名可互動的人物，並察覺到 1 處可疑痕跡。" },
+    ],
+  },
+};

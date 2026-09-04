@@ -72,4 +72,24 @@ describe("FullLogOverlay (H1 D4)", () => {
     // The caption renders exactly the retained line count.
     expect(wrapper.findAll(".narrative-line").length).toBe(lines.length);
   });
+
+  it("renders sys lines with the .sys class and never mounts a choice-point in the full log", () => {
+    const lines = sampleLines();
+    wrapper = mount(FullLogOverlay, {
+      props: {
+        lines,
+        suggestions: {
+          status: "ready",
+          cards: [{ kind: "known_action", action_code: "explore.look", label: "查看房間" }],
+        },
+      },
+    });
+    const sysLine = wrapper.find(".narrative-line.sys");
+    expect(sysLine.exists()).toBe(true);
+    expect(sysLine.attributes("data-line-kind")).toBe("sys");
+
+    // The stream choice-point block never renders in the full log
+    expect(wrapper.find('[data-testid="choicepoint-block"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="option-card"]').exists()).toBe(false);
+  });
 });

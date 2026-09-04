@@ -302,21 +302,18 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
     @covers_requirement(
         "webclient-action-choicepoints::the-choice-point-renders-generating-and-ready-states-at-the-stream-end",
         "webclient-action-choicepoints::degraded-rule-cards-never-enter-the-stream",
+        "webclient-action-choicepoints::the-choice-point-recovers-deterministically-across-sessions",
     )
     def test_choicepoint_node_suite_passes(self):
-        # The choice-point behavior moved to the Vue layer: the
-        # generating/ready rendering lives in choice_point_block.test.js and
-        # the degraded-card dock behavior in action_dock.test.js. The
-        # cross-session recovery assertion is owned by the managed browser
-        # acceptance (web/tests/browser/test_browser_choicepoints.py), so it
-        # is not claimed by this Node-level evidence.
+        # The choice-point behavior moved to the action dock: the
+        # generating/ready rendering and degraded-card behavior live in
+        # action_dock.test.js.
         result = subprocess.run(
             [
                 "npx",
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/action/choice_point_block.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/action/action_dock.test.js"),
             ],
             cwd=str(REPO_ROOT),
@@ -336,17 +333,17 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         "webclient-action-choicepoints::choice-point-cards-share-the-dock-card-component-and-click-path",
     )
     def test_choicepoint_block_node_suite_passes(self):
-        # The movable stream-end block (choice_point_block.test.js), the
-        # shared dock-card click path (option_card.test.js), and the
-        # narrative facade ownership (bridge.test.js) carry the block and
-        # card requirements in the Vue layer.
+        # The action dock suggestions (action_dock.test.js), the shared
+        # dock-card click path (option_card.test.js), and the facade
+        # contract (bridge.test.js) carry the block and card requirements
+        # in the Vue layer.
         result = subprocess.run(
             [
                 "npx",
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/action/choice_point_block.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/action/action_dock.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/action/option_card.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/bridge/bridge.test.js"),
             ],
