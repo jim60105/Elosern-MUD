@@ -118,13 +118,16 @@ PRE_SPLIT_ANNOTATIONS = {
             "blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization",
             "scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields"
         ],
+        "test_duplicate_names_reject_and_retry": [
+            "npc-identity-titles::the-blueprint-author-face-enforces-occupant-name-uniqueness"
+        ],
         "test_elven_tier_named_occupant_passes_within_the_elf_band": [
             "scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields"
         ],
-        "test_field_less_entries_validate_unchanged": [
+        "test_malformed_portrait_object_rejects_and_retries": [
             "scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields"
         ],
-        "test_malformed_portrait_object_rejects_and_retries": [
+        "test_missing_identity_is_rejected_and_retried": [
             "scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields"
         ],
         "test_overlong_display_name_rejects_and_retries": [
@@ -320,7 +323,7 @@ PRE_SPLIT_ANNOTATIONS = {
         "test_identical_contexts_produce_byte_identical_prompts": [
             "scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful"
         ],
-        "test_output_contract_is_unchanged_by_the_injection": [
+        "test_output_contract_carries_the_required_identity_fields": [
             "scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful"
         ],
         "test_oversized_context_is_bounded_and_valid": [
@@ -330,6 +333,7 @@ PRE_SPLIT_ANNOTATIONS = {
             "scenario-director::the-scenario-director-name-inspiration-reads-the-namegen-rule-layer-without-crossing-the-single-writer-boundary"
         ],
         "test_system_carries_the_full_context_seeded_bank_with_guidance": [
+            "prompt-library::the-scenario-director-key-is-registered-with-the-name-inspiration-placeholder-and-carries-the-naming-guidance",
             "scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful"
         ],
         "test_system_message_names_the_blueprint_contract_and_fidelity": [
@@ -338,8 +342,8 @@ PRE_SPLIT_ANNOTATIONS = {
         "test_user_message_carries_keys_and_no_live_objects": [
             "scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful"
         ],
-        "test_validators_accept_missing_and_bank_external_display_names": [
-            "scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful"
+        "test_validators_require_identity_and_accept_bank_external_names": [
+            "scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields"
         ]
     },
     "ScenarioDirectorProposalTypeTests": {

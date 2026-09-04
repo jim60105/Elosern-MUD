@@ -73,6 +73,7 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
         self.assertNotIn("object at", user["content"])
 
     @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
+    @covers_requirement("prompt-library::the-scenario-director-key-is-registered-with-the-name-inspiration-placeholder-and-carries-the-naming-guidance")
     def test_system_carries_the_full_context_seeded_bank_with_guidance(self):
         system, user = build_scenario_prompt(_context())
         bank = _expected_bank(user["content"])
@@ -112,7 +113,7 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
         for name in _expected_bank(user["content"]).split("、"):
             self.assertNotIn(name, json.dumps(SCENARIO_DIRECTOR_OUTPUT_SCHEMA, ensure_ascii=False))
 
-    @covers_requirement("prompt-library::the-scenario-director-key-is-registered-with-the-name-inspiration-placeholder-and-carries-the-naming-guidance")
+    @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
     def test_validators_require_identity_and_accept_bank_external_names(self):
         def _payload(npc_req: dict) -> dict:
             base_npc = {"role": "向導", "tier": "bandit"}
