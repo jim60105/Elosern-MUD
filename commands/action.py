@@ -26,7 +26,7 @@ class CmdCast(Command):
     """Cast a skill through the deterministic action resolver."""
 
     key = "cast"
-    aliases = ("施法",)
+    aliases = ("施法", "c")
     locks = "cmd:all()"
     help_category = "General"
 

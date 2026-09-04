@@ -5,9 +5,12 @@
 // input field is present in the DOM, visible and focusable without any
 // opening action (design D1). The bar renders, in this order: the mode's
 // quick-word chips, a `›` prompt chevron, the `#inputfield` inside its
-// preserved `.inputfieldwrapper`, the hint cluster (`↑↓ 歷史` only — the
-// draft's `Tab 補全` is dropped because the client implements no
-// completion, design D5), the 上一筆/下一筆 history controls (the pointer
+// preserved `.inputfieldwrapper`, the hint cluster (`↑↓ 歷史 · Tab 補全` —
+// both affordances implemented, webclient-align-02-quickbar-shortcuts: Tab
+// completes the draft before the caret over session history, the mode's
+// chip badge letters, and the committed exploration panel's exit/target
+// names; unique → full completion, many → longest-common-prefix then
+// Tab/Shift+Tab cycle, none → untouched), the 上一筆/下一筆 history controls (the pointer
 // path to the same walk state the ArrowUp/ArrowDown keys drive, design D5),
 // and the utility controls that open the settings and help overlays (design
 // D10).
@@ -18,9 +21,10 @@
 // (regardless of how focus arrived), Shift+Enter inserts a newline, a
 // successful send clears the field and keeps focus, and a rejected send
 // (offline or mutations locked) preserves the typed text.
-import { ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import NarrativeMarkup from "../lib/narrative_markup.js";
 import QuickWordChips from "./QuickWordChips.vue";
+import { chipLetters } from "../lib/quick_chips.js";
 
 const props = defineProps({
   // The server-transformed prompt line (e.g. a room name). Rendered through
@@ -42,12 +46,131 @@ const props = defineProps({
   // prompt line (and the feed/full-log lines) render as literal text — the
   // preference chooses whether the pipeline runs, never what it permits.
   textToHtml: { type: Boolean, default: true },
+  // Extra Tab-completion candidates: the committed exploration panel's exit
+  // labels and interact-target display names (webclient-align-02, design
+  // decision "Tab candidate set" — already-committed panel data only, zero
+  // protocol change). Unavailable/absent panel → empty list.
+  completionCandidates: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits(["submit", "focus-parent", "open-overlay", "focus-lost"]);
 
 const field = ref(null);
 const draft = ref("");
+
+// Tab-completion cycle state (webclient-align-02): null = not cycling;
+// otherwise the current candidate list and a cursor where -1 is the
+// longest-common-prefix rung and 0..n-1 the candidate rungs (Tab advances,
+// Shift+Tab reverses, both wrap). Any manual edit, send, chip insert, or
+// history walk resets it — the cycle never resurrects stale candidates.
+let completion = null;
+
+function resetCompletion() {
+  completion = null;
+}
+
+// The candidate set: session history + the committed mode's chip badge
+// letters + the committed exploration panel names, deduplicated
+// case-insensitively with first-seen order (history oldest-first, then
+// chips, then panel rows — the cycle follows this stable order).
+const candidateList = computed(() => {
+  const seen = new Set();
+  const out = [];
+  for (const value of [...props.history, ...chipLetters(props.mode), ...props.completionCandidates]) {
+    const text = String(value ?? "");
+    if (text === "") {
+      continue;
+    }
+    const key = text.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(text);
+    }
+  }
+  return out;
+});
+
+// A candidate-source change (history commit, mode switch, a fresh committed
+// exploration panel) drops any in-flight cycle: cycling must never offer a
+// completion the current committed sources no longer contain. The watch keys
+// on canonicalized content, not array identity, so equal re-snapshots do not
+// disturb the cycle.
+watch(
+  () => JSON.stringify(candidateList.value),
+  resetCompletion,
+);
+
+function longestCommonPrefix(values) {
+  if (!values.length) {
+    return "";
+  }
+  let prefix = values[0];
+  for (const value of values.slice(1)) {
+    while (!value.toLowerCase().startsWith(prefix.toLowerCase())) {
+      prefix = prefix.slice(0, -1);
+    }
+  }
+  return prefix;
+}
+
+function caretStart() {
+  const el = field.value;
+  if (!el || typeof el.selectionStart !== "number") {
+    return draft.value.length;
+  }
+  return el.selectionStart;
+}
+
+function placeCaretEnd() {
+  const el = field.value;
+  if (!el) {
+    return;
+  }
+  nextTick(() => {
+    el.setSelectionRange(el.value.length, el.value.length);
+  });
+}
+
+// Tab inside the field: complete the draft text BEFORE the caret (the
+// change design's caret-relative prefix rule); completion replaces the whole
+// field — MUD-line semantics, no tokenization. Focus and text are unchanged
+// when nothing matches.
+function completeDraft(backward) {
+  const prefix = draft.value.slice(0, caretStart());
+  if (prefix.trim() === "") {
+    resetCompletion();
+    return;
+  }
+  if (!completion) {
+    const lowered = prefix.toLowerCase();
+    const matches = candidateList.value.filter((c) => c.toLowerCase().startsWith(lowered));
+    if (!matches.length) {
+      return;
+    }
+    if (matches.length === 1) {
+      draft.value = matches[0];
+      placeCaretEnd();
+      return;
+    }
+    completion = { matches, index: -1 };
+    // The LCP is over the MATCHES (every match already starts with the
+    // typed prefix, so the field text only ever grows).
+    draft.value = longestCommonPrefix(matches);
+    placeCaretEnd();
+    return;
+  }
+  const n = completion.matches.length;
+  // Rungs: -1 = LCP, then 0..n-1 candidates; Tab steps forward, Shift+Tab
+  // reverses, both wrap around the ring.
+  const rungs = n + 1;
+  const pos = completion.index + 1;
+  completion.index = (backward ? pos - 1 + rungs : pos + 1) % rungs - 1;
+  draft.value =
+    completion.index === -1
+      ? longestCommonPrefix(completion.matches)
+      : completion.matches[completion.index];
+  placeCaretEnd();
+}
 
 // Command-history walk state: null = not walking; otherwise the index into
 // `props.history`, with the unsent draft preserved across the walk and
@@ -125,6 +248,7 @@ function submit() {
     draft.value = "";
   }
   resetHistoryWalk();
+  resetCompletion();
   return true;
 }
 
@@ -133,6 +257,7 @@ function submit() {
 // input paths. Neither path submits.
 function walkHistory(direction) {
   const history = props.history;
+  resetCompletion();
   if (direction === "up") {
     if (!history.length) {
       return;
@@ -167,6 +292,14 @@ function onKeyDown(event) {
     submit();
     return;
   }
+  if (event.key === "Tab") {
+    // Always claimed while candidates could match or the draft is being
+    // completed: the default Tab would move focus out of the field, which
+    // the requirement forbids (focus stays put even on a no-match draft).
+    event.preventDefault();
+    completeDraft(event.shiftKey);
+    return;
+  }
   if (event.key === "Escape") {
     event.preventDefault();
     resetHistoryWalk();
@@ -191,9 +324,19 @@ function focusField() {
 }
 
 function onChipInsert(verb) {
-  // A chip prepares, it does not send: write the verb plus a trailing space
-  // and focus the field (design D4).
-  draft.value = String(verb) + " ";
+  // A chip prepares, it does not send: write the inserted text (the badge
+  // letter, webclient-align-02) plus a trailing space and focus the field
+  // (design D4). The global bound-letter router inserts through this same
+  // path — one insert implementation.
+  insertText(String(verb));
+}
+
+// The shared letter-insert path (webclient-align-02): a chip click and a
+// bound-letter keypress both land here — write the letter + trailing space,
+// focus the field, never submit.
+function insertText(text) {
+  draft.value = text + " ";
+  resetCompletion();
   focusField();
 }
 
@@ -219,7 +362,7 @@ function onFieldBlur() {
   emit("focus-lost");
 }
 
-defineExpose({ focusField });
+defineExpose({ focusField, insertText });
 </script>
 
 <template>
@@ -240,7 +383,7 @@ defineExpose({ focusField });
           spellcheck="false"
           rows="1"
           :value="draft"
-          @input="draft = $event.target.value"
+          @input="draft = $event.target.value; resetCompletion()"
           @keydown="onKeyDown"
           @blur="onFieldBlur"
         ></textarea>
@@ -254,7 +397,7 @@ defineExpose({ focusField });
           ›
         </button>
       </div>
-      <span class="hint">↑↓ 歷史</span>
+      <span class="hint">↑↓ 歷史 · Tab 補全</span>
       <span class="hist">
         <button
           type="button"

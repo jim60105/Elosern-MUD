@@ -81,6 +81,51 @@ class LocalizedCommandSurfaceTests(EvenniaTestCase):
         self.assertTrue(LOCALIZED_DEFAULT_KEYS.issubset(merged))
 
 
+class QuickbarLetterPinningTests(EvenniaTestCase):
+    """The webclient quickbar's bound letters are installed command words.
+
+    The draft's chip badges double as keybindings, and the client contract
+    requires every badge letter to be a literal command the server accepts on
+    every transport (webclient-contextual-hud: quick-word chips + the pinned
+    bound-letters requirement). This pins the six letters against the merged
+    player cmdsets so the chip table cannot drift from the command surface.
+    """
+
+    # letter -> the command key the webclient chip pins it to.
+    BOUND_LETTERS = {
+        "l": "看",
+        "g": "拿",
+        "s": "說",
+        "t": "talk",
+        "w": "wait",
+        "c": "cast",
+    }
+
+    def _letter_owners(self):
+        # ``CmdSet.add`` flattens nested cmdsets (the XYZGrid grid commands
+        # ride in via a sub-cmdset) into ``commands`` at mount time, so the
+        # top-level cmdsets' ``commands`` cover the full installed surface.
+        # Every installed key AND alias is enumerated — that is what makes
+        # the collision check robust against an upstream default claiming a
+        # letter rather than merely trusting a source audit.
+        owners: dict[str, set[str]] = {}
+        for cmdset in (CharacterCmdSet(), AccountCmdSet()):
+            for command in cmdset.commands:
+                for name in [command.key, *command.aliases]:
+                    if isinstance(name, str):
+                        owners.setdefault(name, set()).add(command.key)
+        return owners
+
+    def test_bound_letters_resolve_to_their_pinned_commands(self):
+        owners = self._letter_owners()
+        for letter, pinned_key in self.BOUND_LETTERS.items():
+            with self.subTest(letter=letter):
+                # Exactly one mounted command claims the letter, and it is the
+                # pinned one — no collision against any other installed key
+                # or alias in either player cmdset.
+                self.assertEqual(owners.get(letter), {pinned_key})
+
+
 class LocalizedCharacterCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()

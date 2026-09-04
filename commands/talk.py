@@ -73,7 +73,7 @@ class CmdsTalk(Command):
     """Talk to an NPC, with an optional keyword on dialogue-capable hosts."""
 
     key = "talk"
-    aliases = ("交談", "對話")
+    aliases = ("交談", "對話", "t")
     help_category = "General"
 
     def func(self) -> None:

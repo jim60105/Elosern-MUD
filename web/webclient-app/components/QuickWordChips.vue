@@ -1,20 +1,26 @@
 <script setup>
 // Quick-word chips (H5, webclient-hud-05-overlays-and-command-line, design
-// D4/D5): the command line's verb chips. Each chip's visible label IS the
-// literal command it inserts; activating a chip writes the verb plus a
-// trailing space into the field and focuses it, never submitting — a
-// prepared command still travels through the field's single send path. The
-// v1 sets are drawn from the server's installed command set: the draft's
-// 走/問 chips are dropped because this game has no `go`/`ask` commands
+// D4/D5; rebadged by webclient-align-02-quickbar-shortcuts): the command
+// line's verb chips. Each chip renders the draft structure — a visible
+// zh-TW label plus a letter badge — and activating it writes the badge
+// letter plus a trailing space into the field and focuses it, never
+// submitting: the badge letter IS the installed command word (the server
+// alias pinned by commands.tests.test_localized's QuickbarLetterPinningTests),
+// so what the badge teaches is what every transport receives. The draft's
+// 走/問 chips stay dropped because this game has no `go`/`ask` commands
 // (movement is by exit name through the dock's 移動 frame; NPC keyword talk
 // is 交談).
+//
+// The chip sets and badge letters come from the shared quickbar table
+// (lib/quick_chips.js): badge ⇔ inserted text ⇔ client keybinding are one
+// source, pinned server-side against the installed cmdset.
 //
 // Both mode groups are rendered; the inactive group is hidden by the stage
 // root's `data-elosern-mode` gate with `display:none` (never dimmed), so
 // hidden chips leave the accessibility tree and the tab order (REDESIGN.md
-// §0.1). No mnemonic key badge: the draft's letter badges are dropped
-// because the client binds no key to them and the label already is the verb.
+// §0.1).
 import { glyphPath } from "./dock-icons.js";
+import { EXPLORATION_CHIPS, COMBAT_CHIPS } from "../lib/quick_chips.js";
 
 const props = defineProps({
   // The committed mode (exploration / combat / creation).
@@ -23,14 +29,10 @@ const props = defineProps({
 
 const emit = defineEmits(["insert"]);
 
-// The v1 sets (design D4): exploration = 看/拿/說/交談/等待 (the installed
-// command keys: 看/說/拿, the 交談 alias of talk, the 等待 key of skip),
-// combat = 說/施法 (the 施法 alias of cast).
-const EXPLORATION_CHIPS = ["看", "拿", "說", "交談", "等待"];
-const COMBAT_CHIPS = ["說", "施法"];
-
-function insert(verb) {
-  emit("insert", verb);
+function insert(chip) {
+  // A chip prepares, it does not send: the emitted text is exactly the
+  // badge letter (the field path owns the trailing space).
+  emit("insert", chip.letter);
 }
 
 // Map each chip's verb to the stable glyph key in the shared dock icon
@@ -56,16 +58,17 @@ function chipGlyph(verb) {
   <div class="qwc" aria-label="快捷詞" data-testid="quick-word-chips">
     <div class="qwc__group qwc-exploration" data-testid="quick-word-chips-exploration">
       <button
-        v-for="verb in EXPLORATION_CHIPS"
-        :key="verb"
+        v-for="chip in EXPLORATION_CHIPS"
+        :key="chip.verb"
         type="button"
         class="qwc__chip"
-        :data-verb="verb"
-        :data-testid="`quick-word-chip-${verb}`"
-        @click="insert(verb)"
+        :data-verb="chip.verb"
+        :data-letter="chip.letter"
+        :data-testid="`quick-word-chip-${chip.verb}`"
+        @click="insert(chip)"
       >
         <svg
-          v-if="chipGlyph(verb)"
+          v-if="chipGlyph(chip.verb)"
           class="qwc__chip-icon"
           width="14"
           height="14"
@@ -73,23 +76,25 @@ function chipGlyph(verb) {
           fill="none"
           aria-hidden="true"
         >
-          <path :d="chipGlyph(verb)" stroke="currentColor" stroke-width="1.8" />
+          <path :d="chipGlyph(chip.verb)" stroke="currentColor" stroke-width="1.8" />
         </svg>
-        {{ verb }}
+        <span class="qwc__chip-label">{{ chip.verb }}</span>
+        <b class="qwc__chip-badge" data-testid="quick-chip-badge">{{ chip.letter }}</b>
       </button>
     </div>
     <div class="qwc__group qwc-combat" data-testid="quick-word-chips-combat">
       <button
-        v-for="verb in COMBAT_CHIPS"
-        :key="verb"
+        v-for="chip in COMBAT_CHIPS"
+        :key="chip.verb"
         type="button"
         class="qwc__chip qwc__chip--combat"
-        :data-verb="verb"
-        :data-testid="`quick-word-chip-${verb}`"
-        @click="insert(verb)"
+        :data-verb="chip.verb"
+        :data-letter="chip.letter"
+        :data-testid="`quick-word-chip-${chip.verb}`"
+        @click="insert(chip)"
       >
         <svg
-          v-if="chipGlyph(verb)"
+          v-if="chipGlyph(chip.verb)"
           class="qwc__chip-icon"
           width="14"
           height="14"
@@ -97,9 +102,10 @@ function chipGlyph(verb) {
           fill="none"
           aria-hidden="true"
         >
-          <path :d="chipGlyph(verb)" stroke="currentColor" stroke-width="1.8" />
+          <path :d="chipGlyph(chip.verb)" stroke="currentColor" stroke-width="1.8" />
         </svg>
-        {{ verb }}
+        <span class="qwc__chip-label">{{ chip.verb }}</span>
+        <b class="qwc__chip-badge" data-testid="quick-chip-badge">{{ chip.letter }}</b>
       </button>
     </div>
   </div>
@@ -147,6 +153,19 @@ function chipGlyph(verb) {
 
 .qwc__chip-icon {
   flex: none;
+}
+
+.qwc__chip-badge {
+  /* The draft's key badge: the kbd treatment (mono, --ink-780 ground,
+     2px bottom border) the change-01 legend established for <kbd>. */
+  font-family: var(--f-mono);
+  font-size: var(--text-xs);
+  line-height: 1;
+  padding: 2px 4px;
+  color: var(--paper-300);
+  background: var(--ink-780);
+  border-bottom: 2px solid var(--ink-700);
+  border-radius: 2px;
 }
 
 .qwc__chip:hover {

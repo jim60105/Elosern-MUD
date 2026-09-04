@@ -198,7 +198,7 @@ class CmdSay(_CmdSay):
     """
 
     key = "說"
-    aliases = ["say", '"', "'"]
+    aliases = ["say", "s", '"', "'"]
     arg_regex = None
 
     def func(self):
@@ -259,7 +259,7 @@ class CmdGet(_CmdGet, NumberedTargetCommand):
     """
 
     key = "拿"
-    aliases = ["get", "grab"]
+    aliases = ["get", "grab", "g"]
 
     def func(self):
         """執行撿取。"""

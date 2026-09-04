@@ -180,19 +180,26 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::quick-word-chips-prepare-a-command-without-submitting-it"
     )
     def test_quick_word_chip_prepares_a_command_without_sending(self):
-        """A quick-word chip writes its verb plus a trailing space into the field
-        and moves focus to the field; it prepares, it does not send (exactly one
-        send path — the field's send)."""
+        """A quick-word chip renders the draft's label + letter-badge structure
+        and writes its badge letter plus a trailing space into the field, moving
+        focus to the field; it prepares, it does not send (exactly one send path
+        — the field's send). webclient-align-02-quickbar-shortcuts: the badge
+        letter is the installed command word the chip inserts."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         # The committed mode is exploration: the exploration chip set renders.
         chip = page.locator('[data-testid="quick-word-chip-看"]')
         self.assertEqual(chip.count(), 1, "the 看 chip renders in exploration")
+        # The draft structure: visible zh-TW label + letter badge, and the
+        # badge letter is the chip's data-letter (badge ⇔ insert ⇔ binding).
+        self.assertEqual(chip.locator(".qwc__chip-label").inner_text(), "看")
+        self.assertEqual(chip.locator(".qwc__chip-badge").inner_text(), "l")
+        self.assertEqual(chip.get_attribute("data-letter"), "l")
         chip.click()
         self.assertEqual(
             page.evaluate("() => document.getElementById('inputfield').value"),
-            "看 ",
-            "the chip wrote its verb plus a trailing space into the field",
+            "l ",
+            "the chip wrote its badge letter plus a trailing space into the field",
         )
         self.assertTrue(
             page.evaluate("document.activeElement === document.getElementById('inputfield')"),
@@ -210,17 +217,19 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-contextual-hud::the-command-line-advertises-only-affordances-this-client-implements"
     )
-    def test_command_line_hint_names_history_only_and_controls_share_the_walk(self):
-        """The hint cluster states the command-history recall keys and no completion
-        affordance; the history controls drive the same walk state the keys drive,
-        and neither submits."""
+    def test_command_line_hint_names_history_and_completion_and_controls_share_the_walk(self):
+        """The hint cluster states the command-history recall keys and the
+        Tab-completion affordance (both implemented, webclient-align-02); Tab
+        completes a committed exit name in the live app; the history controls
+        drive the same walk state the keys drive, and neither submits."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        # The hint cluster names only the history recall keys (no completion).
+        # The hint cluster names the history recall keys AND the completion
+        # affordance — the draft wording, both implemented.
         self.assertEqual(
             page.locator(".hint").inner_text(),
-            "↑↓ 歷史",
-            "the hint states only the history recall keys, no completion affordance",
+            "↑↓ 歷史 · Tab 補全",
+            "the hint states the history recall keys and the completion affordance",
         )
         # Seed the command history deterministically by sending two distinct text
         # commands through the client's single send path (the field's send).
@@ -259,6 +268,60 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
             len(outbound_messages(page)),
             baseline,
             "neither the history control nor the recall key submitted (no new wire messages)",
+        )
+        # Tab completion over the live committed sources (webclient-align-02):
+        # the seeded history entry completes uniquely from its prefix, the
+        # draft ends up holding the full candidate, and completion sends
+        # nothing on its own.
+        page.locator("#inputfield").focus()
+        page.keyboard.press("Control+a")
+        page.keyboard.type("take sw")
+        page.keyboard.press("Tab")
+        page.wait_for_function(
+            "() => document.getElementById('inputfield').value === 'take sword'",
+            timeout=10000,
+        )
+        self.assertEqual(
+            len(outbound_messages(page)),
+            baseline,
+            "Tab completion itself sent no client->server message",
+        )
+        # An unmatched draft leaves text and focus untouched.
+        page.keyboard.press("Control+a")
+        page.keyboard.type("zzz")
+        page.keyboard.press("Tab")
+        page.wait_for_timeout(150)
+        self.assertEqual(
+            page.evaluate("() => document.getElementById('inputfield').value"),
+            "zzz",
+            "an unmatched draft is left alone",
+        )
+        self.assertTrue(
+            page.evaluate("document.activeElement === document.getElementById('inputfield')"),
+            "Tab never moved focus out of the field",
+        )
+
+    @covers_requirement(
+        "webclient-contextual-hud::quick-word-chips-prepare-a-command-without-submitting-it"
+    )
+    def test_bound_letter_outside_the_field_inserts_like_a_chip(self):
+        """webclient-align-02-quickbar-shortcuts: with focus on the dock (no
+        text-entry surface), the bound letter `g` is equivalent to activating
+        its chip — the badge letter plus a trailing space lands in the field,
+        focus moves there, and nothing is submitted."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        focus_action_dock(page)
+        page.keyboard.press("g")
+        page.wait_for_function(
+            "() => document.getElementById('inputfield').value === 'g ' && "
+            "document.activeElement === document.getElementById('inputfield')",
+            timeout=10000,
+        )
+        self.assertEqual(
+            outbound_messages(page),
+            [],
+            "the bound letter prepared the command without any client->server message",
         )
 
     @covers_requirement(
