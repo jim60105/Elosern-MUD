@@ -85,8 +85,8 @@ export const Unavailable = {
 // the committed `move` action descriptor, and the shared renderer draws the
 // actionable halo for every node that has one. The SVG node group has no
 // focus state (it is not a tab stop — the island's keyboard paths are the
-// remembered list and the expand control), so this story documents the
-// committed intent without a play function and never dispatches. The
+// full-bleed expand affordance and remembered nodes are non-focusable), so
+// this story documents the committed intent without a play function and never
 // interaction contract — halo present on 南門 only; click emits exactly
 // `{exit_ref: "e_altoria_1_2_e", destination: "grid:altoria:2:2"}`; a node
 // without an action emits nothing — is pinned by the Vitest mount tests in
@@ -98,46 +98,35 @@ export const ActionableNode = {
   },
 };
 
-// Focused remembered node (task 3.2, updated for single-affordance D3/D6):
-// the play function moves keyboard focus to the remembered list's first
-// item (the `li` is `tabindex=0`). Its own visible label states the node's
-// name while the detail line remains the current-node coordinates — the
-// island tracks no hover/selection state, and the coordinate figure never
-// follows focus.
-export const FocusedRemembered = {
+// Edge markers with assistive text mirror (webclient-minimap-05-edge-markers-replace-list):
+// On the lattice variant, remembered gateways are drawn as named edge direction
+// markers, and the text alternative mirror exposes each untruncated place name
+// and its octant direction word to assistive technology.
+export const EdgeMarkers = {
   render: renderMap,
   args: {
     localMap: localMapModelFor(LOCAL_MAP_SAMPLE),
   },
   play: async ({ canvasElement }) => {
-    // The play contract is observable: a drift in the remembered-list
-    // selector or the `tabindex` FAILS the story instead of silently
-    // rendering. The same interaction is pinned in jsdom by
-    // `tests/world/local_map.test.js` ("focuses the remembered
-    // list item without emitting a travel action").
-    const item = canvasElement.querySelector(
-      '[data-testid="local-map-remembered"] li',
+    const marker = canvasElement.querySelector(
+      '[data-testid="local-map__edge-marker--grid:altoria:5:5"]',
     );
-    if (!item) {
-      throw new Error("FocusedRemembered: remembered-list item is missing — the story can no longer demonstrate its named state");
+    if (!marker) {
+      throw new Error("EdgeMarkers: edge marker is missing");
     }
-    item.focus();
-    await new Promise((resolve) => setTimeout(resolve, 60));
-    if (document.activeElement !== item) {
-      throw new Error("FocusedRemembered: the remembered-list item did not take keyboard focus (tabindex/@focus drift?)");
+    const mirror = canvasElement.querySelector(
+      '[data-testid="local-map-edge-markers-mirror"]',
+    );
+    if (!mirror) {
+      throw new Error("EdgeMarkers: assistive mirror is missing");
     }
-    const itemLabel = item.querySelector(".local-map__node-label")?.textContent;
-    if (!itemLabel || !itemLabel.includes("舊街區")) {
-      throw new Error(`FocusedRemembered: remembered item must display its name, got: ${itemLabel}`);
-    }
-    const detail = canvasElement
-      .querySelector('[data-testid="local-map-detail"]')
-      .textContent;
-    if (!detail.includes("座標 1,2")) {
-      throw new Error(`FocusedRemembered: detail line must remain current-node coordinates, got: ${detail}`);
+    const mirrorItem = mirror.querySelector("li");
+    if (!mirrorItem || !mirrorItem.textContent.includes("舊街區")) {
+      throw new Error(`EdgeMarkers: mirror must display untruncated name, got: ${mirrorItem?.textContent}`);
     }
   },
 };
+export const FocusedRemembered = EdgeMarkers;
 
 // Tall-lattice scale-down (task 3.3): the 2-col × 64-row fixture's natural
 // canvas is 116×2830px (64 × 44px row pitch + the 14px label band) against

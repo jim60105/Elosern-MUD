@@ -619,6 +619,7 @@ test("edge marker packing clears every legal input at both surfaces", () => {
   // (3) marker + outward name box stay inside the outer rect.
   const surfaces = [
     { name: "island", cw: 90, ch: 58, mh: 9, nw: 0, nh: 0 },
+    { name: "island_with_names", cw: 90, ch: 58, mh: 9, nw: 0, nh: 16 },
     { name: "overlay", cw: 848, ch: 252, mh: 9 * 4.83, nw: 72, nh: 16 },
   ];
   for (const s of surfaces) {

@@ -70,6 +70,7 @@ function handleMove(payload) {
         :max-height="null"
         :fill-width="true"
         :overlay-chrome="true"
+        :marker-names="true"
         @move="handleMove"
       />
     </div>

@@ -689,6 +689,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(affordances.get_attribute("aria-label"), "展開全地圖")
         # No button in the header meta row.
         self.assertEqual(page.locator(".local-map__meta button").count(), 0)
+        # Exactly one tab stop on the island in lattice variant
+        self.assertEqual(
+            page.evaluate("() => document.querySelectorAll('.local-map button, .local-map a, .local-map [tabindex]:not([tabindex=\"-1\"])').length"),
+            1,
+        )
 
         # Keyboard Enter on the focused affordance opens the map overlay.
         affordances.focus()
@@ -710,6 +715,26 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             sent_action_count(page, "explore.move"),
             moves_before + 1,
             "clicking an actionable lattice node dispatches one explore.move intent",
+        )
+
+        # Inject an interior graph payload with remembered nodes
+        interior_payload = {
+            "schema_version": 1,
+            "available": True,
+            "layer": "interior",
+            "current_node": "room:hall",
+            "title": "公會內部",
+            "nodes": [
+                {"id": "room:hall", "label": "大廳", "x": 0, "y": 0, "visibility": "current", "current": True},
+                {"id": "room:vault", "label": "地下金庫", "x": 0, "y": 1, "visibility": "remembered"},
+            ],
+        }
+        _inject_snapshot(page, {"local_map": interior_payload}, mode="exploration")
+        page.wait_for_selector('[data-testid="local-map-remembered"]', timeout=15000)
+        # Island still offers exactly one tab stop (the affordance)
+        self.assertEqual(
+            page.evaluate("() => document.querySelectorAll('.local-map button, .local-map a, .local-map [tabindex]:not([tabindex=\"-1\"])').length"),
+            1,
         )
 
     @covers_requirement(

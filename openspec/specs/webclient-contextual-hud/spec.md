@@ -352,12 +352,19 @@ and nothing else. The readout SHALL NOT restate the current node's place name, i
 or a movement destination: the place name belongs to the shell's own top-meta location surface, and a
 minimap shows the current position by definition. The readout SHALL NOT be driven by hover or by
 selection, and the island SHALL keep no hovered-node or selected-node state; a node's own name stays
-available as its on-canvas accessible name and, for a remembered node, as its entry's visible text. Apart from that single figure the island SHALL NOT render a bearing angle, a compass
+available as its on-canvas accessible name and, for a remembered node, as the visible text of the
+presentation its layout variant gives it — the name drawn beside its edge direction marker on the
+coordinate lattice, its list entry on the radial graph — with the untruncated name always available
+to assistive technology, so no remembered place is readable by sight alone. Apart from that single figure the island SHALL NOT render a bearing angle, a compass
 angle, a distance, or any other coordinate figure: coordinate readouts for non-current nodes,
 differences between node coordinates, and every spatial figure on the graph variant remain forbidden,
 because on coordinate-bearing layers node coordinates are validated world coordinates whose only
 permitted visual uses are relative-direction geometry and the current-node figure, and on every other
-layer they are renderer-local layout values that carry no spatial meaning at all.
+layer they are renderer-local layout values that carry no spatial meaning at all. The one direction
+statement the island MAY make in words is the octant name an edge direction marker already draws — one
+of `北`, `東北`, `東`, `東南`, `南`, `西南`, `西`, `西北` — and only on the island's assistive-technology
+text alternative for those markers, where it names the bearing the drawing already asserts to a reader
+who cannot see it; a numeric angle, a degree figure, and a distance remain forbidden everywhere.
 
 The island SHALL NOT present any map layout control — no segmented switch, button, menu item, or other
 affordance selecting between the coordinate lattice and the radial graph — on the island or on the
@@ -379,9 +386,12 @@ small region of it. Clicking anywhere on the island's non-interactive body SHALL
 full-map surface as a pointer convenience, provided the click did not originate in an interactive
 descendant, and every activation path SHALL open the surface exactly once. The island root SHALL NOT
 gain a button role or tab-stop of its own — the full-bleed button, not the root, is the keyboard path
-— and `role="button"` on the island root is forbidden outright, because the island contains focusable
-descendants and a `role="button"` element must not contain any. The minimap's existing per-node
-movement submission SHALL be unchanged.
+— and `role="button"` on the island root is forbidden outright: a `role="button"` element must contain
+no focusable descendant and must not flatten a composite surface into one accessible name, and the
+island is a composite surface whose content the root would swallow. The full-bleed button SHALL remain
+the island's only tab stop whatever its content becomes: a remembered place's presentation SHALL NOT
+be a tab stop, on either layout variant, and SHALL be readable without being focusable. The minimap's
+existing per-node movement submission SHALL be unchanged.
 
 #### Scenario: The island states the axis convention on a coordinate-bearing layer
 - **WHEN** the committed payload's layer places nodes on coordinates and the resolved variant is the lattice
@@ -435,11 +445,21 @@ movement submission SHALL be unchanged.
   the surface restores focus to that same still-present element
 
 #### Scenario: Clicking an interactive descendant does not open the map
-- **WHEN** the player activates an actionable lattice node, a remembered-list item, or the full-map
-  affordance itself
+- **WHEN** the player activates an actionable lattice node, an edge direction marker, a
+  graph-variant remembered-list item, or the full-map affordance itself
 - **THEN** only that control's own behavior runs — the node submits its move and no additional
-  map-open is emitted, the remembered item only takes focus, and the affordance opens the map exactly
-  once
+  map-open is emitted, the affordance opens the map exactly once, and the marker and the remembered
+  item, which carry no behaviour and no tab stop, let the click fall through to the island body so the
+  map opens exactly once from there
+
+#### Scenario: A remembered place is readable on the island without a tab stop
+- **WHEN** the island renders a coordinate-bearing payload carrying remembered gateways and, in turn,
+  a coordinate-free payload carrying remembered rooms
+- **THEN** the first draws each place's name beside its edge direction marker and the second lists each
+  place's name beneath the canvas, both expose every such place's untruncated name to assistive
+  technology with the marker's octant direction word on the lattice variant, and in neither case does
+  the island offer a second tab stop beyond its full-map affordance
+
 ### Requirement: The action dock renders as a floating panel in the stage's dock anchor
 The action dock SHALL render inside the stage's `dock` anchor as one floating panel bounded to a
 maximum width and horizontally centred, drawn with the stage's panel gradient, a hairline top border

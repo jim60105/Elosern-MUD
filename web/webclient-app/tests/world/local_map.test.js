@@ -63,13 +63,14 @@ describe("LocalMap (B4 world family)", () => {
       current: "grid:altoria:1:2",
       visible_unvisited: "grid:altoria:2:2",
       visible_visited: "grid:altoria:0:2",
-      remembered: "grid:altoria:5:5",
     };
     for (const [state, id] of Object.entries(expected)) {
       const node = w.get(`[data-testid="local-map__node--${id}"]`);
       expect(node.attributes("data-visibility")).toBe(state);
       expect(node.find(`.local-map__marker--${state}`).exists()).toBe(true);
     }
+    const edgeMarker = w.get('[data-testid="local-map__edge-marker--grid:altoria:5:5"]');
+    expect(edgeMarker.find(".local-map__edge-marker-diamond").exists()).toBe(true);
   });
 
   it("encodes every state by shape, not color alone", () => {
@@ -84,7 +85,7 @@ describe("LocalMap (B4 world family)", () => {
     expect(w.get('[data-testid="local-map__node--grid:altoria:2:2"]').find("circle").exists()).toBe(true);
     expect(w.get('[data-testid="local-map__node--grid:altoria:0:2"]').find("circle").exists()).toBe(true);
     expect(
-      w.get('[data-testid="local-map__node--grid:altoria:5:5"]').find('rect[transform="rotate(45)"]').exists(),
+      w.get('[data-testid="local-map__edge-marker--grid:altoria:5:5"]').find('rect[transform="rotate(45)"]').exists(),
     ).toBe(true);
   });
 
@@ -113,28 +114,40 @@ describe("LocalMap (B4 world family)", () => {
     const w = mountMap();
     await w.get('[data-testid="local-map__node--grid:altoria:0:2"]').trigger("click");
     expect(w.emitted("move")).toBeUndefined();
-    // The remembered node is focusable but inert.
-    await w.get('[data-testid="local-map__node--grid:altoria:5:5"]').trigger("click");
+    // Edge marker click emits no move (falls through to open-map).
+    await w.get('[data-testid="local-map__edge-marker--grid:altoria:5:5"]').trigger("click");
     expect(w.emitted("move")).toBeUndefined();
   });
 
-  it("focuses the remembered list item without emitting a travel action or changing readout", async () => {
-    // Wave 0 / change 04 (task 2.4): the remembered list's first item is a
-    // focusable `li` with tabindex=0. Focusing it selects the item (natural
-    // focus), leaves the readout unchanged (coordinate-only readout), and
-    // emits no travel action.
-    wrapper = mount(LocalMap, {
-      props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) },
-      attachTo: document.body,
-    });
-    const li = wrapper.get('[data-testid="local-map__node--grid:altoria:5:5"]').element;
-    li.focus();
-    await wrapper.vm.$nextTick();
-    expect(document.activeElement).toBe(li);
-    // Readout remains current node coordinates, not the focused item's name.
-    const detail = wrapper.get('[data-testid="local-map-detail"]').text();
-    expect(detail).toBe("座標 1,2");
-    expect(wrapper.emitted("move")).toBeUndefined();
+  it("Task 3.1 & 3.2: scopes remembered list to graph variant and provides text mirror for edge markers", async () => {
+    // Wilderness/grid payload: no remembered list in DOM, mirror is present
+    const wLattice = mountMap({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
+    expect(wLattice.find('[data-testid="local-map-remembered"]').exists()).toBe(false);
+    const mirror = wLattice.find('[data-testid="local-map-edge-markers-mirror"]');
+    expect(mirror.exists()).toBe(true);
+    expect(mirror.attributes("aria-label")).toBe("已知的地圖出入口");
+    const mirrorItems = mirror.findAll("li");
+    expect(mirrorItems).toHaveLength(1);
+    expect(mirrorItems[0].text()).toContain("遠處山徑");
+    expect(mirrorItems[0].attributes("tabindex")).toBeUndefined();
+
+    // Interior payload with remembered: remembered list present, non-focusable items, no mirror
+    const interiorPayload = {
+      ...LOCAL_MAP_INTERIOR_SAMPLE,
+      nodes: [
+        ...LOCAL_MAP_INTERIOR_SAMPLE.nodes,
+        { id: "room:rem", label: "公會倉庫", x: 0, y: 5, visibility: "remembered", landmark: false },
+      ],
+    };
+    const wInterior = mountMap({ localMap: localMapModelFor(interiorPayload) });
+    const remList = wInterior.find('[data-testid="local-map-remembered"]');
+    expect(remList.exists()).toBe(true);
+    const remItems = remList.findAll("li");
+    expect(remItems).toHaveLength(1);
+    expect(remItems[0].text()).toContain("公會倉庫");
+    expect(remItems[0].attributes("tabindex")).toBeUndefined();
+    expect(remItems[0].attributes("data-node")).toBeUndefined();
+    expect(wInterior.find('[data-testid="local-map-edge-markers-mirror"]').exists()).toBe(false);
   });
 
   // slim-minimap-island (design D1): the state legend is an overlay-only
@@ -311,9 +324,21 @@ describe("LocalMap (B4 world family)", () => {
     await w.get('[data-testid="local-map__node--grid:altoria:0:2"]').trigger("click");
     expect(w.emitted("open-map")).toBeUndefined();
 
-    // A remembered-list item click selects the item without opening the map.
-    await w.get('[data-testid="local-map-remembered"] li').trigger("click");
-    expect(w.emitted("open-map")).toBeUndefined();
+    // An edge marker click falls through and emits open-map.
+    await w.get('[data-testid="local-map__edge-marker--grid:altoria:5:5"]').trigger("click");
+    expect(w.emitted("open-map")).toHaveLength(1);
+
+    // On a graph payload, clicking a remembered list item falls through and emits open-map.
+    const interiorPayload = {
+      ...LOCAL_MAP_INTERIOR_SAMPLE,
+      nodes: [
+        ...LOCAL_MAP_INTERIOR_SAMPLE.nodes,
+        { id: "room:rem", label: "公會倉庫", x: 0, y: 5, visibility: "remembered", landmark: false },
+      ],
+    };
+    const wInterior = mountMap({ localMap: localMapModelFor(interiorPayload) });
+    await wInterior.get('[data-testid="local-map-remembered"] li').trigger("click");
+    expect(wInterior.emitted("open-map")).toHaveLength(1);
   });
 
   it("keeps the island root non-interactive (no role, no tabindex)", () => {
@@ -436,11 +461,10 @@ describe("LocalMap (B4 world family)", () => {
     expect(model.remembered).toHaveLength(16);
     const w = mountMap({ localMap: model });
     const svg = w.find("svg.local-map__lattice");
-    expect(svg.attributes("width")).toBe("266");
-    expect(svg.attributes("height")).toBe("2276");
-    const list = w.find('[data-testid="local-map-remembered"]');
-    expect(list.exists()).toBe(true);
-    expect(w.findAll(".local-map__remembered li")).toHaveLength(16);
+    expect(svg.attributes("width")).toBe("302");
+    expect(svg.attributes("height")).toBe("2312");
+    expect(w.find('[data-testid="local-map-remembered"]').exists()).toBe(false);
+    expect(w.findAll('[data-testid^="local-map__edge-marker--"]')).toHaveLength(16);
   });
 
   it("keeps adjacent node markers and labels non-intersecting at natural geometry", () => {
@@ -566,7 +590,7 @@ describe("LocalMap (B4 world family)", () => {
       });
       await wrapper.vm.$nextTick();
       expect(wrapper.find("svg.local-map__lattice").attributes("style")).toContain(
-        "max-height: 69px",
+        "max-height: 117px",
       );
     } finally {
       Element.prototype.getBoundingClientRect = realRect;
@@ -574,6 +598,116 @@ describe("LocalMap (B4 world family)", () => {
     }
   });
 
+  it("Task 4.1: derives canvas height budget from laid out sections on 1280x720 fixture", async () => {
+    const stage = document.createElement("div");
+    const hudRight = document.createElement("div");
+    hudRight.setAttribute("data-anchor", "hud-right");
+    const dock = document.createElement("div");
+    dock.setAttribute("data-anchor", "dock");
+    stage.appendChild(hudRight);
+    stage.appendChild(dock);
+    document.body.appendChild(stage);
+
+    const realRect = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function () {
+      if (this === hudRight) return { top: 64 };
+      if (this === dock) return { top: 500 };
+      if (this.classList?.contains("local-map__meta")) return { height: 15 };
+      if (this.classList?.contains("local-map__detail")) {
+        return { height: this.classList?.contains("local-map__detail--empty") ? 0 : 16 };
+      }
+      if (this.classList?.contains("local-map__remembered")) return { height: 224 };
+      return realRect.call(this);
+    };
+
+    try {
+      // 1. Lattice variant: meta (15) + detail (16) = 31, 2 gaps = 16. 424 - 31 - 16 - 25 = 352 -> clamped 296
+      wrapper = mount(LocalMap, {
+        props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) },
+        attachTo: hudRight,
+      });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find("svg.local-map__lattice").attributes("style")).toContain(
+        "max-height: 296px",
+      );
+      wrapper.unmount();
+      wrapper = null;
+
+      // 2. Graph variant with no remembered: meta (15), no detail (0), 1 gap = 8. 424 - 15 - 8 - 25 = 376 -> clamped 296
+      wrapper = mount(LocalMap, {
+        props: { localMap: localMapModelFor(LOCAL_MAP_INTERIOR_SAMPLE) },
+        attachTo: hudRight,
+      });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find("svg.local-map__lattice").attributes("style")).toContain(
+        "max-height: 296px",
+      );
+      wrapper.unmount();
+      wrapper = null;
+
+      // 3. Graph variant with 16 remembered: meta (15) + remembered (224) = 239, 2 gaps = 16. 424 - 239 - 16 - 25 = 144
+      const graphWith16 = {
+        ...LOCAL_MAP_INTERIOR_SAMPLE,
+        nodes: [
+          ...LOCAL_MAP_INTERIOR_SAMPLE.nodes,
+          ...Array.from({ length: 16 }, (_, i) => ({
+            id: `room:rem:${i}`,
+            label: `倉庫${i}`,
+            x: 0,
+            y: i + 2,
+            visibility: "remembered",
+          })),
+        ],
+      };
+      wrapper = mount(LocalMap, {
+        props: { localMap: localMapModelFor(graphWith16) },
+        attachTo: hudRight,
+      });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find("svg.local-map__lattice").attributes("style")).toContain(
+        "max-height: 144px",
+      );
+    } finally {
+      Element.prototype.getBoundingClientRect = realRect;
+      stage.remove();
+    }
+  });
+
+  it("Task 4.2: gutter enlargement cannot breach canvas height cap and re-measures to same cap", async () => {
+    const stage = document.createElement("div");
+    const hudRight = document.createElement("div");
+    hudRight.setAttribute("data-anchor", "hud-right");
+    const dock = document.createElement("div");
+    dock.setAttribute("data-anchor", "dock");
+    stage.appendChild(hudRight);
+    stage.appendChild(dock);
+    document.body.appendChild(stage);
+
+    const realRect = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function () {
+      if (this === hudRight) return { top: 64 };
+      if (this === dock) return { top: 500 };
+      if (this.classList?.contains("local-map__meta")) return { height: 15 };
+      if (this.classList?.contains("local-map__detail")) return { height: 16 };
+      return realRect.call(this);
+    };
+
+    const crowdedModel = localMapModelFor(LOCAL_MAP_TALL_REMEMBERED_SAMPLE);
+    try {
+      wrapper = mount(LocalMap, {
+        props: { localMap: crowdedModel },
+        attachTo: hudRight,
+      });
+      await wrapper.vm.$nextTick();
+      const svg = wrapper.find("svg.local-map__lattice");
+      expect(svg.attributes("style")).toContain("max-height: 296px");
+      // Width bound spends the height budget proportionally: 296 * (302 / 2312) = 38.66px
+      expect(svg.attributes("style")).toContain("max-width: 38.66px");
+    } finally {
+      Element.prototype.getBoundingClientRect = realRect;
+      stage.remove();
+    }
+  });
   it("budgets against the anchor's room, not the island's own height", async () => {
     const stage = document.createElement("div");
     const host = document.createElement("div");
