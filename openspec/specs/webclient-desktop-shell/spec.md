@@ -46,7 +46,16 @@ one action that returns focus to that control. The foundation
 SHALL target desktop only and SHALL NOT claim mobile acceptance. The shell SHALL show the game name as
 its brand and SHALL show the current location, the world date/time, and the connection state in a
 top-meta surface, with the connected state marked by an ok-green dot paired with a label — never a raw
-mode label in place of location. The action dock SHALL render as the approved command surface: a
+mode label in place of location. The top-meta location SHALL state the best server-authored place name
+the client already holds, resolved in a fixed order: the committed `local_map` panel's `current_node`
+label when that panel is available, names a current node, that node is present in the panel's nodes,
+and its label is a non-empty string; otherwise the committed status panel's actor location label;
+otherwise the surface's own unavailable placeholder. The shell SHALL NOT compose a third string from
+the two candidates, SHALL NOT derive a name from any node or room identifier, and SHALL NOT render a
+raw room key while a committed panel carries the authored place name for the same room — the raw
+wilderness room key is one string for the whole continent, while the map panel names the region the
+player is standing in. Neither payload contract changes: the shell chooses between two labels the
+server already committed at the same revision. The action dock SHALL render as the approved command surface: a
 floating panel bounded to a maximum width and centred in the stage's dock anchor, whose root menu
 frame renders as a tab bar of icon-and-label tabs with the open entry marked by a seal-red fill, and
 whose remaining region renders the current frame's rows. The tab bar SHALL carry a guidance hint
@@ -88,7 +97,15 @@ that names the focused item, its availability, and the next key action wherever 
 
 #### Scenario: The shell identifies brand, location, time, and connection without a mode label
 - **WHEN** the shell is connected in exploration mode
-- **THEN** the brand shows the game name, the top-meta surface shows the current location label from the synced status panel, the world date/time, and an ok-green "● 已連線" indicator, and no raw mode label is rendered
+- **THEN** the brand shows the game name, the top-meta surface shows the current location label resolved from the committed panels, the world date/time, and an ok-green "● 已連線" indicator, and no raw mode label is rendered
+
+#### Scenario: The top-meta location names the region, not the raw room key
+- **WHEN** the player stands in a wilderness cell whose status panel location label is the raw room key `Wilderness` while the committed `local_map` panel's current node is labelled 西部丘陵與谷地
+- **THEN** the top-meta location reads 西部丘陵與谷地, the raw room key is not rendered anywhere in the top-meta surface, and no composed string pairing the two appears
+
+#### Scenario: The location falls back when the map panel cannot supply a name
+- **WHEN** the `local_map` panel is absent, unavailable, or names a current node that its own nodes do not carry or that carries an empty label
+- **THEN** the top-meta location states the committed status panel's actor location label, and states the surface's unavailable placeholder only when neither panel supplies a label
 
 #### Scenario: The action dock renders as a floating panel with a tab bar and a guidance hint
 - **WHEN** the action dock is mounted in any mode

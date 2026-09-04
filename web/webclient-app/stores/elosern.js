@@ -75,6 +75,37 @@ const PANEL_ALLOWLIST = [
   "title_ballot",
 ];
 
+// D5 (webclient-minimap-04-island-single-affordance): top-meta locationLabel
+// fallback resolution:
+// 1. local_map panel's current node label (when available, carries
+//    current_node, matches a node, and has non-empty string label)
+// 2. status panel's actor.location.label
+// 3. null (TopBar renders 「位置：--」)
+//
+// Why the map label wins: the status panel's label is the raw room
+// key (「Wilderness」 for every wilderness cell), while the map
+// payload's current-node label is the presenter's authored place
+// name (the region display name on the wilderness layer). Neither
+// payload contract changes: the shell chooses between two labels the
+// server already committed at the same revision.
+export function resolveLocationLabel(panels) {
+  if (!panels) return null;
+  const lm = panels.local_map;
+  if (lm && lm.available === true && lm.current_node) {
+    const node = Array.isArray(lm.nodes)
+      ? lm.nodes.find((n) => n.id === lm.current_node)
+      : null;
+    if (node && typeof node.label === "string" && node.label !== "") {
+      return node.label;
+    }
+  }
+  const statusLabel = panels.status?.actor?.location?.label;
+  if (typeof statusLabel === "string" && statusLabel !== "") {
+    return statusLabel;
+  }
+  return null;
+}
+
 // Display conversion of the committed `server_time` (unit conversion at
 // display only, mirroring the B1 TopBar `timeLabel` fixture shape).
 function formatTimeLabel(serverTime) {
@@ -1835,10 +1866,7 @@ export const useElosernStore = defineStore("elosern", () => {
        vitals,
        statusSlice: {
         connected: rs.connected,
-        locationLabel:
-          panels.status && panels.status.actor && panels.status.actor.location
-            ? panels.status.actor.location.label
-            : null,
+        locationLabel: resolveLocationLabel(panels),
         timeLabel: formatTimeLabel(rs.serverTime),
       },
        prompt,

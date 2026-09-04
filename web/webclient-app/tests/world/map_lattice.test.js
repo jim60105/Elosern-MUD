@@ -458,15 +458,13 @@ describe("LocalMap island chrome (regression for the MapLattice extraction)", ()
     return wrapper;
   }
 
-  it("clicking a lattice node updates the shared detail line through the select event", async () => {
+  it("clicking a lattice node forwards the move intent while leaving readout unchanged", async () => {
     const w = mountIsland();
-    expect(w.get('[data-testid="local-map-detail"]').text()).toContain("霧骨渡口");
-    // Activating the unvisited node (the lattice's select event drives the
-    // island's selection state).
+    expect(w.get('[data-testid="local-map-detail"]').text()).toBe("座標 1,2");
+    // Activating the unvisited node forwards the move intent.
     await w.get('[data-testid="local-map__node--grid:altoria:2:2"]').trigger("click");
-    const detail = w.get('[data-testid="local-map-detail"]');
-    expect(detail.text()).toContain("南門");
-    expect(detail.text()).toContain("未探索");
+    // Readout remains coordinate-only (webclient-minimap-04-island-single-affordance D3/D6).
+    expect(w.get('[data-testid="local-map-detail"]').text()).toBe("座標 1,2");
     // The actionable node also emits move.
     const moved = w.emitted("move");
     expect(moved).toHaveLength(1);
@@ -476,22 +474,18 @@ describe("LocalMap island chrome (regression for the MapLattice extraction)", ()
     });
   });
 
-  it("clicking a non-actionable node updates the detail line without a move emit", async () => {
+  it("clicking a non-actionable node leaves detail line unchanged without a move emit", async () => {
     const w = mountIsland();
     await w.get('[data-testid="local-map__node--grid:altoria:0:2"]').trigger("click");
-    const detail = w.get('[data-testid="local-map-detail"]');
-    expect(detail.text()).toContain("碼頭");
-    expect(detail.text()).toContain("已探索");
+    expect(w.get('[data-testid="local-map-detail"]').text()).toBe("座標 1,2");
     expect(w.emitted("move")).toBeUndefined();
   });
 
-  it("clicking or focusing a remembered-list node updates the detail line", async () => {
+  it("clicking or focusing a remembered-list node leaves detail line unchanged", async () => {
     const w = mountIsland();
     const rememberedItem = w.get('[data-testid="local-map-remembered"] li');
     await rememberedItem.trigger("click");
-    const detail = w.get('[data-testid="local-map-detail"]');
-    expect(detail.text()).toContain("舊街區");
-    expect(detail.text()).toContain("已探索");
+    expect(w.get('[data-testid="local-map-detail"]').text()).toBe("座標 1,2");
     expect(w.emitted("move")).toBeUndefined();
   });
 });

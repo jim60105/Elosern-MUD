@@ -9,12 +9,18 @@
 // MapLattice component (improve-webclient-map-overlay-scale), so the
 // full-map overlay can render the same lattice at its own larger scale.
 // Since slim-minimap-island the island passes the renderer's legend switch
-// off, so the state legend is an overlay-only presentation. The island
-// keeps its chrome: the meta row (title + orientation marks + the compact
-// "展開全地圖" expand button), the bounded focusable remembered-node list, and
-// the hovered/selected-node readout line driven by the lattice's
-// `select`/`hover`/`leave` events.
-import { computed, onMounted, onUpdated, ref, watch } from "vue";
+// off, so the state legend is an overlay-only presentation.
+//
+// The island chrome (webclient-minimap-04-island-single-affordance):
+// - The single full-map affordance is a full-bleed transparent <button>
+//   layered beneath the island's visual content. It is the island's first
+//   DOM child so keyboard Tab reaches the primary action before the
+//   remembered list's focusable items.
+// - No hover or selection state is tracked; the readout is a pure function
+//   of the committed payload's current node (design D3/D6).
+// - The readout states only `座標 x,y` on coordinate-bearing layers
+//   (grid/wilderness); nothing on coordinate-free layers.
+import { computed, onMounted, onUpdated, ref } from "vue";
 import MapLattice from "./MapLattice.vue";
 
 const props = defineProps({
@@ -41,93 +47,22 @@ const showsOrientation = computed(
   () => props.localMap.layoutVariant === "lattice",
 );
 
-// The detail line localizes the raw visibility token: previously entered
-// nodes (visible_visited / remembered) both read as 已探索.
-const STATE_LABELS = {
-  current: "目前所在",
-  visible_unvisited: "未探索",
-  visible_visited: "已探索",
-  remembered: "已探索",
-};
-
-// Detail line: shows the hovered node when one is hovered, otherwise the
-// selected node, defaulting to the current node on mount. The lattice's
-// `select` event (emitted on every node activation) drives `selectedId`;
-// the remembered list's own click/focus handlers still call `selectNode`
-// directly — it never left the island's scope.
-// The live store passes the reducer's `currentNode` (the raw payload's
-// `current_node` is renamed by `reducePanel`); reading the raw field left the
-// detail line unseeded in production (wave 0 design D1).
-const selectedId = ref(props.localMap.currentNode ?? null);
-const hoveredId = ref(null);
-
-function nodeWithId(id) {
-  if (id == null) return null;
-  // The active node may be an in-view lattice node or a remembered remote
-  // node (the bounded focusable list), so search both collections.
-  return (
-    nodes.value.find((n) => n.id === id) ??
-    remembered.value.find((n) => n.id === id) ??
-    null
-  );
-}
-
-// Re-seed the selection when the player moves. `selectedId` was seeded once
-// at setup, but the island is re-rendered with a REPLACED payload on every
-// move (the store swaps `localMapModel` wholesale), so after one move the
-// held id named the previous room — a node the new payload frequently no
-// longer carries at all. The readout then resolved to nothing and the island
-// showed an empty line, which is the "empty detail bar" the redesign review
-// caught. Following the payload's own `currentNode` restores the documented
-// default (the readout describes where you are) without touching the manual
-// selection made inside one payload.
-watch(
-  () => props.localMap.currentNode,
-  (id) => {
-    selectedId.value = id ?? null;
-    hoveredId.value = null;
-  },
-);
-
-const activeNode = computed(() => {
-  const id = hoveredId.value ?? selectedId.value;
-  // Second guard for the same class of staleness: a targeted panel update can
-  // drop the selected node while `currentNode` itself is unchanged (the room
-  // is the same, its visible neighbours are not). Falling back to the current
-  // node keeps the readout truthful instead of blank.
-  return nodeWithId(id) ?? nodeWithId(props.localMap.currentNode) ?? null;
-});
-
-const detailParts = computed(() => {
-  const node = activeNode.value;
-  if (!node) return [];
-  const parts = [node.label, STATE_LABELS[node.visibility] ?? node.visibility];
-  if (node.action) parts.push(`→ ${node.action.destination}`);
-  // Current-node coordinate readout (slim-minimap-island D2): on the
-  // closed coordinate-bearing set the payload x/y are validated world
-  // coordinates, and the island's position statement is the header's axis
-  // orientation marks plus exactly this one figure — the current node's
-  // two payload integers, no unit, delta, or derived quantity. Any other
-  // active node, any other layer, and the overlay never gain a coordinate
-  // figure (the ban stays verbatim outside this single part).
-  if (node.current && (layer.value === "grid" || layer.value === "wilderness")) {
-    parts.push(`座標 ${node.x},${node.y}`);
+// Coordinate readout (design D6): the island's position statement is the
+// current node's two payload integers on the closed coordinate-bearing set
+// (grid/wilderness), and nothing else. No hover/selection state is tracked
+// (D3): the readout is a pure function of the committed payload's current
+// node, so it follows the payload by construction rather than by a watcher,
+// making every staleness path structurally impossible.
+const detail = computed(() => {
+  const currentId = props.localMap.currentNode;
+  if (!currentId) return "";
+  const node = nodes.value.find((n) => n.id === currentId);
+  if (!node) return "";
+  if (layer.value === "grid" || layer.value === "wilderness") {
+    return `座標 ${node.x},${node.y}`;
   }
-  return parts;
+  return "";
 });
-
-function selectNode(node) {
-  selectedId.value = node.id;
-  hoveredId.value = null;
-}
-
-function hoverNode(node) {
-  hoveredId.value = node.id;
-}
-
-function clearHover() {
-  hoveredId.value = null;
-}
 
 // Dynamic canvas height budget (the crowding fix): a fixed 296px cap would
 // ignore the rendered height of the island's other sections, so a tall
@@ -205,6 +140,9 @@ function measureCanvasBudget() {
   // the canvas 2px and regressed the dense-lattice >=2px separation
   // contract, while the resulting <=1px scroll range stays inside the
   // +1px sub-pixel tolerance the browser budget tests enforce.
+  //
+  // The detail element's padding-top (--sp-1, 4px) is included in its
+  // getBoundingClientRect().height, so no adjustment is needed here.
   const gapCount = 2 + (remembered.value.length > 0 ? 1 : 0);
   const others =
     sectionHeight(metaEl.value) +
@@ -227,11 +165,12 @@ onUpdated(() => {
 
 // Pointer-click convenience (webclient-map-01-draft-chrome D5): clicking the
 // island's non-interactive body opens the full map. A click that originated
-// in an interactive descendant — the expand button, a lattice node group
-// (carrying `data-node`), its actionable halo, or a remembered-list item
-// (`[tabindex]`) — runs only that control's own behavior. The root
-// deliberately gains no role or tabindex: the labelled expand sibling stays
-// the only keyboard path, so the focus-restore contract is untouched.
+// in an interactive descendant — the full-bleed affordance button (a <button>),
+// a lattice node group (carrying `data-node`), its actionable halo, or a
+// remembered-list item (`[tabindex]`) — runs only that control's own behavior.
+// The root deliberately gains no role or tabindex: the full-bleed button is
+// the only keyboard path, and the focus-restore contract captures it as the
+// opener (design D2).
 function onIslandClick(event) {
   if (!available.value) return;
   if (event.target?.closest?.("button, a, [tabindex], [data-node]")) return;
@@ -245,62 +184,49 @@ function onIslandClick(event) {
       {{ reason }}
     </p>
     <template v-else>
+      <!-- Single full-map affordance (webclient-minimap-04-island-single-affordance
+           D1): a content-free <button> spanning the island's whole box,
+           transparent and layered beneath the island's visual content so the
+           button element itself contains no focusable descendant. It is a real
+           <button> (Enter/Space via the platform, never a key handler on a
+           div), carries 展開全地圖 as its accessible name, and is the island's
+           FIRST DOM child so Tab reaches the primary action before the
+           remembered list's focusable items.
+
+           Pointer behaviour is unchanged and stays single-emit: content sits
+           above this button, so a click on visible content targets that
+           content and reaches onIslandClick, which emits open-map. A click on
+           genuinely empty island area lands on this button, which emits
+           open-map itself — and onIslandClick, which also sees that bubbling
+           click, skips it because event.target.closest("button, …") matches
+           this button. Keyboard activation produces the same bubbling click
+           and is skipped by the same guard. So every path emits exactly one
+           open-map, and a click originating in a lattice node group
+           ([data-node]) or a remembered item ([tabindex]) still emits none. -->
+      <button
+        type="button"
+        class="local-map__affordance"
+        data-testid="local-map__expand"
+        aria-label="展開全地圖"
+        title="展開全地圖"
+        @click="emit('open-map')"
+      ></button>
+
       <!-- The island's top-meta line (design D9): the payload's title plus,
            on the coordinate-bearing layers only, the renderer's axis
            orientation marks in the draft's header treatment (`北↑ 東→`,
            webclient-map-01-draft-chrome). No bearing or distance is
            rendered.
 
-           Header budget (the redesign review's first finding): three text
-           items sharing one `space-between` row could not fit the island's
-           210px content box — a real title is authored server-side as
-           `f"{room.key}街道圖"`, so 冒險者公會外街道圖 alone is ~101px next to
-           the ~46px axis marks and the ~71px labelled button, and all three
-           wrapped onto second lines. The row is re-budgeted instead of
-           re-sized: the title is the one elastic item (single line, ellipsis,
-           `min-width: 0`) so ANY authored length is safe, the axis marks and
-           the trigger are fixed-size, and the trigger drops to its glyph. -->
+           Header budget (the redesign review's first finding): the header
+           carries no full-map control of its own — the single full-bleed
+           affordance above is the island's only full-map affordance (D1),
+           so the elastic title now owns the space the control occupied. -->
       <div class="local-map__meta" data-testid="local-map__title" ref="metaEl">
         <span class="local-map__meta-title" :title="title">{{ title }}</span>
         <span v-if="showsOrientation" class="local-map__orientation" data-testid="local-map__orientation">
           北↑ 東→
         </span>
-        <!-- H5 (task 6.2): the island's full-map trigger, a sibling of the
-             lattice on the island's header row (H2's deferred affordance now
-             that the full-map surface is reachable). Opening the map overlay
-             routes through the parent's overlay slice.
-
-             The draft shows NO button at all — its whole `.mini` is clickable
-             with `title="展開全地圖"` — which is a pointer-only affordance. The
-             island keeps the real <button> (it is the only keyboard path to
-             the overlay, and the focus-restore contract restores focus onto
-             it), and reconciles with the draft by spending header width like
-             the draft does: the visible text becomes the expand glyph while
-             `aria-label` keeps the full name for assistive tech and `title`
-             keeps it for pointer users. -->
-        <button
-          type="button"
-          class="local-map__expand"
-          data-testid="local-map__expand"
-          aria-label="展開全地圖"
-          title="展開全地圖"
-          @click="emit('open-map')"
-        >
-          <svg
-            class="local-map__expand-icon"
-            viewBox="0 0 24 24"
-            width="12"
-            height="12"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6" />
-          </svg>
-        </button>
       </div>
 
       <!-- Shared lattice renderer (improve-webclient-map-overlay-scale): the
@@ -314,7 +240,11 @@ function onIslandClick(event) {
            claim, so it must not be the smallest thing in the island). The
            scale is uniform through the viewBox, so the crowding fix's marker,
            label and gutter geometry stays proportional; `max-upscale` bounds
-           it so a one-room payload cannot blow that ramp up ~3.5x. -->
+           it so a one-room payload cannot blow that ramp up ~3.5x.
+
+           The island no longer listens to select/hover/leave (D3): the shared
+           renderer keeps its event surface for the overlay and future changes
+           to consume. -->
       <MapLattice
         :local-map="localMap"
         :variant="localMap.layoutVariant || 'lattice'"
@@ -322,16 +252,15 @@ function onIslandClick(event) {
         :fill-width="true"
         :max-upscale="2"
         :show-legend="false"
-        @select="selectNode"
-        @hover="hoverNode"
-        @leave="clearHover"
         @move="(p) => emit('move', p)"
       />
 
       <!-- The spec's bounded, focusable remembered-remote-node list (outside
            the coordinate canvas): each entry keeps its non-color diamond
-           state indicator and selects (focuses) the node without emitting a
-           travel action. -->
+           state indicator. Clicking or focusing the item gives it natural
+           focus without emitting a travel action — `[tabindex]` is in the
+           onIslandClick guard so no open-map emits. The node's name stays
+           the visible text of its own list item (design D3). -->
       <ul v-if="remembered.length" class="local-map__remembered" data-testid="local-map-remembered" ref="rememberedEl">
         <li
           v-for="node in remembered"
@@ -342,8 +271,6 @@ function onIslandClick(event) {
           :data-node-id="node.id"
           :data-visibility="node.visibility"
           tabindex="0"
-          @click="selectNode(node)"
-          @focus="selectNode(node)"
         >
           <svg
             class="local-map__marker local-map__marker--remembered"
@@ -359,19 +286,20 @@ function onIslandClick(event) {
       </ul>
 
       <!-- The island's closing readout line, in the draft `.mini .compass`
-           treatment (small centred mono under the canvas) rather than the
-           bordered box the review flagged: a box drawn around a line that can
-           legitimately be empty reads as a broken widget, while an unboxed
-           line just is not there. The element itself stays unconditionally
-           mounted — `local-map-detail` is a committed testid and the island's
-           plain-text body click target. -->
+           treatment (design D7): the island's smallest type step, monospace,
+           centred, de-emphasised (--paper-500, 4.98:1 on --panel), with no
+           border, background, or padded box. The element itself stays
+           unconditionally mounted — `local-map-detail` is a committed testid
+           and the island's plain-text body click target. On coordinate-free
+           layers (interior/instance) there is no coordinate figure, so the
+           readout states nothing and paints no box (the --empty modifier). -->
       <p
         class="local-map__detail"
-        :class="{ 'local-map__detail--empty': detailParts.length === 0 }"
+        :class="{ 'local-map__detail--empty': detail === '' }"
         data-testid="local-map-detail"
         ref="detailEl"
       >
-        {{ detailParts.join(" · ") }}
+        {{ detail }}
       </p>
     </template>
   </aside>
@@ -380,8 +308,13 @@ function onIslandClick(event) {
 <style scoped>
 /* The island chrome (design D9): the shared tokens, so a token change or
    the reduced-motion block reaches it at once. The root keeps the
-   load-bearing `.local-map` class that H1's mode-gate CSS selects on. */
+   load-bearing `.local-map` class that H1's mode-gate CSS selects on.
+
+   `position: relative` (webclient-minimap-04-island-single-affordance D1):
+   the full-bleed affordance is `position: absolute; inset: 0`, so the
+   island must establish a positioning context. */
 .local-map {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
@@ -419,6 +352,40 @@ function onIslandClick(event) {
   border-color: var(--ink-600);
 }
 
+/* Single full-map affordance (D1): a content-free transparent button
+   spanning the island's whole box, layered beneath the island's visual
+   content at z-index 0. Every other direct child is raised to z-index 1 so
+   a future island child is elevated by construction rather than by opt-in. */
+.local-map__affordance {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+/* Focus indication on the whole island (D1): the affordance IS the island's
+   box, so :focus-visible draws a ring around the entire island. A box-shadow
+   renders in the paint phase and is not affected by the z-index stack, so it
+   is always visible above the island's content layers. The inset offset keeps
+   the ring inside the card's border-radius without clipping. */
+.local-map__affordance:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--gold-400) inset;
+}
+
+/* Every direct child except the affordance is raised above it, so
+   their clicks target the visible content and reach onIslandClick, and the
+   affordance only receives clicks on genuinely empty island area (padding,
+   the flex gaps between sections). */
+.local-map > *:not(.local-map__affordance) {
+  position: relative;
+  z-index: 1;
+}
+
 /* The draft `.mini .mt` header row, re-budgeted for authored payload titles.
    `justify-content: space-between` is gone: with three items that all want to
    be wider than the row, "space between" only decides where the wrapping
@@ -449,53 +416,6 @@ function onIslandClick(event) {
   color: var(--paper-300);
 }
 
-/* The full-map trigger (H5, task 6.2): a compact square control at the end of
-   the island's meta row, sibling of the lattice — never a wrapper around the
-   actionable move nodes. Sized to a 24px target (WCAG 2.2 target-size floor)
-   so dropping the visible label costs nothing in pointer accuracy, and fixed
-   (`flex: none`) so it is never the thing that shrinks.
-
-   Deliberately NOT the shared `.ui-icon-btn` primitive: that control is the
-   draft's 34px `.closebtn` at chrome weight (filled ink chip, seal hover),
-   and 34px is both taller than this 10px header row and 24px wider than the
-   row has to spend — the very budget this change went to recover. Routing it
-   through the control layer wants a small variant of that primitive, which is
-   a tokens.css decision, not an island one. */
-.local-map__expand {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  min-width: 24px;
-  min-height: 24px;
-  padding: 0;
-  color: var(--gold-400);
-  background: transparent;
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-/* The glyph never becomes the click target: `onIslandClick` skips clicks that
-   originate inside a button, and keeping the SVG out of hit-testing means the
-   button element is always `event.target` — the same reason the lattice's own
-   decorative layers disable pointer events. */
-.local-map__expand-icon {
-  display: block;
-  pointer-events: none;
-}
-
-.local-map__expand:hover {
-  color: var(--paper-50);
-  border-color: var(--gold-400);
-}
-
-.local-map__expand:focus-visible {
-  color: var(--paper-50);
-  border-color: var(--gold-400);
-}
-
 /* The renderer-axis orientation legend (北↑): a statement about the
    drawing's axis convention, not about the world (design D9). Fixed-size:
    the marks are a two-token convention, never a wrapping phrase. */
@@ -517,18 +437,18 @@ function onIslandClick(event) {
   font-size: 0.85em;
 }
 
-/* The draft `.mini .compass` readout treatment: a small centred mono line
-   closing the island, no box. Sitting at the canvas's own 11px label size
-   keeps the island on one type ramp (10px meta / 11px canvas + list / 11px
-   readout) and buys back the two lines the 13px boxed version cost at 230px.
-   It is plain text, so it stays part of the island's click-to-open body.
-   The draft's own `.compass` is `--paper-500` (4.98:1 on the panel) because it
-   states a constant drawing name; this line states the live node, its state
-   and, on a coordinate layer, its coordinates, so it keeps the shipped
-   `--paper-300` (9.58:1) — only the box goes away, not the legibility. */
+/* The draft `.mini .compass` readout treatment (design D7): the island's
+   smallest type step, monospace from the shared font token, centred, at the
+   de-emphasised paper tier (--paper-500, 4.98:1 on --panel — WCAG AA for
+   body text), separated from the canvas by a step from the shared spacing
+   scale (padding-top: --sp-1, so the measured height includes the gap),
+   with no border, background fill, or padded box. No draft hex value and no
+   draft-canvas pixel literal are hardcoded. The line states the current
+   node's two payload integers only; nothing for a hovered or selected node. */
 .local-map__detail {
   margin: 0;
-  color: var(--paper-300);
+  padding-top: var(--sp-1);
+  color: var(--paper-500);
   font-family: var(--f-mono);
   font-size: 11px;
   line-height: 1.45;
@@ -536,11 +456,9 @@ function onIslandClick(event) {
   overflow-wrap: anywhere;
 }
 
-/* An island with no resolvable active node states nothing rather than
-   reserving a blank line (and, with it, a blank slot in the height budget —
-   `sectionHeight` reads 0 for a display:none section). Every available
-   payload carries a current node, so this is the degenerate branch, not the
-   normal one. */
+/* An island with no coordinate figure on the current layer states nothing
+   rather than reserving a blank line (and, with it, a blank slot in the
+   height budget — `sectionHeight` reads 0 for a display:none section). */
 .local-map__detail--empty {
   display: none;
 }

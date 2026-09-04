@@ -7,7 +7,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
-import { useElosernStore } from "../../stores/elosern.js";
+import { resolveLocationLabel, useElosernStore } from "../../stores/elosern.js";
 import * as fx from "./protocol_fixtures.js";
 import { MARKUP_STRESS_SAMPLE, NARRATIVE_SAMPLE, STATUS_SLICE_SAMPLE } from "../../stories/fixtures.js";
 
@@ -287,5 +287,234 @@ describe("store view slices", () => {
     );
     expect(store.view.panels.local_map).toEqual(fx.localMapPanel());
     expect(store.view.panels.context_actions).toEqual(fx.explorationActions());
+  });
+
+  // webclient-minimap-04-island-single-affordance (D5, tasks 3.1 & 3.2):
+  // the top-meta locationLabel fallback order:
+  // 1. local_map panel's current node label (when available, carries
+  //    current_node, matches a node, and has non-empty string label)
+  // 2. status panel's actor.location.label
+  // 3. null (TopBar renders 「位置：--」)
+
+  it("prefers the map current node label over the status panel label (wilderness case)", () => {
+    openActiveSession(store);
+    // Status panel alone gives raw room key "測試起點"
+    expect(store.view.statusSlice.locationLabel).toBe("測試起點");
+
+    // Commit a wilderness snapshot: status has Wilderness, map current node has 西部丘陵與谷地
+    const wildernessMap = fx.localMapPanel({
+      layer: "wilderness",
+      current_node: "wild:plains:60:107",
+      nodes: [
+        {
+          id: "wild:plains:60:107",
+          label: "西部丘陵與谷地",
+          x: 60,
+          y: 107,
+          visibility: "current",
+          current: true,
+          anchor: true,
+          landmark: false,
+          action: null,
+        },
+      ],
+      edges: [],
+});
+    const wildernessStatus = fx.statusPanel({
+      actor: {
+        name: "影行者",
+        identity: "42",
+        location: { label: "Wilderness", identity: "17" },
+      },
+    });
+
+    const res = store.receive(
+      1,
+      "ui_update",
+      [
+        fx.update({
+          revision: 2,
+          panels: {
+            status: wildernessStatus,
+            local_map: wildernessMap,
+          },
+        }),
+      ],
+        {},
+    );
+    expect(res.accepted).toBe(true);
+    expect(store.view.statusSlice.locationLabel).toBe("西部丘陵與谷地");
+  });
+
+  it("covers every fallback branch of locationLabel derivation (resolveLocationLabel)", () => {
+    const status = { actor: { location: { label: "狀態位置" } } };
+
+    // 1. Map panel absent -> falls back to status
+    expect(resolveLocationLabel({ status })).toBe("狀態位置");
+
+    // 2. Map panel available: false -> falls back to status
+    expect(resolveLocationLabel({ status, local_map: { available: false } })).toBe("狀態位置");
+
+    // 2b. Map panel available missing -> falls back to status
+    expect(
+      resolveLocationLabel({
+        status,
+        local_map: {
+          current_node: "room:1",
+          nodes: [{ id: "room:1", label: "地圖" }],
+        },
+      }),
+    ).toBe("狀態位置");
+
+    // 3. current_node naming a node the panel's nodes do not carry -> falls back to status
+    expect(
+      resolveLocationLabel({
+        status,
+        local_map: {
+          available: true,
+          current_node: "room:999",
+          nodes: [{ id: "room:1", label: "節點" }],
+        },
+      }),
+    ).toBe("狀態位置");
+
+    // 4. Node whose label is an empty string -> falls back to status
+    expect(
+      resolveLocationLabel({
+        status,
+        local_map: {
+          available: true,
+          current_node: "room:1",
+          nodes: [{ id: "room:1", label: "" }],
+        },
+      }),
+    ).toBe("狀態位置");
+
+    // 5. Node with non-empty label -> returns map label
+    expect(
+      resolveLocationLabel({
+        status,
+        local_map: {
+          available: true,
+          current_node: "room:1",
+          nodes: [{ id: "room:1", label: "地圖節點" }],
+        },
+      }),
+    ).toBe("地圖節點");
+
+    // 6. Both panels absent / no location -> null
+    expect(resolveLocationLabel({})).toBe(null);
+    expect(resolveLocationLabel(null)).toBe(null);
+    expect(resolveLocationLabel({ status: {} })).toBe(null);
+    expect(resolveLocationLabel({ status: { actor: {} } })).toBe(null);
+    expect(resolveLocationLabel({ status: { actor: { location: {} } } })).toBe(null);
+    expect(resolveLocationLabel({ status: { actor: { location: { label: "" } } } })).toBe(null);
+  });
+
+  it("covers fallback in live store when local_map is unavailable or wiped", () => {
+    openActiveSession(store);
+    expect(store.view.statusSlice.locationLabel).toBe("測試起點");
+
+    // When local_map is unavailable, falls back to status
+    store.receive(
+      1,
+      "ui_update",
+      [
+        fx.update({
+          revision: 2,
+          panels: {
+            status: fx.statusPanel({ actor: { location: { label: "狀態位置" } } }),
+            local_map: {
+              schema_version: 1,
+              available: false,
+              reason: { code: "fog", message: "無法顯示" },
+            },
+          },
+        }),
+      ],
+      {},
+    );
+    expect(store.view.statusSlice.locationLabel).toBe("狀態位置");
+
+    // Snapshot with no status and no local_map -> locationLabel is null (TopBar renders 「位置：--」)
+    const emptySnap = fx.snapshot({
+          revision: 3,
+          panels: {
+        status: fx.statusPanel({ actor: { location: null } }),
+          },
+    });
+    const rNull = store.receive(
+      1,
+      "ui_snapshot",
+      [emptySnap],
+      {},
+    );
+    expect(rNull.accepted).toBe(true);
+    expect(store.view.statusSlice.locationLabel).toBe(null);
+  });
+
+  it("updates locationLabel reactively when local_map current_node changes", () => {
+    openActiveSession(store);
+    const map = fx.localMapPanel({
+      current_node: "room:42",
+      nodes: [
+        {
+          id: "room:42",
+          label: "石板廣場",
+          x: 0,
+          y: 0,
+          visibility: "current",
+          current: true,
+          anchor: true,
+          landmark: true,
+          action: null,
+          },
+        {
+          id: "room:43",
+          label: "西風酒館",
+          x: 1,
+          y: 0,
+          visibility: "visible_visited",
+          current: false,
+          anchor: false,
+          landmark: true,
+          action: null,
+          },
+      ],
+      edges: [
+        { source: "room:42", destination: "room:43", label: "東", known: true, traversable: true },
+      ],
+    });
+    const r1 = store.receive(
+      1,
+      "ui_update",
+      [
+        fx.update({ revision: 2, panels: { local_map: map } }),
+      ],
+        {},
+    );
+    expect(r1.accepted).toBe(true);
+    expect(store.view.statusSlice.locationLabel).toBe("石板廣場");
+
+    // Move to room:43
+    const updatedMap = {
+      ...map,
+      current_node: "room:43",
+      nodes: map.nodes.map((n) =>
+        n.id === "room:43"
+          ? { ...n, visibility: "current", current: true }
+          : { ...n, visibility: "visible_visited", current: false },
+      ),
+    };
+    const r2 = store.receive(
+      1,
+      "ui_update",
+      [
+        fx.update({ revision: 3, panels: { local_map: updatedMap } }),
+      ],
+        {},
+    );
+    expect(r2.accepted).toBe(true);
+    expect(store.view.statusSlice.locationLabel).toBe("西風酒館");
   });
 });
