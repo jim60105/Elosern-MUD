@@ -67,8 +67,10 @@ not editable, and the bounded services quantity form has not captured the digit 
 `1`–`4` moves the current dock frame's focus onto the first four rows (1-indexed, rendered order)
 and activates the row through the same confirm path `Enter` uses — a disabled row shows its
 explanation and submits nothing, an in-flight row stays locked, and a held repeat is suppressed.
-A digit whose row does not exist (a frame with fewer rows, or the pre-session empty stack) is not
-claimed and falls through to the text / command-history path.
+The slots address the pane's rendered rows: where a pane does not render the standard `back`
+cell as a row (the exit-outlet pane), that cell takes no slot. A digit whose row does not exist
+(a frame with fewer rendered rows, or the pre-session empty stack) is not claimed and falls
+through to the text / command-history path.
 
 #### Scenario: The legend renders once
 - **WHEN** the dock renders in a mode where its chrome (tab bar) is shown

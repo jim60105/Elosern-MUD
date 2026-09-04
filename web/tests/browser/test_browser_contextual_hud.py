@@ -1154,8 +1154,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-        # Open the move frame: rows are ex-a, ex-b, ex-c, then the breadcrumb
-        # back row (row 4).
+        # Open the move frame: the outlet pane renders the three exit rows
+        # (the breadcrumb back cell is navigation chrome, never a rendered
+        # row), so the digit slots are exactly [ex-a, ex-b, ex-c].
         focus_action_dock(page)
         page.locator("#dock-tab-move").click()
         page.wait_for_timeout(150)
@@ -1175,24 +1176,23 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "a disabled picked row shows its explanation and submits nothing",
         )
 
-        # `4` picks the fourth row (the breadcrumb back row): the row pops
-        # exactly one level, dispatching nothing.
+        # `4` is beyond the rendered rows: unclaimed, the frame stays open,
+        # nothing submits (the back cell takes no digit slot here — the
+        # breadcrumb chevron owns the close control).
         _press(page, "4")
         self.assertEqual(
             _dock_depth(page),
-            1,
-            "digit 4 activated the back row and popped one level",
+            2,
+            "a digit beyond the outlet's rendered rows leaves the frame open",
         )
-        self.assertEqual(sent_action_count(page), 0, "the back row dispatches no ui_action")
+        self.assertEqual(sent_action_count(page), 0, "the unclaimed digit submits nothing")
 
-        # Re-open the move frame: `1` picks the first row and submits its
-        # move exactly as Enter would — the proof is the OUTBOUND envelope
-        # (the fabricated exit_ref is the server's problem, not the client's;
-        # the commit's authoritative panel replace is intentionally not
-        # asserted, so the assertion cannot race it).
-        page.locator("#dock-tab-move").click()
-        page.wait_for_timeout(150)
-        self.assertEqual(_dock_depth(page), 2)
+        # The frame stayed open: `1` picks the first rendered row and
+        # submits its move exactly as Enter would — the proof is the
+        # OUTBOUND envelope (the fabricated exit_ref is the server's
+        # problem, not the client's; the commit's authoritative panel
+        # replace is intentionally not asserted, so the assertion cannot
+        # race it).
         _press(page, "1")
         moves = [
             args[0]

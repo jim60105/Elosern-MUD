@@ -35,6 +35,7 @@ import CommandEcho from "../lib/command_echo.js";
 import stableStringify from "../lib/stable_stringify.js";
 import { createFrameResolver } from "./frame-resolvers.js";
 import { actionIntentForItem, dockItemKeys } from "../components/dock-items.js";
+import { classifyPane } from "../components/dock-panes.js";
 import { gaugeRatio, isLowHp } from "../components/vitals.js";
 import LayoutStore from "../lib/layout_store.js";
 
@@ -2502,12 +2503,31 @@ export const useElosernStore = defineStore("elosern", () => {
     // through the frozen router façade members — the UMD source is not
     // edited (design D1).
     if (key === "1" || key === "2" || key === "3" || key === "4") {
+      // A held or repeated digit is suppressed exactly like a held Enter
+      // (the router's Enter repeat branch is the reference): the first
+      // press already picked its row, and re-confirming on every
+      // auto-repeat keydown could double-submit the instant the mutation
+      // lock releases mid-hold.
+      if (repeat) {
+        return true;
+      }
       const slot = Number(key) - 1;
       if (router.depth() === 0) {
         return false;
       }
       const menu = router.currentMenu();
-      const item = menu && menu.items ? menu.items[slot] : null;
+      // The slots address the RENDERED rows, not the raw item list: the
+      // exit-outlet pane never renders the `back` cell (the breadcrumb
+      // chevron owns the close control), so its row order excludes `back`
+      // — the same rule DockMenu's outletRows applies (same classifier,
+      // one source of truth). Every other pane renders `back` as an
+      // ordered row, so its slot is real there.
+      const items = menu && menu.items ? menu.items : [];
+      const slots =
+        classifyPane({ items }) === "outlet"
+          ? items.filter((i) => i && i.key !== "back")
+          : items;
+      const item = slots[slot];
       if (!item) {
         return false;
       }

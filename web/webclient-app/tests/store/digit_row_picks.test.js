@@ -64,11 +64,44 @@ describe("dock digit row picks (1–4)", () => {
   it("a digit beyond the frame's row count is unclaimed and submits nothing", () => {
     openSession();
     openMoveFrame();
-    // The move frame has three rows (two exits plus the breadcrumb row):
-    // `4` is unclaimed.
+    // The outlet pane renders only the exit rows (the `back` cell is a
+    // navigation cell, never a rendered row), so the slots are [east,
+    // north] and `3`/`4` are unclaimed.
+    expect(store.focusPress("3")).toBe(false);
     expect(store.focusPress("4")).toBe(false);
     // An untouched digit does not consume the key: focus stays where it was.
     expect(store.view.focus.key).toBe("exit-east");
+    expect(sender.sent.actions).toHaveLength(0);
+  });
+
+  it("the digit slots follow the rendered rows: the outlet's back row takes no slot", () => {
+    openSession();
+    openMoveFrame();
+    // The move frame is an outlet pane: its raw items are [east, north,
+    // back] but the rendered rows are [east, north]. `3` therefore picks
+    // nothing (unclaimed) instead of activating the breadcrumb's back cell,
+    // and the frame stays open.
+    expect(store.focusPress("3")).toBe(false);
+    expect(store.view.dockDepth).toBe(2);
+    expect(sender.sent.actions).toHaveLength(0);
+  });
+
+  it("the root grid pane slots follow item order: digit 2 opens the second tab", () => {
+    openSession();
+    store.receive(
+      1,
+      "ui_update",
+      [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
+      {},
+    );
+    // The root frame is the tab-bar grid pane: every item renders as a
+    // tab in item order, so slot 2 addresses the second root item.
+    expect(store.view.dockDepth).toBe(1);
+    const second = store.router.currentMenu().items[1];
+    expect(store.focusPress("2")).toBe(true);
+    // The second root entry is a navigation row: activating it pushes its
+    // submenu (no ui_action on the wire).
+    expect(store.view.dockDepth, `activating root item ${second?.key} should open a frame`).toBe(2);
     expect(sender.sent.actions).toHaveLength(0);
   });
 
@@ -103,15 +136,33 @@ describe("dock digit row picks (1–4)", () => {
     });
   });
 
-  it("repeat-suppression matches the Enter contract: an immediate second digit-1 is suppressed", () => {
+  it("held digit repeats are suppressed like held Enter, even after the lock releases", () => {
     openSession();
     openMoveFrame();
     expect(store.focusPress("1")).toBe(true);
     expect(sender.sent.actions).toHaveLength(1);
-    // The first submit put a mutation in flight; the router's held-repeat
-    // guard (source !== pointer) plus the mutation lock mean a second
-    // immediate activation cannot double-submit.
-    expect(store.focusPress("1")).toBe(true);
+    // Release the mutation lock exactly like a committed result does
+    // (result declares the revision, the update reaches it). A held-key
+    // repeat arriving after that point must still be suppressed — the
+    // router's Enter-repeat branch is the reference behaviour.
+    store.receive(1, "ui_action_result", [fx.actionResult()], {});
+    store.receive(
+      1,
+      "ui_update",
+      [
+        fx.update({
+          revision: 2,
+          panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() },
+        }),
+      ],
+      {},
+    );
+    expect(store.view.dispatch.inFlight).toBe(null);
+    expect(store.focusPress("1", true)).toBe(true);
     expect(sender.sent.actions).toHaveLength(1);
+    // The digit binding itself still works for a fresh press after the
+    // suppression (the row re-submits once the lock is clear).
+    expect(store.focusPress("1", false)).toBe(true);
+    expect(sender.sent.actions).toHaveLength(2);
   });
 });
