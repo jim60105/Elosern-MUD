@@ -77,14 +77,24 @@ Eight changes, each ≤ one workday. Names follow the `webclient-align-NN-*` ser
 - Command-line util buttons keep position; restyle to draft `.hist button`
   (transparent ground, 26×26, hover `--ink-700`). Function unchanged.
 
-### Change 2 — `webclient-align-02-quickbar-shortcuts` (client only, ~1d)
+### Change 2 — `webclient-align-02-quickbar-shortcuts` (client + server aliases, ~1d)
 
-- Restore draft letter badges; badges are bindings. Explore set `看 l / 拿 t / 說 s /
-  交談 j / 等待 w`; combat set `說 s / 施法 c`. A bound letter, from any non-input
-  focus, focuses the command line and inserts verb + space; never submits. Letters avoid
-  existing bindings (`/`, Esc, arrows, 1–4 card picks, Tab). The verb set stays the five
-  commands that actually exist — no fictional 走/問. This supersedes the
-  `QuickWordChips.vue` no-badge decision.
+- Badges are command-initial letters, and every badge letter is a real command word on
+  the server. Owner rule: the badge equals the command's initial; prefer an existing
+  Evennia single-letter alias, otherwise create the alias so the shortcut text is a
+  literal, playable command on every transport (telnet included).
+  - Explore: `看 l` (alias `l` already exists on 看/look), `拿 g` (get), `說 s` (說/say),
+    `交談 t` (talk), `等待 w` (wait). Combat: `說 s`, `施法 c` (cast).
+  - Server work in this change: add the single-letter aliases `g`→拿(get), `s`→說(say),
+    `t`→talk, `w`→wait, `c`→cast where absent (verified current state: only `l` exists).
+    Alias additions are a player-command surface change → update
+    `docs/game/commands.md` + `docs/game/command-reference.md` and keep
+    `tests/test_command_docs.py` green in the same change.
+  - Client: a bound letter, from any non-input focus, focuses the command line and
+    inserts the badge letter + space (the inserted text IS the command word); never
+    submits. Letters avoid existing client bindings (`/`, Esc, arrows, 1–4 card picks,
+    Tab). The verb set stays the five commands that actually exist — no fictional 走/問.
+    This supersedes the `QuickWordChips.vue` no-badge decision.
 - Tab completion inside the field: candidates = input history + quickbar verbs + committed
   exploration panel exit names/interact target names (zero protocol change). Single
   candidate → complete (caret at end); many → complete to longest common prefix,
