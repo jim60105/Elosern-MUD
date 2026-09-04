@@ -24,7 +24,8 @@ from world.rules.titles import (
     banked_epithets,
     bank_epithet,
     decline_records,
-    grant_starter_pair,
+    grant_first_quest_epithet,
+    grant_rank_title,
     persist_nomination_ballot,
     read_title_state,
 )
@@ -49,7 +50,8 @@ class TitleCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 self.assertIn("語法：title list", self._call(args))
 
     def test_list_shows_the_full_title_and_every_registry_row(self):
-        grant_starter_pair(self.actor)
+        grant_rank_title(self.actor, "F")
+        grant_first_quest_epithet(self.actor)
         output = self._call("list")
         self.assertIn("── 稱號冊 ──", output)
         self.assertIn(f"當前全銜：F級冒險者　{STARTER_EPITHET.display}", output)
@@ -121,7 +123,8 @@ class TitleCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 )
 
     def test_malformed_state_presents_the_unavailable_line_and_writes_nothing(self):
-        grant_starter_pair(self.actor)
+        grant_rank_title(self.actor, "F")
+        grant_first_quest_epithet(self.actor)
         self.actor.attributes.add(TITLE_COLLECTION_KEY, "damaged")
         for args in ("list", "equip fixed g_e_rank", "equip epithet 南門新客"):
             with self.subTest(args=args):
@@ -203,7 +206,8 @@ class TitleBallotCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertTrue(self.actor.attributes.has(PENDING_BALLOT_KEY))
 
     def test_accept_reports_already_owned_epithet(self):
-        grant_starter_pair(self.actor)
+        grant_rank_title(self.actor, "F")
+        grant_first_quest_epithet(self.actor)
         self.assertTrue(
             persist_nomination_ballot(
                 self.actor, [{"display": "南門新客", "basis": "再度入票"}]
@@ -267,7 +271,8 @@ class TitleCodexCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         return self.call(CmdTitle(), args, caller=self.actor, receiver=self.actor)
 
     def test_codex_renders_header_counters_marks_and_basis_lines(self):
-        grant_starter_pair(self.actor)
+        grant_rank_title(self.actor, "F")
+        grant_first_quest_epithet(self.actor)
         bank_epithet(self.actor, "破城先鋒", "率先破門。", 500)
         output = self._call("codex")
         self.assertIn("── 稱號冊 ──", output)
@@ -286,7 +291,8 @@ class TitleCodexCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("　　─ 率先破門。", output)
 
     def test_codex_renders_the_ballot_section_when_pending(self):
-        grant_starter_pair(self.actor)
+        grant_rank_title(self.actor, "F")
+        grant_first_quest_epithet(self.actor)
         self.assertTrue(
             persist_nomination_ballot(
                 self.actor, [{"display": "夜襲之人", "basis": "夜半三度出入敵陣。"}]
@@ -315,7 +321,8 @@ class TitleRemovalCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         return self.call(CmdTitle(), args, caller=self.actor, receiver=self.actor)
 
     def _bank_pair(self):
-        grant_starter_pair(self.actor)
+        grant_rank_title(self.actor, "F")
+        grant_first_quest_epithet(self.actor)
         bank_epithet(self.actor, "破城先鋒", "率先破門。", 500)
 
     def test_gated_targets_answer_stable_lines_and_never_enter_review(self):
@@ -332,7 +339,7 @@ class TitleRemovalCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 self.assertEqual(read_title_state(self.actor), before)
         # Sole epithet answers LAST, not EQUIPPED.
         sole = create_object(PlayerCharacter, key="removal sole actor")
-        grant_starter_pair(sole)
+        grant_first_quest_epithet(sole)
         self.assertEqual(
             self.call(
                 CmdTitle(), "remove epithet 南門新客", caller=sole, receiver=sole
@@ -382,7 +389,8 @@ class TitleRemovalCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_quoted_confirm_tail_round_trips(self):
         # A display whose tail would eat the confirm token is echoed quoted
         # and parses back through one matching quote pair.
-        grant_starter_pair(self.actor)
+        grant_rank_title(self.actor, "F")
+        grant_first_quest_epithet(self.actor)
         bank_epithet(self.actor, "破門 confirm", "尾綴陷阱。", 500)
         output = self._call("remove epithet 破門 confirm")
         # Unquoted, the trailing token IS stripped and "破門" alone is an

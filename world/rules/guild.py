@@ -224,11 +224,12 @@ def register_adventurer(
             from world.rules.affinity import AffinitySource, apply_affinity_change
 
             apply_affinity_change(staff, actor, AffinitySource.GUILD, 1)
-            from world.rules.titles import grant_starter_pair
+            from world.rules.titles import grant_rank_title
 
-            # D8 §6.5: the F-rank title plus the starter epithet bank and
-            # auto-equip inside the same all-or-nothing registration commit.
-            title_notifications = grant_starter_pair(actor)
+            # D8 §6.5: the F-rank title banks and auto-equips inside the same
+            # all-or-nothing registration commit. The starter epithet is NOT
+            # granted here; it rides the first reward claim (turn_in_quest).
+            title_notifications = grant_rank_title(actor, "F")
     except Exception:
         _restore_registration(actor, staff, snapshot)
         raise
@@ -359,6 +360,10 @@ def turn_in_quest(
     claims = parse_reward_claims(actor)
     if quest_id in claims:
         raise RewardClaimError(RewardClaim.ALREADY_CLAIMED)
+    # The starter epithet rides the actor's first-ever reward claim, decided
+    # from the pre-append claims list (any definition; never keyed to one).
+    # ``bank_epithet`` display dedupe is the second guard for any replay.
+    first_claim = not claims
 
     reward = offer.reward
     inventory_plan = plan_inventory_delta(
@@ -390,7 +395,14 @@ def turn_in_quest(
 
     snapshots = snapshot_attributes(
         actor,
-        ("wallet", "inventory", "quest_log", "guild_reward_claims"),
+        (
+            "wallet",
+            "inventory",
+            "quest_log",
+            "guild_reward_claims",
+            "title_collection",
+            "title_equipped",
+        ),
     )
     trait_snapshot = snapshot_traits(actor)
     pin_operations = inventory_plan.acquire[1] if inventory_plan.acquire is not None else ()
@@ -408,6 +420,8 @@ def turn_in_quest(
     companion_snapshots = {
         npc.pk: attribute_snapshot(npc, "relations_data") for npc in companions
     }
+
+    title_notifications: list[str] = []
 
     def writer():
         actor.db.wallet = int(actor.db.wallet or 0) + reward.copper
@@ -428,6 +442,10 @@ def turn_in_quest(
                 inventory_plan.acquire[1],
             )
         actor.db.guild_reward_claims = [*claims, quest_id]
+        if first_claim:
+            from world.rules.titles import grant_first_quest_epithet
+
+            title_notifications.extend(grant_first_quest_epithet(actor))
         from world.rules.affinity import apply_affinity_change, raise_affinity_cap
 
         # Cap breaks apply before the quest-completion gains so a record
@@ -440,7 +458,14 @@ def turn_in_quest(
     def restore():
         from world.rules.surfaces import restore_attribute_best_effort
 
-        for key in ("wallet", "inventory", "quest_log", "guild_reward_claims"):
+        for key in (
+            "wallet",
+            "inventory",
+            "quest_log",
+            "guild_reward_claims",
+            "title_collection",
+            "title_equipped",
+        ):
             restore_attribute_best_effort(actor, key, snapshots[key])
         restore_traits(actor, trait_snapshot)
         from world.quests.transitions import restore_pin_reasons
@@ -463,6 +488,7 @@ def turn_in_quest(
         "copper": reward.copper,
         "merit": reward.merit,
         "items": [str(item.item_key) for item in reward.items],
+        "title_notifications": list(title_notifications),
     }
 
 

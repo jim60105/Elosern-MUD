@@ -77,7 +77,7 @@ from world.rules.titles import (
     epithet_removal_gate,
     fixed_display_name,
     grant_rank_title,
-    grant_starter_pair,
+    grant_first_quest_epithet,
     nomination_cooldown_active,
     nomination_suppressed,
     owned_epithet_displays,
@@ -1077,7 +1077,7 @@ class TitleCastGrantSettlementTests(_CastSettlementTestCase):
 
 
 class TitleGuildPairingTests(EvenniaTest):
-    """Registration banks the starter pair; promotion banks the rank title."""
+    """Registration banks the rank title only; the epithet rides first claim."""
 
     def setUp(self):
         super().setUp()
@@ -1097,22 +1097,22 @@ class TitleGuildPairingTests(EvenniaTest):
         )
 
     @covers_requirement("title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
-    def test_starter_pair_grants_and_auto_equips_both_slots(self):
+    def test_first_quest_epithet_grant_banks_and_auto_equips_the_epithet_slot(self):
         with patch("world.rules.titles.get_world_clock", return_value=WorldClock(42)):
-            lines = grant_starter_pair(self.player)
-        self.assertEqual(lines, ("獲得稱號：F級冒險者", "獲得異名：南門新客"))
-        self.assertEqual(compose_full_title(self.player), "F級冒險者　南門新客")
+            lines = grant_first_quest_epithet(self.player)
+        self.assertEqual(lines, ("獲得異名：南門新客",))
+        self.assertEqual(compose_full_title(self.player), "南門新客")
         collection, equipped = read_title_state(self.player)
-        self.assertEqual(equipped, {"fixed": "g_f_rank", "epithet": STARTER_EPITHET.display})
-        self.assertEqual([entry["granted_tick"] for entry in collection], [42, 42])
-        self.assertEqual(collection[1]["origin_quote"], STARTER_EPITHET.origin_basis)
+        self.assertEqual(equipped, {"fixed": None, "epithet": STARTER_EPITHET.display})
+        self.assertEqual([entry["granted_tick"] for entry in collection], [42])
+        self.assertEqual(collection[0]["origin_quote"], STARTER_EPITHET.origin_basis)
 
-    def test_a_second_starter_grant_is_silent_and_inert(self):
-        first = grant_starter_pair(self.player)
+    def test_a_second_first_quest_epithet_grant_is_silent_and_inert(self):
+        first = grant_first_quest_epithet(self.player)
         before = deepcopy(read_title_state(self.player))
-        self.assertEqual(grant_starter_pair(self.player), ())
+        self.assertEqual(grant_first_quest_epithet(self.player), ())
         self.assertEqual(read_title_state(self.player), before)
-        self.assertEqual(first, ("獲得稱號：F級冒險者", "獲得異名：南門新客"))
+        self.assertEqual(first, ("獲得異名：南門新客",))
 
     @covers_requirement("title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
     def test_rank_titles_pair_one_to_one_with_the_guild_ranks(self):
@@ -1133,13 +1133,15 @@ class TitleGuildPairingTests(EvenniaTest):
         )
 
     @covers_requirement("guild-registration::guild-registration-grants-the-paired-starter-titles-atomically", "title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
-    def test_registration_banks_the_starter_pair(self):
+    def test_registration_banks_the_rank_title_only(self):
         record = register_adventurer(self.player, staff=self.staff)
         self.assertEqual(
             record["title_notifications"],
-            ["獲得稱號：F級冒險者", "獲得異名：南門新客"],
+            ["獲得稱號：F級冒險者"],
         )
-        self.assertEqual(compose_full_title(self.player), "F級冒險者　南門新客")
+        self.assertEqual(compose_full_title(self.player), "F級冒險者")
+        self.assertEqual(banked_fixed_keys(self.player), ("g_f_rank",))
+        self.assertEqual(banked_epithets(self.player), ())
 
     @covers_requirement("guild-registration::guild-registration-grants-the-paired-starter-titles-atomically", "title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
     def test_registration_rollback_leaves_no_titles_and_cannot_double_grant(self):
@@ -1159,9 +1161,9 @@ class TitleGuildPairingTests(EvenniaTest):
         self.assertFalse(self.player.attributes.has(TITLE_COLLECTION_KEY))
         # The retry grants each entry exactly once.
         record = register_adventurer(self.player, staff=self.staff)
-        self.assertEqual(len(record["title_notifications"]), 2)
+        self.assertEqual(record["title_notifications"], ["獲得稱號：F級冒險者"])
         self.assertEqual(len(banked_fixed_keys(self.player)), 1)
-        self.assertEqual(len(banked_epithets(self.player)), 1)
+        self.assertEqual(banked_epithets(self.player), ())
 
     def _arm_exam(self, target_rank: str) -> str:
         """Attach one ACTIVE exam record without running the exam pipeline.
@@ -1378,7 +1380,7 @@ class EpithetNominationRulesTests(EvenniaTest):
 
     @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_accept_with_occupied_slot_banks_without_touching_it(self):
-        grant_starter_pair(self.entity)
+        grant_first_quest_epithet(self.entity)
         self._persist(("新月", "月下救人"))
         _, equipped_before = read_title_state(self.entity)
         self.assertEqual(equipped_before["epithet"], STARTER_EPITHET.display)
@@ -1387,7 +1389,7 @@ class EpithetNominationRulesTests(EvenniaTest):
         self.assertEqual(equipped_after["epithet"], STARTER_EPITHET.display)
 
     def test_duplicate_display_accept_consumes_ballot_without_new_entry(self):
-        grant_starter_pair(self.entity)
+        grant_first_quest_epithet(self.entity)
         self._persist((STARTER_EPITHET.display, "再次入票的事蹟"))
         display, banked = accept_epithet(self.entity, 1)
         self.assertEqual((display, banked), (STARTER_EPITHET.display, False))
@@ -1501,7 +1503,7 @@ class EpithetNominationRulesTests(EvenniaTest):
         self.assertEqual(read_pending_ballot(self.entity)[0]["display"], "甲名")
 
     def test_owned_displays_and_digest_reads(self):
-        grant_starter_pair(self.entity)
+        grant_first_quest_epithet(self.entity)
         self.assertEqual(
                 owned_epithet_displays(self.entity),
                 frozenset({STARTER_EPITHET.display}),
@@ -1539,8 +1541,9 @@ class EpithetRemovalRulesTests(EvenniaTest):
         self.entity = create_object(PlayerCharacter, key="removal-holder")
 
     def _bank_pair(self):
-        """Starter pair plus one removable epithet at a pinned tick."""
-        grant_starter_pair(self.entity)
+        """The titled pair (F fixed + starter epithet) plus a removable one."""
+        grant_rank_title(self.entity, "F")
+        grant_first_quest_epithet(self.entity)
         bank_epithet(self.entity, "破城先鋒", "率先破門。", 500)
 
     @covers_requirement(
@@ -1549,7 +1552,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
     def test_gate_precedence_unknown_then_last_then_equipped(self):
         # Unknown before anything: no epithets at all, fixed keys, blanks,
         # and non-strings all read TARGET_UNKNOWN.
-        grant_starter_pair(self.entity)
+        grant_first_quest_epithet(self.entity)
         for target in (" nonexistent", "g_f_rank", "", None, 7, True, ["破城先鋒"]):
             with self.subTest(target=target):
                 self.assertIs(
@@ -1679,7 +1682,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
         )
 
     def test_removal_log_is_bounded_newest_first(self):
-        grant_starter_pair(self.entity)
+        grant_first_quest_epithet(self.entity)
         previous = "南門新客"
         for index in range(1, 6):
             display = f"異名{index}"
@@ -1712,7 +1715,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
         self.assertEqual(removal_digest(self.entity), ("破城先鋒",))
 
     def test_digest_dedupes_and_degrades_on_malformed_history(self):
-        grant_starter_pair(self.entity)
+        grant_first_quest_epithet(self.entity)
         bank_epithet(self.entity, "甲名", "甲事蹟。", 100)
         bank_epithet(self.entity, "乙名", "乙事蹟。", 200)
         equip_epithet(self.entity, "乙名")

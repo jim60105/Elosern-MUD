@@ -1252,9 +1252,11 @@ class CharacterFullTitlePresenterTests(EvenniaTest):
 
     @covers_requirement("title-system::narrative-consumers-compose-predicates-read-the-collection")
     def test_a_titled_actor_shares_one_composed_title_on_both_panels(self):
-        from world.rules.titles import grant_starter_pair
+        from world.rules.titles import grant_first_quest_epithet, grant_rank_title
 
-        grant_starter_pair(self.player)
+        grant_rank_title(self.player, "F")
+
+        grant_first_quest_epithet(self.player)
         character = self._character()
         status = self._status()
         self.assertEqual(character["full_title"], "F級冒險者　南門新客")
@@ -1267,9 +1269,11 @@ class CharacterFullTitlePresenterTests(EvenniaTest):
         self.assertEqual(self._character()["full_title"], "S級傳說")
 
     def test_a_corrupt_title_record_fails_the_panel_closed(self):
-        from world.rules.titles import grant_starter_pair
+        from world.rules.titles import grant_first_quest_epithet, grant_rank_title
 
-        grant_starter_pair(self.player)
+        grant_rank_title(self.player, "F")
+
+        grant_first_quest_epithet(self.player)
         self.player.attributes.add("title_collection", "damaged")
         self.assertFalse(self._character()["available"])
         self.assertFalse(self._status()["available"])

@@ -284,6 +284,7 @@ class BoardAccessTests(OfferRegistryIsolation, EvenniaTestCase):
 class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
+        self._definition_key = "introductory_hunt"
         self.hall = create_object(Room, key="hall")
         self.staff = create_object(NPC, key="turnin staff", location=self.hall)
         _attach_staff(self.staff)
@@ -303,9 +304,9 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
         from world.quests.runtime import fulfill_record
         from world.quests.transitions import apply_quest_log_replacement
 
-        record = accept_quest(self.player, "introductory_hunt")
+        record = accept_quest(self.player, self._definition_key)
         completed = fulfill_record(
-            record, QUEST_DEFINITION_REGISTRY["introductory_hunt"]
+            record, QUEST_DEFINITION_REGISTRY[self._definition_key]
         )
         records = read_records(self.player)
         new_records = [
@@ -530,6 +531,85 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
         )
         self.assertEqual(companion.db.relations_data, companion_snapshot)
         self.assertEqual(companion.relations.affinity_for(self.player), 0)
+
+    # First-claim starter-epithet grant (quest-reward-settlement delta).
+
+    @covers_requirement("quest-reward-settlement::the-first-ever-reward-claim-grants-the-starter-epithet-atomically")
+    def test_first_ever_claim_grants_the_starter_epithet(self):
+        from world.rules.titles import compose_full_title, read_title_state
+
+        quest_id = self._complete()
+        result = turn_in_quest(self.player, self.staff, quest_id)
+        self.assertEqual(result["title_notifications"], ["獲得異名：南門新客"])
+        self.assertEqual(compose_full_title(self.player), "F級冒險者　南門新客")
+        collection, equipped = read_title_state(self.player)
+        epithets = [entry for entry in collection if entry["kind"] == "epithet"]
+        self.assertEqual([entry["display"] for entry in epithets], ["南門新客"])
+        self.assertEqual(equipped["epithet"], "南門新客")
+
+    @covers_requirement("quest-reward-settlement::the-first-ever-reward-claim-grants-the-starter-epithet-atomically")
+    def test_later_claims_never_re_grant(self):
+        from world.rules.titles import read_title_state
+
+        first = self._complete(1)
+        turn_in_quest(self.player, self.staff, first)
+        before = read_title_state(self.player)
+        second = self._complete(2)
+        result = turn_in_quest(self.player, self.staff, second)
+        self.assertEqual(result["copper"], 50)
+        self.assertEqual(result["title_notifications"], [])
+        self.assertEqual(read_title_state(self.player), before)
+
+    @covers_requirement("quest-reward-settlement::the-first-ever-reward-claim-grants-the-starter-epithet-atomically")
+    def test_rolled_back_first_claim_revokes_the_epithet(self):
+        # The injected affinity failure lands AFTER the epithet was banked,
+        # so this proves rollback of a completed grant, not a skipped one.
+        from world.rules.titles import compose_full_title, read_title_state
+
+        companion = self._companion("epithet rollback companion")
+        quest_id = self._complete()
+        # Prime the in-process title read path so the post-failure assertions
+        # distinguish a stale attribute cache from a real rollback.
+        self.assertEqual(compose_full_title(self.player), "F級冒險者")
+        parsed_before = read_title_state(self.player)
+        raw_before = (
+            self.player.db.title_collection,
+            self.player.db.title_equipped,
+        )
+
+        def _failing_affinity(npc, player, source, delta):
+            raise RuntimeError("injected affinity write failure")
+
+        with patch(
+            "world.rules.affinity.apply_affinity_change",
+            side_effect=_failing_affinity,
+        ):
+            with self.assertRaises(RuntimeError):
+                turn_in_quest(self.player, self.staff, quest_id)
+        self.assertEqual(
+            (self.player.db.title_collection, self.player.db.title_equipped),
+            raw_before,
+        )
+        self.assertEqual(read_title_state(self.player), parsed_before)
+        self.assertEqual(compose_full_title(self.player), "F級冒險者")
+        self.assertEqual(parse_reward_claims(self.player), [])
+
+    @covers_requirement("quest-reward-settlement::the-first-ever-reward-claim-grants-the-starter-epithet-atomically")
+    def test_the_grant_is_definition_independent(self):
+        from world.rules.titles import compose_full_title
+
+        side = register(
+            quest(
+                "first_claim_side_quest",
+                stages=(QuestStage(0, defeat(tier="low")),),
+            )
+        )
+        register_guild_offer(_offer(side.key))
+        self._definition_key = side.key
+        quest_id = self._complete()
+        result = turn_in_quest(self.player, self.staff, quest_id)
+        self.assertEqual(result["title_notifications"], ["獲得異名：南門新客"])
+        self.assertEqual(compose_full_title(self.player), "F級冒險者　南門新客")
 
 
 class RewardClaimsParsingTests(QuestRegistryIsolation, EvenniaTestCase):

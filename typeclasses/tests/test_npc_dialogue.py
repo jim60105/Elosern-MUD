@@ -702,9 +702,11 @@ class TitleDialogueContextTests(EvenniaTest):
 
     @covers_requirement("title-system::narrative-consumers-compose-predicates-read-the-collection")
     def test_titled_player_context_carries_the_composed_epithet(self):
-        from world.rules.titles import grant_starter_pair
+        from world.rules.titles import grant_first_quest_epithet, grant_rank_title
 
-        grant_starter_pair(self.player)
+        grant_rank_title(self.player, "F")
+
+        grant_first_quest_epithet(self.player)
         context = self.npc._player_context(self.player)
         self.assertEqual(context["epithet"], "F級冒險者　南門新客")
         # Identity detail is opt-in; the ordinary context stays minimal.
@@ -717,9 +719,16 @@ class TitleDialogueContextTests(EvenniaTest):
         self.assertEqual(sorted(context), ["disguised_stats", "name"])
 
     def test_identity_detail_attaches_bounded_banked_entries(self):
-        from world.rules.titles import MAX_TITLE_ENTRIES, bank_epithet, grant_starter_pair
+        from world.rules.titles import (
+            MAX_TITLE_ENTRIES,
+            bank_epithet,
+            grant_first_quest_epithet,
+            grant_rank_title,
+        )
 
-        grant_starter_pair(self.player)
+        grant_rank_title(self.player, "F")
+
+        grant_first_quest_epithet(self.player)
         for index in range(6):
             bank_epithet(self.player, f"異名{index}", f"引文{index}", index)
         context = self.npc._player_context(self.player, identity_detail=True)
@@ -730,18 +739,22 @@ class TitleDialogueContextTests(EvenniaTest):
         self.assertEqual(context["epithet"], "F級冒險者　南門新客")
 
     def test_malformed_title_state_degrades_to_no_section(self):
-        from world.rules.titles import grant_starter_pair
+        from world.rules.titles import grant_first_quest_epithet, grant_rank_title
 
-        grant_starter_pair(self.player)
+        grant_rank_title(self.player, "F")
+
+        grant_first_quest_epithet(self.player)
         self.player.attributes.add("title_collection", "damaged")
         context = self.npc._player_context(self.player, identity_detail=True)
         self.assertNotIn("epithet", context)
         self.assertNotIn("identity_entries", context)
 
     def test_plain_exchange_prompt_carries_the_epithet_but_no_identity_detail(self):
-        from world.rules.titles import bank_epithet, grant_starter_pair
+        from world.rules.titles import bank_epithet, grant_first_quest_epithet, grant_rank_title
 
-        grant_starter_pair(self.player)
+        grant_rank_title(self.player, "F")
+
+        grant_first_quest_epithet(self.player)
         bank_epithet(self.player, "夜行者", "夜裡的眼", 1)
         client = FakeLLMClient()
         client.add_response(lambda d: True, _reply_text())
@@ -751,9 +764,11 @@ class TitleDialogueContextTests(EvenniaTest):
         self.assertNotIn("identity_entries", content)
 
     def test_being_addressed_passes_the_identity_detail(self):
-        from world.rules.titles import bank_epithet, grant_starter_pair
+        from world.rules.titles import bank_epithet, grant_first_quest_epithet, grant_rank_title
 
-        grant_starter_pair(self.player)
+        grant_rank_title(self.player, "F")
+
+        grant_first_quest_epithet(self.player)
         bank_epithet(self.player, "夜行者", "夜裡的眼", 1)
         client = FakeLLMClient()
         client.add_response(lambda d: True, _reply_text())
