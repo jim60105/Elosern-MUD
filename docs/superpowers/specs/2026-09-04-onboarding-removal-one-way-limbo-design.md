@@ -38,7 +38,7 @@
 | 南門→荒野閘門 | 不做，留給遊戲資料重設計 | 屬會被重設計取代的測試資料；南門移除回程後仍可通城市內部，不會關死玩家 |
 | 石板／石碑教學內容 | 不做，留給遊戲資料重設計 | 純遊戲資料工作，與本次移除正交 |
 | `introductory_hunt` 任務 | 保留為普通公會任務，只拆「完成→`set_onboarded`＋歡迎訊息」鉤子 | 任務資料本身正常；教學語意只存在於鉤子 |
-| 「南門新客」稱號 | 保留，flavor 改成不依附守衛目送的敘述 | 使用者選擇；稱號是公會新面孔的世界觀記述，不必隨守衛死 |
+| 「南門新客」異名 | 保留；取得時機從公會註冊改掛為「回報第一個公會任務」，flavor 改成不依附守衛目送的敘述 | 舊掛點（公會註冊）是教學語意的殘留；新語意＝「完成第一次回報的新面孔」。授予仍走稱號系統正規寫者 `bank_epithet` |
 | HelpOverlay | 保留元件，內容來源改前端靜態 `lib/controls-reference.js`；後端 guide 內容推送退役 | 其本質是操作教學／按鍵說明，正是新的教學語意；不砍玩家的說明入口 |
 | `guild_staff` 對話 | 對話表迁入 `world/rules/dialogue.py` 唯讀 runtime | 「回報」關鍵字掛的是可回報任務清單（公會功能，非教學功能）；runtime 文件本來就宣稱擁有該例外語意 |
 | 種族→城市選擇 | 不實作，只釘 registry 縫合點 | 其他城市尚不存在；出生固定虛境，YAGNI |
@@ -101,7 +101,7 @@
 保留並改造：
 
 - `world/lore/titles.py` 的 `STARTER_EPITHET`「南門新客」：稱號保留，
-  `origin_basis` flavor 改成不依附守衛目送的敘述。
+  `origin_basis` flavor 改成不依附守衛目送的敘述；授予鉤子遷移見 §6。
 - `introductory_hunt` 任務：留在公會任務目錄，作為普通任務。
 
 保留原樣：
@@ -172,7 +172,31 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType({
   `dialogue.py` 唯讀解析。webclient `exploration_actions.py` 的
   `run_scripted_talk` 呼叫改接同一 seam。
 
-## 6. HelpOverlay 改靜態
+## 6. 「南門新客」異名授予鉤子遷移
+
+現況查證：異名的授予本來就走稱號系統的正規機制——`grant_starter_pair`
+（`world/rules/titles.py:657`）在公會註冊事務（`register_adventurer`，
+`world/rules/guild.py:227` 呼叫）內同時發 F 階稱號（`grant_rank_title`）
+與異名（`bank_epithet`，dedupe＋自動裝備＋通知行）。它**不在** onboarding
+子系統裡；onboarding 掛的只有獨立的 `set_onboarded` 旗標（見 §3）。
+
+新語意：異名是「回報第一個公會任務」的記述，不是「註冊」的記述。遷移：
+
+- 拆散 `grant_starter_pair`：公會註冊只發 F 階稱號（`grant_rank_title`
+  留在原位）；函數退役。
+- 新增 `grant_first_quest_epithet(actor)`（同模組、同 `bank_epithet`
+  正規寫者），由公會任務**回報（reward claim）事務**呼叫；觸發條件＝
+  claim 前 `guild_reward_claims` 為空（第一次回報）。`bank_epithet` 的
+  dedupe 為第二重保證（重複回報／重登不重發）。通知行併入 claim 回應
+  （「獲得異名：南門新客」）。
+- `STARTER_EPITHET.origin_basis` 改寫為第一次回報的新面孔敘述，去除守衛
+  目送與「目送」世界觀。
+- 效果：註冊後全銜只有「F級冒險者」；首次回報後補齊
+  「F級冒險者　南門新客」。
+- 本遷移屬 title-system 主規格的行為變動，以同一 OpenSpec change 的
+  delta 呈現並 sync。
+
+## 7. HelpOverlay 改靜態
 
 - 前端：`HelpOverlay.vue` 內容來源改為既有 `lib/controls-reference.js`
   靜態資料；stories／fixtures／測試跟著改吃靜態輸入。
@@ -180,7 +204,7 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType({
 - Storybook showcase 覆蓋清單（frozen required-set manifest）若引用
   onboarding 來源，在同批更新。
 
-## 7. 錯誤處理
+## 8. 錯誤處理
 
 - 出口不存在：Evennia 原生 "You can't go that way" 路徑，不新增訊息。
 - 企圖進入虛境：`at_pre_object_receive` 既有拒絕文案保留。
@@ -190,12 +214,13 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType({
   observability facade 慣例（`world.observability`、snake_case event、
   context dict）。
 
-## 8. 驗證計畫
+## 9. 驗證計畫
 
 - Focused 測試：maps bootstrap（單向閘門＋回程清除）、
   character_creation（出生留虛境）、talk／dialogue（guild_staff 遷移後
   「回報」仍解析任務清單）、guild（無 `set_onboarded` 仍能完成
-  `introductory_hunt`）、webclient exploration／creation、help overlay。
+  `introductory_hunt`）、titles（註冊不發異名、首次回報發異名、重複回報
+  不重發）、webclient exploration／creation、help overlay。
 - 全量非瀏覽器 Evennia suite 一次（`--parallel 16 --noinput`）。
 - `uv run --locked python -m tools.spec_traceability check`：0 uncovered／
   0 errors——onboarding-guide 規格退役後其 requirement 退出索引；修剪後
@@ -206,10 +231,11 @@ CITY_GATE_REGISTRY: MappingProxyType = MappingProxyType({
 - 實作走 OpenSpec change（建議名 `remove-onboarding-tutorial`），依既有
   worktree→rubber-duck→merge 慣例。
 
-## 9. 範圍邊界（明確不做）
+## 10. 範圍邊界（明確不做）
 
 - 南門→荒野閘門（留給遊戲資料重設計）。
 - 虛境石板／石碑／筆記本教學內容（純遊戲資料工作）。
 - 種族→起始城市選擇邏輯（其他城市尚不存在）。
-- 玩家稱號系統（`world/rules/titles.py`）本體——僅改
-  `STARTER_EPITHET` 的 flavor 文字。
+- 玩家稱號系統（`world/rules/titles.py`）機器本體——不動
+  `bank_epithet`／`bank_fixed`／dedupe／裝備槽機制；僅改
+  `STARTER_EPITHET` 的 flavor 文字與授予鉤子掛點（§6）。
