@@ -303,13 +303,15 @@ class GuildStaffSyncDialogueTests(EvenniaCommandTestMixin, EvenniaTest):
         self._previous_catalog = CATALOG
         load_catalog_into_cache()
         from evennia.utils.search import search_object_by_tag
-        from world.rules.guild_economy import (
-            GUILD_SERVICE_KEY,
-            sync_service_content,
-        )
+        from world.rules.guild_economy import sync_service_content
+        from world.lore.guild import GUILD_BRANCH_REGISTRY
 
         sync_service_content()
-        self.guild_master = NPC.objects.filter(db_key=GUILD_SERVICE_KEY).first()
+        # The host's key is its authored registry name (service anchor reuse,
+        # npc-title-authored-identities D3).
+        self.guild_master = NPC.objects.filter(
+            db_key=GUILD_BRANCH_REGISTRY["guild_branch_altoria"].host_name
+        ).first()
 
     def tearDown(self):
         from world.quests.definitions import QUEST_DEFINITION_REGISTRY

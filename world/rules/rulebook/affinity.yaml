@@ -39,7 +39,7 @@ sexual_forced_penalty: 3
 # old cap cannot clamp them. The example below documents the shape; the
 # introductory hunt is the shipped quest that resolves at load.
 cap_breaks:
-  - npc_key: "altoria_guild_master"
+  - npc_key: "葛里安·衛登"
     quest_key: "introductory_hunt"
     new_cap: 150
 

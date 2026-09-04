@@ -47,24 +47,24 @@ NPC-title 批次的最後一件。
 
 ## 3. Guild service hosts (rules)
 
-- [ ] 3.1 `world/rules/guild_economy.py::_sync_service_host` 改為 design D7 形狀：以元件
+- [x] 3.1 `world/rules/guild_economy.py::_sync_service_host` 改為 design D7 形狀：以元件
   `service_id` 錨找既有 host（`_host_by_service_id`，走 NPC family 掃描，與
   `_initialize_merchant_stock` 同形）；缺則 `create_object(NPC, key=validate_npc_name(host_name))`
   ＋ `host.npc_title = validate_npc_title(host_title)`；既存永不改名、**永不補寫稱號**
   （runtime 寫稱號即違反不可變契約，design D7 第 3 條）；其餘
   既有更新語義（location／race／成年身分／補元件）原封不動。
-- [ ] 3.1b 一次性 legacy cleanup：刪除前功能時代以 `altoria_guild_master`／`altoria_merchant`
+- [x] 3.1b 一次性 legacy cleanup：刪除前功能時代以 `altoria_guild_master`／`altoria_merchant`
   為 `key` 且無稱號的 host（下一次同步即以完整作者身分重建）。放在啟動同步的一次性分支或明確的
   dev-only cleanup 指令，不新增任何持續運行的遷移路徑（未發布、零使用者、clean cutover）。
-- [ ] 3.2 呼叫端（shop host 與 guild-branch host 兩條同步線）從 `SHOP_REGISTRY.host_name/host_title`
+- [x] 3.2 呼叫端（shop host 與 guild-branch host 兩條同步線）從 `SHOP_REGISTRY.host_name/host_title`
   與 `GuildBranch.host_name/host_title` 供給參數；`log_info("guild_service_host_created", ...)`
   僅實際建立時發（context：`char`、`shop`、`service`；design D10）。
-- [ ] 3.3 `world/rules/tests/test_guild_config.py`／`test_guild_economy_sync.py`：首建帶作者姓名＋稱號、
+- [x] 3.3 `world/rules/tests/test_guild_config.py`／`test_guild_economy_sync.py`：首建帶作者姓名＋稱號、
   re-sync 不重複不改名（模擬 registry 改名）、**稱號永不被 sync 改寫**（對既存無稱號 host
   斷言 sync 後仍為空）、建立事件僅一次、legacy cleanup 刪除舊 host 且下次同步重建完整身分
   （patch `world.rules.guild_economy.log_info`）。
   Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_guild_economy_sync`
-- [ ] 3.4 rulebook 清-cut（rubber-duck 計畫審閱 MAJOR）：`world/rules/rulebook/affinity.yaml:42`
+- [x] 3.4 rulebook 清-cut（rubber-duck 計畫審閱 MAJOR）：`world/rules/rulebook/affinity.yaml:42`
   `cap_breaks` 選擇器 `npc_key: altoria_guild_master` 改為新作者公會 host 姓名（它是活選擇器，
   非死字面）；`world/rules/tests/test_affinity_config.py` 與 `test_cap_break_turnin.py` 的字面
   基準／fixture 同批；`world/rules/tests/test_dialogue.py:307` 以 db_key 找 host 的既有斷言改走

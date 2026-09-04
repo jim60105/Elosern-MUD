@@ -173,7 +173,7 @@ class AffinityConfigValidationTests(TestCase):
         start = content.index(marker) + len(marker)
         end = content.index("stages:\n", start)
         return content[:start] + content[start:end].replace(
-            content[start:end], "  - { npc_key: 'altoria_guild_master', "
+            content[start:end], "  - { npc_key: '葛里安·衛登', "
             "quest_key: 'introductory_hunt', new_cap: 150 }\n"
         )
 
@@ -194,22 +194,22 @@ class AffinityConfigValidationTests(TestCase):
     def test_cap_break_neither_selector_is_rejected(self):
         base = self._cap_breaks_base()
         deviant = base.replace(
-            'npc_key: "altoria_guild_master"\n', 'role: ""\n'
+            'npc_key: "葛里安·衛登"\n', 'role: ""\n'
         )
         self._load_deviant(deviant)
 
     def test_cap_break_both_selectors_are_rejected(self):
         base = self._cap_breaks_base()
         deviant = base.replace(
-            'npc_key: "altoria_guild_master"\n',
-            'npc_key: "altoria_guild_master"\n    role: "guard"\n',
+            'npc_key: "葛里安·衛登"\n',
+            'npc_key: "葛里安·衛登"\n    role: "guard"\n',
         )
         self._load_deviant(deviant)
 
     def test_cap_break_malformed_second_selector_is_still_rejected(self):
         base = self._cap_breaks_base()
         deviant = base.replace(
-            'npc_key: "altoria_guild_master"\n',
+            'npc_key: "葛里安·衛登"\n',
             'npc_key: 123\n    role: "guard"\n',
         )
         self._load_deviant(deviant)
@@ -217,7 +217,7 @@ class AffinityConfigValidationTests(TestCase):
     def test_cap_break_npc_key_and_role_selectors_are_distinct(self):
         base = self._cap_breaks_base()
         entries = (
-            "  - npc_key: 'altoria_guild_master'\n"
+            "  - npc_key: '葛里安·衛登'\n"
             "    quest_key: 'introductory_hunt'\n"
             "    new_cap: 150\n"
             "  - role: 'guard'\n"
@@ -234,7 +234,7 @@ class AffinityConfigValidationTests(TestCase):
         self.assertEqual(
             [(e.selector_kind, e.selector, e.new_cap) for e in config.cap_breaks],
             [
-                ("npc_key", "altoria_guild_master", 150),
+                ("npc_key", "葛里安·衛登", 150),
                 ("role", "guard", 200),
             ],
         )
@@ -250,7 +250,7 @@ class AffinityConfigValidationTests(TestCase):
     def test_cap_break_duplicate_quest_and_selector_is_rejected(self):
         base = self._cap_breaks_base()
         extra = (
-            "  - npc_key: 'altoria_guild_master'\n"
+            "  - npc_key: '葛里安·衛登'\n"
             "    quest_key: 'introductory_hunt'\n"
             "    new_cap: 200\n"
         )
