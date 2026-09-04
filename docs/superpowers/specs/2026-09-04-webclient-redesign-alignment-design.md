@@ -34,7 +34,9 @@ Owner decisions locked during brainstorming:
 - Quickbar: real keybindings + real Tab completion (not cosmetic badges).
 - Dialogue: one-shot — server-owned dialogue session, not client text-mining.
 - Command-line util buttons: keep in place, restyle to draft `.hist button`.
-- Objectives: extend `services` panel (`tracked` flag + cap), no second read model.
+- Objectives: server-side `tracked` flag + cap, disclosed through a host-independent
+  `objectives` panel (2026-09-04 amendment §7 supersedes the original "extend `services`,
+  no second read model" note — the derivation cannot work guild-host-gated).
 - Party rows must reuse existing NPC wire vocabulary (`identity`, `display_name`,
   `portrait_ref`, flat `hp_current`/`hp_maximum` from the combat participant row).
 - Each OpenSpec change must fit one workday for one engineer (`tmp/propose.md` scale rule).
@@ -63,7 +65,7 @@ Owner decisions locked during brainstorming:
 
 ## 3. Change decomposition
 
-Eight changes, each ≤ one workday. Names follow the `webclient-align-NN-*` series.
+Ten changes, each ≤ one workday. Names follow the `webclient-align-NN-*` series.
 
 ### Change 1 — `webclient-align-01-dock-chrome` (client only, ~0.5d)
 
@@ -154,23 +156,72 @@ wire shape (exploration target row + combat participant row):
   (avatar / name + class / 羈絆 stage / HP bar + value / 請其離隊 button), and the
   fixed three-line follow-rules card, all verbatim from draft `dr-party`.
 
-### Change 6 — `webclient-align-06-quest-tracker` (server + client, ~1d)
+### Change 6 — `webclient-align-06-quest-tracking-contract` (server only, ~1d)
 
 - Runtime: persistent boolean `tracked` on the quest record (default false; accepting a
-  quest never auto-tracks), written through `world/rules/`. New WS action
+  quest never auto-tracks), written through the quest lifecycle API. New WS action
   `guild.quest_track` — payload `{quest_id, tracked}`; setting true beyond 3 tracked is
   `rejected` (server cap); only `in_progress` quests are trackable.
-- Services panel: `guild.quests` rows gain `tracked: bool` (validator mirrored).
-- Bottom-right `.obj` tracker: derived client-side from services panel rows where
-  `tracked && in_progress` (first 3): checkbox (stage-done state), `objective_summary`,
-  `stage_progress` numerals, optional `deadline_line`. No tracked quests → island not
-  rendered. Head `目標 … N 追蹤`. Combat mode hides optional rows (draft
-  `.mode-combat .obj .opt`).
-- Toggle entry points: 追蹤/取消追蹤 buttons on the quest board/log rows.
-- Remove the `objective-*` deferred entry from
-  `tests/overlays/deferred_surfaces_absent.test.js` in the same change.
+- Services panel v3 → v4: `guild.quests` rows gain `tracked: bool` (validator mirrored).
+- New `objectives` presentation panel (schema v1): `rows` of the holder's
+  `tracked && in_progress` records in quest-log order (cap 3), each `{quest_id,
+  display_name, objective_line, stage_index, stage_total, stage_progress,
+  objective_quantity, reward_copper, deadline_line}` with prose from the existing
+  `describe_objective`/`describe_deadline` seams. Host-independent — the original sketch
+  derived the tracker from guild-host-gated `services` rows, which would blank the
+  tracker outside the guild hall (§7 amendment). Empty tracked set → `rows: []`;
+  corrupt log → shared unavailable form.
+- Client surfaces (tracker island, browser toggle, showcase) are change 9.
 
-### Change 7a — `webclient-align-07-dialogue-session` (server only, ~1d)
+### Change 7 — `webclient-align-07-dialogue-session-state` (server only, ~1d)
+
+- Session state lives on the character (`db.dialogue_session` — `{npc_id, line,
+  updated_tick}`); the writers are the deterministic core only: the
+  `talk_scripted`/`talk_freeform` adapter success paths and the `talk` command path
+  record the result line; the clear seams are a successful `settle_movement`,
+  `explore.engage`, and NPC leave-room/despawn/leave-party cleanup naming the session
+  NPC. A session whose host dbid no longer resolves to a present, interactable NPC is
+  not live and its stale dbid never reaches any presentation. This change ships no
+  client-visible surface; the panel + mode are change 10 (§7 amendment).
+- Offline guarantee: with `LLM_ENABLED=false`, scripted dialogue (`run_scripted_talk`)
+  fully drives open, refresh, and clear (REDESIGN principle 7).
+- Tests: session lifecycle (open via either path / move-clears / engage-clears /
+  departure-clears / stale-dbid not-live), shards, traceability.
+
+### Change 8 — `webclient-align-08-dialogue-surface` (client only, ~1d; depends on 3 and 10)
+
+- Feed dialogue variant: `.dlg` box (64px avatar, `portrait_ref`-missing fallback to the
+  initial mono letter; `who` row = name + ` · 羈絆 stage`; serif line) + numbered `.choices`
+  picks (`1..n` badges submit `explore.talk_scripted{npc_id, keyword_id}`; trailing
+  `⌨ 自由對話 → 指令列` row uses the existing borrowed-send path). Head label `對話`
+  only — no `完整日誌` capsule in dialogue mode (draft-exact).
+- Dock 對話選項 tab mirrors the same choices list; the dock legend swaps to the draft's
+  dialogue hint (`數字鍵 1–4 選 · <kbd>→</kbd> 指令列自由對話`) through the
+  shortcut-legend requirement restated MODIFIED in change 8's own delta (change 1 owns
+  the legend contract; the original "hint text per Change 1" note understated that 8
+  must chain the restatement — §7 amendment).
+- Mode gating per the REDESIGN §2 visibility matrix (minimap ●, tracker ●, command line
+  ●, narrative = dialogue focus). Digit keys 1–4 bind the choice picks and `→` focuses
+  the borrowed command line while the dialogue form presents (orthogonal to Change 2
+  letter bindings; never intercepted from the input field).
+
+### Change 9 — `webclient-align-09-objective-tracker-ui` (client only, ~1d; depends on 6)
+
+- Bottom-right `.obj` tracker island from the committed `objectives` panel: head
+  `目標 … N 追蹤`; per row a stage box (done check at `stage_progress >=
+  objective_quantity`), `objective_line`, a mono-gold slot (`n/m` when the objective
+  counts, else `+reward_copper`), optional muted `deadline_line`. No rows / panel
+  unavailable / creation mode → island not rendered.
+- Toggle entry points: 追蹤/取消追蹤 buttons on the service quest browser rows,
+  dispatching `guild.quest_track {quest_id, tracked}`; the enabled matrix derives from
+  the committed row's `tracked` field.
+- Showcase lockstep: `ObjectiveTracker` joins the manifest with a deterministic offline
+  story; the `objective-*` deferred entry is removed from
+  `tests/overlays/deferred_surfaces_absent.test.js` in the same change.
+- Documented deviation: the draft's `選修` optional tag has no backing field, so the
+  draft's combat `.mode-combat .obj .opt` hiding rule has nothing to hide.
+
+### Change 10 — `webclient-align-10-dialogue-panel` (server only, ~1d; depends on 7)
 
 - Protocol: `MODES` gains `"dialogue"`. New `dialogue` panel (schema v1, unavailable form
   `("dialogue_unavailable", "對話目前無法顯示")`):
@@ -183,47 +234,40 @@ wire shape (exploration target row + combat participant row):
   choices: [ { keyword_id, label } ] }              # server-authorized keyword pool (talk_scripted vocabulary)
 ```
 
-- Session state lives on the character (`db.dialogue_session`); the writer is the
-  deterministic core: the `talk_scripted`/`talk_freeform` adapter success path records
-  the result line. Clears on: successful move (`settle_movement`), `explore.engage`, or
-  dialogue completion/departure semantics (leave-room clears if no explicit end verb).
 - Mode resolution order in the coordinator: creation > combat > dialogue-session-live >
-  exploration. Exploration panel keeps flowing while dialogue is live.
-- Offline guarantee: with `LLM_ENABLED=false`, scripted dialogue (`run_scripted_talk`)
-  fully drives this panel (REDESIGN principle 7).
-- Tests: presenter/validator, session lifecycle (open / move-clears / combat-overrides),
-  shards, traceability.
-
-### Change 7b — `webclient-align-08-dialogue-surface` (client only, ~1d; depends on 3 and 7a)
-
-- Feed dialogue variant: `.dlg` box (64px avatar, `portrait_ref`-missing fallback to the
-  initial mono letter; `who` row = name + ` · 羈絆 stage`; serif line) + numbered `.choices`
-  picks (`1..n` badges submit `explore.talk_scripted{npc_id, keyword_id}`; trailing
-  `⌨ 自由對話 → 指令列` row uses the existing borrowed-send path). Head label `對話`
-  only — no `完整日誌` capsule in dialogue mode (draft-exact).
-- Dock 對話選項 tab mirrors the same choices list; hint text per Change 1.
-- Mode gating per the REDESIGN §2 visibility matrix (minimap ●, tracker ●, command line
-  ●, narrative = dialogue focus). Digit keys 1–4 bind the choice picks (orthogonal to
-  Change 2 letter bindings).
+  exploration. The `exploration` and `character` panels keep shipping their ordinary
+  payloads while dialogue is live; every open/refresh/clear commits mode + panel
+  atomically with the underlying state change.
+- Client protocol mirrors: `dialogue` joins the UMD + Vue panel and mode allowlists in
+  lockstep with the server registry (three-list agreement test + oob snapshot mirror).
+- Tests: presenter/validator (host triple, bonded/unbonded, corrupt session →
+  unavailable), mode-resolution matrix, live→clear snapshot transition; Node-gate
+  mirror fixtures.
 
 ## 4. Dependencies and batching
 
-Hard dependencies: 4 → 5 (quickbar consumes the party panel); 3 + 7a → 7b (dialogue box
-mounts the rebuilt feed shell and the dialogue panel).
+Hard dependencies: 4 → 5 (quickbar consumes the party panel); 6 → 9 (tracker UI consumes
+the committed objectives panel and the track action); 7 → 10 (the panel and mode present
+the session state); 3 + 10 → 8 (dialogue box mounts the rebuilt feed shell and the
+dialogue panel).
 
 File conflicts (why some same-wave changes must not run concurrently):
 
 - `CommandLine.vue`: change 1 (util styling) ∩ change 2 (Tab/hint) → 2 follows 1.
-- `NarrativeFeed.vue`: change 3 ∩ change 7b → serialized by wave.
-- `registry.py` / `protocol.py`: change 4 ∩ 7a both register panels / extend `MODES`.
+- `NarrativeFeed.vue`: change 3 ∩ change 8 → serialized by wave.
+- `registry.py` / `protocol.py`: change 4 ∩ change 10 both register panels / extend
+  `MODES`.
 - `AppClient.vue` / `stores/elosern.js`: near-universal touchpoints; keep cross-batch
   serialization, within-batch same-owner integration for shared files.
 
-Proposed batches (parallel within a wave, serial across waves; ~7 workdays):
+Proposed batches (parallel within a wave, serial across waves; ~9 workdays). Change 10
+consumes change 7's helper API and chains its delta, so 7 and 10 never share a wave:
 
 - W1: 1, 3, 4
-- W2: 2, 5, 6, 7a
-- W3: 7b
+- W2: 2, 5, 6
+- W3: 7, 9
+- W4: 10
+- W5: 8
 
 ## 5. Verification
 
@@ -233,8 +277,9 @@ Proposed batches (parallel within a wave, serial across waves; ~7 workdays):
 - Server: smallest focused Evennia test labels (`--keepdb`), `tools.spec_traceability
   check`, shard manifest updated in the same change; observability lint where logging
   paths change.
-- Player-command surface unchanged (no `docs/game/commands.md` churn expected;
-  `guild.quest_track` is a WS action, not a text command).
+- Player-command surface change is limited to change 2's single-letter aliases
+  (`docs/game/commands.md` + `docs/game/command-reference.md` updated in the same
+  change); `guild.quest_track` is a WS action, not a text command.
 
 ## 6. Non-goals
 
@@ -276,9 +321,11 @@ follow-through.
   requirement IDs land at each change's archive/sync commit (the checker resolves IDs
   only from `openspec/specs/`; magic-xp P1 precedent).
 
-Revised batches (parallel within a wave, serial across waves; ~8 workdays):
+Revised batches (parallel within a wave, serial across waves; ~9 workdays). The
+7 → 10 helper-API dependency and delta chain keep 7 and 10 in separate waves:
 
 - W1: 1, 3, 4
 - W2: 2, 5, 6
-- W3: 7, 9, 10
-- W4: 8
+- W3: 7, 9
+- W4: 10
+- W5: 8
