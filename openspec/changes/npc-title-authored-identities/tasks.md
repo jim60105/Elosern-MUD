@@ -73,11 +73,11 @@ NPC-title 批次的最後一件。
 
 ## 4. Exam examiners (rules)
 
-- [ ] 4.1 `world/rules/guild_exams.py::_spawn_opponent`：`key` 改用 `rank.examiner_name`＋
+- [x] 4.1 `world/rules/guild_exams.py::_spawn_opponent`：`key` 改用 `rank.examiner_name`＋
   `opponent.npc_title = validate_npc_title(rank.examiner_title)`；design D8 條件式去衝突
   （任何其他實體已持有同名才附 `-{pk}`）；`log_info("guild_exam_opponent_created", ...)`
   （context：`char`、`rank`）。
-- [ ] 4.2 `world/rules/tests/test_guild_exams.py`：作者姓名優先、同名玩家佔用時後綴形且考試照常開始、
+- [x] 4.2 `world/rules/tests/test_guild_exams.py`：作者姓名優先、同名玩家佔用時後綴形且考試照常開始、
   兩場同階級先後開考 key 互異（後 spawn 者的排除自身重查詢必須看到先前已提交的同名實體；佔用
   檢查與寫入同在 `start_guild_exam` 的 `transaction.atomic()` 內，無 check-then-create 視窗，
   design D8）、稱號落庫、建立事件；反向斷言舊 `guild-examiner-<rank>` 字面不再出現。

@@ -18,7 +18,8 @@ from typing import Any
 
 from evennia.utils.create import create_object
 
-from world.observability import log_warn
+from world.observability import log_info, log_warn
+from world.rules.npc_identity import validate_npc_title
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer
 from typeclasses.npcs import NPC, ensure_npc_adult_identity
@@ -218,9 +219,29 @@ def _profile_for(target_rank: str):
     return profile
 
 
+def _rank_row(target_rank: str):
+    from world.lore.guild import GUILD_RANK_REGISTRY
+
+    rank = GUILD_RANK_REGISTRY.get(target_rank)
+    if rank is None:
+        raise GuildExamError(ExamReason.UNKNOWN_EXAM, target_rank)
+    return rank
+
+
+def _key_taken_by_other(entity: Any) -> bool:
+    """True when any other persisted entity already carries this display key."""
+    from evennia.objects.models import ObjectDB
+
+    return ObjectDB.objects.filter(db_key=entity.key).exclude(pk=entity.pk).exists()
+
+
 def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
     profile = _profile_for(target_rank)
-    opponent = create_object(NPC, key=f"guild-examiner-{target_rank}")
+    rank = _rank_row(target_rank)
+    # Authored examiner identity is the key (npc-title-authored-identities D8);
+    # the -{pk} disambiguator is applied only when another entity already
+    # holds the name (audit finding F08 roster-keying stays intact).
+    opponent = create_object(NPC, key=rank.examiner_name)
     try:
         opponent.race = "human"
         opponent._apply_trait_config(
@@ -240,13 +261,19 @@ def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
             )
         )
         opponent.db.skills = {"active": list(profile.skills), "passive": []}
+        opponent.npc_title = validate_npc_title(rank.examiner_title)
         ensure_npc_adult_identity(opponent)
         opponent.location = actor.location
-        # Suffix the pk so a participant whose display name equals the bare
-        # ``guild-examiner-<rank>`` pattern can never collide in a battlefield
-        # roster keyed by display key.
-        opponent.key = f"guild-examiner-{target_rank}-{opponent.pk}"
+        # Occupancy check inside the same start_guild_exam transaction: no
+        # check-then-create window. A later same-rank spawn always sees the
+        # earlier committed same-named opponent and takes the suffixed form.
+        if _key_taken_by_other(opponent):
+            opponent.key = f"{rank.examiner_name}-{opponent.pk}"
         opponent.save()
+        log_info(
+            "guild_exam_opponent_created",
+            context={"char": opponent.key, "rank": target_rank},
+        )
     except Exception:
         try:
             opponent.delete()

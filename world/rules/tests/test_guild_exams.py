@@ -15,6 +15,10 @@ from typeclasses.components import GuildExaminer, GuildStaff
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.lore.guild import GUILD_RANK_REGISTRY
+
+# Authored examiner identity for rank E (npc-title-authored-identities D8).
+EXAMINER_NAME = GUILD_RANK_REGISTRY["E"].examiner_name
+EXAMINER_TITLE = GUILD_RANK_REGISTRY["E"].examiner_title
 from world.lore.races import STATIC_TIER_REGISTRY
 from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import QuestRegistryIsolation
@@ -256,19 +260,45 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
 
     @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
     def test_same_named_player_can_take_the_exam(self):
-        self.player.key = "guild-examiner-E"
+        self.player.key = EXAMINER_NAME
         self.player.save()
         self._give_merit(50)
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         self.assertIsNotNone(opponent)
-        self.assertEqual(opponent.key, f"guild-examiner-E-{opponent.pk}")
+        # Name occupied by the player -> conditional -{pk} disambiguator.
+        self.assertEqual(opponent.key, f"{EXAMINER_NAME}-{opponent.pk}")
         self.assertNotEqual(opponent.key, self.player.key)
         self.assertIsNotNone(read_session(self.player))
 
     @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
-    def test_opponent_keys_stay_distinct_across_spawns(self):
+    def test_concurrent_same_rank_exams_never_share_a_key(self):
+        # Two live opponents of one rank: the second spawn sees the first
+        # committed same-named entity and takes its own -<pk> component.
         self._give_merit(50)
+        first = start_guild_exam(self.player, self.examiner, "E")
+        first_opponent = ObjectDB.objects.filter(id=first.opponent_id).first()
+        self.assertEqual(first_opponent.key, EXAMINER_NAME)
+        rival = create_object(PlayerCharacter, key="rival candidate")
+        rival.race = "human"
+        rival.apply_race_baseline()
+        rival.location = self.hall
+        register_adventurer(rival, self.staff)
+        from world.rules.surfaces import write_counter_trait
+
+        write_counter_trait(rival, "guild_merit", 50)
+        second = start_guild_exam(rival, self.examiner, "E")
+        second_opponent = ObjectDB.objects.filter(id=second.opponent_id).first()
+        self.assertIsNotNone(second_opponent)
+        self.assertEqual(second_opponent.key, f"{EXAMINER_NAME}-{second_opponent.pk}")
+        self.assertNotEqual(first_opponent.key, second_opponent.key)
+
+    @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
+    def test_seqentially_released_name_is_reused_verbatim(self):
+        # Restated contract: the suffix is conditional. Once the first
+        # opponent is deleted at forfeit, the next spawn reuses the free
+        # authored name verbatim (no permanent -pk disambiguation).
+        self._give_merit(100)
         first = start_guild_exam(self.player, self.examiner, "E")
         first_opponent = ObjectDB.objects.filter(id=first.opponent_id).first()
         from world.rules.combat_session import forfeit
@@ -278,7 +308,9 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         second_opponent = ObjectDB.objects.filter(id=second.opponent_id).first()
         self.assertIsNotNone(first_opponent)
         self.assertIsNotNone(second_opponent)
-        self.assertNotEqual(first_opponent.key, second_opponent.key)
+        self.assertEqual(first_opponent.key, EXAMINER_NAME)
+        self.assertEqual(second_opponent.key, EXAMINER_NAME)
+        self.assertNotEqual(first_opponent.pk, second_opponent.pk)
 
     @covers_requirement("guild-rank-exams::examination-start-is-all-or-nothing-across-opponent-record-and-session")
     def test_affinity_failure_leaves_no_orphan_session_or_registration(self):
@@ -295,7 +327,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         self.assertIsNone(read_session(self.player))
         self.assertEqual(_BATTLEFIELDS, {})
         orphans = ObjectDB.objects.filter(
-            db_key__startswith="guild-examiner-E-",
+            db_key__startswith=EXAMINER_NAME,
             db_location=self.hall,
         )
         self.assertEqual(orphans.count(), 0)
@@ -316,10 +348,43 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         self.assertIsNone(read_session(self.player))
         self.assertEqual(_BATTLEFIELDS, {})
         orphans = ObjectDB.objects.filter(
-            db_key__startswith="guild-examiner-E-",
+            db_key__startswith=EXAMINER_NAME,
             db_location=self.hall,
         )
         self.assertEqual(orphans.count(), 0)
+
+
+    @covers_requirement("npc-identity-titles::exam-examiners-carry-their-authored-identity")
+    def test_spawn_uses_the_authored_name_and_persists_the_title(self):
+        self._give_merit(50)
+        with patch("world.rules.guild_exams.log_info") as logged:
+            record = start_guild_exam(self.player, self.examiner, "E")
+        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
+        self.assertIsNotNone(opponent)
+        # Free name -> no disambiguator: the authored name IS the key.
+        self.assertEqual(opponent.key, EXAMINER_NAME)
+        self.assertEqual(opponent.npc_title, EXAMINER_TITLE)
+        self.assertTrue(opponent.key.startswith(EXAMINER_NAME))
+        events = [
+            call for call in logged.call_args_list
+            if call.args and call.args[0] == "guild_exam_opponent_created"
+        ]
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].kwargs["context"]["char"], EXAMINER_NAME)
+        self.assertEqual(events[0].kwargs["context"]["rank"], "E")
+
+    @covers_requirement("npc-identity-titles::exam-examiners-carry-their-authored-identity")
+    def test_persistently_occupied_name_forces_the_suffixed_form(self):
+        # A same-named entity that survives (a second candidate mid-exam whose
+        # opponent holds the authored key) forces the new spawn into the
+        # suffixed form so battlefield rosters keyed by str(key) stay distinct.
+        holder = create_object(NPC, key=EXAMINER_NAME, location=self.hall)
+        self._give_merit(50)
+        record = start_guild_exam(self.player, self.examiner, "E")
+        opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
+        self.assertEqual(opponent.key, f"{EXAMINER_NAME}-{opponent.pk}")
+        self.assertNotEqual(opponent.key, holder.key)
+        self.assertEqual(opponent.npc_title, EXAMINER_TITLE)
 
 
 class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
@@ -423,7 +488,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
     def test_same_named_player_can_complete_the_exam(self):
-        self.player.key = "guild-examiner-E"
+        self.player.key = EXAMINER_NAME
         self.player.save()
         for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
@@ -570,7 +635,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         self.assertIsNone(self.player.db.active_combat)
         self.assertEqual(
             ObjectDB.objects.filter(
-                db_key__startswith="guild-examiner-E-",
+                db_key__startswith=EXAMINER_NAME,
                 db_location=self.hall,
             ).count(),
             0,
