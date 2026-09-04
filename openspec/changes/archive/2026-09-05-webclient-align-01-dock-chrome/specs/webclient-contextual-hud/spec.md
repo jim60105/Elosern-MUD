@@ -62,6 +62,16 @@ does not name. When a named affordance's behaviour changes (for example, a contr
 open a surface and now only moves focus into an always-present one), the legend's wording SHALL be
 updated in the same change that alters the behaviour.
 
+The digits the legend names SHALL be bound: while the dock owns keyboard focus (the key target is
+not editable, and the bounded services quantity form has not captured the digit first), pressing
+`1`–`4` moves the current dock frame's focus onto the first four rows (1-indexed, rendered order)
+and activates the row through the same confirm path `Enter` uses — a disabled row shows its
+explanation and submits nothing, an in-flight row stays locked, and a held repeat is suppressed.
+The slots address the pane's rendered rows: where a pane does not render the standard `back`
+cell as a row (the exit-outlet pane), that cell takes no slot. A digit whose row does not exist
+(a frame with fewer rendered rows, or the pre-session empty stack) is not claimed and falls
+through to the text / command-history path.
+
 #### Scenario: The legend renders once
 - **WHEN** the dock renders in a mode where its chrome (tab bar) is shown
 - **THEN** exactly one element carries the shortcut-legend text and test hook, and no duplicate
@@ -71,3 +81,14 @@ updated in the same change that alters the behaviour.
 - **WHEN** the dock tab bar renders in exploration or combat mode
 - **THEN** the legend reads `數字鍵 1–4 · Enter 執行 · Esc 返回` with `Enter` and `Esc` rendered as
   styled `<kbd>` elements and no other key named
+
+#### Scenario: A digit picks its row
+- **WHEN** the current dock frame has at least two rows and the player presses `2` from a
+  non-editable focus
+- **THEN** the second row becomes the frame's focus and its action submits exactly as `Enter`
+  would, once
+
+#### Scenario: A digit beyond the frame's rows is unclaimed
+- **WHEN** the current dock frame has fewer rows than the pressed digit and the command field is
+  not focused
+- **THEN** the digit is not claimed, the frame's focus is unchanged, and nothing submits

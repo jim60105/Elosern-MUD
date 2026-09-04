@@ -20,6 +20,11 @@ buttons use a heavier style than the draft's `.hist button`.
   <kbd>Esc</kbd> 返回`, with the draft's `kbd` styling (mono, `--ink-780` ground, 2px bottom
   border). The `/ 聚焦指令列` wording is dropped (the binding itself stays implemented).
   The truthfulness rule (name only implemented behaviour) is kept.
+- To keep that rule true, the digits the legend names become real: `1`–`4` pick the first four
+  rows of the current dock frame (move focus + activate through the same confirm path as Enter);
+  a digit with no such row stays unclaimed. Implemented entirely through the frozen router
+  façade in the store's focus entry; the digits join the bridge's claimed-key set so a consumed
+  digit cannot type into the command path. The key is added to the client's controls reference.
 - The command line's four utility buttons keep their positions and functions but adopt the
   draft `.hist button` style (transparent ground, 26×26, hover `--ink-700`).
 
@@ -40,6 +45,9 @@ buttons use a heavier style than the draft's `.hist button`.
 
 - `web/webclient-app/components/ActionDock.vue`, `DockTabBar.vue`, `AppShell.vue`/stage
   anchor styling, `styles/tokens.css` consumers; `CommandLine.vue` utility-button styling.
+- Digit row picks: `web/webclient-app/stores/elosern.js` (`focusPress`) and
+  `web/webclient-app/bridge.js` (claimed-key set); the UMD keyboard router is untouched
+  (design D1). `web/webclient-app/lib/controls-reference.js` gains the key entry.
 - Anchoring Vitest/DOM-contract tests for dock geometry and legend wording updated in the
   same change.
 - No server, protocol, or player-command surface changes; no docs churn.

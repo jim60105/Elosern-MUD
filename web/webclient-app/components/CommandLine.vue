@@ -481,14 +481,17 @@ defineExpose({ focusField });
 }
 
 .cmdutil__btn {
-  width: 30px;
-  height: 30px;
+  /* The draft `.hist button` treatment (webclient-align-01-dock-chrome):
+     transparent ground, 26×26, 6px radius, hover `--ink-700`. Positions,
+     functions, labels, and accessibility attributes are unchanged. */
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
   color: var(--paper-500);
   background: transparent;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
   cursor: pointer;
 }
 
@@ -498,7 +501,7 @@ defineExpose({ focusField });
 }
 
 .cmdutil__btn .ic {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
 }
 </style>

@@ -78,6 +78,24 @@ describe("ActionDock (B2 action-dock family)", () => {
     document.body.innerHTML = "";
   });
 
+  function cssRuleFor(selector) {
+    // Scan the mounted component stylesheets (vitest `css: true`) for the
+    // rule whose core selector (before Vue's `[data-v-…]` suffix) matches.
+    for (const sheet of Array.from(document.styleSheets)) {
+      try {
+        const hit = Array.from(sheet.cssRules || []).find((rule) => {
+          if (!rule.selectorText) return false;
+          const core = rule.selectorText.split("[")[0].trim();
+          return core === selector;
+        });
+        if (hit) return hit;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   function mountDock(props = {}, items = AFFORDANCES) {
     const host = document.createElement("div");
     document.body.appendChild(host);
@@ -100,48 +118,62 @@ describe("ActionDock (B2 action-dock family)", () => {
     expect(
       w.get('[data-testid="action-dock-guidance"]').exists(),
     ).toBe(true);
-    expect(w.get('[data-testid="action-dock-description"]').text()).toBe(
-      "附近動作　方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列",
-    );
   });
 
-  it("renders the bare shortcut legend without a prefix", () => {
-    const w = mountDock();
-    expect(w.get('[data-testid="action-dock-description"]').text()).toBe(
-      "方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列",
-    );
+  it("renders the draft shortcut legend as the single hook-bearing element", () => {
+    // webclient-align-01-dock-chrome: the legend is the tab bar's trailing
+    // hint (the draft's `.dock .hint`), the ONLY element carrying the
+    // `action-dock-description` hook. The hidden duplicate is gone.
+    const w = mountDock({ rootItems: ROOT_ITEMS });
+    const legends = w.findAll('[data-testid="action-dock-description"]');
+    expect(legends).toHaveLength(1);
+    const legend = legends[0];
+    expect(legend.classes()).toContain("dock-tab-bar__hint");
+    expect(legend.text()).toBe("數字鍵 1–4 · Enter 執行 · Esc 返回");
+    // The draft's <kbd> structure: exactly two kbd children, in order.
+    const kbds = legend.findAll("kbd");
+    expect(kbds.map((k) => k.text())).toEqual(["Enter", "Esc"]);
+    // Truthfulness: no affordance the draft's legend does not name.
+    expect(legend.text()).not.toContain("/ 聚焦指令列");
+    expect(w.find(".action-dock__description").exists()).toBe(false);
+    expect(legend.attributes("aria-hidden")).toBeUndefined();
   });
 
   it("refreshes the guidance note when the surface prefix changes", async () => {
     const w = mountDock({ guidancePrefix: "附近動作" });
-    expect(w.get('[data-testid="action-dock-description"]').text()).toBe(
-      "附近動作　方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列",
-    );
+    expect(w.get('[data-testid="action-dock-guidance"]').text()).toBe("附近動作");
     w.setProps({ guidancePrefix: "戰鬥動作" });
     await nextTick();
-    expect(w.get('[data-testid="action-dock-description"]').text()).toBe(
-      "戰鬥動作　方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列",
-    );
+    expect(w.get('[data-testid="action-dock-guidance"]').text()).toBe("戰鬥動作");
   });
 
-  it("renders exactly one visible legend: the description is hidden, the tab-bar hint is the visible copy", () => {
+  it("renders exactly one visible legend with the draft's kbd styling", () => {
     const w = mountDock({ rootItems: ROOT_ITEMS });
-    const desc = w.get('[data-testid="action-dock-description"]');
-    const descStyle = getComputedStyle(desc.element);
-    expect(desc.attributes("aria-hidden")).toBe("true");
-    expect(desc.classes()).toContain("visually-hidden");
-    expect(descStyle.position).toBe("absolute");
-    expect(descStyle.width).toBe("1px");
-    expect(descStyle.height).toBe("1px");
-    if (descStyle.clip) {
-      expect(descStyle.clip).toMatch(/0px,\s*0px,\s*0px,\s*0px/);
-    }
-    const hint = w.find(".dock-tab-bar__hint");
-    expect(hint.exists()).toBe(true);
-    expect(hint.text()).toBe("方向鍵選擇・Enter 確認・Esc 返回・/ 聚焦指令列");
+    const hint = w.get('[data-testid="action-dock-description"]');
     const hintStyle = getComputedStyle(hint.element);
+    // The visible legend: not clipped, not a hidden 1x1 copy.
     expect(hintStyle.display).not.toBe("none");
     expect(hintStyle.width).not.toBe("1px");
+    // The draft's kbd rule is owned by this component's stylesheet: mono
+    // face, the `--ink-780` ground, and the 2px bottom border.
+    const kbdRule = cssRuleFor(".dock-tab-bar__hint kbd");
+    expect(kbdRule, "the legend kbd rule ships").not.toBeNull();
+    const kbdCss = kbdRule.style.cssText;
+    expect(kbdCss).toContain("--ink-780");
+    expect(kbdCss).toContain("var(--f-mono)");
+    expect(kbdCss).toContain("border-bottom-width: 2px");
+    // The tab icon's `<path>` carries the reference's per-key stroke
+    // attributes: `move` has both cap+join, `interact` has join only,
+    // `suggestions` (the star) has neither.
+    const movePath = w.find('.dock-tab-bar__tab[data-item-key="move"] .dock-tab-bar__icon path');
+    expect(movePath.attributes("stroke-linecap")).toBe("round");
+    expect(movePath.attributes("stroke-linejoin")).toBe("round");
+    const interactPath = w.find('.dock-tab-bar__tab[data-item-key="interact"] .dock-tab-bar__icon path');
+    expect(interactPath.attributes("stroke-linejoin")).toBe("round");
+    expect(interactPath.attributes("stroke-linecap")).toBeUndefined();
+    const suggPath = w.find('.dock-tab-bar__tab[data-item-key="suggestions"] .dock-tab-bar__icon path');
+    expect(suggPath.attributes("stroke-linecap")).toBeUndefined();
+    expect(suggPath.attributes("stroke-linejoin")).toBeUndefined();
   });
 
   it("never renders suggestion content at the dock root outside the pane", () => {

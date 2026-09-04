@@ -23,7 +23,9 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
+    outbound_messages,
     sent_action_count,
+    store_state,
     valid_character_panel,
     valid_local_map_panel,
     valid_status_panel,
@@ -850,8 +852,16 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::the-action-dock-renders-as-a-floating-panel-in-the-stage-s-dock-anchor"
     )
     def test_action_dock_floating_panel_persists_across_modes(self):
-        """The action dock is one centred floating panel in the dock anchor."""
-        for viewport in ((1440, 900), (1280, 720)):
+        """The dock band paints the full stage width; the content column is
+        centred inside it (webclient-align-01-dock-chrome).
+
+        The painted chrome (the draft's `.dockwrap` gradient, hairline top
+        border, upward shadow, and padding) belongs to the full-width dock
+        ANCHOR; `#action-dock` is the centred max-width-1180 content column
+        (the draft's `.dock`) and paints nothing itself. Verified across the
+        scenario's viewport range (1280x720 through 1920x1080).
+        """
+        for viewport in ((1280, 720), (1600, 900), (1920, 1080)):
             page = self.logged_in_page(viewport)
             exploration = _exploration_panel([_interact_target(11, "小販")])
             _inject_snapshot(
@@ -886,12 +896,41 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                     dockLeft: d.left, dockWidth: d.width, dockHeight: d.height,
                     anchorLeft: a.left, anchorWidth: a.width, anchorHeight: a.height,
                     maxWidth: style.maxWidth,
-                    borderTop: style.borderTopWidth,
-                    boxShadow: style.boxShadow,
-                    anchorHeightComputed: anchorStyle.height,
+                    dockBackgroundImage: style.backgroundImage,
+                    dockBorderTopWidth: style.borderTopWidth,
+                    dockBoxShadow: style.boxShadow,
+                    borderTopWidth: anchorStyle.borderTopWidth,
+                    backgroundImage: anchorStyle.backgroundImage,
+                    boxShadow: anchorStyle.boxShadow,
+                    padTop: parseFloat(anchorStyle.paddingTop),
+                    padBottom: parseFloat(anchorStyle.paddingBottom),
                     viewportWidth: window.innerWidth,
                   };
                 }"""
+            )
+            # The band spans the full stage width with no unpainted gutter:
+            # the anchor starts at x=0 and paints the draft's gradient,
+            # hairline top border, and upward shadow across that width.
+            self.assertEqual(geometry["anchorLeft"], 0.0)
+            self.assertAlmostEqual(
+                geometry["anchorWidth"],
+                float(geometry["viewportWidth"]),
+                places=1,
+                msg=f"the band spans the full stage width at {viewport}",
+            )
+            self.assertIn(
+                "gradient",
+                geometry["backgroundImage"],
+                f"the band paints the draft's gradient at {viewport}",
+            )
+            self.assertTrue(
+                geometry["borderTopWidth"].startswith("1px"),
+                "the band carries the --line hairline top border",
+            )
+            self.assertIn(
+                "rgb(0, 0, 0)",
+                geometry["boxShadow"],
+                "the band carries the draft's upward shadow (#000)",
             )
             # The panel is horizontally centred within the anchor.
             self.assertLess(
@@ -900,17 +939,27 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 4.0,
                 f"the dock must be centred within the dock anchor at {viewport}",
             )
-            self.assertTrue(
-                geometry["borderTop"].startswith("1px"),
-                "the floating panel carries the --line top border",
+            self.assertLessEqual(
+                geometry["dockWidth"],
+                min(1180.0, geometry["anchorWidth"]),
+                f"the content column stays inside max-width 1180 at {viewport}",
             )
-            self.assertIn("rgba", geometry["boxShadow"], "the panel carries an upward shadow")
-            # The panel's height equals the anchor's height (both driven by --dock-h).
+            self.assertEqual(geometry["maxWidth"], "1180px")
+            # The content column paints nothing: the band owns the chrome.
+            self.assertEqual(geometry["dockBackgroundImage"], "none")
+            self.assertEqual(geometry["dockBorderTopWidth"], "0px")
+            self.assertEqual(geometry["dockBoxShadow"], "none")
+            # The band's border-box height is the --dock-h token (the anchor
+            # is border-box: height = token); the content column fills the
+            # band's padded content box (vertical padding + border subtract).
             self.assertAlmostEqual(
                 geometry["dockHeight"],
-                float(geometry["anchorHeightComputed"].replace("px", "")),
+                geometry["anchorHeight"]
+                - geometry["padTop"]
+                - geometry["padBottom"]
+                - 1.0,
                 places=1,
-                msg=f"the dock height must equal the anchor height (the --dock-h token) at {viewport}",
+                msg=f"the content column fills the band's padded box at {viewport}",
             )
             # The panel stays inside the anchor's box.
             self.assertGreaterEqual(geometry["dockLeft"], geometry["anchorLeft"])
@@ -1076,6 +1125,97 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "the breadcrumb hides again after popping one level",
         )
         self.assertEqual(sent_action_count(page), 0, "the back control dispatches no ui_action")
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-dock-s-shortcut-legend-names-only-real-keyboard-behaviour-and-renders-as-one-visible-instance"
+    )
+    def test_digit_keys_pick_the_first_four_rows_of_the_current_frame(self):
+        """`數字鍵 1–4` is real behaviour: a digit moves the dock focus onto
+        the Nth row of the current frame and runs it exactly like Enter; a
+        digit whose row does not exist is unclaimed (webclient-align-01)."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        exploration = _exploration_panel(
+            [_interact_target(11, "小販")],
+            move_rows=[
+                _move_row("ex-a", "東門", "room:44"),
+                _move_row("ex-b", "北門", "room:45", enabled=False),
+                _move_row("ex-c", "南門", "room:46"),
+            ],
+        )
+        _inject_snapshot(
+            page,
+            {
+                "exploration": exploration,
+                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "local_map": valid_local_map_panel(),
+            },
+            mode="exploration",
+        )
+        _wait_mode(page, "exploration")
+
+        # Open the move frame: the outlet pane renders the three exit rows
+        # (the breadcrumb back cell is navigation chrome, never a rendered
+        # row), so the digit slots are exactly [ex-a, ex-b, ex-c].
+        focus_action_dock(page)
+        page.locator("#dock-tab-move").click()
+        page.wait_for_timeout(150)
+        self.assertEqual(_dock_depth(page), 2, "the move frame is at depth 2")
+
+        # `2` picks the second row (a disabled row): the focus moves onto it
+        # and nothing submits — a stable state with no server commit to race.
+        _press(page, "2")
+        self.assertEqual(
+            store_state(page)["focus"]["key"],
+            "exit-ex-b",
+            "digit 2 moved the focus onto the second row",
+        )
+        self.assertEqual(
+            sent_action_count(page),
+            0,
+            "a disabled picked row shows its explanation and submits nothing",
+        )
+
+        # `4` is beyond the rendered rows: unclaimed, the frame stays open,
+        # nothing submits (the back cell takes no digit slot here — the
+        # breadcrumb chevron owns the close control).
+        _press(page, "4")
+        self.assertEqual(
+            _dock_depth(page),
+            2,
+            "a digit beyond the outlet's rendered rows leaves the frame open",
+        )
+        self.assertEqual(sent_action_count(page), 0, "the unclaimed digit submits nothing")
+
+        # The frame stayed open: `1` picks the first rendered row and
+        # submits its move exactly as Enter would — the proof is the
+        # OUTBOUND envelope (the fabricated exit_ref is the server's
+        # problem, not the client's; the commit's authoritative panel
+        # replace is intentionally not asserted, so the assertion cannot
+        # race it).
+        _press(page, "1")
+        moves = [
+            args[0]
+            for cmdname, args, _kwargs in outbound_messages(page)
+            if cmdname == "ui_action" and args and args[0].get("action_id") == "explore.move"
+        ]
+        self.assertEqual(
+            [m.get("payload", {}).get("exit_ref") for m in moves],
+            ["ex-a"],
+            "digit 1 submitted exactly the first row's move, once",
+        )
+
+        # A digit with no such row is unclaimed: the bridge does not prevent
+        # its default (dispatchEvent returns false only when a listener
+        # cancelled the event).
+        unclaimed = page.evaluate(
+            """() => {
+          const event = new KeyboardEvent("keydown", { key: "9", bubbles: true, cancelable: true });
+          document.dispatchEvent(event);
+          return !event.defaultPrevented;
+        }"""
+        )
+        self.assertTrue(unclaimed, "a digit beyond the frame's rows is not claimed")
 
     @covers_requirement(
         "webclient-contextual-hud::dock-panes-render-a-per-kind-vocabulary-from-backed-fields-only"

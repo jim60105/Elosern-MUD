@@ -35,6 +35,7 @@ import CommandEcho from "../lib/command_echo.js";
 import stableStringify from "../lib/stable_stringify.js";
 import { createFrameResolver } from "./frame-resolvers.js";
 import { actionIntentForItem, dockItemKeys } from "../components/dock-items.js";
+import { classifyPane } from "../components/dock-panes.js";
 import { gaugeRatio, isLowHp } from "../components/vitals.js";
 import LayoutStore from "../lib/layout_store.js";
 
@@ -2487,6 +2488,57 @@ export const useElosernStore = defineStore("elosern", () => {
         return true;
       }
       // Any other key while the form is open is consumed locally.
+      return true;
+    }
+    // The dock's positional row picks (webclient-align-01-dock-chrome): the
+    // legend `數字鍵 1-4 · Enter 執行 · Esc 返回` names the first four rows
+    // of the current dock frame as reachable by the top-row number keys. A
+    // digit moves the frame's focus onto its row (1-indexed, rendered
+    // order) and activates it through the same confirm path Enter uses
+    // (disabled rows show their explanation, in-flight rows stay locked,
+    // repeats are suppressed by the router's guard). Focus moving is the
+    // consumption signal: a digit whose row does not exist (a frame with
+    // fewer rows, or the pre-session empty stack) is unclaimed and falls
+    // through to the text / command-history path. Implemented entirely
+    // through the frozen router façade members — the UMD source is not
+    // edited (design D1).
+    if (key === "1" || key === "2" || key === "3" || key === "4") {
+      // A held or repeated digit is suppressed exactly like a held Enter
+      // (the router's Enter repeat branch is the reference): the first
+      // press already picked its row, and re-confirming on every
+      // auto-repeat keydown could double-submit the instant the mutation
+      // lock releases mid-hold.
+      if (repeat) {
+        return true;
+      }
+      const slot = Number(key) - 1;
+      if (router.depth() === 0) {
+        return false;
+      }
+      const menu = router.currentMenu();
+      // The slots address the RENDERED rows, not the raw item list: the
+      // exit-outlet pane never renders the `back` cell (the breadcrumb
+      // chevron owns the close control), so its row order excludes `back`
+      // — the same rule DockMenu's outletRows applies (same classifier,
+      // one source of truth). Every other pane renders `back` as an
+      // ordered row, so its slot is real there.
+      const items = menu && menu.items ? menu.items : [];
+      const slots =
+        classifyPane({ items }) === "outlet"
+          ? items.filter((i) => i && i.key !== "back")
+          : items;
+      const item = slots[slot];
+      if (!item) {
+        return false;
+      }
+      const itemKey = item.key !== undefined ? item.key : item.label;
+      if (!router.focusItemByKey(itemKey)) {
+        return false;
+      }
+      // The activation itself may decline (disabled, locked, or the
+      // held-repeat guard) after the focus moved; the key was still
+      // consumed, exactly as a focused Enter that shows an explanation.
+      router.confirm({ source: "keyboard" });
       return true;
     }
     return router.press(key, !!repeat);
