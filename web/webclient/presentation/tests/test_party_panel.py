@@ -5,13 +5,15 @@ names only, true-trait HP), empty-party availability, stale-dbid omission,
 unavailable forms, read-only rendering, the pure validator's drift rejections,
 the connected leave/purge push seams, and the identity-join contract against
 the combat participant rows. ``covers_requirement`` annotations for the new
-``webclient-party-panel`` IDs land at this change's archive/sync commit (the
+``webclient-party-panel`` IDs landed at the change's archive/sync commit (the
 checker resolves IDs only from ``openspec/specs/``).
 """
 
 from copy import deepcopy
 from types import SimpleNamespace
 import unittest
+
+from tools.spec_traceability import covers_requirement
 
 from evennia.server.serversession import ServerSession
 from evennia.utils.create import create_object
@@ -129,6 +131,9 @@ class PartyPresenterTests(EvenniaTest):
     def _render(self):
         return self.registry.render("party", self.context)
 
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
     def test_two_companion_rows_follow_party_order_and_exact_vocabulary(self):
         first = _companion("薇拉", self.room, hp_current=60, hp_maximum=120)
         second = _companion("米雅", self.room, hp_current=44, hp_maximum=44)
@@ -182,12 +187,18 @@ class PartyPresenterTests(EvenniaTest):
             self.assertNotEqual(row["hp_maximum"], affinity_value)
             self.assertNotIn(affinity_value, row.values())
 
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
     def test_empty_party_is_available_with_no_slots(self):
         payload = self._render()
         self.assertIs(payload["available"], True)
         self.assertEqual(payload["slots"], [])
         self.assertNotIn("reason", payload)
 
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
     def test_stale_membership_dbid_is_omitted_without_error(self):
         companion = _companion("薇拉", self.room)
         join_party(companion, self.player)
@@ -198,14 +209,23 @@ class PartyPresenterTests(EvenniaTest):
         )
         validate_party(payload)
 
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
     def test_creation_pending_puppet_sees_the_shared_unavailable_form(self):
         self.player.creation_pending = True
         self.assertEqual(self._render(), UNAVAILABLE_PAYLOAD)
 
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
     def test_no_location_puppet_sees_the_shared_unavailable_form(self):
         self.player.location = None
         self.assertEqual(self._render(), UNAVAILABLE_PAYLOAD)
 
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
     def test_rows_cap_at_four_and_presenting_twice_is_read_only(self):
         companions = [
             _companion(f"同伴{index}", self.room) for index in range(PARTY_MAX_ROWS)
@@ -236,6 +256,9 @@ class PartyValidatorTests(unittest.TestCase):
     def _panel(self, slots):
         return {"schema_version": PARTY_SCHEMA_VERSION, "available": True, "slots": slots}
 
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
     def test_valid_forms_normalize_identically(self):
         self.assertEqual(
             validate_party(self._panel([_slot()])), self._panel([_slot()])
@@ -245,12 +268,18 @@ class PartyValidatorTests(unittest.TestCase):
         # legal text on both mirrors.
         validate_party(self._panel([_slot(display_name="薇拉\U0001F600")]))
 
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
     def test_bounds_only_hp_semantics(self):
         # Zero is legal and no current/maximum cross assertion exists — traits
         # are truth (the delta spec overrides the proposal's "positive" wording).
         validate_party(self._panel([_slot(hp_current=0, hp_maximum=0)]))
         validate_party(self._panel([_slot(hp_current=500, hp_maximum=1)]))
 
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
     def test_drift_rejections(self):
         cases = {
             "fifth row": self._panel([_slot(identity=i + 1) for i in range(5)]),
@@ -322,6 +351,9 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
     def _messages(session, name):
         return [call[name][0][0] for call in session.sent if name in call]
 
+    @covers_requirement(
+        "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes"
+    )
     def test_party_leave_action_publishes_full_snapshot_without_the_companion(self):
         companion = _companion("薇拉", self.room)
         join_party(companion, self.player)
@@ -379,6 +411,9 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
             "the post-leave snapshot must precede the action result",
         )
 
+    @covers_requirement(
+        "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes"
+    )
     def test_companion_deletion_pushes_party_update_to_live_watchers(self):
         companion = _companion("薇拉", self.room)
         join_party(companion, self.player)
@@ -419,6 +454,9 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(payload["slots"], [])
         del self.sessionhandler[session.sessid]
 
+    @covers_requirement(
+        "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes"
+    )
     def test_deletion_without_watchers_is_a_silent_no_op(self):
         companion = _companion("孤身薇拉", self.room)
         join_party(companion, self.player)
@@ -427,6 +465,9 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
             companion.delete()
         self.assertNotIn(companion_id, [int(dbid) for dbid in self.player.db.party or []])
 
+    @covers_requirement(
+        "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes"
+    )
     def test_registry_construction_failure_degrades_to_a_bounded_diagnostic(self):
         # Final rubber-duck round: a registry-build defect must never raise
         # out of the deferred delete callback — the committed deletion stays
@@ -467,12 +508,18 @@ class PartyCombatJoinTests(BattlefieldIsolation, EvenniaTest):
         self.action_registry = build_production_action_registry()
         self.registry = build_production_registry()
 
+    @covers_requirement(
+        "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes"
+    )
     def test_combat_partial_publishers_name_the_party_panel(self):
         for action_id in ("combat.cast", "combat.flee", "combat.forfeit"):
             with self.subTest(action_id):
                 spec = self.action_registry.spec(action_id)
                 self.assertIn("party", spec.affected_panels)
 
+    @covers_requirement(
+        "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes"
+    )
     def test_settlement_round_publishes_fresh_companion_hp(self):
         from unittest.mock import patch
 
@@ -533,6 +580,9 @@ class PartyCombatJoinTests(BattlefieldIsolation, EvenniaTest):
         ]
         self.assertEqual(results[-1]["outcome"], "success")
 
+    @covers_requirement(
+        "webclient-party-panel::party-tokens-are-joined-not-duplicated"
+    )
     def test_identity_join_recovers_the_session_token_from_the_combat_panel(self):
         import re
 

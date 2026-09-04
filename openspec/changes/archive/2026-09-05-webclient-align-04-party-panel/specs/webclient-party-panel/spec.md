@@ -18,7 +18,7 @@ SHALL NOT appear anywhere in the payload. The presenter SHALL be read-only: it S
 party membership, traits, affinity, combat, quest, or world state, and SHALL emit no live object
 or filesystem reference.
 
-#### Scenario: A two-companion party serializes exactly four-key-bounded rows
+#### Scenario: A two-companion party serializes exactly the six-key bounded rows
 - **WHEN** a puppeted explorer with two live companions receives a full snapshot
 - **THEN** `party.slots` carries two rows in party-list order with the exact field set, their
   true HP integers, and each companion's canonical bond stage name, and no raw affinity value

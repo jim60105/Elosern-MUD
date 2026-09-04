@@ -87,6 +87,9 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
             "panel schema versions diverged across module, registry, and client",
         )
 
+    @covers_requirement(
+        "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes",
+    )
     def test_panel_registration_is_mirrored_in_all_three_lists(self):
         # Three-list agreement (webclient-align-04): every name the production
         # registry registers must exist in the checked table, the UMD
