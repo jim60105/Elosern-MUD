@@ -52,6 +52,14 @@ def after_successful_movement(
     ``PlayerCharacter.at_post_move`` (the shared post-move lifecycle), which
     every successful hooks-enabled relocation — ordinary traversal and direct
     ``move_to()`` alike — reaches (action-options-wiring-hardening design D2).
+
+    The tail additionally runs the one-way-gate home re-anchor
+    (limbo-one-way-gates design D7): a successful arrival at a
+    ``CITY_GATE_REGISTRY`` gate room re-homes a character whose ``home`` is
+    still the 虛境 starting room, exactly once. It sits strictly after the
+    raise-capable ``charge_movement`` so a failing settlement (compensated by
+    ``settle_movement``) never reaches it; the rules-side writer is itself a
+    no-op for anything but a player character at a registry gate coordinate.
     """
     from world.rules.map_knowledge import record_arrival
     from world.rules.movement import charge_movement
@@ -66,6 +74,12 @@ def after_successful_movement(
         wilderness_coordinates=wilderness_coordinates,
         wilderness_source_coordinates=wilderness_source_coordinates,
         wilderness_name=wilderness_name,
+    )
+    from world.rules.city_gates import reanchor_home_on_gate_arrival
+
+    reanchor_home_on_gate_arrival(
+        traversing_object,
+        destination if destination is not None else traversing_object.location,
     )
 
 
@@ -167,6 +181,20 @@ class MovementCostMixin:
             destination=traversing_object.location,
         )
 
+    def at_failed_traverse(self, traversing_object, **kwargs):
+        """Localize the 虛境 hard-gate refusal; keep the stock failure line.
+
+        ``LimboRoom.at_pre_object_receive`` already delivered the zh-tw
+        refusal and marked this traversal (``ndb.limbo_refused``); the stock
+        ``"You cannot go there."`` would contradict it with an English line,
+        so exactly this marker suppresses the default message. Every other
+        failed traversal is untouched.
+        """
+        if getattr(traversing_object.ndb, "limbo_refused", False):
+            traversing_object.ndb.limbo_refused = None
+            return
+        super().at_failed_traverse(traversing_object, **kwargs)
+
     def at_traverse(self, traversing_object, target_location, **kwargs):
         """Open the movement-settlement boundary around the stock traversal.
 
@@ -182,6 +210,11 @@ class MovementCostMixin:
 
         def traverse_stock():
             return stock_traversal(traversing_object, target_location, **kwargs)
+
+        # A stale 虛境-refusal marker (set by a non-exit move_to that never
+        # reached at_failed_traverse, e.g. a refused `home` recall) must not
+        # swallow this traversal's own failure line.
+        traversing_object.ndb.limbo_refused = None
 
         return settle_movement(
             traversing_object,

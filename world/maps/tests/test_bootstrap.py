@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import inspect
+from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object
@@ -14,6 +15,7 @@ from typeclasses.rooms import AnchorRoom, GridRoom, Room
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.maps.altoria_capital import XYMAP_DATA
+from world.maps.city_gates import CITY_GATE_REGISTRY, CityGateDef
 from world.maps.bootstrap import sync_grid, sync_limbo, sync_wilderness
 from world.maps.limbo import LIMBO_ALIAS, LIMBO_DESC, LIMBO_KEY, LIMBO_LEGACY_KEY
 from world.maps.wilderness_provider import WILDERNESS_NAME
@@ -61,14 +63,14 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
     @covers_requirement("sample-city-altoria::the-sample-city-has-exactly-thirteen-rooms-in-a-fixed-connected-topology")
     @covers_requirement("grid-room-sync::a-single-authored-idempotent-exit-bridges-limbo-and-the-sample-city")
-    def test_sync_grid_creates_thirteen_rooms_and_twenty_six_exits(self):
+    def test_sync_grid_creates_thirteen_rooms_and_twenty_five_exits(self):
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_grid()
 
         self.assertEqual(self._count_grid_rooms(), 13)
         self.assertEqual(self._count_city_exits(), 24)
-        self.assertEqual(len(self._bridging_exits()), 2)
-        self.assertEqual(len(self._bridging_exits()) + self._count_city_exits(), 26)
+        self.assertEqual(len(self._bridging_exits()), 1)
+        self.assertEqual(len(self._bridging_exits()) + self._count_city_exits(), 25)
 
     def test_sync_grid_is_idempotent_and_preserves_dbid(self):
         create_object(Room, key=LIMBO_KEY, location=None)
@@ -86,7 +88,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
         self.assertEqual(self._count_grid_rooms(), 13)
         self.assertEqual(self._count_city_exits(), 24)
-        self.assertEqual(len(self._bridging_exits()), 2)
+        self.assertEqual(len(self._bridging_exits()), 1)
         self.assertEqual(first_ids, second_ids)
 
     def test_single_call_on_fresh_grid_spawns_all_thirteen_rooms(self):
@@ -136,18 +138,17 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         sync_grid()
 
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
-        limbo_exits = [exit_obj for exit_obj in limbo.exits]
-        south_gate_to_limbo = [
-            exit_obj for exit_obj in south_gate.exits if exit_obj.destination == limbo
-        ]
-        self.assertEqual([exit_obj.key for exit_obj in limbo_exits], ["南門"])
-        self.assertEqual([exit_obj.key for exit_obj in south_gate_to_limbo], ["離開王都"])
+        self.assertEqual([exit_obj.key for exit_obj in limbo.exits], ["南門"])
+        self.assertEqual(
+            [exit_obj.key for exit_obj in south_gate.exits if exit_obj.destination == limbo],
+            [],
+        )
 
         sync_grid()
         self.assertEqual([exit_obj.key for exit_obj in limbo.exits], ["南門"])
         self.assertEqual(
             [exit_obj.key for exit_obj in south_gate.exits if exit_obj.destination == limbo],
-            ["離開王都"],
+            [],
         )
 
     def test_bridging_lookup_is_by_key_not_dbref(self):
@@ -175,6 +176,173 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         self.assertEqual(self._count_city_exits(), 24)
         self.assertEqual(len(self._bridging_exits()), 0)
 
+    @covers_requirement("limbo-one-way-gates::sync-grid-creates-exactly-one-forward-gate-exit-per-registry-row-and-converges-it-idempotently")
+    def test_forward_gate_exit_converges_from_legacy_aliases_in_place(self):
+        limbo = create_object(Room, key=LIMBO_KEY, location=None)
+        sync_grid()
+        south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        forward = [exit_obj for exit_obj in limbo.exits if exit_obj.destination == south_gate][0]
+        forward_id = forward.id
+        # Drift the object the way a legacy database has it: English aliases.
+        forward.aliases.clear()
+        forward.aliases.add("south gate", "altoria")
+
+        sync_grid()
+
+        forwards = [exit_obj for exit_obj in limbo.exits if exit_obj.destination == south_gate]
+        self.assertEqual(len(forwards), 1)
+        self.assertEqual(forwards[0].id, forward_id)
+        self.assertEqual(forwards[0].key, "南門")
+        self.assertEqual(set(forwards[0].aliases.all()), {"王都", "城門"})
+
+    @covers_requirement("limbo-one-way-gates::the-city-gate-registry-is-the-sole-authored-source-of-虛境-city-gates")
+    def test_registry_pins_the_capital_row_and_rejects_mutation(self):
+        from dataclasses import FrozenInstanceError
+
+        self.assertEqual(list(CITY_GATE_REGISTRY), ["capital_altoria"])
+        row = CITY_GATE_REGISTRY["capital_altoria"]
+        self.assertEqual(row.gate_xyz, (2, 0, "capital_altoria"))
+        self.assertEqual(row.exit_key, "南門")
+        self.assertEqual(row.exit_aliases, ("王都", "城門"))
+        with self.assertRaises(TypeError):
+            CITY_GATE_REGISTRY["ghost"] = row
+        with self.assertRaises(TypeError):
+            del CITY_GATE_REGISTRY["capital_altoria"]
+        with self.assertRaises(FrozenInstanceError):
+            row.exit_key = "篡改"
+        self.assertEqual(list(CITY_GATE_REGISTRY), ["capital_altoria"])
+
+    @covers_requirement("limbo-one-way-gates::sync-grid-creates-exactly-one-forward-gate-exit-per-registry-row-and-converges-it-idempotently")
+    def test_duplicate_forward_exits_collapse_to_the_single_authored_exit(self):
+        limbo = create_object(Room, key=LIMBO_KEY, location=None)
+        sync_grid()
+        south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        # Seed a second forward exit toward the same gate (database history).
+        duplicate = create_object(Exit, key="重複門", location=limbo, destination=south_gate)
+        keeper_id = min(
+            exit_obj.id for exit_obj in limbo.exits if exit_obj.destination == south_gate
+        )
+
+        sync_grid()
+
+        forwards = [exit_obj for exit_obj in limbo.exits if exit_obj.destination == south_gate]
+        self.assertEqual(len(forwards), 1)
+        self.assertEqual(forwards[0].id, keeper_id)
+        self.assertEqual(forwards[0].key, "南門")
+        self.assertFalse(Exit.objects.filter(id=duplicate.id).exists())
+
+    @covers_requirement("limbo-one-way-gates::every-sync-prunes-every-exit-whose-destination-is-the-starting-room")
+    def test_reverse_exit_is_pruned_once_with_event(self):
+        limbo = create_object(Room, key=LIMBO_KEY, location=None)
+        sync_grid()
+        south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        # Seed the pre-change return exit the way an existing database has it.
+        create_object(
+            Exit,
+            key="離開王都",
+            aliases=["回虛境"],
+            location=south_gate,
+            destination=limbo,
+        )
+
+        with patch("world.maps.bootstrap.log_info") as info:
+            sync_grid()
+        prunes = [
+            call
+            for call in info.call_args_list
+            if call.args and call.args[0] == "bootstrap_grid_exit_pruned"
+        ]
+        self.assertEqual(len(prunes), 1)
+        self.assertEqual(prunes[0].args[0], "bootstrap_grid_exit_pruned")
+        self.assertEqual(prunes[0].kwargs["context"]["exit_key"], "離開王都")
+        self.assertEqual(prunes[0].kwargs["context"]["source_room_key"], south_gate.key)
+        self.assertEqual(
+            [exit_obj for exit_obj in south_gate.exits if exit_obj.destination == limbo],
+            [],
+        )
+
+        # A converged database prunes and logs nothing.
+        with patch("world.maps.bootstrap.log_info") as info:
+            sync_grid()
+        self.assertEqual(
+            [
+                call
+                for call in info.call_args_list
+                if call.args and call.args[0] == "bootstrap_grid_exit_pruned"
+            ],
+            [],
+        )
+
+    @covers_requirement("limbo-one-way-gates::the-city-gate-registry-is-the-sole-authored-source-of-虛境-city-gates")
+    def test_limbo_exit_set_equals_registry_rows(self):
+        limbo = create_object(Room, key=LIMBO_KEY, location=None)
+        sync_grid()
+
+        expected = {row.exit_key: row.gate_xyz for row in CITY_GATE_REGISTRY.values()}
+        self.assertEqual(
+            {exit_obj.key: exit_obj.destination.xyz for exit_obj in limbo.exits},
+            expected,
+        )
+
+    @covers_requirement("limbo-one-way-gates::a-registry-row-whose-gate-room-is-missing-warns-and-is-skipped-without-blocking-other-rows")
+    def test_missing_gate_room_row_warns_and_skips_without_blocking(self):
+        limbo = create_object(Room, key=LIMBO_KEY, location=None)
+        broken_row = CityGateDef(
+            map_id="nowhere_city",
+            gate_xyz=(9, 9, "nowhere"),
+            exit_key="空門",
+            exit_aliases=("不存在",),
+        )
+        rebound = dict(CITY_GATE_REGISTRY)
+        rebound["nowhere_city"] = broken_row
+
+        with (
+            patch("world.maps.bootstrap.CITY_GATE_REGISTRY", rebound),
+            patch("world.maps.bootstrap.log_warn") as warn,
+        ):
+            sync_grid()
+
+        missing = [
+            call
+            for call in warn.call_args_list
+            if call.args and call.args[0] == "bootstrap_grid_gate_missing"
+        ]
+        self.assertEqual(len(missing), 1)
+        self.assertEqual(missing[0].kwargs["context"]["map_id"], "nowhere_city")
+        self.assertEqual(missing[0].kwargs["context"]["action"], "skip_gate_row")
+        # The healthy row still converged; the broken row created nothing.
+        self.assertEqual([exit_obj.key for exit_obj in limbo.exits], ["南門"])
+
+    @covers_requirement("limbo-one-way-gates::adding-a-city-means-adding-a-registry-row-with-no-bootstrap-code-change")
+    def test_second_registry_row_converges_a_second_forward_gate(self):
+        limbo = create_object(Room, key=LIMBO_KEY, location=None)
+        second_row = CityGateDef(
+            map_id="capital_altoria",
+            gate_xyz=NORTH_GATE_XYZ,
+            exit_key="北門",
+            exit_aliases=("王都北",),
+        )
+        rebound = dict(CITY_GATE_REGISTRY)
+        rebound["capital_altoria_north"] = second_row
+
+        with patch("world.maps.bootstrap.CITY_GATE_REGISTRY", rebound):
+            sync_grid()
+
+        north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
+        keys = sorted(exit_obj.key for exit_obj in limbo.exits)
+        self.assertEqual(keys, ["北門", "南門"])
+        self.assertEqual(len(limbo.exits), 2)
+        # Both gates exist; neither city side leads back into 虛境.
+        self.assertIsNone(
+            [exit_obj for exit_obj in north_gate.exits if exit_obj.destination == limbo] or None
+        )
+        # And a seeded reverse exit for the NEW gate prunes the same way.
+        create_object(Exit, key="回虛境二", location=north_gate, destination=limbo)
+        sync_grid()
+        self.assertEqual([exit_obj for exit_obj in north_gate.exits if exit_obj.destination == limbo], [])
+        sync_grid()
+        self.assertEqual(len(limbo.exits), 2)
+
     @covers_requirement("grid-room-sync::sync-grid-runs-automatically-at-server-start-after-sync-all")
     @covers_requirement("grid-room-sync::the-evennia-xyzgrid-cli-remains-available-but-is-not-required-for-boot", "lore-startup-sync::sync-runs-automatically-at-evennia-server-start")
     def test_at_server_start_calls_sync_grid_after_sync_all(self):
@@ -201,7 +369,7 @@ class GridBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
 
         self.assertEqual(self._count_grid_rooms(), 13)
         self.assertEqual(self._count_city_exits(), 24)
-        self.assertEqual(len(self._bridging_exits()), 2)
+        self.assertEqual(len(self._bridging_exits()), 1)
 
 
 class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
