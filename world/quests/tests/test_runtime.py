@@ -464,6 +464,7 @@ class QuestTrackingTests(QuestRegistryIsolation, EvenniaTest):
         self.assertFalse(record.tracked)
         self.assertFalse(read_records(self.player)[0].tracked)
 
+    @covers_requirement("quest-lifecycle::tracking-state-is-bounded-deterministic-quest-state")
     def test_tracking_three_succeeds_and_round_trips(self):
         ids = [self._accept(f"track_{index}").quest_id for index in range(3)]
         for quest_id in ids:

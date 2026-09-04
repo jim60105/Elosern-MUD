@@ -670,6 +670,10 @@ class ServiceDispatchTests(ServiceActionBase):
         self.assertEqual(result["code"], "insufficient_funds")
         self.assertEqual(result["presentation_revision"], coordinator.revision)
 
+    @covers_requirement(
+        "webclient-objectives-panel::objectives-presentation-stays-current-across-quest-and-tracking-seams",
+        "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative",
+    )
     def test_track_action_publishes_services_and_objectives_together(self):
         self._register()
         record = accept_guild_offer(self.player, self.staff, "introductory_hunt")

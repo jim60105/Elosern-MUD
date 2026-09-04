@@ -11,6 +11,8 @@ from copy import deepcopy
 import json
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
@@ -109,6 +111,9 @@ class ObjectivesPresenterTests(EvenniaTest):
             },
         )
 
+    @covers_requirement(
+        "webclient-objectives-panel::the-objectives-panel-discloses-the-tracked-active-quests-host-independently"
+    )
     def test_tracked_active_quest_serializes_with_describe_seams(self):
         # 2 stages, deadline 72h, offer reward 80 copper.
         stage_zero = QuestStage(index=0, objective=defeat("low", quantity=1))
@@ -178,6 +183,9 @@ class ObjectivesPresenterTests(EvenniaTest):
         # Without registration, reward_copper is null.
         self.assertIsNone(payload["rows"][0]["reward_copper"])
 
+    @covers_requirement(
+        "webclient-objectives-panel::objectives-presentation-stays-current-across-quest-and-tracking-seams"
+    )
     def test_untracked_and_terminal_records_are_omitted(self):
         d1 = register(quest("q_active_tracked_1"))
         d2 = register(quest("q_active_untracked"))
