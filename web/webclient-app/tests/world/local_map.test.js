@@ -1,4 +1,6 @@
 import { mount } from "@vue/test-utils";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import LocalMap from "../../components/LocalMap.vue";
 import MapOverlay from "../../components/MapOverlay.vue";
@@ -787,5 +789,81 @@ describe("LocalMap (B4 world family)", () => {
     expect(lattice.props("maxUpscale")).toBeUndefined();
     const label = lattice.find(".local-map__node-label");
     expect(label.attributes("style")).toContain("font-size: 9px");
+  });
+
+  // ---------------------------------------------------------------------
+  // The island's own type ladder and its layered-content contract. Both are
+  // expressed in the SFC's scoped CSS, which a jsdom mount does not apply, so
+  // they are asserted against the authored rule text — the same technique the
+  // layout-variant and z-index suites already use for style contracts.
+  // ---------------------------------------------------------------------
+
+  const ISLAND_SOURCE = readFileSync(
+    join(import.meta.dirname, "../../components/LocalMap.vue"),
+    "utf-8",
+  );
+
+  function ruleBody(source, selector) {
+    const start = source.indexOf(`${selector} {`);
+    expect(start, `rule not found: ${selector}`).toBeGreaterThan(-1);
+    return source.slice(start, source.indexOf("}", start));
+  }
+
+  it("keeps the readout at the island's smallest type step, never above its own header", () => {
+    // webclient-local-map: the readout "SHALL render at the island's smallest
+    // type step". The island's smallest chrome step is the meta row's 10px, so
+    // the readout states its one secondary figure at exactly that step — it
+    // shipped at 11px, which made a coordinate pair the LARGEST text on the
+    // card, above the card's own title.
+    const header = ruleBody(ISLAND_SOURCE, ".local-map__meta");
+    const readout = ruleBody(ISLAND_SOURCE, ".local-map__detail");
+    const step = (body) => body.match(/font-size:\s*([0-9.]+)px/)?.[1];
+    expect(step(header)).toBe("10");
+    expect(step(readout)).toBe(step(header));
+    // ...and the treatment stays box-free and token-driven (design D7).
+    expect(readout).toContain("var(--f-mono)");
+    expect(readout).toContain("var(--paper-500)");
+    expect(readout).not.toMatch(/\bborder\s*:/);
+    expect(readout).not.toMatch(/\bbackground\s*:/);
+    expect(readout).not.toMatch(/#[0-9a-fA-F]{3,6}/);
+  });
+
+  it("declares the marker-name step so no island text outweighs the island's chrome", () => {
+    const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
+    const lattice = w.findComponent({ name: "MapLattice" });
+    expect(lattice.props("markerNameFont")).toBe(10);
+    // Declared by the surface, not inherited from the renderer's default —
+    // the island owns every type size it draws (the `labelFont` precedent).
+    expect(ISLAND_SOURCE).toContain(':marker-name-font="10"');
+    // Every type size the island declares is at or below its 10px chrome step:
+    // the node label (9), the marker name (10), the readout and the header
+    // (10). A marker name drawn at --text-sm (13) used to out-shout both.
+    const chromeStep = 10;
+    expect(lattice.props("labelFont")).toBeLessThanOrEqual(chromeStep);
+    expect(lattice.props("markerNameFont")).toBeLessThanOrEqual(chromeStep);
+  });
+
+  it("keeps the assistive-technology mirror out of the island's flex flow", () => {
+    // The z-index raising rule outranks `.visually-hidden` on specificity, so
+    // without an explicit exclusion it re-positions the mirror to `relative`:
+    // `clip` then stops applying (it only affects absolutely positioned boxes)
+    // and the mirror becomes an in-flow flex item worth its own box plus a full
+    // gap — height that `measureCanvasBudget()` never reserves, because it
+    // counts only the meta row, the canvas, and at most one of the graph list
+    // and the readout.
+    const raising = ISLAND_SOURCE.match(
+      /\.local-map > \*:not\(\.local-map__affordance\)([^{]*)\{/,
+    );
+    expect(raising, "the raising rule must stay a :not() rule").not.toBeNull();
+    expect(raising[1]).toContain(":not(.visually-hidden)");
+    expect(ruleBody(ISLAND_SOURCE, ".visually-hidden")).toContain("position: absolute");
+
+    // The mirror is still rendered, still unfocusable, and still the only
+    // island section the budget does not count.
+    const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
+    const mirror = w.find('[data-testid="local-map-edge-markers-mirror"]');
+    expect(mirror.exists()).toBe(true);
+    expect(mirror.classes()).toContain("visually-hidden");
+    expect(mirror.attributes("tabindex")).toBeUndefined();
   });
 });

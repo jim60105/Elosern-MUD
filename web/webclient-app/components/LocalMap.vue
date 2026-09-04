@@ -296,6 +296,7 @@ function onIslandClick(event) {
         :col-pitch="40"
         :row-pitch="40"
         :label-font="9"
+        :marker-name-font="10"
         :field-fill="true"
         :show-axis="true"
         :fog-vignette="true"
@@ -433,11 +434,23 @@ function onIslandClick(event) {
   box-shadow: 0 0 0 2px var(--gold-400) inset;
 }
 
-/* Every direct child except the affordance is raised above it, so
-   their clicks target the visible content and reach onIslandClick, and the
+/* Every direct child that paints is raised above the affordance, so its
+   clicks target the visible content and reach onIslandClick, and the
    affordance only receives clicks on genuinely empty island area (padding,
-   the flex gaps between sections). */
-.local-map > *:not(.local-map__affordance) {
+   the flex gaps between sections). Written as a `:not()` rule rather than a
+   per-child opt-in so a future island child is raised by construction.
+
+   `.visually-hidden` is excluded deliberately, and the exclusion is
+   load-bearing twice over. This rule's specificity (0,2,0) outranks
+   `.visually-hidden`'s (0,1,0), so without the exclusion it re-positions the
+   assistive-technology mirror to `relative` — and (a) `clip` only applies to
+   absolutely positioned boxes, so the clip-rect hiding pattern silently stops
+   working, and (b) the mirror becomes an in-flow flex item, adding its 1px box
+   plus a full `--sp-2` gap to the island while `measureCanvasBudget()` — which
+   counts only the meta row, the canvas, and at most one of the graph-variant
+   list and the readout — reserves nothing for it. The mirror has nothing to
+   raise: it is clipped to nothing and never paints. */
+.local-map > *:not(.local-map__affordance):not(.visually-hidden) {
   position: relative;
   z-index: 1;
 }
@@ -506,7 +519,11 @@ function onIslandClick(event) {
   padding-top: var(--sp-1);
   color: var(--paper-500);
   font-family: var(--f-mono);
-  font-size: 11px;
+  /* The island's smallest type step — the same 10px the meta row above
+     already uses. The readout is one secondary figure beside a canvas that is
+     the primary content; at 11px it was the LARGEST text in the island, above
+     the card's own title. */
+  font-size: 10px;
   line-height: 1.45;
   text-align: center;
   overflow-wrap: anywhere;

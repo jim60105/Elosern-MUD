@@ -42,6 +42,18 @@ const props = defineProps({
   // and bare mounts; the island passes 9 to respect the type proportion and
   // stay below the island's own 10px chrome step.
   labelFont: { type: Number, default: 11 },
+  // Type size for the island's edge-marker names (SVG user units). Declared
+  // by the surface for the same reason `labelFont` is: the island's coordinate
+  // margin now resolves the uniform scale to ~1, so a user-unit size IS the
+  // drawn CSS px size. The island's smallest chrome type step is 10px (its
+  // header row), and a marker name annotates the drawing rather than titling
+  // it, so it renders AT that step and never above it. The number also drives
+  // the along-edge fit budget and the stacked-column line step below: the
+  // labels are full-width CJK in the shared monospace token, so one glyph
+  // advances exactly one type step on either axis, and a divisor that
+  // disagreed with the drawn size would either overflow the marker's slot or
+  // truncate names that had room to spare.
+  markerNameFont: { type: Number, default: 10 },
   // Coordinate-field padding (island-only opt-in): pads coordinate space
   // symmetrically around the node core up to maxWidth rather than magnifying.
   fieldFill: { type: Boolean, default: false },
@@ -362,7 +374,7 @@ const fittedEdgeMarkers = computed(() => {
 
   const fittedList = markers.map((m) => {
     const span = spanBySide[m.side] || 0;
-    const budget = Math.floor(span / 13);
+    const budget = Math.floor(span / props.markerNameFont);
     const fitted = fitMarkerName(m.name, budget);
     return {
       ...m,
@@ -520,10 +532,17 @@ function markerNameY(marker) {
     return 4;
   }
   const reach = Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale;
+  // The name sits in the band, clear of the diamond's axial reach by the same
+  // 4-unit gap on either horizontal edge: above the marker on `top` (the
+  // baseline, so the ascent grows outward), below it on `bottom` (one type
+  // step past the gap, so the whole line clears the diamond).
   if (marker.side === "top") return -(reach + 4);
-  if (marker.side === "bottom") return reach + 14;
+  if (marker.side === "bottom") return reach + 4 + props.markerNameFont;
+  // Vertical edges stack one glyph per line, so the column is centred on the
+  // marker by lifting it half its own height and dropping the first baseline
+  // by roughly half a glyph's ascent.
   const k = marker.glyphs?.length || 1;
-  return -((k - 1) * 13) / 2 + 4;
+  return -((k - 1) * props.markerNameFont) / 2 + props.markerNameFont * 0.36;
 }
 function markerNameAnchor(marker) {
   if (props.overlayChrome) {
@@ -800,6 +819,7 @@ const latticeStyle = computed(() => {
         <text
           v-else-if="marker.visibleName && (marker.side === 'top' || marker.side === 'bottom')"
           class="local-map__edge-marker-name--island"
+          :style="{ fontSize: `${markerNameFont}px` }"
           :x="markerNameX(marker)"
           :y="markerNameY(marker)"
           :text-anchor="markerNameAnchor(marker)"
@@ -807,6 +827,7 @@ const latticeStyle = computed(() => {
         <text
           v-else-if="marker.visibleName && (marker.side === 'left' || marker.side === 'right')"
           class="local-map__edge-marker-name--island"
+          :style="{ fontSize: `${markerNameFont}px` }"
           :x="markerNameX(marker)"
           :y="markerNameY(marker)"
           :text-anchor="markerNameAnchor(marker)"
@@ -815,7 +836,7 @@ const latticeStyle = computed(() => {
             v-for="(glyph, i) in marker.glyphs"
             :key="i"
             :x="markerNameX(marker)"
-            :dy="i === 0 ? 0 : 13"
+            :dy="i === 0 ? 0 : markerNameFont"
           >{{ glyph }}</tspan>
         </text>
       </template>
@@ -964,9 +985,17 @@ const latticeStyle = computed(() => {
   overflow: visible;
 }
 
+/* The island's edge-marker name. Its type size is the surface's own declared
+   `markerNameFont` step, bound as an inline style (the same policy the node
+   label follows) because the SAME number drives the along-edge fit budget and
+   the stacked-column line step in script: a CSS-only size could drift away
+   from the geometry that reserves the name's room. `--text-sm` (13px) used to
+   sit here, which the island's coordinate margin then drew at ~13 CSS px —
+   larger than the island's 10px title and than the 9-unit node labels, so a
+   marker's name out-shouted both the map it annotates and the card's own
+   heading. */
 .local-map__edge-marker-name--island {
   font-family: var(--f-mono);
-  font-size: var(--text-sm);
   fill: var(--paper-500);
 }
 

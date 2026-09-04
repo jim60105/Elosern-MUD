@@ -561,6 +561,144 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 self.assertTrue(page.locator('[data-testid="local-map-detail"]').is_visible())
                 page.close()
 
+    @covers_requirement(
+        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::the-minimap-island-states-only-its-own-drawing-convention",
+    )
+    def test_island_type_ladder_stays_under_its_own_chrome_step(self):
+        """No text the island draws outweighs the island's own chrome step.
+
+        The spec bounds the node label at "the surface's own smallest chrome
+        type step" and states the readout and the marker names at that same
+        step. Because the island's coordinate margin resolves the uniform scale
+        to ~1, a lattice user unit IS a drawn CSS pixel, so this is a single
+        measurable ladder: header 10, readout 10, marker name 10, node label 9.
+        It shipped inverted — the readout at 11 and the marker names at
+        --text-sm (13), which drew the largest text on the card over the map it
+        annotates.
+        """
+        for viewport in ((1440, 900), (1280, 720)):
+            with self.subTest(viewport=viewport):
+                page = self.new_page(viewport)
+                from .browser_helpers import login_and_open
+
+                login_and_open(page, self.webclient_url, self.base_url)
+                self._wait_local_map_available(page)
+                page.wait_for_selector('[data-testid="local-map__lattice"]', timeout=30000)
+                # The seeded grid payload carries a remembered gateway, so the
+                # island draws at least one named edge marker to measure.
+                page.wait_for_selector(
+                    '[data-testid^="local-map__edge-marker--"]', timeout=15000
+                )
+
+                ladder = page.evaluate(
+                    """() => {
+                      const island = document.querySelector('[data-testid="local-map"]');
+                      const svg = island.querySelector('[data-testid="local-map__lattice"]');
+                      const cs = (el) => window.getComputedStyle(el);
+                      const box = svg.getBoundingClientRect();
+                      const svgStyle = cs(svg);
+                      const drawnWidth =
+                        box.width -
+                        parseFloat(svgStyle.borderLeftWidth) -
+                        parseFloat(svgStyle.borderRightWidth);
+                      const viewBoxWidth = Number(svg.getAttribute('viewBox').split(' ')[2]);
+                      const scale = drawnWidth / viewBoxWidth;
+                      const px = (el) => parseFloat(cs(el).fontSize);
+                      const drawn = (sel) =>
+                        Array.from(island.querySelectorAll(sel)).map(
+                          (el) => Math.round(px(el) * scale * 100) / 100
+                        );
+                      return {
+                        scale: Math.round(scale * 1000) / 1000,
+                        header: px(island.querySelector('[data-testid="local-map__title"]')),
+                        readout: px(island.querySelector('[data-testid="local-map-detail"]')),
+                        nodeLabels: drawn('.local-map__node-label'),
+                        markerNames: drawn('.local-map__edge-marker-name--island'),
+                      };
+                    }"""
+                )
+                chrome_step = ladder["header"]
+                self.assertEqual(chrome_step, 10, "the island's chrome type step is 10px")
+                self.assertEqual(
+                    ladder["readout"],
+                    chrome_step,
+                    "the readout states its figure at the island's smallest type step",
+                )
+                self.assertLessEqual(
+                    ladder["scale"], 1, "coordinate margin never magnifies the drawing"
+                )
+                self.assertTrue(ladder["markerNames"], "at least one marker name is drawn")
+                for size in ladder["markerNames"]:
+                    self.assertLessEqual(
+                        size,
+                        chrome_step,
+                        f"a marker name drawn at {size}px outweighs the island's chrome",
+                    )
+                self.assertTrue(ladder["nodeLabels"], "at least one node label is drawn")
+                for size in ladder["nodeLabels"]:
+                    self.assertLessEqual(
+                        size,
+                        chrome_step,
+                        f"a node label drawn at {size}px outweighs the island's chrome",
+                    )
+                page.close()
+
+    @covers_requirement(
+        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone"
+    )
+    def test_marker_mirror_is_out_of_the_island_height_budget(self):
+        """The AT mirror is presentation-free: it costs the island no height.
+
+        ``measureCanvasBudget()`` reserves height for the meta row, the canvas,
+        and at most one of {the graph-variant remembered list, the readout}.
+        The visually-hidden marker mirror is deliberately not among them, so it
+        MUST stay out of the flex flow — otherwise it spends its own box plus a
+        full inter-section gap of budget nobody reserved, and its clip-rect
+        hiding stops applying (``clip`` only affects absolutely positioned
+        boxes).
+        """
+        page = self.logged_in_page()
+        self._wait_local_map_available(page)
+        page.wait_for_selector('[data-testid="local-map-edge-markers-mirror"]', timeout=30000)
+
+        layout = page.evaluate(
+            """() => {
+              const island = document.querySelector('[data-testid="local-map"]');
+              const mirror = island.querySelector('[data-testid="local-map-edge-markers-mirror"]');
+              const out = (el) => ['absolute', 'fixed'].includes(
+                window.getComputedStyle(el).position
+              );
+              const inFlow = Array.from(island.children).filter((el) => !out(el));
+              const detail = island.querySelector('[data-testid="local-map-detail"]');
+              return {
+                mirrorPosition: window.getComputedStyle(mirror).position,
+                mirrorEntries: mirror.querySelectorAll('li').length,
+                mirrorInFlow: inFlow.includes(mirror),
+                inFlowCount: inFlow.length,
+                hasRememberedList:
+                  island.querySelectorAll('[data-testid="local-map-remembered"]').length > 0,
+                readoutLaidOut: detail.getBoundingClientRect().height > 0,
+              };
+            }"""
+        )
+        self.assertGreaterEqual(layout["mirrorEntries"], 1, "the mirror lists its markers")
+        self.assertEqual(
+            layout["mirrorPosition"],
+            "absolute",
+            "the mirror must stay absolutely positioned, or clip-rect hiding stops applying",
+        )
+        self.assertFalse(layout["mirrorInFlow"], "the mirror is not a laid-out island section")
+        # The laid-out sections are exactly the ones the budget counts.
+        expected = 2 + int(layout["hasRememberedList"]) + int(layout["readoutLaidOut"])
+        self.assertEqual(
+            layout["inFlowCount"],
+            expected,
+            "the island lays out only the sections measureCanvasBudget() reserves for",
+        )
+
     # The maximal-height, minimal-width lattice (task 3.5): 64 in-view nodes,
     # one per row across 64 rows, alternating the two columns — a legal
     # 64-node payload (the model's node bound). Mirrors
