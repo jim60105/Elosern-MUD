@@ -12,6 +12,7 @@
 - **guild／shop host**：`world/rules/guild_economy.py::_sync_service_host(key, room, component_specs)` 以 `NPC.objects.filter(db_key=key).first()` 找既有 host，找不到就 `create_object(NPC, key=key, ...)`。`key` 是模組常量 `GUILD_SERVICE_KEY = "altoria_guild_master"`／`MERCHANT_SERVICE_KEY = "altoria_merchant"`，同一字串又被當成元件的 `service_id`。所以公會長現在在房間裡的顯示名稱就是 ASCII 的 `altoria_guild_master`。重用是「找到就更新 location／race／成年身分＋補齊缺少的元件」，不是「找到就完全不動」。
 - **`SHOP_REGISTRY`**（`world/lore/shops.py`）目前只有 `altoria_general_store` 一列，欄位為 `key`／`merchant_component_key`／`offered_item_keys`。公會分會 host 沒有任何 registry row：它的身分來源是 `GUILD_BRANCH_REGISTRY["guild_branch_altoria"]`（`world/lore/guild.py`）＋兩個模組常量。
 - **考官**：建立點是 `world/rules/guild_exams.py::_spawn_opponent`，由 `start_guild_exam` 呼叫；`settle_exam_outcome` 只寫考試終局狀態，**臨時對手是由呼叫端在結算交易提交後刪除的**。設計 §5 寫的建立點與現況不符，見 D8。現況 key 為 `f"guild-examiner-{rank}-{pk}"`，pk 後綴是 archived change `fix-battlefield-identity-collisions` 為了修 audit finding F08 加的：戰場 roster（`combat.py`／`combat_session.py`）與 skip-safety 註冊表（`skip_safety.py`）**都以 `str(entity.key)` 為鍵**。
+- **crc32 兜底補名（namegen-npc-flow，與本 change 同期落地）**：`scene_builder._spawn_npc` 在 `npc.db.display_name` 為 `None` 時以 `roll_name_for_race(..., Random(crc32(f"{definition_key}:{stage}:{role}")))` 補名並發 `npc_name_fallback` 事件；主規格 `scene-builder` 有兩條 requirement 釘住此契約。prompt 端另有一個脈絡種子的「僅供靈感」建議名庫（`scenario-director` 規格）。使用者已決定**刪除 spawn 端兜底、保留 prompt 端靈感**，見 D11。
 - `GUILD_RANK_REGISTRY`（`world/lore/guild.py`）七列，欄位為 `key`／`order`／獎勵區間／`description`／`title_key`（玩家固定稱號，與 NPC 稱號無關）。
 - 前置 change `npc-title-identity-core` 交付 `world/rules/npc_identity.py`（`validate_npc_title`／`npc_title_value`／`npc_display_name`）與 `NPC.npc_title`；`npc-title-import-pipeline` 交付匯入面的 `title` 欄位、loader 落庫與對既有 NPC 的重名 gate。
 
@@ -49,10 +50,10 @@
 
 與 change 2 的差異（不是矛盾）：匯入面的角色卡**有** `key` 欄位，`display_name` 是被驗證但 loader 從不讀取的惰性欄位，change 2 的 D7 因此明文不把它接成顯示姓名。blueprint 面沒有 `key`，情況相反。
 
-**離線核算（設計要求的「不引入命名池」在此成立）**：現況沒有任何「LLM 缺 `display_name` 時由程式湊一個名字」的 fallback——`key` 從來就是 `f"{場景}的{role}"` 這個泛型合成字串，與 LLM 無關。本 change 之後：
+**離線核算（設計要求的「不引入命名池」在此成立）**：落地本 change 後，唯一的名字來源是作者供給：LLM 提案、模板池、registry。prompt 端的 crc32 建議名庫只是靈感（人／LLM 可採用可改寫），**系統永遠不把擲出來的名字直接寫成實體的最終名**。
 
 1. LLM 提案缺 `display_name`／`title` → guardrail 具名拒絕 → 既有重試預算內重試 → 仍失敗則 `generate_quest_blueprint` 依既有降級路徑改用 `director_templates.py` 的模板池，而模板池的 `npc_req` 由本 change 補齊作者姓名與稱號。
-2. 因此「離線可玩」不需要任何取名演算法，也不會出現無名 NPC；泛型合成 key 從此消失。
+2. 因此「離線可玩」不需要任何取名演算法，也不會出現無名 NPC；泛型合成 key 與 spawn 端兜底補名同時消失（D11）。
 
 代價（刻意接受）：同一個模板重複派發時，場景佔用者永遠叫同一個名字（例如兩次「討伐林間盜匪」都遇到「黑鬍」）。這與設計 §3.2「runtime 生成沿用既有具名佔用者的冪等同步語義（同名即同一人）」一致——同一位盜匪頭子在不同任務裡是同一個角色。
 
@@ -133,7 +134,7 @@ def _sync_service_host(service_id, name, title, room, component_specs) -> NPC:
 4. `world/rules/guild_exams.py`（考官）— 本 change。
 5. `world/rules/onboarding.py::sync_guard_npc`（`GUARD_NPC_KEY = "南門守衛"`）— **刻意豁免**。該守衛是新手教學的一部分，使用者已決定整體移除 onboarding 教學；為註定刪除的 NPC 設計 registry 條目與載入驗證違反「不留將死之抽象」，且 AGENTS.md 明文「deliberate skip is preferable to a fake implementation」。豁免的範圍與失效條件寫進本 change 的 proposal／specs 敘述，讓不變式缺口保持可見；移除 onboarding 的那個 change 落地時豁免自然消失。在此之前，該守衛是唯一一具以退化狀態（純姓名）呈現的生產 NPC。
 
-測試端 `create_object(NPC, ...)` 不納入不變式（見 change 1 對 default `""` 的 storage-default 定性）；生產者清單是設計文件的人工維護清單，由評審對帳（change 1 的靜態掃描迴歸案已因假保衛判定撤除，見該 change tasks 6.4b）。
+測試端 `create_object(NPC, ...)` 不納入不變式（見 change 1 對 default `""` 的 storage-default 定性）；生產者清單是設計文件的**人工維護清單**、由評審對帳（change 1 階段的靜態掃描迴歸案經 rubber-duck 判定為假保衛而撤除——`world/imports/loader.py` 以變數派發 typeclass，文字正則掃不到；撤除優於假實作）。
 
 ### D8. 考官：建立點是 `_spawn_opponent`（設計文字校正），去衝突後綴改為條件式
 
@@ -148,6 +149,15 @@ opponent.npc_title = validate_npc_title(rank.examiner_title)
 if _key_taken_by_other(opponent):          # 任何其他實體（含玩家）已持有同名
     opponent.key = f"{rank.examiner_name}-{opponent.pk}"
 ```
+
+**佔用檢查的落點＝建立後的同一 transaction 內、以排除自身的重查詢**（`_spawn_opponent` 本就在
+`start_guild_exam` 的 `transaction.atomic()` 內執行，`guild_exams.py:338-341`）：先以作者姓名
+`create_object`，再查「除自己外是否還有實體持有同 key」，命中才改附 `-{pk}`——檢查與寫入同處
+一個原子區塊，不存在「先查後造」的 TOCTOU 視窗（rubber-duck 計畫審閱發現）。序列化正當性＝本專案的
+部署事實：Evennia 單進程 asyncio 執行模型＋SQLite 單一寫者，兩場同階級考試的 spawn 區段不可能
+真正交錯。測試以「作者姓名已被玩家佔用」＋「兩場同階級考試先後開考」兩案斷言 roster／
+skip-safety 鍵互異：順序建立已足以捕捉回歸，因為後 spawn 者的重查詢一定看得到先前已提交的同名
+實體。
 
 即：**作者姓名優先，被佔用時才附加 `-{pk}`**。兩條既有 scenario 的保證原封不動——玩家合法取了同名時考試照樣開得起來（對手改用後綴形），兩場同階級考試同時進行時兩隻對手的 key 仍互異——而 audit finding F08（roster／skip-safety 以 `str(entity.key)` 為鍵）的修補不被回退。requirement 原文改述為這個條件式規則。
 
@@ -173,6 +183,15 @@ log_info("guild_exam_opponent_created", context={"char": opponent.key, "rank": t
 ```
 
 只在**實際建立**時發（重用是既有的冪等 no-op，不再發一次「建立」）；`context` 帶設計指名的 `char`／`shop`／`rank`，不帶玩家文案。兩個檔案都已經是 facade adopter（都已具名匯入 `log_warn`），所以本 change 不改變 adopter 集合，`tools/observability_freeze.json`（空清單）不動。測試依 AGENTS.md patch **呼叫端模組**的綁定（`world.rules.guild_economy.log_info`），不 patch `world.observability.*`。
+
+### D11. crc32 spawn 兜底補名整條刪除；擲名僅存活為 prompt 端靈感（使用者核定，2026-09-04）
+
+Q1=A 的完整含義：`display_name`＋`title` 在 guardrail 與編譯邊界**必填**，spawn 端重驗對任何缺欄／違規一律 fail-closed 回滾（D6 的嚴格版）。因此 namegen-npc-flow 的 crc32 槽位種子兜底補名在生產上不可達，且它的存在直接抵觸「每隻 NPC 的姓名由作者供給」不變式（設計 §3.2）——一個系統自動湊的最終名就是命名池後門。處置：
+
+- **刪除**：`scene_builder` 的兜底區塊、`_log_name_fallback`、`roll_name_for_race` 匯入、`npc_name_fallback` 事件，以及主規格 `scene-builder` 的兩條對應 requirement（本 change delta 以 `## REMOVED Requirements` 宣告，含理由與遷移說明，先例：`2026-08-13-overwhelm-log-attribution`）。對應測試同批刪除。
+- **保留**：prompt 端脈絡種子靈感名庫（`scenario_director` 規格）原封不動——它正是使用者要的擲名定位：**給人／LLM 的參考**，對抗「創作者總取同名」的偏誤；採用與否、如何改寫由作者決定。prompt 文案中「建議填寫 display_name」一句改為陳述 `display_name`＋`title` 為必填（`prompts/scenario_director.yaml`，verbatim-shipment 基準同批）。
+- **設計文件修訂**：`docs/superpowers/specs/2026-09-03-npc-namegen-design.md` §6.2（＋§2 決策表、§9 測試預期）由本 change 明文標註作廢（spawn 兜底撤回，靈感庫不動）。設計文件勝出規則（AGENTS.md）要求撤回必須明文，不能只藏在 change 裡。
+- **資格核算**：既有生成任務與既存 NPC 將由使用者以新路線整體重造（未發布、零使用者），故 REMOVED 不需任何資料遷移。
 
 ## Risks / Trade-offs
 

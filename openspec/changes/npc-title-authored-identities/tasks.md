@@ -1,7 +1,25 @@
 # npc-title-authored-identities — Tasks
 
-前置：`npc-title-identity-core`（提供 `world/rules/npc_identity.py::validate_npc_title`、
-`MAX_NPC_TITLE_CODE_POINTS`、`NPC.npc_title`）。與 `npc-title-import-pipeline` 無檔案交集，可平行。
+前置（已滿足，2026-09-04）：`npc-title-identity-core` 與 `npc-title-import-pipeline` 均已落地並
+歸檔——`world/rules/npc_identity.py::validate_npc_title`、`MAX_NPC_TITLE_CODE_POINTS`、
+`NPC.npc_title`、主規格 capability `npc-identity-titles`（17 條）都在 master 上。本 change 是
+NPC-title 批次的最後一件。
+
+## 0. Artifacts（先於程式碼；使用者核定 2026-09-04，design D11）
+
+- [x] 0.1 新增 `specs/scene-builder/spec.md`：以 `## REMOVED Requirements` 撤除主規格兩條 crc32
+  兜底補名 requirement（含 Reason／Migration，先例：archived `2026-08-13-overwhelm-log-attribution`）。
+- [x] 0.2 `specs/scenario-director/spec.md`：補兩條 MODIFIED——prompt 規格（靈感庫保留、必填敘述
+  取代「recommended but optional」、删「缺 display_name 照樣通過」scenario）與 compile 邊界規格
+  （digest 欄位清單含必填 `title`、field-less scenario 改寫）。
+- [x] 0.3 design D11／proposal 同步折入（REMOVED 範圍、prompt 文案改寫、設計文件作廢標註、
+  前置落地狀態校正）。
+- [ ] 0.4 `docs/superpowers/specs/2026-09-03-npc-namegen-design.md`：§6.2 spawn 兜底段落明文標註
+  由本 change 撤回（§2 決策表「NPC 整合」列與 §9 測試預期同步；§6.1 靈感庫不動）。設計文件勝出
+  規則要求撤回必須明文。
+- [x] 0.5 新增 `specs/prompt-library/spec.md`：MODIFIED `The scenario-director key is registered
+  with the name-inspiration placeholder and carries the naming guidance`（出貨 YAML 指導句的
+  「recommended, not required」措辭被必填推翻；rubber-duck 計畫審閱 BLOCKER 1）。
 
 ## 1. Shared name rule
 
@@ -46,6 +64,12 @@
   斷言 sync 後仍為空）、建立事件僅一次、legacy cleanup 刪除舊 host 且下次同步重建完整身分
   （patch `world.rules.guild_economy.log_info`）。
   Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_guild_economy_sync`
+- [ ] 3.4 rulebook 清-cut（rubber-duck 計畫審閱 MAJOR）：`world/rules/rulebook/affinity.yaml:42`
+  `cap_breaks` 選擇器 `npc_key: altoria_guild_master` 改為新作者公會 host 姓名（它是活選擇器，
+  非死字面）；`world/rules/tests/test_affinity_config.py` 與 `test_cap_break_turnin.py` 的字面
+  基準／fixture 同批；`world/rules/tests/test_dialogue.py:307` 以 db_key 找 host 的既有斷言改走
+  service 錨或新姓名。
+  Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_affinity_config world.rules.tests.test_cap_break_turnin`
 
 ## 4. Exam examiners (rules)
 
@@ -54,7 +78,9 @@
   （任何其他實體已持有同名才附 `-{pk}`）；`log_info("guild_exam_opponent_created", ...)`
   （context：`char`、`rank`）。
 - [ ] 4.2 `world/rules/tests/test_guild_exams.py`：作者姓名優先、同名玩家佔用時後綴形且考試照常開始、
-  兩場同階級並發 key 互異、稱號落庫、建立事件；反向了斷言舊 `guild-examiner-<rank>` 字面不再出現。
+  兩場同階級先後開考 key 互異（後 spawn 者的排除自身重查詢必須看到先前已提交的同名實體；佔用
+  檢查與寫入同在 `start_guild_exam` 的 `transaction.atomic()` 內，無 check-then-create 視窗，
+  design D8）、稱號落庫、建立事件；反向斷言舊 `guild-examiner-<rank>` 字面不再出現。
   Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests.test_guild_exams`
 
 ## 5. Blueprint required identity fields (quests + ai)
@@ -69,11 +95,19 @@
 - [ ] 5.3 `world/quests/scene_builder.py`：`_spawn_npc` 的 prototype `key` 改用作者 `display_name`
   （保留 `db.display_name` 寫入，design D2）；`_revalidate_characterization` 對缺
   characterization／`display_name`／`title` 一律 `SceneBuilderSpawnError` 回滾（design D6）；
-  `_apply_characterization` 寫 `npc.npc_title`（驗證器回傳值）。
+  `_apply_characterization` 寫 `npc.npc_title`（驗證器回傳值）。**同批刪除（design D11）**：crc32
+  兜底補名區塊、`_log_name_fallback`、`roll_name_for_race` 與 `partial`／`zlib` 等只服務該區塊的
+  匯入。
 - [ ] 5.4 `world/ai/scenario_director.py`：輸出 jsonschema 宣告 `title`、payload round-trip 帶 `title`；
   `world/ai/director_templates.py` 模板 `npc_req` 補作者 `title`（黑鬍列）。
+- [ ] 5.4b **repo 根** `prompts/scenario_director.yaml`（不是 `world/prompts/`）：命名指導句改為
+  「每個 `npc_req` 必須帶 `display_name` 與 `title`；以下名字僅供靈感，可直接採用或依性別、背景、
+  語氣改寫」（`{name_inspiration}` 佔位符不動）；`world/prompts/tests/test_verbatim_shipment.py`
+  （`_SCENARIO_DIRECTOR_SYSTEM` 字面基準）與 `test_loader.py`（`建議填寫 display_name` 斷言）同批。
 - [ ] 5.5 更新連帶轉紅的既有測試與基準線：全 repo 搜尋以字面 `npc_req` dict／`BlueprintNpcReq(...)`
-  建測資而缺新欄的位置、斷言「XX的YY」場景 key、寫死 `ai_` 前綴 digest 的基準線（design Risks）。
+  建測資而缺新欄的位置、斷言「XX的YY」場景 key、寫死 digest 的基準線（design Risks）。
+  **刪除** `test_scene_builder.py` 的 crc32 補名測試群（backfill 斷言、`npc_name_fallback` 事件
+  斷言、rollback-無殘留補名案；design D11）。
 - [ ] 5.6 `world/quests/tests/test_characterization.py`／`test_compile_blueprint.py`／
   `test_scene_builder.py`／`test_generated_quest_store.py` 與
   `world/ai/tests/test_scenario_director_validation.py`／`test_scenario_director_proposals.py`：
@@ -85,15 +119,15 @@
 ## 6. Spec bookkeeping
 
 - [ ] 6.1 `openspec validate npc-title-authored-identities --strict` 通過；
-  `openspec validate --all --strict` 僅剩既有 namegen 空殼的兩筆失敗。
-- [ ] 6.2 **批次收尾整合**（三份提案約定的唯一 main-spec 寫入點，見 change 1／2 tasks 6.2）：
-  本 change 為批次最後落地者時，依序把三件 delta 單次 sync 進
-  `openspec/specs/npc-identity-titles/spec.md`（順序：`npc-title-identity-core` →
-  `npc-title-import-pipeline` → 本 change，用 `.agents/skills/openspec-sync-specs`），
-  然後以 `uv run --locked python -m tools.spec_traceability list` **一次**取 canonical ID，
-  依 change 1／2／3 各自 tasks 6.3 的錨定映射，把全部 `covers_requirement` 標註一次掛齊，
-  跑 `uv run --locked python -m tools.spec_traceability check` 至零錯誤、全 capability 覆蓋。
-  若本 change 反而先落地：等待前置批次整合完成，只在單獨歸檔場景才自行 sync。
+  `openspec validate --all --strict` 全綠（使用者自己的 change 除外）。
+- [ ] 6.2 sync 本 change 自己的 delta（前置兩件的 delta 已隨其歸檔 sync 完畢）：用
+  `.agents/skills/openspec-sync-specs` 把 `npc-identity-titles`（7 ADDED）、
+  `blueprint-portrait-policy`／`scenario-director`／`prompt-library`／`guild-rank-exams`／
+  `sample-city-altoria`（MODIFIED）與 `scene-builder`（2 REMOVED）套進 `openspec/specs/`
+  （MODIFIED/REMOVED 的 requirement 標題須與主規格逐字相符，sync 以標題對帳），
+  然後以 `uv run --locked python -m tools.spec_traceability list` 取 canonical ID，
+  將本 change requirement 的 `covers_requirement` 標註掛到第 1–5 組的錨定測試上，
+  跑 `uv run --locked python -m tools.spec_traceability check` 至零錯誤。
 - [ ] 6.3 確認 `.github/evennia-shards.json` 不需變動（本 change 不新增測試模組）；
   `git diff --check` 乾淨。
 
