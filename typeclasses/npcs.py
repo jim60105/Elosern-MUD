@@ -84,11 +84,25 @@ class NPC(LivingEntity):
         Runs the party module's purge API (party-core D-6) so instance
         reclamation, scene teardown, and ordinary deletes never leave a stale
         dbid consuming a player's companion slot. Returns ``True`` so the
-        delete proceeds (Evennia aborts when this hook is falsy).
+        delete proceeds (Evennia aborts when this hook is falsy). After the
+        purge commits, the owning player's connected webclient sessions get an
+        epoch-guarded ``party`` panel push (webclient-align-04) so a dismissed
+        companion never lingers in committed presentation until the next
+        unrelated sync; the fan-out is deferred through
+        ``transaction.on_commit`` (the established side-effect seam) so a
+        rolled-back deletion never burns a presentation revision or shows a
+        removal that was undone, and never fails the delete.
         """
-        from world.rules.party import purge_npc_memberships
+        from django.db import transaction
 
+        from world.rules.party import bound_owner_of, purge_npc_memberships
+
+        owner = bound_owner_of(self)
         purge_npc_memberships(self)
+        if owner is not None:
+            from web.webclient.presentation.party_push import push_party_update
+
+            transaction.on_commit(lambda: push_party_update(owner))
         return True
 
     def get_display_desc(self, looker=None, **kwargs) -> str:

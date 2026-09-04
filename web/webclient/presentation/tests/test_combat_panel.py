@@ -1479,6 +1479,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                     "status",
                     "context_actions",
                     "local_map",
+                    "party",
                     "services",
                     "creation",
                     "exploration",

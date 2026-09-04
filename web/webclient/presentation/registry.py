@@ -183,6 +183,10 @@ def build_production_registry() -> PresentationRegistry:
         LOCAL_MAP_SCHEMA_VERSION,
         local_map_presenter,
     )
+    from web.webclient.presentation.party import (
+        PARTY_SCHEMA_VERSION,
+        party_presenter,
+    )
     from web.webclient.presentation.services import (
         SERVICES_SCHEMA_VERSION,
         services_presenter,
@@ -231,6 +235,14 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=LOCAL_MAP_SCHEMA_VERSION,
             unavailable_reason=("map_unavailable", "區域地圖目前無法顯示"),
             presenter=local_map_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="party",
+            schema_version=PARTY_SCHEMA_VERSION,
+            unavailable_reason=("party_unavailable", "隊伍資訊目前無法顯示"),
+            presenter=party_presenter,
         )
     )
     registry.register(
