@@ -342,7 +342,7 @@ class WildernessPopulationSpawnTests(EvenniaTest):
 
 
 class OnboardingHuntIntegrationTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaCommandTestMixin, EvenniaTest):
-    """End-to-end onboarding hunt: register, accept, walk out the North Gate,
+    """End-to-end introductory hunt: register, accept, walk out the North Gate,
     defeat the populated monster, and observe the quest complete.
 
     ``setUp`` runs ``sync_guild_economy()``, which registers the canonical

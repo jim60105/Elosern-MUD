@@ -28,7 +28,7 @@ class MovementCostExitTests(EvenniaTest):
         self.room1.save()
         self.room2.save()
 
-    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
+    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-and-companion-following-as-one-coherent-transaction")
     def test_player_traversing_plain_exit_advances_clock_by_move(self):
         exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
         before = get_world_clock().tick
@@ -100,8 +100,8 @@ class MovementCostExitTests(EvenniaTest):
 
 class MovementCostMixinSourceTests(EvenniaTestCase):
     """Source-inspection: at_post_traverse delegates to the shared
-    after_successful_movement completion helper (onboarding-skip coverage
-    design D1), never an inline get_world_clock().advance."""
+    after_successful_movement completion helper, never an inline
+    get_world_clock().advance."""
 
     @covers_requirement("movement-cost-charging::movementcostmixin-charges-via-at-post-traverse-not-at-traverse-s-return-value")
     def test_mixin_delegates_to_shared_completion_helper(self):

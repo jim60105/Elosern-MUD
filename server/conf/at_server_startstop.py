@@ -52,7 +52,6 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "sync_service_interiors",
     "sync_quest_runtime",
     "sync_guild_economy",
-    "sync_guard_npc",
     "sync_npc_schedules",
     "register_title_planner",
     "restore_persisted_sessions",
@@ -361,7 +360,6 @@ def at_server_start():
     from world.rules.clock import get_world_clock
     from world.rules.guild_economy import restore_persisted_sessions, sync_guild_economy
     from world.rules.npc_schedules import sync_npc_schedules
-    from world.rules.onboarding import sync_guard_npc
 
     # Per-layer tolerated registration-conflict classes, resolved lazily at
     # first failure exactly like the pre-refactor helper-local imports.
@@ -382,13 +380,12 @@ def at_server_start():
     _startup_step("sync_grid", sync_grid)
     # Every world-event clock source must be registered before any startup
     # operation can advance time: the service interiors, quest runtime, guild
-    # economy, guard, and NPC-schedule syncs all move ahead of session
+    # economy, and NPC-schedule syncs all move ahead of session
     # restoration so a recovery settlement runs the complete stage set
     # (fix-startup-clock-source-order D1).
     _startup_step("sync_service_interiors", sync_service_interiors)
     _startup_step("sync_quest_runtime", sync_quest_runtime)
     _startup_step("sync_guild_economy", sync_guild_economy)
-    _startup_step("sync_guard_npc", sync_guard_npc)
     _startup_step("sync_npc_schedules", sync_npc_schedules)
     # The title event-effect planner derives fixed-title grants from committed
     # actions; like the quest planner it must be registered before any player

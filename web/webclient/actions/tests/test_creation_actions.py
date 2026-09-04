@@ -37,7 +37,6 @@ from web.webclient.actions.dispatcher import handle_ui_action
 from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.registry import build_production_registry
-from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
     CharacterCreationRequest,
@@ -602,16 +601,7 @@ class CreationActivateIntegrationTests(CreationActionBase):
 
     @covers_requirement("webclient-character-creation-ui::activation-is-all-or-nothing-and-hands-off-to-exploration")
     def test_activation_clears_draft_and_hands_off_to_exploration(self):
-        from evennia.utils.create import create_object as _co
-        from typeclasses.rooms import Room
-
-        _co(Room, key="虛境", location=None)
-        sync_grid()
-        from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
-
-        south_gate = XYZRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
-        self.assertIsNotNone(south_gate)
-
+        before_location = self.character.location
         result = _creation_activate_adapter(self.character, {})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "activated")
@@ -620,18 +610,9 @@ class CreationActivateIntegrationTests(CreationActionBase):
         self.assertIsNone(read_draft(self.character))
         self.assertEqual(self.character.key, "新角色")
         self.assertEqual(self.character.age, 20)
-        self.assertIs(self.character.location, south_gate)
+        # Activation performs no relocation: the shell stays in place.
+        self.assertIs(self.character.location, before_location)
         self.assertIsNotNone(self.character.traits.magic_power)
-
-    def test_failed_relocation_preserves_activated_state(self):
-        messages = []
-        self.character.msg = lambda text, **kwargs: messages.append(str(text))
-        with patch("world.rules.onboarding._south_gate", return_value=None):
-            result = _creation_activate_adapter(self.character, {})
-        self.assertEqual(result["outcome"], "success")
-        self.assertFalse(self.character.creation_pending)
-        self.assertIsNotNone(self.character.traits.magic_power)
-        self.assertTrue(any("南門" in message for message in messages))
 
     def test_draft_clear_failure_rolls_back_the_whole_activation(self):
         def fail(stage):

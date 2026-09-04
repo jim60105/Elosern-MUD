@@ -4,10 +4,12 @@ from tools.spec_traceability import covers_requirement
 
 from unittest.mock import Mock
 
+from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
+from typeclasses.rooms import Room
 
 
 class LoginIntroductionTests(EvenniaTest):
@@ -73,3 +75,27 @@ class LoginIntroductionTests(EvenniaTest):
         ]
         self.assertEqual(len(logged_in_calls), 1)
         self.assertEqual(logged_in_calls[0].kwargs["logged_in"], {})
+
+    def test_reconnect_of_activated_account_keeps_persisted_location(self):
+        """Regression: login never relocates an activated character.
+
+        ``at_post_login`` performs no relocation of any kind: reconnecting
+        an activated character must leave it exactly where it persisted --
+        no relocation, no teleport.
+        """
+        from world.rules.character_creation import (
+            CharacterCreationRequest,
+            activate_player_character,
+        )
+
+        activate_player_character(
+            self.account,
+            self.char1,
+            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+        )
+        elsewhere = create_object(Room, key="重連測試房", location=None)
+        self.char1.location = elsewhere
+        self.char1.save()
+        self.account.at_post_login(session=self.session)
+        self.char1.refresh_from_db()
+        self.assertIs(self.char1.location, elsewhere)

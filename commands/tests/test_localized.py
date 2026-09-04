@@ -810,23 +810,3 @@ class LocalizedHelpCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         output = self.call(CmdHelp(), "中央廣場", cmdset=self._merged_cmdset())
         self.assertIn("其他建議主題", output)
         self.assertIn("測試主題", output)
-
-
-class LocalizedLookOnboardingIntegrationTests(EvenniaCommandTestMixin, EvenniaTest):
-    """The localized 看 command still advances the onboarding look beat."""
-
-    def test_look_command_advances_the_onboarding_look_beat(self):
-        from world.maps.bootstrap import sync_grid
-        from world.rules.onboarding import LOOK_BEAT_ID, GUIDANCE_BEAT_ID
-
-        sync_grid()
-        gate = self.room1
-        gate.key = "南門"
-        gate.save()
-        self.char1.location = gate
-        self.char1.onboarding_beat = LOOK_BEAT_ID
-        self.char1.guide_progress = {"state": "active", "seen_keywords": []}
-        self.char1.onboarded = False
-        self.call(CmdLook(), "")
-        self.assertTrue(self.char1.first_arrival_seen)
-        self.assertEqual(self.char1.onboarding_beat, GUIDANCE_BEAT_ID)

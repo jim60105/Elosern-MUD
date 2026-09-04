@@ -84,7 +84,6 @@ class NoGenerativeImportTests(unittest.TestCase):
             "sync_service_interiors",
             "sync_quest_runtime",
             "sync_guild_economy",
-            "sync_guard_npc",
             "sync_npc_schedules",
         ):
             with self.subTest(sync=sync):
@@ -116,7 +115,6 @@ class NoGenerativeImportTests(unittest.TestCase):
             "world.maps.bootstrap.sync_service_interiors": "sync_service_interiors",
             "world.quests.bootstrap.sync_quest_runtime": "sync_quest_runtime",
             "world.rules.guild_economy.sync_guild_economy": "sync_guild_economy",
-            "world.rules.onboarding.sync_guard_npc": "sync_guard_npc",
             "world.rules.npc_schedules.sync_npc_schedules": "sync_npc_schedules",
         }
         patchers = [
@@ -150,7 +148,6 @@ class NoGenerativeImportTests(unittest.TestCase):
             "sync_service_interiors",
             "sync_quest_runtime",
             "sync_guild_economy",
-            "sync_guard_npc",
             "sync_npc_schedules",
         ):
             self.assertLess(
@@ -163,13 +160,9 @@ class NoGenerativeImportTests(unittest.TestCase):
             order.index("sync_wilderness"),
         )
 
-    def test_schedule_sync_runs_after_guard_npc_sync(self):
+    def test_schedule_sync_runs_after_guild_economy_sync(self):
         from server.conf.at_server_startstop import STARTUP_STEP_ORDER
 
-        self.assertLess(
-            STARTUP_STEP_ORDER.index("sync_guard_npc"),
-            STARTUP_STEP_ORDER.index("sync_npc_schedules"),
-        )
         self.assertLess(
             STARTUP_STEP_ORDER.index("sync_guild_economy"),
             STARTUP_STEP_ORDER.index("sync_npc_schedules"),

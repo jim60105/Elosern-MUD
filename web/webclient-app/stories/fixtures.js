@@ -1702,24 +1702,3 @@ export const CREATION_PANEL_UNAVAILABLE_SAMPLE = {
   available: false,
   reason: { code: "creation_unavailable", message: "角色創建目前無法顯示" },
 };
-
-// The onboarding guide content (help surface): the authored arrival prose,
-// the South-Gate guard's scripted guidance, and the keyword Q&A set, as
-// carried by the onboarding-guide capability (the game-authored help copy,
-// rendered verbatim, no invented content).
-export const ONBOARDING_GUIDE_SAMPLE = {
-  arrival: {
-    prose: "晨霧未散的聖潔王都，南城門在你身後緩緩合攏。城牆上的石磚磨出了細紋，守衛的腳步聲由遠而近。",
-    prompt: "守衛低聲說：「先試試「看」，看看你身處之處。」",
-  },
-  guard: {
-    name: "南門守衛",
-    guidance: "先北行至南大道，再東行至冒險者公會外。公會可接取任務、購買物資、登記會員。",
-  },
-  qna: [
-    { question: "看", answer: "「看」會描繪你眼前的景象，是探索的第一步。" },
-    { question: "公會", answer: "冒險者公會就在南東側，是接取任務與登記會員之處。" },
-    { question: "任務", answer: "公會任務榜上有可接取的任務，完成後可領取報酬。" },
-    { question: "商店", answer: "公會旁的商店可購買基本物資，價格以銅幣計。" },
-  ],
-};

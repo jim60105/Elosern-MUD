@@ -111,7 +111,7 @@ class FixedTitleDef:
 
 @dataclass(frozen=True, slots=True)
 class StarterEpithet:
-    """The deterministic onboarding epithet (D8 §6.5): display plus basis."""
+    """The deterministic starter epithet (D8 §6.5): display plus basis."""
 
     display: str
     origin_basis: str

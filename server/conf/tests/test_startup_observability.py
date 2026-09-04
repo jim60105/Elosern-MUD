@@ -36,7 +36,6 @@ _BODY_TARGETS = (
     "world.rules.guild_economy.restore_persisted_sessions",
     "world.rules.guild_economy.sync_guild_economy",
     "world.rules.npc_schedules.sync_npc_schedules",
-    "world.rules.onboarding.sync_guard_npc",
     "world.rules.titles.register_title_planner",
     "world.prompts.loader.load_prompt_library",
     "world.art.service.art_sync_all",

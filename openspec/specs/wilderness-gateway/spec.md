@@ -89,10 +89,10 @@ successful traversal, it SHALL send departure/arrival room announcements, call
 movement-completion helper `typeclasses.exits.after_successful_movement(traversing_object,
 source_location, cost_key="wilderness_move",
 wilderness_coordinates=WILDERNESS_ENTRY_REGISTRY[<its anchor_key>].approach_cell(<its gate>),
-wilderness_name=WILDERNESS_NAME)` — the `onboarding-skip-coverage` change's shared boundary —
+wilderness_name=WILDERNESS_NAME)` — the shared movement boundary —
 which SHALL call `world.rules.movement.charge_movement(traversing_object, cost_key)` (the
-`movement-cost-charging` capability), `world.rules.map_knowledge.record_arrival(traversing_object)`
-(the `map-knowledge` capability), and the onboarding room-entry observer, rather than calling
+`movement-cost-charging` capability) and `world.rules.map_knowledge.record_arrival(traversing_object)`
+(the `map-knowledge` capability), rather than calling
 `world.rules.clock.get_world_clock().advance()` directly. The observable cost, success-only
 condition, and `AdvanceSource.COMMAND` source are unchanged; only the call sites are now the
 shared functions every movement lineage uses. The arrival recording SHALL NOT alter the charge.
@@ -191,7 +191,7 @@ coordinate and direction — SHALL complete through the shared movement-completi
 `typeclasses.exits.after_successful_movement(...)` with `cost_key="wilderness_move"`, which SHALL call
 `world.rules.movement.charge_movement(traversing_object, cost_key)` (the `movement-cost-charging`
 capability) and `world.rules.map_knowledge.record_arrival(traversing_object)` (the `map-knowledge`
-capability) on both branches, plus the onboarding room-entry observer — rather than calling
+capability) on both branches — rather than calling
 `world.rules.clock.get_world_clock().advance()` directly. No successful step through this exit SHALL
 be free, and every successful step SHALL record its destination node. An unsuccessful traversal (the
 underlying `at_traverse_coordinates`/`at_pre_move` check fails, per the stock `WildernessExit`'s own

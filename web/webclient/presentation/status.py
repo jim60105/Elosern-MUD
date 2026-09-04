@@ -44,7 +44,7 @@ def status_presenter(context: PresentationContext) -> dict[str, Any]:
         "identity": model.actor_identity,
     }
     # The composed full title (fixed　epithet); the wire field is optional and
-    # omitted when empty, so a pre-onboarding character keeps the v1 shape
+    # omitted when empty, so a pre-creation character keeps the v1 shape
     # minus the version bump.
     if model.full_title:
         actor_field["full_title"] = model.full_title

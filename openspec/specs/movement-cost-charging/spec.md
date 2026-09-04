@@ -55,8 +55,7 @@ SHALL return without advancing the clock — the flight waiver. This waiver appl
 `movement_cost_key: str` (default `"move"`) and overriding `at_post_traverse(traversing_object,
 source_location, **kwargs)` to call `super().at_post_traverse(...)` followed by
 `after_successful_movement(traversing_object, source_location, cost_key=self.movement_cost_key,
-destination=traversing_object.location)` — the shared movement-completion helper (the
-onboarding-skip-coverage change's shared boundary) — which SHALL call
+destination=traversing_object.location)` — the shared movement-completion helper — which SHALL call
 `world.rules.movement.charge_movement(traversing_object, cost_key)` and then
 `world.rules.map_knowledge.record_arrival(traversing_object)`. Recording map knowledge happens only
 after the movement transaction has already succeeded, because this hook fires exclusively from the

@@ -17,11 +17,15 @@ from typing import Any
 from twisted.internet.defer import Deferred
 
 from web.webclient.actions.node_ids import node_id_for_location
-from world.onboarding.guide_dialogue import DIALOGUE_TABLE
 from world.rules.affinity import AFFINITY_DAILY_CAP_HINT
 from world.rules.clock import DaypartError, get_world_clock, seconds_until_daypart
 from world.rules.combat_session import CombatSessionError, SessionReason, engage
-from world.rules.dialogue import dialogue_key_for, is_dialogue_host
+from world.rules.dialogue import (
+    DIALOGUE_TABLE,
+    dialogue_key_for,
+    is_dialogue_host,
+    run_scripted_talk,
+)
 from world.rules.map_knowledge import KnowledgeError, decode_node
 from world.rules.npc_intents import (
     STALE_CONTEXT_NOTE,
@@ -30,7 +34,6 @@ from world.rules.npc_intents import (
     is_stale_context,
 )
 from world.rules.npc_schedules import interaction_reason
-from world.rules.onboarding import run_scripted_talk
 from world.rules.party import (
     PARTY_MAX_COMPANIONS,
     PartyJoinError,

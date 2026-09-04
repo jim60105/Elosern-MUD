@@ -131,8 +131,8 @@ delta used, budget capped) so callers can render feedback.
 
 ### Requirement: Deterministic gains apply at talk, trade, and guild success paths
 A known-keyword talk answer SHALL grant +1 affinity (`talk` source) with the host NPC through a
-deterministic talk writer that resolves the keyword, records any onboarding `guide_progress`
-update, and applies the affinity gain in one transaction with cache restoration on failure; unknown
+deterministic talk writer that resolves the keyword and applies the affinity gain in one
+transaction with cache restoration on failure; unknown
 keywords and no-keyword paths SHALL grant nothing. A successful buy or sell SHALL grant +1
 (`trade` source) with the local Merchant host. Successful guild registration, board acceptance,
 and examination start SHALL each grant +1 (`guild` source) with the respective host. Every gain
@@ -148,11 +148,6 @@ expose the cap or any number.
   unknown keyword
 - **THEN** the known-keyword answer raises the host's value by 1 and the unknown keyword changes
   nothing
-
-#### Scenario: Guard keyword tracking and affinity commit together
-- **WHEN** the player talks to the South Gate guard with a known guard keyword
-- **THEN** the guard answers, `guide_progress` records the keyword, and the guard's affinity value
-  rises by 1 in one commit; if any write fails, both surfaces are restored
 
 #### Scenario: A failed operation grants no affinity
 - **WHEN** a trade, registration, acceptance, or examination is rejected before committing

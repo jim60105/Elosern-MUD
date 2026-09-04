@@ -20,7 +20,7 @@ LIMBO_LEGACY_KEY = "Limbo"
 LIMBO_ALIAS = "limbo"
 
 # Authored zh-tw description: the threshold where awakening souls pause
-# before stepping onto 伊洛瑟恩大陸 (a "gray waiting room", per the onboarding
+# before stepping onto 伊洛瑟恩大陸 (a "gray waiting room", per the design
 # design spec O2). Contains no upstream Evennia boilerplate.
 LIMBO_DESC = """你身處一片無盡的灰白虛境。沒有天空，也沒有大地，只有流動的霧氣在四周緩緩盤繞。記憶像斷線的珠子散落在腳邊——你隱約記得一座宏偉的城，記得它名叫聖潔王都·阿爾托利亞。
 

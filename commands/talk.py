@@ -10,23 +10,20 @@ from commands.command import Command
 
 from typeclasses.components import GuildStaff
 from typeclasses.npcs import NPC
-from world.onboarding.guide_dialogue import (
+from world.rules.affinity import AFFINITY_DAILY_CAP_HINT
+from world.rules.dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     GUILD_STAFF_TURNIN_KEYWORD,
+    dialogue_key_for,
+    greeting_for,
+    is_dialogue_host,
+    run_scripted_talk,
 )
-from world.rules.affinity import AFFINITY_DAILY_CAP_HINT
-from world.rules.dialogue import dialogue_key_for, greeting_for, is_dialogue_host
 from world.rules.guild import (
     GuildDataError,
     GuildServiceError,
     RewardClaimError,
     dialogue_turn_in,
-)
-from world.rules.onboarding import (
-    current_guide_prompt,
-    is_guide_host,
-    run_scripted_talk,
-    talk_response,
 )
 from world.rules.npc_schedules import interaction_reason
 
@@ -119,17 +116,6 @@ class CmdsTalk(Command):
             self.caller.msg(f"{npc.key}說：{result.response}{hint}")
             return
 
-        if is_guide_host(npc):
-            prompt = current_guide_prompt(self.caller)
-            if prompt is not None:
-                self.caller.msg(
-                    f"{npc.key}說：{prompt}\n（用 talk {npc.key} <keyword> 詢問：公會、冒險、危險、再見）"
-                )
-                return
-            response = talk_response(npc, self.caller, "再見")
-            self.caller.msg(f"{npc.key}說：{response}\n{_USAGE}")
-            return
-
         if is_dialogue_host(npc):
             greeting = greeting_for(npc)
             if greeting is not None:
@@ -154,7 +140,3 @@ class CmdsTalk(Command):
             f"你回報了任務 {result['quest_id']}，獲得 {result['copper']} 銅、"
             f"功績 {result['merit']} 與道具 {result['items']}。"
         )
-        if result.get("onboarding_completed"):
-            self.caller.msg(
-                "你的第一個日子在這裡圓滿結束。冒險者，歡迎正式踏入伊洛瑟恩大陸。"
-            )

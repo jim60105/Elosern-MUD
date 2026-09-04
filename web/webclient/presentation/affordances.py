@@ -29,8 +29,7 @@ from web.webclient.actions.exploration_actions import (
     validate_wait_payload,
 )
 from web.webclient.actions.node_ids import node_id_for_location
-from world.onboarding.guide_dialogue import DIALOGUE_TABLE
-from world.rules.dialogue import dialogue_key_for, is_dialogue_host
+from world.rules.dialogue import DIALOGUE_TABLE, dialogue_key_for, is_dialogue_host
 from world.rules.npc_schedules import interaction_reason
 from world.rules.party import is_companion, party_size
 from world.rules.time_skip import unsafe_rejection

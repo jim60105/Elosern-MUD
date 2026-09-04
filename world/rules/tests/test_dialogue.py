@@ -1,9 +1,9 @@
-"""Tests for the read-only scripted dialogue service (scripted-dialogue D3/D4).
+"""Tests for the scripted dialogue runtime (scripted-dialogue D3/D4).
 
 These EvenniaTest cases exercise ``world.rules.dialogue`` component resolution,
-keyword lookup, greetings, and the guard's stateful exception. The guild-master
-dialogue is exercised through the sync-attached ``ScriptedDialogue`` host and
-the ``talk`` command.
+keyword lookup, greetings, and the deterministic scripted-talk affinity writer.
+The guild-master dialogue is exercised through the sync-attached
+``ScriptedDialogue`` host and the ``talk`` command.
 """
 
 from tools.spec_traceability import covers_requirement
@@ -11,23 +11,19 @@ from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
-from typeclasses.components import GuildStaff, OnboardingGuide, ScriptedDialogue
+from typeclasses.components import GuildStaff, ScriptedDialogue
 from typeclasses.npcs import NPC
-from world.onboarding.guide import GuideProgress
-from world.onboarding.guide_dialogue import (
-    GUARD_DIALOGUE_KEY,
+from world.rules.dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     GUILD_STAFF_TURNIN_KEYWORD,
     NO_UNDERSTANDING_LINE,
-)
-from world.rules.dialogue import (
     dialogue_key_for,
     dialogue_response,
     greeting_for,
     is_dialogue_host,
     resolve_dialogue_component,
+    run_scripted_talk,
 )
-from world.rules.onboarding import run_scripted_talk, snapshot_for
 
 
 class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
@@ -48,10 +44,11 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         host.components.add(ScriptedDialogue.create(host, dialogue_key=dialogue_key))
         return host
 
-    def _guard(self) -> NPC:
-        guard = create_object(NPC, key="guard")
-        guard.components.add(OnboardingGuide.create(guard, dialogue_key=GUARD_DIALOGUE_KEY))
-        return guard
+    def _affinity_host(self) -> NPC:
+        """A scripted host whose every known keyword carries the +1 talk gain."""
+        host = create_object(NPC, key="talk-host")
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=GUILD_STAFF_DIALOGUE_KEY))
+        return host
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
     def test_scripted_host_is_a_dialogue_host(self):
@@ -87,29 +84,26 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
     def test_missing_greeting_falls_back_to_none(self):
-        guard = self._guard()
-        self.assertIsNone(greeting_for(guard))
+        host = self._scripted_host(dialogue_key="no_such_table")
+        self.assertIsNone(greeting_for(host))
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
     def test_scripted_host_without_greeting_answers_talk_without_state_change(self):
         from commands.talk import CmdsTalk
         from typeclasses.characters import PlayerCharacter
 
-        # The guard's table is the only registered definition with greeting=None;
-        # a generic ScriptedDialogue host pointing at it exercises the
-        # no-keyword fallback branch (not the OnboardingGuide guard branch).
+        # A host whose dialogue_key resolves to no definition exercises the
+        # no-keyword fallback branch of the talk command.
         host = create_object(NPC, key="greetingless", location=self.room1)
         host.components.add(
-            ScriptedDialogue.create(host, dialogue_key=GUARD_DIALOGUE_KEY)
+            ScriptedDialogue.create(host, dialogue_key="no_such_table")
         )
         player = create_object(PlayerCharacter, key="greetingless-talker")
         player.race = "human"
         player.apply_race_baseline()
-        player.guide_progress = GuideProgress.active().to_storage()
         player.location = self.room1
         output = self.call(CmdsTalk(), host.key, caller=player)
         self.assertIn("沒有理會", output)
-        self.assertEqual(snapshot_for(player).guide_progress.seen_keywords, ())
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
     def test_componentless_npc_is_not_a_host(self):
@@ -126,11 +120,11 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         player = create_object(PlayerCharacter, key="guild-talker")
         player.race = "human"
         player.apply_race_baseline()
-        player.guide_progress = GuideProgress.active().to_storage()
         host = self._scripted_host()
+        relations_before = host.db.relations_data
         dialogue_response(host, player, "公會")
         greeting_for(host)
-        self.assertEqual(snapshot_for(player).guide_progress.seen_keywords, ())
+        self.assertEqual(host.db.relations_data, relations_before)
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
     def test_guild_staff_turnin_keyword_for_unregistered_member_falls_back_to_authored_line(self):
@@ -145,7 +139,6 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         player = create_object(PlayerCharacter, key="unregistered-talker")
         player.race = "human"
         player.apply_race_baseline()
-        player.guide_progress = GuideProgress.active().to_storage()
         player.location = room
         host = self._scripted_host()
         host.location = room
@@ -155,39 +148,34 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         response = dialogue_response(host, player, GUILD_STAFF_TURNIN_KEYWORD)
         self.assertIn("guild register", response)
         self.assertNotIn("可以交回", response)
-        self.assertEqual(snapshot_for(player).guide_progress.seen_keywords, ())
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
     def test_turnin_keyword_on_non_guild_host_is_an_unknown_keyword(self):
-        guard = self._guard()
-        response = dialogue_response(guard, self.player, GUILD_STAFF_TURNIN_KEYWORD)
+        host = self._scripted_host(dialogue_key="no_such_table")
+        response = dialogue_response(host, self.player, GUILD_STAFF_TURNIN_KEYWORD)
         self.assertEqual(response, NO_UNDERSTANDING_LINE)
 
     @covers_requirement(
         "scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines",
-        "onboarding-guide::talk-behaves-predictably-for-any-npc",
         "affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths",
     )
-    def test_guard_known_keyword_writes_progress_and_unknown_writes_nothing(self):
+    def test_known_keyword_writes_affinity_and_unknown_writes_nothing(self):
         from typeclasses.characters import PlayerCharacter
 
-        player = create_object(PlayerCharacter, key="guard-talker")
+        player = create_object(PlayerCharacter, key="talk-host-talker")
         player.race = "human"
         player.apply_race_baseline()
-        player.guide_progress = GuideProgress.active().to_storage()
-        guard = self._guard()
-        result = run_scripted_talk(guard, player, "公會")
+        host = self._affinity_host()
+        result = run_scripted_talk(host, player, "公會")
         self.assertIn("冒險者公會", result.response)
         self.assertFalse(result.budget_capped)
-        self.assertEqual(snapshot_for(player).guide_progress.seen_keywords, ("公會",))
-        self.assertEqual(guard.relations.affinity_for(player), 1)
-        unknown = run_scripted_talk(guard, player, "謎語")
+        self.assertEqual(host.relations.affinity_for(player), 1)
+        unknown = run_scripted_talk(host, player, "謎語")
         self.assertIn("明白", unknown.response)
-        self.assertEqual(snapshot_for(player).guide_progress.seen_keywords, ("公會",))
-        self.assertEqual(guard.relations.affinity_for(player), 1)
+        self.assertEqual(host.relations.affinity_for(player), 1)
 
     @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
-    def test_failed_guard_talk_write_restores_both_surfaces(self):
+    def test_failed_talk_write_restores_the_relations_surface(self):
         from unittest.mock import patch
 
         from typeclasses.characters import PlayerCharacter
@@ -195,10 +183,8 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         player = create_object(PlayerCharacter, key="guard-talker")
         player.race = "human"
         player.apply_race_baseline()
-        player.guide_progress = GuideProgress.active().to_storage()
-        guard = self._guard()
-        progress_before = player.guide_progress
-        relations_before = guard.db.relations_data
+        host = self._affinity_host()
+        relations_before = host.db.relations_data
 
         class FakeAtomic:
             def __enter__(self):
@@ -209,30 +195,27 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
 
         with patch("django.db.transaction.atomic", return_value=FakeAtomic()):
             with self.assertRaises(RuntimeError):
-                run_scripted_talk(guard, player, "公會")
-        self.assertEqual(player.guide_progress, progress_before)
-        self.assertEqual(guard.db.relations_data, relations_before)
-        self.assertEqual(snapshot_for(player).guide_progress.seen_keywords, ())
+                run_scripted_talk(host, player, "公會")
+        self.assertEqual(host.db.relations_data, relations_before)
 
     @covers_requirement("affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths")
     def test_budget_capped_talk_presents_the_non_numeric_hint(self):
         from commands.talk import CmdsTalk
         from typeclasses.characters import PlayerCharacter
 
-        guard = self._guard()
-        guard.location = self.room1
+        host = self._affinity_host()
+        host.location = self.room1
         player = create_object(PlayerCharacter, key="capped-talker")
         player.race = "human"
         player.apply_race_baseline()
-        player.guide_progress = GuideProgress.active().to_storage()
         player.location = self.room1
         for _ in range(5):
-            self.call(CmdsTalk(), f"{guard.key} 公會", caller=player)
+            self.call(CmdsTalk(), f"{host.key} 公會", caller=player)
         from world.rules.affinity import AFFINITY_DAILY_CAP_HINT
 
-        output = self.call(CmdsTalk(), f"{guard.key} 公會", caller=player)
+        output = self.call(CmdsTalk(), f"{host.key} 公會", caller=player)
         self.assertIn(AFFINITY_DAILY_CAP_HINT, output)
-        self.assertEqual(guard.relations.affinity_for(player), 5)
+        self.assertEqual(host.relations.affinity_for(player), 5)
 
     @covers_requirement("guild-registration::guild-service-hosts-teach-their-service-commands-through-scripted-dialogue")
     def test_every_taught_guild_command_resolves_to_a_registered_command(self):
@@ -257,7 +240,7 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement("guild-registration::guild-service-hosts-teach-their-service-commands-through-scripted-dialogue")
     def test_guild_staff_definition_teaches_the_guild_commands(self):
-        from world.onboarding.guide_dialogue import DIALOGUE_TABLE
+        from world.rules.dialogue import DIALOGUE_TABLE
 
         definition = DIALOGUE_TABLE[GUILD_STAFF_DIALOGUE_KEY]
         combined = definition.greeting + "".join(
@@ -355,8 +338,6 @@ class GuildStaffSyncDialogueTests(EvenniaCommandTestMixin, EvenniaTest):
 
     def _player_state(self):
         return {
-            "guide_progress": self.char1.guide_progress,
-            "onboarded": self.char1.onboarded,
             "guild_rank": self.char1.guild_rank,
             "guild_registration": self.char1.db.guild_registration,
             "quest_log": list(self.char1.db.quest_log or []),

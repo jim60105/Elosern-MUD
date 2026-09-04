@@ -1,8 +1,8 @@
 """Keyboard-only exploration browser acceptance (webclient-exploration-menu 4.2-4.6).
 
 These journeys drive the real Evennia server's exploration dock: movement
-through ``explore.move`` with matching clock/map updates, look that preserves
-the onboarding beat, scripted keyword dialogue, free-form dialogue with offline
+through ``explore.move`` with matching clock/map updates, room and entity
+look, scripted keyword dialogue, free-form dialogue with offline
 degrade, engage-to-combat, wait/rest daypart and duration with safety
 rejections, stale/duplicate/tampered rejections, the no-take/drop rule, and
 reconnect retention.
@@ -199,36 +199,14 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             "after Character -> Escape the exploration root must accept keyboard input",
         )
 
-    @covers_requirement("webclient-exploration-menu::explore-look-reuses-the-command-appearance-path-and-preserves-onboarding-look-hooks")
-    def test_look_at_room_preserves_the_onboarding_beat(self):
-        page = self.logged_in_page()
-        install_outbound_recorder(page)
-        self._wait_exploration_available(page)
-
-        self._open_root(page, 1)  # Look
-        _press(page, "Enter")  # look at the room
-        self.assertEqual(sent_action_count(page, "explore.look"), 1)
-        wait_for_store_state(
-            page,
-            _connected_active,
-            dom_readiness={
-                "selector": '[data-testid="narrative-feed"]',
-                "predicate": (
-                    "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "return !!el && el.innerText.indexOf('南門') !== -1; }"
-                ),
-                "description": "narrative feed shows the South Gate room",
-            },
-        )
-
     @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
-    def test_look_at_guard_shows_the_affinity_stage_line(self):
+    def test_look_at_scripted_host_shows_the_affinity_stage_line(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
         self._open_root(page, 1)  # Look
-        _press(page, "ArrowRight")  # the guard (first present entity)
+        _press(page, "ArrowRight")  # the scripted host (first present entity)
         _press(page, "Enter")
         self.assertEqual(sent_action_count(page, "explore.look"), 1)
         wait_for_store_state(
@@ -240,7 +218,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                     "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
                     "return !!el && el.innerText.indexOf('她看著你的眼神裡帶著信賴。') !== -1; }"
                 ),
-                "description": "narrative feed shows the guard's trust line",
+                "description": "narrative feed shows the host's trust line",
             },
         )
 
@@ -251,7 +229,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         self._open_root(page, 2)  # Interact
-        _press(page, "Enter")  # the guard (first present target, synced in the seed)
+        _press(page, "Enter")  # the scripted host (first present target, synced in the seed)
         _press(page, "Enter")  # 交談 (scripted affordance)
         _press(page, "Enter")  # first keyword
         self._wait_panel(
@@ -1537,11 +1515,11 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # Interact -> the guard -> 交談 (scripted keywords): two levels deep.
+        # Interact -> the scripted host -> 交談 (scripted keywords): two levels deep.
         panel = self._live_exploration_panel(page)
-        guard_identity = panel["interact"][0]["identity"]
+        host_identity = panel["interact"][0]["identity"]
         self._open_root(page, 2)  # Interact
-        _press(page, "Enter")  # the guard (first present target)
+        _press(page, "Enter")  # the scripted host (first present target)
         _press(page, "Enter")  # 交談 (first affordance)
         self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 4)
         _press(page, "Escape")  # back to the target-affordance menu
@@ -1554,7 +1532,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             "() => Array.from(document.querySelectorAll("
             "'.action-dock__pane [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
         )
-        # The guard's affordance menu: the scripted-talk entry plus the final
+        # The host's affordance menu: the scripted-talk entry plus the final
         # back cell (the exploration fixture carries no guild navigate entry).
         self.assertEqual(
             target_keys,
@@ -1589,7 +1567,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                 "window.__elosernBridge.router.currentItem() && "
                 "window.__elosernBridge.router.currentItem().key"
             ),
-            "target-" + str(guard_identity),
+            "target-" + str(host_identity),
         )
         self.assertEqual(sent_action_count(page), 0)
 

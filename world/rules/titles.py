@@ -658,7 +658,7 @@ def grant_starter_pair(actor: Any) -> tuple[str, ...]:
     """Grant the F-rank title plus the starter epithet (D8 §6.5).
 
     Both grants ride ``register_adventurer``'s transaction; both auto-equip
-    their empty slots, so the onboarding-complete full title is
+    their empty slots, so the registration-complete full title is
     「F級冒險者　南門新客」. Re-registration no-ops through the two dedupe
     rules.
     """

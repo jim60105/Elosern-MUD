@@ -26,31 +26,6 @@ Each dict is on the form
 
 HELP_ENTRY_DICTS = [
     {
-        "key": "新手引導",
-        "aliases": ["onboarding", "新手指引"],
-        "category": "General",
-        "text": """
-            你從南門踏入聖潔王都時，城門的守衛會向你說明下一步。
-
-            # 抵達
-
-            初來乍到時，先用「看」看看四周。守衛會引導你先向北走到南大道，
-            再向東抵達冒險者公會外。
-
-            # 守衛
-
-            你可以用 talk 與守衛交談，並詢問關鍵字（公會、冒險、危險、再見）
-            取得他對王都與冒險的解說。
-
-            # 第一天
-
-            到冒險者公會註冊成為冒險者（guild register），
-            從任務板接取討伐低階魔物，前往北門外的荒野討伐目標，
-            然後回到公會回報（guild turnin），完成你的第一天。
-
-        """,
-    },
-    {
         "key": "evennia",
         "aliases": ["ev"],
         "category": "General",

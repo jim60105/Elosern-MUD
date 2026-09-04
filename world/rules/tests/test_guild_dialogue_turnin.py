@@ -243,15 +243,14 @@ class DialogueTurnInTests(DialogueTurnInRegistryIsolation, EvenniaTestCase):
         return completed.quest_id
 
     @covers_requirement("guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host")
-    def test_turn_in_pays_exactly_once_and_completes_onboarding(self):
+    def test_turn_in_pays_exactly_once(self):
         quest_id = self._complete()
         result = dialogue_turn_in(self.player, self.staff, quest_id)
         self.assertEqual(result["quest_id"], quest_id)
         self.assertEqual(result["copper"], 50)
         self.assertEqual(result["merit"], 25)
         self.assertIn("healing_potion", result["items"])
-        self.assertTrue(result["onboarding_completed"])
-        self.assertTrue(self.player.onboarded)
+        self.assertNotIn("onboarding_completed", result)
         self.assertEqual(self.player.db.wallet, 50)
         self.assertEqual(read_counter_trait(self.player, "guild_merit"), 25)
         self.assertEqual(parse_reward_claims(self.player), [quest_id])
@@ -314,7 +313,6 @@ class DialogueTurnInTests(DialogueTurnInRegistryIsolation, EvenniaTestCase):
             read_counter_trait(self.player, "guild_merit"),
             list(self.player.db.quest_log),
             list(self.player.db.guild_reward_claims or []),
-            self.player.onboarded,
         )
 
         class FakeAtomic:
@@ -334,7 +332,6 @@ class DialogueTurnInTests(DialogueTurnInRegistryIsolation, EvenniaTestCase):
                 read_counter_trait(self.player, "guild_merit"),
                 list(self.player.db.quest_log),
                 list(self.player.db.guild_reward_claims or []),
-                self.player.onboarded,
             ),
             snapshot,
         )

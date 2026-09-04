@@ -50,7 +50,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         return get_world_clock().tick
 
     @covers_requirement("wilderness-gateway::wildernessgateexit-moves-a-traversing-object-from-a-grid-room-into-the-wilderness")
-    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
+    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-and-companion-following-as-one-coherent-transaction")
     def test_gate_exit_places_traverser_at_gate_approach_and_advances_clock(self):
         before = self._tick()
         self.gate.at_traverse(self.char1, self.north_gate)
@@ -123,7 +123,7 @@ class WildernessGatewayExitTests(EvenniaTest):
             self.assertIsInstance(exit_obj, WildernessReturnExit)
 
     @covers_requirement("wilderness-gateway::wildernessreturnexit-routes-every-registered-approach-cell-and-direction-pair-back-to-the-grid")
-    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
+    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-and-companion-following-as-one-coherent-transaction")
     def test_south_from_entry_returns_to_exact_grid_room(self):
         from typeclasses.rooms import TerrainRoom
 
@@ -143,7 +143,7 @@ class WildernessGatewayExitTests(EvenniaTest):
         self.assertIs(self.char1.location, self.south_gate)
         self.assertEqual(self._tick(), before + 9000)
 
-    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
+    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-and-companion-following-as-one-coherent-transaction")
     def test_intermediate_steps_each_advance_clock_by_one_wilderness_move(self):
         from typeclasses.rooms import TerrainRoom
 
@@ -252,33 +252,11 @@ class WildernessGatewayExitTests(EvenniaTest):
         self.assertIs(self.char1.location, wilderness_location)
         self.assertEqual(self._tick(), before)
 
-    @covers_requirement("onboarding-guide::deviation-detection-applies-to-every-room-type")
-    def test_guided_player_entering_wilderness_is_marked_skipped(self):
-        from world.rules.onboarding import snapshot_for
-
-        self.char1.guide_progress = {"state": "active", "seen_keywords": []}
-        self.gate.at_traverse(self.char1, self.north_gate)
-        self.assertEqual(snapshot_for(self.char1).guide_progress.state, "skipped")
-        self.assertFalse(self.char1.onboarded)
-
-    def test_wilderness_step_and_return_are_noops_for_ended_guide(self):
-        from world.rules.onboarding import snapshot_for
-
-        self.char1.guide_progress = {"state": "active", "seen_keywords": []}
-        self.gate.at_traverse(self.char1, self.north_gate)
-        before = snapshot_for(self.char1).guide_progress
-        self._exit("east").at_traverse(self.char1, self.char1.location)
-        self.assertEqual(snapshot_for(self.char1).guide_progress, before)
-        self._exit("west").at_traverse(self.char1, self.char1.location)
-        self._exit("south").at_traverse(self.char1, self.char1.location)
-        self.assertEqual(snapshot_for(self.char1).guide_progress, before)
-        self.assertIs(self.char1.location, self.north_gate)
-
 
 class WildernessClockChargeSourceTests(EvenniaTestCase):
     """Source-inspection: the wilderness wiring routes through the shared
-    ``after_successful_movement`` completion helper (onboarding-skip coverage
-    design D1), never an inline get_world_clock().advance."""
+    ``after_successful_movement`` completion helper, never an inline
+    get_world_clock().advance."""
 
     @covers_requirement("wilderness-gateway::wildernessgateexit-moves-a-traversing-object-from-a-grid-room-into-the-wilderness")
     def test_gate_exit_routes_success_through_shared_completion_helper(self):
@@ -295,9 +273,8 @@ class WildernessClockChargeSourceTests(EvenniaTestCase):
         self.assertNotIn("get_world_clock().advance", source)
 
     @covers_requirement("wilderness-gateway::every-successful-wildernessreturnexit-traversal-advances-the-clock-not-only-the-registered-return-branch")
-    def test_shared_helper_charges_records_and_observes_through_shared_functions(self):
+    def test_shared_helper_charges_and_records_through_shared_functions(self):
         source = inspect.getsource(after_successful_movement)
         self.assertIn("charge_movement(traversing_object, cost_key)", source)
         self.assertIn("record_arrival(traversing_object)", source)
-        self.assertIn("observe_room_entry(traversing_object)", source)
         self.assertNotIn("get_world_clock().advance", source)

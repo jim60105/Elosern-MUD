@@ -792,7 +792,7 @@ def _serialize(
         "persona": persona,
         "intimate": _serialize_intimate(model.intimate),
     }
-    # The composed live full title; omitted when empty so pre-onboarding
+    # The composed live full title; omitted when empty so pre-creation
     # characters keep the payload shape identical.
     if model.full_title:
         payload["full_title"] = model.full_title

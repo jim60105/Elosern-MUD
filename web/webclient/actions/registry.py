@@ -344,7 +344,7 @@ def build_production_action_registry() -> ActionRegistry:
             validate_payload=validate_look_payload,
             adapter=_look_adapter,
             # Look changes no panel; the ordinary full-snapshot refresh keeps
-            # the dock honest with the onboarding beat (design D4).
+            # the dock honest with the room's current contents (design D4).
             affected_panels=(),
         )
     )

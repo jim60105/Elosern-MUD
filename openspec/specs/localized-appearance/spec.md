@@ -40,9 +40,8 @@ stage line.
 
 #### Scenario: The at_look seam stays intact
 
-- **WHEN** a player looks while the onboarding arrival beat is active
-- **THEN** the look still flows through the character's `at_look` hook (the look beat completes as
-  before) and the presented appearance is the zh-tw frame
+- **WHEN** a player looks through the character's `at_look` hook
+- **THEN** the look still flows through the hook and the presented appearance is the zh-tw frame
 
 #### Scenario: NPC appearance includes the affinity stage line on every path
 
@@ -75,7 +74,7 @@ The shared target-appearance layer SHALL append the displayed-stats block (`disp
 for living targets identically across all three entry paths: the text look command (「看 <目標>」),
 the character's `at_look` hook, and the webclient `explore.look` action. The block SHALL appear
 after the target's zh-tw description and SHALL NOT appear in room appearance. Entities that are not
-living SHALL render no block. The affinity stage-line behavior and the onboarding look beat SHALL
+living SHALL render no block. The affinity stage-line behavior SHALL
 be unchanged.
 
 #### Scenario: All three entry paths show the same block

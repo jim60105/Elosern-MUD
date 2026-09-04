@@ -217,48 +217,6 @@ class MapKnowledgeSeamTests(EvenniaTest):
         self.assertIsNone(self.char1.attributes.get("map_knowledge"))
 
 
-class MapKnowledgeOnboardingTests(EvenniaTest):
-    """Activation relocation records 南門 without charging time (task 1.5)."""
-
-    def setUp(self):
-        super().setUp()
-        create_object(Room, key="虛境", location=None)
-        sync_grid()
-        self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
-
-    def _relocate(self, character):
-        from world.rules.onboarding import relocate_to_starting_location
-
-        relocate_to_starting_location(character)
-
-    @covers_requirement("player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation")
-    def test_relocation_records_south_gate_without_clock_advance(self):
-        self.char1.location = self.room1
-        clock_tick = get_world_clock().tick
-        self._relocate(self.char1)
-        self.assertIs(self.char1.location, self.south_gate)
-        self.assertEqual(get_world_clock().tick, clock_tick)
-        self.assertIn("grid:capital_altoria:2:0", _node_ids(self.char1))
-
-    @covers_requirement("player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation")
-    def test_missing_south_gate_records_nothing(self):
-        self.char1.location = self.room1
-        with patch("world.rules.onboarding._south_gate", return_value=None):
-            self._relocate(self.char1)
-        self.assertIs(self.char1.location, self.room1)
-        self.assertEqual(_node_ids(self.char1), set())
-
-    @covers_requirement("player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation")
-    def test_failed_relocation_records_nothing(self):
-        self.char1.location = self.room1
-        with patch("world.rules.onboarding._south_gate", return_value=self.south_gate), patch.object(
-            self.char1, "move_to", return_value=False
-        ):
-            self._relocate(self.char1)
-        self.assertIs(self.char1.location, self.room1)
-        self.assertEqual(_node_ids(self.char1), set())
-
-
 class MapKnowledgePruneTests(EvenniaTest):
     """Reclaimed-room pruning (design D4) through the instance reclaim seam."""
 
