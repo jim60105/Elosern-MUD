@@ -116,10 +116,14 @@
 
 Evennia 事實：`Exit` 是獨立持久物件，`create_object(Exit, ...)` 只建你給的
 那一條；没有任何「自動成對反向」機制（`@dig` 是建檔wizard指令的便利行為，
-與程式端無關）。因此單向通道＝只建去程。本倉庫另有第二層保證：
-`typeclasses/rooms.py` 的 `at_pre_object_receive` 拒絕任何 character 進入
-虛境（「Characters never move into Limbo」），即使未來有人建出回程物件或
-指令也進不去。單向性由「去程存在於虛境側＋虛境房間硬閘」兩層共同保證。
+與程式端無關）。因此單向通道＝只建去程。第二層保證目前是**缺口而非現況**：
+查證 master 的 `typeclasses/rooms.py`，`Room`（虛境房間的 typeclass）是裸
+`pass` 類別，並無任何入口閘——上游 Evennia 文件中的 Limbo 範例行為不存在於
+本倉庫。本設計因此要求把硬閘**補成真實作**：虛境同步（`sync_limbo()`）對
+虛境房間宣告式收斂一道入口閘（Evennia 的房間入口權限語意＝目的地 "get"
+lock 檢查；實作位置以安裝的 Evennia 6.1.0 源碼為準，在 `at_pre_object_receive`
+與 lock 兩者中選確定性較高者），拒絕任何 character 進入虛境，拒絕文案走
+zh-tw 本地化框。單向性由「去程只從虛境側建立＋虛境入口硬閘」兩層共同保證。
 
 新增 `world/maps/city_gates.py`：
 
