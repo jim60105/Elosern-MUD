@@ -85,30 +85,30 @@ NPC-title 批次的最後一件。
 
 ## 5. Blueprint required identity fields (quests + ai)
 
-- [ ] 5.1 `world/quests/characterization.py`：`display_name` 必填、新增 `title` 必填（結構層維持
+- [x] 5.1 `world/quests/characterization.py`：`display_name` 必填、新增 `title` 必填（結構層維持
   `str | None`，必填由本驗證器執行，design D5）；規則以函式內延遲匯入委派
   `validate_npc_name`／`validate_npc_title`（design D3），`MAX_DISPLAY_NAME_LENGTH` 常數來源改指
   `MAX_NPC_NAME_CODE_POINTS`；`duplicate_display_name_errors` 對**整份 blueprint 的所有
   `npc_req`** 檢查姓名唯一（同 stage 與跨 stage 皆拒，design D4）；同批修訂模組 docstring 的純度契約。
-- [ ] 5.2 `world/quests/compile.py`：`StageNpcCharacterization.title`、canonical digest 帶 `title`、
+- [x] 5.2 `world/quests/compile.py`：`StageNpcCharacterization.title`、canonical digest 帶 `title`、
   `_characterization_from_payload` 對缺 `title` 的 payload 具名 `QuestCompileError`（design D5/Risks）。
-- [ ] 5.3 `world/quests/scene_builder.py`：`_spawn_npc` 的 prototype `key` 改用作者 `display_name`
+- [x] 5.3 `world/quests/scene_builder.py`：`_spawn_npc` 的 prototype `key` 改用作者 `display_name`
   （保留 `db.display_name` 寫入，design D2）；`_revalidate_characterization` 對缺
   characterization／`display_name`／`title` 一律 `SceneBuilderSpawnError` 回滾（design D6）；
   `_apply_characterization` 寫 `npc.npc_title`（驗證器回傳值）。**同批刪除（design D11）**：crc32
   兜底補名區塊、`_log_name_fallback`、`roll_name_for_race` 與 `partial`／`zlib` 等只服務該區塊的
   匯入。
-- [ ] 5.4 `world/ai/scenario_director.py`：輸出 jsonschema 宣告 `title`、payload round-trip 帶 `title`；
+- [x] 5.4 `world/ai/scenario_director.py`：輸出 jsonschema 宣告 `title`、payload round-trip 帶 `title`；
   `world/ai/director_templates.py` 模板 `npc_req` 補作者 `title`（黑鬍列）。
-- [ ] 5.4b **repo 根** `prompts/scenario_director.yaml`（不是 `world/prompts/`）：命名指導句改為
+- [x] 5.4b **repo 根** `prompts/scenario_director.yaml`（不是 `world/prompts/`）：命名指導句改為
   「每個 `npc_req` 必須帶 `display_name` 與 `title`；以下名字僅供靈感，可直接採用或依性別、背景、
   語氣改寫」（`{name_inspiration}` 佔位符不動）；`world/prompts/tests/test_verbatim_shipment.py`
   （`_SCENARIO_DIRECTOR_SYSTEM` 字面基準）與 `test_loader.py`（`建議填寫 display_name` 斷言）同批。
-- [ ] 5.5 更新連帶轉紅的既有測試與基準線：全 repo 搜尋以字面 `npc_req` dict／`BlueprintNpcReq(...)`
+- [x] 5.5 更新連帶轉紅的既有測試與基準線：全 repo 搜尋以字面 `npc_req` dict／`BlueprintNpcReq(...)`
   建測資而缺新欄的位置、斷言「XX的YY」場景 key、寫死 digest 的基準線（design Risks）。
   **刪除** `test_scene_builder.py` 的 crc32 補名測試群（backfill 斷言、`npc_name_fallback` 事件
   斷言、rollback-無殘留補名案；design D11）。
-- [ ] 5.6 `world/quests/tests/test_characterization.py`／`test_compile_blueprint.py`／
+- [x] 5.6 `world/quests/tests/test_characterization.py`／`test_compile_blueprint.py`／
   `test_scene_builder.py`／`test_generated_quest_store.py` 與
   `world/ai/tests/test_scenario_director_validation.py`／`test_scenario_director_proposals.py`：
   缺欄拒（兩層同決策）、同 stage 與跨 stage 重名皆拒（含 characterization 全同的反向案）、

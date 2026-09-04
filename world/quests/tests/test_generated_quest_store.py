@@ -118,6 +118,7 @@ def _characterized_payload(**overrides):
             "tier": "bandit",
             "disposition": None,
             "display_name": "黑鬍",
+            "title": "林間盜匪首領",
             "age": 35,
             "apparent_age": 35,
             "portrait": {"stable_key": "forest_bandit_chief"},
@@ -232,6 +233,7 @@ class PayloadRoundTripTests(RegistryIsolationMixin, EvenniaTestCase):
         self.assertEqual(requirements, compiled.stage_requirements)
         self.assertEqual(len(requirements), 1)
         self.assertEqual(requirements[0].characterizations[0].display_name, "黑鬍")
+        self.assertEqual(requirements[0].characterizations[0].title, "林間盜匪首領")
         self.assertEqual(requirements[0].characterizations[0].portrait_stable_key, "forest_bandit_chief")
 
     @covers_requirement("scene-builder::generated-quest-content-is-durably-stored-at-registration-time")

@@ -170,7 +170,13 @@ class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase)
             "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
         }
         payload["stages"][0]["npc_req"] = [
-            {"role": "bandit", "tier": "bandit", "disposition": None}
+            {
+                "role": "bandit",
+                "tier": "bandit",
+                "disposition": None,
+                "display_name": "黑鬍",
+                "title": "林間盜匪首領",
+            }
         ]
         return compile_quest_blueprint(payload)
 
@@ -212,7 +218,13 @@ class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase)
             "scene_sentence": "另一段不同的場景描述。",
         }
         second_payload["stages"][0]["npc_req"] = [
-            {"role": "bandit", "tier": "bandit", "disposition": None}
+            {
+                "role": "bandit",
+                "tier": "bandit",
+                "disposition": None,
+                "display_name": "黑鬍",
+                "title": "林間盜匪首領",
+            }
         ]
         second = compile_quest_blueprint(second_payload)
         self.assertNotEqual(first.definition.key, second.definition.key)

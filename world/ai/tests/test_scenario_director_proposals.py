@@ -221,7 +221,13 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
             "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
         }
         base_payload["stages"][0]["npc_req"] = [
-            {"role": "bandit", "tier": "bandit", "disposition": None}
+            {
+                "role": "bandit",
+                "tier": "bandit",
+                "disposition": None,
+                "display_name": "黑鬍",
+                "title": "無portrait頭目",
+            }
         ]
         first = compile_quest_blueprint(base_payload)
 
@@ -229,6 +235,7 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
         changed["stages"][0]["npc_req"][0].update(
             {
                 "display_name": "黑鬍",
+                "title": "林間盜匪首領",
                 "age": 35,
                 "apparent_age": 35,
                 "portrait": {"stable_key": "forest_bandit_chief"},

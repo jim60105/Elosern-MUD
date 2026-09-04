@@ -25,6 +25,7 @@ from world.maps.bootstrap import sync_grid
 from world.quests.catalog import register_catalog
 from world.quests.compile import compile_quest_blueprint, register_generated_quest
 from world.quests.runtime import QuestState, accept_quest, read_records
+from world.quests.compile import StageNpcCharacterization
 from world.quests.scene_builder import _spawn_npc, materialize_stage
 from world.quests.tests.test_scene_builder import (
     SceneBuilderIsolation,
@@ -244,19 +245,14 @@ class SceneSpawnLineageSeedTests(SceneBuilderIsolation, EvenniaTest):
             spawned[0].db.skill_proficiency = {}
             return spawned
 
-        requirement = SimpleNamespace(archetype="forest_path", characterizations=())
+        requirement = SimpleNamespace(
+            archetype="forest_path",
+            characterizations=(
+                StageNpcCharacterization(display_name="深skills盜匪", title="試煉佔用者"),
+            ),
+        )
         with patch.object(scene_builder, "spawn", deep_skill_spawn):
-            npc = _spawn_npc(
-                self.room,
-                requirement,
-                "bandit",
-                "bandit",
-                None,
-                0,
-                definition_key="test-lineage-def",
-                stage_index=0,
-                quest_id="test-lineage-quest",
-            )
+            npc = _spawn_npc(self.room, requirement, "bandit", "bandit", None, 0)
         self.assertLessEqual(
             {"fire_arrow", "fire_ball", "scorching_wave", "firestorm"},
             set(npc.db.skills["active"]),
@@ -275,18 +271,13 @@ class SceneSpawnLineageSeedTests(SceneBuilderIsolation, EvenniaTest):
     def test_skill_less_spawn_is_an_unaffected_no_op(self):
         from types import SimpleNamespace
 
-        requirement = SimpleNamespace(archetype="forest_path", characterizations=())
-        npc = _spawn_npc(
-            self.room,
-            requirement,
-            "bandit",
-            "bandit",
-            None,
-            0,
-            definition_key="test-lineage-def",
-            stage_index=0,
-            quest_id="test-lineage-quest",
+        requirement = SimpleNamespace(
+            archetype="forest_path",
+            characterizations=(
+                StageNpcCharacterization(display_name="無skills盜匪", title="試煉佔用者"),
+            ),
         )
+        npc = _spawn_npc(self.room, requirement, "bandit", "bandit", None, 0)
         # The scene_npc prototype carries no skills: spawn must not fabricate
         # any proficiency state.
         self.assertIsNone(npc.db.skills)

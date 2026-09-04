@@ -104,7 +104,13 @@ class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
             "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
         }
         payload["stages"][0]["npc_req"] = [
-            {"role": "victim", "tier": "civilian", "disposition": "frightened"}
+            {
+                "role": "victim",
+                "tier": "civilian",
+                "disposition": "frightened",
+                "display_name": "受驚旅人",
+                "title": "邊境商隊腳伕",
+            }
         ]
         compiled = compile_quest_blueprint(payload)
         stage = compiled.definition.stages[0]
@@ -532,6 +538,73 @@ class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
         second = compile_quest_blueprint(changed)
         self.assertNotEqual(first.definition.key, second.definition.key)
 
+    @covers_requirement("blueprint-portrait-policy::the-blueprint-lifecycle-preserves-the-characterization-fields")
+    def test_title_only_difference_changes_the_generated_key(self):
+        base = _characterized_payload()
+        first = compile_quest_blueprint(base)
+        changed = json.loads(json.dumps(base))
+        changed["stages"][0]["npc_req"][0]["title"] = "另一段頭銜"
+        second = compile_quest_blueprint(changed)
+        self.assertNotEqual(first.definition.key, second.definition.key)
+
+    @covers_requirement("blueprint-portrait-policy::the-blueprint-lifecycle-preserves-the-characterization-fields")
+    @covers_requirement("npc-identity-titles::the-blueprint-author-face-enforces-occupant-name-uniqueness")
+    def test_missing_or_duplicate_identity_rejects_at_compile(self):
+        # Missing identity fields reject at BOTH layers with identical decisions.
+        from world.ai.scenario_director import _VALIDATORS
+
+        for field in ("display_name", "title"):
+            with self.subTest(field=field):
+                bad = _characterized_payload()
+                del bad["stages"][0]["npc_req"][0][field]
+                with self.assertRaises(QuestCompileError):
+                    compile_quest_blueprint(bad)
+                guardrail_errors = []
+                for validator in _VALIDATORS.values():
+                    guardrail_errors.extend(validator(bad))
+                self.assertTrue(guardrail_errors, "guardrail rejects too")
+
+        # Same-stage duplicate names reject (npc-identity-titles uniqueness).
+        twin = _characterized_payload()
+        first_entry = twin["stages"][0]["npc_req"][0]
+        twin["stages"][0]["npc_req"].append(
+            {
+                **first_entry,
+                "portrait": {"stable_key": "different_face"},
+            }
+        )
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(twin)
+
+    @covers_requirement("npc-identity-titles::the-blueprint-author-face-enforces-occupant-name-uniqueness")
+    def test_cross_stage_duplicate_names_reject_even_identical(self):
+        base = _characterized_payload()
+        second_stage = json.loads(json.dumps(base["stages"][0]))
+        second_stage["index"] = 1
+        second_stage["location_req"]["scene_sentence"] = "另一段不同的場景描述。"
+        second_stage["npc_req"] = json.loads(
+            json.dumps(base["stages"][0]["npc_req"])
+        )
+        base["stages"].append(second_stage)
+        with self.assertRaises(QuestCompileError):
+            compile_quest_blueprint(base)
+
+    @covers_requirement("blueprint-portrait-policy::the-blueprint-lifecycle-preserves-the-characterization-fields")
+    def test_restore_payload_without_title_raises_named_compile_error(self):
+        from world.quests.compile import _characterization_from_payload
+
+        payload = _characterized_payload()["stages"][0]["npc_req"][0]
+        stored = {
+            "display_name": payload["display_name"],
+            "age": payload["age"],
+            "apparent_age": payload["apparent_age"],
+            "portrait_stable_key": payload["portrait"]["stable_key"],
+            "background": None,
+            "persona": [],
+        }
+        with self.assertRaisesRegex(QuestCompileError, "title"):
+            _characterization_from_payload(stored)
+
     @covers_requirement("blueprint-portrait-policy::the-compile-boundary-carries-the-characterization-fields")
     @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")
     def test_malformed_characterization_rejects_before_registration(self):
@@ -578,6 +651,7 @@ class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
                 "tier": "bandit",
                 "disposition": None,
                 "display_name": "另一個人",
+                "title": "林間盜匪副手",
                 "age": 40,
                 "apparent_age": 40,
                 "portrait": {"stable_key": "forest_bandit_chief"},

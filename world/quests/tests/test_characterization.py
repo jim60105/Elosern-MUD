@@ -1,10 +1,11 @@
 """Pure unit tests for the shared blueprint-characterization bound helper.
 
-Covers the per-entry validation rules (``display_name`` bounds, paired
-``age``/``apparent_age`` integer/floor/lifespan-band rules, the exactly-one-
-``stable_key`` portrait rule, missing-key-vs-``None`` distinction) and the
-cross-entry duplicate-``stable_key`` agreement rule, plus the registry-driven
-race-lifespan bound resolution.
+Covers the per-entry validation rules (REQUIRED authored ``display_name`` and
+``title`` through the shared identity validators, paired ``age``/``apparent_age``
+integer/floor/lifespan-band rules, the exactly-one-``stable_key`` portrait rule,
+missing-key-vs-``None`` distinction), the cross-entry duplicate-``stable_key``
+agreement rule, the whole-blueprint authored-name uniqueness rule, and the
+registry-driven race-lifespan bound resolution.
 """
 
 from dataclasses import FrozenInstanceError
@@ -12,11 +13,13 @@ import unittest
 
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.races import RACE_REGISTRY
+from world.rules.npc_identity import MAX_NPC_NAME_CODE_POINTS
 from world.quests.characterization import (
     ADULT_MINIMUM,
     MAX_DISPLAY_NAME_LENGTH,
     MAX_STABLE_KEY_LENGTH,
     characterize_errors,
+    duplicate_display_name_errors,
     duplicate_stable_key_errors,
     race_lifespan_upper_bound,
 )
@@ -25,7 +28,9 @@ from tools.spec_traceability import covers_requirement
 
 
 def _entry(**overrides):
-    entry = {}
+    entry = {"display_name": "莉絲·晨星", "title": "城鎮圖書館員"}
+    if overrides.pop("no_identity", False):
+        entry = {}
     entry.update(overrides)
     return entry
 
@@ -239,12 +244,34 @@ class CharacterizationEntryValidationTests(unittest.TestCase):
         )
 
     @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
-    def test_absent_fields_are_a_noop(self):
+    def test_required_identity_and_optional_noop(self):
+        # An entry with the required identity and nothing else validates; the
+        # optional fields stay optional (disposition is not characterized).
         self.assertEqual(characterize_errors(_entry(), lifespan_upper_bound=80), [])
         self.assertEqual(
             characterize_errors(_entry(disposition="frightened"), lifespan_upper_bound=80),
             [],
         )
+
+    @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
+    def test_missing_required_identity_rejects(self):
+        for entry in (
+            _entry(no_identity=True),  # both fields missing
+            _entry(no_identity=True, title="城鎮圖書館員"),  # name missing
+            _entry(no_identity=True, display_name="莉絲·晨星"),  # title missing
+            _entry(display_name=None),
+            _entry(title=None),
+            _entry(title="含 空白"),
+            _entry(title="稱" * 33),
+        ):
+            with self.subTest(entry=sorted(entry)):
+                self.assertTrue(
+                    characterize_errors(entry, lifespan_upper_bound=80), entry
+                )
+
+    @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")
+    def test_name_cap_is_the_shared_identity_bound(self):
+        self.assertIs(MAX_DISPLAY_NAME_LENGTH, MAX_NPC_NAME_CODE_POINTS)
 
 
 class CharacterizationDuplicateKeyTests(unittest.TestCase):
@@ -263,6 +290,22 @@ class CharacterizationDuplicateKeyTests(unittest.TestCase):
             _entry(display_name="另一個人", age=69, apparent_age=69, portrait={"stable_key": "library_keeper"}),
         ]
         self.assertTrue(duplicate_stable_key_errors(entries))
+
+    @covers_requirement("npc-identity-titles::the-blueprint-author-face-enforces-occupant-name-uniqueness")
+    def test_duplicate_authored_names_reject_across_the_entry_set(self):
+        entries = [
+            _entry(portrait={"stable_key": "keeper_a"}),
+            _entry(portrait={"stable_key": "keeper_b"}, age=40, apparent_age=40),
+        ]
+        self.assertTrue(duplicate_display_name_errors(entries))
+        distinct = [
+            _entry(portrait={"stable_key": "keeper_a"}),
+            _entry(display_name="另一個人", portrait={"stable_key": "keeper_b"}),
+        ]
+        self.assertEqual(duplicate_display_name_errors(distinct), [])
+        # Identical characterization duplicated is still a duplicate NAME.
+        twin = [_entry(), _entry()]
+        self.assertTrue(duplicate_display_name_errors(twin))
 
     @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
     def test_entries_without_a_well_formed_key_are_ignored(self):

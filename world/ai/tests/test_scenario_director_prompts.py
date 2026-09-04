@@ -80,8 +80,9 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
         self.assertIn(bank, system["content"])
         self.assertEqual(system["content"].count(bank), 1)
         self.assertIn("僅供靈感", system["content"])
-        self.assertIn("建議填寫 display_name", system["content"])
-        self.assertIn("仍為選填", system["content"])
+        # Required-identity guidance ships in the prompt library only.
+        self.assertIn("必須附帶 display_name 與 title", system["content"])
+        self.assertNotIn("仍為選填", system["content"])
 
     @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
     def test_contexts_normalizing_to_one_bounded_text_share_one_bank(self):
@@ -96,21 +97,23 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
         self.assertEqual(first[0]["content"], second[0]["content"])
 
     @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
-    def test_output_contract_is_unchanged_by_the_injection(self):
+    def test_output_contract_carries_the_required_identity_fields(self):
         npc_req = (
             SCENARIO_DIRECTOR_OUTPUT_SCHEMA["properties"]["stages"]["items"]
             ["properties"]["npc_req"]["items"]
         )
-        self.assertNotIn("display_name", npc_req["required"])
+        self.assertIn("display_name", npc_req["required"])
+        self.assertIn("title", npc_req["required"])
         self.assertEqual(
             npc_req["properties"]["display_name"]["type"], ["string", "null"]
         )
+        self.assertEqual(npc_req["properties"]["title"]["type"], ["string", "null"])
         system, user = build_scenario_prompt(_context())
         for name in _expected_bank(user["content"]).split("、"):
             self.assertNotIn(name, json.dumps(SCENARIO_DIRECTOR_OUTPUT_SCHEMA, ensure_ascii=False))
 
-    @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
-    def test_validators_accept_missing_and_bank_external_display_names(self):
+    @covers_requirement("prompt-library::the-scenario-director-key-is-registered-with-the-name-inspiration-placeholder-and-carries-the-naming-guidance")
+    def test_validators_require_identity_and_accept_bank_external_names(self):
         def _payload(npc_req: dict) -> dict:
             base_npc = {"role": "向導", "tier": "bandit"}
             return {
@@ -124,8 +127,18 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
             }
 
         validate = _VALIDATORS["npc_characterization"]
-        self.assertEqual(validate(_payload({})), [])
-        self.assertEqual(validate(_payload({"display_name": "非庫名・自取"})), [])
+        # Missing identity fields are named guardrail failures now.
+        self.assertTrue(validate(_payload({})))
+        self.assertTrue(validate(_payload({"display_name": "非庫名・自取"})))
+        # A bank-external authored pair (rolled name adapted freely) validates.
+        self.assertEqual(
+            validate(
+                _payload(
+                    {"display_name": "非庫名・自取", "title": "邊境嚮導"}
+                )
+            ),
+            [],
+        )
 
     @covers_requirement("scenario-director::the-scenario-director-name-inspiration-reads-the-namegen-rule-layer-without-crossing-the-single-writer-boundary")
     def test_prompt_construction_leaves_no_state_behind(self):

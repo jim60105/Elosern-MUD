@@ -35,12 +35,13 @@ _SCENARIO_DIRECTOR_SYSTEM = (
     '"monster_tier": null, "item_key": null}, "location_req": {"layer": '
     '"anchor/grid/instance", "archetype": "…", "anchor_key": null, '
     '"anchor_near": null, "xyz": null, "scene_sentence": null}, "npc_req": '
-    '[{"role": "…", "tier": "…", "disposition": null}]}], "reward": '
+    '[{"role": "…", "tier": "…", "disposition": null, "display_name": "…", '
+    '"title": "…"}]}], "reward": '
     '{"copper": 100, "items": [{"item_key": "healing_potion", "quantity": 1}], '
     '"merit": 25}, "failure": {"deadline_hours": 72, "conditions": []}}。'
     "stage 的 index 必須從 0 開始連續遞增。"
-    "每個 npc_req 建議填寫 display_name；以下名字僅供靈感，"
-    "可直接採用或依角色的性別、背景與語氣改寫（display_name 仍為選填）："
+    "每個 npc_req 必須附帶 display_name 與 title；以下名字僅供靈感，"
+    "可直接採用或依角色的性別、背景與語氣改寫："
     "{name_inspiration}。"
 )
 _NPC_DIALOGUE_TEMPLATE = (

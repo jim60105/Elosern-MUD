@@ -2,11 +2,15 @@
 
 Change 22's mirror-validation rule source: both the scenario-director guardrail
 (``world/ai``) and the deterministic compile boundary (``world/quests``)
-validate the optional per-occupant characterization fields -- ``display_name``,
-paired ``age``/``apparent_age``, and the named ``portrait.stable_key`` --
-through this one module, so the two layers cannot drift. The module is pure: it
-imports only the immutable lore registries and the adult floor constant, and it
-never mutates state. ``world/ai`` imports it read-only, the same direction it
+validate the per-occupant characterization fields -- the required authored
+``display_name``/``title``, paired ``age``/``apparent_age``, and the named
+``portrait.stable_key`` -- through this one module, so the two layers cannot
+drift. The module never mutates state, and its only world.rules dependency is
+the single shared identity validator in ``world/rules/npc_identity.py``
+(npc-title-authored-identities D3: the name and title character rules delegate
+to that one module through function-local deferred imports, so this helper
+never inlines or duplicates the character-set rules; the bound constant is a
+plain immutable read). ``world/ai`` imports it read-only, the same direction it
 already uses for ``world/lore`` registries; ``world/quests`` imports it
 directly. No state-changing API is reachable from here.
 """
@@ -23,14 +27,18 @@ from world.art.subjects import (
     is_reserved_player_stable_key,
 )
 
-# Bounded text/key caps for the characterization fields. ``stable_key`` obeys
+# Bounded text/key caps for the characterization fields. The authored-name cap
+# is the shared NPC name bound itself (npc-title-authored-identities D3): the
+# name/title character rules live in exactly one module. ``stable_key`` obeys
 # the single shared art-side subject-key contract (fix-art-pipeline-contracts
 # D1): non-empty, no reserved separators, no control characters, at most 64
 # code points and at most 200 UTF-8 bytes -- exactly what
 # ``world/art/subjects.py`` enforces for every producer, so a compiled quest
 # key can never be rejected later at the queue or exceed the worker output
 # filename bound.
-MAX_DISPLAY_NAME_LENGTH = 64
+from world.rules.npc_identity import MAX_NPC_NAME_CODE_POINTS
+
+MAX_DISPLAY_NAME_LENGTH = MAX_NPC_NAME_CODE_POINTS
 MAX_STABLE_KEY_LENGTH = MAX_SUBJECT_KEY_LENGTH
 
 # The optional authored persona/background flavor fields share the persona
@@ -71,7 +79,10 @@ def characterize_errors(
     Returns a list of human-readable problems (empty when valid). The rules
     mirror design D2/D3/D4 and the art-side subject-key contract:
 
-    - ``display_name``, when declared, is bounded non-empty text.
+    - ``display_name`` and ``title`` are REQUIRED authored identity fields
+      (npc-title-authored-identities D5): missing or empty rejects, never
+      defaulted, and the character rules delegate to the single shared
+      validators in ``world/rules/npc_identity.py``.
     - ``age``/``apparent_age``, when declared, are paired and each satisfies
       ``type(value) is int`` (so booleans, floats, and ``None`` reject) with
       ``ADULT_MINIMUM <= value <= lifespan_upper_bound``. A key present with a
@@ -86,14 +97,31 @@ def characterize_errors(
     """
     errors: list[str] = []
 
-    if "display_name" in entry:
-        value = entry["display_name"]
-        if value is None or not isinstance(value, str) or not value.strip():
-            errors.append("display_name must be non-empty text")
-        elif len(value) > MAX_DISPLAY_NAME_LENGTH:
+    from world.rules.npc_identity import (
+        NPCNameError,
+        NPCTitleError,
+        validate_npc_name,
+        validate_npc_title,
+    )
+
+    for field, validator_error in (
+        ("display_name", (NPCNameError, validate_npc_name)),
+        ("title", (NPCTitleError, validate_npc_title)),
+    ):
+        error_type, validator = validator_error
+        if field not in entry:
             errors.append(
-                f"display_name exceeds the {MAX_DISPLAY_NAME_LENGTH}-character cap"
+                f"{field} is required (authored identity is never defaulted)"
             )
+            continue
+        value = entry[field]
+        if value is None or not isinstance(value, str) or not value.strip():
+            errors.append(f"{field} must be non-empty text")
+            continue
+        try:
+            validator(value)
+        except error_type as error:
+            errors.append(f"{field} is not a valid authored {field}: {error}")
 
     age_present = "age" in entry
     apparent_present = "apparent_age" in entry
@@ -231,3 +259,29 @@ def duplicate_stable_key_errors(entries: list[Mapping[str, Any]]) -> list[str]:
             )
         seen.setdefault(stable_key, identity)
     return errors
+
+
+def duplicate_display_name_errors(entries: list[Mapping[str, Any]]) -> list[str]:
+    """Return errors when two ``npc_req`` entries share one authored name.
+
+    Every authored ``display_name`` is world-unique (design §3.2): two entries
+    in ONE blueprint -- same stage or across stages -- declaring the same name
+    reject (design D4). A shared portrait ``stable_key`` is the sanctioned way
+    to say "the same face appears twice"; it never licenses two live NPCs under
+    one key, because every materialization spawns fresh occupants with no
+    cross-stage reuse path. Entries without a usable name string are ignored --
+    ``characterize_errors`` reports them.
+    """
+    counts: dict[str, int] = {}
+    for entry in entries:
+        value = entry.get("display_name")
+        if not isinstance(value, str) or not value.strip():
+            continue
+        name = value.strip()
+        counts[name] = counts.get(name, 0) + 1
+    return [
+        f"display_name {name!r} is declared {count} times in this blueprint; "
+        "authored names are unique across the whole blueprint"
+        for name, count in counts.items()
+        if count > 1
+    ]
