@@ -195,6 +195,10 @@ function latticePos(node) {
 const coreW = computed(() => Math.max(1, cols.value) * effectiveColPitch.value);
 const coreH = computed(() => Math.max(1, rows.value) * effectiveRowPitch.value);
 
+const outwardNameBox = computed(() =>
+  props.overlayChrome ? (props.labelMax + 1) * props.markerNameFont : 0,
+);
+
 const layoutGeometry = computed(() => {
   if (isGraph.value) {
     return {
@@ -243,7 +247,7 @@ const layoutGeometry = computed(() => {
   }
 
   const markerHalf = MARKER_DIAMOND_HALF * props.markerScale;
-  const nameWidth = props.overlayChrome ? (props.labelMax + 1) * 11 : 0;
+  const nameWidth = outwardNameBox.value;
   const nameHeight = props.markerNames ? 16 : 0;
 
   let g = 0;
@@ -340,41 +344,18 @@ const fittedEdgeMarkers = computed(() => {
       glyphs: [],
     }));
   }
-  if (props.overlayChrome) {
-    return markers.map((m) => ({
-      ...m,
-      visibleName: m.name,
-      glyphs: [],
-    }));
-  }
-
-  const reach = Math.SQRT2 * MARKER_DIAMOND_HALF * props.markerScale;
-  const namePad = 18;
-  const inset = Math.max(19, 2 * reach + namePad + 1);
-  const slotMinH = 2 * reach + 1;
-  const slotMinV = 2 * reach + 1 + 16;
-  const outerWidth = activeEdgeMarkers.value.width;
-  const outerHeight = activeEdgeMarkers.value.height;
-
-  const bySide = { top: [], bottom: [], left: [], right: [] };
-  markers.forEach((m) => {
-    if (bySide[m.side]) bySide[m.side].push(m);
-  });
-
-  const spanBySide = {};
-  for (const side of ["top", "bottom", "left", "right"]) {
-    const group = bySide[side];
-    if (group.length === 0) continue;
-    const horizontal = side === "top" || side === "bottom";
-    const outerLength = horizontal ? outerWidth : outerHeight;
-    const slotMin = horizontal ? slotMinH : slotMinV;
-    const usable = Math.max(outerLength - 2 * inset, group.length * slotMin);
-    spanBySide[side] = usable / group.length;
-  }
 
   const fittedList = markers.map((m) => {
-    const span = spanBySide[m.side] || 0;
-    const budget = Math.floor(span / props.markerNameFont);
+    const span = m.span || 0;
+    const drawsOutward =
+      outwardNameBox.value > 0 && (m.side === "left" || m.side === "right");
+    const maxBoxGlyphs = drawsOutward
+      ? Math.floor(outwardNameBox.value / props.markerNameFont)
+      : Infinity;
+    const budget = Math.min(
+      Math.floor(span / props.markerNameFont),
+      maxBoxGlyphs,
+    );
     const fitted = fitMarkerName(m.name, budget);
     return {
       ...m,
@@ -810,8 +791,9 @@ const latticeStyle = computed(() => {
       />
       <template v-if="markerNames">
         <text
-          v-if="overlayChrome"
+          v-if="overlayChrome && marker.visibleName"
           class="local-map__edge-marker-name"
+          :style="{ fontSize: `${markerNameFont}px` }"
           :x="markerNameX(marker)"
           :y="markerNameY(marker)"
           :text-anchor="markerNameAnchor(marker)"
@@ -1114,7 +1096,6 @@ const latticeStyle = computed(() => {
 
 .local-map__edge-marker-name {
   font-family: var(--f-mono);
-  font-size: 11px;
   fill: var(--paper-500);
 }
 

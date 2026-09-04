@@ -1193,6 +1193,126 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             "clicking actionable node must dispatch move without opening overlay",
         )
 
+    @covers_requirement(
+        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone"
+    )
+    def test_crowded_edge_overlay_marker_names_stay_separated_and_outside_canvas(self):
+        """Task 5.1: crowded remembered gateways on overlay edge keep names apart and outside canvas."""
+        page = self.logged_in_page()
+        self._wait_local_map_available(page)
+
+        # 3x3 in-view lattice with current at (1, 1), plus 4 remembered gateways crowding left edge
+        crowded_panel = {
+            "schema_version": 1,
+            "available": True,
+            "layer": "grid",
+            "title": "霧骨渡口",
+            "current_node": "grid:altoria:1:1",
+            "nodes": [
+                {"id": "grid:altoria:0:0", "label": "0,0", "x": 0, "y": 0, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "action": None},
+                {"id": "grid:altoria:1:0", "label": "1,0", "x": 1, "y": 0, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "action": None},
+                {"id": "grid:altoria:2:0", "label": "2,0", "x": 2, "y": 0, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "action": None},
+                {"id": "grid:altoria:0:1", "label": "0,1", "x": 0, "y": 1, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "action": None},
+                {"id": "grid:altoria:1:1", "label": "1,1", "x": 1, "y": 1, "visibility": "current", "current": True, "anchor": True, "landmark": True, "action": None},
+                {"id": "grid:altoria:2:1", "label": "2,1", "x": 2, "y": 1, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "action": None},
+                {"id": "grid:altoria:0:2", "label": "0,2", "x": 0, "y": 2, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "action": None},
+                {"id": "grid:altoria:1:2", "label": "1,2", "x": 1, "y": 2, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "action": None},
+                {"id": "grid:altoria:2:2", "label": "2,2", "x": 2, "y": 2, "visibility": "visible_visited", "current": False, "anchor": False, "landmark": False, "action": None},
+                {"id": "grid:altoria:-10:-5", "label": "灰鬮荒原駐軍第一要塞前哨營地", "x": -10, "y": -5, "visibility": "remembered", "current": False, "anchor": False, "landmark": True, "action": None},
+                {"id": "grid:altoria:-10:0", "label": "灰鬮荒原駐軍第二要塞前哨營地", "x": -10, "y": 0, "visibility": "remembered", "current": False, "anchor": False, "landmark": True, "action": None},
+                {"id": "grid:altoria:-10:2", "label": "灰鬮荒原駐軍第三要塞前哨營地", "x": -10, "y": 2, "visibility": "remembered", "current": False, "anchor": False, "landmark": True, "action": None},
+                {"id": "grid:altoria:-10:5", "label": "灰鬮荒原駐軍第四要塞前哨營地", "x": -10, "y": 5, "visibility": "remembered", "current": False, "anchor": False, "landmark": True, "action": None},
+            ],
+            "edges": [],
+            "legend": [
+                "你目前所在的位置",
+                "尚未探索的相鄰位置",
+                "已經探索過的相鄰位置",
+                "曾經到過、但不在附近的遠方位置",
+            ],
+        }
+        res = self._inject_panel(page, crowded_panel)
+        self.assertTrue(res.get("accepted"), f"ui_update rejected: {res}")
+
+        page.evaluate("window.__elosernBridge.store.openOverlay('map')")
+        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
+        page.wait_for_selector(
+            '[data-testid="map-overlay"] .local-map__edge-marker-name', timeout=15000
+        )
+
+        result = page.evaluate(
+            """() => {
+              const overlay = document.querySelector('[data-testid="map-overlay"]');
+              const svg = overlay.querySelector('svg.local-map__lattice');
+              const svgRect = svg.getBoundingClientRect();
+              const scale = svgRect.width / svg.viewBox.baseVal.width;
+
+              const gutterUnits = (svg.viewBox.baseVal.width - 840) / 2;
+              const gutterPx = gutterUnits * scale;
+
+              const canvasRect = {
+                left: svgRect.left + gutterPx,
+                right: svgRect.right - gutterPx,
+                top: svgRect.top + gutterPx,
+                bottom: svgRect.bottom - gutterPx,
+              };
+
+              const nameEls = Array.from(svg.querySelectorAll('.local-map__edge-marker-name'));
+              const names = nameEls.map((el) => {
+                const r = el.getBoundingClientRect();
+                return {
+                  text: el.textContent,
+                  left: r.left,
+                  right: r.right,
+                  top: r.top,
+                  bottom: r.bottom,
+                  width: r.width,
+                  height: r.height,
+                };
+              });
+
+              function separated(a, b) {
+                return (
+                  a.right + 1 <= b.left ||
+                  b.right + 1 <= a.left ||
+                  a.bottom + 1 <= b.top ||
+                  b.bottom + 1 <= a.top
+                );
+              }
+
+              let overlaps = 0;
+              for (let i = 0; i < names.length; i++) {
+                for (let j = i + 1; j < names.length; j++) {
+                  if (!separated(names[i], names[j])) {
+                    overlaps++;
+                  }
+                }
+              }
+
+              let insideCanvasCount = 0;
+              for (const n of names) {
+                if (n.right > canvasRect.left + 1e-3) {
+                  insideCanvasCount++;
+                }
+              }
+
+              return {
+                count: names.length,
+                overlaps,
+                insideCanvasCount,
+                texts: names.map(n => n.text),
+              };
+            }"""
+        )
+
+        self.assertEqual(result["count"], 4)
+        self.assertEqual(result["overlaps"], 0)
+        self.assertEqual(result["insideCanvasCount"], 0)
+        for text in result["texts"]:
+            self.assertIn("…", text)
+            self.assertEqual(len(text), 11)
+
+        page.close()
 
 
 class LayoutVariantsBrowserTest(BrowserAcceptanceTest):

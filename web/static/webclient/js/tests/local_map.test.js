@@ -620,7 +620,7 @@ test("edge marker packing clears every legal input at both surfaces", () => {
   const surfaces = [
     { name: "island", cw: 90, ch: 58, mh: 9, nw: 0, nh: 0 },
     { name: "island_with_names", cw: 90, ch: 58, mh: 9, nw: 0, nh: 16 },
-    { name: "overlay", cw: 848, ch: 252, mh: 9 * 4.83, nw: 72, nh: 16 },
+    { name: "overlay", cw: 848, ch: 252, mh: 9 * 4.83, nw: 121, nh: 16 },
   ];
   for (const s of surfaces) {
     const reach = Math.SQRT2 * s.mh;
@@ -652,6 +652,39 @@ test("edge marker packing clears every legal input at both surfaces", () => {
             && m.y >= pad && m.y <= result.height - pad,
           `${label}: ${m.id} leaves the outer rect`
         );
+      }
+      const inset = Math.max(19, 2 * reach + pad + 1);
+      const bySide = {};
+      for (const m of result.markers) {
+        (bySide[m.side] = bySide[m.side] || []).push(m);
+      }
+      for (const side of Object.keys(bySide)) {
+        const group = bySide[side];
+        for (let i = 0; i < group.length; i += 1) {
+          const m = group[i];
+          assert.strictEqual(typeof m.span, "number", `${label}: ${m.id} span is number`);
+          assert.ok(m.span > 0, `${label}: ${m.id} span is positive`);
+          const pos = (side === "top" || side === "bottom") ? m.x : m.y;
+          const expectedPos = inset + (i + 0.5) * m.span;
+          assert.ok(
+            Math.abs(pos - expectedPos) < 1e-9,
+            `${label}: ${m.id} pos=${pos} expected=${expectedPos}`
+          );
+          if (i === 0) {
+            assert.ok(
+              Math.abs(pos - (inset + m.span / 2)) < 1e-9,
+              `${label}: first marker centre pos=${pos} expected=${inset + m.span / 2}`
+            );
+          }
+          if (i > 0) {
+            const prev = group[i - 1];
+            const prevPos = (side === "top" || side === "bottom") ? prev.x : prev.y;
+            assert.ok(
+              Math.abs(pos - prevPos - m.span) < 1e-9,
+              `${label}: consecutive spacing pos-prevPos=${pos - prevPos} expected=${m.span}`
+            );
+          }
+        }
       }
     };
     // Worst case: all 64 remembered nodes crowd a single edge, each surface.

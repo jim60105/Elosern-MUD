@@ -573,6 +573,7 @@
           dy: candidate.dir.dy,
           octant: candidate.dir.octant,
           side: side,
+          span: usable / group.length,
           x: 0,
           y: 0
         };

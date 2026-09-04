@@ -71,6 +71,7 @@ function handleMove(payload) {
         :fill-width="true"
         :overlay-chrome="true"
         :marker-names="true"
+        :marker-name-font="11"
         @move="handleMove"
       />
     </div>

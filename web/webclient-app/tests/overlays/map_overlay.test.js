@@ -1,5 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
+import MapLattice from "../../components/MapLattice.vue";
 import MapOverlay from "../../components/MapOverlay.vue";
 import {
   LOCAL_MAP_MINIMAL_SAMPLE,
@@ -101,5 +102,16 @@ describe("MapOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", () 
     expect(wrapper.find(".local-map__lattice").exists()).toBe(false);
     await wrapper.setProps({ localMap: localMapModelFor(LOCAL_MAP_SAMPLE) });
     expect(wrapper.find(".local-map__lattice").exists()).toBe(true);
+  });
+
+  it("Task 3.1: declares markerNameFont 11 alongside existing overlay props", () => {
+    wrapper = mount(MapOverlay, { props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) } });
+    const lattice = wrapper.findComponent(MapLattice);
+    expect(lattice.props("markerNameFont")).toBe(11);
+    expect(lattice.props("colPitch")).toBe(280);
+    expect(lattice.props("rowPitch")).toBe(212);
+    expect(lattice.props("labelMax")).toBe(10);
+    expect(lattice.props("markerScale")).toBe(4.83);
+    expect(lattice.props("maxWidth")).toBe(848);
   });
 });
