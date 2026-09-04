@@ -40,7 +40,10 @@ import LayoutStore from "./lib/layout_store.js";
 // multi-select, and `/` toggles the command drawer. The router's `handle`
 // return value is the claim signal, so the bridge prevents the default
 // exactly when the router consumed the key.
-const CLAIMED_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Escape", " ", "/"];
+// The digits are claimed exactly when the router consumes them as dock row
+// picks (webclient-align-01-dock-chrome): an unclaimed digit (no such row)
+// still falls through to the text / command-history path.
+const CLAIMED_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Escape", " ", "/", "1", "2", "3", "4"];
 
 function isEditable(target) {
   if (!target || !target.tagName) {

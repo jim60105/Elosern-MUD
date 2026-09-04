@@ -2489,6 +2489,38 @@ export const useElosernStore = defineStore("elosern", () => {
       // Any other key while the form is open is consumed locally.
       return true;
     }
+    // The dock's positional row picks (webclient-align-01-dock-chrome): the
+    // legend `數字鍵 1-4 · Enter 執行 · Esc 返回` names the first four rows
+    // of the current dock frame as reachable by the top-row number keys. A
+    // digit moves the frame's focus onto its row (1-indexed, rendered
+    // order) and activates it through the same confirm path Enter uses
+    // (disabled rows show their explanation, in-flight rows stay locked,
+    // repeats are suppressed by the router's guard). Focus moving is the
+    // consumption signal: a digit whose row does not exist (a frame with
+    // fewer rows, or the pre-session empty stack) is unclaimed and falls
+    // through to the text / command-history path. Implemented entirely
+    // through the frozen router façade members — the UMD source is not
+    // edited (design D1).
+    if (key === "1" || key === "2" || key === "3" || key === "4") {
+      const slot = Number(key) - 1;
+      if (router.depth() === 0) {
+        return false;
+      }
+      const menu = router.currentMenu();
+      const item = menu && menu.items ? menu.items[slot] : null;
+      if (!item) {
+        return false;
+      }
+      const itemKey = item.key !== undefined ? item.key : item.label;
+      if (!router.focusItemByKey(itemKey)) {
+        return false;
+      }
+      // The activation itself may decline (disabled, locked, or the
+      // held-repeat guard) after the focus moved; the key was still
+      // consumed, exactly as a focused Enter that shows an explanation.
+      router.confirm({ source: "keyboard" });
+      return true;
+    }
     return router.press(key, !!repeat);
   }
 

@@ -23,7 +23,9 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
+    outbound_messages,
     sent_action_count,
+    store_state,
     valid_character_panel,
     valid_local_map_panel,
     valid_status_panel,
@@ -1123,6 +1125,97 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "the breadcrumb hides again after popping one level",
         )
         self.assertEqual(sent_action_count(page), 0, "the back control dispatches no ui_action")
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-dock-s-shortcut-legend-names-only-real-keyboard-behaviour-and-renders-as-one-visible-instance"
+    )
+    def test_digit_keys_pick_the_first_four_rows_of_the_current_frame(self):
+        """`數字鍵 1–4` is real behaviour: a digit moves the dock focus onto
+        the Nth row of the current frame and runs it exactly like Enter; a
+        digit whose row does not exist is unclaimed (webclient-align-01)."""
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        exploration = _exploration_panel(
+            [_interact_target(11, "小販")],
+            move_rows=[
+                _move_row("ex-a", "東門", "room:44"),
+                _move_row("ex-b", "北門", "room:45", enabled=False),
+                _move_row("ex-c", "南門", "room:46"),
+            ],
+        )
+        _inject_snapshot(
+            page,
+            {
+                "exploration": exploration,
+                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "local_map": valid_local_map_panel(),
+            },
+            mode="exploration",
+        )
+        _wait_mode(page, "exploration")
+
+        # Open the move frame: rows are ex-a, ex-b, ex-c, then the breadcrumb
+        # back row (row 4).
+        focus_action_dock(page)
+        page.locator("#dock-tab-move").click()
+        page.wait_for_timeout(150)
+        self.assertEqual(_dock_depth(page), 2, "the move frame is at depth 2")
+
+        # `2` picks the second row (a disabled row): the focus moves onto it
+        # and nothing submits — a stable state with no server commit to race.
+        _press(page, "2")
+        self.assertEqual(
+            store_state(page)["focus"]["key"],
+            "exit-ex-b",
+            "digit 2 moved the focus onto the second row",
+        )
+        self.assertEqual(
+            sent_action_count(page),
+            0,
+            "a disabled picked row shows its explanation and submits nothing",
+        )
+
+        # `4` picks the fourth row (the breadcrumb back row): the row pops
+        # exactly one level, dispatching nothing.
+        _press(page, "4")
+        self.assertEqual(
+            _dock_depth(page),
+            1,
+            "digit 4 activated the back row and popped one level",
+        )
+        self.assertEqual(sent_action_count(page), 0, "the back row dispatches no ui_action")
+
+        # Re-open the move frame: `1` picks the first row and submits its
+        # move exactly as Enter would — the proof is the OUTBOUND envelope
+        # (the fabricated exit_ref is the server's problem, not the client's;
+        # the commit's authoritative panel replace is intentionally not
+        # asserted, so the assertion cannot race it).
+        page.locator("#dock-tab-move").click()
+        page.wait_for_timeout(150)
+        self.assertEqual(_dock_depth(page), 2)
+        _press(page, "1")
+        moves = [
+            args[0]
+            for cmdname, args, _kwargs in outbound_messages(page)
+            if cmdname == "ui_action" and args and args[0].get("action_id") == "explore.move"
+        ]
+        self.assertEqual(
+            [m.get("payload", {}).get("exit_ref") for m in moves],
+            ["ex-a"],
+            "digit 1 submitted exactly the first row's move, once",
+        )
+
+        # A digit with no such row is unclaimed: the bridge does not prevent
+        # its default (dispatchEvent returns false only when a listener
+        # cancelled the event).
+        unclaimed = page.evaluate(
+            """() => {
+          const event = new KeyboardEvent("keydown", { key: "9", bubbles: true, cancelable: true });
+          document.dispatchEvent(event);
+          return !event.defaultPrevented;
+        }"""
+        )
+        self.assertTrue(unclaimed, "a digit beyond the frame's rows is not claimed")
 
     @covers_requirement(
         "webclient-contextual-hud::dock-panes-render-a-per-kind-vocabulary-from-backed-fields-only"

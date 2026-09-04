@@ -33,6 +33,12 @@ export const CONTROLS_REFERENCE = [
     detail: "Hidden and disabled controls are skipped.",
   },
   {
+    key: "1-4",
+    label: "Pick a dock row by position",
+    detail:
+      "Moves the dock focus to the first four rows of the current frame (in rendered order) and runs it like Enter; a slot beyond the row count does nothing.",
+  },
+  {
     key: "Quick-word chips",
     label: "Prepare a command without submitting",
     detail: "The chip writes its verb plus a trailing space into the field and focuses it.",

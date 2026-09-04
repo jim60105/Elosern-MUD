@@ -76,6 +76,12 @@ Ten changes, each ≤ one workday. Names follow the `webclient-align-NN-*` serie
   執行 · <kbd>Esc</kbd> 返回`; dialogue-mode variant `數字鍵 1–4 選 · <kbd>→</kbd>
   指令列自由對話`. `<kbd>` gets mono styling (`--ink-780` ground, 2px bottom border).
   The `/ 聚焦指令列` broadcast is dropped (binding stays).
+- To keep the legend truthful, the digits it names become real here: `1`–`4` pick the first
+  four rows of the current dock frame (move focus + activate via the same confirm path as
+  Enter; unclaimed when the frame is shorter or the stack is empty; the quantity form keeps
+  precedence). Implemented in the store's focus entry through the frozen router façade —
+  the UMD router source is not edited (design D1); the digits join the bridge's claimed-key
+  set. The draft's own `1–4` badges on suggestion cards reflect this same intent.
 - Command-line util buttons keep position; restyle to draft `.hist button`
   (transparent ground, 26×26, hover `--ink-700`). Function unchanged.
 

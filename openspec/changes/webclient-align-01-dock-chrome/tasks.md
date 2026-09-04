@@ -21,6 +21,15 @@
   bottom, radius 4, `--paper-300`) scoped to the legend.
 - [x] 2.3 Update the legend one-instance/wording tests: exactly one legend element; text matches
   the draft; no element names a key the client does not bind.
+- [x] 2.4 Make the named digits real: bind `1`–`4` in the store's `focusPress` entry (move the
+  current frame's focus onto the Nth row and activate through the same confirm path as Enter;
+  unclaimed when the frame has fewer rows or the stack is empty; the quantity form keeps
+  precedence), add the digits to the bridge's claimed-key set, and add the key to the client's
+  controls reference — the UMD keyboard router stays untouched (design D1).
+- [x] 2.5 Cover the binding: Vitest store suite (pick, disabled row, unclaimed slot, pre-session,
+  quantity precedence, repeat suppression), bridge claim test (consumed digit prevents the
+  default, unclaimed digit does not), and a managed-browser journey (digit 4 pops via the back
+  row, digit 2 submits the second row's move once, digit 9 unclaimed).
 
 ## 3. Utility button restyle
 

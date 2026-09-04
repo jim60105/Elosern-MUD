@@ -113,7 +113,6 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
   it("Escape from the focused field returns focus to the dock; the menu depth is unchanged", async () => {
     const store = mountAll();
     openActiveSession(store);
-
     // Navigate the router into a submenu (depth 2) so the dock's menu level
     // state is non-trivial. H4 re-homed "character" into a reference drawer
     // (no router push); "move" is the root entry that opens a real submenu.
@@ -138,6 +137,36 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
     expect(event.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(document.getElementById("action-dock"));
     expect(store.view.dockDepth).toBe(2, "the dock's menu level is untouched by the field's Escape");
+  });
+
+  it("a digit claimed as a dock row pick prevents the default; an unclaimed digit does not", async () => {
+    const store = mountAll();
+    openActiveSession(store);
+    const sender = fx.createFakeSender();
+    store.setSender(sender);
+
+    // Open the move frame (rows: exit-east enabled, exit-north disabled,
+    // back) so a real row exists at slot 1.
+    store.focusItemByKey("move");
+    store.focusConfirm();
+    await wrapper.vm.$nextTick();
+    expect(store.view.dockDepth).toBe(2);
+
+    // `1` is consumed by the store's row pick -> the bridge claims it:
+    // preventDefault fires and the row submits through the store.
+    const claimed = new KeyboardEvent("keydown", { key: "1", bubbles: true, cancelable: true });
+    document.dispatchEvent(claimed);
+    await wrapper.vm.$nextTick();
+    expect(claimed.defaultPrevented).toBe(true);
+    expect(sender.sent.actions.map((a) => a.action_id)).toContain("explore.move");
+
+    // A digit with no such row is unclaimed: the bridge does not prevent the
+    // default, so the key falls through to the text / command-history path.
+    for (const key of ["5", "6", "7", "8", "9", "0"]) {
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      document.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    }
   });
 
   it("ArrowDown on the single-row exploration root is a no-op move but still suppresses the default", async () => {
