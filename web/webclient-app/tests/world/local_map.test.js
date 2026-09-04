@@ -370,9 +370,115 @@ describe("LocalMap (B4 world family)", () => {
     // canvas (2830px natural height cannot overflow the island). The
     // rendered proportional size is verified in the running Storybook
     // (World/LocalMap — TallLatticeScaled), not here.
+    //
+    // Since the island fills its width (the draft's `.mini svg{width:100%}`),
+    // the renderer resolves every cap into ONE width bound rather than leaving
+    // a definite width fighting a `max-height`: 296px of height budget buys
+    // 296 × 116/2830 = 12.13px of width at this canvas's ratio. That is the
+    // same rendered box the height cap produced before — a 64-row lattice
+    // squeezed into 296px is 12px wide either way — but now it is the
+    // renderer's own arithmetic instead of an engine-dependent constraint
+    // resolution, so no engine can letterbox or distort it.
     const style = svg.attributes("style") ?? "";
-    expect(style).toContain("max-width: 206px");
+    expect(style).toContain("width: 100%");
+    expect(style).toContain("max-width: 12.13px");
     expect(style).toContain("max-height: 296px");
+  });
+
+  // ---------------------------------------------------------------------
+  // The minimap island claims its card (the redesign review's primary
+  // finding, REDESIGN §7 / draft `.mini svg { width:100%; max-width:172px }`).
+  // ---------------------------------------------------------------------
+
+  it("fills the island's width instead of drawing at natural pixel size", () => {
+    // The shipped island used to render this payload's canvas at its natural
+    // 226.91 × 110.91 and merely cap it, so any payload narrower than the card
+    // left the map the smallest thing in the island. `fill-width` makes the
+    // canvas claim the card, and the 206px island cap is what bounds it.
+    const w = mountMap();
+    const svg = w.get("svg.local-map__lattice");
+    const style = svg.attributes("style") ?? "";
+    expect(style).toContain("width: 100%");
+    expect(style).toContain("max-width: 206px");
+  });
+
+  it("bounds the upscale so a one-room payload cannot blow up the marker ramp", () => {
+    // A single-node room's natural canvas is 58 × 58. Filling the card would
+    // scale the designed geometry ~3.5x (a 57px "you are here" seal, 39px
+    // labels); the island's `max-upscale` of 2 caps the drawn card at 116px
+    // and centres it (`align-self: center`) instead.
+    const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE) });
+    const style = w.get("svg.local-map__lattice").attributes("style") ?? "";
+    expect(style).toContain("width: 100%");
+    expect(style).toContain("max-width: 116px");
+  });
+
+  it("keeps the header on one row: an elastic title, fixed marks, a fixed trigger", () => {
+    // The wrapping header was a three-way squeeze between a server-authored
+    // title (`f"{room.key}街道圖"`), the axis marks, and a labelled button in a
+    // 210px content box. Only the title may flex, and it ellipsizes rather
+    // than wrapping, so any authored/translated length is safe.
+    const w = mountMap({
+      localMap: {
+        ...localMapModelFor(LOCAL_MAP_SAMPLE),
+        title: "冒險者公會外街道圖",
+      },
+    });
+    const titleEl = w.get('[data-testid="local-map__title"] .local-map__meta-title');
+    expect(titleEl.text()).toBe("冒險者公會外街道圖");
+    // The untruncated string stays reachable on the element itself.
+    expect(titleEl.attributes("title")).toBe("冒險者公會外街道圖");
+    // The trigger keeps its accessible name (and gains the pointer tooltip)
+    // while its visible content drops to the expand glyph, which is
+    // aria-hidden and never a hit-test target of its own.
+    const expand = w.get('[data-testid="local-map__expand"]');
+    expect(expand.attributes("aria-label")).toBe("展開全地圖");
+    expect(expand.attributes("title")).toBe("展開全地圖");
+    expect(expand.text()).toBe("");
+    const icon = expand.get("svg.local-map__expand-icon");
+    expect(icon.attributes("aria-hidden")).toBe("true");
+    // The axis marks stay in the header, unwrapped, on the lattice variant.
+    expect(w.find('[data-testid="local-map__orientation"]').exists()).toBe(true);
+  });
+
+  it("re-seeds the readout when the payload's current node moves", async () => {
+    // The island's selection was seeded once at setup while the store replaces
+    // the whole model on every move, so after one move the held id named a
+    // room the new payload no longer carried and the readout line went blank
+    // (the review's "empty detail bar"). Following `currentNode` restores the
+    // documented default: the readout describes where you are.
+    const w = mountMap();
+    expect(w.get('[data-testid="local-map-detail"]').text()).toContain("霧骨渡口");
+    await w.setProps({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
+    const detail = w.get('[data-testid="local-map-detail"]');
+    expect(detail.text()).toContain("灰鬮荒原");
+    expect(detail.classes()).not.toContain("local-map__detail--empty");
+  });
+
+  it("falls back to the current node when a targeted update drops the selection", async () => {
+    // Same staleness, different trigger: the room (and so `currentNode`) is
+    // unchanged, but the replacement payload no longer carries the node the
+    // player had selected. The readout must stay truthful, not blank.
+    const w = mountMap();
+    await w.get('[data-testid="local-map-remembered"] li').trigger("click");
+    expect(w.get('[data-testid="local-map-detail"]').text()).toContain("舊街區");
+    const minimal = localMapModelFor(LOCAL_MAP_MINIMAL_SAMPLE);
+    expect(minimal.currentNode).toBe("grid:altoria:1:2");
+    await w.setProps({ localMap: minimal });
+    const detail = w.get('[data-testid="local-map-detail"]');
+    expect(detail.text()).toContain("霧骨渡口");
+    expect(detail.classes()).not.toContain("local-map__detail--empty");
+  });
+
+  it("states nothing rather than an empty box when no node resolves", () => {
+    // Degenerate branch only (every available payload carries a current node):
+    // the element stays mounted for the committed testid and the island's
+    // body-click target, but the draft's unboxed readout simply is not drawn.
+    const model = localMapModelFor(LOCAL_MAP_MINIMAL_SAMPLE);
+    const w = mountMap({ localMap: { ...model, currentNode: null } });
+    const detail = w.get('[data-testid="local-map-detail"]');
+    expect(detail.text()).toBe("");
+    expect(detail.classes()).toContain("local-map__detail--empty");
   });
 
   it("keeps the 48-row lattice + 16 remembered nodes within the 64-node bound", () => {
@@ -559,6 +665,77 @@ describe("LocalMap (B4 world family)", () => {
     } finally {
       Element.prototype.getBoundingClientRect = realRect;
       host.remove();
+    }
+  });
+
+  // The budget's SOURCE, which is what actually starved the shipped island.
+  // `[data-anchor="hud-right"]` is an absolutely positioned box with `top` +
+  // `max-height` and no `height`, so while its content fits it is sized BY the
+  // island — and the island's height is dominated by the canvas the budget
+  // caps. Substituting that back into the formula collapses it to
+  // `available = renderedCanvasHeight − 1`, a strictly decreasing map: every
+  // ResizeObserver pass shrank the canvas, which shrank the anchor, which
+  // re-fired the observer, ratcheting the minimap onto its 40px floor. The
+  // budget must therefore be read from geometry the canvas does not move.
+  it("budgets against the anchor's room, not the island's own height", async () => {
+    const stage = document.createElement("div");
+    const host = document.createElement("div");
+    host.setAttribute("data-anchor", "hud-right");
+    const dock = document.createElement("div");
+    dock.setAttribute("data-anchor", "dock");
+    stage.append(host, dock);
+    document.body.appendChild(stage);
+
+    const sectionHeights = {
+      "local-map__meta": 24,
+      "local-map__detail": 18,
+    };
+    const realRect = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function () {
+      for (const [cls, height] of Object.entries(sectionHeights)) {
+        if (this.classList?.contains(cls)) return { height };
+      }
+      // The stage geometry a 1280×720 viewport produces: the island's anchor
+      // starts 64px down and the dock's top edge is the first thing below it.
+      if (this === host) return { top: 64, height: host.clientHeight };
+      if (this === dock) return { top: 500, height: 158 };
+      return realRect.call(this);
+    };
+    // The hostile part: the anchor reports the island's own rendered height,
+    // exactly as a content-sized anchor does in the browser. Any budget that
+    // reads it ratchets; the fixed one ignores it.
+    Object.defineProperty(host, "clientHeight", {
+      configurable: true,
+      get() {
+        const svg = host.querySelector("svg.local-map__lattice");
+        const cap = /max-height:\s*([\d.]+)px/.exec(svg?.getAttribute("style") ?? "");
+        const canvas = Math.min(154.91, cap ? parseFloat(cap[1]) : 296);
+        // island border-box: 2 border + 18 padding + meta 24 + 4 meta margin
+        // + 8 gap + canvas + 8 gap + detail 18.
+        return 2 + 18 + 24 + 4 + 8 + canvas + 8 + 18;
+      },
+    });
+
+    try {
+      wrapper = mount(LocalMap, {
+        props: { localMap: localMapModelFor(LOCAL_MAP_MINIMAL_SAMPLE) },
+        attachTo: host,
+      });
+      // Budget = floor(dock top 500 − anchor top 64 − 12 clearance) = 424, so
+      // available = 424 − (24 + 18) − 2 gaps × 8 − 25 = 341, clamped to the
+      // 296px cap. Reading `clientHeight` instead would have budgeted from
+      // ~236px of island and handed the canvas 177px on the first pass, then
+      // less on every pass after it.
+      for (let pass = 0; pass < 8; pass += 1) {
+        await wrapper.vm.$nextTick();
+        expect(
+          wrapper.find("svg.local-map__lattice").attributes("style"),
+          `pass ${pass} must not ratchet the canvas down`,
+        ).toContain("max-height: 296px");
+      }
+    } finally {
+      Element.prototype.getBoundingClientRect = realRect;
+      stage.remove();
     }
   });
 

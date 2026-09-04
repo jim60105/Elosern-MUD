@@ -29,9 +29,24 @@ const props = defineProps({
   // measured height budget down from `LocalMap.vue`.
   maxWidth: { default: 206 },
   maxHeight: { default: 296 },
-  // Fill-width layout variant: the overlay renders the canvas at the body's
-  // available width instead of the island's natural auto width.
+  // Fill-width layout variant: the canvas claims the caller's content width
+  // instead of drawing at its natural pixel size. Both surfaces pass it —
+  // the overlay to fill the overlay body, the minimap island to honour the
+  // draft's `.mini svg { display:block; width:100%; max-width:172px }` rule
+  // (REDESIGN §7: the lattice's geometry is its claim, so it must not be
+  // invisible). Drawing at natural size left a sparse payload rendering a
+  // ~111px canvas inside a ~210px island — the map was the smallest thing in
+  // the island whose whole reason to exist is the map.
   fillWidth: { type: Boolean, default: false },
+  // Upscale bound for `fillWidth` (island-only opt-in; `null` = unbounded, so
+  // the overlay keeps filling its body width at its own larger scale). A
+  // one-room payload's natural canvas is 58px wide, and letting it stretch to
+  // the island's full width would blow the designed marker/label ramp up ~3.5x
+  // — a 57px "you are here" seal and 39px labels. Bounding the uniform scale
+  // keeps the drawn type ramp close to the draft's while every payload from
+  // two columns (or one column plus the edge-marker gutter) up still claims
+  // the whole island width.
+  maxUpscale: { type: Number, default: null },
   // Draft overlay chrome (webclient-map-01-draft-chrome design D4): the
   // full-map surface paints its canvas in the `mapcanvas` treatment and
   // draws the teardrop location pin above the current marker. Off on the
@@ -308,10 +323,36 @@ function activateNode(node) {
 // dynamically measured height budget down, the overlay passes `null` for no
 // height cap and fills the body width — bound as inline styles so the
 // caller controls the layout variant.
+//
+// Every cap is resolved into ONE width bound, because under `fillWidth` the
+// element's width is definite (100% of the caller's content box) and a bare
+// `max-height` would then be an engine-dependent constraint: the replaced-
+// element constraint table is meant to shrink the width back to preserve the
+// intrinsic ratio, but the observable behaviour across engines ranges from
+// that, to a distorted box, to a `preserveAspectRatio` letterbox that leaves
+// the canvas's background/border painted around a thin drawing. The renderer
+// knows the exact canvas ratio, so it spends the height budget as its
+// equivalent width instead: the drawing then fills its box in every engine,
+// and the rendered height is exactly the budget. `max-height` is still bound
+// as the belt-and-braces cap it always was (it can no longer bind, since the
+// width bound is floored, never rounded up).
+function widthCaps() {
+  const caps = [];
+  if (props.maxWidth != null) caps.push(Number(props.maxWidth));
+  if (props.maxHeight != null && canvasHeight.value > 0) {
+    caps.push((Number(props.maxHeight) * canvasWidth.value) / canvasHeight.value);
+  }
+  if (props.maxUpscale != null) caps.push(canvasWidth.value * props.maxUpscale);
+  return caps;
+}
+
 const latticeStyle = computed(() => {
   const style = {};
   if (props.fillWidth) style.width = "100%";
-  if (props.maxWidth != null) style.maxWidth = props.maxWidth + "px";
+  const caps = widthCaps();
+  // Floored to 2 decimals: a bound rounded UP could re-cross the height
+  // budget by a sub-pixel and hand the anchor a scrollbar.
+  if (caps.length) style.maxWidth = Math.floor(Math.min(...caps) * 100) / 100 + "px";
   if (props.maxHeight != null) style.maxHeight = props.maxHeight + "px";
   return style;
 });
@@ -510,16 +551,21 @@ const latticeStyle = computed(() => {
 
 <style scoped>
 /* The lattice canvas sizes from the model's exported lattice (cols × rows
-   cells) and scales down proportionally under the caller-supplied caps
-   (the island passes its measured height budget; the overlay passes no
-   height cap and fills the body width). */
+   cells) and scales proportionally under the caller-supplied caps, which
+   both callers resolve into the single `max-width` bound computed in
+   `latticeStyle` (the island passes its measured height budget and an
+   upscale bound; the overlay passes no height cap and fills the body
+   width). */
 .local-map__lattice {
   display: block;
-  /* The parent surfaces are flex columns (the island, the overlay body's
-     centering wrapper), so without this the SVG would stretch to the
-     parent's content width, *enlarging* small lattices and pushing the
-     label offset back onto the marker below. `align-self: center` keeps
-     the canvas at its natural (or uniformly capped) size, centered. */
+  /* `align-self: center` centres the canvas whenever a cap makes it narrower
+     than the surface (a tall payload trades width for the island's height
+     budget). It no longer defends a natural-size rendering: an earlier
+     revision used it plus `width: auto` to stop the flex column from
+     *enlarging* small lattices, which is exactly what the draft's
+     `.mini svg { width: 100% }` asks for and what `fillWidth` now does —
+     uniformly, through the viewBox, so every marker/label/gutter offset in
+     the geometry contract stays proportional and scale-invariant. */
   align-self: center;
   width: auto;
   height: auto;

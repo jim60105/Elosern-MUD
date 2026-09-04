@@ -16,9 +16,13 @@ import {
 // the old private copy deleted), reusing the existing `local_map` fixtures
 // so both surfaces render the identical committed payload.
 
+// The island column's CONTENT box: the 230px hud-right anchor less the
+// island's 9px padding and 1px border on each side. Island-scale stories fill
+// it the way the island does, so a story shows the same canvas the minimap
+// draws rather than a natural-size one.
 const renderLattice = (args) => ({
   render: () =>
-    h("div", { style: "width: 230px;" }, [h(MapLattice, args)]),
+    h("div", { style: "width: 210px;" }, [h(MapLattice, args)]),
 });
 
 const renderOverlayScale = (args) => ({
@@ -50,8 +54,16 @@ const latticeOf = (fixture) => {
   const model = localMapModelFor(fixture);
   // Mirror the real island wiring (slim-minimap-island D1): the minimap
   // surface passes the legend-display switch off, so island-scale stories
-  // mount no legend element either.
-  return { localMap: model, variant: model.layoutVariant, showLegend: false };
+  // mount no legend element either — plus the draft `.mini svg{width:100%}`
+  // fill and its upscale bound, which is what makes the canvas claim the
+  // island's card instead of drawing at natural pixel size.
+  return {
+    localMap: model,
+    variant: model.layoutVariant,
+    showLegend: false,
+    fillWidth: true,
+    maxUpscale: 2,
+  };
 };
 
 // Island (minimap) scale: the crowding fix's decoupled pitches (58px
