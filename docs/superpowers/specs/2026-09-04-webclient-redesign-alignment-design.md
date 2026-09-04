@@ -243,3 +243,42 @@ Proposed batches (parallel within a wave, serial across waves; ~7 workdays):
 - A full 58-command completion catalog panel.
 - Layout/format changes to drawers other than the party drawer content.
 - Any backward compatibility, schema migration, or legacy payload handling.
+
+## 7. Amendments
+
+### 2026-09-04 — Change-set restructure after rubber-duck review
+
+Two changes were split so each ships one independently testable contract, and the
+suggestion-surface dedupe (change 3) gained explicit showcase/manifest/browser-test
+follow-through.
+
+- **Change 6 split.** `webclient-align-06-quest-tracker` becomes
+  `webclient-align-06-quest-tracking-contract` (server only: `tracked` record field,
+  `guild.quest_track`, `objectives` panel, services v4) plus
+  `webclient-align-09-objective-tracker-ui` (client only: `.obj` tracker island,
+  quest-browser tracking toggle, showcase registration, deferred-surface test trim).
+  All Change 6 server decisions stand, including the host-independent `objectives`
+  panel replacing the guild-host-gated services-row derivation.
+- **Change 7a split.** `webclient-align-07-dialogue-session` becomes
+  `webclient-align-07-dialogue-session-state` (deterministic-core session helpers,
+  writer/clear seams — invisible on its own) plus `webclient-align-10-dialogue-panel`
+  (`dialogue` mode, panel registry/validator, coordinator resolution order, client
+  protocol mirrors). Change 08's dependency is now change 10, not 07.
+- **Change 3 scope closed.** Deleting the stream choice-point also deletes its
+  showcase story/manifest entry, its browser test file and browser-shard entry, and
+  retargets the evidence-harness annotations; a showcase delta removes the
+  choice-point from the manifest minimum and the action-dock family contract.
+- **Change 8 legend ownership corrected.** Its dock dialogue hint had been attributed to a
+  nonexistent "command-line hint contract"; it is change 1's shortcut-legend requirement,
+  which change 8 now restates as MODIFIED with the reference's dialogue variant
+  (`數字鍵 1–4 選 · → 指令列自由對話`, draft line 911) and the matching `→` key binding.
+- **Traceability timing pinned repo-wide:** `covers_requirement` annotations for new
+  requirement IDs land at each change's archive/sync commit (the checker resolves IDs
+  only from `openspec/specs/`; magic-xp P1 precedent).
+
+Revised batches (parallel within a wave, serial across waves; ~8 workdays):
+
+- W1: 1, 3, 4
+- W2: 2, 5, 6
+- W3: 7, 9, 10
+- W4: 8
