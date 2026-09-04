@@ -594,8 +594,7 @@ class ScenarioDirectorNameInspirationTests(PromptFixture):
         text = library.texts["scenario_director.system"]
         self.assertIn("{name_inspiration}", text)
         self.assertIn("僅供靈感", text)
-        self.assertIn("建議填寫 display_name", text)
-        self.assertIn("仍為選填", text)
+        self.assertIn("必須附帶 display_name 與 title", text)
 
     @covers_requirement("prompt-library::the-scenario-director-key-is-registered-with-the-name-inspiration-placeholder-and-carries-the-naming-guidance")
     def test_typo_placeholder_outside_allowlist_is_rejected(self):

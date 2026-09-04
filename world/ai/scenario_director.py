@@ -56,6 +56,7 @@ from world.prompts.loader import PromptUnavailableError, render_prompt
 from world.rules.namegen import roll_name_for_race
 from world.quests.characterization import (
     characterize_errors,
+    duplicate_display_name_errors,
     duplicate_stable_key_errors,
     race_lifespan_upper_bound,
 )
@@ -168,21 +169,25 @@ class BlueprintPortrait:
 
 @dataclass(frozen=True)
 class BlueprintNpcReq:
-    """One stage's NPC requirement: role, tier, disposition, and optional
-    story-driven characterization (design D1).
+    """One stage's NPC requirement: role, tier, disposition, and story-driven
+    characterization (design D1).
 
-    ``display_name``, paired ``age``/``apparent_age``, ``portrait``, and the
-    optional authored persona/background flavor block are optional per-occupant
-    fields authored by the generative layer like speech and bounded
-    deterministically by the shared ``world.quests.characterization`` helper.
-    ``portrait`` is a frozen value object so the immutability-by-construction
-    guard stays intact.
+    ``display_name`` and ``title`` are the REQUIRED authored identity fields
+    (npc-title-authored-identities D5): the structural layer keeps the
+    defaulted ``str | None`` shape so a missing field surfaces as the shared
+    helper's named guardrail diagnostic instead of a constructor error. Paired
+    ``age``/``apparent_age``, ``portrait``, and the optional authored
+    persona/background flavor block stay optional. All fields are authored by
+    the generative layer like speech and bounded deterministically by the
+    shared ``world.quests.characterization`` helper. ``portrait`` is a frozen
+    value object so the immutability-by-construction guard stays intact.
     """
 
     role: str
     tier: str
     disposition: str | None = None
     display_name: str | None = None
+    title: str | None = None
     age: int | None = None
     apparent_age: int | None = None
     portrait: BlueprintPortrait | None = None
@@ -353,6 +358,11 @@ class QuestBlueprint:
                                 else {}
                             ),
                             **(
+                                {"title": requirement.title}
+                                if requirement.title is not None
+                                else {}
+                            ),
+                            **(
                                 {"age": requirement.age}
                                 if requirement.age is not None
                                 else {}
@@ -435,6 +445,7 @@ class QuestBlueprint:
                         tier=requirement["tier"],
                         disposition=requirement.get("disposition"),
                         display_name=requirement.get("display_name"),
+                        title=requirement.get("title"),
                         age=requirement.get("age"),
                         apparent_age=requirement.get("apparent_age"),
                         portrait=(
@@ -558,12 +569,13 @@ SCENARIO_DIRECTOR_OUTPUT_SCHEMA: dict[str, Any] = {
                         "type": "array",
                         "items": {
                             "type": "object",
-                            "required": ["role", "tier"],
+                            "required": ["role", "tier", "display_name", "title"],
                             "properties": {
                                 "role": {"type": "string"},
                                 "tier": {"type": "string"},
                                 "disposition": {"type": ["string", "null"]},
                                 "display_name": {"type": ["string", "null"]},
+                                "title": {"type": ["string", "null"]},
                                 "age": {"type": ["integer", "null"]},
                                 "apparent_age": {"type": ["integer", "null"]},
                                 "portrait": {
@@ -767,6 +779,7 @@ def _validate_npc_characterization(parsed: Any) -> list[str]:
             ):
                 errors.append(f"stage {index} {message}")
     errors.extend(duplicate_stable_key_errors(entries))
+    errors.extend(duplicate_display_name_errors(entries))
     return errors
 
 

@@ -2,6 +2,8 @@
 
 from tools.spec_traceability import covers_requirement
 
+from unittest.mock import patch
+
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object_by_tag
 from evennia.utils.test_resources import EvenniaTestCase
@@ -20,11 +22,20 @@ from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.guild_config import CATALOG, get_catalog
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+from world.lore.guild import GUILD_BRANCH_REGISTRY, GuildBranch
+from world.lore.shops import SHOP_REGISTRY
 from world.rules.guild_economy import (
     GUILD_SERVICE_KEY,
+    ServiceAnchorIntegrityError,
+    _cleanup_legacy_service_hosts,
     MERCHANT_SERVICE_KEY,
     sync_service_content,
 )
+
+GUILD_HOST_NAME = GUILD_BRANCH_REGISTRY["guild_branch_altoria"].host_name
+GUILD_HOST_TITLE = GUILD_BRANCH_REGISTRY["guild_branch_altoria"].host_title
+MERCHANT_HOST_NAME = SHOP_REGISTRY["altoria_general_store"].host_name
+MERCHANT_HOST_TITLE = SHOP_REGISTRY["altoria_general_store"].host_title
 
 MERCHANT_STOCK_COUNT = 30  # every offered item key
 
@@ -53,10 +64,12 @@ class ServiceContentIsolation(QuestRegistryIsolation):
 
 class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
     def _guild_host(self):
-        return NPC.objects.filter(db_key=GUILD_SERVICE_KEY).first()
+        # Authored identity is the key now; reuse anchors on the component
+        # service_id (npc-title-authored-identities D3).
+        return NPC.objects.filter(db_key=GUILD_HOST_NAME).first()
 
     def _merchant_host(self):
-        return NPC.objects.filter(db_key=MERCHANT_SERVICE_KEY).first()
+        return NPC.objects.filter(db_key=MERCHANT_HOST_NAME).first()
 
     def _guild_hall(self):
         return search_object_by_tag(GUILD_HALL_TAG)[0]
@@ -144,6 +157,156 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(
             [name for name in guild_host.components.db_names if name in {"guild_staff", "guild_examiner"}],
             ["guild_staff", "guild_examiner"],
+        )
+
+
+class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
+    """Authored creation, service-anchor reuse, no runtime identity writes (D3)."""
+
+    def _guild_host(self):
+        return NPC.objects.filter(db_key=GUILD_HOST_NAME).first()
+
+    @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
+    @covers_requirement("npc-identity-titles::host-and-examiner-creation-emit-boundary-info-events")
+    def test_first_sync_creates_the_authored_host_once(self):
+        with patch("world.rules.guild_economy.log_info") as logged:
+            sync_service_content()
+        host = self._guild_host()
+        self.assertIsNotNone(host)
+        self.assertEqual(host.npc_title, GUILD_HOST_TITLE)
+        events = [
+            call for call in logged.call_args_list
+            if call.args and call.args[0] == "guild_service_host_created"
+        ]
+        self.assertEqual(len(events), 2)  # guild host + merchant host
+        self.assertEqual(events[0].kwargs["context"]["char"], GUILD_HOST_NAME)
+        self.assertEqual(events[0].kwargs["context"]["service"], GUILD_SERVICE_KEY)
+        self.assertEqual(events[0].kwargs["context"]["shop"], "guild_branch_altoria")
+        sync_service_content()  # reuse fires nothing
+        late = [
+            call for call in logged.call_args_list
+            if call.args and call.args[0] == "guild_service_host_created"
+        ]
+        self.assertEqual(len(late), 2)
+
+    @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
+    def test_resync_never_renames_or_duplicates(self):
+        sync_service_content()
+        before = self._guild_host()
+        self.assertIsNotNone(before)
+        # Simulate an author renaming the registry row: the anchor keeps the host.
+        branch = GUILD_BRANCH_REGISTRY["guild_branch_altoria"]
+        renamed = GuildBranch(
+            branch.key, branch.display_name_zh, "改名後", branch.host_title, branch.anchor_key
+        )
+        GUILD_BRANCH_REGISTRY["guild_branch_altoria"] = renamed
+        try:
+            sync_service_content()
+        finally:
+            GUILD_BRANCH_REGISTRY["guild_branch_altoria"] = branch
+        self.assertEqual(NPC.objects.filter(db_key=GUILD_HOST_NAME).count(), 1)
+        self.assertEqual(NPC.objects.filter(db_key="改名後").count(), 0)
+        self.assertEqual(self._guild_host().pk, before.pk)
+
+    def _anchored_legacy_host(self, key):
+        # A pre-identity dev host anchored by service_id under a free key.
+        legacy = create_object(NPC, key=key, location=self._guild_hallish())
+        legacy.components.add(
+            GuildStaff.create(legacy, service_id=GUILD_SERVICE_KEY, branch_key="guild_branch_altoria")
+        )
+        legacy.components.add(
+            GuildExaminer.create(legacy, service_id=GUILD_SERVICE_KEY, branch_key="guild_branch_altoria")
+        )
+        return legacy
+
+    @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
+    def test_sync_never_backfills_a_title_into_an_anchored_host(self):
+        legacy = self._anchored_legacy_host("舊公會管理人")
+        sync_service_content()
+        legacy.refresh_from_db()
+        # Reused as-is: no runtime title write, no second authored host.
+        self.assertEqual(legacy.npc_title, "")
+        self.assertEqual(NPC.objects.filter(db_key=GUILD_HOST_NAME).count(), 0)
+
+    def test_unrelated_npc_sharing_a_retired_key_survives_cleanup(self):
+        # Deletion anchors on the legacy identity shape (retired key + anchor
+        # component + no title), never the key alone: an unrelated NPC that
+        # merely carries a retired ASCII key is never destroyed.
+        unrelated = create_object(NPC, key=GUILD_SERVICE_KEY, location=self._guild_hallish())
+        _cleanup_legacy_service_hosts()
+        unrelated.refresh_from_db()  # still alive
+        self.assertIsNone(unrelated.npc_title or None)
+
+    def test_ambiguous_titled_same_anchor_host_is_kept_with_warning(self):
+        # A same-key titled host with the anchor component is ambiguous
+        # residue; cleanup refuses to guess and names the condition instead.
+        host = self._anchored_legacy_host(GUILD_SERVICE_KEY)
+        host.npc_title = "手工頭銜"
+        host.save()
+        with patch("world.rules.guild_economy.log_warn") as warned:
+            _cleanup_legacy_service_hosts()
+        host.refresh_from_db()  # kept for manual repair
+        events = [
+            call for call in warned.call_args_list
+            if call.args and call.args[0] == "guild_service_host_legacy_cleanup_ambiguous"
+        ]
+        self.assertEqual(len(events), 1)
+
+    @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
+    def test_duplicate_service_anchors_fail_closed_before_mutation(self):
+        # Two live NPCs claiming one service anchor violate the single-host
+        # invariant: sync raises the named integrity error and creates nothing.
+        first = self._anchored_legacy_host("分身公會管理人一")
+        second = create_object(NPC, key="分身公會管理人二", location=self._guild_hallish())
+        second.components.add(
+            GuildStaff.create(
+                second, service_id=GUILD_SERVICE_KEY, branch_key="guild_branch_altoria"
+            )
+        )
+        with self.assertRaises(ServiceAnchorIntegrityError):
+            sync_service_content()
+        first.refresh_from_db()
+        second.refresh_from_db()  # untouched fail-closed, no arbitrary pick
+        self.assertEqual(NPC.objects.filter(db_key=GUILD_HOST_NAME).count(), 0)
+
+    @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
+    def test_legacy_keyed_host_is_discarded_and_recreated_authored(self):
+        # The one-time cleanup discards hosts still keyed by the retired ASCII
+        # anchors (clean cutover); the next sync recreates the full authored
+        # identity with components.
+        legacy = self._anchored_legacy_host(GUILD_SERVICE_KEY)
+        _cleanup_legacy_service_hosts()
+        self.assertIsNone(NPC.objects.filter(db_key=GUILD_SERVICE_KEY).first())
+        with self.assertRaises(NPC.DoesNotExist):
+            legacy.refresh_from_db()
+        sync_service_content()
+        host = self._guild_host()
+        self.assertIsNotNone(host)
+        self.assertEqual(host.npc_title, GUILD_HOST_TITLE)
+        self.assertIsNotNone(host.components.get(GuildStaff.get_component_slot()))
+
+    def _guild_hallish(self):
+        return search_object_by_tag(GUILD_HALL_TAG)[0]
+
+
+class ServiceHostAnchorReuseTests(ServiceContentIsolation, EvenniaTestCase):
+    """Anchor survives key drift: a renamed host stays reused (no rename path)."""
+
+    @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
+    def test_anchor_reuse_survives_a_manual_key_change(self):
+        sync_service_content()
+        host = NPC.objects.filter(db_key=MERCHANT_HOST_NAME).first()
+        host.key = "手工改名的商人"
+        host.save()
+        with patch("world.rules.guild_economy.log_info") as logged:
+            sync_service_content()
+        self.assertEqual(NPC.objects.filter(db_key="手工改名的商人").count(), 1)
+        self.assertIsNone(NPC.objects.filter(db_key=MERCHANT_HOST_NAME).first())
+        self.assertFalse(
+            [
+                call for call in logged.call_args_list
+                if call.args and call.args[0] == "guild_service_host_created"
+            ]
         )
 
 

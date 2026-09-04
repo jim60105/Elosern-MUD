@@ -6,7 +6,6 @@ plaza and one authored bridging exit to non-grid space.
 
 ## Requirements
 
-
 ### Requirement: The sample city has exactly thirteen rooms in a fixed, connected topology
 `world/maps/altoria_capital.py` SHALL declare `XYMAP_DATA` for `zcoord="capital_altoria"` describing
 exactly thirteen rooms at the coordinates: `(2,0)`, `(1,1)`, `(2,1)`, `(3,1)`, `(0,2)`, `(1,2)`,
@@ -132,9 +131,12 @@ merchant stock that has already been initialized.
 
 ### Requirement: Guild service hosts carry adult identity
 
-The system SHALL persist adult `age`/`apparent_age` on the guild service host NPCs
-(guild master and merchant) created during `sync_guild_economy`.
+The system SHALL persist adult `age`/`apparent_age` on the guild service host NPCs (guild master
+and merchant) created during `sync_guild_economy`. The hosts are identified by their service
+component anchors (`service_id`), not by their display keys — their display keys are the authored
+registry names.
 
 #### Scenario: Service host has adult age after sync
-- **WHEN** `sync_guild_economy` creates `altoria_guild_master` or `altoria_merchant`
+- **WHEN** `sync_guild_economy` creates the guild-master host or the merchant host for their
+  service components
 - **THEN** both NPCs have integer `age` and `apparent_age` of at least 18

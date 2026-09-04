@@ -32,6 +32,7 @@ from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.quests.characterization import (
     characterize_errors,
+    duplicate_display_name_errors,
     duplicate_stable_key_errors,
     race_lifespan_upper_bound,
 )
@@ -85,13 +86,16 @@ class StageNpcCharacterization:
     """Optional frozen characterization of one spawned occupant.
 
     Carries the validated per-occupant characterization fields in deterministic
-    order (design D5): ``display_name``, paired ``age``/``apparent_age``, the
-    named portrait ``stable_key``, and the optional authored persona/background
-    flavor block. ``None`` fields mean the blueprint declared nothing for that
-    surface; a fully-absent occupant keeps today's shape.
+    order (design D5): the required authored ``display_name``/``title``, paired
+    ``age``/``apparent_age``, the named portrait ``stable_key``, and the
+    optional authored persona/background flavor block. The structural layer
+    keeps ``str | None`` (npc-title-authored-identities D5): the shared helper
+    enforces requiredness, so a ``None`` identity here means only that a
+    pre-change stored payload predates the field.
     """
 
     display_name: str | None = None
+    title: str | None = None
     age: int | None = None
     apparent_age: int | None = None
     portrait_stable_key: str | None = None
@@ -285,11 +289,11 @@ def _compile_characterization(
 ) -> StageNpcCharacterization | None:
     """Build one occupant's frozen characterization value from a raw entry.
 
-    Returns ``None`` when the entry declares no characterization surface, so a
-    field-less blueprint keeps today's exact requirement shape (design D5).
-    The optional authored persona/background flavor is preserved in
-    deterministic field order (fix-custom-creation-information-and-background
-    D7).
+    Every accepted entry carries the required authored identity (the shared
+    helper rejected a missing ``display_name``/``title`` before this point), so
+    the result is never ``None`` (npc-title-authored-identities D5). The
+    optional authored persona/background flavor is preserved in deterministic
+    field order (fix-custom-creation-information-and-background D7).
     """
     portrait = requirement.get("portrait")
     stable_key = None
@@ -304,19 +308,9 @@ def _compile_characterization(
             for field in ("personality", "life_story", "habit")
             if isinstance(persona.get(field), str) and persona[field].strip()
         )
-    if all(
-        value is None
-        for value in (
-            requirement.get("display_name"),
-            requirement.get("age"),
-            requirement.get("apparent_age"),
-            stable_key,
-            background,
-        )
-    ) and not persona_prose:
-        return None
     return StageNpcCharacterization(
         display_name=requirement.get("display_name"),
+        title=requirement.get("title"),
         age=requirement.get("age"),
         apparent_age=requirement.get("apparent_age"),
         portrait_stable_key=stable_key,
@@ -522,6 +516,8 @@ def _npc_req_canonical(
     if characterization is not None:
         if characterization.display_name is not None:
             canonical["display_name"] = characterization.display_name
+        if characterization.title is not None:
+            canonical["title"] = characterization.title
         if characterization.age is not None:
             canonical["age"] = characterization.age
         if characterization.apparent_age is not None:
@@ -724,6 +720,8 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
 
     for message in duplicate_stable_key_errors(all_npc_entries):
         _reject(message)
+    for message in duplicate_display_name_errors(all_npc_entries):
+        _reject(message)
 
     definition_fields = {
         "display_name": name,
@@ -858,8 +856,13 @@ def _characterization_from_payload(
 ) -> StageNpcCharacterization | None:
     if data is None:
         return None
+    if "title" not in data:
+        raise QuestCompileError(
+            "stored characterization lacks the required authored title field"
+        )
     return StageNpcCharacterization(
         display_name=data["display_name"],
+        title=data["title"],
         age=data["age"],
         apparent_age=data["apparent_age"],
         portrait_stable_key=data["portrait_stable_key"],

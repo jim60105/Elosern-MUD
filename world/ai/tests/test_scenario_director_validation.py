@@ -164,6 +164,8 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
                         {
                             "role": "bandit",
                             "tier": "bandit",
+                            "display_name": "沉穩獵人",
+                            "title": "森林嚮導",
                             "persona": {
                                 "personality": "沉穩",
                                 "life_story": "守護森林多年",
@@ -375,7 +377,13 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
             "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
         }
         payload["stages"][0]["npc_req"] = [
-            {"role": "bandit", "tier": "bandit", "disposition": None}
+            {
+                "role": "bandit",
+                "tier": "bandit",
+                "disposition": None,
+                "display_name": "黑鬍",
+                "title": "林間盜匪首領",
+            }
         ]
         payload.update(overrides)
         return payload
@@ -521,6 +529,7 @@ class CharacterizationValidatorTests(unittest.TestCase):
                 "tier": "bandit",
                 "disposition": None,
                 "display_name": "黑鬍",
+                "title": "林間盜匪首領",
                 "age": 35,
                 "apparent_age": 35,
                 "portrait": {"stable_key": "forest_bandit_chief"},
@@ -661,6 +670,7 @@ class CharacterizationValidatorTests(unittest.TestCase):
                 "tier": "bandit",
                 "disposition": None,
                 "display_name": "另一個人",
+                "title": "林間盜匪副手",
                 "age": 40,
                 "apparent_age": 40,
                 "portrait": {"stable_key": "forest_bandit_chief"},
@@ -679,12 +689,50 @@ class CharacterizationValidatorTests(unittest.TestCase):
         self.assertEqual(len(client.calls), 2)
 
     @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
-    def test_field_less_entries_validate_unchanged(self):
-        payload = self._instance_bound_payload()
-        payload["stages"][0]["npc_req"][0] = {
-            "role": "bandit",
-            "tier": "bandit",
-            "disposition": None,
-        }
-        for validator_fn in scenario_director._VALIDATORS.values():
-            self.assertEqual(validator_fn(payload), [], validator_fn.__name__)
+    def test_missing_identity_is_rejected_and_retried(self):
+        for field in ("display_name", "title"):
+            with self.subTest(field=field):
+                client = FakeLLMClient()
+                bad = self._instance_bound_payload()
+                del bad["stages"][0]["npc_req"][0][field]
+                errors = scenario_director._VALIDATORS["npc_characterization"](bad)
+                self.assertTrue(
+                    any(field in error for error in errors), errors
+                )
+                client.add_response(
+                    lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False)
+                )
+                client.add_response(
+                    lambda d: len(d.messages) == 3,
+                    json.dumps(_payload(), ensure_ascii=False),
+                )
+                with override_settings(LLM_PROFILES=_raw()):
+                    d = generate_quest_blueprint(client, context=_context())
+                    result = await_result(d)
+                self.assertEqual(result, _blueprint())
+                self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("npc-identity-titles::the-blueprint-author-face-enforces-occupant-name-uniqueness")
+    def test_duplicate_names_reject_and_retry(self):
+        client = FakeLLMClient()
+        bad = self._instance_bound_payload()
+        first = bad["stages"][0]["npc_req"][0]
+        bad["stages"][0]["npc_req"].append(
+            {
+                **first,
+                "portrait": {"stable_key": "another_face"},
+            }
+        )
+        errors = scenario_director._VALIDATORS["npc_characterization"](bad)
+        self.assertTrue(errors, errors)
+        client.add_response(
+            lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False)
+        )
+        client.add_response(
+            lambda d: len(d.messages) == 3, json.dumps(_payload(), ensure_ascii=False)
+        )
+        with override_settings(LLM_PROFILES=_raw()):
+            d = generate_quest_blueprint(client, context=_context())
+            result = await_result(d)
+        self.assertEqual(result, _blueprint())
+        self.assertEqual(len(client.calls), 2)

@@ -11,8 +11,6 @@ boundary classes moved to sibling modules that import them from this file.
 
 from pathlib import Path
 import tempfile
-import zlib
-from random import Random
 from unittest.mock import patch
 import unittest
 
@@ -56,31 +54,24 @@ from world.quests.scene_builder import (
 )
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
-from world.rules.namegen import roll_name_for_race
 from world.rules.traits import build_initial_traits, trait_config_for_values
 
 from tools.spec_traceability import covers_requirement
 
 
 def _portrait_callbacks(callbacks):
-    """The captured on-commit callbacks excluding quest-transition events and
-    the namegen backfill trace.
+    """The captured on-commit callbacks excluding quest-transition events.
 
     The observability migration schedules one ``quest_transition`` event per
-    changed quest through ``transaction.on_commit``, and the backfill seam
-    schedules one ``npc_name_fallback`` event per rolled name (namegen-npc-flow
-    D4); the portrait-seam contracts below count only the callbacks the seam
-    itself owns.
+    changed quest through ``transaction.on_commit``; the portrait-seam
+    contracts below count only the callbacks the seam itself owns.
     """
-    from world.quests import scene_builder
-
     return [
         callback
         for callback in callbacks
         if not getattr(getattr(callback, "__code__", None), "co_filename", "").endswith(
             "world/quests/transitions.py"
         )
-        and getattr(callback, "func", None) is not scene_builder._log_name_fallback
     ]
 
 def _raw(**overrides):
@@ -126,7 +117,15 @@ def _instance_bound_payload(**overrides):
                     "xyz": None,
                     "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
                 },
-                "npc_req": [{"role": "bandit", "tier": "bandit", "disposition": None}],
+                "npc_req": [
+                    {
+                        "role": "bandit",
+                        "tier": "bandit",
+                        "disposition": None,
+                        "display_name": "黑鬍",
+                        "title": "林間盜匪首領",
+                    }
+                ],
             }
         ],
         "reward": {"copper": 50, "items": [], "merit": 25},
@@ -256,6 +255,7 @@ class SceneBuilderTestBase(SceneBuilderIsolation, EvenniaTest):
 
 class SceneOccupantPrototypeTests(EvenniaTestCase):
     @covers_requirement("scene-builder::anti-hallucination-the-proposal-never-chooses-numbers-stats-or-class-lineage")
+    @covers_requirement("npc-identity-titles::the-existing-scene-builder-and-generated-quest-contracts-are-unchanged-where-not-amended")
     def test_module_prototypes_resolve_with_whitelisted_keys_and_typeclasses(self):
         prototypes_module.load_module_prototypes("world.prototypes")
         npc_proto = spawner_module.search_prototype("scene_npc", require_single=True)[0]
@@ -470,6 +470,7 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         payload["stages"][0]["npc_req"][0].update(
             {
                 "display_name": "黑鬍",
+                "title": "林間盜匪首領",
                 "age": 35,
                 "apparent_age": 35,
                 "portrait": {"stable_key": "forest_bandit_chief"},
@@ -538,6 +539,7 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         payload["stages"][0]["npc_req"][0].update(
             {
                 "display_name": "黑鬍",
+                "title": "林間盜匪首領",
                 "age": 35,
                 "apparent_age": 35,
                 "portrait": {"stable_key": "forest_bandit_chief"},
@@ -563,6 +565,7 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         payload["stages"][0]["npc_req"][0].update(
             {
                 "display_name": "黑鬍",
+                "title": "林間盜匪首領",
                 "age": 35,
                 "apparent_age": 35,
                 "portrait": {"stable_key": "forest_bandit_chief"},
@@ -598,16 +601,33 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
         return next(obj for obj in result.room.contents if isinstance(obj, NPC))
 
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
+    @covers_requirement("npc-identity-titles::blueprint-scene-occupants-spawn-under-the-authored-name-with-the-authored-title")
+    def test_surrounding_whitespace_never_reaches_the_entity_key(self):
+        # Validators strip before deciding, so an otherwise-valid authored
+        # identity may carry surrounding whitespace; the spawner and the
+        # persisted display_name both take the normalized form.
+        npc = self._spawned_npc(
+            self._characterized(display_name="  黑鬍  ", title=" 林間盜匪首領 ")
+        )
+        self.assertEqual(npc.key, "黑鬍")
+        self.assertEqual(npc.db.display_name, "黑鬍")
+        self.assertEqual(npc.npc_title, "林間盜匪首領")
+
+    @covers_requirement("npc-identity-titles::blueprint-scene-occupants-spawn-under-the-authored-name-with-the-authored-title")
     def test_full_characterization_is_materialized_fully(self):
         npc = self._spawned_npc(
             self._characterized(
                 display_name="黑鬍",
+                title="林間盜匪首領",
                 age=68,
                 apparent_age=68,
                 portrait={"stable_key": "forest_bandit_chief"},
             )
         )
+        # The authored name IS the key; the title lands as the validated form.
+        self.assertEqual(npc.key, "黑鬍")
         self.assertEqual(npc.db.display_name, "黑鬍")
+        self.assertEqual(npc.npc_title, "林間盜匪首領")
         self.assertEqual(npc.db.age, 68)
         self.assertEqual(npc.db.apparent_age, 68)
         self.assertEqual(
@@ -677,6 +697,8 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
                 npc_reqs=(("bandit", "bandit", None),),
                 characterizations=(
                     StageNpcCharacterization(
+                        display_name="偽造者",
+                        title="偽造測試員",
                         background="x" * 601,
                     ),
                 ),
@@ -719,7 +741,9 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
 
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
     def test_name_only_occupant_is_named_but_portrait_less(self):
-        npc = self._spawned_npc(self._characterized(display_name="黑鬍"))
+        npc = self._spawned_npc(
+            self._characterized(display_name="黑鬍", title="林間盜匪首領")
+        )
         self.assertEqual(npc.db.display_name, "黑鬍")
         self.assertIsNone(npc.db.age)
         self.assertIsNone(npc.db.apparent_age)
@@ -730,18 +754,6 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
         npc = self._spawned_npc(self._characterized(age=40, apparent_age=40))
         self.assertEqual(npc.db.age, 40)
         self.assertEqual(npc.db.apparent_age, 40)
-        self.assertIsNone(npc.db.portrait_policy)
-
-    @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
-    @covers_requirement("scene-builder::the-occupant-spawn-path-backfills-a-missing-display-name-deterministically-through-the-namegen-rule-layer")
-    def test_role_based_occupant_without_characterization_only_gets_a_name(self):
-        # namegen-npc-flow: the backfill reaches this occupant (no authored
-        # name); every other characterization field stays untouched.
-        npc = self._spawned_npc(self._characterized())
-        self.assertIsNotNone(npc.db.display_name)
-        self.assertIn("・", npc.db.display_name)
-        self.assertIsNone(npc.db.age)
-        self.assertIsNone(npc.db.apparent_age)
         self.assertIsNone(npc.db.portrait_policy)
 
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
@@ -763,7 +775,11 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
                 scene_sentence="王都近郊的林間小徑，樹影搖曳。",
                 npc_reqs=(("bandit", "bandit", None),),
                 characterizations=(
-                    StageNpcCharacterization(portrait_stable_key="forged_key"),
+                    StageNpcCharacterization(
+                        display_name="偽造者",
+                        title="偽造測試員",
+                        portrait_stable_key="forged_key",
+                    ),
                 ),
             ),
         )
@@ -788,11 +804,17 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
         permanently adult-gated occupant). Each forged shape raises before any
         room or occupant is created.
         """
+        _ids = {"display_name": "偽造者", "title": "偽造測試員"}
         forged_shapes = (
-            StageNpcCharacterization(age=17, apparent_age=17),
-            StageNpcCharacterization(age="30", apparent_age="30"),
-            StageNpcCharacterization(age=30, apparent_age=None),
-            StageNpcCharacterization(age=True, apparent_age=30),
+            StageNpcCharacterization(**_ids, age=17, apparent_age=17),
+            StageNpcCharacterization(**_ids, age="30", apparent_age="30"),
+            StageNpcCharacterization(**_ids, age=30, apparent_age=None),
+            StageNpcCharacterization(**_ids, age=True, apparent_age=30),
+            # Missing identity fields are themselves fail-closed (design D6):
+            # a nameless or titleless forged occupant never spawns.
+            StageNpcCharacterization(title="缺名"),
+            StageNpcCharacterization(display_name="缺銜"),
+            None,
         )
         record, _ = self._accept(_instance_bound_payload())
         for shape in forged_shapes:
@@ -817,172 +839,6 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
                     )
                 self.assertEqual(InstanceRoom.objects.all().count(), rooms_before)
 
-
-def _expected_backfill_name(
-    definition_key: str, stage_index: int, role: str, race: str | None, sex: str | None
-) -> str:
-    """Independently recompute the design-D3 seed for backfill equality."""
-    return roll_name_for_race(
-        race or None,
-        sex or None,
-        Random(zlib.crc32(f"{definition_key}:{stage_index}:{role}".encode("utf-8"))),
-    )
-
-
-class SceneBuilderNamegenBackfillTests(SceneBuilderTestBase):
-    """namegen-npc-flow: deterministic display-name backfill at the spawn seam."""
-
-    def _room_npc(self, result):
-        return next(obj for obj in result.room.contents if isinstance(obj, NPC))
-
-    @covers_requirement("scene-builder::the-occupant-spawn-path-backfills-a-missing-display-name-deterministically-through-the-namegen-rule-layer")
-    def test_backfill_matches_the_seed_and_replays_for_the_same_slot(self):
-        record, compiled = self._accept(_instance_bound_payload())
-        with self.captureOnCommitCallbacks(execute=True):
-            first = materialize_stage(
-                self.player, record.quest_id, origin_room=self.anchor
-            )
-        npc_one = self._room_npc(first)
-        # Precondition (design D3): the prototype lands nameless; only the
-        # backfill seam can give it a name here.
-        self.assertEqual(
-            npc_one.db.display_name,
-            _expected_backfill_name(compiled.definition.key, 0, "bandit", npc_one.race, npc_one.sex),
-        )
-        # Rebuild the same definition's same stage/role for another actor: the
-        # seed is slot-anchored, not instance-anchored, so the name replays.
-        other = create_object(PlayerCharacter, key="scene-player-2")
-        other.race = "human"
-        other.apply_race_baseline()
-        other.location = self.anchor
-        second_record = accept_quest(other, compiled.definition.key)
-        with self.captureOnCommitCallbacks(execute=True):
-            second = materialize_stage(
-                other, second_record.quest_id, origin_room=self.anchor
-            )
-        npc_two = self._room_npc(second)
-        self.assertEqual(npc_two.db.display_name, npc_one.db.display_name)
-
-    @covers_requirement("scene-builder::the-occupant-spawn-path-backfills-a-missing-display-name-deterministically-through-the-namegen-rule-layer")
-    @covers_requirement("scene-builder::every-display-name-backfill-emits-an-observability-info-event")
-    def test_authored_display_name_never_rolls_never_logs(self):
-        payload = _instance_bound_payload()
-        payload["stages"][0]["npc_req"][0]["display_name"] = "黑鬍"
-        record, _ = self._accept(payload)
-        with (
-            patch("world.quests.scene_builder.roll_name_for_race") as roll,
-            patch("world.quests.scene_builder.log_info") as info,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            result = materialize_stage(
-                self.player, record.quest_id, origin_room=self.anchor
-            )
-        npc = self._room_npc(result)
-        self.assertEqual(npc.db.display_name, "黑鬍")
-        roll.assert_not_called()
-        info.assert_not_called()
-
-    @covers_requirement("scene-builder::the-occupant-spawn-path-backfills-a-missing-display-name-deterministically-through-the-namegen-rule-layer")
-    def test_absent_or_empty_race_reaches_the_rule_layer_as_none(self):
-        # Force the "prototype race absent" branches: a wrapper characterization
-        # seam clears npc.race to None (never set) or the empty string (the
-        # real AttributeProperty corner) after the tier assignment, and a
-        # recording roll captures exactly what the backfill seam passes on.
-        from world.quests import scene_builder
-
-        original_apply = scene_builder._apply_characterization
-        original_roll = scene_builder.roll_name_for_race
-
-        for marker, absent in (("none", None), ("empty", "")):
-            with self.subTest(race=absent):
-                calls: list[tuple] = []
-
-                def clearing_apply(npc, requirement, position, _absent=absent):
-                    original_apply(npc, requirement, position)
-                    npc.race = _absent
-
-                def recording_roll(race, sex, rng):
-                    calls.append((race, sex))
-                    return original_roll(race, sex, rng)
-
-                actor = create_object(PlayerCharacter, key=f"scene-race-{marker}")
-                actor.race = "human"
-                actor.apply_race_baseline()
-                actor.location = self.anchor
-                compiled = compile_quest_blueprint(_instance_bound_payload())
-                register_generated_quest(compiled)
-                record = accept_quest(actor, compiled.definition.key)
-                with (
-                    self.captureOnCommitCallbacks(execute=True),
-                    patch.object(scene_builder, "_apply_characterization", clearing_apply),
-                    patch.object(scene_builder, "roll_name_for_race", recording_roll),
-                ):
-                    result = materialize_stage(
-                        actor, record.quest_id, origin_room=self.anchor
-                    )
-                npc = self._room_npc(result)
-                self.assertEqual(calls, [(None, "other")])
-                self.assertEqual(
-                    npc.db.display_name,
-                    _expected_backfill_name(
-                        compiled.definition.key, 0, "bandit", None, "other"
-                    ),
-                )
-
-    @covers_requirement("scene-builder::every-display-name-backfill-emits-an-observability-info-event")
-    def test_committed_backfill_logs_exactly_one_five_key_event(self):
-        record, compiled = self._accept(_instance_bound_payload())
-        with (
-            patch("world.quests.scene_builder.log_info") as info,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            result = materialize_stage(
-                self.player, record.quest_id, origin_room=self.anchor
-            )
-        # The patch must be entered BEFORE the capture block so the capture's
-        # __exit__ runs the scheduled callbacks while log_info is still the
-        # mock (with-exit order is reverse of entry).
-        npc = self._room_npc(result)
-        events = [
-            call
-            for call in info.call_args_list
-            if call.args and call.args[0] == "npc_name_fallback"
-        ]
-        self.assertEqual(len(events), 1)
-        context = events[0].kwargs["context"]
-        self.assertEqual(
-            set(context), {"quest", "definition_key", "stage", "role", "name"}
-        )
-        self.assertEqual(context["quest"], record.quest_id)
-        self.assertEqual(context["definition_key"], compiled.definition.key)
-        self.assertEqual(context["stage"], 0)
-        self.assertEqual(context["role"], "bandit")
-        self.assertEqual(context["name"], npc.db.display_name)
-
-    @covers_requirement("scene-builder::the-occupant-spawn-path-backfills-a-missing-display-name-deterministically-through-the-namegen-rule-layer")
-    @covers_requirement("scene-builder::every-display-name-backfill-emits-an-observability-info-event")
-    def test_rolled_back_materialization_keeps_no_name_and_no_event(self):
-        record, _ = self._accept(_instance_bound_payload())
-        npcs_before = NPC.objects.count()
-        with (
-            patch("world.quests.scene_builder.log_info") as info,
-            patch(
-                "world.quests.scene_builder._bind_stage",
-                side_effect=RuntimeError("spawn failed"),
-            ),
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            with self.assertRaises(RuntimeError):
-                materialize_stage(
-                    self.player, record.quest_id, origin_room=self.anchor
-                )
-        events = [
-            call
-            for call in info.call_args_list
-            if call.args and call.args[0] == "npc_name_fallback"
-        ]
-        self.assertEqual(events, [])
-        self.assertEqual(NPC.objects.count(), npcs_before)
 
 
 class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):

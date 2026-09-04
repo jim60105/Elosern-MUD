@@ -45,7 +45,7 @@ from world.rules.party import join_party
 from world.rules.npc_schedules import set_npc_schedule
 
 ALTORIA_BRANCH = "guild_branch_altoria"
-MATCHED_NPC_KEY = "altoria_guild_master"
+MATCHED_NPC_KEY = "葛里安·衛登"
 
 
 def _attach_staff(npc) -> None:

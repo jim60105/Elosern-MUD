@@ -128,6 +128,12 @@ def _instance_payload():
         "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
     }
     payload["stages"][0]["npc_req"] = [
-        {"role": "bandit", "tier": "bandit", "disposition": None}
+        {
+            "role": "bandit",
+            "tier": "bandit",
+            "disposition": None,
+            "display_name": "黑鬍",
+            "title": "林間盜匪首領",
+        }
     ]
     return payload
