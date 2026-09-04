@@ -52,7 +52,19 @@ def push_party_update(player: Any) -> None:
         return
     if not watchers:
         return
-    registry = build_production_registry()
+    try:
+        registry = build_production_registry()
+    except Exception as error:
+        # A registry-construction defect must degrade to a bounded diagnostic
+        # like every other failure here: the deletion already committed, and
+        # raising from an on-commit callback would surface in the delete
+        # caller and skip later commit callbacks (final rubber-duck round).
+        log_warn(
+            "party_push_failed",
+            context={"surface": "presentation", "char": str(getattr(player, "pk", "?"))},
+            exc=error,
+        )
+        return
     for session, epoch in watchers:
         try:
             context = build_presentation_context(session, player)

@@ -55,10 +55,25 @@ class PartyPanelError(ProtocolValidationError):
     """The available party payload violates its exact bounded schema."""
 
 
+def _reject_lone_surrogates(value: str, field: str) -> str:
+    """Reject strings carrying unpaired UTF-16 surrogate code points.
+
+    A Python ``str`` can store ``U+D800..U+DFFF`` values, but they are not
+    valid JSON text and cannot be encoded as UTF-8, so a corrupt stored name
+    would otherwise escape the closing byte check as a raw
+    ``UnicodeEncodeError``. Rejected as an explicit schema violation, and the
+    UMD mirror rejects the same payloads (final rubber-duck parity round).
+    """
+    for char in value:
+        if 0xD800 <= ord(char) <= 0xDFFF:
+            raise PartyPanelError(f"{field} contains an unpaired surrogate code point")
+    return value
+
+
 def _bounded_name(value: str, field: str) -> str:
     if not value:
         raise PartyPanelError(f"{field} must be non-empty")
-    return value
+    return _reject_lone_surrogates(value, field)
 
 
 def _validate_slot(value: Any) -> dict[str, Any]:

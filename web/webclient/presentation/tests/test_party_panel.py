@@ -241,6 +241,9 @@ class PartyValidatorTests(unittest.TestCase):
             validate_party(self._panel([_slot()])), self._panel([_slot()])
         )
         self.assertEqual(validate_party(self._panel([])), self._panel([]))
+        # Paired astral code points (surrogate pairs in UTF-16 terms) are
+        # legal text on both mirrors.
+        validate_party(self._panel([_slot(display_name="薇拉\U0001F600")]))
 
     def test_bounds_only_hp_semantics(self):
         # Zero is legal and no current/maximum cross assertion exists — traits
@@ -269,6 +272,10 @@ class PartyValidatorTests(unittest.TestCase):
             "duplicate identities": self._panel(
                 [_slot(identity=7), _slot(identity=7)]
             ),
+            "lone high surrogate display_name": self._panel(
+                [_slot(display_name="\ud800")]
+            ),
+            "lone low surrogate bond_stage": self._panel([_slot(bond_stage="\udc00")]),
             "version drift": {
                 "schema_version": PARTY_SCHEMA_VERSION + 1,
                 "available": True,
@@ -419,6 +426,28 @@ class PartyPushTests(BattlefieldIsolation, EvenniaTest):
         with self.captureOnCommitCallbacks(execute=True):
             companion.delete()
         self.assertNotIn(companion_id, [int(dbid) for dbid in self.player.db.party or []])
+
+    def test_registry_construction_failure_degrades_to_a_bounded_diagnostic(self):
+        # Final rubber-duck round: a registry-build defect must never raise
+        # out of the deferred delete callback — the committed deletion stays
+        # committed and later on-commit callbacks keep running.
+        from unittest.mock import patch
+
+        from web.webclient.presentation import party_push
+
+        def _boom():
+            raise RuntimeError("registry construction defect")
+
+        with (
+            patch.object(
+                party_push, "watchers_for", return_value=((object(), "x" * 22),)
+            ),
+            patch.object(party_push, "build_production_registry", _boom),
+            patch.object(party_push, "log_warn") as warned,
+        ):
+            party_push.push_party_update(self.player)
+        events = [call.args[0] for call in warned.call_args_list]
+        self.assertIn("party_push_failed", events)
 
 
 class PartyCombatJoinTests(BattlefieldIsolation, EvenniaTest):

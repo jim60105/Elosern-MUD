@@ -518,7 +518,11 @@
     if (!isPlainObject(payload)) {
       throw new Error(name + " must be a JSON object");
     }
-    var known = {};
+    // Null prototype: an own "__proto__"/"constructor"/"toString" key from a
+    // JSON-parsed payload must read as unknown, not inherit a truthy value
+    // from Object.prototype (webclient-align-04 final review — every panel's
+    // exact-shape gate relies on this helper).
+    var known = Object.create(null);
     required.forEach(function (field) {
       known[field] = true;
     });
@@ -4324,6 +4328,28 @@
   // appear because bond_stage is a bounded non-empty string; HP fields are
   // zero-clamped bounds with NO current/maximum cross assertion (traits are
   // truth — the Python validator documents the same rule).
+  // Unpaired UTF-16 surrogate halves are rejected on both sides: they are
+  // not valid JSON text and cannot survive the Python UTF-8 byte check.
+  function hasLoneSurrogate(value) {
+    var pendingHigh = false;
+    for (var i = 0; i < value.length; i++) {
+      var code = value.charCodeAt(i);
+      if (pendingHigh) {
+        if (code < 0xdc00 || code > 0xdfff) {
+          return true;
+        }
+        pendingHigh = false;
+        continue;
+      }
+      if (code >= 0xd800 && code <= 0xdbff) {
+        pendingHigh = true;
+      } else if (code >= 0xdc00 && code <= 0xdfff) {
+        return true;
+      }
+    }
+    return pendingHigh;
+  }
+
   function validatePartySlot(value, index) {
     var name = "party slot " + index;
     requireExactFields(
@@ -4334,7 +4360,7 @@
     );
     var identity = requireInt(value.identity, "identity", 1, MAX_SAFE_INTEGER);
     var displayName = requireString(value.display_name, "display_name", PARTY_MAX_DISPLAY_NAME);
-    if (displayName.length === 0) {
+    if (displayName.length === 0 || hasLoneSurrogate(displayName)) {
       throw new Error("slot display_name must be non-empty");
     }
     if (value.portrait_ref !== null) {
@@ -4343,7 +4369,7 @@
     var hpCurrent = requireInt(value.hp_current, "hp_current", 0, MAX_SAFE_INTEGER);
     var hpMaximum = requireInt(value.hp_maximum, "hp_maximum", 0, MAX_SAFE_INTEGER);
     var bondStage = requireString(value.bond_stage, "bond_stage", PARTY_MAX_DISPLAY_NAME);
-    if (bondStage.length === 0) {
+    if (bondStage.length === 0 || hasLoneSurrogate(bondStage)) {
       throw new Error("slot bond_stage must be a non-empty stage name");
     }
     return {

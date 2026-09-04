@@ -4976,10 +4976,25 @@ test("party available form validates and empty slots is legal", () => {
     available: true,
     slots: [],
   });
+  // Paired astral code points are legal text on both mirrors.
+  assert.doesNotThrow(() =>
+    Protocol.validatePartyPanel(validPartyPanel([validPartySlot({ display_name: "薇拉\u{1F600}" })]))
+  );
 });
 
 test("party validator mirrors the server drift rejections", () => {
   for (const bad of [
+    // prototype-named own keys from JSON.parse must read as unknown fields
+    validPartyPanel([
+      JSON.parse(
+        '{"identity":41,"display_name":"a","portrait_ref":null,"hp_current":1,"hp_maximum":1,"bond_stage":"友","__proto__":{}}'
+      ),
+    ]),
+    validPartyPanel([
+      JSON.parse(
+        '{"identity":41,"display_name":"a","portrait_ref":null,"hp_current":1,"hp_maximum":1,"bond_stage":"友","constructor":1}'
+      ),
+    ]),
     // fifth row
     validPartyPanel([
       validPartySlot({ identity: 1 }),
@@ -5007,6 +5022,10 @@ test("party validator mirrors the server drift rejections", () => {
     validPartyPanel([validPartySlot({ portrait_ref: "42" })]),
     // duplicate identities
     validPartyPanel([validPartySlot({ identity: 7 }), validPartySlot({ identity: 7 })]),
+    // unpaired surrogate halves are not valid JSON text (server parity)
+    validPartyPanel([validPartySlot({ display_name: "\uD800" })]),
+    validPartyPanel([validPartySlot({ display_name: "\uDC00a" })]),
+    validPartyPanel([validPartySlot({ bond_stage: "\uD83D\uD83D" })]),
     // version drift
     { schema_version: 2, available: true, slots: [] },
     // availability and container drift
