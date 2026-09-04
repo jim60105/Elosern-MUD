@@ -83,6 +83,25 @@ const nodeById = computed(() => {
   for (const node of nodes.value) byId[node.id] = node;
   return byId;
 });
+
+// FLAGGED/STRIKEABLE (design D8b, ADDED requirement "The map surfaces state
+// a place name only where it adds information"): the wilderness 3x3
+// neighbourhood otherwise repeats one region name across every in-view cell
+// in it. Scoped to the `wilderness` layer only -- on `grid`/`instance`/
+// `interior`, a node's label is an individual room key, and two distinct
+// rooms coincidentally sharing a name are still two distinct places worth
+// naming, not the same shared-region repetition this rule exists to hide.
+const currentNodeLabel = computed(() => {
+  const current = nodes.value.find((node) => node.visibility === "current");
+  return current ? current.label : null;
+});
+function labelSuppressed(node) {
+  return (
+    props.localMap.layer === "wilderness" &&
+    (node.visibility === "visible_unvisited" || node.visibility === "visible_visited") &&
+    node.label === currentNodeLabel.value
+  );
+}
 // Placement sourcing (map-02 D2): the lattice variant draws the model's
 // rank-compressed `col`/`row` grid; the graph variant draws the model's
 // radial placement (design D1) at `markerScale`, so the D1 geometry
@@ -379,7 +398,15 @@ const currentPos = computed(() => {
 // island's list, which keeps the plain paper label.
 function labelTier(node) {
   if (node.visibility === "current") return "here";
-  if (node.landmark) return "gold";
+  // A remembered gateway also carries `landmark: true` now (local-map-
+  // remembered-are-map-gateways design D2), but a remembered node is never
+  // drawn through this ladder -- it lives in the island's list/edge-marker
+  // presentation instead (`rememberedList`/`edgeMarkers`, not `drawnNodes`).
+  // The check mirrors the existing landmark-ring guard below so the
+  // "remembered never gets the gold in-lattice treatment" invariant is
+  // enforced here too, not only by the reducer's current node/remembered
+  // split staying in sync (rubber-duck run 2).
+  if (node.landmark && node.visibility !== "remembered") return "gold";
   if (node.visibility === "visible_visited") return "seen";
   return "far";
 }
@@ -655,7 +682,7 @@ const latticeStyle = computed(() => {
         :y="labelY()"
         text-anchor="middle"
       >
-        <title>{{ node.label }}</title>{{ truncatedLabel(node.label) }}
+        <title>{{ node.label }}</title>{{ labelSuppressed(node) ? "" : truncatedLabel(node.label) }}
       </text>
     </g>
   </svg>

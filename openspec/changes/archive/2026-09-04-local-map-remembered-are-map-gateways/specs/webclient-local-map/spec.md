@@ -210,7 +210,9 @@ state always produce the same nodes in the same order.
 
 #### Scenario: Two gateways onto one far side stay distinguishable
 - **WHEN** the payload remembers two registered gateways whose far sides carry the same authored name —
-  the two city gates that both open onto one wilderness region
+  on the `grid` layer, the two city gates that both open onto one wilderness region; on the
+  `wilderness` layer, the two gates of one anchor that share one anchor display name, since a single
+  registered entry MAY carry more than one gate
 - **THEN** the two nodes carry distinct labels, each qualified with the canonical name of its own
   boundary node, and no two `remembered` nodes in the payload share a label
 
@@ -246,12 +248,15 @@ other field SHALL be unchanged, so the payload states a better name for the same
 invents an identity for it. Every other in-view cell SHALL keep the region display name it carries
 today, and every emitted node label SHALL remain a non-empty string.
 
-The shared map renderer SHALL NOT draw visible label text for an in-view node whose label string is
-identical to the `current` node's label string; that node SHALL keep its full label as its accessible
-name, and its marker, shape ladder, landmark treatment, and activation SHALL be unaffected. The
-`current` node SHALL always draw its own label. This suppression is a drawing rule about the set on the
-canvas, not a payload rule: no payload field changes, and both validators keep their existing bounds
-and their non-empty label rules unchanged.
+On a payload whose `layer` is `wilderness`, the shared map renderer SHALL NOT draw visible label text
+for an in-view node whose label string is identical to the `current` node's label string; that node
+SHALL keep its full label as its accessible name, and its marker, shape ladder, landmark treatment, and
+activation SHALL be unaffected. The `current` node SHALL always draw its own label. The suppression is
+scoped to the `wilderness` layer because that layer's labels are shared region names, where a repeat is
+the reported defect; on `grid`, `instance`, and `interior` layers a label is an individual room name,
+where two distinct rooms sharing a name are still two distinct places and SHALL both draw their label.
+This suppression is a drawing rule about the set on the canvas, not a payload rule: no payload field
+changes, and both validators keep their existing bounds and their non-empty label rules unchanged.
 
 #### Scenario: The wilderness neighbourhood stops repeating one region name
 - **WHEN** the island renders a wilderness payload whose current cell and all eight in-view neighbours

@@ -55,6 +55,11 @@ ACTION_KINDS = ("move",)
 MAX_GRID_VISUAL_RANGE = 8
 GRID_MODES = ("nodes", "scan")
 
+# Remembered-gateway ceiling (presenter-side only, design D6) -- deliberately
+# NOT mirrored in web/static/webclient/js/elosern/protocol.js: it bounds the
+# presenter's own candidate selection, not a payload field.
+MAX_REMEMBERED_GATEWAYS = 16
+
 # The eight wilderness cardinal directions (wilderness-map-provider).
 WILD_DIRECTIONS = ("n", "ne", "e", "se", "s", "sw", "w", "nw")
 
@@ -474,21 +479,51 @@ def _grid_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilder) -> 
         )
         builder.add_edge(current_id, gate_id, direction, action is not None)
 
-    # Remembered grid nodes (outside visual range), bounded.
-    for visit in builder.remembered(MAX_NODES - len(builder.nodes)):
-        if not visit.node_id.startswith("grid:"):
-            continue
-        if visit.node_id == current_id:
+    # Remembered grid-layer gateways: a map boundary stood on, not visited
+    # ground (design D1-D6). The gateway filter runs over EVERY ordered
+    # visited candidate -- not pre-truncated to the remaining node budget,
+    # which would let enough recent non-gateway visits silently crowd an
+    # older gateway out of the candidate list before the filter ever saw it
+    # -- and only the FILTERED result is then bounded.
+    gateway_candidates: list[tuple[str, int, int, str, str]] = []
+    for visit in builder.remembered(len(builder.visited)):
+        if not visit.node_id.startswith("grid:") or visit.node_id == current_id:
             continue
         decoded = decode_node(visit.node_id)
+        if decoded["z_map_key"] != z:
+            # A different grid map's coordinate space: omitted, never
+            # plotted at a fabricated or cross-space position (design D3).
+            continue
+        gateway = _grid_gateway_at(decoded["x"], decoded["y"], decoded["z_map_key"])
+        if gateway is None:
+            # A visited grid room that is not a registered gate room (an
+            # AnchorRoom plaza is an in-map landmark, not a way out; design D2).
+            continue
+        approach_cell, _, anchor_key = gateway
+        far_label = _gateway_far_side_label("grid", approach_cell, anchor_key)
+        boundary_name = _grid_room_label((decoded["x"], decoded["y"]), decoded["z_map_key"])
+        gateway_candidates.append((visit.node_id, decoded["x"], decoded["y"], far_label, boundary_name))
+
+    remembered_budget = min(MAX_REMEMBERED_GATEWAYS, MAX_NODES - len(builder.nodes))
+    gateway_candidates = gateway_candidates[:remembered_budget]
+
+    # Distinctness (design D5): two gates of one city can open onto the same
+    # far-side region, so a repeated label is qualified with its own
+    # boundary node's name. Counted over the final, bounded set only, so a
+    # collision that was truncated away never forces an unneeded qualifier.
+    label_counts: dict[str, int] = {}
+    for _, _, _, far_label, _ in gateway_candidates:
+        label_counts[far_label] = label_counts.get(far_label, 0) + 1
+    for node_id, gx, gy, far_label, boundary_name in gateway_candidates:
+        label = f"{far_label}（{boundary_name}）" if label_counts[far_label] > 1 else far_label
         builder.add_node(
-            visit.node_id,
-            _grid_room_label((decoded["x"], decoded["y"]), decoded["z_map_key"]),
-            decoded["x"],
-            decoded["y"],
+            node_id,
+            label,
+            gx,
+            gy,
             visibility="remembered",
-            anchor=_grid_coord_is_anchor(xymap, (decoded["x"], decoded["y"])),
-            landmark=False,
+            anchor=False,
+            landmark=True,
             action=None,
         )
 
@@ -606,6 +641,61 @@ def _wild_region_label(x: int, y: int) -> str:
     from world.maps.wilderness_provider import region_for_coordinates
 
     return WILDERNESS_REGION_REGISTRY[region_for_coordinates(x, y)].display_name_zh
+
+
+def _registered_gateways() -> list[tuple[tuple[int, int], tuple[tuple[int, int], str], str]]:
+    """Every registered gateway's ``(approach_cell, (grid_xy, z_map_key), anchor_key)``.
+
+    Walks ``WILDERNESS_ENTRY_REGISTRY`` (deferred import, lore's own module
+    boundary). A gate whose ``approach_cell`` is ``None`` is skipped, never
+    raised on -- the registry is validated at sync time
+    (``validate_wilderness_entries``) and this presenter must not go
+    unavailable on authored data (design D1).
+    """
+    from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+
+    result: list[tuple[tuple[int, int], tuple[tuple[int, int], str], str]] = []
+    for entry in WILDERNESS_ENTRY_REGISTRY.values():
+        for gate in entry.gates:
+            approach = entry.approach_cell(gate)
+            if approach is None:
+                continue
+            result.append((approach, (gate.grid_xy, gate.z_map_key), entry.anchor_key))
+    return result
+
+
+def _wilderness_gateway_at(
+    x: int, y: int
+) -> tuple[tuple[int, int], tuple[tuple[int, int], str], str] | None:
+    """The registered gateway whose approach cell is ``(x, y)``, or ``None`` (design D1)."""
+    for approach, grid_gate, anchor_key in _registered_gateways():
+        if approach == (x, y):
+            return approach, grid_gate, anchor_key
+    return None
+
+
+def _grid_gateway_at(
+    x: int, y: int, z: str
+) -> tuple[tuple[int, int], tuple[tuple[int, int], str], str] | None:
+    """The registered gateway whose gate room is ``(x, y, z)``, or ``None`` (design D1)."""
+    for approach, (grid_xy, z_map_key), anchor_key in _registered_gateways():
+        if grid_xy == (x, y) and z_map_key == z:
+            return approach, (grid_xy, z_map_key), anchor_key
+    return None
+
+
+def _gateway_far_side_label(layer: str, approach_cell: tuple[int, int], anchor_key: str) -> str:
+    """The name of the place a gateway's traversal reaches (design D5).
+
+    The wilderness side names the anchor the gate leads INTO; the grid side
+    names the wilderness region the gate opens ONTO -- the far side either
+    way, never the terrain the gateway node itself stands on.
+    """
+    if layer == "wilderness":
+        from world.lore.anchors import ANCHOR_REGISTRY
+
+        return ANCHOR_REGISTRY[anchor_key].display_name_zh
+    return _wild_region_label(*approach_cell)
 
 
 def _grid_nodes_in_range(xymap, current_node, visual_range: int, map_mode: str) -> list:
@@ -828,9 +918,23 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
             if _known_node_id(node_id, visited)
             else "visible_unvisited"
         )
+        # FLAGGED/STRIKEABLE (design D8a, ADDED requirement "The map surfaces
+        # state a place name only where it adds information"): an in-view
+        # neighbour that is itself a registered gate's approach cell is named
+        # for the place its traversal reaches, not the region it stands on --
+        # closing the same one-name-repeated-nine-times defect inside the
+        # drawn field of view that the remembered-gateway rule closes outside
+        # it. Nothing else about the node (id, action, edge, visibility)
+        # changes.
+        neighbor_gateway = _wilderness_gateway_at(nx, ny)
+        if neighbor_gateway is not None:
+            _, _, neighbor_anchor_key = neighbor_gateway
+            label = _gateway_far_side_label("wilderness", (nx, ny), neighbor_anchor_key)
+        else:
+            label = WILDERNESS_REGION_REGISTRY[region_for_coordinates(nx, ny)].display_name_zh
         builder.add_node(
             node_id,
-            WILDERNESS_REGION_REGISTRY[region_for_coordinates(nx, ny)].display_name_zh,
+            label,
             nx,
             ny,
             visibility=visibility,
@@ -840,24 +944,48 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
         )
         builder.add_edge(current_id, node_id, direction, action is not None)
 
-    # Remembered wild cells outside adjacency, bounded by most-recent last_seen.
-    for visit in builder.remembered(MAX_NODES - len(builder.nodes)):
+    # Remembered wilderness-layer gateways: a map boundary stood on, not
+    # visited ground (design D1-D6). Same filter-then-bound ordering as the
+    # grid layer -- the gateway filter runs over every ordered visited
+    # candidate before the result is truncated to the remembered ceiling.
+    gateway_candidates: list[tuple[str, int, int, str, str]] = []
+    for visit in builder.remembered(len(builder.visited)):
         if not visit.node_id.startswith("wild:"):
             continue
         decoded = decode_node(visit.node_id)
-        if abs(decoded["x"] - x) > 1 or abs(decoded["y"] - y) > 1:
-            builder.add_node(
-                visit.node_id,
-                WILDERNESS_REGION_REGISTRY[
-                    region_for_coordinates(decoded["x"], decoded["y"])
-                ].display_name_zh,
-                decoded["x"],
-                decoded["y"],
-                visibility="remembered",
-                anchor=False,
-                landmark=False,
-                action=None,
-            )
+        if abs(decoded["x"] - x) <= 1 and abs(decoded["y"] - y) <= 1:
+            continue  # still inside the drawn field of view
+        gateway = _wilderness_gateway_at(decoded["x"], decoded["y"])
+        if gateway is None:
+            continue
+        _, (grid_xy, z_map_key), anchor_key = gateway
+        far_label = _gateway_far_side_label("wilderness", (decoded["x"], decoded["y"]), anchor_key)
+        boundary_name = _grid_room_label(grid_xy, z_map_key)
+        gateway_candidates.append((visit.node_id, decoded["x"], decoded["y"], far_label, boundary_name))
+
+    remembered_budget = min(MAX_REMEMBERED_GATEWAYS, MAX_NODES - len(builder.nodes))
+    gateway_candidates = gateway_candidates[:remembered_budget]
+
+    # Distinctness (design D5): one anchor can register more than one gate
+    # (capital_altoria already has two), so the far-side name alone is not
+    # unique on this layer either -- the same collision-then-qualify rule the
+    # grid layer applies, mirrored here with the grid-side room as the
+    # boundary qualifier. Counted over the final, bounded set only.
+    label_counts: dict[str, int] = {}
+    for _, _, _, far_label, _ in gateway_candidates:
+        label_counts[far_label] = label_counts.get(far_label, 0) + 1
+    for node_id, gx, gy, far_label, boundary_name in gateway_candidates:
+        label = f"{far_label}（{boundary_name}）" if label_counts[far_label] > 1 else far_label
+        builder.add_node(
+            node_id,
+            label,
+            gx,
+            gy,
+            visibility="remembered",
+            anchor=False,
+            landmark=True,
+            action=None,
+        )
 
     return "wilderness"
 

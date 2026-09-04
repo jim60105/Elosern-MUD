@@ -240,16 +240,25 @@ opens onto, which is both the far side and exactly the label the shipped in-view
 grid gate node already carries (`_wild_region_label(*landing_cell)`), so one
 gateway reads the same whether it is in view or remembered.
 
-**Distinctness clause.** The grid side can still repeat: the capital's two gates
-both open onto one region. Within a single payload, remembered gateway labels
-SHALL be distinct; where the far-side name would repeat, each colliding node is
-qualified with the canonical name of the boundary node it carries, in the exact
-form `<far-side name>（<boundary node name>）` — 「西部丘陵與谷地（南門）」 and
-「西部丘陵與谷地（北門）」. Both halves are authored strings (the region registry and
-the room's prototype key); the presenter composes presentation text, never an
-identity, and the result stays far inside the 256-code-point node-string bound.
-Without this clause the change would have reproduced the reported defect with
-two chips instead of seven.
+**Distinctness clause.** Either side can repeat, not just the grid side:
+`WildernessEntryPoint.gates` is a tuple, so one anchor can register more than
+one gate — the capital already does, both onto one region on the grid side
+AND both from `ANCHOR_REGISTRY["capital_altoria"].display_name_zh` on the
+wilderness side (a `rubber-duck run 2` finding: an earlier draft of this
+clause assumed the anchor's display name was "already unique on the
+wilderness layer," which is only true for a single-gate entry). Within a
+single payload, remembered gateway labels SHALL be distinct; where the
+far-side name would repeat, each colliding node is qualified with the gate
+room's own canonical name (its `key`) — the same qualifier on both layers,
+since it is the one identity that is always unique per gate regardless of
+which side is drawn — in the exact form `<far-side name>（<gate room name>）`:
+「西部丘陵與谷地（南門）」/「西部丘陵與谷地（北門）」 on the grid side, and
+「聖潔王都（南門）」/「聖潔王都（北門）」 on the wilderness side. Both halves are
+authored strings (the region/anchor registry and the room's prototype key);
+the presenter composes presentation text, never an identity, and the result
+stays far inside the 256-code-point node-string bound. Without this clause
+on BOTH layers the change would have reproduced the reported defect at a
+smaller scale — two identical chips instead of seven.
 
 *Alternatives rejected:*
 
@@ -323,12 +332,19 @@ for the same reason the remembered list did. Two clauses fix it:
   action, or the gateway pair rendering moves. Standing at `(60, 104)`, the cell
   south of you stops reading 「西部丘陵與谷地」 and starts reading 「聖潔王都」, which is
   the true and useful statement.
-- **(b) Renderer.** The shared renderer draws no visible label text for an
-  in-view node whose label string is identical to the `current` node's label,
-  while keeping the node's full label as its accessible name (`MapLattice.vue`
-  already emits `<text><title>{{ node.label }}</title>…</text>`, so the `<title>`
-  stays and only the visible text goes). Markers, actions, and the shape ladder
-  are untouched, so state remains distinguishable without colour.
+- **(b) Renderer.** On a `wilderness` payload, the shared renderer draws no
+  visible label text for an in-view node whose label string is identical to
+  the `current` node's label, while keeping the node's full label as its
+  accessible name (`MapLattice.vue` already emits
+  `<text><title>{{ node.label }}</title>…</text>`, so the `<title>` stays and
+  only the visible text goes). Markers, actions, and the shape ladder are
+  untouched, so state remains distinguishable without colour. Scoped to
+  `wilderness` deliberately: on `grid`/`instance`/`interior` a node's label is
+  an individual room name (`GridRoom.key`/`Room.key`), not a shared region
+  name, so two distinct rooms that happen to share a name are still two
+  distinct places and both must keep their visible label — this clause exists
+  to hide a repeated *region*, not to deduplicate coincidentally identical
+  *room* names.
 
 The result on the reported screen: one region name at the current node, a
 different name where the region changes, 「聖潔王都」 where the city gate is, and

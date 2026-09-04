@@ -149,6 +149,15 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         )
         edge_markers = page.locator('[data-testid^="local-map__edge-marker--"]')
         self.assertGreaterEqual(edge_markers.count(), 1)
+        # local-map-remembered-are-map-gateways: the remembered gate's marker
+        # is named for the place its traversal reaches (the far-side
+        # wilderness region), not the gate room's own name.
+        north_gate_marker = page.locator(
+            '[data-testid="local-map__edge-marker--grid:capital_altoria:2:4"]'
+        )
+        self.assertEqual(north_gate_marker.count(), 1)
+        marker_name = north_gate_marker.locator("title").evaluate("el => el.textContent")
+        self.assertIn("西部丘陵與谷地", marker_name)
         # Assistive technology mirror is present
         mirror = page.locator('[data-testid="local-map-edge-markers-mirror"]')
         self.assertEqual(mirror.count(), 1)
