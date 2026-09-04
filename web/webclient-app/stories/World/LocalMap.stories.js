@@ -98,13 +98,12 @@ export const ActionableNode = {
   },
 };
 
-// Focused remembered node (task 3.2): the play function moves keyboard
-// focus to the remembered list's first item (the `li` is `tabindex=0`),
-// which selects it. The detail line then renders that node's name and its
-// explored state — the component renders no landmark field, no travel
-// affordance, and no world-coordinate numbers for a remembered node
-// (focus-only, per the local-map spec; map-02 design D3 drops the
-// coordinate pair on every variant).
+// Focused remembered node (task 3.2, updated for single-affordance D3/D6):
+// the play function moves keyboard focus to the remembered list's first
+// item (the `li` is `tabindex=0`). Its own visible label states the node's
+// name while the detail line remains the current-node coordinates — the
+// island tracks no hover/selection state, and the coordinate figure never
+// follows focus.
 export const FocusedRemembered = {
   render: renderMap,
   args: {
@@ -112,10 +111,9 @@ export const FocusedRemembered = {
   },
   play: async ({ canvasElement }) => {
     // The play contract is observable: a drift in the remembered-list
-    // selector, the `tabindex`, the `@focus` wiring, or the detail-line
-    // update FAILS the story instead of silently rendering the default
-    // (current-node) state. The same interaction is pinned in jsdom by
-    // `tests/world/local_map.test.js` ("selects the focused remembered
+    // selector or the `tabindex` FAILS the story instead of silently
+    // rendering. The same interaction is pinned in jsdom by
+    // `tests/world/local_map.test.js` ("focuses the remembered
     // list item without emitting a travel action").
     const item = canvasElement.querySelector(
       '[data-testid="local-map-remembered"] li',
@@ -128,11 +126,15 @@ export const FocusedRemembered = {
     if (document.activeElement !== item) {
       throw new Error("FocusedRemembered: the remembered-list item did not take keyboard focus (tabindex/@focus drift?)");
     }
+    const itemLabel = item.querySelector(".local-map__node-label")?.textContent;
+    if (!itemLabel || !itemLabel.includes("舊街區")) {
+      throw new Error(`FocusedRemembered: remembered item must display its name, got: ${itemLabel}`);
+    }
     const detail = canvasElement
       .querySelector('[data-testid="local-map-detail"]')
       .textContent;
-    if (!detail.includes("舊街區") || !detail.includes("已探索") || detail.includes("→")) {
-      throw new Error(`FocusedRemembered: detail line must show the focused remembered node without a travel affordance, got: ${detail}`);
+    if (!detail.includes("座標 1,2")) {
+      throw new Error(`FocusedRemembered: detail line must remain current-node coordinates, got: ${detail}`);
     }
   },
 };

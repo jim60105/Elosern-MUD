@@ -555,6 +555,40 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         self.assertIn("已連線", conn)
         self.assertEqual(page.locator(".header-mode").count(), 0, "no raw mode label")
 
+        # Wilderness location preference (webclient-minimap-04-island-single-affordance D5):
+        # on a wilderness snapshot the top-meta location states the region name
+        # from the local_map panel, not the raw room key "Wilderness" from the
+        # status panel.
+        wilderness_status = valid_status_panel("影行者", "42")
+        wilderness_status["actor"]["location"] = {"label": "Wilderness", "identity": "17"}
+        wilderness_map = {
+            "schema_version": 1,
+            "available": True,
+            "layer": "wilderness",
+            "current_node": "wild:plains:60:107",
+            "title": "西部丘陵與谷地",
+            "nodes": [
+                {
+                    "id": "wild:plains:60:107",
+                    "label": "西部丘陵與谷地",
+                    "x": 60,
+                    "y": 107,
+                    "visibility": "current",
+                    "current": True,
+                    "anchor": True,
+                    "landmark": False,
+                    "action": None,
+                }
+            ],
+            "edges": [],
+            "legend": [],
+        }
+        inject_snapshot(page, {"status": wilderness_status, "local_map": wilderness_map})
+        page.wait_for_timeout(300)
+        loc = page.locator('[data-testid="topbar-location"]').inner_text()
+        self.assertEqual(loc, "西部丘陵與谷地")
+        self.assertNotIn("Wilderness", loc)
+
     @covers_requirement(
         "webclient-desktop-shell::the-command-drawer-preserves-ordinary-text-control"
     )

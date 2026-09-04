@@ -667,6 +667,52 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
+        "webclient-contextual-hud::the-minimap-island-states-only-its-own-drawing-convention"
+    )
+    def test_minimap_island_single_affordance_keyboard_and_movement(self):
+        """Single full-map affordance contract (webclient-minimap-04-island-single-affordance):
+        the island renders exactly one full-map affordance (a full-bleed button
+        with 展開全地圖) and no visible button chrome in the header; pressing
+        Enter on the focused affordance opens the overlay; activating an
+        actionable lattice node moves without opening the overlay.
+        """
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        _inject_snapshot(page, {"local_map": valid_local_map_panel()}, mode="exploration")
+        _wait_mode(page, "exploration")
+
+        page.wait_for_selector('[data-testid="local-map"]', timeout=15000)
+
+        # Exactly one affordance exists, carrying the accessible name.
+        affordances = page.locator('[data-testid="local-map__expand"]')
+        self.assertEqual(affordances.count(), 1)
+        self.assertEqual(affordances.get_attribute("aria-label"), "展開全地圖")
+        # No button in the header meta row.
+        self.assertEqual(page.locator(".local-map__meta button").count(), 0)
+
+        # Keyboard Enter on the focused affordance opens the map overlay.
+        affordances.focus()
+        page.keyboard.press("Enter")
+        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"map-overlay\"]') === null",
+            timeout=15000,
+        )
+
+        # Activating an actionable lattice node moves without opening the overlay.
+        actionable = page.locator('[data-testid="local-map__actionable"]')
+        self.assertEqual(actionable.count(), 1)
+        moves_before = sent_action_count(page, "explore.move")
+        actionable.first.click()
+        self.assertEqual(page.locator('[data-testid="map-overlay"]').count(), 0)
+        self.assertEqual(
+            sent_action_count(page, "explore.move"),
+            moves_before + 1,
+            "clicking an actionable lattice node dispatches one explore.move intent",
+        )
+
+    @covers_requirement(
         "webclient-contextual-hud::the-action-dock-renders-as-a-floating-panel-in-the-stage-s-dock-anchor"
     )
     def test_command_line_never_overlaps_dock_caption_or_hud(self):
