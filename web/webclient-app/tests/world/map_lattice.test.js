@@ -617,6 +617,60 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     ).toContain("local-map__node-label--far");
   });
 
+  // ---------------------------------------------------------------------
+  // local-map-remembered-are-map-gateways wave 6 (FLAGGED/STRIKEABLE, design
+  // D8b): the wilderness in-view neighbourhood must not repeat one region
+  // name across every drawn cell.
+  // ---------------------------------------------------------------------
+
+  it("suppresses a duplicate in-view label on the wilderness layer, keeping the accessible name", () => {
+    const model = localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE);
+    const current = model.nodes.find((n) => n.visibility === "current");
+    const inViewVisibilities = new Set(["visible_unvisited", "visible_visited"]);
+    const duped = {
+      ...model,
+      nodes: model.nodes.map((n) =>
+        inViewVisibilities.has(n.visibility) ? { ...n, label: current.label } : n,
+      ),
+    };
+    const inViewIds = duped.nodes.filter((n) => inViewVisibilities.has(n.visibility)).map((n) => n.id);
+    expect(inViewIds.length).toBeGreaterThan(0);
+    const w = mountLattice({ localMap: duped });
+    for (const id of inViewIds) {
+      const label = w.get(`[data-testid="local-map__node--${id}"] .local-map__node-label`);
+      // The <title> element's text is part of the label's own textContent in
+      // jsdom, so isolate the visible run by reading its own direct text.
+      expect(label.element.childNodes[label.element.childNodes.length - 1].textContent).toBe("");
+      expect(label.get("title").text()).toBe(current.label);
+    }
+    // The current node always draws its own label.
+    const currentLabel = w.get(`[data-testid="local-map__node--${current.id}"] .local-map__node-label`);
+    expect(
+      currentLabel.element.childNodes[currentLabel.element.childNodes.length - 1].textContent,
+    ).toBe(current.label);
+  });
+
+  it("does not suppress a duplicate in-view label outside the wilderness layer", () => {
+    const model = localMapModelFor(LOCAL_MAP_SAMPLE);
+    const current = model.nodes.find((n) => n.visibility === "current");
+    const inViewVisibilities = new Set(["visible_unvisited", "visible_visited"]);
+    const duped = {
+      ...model,
+      nodes: model.nodes.map((n) =>
+        inViewVisibilities.has(n.visibility) ? { ...n, label: current.label } : n,
+      ),
+    };
+    const inViewIds = duped.nodes.filter((n) => inViewVisibilities.has(n.visibility)).map((n) => n.id);
+    expect(inViewIds.length).toBeGreaterThan(0);
+    const w = mountLattice({ localMap: duped });
+    for (const id of inViewIds) {
+      const label = w.get(`[data-testid="local-map__node--${id}"] .local-map__node-label`);
+      expect(label.element.childNodes[label.element.childNodes.length - 1].textContent).toBe(
+        current.label,
+      );
+    }
+  });
+
   it("pairs every legend entry with a dot chip at both scales", () => {
     for (const props of [{}, OVERLAY_PROPS]) {
       const w = mountLattice(props);
