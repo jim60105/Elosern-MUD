@@ -7,7 +7,7 @@
 // selection state and detail line; this component owns only the stateless
 // lattice rendering and emits `select`/`hover`/`leave`/`move` so each
 // caller drives its own chrome.
-import { computed } from "vue";
+import { computed, useId } from "vue";
 import LocalMap from "../lib/local_map.js";
 
 const props = defineProps({
@@ -38,15 +38,17 @@ const props = defineProps({
   // ~111px canvas inside a ~210px island — the map was the smallest thing in
   // the island whose whole reason to exist is the map.
   fillWidth: { type: Boolean, default: false },
-  // Upscale bound for `fillWidth` (island-only opt-in; `null` = unbounded, so
-  // the overlay keeps filling its body width at its own larger scale). A
-  // one-room payload's natural canvas is 58px wide, and letting it stretch to
-  // the island's full width would blow the designed marker/label ramp up ~3.5x
-  // — a 57px "you are here" seal and 39px labels. Bounding the uniform scale
-  // keeps the drawn type ramp close to the draft's while every payload from
-  // two columns (or one column plus the edge-marker gutter) up still claims
-  // the whole island width.
-  maxUpscale: { type: Number, default: null },
+  // Type size for node labels (SVG user units). Defaults to 11 for the overlay
+  // and bare mounts; the island passes 9 to respect the type proportion and
+  // stay below the island's own 10px chrome step.
+  labelFont: { type: Number, default: 11 },
+  // Coordinate-field padding (island-only opt-in): pads coordinate space
+  // symmetrically around the node core up to maxWidth rather than magnifying.
+  fieldFill: { type: Boolean, default: false },
+  // Knowledge-edge vignette (island-only opt-in): radial gradient wash.
+  fogVignette: { type: Boolean, default: false },
+  // Axis cross (island-only opt-in): drawn through current node.
+  showAxis: { type: Boolean, default: false },
   // Draft overlay chrome (webclient-map-01-draft-chrome design D4): the
   // full-map surface paints its canvas in the `mapcanvas` treatment and
   // draws the teardrop location pin above the current marker. Off on the
@@ -72,6 +74,10 @@ const props = defineProps({
 
 const emit = defineEmits(["select", "hover", "leave", "move"]);
 
+const uid = useId();
+const patternId = computed(() => `map-lattice-grid-${uid}`);
+const fogId = computed(() => `map-lattice-fog-${uid}`);
+
 const nodes = computed(() => (Array.isArray(props.localMap.nodes) ? props.localMap.nodes : []));
 const edges = computed(() => (Array.isArray(props.localMap.edges) ? props.localMap.edges : []));
 const legend = computed(() => (Array.isArray(props.localMap.legend) ? props.localMap.legend : []));
@@ -95,6 +101,7 @@ const currentNodeLabel = computed(() => {
   const current = nodes.value.find((node) => node.visibility === "current");
   return current ? current.label : null;
 });
+
 function labelSuppressed(node) {
   return (
     props.localMap.layer === "wilderness" &&
@@ -102,6 +109,40 @@ function labelSuppressed(node) {
     node.label === currentNodeLabel.value
   );
 }
+
+function visibleNodeLabel(node) {
+  if (labelSuppressed(node)) return "";
+  return truncatedLabel(node.label);
+}
+
+// Effective pitch derivation (design D4): derived from what actually needs
+// clearing rather than a constant. Two horizontally adjacent drawn nodes both
+// showing visible labels trigger the label-cleared pitch ((labelMax + 1) * labelFont + 3).
+const adjacentDrawnLabelPair = computed(() => {
+  const labeled = drawnNodes.value.filter((n) => visibleNodeLabel(n) !== "");
+  for (let i = 0; i < labeled.length; i++) {
+    for (let j = i + 1; j < labeled.length; j++) {
+      const a = labeled[i];
+      const b = labeled[j];
+      if (a.row === b.row && Math.abs(a.col - b.col) === 1) {
+        return true;
+      }
+    }
+  }
+  return false;
+});
+const labelClearancePitch = computed(() =>
+  adjacentDrawnLabelPair.value ? (props.labelMax + 1) * props.labelFont + 3 : 0,
+);
+const isSquarePitch = computed(() => props.colPitch === props.rowPitch);
+const effectiveColPitch = computed(() =>
+  Math.max(props.colPitch, labelClearancePitch.value),
+);
+const effectiveRowPitch = computed(() =>
+  isSquarePitch.value
+    ? Math.max(props.rowPitch, labelClearancePitch.value)
+    : props.rowPitch,
+);
 // Placement sourcing (map-02 D2): the lattice variant draws the model's
 // rank-compressed `col`/`row` grid; the graph variant draws the model's
 // radial placement (design D1) at `markerScale`, so the D1 geometry
@@ -135,34 +176,129 @@ const rememberedList = computed(() =>
 );
 function latticePos(node) {
   return {
-    x: node.col * props.colPitch + props.colPitch / 2,
-    y: (Math.max(1, rows.value) - 1 - node.row) * props.rowPitch + props.rowPitch / 2,
+    x: node.col * effectiveColPitch.value + effectiveColPitch.value / 2,
+    y: (Math.max(1, rows.value) - 1 - node.row) * effectiveRowPitch.value + effectiveRowPitch.value / 2,
   };
 }
-const localEdgeMarkers = computed(() => {
-  if (isGraph.value || rememberedList.value.length === 0) {
-    return { markers: [], gutter: 0, width: 0, height: 0 };
+const coreW = computed(() => Math.max(1, cols.value) * effectiveColPitch.value);
+const coreH = computed(() => Math.max(1, rows.value) * effectiveRowPitch.value);
+
+const layoutGeometry = computed(() => {
+  if (isGraph.value) {
+    return {
+      fieldW: graphCanvasWidth.value,
+      fieldH: graphCanvasHeight.value,
+      marginX: 0,
+      marginY: 0,
+      gutter: 0,
+      canvasWidth: graphCanvasWidth.value,
+      canvasHeight: graphCanvasHeight.value,
+      markers: [],
+    };
   }
+
   const current = nodes.value.find((node) => node.visibility === "current");
-  if (!current) {
-    return { markers: [], gutter: 0, width: 0, height: 0 };
+  const cW = coreW.value;
+  const cH = coreH.value;
+
+  if (rememberedList.value.length === 0 || !current) {
+    let mX = 0;
+    let mY = 0;
+    let fW = cW;
+    let fH = cH + LABEL_BAND;
+
+    if (props.fieldFill && props.maxWidth != null) {
+      fW = Math.max(cW, Number(props.maxWidth));
+      mX = (fW - cW) / 2;
+      const verticalSlack =
+        props.maxHeight != null
+          ? Math.max(0, (Number(props.maxHeight) - cH - LABEL_BAND) / 2)
+          : mX;
+      mY = Math.min(mX, verticalSlack);
+      fH = cH + LABEL_BAND + 2 * mY;
+    }
+
+    return {
+      fieldW: fW,
+      fieldH: fH,
+      marginX: mX,
+      marginY: mY,
+      gutter: 0,
+      canvasWidth: fW,
+      canvasHeight: fH,
+      markers: [],
+    };
   }
-  return LocalMap.edgeMarkersFor(nodes.value, rememberedList.value, {
-    canvasWidth: Math.max(1, cols.value) * props.colPitch,
-    canvasHeight: Math.max(1, rows.value) * props.rowPitch + LABEL_BAND,
-    current: latticePos(current),
-    // The drawn diamond: 9-half-extent rect rotated 45 degrees at the
-    // active marker scale (the model's reach formula consumes it directly).
-    markerHalf: MARKER_DIAMOND_HALF * props.markerScale,
-    // Only the overlay draws marker names; the bound is the truncated
-    // label's worst-case box (labelMax + 1 full-width glyphs at the 11px
-    // canvas font, which does not scale with the markers).
-    nameWidth: props.overlayChrome ? (props.labelMax + 1) * 11 : 0,
-    nameHeight: props.markerNames ? 16 : 0,
-  });
+
+  const markerHalf = MARKER_DIAMOND_HALF * props.markerScale;
+  const nameWidth = props.overlayChrome ? (props.labelMax + 1) * 11 : 0;
+  const nameHeight = props.markerNames ? 16 : 0;
+
+  let g = 0;
+  let fW = cW;
+  let fH = cH + LABEL_BAND;
+  let mX = 0;
+  let mY = 0;
+  let markersResult = null;
+
+  // Fixed-point convergence loop (converges in 1-3 iterations since gutter is non-increasing)
+  for (let iter = 0; iter < 5; iter++) {
+    const curX = current.col * effectiveColPitch.value + effectiveColPitch.value / 2 + mX;
+    const curY =
+      (Math.max(1, rows.value) - 1 - current.row) * effectiveRowPitch.value +
+      effectiveRowPitch.value / 2 +
+      mY;
+
+    markersResult = LocalMap.edgeMarkersFor(nodes.value, rememberedList.value, {
+      canvasWidth: fW,
+      canvasHeight: fH,
+      current: { x: curX, y: curY },
+      markerHalf,
+      nameWidth,
+      nameHeight,
+    });
+
+    const newG = markersResult.gutter;
+    if (newG === g && iter > 0) {
+      break;
+    }
+    g = newG;
+
+    if (props.fieldFill && props.maxWidth != null) {
+      fW = Math.max(cW, Number(props.maxWidth) - 2 * g);
+      mX = (fW - cW) / 2;
+      const verticalSlack =
+        props.maxHeight != null
+          ? Math.max(0, (Number(props.maxHeight) - cH - LABEL_BAND - 2 * g) / 2)
+          : mX;
+      mY = Math.min(mX, verticalSlack);
+      fH = cH + LABEL_BAND + 2 * mY;
+    } else {
+      break;
+    }
+  }
+
+  return {
+    fieldW: fW,
+    fieldH: fH,
+    marginX: mX,
+    marginY: mY,
+    gutter: g,
+    canvasWidth: fW + 2 * g,
+    canvasHeight: fH + 2 * g,
+    markers: markersResult ? markersResult.markers : [],
+  };
 });
 
-const activeEdgeMarkers = computed(() => props.edgeMarkers || localEdgeMarkers.value);
+const activeEdgeMarkers = computed(() => {
+  if (props.edgeMarkers) return props.edgeMarkers;
+  return {
+    markers: layoutGeometry.value.markers,
+    gutter: layoutGeometry.value.gutter,
+    width: layoutGeometry.value.canvasWidth,
+    height: layoutGeometry.value.canvasHeight,
+  };
+});
 
 function fitMarkerName(label, budget) {
   if (!label || budget < 3) return "";
@@ -286,14 +422,10 @@ const graphCanvasHeight = computed(() =>
 // sizes from the radial placement at the marker scale. `overflow: visible`
 // already lets the gutter content paint outside the node canvas.
 const canvasWidth = computed(() =>
-  radial.value
-    ? graphCanvasWidth.value
-    : Math.max(1, cols.value) * props.colPitch + 2 * activeEdgeMarkers.value.gutter,
+  layoutGeometry.value.canvasWidth,
 );
 const canvasHeight = computed(() =>
-  radial.value
-    ? graphCanvasHeight.value
-    : Math.max(1, rows.value) * props.rowPitch + LABEL_BAND + 2 * activeEdgeMarkers.value.gutter,
+  layoutGeometry.value.canvasHeight,
 );
 // The crowding fix decouples column pitch and row pitch: the row pitch
 // clears the marker height, the label line, and a strictly-positive gap
@@ -320,8 +452,25 @@ const HALO_R = 10;
 // non-overlap invariant holds a fortiori.
 const LABEL_ANCHOR_HALF = 13;
 function labelY() {
-  return LABEL_ANCHOR_HALF * props.markerScale + 13;
+  if (props.labelFont === 11) {
+    return LABEL_ANCHOR_HALF * props.markerScale + 13;
+  }
+  return 11 * props.markerScale + 2 + props.labelFont;
 }
+
+const dotCx = computed(() => {
+  const { gutter, marginX } = layoutGeometry.value;
+  const originOffsetX = gutter + marginX;
+  const pitch = effectiveColPitch.value;
+  return ((pitch / 2 + originOffsetX) % pitch + pitch) % pitch;
+});
+
+const dotCy = computed(() => {
+  const { gutter, marginY } = layoutGeometry.value;
+  const originOffsetY = gutter + marginY;
+  const pitch = effectiveRowPitch.value;
+  return ((pitch / 2 + originOffsetY) % pitch + pitch) % pitch;
+});
 
 // Node labels are bounded and truncated (the full label stays reachable
 // through the node's accessible name); a truncated label appends "…"
@@ -340,8 +489,8 @@ function nodePos(node) {
     return { x: placed.x * props.markerScale, y: placed.y * props.markerScale };
   }
   const core = latticePos(node);
-  const gutter = activeEdgeMarkers.value.gutter;
-  return { x: core.x + gutter, y: core.y + gutter };
+  const { gutter, marginX, marginY } = layoutGeometry.value;
+  return { x: core.x + gutter + marginX, y: core.y + gutter + marginY };
 }
 
 // Edge-marker name placement (map-02 D4 wording): the name box is drawn
@@ -485,7 +634,6 @@ function widthCaps() {
   if (props.maxHeight != null && canvasHeight.value > 0) {
     caps.push((Number(props.maxHeight) * canvasWidth.value) / canvasHeight.value);
   }
-  if (props.maxUpscale != null) caps.push(canvasWidth.value * props.maxUpscale);
   return caps;
 }
 
@@ -519,6 +667,56 @@ const latticeStyle = computed(() => {
     data-testid="local-map__lattice"
     @mouseleave="emit('leave')"
   >
+    <defs>
+      <pattern
+        :id="patternId"
+        :width="effectiveColPitch"
+        :height="effectiveRowPitch"
+        patternUnits="userSpaceOnUse"
+      >
+        <circle
+          :cx="dotCx"
+          :cy="dotCy"
+          :r="1.15 * markerScale"
+          class="local-map__dot"
+          fill="var(--ink-edge)"
+          fill-opacity="0.85"
+        />
+      </pattern>
+      <radialGradient
+        :id="fogId"
+        gradientUnits="userSpaceOnUse"
+        :cx="canvasWidth / 2"
+        :cy="canvasHeight / 2"
+        :r="Math.hypot(canvasWidth / 2, canvasHeight / 2)"
+      >
+        <stop offset="0.5" stop-color="var(--map-canvas-lo)" stop-opacity="0" />
+        <stop offset="0.78" stop-color="var(--map-canvas-lo)" stop-opacity="0.26" />
+        <stop offset="1" stop-color="var(--map-canvas-lo)" stop-opacity="0.50" />
+      </radialGradient>
+    </defs>
+    <rect
+      v-if="!isGraph"
+      class="local-map__dot-field"
+      data-testid="local-map__dot-field"
+      x="0"
+      y="0"
+      :width="canvasWidth"
+      :height="canvasHeight"
+      :fill="`url(#${patternId})`"
+      aria-hidden="true"
+    />
+    <rect
+      v-if="fogVignette && !isGraph"
+      class="local-map__vignette"
+      data-testid="local-map__vignette"
+      x="0"
+      y="0"
+      :width="canvasWidth"
+      :height="canvasHeight"
+      :fill="`url(#${fogId})`"
+      aria-hidden="true"
+    />
     <line
       v-for="edge in edgeGeoms"
       :key="`edge-${edge.i}`"
@@ -545,6 +743,18 @@ const latticeStyle = computed(() => {
       d="M0 -16 l-7 24 6 -5 5 7 5 -7 6 5 z"
       aria-hidden="true"
     />
+    <g
+      v-if="showAxis && !isGraph && currentPos"
+      class="local-map__axis"
+      data-testid="local-map__axis"
+      stroke="var(--ink-edge)"
+      stroke-width="1.5"
+      opacity="0.8"
+      aria-hidden="true"
+    >
+      <line :x1="0" :y1="currentPos.y" :x2="canvasWidth" :y2="currentPos.y" />
+      <line :x1="currentPos.x" :y1="0" :x2="currentPos.x" :y2="canvasHeight" />
+    </g>
     <!-- Edge direction markers (map-02 D3b): remembered places outside the
          in-view extent, claimed by the true current→remote bearing, drawn in
          the gutter OUTSIDE the node canvas. A pure decoration layer:
@@ -679,10 +889,11 @@ const latticeStyle = computed(() => {
       <text
         class="local-map__node-label"
         :class="`local-map__node-label--${labelTier(node)}`"
+        :style="{ fontSize: `${labelFont}px` }"
         :y="labelY()"
         text-anchor="middle"
       >
-        <title>{{ node.label }}</title>{{ labelSuppressed(node) ? "" : truncatedLabel(node.label) }}
+        <title>{{ node.label }}</title>{{ visibleNodeLabel(node) }}
       </text>
     </g>
   </svg>
@@ -717,12 +928,23 @@ const latticeStyle = computed(() => {
 </template>
 
 <style scoped>
+.local-map__dot-field {
+  pointer-events: none;
+}
+
+.local-map__vignette {
+  pointer-events: none;
+}
+
+.local-map__axis {
+  pointer-events: none;
+}
+
 /* The lattice canvas sizes from the model's exported lattice (cols × rows
    cells) and scales proportionally under the caller-supplied caps, which
    both callers resolve into the single `max-width` bound computed in
-   `latticeStyle` (the island passes its measured height budget and an
-   upscale bound; the overlay passes no height cap and fills the body
-   width). */
+   `latticeStyle` (the island passes its measured height budget; the overlay
+   passes no height cap and fills the body width). */
 .local-map__lattice {
   display: block;
   /* `align-self: center` centres the canvas whenever a cap makes it narrower

@@ -344,7 +344,16 @@ coordinate lattice — which exactly the coordinate-bearing layers (`grid`, `wil
 island SHALL state the renderer's own axis convention as orientation marks in its header following the
 redesign draft's header treatment (the letterspaced title style and the `北↑ 東→` marks the draft's
 lattice header draws); on the radial graph variant it SHALL omit those marks rather than assert an axis
-the presentation does not draw (a radial graph draws no axis). On a coordinate-bearing layer the island SHALL additionally state the
+the presentation does not draw (a radial graph draws no axis). Those marks and the axis cross the
+lattice draws are ONE claim stated twice — once in words, once as geometry — so the two SHALL travel
+together: a map surface SHALL draw the axis cross only where that same surface states the axis
+convention in words, and the island's marks are what license the axis its lattice draws. The island
+SHALL therefore draw the axis cross through the `current` node on the coordinate lattice and SHALL draw
+none on the radial graph, and a surface that states no orientation marks — the full-map surface as it
+stands — SHALL draw no axis at all. The lattice's coordinate dot field and its knowledge-edge vignette
+are decoration that states nothing in words and SHALL NOT be read as a position, a bearing, a distance,
+or a terrain claim: the dot field pictures the coordinate cell step the lattice already claims, and the
+vignette pictures the limit of what the payload knows. On a coordinate-bearing layer the island SHALL additionally state the
 `current` node's own coordinates as a two-integer figure — the payload `x` and `y` exactly as
 committed, with no unit, delta, or derived quantity — as the entire content of its readout line, so
 the island's position statement is the drawing convention plus the current cell's world coordinates
@@ -398,6 +407,17 @@ existing per-node movement submission SHALL be unchanged.
 - **THEN** the island renders the renderer's axis orientation marks in its draft-styled header
   alongside the map title, and its readout line states the current node's two payload coordinates as
   its entire content — no place name, no visibility-state word, no destination
+
+#### Scenario: The stated convention and the drawn axis travel together
+- **WHEN** a coordinate-bearing payload renders on the island, then a coordinate-free payload renders on
+  the island, then the same coordinate-bearing payload renders on the full-map surface, which states no
+  orientation marks
+- **THEN** the island draws the axis cross exactly where it states `北↑ 東→` and nowhere else — drawn on
+  the lattice, absent on the graph, and absent on the full-map surface — so no surface ever draws an axis
+  it does not name or names an axis it does not draw
+- **AND** the island's coordinate dot field and knowledge-edge vignette add no word, figure, or angle to
+  the island: no bearing, no distance, and no coordinate figure beyond the current node's own pair appears
+  anywhere because of them
 
 #### Scenario: The readout ignores hover and selection
 - **WHEN** the player hovers and then activates a non-current node on a coordinate-bearing layer
