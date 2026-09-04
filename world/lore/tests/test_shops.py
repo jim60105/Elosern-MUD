@@ -2,6 +2,7 @@
 
 import unittest
 
+from tools.spec_traceability import covers_requirement
 from world.lore.shops import (
     SHOP_REGISTRY,
     ShopDefinition,
@@ -13,6 +14,7 @@ from world.lore.shops import (
 class ShopNPCIdentityTests(unittest.TestCase):
     """Authored host identities fail closed at load (design D4)."""
 
+    @covers_requirement("npc-identity-titles::shop-and-guild-registries-author-host-and-examiner-identities-validated-at-load")
     def test_invalid_host_title_is_named_by_row_and_field(self):
         row = SHOP_REGISTRY["altoria_general_store"]
         bad = {
@@ -40,6 +42,7 @@ class ShopNPCIdentityTests(unittest.TestCase):
         self.assertIn("shop s", str(caught.exception))
         self.assertIn("invalid host_name", str(caught.exception))
 
+    @covers_requirement("npc-identity-titles::shop-and-guild-registries-author-host-and-examiner-identities-validated-at-load")
     def test_shipped_rows_load_clean(self):
         validate_shop_npc_identities()
 

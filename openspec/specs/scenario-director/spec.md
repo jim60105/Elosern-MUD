@@ -79,9 +79,12 @@ The system message SHALL additionally carry a deterministic name-inspiration ban
 compute `zlib.crc32` over the serialized bounded request context, roll a fixed number of names
 through the read-only `world.rules.namegen.roll_name_for_race(None, "", Random(seed))`, and inject
 them as the `name_inspiration` values together with the library text's guidance that the names are
-inspiration only — directly usable, adjustable to the character's declared sex and background, and
-`display_name` is recommended but optional. The output-schema optionality of `display_name` and
-every semantic validator SHALL be unchanged by the injection.
+inspiration only — directly usable, or adjustable to the character's declared sex and background —
+countering same-name bias when the author runs out of inspiration, and that every `npc_req` entry
+MUST carry the required identity fields `display_name` and `title`. The bank remains an
+inspiration-only surface: the rolled names are never a fallback final name written by the system,
+and the injection itself SHALL add no output-schema field; the requiredness of `display_name` and
+`title` is enforced by the shared characterization validator, not by the prompt.
 
 #### Scenario: Identical contexts produce identical prompts
 - **WHEN** `build_scenario_prompt()` is called twice with the same context
@@ -96,15 +99,16 @@ every semantic validator SHALL be unchanged by the injection.
 
 #### Scenario: The injected names are framed as inspiration only
 - **WHEN** the system message is inspected
-- **THEN** the bank is presented with the library text marking the names as 僅供靈感 (adjustable to
-  sex and background) and recommending — not requiring — that `npc_req` entries fill `display_name`
+- **THEN** the bank is presented with the library text marking the names as 僅供靈感 (directly
+  usable or adjustable to sex and background) and stating that `npc_req` entries carry the required
+  `display_name` and `title`
 
-#### Scenario: The output contract stays unchanged by the injection
-- **WHEN** a blueprint omits `display_name` on every `npc_req` entry, and another blueprint fills
-  it with a name not present in the inspiration bank
-- **THEN** both validate exactly as before the injection: `display_name` remains optional, no
-  validator rejects a bank-external name, and the registered output schema is byte-identical to
-  the pre-change schema
+#### Scenario: The injection changes no output-schema field
+- **WHEN** a blueprint uses a bank name verbatim as `display_name`, adapts a bank name, or declares
+  a name absent from the bank
+- **THEN** the validator's decision depends only on the shared identity rules — a bank-external name
+  is accepted, an omitted `display_name` or `title` is rejected — and the injection adds no schema
+  field of its own
 
 #### Scenario: An oversized context produces a bounded prompt
 - **WHEN** `build_scenario_prompt()` is called with fields exceeding the caps
@@ -218,22 +222,29 @@ before retrying.
 - **THEN** the pipeline returns it as a frozen `QuestBlueprint` with no retry
 
 ### Requirement: Blueprint validation accepts and bounds the optional npc characterization fields
-The scenario director's blueprint validator SHALL accept the four optional per-occupant fields —
-`display_name`, paired `age`/`apparent_age`, and `portrait: {stable_key}` — on `npc_req` entries,
-in addition to the existing role/tier/disposition checks. Every declared field SHALL be validated
-through the shared bound helper under `world/quests/` (the single rule source, imported read-only):
-`display_name` bounded non-empty text; `age`/`apparent_age` paired values satisfying
-`type(value) is int` with the hard adult floor `18` and an upper bound from
-`NPC_TIER_REGISTRY[tier].race_key` → `RACE_REGISTRY[race].lifespan`; `portrait` a mapping with
-exactly one `stable_key` field that is subject-key-valid. A payload whose tier is unknown, whose
-ages are unpaired, non-integer, underage, or beyond the race lifespan, or whose portrait key is
-malformed SHALL be rejected and retried within the budget exactly like today's other semantic
-failures. Entries without the optional fields SHALL validate unchanged.
+The scenario director's blueprint validator SHALL require two per-occupant identity fields —
+`display_name` (authored name, bounded non-empty text through the shared bound helper) and `title`
+(authored NPC title, single-line plain text through the shared bound helper) — on every `npc_req`
+entry, in addition to the existing role/tier/disposition checks, and SHALL accept the three
+optional fields `age`/`apparent_age` (paired) and `portrait: {stable_key}`. Every field SHALL be
+validated through the shared bound helper under `world/quests/` (the single rule source, imported
+read-only): `display_name` and `title` required with their shared character-set rules;
+`age`/`apparent_age` paired values satisfying `type(value) is int` with the hard adult floor `18`
+and an upper bound from `NPC_TIER_REGISTRY[tier].race_key` → `RACE_REGISTRY[race].lifespan`;
+`portrait` a mapping with exactly one `stable_key` field that is subject-key-valid. A payload whose
+tier is unknown, whose occupant is missing `display_name` or `title`, whose ages are unpaired,
+non-integer, underage, or beyond the race lifespan, or whose portrait key is malformed SHALL be
+rejected and retried within the budget exactly like today's other semantic failures.
 
-#### Scenario: A valid named occupant with ages passes validation
-- **WHEN** a blueprint's `npc_req` entry declares a known tier plus `display_name`, paired ages
-  within the race band, and a valid `portrait.stable_key`
+#### Scenario: A valid named occupant with a title and ages passes validation
+- **WHEN** a blueprint's `npc_req` entry declares a known tier plus `display_name`, `title`,
+  paired ages within the race band, and a valid `portrait.stable_key`
 - **THEN** the blueprint passes semantic validation and proceeds to compile
+
+#### Scenario: A missing identity field is rejected and retried
+- **WHEN** an `npc_req` entry omits `display_name` or `title`
+- **THEN** the output is treated as a validation failure, the named error is appended, and the
+  pipeline retries within the budget
 
 #### Scenario: An unpaired, underage, or non-integer declaration is rejected and retried
 - **WHEN** an `npc_req` entry declares `age` without `apparent_age`, either age below 18, or any
@@ -251,9 +262,9 @@ failures. Entries without the optional fields SHALL validate unchanged.
 - **THEN** the blueprint is rejected and retried
 
 #### Scenario: The shared helper is the sole rule implementation
-- **WHEN** a blueprint's optional fields are validated
+- **WHEN** a blueprint's per-occupant fields are validated
 - **THEN** the checks execute through the shared `world/quests/` helper, and no inline duplicate of
-  the age/name/key rules exists in the scenario director
+  the age/name/title/key rules exists in the scenario director
 
 ### Requirement: The hand-written template pool provides offline quest generation
 `world/ai/director_templates.py` SHALL define a non-empty tuple of hand-written, pre-validated
@@ -327,17 +338,18 @@ and deadline) plus a `QuestReward` and an issuer branch key. It SHALL raise a na
 SHALL be a stable content digest over the canonical runtime definition serialization **plus the
 canonical serialization of the compiled per-stage spawn requirements**, so two blueprints with
 identical runtime stages but different scene requirements (archetype, `anchor_near`, `scene_sentence`,
-or `npc_reqs`, or any carried characterization field — `display_name`, paired `age`/`apparent_age`,
-or portrait `stable_key`) always yield different keys and equal content always yields an equal key.
-`register_generated_quest(...)` SHALL register the compiled `QuestDefinition`, its `GuildQuestOffer`,
-**and its per-stage spawn requirements (readable through `scene_requirements_for(definition_key)`)**
-as one all-or-nothing operation: it SHALL preflight all three registries' equal/conflict states
-before writing any of them, SHALL roll back every write if any later write fails, and SHALL leave no
-spawn-requirement entry behind on a rolled-back publication, so a generated definition is never left
-registered without its offer or its requirements. `scene_requirements_for` SHALL return an empty
-tuple for any key with no registered requirements (for example a hand-written catalog quest). Raw
-AI-shaped dicts SHALL still be rejected by `register_quest_definition` — the compile boundary is the
-sole sanctioned translator and AI dicts never enter `QUEST_DEFINITION_REGISTRY` directly.
+or `npc_reqs`, or any carried characterization field — the required `display_name` and `title`, the
+optional paired `age`/`apparent_age`, or portrait `stable_key`) always yield different keys and equal
+content always yields an equal key. `register_generated_quest(...)` SHALL register the compiled
+`QuestDefinition`, its `GuildQuestOffer`, **and its per-stage spawn requirements (readable through
+`scene_requirements_for(definition_key)`)** as one all-or-nothing operation: it SHALL preflight all
+three registries' equal/conflict states before writing any of them, SHALL roll back every write if
+any later write fails, and SHALL leave no spawn-requirement entry behind on a rolled-back
+publication, so a generated definition is never left registered without its offer or its
+requirements. `scene_requirements_for` SHALL return an empty tuple for any key with no registered
+requirements (for example a hand-written catalog quest). Raw AI-shaped dicts SHALL still be rejected
+by `register_quest_definition` — the compile boundary is the sole sanctioned translator and AI dicts
+never enter `QUEST_DEFINITION_REGISTRY` directly.
 
 #### Scenario: A valid blueprint compiles to a registrable definition
 - **WHEN** a validated blueprint passes through `compile_quest_blueprint`
@@ -365,22 +377,23 @@ sole sanctioned translator and AI dicts never enter `QUEST_DEFINITION_REGISTRY` 
   spawn requirements
 
 #### Scenario: Compiled requirements carry the characterization fields
-- **WHEN** an accepted blueprint's `npc_req` entry declares `display_name`, paired ages, and a
-  portrait `stable_key`
-- **THEN** the compiled per-stage spawn requirements expose all three in deterministic order
+- **WHEN** an accepted blueprint's `npc_req` entry declares the required `display_name` and `title`
+  plus paired ages and a portrait `stable_key`
+- **THEN** the compiled per-stage spawn requirements expose all four in deterministic order
 
 #### Scenario: Characterization differences change the generated key
 - **WHEN** two accepted blueprints differ only in a carried characterization field
 - **THEN** their compiled `QuestDefinition.key` digests differ
 
-#### Scenario: A field-less blueprint compiles unchanged
-- **WHEN** an accepted blueprint declares no optional characterization fields
-- **THEN** the compiled requirements, digest, and registration behave exactly as today
+#### Scenario: An option-field-less blueprint compiles with the identity-bearing digest
+- **WHEN** an accepted blueprint declares no optional characterization fields (no ages, no portrait)
+- **THEN** it compiles with the same deterministic registration behavior, and its digest includes
+  the required `display_name` and `title` of every occupant
 
 #### Scenario: Spawn requirements are registered with the publication
 - **WHEN** a compiled quest is registered and `scene_requirements_for(definition_key)` is read
-- **THEN** it returns the compiled stage's spawn requirements, so change 21's SceneBuilder can
-  materialize the scene when the player arrives
+- **THEN** it returns the compiled stage's spawn requirements, so the SceneBuilder can materialize
+  the scene when the player arrives
 
 #### Scenario: A conflicting offer rolls back the definition, its requirements, and the offer
 - **WHEN** a compiled definition is new but a conflicting `GuildQuestOffer` already exists for its
@@ -401,8 +414,8 @@ sole sanctioned translator and AI dicts never enter `QUEST_DEFINITION_REGISTRY` 
 #### Scenario: The compiler re-validates every guardrail-checked constraint
 - **WHEN** a payload that was never guardrail-validated is passed to `compile_quest_blueprint`
 - **THEN** every constraint the semantic validators check (rank, reward band, item keys, archetype,
-  tiers, branch, indices, deadline, scene-bound rules) is re-checked deterministically, so no proposal
-  can reach the registry unchecked
+  tiers, branch, indices, deadline, scene-bound rules) is re-checked deterministically, so no
+  proposal can reach the registry unchecked
 
 ### Requirement: Scene-bound proposal stages are validated before publication
 The `scenario_director` guardrail semantic validators and the deterministic compiler SHALL both

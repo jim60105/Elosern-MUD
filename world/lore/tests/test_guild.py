@@ -31,6 +31,7 @@ class GuildRegistryTests(unittest.TestCase):
 class GuildNPCIdentityTests(unittest.TestCase):
     """Authored examiner/host identities fail closed at load (design D4)."""
 
+    @covers_requirement("npc-identity-titles::shop-and-guild-registries-author-host-and-examiner-identities-validated-at-load")
     def test_invalid_examiner_title_is_named_by_row_and_field(self):
         bad = dict(GUILD_RANK_REGISTRY)
         row = bad["D"]
@@ -53,6 +54,7 @@ class GuildNPCIdentityTests(unittest.TestCase):
             validate_guild_npc_identities(ranks={}, branches=bad)
         self.assertIn("invalid host_name", str(caught.exception))
 
+    @covers_requirement("npc-identity-titles::shop-and-guild-registries-author-host-and-examiner-identities-validated-at-load")
     def test_shipped_rows_load_clean(self):
         # The module-level call already ran at import; an explicit re-run is a
         # no-op proof that every shipped row passes both shared validators.

@@ -166,6 +166,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         return NPC.objects.filter(db_key=GUILD_HOST_NAME).first()
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
+    @covers_requirement("npc-identity-titles::host-and-examiner-creation-emit-boundary-info-events")
     def test_first_sync_creates_the_authored_host_once(self):
         with patch("world.rules.guild_economy.log_info") as logged:
             sync_service_content()

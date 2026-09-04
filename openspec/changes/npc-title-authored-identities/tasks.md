@@ -118,9 +118,9 @@ NPC-title 批次的最後一件。
 
 ## 6. Spec bookkeeping
 
-- [ ] 6.1 `openspec validate npc-title-authored-identities --strict` 通過；
+- [x] 6.1 `openspec validate npc-title-authored-identities --strict` 通過；
   `openspec validate --all --strict` 全綠（使用者自己的 change 除外）。
-- [ ] 6.2 sync 本 change 自己的 delta（前置兩件的 delta 已隨其歸檔 sync 完畢）：用
+- [x] 6.2 sync 本 change 自己的 delta（前置兩件的 delta 已隨其歸檔 sync 完畢）：用
   `.agents/skills/openspec-sync-specs` 把 `npc-identity-titles`（7 ADDED）、
   `blueprint-portrait-policy`／`scenario-director`／`prompt-library`／`guild-rank-exams`／
   `sample-city-altoria`（MODIFIED）與 `scene-builder`（2 REMOVED）套進 `openspec/specs/`
@@ -128,7 +128,7 @@ NPC-title 批次的最後一件。
   然後以 `uv run --locked python -m tools.spec_traceability list` 取 canonical ID，
   將本 change requirement 的 `covers_requirement` 標註掛到第 1–5 組的錨定測試上，
   跑 `uv run --locked python -m tools.spec_traceability check` 至零錯誤。
-- [ ] 6.3 確認 `.github/evennia-shards.json` 不需變動（本 change 不新增測試模組）；
+- [x] 6.3 確認 `.github/evennia-shards.json` 不需變動（本 change 不新增測試模組）；
   `git diff --check` 乾淨。
 
 ## 7. 明確不做（延期，非遺漏）

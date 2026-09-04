@@ -222,6 +222,7 @@ class PayloadRoundTripTests(RegistryIsolationMixin, EvenniaTestCase):
     """Task 1.2/4.1: serialization round-trip and registration idempotency."""
 
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    @covers_requirement("npc-identity-titles::the-existing-scene-builder-and-generated-quest-contracts-are-unchanged-where-not-amended")
     def test_register_persists_a_payload_that_reconstructs_equal_values(self):
         compiled = compile_quest_blueprint(_characterized_payload())
         register_generated_quest(compiled)

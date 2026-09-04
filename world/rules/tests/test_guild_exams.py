@@ -355,6 +355,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
 
 
     @covers_requirement("npc-identity-titles::exam-examiners-carry-their-authored-identity")
+    @covers_requirement("npc-identity-titles::host-and-examiner-creation-emit-boundary-info-events")
     def test_spawn_uses_the_authored_name_and_persists_the_title(self):
         self._give_merit(50)
         with patch("world.rules.guild_exams.log_info") as logged:

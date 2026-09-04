@@ -255,6 +255,7 @@ class SceneBuilderTestBase(SceneBuilderIsolation, EvenniaTest):
 
 class SceneOccupantPrototypeTests(EvenniaTestCase):
     @covers_requirement("scene-builder::anti-hallucination-the-proposal-never-chooses-numbers-stats-or-class-lineage")
+    @covers_requirement("npc-identity-titles::the-existing-scene-builder-and-generated-quest-contracts-are-unchanged-where-not-amended")
     def test_module_prototypes_resolve_with_whitelisted_keys_and_typeclasses(self):
         prototypes_module.load_module_prototypes("world.prototypes")
         npc_proto = spawner_module.search_prototype("scene_npc", require_single=True)[0]
@@ -600,6 +601,7 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
         return next(obj for obj in result.room.contents if isinstance(obj, NPC))
 
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
+    @covers_requirement("npc-identity-titles::blueprint-scene-occupants-spawn-under-the-authored-name-with-the-authored-title")
     def test_full_characterization_is_materialized_fully(self):
         npc = self._spawned_npc(
             self._characterized(
