@@ -10,8 +10,7 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 from commands.talk import CmdsTalk
-from world.onboarding.guide_dialogue import (
-    GUARD_DIALOGUE_KEY,
+from world.rules.dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     GUILD_STAFF_TURNIN_KEYWORD,
 )
@@ -20,7 +19,7 @@ from world.rules.guild import (
     GuildServiceError,
     RewardClaimError,
 )
-from world.rules.onboarding import ScriptedTalkResult
+from world.rules.dialogue import ScriptedTalkResult
 
 _NO_RESPONSE = "對方沒有理會你。"
 
@@ -52,33 +51,12 @@ class TalkTurnInBranchTests(TestCase):
                 "copper": 50,
                 "merit": 25,
                 "items": ["healing_potion"],
-                "onboarding_completed": False,
             },
         ) as turnin, patch("commands.talk.run_scripted_talk") as response:
             command.func()
         turnin.assert_called_once_with(command.caller, npc, "quest-1")
         response.assert_not_called()
         self.assertIn("你回報了任務 quest-1", command.caller.msg.call_args.args[0])
-
-    def test_turnin_reports_onboarding_completion_line(self):
-        command = _command(f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} quest-1")
-        with patch("commands.talk._resolve_npc", return_value=_staff_npc()), patch(
-            "commands.talk.dialogue_key_for", return_value=GUILD_STAFF_DIALOGUE_KEY
-        ), patch(
-            "commands.talk.dialogue_turn_in",
-            return_value={
-                "quest_id": "quest-1",
-                "copper": 0,
-                "merit": 0,
-                "items": [],
-                "onboarding_completed": True,
-            },
-        ):
-            command.func()
-        self.assertEqual(
-            command.caller.msg.call_args_list[1].args[0],
-            "你的第一個日子在這裡圓滿結束。冒險者，歡迎正式踏入伊洛瑟恩大陸。",
-        )
 
     def test_turnin_maps_reward_and_data_errors(self):
         npc = _staff_npc()
@@ -121,7 +99,7 @@ class TalkTurnInBranchTests(TestCase):
         ):
             command = _command(args)
             with patch("commands.talk._resolve_npc", return_value=npc), patch(
-                "commands.talk.dialogue_key_for", return_value=GUARD_DIALOGUE_KEY
+                "commands.talk.dialogue_key_for", return_value="some_other_table"
             ), patch("commands.talk.run_scripted_talk", return_value=None) as response, patch(
                 "commands.talk.dialogue_turn_in"
             ) as turnin:

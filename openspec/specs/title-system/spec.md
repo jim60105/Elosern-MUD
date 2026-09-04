@@ -100,7 +100,7 @@ Exam promotions SHALL grant the new rank's title inside `settle_exam_outcome`'s
 promotion transaction; a rolled-back promotion removes it. Merit changes, branch
 moves, and any future demotion SHALL NOT revoke banked titles.
 
-#### Scenario: Onboarding completes with the composed starter title
+#### Scenario: Guild registration grants the composed starter title
 - **WHEN** a fresh character completes guild registration
 - **THEN** the collection holds fixed 「F級冒險者」 plus epithet 「南門新客」, both slots auto-equipped, and the live full title is 「F級冒險者　南門新客」
 

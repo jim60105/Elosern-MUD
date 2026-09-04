@@ -18,11 +18,7 @@ applied by the deterministic talk writer in the same transaction as the answer; 
 and no-keyword paths SHALL NOT write any state.
 `talk <npc>` without a keyword SHALL present the host's authored greeting when one is configured,
 and the no-response line when it is not. An NPC without any dialogue component SHALL keep yielding
-the no-response line. An `OnboardingGuide` host (the South Gate guard) SHALL answer through the
-same authored tables, is explicitly exempt from the no-state guarantee (a known guard keyword
-updates `guide_progress` exactly as the existing onboarding rules define), and SHALL grant the
-same +1 affinity as any other known-keyword answer — with `guide_progress` and the affinity gain
-committed in one transaction — while an unknown keyword SHALL NOT write. The
+the no-response line. The
 `guild_staff` host SHALL be the dialogue action exception: the keyword `回報`
 SHALL resolve the read-only reportable-quest listing through the deterministic
 guild service without granting the talk affinity, and `talk <guild-staff> 回報 <quest_id>` SHALL
@@ -31,8 +27,8 @@ settlement and rejection semantics as `guild turnin`. Every other `guild_staff`
 keyword SHALL grant the same +1 affinity as any other known-keyword answer.
 Before answering, the scripted-talk entry path SHALL consult
 `world/rules/npc_schedules.py::interaction_reason(npc, "talk")`; a non-`None` result SHALL present
-that stable rejection line and SHALL write no state — the +1 affinity, guide progress, and
-turn-in paths are all bypassed for the blocked interaction.
+that stable rejection line and SHALL write no state — the +1 affinity and
+turn-in paths are both bypassed for the blocked interaction.
 
 #### Scenario: Guild staff answers a known keyword
 - **WHEN** the player talks to the guild master with a keyword such as 公會 or 任務
@@ -58,18 +54,6 @@ turn-in paths are all bypassed for the blocked interaction.
 - **WHEN** the player talks to an NPC that carries neither dialogue component
 - **THEN** the player receives the no-response line and no state changes
 
-#### Scenario: Guard keyword tracking and affinity commit together
-- **WHEN** the player talks to the South Gate guard with a known guard keyword
-- **THEN** the guard answers from the authored table, records the keyword on
-  `guide_progress`, and the guard's affinity value rises by 1 in one transaction; an unknown
-  guard keyword records nothing and grants no affinity
-
-#### Scenario: A failed guard talk write restores both surfaces
-- **WHEN** persistence is fault-injected after `guide_progress` is written and before the
-  affinity gain commits
-- **THEN** `guide_progress` and the affinity record — and their in-process caches — equal their
-  pre-talk values
-
 #### Scenario: Guild staff 回報 keyword lists reportable quests read-only
 - **WHEN** a registered player with completed, unclaimed quests talks to the
   guild staff with the keyword `回報` and no quest id
@@ -82,7 +66,7 @@ turn-in paths are all bypassed for the blocked interaction.
   reportable quest
 - **THEN** the staff turns the quest in through `turn_in_quest`, paying the
   exact reward once and answering with the same success or rejection prose as
-  `guild turnin`, including the onboarding-completion line
+  `guild turnin`
 
 #### Scenario: Guild staff 回報 without a reportable quest says so
 - **WHEN** a registered player with no completed-and-unclaimed quests talks to
@@ -103,8 +87,9 @@ turn-in paths are all bypassed for the blocked interaction.
 
 #### Scenario: A schedule-blocked host does not answer and writes nothing
 - **WHEN** the player talks to a scripted dialogue host whose schedule state blocks `talk`
-- **THEN** the player receives the stable schedule rejection line, and no affinity, guide
-  progress, or turn-in state changes
+- **THEN** the player receives the stable schedule rejection line, and no affinity
+  or turn-in state changes
+
 ### Requirement: Dialogue tables are immutable, keyed, and registry-backed
 The dialogue-table registry SHALL be keyed by `dialogue_key` and SHALL hold only
 frozen `DialogueDefinition` values composed of an optional `greeting` and a

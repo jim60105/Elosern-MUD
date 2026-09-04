@@ -128,16 +128,10 @@ def _activate_creation(
     except CharacterCreationError as error:  # observability: ignore R2: player-facing recovery; the reason is rendered to the caller and the draft stays retryable
         caller.msg(f"角色建立失敗：{error}")
         return
-    from world.rules.onboarding import (
-        maybe_play_arrival,
-        relocate_to_starting_location,
-    )
-
     # Portrait finalization (named ``portrait_policy`` + post-commit ensure)
     # runs INSIDE the activation transaction through the shared
     # ``finalize_player_portrait``, so a rolled-back creation never writes a
     # policy or emits a job (fix-creation-finalization-safety D3).
-    relocate_to_starting_location(caller)
     # Release a concept prompt chain a competing surface may have opened on
     # this shell (the async rack's ndb slot survives its cmdset eviction;
     # the stale continuation itself self-cleans through its release check on
@@ -147,7 +141,6 @@ def _activate_creation(
     caller.msg(
         f"角色 {result.display_name} 已建立，初始魔力為 {result.magic_power}。"
     )
-    maybe_play_arrival(caller)
 
 
 class CmdCharacter(Command):

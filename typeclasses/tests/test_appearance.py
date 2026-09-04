@@ -357,22 +357,10 @@ class DisplayedStatsBlockTests(EvenniaTest):
         self.assertNotIn("攻擊：88", appearance)
 
     @covers_requirement("displayed-stats-view::look-target-appends-the-displayed-stats-block-room-look-never-does")
-    def test_onboarding_look_beat_still_completes_with_the_block_present(self):
-        from world.maps.bootstrap import sync_grid
-        from world.rules.onboarding import GUIDANCE_BEAT_ID, LOOK_BEAT_ID
-
-        sync_grid()
-        gate = self.room1
-        gate.key = "南門"
-        gate.save()
-        self.char1.location = gate
-        self.char1.onboarding_beat = LOOK_BEAT_ID
-        self.char1.guide_progress = {"state": "active", "seen_keywords": []}
-        self.char1.onboarded = False
+    def test_at_look_through_the_ordinary_seam_appends_the_block(self):
+        self.char1.location = self.room1
         appearance = self.char1.at_look(self.npc)
         self.assertIn("攻擊：60", appearance)
-        self.assertTrue(self.char1.first_arrival_seen)
-        self.assertEqual(self.char1.onboarding_beat, GUIDANCE_BEAT_ID)
 
 
 class PersonaBlockLookTests(EvenniaTest):

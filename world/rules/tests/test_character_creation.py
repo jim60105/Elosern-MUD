@@ -306,63 +306,22 @@ class CharacterActivationTests(EvenniaTest):
                     self.assertEqual(character.attributes.has(key), existed, key)
                     self.assertEqual(character.attributes.get(key), value, key)
 
-    def test_successful_activation_teleports_to_south_gate_without_clock(self):
-        from evennia.utils.create import create_object as _co
-        from typeclasses.rooms import Room
-        from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
-        from world.rules.onboarding import relocate_to_starting_location
+    @covers_requirement("player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation")
+    def test_successful_activation_leaves_the_shell_in_place(self):
+        """Activation performs no relocation and records no arrival."""
+        from world.rules.clock import get_world_clock
 
-        _co(Room, key="虛境", location=None)
-        sync_grid()
-        from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
-
-        south_gate = XYZRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
-        self.assertIsNotNone(south_gate)
         old_location = self.character.location
-        result = activate_player_character(
+        activate_player_character(
             self.account, self.character, self.request()
         )
-        clock = __import__("world.rules.clock", fromlist=["get_world_clock"]).get_world_clock()
+        clock = get_world_clock()
         tick_before = clock.tick
-        relocate_to_starting_location(self.character)
-        self.assertFalse(self.character.creation_pending)
-        self.assertIs(self.character.location, south_gate)
-        self.assertEqual(clock.tick, tick_before)
-        self.assertIsNot(self.character.location, old_location)
-
-    @covers_requirement("player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation")
-    def test_missing_south_gate_leaves_shell_and_activation_intact(self):
-        from world.rules.onboarding import relocate_to_starting_location
-
-        old_location = self.character.location
-        activate_player_character(
-            self.account, self.character, self.request()
-        )
-        with patch("world.rules.onboarding._south_gate", return_value=None):
-            relocate_to_starting_location(self.character)
-        self.assertFalse(self.character.creation_pending)
-        self.assertIs(self.character.location, old_location)
-
-    @covers_requirement("player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation")
-    def test_failed_relocation_never_rolls_back_activation(self):
-        from world.rules.onboarding import relocate_to_starting_location
-
-        activate_player_character(
-            self.account, self.character, self.request()
-        )
-        old_location = self.character.location
-
-        def boom():
-            raise RuntimeError("relocation failure")
-
-        messages = []
-        self.character.msg = lambda text, **kwargs: messages.append(str(text))
-        with patch("world.rules.onboarding._south_gate", side_effect=boom):
-            relocate_to_starting_location(self.character)
         self.assertFalse(self.character.creation_pending)
         self.assertIsNotNone(self.character.traits.magic_power)
         self.assertIs(self.character.location, old_location)
-        self.assertTrue(any("南門" in message for message in messages))
+        self.assertEqual(clock.tick, tick_before)
+        self.assertIsNone(self.character.attributes.get("map_knowledge"))
 
 
 class PortraitFinalizationTests(EvenniaTest):

@@ -992,11 +992,10 @@ onMounted(() => {
           :codex="panel('title_codex')"
           @action="onTitleCodexAction"
         />
-        <!-- No committed panel carries authored guide content, so the help
-             surface renders its client-owned control reference and the
-             statement of how the game's own `help` output is reached (task
-             6.6) — no invented copy. -->
-        <HelpOverlay v-else :guide="{}" />
+        <!-- The help surface renders the client-owned control reference and
+             the statement of how the game's own `help` output is reached —
+             no invented copy. -->
+        <HelpOverlay v-else />
       </template>
     </OverlayHost>
 

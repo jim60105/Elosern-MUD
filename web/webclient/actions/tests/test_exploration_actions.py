@@ -2,7 +2,7 @@
 
 Covers the six explore payload validators, the movement charge/recording
 through the shared exit seam, the stale/tampered/locked rejections, the combat
-``at_pre_move`` veto, the look onboarding hook, scripted and free-form
+plain traversal, the ``at_pre_move`` veto, scripted and free-form
 dialogue (offline degrade included), engage-to-combat, and the shared skip
 helper arithmetic.
 """
@@ -57,8 +57,6 @@ from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
 from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
 from world.maps.wilderness_provider import WILDERNESS_NAME
-from world.onboarding.guide_dialogue import GUARD_DIALOGUE_KEY
-from world.onboarding.scenes import GUIDANCE_BEAT_ID, LOOK_BEAT_ID
 from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
 from world.rules.combat_session import (
     CombatSessionError,
@@ -476,7 +474,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     # explore.look
     # ------------------------------------------------------------------
 
-    @covers_requirement("webclient-exploration-menu::explore-look-reuses-the-command-appearance-path-and-preserves-onboarding-look-hooks")
+    @covers_requirement("webclient-exploration-menu::explore-look-reuses-the-command-appearance-path")
     def test_look_at_present_entity_uses_ordinary_display(self):
         target = create_object(NPC, key="路人", location=self.room1)
         with patch.object(self.player, "msg") as msg:
@@ -511,29 +509,10 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn("羈絆", appearance)
         self.assertIsNone(monster.db.relations_data)
 
-    def test_look_at_absent_target_rejects_without_onboarding_write(self):
-        before = self.player.first_arrival_seen
+    def test_look_at_absent_target_is_rejected(self):
         result = _look_adapter(self.player, {"target_id": 999999})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_target")
-        self.assertEqual(self.player.first_arrival_seen, before)
-
-    @covers_requirement("webclient-exploration-menu::explore-look-reuses-the-command-appearance-path-and-preserves-onboarding-look-hooks")
-    @covers_requirement("localized-appearance::the-shared-appearance-layer-renders-traditional-chinese-frames")
-    def test_look_at_room_advances_the_onboarding_look_beat(self):
-        sync_grid()
-        gate = self.room1
-        gate.key = "南門"
-        gate.save()
-        self.player.location = gate
-        self.player.onboarding_beat = LOOK_BEAT_ID
-        self.player.guide_progress = {"state": "active", "seen_keywords": []}
-        self.player.onboarded = False
-        with patch.object(self.player, "msg"):
-            result = _look_adapter(self.player, {"room": True})
-        self.assertEqual(result["outcome"], "success")
-        self.assertTrue(self.player.first_arrival_seen)
-        self.assertEqual(self.player.onboarding_beat, GUIDANCE_BEAT_ID)
 
     def test_look_appearance_failure_is_rejected_without_prose(self):
         target = create_object(NPC, key="路人", location=self.room1)
@@ -589,22 +568,14 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     # ------------------------------------------------------------------
 
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
-    def test_scripted_host_answers_and_guard_records_the_keyword(self):
-        host = create_object(NPC, key="南門守衛", location=self.room1)
-        from typeclasses.components import OnboardingGuide
-
-        host.components.add(
-            OnboardingGuide.create(host, dialogue_key=GUARD_DIALOGUE_KEY)
-        )
-        self.player.guide_progress = {"state": "active", "seen_keywords": []}
-        self.player.save()
+    def test_scripted_host_answers_with_the_authored_line(self):
+        host = create_object(NPC, key="公會職員", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
         result = _talk_scripted_adapter(
             self.player, {"npc_id": int(host.pk), "keyword_id": "公會"}
         )
         self.assertEqual(result["outcome"], "success")
         self.assertIn("冒險者公會", result["message"])
-        progress = self.player.guide_progress or {}
-        self.assertIn("公會", progress.get("seen_keywords", []))
 
     def test_scripted_host_no_state_answer(self):
         host = create_object(NPC, key="公會職員", location=self.room1)
@@ -614,8 +585,6 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertEqual(result["outcome"], "success")
         self.assertIn("guild", result["message"])
-        # A scripted host never writes guide state.
-        self.assertFalse(self.player.guide_progress)
 
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
     def test_turnin_keyword_flows_through_the_shared_dialogue_resolution(self):
@@ -633,30 +602,20 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         # The unregistered player receives the authored register-first line
         # through the shared resolution; no claim or quest state can change.
         self.assertIn("guild register", result["message"])
-        self.assertFalse(self.player.guide_progress)
 
     def test_unregistered_keyword_rejects_without_writing(self):
-        host = create_object(NPC, key="南門守衛", location=self.room1)
-        from typeclasses.components import OnboardingGuide
-
-        host.components.add(
-            OnboardingGuide.create(host, dialogue_key=GUARD_DIALOGUE_KEY)
-        )
+        host = create_object(NPC, key="公會職員", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
         result = _talk_scripted_adapter(
             self.player, {"npc_id": int(host.pk), "keyword_id": "不存在的話題"}
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "unregistered_keyword")
-        self.assertFalse(self.player.guide_progress)
 
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
     def test_no_longer_present_npc_rejects_before_any_dialogue_api(self):
-        host = create_object(NPC, key="南門守衛", location=self.room1)
-        from typeclasses.components import OnboardingGuide
-
-        host.components.add(
-            OnboardingGuide.create(host, dialogue_key=GUARD_DIALOGUE_KEY)
-        )
+        host = create_object(NPC, key="公會職員", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
         host.location = create_object(Room, key="別處", location=None)
         with patch(
             "web.webclient.actions.exploration_actions.run_scripted_talk"
@@ -667,7 +626,6 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_npc")
         talk.assert_not_called()
-        self.assertFalse(self.player.guide_progress)
 
     def test_non_dialogue_host_rejects_before_any_dialogue_api(self):
         plain = create_object(NPC, key="路人", location=self.room1)
@@ -678,12 +636,8 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["code"], "not_dialogue_host")
 
     def test_talk_response_failure_and_silence_are_rejected(self):
-        host = create_object(NPC, key="南門守衛", location=self.room1)
-        from typeclasses.components import OnboardingGuide
-
-        host.components.add(
-            OnboardingGuide.create(host, dialogue_key=GUARD_DIALOGUE_KEY)
-        )
+        host = create_object(NPC, key="公會職員", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
         with patch(
             "web.webclient.actions.exploration_actions.run_scripted_talk",
             side_effect=RuntimeError("boom"),
@@ -857,7 +811,6 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["code"], "schedule_blocked")
         self.assertIn("她現在正忙著", result["message"])
         talk.assert_not_called()
-        self.assertFalse(self.player.guide_progress)
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_busy_host_rejects_freeform_talk_before_any_seam_work(self):

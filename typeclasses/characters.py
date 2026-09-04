@@ -90,10 +90,6 @@ class PlayerCharacter(LivingEntity):
     guild_rank: str | None = AttributeProperty(default=None)
     quest_log: list = AttributeProperty(default=list)
     wallet: int = AttributeProperty(default=0)
-    onboarded: bool = AttributeProperty(default=False)
-    onboarding_beat: str | None = AttributeProperty(default=None)
-    guide_progress: dict = AttributeProperty(default=dict)
-    first_arrival_seen: bool = AttributeProperty(default=False)
     # Server-owned creation-wizard staging draft (webclient-character-creation-
     # ui D3). The single-writer rule is enforced by code review: every write
     # routes through world.rules.creation_wizard, which is the sole writer.
@@ -131,22 +127,6 @@ class PlayerCharacter(LivingEntity):
         """
         super().at_post_move(source_location, **kwargs)
         _schedule_action_options_after_move(self)
-
-    def at_look(self, target, **kwargs) -> str:
-        """Advance the arrival ``look`` beat after a successful look at the gate.
-
-        The onboarding service guards on room + state, so a look elsewhere (or a
-        look that fails) never advances the beat. On a successful advance the
-        guard-guidance prompt is appended to the returned look text.
-        """
-        look_string = super().at_look(target, **kwargs)
-        if not self.creation_pending:
-            from world.rules.onboarding import advance_beat
-
-            guidance = advance_beat(self)
-            if guidance:
-                look_string = f"{look_string}\n\n{guidance}"
-        return look_string
 
     def at_post_unpuppet(self, account=None, session=None, **kwargs) -> None:
         """Fire the logout epithet-nomination rest point (change G)."""

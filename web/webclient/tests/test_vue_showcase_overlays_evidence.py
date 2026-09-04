@@ -19,8 +19,8 @@ Test-to-requirement mapping (applied at archive):
 - ``webclient-component-showcase::the-full-overlays-are-complete-the-deferred-surfaces-are-absent-and-the-manifest-is-frozen``:
   ``test_vitest_overlays_family_suite_passes`` (every overlays SFC: settings
   `options.*` emission, creation wizard with the both-fields adult gate,
-  map overlay reusing B4's LocalMap, help overlay from the onboarding
-  content), ``test_component_coverage_gate_enforces_frozen_manifest`` (the
+  map overlay reusing B4's LocalMap and the static help overlay,
+  ``test_component_coverage_gate_enforces_frozen_manifest`` (the
   frozen manifest plus the gate's complete-set enforcement, including the
   deferred-absent assertions), ``test_overlays_family_stories_are_registered_in_showcase``
   (every overlays family story registered in the built static showcase), and
@@ -67,7 +67,6 @@ OVERLAYS_STORY_IDS = {
     "overlays-settingsoverlay--html-narrative",
     "overlays-settingsoverlay--colorblind",
     "overlays-helpoverlay--default",
-    "overlays-helpoverlay--bare",
     "overlays-creationoverlay--default",
     "overlays-creationoverlay--preset-draft",
     "overlays-creationoverlay--custom-draft",
@@ -193,7 +192,7 @@ class VueShowcaseOverlaysEvidenceTest(unittest.TestCase):
         creation wizard's presets/custom/concept sub-states with the
         both-fields adult gate and `creation.*` intents, the map overlay
         reusing B4's LocalMap (lattice states, legend, detail line,
-        actionable nodes), the help overlay's onboarding-backed content, and
+        actionable nodes), the help overlay's static control reference, and
         the deferred-absent / frozen-manifest contract test in the same
         directory — each asserted only from the mock OOB payloads (no
         invented data).

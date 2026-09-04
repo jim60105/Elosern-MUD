@@ -37,7 +37,7 @@ from web.webclient.presentation.registry import build_production_registry
 from world.art.queue import claim, ensure, record_key, settle
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
-from world.onboarding.guide_dialogue import GUILD_STAFF_DIALOGUE_KEY
+from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
 from world.rules.combat_session import engage
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 

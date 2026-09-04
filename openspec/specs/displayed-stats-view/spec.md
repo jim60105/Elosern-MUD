@@ -68,9 +68,8 @@ The displayed-stats block SHALL therefore render true values for such entities.
 
 ### Requirement: look <target> appends the displayed-stats block, room look never does
 The shared target-appearance path used by the text `look` command (「看 <對象>」) SHALL append
-`display_stat_block(target)` after the target's description and before any onboarding guidance when
-the target is a living entity. Bare `look` (the room) SHALL append nothing. The onboarding
-`at_look` arrival beat SHALL be unaffected: the block SHALL NOT change beat detection or progress.
+`display_stat_block(target)` after the target's description when
+the target is a living entity. Bare `look` (the room) SHALL append nothing.
 
 #### Scenario: Text look at a living target includes the block
 - **WHEN** a player uses 「看 <目標>」 on a present NPC, player character, or monster
@@ -79,12 +78,6 @@ the target is a living entity. Bare `look` (the room) SHALL append nothing. The 
 #### Scenario: Text look at the room omits the block
 - **WHEN** a player uses 「看」 with no argument
 - **THEN** the room appearance is unchanged and contains no displayed-stats block
-
-#### Scenario: The onboarding look beat still completes
-- **WHEN** an onboarding actor at the South Gate uses 「看 衛兵」 while the arrival look beat is
-  active
-- **THEN** the look completes the beat as before and the displayed-stats block is present without
-  altering the guidance text or beat progression
 
 ### Requirement: explore.look shows the identical displayed-stats block
 The WebClient `explore.look` action's target detail SHALL route through the same shared

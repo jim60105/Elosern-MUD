@@ -35,7 +35,7 @@ from world.ai.npc_dialogue import (
 )
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
-from world.onboarding.guide_dialogue import GUILD_STAFF_DIALOGUE_KEY
+from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
 from world.rules.affinity import apply_affinity_change
 from world.rules.npc_intents import is_stale_context
 

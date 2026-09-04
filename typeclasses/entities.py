@@ -105,8 +105,8 @@ class LivingEntity(ComponentHolderMixin, ObjectParent, DefaultCharacter):
         entity has at least one valid displayed row; the flattened persona
         block (including 背景 when present) appears when the entity's persona
         record has content. Entities without a persona (e.g. monsters) render
-        no persona block, and the onboarding look beat is untouched (the blocks
-        are part of the appearance, not of beat detection).
+        no persona block (the blocks are part of the appearance, never
+        gating any behavior).
         The composed full title (title-system D6) adds one ``稱號：…`` line
         between the stats block and the persona block whenever the entity
         occupies a title slot; an untitled entity — or one whose title state

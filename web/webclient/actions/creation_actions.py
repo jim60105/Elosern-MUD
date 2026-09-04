@@ -8,7 +8,8 @@ each adapter re-resolves the owning account from the authenticated session's
 puppet, verifies that the puppet is an owned ``PlayerCharacter`` still pending
 creation, and calls only the public deterministic creation-wizard APIs
 (``save_preset_draft``, ``save_custom_draft``, ``activate_draft``,
-``clear_draft``) plus the unchanged onboarding relocation/arrival functions.
+``clear_draft``). Activation performs no relocation: the character stays in
+虛境.
 ``creation.concept`` writes nothing persistent at all: the validated proposal
 lands only in the session-scoped transient slot the presentation layer renders
 onto the creation panel (retool-concept-transient-fill D1). No adapter assigns
@@ -656,16 +657,9 @@ def _creation_activate_adapter(actor: Any, payload: dict[str, Any], session: Any
         result = activate_draft(account, actor)
     except CharacterCreationError as error:
         return _rejected(error)
-    from world.rules.onboarding import (
-        maybe_play_arrival,
-        relocate_to_starting_location,
-    )
-
-    relocate_to_starting_location(actor)
     actor.msg(
         f"角色 {result.display_name} 已建立，初始魔力為 {result.magic_power}。"
     )
-    maybe_play_arrival(actor)
     message = f"角色 {result.display_name} 已建立，初始魔力為 {result.magic_power}。"
     # No affected panels: the dispatcher publishes a full snapshot so the mode
     # change to exploration and every panel replacement are one atomic hand-off.

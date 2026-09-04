@@ -101,8 +101,6 @@
         "world.rules.tests.test_npc_intents",
         "world.rules.tests.test_npc_schedule_runtime",
         "world.rules.tests.test_npc_schedules",
-        "world.rules.tests.test_onboarding",
-        "world.rules.tests.test_onboarding_journey",
         "world.rules.tests.test_ordered_level_trait",
         "world.rules.tests.test_overwhelm_compression",
         "world.rules.tests.test_overwhelm_resolution",
@@ -159,13 +157,12 @@
     },
     {
       "index": 4,
-      "name": "quests-skills-art-ai-onboarding-lore",
+      "name": "quests-skills-art-ai-lore",
       "labels": [
         "world.quests",
         "world.skills",
         "world.art",
         "world.ai",
-        "world.onboarding",
         "world.lore"
       ]
     },

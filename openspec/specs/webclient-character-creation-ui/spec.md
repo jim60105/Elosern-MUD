@@ -216,15 +216,11 @@ The creation service SHALL reject missing, malformed, `age < 18`, and `apparent_
 - **THEN** exact-schema validation or the deterministic service rejects before activation and the character remains pending
 
 ### Requirement: Activation is all-or-nothing and hands off to exploration
-Successful `creation.activate` SHALL remain all-or-nothing for character state: either the pending gate is removed with the full deterministic initialization committed, or the character stays pending with no partial trait, identity, or progression state. After a committed activation the adapter SHALL reuse the unchanged best-effort relocation to 聖潔王都南門 and the onboarding arrival behavior, and SHALL publish a full `exploration` snapshot so the browser atomically replaces the creation dock. A failed relocation SHALL preserve the activated state and report the existing explanatory degradation rather than reopening creation with a partially mutated character. The creation adapters SHALL NOT publish an affected-panel set that leaves the shell in creation mode after a successful activation.
+Successful `creation.activate` SHALL remain all-or-nothing for character state: either the pending gate is removed with the full deterministic initialization committed, or the character stays pending with no partial trait, identity, or progression state. After a committed activation the character SHALL remain in 虛境 (its unchanged default home — activation performs no relocation and no arrival behavior), and the adapter SHALL publish a full `exploration` snapshot so the browser atomically replaces the creation dock. The creation adapters SHALL NOT publish an affected-panel set that leaves the shell in creation mode after a successful activation.
 
 #### Scenario: Successful activation moves the shell to exploration
-- **WHEN** `creation.activate` commits and the South Gate exists
-- **THEN** the full snapshot mode is `exploration`, the creation dock unloads, the character stands at the South Gate with the onboarding arrival behavior unchanged, and `creation_pending` is false
-
-#### Scenario: Failed relocation preserves activated state
-- **WHEN** `creation.activate` commits but the South Gate relocation fails
-- **THEN** the character remains activated, `creation_pending` is false, the player receives the existing degradation notice, and creation is not reopened
+- **WHEN** `creation.activate` commits
+- **THEN** the full snapshot mode is `exploration`, the creation dock unloads, the character stands in 虛境 with no relocation performed, and `creation_pending` is false
 
 #### Scenario: A failed activation transaction leaves the character pending
 - **WHEN** a write failure is injected into the activation transaction

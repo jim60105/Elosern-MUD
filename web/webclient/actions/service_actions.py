@@ -344,8 +344,6 @@ def _quest_turnin_adapter(actor: Any, payload: dict[str, Any], session: Any = No
         f"功績 {result['merit']} 與道具 {result['items']}。"
     )
     actor.msg(message)
-    if result.get("onboarding_completed"):
-        actor.msg("你的第一個日子在這裡圓滿結束。冒險者，歡迎正式踏入伊洛瑟恩大陸。")
     return _success("claimed", message, AFFECTED_TURNIN)
 
 

@@ -10,12 +10,11 @@ from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
-from typeclasses.components import GuildStaff, OnboardingGuide, ScriptedDialogue
+from typeclasses.components import GuildStaff, ScriptedDialogue
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from commands.talk import CmdsTalk
-from world.onboarding.guide_dialogue import (
-    GUARD_DIALOGUE_KEY,
+from world.rules.dialogue import (
     GUILD_STAFF_DIALOGUE_KEY,
     GUILD_STAFF_TURNIN_KEYWORD,
 )
@@ -89,16 +88,14 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         self.assertEqual(self.char1.db.wallet, 0)  # listing never settles
 
     @covers_requirement("guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host")
-    def test_talk_turnin_with_quest_id_settles_once_and_completes_onboarding(self):
+    def test_talk_turnin_with_quest_id_settles_once(self):
         from commands.guild import CmdGuildAccept
 
         self.call(CmdGuildAccept(), "introductory_hunt", "你接取了任務")
         quest_id = self._complete_intro_hunt()
         output = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}")
         self.assertIn("你回報了任務", output)
-        self.assertIn("你的第一個日子在這裡圓滿結束", output)
         self.assertEqual(self.char1.db.wallet, 50)
-        self.assertTrue(self.char1.onboarded)
         second = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}")
         self.assertIn("無法回報任務", second)
         self.assertEqual(self.char1.db.wallet, 50)
@@ -117,15 +114,6 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         output = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD}", caller=unregistered)
         self.assertIn("guild register", output)
         self.assertNotIn("可以交回", output)
-
-    @covers_requirement("scripted-dialogue::scripted-dialogue-hosts-answer-authored-talk-lines")
-    def test_turnin_keyword_on_the_guard_is_an_unknown_keyword(self):
-        guard = create_object(NPC, key="南門守衛", location=self.hall)
-        guard.components.add(
-            OnboardingGuide.create(guard, dialogue_key=GUARD_DIALOGUE_KEY)
-        )
-        output = self.call(CmdsTalk(), f"南門守衛 {GUILD_STAFF_TURNIN_KEYWORD}")
-        self.assertIn("明白", output)
 
     @covers_requirement("guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host")
     def test_turnin_with_ambiguous_staff_is_rejected(self):
@@ -181,7 +169,6 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         output = self.call(CmdsTalk(), "公會職員 公會")
         self.assertIn("她現在正忙著，沒有理會你。", output)
         self.assertEqual(self.staff.relations.affinity_for(self.char1), before)
-        self.assertNotIn("公會", (self.char1.guide_progress or {}).get("seen_keywords", []))
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_busy_host_blocks_the_turnin_keyword_without_a_claim(self):

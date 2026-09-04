@@ -38,9 +38,8 @@ def render_pending_character_login(account, session=None):
 
     This is the single login coordinator for a pending character: it sends the
     immutable world introduction (design.md D2/D3) followed by the reusable
-    no-argument ``character`` presentation (design.md D6). The ``onboarding-guide``
-    change extends this same function for activated characters rather than adding
-    a second hook.
+    no-argument ``character`` presentation (design.md D6). Activated accounts
+    get neither screen — reconnect performs no relocation or arrival playback.
     """
     from commands.character_creation import creation_start_screen
     from world.intro import WORLD_INTRODUCTION
@@ -171,21 +170,15 @@ class Account(DefaultAccount):
         Calls the parent hook first so Evennia's default login flow (protocol
         flags, connect channel, auto-puppeting) is preserved. The introduction
         and creation start screen are rendered only while the auto-created
-        character is still pending creation; activated accounts receive neither.
-        This is the single login coordinator that ``onboarding-guide`` extends.
+        character is still pending creation; activated accounts receive neither,
+        so reconnecting is pure "stay where you are": the character remains at
+        its persisted location and nothing teleports it.
         """
         super().at_post_login(session=session, **kwargs)
         pending = _pending_character(self)
         if pending is not None:
             render_pending_character_login(self, session=session)
             return
-        from world.rules.onboarding import maybe_play_arrival
-
-        puppet = self.get_puppet(session)
-        if puppet is not None:
-            maybe_play_arrival(puppet)
-
-    pass
 
 
 class Guest(DefaultGuest):

@@ -77,7 +77,6 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         destination = create_object(InstanceRoom, key="目的地")
         destination.db.pin_reasons = ["quest:1:q1:stage:0"]
         exit_obj = create_object(Exit, key="door", location=self.room1, destination=destination)
-        self.char1.guide_progress = {"state": "active", "seen_keywords": []}
         before = get_world_clock().tick
         with patch.object(WorldClock, "advance", _failing_advance):
             with self.assertRaises(RuntimeError):
@@ -91,7 +90,6 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         self.assertEqual(get_world_clock().tick, before)
         with self.assertRaises(KnowledgeError):
             parse_knowledge(self.char1)
-        self.assertEqual(self.char1.guide_progress, {"state": "active", "seen_keywords": []})
         self.assertEqual(self.char1.attributes.get("quest_log"), [])
         # The destination room's quest-observation surfaces were restored: the
         # arrival set ``interacted`` inside the rolled-back move, so the value
@@ -103,10 +101,15 @@ class MovementSettlementPlainExitTests(EvenniaTest):
     def test_failure_after_companions_move_returns_every_companion(self):
         npc = self._companion()
         exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
-        with patch(
-            "world.rules.onboarding.observe_room_entry",
-            side_effect=RuntimeError("room-entry observer failed"),
-        ):
+        import world.rules.party as party_module
+
+        real_follow = party_module.follow_companions
+
+        def follow_then_raise(*args, **kwargs):
+            real_follow(*args, **kwargs)
+            raise RuntimeError("post-follow step failed")
+
+        with patch("world.rules.party.follow_companions", side_effect=follow_then_raise):
             with self.assertRaises(RuntimeError):
                 exit_obj.at_traverse(self.char1, self.room2)
         self.assertIs(self.char1.location, self.room1)
@@ -146,7 +149,6 @@ class MovementSettlementPlainExitTests(EvenniaTest):
                 f"room:{int(self.room2.pk)}": {"first_seen_tick": 5, "last_seen_tick": 5}
             },
         }
-        self.char1.db.guide_progress = {"state": "skipped", "seen_keywords": []}
         self.char1.db.quest_log = [{"quest_id": "divergent"}]
         self.room2.db.interacted = True
         self.room2.db.pin_reasons = ["divergent"]
@@ -157,13 +159,12 @@ class MovementSettlementPlainExitTests(EvenniaTest):
         self.assertNotIn(self.char1, self.room2.contents)
         visits = {visit.node_id for visit in parse_knowledge(self.char1)}
         self.assertEqual(visits, {f"room:{int(self.room1.pk)}"})
-        self.assertEqual(self.char1.attributes.get("guide_progress"), {})
         self.assertEqual(self.char1.attributes.get("quest_log"), [])
         self.assertFalse(self.room2.db.interacted)
         self.assertIsNone(self.room2.attributes.get("pin_reasons"))
         self.assertEqual(get_world_clock().tick, before)
 
-    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-companion-following-and-onboarding-as-one-coherent-transaction")
+    @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-and-companion-following-as-one-coherent-transaction")
     def test_npc_traversal_passes_through_the_boundary_without_surfaces(self):
         npc = create_object(NPC, key="npc", location=self.room1)
         exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
@@ -244,10 +245,15 @@ class MovementSettlementWildernessTests(EvenniaTest):
         join_party(npc, self.char1)
         before_tick = get_world_clock().tick
         before_bookkeeping = self._bookkeeping()
-        with patch(
-            "world.rules.onboarding.observe_room_entry",
-            side_effect=RuntimeError("room-entry observer failed"),
-        ):
+        import world.rules.party as party_module
+
+        real_follow = party_module.follow_companions
+
+        def follow_then_raise(*args, **kwargs):
+            real_follow(*args, **kwargs)
+            raise RuntimeError("post-follow step failed")
+
+        with patch("world.rules.party.follow_companions", side_effect=follow_then_raise):
             with self.assertRaises(RuntimeError):
                 self.gate.at_traverse(self.char1, self.north_gate)
         self.assertIs(self.char1.location, self.north_gate)

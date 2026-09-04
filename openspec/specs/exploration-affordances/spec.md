@@ -29,7 +29,7 @@ panel presenter and the `context_actions` exploration presenter. Every emitted e
 `explore.move` SHALL be emitted once per present, traversable Exit with a bounded localized label;
 `explore.look` SHALL be emitted per present non-exit object with `{"target_id": int}`;
 `explore.talk_scripted` SHALL be emitted once per authored keyword of a present dialogue host
-(resolved `OnboardingGuide` or `ScriptedDialogue` component), `explore.talk_freeform` SHALL be
+(resolved `ScriptedDialogue` component), `explore.talk_freeform` SHALL be
 emitted once per present `LLMNPC`, `explore.party_invite` SHALL follow the existing party-bound
 and full-party rules and `explore.party_leave` the companion-bound rule, `explore.engage` SHALL be
 emitted once per present `Monster` (a living monster yields `enabled` true; a dead monster yields

@@ -39,27 +39,22 @@ def after_successful_movement(
 ) -> None:
     """Complete a successful traversal through the shared movement boundary.
 
-    Runs the success-path sequence every exit lineage shares (onboarding-skip
-    coverage design D1): charge the ``cost_key`` clock cost, record the
-    destination map-knowledge node, move co-located companions, and finally run
-    the onboarding room-entry observer so any arrival outside the guided
-    corridor — plain ``Room``, ``GridRoom``, ``TerrainRoom``, or
-    ``InstanceRoom`` — marks the guide skipped. ``charge_movement``,
-    ``record_arrival``, and ``follow_companions`` are internally no-ops for
-    anything that is not a ``PlayerCharacter``; ``charge_movement`` can raise
-    when ``WorldClock.advance`` fails — the movement-settlement boundary
-    (movement-settlement-atomicity design D1) compensates that failure — and
-    ``record_arrival``/``follow_companions`` are exception-isolated. The
-    onboarding observer is player-gated and idempotent, so the helper is safe
-    to call on any successful traversal from any path. The action-options
-    trigger is owned by ``PlayerCharacter.at_post_move`` (the shared post-move
-    lifecycle), which every successful hooks-enabled relocation — ordinary
-    traversal and direct ``move_to()`` alike — reaches (action-options-wiring-
-    hardening design D2).
+    Runs the success-path sequence every exit lineage shares: charge the
+    ``cost_key`` clock cost, record the
+    destination map-knowledge node, and move co-located companions.
+    ``charge_movement``, ``record_arrival``, and ``follow_companions`` are
+    internally no-ops for anything that is not a ``PlayerCharacter``;
+    ``charge_movement`` can raise when ``WorldClock.advance`` fails — the
+    movement-settlement boundary (movement-settlement-atomicity design D1)
+    compensates that failure — and ``record_arrival``/``follow_companions``
+    are exception-isolated, so the helper is safe to call on any successful
+    traversal from any path. The action-options trigger is owned by
+    ``PlayerCharacter.at_post_move`` (the shared post-move lifecycle), which
+    every successful hooks-enabled relocation — ordinary traversal and direct
+    ``move_to()`` alike — reaches (action-options-wiring-hardening design D2).
     """
     from world.rules.map_knowledge import record_arrival
     from world.rules.movement import charge_movement
-    from world.rules.onboarding import observe_room_entry
     from world.rules.party import follow_companions
 
     charge_movement(traversing_object, cost_key)
@@ -72,7 +67,6 @@ def after_successful_movement(
         wilderness_source_coordinates=wilderness_source_coordinates,
         wilderness_name=wilderness_name,
     )
-    observe_room_entry(traversing_object)
 
 
 class MovementCostMixin:
@@ -86,9 +80,8 @@ class MovementCostMixin:
     (design.md D-6); neither needs a guard here. On success the traversal runs
     ``after_successful_movement`` — charging the ``movement_cost_key`` cost,
     recording the destination node through ``world.rules.map_knowledge.
-    record_arrival`` (map-knowledge-minimap design D3), moving companions, and
-    running the onboarding room-entry observer (onboarding-skip coverage design
-    D1) — all no-ops for anything that is not a ``PlayerCharacter``.
+    record_arrival`` (map-knowledge-minimap design D3) and moving companions —
+    all no-ops for anything that is not a ``PlayerCharacter``.
 
     ``at_traverse`` is overridden ONLY to open the movement-settlement boundary
     (movement-settlement-atomicity design D5): the stock traversal, relocation,
@@ -181,9 +174,9 @@ class MovementCostMixin:
         ``DefaultExit`` nor ``XYZExit`` overrides ``at_traverse``, so the MRO
         reaches this mixin). The boundary (``settle_movement``) wraps the
         relocation, the clock charge, map-knowledge recording, companion
-        following, and the onboarding observer in one outer database
-        transaction and compensates every Evennia cache surface when any step
-        fails (movement-settlement-atomicity design D5).
+        following in one outer database transaction and compensates every
+        Evennia cache surface when any step fails
+        (movement-settlement-atomicity design D5).
         """
         stock_traversal = super().at_traverse
 
@@ -233,7 +226,7 @@ class WildernessGateExit(Exit):
     raising out of a traversal hook. A successful entry charges wilderness_move,
     records the destination ``wild:`` node
     (map-knowledge-minimap design D3), and completes through the shared
-    ``after_successful_movement`` boundary (onboarding-skip coverage design D1).
+    ``after_successful_movement`` boundary.
     The whole entry body runs inside the movement-settlement boundary
     (movement-settlement-atomicity design D5), so a failing charge returns the
     traverser to the grid room with every cache surface reconciled.
@@ -310,8 +303,8 @@ class WildernessReturnExit(WildernessExit):
     step is free (map-wilderness design.md D-6's correction note). Every
     successful step also records its destination node through
     ``record_arrival`` (map-knowledge-minimap design D3); both branches
-    complete through the shared ``after_successful_movement`` boundary
-    (onboarding-skip coverage design D1). Both branches run inside the
+    complete through the shared ``after_successful_movement`` boundary.
+    Both branches run inside the
     movement-settlement boundary (movement-settlement-atomicity design D5), and
     the return-branch falsy-return-with-relocation case (a ``move_to`` hook
     raising after relocation) is compensated as a failure.

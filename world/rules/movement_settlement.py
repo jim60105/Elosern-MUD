@@ -2,13 +2,12 @@
 
 Evennia persists a successful location change before ``Exit.at_post_traverse``
 runs, so a failing post-traverse step used to leave the player relocated with
-world time, map knowledge, companions, and onboarding state behind (security-
-audit run-3 finding index 2). ``settle_movement`` is the single outer boundary
-every project exit lineage opens in ``at_traverse``: one database transaction
-covers the Evennia relocation, the clock charge (``charge_movement``), the
-destination map-knowledge recording (``record_arrival``), companion following
-(``follow_companions``), and the onboarding room-entry observation
-(``observe_room_entry``) as one all-or-nothing unit. On any failure — an
+world time, map knowledge, and companions behind (security-audit run-3 finding
+index 2). ``settle_movement`` is the single outer boundary every project exit
+lineage opens in ``at_traverse``: one database transaction covers the Evennia
+relocation, the clock charge (``charge_movement``), the destination
+map-knowledge recording (``record_arrival``), and companion following
+(``follow_companions``) as one all-or-nothing unit. On any failure — an
 exception inside the transaction, an outer-commit failure, or a falsy
 wilderness-lineage return that relocated the traverser anyway — the already
 persisted relocation is compensated in a fixed deterministic order before the
@@ -56,16 +55,11 @@ from world.rules.clock import (
 from world.rules.party import _companion_co_located, live_companions
 from world.rules.surfaces import attribute_snapshot
 
-# Onboardable/move-observable attribute surfaces the settlement can write on
-# the traverser, snapshotted directly (the advance registry covers the
-# remainder). ``quest_log`` and the destination room's pin/state surfaces use
-# the quest module's own helpers so the two writers never drift.
-_TRAVERSER_SURFACES: tuple[str, ...] = (
-    "map_knowledge",
-    "guide_progress",
-    "onboarding_beat",
-    "first_arrival_seen",
-)
+# Move-observable attribute surfaces the settlement can write on the
+# traverser, snapshotted directly (the advance registry covers the remainder).
+# ``quest_log`` and the destination room's pin/state surfaces use the quest
+# module's own helpers so the two writers never drift.
+_TRAVERSER_SURFACES: tuple[str, ...] = ("map_knowledge",)
 
 
 @dataclass

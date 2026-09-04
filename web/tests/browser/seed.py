@@ -7,7 +7,7 @@ Run as a one-off process against a freshly migrated browser-test database:
 The harness runs ``evennia migrate`` first. This process then creates Account
 #1 (the superuser Evennia's launcher requires), an activated adult
 PlayerCharacter owned by that account, a start room, and places the character
-in it. The world bootstrap (lore sync, maps, clock, guard NPC) is left to the
+in it. The world bootstrap (lore sync, maps, clock) is left to the
 managed server's ``at_server_start`` hook. Everything is deterministic: no
 network service, no LLM, and no random sampling beyond the validated magic
 band seeded to its deterministic lower bound.
@@ -190,7 +190,7 @@ def _art_fixture(character, room) -> None:
 
     host = create_object(NPC, key="酒館老闆", location=art_room)
     from typeclasses.components import ScriptedDialogue
-    from world.onboarding.guide_dialogue import GUILD_STAFF_DIALOGUE_KEY
+    from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
 
     host.components.add(ScriptedDialogue.create(host, dialogue_key=GUILD_STAFF_DIALOGUE_KEY))
     # A named portrait policy on the dialogue host: the actor is excluded from
@@ -419,15 +419,15 @@ def _exploration_fixture(character) -> None:
     """Deterministically prepare an exploration-menu fixture (webclient-exploration-menu).
 
     Opted-in with ``ELOSERN_BROWSER_EXPLORATION=1``. Places the character at the
-    South Gate with the scripted-dialogue guard, a present ``LLMNPC`` whose
-    ``npc_dialogue`` profile is disabled offline, a living hostile monster, and
-    an onboarding state that lets a ``look`` advance the arrival beat. No
-    remote, LLM, or image service is involved.
+    South Gate with a scripted-dialogue guild-staff host (first present entity,
+    affinity-seeded so a look renders the stage line), a present ``LLMNPC``
+    bard whose ``npc_dialogue`` profile is disabled offline, a living hostile
+    monster, and a defeated monster. No remote, LLM, or image service is
+    involved.
     """
     from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
     from evennia.utils.create import create_object
-    from evennia.utils.search import search_object_by_tag
-    from typeclasses.components import OnboardingGuide, ScriptedDialogue
+    from typeclasses.components import ScriptedDialogue
     from typeclasses.monsters import Monster
     from typeclasses.npcs import LLMNPC, NPC
     from world.maps.bootstrap import (
@@ -435,43 +435,28 @@ def _exploration_fixture(character) -> None:
         sync_grid,
         sync_service_interiors,
     )
-    from world.onboarding.scenes import LOOK_BEAT_ID
     from world.rules.map_knowledge import record_arrival
-    from world.rules.onboarding import sync_guard_npc
 
     if os.environ.get("ELOSERN_BROWSER_EXPLORATION") != "1":
         return
 
     sync_grid()
     sync_service_interiors()
-    sync_guard_npc()
     south_gate = XYZRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
     if south_gate is None:
         return
     character.location = south_gate
-    character.onboarded = False
-    character.onboarding_beat = LOOK_BEAT_ID
-    character.guide_progress = {"state": "active", "seen_keywords": []}
-    character.first_arrival_seen = False
-    character.save()
     record_arrival(character)
 
-    guard = next(
-        (
-            obj
-            for obj in south_gate.contents
-            if isinstance(obj, NPC)
-            and getattr(obj, "components", None) is not None
-            and obj.components.has(OnboardingGuide.name)
-        ),
-        None,
-    )
-    if guard is not None:
-        from world.rules.affinity import AffinitySource, apply_affinity_change
+    # The scripted-talk host: an ordinary NPC carrying the guild_staff
+    # ScriptedDialogue table (created before the bard so it is the first
+    # present interact/look entity), affinity-seeded so a look renders the
+    # stage line.
+    host = create_object(NPC, key="公會職員", location=south_gate)
+    host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+    from world.rules.affinity import AffinitySource, apply_affinity_change
 
-        apply_affinity_change(
-            guard, character, AffinitySource.QUEST_COMPLETION, 50
-        )
+    apply_affinity_change(host, character, AffinitySource.QUEST_COMPLETION, 50)
 
     bard = create_object(LLMNPC, key="吟遊詩人", location=south_gate)
     bard.components.add(
@@ -514,7 +499,7 @@ def _exploration_fixture(character) -> None:
         ttl_seconds=3600,
     )
 
-    print("seeded exploration fixture: south gate + guard + LLMNPC + goblin + defeated wolf + cave (+ boot-provisioned 荒野 gate)")
+    print("seeded exploration fixture: south gate + scripted host + LLMNPC + goblin + defeated wolf + cave (+ boot-provisioned 荒野 gate)")
 
 
 def _options_surface_fixture(character) -> None:

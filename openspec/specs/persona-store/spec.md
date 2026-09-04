@@ -102,7 +102,7 @@ living entity's flattened persona block (including the `背景：` section when 
 background) when the player looks at themself, at another player character, or at an NPC, using the
 same code path for all three. Looking at the room or at an object SHALL NOT append any persona
 block. A record without any of the rendered fields renders nothing, so entities without a persona
-(e.g. monsters) are unchanged; the onboarding look beat and the displayed-stats block are
+(e.g. monsters) are unchanged; the displayed-stats block is
 unaffected.
 
 #### Scenario: Looking at yourself shows the persona block

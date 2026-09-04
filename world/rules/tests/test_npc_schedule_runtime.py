@@ -776,7 +776,6 @@ class StartupClockSourceOrderTests(BattlefieldIsolation, RegistryIsolationMixin,
             sync_guild_economy,
         )
         from world.rules.npc_schedules import sync_npc_schedules
-        from world.rules.onboarding import sync_guard_npc
 
         clock = get_world_clock()
         self.assertEqual(clock.tick, 0)
@@ -814,7 +813,6 @@ class StartupClockSourceOrderTests(BattlefieldIsolation, RegistryIsolationMixin,
             sync_service_interiors()
             sync_quest_runtime()
             sync_guild_economy()
-            sync_guard_npc()
             sync_npc_schedules()
             restore_persisted_sessions()
 

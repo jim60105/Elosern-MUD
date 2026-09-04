@@ -409,8 +409,6 @@ def turn_in_quest(
         npc.pk: attribute_snapshot(npc, "relations_data") for npc in companions
     }
 
-    onboarding_completed = False
-
     def writer():
         actor.db.wallet = int(actor.db.wallet or 0) + reward.copper
         actor.db.inventory = list(inventory_plan.after)
@@ -438,12 +436,6 @@ def turn_in_quest(
             raise_affinity_cap(npc, actor, new_cap)
         for npc in companions:
             apply_affinity_change(npc, actor, "quest_completion", companion_gain)
-        nonlocal onboarding_completed
-        if record.definition_key == "introductory_hunt" and not actor.onboarded:
-            from world.rules.onboarding import set_onboarded
-
-            set_onboarded(actor)
-            onboarding_completed = True
 
     def restore():
         from world.rules.surfaces import restore_attribute_best_effort
@@ -471,7 +463,6 @@ def turn_in_quest(
         "copper": reward.copper,
         "merit": reward.merit,
         "items": [str(item.item_key) for item in reward.items],
-        "onboarding_completed": onboarding_completed,
     }
 
 
