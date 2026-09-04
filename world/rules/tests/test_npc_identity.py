@@ -19,10 +19,13 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.npcs import LLMNPC, NPC
 from world.rules.npc_identity import (
+    MAX_NPC_NAME_CODE_POINTS,
     MAX_NPC_TITLE_CODE_POINTS,
+    NPCNameError,
     NPCTitleError,
     npc_display_name,
     npc_title_value,
+    validate_npc_name,
     validate_npc_title,
 )
 
@@ -115,8 +118,79 @@ class ValidateNPCTitleTests(unittest.TestCase):
                 )
 
 
+class ValidateNPCNameTests(unittest.TestCase):
+    """The shared authored-name rule (npc-title-authored-identities).
+
+    Traceability annotations are attached after the change's delta syncs
+    (tasks 6.2 fixes the canonical requirement IDs); behavior is pinned here.
+    """
+
+    def test_legal_name_round_trips_stripped(self):
+        self.assertEqual(validate_npc_name(" 黑鬍 "), "黑鬍")
+        self.assertEqual(
+            validate_npc_name(f"{_FULL_WIDTH_SPACE}雷加·鐵拳{_FULL_WIDTH_SPACE}"),
+            "雷加·鐵拳",
+        )
+
+    def test_interior_ordinary_whitespace_is_allowed(self):
+        # The single deliberate divergence from the title rule: multi-word
+        # names are legal entity keys and must validate untouched.
+        self.assertEqual(validate_npc_name("Jorn Urial"), "Jorn Urial")
+
+    def test_boundary_lengths_are_decided_exactly(self):
+        at_bound = "守" * MAX_NPC_NAME_CODE_POINTS
+        self.assertEqual(validate_npc_name(at_bound), at_bound)
+        with self.assertRaises(NPCNameError):
+            validate_npc_name(at_bound + "守")
+
+    def test_full_width_separator_is_rejected(self):
+        with self.assertRaises(NPCNameError):
+            validate_npc_name(f"南門{_FULL_WIDTH_SPACE}守衛")
+
+    def test_control_and_nonprintable_characters_are_rejected(self):
+        for value in ("雷加\x00拳", "雷加\x1b拳", "雷加\u200b拳"):
+            with self.subTest(value=value):
+                with self.assertRaises(NPCNameError):
+                    validate_npc_name(value)
+
+    def test_markup_delimiter_is_rejected(self):
+        with self.assertRaises(NPCNameError):
+            validate_npc_name("|r雷加|n")
+
+    def test_non_text_values_are_rejected(self):
+        for value in (None, 42, True, False, 3.5, ["雷加"], {"n": "雷加"}):
+            with self.subTest(value=value):
+                with self.assertRaises(NPCNameError):
+                    validate_npc_name(value)
+
+    def test_empty_and_whitespace_only_values_are_rejected(self):
+        for value in ("", "   ", _FULL_WIDTH_SPACE, " \t\u3000 "):
+            with self.subTest(value=value):
+                with self.assertRaises(NPCNameError):
+                    validate_npc_name(value)
+
+    def test_rejection_messages_are_stable_english_identifiers(self):
+        cases = {
+            123: "npc name must be text",
+            "  ": "npc name must be non-empty after stripping",
+            "守" * (MAX_NPC_NAME_CODE_POINTS + 1): "npc name must be at most",
+            f"南{_FULL_WIDTH_SPACE}門": "npc name contains the identity separator",
+            "雷\x00加": "npc name contains a control character",
+            "雷|加": "npc name contains an Evennia markup delimiter",
+        }
+        for value, expected in cases.items():
+            with self.subTest(value=repr(value)):
+                with self.assertRaises(NPCNameError) as caught:
+                    validate_npc_name(value)
+                self.assertIn(expected, str(caught.exception))
+                self.assertTrue(
+                    all(ord(char) < 128 for char in str(caught.exception))
+                )
+
+
 class NPCTitleComposerTests(EvenniaTest):
     """The single deterministic composer and the pure-read invariant."""
+
 
     def setUp(self):
         super().setUp()

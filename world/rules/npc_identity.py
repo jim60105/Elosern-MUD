@@ -35,9 +35,18 @@ _FULL_WIDTH_SPACE = "\u3000"
 # identity stays inside the webclient display-name bound (128).
 MAX_NPC_TITLE_CODE_POINTS = 32
 
+# Upper bound, in code points, of the validator's stripped name form. It
+# matches the entity-key bound the authored name becomes (MAX_ENTITY_KEY_LENGTH
+# is 64), so a spawned NPC's key always round-trips through the name rule.
+MAX_NPC_NAME_CODE_POINTS = 64
+
 
 class NPCTitleError(ValueError):
     """A proposed NPC title violates the single-line plain-text contract."""
+
+
+class NPCNameError(ValueError):
+    """A proposed NPC name violates the entity-key-safe text contract."""
 
 
 def validate_npc_title(value: Any) -> str:
@@ -72,6 +81,49 @@ def validate_npc_title(value: Any) -> str:
     if "|" in title:
         raise NPCTitleError("npc title contains an Evennia markup delimiter")
     return title
+
+
+def validate_npc_name(value: Any) -> str:
+    """Normalize and validate an authored NPC name, returning the stripped form.
+
+    The authored name is the NPC's entity key on every authored creation path
+    (blueprint materialization, registry-backed host or examiner), so the rule
+    is the title rule minus its strictest clause: surrounding whitespace (of
+    any kind, U+3000 included) is normalized away and every rejection decision
+    is made on the stripped form; a non-``str`` value, an empty stripped form,
+    a stripped form longer than :data:`MAX_NPC_NAME_CODE_POINTS` code points,
+    any control or non-printable character, and the Evennia markup delimiter
+    ``|`` all raise :class:`NPCNameError` with a stable English identifier.
+
+    Unlike :func:`validate_npc_title`, ordinary whitespace INSIDE the name is
+    allowed (multi-word names are legal entity keys today; tightening them
+    here would rewrite the pre-existing key contract for no identity-safety
+    gain). The full-width separator U+3000 is the one rejected whitespace:
+    it belongs to the composer, and a name carrying it would make a composed
+    「姓名　稱號」 identity impossible to parse back into its parts.
+    """
+    if not isinstance(value, str):
+        raise NPCNameError("npc name must be text")
+    name = value.strip()
+    if not name:
+        raise NPCNameError("npc name must be non-empty after stripping")
+    if len(name) > MAX_NPC_NAME_CODE_POINTS:
+        raise NPCNameError(
+            f"npc name must be at most {MAX_NPC_NAME_CODE_POINTS} code points"
+        )
+    if _FULL_WIDTH_SPACE in name:
+        # Checked before the control scan: Python reports U+3000 as
+        # non-printable (category Zs), and the separator rejection carries its
+        # own stable identifier instead of the generic control-character one.
+        raise NPCNameError("npc name contains the identity separator")
+    if any(
+        unicodedata.category(char).startswith("C") or not char.isprintable()
+        for char in name
+    ):
+        raise NPCNameError("npc name contains a control character")
+    if "|" in name:
+        raise NPCNameError("npc name contains an Evennia markup delimiter")
+    return name
 
 
 def _title_is_plain_text(title: str) -> bool:

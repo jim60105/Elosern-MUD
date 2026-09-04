@@ -23,10 +23,10 @@ NPC-title 批次的最後一件。
 
 ## 1. Shared name rule
 
-- [ ] 1.1 在 `world/rules/npc_identity.py` 新增 `MAX_NPC_NAME_CODE_POINTS = 64` 與
+- [x] 1.1 在 `world/rules/npc_identity.py` 新增 `MAX_NPC_NAME_CODE_POINTS = 64` 與
   `validate_npc_name(value) -> str`（design D3 規則：`str`、strip 後 1–64 code points、拒控制字元、
   拒 `|`、拒全形空格 U+3000、允許一般 ASCII 空白；回傳 strip 後正規形），module scope 維持 stdlib-only。
-- [ ] 1.2 在 `world/rules/tests/` 的 npc_identity 測試模組補 `validate_npc_name` 邊界測試
+- [x] 1.2 在 `world/rules/tests/` 的 npc_identity 測試模組補 `validate_npc_name` 邊界測試
   （空、過長、控制字元、`|`、U+3000、含一般空白允許、strip 正規形）。
   Focused：`MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules.tests`
 
