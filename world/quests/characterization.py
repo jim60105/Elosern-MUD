@@ -45,9 +45,10 @@ MAX_STABLE_KEY_LENGTH = MAX_SUBJECT_KEY_LENGTH
 # field bound (fix-custom-creation-information-and-background D7): a generated
 # NPC's flavor text must always fit the read-only ``PersonaStore`` contract so
 # the look appearance path can render it unchanged. The value mirrors
-# ``world.rules.character_creation.MAX_PERSONA_FIELD_LENGTH``; this module
-# cannot import ``world.rules`` (the shared-helper purity contract), so a
-# parity contract pins the two numbers together.
+# ``world.rules.character_creation.MAX_PERSONA_FIELD_LENGTH``; under the
+# shared-helper purity contract this module's only ``world.rules`` dependency
+# is ``world.rules.npc_identity``, so the persona bound is mirrored locally
+# and a parity contract pins the two numbers together.
 MAX_PERSONA_FIELD_LENGTH = 600
 PERSONA_PROSE_KEYS = ("personality", "life_story", "habit")
 
