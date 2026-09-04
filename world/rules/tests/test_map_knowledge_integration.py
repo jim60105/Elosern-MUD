@@ -77,14 +77,15 @@ class MapKnowledgeSeamTests(EvenniaTest):
 
     @covers_requirement("map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams")
     def test_limbo_bridge_records_grid_node(self):
-        from world.maps.bootstrap import EXIT_TO_CITY
+        from world.maps.city_gates import CITY_GATE_REGISTRY
 
+        row = CITY_GATE_REGISTRY["capital_altoria"]
         limbo = create_object(Room, key="LimboBridge", location=None)
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         bridge = create_object(
             Exit,
-            key=EXIT_TO_CITY["key"],
-            aliases=EXIT_TO_CITY["aliases"],
+            key=row.exit_key,
+            aliases=list(row.exit_aliases),
             location=limbo,
             destination=south_gate,
         )

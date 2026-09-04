@@ -29,6 +29,51 @@ class Room(ObjectParent, DefaultRoom):
     pass
 
 
+class LimboRoom(Room):
+    """The starting room (虛境) as the one-way threshold's hard gate.
+
+    Layer 2 of the one-way guarantee (limbo-one-way-gates design D4,
+    design doc §4 amended): ``sync_limbo()`` converges the starting room onto
+    this typeclass, and the entry hook refuses every non-superuser character
+    arrival. Overriding ``at_pre_object_receive`` covers every supported
+    relocation path because Evennia 6.1.0 ``DefaultObject.move_to`` calls it on
+    the destination as an abort hook for all of them — ordinary exit traversal,
+    teleport, and ``moveto``-style moves alike (objects.py ``move_to``
+    pre-hooks). Raw ORM-level ``db_location`` writes are an out-of-band
+    admin/DBA surface, not a supported relocation path.
+
+    Refusing via ``arriving_object.msg`` plus ``False`` means the stock exit
+    path would also append its English ``at_failed_traverse`` line;
+    ``typeclasses.exits`` suppresses exactly that one case (the
+    ``limbo_refused`` marker) so the refusal stays a single localized sentence.
+    Superuser-governed arrivals pass (builder/debug convention, mirroring the
+    exit lock-bypass).
+    """
+
+    LIMBO_REFUSAL_MSG = "虛境的霧氣在你面前凝結成一道無聲的牆——返回門檻之路已經關閉。"
+
+    def at_pre_object_receive(self, arriving_object, source_location=None, **kwargs):
+        from typeclasses.characters import Character
+
+        if isinstance(arriving_object, Character) and not self._is_superuser_governed(
+            arriving_object
+        ):
+            arriving_object.msg(self.LIMBO_REFUSAL_MSG)
+            # Mark the shared exit seam so the stock English failure line is
+            # suppressed for this refusal only (typeclasses/exits.py).
+            arriving_object.ndb.limbo_refused = True
+            return False
+        return super().at_pre_object_receive(arriving_object, source_location, **kwargs)
+
+    @staticmethod
+    def _is_superuser_governed(moving_object) -> bool:
+        """Mirror the repo's admin convention (``typeclasses/exits.py``)."""
+        if getattr(moving_object, "is_superuser", False):
+            return True
+        account = getattr(moving_object, "account", None)
+        return bool(getattr(account, "is_superuser", False))
+
+
 class SceneArchetypeMixin:
     """The design doc D10/§8 seam: which SceneArchetype (change 22, unbuilt) a
     room's scene art should use. Not validated against any registry here -- see

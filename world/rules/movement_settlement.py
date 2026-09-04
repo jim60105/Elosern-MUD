@@ -281,6 +281,7 @@ def _compensate(snapshot: MovementSnapshot) -> None:
     never masks the original traversal failure.
     """
     _compensate_traverser(snapshot)
+    _compensate_home(snapshot)
     _compensate_companions(snapshot)
     _restore_wilderness_bookkeeping(snapshot)
     _restore_surfaces(snapshot)
@@ -327,6 +328,39 @@ def _compensate_traverser(snapshot: MovementSnapshot) -> None:
             },
         )
         _force_reconcile_location(traverser, snapshot.source_location)
+
+
+def _compensate_home(snapshot: MovementSnapshot) -> None:
+    """Reconcile the live traverser's ``home`` after the outer rollback.
+
+    The one-way-gate re-anchor (limbo-one-way-gates D7) may have written the
+    traverser's durable ``home`` FK before a later settlement step raised; the
+    outer rollback reverted the row but the live object keeps its in-memory
+    relation — the same rollback-stale surface class ``db_location`` is treated
+    as. The authoritative value is re-read from the rolled-back row and applied
+    in-memory only (never a re-assign through the property, which would
+    re-save a row the writer did not end up touching).
+    """
+    from evennia.objects.models import ObjectDB
+    from typeclasses.characters import PlayerCharacter
+
+    traverser = snapshot.traverser
+    if not isinstance(traverser, PlayerCharacter):
+        return
+    try:
+        row_home = ObjectDB.objects.filter(id=traverser.id).values_list(
+            "db_home_id", flat=True
+        ).first()
+        if traverser.db_home_id != row_home:
+            traverser.db_home_id = row_home
+    except Exception as error:
+        # A home that cannot be reconciled is a diagnostic, never a mask of
+        # the original traversal failure (mirrors every other step here).
+        log_warn(
+            "rollback_restore_failed",
+            exc=error,
+            context={"obj": str(traverser), "surface": "home"},
+        )
 
 
 def _compensate_companions(snapshot: MovementSnapshot) -> None:

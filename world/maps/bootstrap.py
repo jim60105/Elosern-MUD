@@ -1,20 +1,23 @@
 """Idempotent grid and wilderness bootstrap: spawn the sample city, bridge it to
-Limbo, and provision the wilderness layer and one grid-side gate exit per
-registered gate (map-wilderness, wilderness-anchor-footprint)."""
+Limbo with one-way registry gates, and provision the wilderness layer and one
+grid-side gate exit per registered gate (map-wilderness,
+wilderness-anchor-footprint, limbo-one-way-gates)."""
 
 from evennia.contrib.grid.xyzgrid.xyzgrid import get_xyzgrid
 from evennia.contrib.grid.wilderness.wilderness import (
     WildernessScript,
     create_wilderness,
 )
+from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object
 
-from world.observability import log_warn
+from world.observability import log_info, log_warn
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import GridRoom, Room
 from world.lore.wilderness_entry import OPPOSITE_DIRECTION, WILDERNESS_ENTRY_REGISTRY
 from world.maps.altoria_capital import XYMAP_DATA_LIST
+from world.maps.city_gates import CITY_GATE_REGISTRY
 from world.maps.instance import register_instance_reclamation
 from world.maps.limbo import (
     LIMBO_ALIAS,
@@ -30,6 +33,10 @@ from world.maps.wilderness_provider import (
 
 SOUTH_GATE_XYZ = (2, 0, "capital_altoria")
 NORTH_GATE_XYZ = (2, 4, "capital_altoria")
+
+# The hard-gate starting-room typeclass (limbo-one-way-gates D4). Referenced
+# by module path so bootstrap never imports typeclasses.rooms' subclasses.
+LIMBO_ROOM_TYPECLASS = "typeclasses.rooms.LimboRoom"
 
 # Permanent service interiors (guild-economy D-9). They are ordinary permanent
 # rooms OUTSIDE the xyzgrid node count, linked bidirectionally to their
@@ -122,15 +129,6 @@ def sync_service_interiors() -> None:
         ["general store", "store", "shop"],
     )
 
-EXIT_TO_CITY = {
-    "key": "南門",
-    "aliases": ["王都", "城門"],
-}
-EXIT_TO_LIMBO = {
-    "key": "離開王都",
-    "aliases": ["回虛境"],
-}
-
 
 def sync_limbo() -> None:
     """Converge the starting room (Limbo) onto its zh-tw identity idempotently.
@@ -149,12 +147,17 @@ def sync_limbo() -> None:
     (never the alias-inclusive ``search_object``), so a non-room object that
     happens to share the key or the ``limbo`` alias can never be rewritten or
     bridged.
+
+    The call also declaratively converges the room's typeclass onto the
+    hard-gate ``LimboRoom`` (limbo-one-way-gates D4): an unconverged room is
+    swapped in place without clearing attributes, an already-converged room
+    is left as-is, so the convergence is idempotent and never a migration.
     """
 
-    limbo = Room.objects.filter(db_key=LIMBO_KEY)
+    limbo = find_starting_rooms(LIMBO_KEY)
     # Legacy lookup matches the db_key exactly: Evennia's alias-inclusive
     # search would also match the canonical room through its ``limbo`` alias.
-    legacy = Room.objects.filter(db_key=LIMBO_LEGACY_KEY)
+    legacy = find_starting_rooms(LIMBO_LEGACY_KEY)
     if not limbo:
         if not legacy:
             log_warn(
@@ -187,31 +190,50 @@ def sync_limbo() -> None:
     room.aliases.add(LIMBO_ALIAS)
     room.db.desc = LIMBO_DESC
     room.save()
+    # Layer-2 one-way gate (limbo-one-way-gates D4): declaratively converge
+    # the typeclass in place. clean_attributes=False keeps the authored
+    # identity; no_default=True suppresses creation-hook churn; the guard
+    # makes every run after the first a no-op.
+    if room.typeclass_path != LIMBO_ROOM_TYPECLASS:
+        room.swap_typeclass(LIMBO_ROOM_TYPECLASS, clean_attributes=False, no_default=True)
 
 
-def _existing_exit(location, destination):
-    """Return the exit at ``location`` leading to ``destination``, if any.
+def find_starting_rooms(db_key: str) -> list:
+    """Return the ``Room``-family objects whose db key is exactly ``db_key``.
 
-    Matches by location and destination, not by key, to tolerate a future
-    rename of the bridging exits.
+    The lookup runs at the unscoped ``ObjectDB`` level because Evennia's
+    ``TypeclassManager`` filters pin to the manager's exact typeclass path,
+    which would blind a plain ``Room`` query to the starting room once
+    ``sync_limbo()`` has converged it onto ``LimboRoom`` (which subclasses
+    ``Room``). Evennia's manager converts each row to its own stored
+    typeclass, so the ``isinstance`` gate below still rejects any non-room
+    object that happens to share the key.
     """
 
-    for exit_obj in location.exits:
-        if exit_obj.destination == destination:
-            return exit_obj
-    return None
+    return [
+        obj
+        for obj in ObjectDB.objects.filter(db_key=db_key)
+        if isinstance(obj, Room)
+    ]
 
 
 def _ensure_exit(location, destination, key, aliases):
-    """Create or reconcile ``key``/``aliases`` exit from ``location`` to ``destination``.
+    """Create or reconcile exactly one ``key``/``aliases`` exit toward ``destination``.
 
-    When the exit already exists, its key and aliases are rewritten in place
+    When one exit already exists, its key and aliases are rewritten in place
     to the authored values on every call, so a pre-existing exit converges on
     the zh-tw bridge surface without being rebuilt (localize-limbo-zhtw D-3).
+    Duplicate pre-existing exits toward the same destination are declaratively
+    pruned (the lowest dbid is the stable keeper), so "exactly one" forward
+    exit per registry row holds regardless of database history
+    (limbo-one-way-gates D3's convergence discipline).
     """
 
-    exit_obj = _existing_exit(location, destination)
-    if exit_obj is None:
+    existing = sorted(
+        (exit_obj for exit_obj in location.exits if exit_obj.destination == destination),
+        key=lambda exit_obj: exit_obj.id,
+    )
+    if not existing:
         create_object(
             Exit,
             key=key,
@@ -220,15 +242,34 @@ def _ensure_exit(location, destination, key, aliases):
             destination=destination,
         )
         return
-    if exit_obj.key != key or set(exit_obj.aliases.all()) != set(aliases):
-        exit_obj.key = key
-        exit_obj.aliases.clear()
-        exit_obj.aliases.add(*aliases)
-        exit_obj.save()
+    keep = existing[0]
+    for duplicate in existing[1:]:
+        log_info(
+            "bootstrap_grid_exit_pruned",
+            context={
+                "exit_key": duplicate.key,
+                "exit_dbref": duplicate.dbref,
+                "source_room_key": location.key,
+                "action": "collapse_duplicate_gate_exit",
+            },
+        )
+        duplicate.delete()
+    if keep.key != key or set(keep.aliases.all()) != set(aliases):
+        keep.key = key
+        keep.aliases.clear()
+        # TagHandler.add takes ONE key or an iterable (``add(a, b)`` would
+        # read ``b`` as a category); pass the authored list as one iterable.
+        keep.aliases.add(list(aliases))
+        keep.save()
 
 
 def sync_grid() -> None:
-    """Spawn every declared grid map and bridge the sample city to Limbo.
+    """Spawn every declared grid map and bridge Limbo to the registry gates.
+
+    The bridge is one-way (limbo-one-way-gates): one forward exit per
+    ``CITY_GATE_REGISTRY`` row, then a prune pass deleting every persisted
+    exit that points back into the starting room. A registry row whose gate
+    room is missing warns and is skipped; other rows still converge.
 
     Mirrors ``world.lore.sync.sync_all()`` in being idempotent and called on
     every server start, but instantiates real walkable rooms/exits (via the
@@ -245,7 +286,7 @@ def sync_grid() -> None:
 
     register_instance_reclamation()
 
-    limbo = Room.objects.filter(db_key=LIMBO_KEY)
+    limbo = find_starting_rooms(LIMBO_KEY)
     if not limbo:
         log_warn(
             "bootstrap_grid_limbo_room_missing",
@@ -254,16 +295,49 @@ def sync_grid() -> None:
         return
     limbo = limbo[0]
 
-    south_gate = grid.get_room(SOUTH_GATE_XYZ).first()
-    if south_gate is None:
-        log_warn(
-            "bootstrap_grid_south_gate_missing",
-            context={"xyz": SOUTH_GATE_XYZ, "action": "skip_bridging_exits"},
-        )
-        return
+    for row in CITY_GATE_REGISTRY.values():
+        gate = grid.get_room(row.gate_xyz).first()
+        if gate is None:
+            log_warn(
+                "bootstrap_grid_gate_missing",
+                context={
+                    "map_id": row.map_id,
+                    "xyz": row.gate_xyz,
+                    "action": "skip_gate_row",
+                },
+            )
+            continue
+        _ensure_exit(limbo, gate, key=row.exit_key, aliases=list(row.exit_aliases))
 
-    _ensure_exit(limbo, south_gate, **EXIT_TO_CITY)
-    _ensure_exit(south_gate, limbo, **EXIT_TO_LIMBO)
+    _prune_exits_into(limbo)
+
+
+def _prune_exits_into(limbo) -> None:
+    """Delete every persisted exit whose destination is ``limbo``.
+
+    The synchronizer's declarative convergence over its own exit surface
+    (limbo-one-way-gates D3): legacy 「離開王都」/「回虛境」 exits and any
+    later reverse object converge away on the next start, no migration. The
+    query runs on the indexed ``db_destination`` FK at the unscoped
+    ``ObjectDB`` level so every Exit subclass is caught, while the
+    ``isinstance`` gate keeps non-exit objects (items with a destination)
+    untouched. On a converged database this deletes and logs nothing.
+    """
+
+    for exit_obj in ObjectDB.objects.filter(db_destination=limbo.id):
+        if not isinstance(exit_obj, Exit):
+            continue
+        source = exit_obj.location
+        log_info(
+            "bootstrap_grid_exit_pruned",
+            context={
+                "exit_key": exit_obj.key,
+                "exit_dbref": exit_obj.dbref,
+                "source_room_key": source.key if source else None,
+                "action": "enforce_one_way_gates",
+            },
+        )
+        exit_obj.delete()
 
 
 # Wilderness-side gate exits all share this key on DIFFERENT rooms; gateway
