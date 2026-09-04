@@ -20,6 +20,39 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import store_state, wait_for_store_state
 
+def _srgb_to_linear(c: float) -> float:
+    c = c / 255.0
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _relative_luminance(rgb: tuple[int, int, int]) -> float:
+    r, g, b = rgb
+    return 0.2126 * _srgb_to_linear(r) + 0.7152 * _srgb_to_linear(g) + 0.0722 * _srgb_to_linear(b)
+
+
+def _contrast_ratio(rgb1: tuple[int, int, int], rgb2: tuple[int, int, int]) -> float:
+    l1 = _relative_luminance(rgb1)
+    l2 = _relative_luminance(rgb2)
+    lighter = max(l1, l2)
+    darker = min(l1, l2)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _alpha_composite(fg: tuple[int, int, int], bg: tuple[int, int, int], alpha: float) -> tuple[int, int, int]:
+    return (
+        round(fg[0] * alpha + bg[0] * (1 - alpha)),
+        round(fg[1] * alpha + bg[1] * (1 - alpha)),
+        round(fg[2] * alpha + bg[2] * (1 - alpha)),
+    )
+
+
+def _hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
+    h = hex_str.strip().lstrip('#')
+    if len(h) == 3:
+        h = ''.join([c * 2 for c in h])
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
 
 class LocalMapBrowserTest(BrowserAcceptanceTest):
     """Dedicated minimap server with pre-recorded knowledge, shared per process."""
@@ -173,12 +206,47 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             "schema_version": 1,
             "available": True,
             "layer": "interior",
-            "current_node": "room:hall",
-            "title": "公會內部",
+            "current_node": "room:201",
+            "title": "公會大廳",
             "nodes": [
-                {"id": "room:hall", "label": "大廳", "x": 0, "y": 0, "visibility": "current", "current": True},
-                {"id": "room:vault", "label": "地下金庫", "x": 0, "y": 1, "visibility": "remembered"},
+                {
+                    "id": "room:201",
+                    "label": "公會大廳",
+                    "x": 0,
+                    "y": 0,
+                    "visibility": "current",
+                    "current": True,
+                    "anchor": False,
+                    "landmark": False,
+                    "action": None,
+                },
+                {
+                    "id": "room:202",
+                    "label": "訓練場",
+                    "x": 1,
+                    "y": 0,
+                    "visibility": "visible_visited",
+                    "current": False,
+                    "anchor": False,
+                    "landmark": False,
+                    "action": {"kind": "move", "exit_ref": "e_hall_training", "destination": "room:202"},
+                },
+                {
+                    "id": "room:203",
+                    "label": "地下金庫",
+                    "x": 0,
+                    "y": 1,
+                    "visibility": "remembered",
+                    "current": False,
+                    "anchor": False,
+                    "landmark": False,
+                    "action": None,
+                },
             ],
+            "edges": [
+                {"source": "room:201", "destination": "room:202", "label": "訓練場", "known": True, "traversable": True},
+            ],
+            "legend": ["你目前所在的位置", "已經探索過的相鄰位置", "曾經到過、但不在附近的遠方位置"],
         }
         self._inject_panel(page, interior_payload)
         page.wait_for_selector('[data-testid="local-map-remembered"]', timeout=15000)
@@ -391,6 +459,94 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 # list, detail) stays inside the island's bounded height —
                 # no required surface has to be scrolled to (slim-minimap-
                 # island: the legend left the island's section list).
+                # Wave 1 & 3: Coordinate dot field, vignette, axis, and contrast gates (Tasks 3.1 - 3.3)
+                dot_field = page.locator('[data-testid="local-map__dot-field"]')
+                self.assertEqual(dot_field.count(), 1, "coordinate dot field must exist")
+                self.assertTrue(dot_field.is_visible())
+                dot_fill = dot_field.get_attribute("fill") or ""
+                self.assertTrue(
+                    dot_fill.startswith("url(#map-lattice-grid-"),
+                    f"dot field fill must reference grid pattern, got {dot_fill}"
+                )
+
+                # Task 3.1: canvas spans roughly 5 coordinate cells across (~206 / 40 ≈ 5.15)
+                pattern_width = float(page.locator("defs pattern").first.get_attribute("width"))
+                canvas_user_width = float(page.locator('[data-testid="local-map__lattice"]').get_attribute("width"))
+                cells_across = canvas_user_width / pattern_width
+                self.assertGreaterEqual(cells_across, 4.5, f"cells across {cells_across} must be >= 4.5")
+                self.assertLessEqual(cells_across, 5.5, f"cells across {cells_across} must be <= 5.5")
+
+                # Task 3.2: Contrast gate (band from spec: >= 1.15 everywhere, >= 1.35 inner field, <= connector edge)
+                tokens = page.evaluate("""() => {
+                    const s = window.getComputedStyle(document.documentElement);
+                    return {
+                        ink860: s.getPropertyValue('--ink-860').trim() || '#151219',
+                        inkEdge: s.getPropertyValue('--ink-edge').trim() || '#3a3344',
+                        mapCanvasLo: s.getPropertyValue('--map-canvas-lo').trim() || '#0c0a10',
+                    };
+                }""")
+                ground_rgb = _hex_to_rgb(tokens["ink860"])
+                edge_ink_rgb = _hex_to_rgb(tokens["inkEdge"])
+                fog_ink_rgb = _hex_to_rgb(tokens["mapCanvasLo"])
+
+                # Read mounted SVG paint attributes from the DOM:
+                dot_circle = page.locator("defs pattern circle").first
+                dot_fill_opacity = float(dot_circle.get_attribute("fill-opacity") or 0.85)
+                axis_el = page.locator('[data-testid="local-map__axis"]')
+                self.assertEqual(axis_el.count(), 1, "axis cross must exist")
+                self.assertTrue(axis_el.is_visible())
+                axis_opacity = float(axis_el.get_attribute("opacity") or 0.80)
+
+                vignette_el = page.locator('[data-testid="local-map__vignette"]')
+                self.assertEqual(vignette_el.count(), 1, "vignette must exist")
+                self.assertTrue(vignette_el.is_visible())
+                vignette_stops = page.locator("defs radialGradient stop")
+                outer_stop_opacity = float(vignette_stops.last.get_attribute("stop-opacity") or 0.50)
+                self.assertLessEqual(outer_stop_opacity, 0.50, "vignette outer stop opacity must be <= 0.50")
+
+                # Inner field (vignette opacity 0.0):
+                inner_dot_rgb = _alpha_composite(edge_ink_rgb, ground_rgb, dot_fill_opacity)
+                inner_axis_rgb = _alpha_composite(edge_ink_rgb, ground_rgb, axis_opacity)
+                edge_rgb = edge_ink_rgb
+
+                inner_dot_contrast = _contrast_ratio(inner_dot_rgb, ground_rgb)
+                inner_axis_contrast = _contrast_ratio(inner_axis_rgb, ground_rgb)
+                edge_contrast = _contrast_ratio(edge_rgb, ground_rgb)
+
+                self.assertGreaterEqual(inner_dot_contrast, 1.35, "inner dot contrast must be >= 1.35:1")
+                self.assertGreaterEqual(inner_axis_contrast, 1.35, "inner axis contrast must be >= 1.35:1")
+                self.assertLessEqual(inner_dot_contrast, edge_contrast, "dot contrast must never exceed connector edge contrast")
+                self.assertLessEqual(inner_axis_contrast, edge_contrast, "axis contrast must never exceed connector edge contrast")
+
+                # Near corner (vignette outer stop opacity read from DOM):
+                corner_ground_rgb = _alpha_composite(fog_ink_rgb, ground_rgb, outer_stop_opacity)
+                corner_dot_rgb = _alpha_composite(fog_ink_rgb, inner_dot_rgb, outer_stop_opacity)
+                corner_dot_contrast = _contrast_ratio(corner_dot_rgb, corner_ground_rgb)
+                self.assertGreaterEqual(round(corner_dot_contrast, 2), 1.15, "corner dot contrast must be >= 1.15:1")
+
+                # Task 3.3: Audit exclusions and single tab stop
+                self.assertEqual(
+                    page.locator('.local-map__dot-field.local-map__marker, .local-map__vignette.local-map__marker, .local-map__axis.local-map__marker').count(),
+                    0,
+                    "decoration layers must not carry local-map__marker class"
+                )
+                self.assertEqual(
+                    page.locator('.local-map__dot-field.local-map__node-label, .local-map__vignette.local-map__node-label, .local-map__axis.local-map__node-label').count(),
+                    0,
+                    "decoration layers must not carry local-map__node-label class"
+                )
+                tab_stops = page.evaluate("""() => {
+                    const island = document.querySelector('[data-testid="local-map"]');
+                    const candidates = island.querySelectorAll(
+                        'button:not([disabled]), [tabindex]:not([tabindex="-1"]), a[href]'
+                    );
+                    return Array.from(candidates).filter(el => {
+                        const style = window.getComputedStyle(el);
+                        return style.display !== 'none' && style.visibility !== 'hidden';
+                    }).length;
+                }""")
+                self.assertEqual(tab_stops, 1, f"the island must expose exactly one tab stop at {viewport}")
+
                 island_box = page.locator('[data-testid="local-map"]').bounding_box()
                 self.assertIsNotNone(island_box)
                 self.assertEqual(
@@ -846,6 +1002,59 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
             self.assertNotIn(f"local-map__legend-chip--{state}", fifth_classes)
         self.assertEqual(fifth.inner_text().strip(), "每格約 10 公里")
         page.close()
+
+
+    @covers_requirement(
+        "webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone"
+    )
+    def test_minimap_pointer_events_blank_canvas_opens_overlay_while_actionable_moves(self):
+        """Pointer-event contract: clicking blank canvas passes to affordance and opens overlay;
+
+        clicking actionable node dispatches explore.move without opening overlay.
+        """
+        import time
+        from .browser_helpers import install_outbound_recorder, sent_action_count
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_local_map_available(page)
+
+        # 1. Click blank canvas corner on the island (empty coordinate margin):
+        # Must pass through SVG to .local-map__affordance and open overlay.
+        svg = page.locator('[data-testid="local-map__lattice"]')
+        self.assertTrue(svg.is_visible())
+        box = svg.bounding_box()
+        self.assertIsNotNone(box)
+        # Click near top-left margin (inside canvas but away from node center)
+        page.mouse.click(box["x"] + 8, box["y"] + 8)
+        page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
+        self.assertEqual(page.locator('[data-testid="map-overlay"]').count(), 1)
+
+        # Close overlay with Escape
+        page.keyboard.press("Escape")
+        page.wait_for_function(
+            '() => document.querySelector(\'[data-testid="map-overlay"]\') === null',
+            timeout=15000,
+        )
+
+        # 2. Click actionable node: dispatches move without opening overlay
+        actionable = page.locator('[data-testid="local-map__actionable"]')
+        self.assertGreaterEqual(actionable.count(), 1)
+        moves_before = sent_action_count(page, "explore.move")
+        actionable.first.click()
+        self.assertEqual(page.locator('[data-testid="map-overlay"]').count(), 0)
+
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            if sent_action_count(page, "explore.move") >= moves_before + 1:
+                break
+            page.wait_for_timeout(250)
+
+        self.assertEqual(
+            sent_action_count(page, "explore.move"),
+            moves_before + 1,
+            "clicking actionable node must dispatch move without opening overlay",
+        )
+
 
 
 class LayoutVariantsBrowserTest(BrowserAcceptanceTest):

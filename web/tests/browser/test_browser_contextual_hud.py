@@ -683,6 +683,14 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
         page.wait_for_selector('[data-testid="local-map"]', timeout=15000)
 
+        # Axis/words coupling (Task 3.5):
+        # On coordinate-bearing layer (lattice variant), orientation marks "北↑ 東→" are stated
+        # and the island draws the axis cross.
+        orientation = page.locator('[data-testid="local-map__orientation"]')
+        self.assertEqual(orientation.count(), 1)
+        self.assertIn("北↑ 東→", orientation.inner_text())
+        self.assertEqual(page.locator('.local-map [data-testid="local-map__axis"]').count(), 1)
+
         # Exactly one affordance exists, carrying the accessible name.
         affordances = page.locator('[data-testid="local-map__expand"]')
         self.assertEqual(affordances.count(), 1)
@@ -699,6 +707,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         affordances.focus()
         page.keyboard.press("Enter")
         page.wait_for_selector('[data-testid="map-overlay"]', timeout=15000)
+        # The full-map overlay states no orientation marks and draws no axis cross
+        self.assertEqual(page.locator('[data-testid="map-overlay"] [data-testid="local-map__orientation"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="map-overlay"] [data-testid="local-map__axis"]').count(), 0)
         page.keyboard.press("Escape")
         page.wait_for_function(
             "() => document.querySelector('[data-testid=\"map-overlay\"]') === null",
@@ -722,15 +733,53 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "schema_version": 1,
             "available": True,
             "layer": "interior",
-            "current_node": "room:hall",
-            "title": "公會內部",
+            "current_node": "room:201",
+            "title": "公會大廳",
             "nodes": [
-                {"id": "room:hall", "label": "大廳", "x": 0, "y": 0, "visibility": "current", "current": True},
-                {"id": "room:vault", "label": "地下金庫", "x": 0, "y": 1, "visibility": "remembered"},
+                {
+                    "id": "room:201",
+                    "label": "公會大廳",
+                    "x": 0,
+                    "y": 0,
+                    "visibility": "current",
+                    "current": True,
+                    "anchor": False,
+                    "landmark": False,
+                    "action": None,
+                },
+                {
+                    "id": "room:202",
+                    "label": "訓練場",
+                    "x": 1,
+                    "y": 0,
+                    "visibility": "visible_visited",
+                    "current": False,
+                    "anchor": False,
+                    "landmark": False,
+                    "action": {"kind": "move", "exit_ref": "e_hall_training", "destination": "room:202"},
+                },
+                {
+                    "id": "room:203",
+                    "label": "地下金庫",
+                    "x": 0,
+                    "y": 1,
+                    "visibility": "remembered",
+                    "current": False,
+                    "anchor": False,
+                    "landmark": False,
+                    "action": None,
+                },
             ],
+            "edges": [
+                {"source": "room:201", "destination": "room:202", "label": "訓練場", "known": True, "traversable": True},
+            ],
+            "legend": ["你目前所在的位置", "已經探索過的相鄰位置", "曾經到過、但不在附近的遠方位置"],
         }
         _inject_snapshot(page, {"local_map": interior_payload}, mode="exploration")
         page.wait_for_selector('[data-testid="local-map-remembered"]', timeout=15000)
+        # On coordinate-free layer (radial graph variant), orientation marks and axis are absent
+        self.assertEqual(page.locator('[data-testid="local-map__orientation"]').count(), 0)
+        self.assertEqual(page.locator('.local-map [data-testid="local-map__axis"]').count(), 0)
         # Island still offers exactly one tab stop (the affordance)
         self.assertEqual(
             page.evaluate("() => document.querySelectorAll('.local-map button, .local-map a, .local-map [tabindex]:not([tabindex=\"-1\"])').length"),

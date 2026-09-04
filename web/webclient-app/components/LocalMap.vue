@@ -67,11 +67,11 @@ const islandEdgeMarkers = computed(() => {
   const cols = props.localMap.cols ?? 0;
   const rows = props.localMap.rows ?? 0;
   return LocalMap.edgeMarkersFor(nodes.value, remembered.value, {
-    canvasWidth: Math.max(1, cols) * 58,
-    canvasHeight: Math.max(1, rows) * 44 + 14,
+    canvasWidth: Math.max(1, cols) * 40,
+    canvasHeight: Math.max(1, rows) * 40 + 14,
     current: {
-      x: (current.col ?? 0) * 58 + 29,
-      y: (Math.max(1, rows) - 1 - (current.row ?? 0)) * 44 + 22,
+      x: (current.col ?? 0) * 40 + 20,
+      y: (Math.max(1, rows) - 1 - (current.row ?? 0)) * 40 + 20,
     },
     markerHalf: 9,
     nameWidth: 0,
@@ -281,8 +281,9 @@ function onIslandClick(event) {
            at natural pixel size (REDESIGN §7 — the lattice's geometry IS its
            claim, so it must not be the smallest thing in the island). The
            scale is uniform through the viewBox, so the crowding fix's marker,
-           label and gutter geometry stays proportional; `max-upscale` bounds
-           it so a one-room payload cannot blow that ramp up ~3.5x.
+           label and gutter geometry stays proportional; coordinate-margin
+           padding (`field-fill`) spends the width slack on coordinate space
+           rather than magnification, keeping uniform scale <= 1.
 
            The island no longer listens to select/hover/leave (D3): the shared
            renderer keeps its event surface for the overlay and future changes
@@ -292,10 +293,14 @@ function onIslandClick(event) {
         :variant="localMap.layoutVariant || 'lattice'"
         :max-height="canvasMaxHeight || 296"
         :fill-width="true"
-        :max-upscale="2"
+        :col-pitch="40"
+        :row-pitch="40"
+        :label-font="9"
+        :field-fill="true"
+        :show-axis="true"
+        :fog-vignette="true"
         :show-legend="false"
         :marker-names="true"
-        :edge-markers="islandEdgeMarkers"
         @move="(p) => emit('move', p)"
       />
 
@@ -561,4 +566,13 @@ function onIslandClick(event) {
   white-space: nowrap;
   border: 0;
 }
+
+.local-map :deep(.local-map__lattice) {
+  pointer-events: none;
+}
+
+.local-map :deep(.local-map__node) {
+  pointer-events: auto;
+}
+
 </style>

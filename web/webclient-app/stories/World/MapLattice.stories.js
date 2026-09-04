@@ -1,10 +1,12 @@
 import { h } from "vue";
 import MapLattice from "../../components/MapLattice.vue";
 import {
+  LOCAL_MAP_GEOMETRY_STRESS_SAMPLE,
   LOCAL_MAP_INSTANCE_SAMPLE,
   LOCAL_MAP_INTERIOR_SAMPLE,
   LOCAL_MAP_MINIMAL_SAMPLE,
   LOCAL_MAP_SAMPLE,
+  LOCAL_MAP_SINGLE_NODE_SAMPLE,
   LOCAL_MAP_WILDERNESS_SAMPLE,
   localMapModelFor,
 } from "../fixtures.js";
@@ -52,17 +54,18 @@ export default {
 // pass it explicitly, mirroring what the surfaces wire.
 const latticeOf = (fixture) => {
   const model = localMapModelFor(fixture);
-  // Mirror the real island wiring (slim-minimap-island D1): the minimap
-  // surface passes the legend-display switch off, so island-scale stories
-  // mount no legend element either — plus the draft `.mini svg{width:100%}`
-  // fill and its upscale bound, which is what makes the canvas claim the
-  // island's card instead of drawing at natural pixel size.
   return {
     localMap: model,
     variant: model.layoutVariant,
     showLegend: false,
     fillWidth: true,
-    maxUpscale: 2,
+    colPitch: 40,
+    rowPitch: 40,
+    labelFont: 9,
+    fieldFill: true,
+    showAxis: true,
+    fogVignette: true,
+    markerNames: true,
   };
 };
 
@@ -97,13 +100,17 @@ export const IslandScaleRadial = {
 // 212px row), 10-char labels, 4.83x markers, fill-width layout at the
 // 848px body content width. The overlay chrome mirrors MapOverlay.vue: it
 // turns on the mapcanvas framing, the pin, and the marker NAME boxes.
-const overlayOf = (fixture) => ({
-  ...latticeOf(fixture),
-  overlayChrome: true,
-  // The full-map overlay keeps the state legend (slim-minimap-island D1:
-  // the switch is on wherever the overlay renders).
-  showLegend: true,
-});
+const overlayOf = (fixture) => {
+  const model = localMapModelFor(fixture);
+  return {
+    localMap: model,
+    variant: model.layoutVariant,
+    overlayChrome: true,
+    showLegend: true,
+    fillWidth: true,
+    markerNames: true,
+  };
+};
 
 export const OverlayScaleSample = {
   render: renderOverlayScale,
@@ -125,4 +132,30 @@ export const OverlayScaleMinimal = {
 export const OverlayScaleRadial = {
   render: renderOverlayScale,
   args: overlayOf(LOCAL_MAP_INTERIOR_SAMPLE),
+};
+
+// Task 3.6: Draft lattice fidelity stories (webclient-minimap-06-draft-lattice-fidelity)
+
+// Sparse payload: one marker centered in a five-cell coordinate dot field
+export const IslandScaleSparse = {
+  render: renderLattice,
+  args: latticeOf(LOCAL_MAP_SINGLE_NODE_SAMPLE),
+};
+
+// Reported three-by-three wilderness payload
+export const IslandScaleReportedWilderness = {
+  render: renderLattice,
+  args: latticeOf(LOCAL_MAP_WILDERNESS_SAMPLE),
+};
+
+// Adjacent-labelled-pair payload at 48-unit pitch
+export const IslandScaleAdjacentLabelledPair = {
+  render: renderLattice,
+  args: latticeOf(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE),
+};
+
+// Overlay scale with coordinate dot field
+export const OverlayScaleReportedWilderness = {
+  render: renderOverlayScale,
+  args: overlayOf(LOCAL_MAP_WILDERNESS_SAMPLE),
 };

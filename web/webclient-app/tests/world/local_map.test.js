@@ -369,19 +369,15 @@ describe("LocalMap (B4 world family)", () => {
     const w = mountMap({ localMap: model });
     const svg = w.find("svg.local-map__lattice");
     expect(svg.exists()).toBe(true);
-    // Natural (pre-scale) canvas: 2 × 58px column pitch wide,
-    // 64 × 44px row pitch + 14px label band tall.
-    expect(svg.attributes("width")).toBe("116");
-    expect(svg.attributes("height")).toBe("2830");
-    expect(svg.attributes("viewBox")).toBe("0 0 116 2830");
-    // Wave 0 (task 3.3): the scale-down CONTRACT jsdom can prove — the
-    // island's caps bind as inline styles so a real browser scales the
-    // canvas (2830px natural height cannot overflow the island). The
-    // rendered proportional size is verified in the running Storybook
-    // (World/LocalMap — TallLatticeScaled), not here.
+    // Design D5 row 6: 2 × 40px column core padded symmetrically to 206px width cap,
+    // 64 × 40px row pitch + 14px label band = 2574px tall, zero vertical margin.
+    expect(svg.attributes("width")).toBe("206");
+    expect(svg.attributes("height")).toBe("2574");
+    expect(svg.attributes("viewBox")).toBe("0 0 206 2574");
+    // Single width bound: 296 * 206 / 2574 = 23.68px
     const style = svg.attributes("style") ?? "";
     expect(style).toContain("width: 100%");
-    expect(style).toContain("max-width: 12.13px");
+    expect(style).toContain("max-width: 23.68px");
     expect(style).toContain("max-height: 296px");
   });
 
@@ -398,11 +394,12 @@ describe("LocalMap (B4 world family)", () => {
     expect(style).toContain("max-width: 206px");
   });
 
-  it("bounds the upscale so a one-room payload cannot blow up the marker ramp", () => {
+  it("spends width fill as coordinate margin rather than magnification (maxUpscale retired)", () => {
     const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE) });
     const style = w.get("svg.local-map__lattice").attributes("style") ?? "";
     expect(style).toContain("width: 100%");
-    expect(style).toContain("max-width: 116px");
+    // Design D5 row 3: single node canvas is padded to 206px with scale 1.0
+    expect(style).toContain("max-width: 206px");
   });
 
   it("keeps the header on one row: an elastic title, fixed marks, and no trailing control", () => {
@@ -461,8 +458,8 @@ describe("LocalMap (B4 world family)", () => {
     expect(model.remembered).toHaveLength(16);
     const w = mountMap({ localMap: model });
     const svg = w.find("svg.local-map__lattice");
-    expect(svg.attributes("width")).toBe("302");
-    expect(svg.attributes("height")).toBe("2312");
+    expect(Number(svg.attributes("width"))).toBeCloseTo(206, 5);
+    expect(Number(svg.attributes("height"))).toBeCloseTo(2022.911688, 4);
     expect(w.find('[data-testid="local-map-remembered"]').exists()).toBe(false);
     expect(w.findAll('[data-testid^="local-map__edge-marker--"]')).toHaveLength(16);
   });
@@ -471,34 +468,37 @@ describe("LocalMap (B4 world family)", () => {
     const model = localMapModelFor(LOCAL_MAP_GEOMETRY_STRESS_SAMPLE);
     const w = mountMap({ localMap: model });
 
+    // Distinct adjacent labels trigger pitch 48 on both axes. Margin = 31 on both axes.
     const centers = {
-      "grid:altoria:1:1": { x: 87, y: 66 },
-      "grid:altoria:2:1": { x: 145, y: 66 },
-      "grid:altoria:1:2": { x: 87, y: 22 },
-      "grid:altoria:0:1": { x: 29, y: 66 },
+      "grid:altoria:1:1": { x: 103, y: 103 },
+      "grid:altoria:2:1": { x: 151, y: 103 },
+      "grid:altoria:1:2": { x: 103, y: 55 },
+      "grid:altoria:0:1": { x: 55, y: 103 },
     };
     for (const [id, center] of Object.entries(centers)) {
       const node = w.get(`[data-testid="local-map__node--${id}"]`);
       expect(node.attributes("transform")).toBe(`translate(${center.x}, ${center.y})`);
     }
 
+    // Label baseline at labelFont 9: 22 units
     for (const id of Object.keys(centers)) {
       const label = w.get(`[data-testid="local-map__node--${id}"] .local-map__node-label`);
-      expect(label.attributes("y")).toBe("26");
+      expect(label.attributes("y")).toBe("22");
     }
 
     const markerBoxes = {
-      "grid:altoria:1:1": { x1: 78, y1: 57, x2: 96, y2: 75 },
-      "grid:altoria:2:1": { x1: 139.5, y1: 60.5, x2: 150.5, y2: 71.5 },
-      "grid:altoria:1:2": { x1: 81.5, y1: 16.5, x2: 92.5, y2: 27.5 },
-      "grid:altoria:0:1": { x1: 24, y1: 61, x2: 34, y2: 71 },
+      "grid:altoria:1:1": { x1: 94, y1: 94, x2: 112, y2: 112 },
+      "grid:altoria:2:1": { x1: 145.5, y1: 97.5, x2: 156.5, y2: 108.5 },
+      "grid:altoria:1:2": { x1: 97.5, y1: 49.5, x2: 108.5, y2: 60.5 },
+      "grid:altoria:0:1": { x1: 49.5, y1: 97.5, x2: 60.5, y2: 108.5 },
     };
 
+    // Label boxes: font 9, 5 full-width glyphs (45 wide), ascent 8.55, descent 4.05 around y=22
     const labelBoxes = {
-      "grid:altoria:1:1": { x1: 65, y1: 81.5, x2: 109, y2: 95 },
-      "grid:altoria:2:1": { x1: 117.5, y1: 81.5, x2: 172.5, y2: 95 },
-      "grid:altoria:1:2": { x1: 59.5, y1: 37.5, x2: 114.5, y2: 51 },
-      "grid:altoria:0:1": { x1: 7, y1: 81.5, x2: 51, y2: 95 },
+      "grid:altoria:1:1": { x1: 80.5, y1: 116.45, x2: 125.5, y2: 129.05 },
+      "grid:altoria:2:1": { x1: 128.5, y1: 116.45, x2: 173.5, y2: 129.05 },
+      "grid:altoria:1:2": { x1: 80.5, y1: 68.45, x2: 125.5, y2: 81.05 },
+      "grid:altoria:0:1": { x1: 32.5, y1: 116.45, x2: 77.5, y2: 129.05 },
     };
 
     function separated(a, b) {
@@ -531,28 +531,29 @@ describe("LocalMap (B4 world family)", () => {
     everyPair(markerBoxes);
 
     const e0 = w.get('[data-testid="local-map__edge--0"]');
-    expect(e0.attributes("x1")).toBe("87");
-    expect(e0.attributes("y1")).toBe("66");
-    expect(e0.attributes("x2")).toBe("145");
-    expect(e0.attributes("y2")).toBe("66");
-    expect(58 - 9 - 5.5).toBeGreaterThan(0);
+    expect(e0.attributes("x1")).toBe("103");
+    expect(e0.attributes("y1")).toBe("103");
+    expect(e0.attributes("x2")).toBe("151");
+    expect(e0.attributes("y2")).toBe("103");
+    expect(48 - 9 - 5.5).toBeGreaterThan(0);
     const e1 = w.get('[data-testid="local-map__edge--1"]');
-    expect(e1.attributes("x1")).toBe("87");
-    expect(e1.attributes("y1")).toBe("66");
-    expect(e1.attributes("x2")).toBe("87");
-    expect(e1.attributes("y2")).toBe("22");
-    expect(44 - 9 - 5.5).toBeGreaterThan(0);
+    expect(e1.attributes("x1")).toBe("103");
+    expect(e1.attributes("y1")).toBe("103");
+    expect(e1.attributes("x2")).toBe("103");
+    expect(e1.attributes("y2")).toBe("55");
+    expect(48 - 9 - 5.5).toBeGreaterThan(0);
   });
 
   it("renders a single-node room with no collision risk (no regression)", () => {
     const model = localMapModelFor(LOCAL_MAP_SINGLE_NODE_SAMPLE);
     const w = mountMap({ localMap: model });
     const svg = w.find("svg.local-map__lattice");
-    expect(svg.attributes("width")).toBe("58");
-    expect(svg.attributes("height")).toBe("58");
+    // Design D5 row 3: canvas fills maxWidth 206px as coordinate margin, height 220px
+    expect(svg.attributes("width")).toBe("206");
+    expect(svg.attributes("height")).toBe("220");
     expect(
       w.get('[data-testid="local-map__node--grid:altoria:1:1"]').attributes("transform"),
-    ).toBe("translate(29, 22)");
+    ).toBe("translate(103, 103)");
     expect(w.get('[data-testid="local-map__marker--current"]').exists()).toBe(true);
   });
 
@@ -701,8 +702,8 @@ describe("LocalMap (B4 world family)", () => {
       await wrapper.vm.$nextTick();
       const svg = wrapper.find("svg.local-map__lattice");
       expect(svg.attributes("style")).toContain("max-height: 296px");
-      // Width bound spends the height budget proportionally: 296 * (302 / 2312) = 38.66px
-      expect(svg.attributes("style")).toContain("max-width: 38.66px");
+      // Width bound spends the height budget proportionally: 296 * (206 / 2022.91) = 30.14px
+      expect(svg.attributes("style")).toContain("max-width: 30.14px");
     } finally {
       Element.prototype.getBoundingClientRect = realRect;
       stage.remove();
@@ -771,5 +772,20 @@ describe("LocalMap (B4 world family)", () => {
       destination: "grid:altoria:2:1",
     });
     overlay.unmount();
+  });
+
+  it("Task 2.5: declares island geometry on MapLattice mount and renders node label at <= 9 CSS px", () => {
+    const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });
+    const lattice = w.findComponent({ name: "MapLattice" });
+    expect(lattice.exists()).toBe(true);
+    expect(lattice.props("colPitch")).toBe(40);
+    expect(lattice.props("rowPitch")).toBe(40);
+    expect(lattice.props("labelFont")).toBe(9);
+    expect(lattice.props("fieldFill")).toBe(true);
+    expect(lattice.props("showAxis")).toBe(true);
+    expect(lattice.props("fogVignette")).toBe(true);
+    expect(lattice.props("maxUpscale")).toBeUndefined();
+    const label = lattice.find(".local-map__node-label");
+    expect(label.attributes("style")).toContain("font-size: 9px");
   });
 });
