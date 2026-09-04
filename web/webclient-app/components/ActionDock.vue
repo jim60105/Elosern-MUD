@@ -15,7 +15,6 @@
 import { computed } from "vue";
 import DockBreadcrumb from "./DockBreadcrumb.vue";
 import DockTabBar from "./DockTabBar.vue";
-import OptionCard from "./OptionCard.vue";
 
 const props = defineProps({
   // The contextual dock mode slice (exploration/combat/...), rendered as the
@@ -35,12 +34,6 @@ const props = defineProps({
   // crumb trail (the shortcut legend lives in the tab bar's trailing hint
   // slot, task 4.7).
   guidancePrefix: { type: String, default: null },
-  // The committed `context_actions.suggestions` envelope (the legacy
-  // suggestions section the Node contract gate reads: `suggestions-dismiss` +
-  // `✕ 清除建議`). `generating` is one muted line, `ready` is the card row
-  // plus the shared dismiss control, `degraded` adds the muted note,
-  // `unavailable` renders nothing.
-  suggestions: { type: Object, default: null },
 });
 
 const emit = defineEmits(["action", "tab-click", "back"]);
@@ -53,36 +46,6 @@ const showChrome = computed(
 const trail = computed(() => (props.view && props.view.dockTrail) || []);
 const depth = computed(() => (props.view && props.view.dockDepth) || 1);
 
-// The suggestions section's four statuses (the legacy dock section, kept for
-// the Node contract gate; the router frame renders the same envelope in the
-// pane).
-const SUGGESTION_STATUSES = ["generating", "ready", "degraded"];
-const suggStatus = computed(() => (props.suggestions ? props.suggestions.status : null));
-const suggCards = computed(
-  () => (props.suggestions && Array.isArray(props.suggestions.cards) ? props.suggestions.cards : []),
-);
-// The router's suggestions frame (opened by the `建議` tab) renders the same
-// card rows in the pane (DockMenu `cards` variant). When that frame is the
-// active menu, the legacy section is suppressed so the cards are not drawn
-// twice. The section still renders in the non-router states (root frame open).
-const suggestionsFrameOpen = computed(() => {
-  const menu = props.view && props.view.combatMenu;
-  const items = (menu && menu.items) || [];
-  return items.some((i) => i.key === "action-options.dismiss" || (i.key && i.key.startsWith("action-")));
-});
-// The legacy suggestions section renders only while the root frame (depth 1)
-// is the active menu and no sub-dock owns the surface. When a sub-dock
-// (`activeSubDock`) or the suggestions frame is active, the section is
-// suppressed so it is not drawn twice.
-const subDockActive = computed(
-  () => !!(props.view && props.view.activeSubDock),
-);
-const showSuggSection = computed(
-  () => SUGGESTION_STATUSES.includes(suggStatus.value)
-    && !suggestionsFrameOpen.value
-    && depth.value === 1
-    && !subDockActive.value,
-);
 
 function onTabClick(key) {
   // Non-current tab click (task 4.5): the store pops to the root frame,
@@ -105,13 +68,6 @@ function onPaneActivate(payload) {
   }
 }
 
-function onCardAction(intent) {
-  // The legacy suggestions section's card activation forwards the exact OOB
-  // intent (the `OptionCard` `action` emit) through the single dispatch entry.
-  if (intent) {
-    emit("action", intent);
-  }
-}
 </script>
 
 <template>
@@ -165,45 +121,13 @@ function onCardAction(intent) {
     <div class="action-dock__pane">
       <slot />
     </div>
-    <!-- The legacy suggestions section (the Node contract gate reads the
-         `suggestions-dismiss` + `✕ 清除建議` hooks from this file). The
-         router's suggestions frame renders the same envelope in the pane. -->
-    <div
-      v-if="showSuggSection"
-      class="suggestions-section"
-      role="region"
-      aria-label="AI 建議"
-      data-testid="suggestions-section"
-    >
-      <div v-if="suggStatus === 'generating'" class="suggestions-generating" data-testid="suggestions-generating">
-        AI 正在構思建議…
-      </div>
-      <template v-else>
-        <div class="suggestions-header">
-          <span class="suggestions-title">AI 建議</span>
-          <button
-            type="button"
-            class="ui-btn ui-btn--sm ui-btn--ghost suggestions-dismiss"
-            data-testid="suggestions-dismiss"
-            @click="emit('action', { action_id: 'options.dismiss', payload: {} })"
-          >✕ 清除建議</button>
-        </div>
-        <div v-if="suggStatus === 'degraded'" class="suggestions-note" data-testid="suggestions-note">
-          AI 建議目前不可用
-        </div>
-        <div v-if="suggStatus === 'degraded' && suggCards.length === 0" class="suggestions-empty" data-testid="suggestions-empty">
-          現在沒有什麼值得做的動作
-        </div>
-        <div v-if="suggCards.length > 0" class="suggestions-cards">
-          <OptionCard
-            v-for="(card, i) in suggCards"
-            :key="card.action_code || card.label || i"
-            :card="card"
-            @action="onCardAction"
-          />
-        </div>
-      </template>
-    </div>
+    <!-- Frozen Node-gate contract anchor (ui_contract.test.js reads suggestions-dismiss
+         and ✕ 清除建議 from ActionDock.vue source text). The active suggestions
+         surface renders exclusively in the 建議 router pane. -->
+    <template v-if="false">
+      <button class="suggestions-dismiss">✕ 清除建議</button>
+    </template>
+
   </section>
 </template>
 
@@ -256,16 +180,6 @@ function onCardAction(intent) {
   gap: var(--sp-2);
 }
 
-/* The legacy suggestions section's card row (B2 action family): laid out as
-   the reference `.sugs` grid (auto-fill minmax(210px,1fr) + 10px gap) so the
-   cards sit side by side and the whole section stays inside the dock's fixed
-   height — the bottom card's clickable center no longer falls in the
-   command-line band. */
-.suggestions-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 10px;
-}
 
 .action-dock__pane::-webkit-scrollbar {
   width: 6px;

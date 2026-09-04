@@ -722,12 +722,6 @@ function onSubmitCommand(text) {
   return store.sendText(text);
 }
 
-function onChoiceAction(intent) {
-  // The narrative stream-end choice-point card/dismiss intents (C4): the
-  // same single dispatch entry as the dock (store is the sole writer).
-  dispatchIntent(intent.action_id, intent.payload);
-}
-
 // Register the SceneBackdrop instance (its exposed interface) on the window
 // bridge so the managed-browser pending-scene journey can seed the
 // client-local prior-image memory (webclient-contextual-hud: a pending scene
@@ -754,14 +748,12 @@ onMounted(() => {
         :uncertain="store.view.dispatch.uncertain"
         :prompt="store.view.prompt"
         :command-history="store.commandHistory"
-        :suggestions="store.view.suggestions"
         :mutations-locked="store.view.mutationsLocked"
         :open-surfaces="openSurfaces"
         :low-hp="store.view.vitals.lowHp"
         :text-to-html="store.view.textToHtml"
         :in-flight="store.view.dispatch.inFlight !== null"
         @submit-command="onSubmitCommand"
-        @choice-action="onChoiceAction"
         @focus-lost="store.clearFreeformTarget()"
         @open-full-log="openFullLog"
         @open-overlay="onOpenOverlay"
@@ -830,8 +822,7 @@ onMounted(() => {
           :root-items="rootItems"
           :focused-key="store.view.focus.key"
           :view="store.view"
-          :suggestions="store.view.suggestions"
-          @action="onAction"
+            @action="onAction"
           @tab-click="onTabClick"
           @back="onDockBack"
         >
@@ -1019,9 +1010,7 @@ onMounted(() => {
       v-if="fullLogOpen"
       ref="fullLogRef"
       :lines="store.narrative"
-      :suggestions="store.view.suggestions"
       @close="closeFullLog(true)"
-      @choice-action="onChoiceAction"
     />
 
     <!-- The action-feedback toast queue (webclient-action-feedback D2): the

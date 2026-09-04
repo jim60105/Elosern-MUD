@@ -116,16 +116,24 @@ absolutely positioned within the same full-bleed stage.
 
 ### Requirement: The narrative is a bounded caption whose complete log is reachable in one action
 The narrative SHALL render as a bounded caption card at the visual centre of the stage, constrained in
-both measure and height so it never grows to fill the stage. The card SHALL carry a single labelled
-control that opens a full-log surface presenting the complete retained narrative through the same
-markup renderer as the caption — never a second markup path. The full-log surface SHALL be scrollable,
-SHALL trap focus while open, SHALL close on Escape, and SHALL restore focus to the control that opened
-it. The unread indicator, its polite live region, and its jump-to-latest behaviour SHALL remain on the
-caption card and SHALL be unchanged.
+both measure and height so it never grows to fill the stage, drawn with the reference's caption panel
+treatment: panel fill with backdrop blur, hairline border, shared radius and shadow, and the
+reference's vertical hairline rule offset outside the card's left edge. The card SHALL carry a head
+row styled as the reference's caption head (small uppercase letter-spaced label): on the left, a mode
+label — `敘述` while the committed mode is exploration and `戰鬥日誌` while it is combat — and on the
+right, a single labelled capsule control that opens a full-log surface presenting the complete
+retained narrative through the same markup renderer — never a second markup path. The full-log surface
+SHALL be scrollable, SHALL trap focus while open, SHALL close on Escape, and SHALL restore focus to the
+control that opened it. The unread indicator, its polite live region, and its jump-to-latest behaviour
+SHALL remain on the caption card beside the head label and SHALL otherwise be unchanged.
 
 #### Scenario: The caption card is bounded
 - **WHEN** the narrative holds more lines than the caption card can show
 - **THEN** the card scrolls internally within its bounded height and does not expand to fill the stage
+
+#### Scenario: The head row names the mode and owns the log control
+- **WHEN** the caption renders in exploration mode and then in combat mode
+- **THEN** the head label reads `敘述`, then `戰鬥日誌`, and the `完整日誌` capsule is the card's only full-log control
 
 #### Scenario: The complete log opens in one action
 - **WHEN** the player activates the caption card's full-log control
@@ -311,7 +319,9 @@ client between committed revisions.
 Visible chips SHALL be bounded, and the remainder SHALL be reachable in one action through an overflow
 chip stating how many are hidden. The overflow surface SHALL be bounded and scrollable and SHALL close
 on Escape, so no committed condition becomes unreachable at any condition count the payload permits.
-An empty condition list SHALL render an explicit text statement rather than an empty island.
+An empty condition list SHALL render no condition island at all — no placeholder island, no
+`無條件` text — consistent with the contextual-hiding rule that an absent surface is not a dimmed or
+emptied surface.
 
 #### Scenario: A chip carries its label, duration, and modifiers
 - **WHEN** a condition with a label, a remaining duration, and a derived modifier is committed
@@ -333,9 +343,9 @@ An empty condition list SHALL render an explicit text statement rather than an e
 - **WHEN** more conditions are committed than the island shows as chips
 - **THEN** an overflow chip states the hidden count and reveals every remaining condition in one action, within a bounded scrollable surface that closes on Escape
 
-#### Scenario: No conditions renders an explicit statement
+#### Scenario: No conditions renders no island
 - **WHEN** the committed condition list is empty
-- **THEN** the island renders an explicit text statement that there are no conditions
+- **THEN** no condition island is rendered anywhere in the HUD
 
 ### Requirement: The minimap island states only its own drawing convention
 The minimap SHALL render as a bounded HUD island in the stage's right anchor, beneath the top-meta
@@ -1359,3 +1369,28 @@ When a dock pane's row region uses a fixed column count for keyboard row/col geo
 #### Scenario: The move frame navigates as a single-column list
 - **WHEN** the player presses ArrowUp or ArrowDown inside the move frame
 - **THEN** focus cycles through the move frame's items — the exit rows in order, then the `back` row — ArrowLeft and ArrowRight are no-ops, and the keyboard cell mapping does not depend on the pane's rendered column count
+
+### Requirement: Narrative lines carry the reference's semantic classes
+Committed narrative lines SHALL render with the reference draft's semantic presentation: a line of
+committed `sys` kind SHALL render in the sans face at the reference's secondary size and colour with
+a leading `◈` seal-colour marker contributed by the line's own class, not by invented text;
+emphasis inside prose lines SHALL render in the reference's gold accent; plain prose lines SHALL
+render in the serif reading face. The classes SHALL be mounted by the existing markup pipeline at
+render time from committed line kinds only — the tokenizer, the player-echo divider lines, and the
+box-drawing art path SHALL be unchanged, and no markup class SHALL be mounted for a kind the store
+does not carry.
+
+#### Scenario: A sys line renders with the seal marker
+- **WHEN** a committed narrative line of kind `sys` renders
+- **THEN** the line carries the reference's sys treatment including the leading `◈` marker, and the
+  marker is decorative (absent from the accessible name of any surrounding live region update that
+  already names the line's text)
+
+#### Scenario: Emphasis renders gold inside prose
+- **WHEN** a committed prose line carries emphasis through the markup pipeline
+- **THEN** the emphasis renders in the reference's gold accent without changing the surrounding
+  prose face
+
+#### Scenario: Unknown kinds do not gain semantic classes
+- **WHEN** a committed line carries no semantic kind beyond plain output
+- **THEN** it renders as plain serif prose without the sys marker

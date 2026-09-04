@@ -93,10 +93,10 @@ describe("StatusPanel (H2 island-stack root)", () => {
     expect(combat.text()).toBe("戰鬥中（公會考核）· 第 3 回合");
   });
 
-  it("renders the 無條件 empty state in the conditions island", () => {
+  it("renders no conditions island when conditions are empty", () => {
     const w = mountPanel({ status: STATUS_PANEL_MINIMAL_SAMPLE });
-    expect(w.get('[data-testid="status-panel__conditions-empty"]').text()).toBe("無條件");
-    expect(w.findAll('[data-testid^="status-panel__condition--"]')).toHaveLength(0);
+    expect(w.find('[data-testid="status-panel__conditions"]').exists()).toBe(false);
+    expect(w.find('[data-testid="status-panel__conditions-empty"]').exists()).toBe(false);
   });
 
   it("invents no intimate/adult block (no backing field, not mocked)", () => {

@@ -151,7 +151,7 @@ describe("store view slices", () => {
     expect(store.view.localMapModel).toBe(null);
   });
 
-  it("drives the choice-point state machine from the committed suggestions", () => {
+  it("drives the suggestions view model from the committed suggestions", () => {
     openActiveSession(store);
     store.receive(
       1,
@@ -164,7 +164,6 @@ describe("store view slices", () => {
         {},
       ],
     );
-    expect(store.view.choicePoint.state).toBe("generating");
 
     const readyCards = [
       {
@@ -202,7 +201,6 @@ describe("store view slices", () => {
         {},
       ],
     );
-    expect(store.view.choicePoint.state).toBe("ready");
     expect(store.view.suggestionsView.status).toBe("ready");
     expect(store.view.suggestionsView.cards.length).toBe(3);
     expect(store.view.suggestionsView.emptyState).toBe(false);
@@ -223,7 +221,6 @@ describe("store view slices", () => {
         {},
       ],
     );
-    expect(store.view.choicePoint.state).toBe("absent");
     expect(store.view.suggestionsView.status).toBe("unavailable");
     expect(store.view.suggestionsView.visible).toBe(false);
     expect(store.view.suggestionsSignature).not.toBe(sigBefore);

@@ -1,18 +1,17 @@
 <script>
-import { h, nextTick, onMounted, ref, watch } from "vue";
+import { computed, h, nextTick, onMounted, ref, watch } from "vue";
 import NarrativeMarkup from "../lib/narrative_markup.js";
 import UnreadIndicator from "./UnreadIndicator.vue";
-import ChoicePointBlock from "./ChoicePointBlock.vue";
 import { renderNarrativeTokens } from "./narrative-renderer.js";
 
 // Bounded narrative caption card (H1, design D4): the narrative is a
 // bounded caption at the visual centre of the stage — `width:min(880px,90vw)`,
 // `max-height:30vh` (set by the `feed` anchor), blurred panel chrome. The
-// card carries a single labelled control (`完整日誌`) that opens the
-// full-log surface presenting the complete retained narrative through the
-// same markup renderer (never a second markup path). The `#narrative-unread`
-// indicator, its polite live region, and the jump-to-latest behaviour
-// remain on the card, unchanged.
+// card carries a head row naming the mode and a single labelled control
+// (`完整日誌 ↑`) that opens the full-log surface presenting the complete
+// retained narrative through the same markup renderer (never a second markup
+// path). The `#narrative-unread` indicator, its polite live region, and the
+// jump-to-latest behaviour remain on the card beside the mode label.
 
 // Narrative feed (the story centerpiece): renders the narrative log slice.
 // Server-transformed lines (out/sys/err) render through the preserved
@@ -33,17 +32,16 @@ export default {
   name: "NarrativeFeed",
   props: {
     lines: { type: Array, default: () => [] },
-    // The committed `context_actions.suggestions` envelope (or null). The
-    // stream-end choice-point block renders from this slice (the AI-only
-    // surface — generating and ready only).
-    suggestions: { type: Object, default: null },
+    mode: { type: String, default: "exploration" },
   },
-  emits: ["choice-action", "open-full-log"],
+  emits: ["open-full-log"],
   setup(props, { expose, emit }) {
     const feedRoot = ref(null);
     const unread = ref(0);
 
-    const BOX_DRAWING = /[\u2500-\u257f]/;
+    const modeLabel = computed(() => (props.mode === "combat" ? "戰鬥日誌" : "敘述"));
+
+    const BOX_DRAWING = /[─-╿]/;
     const AT_BOTTOM_SLACK = 8;
 
     function lineText(line) {
@@ -111,25 +109,12 @@ export default {
     // exactly like the legacy single-owner check around each insertion.
     // Watch the array length (not the array reference) so a push or a trim
     // both trigger the auto-scroll / unread logic.
-    //
-    // `lastSettledSh` tracks the content height of the last settled render.
-    // The stream-end choice-point block (webclient-action-choicepoints) swaps
-    // its generating line / ready group in place, and that in-place re-render
-    // can complete before a watcher callback reads the DOM, so the
-    // "reader was tracking the stream end" decision for a block swap is made
-    // against the last settled geometry, never the live mid-swap DOM.
-    const lastSettledSh = ref(0);
-
     watch(
       () => props.lines.length,
       (newLen, oldLen) => {
         const added = Math.max(0, newLen - (oldLen ?? 0));
         const wasAtBottom = atBottom();
         void nextTick().then(() => {
-          const el = feedRoot.value;
-          if (el) {
-            lastSettledSh.value = el.scrollHeight;
-          }
           if (added === 0) {
             return;
           }
@@ -140,37 +125,6 @@ export default {
           }
         });
       },
-    );
-
-    // The stream-end choice-point block (webclient-action-choicepoints): the
-    // generating line and the taller ready group are the SAME DOM node swapping
-    // content in place, so the `lines.length` watcher alone would not keep the
-    // stream end visible across the swap. Watch the suggestions status (sync
-    // flush, at the store commit) and auto-scroll for a reader pinned at the
-    // bottom, deciding "was at the stream end" from the settled height that
-    // preceded the current block content (`preBlockSh`), never the mid-swap DOM.
-    const preBlockSh = ref(0);
-
-    watch(
-      () => (props.suggestions && props.suggestions.status) || "none",
-      (status) => {
-        const el = feedRoot.value;
-        const wasAtBottom =
-          !el || preBlockSh.value - el.scrollTop - el.clientHeight < AT_BOTTOM_SLACK;
-        void nextTick().then(() => {
-          const el2 = feedRoot.value;
-          if (el2) {
-            // `lastSettledSh` still holds the pre-swap height here; hand it to
-            // `preBlockSh` as the reference for the next in-place swap.
-            preBlockSh.value = lastSettledSh.value;
-            lastSettledSh.value = el2.scrollHeight;
-          }
-          if (wasAtBottom) {
-            scrollToBottom();
-          }
-        });
-      },
-      { flush: "sync" },
     );
 
     function onScroll() {
@@ -203,7 +157,7 @@ export default {
         "div",
         {
           ref: feedRoot,
-          class: "elosern elosern-narrative",
+          class: "elosern elosern-narrative feed-inner",
           role: "log",
           "aria-label": "敘事紀錄",
           tabindex: "-1",
@@ -213,8 +167,16 @@ export default {
         [
           h(
             "div",
-            { class: "narrative-head", "data-testid": "narrative-head" },
+            { class: "narrative-head head", "data-testid": "narrative-head" },
             [
+              h(
+                "span",
+                {
+                  class: "narrative-mode-label",
+                  "data-testid": "narrative-mode-label",
+                },
+                modeLabel.value,
+              ),
               h(UnreadIndicator, {
                 count: unread.value,
                 onJump: () => {
@@ -225,23 +187,16 @@ export default {
                 "button",
                 {
                   type: "button",
-                  class: "narrative-fulllog-control",
+                  class: "narrative-fulllog-control more",
                   "data-testid": "narrative-fulllog-control",
+                  "data-openlog": "",
                   onClick: () => emit("open-full-log"),
                 },
-                "完整日誌",
+                "完整日誌 ↑",
               ),
             ],
           ),
           ...props.lines.flatMap((line, index) => lineNodes(line, index)),
-          // The stream-end choice-point block (webclient-action-choicepoints):
-          // rendered after the lines so it stays at the stream end and is
-          // re-parented (moved down) when newer narrative text lands, exactly
-          // like the legacy `appendNode` insertBefore-the-block semantics.
-          h(ChoicePointBlock, {
-            suggestions: props.suggestions,
-            onAction: (intent) => emit("choice-action", intent),
-          }),
         ],
       );
   },
@@ -249,35 +204,54 @@ export default {
 </script>
 
 <style>
-/* Bounded caption card (design D4): the card takes the `feed` anchor's
-   geometry (`width:min(880px,90vw)`, `max-height:30vh`), carries the
-   draft's blurred panel chrome, and never grows to fill the stage. The
-   card scrolls internally when the narrative outgrows its bounded height. */
+/* Bounded caption card (design D4, draft .feed-inner): panel fill with
+   backdrop blur, hairline border, shared radius and shadow, and the left
+   hairline gradient rule. Internal scrolling within bounded height. */
 .elosern-narrative {
   position: relative;
   box-sizing: border-box;
-  max-height: 30vh;
+  max-height: 32vh;
   overflow-y: auto;
   padding: 14px 20px 15px;
   scroll-behavior: smooth;
   background: var(--panel);
   backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
   border: var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
 
-/* The caption's head row: the unread indicator and the `完整日誌` control
-   (the one-action escape hatch to the complete log). */
+.elosern-narrative::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background: linear-gradient(180deg, transparent, var(--ink-600) 12%, var(--ink-600) 88%, transparent);
+}
+
+/* The caption's head row: mode label, unread indicator, and the `完整日誌 ↑`
+   capsule control. */
 .elosern-narrative .narrative-head {
   position: sticky;
   top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
   padding: 4px 0;
   background: var(--panel-solid);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--paper-500);
+  text-transform: uppercase;
+}
+
+.elosern-narrative .narrative-head .narrative-mode-label {
+  font-family: var(--f-sans);
   font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--paper-500);
@@ -316,6 +290,12 @@ export default {
   overflow-wrap: break-word;
 }
 
+.elosern-narrative .narrative-line em,
+.elosern-narrative .narrative-line .em {
+  font-style: normal;
+  color: var(--gold-400);
+}
+
 .elosern-narrative .narrative-line.map-art {
   font-family: var(--f-mono);
   font-size: var(--text-sm);
@@ -332,14 +312,21 @@ export default {
   color: var(--paper-500);
 }
 
-.elosern-narrative .narrative-line.sys,
-.elosern-narrative .narrative-line.err {
+.elosern-narrative .narrative-line.sys {
+  font-family: var(--f-sans);
+  font-size: calc(13px * var(--prose-scale));
   color: var(--paper-500);
-  font-style: italic;
+  font-style: normal;
+}
+
+.elosern-narrative .narrative-line.sys::before {
+  content: "◈ ";
+  color: var(--seal-500);
 }
 
 .elosern-narrative .narrative-line.err {
   color: var(--seal-400);
+  font-style: italic;
 }
 
 .elosern-narrative .narrative-divider {

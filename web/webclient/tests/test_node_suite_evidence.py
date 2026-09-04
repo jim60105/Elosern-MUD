@@ -300,23 +300,18 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-action-choicepoints::the-choice-point-renders-generating-and-ready-states-at-the-stream-end",
-        "webclient-action-choicepoints::degraded-rule-cards-never-enter-the-stream",
+        "webclient-context-actions-suggestions::the-dock-suggestion-pane-is-the-single-suggestion-surface",
     )
     def test_choicepoint_node_suite_passes(self):
-        # The choice-point behavior moved to the Vue layer: the
-        # generating/ready rendering lives in choice_point_block.test.js and
-        # the degraded-card dock behavior in action_dock.test.js. The
-        # cross-session recovery assertion is owned by the managed browser
-        # acceptance (web/tests/browser/test_browser_choicepoints.py), so it
-        # is not claimed by this Node-level evidence.
+        # The suggestions behavior lives in the action dock: generating,
+        # ready, degraded, and transport-reset all render exclusively in
+        # the dock suggestion pane (action_dock.test.js).
         result = subprocess.run(
             [
                 "npx",
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/action/choice_point_block.test.js"),
                 str(REPO_ROOT / "web/webclient-app/tests/action/action_dock.test.js"),
             ],
             cwd=str(REPO_ROOT),
@@ -332,23 +327,20 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-action-choicepoints::the-choice-point-is-a-movable-stream-end-block-owned-by-the-narrative-facade",
-        "webclient-action-choicepoints::choice-point-cards-share-the-dock-card-component-and-click-path",
+        "webclient-contextual-hud::narrative-lines-carry-the-reference-s-semantic-classes",
     )
     def test_choicepoint_block_node_suite_passes(self):
-        # The movable stream-end block (choice_point_block.test.js), the
-        # shared dock-card click path (option_card.test.js), and the
-        # narrative facade ownership (bridge.test.js) carry the block and
-        # card requirements in the Vue layer.
+        # The narrative feed semantic line styling (sys lines with seal ◈ marker,
+        # gold emphasis, plain serif lines) and full-log parity render
+        # through narrative_feed.test.js and full_log_overlay.test.js.
         result = subprocess.run(
             [
                 "npx",
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/action/choice_point_block.test.js"),
-                str(REPO_ROOT / "web/webclient-app/tests/action/option_card.test.js"),
-                str(REPO_ROOT / "web/webclient-app/tests/bridge/bridge.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/narrative_feed.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/full_log_overlay.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,

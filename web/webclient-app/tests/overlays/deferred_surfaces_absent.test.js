@@ -197,8 +197,9 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
     // code, re-freezing the set at 40. The improve-webclient-map-overlay-scale
     // change adds `World/MapLattice` to the required set (40 → 41). The
     // add-action-feedback-toasts change adds the action-feedback queue
-    // (`Feedback/ToastQueue`, 41 → 42).
-    expect(manifest.required).toHaveLength(42);
+    // (`Feedback/ToastQueue`, 41 → 42). webclient-align-03-narrative-feed
+    // removes ChoicePointBlock (42 → 41).
+    expect(manifest.required).toHaveLength(41);
    // The four full overlays complete the required set (B5's new family).
    for (const title of [
      "Overlays/MapOverlay",

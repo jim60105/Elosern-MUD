@@ -120,7 +120,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Action/OptionCard",
     "Action/RestForm",
     "Action/ChoiceCardRow",
-    "Action/ChoicePointBlock",
     "Action/DockTabBar",
     "Action/DockBreadcrumb",
     "Action/SkillDetailPane",

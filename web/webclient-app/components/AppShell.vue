@@ -55,10 +55,6 @@ const props = defineProps({
   uncertain: { type: Boolean, default: false },
   prompt: { type: String, default: "" },
   commandHistory: { type: Array, default: () => [] },
-  // The committed `context_actions.suggestions` envelope — the narrative
-  // stream-end choice-point block renders at the feed's end through this
-  // slice.
-  suggestions: { type: Object, default: null },
   // The store's mutation-lock flag (connection-loss or a reload-required
   // protocol error locks all graphical mutations). Passed to the drawer so a
   // rejected send preserves the typed speech.
@@ -83,7 +79,7 @@ const props = defineProps({
   inFlight: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["submit-command", "choice-action", "open-full-log", "open-overlay", "focus-lost"]);
+const emit = defineEmits(["submit-command", "open-full-log", "open-overlay", "focus-lost"]);
 
 const commandLine = ref(null);
 const feed = ref(null);
@@ -135,12 +131,6 @@ function onSubmit(text) {
   // One deliberate send through the single dispatch entry (the store routes
   // it at C1; the transport carries ordinary text, never ui_action).
   emit("submit-command", text);
-}
-
-function onChoiceAction(intent) {
-  // The narrative stream-end choice-point card/dismiss actions route through
-  // the same single dispatch entry as the dock (store is the sole writer).
-  emit("choice-action", intent);
 }
 
 function onOpenOverlay(name) {
@@ -242,9 +232,8 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
       <template #feed>
         <NarrativeFeed
           ref="feed"
+          :mode="props.mode"
           :lines="props.narrative"
-          :suggestions="props.suggestions"
-          @choice-action="onChoiceAction"
           @open-full-log="() => emit('open-full-log')"
         />
       </template>

@@ -52,7 +52,6 @@ ACTION_FAMILY_KEYS = (
     "Action/DockMenuItem",
     "Action/OptionCard",
     "Action/ChoiceCardRow",
-    "Action/ChoicePointBlock",
 )
 
 # The exact showcase story registration for the action-dock family: the
@@ -64,9 +63,6 @@ ACTION_FAMILY_STORY_IDS = {
     "action-actiondock--generating-suggestions",
     "action-actiondock--unavailable-suggestions",
     "action-choicecardrow--ready-row",
-    "action-choicepointblock--generating",
-    "action-choicepointblock--ready",
-    "action-choicepointblock--stream-end",
     "action-dockmenu--exploration-frame",
     "action-dockmenu--fixed-grid-frame",
     "action-dockmenu--target-frame",
@@ -229,6 +225,6 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
             family_titles,
             {f"Action/{component}" for component in (
                 "ActionDock", "DockMenu", "DockMenuItem",
-                "OptionCard", "ChoiceCardRow", "ChoicePointBlock",
+                "OptionCard", "ChoiceCardRow",
             )},
         )

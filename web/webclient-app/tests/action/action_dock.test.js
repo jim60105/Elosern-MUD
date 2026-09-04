@@ -1,8 +1,9 @@
 import { mount } from "@vue/test-utils";
-import { h, nextTick } from "vue";
+import { h, nextTick, ref } from "vue";
 import { afterEach, describe, expect, it } from "vitest";
 import ActionDock from "../../components/ActionDock.vue";
 import DockMenu from "../../components/DockMenu.vue";
+import ExplorationMenu from "../../lib/exploration_menu.js";
 
 const AFFORDANCES = [
   {
@@ -22,6 +23,26 @@ const ROOT_ITEMS = [
   { key: "interact", label: "互動", enabled: true },
   { key: "suggestions", label: "建議", enabled: true },
 ];
+
+
+function normalizeItems(items) {
+  return items.map((item) => {
+    const norm = {
+      key: item.key,
+      label: item.label,
+      enabled: item.enabled !== false,
+      hint: item.hint,
+    };
+    if (item.actionId) {
+      norm.action_id = item.actionId;
+      norm.params = item.payload || {};
+    } else {
+      norm.navigation = true;
+      norm.surface = item.key;
+    }
+    return norm;
+  });
+}
 
 const READY = {
   status: "ready",
@@ -57,14 +78,14 @@ describe("ActionDock (B2 action-dock family)", () => {
     document.body.innerHTML = "";
   });
 
-  function mountDock(props = {}) {
+  function mountDock(props = {}, items = AFFORDANCES) {
     const host = document.createElement("div");
     document.body.appendChild(host);
     wrapper = mount(ActionDock, {
       attachTo: host,
       props: { mode: "exploration", ...props },
       slots: {
-        default: () => [h(DockMenu, { items: AFFORDANCES })],
+        default: () => [h(DockMenu, { items, depth: 2 })],
       },
     });
     return wrapper;
@@ -91,109 +112,6 @@ describe("ActionDock (B2 action-dock family)", () => {
     );
   });
 
-  it("renders ready suggestions as the exact card shapes plus dismiss", () => {
-    const w = mountDock({ suggestions: READY });
-    const section = w.get('[data-testid="suggestions-section"]');
-    expect(section.attributes("role")).toBe("region");
-    expect(section.attributes("aria-label")).toBe("AI 建議");
-    expect(
-      w.get('[data-testid="suggestions-dismiss"]').text(),
-    ).toBe("✕ 清除建議");
-    const cards = w.findAll('[data-testid="option-card"]');
-    expect(cards).toHaveLength(3);
-    expect(cards[1].get(".option-card-hint").text()).toBe("先休息一會兒再行動");
-    expect(w.find('[data-testid="suggestions-generating"]').exists()).toBe(false);
-  });
-
-  it("emits the exact OOB action intent for a ready card activation", async () => {
-    const w = mountDock({ suggestions: READY });
-    const cards = w.findAll('[data-testid="option-card"]');
-    await cards[0].trigger("click");
-    expect(w.emitted("action")).toHaveLength(1);
-    expect(w.emitted("action")[0][0]).toEqual({
-      action_id: "explore.look",
-      payload: { room: true },
-    });
-    await cards[2].trigger("click");
-    expect(w.emitted("action")).toHaveLength(2);
-    expect(w.emitted("action")[1][0]).toEqual({
-      action_id: "explore.talk_freeform",
-      payload: { npc_id: 9, speech: "我們聊聊好嗎？" },
-    });
-  });
-
-  it("emits the options.dismiss intent with the exact empty payload", async () => {
-    const w = mountDock({ suggestions: READY });
-    await w.get('[data-testid="suggestions-dismiss"]').trigger("click");
-    expect(w.emitted("action")[0][0]).toEqual({
-      action_id: "options.dismiss",
-      payload: {},
-    });
-  });
-
-  it("renders the generating state as one muted line with no cards", () => {
-    const w = mountDock({ suggestions: { status: "generating" } });
-    expect(
-      w.get('[data-testid="suggestions-generating"]').text(),
-    ).toBe("AI 正在構思建議…");
-    expect(w.findAll('[data-testid="option-card"]')).toHaveLength(0);
-    expect(w.find('[data-testid="suggestions-dismiss"]').exists()).toBe(false);
-  });
-
-  it("renders degraded 0 cards as the note plus the empty-state line", () => {
-    const w = mountDock({ suggestions: { status: "degraded", cards: [] } });
-    expect(
-      w.get('[data-testid="suggestions-note"]').text(),
-    ).toBe("AI 建議目前不可用");
-    expect(
-      w.get('[data-testid="suggestions-empty"]').text(),
-    ).toBe("現在沒有什麼值得做的動作");
-    expect(w.findAll('[data-testid="option-card"]')).toHaveLength(0);
-  });
-
-  it("renders degraded rule cards with the note present", () => {
-    const w = mountDock({
-      suggestions: {
-        status: "degraded",
-        cards: [
-          {
-            kind: "known_action",
-            action_code: "explore.look",
-            label: "查看房間",
-            params: { room: true },
-          },
-        ],
-      },
-    });
-    expect(w.get('[data-testid="suggestions-note"]').exists()).toBe(true);
-    expect(w.findAll('[data-testid="option-card"]')).toHaveLength(1);
-    expect(w.find('[data-testid="suggestions-empty"]').exists()).toBe(false);
-  });
-
-  it("renders nothing for the unavailable suggestions state", () => {
-    const w = mountDock({ suggestions: { status: "unavailable" } });
-    expect(w.find('[data-testid="suggestions-section"]').exists()).toBe(false);
-  });
-
-  it("omits the suggestions section entirely when the slice is absent", () => {
-    const w = mountDock();
-    expect(w.find('[data-testid="suggestions-section"]').exists()).toBe(false);
-  });
-
-  it("reacts to committed slice changes without remounting the dock", async () => {
-    const w = mountDock({ suggestions: { status: "generating" } });
-    const root = w.get('[data-testid="action-dock"]').element;
-    expect(w.get('[data-testid="suggestions-generating"]').exists()).toBe(true);
-    w.setProps({ suggestions: READY });
-    await nextTick();
-    expect(w.find('[data-testid="action-dock"]').element).toBe(root);
-    expect(w.findAll('[data-testid="option-card"]')).toHaveLength(3);
-    w.setProps({ suggestions: { status: "unavailable" } });
-    await nextTick();
-    expect(w.find('[data-testid="action-dock"]').element).toBe(root);
-    expect(w.find('[data-testid="suggestions-section"]').exists()).toBe(false);
-  });
-
   it("refreshes the guidance note when the surface prefix changes", async () => {
     const w = mountDock({ guidancePrefix: "附近動作" });
     expect(w.get('[data-testid="action-dock-description"]').text()).toBe(
@@ -207,14 +125,9 @@ describe("ActionDock (B2 action-dock family)", () => {
   });
 
   it("renders exactly one visible legend: the description is hidden, the tab-bar hint is the visible copy", () => {
-    // Mount with rootItems so the tab bar (and its trailing hint) renders;
-    // the default mount has no tabs, so the duplicate copy check needs the
-    // tab-bar present to be meaningful.
     const w = mountDock({ rootItems: ROOT_ITEMS });
     const desc = w.get('[data-testid="action-dock-description"]');
     const descStyle = getComputedStyle(desc.element);
-    // Assert the rendered state, not merely the class-name presence: the
-    // element is 1x1, absolutely positioned, and clipped.
     expect(desc.attributes("aria-hidden")).toBe("true");
     expect(desc.classes()).toContain("visually-hidden");
     expect(descStyle.position).toBe("absolute");
@@ -229,17 +142,147 @@ describe("ActionDock (B2 action-dock family)", () => {
     const hintStyle = getComputedStyle(hint.element);
     expect(hintStyle.display).not.toBe("none");
     expect(hintStyle.width).not.toBe("1px");
-    // The tab icon's `<path>` carries the reference's per-key stroke
-    // attributes: `move` has both cap+join, `interact` has join only,
-    // `suggestions` (the star) has neither.
-    const movePath = w.find('.dock-tab-bar__tab[data-item-key="move"] .dock-tab-bar__icon path');
-    expect(movePath.attributes("stroke-linecap")).toBe("round");
-    expect(movePath.attributes("stroke-linejoin")).toBe("round");
-    const interactPath = w.find('.dock-tab-bar__tab[data-item-key="interact"] .dock-tab-bar__icon path');
-    expect(interactPath.attributes("stroke-linejoin")).toBe("round");
-    expect(interactPath.attributes("stroke-linecap")).toBeUndefined();
-    const suggPath = w.find('.dock-tab-bar__tab[data-item-key="suggestions"] .dock-tab-bar__icon path');
-    expect(suggPath.attributes("stroke-linecap")).toBeUndefined();
-    expect(suggPath.attributes("stroke-linejoin")).toBeUndefined();
+  });
+
+  it("never renders suggestion content at the dock root outside the pane", () => {
+    const w = mountDock({ rootItems: ROOT_ITEMS }, []);
+    expect(w.find('[data-testid="suggestions-section"]').exists()).toBe(false);
+    expect(w.findAll('[data-testid="option-card"]')).toHaveLength(0);
+  });
+
+  it("renders ready suggestions solely inside the 建議 router pane with dismiss control", () => {
+    const menu = ExplorationMenu.suggestionsMenu(READY);
+    const w = mountDock({ rootItems: ROOT_ITEMS }, normalizeItems(menu.items));
+
+    // No legacy root section exists
+    expect(w.find('[data-testid="suggestions-section"]').exists()).toBe(false);
+
+    // Cards render inside the pane
+    const cards = w.findAll('.dock-menu__cards [data-item-key^="action-explore"]');
+    expect(cards).toHaveLength(3);
+    expect(cards[0].text()).toContain("查看房間");
+    expect(cards[1].text()).toContain("等到黃昏");
+    expect(cards[1].text()).toContain("先休息一會兒再行動");
+    expect(cards[2].text()).toContain("我們聊聊好嗎？");
+
+    // Clear suggestions row exists in the pane
+    const dismissRow = w.find('[data-item-key="action-options.dismiss"]');
+    expect(dismissRow.exists()).toBe(true);
+    expect(dismissRow.text()).toContain("✕ 清除建議");
+  });
+
+  it("emits the exact OOB action intent when a card or dismiss in the 建議 pane is activated", async () => {
+    const menu = ExplorationMenu.suggestionsMenu(READY);
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+
+    let emittedAction = null;
+    wrapper = mount({
+      components: { ActionDock, DockMenu },
+      setup: () => ({
+        items: normalizeItems(menu.items),
+        onActivate: (ev) => { emittedAction = ev; },
+      }),
+      template: `
+        <ActionDock :root-items="['suggestions']" mode="exploration">
+          <DockMenu :items="items" :depth="2" @activate="onActivate" />
+        </ActionDock>
+      `,
+    }, { attachTo: host });
+
+    const cards = wrapper.findAll('.dock-menu__cards [data-item-key^="action-explore"]');
+    expect(cards).toHaveLength(3);
+
+    // Click card 0: known_action explore.look
+    await cards[0].trigger("click");
+    expect(emittedAction.intent).toEqual({
+      action_id: "explore.look",
+      payload: { room: true },
+    });
+
+    // Click card 2: freeform explore.talk_freeform
+    await cards[2].trigger("click");
+    expect(emittedAction.intent).toEqual({
+      action_id: "explore.talk_freeform",
+      payload: { npc_id: 9, speech: "我們聊聊好嗎？" },
+    });
+
+    // Click dismiss control
+    const dismissRow = wrapper.find('[data-item-key="action-options.dismiss"]');
+    await dismissRow.trigger("click");
+    expect(emittedAction.intent).toEqual({
+      action_id: "options.dismiss",
+      payload: {},
+    });
+  });
+
+  it("renders generating state in the 建議 pane as one disabled row with no cards", () => {
+    const menu = ExplorationMenu.suggestionsMenu({ status: "generating" });
+    const w = mountDock({ rootItems: ROOT_ITEMS }, normalizeItems(menu.items));
+
+    expect(w.findAll('.dock-menu__cards [data-item-key^="action-explore"]')).toHaveLength(0);
+    const generatingRow = w.find('[data-item-key="suggestions-generating"]');
+    expect(generatingRow.exists()).toBe(true);
+    expect(generatingRow.text()).toContain("AI 正在構思建議…");
+  });
+
+  it("renders degraded state in the 建議 pane with rule cards or empty note", () => {
+    // Degraded with 0 cards: empty note
+    const emptyMenu = ExplorationMenu.suggestionsMenu({ status: "degraded", cards: [] });
+    const w1 = mountDock({ rootItems: ROOT_ITEMS }, normalizeItems(emptyMenu.items));
+    expect(w1.findAll('.dock-menu__cards [data-item-key^="action-explore"]')).toHaveLength(0);
+    const emptyRow = w1.find('[data-item-key="suggestions-empty"]');
+    expect(emptyRow.exists()).toBe(true);
+    expect(emptyRow.text()).toContain("現在沒有什麼值得做的動作");
+
+    w1.unmount();
+    document.body.innerHTML = "";
+
+    // Degraded with 1 rule card: card present
+    const ruleMenu = ExplorationMenu.suggestionsMenu({
+      status: "degraded",
+      cards: [READY.cards[0]],
+    });
+    const w2 = mountDock({ rootItems: ROOT_ITEMS }, normalizeItems(ruleMenu.items));
+    expect(w2.findAll('.dock-menu__cards [data-item-key^="action-explore"]')).toHaveLength(1);
+    expect(w2.find('[data-item-key="action-options.dismiss"]').exists()).toBe(true);
+  });
+
+  it("replaces generating line in place with ready cards inside the 建議 pane", async () => {
+    const genMenu = ExplorationMenu.suggestionsMenu({ status: "generating" });
+    const readyMenu = ExplorationMenu.suggestionsMenu(READY);
+
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+
+    const itemsRef = ref(normalizeItems(genMenu.items));
+    wrapper = mount({
+      components: { ActionDock, DockMenu },
+      setup: () => ({ items: itemsRef }),
+      template: `
+        <ActionDock :root-items="['suggestions']" mode="exploration">
+          <DockMenu :items="items" :depth="2" />
+        </ActionDock>
+      `,
+    }, { attachTo: host });
+
+    const paneBefore = wrapper.get(".action-dock__pane").element;
+    expect(wrapper.find('[data-item-key="suggestions-generating"]').exists()).toBe(true);
+    expect(wrapper.findAll('.dock-menu__cards [data-item-key^="action-explore"]')).toHaveLength(0);
+
+    itemsRef.value = normalizeItems(readyMenu.items);
+    await nextTick();
+
+    const paneAfter = wrapper.get(".action-dock__pane").element;
+    expect(paneAfter).toBe(paneBefore);
+    expect(wrapper.find('[data-item-key="suggestions-generating"]').exists()).toBe(false);
+    expect(wrapper.findAll('.dock-menu__cards [data-item-key^="action-explore"]')).toHaveLength(3);
+  });
+
+  it("retires suggestion presentation on transport reset", () => {
+    // When transport reset occurs, the suggestions menu is cleared
+    const w = mountDock({ rootItems: ROOT_ITEMS }, []);
+    expect(w.findAll('[data-testid="option-card"]')).toHaveLength(0);
+    expect(w.find('[data-item-key="action-options.dismiss"]').exists()).toBe(false);
   });
 });

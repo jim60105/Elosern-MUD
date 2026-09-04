@@ -72,15 +72,12 @@ function onChipKeydown(event) {
 
 <template>
   <div
+    v-if="conditions.length > 0"
     class="hud conditions"
     data-testid="status-panel__conditions"
     @keydown="onChipKeydown"
   >
-    <p v-if="conditions.length === 0" class="empty" data-testid="status-panel__conditions-empty">
-      無條件
-    </p>
-    <template v-else>
-      <p class="clab">狀態</p>
+    <p class="clab">狀態</p>
       <div class="chips">
         <button
           v-for="condition in visible"
@@ -154,7 +151,6 @@ function onChipKeydown(event) {
       >
         {{ chipName(conditions.find((c) => c.code === activeCode) || {}) }}
       </p>
-    </template>
   </div>
 </template>
 

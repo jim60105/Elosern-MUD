@@ -160,7 +160,7 @@ class VueShowcaseDataEvidenceTest(unittest.TestCase):
                 "Core/FullLogOverlay", "Core/HudDrawer",
                 "Action/ActionDock", "Action/DockMenu", "Action/DockMenuItem",
                 "Action/OptionCard", "Action/RestForm", "Action/ChoiceCardRow",
-                "Action/ChoicePointBlock", "Action/DockTabBar",
+                "Action/DockTabBar",
                 "Action/DockBreadcrumb", "Action/SkillDetailPane",
                 "Data/CharacterHead", "Data/VitalsTrack", "Data/ConditionChips",
                 "Data/ParticipantFrame", "Data/EquipmentDoll", "Data/CharacterStatusDrawer",

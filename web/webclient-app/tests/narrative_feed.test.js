@@ -143,4 +143,58 @@ describe("NarrativeFeed (B1 core family)", () => {
     expect(wrapper.element.scrollTop).toBe(600);
     expect(wrapper.get('[data-testid="unread-indicator"]').attributes("data-count")).toBe("0");
   });
+
+  it("renders the head row with mode label 敘述 for exploration and 戰鬥日誌 for combat", async () => {
+    wrapper = mount(NarrativeFeed, {
+      props: {
+        mode: "exploration",
+        lines: [{ kind: "out", text: "晨霧漫卷。" }],
+      },
+    });
+    const label = wrapper.get('[data-testid="narrative-mode-label"]');
+    expect(label.text()).toBe("敘述");
+    const fullLogBtn = wrapper.get('[data-testid="narrative-fulllog-control"]');
+    expect(fullLogBtn.text()).toBe("完整日誌 ↑");
+
+    await fullLogBtn.trigger("click");
+    expect(wrapper.emitted("open-full-log")).toBeTruthy();
+
+    await wrapper.setProps({ mode: "combat" });
+    expect(wrapper.get('[data-testid="narrative-mode-label"]').text()).toBe("戰鬥日誌");
+  });
+
+  it("renders sys lines with the .sys class and plain lines without it", () => {
+    wrapper = mount(NarrativeFeed, {
+      props: {
+        lines: [
+          { kind: "out", text: "晨霧貼著灰河的水面爬行。" },
+          { kind: "sys", text: "渡口有 1 名可互動的人物。" },
+        ],
+      },
+    });
+    const lines = wrapper.findAll(".narrative-line");
+    expect(lines).toHaveLength(2);
+
+    // Plain line: kind 'out', no 'sys' class
+    expect(lines[0].classes()).toContain("out");
+    expect(lines[0].classes()).not.toContain("sys");
+
+    // Sys line: kind 'sys', carries 'sys' class
+    expect(lines[1].classes()).toContain("sys");
+    expect(lines[1].attributes("data-line-kind")).toBe("sys");
+  });
+
+  it("never renders a stream choice-point block or card group in the feed", () => {
+    wrapper = mount(NarrativeFeed, {
+      props: {
+        lines: [{ kind: "out", text: "晨霧漫卷。" }],
+        suggestions: {
+          status: "ready",
+          cards: [{ kind: "known_action", action_code: "explore.look", label: "查看房間" }],
+        },
+      },
+    });
+    expect(wrapper.find('[data-testid="choicepoint-block"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="option-card"]').exists()).toBe(false);
+  });
 });

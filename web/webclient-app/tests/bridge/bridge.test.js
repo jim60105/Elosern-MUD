@@ -128,6 +128,13 @@ describe("window.Elosern bridge", () => {
     expect(store.commandHistory).toEqual(["look", "look 2"]);
   });
 
+  it("mountChoicePoint, replaceChoicePoint, unmountChoicePoint are safe no-ops returning false", () => {
+    const { facade } = installBridge();
+    expect(facade.narrativeInput.mountChoicePoint({})).toBe(false);
+    expect(facade.narrativeInput.replaceChoicePoint({})).toBe(false);
+    expect(facade.narrativeInput.unmountChoicePoint()).toBe(false);
+  });
+
   it("exposes exactly one action-dispatch entry, with a one-mutation-in-flight gate", () => {
     const { store, facade } = installBridge();
     openActiveSession(store);

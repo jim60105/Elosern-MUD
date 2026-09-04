@@ -8,7 +8,7 @@ single-file component and SHALL have at least one Storybook story that documents
 events/actions it emits, and its primary states. At the completion of the contextual HUD
 redesign the required manifest SHALL enumerate at minimum: the header; the narrative feed and its
 unread indicator; the command line (with its quick-word chips); the action dock with its menu,
-submenu, and choice-card frames; the choice-point block; the status panel with its gauges, counters,
+submenu, and choice-card frames; the status panel with its gauges, counters,
 and conditions; the character status drawer (including the equipment doll); the skill book; the
 local map; the art panel; the shop, quest board, and lore drawer (each backed by the `services`
 panel); and each full overlay (map, settings, help, and creation). Each component SHALL render
@@ -72,12 +72,11 @@ non-local network requests blocked.
 - **THEN** it renders from local assets without failure
 
 ### Requirement: The action-dock family presents a finite, keyboard-and-pointer-actionable contract
-The action-dock components (`ActionDock`, `DockMenu`/`DockMenuItem`, `OptionCard`/`ChoiceCardRow`,
-`ChoicePointBlock`) SHALL present the `context_actions` v5 menus as a finite, framed grid with a guidance
+The action-dock components (`ActionDock`, `DockMenu`/`DockMenuItem`, `OptionCard`/`ChoiceCardRow`)
+SHALL present the `context_actions` v5 menus as a finite, framed grid with a guidance
 line and focused/disabled states, and SHALL render the option and choice cards in the exact
 server-authored shape. The action dock SHALL expose the preserved `action-` and `target-` item keys and the
-focusable action-dock target, and SHALL expose a stable `data-testid` on every interactive cell. The
-choice-point block SHALL show ready and generating states and remain movable. Every card and row SHALL be
+focusable action-dock target, and SHALL expose a stable `data-testid` on every interactive cell. Every card and row SHALL be
 backed only by the `context_actions` panel and SHALL emit, on activation, the exact OOB action intent — the
 `action_id` and `payload` fields of the `ui_action` envelope (the transport-level fields are owned by the
 C1 store) — so no action or target SHALL be invented.
@@ -89,10 +88,6 @@ C1 store) — so no action or target SHALL be invented.
 #### Scenario: Option and choice cards match the server shape
 - **WHEN** the `context_actions` suggestions render
 - **THEN** each option and choice card is the exact server-authored shape and its activation emits the exact OOB action intent (the `ui_action` envelope's `action_id` + `payload`) with no invented value
-
-#### Scenario: Choice-point shows generating then ready
-- **WHEN** a choice-point transitions from generating to ready
-- **THEN** the block renders the generating state then the ready state and remains movable
 
 ### Requirement: The status, character, and skill surfaces present truthful, non-color-only state
 The `StatusPanel`, the `CharacterStatusDrawer` (housing the `EquipmentDoll`), and the `SkillBook`
