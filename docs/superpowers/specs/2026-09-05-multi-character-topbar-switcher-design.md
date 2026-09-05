@@ -1,7 +1,8 @@
 # Multi-Character Support and TopBar Character Switcher — Design
 
 **Date:** 2026-09-05
-**Status:** Approved
+**Status:** Approved; decomposed into five OpenSpec changes (§10). Decisions D8, §4, and §5.2
+are amended by §11 — read it alongside the sections below.
 **Scope:** Enabling one account to own and play multiple characters end to end — backend
 capacity, a new-character creation entry point, account-level WebClient protocol/actions, and a
 TopBar dropdown for switching or creating characters.
@@ -26,6 +27,9 @@ the WebClient protocol, surfaced as a dropdown in `TopBar.vue`.
 ---
 
 ## 2. Design Decisions
+
+> D8 and D10 are revisited in §11 after implementation research. D8 is amended; D10 is confirmed
+> but needs less work than described.
 
 | # | Decision | Rationale |
 |---|---|---|
@@ -59,6 +63,10 @@ the WebClient protocol, surfaced as a dropdown in `TopBar.vue`.
   Evennia's default multi-character OOC menu once more than one character exists.
 
 ## 4. New-Character Creation Flow
+
+> The adapter sequence below is amended by §11: the shell is created before the current character
+> is left, the transition is scheduled after the action result rather than run inline, and the
+> helper never unpuppets first.
 
 New account-scoped action `account.character.create` (empty payload), added to a new
 `web/webclient/actions/account_actions.py` alongside `character_actions.py`'s existing pattern.
@@ -113,6 +121,9 @@ gains a `roster` slice:
 
 ### 5.2 `account.character.switch`
 
+> Amended by §11: step 3 is a rejection, not a no-op success, and steps 2/4/5 are scheduled after
+> the action result with a verify-and-recover contract.
+
 Payload: `{"character_id": <int>}`.
 
 Adapter behavior:
@@ -164,6 +175,9 @@ mechanism is introduced.
 
 ## 8. Testing Plan
 
+> Distributed across the five changes of §10; each change carries its own share plus the
+> failure-path coverage §11 requires.
+
 - **Backend unit tests:** `web/webclient/actions/tests/test_account_actions.py` covering
   `account.character.create` (slot-cap gate) and `account.character.switch` (membership gate,
   combat-lock gate, no-op-on-self, successful puppet transition + `_last_puppet` update).
@@ -186,3 +200,111 @@ mechanism is introduced.
 - Per-character-slot monetization, deletion, or renaming flows.
 - Concurrent multi-window puppeting of two characters from the same account at once (unaffected by
   and unrelated to `MULTISESSION_MODE`, which this change does not touch).
+
+---
+
+## 10. Delivery Roadmap
+
+The feature is split into five OpenSpec changes, each sized to one engineer-day. Change numbers
+are `MC1`–`MC5` here and match the change directory prefixes under `openspec/changes/`.
+
+| Order | OpenSpec change | Depends on | Delivers | Status |
+|---|---|---|---|---|
+| MC1 | `multichar-01-account-capacity` | — | `MAX_NR_CHARACTERS = _env_int_bounded("ELOSERN_MAX_CHARACTERS", 5, low=1, high=10)` with its `.env.example` and settings-guide inventory rows; the login world-introduction re-keyed from "any pending character the account owns" to the session's own puppet; the dead `_MAX_NR_CHARACTERS == 1` branches removed from `CmdOOCLook`/`CmdOOC`; Evennia's stock `charcreate`/`chardelete` Developer-locked to match what `command-reference.md` already documents; a behavioural capacity test | Proposed |
+| MC2 | `multichar-02-roster-read-model` | MC1 | the `webclient-character-roster` capability; `world/rules/account_roster.py` plus the `roster` presentation panel (schema v1) rendered in every snapshot and deliberately ungated on `creation_pending`; portrait rows through the existing `resolve_character`; `max_characters` / `can_create` / `switch_locked` / `lock_reason`; the `PANEL_ALLOWLIST` entry and the client store slice, with no consumer yet | Proposed |
+| MC3 | `multichar-03-character-switch-action` | MC1 (MC2 for shared vocabulary) | the injectable clock seam, the verified `_attach_puppet` helper, the three-rung recovery ladder, and `account.character.switch` — decided synchronously, transitioned one reactor turn later, result-only | Proposed |
+| MC4 | `multichar-04-character-create-action` | MC3 (MC2 to be fully verifiable) | `account.character.create` reusing MC3's machinery, creating the shell *before* any detach; the end-to-end two-character WebSocket integration test | Proposed |
+| MC5 | `multichar-05-topbar-switcher-ui` | MC2, MC3, MC4 | `CharacterSwitcher.vue` in the top band, the confirmation gate on creation only, one shared lock note, the showcase manifest lockstep (44 → 45) | Proposed |
+
+### Parallel batch order
+
+1. **Batch 1 — MC1 alone.** MC2 and MC3 are both untestable until an account can genuinely hold a
+   second character.
+2. **Batch 2 — MC2 ‖ MC3.** File-disjoint: MC2 touches `web/webclient/presentation/`,
+   `world/rules/`, the reducer's `PANEL_ALLOWLIST`, and `stores/elosern.js`; MC3 touches
+   `web/webclient/actions/`. Their only overlap is the conceptual capacity/combat-lock vocabulary,
+   and MC3's adapter re-derives every predicate itself rather than reading the panel, so there is
+   no implementation coupling.
+3. **Batch 3 — MC4.** Serial after MC3, whose transition helper it reuses. Merge it after MC2 as
+   well: its integration test asserts on the `roster` panel, so landing it earlier would leave a
+   weaker assertion to be strengthened later.
+4. **Batch 4 — MC5.** Pure client work, after all three of MC2/MC3/MC4.
+
+The only cross-change file contention in the whole set is `web/webclient/actions/registry.py`
+(MC3 and MC4 each add one registration and one docstring line) and
+`web/webclient/actions/account_actions.py` (MC4 extends the module MC3 creates) — both serial by
+construction, so no batch contains two changes editing one file.
+
+---
+
+## 11. Amendments Made During Proposal Work
+
+Reading the tree while writing MC1–MC5 contradicted five decisions above. This section supersedes
+them; the original wording is kept for the record rather than edited in place.
+
+- **D8 is amended.** "The roster travels with every status snapshot" is delivered as a *separate*
+  `roster` panel, not as a field inside `status`. Folding it into `status` would bump
+  `STATUS_SCHEMA_VERSION` 2 → 3 and move every status consumer, fixture, story, and the client
+  allowlist with it. A separate panel rides every snapshot anyway (`full_snapshot` renders every
+  registered panel), gets its own availability discriminator, and — the load-bearing part — can be
+  ungated on `creation_pending`, which is what lets a player escape an abandoned wizard. `objectives`
+  is the precedent.
+
+- **§4 and §5.2's adapter sequences are amended.** An adapter must **not** perform the puppet
+  transition inline. `retire_sequence` nulls `session.ndb.elosern_dispatch` and
+  `reset_client_sequence` bumps the epoch, so `_publish_completion`'s guard
+  (`dispatcher.py:344`) trips on all three clauses and **no `ui_action_result` is sent at all**.
+  The browser then recovers only through the `no_puppet` path, which sets `uncertain = true`
+  (`stores/elosern.js:1009-1011`) — every *successful* switch would display "outcome could not be
+  confirmed". Both actions therefore decide synchronously, return a `no_presentation` result, and
+  schedule the transition one reactor turn later.
+
+- **§4 step 2 and §5.2 step 4's "unpuppet first" is amended.** The transition never calls
+  `unpuppet_object` itself. Evennia's `puppet_object`
+  (`evennia/accounts/accounts.py:459-555`) refuses **silently** — a player message, no exception —
+  in three cases, all of which return *before* it releases the previous puppet at line 517; letting
+  it own the unpuppet means a refusal leaves the current character attached. Its
+  `MAX_NR_SIMULTANEOUS_PUPPETS` guard, however, refuses *after* that release, so the transition
+  must also **verify** `get_puppet(session) is target` and walk an explicit recovery ladder ending
+  in an error-level log plus an unambiguous "you hold no character, use `進入世界`" line.
+
+- **§4's ordering for creation is amended.** The new shell is created **before** the current
+  character is left. `create_character` reports a full account by returning `(None, [error])`
+  rather than raising, so creating first makes a capacity failure a pure no-op on the session — no
+  detach, no retired sequence, no recovery needed. A shell created but not attached is kept, not
+  deleted: it is a legitimate pending character that appears in the roster and can be entered
+  later, and deleting on an error branch would be a destructive write in the least trustworthy
+  place.
+
+- **§5.2 step 3 is amended.** A switch naming the session's own live puppet is a **rejection**
+  (`already_current`), not a no-op success. A success would tell the client a transition is coming
+  and leave it waiting for a `no_puppet` signal that never arrives.
+
+- **D10 is confirmed, not amended,** but needs no generalization work:
+  `world/art/presenter.py::resolve_character(entity)` already accepts any entity, resolves only
+  from an explicit named `portrait_policy`, and applies the adult gate. Room presence was never a
+  precondition. A still-pending shell carries no policy (it is written by
+  `finalize_player_portrait` at activation), so it resolves to the `無肖像` placeholder.
+
+### Consequences found that this design did not cover
+
+- **§3's "no code change is required" for `commands/localized/account.py` is wrong in one respect
+  beyond the dead branches.** `Account.at_post_login` decides the world introduction from
+  `_pending_character(account)`, an account-wide scan. Once the cap rises, an account owning one
+  activated and one abandoned-pending character sees the introduction and the creation start screen
+  on every login while playing the finished character. MC1 re-keys both to the session's own puppet.
+
+- **§9's "Telnet-side is out of scope" understates what raising the cap unlocks.** Evennia's
+  `CmdCharCreate` and `CmdCharDelete` are mounted by `AccountCmdSet`'s `super()` call at
+  `cmd:pperm(Player)` and are not in `_LOCALIZED_ORIGINALS`. `charcreate` is inert today only
+  because the slot check always fails; raising the cap makes it a live, unlocalized English
+  creation entry that bypasses the client-side confirmation of D5, while
+  `docs/game/command-reference.md:820-821` already documents both as 管理員. MC1 Developer-locks
+  them, which also closes an already-live `chardelete` that can delete an account's only character.
+
+- **Two per-character effects of switching are accepted rather than solved**, and are recorded so a
+  follow-up can own them deliberately: party and companion bindings (`world/rules/party.py`) stay
+  on the character left behind, with no online owner; and `PlayerCharacter.at_post_unpuppet`
+  (`typeclasses/characters.py:131-134`) fires the logout epithet-nomination rest point on every
+  switch, not only on a real disconnect. The latter is cooldown-gated, so it cannot runaway-spam
+  the LLM.
