@@ -47,8 +47,10 @@ room; `malformed_binding` when the stored binding is unknown, `place` lacks a re
 room, or the attributes are missing on a component this change's sync has re-converged — the
 resolver SHALL fail closed, never default open. The resolver SHALL write no state, and each
 `malformed_binding` verdict SHALL emit at most one debounced warn event per host carrying the host
-and component context. Fixed Traditional Chinese messages for `remote` and `off_anchor` SHALL be
-registry-owned constants of the gate module consumed by every caller.
+and component context. The fixed Traditional Chinese message for `off_anchor` SHALL be a
+registry-owned constant of the gate module consumed by every caller; `remote` refusals SHALL NOT
+gain a gate-owned message — they name the service per surface (merchant, guild staff) and stay in
+each caller's own message table, the gate exposing only the stable reason code.
 
 #### Scenario: Co-location rules first
 - **WHEN** a place-bound host in another room is queried
@@ -67,3 +69,8 @@ registry-owned constants of the gate module consumed by every caller.
   deleted
 - **THEN** the verdict is `malformed_binding`, resolution allowed is false, and repeated queries
   against the same host emit one debounced warn event only
+
+#### Scenario: Remote refusals keep per-surface prose
+- **WHEN** the merchant surface and the guild surface each refuse a `remote` host through their
+  command paths
+- **THEN** each refusal line names its own service and no gate-module constant supplies either line
