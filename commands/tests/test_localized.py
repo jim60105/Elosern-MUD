@@ -116,6 +116,9 @@ class QuickbarLetterPinningTests(EvenniaTestCase):
                         owners.setdefault(name, set()).add(command.key)
         return owners
 
+    @covers_requirement(
+        "webclient-contextual-hud::bound-quickbar-letters-are-pinned-against-the-installed-player-cmdset"
+    )
     def test_bound_letters_resolve_to_their_pinned_commands(self):
         owners = self._letter_owners()
         for letter, pinned_key in self.BOUND_LETTERS.items():
