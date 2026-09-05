@@ -87,13 +87,20 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
 
     def _section(self, page):
         return page.evaluate(
-            "document.querySelector('#action-dock [data-item-key=\"suggestions\"]') !== null"
+            """() => {
+                const s = (window.__elosernBridge && window.__elosernBridge.store.view) || {};
+                const subDock = s.activeSubDock || null;
+                const desc = (window.__elosernBridge && window.__elosernBridge.router.currentDescriptor()) || {};
+                const pane = document.querySelector('[data-testid="dock-menu"]');
+                const hasCards = pane !== null && pane.querySelector('[data-item-key^="action-"], [data-item-key^="suggestions-"]') !== null;
+                return subDock === null && desc.source === 'exploration.suggestions' && hasCards;
+            }"""
         )
 
     def _open_suggestions_pane(self, page):
         desc = page.evaluate("() => window.__elosernBridge.router.currentDescriptor()") or {}
         if desc.get("source") != "exploration.suggestions":
-            page.locator('[data-testid="dock-menu"] [data-item-key="suggestions"]').click()
+            page.locator('[data-testid="dock-menu"] [data-item-key="suggestions"]').click(force=True)
             page.wait_for_timeout(60)
 
     def _wait_section(self, page, timeout=30000):
@@ -461,6 +468,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             return (not state.get("connected")) and bool(state.get("mutationsLocked"))
 
         wait_for_store_state(page, _locked)
+        self._open_suggestions_pane(page)
         # The non-dismissible offline overlay covers the dock (the lock UX);
         # scroll the card into view, then force the click so the card's direct
         # listener still runs and the action client's own lock gate is what
