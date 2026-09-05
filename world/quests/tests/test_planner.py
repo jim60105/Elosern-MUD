@@ -436,6 +436,22 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
     def _records(self):
         return [to_storage(record) for record in read_records(self.player)]
 
+    @covers_requirement(
+        "companion-possession-core::a-possessed-npc-is-autonomy-silent-and-unreachable-by-dialogue"
+    )
+    def test_possessed_companion_kill_advances_owner_objective(self):
+        """Scenario: Possessed-companion combat still credits the owner's quest."""
+        from world.rules.possession import enter_possession
+
+        accept_quest(self.player, self.tier_hunt.key)
+        companion = self._companion("possessed_killer")
+        enter_possession(self.player, companion)
+        prey = self._monster("prey_possessed")
+        field = self._field(companion, [prey])
+        result = self._resolve(companion, "claw", [prey], field)
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self._records()[0]["stage_progress"], 1)
+
     @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_bound_companion_kill_advances_owner_objective(self):

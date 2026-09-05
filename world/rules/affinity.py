@@ -246,6 +246,14 @@ def apply_affinity_change(
         new_value = max(record.value + delta, 0)
         applied = new_value - record.value
         notification = None
+        # Auto-leave release-then-commit (companion-possession-core / D8):
+        # When a possessed companion's affinity will drop below the invite threshold,
+        # release possession FIRST, before opening the affinity atomic block.
+        # If the release fails, it aborts before any affinity write occurs.
+        from world.rules.party import is_companion
+        if is_companion(npc, player) and new_value < get_config().invite_threshold:
+            from world.rules.possession import release_for_party_change
+            release_for_party_change(npc, player)
         with transaction.atomic():
             if applied != 0:
                 handler._save(player, replace(record, value=new_value))

@@ -32,6 +32,7 @@ REASON_NOT_NPC = "not_npc"
 REASON_NOT_CO_LOCATED = "not_co_located"
 REASON_ALREADY_COMPANION = "already_companion"
 REASON_PARTY_FULL = "party_full"
+REASON_HANDBACK_FIRST = "handback_first"
 
 # Fixed player-facing party lines shared by the ``invite``/``leave`` commands
 # and the webclient ``explore.party_invite``/``explore.party_leave`` adapters,
@@ -41,6 +42,7 @@ REFUSED_MESSAGE = "她婉拒了你的邀請。"
 ALREADY_COMPANION_MESSAGE = "她已經是你的同伴了。"
 PARTY_FULL_MESSAGE = "你的隊伍已經滿了（最多 4 人）。"
 NOT_DIALOGUE_MESSAGE = "對方無法回應你的邀請。"
+HANDBACK_FIRST_MESSAGE = "請先歸位再解散同伴。"
 NOT_COMPANION_MESSAGE = "她不是你的同伴。"
 LEAVE_DISMISSED_MESSAGE = "你解散了與她的隊伍。"
 AUTO_LEAVE_MESSAGE = "她與你的羈絆淡去，隊伍解散了。"
@@ -57,6 +59,7 @@ JOIN_REJECTION_MESSAGES: dict[str, str] = {
     REASON_ALREADY_COMPANION: ALREADY_COMPANION_MESSAGE,
     REASON_NOT_CO_LOCATED: "她不在這裡。",
     REASON_NOT_NPC: "那不是你可以邀請的對象。",
+    REASON_HANDBACK_FIRST: HANDBACK_FIRST_MESSAGE,
 }
 
 
@@ -399,6 +402,9 @@ def leave_party(npc: Any, player: Any, reason: str) -> None:
     both surfaces are restored and ``PartyWriteError`` is raised.
     """
     del reason
+    if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
+        if int(npc.db.possessed_by) == int(player.pk):
+            raise PartyJoinError(REASON_HANDBACK_FIRST)
     party = party_ids(player)
     member = npc.db.party_member
     member_is_ours = member is not None and int(member) == int(player.pk)
@@ -430,6 +436,11 @@ def purge_npc_memberships(npc: Any) -> None:
     from ``NPC.at_object_delete`` so a deleted companion never consumes a
     companion slot.
     """
+    possessed_by = getattr(getattr(npc, "db", None), "possessed_by", None)
+    if possessed_by is not None:
+        from world.rules.possession import purge_possession_on_delete
+
+        purge_possession_on_delete(npc)
     member = npc.db.party_member
     if member is None:
         return

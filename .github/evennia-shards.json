@@ -122,6 +122,8 @@
         "world.rules.tests.test_party_offline_loop",
         "world.rules.tests.test_persona",
         "world.rules.tests.test_persona_edit",
+        "world.rules.tests.test_player_control",
+        "world.rules.tests.test_possession",
         "world.rules.tests.test_phase4_integration",
         "world.rules.tests.test_progression",
         "world.rules.tests.test_race_scale",

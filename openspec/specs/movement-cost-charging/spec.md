@@ -12,8 +12,8 @@ non-teleport exit lineage charges successful player movement through it via
 `world/rules/movement.py` SHALL provide `charge_movement(traversing_object, cost_key: str) -> None`,
 resolving the cost from `CLOCK_YAML["command_defaults"][cost_key]` and calling
 `world.rules.clock.get_world_clock().advance(cost, AdvanceSource.COMMAND, [traversing_object])` when
-`traversing_object` is a `typeclasses.characters.PlayerCharacter`, and doing nothing otherwise. No
-other function or inline call site in this project SHALL call
+`world.rules.player_control.is_player_driven(traversing_object)` is true, and doing nothing
+otherwise. No other function or inline call site in this project SHALL call
 `world.rules.clock.get_world_clock().advance()` for a movement event; every exit lineage that charges
 movement SHALL call `charge_movement()`. When `cost_key == "wilderness_move"` and `traversing_object`
 owns the `flight` skill (`"flight" in traversing_object.skills.owned_keys()`), `charge_movement()`
@@ -29,6 +29,11 @@ SHALL return without advancing the clock — the flight waiver. This waiver appl
 - **WHEN** `charge_movement(npc, "move")` is called for an `NPC`-typeclassed (not `PlayerCharacter`)
   entity
 - **THEN** `get_world_clock().tick` is unchanged
+
+#### Scenario: A possessed NPC charges movement like a player
+- **WHEN** `charge_movement(npc, "move")` is called for an NPC that is possessed and puppeted
+- **THEN** the clock advances by `CLOCK_YAML["command_defaults"]["move"]` with
+  `AdvanceSource.COMMAND` and the possessed NPC as the settled entity
 
 #### Scenario: charge_movement always uses AdvanceSource.COMMAND
 - **WHEN** `charge_movement()` is called with any registered `cost_key`
@@ -159,17 +164,24 @@ example, a `move_type="teleport"` call, or a raw `move_to(quiet=True)` relocatio
 - **THEN** `get_world_clock().tick` is unchanged, even though `at_post_move` still fires on the moved
   object (verified: `quiet=True` alone does not suppress `move_hooks`)
 
-### Requirement: Movement charges only for a PlayerCharacter traverser, never for an autonomous NPC
+### Requirement: Movement charges only for a player-driven traverser, never for an autonomous NPC
 or monster
-`charge_movement()` SHALL check `isinstance(traversing_object, typeclasses.characters.
-PlayerCharacter)` and SHALL NOT advance `WorldClock` for any other traverser, matching design doc D4
-("the world advances only on player action").
+`charge_movement()` SHALL consult `world.rules.player_control.is_player_driven(traversing_object)`
+(a puppeted `PlayerCharacter` or a possessed-and-puppeted NPC) and SHALL NOT advance `WorldClock`
+for any other traverser, matching design doc D4 ("the world advances only on player action").
+This requirement supersedes the removed same-rule requirement titled for `PlayerCharacter`
+specifically; the scenarios below are its continuation.
 
 #### Scenario: An NPC traversing a MovementCostMixin exit does not advance the clock
 - **WHEN** an `NPC`-typeclassed object successfully traverses an exit whose class includes
   `MovementCostMixin`
 - **THEN** the traversal itself succeeds (the traverser's location changes), but
   `get_world_clock().tick` is unchanged
+
+#### Scenario: A possessed NPC traversing the same exit charges the clock
+- **WHEN** a possessed, puppeted NPC traverses a `MovementCostMixin` exit
+- **THEN** the traversal succeeds and the clock advances by the exit's resolved movement cost
+
 
 ### Requirement: Flight-required exits pass only for flight/flash_step owners
 `typeclasses/exits.py` SHALL support an opt-in `requires_flight: bool` class/instance attribute

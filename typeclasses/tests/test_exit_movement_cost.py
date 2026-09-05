@@ -2,6 +2,9 @@
 
 from tools.spec_traceability import covers_requirement
 
+import evennia
+from unittest.mock import MagicMock
+from evennia.server.serversession import ServerSession
 from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
@@ -75,7 +78,7 @@ class MovementCostExitTests(EvenniaTest):
         self.assertIs(self.char1.location, room_b)
         self.assertEqual(get_world_clock().tick, before + MOVE)
 
-    @covers_requirement("movement-cost-charging::movement-charges-only-for-a-playercharacter-traverser-never-for-an-autonomous-npc")
+    @covers_requirement("movement-cost-charging::movement-charges-only-for-a-player-driven-traverser-never-for-an-autonomous-npc")
     def test_npc_traversal_moves_but_does_not_advance_clock(self):
         exit_obj = create_object(Exit, key="npc_door", location=self.room1, destination=self.room2)
         npc = create_object(NPC, key="npc", location=self.room1)
@@ -83,6 +86,27 @@ class MovementCostExitTests(EvenniaTest):
         exit_obj.at_traverse(npc, self.room2)
         self.assertIs(npc.location, self.room2)
         self.assertEqual(get_world_clock().tick, before)
+
+    @covers_requirement("movement-cost-charging::movement-charges-only-for-a-player-driven-traverser-never-for-an-autonomous-npc")
+    def test_possessed_npc_traversing_exit_charges_clock(self):
+        """Scenario: A possessed NPC traversing the same exit charges the clock."""
+        exit_obj = create_object(Exit, key="npc_door_p", location=self.room1, destination=self.room2)
+        npc = create_object(NPC, key="possessed_npc", location=self.room1)
+        npc.db.possessed_by = self.char1.pk
+        session = ServerSession()
+        session.sessionhandler = evennia.SESSION_HANDLER
+        session.data_out = MagicMock()
+        session.sessid = 99993
+        evennia.SESSION_HANDLER[session.sessid] = session
+        npc.sessions.add(session)
+        try:
+            before = get_world_clock().tick
+            exit_obj.at_traverse(npc, self.room2)
+            self.assertIs(npc.location, self.room2)
+            self.assertEqual(get_world_clock().tick, before + MOVE)
+        finally:
+            npc.sessions.remove(session)
+            evennia.SESSION_HANDLER.pop(session.sessid, None)
 
     def test_teleport_style_move_to_does_not_advance_clock(self):
         before = get_world_clock().tick

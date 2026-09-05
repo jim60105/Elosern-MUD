@@ -43,8 +43,8 @@ def _make_session(sessionhandler, sessid, puppet):
     session.logged_in = True
     session.ndb.elosern_coordinator = None
     session.ndb.elosern_actor_id = str(getattr(puppet, "pk", ""))
-    puppet.sessions.add(session)
     sessionhandler[session.sessid] = session
+    puppet.sessions.add(session)
     return session
 
 
@@ -80,6 +80,21 @@ class RoomEntryTriggerTests(EvenniaTest):
         traverser = traverser or self.char1
         with self.captureOnCommitCallbacks(execute=True):
             exit_obj.at_traverse(traverser, self.room2)
+
+    @covers_requirement("action-options-trigger-hooks::room-entry-triggers-a-proposal-on-deterministic-movement-success")
+    def test_possessed_npc_traversal_schedules_a_generation(self):
+        """Scenario: A possessed NPC traversal schedules a generation."""
+        npc = create_object(NPC, key="附身NPC", location=self.room1)
+        npc.db.possessed_by = self.char1.pk
+        session = _make_session(self.sessionhandler, 43, npc)
+        attach_coordinator(session, build_production_registry())
+        watchers.register_watcher(session)
+        exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
+        with patch.object(service, "schedule_action_options") as schedule:
+            self._traverse(exit_obj, traverser=npc)
+            self.assertEqual(schedule.call_count, 1)
+            self.assertIs(schedule.call_args.args[0], npc)
+        self.assertIs(npc.location, self.room2)
 
     @covers_requirement("action-options-trigger-hooks::room-entry-triggers-a-proposal-on-deterministic-movement-success")
     def test_successful_plain_exit_schedules_exactly_one_call_with_live_watchers(self):
@@ -127,6 +142,27 @@ class RoomEntryTriggerTests(EvenniaTest):
                     self._traverse(exit_obj)
                 schedule.assert_not_called()
         self.assertIs(self.char1.location, self.room1)
+        self.assertEqual(get_world_clock().tick, before)
+
+    @covers_requirement("action-options-trigger-hooks::room-entry-triggers-a-proposal-on-deterministic-movement-success")
+    def test_failed_clock_charge_on_possessed_npc_compensates_location_and_clock(self):
+        """When clock advance fails for a possessed NPC, rollback compensates location and clock."""
+        def _failing_advance(clock, *args, **kwargs):
+            raise RuntimeError("clock advance failed")
+
+        npc = create_object(NPC, key="附身NPC_fail", location=self.room1)
+        npc.db.possessed_by = self.char1.pk
+        session = _make_session(self.sessionhandler, 44, npc)
+        attach_coordinator(session, build_production_registry())
+        watchers.register_watcher(session)
+        exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
+        before = get_world_clock().tick
+        with patch.object(WorldClock, "advance", _failing_advance):
+            with patch.object(service, "schedule_action_options") as schedule:
+                with self.assertRaises(RuntimeError):
+                    self._traverse(exit_obj, traverser=npc)
+                schedule.assert_not_called()
+        self.assertIs(npc.location, self.room1)
         self.assertEqual(get_world_clock().tick, before)
 
     @covers_requirement("action-options-trigger-hooks::room-entry-triggers-a-proposal-on-deterministic-movement-success")

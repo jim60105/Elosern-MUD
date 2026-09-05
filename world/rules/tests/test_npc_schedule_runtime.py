@@ -331,6 +331,28 @@ class SettlementSilenceTests(EvenniaTest):
         self.assertIsNone(self.clerk.db.schedule_state)
         self.assertIs(self.clerk.location, self.wild)
 
+    @covers_requirement(
+        "companion-possession-core::a-possessed-npc-is-autonomy-silent-and-unreachable-by-dialogue"
+    )
+    def test_possessed_companion_settles_nothing(self):
+        """Scenario: The possessed companion's schedule stays silent."""
+        from world.rules.party import join_party
+        from world.rules.possession import enter_possession
+
+        possessed_guard = create_object(NPC, key="附身守衛", location=self.wild)
+        schedule = {
+            "schema_version": 1,
+            "entries": [{"tick_offset": 50400, "kind": "state", "state": "resting"}],
+        }
+        set_npc_schedule(possessed_guard, schedule)
+        join_party(possessed_guard, self.owner)
+        enter_possession(self.owner, possessed_guard)
+
+        events = settle_npc_schedules(0, DAY_SECONDS)
+        npc_ids = [e.payload.get("npc_id") for e in events]
+        self.assertNotIn(int(possessed_guard.pk), npc_ids)
+        self.assertIsNone(possessed_guard.db.schedule_state)
+
     @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
     def test_returning_to_anchor_resumes_settlement(self):
         # Dismissed back at the storefront, the clerk settles normally;

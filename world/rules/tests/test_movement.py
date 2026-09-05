@@ -3,6 +3,9 @@
 from tools.spec_traceability import covers_requirement
 
 from unittest.mock import patch
+from unittest.mock import MagicMock
+import evennia
+from evennia.server.serversession import ServerSession
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -54,6 +57,26 @@ class ChargeMovementTests(EvenniaTest):
             get_world_clock().tick,
             before + CLOCK_YAML["command_defaults"]["wilderness_move"],
         )
+
+    @covers_requirement(
+        "movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function"
+    )
+    def test_possessed_npc_charges_movement_like_a_player(self):
+        """Scenario: A possessed NPC charges movement like a player."""
+        self.npc.db.possessed_by = self.char1.pk
+        session = ServerSession()
+        session.sessionhandler = evennia.SESSION_HANDLER
+        session.data_out = MagicMock()
+        session.sessid = 99994
+        evennia.SESSION_HANDLER[session.sessid] = session
+        self.npc.sessions.add(session)
+        try:
+            before = get_world_clock().tick
+            charge_movement(self.npc, "move")
+            self.assertEqual(get_world_clock().tick, before + CLOCK_YAML["command_defaults"]["move"])
+        finally:
+            self.npc.sessions.remove(session)
+            evennia.SESSION_HANDLER.pop(session.sessid, None)
 
     @covers_requirement("movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function")
     def test_flight_owner_is_waived_the_wilderness_move_cost(self):

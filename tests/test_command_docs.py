@@ -72,6 +72,8 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "一般（需有可邀請的 NPC）",
     },
     "leave": {"syntax": "leave <npc>", "context": "一般（需有同伴）"},
+    "possess": {"syntax": "possess <npc>", "context": "一般（需有同伴）"},
+    "unpossess": {"syntax": "unpossess", "context": "附身中"},
     "lore": {"syntax": "lore、lore <category> <key>", "context": "一般（隨時可用）"},
     "rest": {"syntax": "rest <duration> [practice <skill>]", "context": "一般"},
     "sleep": {"syntax": "sleep", "context": "一般"},
