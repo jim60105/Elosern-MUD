@@ -821,6 +821,16 @@ function onSubmitCommand(text) {
   return store.sendText(text);
 }
 
+// MC5 (multichar-05-topbar-switcher-ui): route character switch/create actions
+// through the store's single dispatchAction entry point.
+function onSwitchCharacter(characterId) {
+  store.dispatchAction("account.character.switch", { character_id: characterId });
+}
+
+function onCreateCharacter() {
+  store.dispatchAction("account.character.create", {});
+}
+
 // Register the SceneBackdrop instance (its exposed interface) on the window
 // bridge so the managed-browser pending-scene journey can seed the
 // client-local prior-image memory (webclient-contextual-hud: a pending scene
@@ -855,12 +865,20 @@ onMounted(() => {
         :text-to-html="store.view.textToHtml"
         :in-flight="store.view.dispatch.inFlight !== null"
         :completion-candidates="completionCandidates"
+        :roster-available="store.rosterAvailable"
+        :roster-characters="store.rosterCharacters"
+        :roster-can-create="store.rosterCanCreate"
+        :roster-switch-locked="store.rosterSwitchLocked"
+        :roster-lock-reason="store.rosterLockReason"
+        :epoch="store.view.epoch"
         @submit-command="onSubmitCommand"
         @focus-lost="store.clearFreeformTarget()"
         @open-full-log="openFullLog"
         @dialogue-pick="onDialoguePick"
         @dialogue-freeform="onDialogueFreeform"
         @open-overlay="onOpenOverlay"
+        @switch-character="onSwitchCharacter"
+        @create-character="onCreateCharacter"
       >
         <!-- The scene backdrop is the lowest stage layer (design D3/D8):
              it renders the committed `art` panel's scene truthfully — the

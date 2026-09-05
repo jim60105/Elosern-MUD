@@ -88,6 +88,13 @@ const props = defineProps({
   // the committed exploration panel's exit labels and interact-target display
   // names, forwarded untouched to the command line.
   completionCandidates: { type: Array, default: () => [] },
+  // MC5 (multichar-05-topbar-switcher-ui): committed account roster read model
+  rosterAvailable: { type: Boolean, default: false },
+  rosterCharacters: { type: Array, default: () => [] },
+  rosterCanCreate: { type: Boolean, default: false },
+  rosterSwitchLocked: { type: Boolean, default: false },
+  rosterLockReason: { type: String, default: null },
+  epoch: { type: [Number, String], default: null },
 });
 
 const emit = defineEmits([
@@ -97,6 +104,8 @@ const emit = defineEmits([
   "focus-lost",
   "dialogue-pick",
   "dialogue-freeform",
+  "switch-character",
+  "create-character",
 ]);
 
 const commandLine = ref(null);
@@ -315,6 +324,15 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
       :connected="connected"
       :location-label="locationLabel"
       :time-label="timeLabel"
+      :roster-available="rosterAvailable"
+      :roster-characters="rosterCharacters"
+      :roster-can-create="rosterCanCreate"
+      :roster-switch-locked="rosterSwitchLocked"
+      :roster-lock-reason="rosterLockReason"
+      :locked="mutationsLocked || !connected"
+      :epoch="epoch"
+      @switch-character="emit('switch-character', $event)"
+      @create-character="emit('create-character')"
     />
 
     <div

@@ -198,9 +198,11 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
     // webclient-align-05-party-hud adds Overlays/PartyStrip and
     // Overlays/PartyDrawer (41 → 43).
     // webclient-align-09-objective-tracker-ui adds Overlays/ObjectiveTracker (43 → 44).
-    expect(manifest.required).toHaveLength(44);
+    // multichar-05-topbar-switcher-ui adds Core/CharacterSwitcher (44 → 45).
+    expect(manifest.required).toHaveLength(45);
    // The four full overlays complete the required set (B5's new family).
    for (const title of [
+     "Core/CharacterSwitcher",
      "Overlays/MapOverlay",
      "Overlays/SettingsOverlay",
      "Overlays/HelpOverlay",

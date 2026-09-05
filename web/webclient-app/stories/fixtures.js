@@ -50,6 +50,52 @@ export const PROMPT_SAMPLE = "<span class=\"color-111\">></span> ";
 
 export const COMMAND_HISTORY_SAMPLE = ["look", "北", "talk 老周"];
 
+// Roster slice backing CharacterSwitcher (webclient-character-roster, MC5).
+export const ROSTER_CHARACTERS_SAMPLE = [
+  {
+    identity: 1,
+    name: "艾莉亞",
+    current: true,
+    pending: false,
+    portrait: {
+      subject_key: "char_1",
+      status: "done",
+      url: "/art/portraits/char_1.webp",
+      aspect_ratio: "3/4",
+      alt: "艾莉亞的肖像",
+      placeholder: null,
+    },
+  },
+  {
+    identity: 2,
+    name: "雷恩",
+    current: false,
+    pending: false,
+    portrait: {
+      subject_key: "char_2",
+      status: "pending",
+      url: null,
+      aspect_ratio: "3/4",
+      alt: "雷恩的肖像",
+      placeholder: { kind: "generating", label: "肖像生成中" },
+    },
+  },
+  {
+    identity: 3,
+    name: "新冒險者",
+    current: false,
+    pending: true,
+    portrait: {
+      subject_key: null,
+      status: "missing",
+      url: null,
+      aspect_ratio: "3/4",
+      alt: "新冒險者的肖像",
+      placeholder: { kind: "silhouette", label: "建立中" },
+    },
+  },
+];
+
 // ---------------------------------------------------------------------------
 // B2 action-dock family fixtures (webclient-vue-03-showcase-action).
 //
