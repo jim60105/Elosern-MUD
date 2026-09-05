@@ -24,10 +24,16 @@ professions.
 
 ## Decisions
 
-- **Assembly helper in the loader module** (`_apply_profession(record, entity)`), not a new
-  module: it is import-path logic, and `declarative-service-hosts` imports the same helper.
-  Attaching components = construct the component class with the merged kwargs through the same
-  attach path the guild sync uses (`_sync_service_host`'s loop) so assembly is one mechanism.
+- **Shared pure resolution module** (`world/imports/assembly.py`): `resolve_plan`,
+  `explicit_map`, `component_field_names`, `identity_fields`, and `missing_identity_kwargs`
+  live there, and BOTH the batch validator (`validate._check_profession_fields`) and the
+  loader (`loader._apply_profession`, the attach side) consume the same functions — the
+  validator cannot run the identity gate on the FINAL resolved plan without the resolution,
+  and duplicating it would let the two gates drift. `_apply_profession` (attach + schedule +
+  event) stays in the loader; `declarative-service-hosts` imports the same helper.
+  Attaching components = construct the component class with the resolved kwargs through the
+  same attach path the guild sync uses (`_sync_service_host`'s loop) so assembly is one
+  mechanism.
 - **Identity kwargs resolution:** the record's explicit `components` entry carries the full
   kwargs mapping (`{"type": "merchant", "kwargs": {"shop_key": "…", "service_id": "…"}}`);
   blueprint-only components (no per-record kwargs) are attachable ONLY when every identity kwarg

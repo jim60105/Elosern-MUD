@@ -201,6 +201,45 @@ CHARACTER_SCHEMA_V1 = {
                 "semantically)."
             ),
         },
+        "profession": {
+            "anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}],
+            "description": (
+                "Optional assembly-time profession blueprint key. A non-null value "
+                "must name a row of the loaded profession rulebook "
+                "(world/rules/profession_config.py); an unknown key rejects the "
+                "record in the shared batch validator. null or an absent field "
+                "means no profession. The blueprint assembles NPC components, "
+                "applies the row's schedule template, and supplies a default tier; "
+                "it takes effect only for NPC-targeted imports and never overrides "
+                "the record's own literal stats."
+            ),
+        },
+        "components": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["type", "kwargs"],
+                "properties": {
+                    "type": {"type": "string", "minLength": 1},
+                    "kwargs": {
+                        "type": "object",
+                        "propertyNames": {"type": "string"},
+                    },
+                },
+                "additionalProperties": False,
+            },
+            "description": (
+                "Optional explicit per-record component assembly entries "
+                "[{type, kwargs}]. An entry's type must name a key of the "
+                "profession component vocabulary and its kwargs are the authored "
+                "service-identity values (service_id, shop_key, branch_key, "
+                "dialogue_key as the component class defines them); the loader "
+                "never invents identity. Entries override the profession "
+                "blueprint for their type (design D5) and may add vocabulary "
+                "components the blueprint omits. Valid only alongside a "
+                "profession; only for NPC-targeted imports."
+            ),
+        },
     },
     "additionalProperties": False,
 }

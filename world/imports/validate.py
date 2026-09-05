@@ -375,6 +375,114 @@ def _check_skills(record: dict[str, Any]) -> list[Issue]:
     ]
 
 
+def _is_npc_target(typeclass: type | None) -> bool:
+    """Whether the load target assembles NPC components (default: NPC).
+
+    ``None`` means the NPC-default caller (the CLI and every pre-existing
+    record path); a PlayerCharacter target is any non-NPC living-entity class.
+    """
+    if typeclass is None:
+        return True
+    from typeclasses.npcs import NPC
+
+    return issubclass(typeclass, NPC)
+
+
+def _check_profession_fields(
+    record: dict[str, Any], is_npc_target: bool
+) -> list[Issue]:
+    """Reject an incomplete or misplaced profession/components pair.
+
+    Every rejection is decided from the record, the profession registry, and the
+    component vocabulary alone, so the whole plan (blueprint expansion plus the
+    authored identity kwargs) fails as a named ISSUE in the shared batch report
+    BEFORE any entity is constructed. The loader re-runs the same
+    ``assembly.resolve_plan`` fail-closed as its second gate.
+    """
+    profession_value = record.get("profession")
+    entries = record.get("components")
+    if profession_value is None:
+        if entries:
+            return [
+                Issue(
+                    "components",
+                    "explicit components require a profession blueprint; the "
+                    "assembly plan is defined only alongside a profession",
+                )
+            ]
+        return []
+    issues: list[Issue] = []
+    if not is_npc_target:
+        issues.append(
+            Issue(
+                "profession",
+                "a PlayerCharacter-targeted record cannot declare a profession; "
+                "professions assemble NPC components only",
+            )
+        )
+    from world.imports import assembly
+    from world.rules.profession_config import PROFESSION_COMPONENT_TYPES, get_profession
+
+    profession = get_profession(profession_value)
+    if profession is None:
+        issues.append(
+            Issue(
+                "profession",
+                f"unknown profession key '{profession_value}' is not a profession "
+                "rulebook row",
+            )
+        )
+    if entries is not None:
+        seen: set[str] = set()
+        for index, entry in enumerate(entries):
+            type_key = entry["type"]
+            if type_key not in PROFESSION_COMPONENT_TYPES:
+                issues.append(
+                    Issue(
+                        f"components.{index}.type",
+                        f"unknown component type '{type_key}' is outside the "
+                        "profession component vocabulary",
+                    )
+                )
+                continue
+            if type_key in seen:
+                issues.append(
+                    Issue(
+                        f"components.{index}.type",
+                        f"duplicate component type '{type_key}'; one entry per "
+                        "component slot",
+                    )
+                )
+                continue
+            seen.add(type_key)
+            allowed = assembly.component_field_names(type_key)
+            for kwarg in sorted(entry["kwargs"]):
+                if kwarg not in allowed:
+                    issues.append(
+                        Issue(
+                            f"components.{index}.kwargs",
+                            f"component '{type_key}' accepts no kwarg '{kwarg}'; "
+                            f"authored kwargs are {sorted(allowed)}",
+                        )
+                    )
+    if profession is None or issues:
+        return issues
+    # Identity completeness on the FINAL resolved set: blueprint-only and
+    # explicit-replacement components face the same non-empty identity rule
+    # (the loader never invents a service anchor).
+    for type_key, kwargs in assembly.resolve_plan(profession, record):
+        missing = assembly.missing_identity_kwargs(type_key, kwargs)
+        if missing:
+            issues.append(
+                Issue(
+                    "components",
+                    f"profession '{profession_value}' component '{type_key}' is "
+                    f"missing authored identity kwargs {missing}",
+                )
+            )
+    return issues
+
+
 def _check_skill_proficiency_keys(record: dict[str, Any]) -> list[Issue]:
     """Reject explicit practice XP for unregistered skill keys.
 
@@ -441,7 +549,9 @@ def _flag_duplicate_keys(
             )
 
 
-def validate_character(record: dict[str, Any]) -> RecordReport:
+def validate_character(
+    record: dict[str, Any], typeclass: type | None = None
+) -> RecordReport:
     report = RecordReport(str(record.get("key", "<unknown>")), record=record)
     report.rejections.extend(_structural_issues(record, CHARACTER_SCHEMA_V1))
     # The digit-only reservation is part of the structural phase: a digit-only
@@ -474,6 +584,9 @@ def validate_character(record: dict[str, Any]) -> RecordReport:
     report.warnings.extend(magic_warnings)
     report.rejections.extend(_check_affinity_elements(record))
     report.rejections.extend(_check_skills(record))
+    report.rejections.extend(
+        _check_profession_fields(record, _is_npc_target(typeclass))
+    )
     report.warnings.extend(_check_stats_band(record))
     return report
 
@@ -490,7 +603,9 @@ def validate_world_entry(record: dict[str, Any]) -> RecordReport:
     return report
 
 
-def validate_batch(paths: list[Path]) -> BatchReport:
+def validate_batch(
+    paths: list[Path], typeclass: type | None = None
+) -> BatchReport:
     reports: list[RecordReport] = []
     character_records: list[dict[str, Any]] = []
     world_records: list[dict[str, Any]] = []
@@ -524,7 +639,7 @@ def validate_batch(paths: list[Path]) -> BatchReport:
             )
             continue
         report = (
-            validate_character(raw)
+            validate_character(raw, typeclass)
             if kind == "character"
             else validate_world_entry(raw)
         )

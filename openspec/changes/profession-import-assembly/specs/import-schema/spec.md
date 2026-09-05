@@ -1,32 +1,38 @@
 # Delta spec: import-schema (profession-import-assembly)
 
 Adds the two blueprint fields to `CHARACTER_SCHEMA_V1`. The profession key must name a registry
-row; component types are constrained to the profession vocabulary; identity kwargs stay authored
-in the record.
+row; component types and kwargs are constrained semantically; identity kwargs stay authored.
 
 ## ADDED Requirements
 
-### Requirement: CHARACTER_SCHEMA_V1 accepts optional profession and components fields
-`CHARACTER_SCHEMA_V1` SHALL accept an optional `profession` (a non-empty string that must name a
-key of the loaded profession registry — an unknown key rejects the record in the shared batch
-validator) and an optional `components` (a list of `{"type": <vocabulary key>, "kwargs":
-<mapping of strings to authored values>}` entries whose `type` values are constrained to the
-profession loader's component-type vocabulary). Both fields absent SHALL leave validation and
-construction byte-identical to the pre-change schema. `profession` SHALL be rejected with a named
-issue on a record whose target typeclass is `PlayerCharacter`.
+### Requirement: The character record schema defines an optional profession field and an optional components field
+`CHARACTER_SCHEMA_V1` SHALL define two new OPTIONAL fields: `profession` (a non-empty string or
+`null`; the registry-membership check is semantic, not schema-level) and `components` (an array of
+`{type, kwargs}` objects, `type` a non-empty string, `kwargs` an object with string keys). When
+both fields are absent, a record SHALL be structurally identical to the pre-change schema;
+`components` entries are valid only alongside a `profession` blueprint and never for a
+`PlayerCharacter`-targeted import; `profession` SHALL reject unknown keys in the shared batch
+validator (see import-loader), not by schema constants.
 
-#### Scenario: An unknown profession key rejects the batch
-- **WHEN** a record declares `"profession": "blacksmith"` and no such registry key exists
-- **THEN** the record carries a named validation issue and `load_batch` persists nothing
+#### Scenario: An absent profession field leaves the record unchanged
+- **WHEN** a pre-existing valid record omits both new fields
+- **THEN** schema validation passes with the same report (identical `fields`, `keys`, warnings) as
+  before this change
 
-#### Scenario: A component type outside the vocabulary is rejected
-- **WHEN** a record's `components` entry declares `type: tinker`
-- **THEN** validation names the record and the unknown type, and no entity is constructed
+#### Scenario: Unknown profession keys name the record in the batch report
+- **WHEN** a record declares `"profession": "paladin"`
+- **THEN** validation rejects it with a field-path issue naming the record and the
+  `profession` field; the key is checked against the profession registry, not a schema constant
+  list
 
-#### Scenario: A PlayerCharacter record cannot declare a profession
-- **WHEN** a `PlayerCharacter`-targeted record declares `profession`
-- **THEN** validation rejects the record with a named issue
+#### Scenario: Component entries are shape-checked at the schema level, vocabulary-checked semantically
+- **WHEN** a record's `components` entry is `{"type": "merchant", "kwargs": {"shop_key": "silver"}}`
+- **THEN** schema-level shape validation passes; a non-object `kwargs` or non-string key fails the
+  shape check; vocabulary membership and the NPC-only rule (a profession/components pair on a
+  `PlayerCharacter`-targeted record is rejected as a named batch issue) are enforced in
+  `validate_character` against `profession_config.PROFESSION_COMPONENT_TYPES` and the load target
 
-#### Scenario: Records without the new fields are untouched
-- **WHEN** every existing example and fixture record validates after the schema change
-- **THEN** validation results and constructed attribute state equal the pre-change behavior
+#### Scenario: A components list without a profession is rejected
+- **WHEN** a record declares `components` but omits `profession`
+- **THEN** validation rejects it naming the `components` field and the reason (the assembly plan
+  exists only alongside a blueprint)

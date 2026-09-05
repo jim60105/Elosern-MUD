@@ -16,6 +16,21 @@ instead of the plain race floor. A record declaring any literal stat keeps those
 unchanged, and a record without `profession` (or with a null-tier row) SHALL construct traits
 byte-identically to the pre-change loader.
 
+#### Scenario: An explicitly imported stat value is used verbatim
+- **WHEN** a character record's `stats.atk_phys` is `88` and the record's `race` is `elf`
+- **THEN** the constructed entity's `entity.traits.atk_phys` base value equals exactly `88`, not a
+  value derived from `vital_baseline` or scaled by any multiplier
+
+#### Scenario: An omitted stat falls back to the race floor
+- **WHEN** a character record's `stats` object has no `guild_merit` key
+- **THEN** the constructed entity's `entity.traits.guild_merit` value equals
+  `race_floor(RACE_REGISTRY[record_race])["guild_merit"]`
+
+#### Scenario: The loader never applies a skill multiplier
+- **WHEN** a warning-only out-of-band static value is loaded
+- **THEN** the resulting trait equals that literal imported value; the loader never multiplies or
+  scales it, while the validation warning remains visible
+
 #### Scenario: Literal stats beat any profession tier
 - **WHEN** a record with `"profession": "merchant"` (row tier non-null) also declares literal
   `stats` values
@@ -37,14 +52,17 @@ byte-identically to the pre-change loader.
 When a validated NPC record declares `profession`, `loader.py` SHALL attach, inside the record's
 construction transaction, every component of the profession blueprint that the record does NOT
 list explicitly in its own `components` (blueprint minus explicit types — an explicit entry of the
-same type replaces the blueprint entry entirely, design D5). Component kwargs SHALL come only
-from authored sources: the record's explicit `components` entry kwargs, or — for a
-blueprint-only component — the record's kwargs under the same type key. When a blueprint
-component's identity kwargs (any of `service_id`, `shop_key`, `branch_key`, `dialogue_key`)
-cannot be fully supplied from authored record data, the WHOLE batch SHALL be rejected with a named
-issue; the loader SHALL NEVER invent or default an identity value. Assembly SHALL attach through
-the same component-attach path `world/rules/guild_economy.py`'s sync uses, and an
-absent-`profession` record SHALL construct byte-identically to the pre-change loader.
+same type replaces the blueprint entry entirely, design D5). Explicit vocabulary entries the
+blueprint omits SHALL be appended in record order. Component kwargs SHALL come only from authored
+sources: the record's explicit `components` entry kwargs. When a blueprint component's identity
+kwargs (any of `service_id`, `shop_key`, `branch_key`, `dialogue_key`) cannot be fully supplied
+from authored record data, the WHOLE batch SHALL be rejected with a named issue BEFORE any entity
+is constructed (the shared batch validator owns the rejection; the loader re-runs the same
+resolution fail-closed as its second gate); the loader SHALL NEVER invent or default an identity
+value. Assembly SHALL attach through the same component-attach path
+`world/rules/guild_economy.py`'s sync uses, and an absent-`profession` record SHALL construct
+byte-identically to the pre-change loader. Each assembled NPC SHALL emit one
+`import_profession_assembled` info event (`char` = the record key, `profession` = the row key).
 
 #### Scenario: Blueprint minus explicit components
 - **WHEN** a record declares a profession whose blueprint carries `guild_staff` and
