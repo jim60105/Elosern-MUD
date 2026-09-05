@@ -8,6 +8,7 @@ re-chrome contract: the centred floating dock panel, the root tab bar with truth
 the router-derived breadcrumb, the per-kind row vocabulary, the display-only combat participant
 frame, the bounded skill master-detail, and the two-step destructive confirmation.
 ## Requirements
+
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
 The WebClient SHALL render as a full-bleed stage that fills the viewport, with the scene backdrop as
 the lowest layer, the narrative caption card above it, the HUD islands above that, the action dock
@@ -36,16 +37,22 @@ visibility SHALL be derived from that single attribute. A surface hidden for the
 removed from rendering with `display:none` — never dimmed, never merely visually hidden — so it leaves
 the accessibility tree and the tab order. The matrix SHALL be:
 
-| Surface | exploration | combat | creation |
-|---|---|---|---|
-| narrative caption | visible | visible | hidden |
-| HUD island stack (character/vitals/conditions) | visible | visible | hidden |
-| minimap island | visible | **hidden** | hidden |
-| action dock | visible | visible | visible (creation form) |
-| command line | visible | visible | hidden |
-| scene backdrop | visible (exploration stage) | visible (combat stage) | visible |
+| Surface | exploration | combat | dialogue | creation |
+|---|---|---|---|---|
+| narrative caption | visible | visible | visible (dialogue focus) | hidden |
+| HUD island stack (character/vitals/conditions) | visible | visible | visible | hidden |
+| minimap island | visible | **hidden** | visible | hidden |
+| party quickbar island | visible | visible | visible | hidden |
+| objective tracker island | visible | visible | visible | hidden |
+| action dock | visible | visible | visible (dialogue form) | visible (creation form) |
+| command line | visible | visible | visible | hidden |
+| scene backdrop | visible (exploration stage) | visible (combat stage) | visible (unchanged art) | visible |
 
-When a mode change hides the surface that currently holds focus, the shell SHALL move focus to the
+While the committed mode is `dialogue` the scene backdrop SHALL keep rendering its committed
+exploration art truthfully — the reference's dialogue focus is carried by the dialogue box
+itself, not by mutating the backdrop. Per-surface requirements that name their own visible-mode
+sets SHALL stay consistent with this matrix. When a mode change hides the surface that currently
+holds focus, the shell SHALL move focus to the
 action dock before the surface is removed, using the existing focus-restore path.
 
 #### Scenario: The minimap disappears in combat
@@ -63,6 +70,16 @@ action dock before the surface is removed, using the existing focus-restore path
 #### Scenario: Creation mode presents only the creation surfaces
 - **WHEN** the committed mode is creation
 - **THEN** the narrative caption, the HUD island stack, the minimap, and the command line are absent, and the action dock renders the creation form
+
+#### Scenario: Dialogue mode keeps the cockpit visible
+- **WHEN** the committed mode changes from exploration to dialogue
+- **THEN** the narrative caption, HUD islands, minimap, party quickbar, objective tracker, action
+  dock, and command line all remain rendered, and only the narrative presentation changes
+
+#### Scenario: Dialogue backdrop keeps its committed art
+- **WHEN** the committed mode is dialogue
+- **THEN** the scene backdrop renders the same committed exploration art as before the mode
+  change, unmodified
 
 ### Requirement: The scene backdrop renders the art payload truthfully behind the stage
 The stage backdrop SHALL render the committed `art` panel's scene: the same-origin image with
@@ -120,24 +137,31 @@ both measure and height so it never grows to fill the stage, drawn with the refe
 treatment: panel fill with backdrop blur, hairline border, shared radius and shadow, and the
 reference's vertical hairline rule offset outside the card's left edge. The card SHALL carry a head
 row styled as the reference's caption head (small uppercase letter-spaced label): on the left, a mode
-label — `敘述` while the committed mode is exploration and `戰鬥日誌` while it is combat — and on the
-right, a single labelled capsule control that opens a full-log surface presenting the complete
-retained narrative through the same markup renderer — never a second markup path. The full-log surface
-SHALL be scrollable, SHALL trap focus while open, SHALL close on Escape, and SHALL restore focus to the
-control that opened it. The unread indicator, its polite live region, and its jump-to-latest behaviour
-SHALL remain on the caption card beside the head label and SHALL otherwise be unchanged.
+label — `敘述` while the committed mode is exploration, `戰鬥日誌` while it is combat, and `對話`
+while it is dialogue — and on the right, a single labelled capsule control that opens a full-log surface presenting the complete
+retained narrative through the same markup renderer as the caption — never a second markup path. The
+full-log surface SHALL be scrollable, SHALL trap focus while open, SHALL close on Escape, and SHALL
+restore focus to the control that opened it. While the committed mode is dialogue and the
+committed `dialogue` panel is available, the head label reads `對話` and the full-log capsule SHALL
+NOT be rendered (the reference renders no log control in the dialogue variant); the unread
+indicator, its polite live region, and its
+jump-to-latest behaviour SHALL remain on the caption card beside the head label and SHALL otherwise
+be unchanged.
 
 #### Scenario: The caption card is bounded
 - **WHEN** the narrative holds more lines than the caption card can show
-- **THEN** the card scrolls internally within its bounded height and does not expand to fill the stage
+- **THEN** the card scrolls internally within its bounded height and does not expand to fill the
+  stage
 
 #### Scenario: The head row names the mode and owns the log control
 - **WHEN** the caption renders in exploration mode and then in combat mode
-- **THEN** the head label reads `敘述`, then `戰鬥日誌`, and the `完整日誌` capsule is the card's only full-log control
+- **THEN** the head label reads `敘述`, then `戰鬥日誌`, and the `完整日誌` capsule is the card's only
+  full-log control
 
 #### Scenario: The complete log opens in one action
 - **WHEN** the player activates the caption card's full-log control
-- **THEN** the full-log surface opens showing the complete retained narrative, rendered through the same markup renderer as the caption
+- **THEN** the full-log surface opens showing the complete retained narrative, rendered through the
+  same markup renderer as the caption
 
 #### Scenario: The full-log surface returns focus on Escape
 - **WHEN** the full-log surface is open and the player presses Escape
@@ -145,7 +169,12 @@ SHALL remain on the caption card beside the head label and SHALL otherwise be un
 
 #### Scenario: The unread indicator is unchanged
 - **WHEN** new narrative lines arrive while the caption card is scrolled away from the latest line
-- **THEN** the unread indicator states its count and jump action and is announced through its polite live region exactly as before
+- **THEN** the unread indicator states its count and jump action and is announced through its polite
+  live region exactly as before
+
+#### Scenario: The dialogue head reads 對話 without the log capsule
+- **WHEN** the committed mode is dialogue and the `dialogue` panel is available
+- **THEN** the head label reads `對話` and no `完整日誌` capsule is rendered
 
 ### Requirement: An open drawer or overlay dims the stage behind it
 When a drawer or a full-screen overlay is open, the shell SHALL mark the stage so the surfaces behind
@@ -586,9 +615,11 @@ represents it and is never required to match a reference that does not exist.
 
 ### Requirement: The dock's shortcut legend names only real keyboard behaviour and renders as one visible instance
 The action dock SHALL carry a shortcut-legend element matching
-`docs/design/elosern-redesign/index.html`'s dock hint in wording and structure: for the modes this
-capability renders, the text `數字鍵 1–4 · ` followed by an `<kbd>` element naming `Enter` and the
-verb `執行`, the separator `·`, and an `<kbd>` element naming `Esc` and the verb `返回`, rendered
+`docs/design/elosern-redesign/index.html`'s dock hint in wording and structure: while the dock
+presents its regular form, the text `數字鍵 1–4 · ` followed by an `<kbd>` element naming `Enter`
+and the verb `執行`, the separator `·`, and an `<kbd>` element naming `Esc` and the verb `返回`;
+while the dock presents the dialogue form, the text `數字鍵 1–4 選 · ` followed by an `<kbd>`
+element naming `→` and the verb phrase `指令列自由對話`. Both variants render
 with the reference's `<kbd>` treatment (monospace face, `--ink-780` ground, 2px bottom border).
 The legend SHALL render exactly once as visible content and SHALL be the only element carrying the
 legend's test hook.
@@ -605,8 +636,11 @@ not editable, and the bounded services quantity form has not captured the digit 
 and activates the row through the same confirm path `Enter` uses — a disabled row shows its
 explanation and submits nothing, an in-flight row stays locked, and a held repeat is suppressed.
 The slots address the pane's rendered rows: where a pane does not render the standard `back`
-cell as a row (the exit-outlet pane), that cell takes no slot. A digit whose row does not exist
-(a frame with fewer rendered rows, or the pre-session empty stack) is not claimed and falls
+cell as a row (the exit-outlet pane), that cell takes no slot. While the dock presents the
+dialogue form, the slots address only the rendered scripted picks — the trailing free-dialogue
+row never takes a digit slot, and a degraded dialogue form (no rendered picks) claims no digit.
+A digit whose row does not exist (a frame with fewer rendered rows, a degraded dialogue form, or
+the pre-session empty stack) is not claimed and falls
 through to the text / command-history path.
 
 #### Scenario: The legend renders once
@@ -629,6 +663,11 @@ through to the text / command-history path.
 - **WHEN** the current dock frame has fewer rows than the pressed digit and the command field is
   not focused
 - **THEN** the digit is not claimed, the frame's focus is unchanged, and nothing submits
+
+#### Scenario: The dialogue legend swaps to the reference dialogue hint
+- **WHEN** the dock tab bar renders while the dialogue form presents
+- **THEN** the legend reads `數字鍵 1–4 選 · → 指令列自由對話` with `→` rendered as a styled `<kbd>`
+  element, and the legend element is the same single instance, not a second copy
 
 ### Requirement: A breadcrumb derived from the router names the player's position at depth
 
@@ -1390,7 +1429,6 @@ no committed panel exists, and SHALL NOT stand a placeholder in for it.
 - **WHEN** the help surface renders with no committed panel carrying authored guide content
 - **THEN** it renders the client's own control reference and a statement of how the game's help output is reached, and it renders no authored game-help entry and no placeholder standing in for one
 
-
 ### Requirement: Narrative prose scale is a client-local preference the settings surface owns
 The client SHALL expose a narrative prose scale with three steps, selectable from the settings surface,
 whose current step is marked by an indicator that does not rely on colour alone. The scale SHALL apply
@@ -1482,7 +1520,7 @@ does not carry.
 
 ### Requirement: The party quickbar island presents the committed party only
 The left HUD SHALL carry a party island while the committed `party` panel is available in
-exploration or combat mode, and SHALL render no party island when the panel is unavailable or the
+exploration, combat, or dialogue mode, and SHALL render no party island when the panel is unavailable or the
 committed mode is creation. The island's header SHALL read `同伴` with the slot count as
 `N / 4`, where `N` equals the committed slot count. Each row of `party.slots` SHALL render one
 cell carrying: the companion's display name; an avatar showing the bound portrait only when the
@@ -1570,7 +1608,8 @@ chip badge contract cannot drift from the server's command set.
 
 ### Requirement: The objective tracker island presents the committed objectives only
 The HUD SHALL carry a bottom-right objective tracker island while the committed `objectives`
-panel is available with a non-empty `rows` list in exploration or combat mode, and SHALL render no
+panel is available with a non-empty `rows` list in exploration, combat, or
+dialogue mode, and SHALL render no
 tracker island when `rows` is empty, when the panel is unavailable, or in creation mode. The
 island's header SHALL read `目標` with the mono-gold count `N 追蹤`, where `N` equals the
 committed row count. Each row of `objectives.rows` SHALL render, in payload order: a stage box
@@ -1600,3 +1639,84 @@ carry and no invented optional or previous-stage rows.
 #### Scenario: The tracker dispatches nothing
 - **WHEN** the player interacts with the tracker island
 - **THEN** no `ui_action` or text command is sent and no mutation control is present
+
+### Requirement: The feed presents the dialogue variant from the committed panel
+While the committed mode is `dialogue` and the committed `dialogue` panel is available, the
+narrative caption SHALL present the reference's dialogue variant: a dialogue box carrying the
+host's avatar (the bound portrait through the client's art catalog when the row's `portrait_ref`
+resolves, otherwise the display name's initial letter in the reference's gold display face), a
+gold speaker line carrying the host's `display_name` plus ` · 羈絆 <stage>` only when
+`bond_stage` is non-null, and the serif reply line carrying the panel's `line` verbatim; below
+the box, one numbered pick row per `dialogue.choices` entry in payload order with its mono
+digit badge and bounded label, followed by a trailing free-dialogue row (`⌨` badge,
+`自由對話（輸入任意話語）→ 指令列`). Activating a pick row SHALL dispatch
+`explore.talk_scripted` with `{npc_id: host.identity, keyword_id}` under the existing dispatch
+contract; activating the free-dialogue row SHALL focus the borrowed command line through the
+existing freeform-borrow path and SHALL dispatch nothing itself. The variant SHALL render the
+session line exactly once — the box replaces the caption's duplicate stream tail for that
+exchange while the polite live region announces each new committed line exactly once — and SHALL
+NOT render picks the panel does not carry, reason tags, or disabled-row states. While mode is
+`dialogue` but the panel is unavailable (the transient window between a clear seam and its
+commit), the caption SHALL fall back to its plain narrative presentation with the `對話` head
+label and no dialogue box.
+
+#### Scenario: The dialogue box mirrors the committed panel
+- **WHEN** mode `dialogue` commits with host `灰婆婆`, `bond_stage` `親睦`, a line, and four
+  keyword choices
+- **THEN** the caption shows the initial-letter gold avatar, the speaker line
+  `灰婆婆 · 羈絆 親睦`, the reply line, four numbered pick rows, and the free-dialogue row
+
+#### Scenario: A pick dispatches the scripted keyword
+- **WHEN** the player activates pick 2 through pointer or Enter
+- **THEN** exactly one `explore.talk_scripted` request with the committed host identity and that
+  row's `keyword_id` is submitted through the existing dispatch contract
+
+#### Scenario: Free dialogue borrows the command line
+- **WHEN** the player activates the trailing free-dialogue row
+- **THEN** the command line receives focus for a freeform utterance and no action is dispatched
+
+#### Scenario: The session line announces once
+- **WHEN** a new reply commits while the dialogue variant renders
+- **THEN** the reply appears once in the caption and the polite live region names its text exactly
+  once
+
+#### Scenario: A transiently unavailable panel falls back plainly
+- **WHEN** mode is `dialogue` but the committed panel is the unavailable form
+- **THEN** no dialogue box or picks render and the caption shows plain narrative with the `對話`
+  label
+
+### Requirement: The dock presents the dialogue form as a mirror of the same picks
+While the committed mode is `dialogue`, the action dock SHALL present the dialogue root form:
+one tab `對話選項` whose pane lists the SAME committed `dialogue.choices` rows as the feed —
+through one shared derived view model, never a second fetch or copy — with the same dispatch
+semantics, and its legend SHALL carry the reference's dialogue hint through the shortcut-legend
+requirement restated below. While mode is `dialogue` and the
+panel is unavailable, the pane SHALL resolve to the shared degradation marker with the panel's
+server-authored reason, like any unresolvable frame. Digit keys `1`–`4` SHALL activate the first
+four rendered picks while the dialogue form is presented, and SHALL keep their command-line
+semantics everywhere else, never intercepted from the input field. While the dialogue form is
+presented, the `→` key SHALL focus the borrowed command line through the same freeform-borrow
+path and SHALL dispatch nothing itself, never intercepted from the input field. Pointer, Enter,
+and digit activation SHALL dispatch identically through the same router entry.
+
+#### Scenario: Feed and dock mirror one committed list
+- **WHEN** four choices commit while mode is dialogue
+- **THEN** the feed and the dock pane render the same four rows from one derived model and both
+  dispatch the same identifiers and payloads
+
+#### Scenario: Digits pick in dialogue mode only
+- **WHEN** the player presses `3` while the dialogue form renders, and separately while the
+  command line has focus
+- **THEN** the dialogue press activates pick three through the same dispatch entry, and the
+  command-line press types into the input untouched
+
+#### Scenario: The arrow key borrows the command line
+- **WHEN** the player presses `→` while the dialogue form renders, and separately while the
+  command line already has focus
+- **THEN** the dialogue-mode press focuses the command line and dispatches nothing, and the
+  focused press moves the caret normally with no focus change
+
+#### Scenario: The unavailable dialogue frame degrades like any lost frame
+- **WHEN** mode is dialogue and the panel is unavailable
+- **THEN** the dock pane shows the shared degradation marker with the server-authored reason and
+  no pick renders

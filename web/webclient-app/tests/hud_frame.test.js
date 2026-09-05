@@ -18,6 +18,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import AppShell from "../components/AppShell.vue";
 import ActionDock from "../components/ActionDock.vue";
 import LocalMap from "../components/LocalMap.vue";
+import SceneBackdrop from "../components/SceneBackdrop.vue";
+import { ART_PANEL_SAMPLE } from "../stories/fixtures.js";
 import * as fx from "./store/protocol_fixtures.js";
 
 import { h } from "vue";
@@ -116,6 +118,32 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     await explore.vm.$nextTick();
     // The feed stays visible in combat, so focus is not rescued.
     expect(document.activeElement).toBe(feedEl);
+  });
+
+  it("keeps the backdrop's committed art unmodified across the dialogue mode flip", () => {
+    // webclient-align-08: "Dialogue backdrop keeps its committed art" — the
+    // mode change must not touch the scene surface: same committed bitmap and
+    // label before and after the flip.
+    const host = document.createElement("div");
+    host.id = "elosern-app";
+    document.body.appendChild(host);
+    wrapper = mount(AppShell, {
+      attachTo: host,
+      props: { mode: "exploration" },
+      slots: {
+        "action-dock": () => h(ActionDock, { mode: "exploration" }),
+        backdrop: () => h(SceneBackdrop, { art: ART_PANEL_SAMPLE }),
+      },
+    });
+    const before = wrapper.get('[data-testid="scene-backdrop-image"]').attributes("src");
+    expect(before).toBe("/art/scenes/scene_river_dawn.png");
+
+    wrapper.setProps({ mode: "dialogue" });
+    return wrapper.vm.$nextTick().then(() => {
+      expect(wrapper.find('[data-elosern-mode="dialogue"]').exists()).toBe(true);
+      expect(wrapper.get('[data-testid="scene-backdrop-image"]').attributes("src")).toBe(before);
+      expect(wrapper.get('[data-testid="scene-backdrop-label"]').text()).toBe("河畔清晨");
+    });
   });
 
   it("keeps the whole cockpit visible in dialogue mode (matrix dialogue column)", () => {
