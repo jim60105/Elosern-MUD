@@ -5,8 +5,8 @@ Source design: `docs/superpowers/specs/2026-09-05-companion-possession-design.md
 unimplemented: the puppet transfer, the cmdset mount, the disconnect wiring, and the entrance
 rendering. The state machine, gates, and release ordering are settled there.
 
-## D-T1: Reuse the multichar transition ordering through the landed session-level helpers
-The switcher (`multichar-03`, landed) solved the exact hazards this change re-traverses: silent
+## D-T1: Reuse the multichar transition ordering through the existing session-level helpers
+The switcher line (`multichar-03`, PROPOSED — land it first) solves the exact hazards this change re-traverses: silent
 `puppet_object` refusals, retire/epoch ordering, and the `at_post_unpuppet` side effects. The
 transition SHALL perform, in order: retire the acting session's in-flight action sequence
 (`web/webclient/actions/dispatcher.py::retire_sequence(session)`) AND bump its presentation epoch
@@ -15,9 +15,12 @@ owner: it re-attaches the coordinator and calls `coordinator.reset()` plus the `
 clear (`send_unpuppet_transition` only signals the browser; it bumps nothing) — THEN the puppet
 swap, then the transition push (`send_unpuppet_transition(session)`); all three are already
 session-level and importable. The contract this ordering enforces: a completion Deferred started
-for A's panel can never publish after the swap. Possession calls these directly; no second copy
-of the ladder exists outside `possession.py` itself (the verify-`get_puppet`-after recovery ladder
-is possession-local because its restore target — A — is possession-specific).
+for A's panel can never publish after the swap. The three helpers already exist in the tree
+(shipped by `fix-webclient-session-lifecycle` / `action-options-trigger-service`); MC3
+contributes the verified `_attach_puppet` helper, the three-rung recovery ladder, and the
+codified epoch semantics this change mirrors. Possession calls the helpers directly; no second
+copy of the ladder exists outside `possession.py` itself (the verify-`get_puppet`-after recovery
+ladder is possession-local because its restore target — A — is possession-specific).
 
 ## D-T2: Lock grant is additive and survives; release strips it
 Before the first puppet of B, `npc.locks.add("puppet:id(<account id>)")` is ADDED alongside the
@@ -84,6 +87,7 @@ row; silence is the worse failure.
   and the `restored_possession_surfaces` export this change's tests import.
 - `companion-possession-webclient` (8): consumes the banner/panel surfaces this change makes
   real; replaces the server-side epoch reset (webclient-internal) with this transition path.
-- multichar-03 (landed): shared ordering; `typeclasses/characters.py` `at_post_unpuppet` is
+- multichar-03 (PROPOSED — hard landing dependency, land it first): shared ordering;
+  `typeclasses/characters.py` `at_post_unpuppet` is
   edited by both lines — land after it. The possession release hook itself is NOT on that hook
   (D-T4); it lives on `Account.at_post_disconnect`, disjoint from the multichar switcher's turf.

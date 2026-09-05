@@ -108,6 +108,18 @@ after `profession-rulebook-registry` (1) → `profession-import-assembly` (2) �
 `declarative-service-hosts` (3), and before the companion-possession line (6–8). Full batch order
 is serial 1→8; see the profession-registries design §9 for the table.
 
+**Proposal list (this design):**
+
+| # | Change | Delivers |
+|---|---|---|
+| 4 | `service-anchoring-gate` | binding/anchor `DBField` persistence, `service_available` resolver, gate rewiring (shop/registration/exam), fail-closed posture |
+| 5 | `service-anchor-presentation-silence` | `off_anchor`/silence presentation, PartyDrawer darkening, schedule-silence reuse surface |
+
+**Implementation batch order:** `4 → 5` strictly serial (5 renders 4's verdict vocabulary on the
+same gate module). Whole-line position: after 1→2→3, before 6. No overlap with the multichar line
+(MC1–MC5): 4–5 touch `world/rules/` and gate tests only, never an MC file, so this window is the
+free slot around MC's own batching.
+
 Amendment recorded during change authoring (rubber-duck review): **D2's per-NPC binding override
 is deliberately deferred** — no shipped content needs a host whose binding disagrees with its
 profession, and the documented traveling-antique-dealer exception is expressible today as its own

@@ -110,3 +110,22 @@ profession-registries design §9. Amendments from the pre-handoff rubber-duck re
 into D5 (release-then-commit wording is in D8) and D8/§5 (`Account.at_post_disconnect` replaces
 `at_post_unpuppet` as the disconnect hook); the epoch bump is owned by
 `reset_client_sequence` (transition change D-T1).
+
+**Proposal list (this design):**
+
+| # | Change | Delivers |
+|---|---|---|
+| 6 | `companion-possession-rules` | `possession.py` writer + gates, `is_player_driven` predicate, party release hooks, possess/歸位 commands, autonomy silencing, movement retitling |
+| 7 | `companion-possession-transition` | real puppet-transfer ladder, cmdset mount, `Account.at_post_disconnect` wiring, entranced rendering |
+| 8 | `companion-possession-webclient` | possess affordances, banner presentation, PartyDrawer integration, JS gates |
+
+**Implementation batch order:** `6 → 7 → 8` strictly serial (7 fills 6's named seams; 8 renders
+7's real state). **Cross-line coupling with multichar (MC1–MC5):** 7 has a HARD landing
+dependency on MC3 (`multichar-03-character-switch-action`, itself still Proposed — its
+"landed" claim was corrected in change 7's D-T1): the transition ladder rides MC3's verified
+`_attach_puppet` helper, three-rung recovery ladder, and codified epoch semantics, and both
+lines edit `typeclasses/characters.py` around `at_post_unpuppet`. Text-level contention points:
+`typeclasses/accounts.py` (MC1 vs 7, different methods), `docs/game/command-reference.md` +
+`tests/test_command_docs.py` manifest (MC1 vs 6), Storybook `component-manifest.json`
+(MC5 44→45 vs 8 — second arriver rebases). Practical interleaving and the full table:
+profession-registries design §9.

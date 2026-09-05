@@ -177,6 +177,16 @@ anchoring/presentation/possession line owned by the sibling designs:
 | 7 | `companion-possession-transition` | companion-possession design D3/D7, §3/§5 |
 | 8 | `companion-possession-webclient` | companion-possession design D9/D10 |
 
+**Proposal list (this design):**
+
+| # | Change | Delivers |
+|---|---|---|
+| 1 | `profession-rulebook-registry` | `professions.yaml` schema + immutable keyed registry, `default_binding`/`anchor_room` stored, startup idempotent sync |
+| 2 | `profession-import-assembly` | import-record profession references, shared `profession_assembly` construction, validation-before-persistence |
+| 3 | `declarative-service-hosts` | roster-driven `sync_service_content` (names/components/hosts from the roster), roster anchor fields |
+
+This design's own line is serial `1 → 2 → 3` (2 consumes 1's registry; 3 interprets both).
+
 **Implementation batch order: fully serial `1 → 2 → 3 → 4 → 5 → 6 → 7 → 8`.**
 Reviewed in the pre-handoff rubber-duck pass: every candidate parallel wave was rejected — 3
 consumes 2's assembly helper; 4 reads 3's roster anchor fields and shared assembly; 5 renders 4's
@@ -184,3 +194,21 @@ verdict vocabulary on the same gate module; 6 needs 5's `schedule_silenced`; the
 (7, 8) layers on 6. There is no safe overlap; `tmp/propose.md`'s one-at-a-time rule matches the
 graph. Sizing notes in each proposal record the intra-change landing order if a slice exceeds one
 engineer day.
+
+### Relationship to the multichar line (MC1–MC5, also Proposed)
+
+No semantic conflict — the lines own disjoint rule surfaces — but there is one hard dependency
+and three file-contention points:
+
+- **Hard:** 7 (`companion-possession-transition`) lands after **MC3**
+  (`multichar-03-character-switch-action`). The transition ladder rides MC3's verified
+  `_attach_puppet` helper, three-rung recovery ladder, and codified epoch semantics, and both
+  lines edit `typeclasses/characters.py` around `at_post_unpuppet`.
+- **Contention (text-level, order-merge):** `typeclasses/accounts.py` (MC1 edits
+  `at_post_login`/`_pending_character`; 7 adds `at_post_disconnect` — different methods);
+  `docs/game/command-reference.md` + `tests/test_command_docs.py` curated manifest (MC1 and 6
+  both add rows); the Storybook `component-manifest.json` (MC5 44→45 and 8's banner/PartyDrawer
+  rows — whichever lands second rebases the count).
+- Everything else is free: 1–6 touch no MC file; MC2/MC4/MC5 are account-surface only. Practical
+  interleaving: `MC1 → {1..5 in serial, ‖ MC2/MC3 per MC's own batching} → MC3 done → 6 → 7 →
+  {8 after MC5}`.
