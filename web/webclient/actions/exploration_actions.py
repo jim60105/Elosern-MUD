@@ -230,6 +230,24 @@ def validate_wait_payload(payload: Any) -> dict[str, Any]:
     raise ExplorationActionError("explore.wait requires exactly one of daypart, seconds, or sleep")
 
 
+def validate_possess_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact ``explore.possess`` payload."""
+    if not isinstance(payload, dict):
+        raise ExplorationActionError("explore.possess payload must be an object")
+    if set(payload) != {"npc_id"}:
+        raise ExplorationActionError("explore.possess requires exactly npc_id")
+    return {"npc_id": _require_positive_int(payload["npc_id"], "npc_id")}
+
+
+def validate_possess_release_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact ``explore.possess_release`` payload."""
+    if not isinstance(payload, dict):
+        raise ExplorationActionError("explore.possess_release payload must be an object")
+    if set(payload) != {"npc_id"}:
+        raise ExplorationActionError("explore.possess_release requires exactly npc_id")
+    return {"npc_id": _require_positive_int(payload["npc_id"], "npc_id")}
+
+
 # ---------------------------------------------------------------------------
 # Adapter helpers.
 # ---------------------------------------------------------------------------
@@ -369,6 +387,15 @@ def _look_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
 def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Re-verify the host and keyword, then call the deterministic dialogue API."""
     del session
+    from world.rules.possession import (
+        POSSESSED_REFUSAL_MESSAGES,
+        REASON_POSSESSED_TALK,
+        is_possessed_actor,
+    )
+
+    if is_possessed_actor(actor):
+        return _rejected(REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
+
     npc = _resolve_npc(actor, payload["npc_id"])
     if npc is None:
         return _rejected("no_npc", "這裡沒有這個對象。")
@@ -412,6 +439,15 @@ def _talk_freeform_adapter(actor: Any, payload: dict[str, Any], session: Any = N
     verified-intent included).
     """
     del session
+    from world.rules.possession import (
+        POSSESSED_REFUSAL_MESSAGES,
+        REASON_POSSESSED_TALK,
+        is_possessed_actor,
+    )
+
+    if is_possessed_actor(actor):
+        return _rejected(REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
+
     npc = _resolve_llm_npc(actor, payload["npc_id"])
     if npc is None:
         return _rejected("no_npc", "這裡沒有可以自由交談的對象。")
@@ -571,6 +607,15 @@ def _party_leave_adapter(actor: Any, payload: dict[str, Any], session: Any = Non
 def _engage_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Re-resolve a present monster and delegate to the existing engage contract."""
     del session
+    from world.rules.possession import (
+        POSSESSED_REFUSAL_MESSAGES,
+        REASON_POSSESSED_ENGAGE,
+        is_possessed_actor,
+    )
+
+    if is_possessed_actor(actor):
+        return _rejected(REASON_POSSESSED_ENGAGE, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_ENGAGE])
+
     monster = _resolve_monster(actor, payload["monster_id"])
     if monster is None:
         return _rejected("no_monster", "這裡沒有這個對象。")
@@ -622,6 +667,147 @@ def _wait_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
     return _success("skipped", message, AFFECTED_FULL)
 
 
+def _perform_possess_transition(session: Any, player: Any, npc: Any) -> None:
+    from web.webclient.actions.account_actions import _clear_transition_pending
+    try:
+        from world.rules.possession import enter_possession
+        enter_possession(player, npc)
+    except Exception as exc:
+        log_error(
+            "possess_transition_failed",
+            context={
+                "player": str(getattr(player, "pk", "?")),
+                "npc": str(getattr(npc, "pk", "?")),
+            },
+            exc=exc,
+        )
+        if session is not None:
+            from web.webclient.presentation.ingress import synchronize_session
+            synchronize_session(session, player)
+            session.msg("此刻無法附身於他。")
+    finally:
+        _clear_transition_pending(session)
+
+
+def _possess_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
+    """Enter possession of a bound companion.
+
+    Synchronously verifies companion binding and entry gates. If admitted on a
+    live session, returns a result-only success response (no_presentation=True)
+    and schedules the puppet transition on the next reactor turn to prevent
+    epoch races with the dispatcher.
+    """
+    from web.webclient.actions.account_actions import (
+        _set_transition_pending,
+        _transition_pending,
+        get_clock,
+    )
+    from world.rules.possession import (
+        POSSESSION_REJECTION_MESSAGES,
+        REASON_NOT_CO_LOCATED,
+        enter_possession,
+        possession_verdict,
+    )
+
+    if _transition_pending(session):
+        return _rejected("transition_pending", "角色切換正在進行中，請稍候。")
+
+    npc = _resolve_npc(actor, payload["npc_id"])
+    if npc is None:
+        return _rejected(REASON_NOT_CO_LOCATED, POSSESSION_REJECTION_MESSAGES[REASON_NOT_CO_LOCATED])
+
+    verdict = possession_verdict(actor, npc)
+    if verdict is not None:
+        return _rejected(verdict, POSSESSION_REJECTION_MESSAGES.get(verdict, "無法附身。"))
+
+    message = f"你附身到了{npc.key}身上。"
+    if session is not None:
+        clock = get_clock()
+        clock.callLater(0, _perform_possess_transition, session, actor, npc)
+        _set_transition_pending(session)
+        return {
+            "outcome": "success",
+            "code": "possessed",
+            "message": message,
+            "no_presentation": True,
+        }
+
+    # Headless / tests with no session context
+    enter_possession(actor, npc)
+    return _success("possessed", message, AFFECTED_FULL)
+
+
+def _perform_release_transition(session: Any, player: Any, npc: Any) -> None:
+    from web.webclient.actions.account_actions import _clear_transition_pending
+    try:
+        from world.rules.possession import release_possession
+        release_possession(player, npc=npc, reason="handback")
+    except Exception as exc:
+        log_error(
+            "release_transition_failed",
+            context={
+                "player": str(getattr(player, "pk", "?")),
+                "npc": str(getattr(npc, "pk", "?")),
+            },
+            exc=exc,
+        )
+        if session is not None:
+            from web.webclient.presentation.ingress import synchronize_session
+            synchronize_session(session, getattr(session, "puppet", None) or player)
+            session.msg("你的身體搖搖欲墜,彷彿從很深的水裡被拉回來。")
+    finally:
+        _clear_transition_pending(session)
+
+
+def _possess_release_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
+    """Release possession and return puppet to the owning player character."""
+    from web.webclient.actions.account_actions import (
+        _set_transition_pending,
+        _transition_pending,
+        get_clock,
+    )
+    from world.rules.possession import (
+        UNPOSSESS_RELEASED_MESSAGE,
+        _resolve_live_object,
+        current_possession,
+        is_possessed_actor,
+        release_possession,
+    )
+
+    if _transition_pending(session):
+        return _rejected("transition_pending", "角色切換正在進行中，請稍候。")
+
+    if is_possessed_actor(actor):
+        player_id = int(actor.db.possessed_by)
+        player = _resolve_live_object(player_id)
+        npc = actor
+    else:
+        player = actor
+        npc = _resolve_live_object(payload["npc_id"])
+
+    if player is None or npc is None:
+        return _rejected("mismatched_possession", "未處於附身狀態或找不到對應的本體。")
+
+    pos = current_possession(player)
+    if pos is None or pos.get("npc_dbid") != getattr(npc, "pk", None) or getattr(npc.db, "possessed_by", None) != getattr(player, "pk", None):
+        return _rejected("mismatched_possession", "附身狀態不相符，無法歸位。")
+
+    if session is not None:
+        clock = get_clock()
+        clock.callLater(0, _perform_release_transition, session, player, npc)
+        _set_transition_pending(session)
+        return {
+            "outcome": "success",
+            "code": "released",
+            "message": UNPOSSESS_RELEASED_MESSAGE,
+            "no_presentation": True,
+        }
+
+    # Headless / tests with no session context
+    release_possession(player, npc=npc, reason="handback")
+    return _success("released", UNPOSSESS_RELEASED_MESSAGE, AFFECTED_FULL)
+
+
 __all__ = [
     "AFFECTED_ENGAGE",
     "DAYPARTS",
@@ -635,6 +821,8 @@ __all__ = [
     "validate_move_payload",
     "validate_party_invite_payload",
     "validate_party_leave_payload",
+    "validate_possess_payload",
+    "validate_possess_release_payload",
     "validate_talk_freeform_payload",
     "validate_talk_scripted_payload",
     "validate_wait_payload",

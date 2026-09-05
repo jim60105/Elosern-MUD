@@ -18,8 +18,9 @@ panel presenter and the `context_actions` exploration presenter. Every emitted e
   (false), `enabled`, and nullable `disabled_reason`; `action_id` SHALL be one member of
   `ACTION_CODE_ALLOWLIST`, which SHALL contain exactly `explore.move`, `explore.look`,
   `explore.talk_scripted`, `explore.talk_freeform`, `explore.party_invite`, `explore.party_leave`,
-  `explore.engage`, and `explore.wait` — there SHALL be no `explore.interact` entry (the
-  exploration panel's interact group is a label over per-target affordances, not an action); there
+  `explore.engage`, `explore.wait`, `explore.possess`, and `explore.possess_release` — there SHALL
+  be no `explore.interact` entry (the exploration panel's interact group is a label over
+  per-target affordances, not an action); there
   SHALL be no NPC or companion `explore.engage` (engagement is monsters-only);
 - a **navigation entry** SHALL carry exactly `surface` (`"guild"` or `"shop"`), `label`,
   `navigation` (true), `enabled`, and nullable `disabled_reason`, and SHALL carry no
@@ -35,7 +36,15 @@ and full-party rules and `explore.party_leave` the companion-bound rule, `explor
 emitted once per present `Monster` (a living monster yields `enabled` true; a dead monster yields
 a disabled entry with a stable `target_dead` reason — matching the v1 panel), guild/shop
 navigation entries SHALL be emitted only for the exact local host, and the idle baseline SHALL
-follow the idle-baseline requirement below. A schedule-blocked dialogue host SHALL NOT be omitted
+follow the idle-baseline requirement below. `explore.possess` SHALL be emitted once per present
+bound companion with `params {"npc_id": int}`: `enabled` true when
+`world/rules/possession.py`'s deterministic entry gates pass for that companion, otherwise a
+disabled entry carrying the gate's stable reason code and fixed message. `explore.possess_release`
+SHALL be emitted exactly once, only while the puppeted actor is a possessed NPC. While the
+puppeted actor IS a possessed NPC, the vocabulary SHALL keep its refusal surface honest: talk
+entries, `explore.engage`, and shop navigation entries SHALL be emitted disabled with stable
+possession-refusal codes and safe Traditional Chinese messages — v1 possession refusals are
+visible disabled states, not hidden entries. A schedule-blocked dialogue host SHALL NOT be omitted
 from the vocabulary — the vocabulary preserves the v1 panel's emission semantics; schedule-gate
 exclusion applies only to suggestion eligibility (suggestion-eligibility requirement below).
 A dialogue host whose authored dialogue table cannot be resolved SHALL have no talk entries in
@@ -63,6 +72,21 @@ quests, inventory, combat sessions, party, or world time.
   `navigation` true, and no `action_id` and no `params`, and no `ui_action` registry lookup
   exists for it
 
+#### Scenario: Possess entries mirror the deterministic gates
+- **WHEN** a bound companion stands beside the player while a combat session is active
+- **THEN** the vocabulary carries that companion's `explore.possess` entry disabled with the
+  combat gate's stable code, and the same entry is enabled once combat ends
+
+#### Scenario: Release is offered exactly once, only while possessing
+- **WHEN** the actor possesses a companion and the vocabulary is emitted
+- **THEN** exactly one `explore.possess_release` entry is present, and no unpossessed-emission
+  vocabulary contains it
+
+#### Scenario: The possessed actor's refusal surface stays visible
+- **WHEN** the puppeted actor is a possessed NPC and a monster and a shop host are present
+- **THEN** the engage and shop entries render disabled with stable possession-refusal codes and
+  fixed messages rather than being omitted
+
 ### Requirement: Affordance params are validator-normalized
 Every action entry's `params` SHALL be the normalized output of that action's registered
 validator in `web/webclient/actions/exploration_actions.py` applied to a candid payload the
@@ -70,7 +94,8 @@ builder constructs (exact shapes: `explore.move` `{"exit_ref", "current_node"}`,
 `{"target_id"}` or `{"room": true}`, `explore.talk_scripted` `{"npc_id", "keyword_id"}`,
 `explore.party_invite` `{"npc_id", "message"}` (message empty by construction),
 `explore.party_leave` `{"npc_id"}`, `explore.engage` `{"monster_id"}`, `explore.wait`
-`{"daypart": "noon"}`) — so the dispatched payload is byte-for-byte the payload the dispatcher
+`{"daypart": "noon"}`, `explore.possess` `{"npc_id"}`, and `explore.possess_release`
+`{"npc_id"}`) — so the dispatched payload is byte-for-byte the payload the dispatcher
 accepts. The `explore.talk_freeform` entry SHALL be the single exception: its `params` SHALL be
 exactly `{"npc_id": int}` (binding-only), because no registered validator produces that shape
 without `speech`; the full validator SHALL run only on the client-composed dispatch payload

@@ -195,6 +195,10 @@ def build_production_registry() -> PresentationRegistry:
         PARTY_SCHEMA_VERSION,
         party_presenter,
     )
+    from web.webclient.presentation.possession_banner import (
+        POSSESSION_BANNER_SCHEMA_VERSION,
+        possession_banner_presenter,
+    )
     from web.webclient.presentation.roster import (
         ROSTER_SCHEMA_VERSION,
         roster_presenter,
@@ -337,6 +341,14 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=ROSTER_SCHEMA_VERSION,
             unavailable_reason=UNAVAILABLE_REASON,
             presenter=roster_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="possession_banner",
+            schema_version=POSSESSION_BANNER_SCHEMA_VERSION,
+            unavailable_reason=("not_possessing", "目前未處於附身狀態"),
+            presenter=possession_banner_presenter,
         )
     )
     return registry

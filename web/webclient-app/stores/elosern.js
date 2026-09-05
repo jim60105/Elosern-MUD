@@ -80,6 +80,7 @@ const PANEL_ALLOWLIST = [
   "title_ballot",
   "title_codex",
   "roster",
+  "possession_banner",
 ];
 
 // D5 (webclient-minimap-04-island-single-affordance): top-meta locationLabel

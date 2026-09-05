@@ -95,6 +95,7 @@ const props = defineProps({
   rosterSwitchLocked: { type: Boolean, default: false },
   rosterLockReason: { type: String, default: null },
   epoch: { type: [Number, String], default: null },
+  possessionBanner: { type: Object, default: null },
 });
 
 const emit = defineEmits([
@@ -331,6 +332,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
       :roster-lock-reason="rosterLockReason"
       :locked="mutationsLocked || !connected"
       :epoch="epoch"
+      :possession-banner="possessionBanner"
       @switch-character="emit('switch-character', $event)"
       @create-character="emit('create-character')"
     />

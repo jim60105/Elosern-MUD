@@ -19,8 +19,15 @@ STATUS_SCHEMA_VERSION = 2
 def status_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available ``status`` panel payload for the actor."""
     actor = context.actor
+    possessed_by = getattr(getattr(actor, "db", None), "possessed_by", None)
+    status_source = actor
+    if possessed_by is not None:
+        from world.rules.possession import _resolve_live_object
+        owner = _resolve_live_object(int(possessed_by))
+        if owner is not None:
+            status_source = owner
     try:
-        model = build_status_read_model(actor)
+        model = build_status_read_model(status_source)
     except StatusQueryError:
         raise PanelUnavailableError
     resources: dict[str, Any] = {}

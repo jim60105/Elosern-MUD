@@ -74,7 +74,7 @@ class VocabularyTestCase(EvenniaTestCase):
 
 
 class AffordanceContractTests(unittest.TestCase):
-    def test_action_code_allowlist_is_exactly_the_eight_actions(self):
+    def test_action_code_allowlist_is_exactly_the_ten_actions(self):
         self.assertEqual(
             ACTION_CODE_ALLOWLIST,
             (
@@ -86,6 +86,8 @@ class AffordanceContractTests(unittest.TestCase):
                 "explore.party_leave",
                 "explore.engage",
                 "explore.wait",
+                "explore.possess",
+                "explore.possess_release",
             ),
         )
         self.assertNotIn("explore.interact", ACTION_CODE_ALLOWLIST)
@@ -93,7 +95,12 @@ class AffordanceContractTests(unittest.TestCase):
     def test_suggestible_set_excludes_party_actions(self):
         self.assertEqual(
             SUGGESTIBLE_ACTION_IDS,
-            set(ACTION_CODE_ALLOWLIST) - {"explore.party_invite", "explore.party_leave"},
+            set(ACTION_CODE_ALLOWLIST) - {
+                "explore.party_invite",
+                "explore.party_leave",
+                "explore.possess",
+                "explore.possess_release",
+            },
         )
 
     def test_max_cards_is_five(self):

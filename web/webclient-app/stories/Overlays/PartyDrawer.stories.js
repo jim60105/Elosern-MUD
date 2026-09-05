@@ -69,6 +69,38 @@ export const TwoCompanions = {
   },
 };
 
+export const PossessionAndRelease = {
+  render: renderDrawer,
+  args: {
+    slots: PARTY_PANEL_SAMPLE.slots,
+    combatParticipants: [],
+    artPanel: ART_PANEL_SAMPLE,
+    interactTargets: PARTY_INTERACT_TARGETS_SAMPLE,
+    mode: "exploration",
+    releaseAffordance: {
+      action_id: "explore.possess_release",
+      label: "歸位",
+      params: { npc_id: 101 },
+      enabled: true,
+    },
+    affordances: [
+      {
+        action_id: "explore.possess",
+        label: "附身",
+        params: { npc_id: 101 },
+        enabled: true,
+      },
+      {
+        action_id: "explore.possess",
+        label: "附身",
+        params: { npc_id: 102 },
+        enabled: false,
+        disabled_reason: { code: "in_combat", message: "戰鬥中無法附身。" },
+      },
+    ],
+  },
+};
+
 export const EmptyParty = {
   render: renderDrawer,
   args: {

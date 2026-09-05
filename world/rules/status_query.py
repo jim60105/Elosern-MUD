@@ -1513,7 +1513,17 @@ def _read_disguise(entity: Any) -> tuple[bool, tuple[tuple[str, int], ...]]:
 
 
 def _read_wallet(entity: Any) -> int:
-    raw = entity.db.wallet
+    raw = getattr(getattr(entity, "db", None), "wallet", None)
+    if raw is None:
+        possessed_by = getattr(getattr(entity, "db", None), "possessed_by", None)
+        if possessed_by is not None:
+            from world.rules.possession import _resolve_live_object
+            owner = _resolve_live_object(int(possessed_by))
+            if owner is not None:
+                return _read_wallet(owner)
+        from typeclasses.characters import PlayerCharacter
+        if not isinstance(entity, PlayerCharacter):
+            return 0
     if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
         raise StatusQueryError("wallet is malformed")
     return raw
@@ -1542,6 +1552,25 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
     # the model build can observe or repair it.
     intimate = _read_intimate(entity)
     active_keys, passive_keys = _split_active_passive_keys(entity)
+
+    possessed_by = getattr(getattr(entity, "db", None), "possessed_by", None)
+    owner = None
+    if possessed_by is not None:
+        from world.rules.possession import _resolve_live_object
+        owner = _resolve_live_object(int(possessed_by))
+
+    if owner is not None:
+        owner_assembly = _assemble(owner)
+        guild_rank = getattr(owner, "guild_rank", None)
+        guild_merit = _read_guild_merit(owner_assembly.traits_data)
+        wallet = _read_wallet(owner)
+        full_title = _read_full_title(owner)
+    else:
+        guild_rank = getattr(entity, "guild_rank", None)
+        guild_merit = _read_guild_merit(assembly.traits_data)
+        wallet = _read_wallet(entity)
+        full_title = _read_full_title(entity)
+
     return CharacterReadModel(
         traits=tuple(traits),
         active_keys=active_keys,
@@ -1549,10 +1578,10 @@ def build_character_read_model(entity: Any) -> CharacterReadModel:
         equipment=assembly.equipment,
         disguise_active=disguise_active,
         disguise_displayed=disguise_displayed,
-        guild_rank=getattr(entity, "guild_rank", None),
-        guild_merit=_read_guild_merit(assembly.traits_data),
-        wallet=_read_wallet(entity),
-        full_title=_read_full_title(entity),
+        guild_rank=guild_rank,
+        guild_merit=guild_merit,
+        wallet=wallet,
+        full_title=full_title,
         intimate=intimate,
         breakdown=build_stat_breakdown(entity, assembly),
     )

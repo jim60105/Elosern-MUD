@@ -30,6 +30,14 @@ export const Disconnected = {
   },
 };
 
+export const PossessionBannerActive = {
+  render: renderTopBar,
+  args: {
+    ...STATUS_SLICE_SAMPLE,
+    possessionBanner: { available: true, host_name: "小艾", since_tick: 42 },
+  },
+};
+
 export const NoSlice = {
   render: renderTopBar,
   args: {

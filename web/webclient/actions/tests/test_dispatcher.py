@@ -163,6 +163,8 @@ class RegistryTests(unittest.TestCase):
                     "explore.party_leave",
                     "explore.engage",
                     "explore.wait",
+                    "explore.possess",
+                    "explore.possess_release",
                     "options.dismiss",
                     "title.accept",
                     "title.decline",

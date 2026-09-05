@@ -52,6 +52,8 @@ ACTION_CODE_ALLOWLIST = (
     "explore.party_leave",
     "explore.engage",
     "explore.wait",
+    "explore.possess",
+    "explore.possess_release",
 )
 
 # The subset of action codes a suggestion may carry: party management is a
@@ -59,6 +61,8 @@ ACTION_CODE_ALLOWLIST = (
 SUGGESTIBLE_ACTION_IDS = frozenset(ACTION_CODE_ALLOWLIST) - {
     "explore.party_invite",
     "explore.party_leave",
+    "explore.possess",
+    "explore.possess_release",
 }
 
 SURFACES = ("guild", "shop")
@@ -260,7 +264,7 @@ def _present_npc(actor: Any, npc_id: int) -> Any | None:
 # ---------------------------------------------------------------------------
 
 
-def _scripted_entries(npc: Any) -> list[AffordanceView]:
+def _scripted_entries(npc: Any, *, actor: Any = None) -> list[AffordanceView]:
     """One ``explore.talk_scripted`` entry per authored keyword of a host."""
     dialogue_key = dialogue_key_for(npc)
     definition = DIALOGUE_TABLE.get(dialogue_key) if dialogue_key is not None else None
@@ -268,6 +272,14 @@ def _scripted_entries(npc: Any) -> list[AffordanceView]:
         return []
     npc_id = int(npc.pk)
     entries: list[AffordanceView] = []
+    from world.rules.possession import (
+        POSSESSED_REFUSAL_MESSAGES,
+        REASON_POSSESSED_TALK,
+        is_possessed_actor,
+    )
+    possessed = actor is not None and is_possessed_actor(actor)
+    disabled_reason = (REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK]) if possessed else None
+
     for response in definition.responses[:MAX_SCRIPTED_KEYWORDS]:
         params = validate_talk_scripted_payload(
             {"npc_id": npc_id, "keyword_id": response.keyword}
@@ -279,8 +291,8 @@ def _scripted_entries(npc: Any) -> list[AffordanceView]:
                 params=params,
                 freeform=False,
                 navigation=False,
-                enabled=True,
-                disabled_reason=None,
+                enabled=not possessed,
+                disabled_reason=disabled_reason,
             )
         )
     return entries
@@ -303,21 +315,24 @@ def _scripted_keyword_descriptors(npc: Any) -> list[dict[str, str]]:
     ]
 
 
-def _freeform_entry(npc: Any) -> AffordanceView:
-    """The always-enabled freeform talk entry for a present ``LLMNPC``.
+def _freeform_entry(npc: Any, *, actor: Any = None) -> AffordanceView:
+    """The freeform talk entry for a present ``LLMNPC``, gated on possession."""
+    from world.rules.possession import (
+        POSSESSED_REFUSAL_MESSAGES,
+        REASON_POSSESSED_TALK,
+        is_possessed_actor,
+    )
+    possessed = actor is not None and is_possessed_actor(actor)
+    disabled_reason = (REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK]) if possessed else None
 
-    The params are binding-only: no registered validator produces the shape
-    without ``speech``, so the entry carries exactly ``{"npc_id": int}`` and
-    the full validator runs only on the client-composed dispatch payload.
-    """
     return AffordanceView(
         action_id="explore.talk_freeform",
         label="自由交談",
         params={"npc_id": int(npc.pk)},
         freeform=True,
         navigation=False,
-        enabled=True,
-        disabled_reason=None,
+        enabled=not possessed,
+        disabled_reason=disabled_reason,
     )
 
 
@@ -366,11 +381,29 @@ def _party_leave_entry(npc: Any) -> AffordanceView:
     )
 
 
-def _engage_entry(monster: Any) -> AffordanceView:
+def _engage_entry(monster: Any, *, actor: Any = None) -> AffordanceView:
     """The engage entry for a present monster (dead monsters stay disabled)."""
     traits = getattr(monster, "traits", None)
     living = getattr(traits, "hp", None) is not None and monster.traits.hp.value > 0
     params = validate_engage_payload({"monster_id": int(monster.pk)})
+    from world.rules.possession import (
+        POSSESSED_REFUSAL_MESSAGES,
+        REASON_POSSESSED_ENGAGE,
+        is_possessed_actor,
+    )
+    if actor is not None and is_possessed_actor(actor):
+        return AffordanceView(
+            action_id="explore.engage",
+            label="戰鬥",
+            params=params,
+            freeform=False,
+            navigation=False,
+            enabled=False,
+            disabled_reason=(
+                REASON_POSSESSED_ENGAGE,
+                POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_ENGAGE],
+            ),
+        )
     if not living:
         return AffordanceView(
             action_id="explore.engage",
@@ -398,7 +431,40 @@ def _engage_entry(monster: Any) -> AffordanceView:
 _SERVICE_DISABLED_REASON = ("service_unavailable", MESSAGE_OFF_ANCHOR)
 
 
+def _possess_entry(npc: Any, actor: Any) -> AffordanceView:
+    from web.webclient.actions.exploration_actions import validate_possess_payload
+    from world.rules.possession import POSSESSION_REJECTION_MESSAGES, possession_verdict
+
+    params = validate_possess_payload({"npc_id": int(npc.pk)})
+    verdict = possession_verdict(actor, npc)
+    enabled = verdict is None
+    disabled_reason = None if enabled else (verdict, POSSESSION_REJECTION_MESSAGES[verdict])
+    return AffordanceView(
+        action_id="explore.possess",
+        label="附身",
+        params=params,
+        freeform=False,
+        navigation=False,
+        enabled=enabled,
+        disabled_reason=disabled_reason,
+    )
+
+
 def _service_entry(surface: str, actor: Any, host: Any) -> AffordanceView:
+    from world.rules.possession import (
+        POSSESSED_REFUSAL_MESSAGES,
+        REASON_POSSESSED_SHOP,
+        is_possessed_actor,
+    )
+    if is_possessed_actor(actor):
+        disabled_msg = POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP]
+        return AffordanceView(
+            surface=surface,
+            label="公會服務" if surface == "guild" else "商店",
+            navigation=True,
+            enabled=False,
+            disabled_reason=(REASON_POSSESSED_SHOP, disabled_msg),
+        )
     """The navigate-kind service entry for one surface, gated honestly.
 
     The emission key is unchanged (exact local host); this consults the one
@@ -475,16 +541,17 @@ def _target_affordance_entries(
     from typeclasses.npcs import LLMNPC, NPC
 
     entries: list[AffordanceView] = []
-    if isinstance(obj, NPC) and is_dialogue_host(obj):
-        entries.extend(_scripted_entries(obj))
-    if isinstance(obj, LLMNPC):
-        entries.append(_freeform_entry(obj))
     if isinstance(obj, NPC) and is_companion(obj, actor):
         entries.append(_party_leave_entry(obj))
+        entries.append(_possess_entry(obj, actor))
     elif isinstance(obj, LLMNPC):
         entries.append(_party_invite_entry(obj, actor))
+    if isinstance(obj, NPC) and is_dialogue_host(obj):
+        entries.extend(_scripted_entries(obj, actor=actor))
+    if isinstance(obj, LLMNPC):
+        entries.append(_freeform_entry(obj, actor=actor))
     if isinstance(obj, Monster):
-        entries.append(_engage_entry(obj))
+        entries.append(_engage_entry(obj, actor=actor))
     if guild_host is not None and obj is guild_host:
         entries.append(_service_entry("guild", actor, obj))
     if shop_host is not None and obj is shop_host:
@@ -662,6 +729,21 @@ def exploration_affordances(actor: Any) -> tuple[AffordanceView, ...]:
     entries.extend(_look_entries(actor))
     entries.extend(_target_entries(actor))
     entries.extend(_baseline_entries(actor))
+    from world.rules.possession import is_possessed_actor
+    if is_possessed_actor(actor):
+        from web.webclient.actions.exploration_actions import validate_possess_release_payload
+        params = validate_possess_release_payload({"npc_id": int(actor.pk)})
+        entries.append(
+            AffordanceView(
+                action_id="explore.possess_release",
+                label="歸位",
+                params=params,
+                freeform=False,
+                navigation=False,
+                enabled=True,
+                disabled_reason=None,
+            )
+        )
     return tuple(entries)
 
 

@@ -618,6 +618,7 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
                 "explore.party_invite",
                 "explore.party_leave",
                 "explore.engage",
+                "explore.possess",
             ):
                 affordances.append(
                     {

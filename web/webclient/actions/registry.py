@@ -131,6 +131,8 @@ def build_production_action_registry() -> ActionRegistry:
         _move_adapter,
         _party_invite_adapter,
         _party_leave_adapter,
+        _possess_adapter,
+        _possess_release_adapter,
         _talk_freeform_adapter,
         _talk_scripted_adapter,
         _wait_adapter,
@@ -139,6 +141,8 @@ def build_production_action_registry() -> ActionRegistry:
         validate_move_payload,
         validate_party_invite_payload,
         validate_party_leave_payload,
+        validate_possess_payload,
+        validate_possess_release_payload,
         validate_talk_freeform_payload,
         validate_talk_scripted_payload,
         validate_wait_payload,
@@ -417,6 +421,22 @@ def build_production_action_registry() -> ActionRegistry:
             adapter=_wait_adapter,
             # No affected panels: a clock skip changes header, status, shop
             # hours, and quest deadlines together (design D7).
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.possess",
+            validate_payload=validate_possess_payload,
+            adapter=_possess_adapter,
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.possess_release",
+            validate_payload=validate_possess_release_payload,
+            adapter=_possess_release_adapter,
             affected_panels=(),
         )
     )

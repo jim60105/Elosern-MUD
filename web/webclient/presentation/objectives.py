@@ -215,16 +215,23 @@ def objectives_presenter(context: PresentationContext) -> dict[str, Any]:
     actor = context.actor
     if bool(getattr(actor, "creation_pending", False)):
         raise PanelUnavailableError
+    possessed_by = getattr(getattr(actor, "db", None), "possessed_by", None)
+    quest_source = actor
+    if possessed_by is not None:
+        from world.rules.possession import _resolve_live_object
+        owner = _resolve_live_object(int(possessed_by))
+        if owner is not None:
+            quest_source = owner
     clock = read_world_clock()
     if clock is None:
         raise PanelUnavailableError
     tick = int(clock.tick)
     try:
-        records = read_records(actor)
+        records = read_records(quest_source)
     except QuestDataError:
         raise PanelUnavailableError
     try:
-        registration = parse_guild_registration(actor)
+        registration = parse_guild_registration(quest_source)
     except GuildDataError:
         # A malformed registration hides only the reward column, never the
         # tracking truth (degrade-independently, mirroring the surfaces).
