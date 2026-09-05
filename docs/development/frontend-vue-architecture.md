@@ -22,7 +22,7 @@ Elosern 網頁客戶端由 Django 與 Evennia 範本組合 `web/templates/webcli
 ## 決策（D1–D10，摘自原始提案；附註 A2 成果）
 
 ### D1 — 框架：Vue 3（SFC）+ Vite
-採用 Vue 3 單一檔案元件（SFC），由 Vite 6.x 建置為 ES 模組。開發使用 `npm run dev`；正式建置使用 `npm run build`。捨棄 React（第二生態系，在此設計導向流程中與 Storybook 契合度較弱）、免建置的全域 Vue（無 SFC 與 HMR），以及繼續停留在 jQuery（無法提供元件優先且可預覽的 UI）。GoldenLayout 的分頁／面板模型由元件樹取代。
+採用 Vue 3 單一檔案元件（SFC），由 Vite 6.x 建置為 ES 模組。開發使用 `pnpm run dev`；正式建置使用 `pnpm run build`。捨棄 React（第二生態系，在此設計導向流程中與 Storybook 契合度較弱）、免建置的全域 Vue（無 SFC 與 HMR），以及繼續停留在 jQuery（無法提供元件優先且可預覽的 UI）。GoldenLayout 的分頁／面板模型由元件樹取代。
 
 ### D2 — 透過 CJS 互通重用邏輯，切勿修改原始碼
 `js/elosern` 的 UMD 模組由 Vite 組合包透過 `web/webclient-app/lib/*` ES 包裝器匯入（Vite 與 esbuild 的 CommonJS 互通）；原始碼與無相依套件的 Node 閘門完全維持不變。注意事項：CJS 互通**不會**設定 `window.Elosern.*` 瀏覽器全域變數，那是 C2 瀏覽器橋接器的工作（D9）。**A2 成果：** 互通性已由 Vite 正式建置（`tests/test_frontend_toolchain_contract.py` 中的 `dist/index.js` 檢查會驗證組合包包含保留的 reducer）與 Vitest 包裝器測試所證實。
@@ -41,8 +41,8 @@ Vue 應用程式保留 OOB 與瀏覽器契約已相依的識別碼（可聚焦�
 
 ### D7 — 測試策略：四道閘門
 - **Node 閘門（維持不變，邏輯）：** `node --test web/static/webclient/js/tests/*.test.js`，無相依套件。
-- **Vitest（元件）：** `npm test`，位於 `web/webclient-app/` 底下的 SFC 掛載元件測試（jsdom、離線）。
-- **Storybook 閘門：** `npm run build-storybook` + 對照 `web/webclient-app/component-manifest.json` 執行的元件覆蓋率檢查（`npm run showcase-coverage`）（B1 植入初始值，B5 凍結）。
+- **Vitest（元件）：** `pnpm test`，位於 `web/webclient-app/` 底下的 SFC 掛載元件測試（jsdom、離線）。
+- **Storybook 閘門：** `pnpm run build-storybook` + 對照 `web/webclient-app/component-manifest.json` 執行的元件覆蓋率檢查（`pnpm run showcase-coverage`）（B1 植入初始值，B5 凍結）。
 - **Playwright（整合）：** 受管執行期瀏覽器套件。
 Python 80% 覆蓋率閘門不受影響（JavaScript 不在 Python 原始碼根目錄內）。
 
@@ -57,7 +57,7 @@ Vue 應用程式保持相同的穩定公開契約介面：`window.Elosern.Protoc
 
 ## 風險與權衡
 
-- **在 Python 優先儲存庫中引入 npm 工具鏈** → 僅限開發與 CI 期間使用；根目錄套件保持零執行期 npm 相依（受契約測試驗證）；Node 閘門保持無外部相依；每個 npm 步驟均為明確且不壓制錯誤的 CI 步驟。
+- **在 Python 優先儲存庫中引入 pnpm 工具鏈** → 僅限開發與 CI 期間使用；根目錄套件保持零執行期 npm 或 pnpm 相依（受契約測試驗證）；Node 閘門保持無外部相依；每個 pnpm 步驟均為明確且不壓制錯誤的 CI 步驟。
 - **替換主架構時的瀏覽器測試變動** → D5 掛鉤 + D9 橋接器 + A1 審查凍結了增量集合；行為切片於 C4 重新對應。
 - **傳輸層接線錯誤（epoch／修訂版本／重新連線／鎖定）** → C1 重用經過 Node 測試的 reducer 作為 store 核心；C3 與 C4 重新執行現有的 Playwright 驗收測試。
 - **提供服務的環境出現 `dist/` 404** → 在 CI 前端工作、兩個瀏覽器工作區以及容器 `vue-dist` 階段中建置；受管瀏覽器檢查（A2）驗證組合包、樣式與字型能從來源端載入，並封鎖所有非本機請求。

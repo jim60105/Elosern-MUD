@@ -153,7 +153,7 @@ class BrowserVerificationContractTests(unittest.TestCase):
             ),
             "evennia": ("Run evennia shard ${{ matrix.index }}",),
             "frontend": (
-                "Install locked npm toolchain",
+                "Enable Corepack and install locked pnpm toolchain",
                 "Build Vue application with Vite",
                 "Run Vue component tests with Vitest",
                 "Build Storybook component showcase",

@@ -45,12 +45,18 @@ def _run(command: list[str]) -> subprocess.CompletedProcess:
 
 
 def setUpModule() -> None:
+    # Ensure Corepack is enabled so the locked pnpm executable is on PATH
+    # even when tests run in an environment where corepack was not run yet.
+    corepack_result = _run(["corepack", "enable"])
+    assert corepack_result.returncode == 0, (
+        f"corepack enable failed:\n{corepack_result.stdout}\n{corepack_result.stderr}"
+    )
     # One deterministic locked install per execution; the individual tests
     # below then exercise the build/test gates exactly like the CI frontend
     # job does.
-    result = _run(["npm", "ci", "--no-audit", "--no-fund"])
+    result = _run(["pnpm", "install", "--frozen-lockfile"])
     assert result.returncode == 0, (
-        "npm ci failed (Node 24 + the committed package-lock.json are "
+        "pnpm install --frozen-lockfile failed (Node 24 + the committed pnpm-lock.yaml are "
         f"required):\n{result.stdout}\n{result.stderr}"
     )
 
@@ -71,7 +77,7 @@ class NodeGateAndInteropTests(unittest.TestCase):
         "webclient-browser-verification::dom-independent-client-behavior-has-an-executable-node-test-gate"
     )
     def test_vite_build_reuses_the_preserved_logic_via_commonjs_interop(self):
-        result = _run(["npm", "run", "build"])
+        result = _run(["pnpm", "run", "build"])
         self.assertEqual(
             result.returncode,
             0,
@@ -110,7 +116,6 @@ class NodeGateAndInteropTests(unittest.TestCase):
             "keyboard_router.js",
             "narrative_markup.js",
             "local_map.js",
-            "choicepoint.js",
             "option_cards.js",
         ):
             path = app_lib / wrapper
@@ -126,19 +131,41 @@ class VueComponentGateTests(unittest.TestCase):
         "webclient-component-showcase::the-component-showcase-is-completed-before-live-wiring-and-is-a-mandatory-ci-gate",
     )
     def test_vitest_component_suite_and_showcase_coverage_run(self):
-        vitest = _run(["npm", "test"])
+        vitest = _run(["pnpm", "test"])
         self.assertEqual(
             vitest.returncode,
             0,
             f"the Vue component (Vitest) gate must pass:\n"
             f"{vitest.stdout}\n{vitest.stderr}",
         )
-        coverage = _run(["npm", "run", "showcase-coverage"])
+        coverage = _run(["pnpm", "run", "showcase-coverage"])
         self.assertEqual(
             coverage.returncode,
             0,
             f"the component-coverage check must pass:\n"
             f"{coverage.stdout}\n{coverage.stderr}",
+        )
+
+    @covers_requirement(
+        "webclient-browser-verification::node-and-playwright-checks-are-mandatory-quality-gate-steps"
+    )
+    def test_pnpm_manifest_and_lockfile_invariants(self):
+        package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
+        self.assertEqual(package.get("packageManager"), "pnpm@9.15.4")
+        pnpm_config = package.get("pnpm")
+        self.assertIsInstance(pnpm_config, dict)
+        self.assertEqual(pnpm_config.get("onlyBuiltDependencies"), ["esbuild"])
+        self.assertNotIn("allowScripts", package)
+        self.assertNotIn("dependencies", package)
+        self.assertTrue(package.get("devDependencies"))
+        self.assertIn("no runtime Node.js or pnpm dependency", package.get("description", ""))
+        self.assertTrue(
+            (REPO_ROOT / "pnpm-lock.yaml").is_file(),
+            "pnpm-lock.yaml must exist as the committed lockfile",
+        )
+        self.assertFalse(
+            (REPO_ROOT / "package-lock.json").exists(),
+            "package-lock.json must be removed after migration to pnpm",
         )
 
     @covers_requirement(
@@ -151,15 +178,17 @@ class VueComponentGateTests(unittest.TestCase):
         frontend = jobs["frontend"]
         steps = {step["name"]: step for step in frontend["steps"]}
 
-        self.assertIn("npm ci", steps["Install locked npm toolchain"]["run"])
-        self.assertIn("npm run build", steps["Build Vue application with Vite"]["run"])
-        self.assertIn("npm test", steps["Run Vue component tests with Vitest"]["run"])
+        pnpm_step = steps["Enable Corepack and install locked pnpm toolchain"]["run"]
+        self.assertIn("corepack enable", pnpm_step)
+        self.assertIn("pnpm install --frozen-lockfile", pnpm_step)
+        self.assertIn("pnpm run build", steps["Build Vue application with Vite"]["run"])
+        self.assertIn("pnpm test", steps["Run Vue component tests with Vitest"]["run"])
         self.assertIn(
-            "npm run build-storybook",
+            "pnpm run build-storybook",
             steps["Build Storybook component showcase"]["run"],
         )
         self.assertIn(
-            "npm run showcase-coverage",
+            "pnpm run showcase-coverage",
             steps["Check component coverage"]["run"],
         )
         dist_check = steps["Verify dist artifact"]["run"]
@@ -171,16 +200,20 @@ class VueComponentGateTests(unittest.TestCase):
         # browser test workspaces").
         browser_steps = {step["name"]: step for step in jobs["browser"]["steps"]}
         dist_build = browser_steps["Build Vue dist in browser workspaces"]["run"]
-        self.assertIn("(cd w-a && npm ci", dist_build)
-        self.assertIn("npm run build", dist_build)
-        self.assertIn("(cd w-b && npm ci", dist_build)
-
-        # The top-level contract tests execute the npm gates, so the job
-        # needs the Node toolchain.
         self.assertIn(
-            "Install Node.js",
-            [step["name"] for step in jobs["top-level"]["steps"]],
+            "(cd w-a && corepack enable && pnpm install --frozen-lockfile && pnpm run build)",
+            dist_build,
         )
+        self.assertIn(
+            "(cd w-b && corepack enable && pnpm install --frozen-lockfile && pnpm run build)",
+            dist_build,
+        )
+
+        # The top-level contract tests execute the pnpm gates, so the job
+        # needs the Node toolchain and Corepack enabled.
+        top_level_step_names = [step["name"] for step in jobs["top-level"]["steps"]]
+        self.assertIn("Install Node.js", top_level_step_names)
+        self.assertIn("Enable Corepack", top_level_step_names)
 
         # The evennia evidence bridges (web.webclient tests under the Evennia
         # runner) execute the Vue showcase gates as requirement evidence, so
@@ -190,7 +223,9 @@ class VueComponentGateTests(unittest.TestCase):
             "24",
             evennia_steps["Install Node.js"]["with"]["node-version"],
         )
-        self.assertIn("npm ci", evennia_steps["Install locked npm toolchain"]["run"])
+        evennia_pnpm_step = evennia_steps["Enable Corepack and install locked pnpm toolchain"]["run"]
+        self.assertIn("corepack enable", evennia_pnpm_step)
+        self.assertIn("pnpm install --frozen-lockfile", evennia_pnpm_step)
 
 
 class FrontendLayoutContractTests(unittest.TestCase):
