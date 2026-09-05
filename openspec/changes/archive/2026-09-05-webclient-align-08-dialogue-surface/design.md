@@ -2,7 +2,7 @@
 
 ## Context
 
-Change 07 committed mode `dialogue` + the `dialogue` panel. The draft's dialogue mode keeps the
+Changes 07/10 committed the session lifecycle plus mode `dialogue` and the `dialogue` panel. The draft's dialogue mode keeps the
 whole cockpit visible (REDESIGN §2 matrix: 敘事=對話聚焦, 小地圖 ●, 同伴快帶 ●, 目標追蹤 ●,
 指令列 ●, 行動甲板=對話選項) and puts the conversation in the centre: `.dlg` box (64px avatar,
 `.who` gold speaker line, serif `.say`) with `.choices`/`.pick` numbered rows (mono `.k` badge,

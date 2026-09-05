@@ -1,8 +1,9 @@
 <script>
-import { computed, h, nextTick, onMounted, ref, watch } from "vue";
+import { computed, h, nextTick, onMounted, onUpdated, ref, watch } from "vue";
 import NarrativeMarkup from "../lib/narrative_markup.js";
 import UnreadIndicator from "./UnreadIndicator.vue";
 import { renderNarrativeTokens } from "./narrative-renderer.js";
+import { portraitFor, portraitGlyph } from "./party-helpers.js";
 
 // Bounded narrative caption card (H1, design D4): the narrative is a
 // bounded caption at the visual centre of the stage — `width:min(880px,90vw)`,
@@ -33,13 +34,31 @@ export default {
   props: {
     lines: { type: Array, default: () => [] },
     mode: { type: String, default: "exploration" },
+    // The dialogue view model (webclient-align-08-dialogue-surface): the ONE
+    // derived shape over the committed `dialogue` panel (null when the panel
+    // is unavailable/absent or the mode is not dialogue). The variant renders
+    // only while mode is `dialogue` AND this is non-null; the plain fallback
+    // (mode dialogue, panel transiently unavailable) keeps the `對話` head
+    // label with no dialogue box.
+    dialogue: { type: Object, default: null },
+    // The committed `art` panel (the portrait catalog source; the same seam
+    // the party rows use — schema ships `portrait_ref: null` today, so the
+    // gold initial fallback is the exercised path).
+    artPanel: { type: Object, default: null },
   },
-  emits: ["open-full-log"],
+  emits: ["open-full-log", "dialogue-pick", "dialogue-freeform"],
   setup(props, { expose, emit }) {
     const feedRoot = ref(null);
     const unread = ref(0);
 
-    const modeLabel = computed(() => (props.mode === "combat" ? "戰鬥日誌" : "敘述"));
+    const modeLabel = computed(() =>
+      props.mode === "combat" ? "戰鬥日誌" : props.mode === "dialogue" ? "對話" : "敘述",
+    );
+    // The dialogue variant (draft `.feed.m-dialogue`): the box renders while
+    // mode is dialogue AND the committed panel is available. The `完整日誌`
+    // capsule suppression is scoped to the same available-window (the draft
+    // renders no log control in the dialogue variant).
+    const dialogueVariant = computed(() => props.mode === "dialogue" && !!props.dialogue);
 
     const BOX_DRAWING = /[─-╿]/;
     const AT_BOTTOM_SLACK = 8;
@@ -47,6 +66,73 @@ export default {
     function lineText(line) {
       return line && line.text == null ? "" : String(line.text);
     }
+
+    // Announce-once invariant (design risk §): the `.dlg` box renders the
+    // SAME committed line the narrative stream already carries. The variant
+    // owns presentation of that exchange, so the exchange's stream record is
+    // dropped — but ONLY through an anchored match on the FINAL output line:
+    // either the verbatim reply or the deterministic echo form
+    // `<host>說：<reply>` the scripted/freeform adapters emit for it. A player
+    // input echo (`kind: "in"`) is never suppressed even when its text
+    // coincides with the reply, and an older line is never searched
+    // backwards. The polite live region keeps announcing each new committed
+    // line exactly once.
+    const renderedLines = computed(() => {
+      const lines = props.lines;
+      if (!dialogueVariant.value || lines.length === 0) {
+        return lines;
+      }
+      const last = lines[lines.length - 1];
+      // Only outgoing narrative records are echo candidates: player input
+      // echoes keep their literal line, and a sys/err record that coincides
+      // with the reply is a distinct event the feed must not swallow.
+      if (!last || (last.kind || "out") !== "out") {
+        return lines;
+      }
+      // Stored stream text carries the markup pipeline's inline tags; the
+      // committed reply is plain server-authored prose. The match runs on text
+      // normalized like the renderer sees it: `<br>` becomes a newline and
+      // only the pipeline's own recognized tags are removed, so any literal
+      // `<...>` prose a hint carries survives verbatim into the residual
+      // (where the strict tokenizer renders it as literal text).
+      const text = lineText(last)
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/?(?:span|a)(?: [^>]*)?>/gi, "");
+      const reply = props.dialogue.line;
+      // The anchored echo form is `<npc key>說：<reply>` (the scripted and
+      // freeform adapters' message shape). The key differs from the panel's
+      // display_name (no title), so the match anchors on the speech-marker
+      // seam and a bounded speaker prefix. A settled exchange may carry the
+      // server's daily-affinity hint as a newline-delimited suffix on the
+      // same message. The exchange's reply is presentation-duplicated by the
+      // box, so the stream keeps ONLY the residual (the hint) after the
+      // anchored reply is cut — never the reply twice, never the hint lost.
+      const prefixCut = text.lastIndexOf("說：");
+      const suffix = prefixCut > 0 ? text.slice(prefixCut + 2) : "";
+      const exactEcho =
+        prefixCut > 0 &&
+        prefixCut <= 48 &&
+        !text.slice(0, prefixCut).includes("說：") &&
+        suffix.startsWith(reply);
+      // The residual is the markup-free remainder AFTER the anchored reply.
+      // A null/empty residual means the whole line was the exchange: it drops.
+      const remainder = exactEcho ? suffix.slice(reply.length).replace(/^(\n|<br\s*\/?>)+/i, "") : "";
+      const matches =
+        text === reply ||
+        (exactEcho &&
+          (suffix === reply ||
+            suffix[reply.length] === "\n" ||
+            // Belt-and-braces: some markup forms glue the parenthetical hint
+            // directly after the reply, so the hint glyph itself is accepted
+            // as the seam alongside the newline form.
+            suffix[reply.length] === "（"));
+      if (!matches) {
+        return lines;
+      }
+      return remainder === ""
+        ? lines.slice(0, -1)
+        : [...lines.slice(0, -1), { ...last, text: remainder }];
+    });
 
     // One line → the vnodes that render it: a divider plus a literal `.inp`
     // line for player input, a pipeline-rendered line for everything else.
@@ -105,22 +191,78 @@ export default {
       }
     }
 
+    // The dialogue variant's focus pin: align the `.dlg` box with the head
+    // (the head row is sticky, so it stays under it). A reply + its picks can
+    // exceed the bounded caption (the panel allows up to 16 choices); the box
+    // is the newest exchange and keeps its top visible, and the player scrolls
+    // the remaining picks within the card.
+    // The pin holds across renders (a panel commit and its stream push land
+    // in separate ticks) until the player scrolls the box away by hand.
+    const dialoguePin = ref(false);
+
+    function pinDialogueBox() {
+      const el = feedRoot.value;
+      const box = el?.querySelector(".dlg");
+      if (!el || !box) {
+        scrollToBottom();
+        return;
+      }
+      const prevBehavior = el.style.scrollBehavior;
+      el.style.scrollBehavior = "auto";
+      const head = el.querySelector(".narrative-head");
+      el.scrollTop = Math.max(0, box.offsetTop - (head?.offsetHeight ?? 0) - 8);
+      el.style.scrollBehavior = prevBehavior;
+    }
+
+    // Re-pin on every render while held: the committed panel and the stream
+    // push land in separate updates, and each one moves the box.
+    onUpdated(() => {
+      if (dialoguePin.value && dialogueVariant.value) {
+        pinDialogueBox();
+      }
+    });
+
     // The at-bottom decision is taken against the old DOM (pre-render),
     // exactly like the legacy single-owner check around each insertion.
     // Watch the array length (not the array reference) so a push or a trim
-    // both trigger the auto-scroll / unread logic.
+    // both trigger the auto-scroll / unread logic. The dialogue variant's
+    // committed line joins the signature: the box sits at the stream tail, so
+    // a panel commit that changes the reply must re-pin the view even when the
+    // stream length itself did not move (the duplicate tail is suppressed).
     watch(
-      () => props.lines.length,
-      (newLen, oldLen) => {
+      () => [props.lines.length, dialogueVariant.value ? props.dialogue.line : null],
+      ([newLen, newLine], [oldLen, oldLine] = []) => {
         const added = Math.max(0, newLen - (oldLen ?? 0));
+        const variant = dialogueVariant.value;
+        // A reply change only owns the focus while the variant is presented;
+        // the null→line transition on ENTERING the variant counts as a new
+        // reply, and the line→null transition on EXITING it must not be
+        // mistaken for one (it would pin and scroll a box that no longer
+        // exists).
+        const replyChanged = variant && newLine !== oldLine;
         const wasAtBottom = atBottom();
+        if (!variant && dialoguePin.value) {
+          // Exiting the variant releases the pin — the box is gone and the
+          // pin must not survive to leak into a later dialogue mount.
+          dialoguePin.value = false;
+        }
         void nextTick().then(() => {
-          if (added === 0) {
+          if (added === 0 && !replyChanged) {
             return;
           }
-          if (wasAtBottom) {
+          if (replyChanged) {
+            // A committed dialogue reply owns the caption's focus: the box is
+            // pinned into view even when the player had scrolled the stream
+            // away (the exchange it carries is the newest line).
+            // The box IS the newest exchange, so the commit clears unread.
+            dialoguePin.value = true;
+            unread.value = 0;
+            pinDialogueBox();
+          } else if (wasAtBottom) {
             scrollToBottom();
-          } else {
+          } else if (added > 0 && !dialoguePin.value) {
+            // While the dialogue variant pins, the newest exchange stays
+            // visible in the box — nothing arrived unread.
             unread.value += added;
           }
         });
@@ -128,6 +270,22 @@ export default {
     );
 
     function onScroll() {
+      if (dialoguePin.value) {
+        // Manual scrolling that moves the box away from its pin releases the
+        // pin; the pin's own scroll assignments keep it.
+        const el = feedRoot.value;
+        const box = el?.querySelector(".dlg");
+        const head = el?.querySelector(".narrative-head");
+        if (box && el) {
+          const drift = Math.abs(
+            box.getBoundingClientRect().top -
+              el.getBoundingClientRect().top -
+              (head?.offsetHeight ?? 0) -
+              8,
+          );
+          dialoguePin.value = drift < 64;
+        }
+      }
       if (atBottom() && unread.value > 0) {
         unread.value = 0;
       }
@@ -138,7 +296,11 @@ export default {
       if (el) {
         el.focus({ preventScroll: true });
       }
-      scrollToBottom();
+      if (dialogueVariant.value) {
+        pinDialogueBox();
+      } else {
+        scrollToBottom();
+      }
       unread.value = 0;
     }
 
@@ -147,17 +309,99 @@ export default {
     }
 
     onMounted(() => {
-      scrollToBottom();
+      if (dialogueVariant.value) {
+        // Mounting INTO the dialogue variant: the box is the newest exchange
+        // from the first render, so nothing is unread and the card opens
+        // pinned to it instead of the stream history's top.
+        unread.value = 0;
+        dialoguePin.value = true;
+        void nextTick().then(pinDialogueBox);
+      } else {
+        scrollToBottom();
+      }
     });
 
     expose({ focus: focusFeed });
+
+    // The draft's `.dlg` box (JRPG dialogue): the host avatar (the bound
+    // portrait through the art catalog when `portrait_ref` resolves, else the
+    // display name's initial letter in the gold display face), the gold
+    // speaker line (display_name plus ` · 羈絆 <stage>` only when bond_stage
+    // is non-null), and the serif reply line verbatim. The numbered picks and
+    // the trailing free-dialogue row follow under the draft's `.choices`
+    // markup — activation emits through the same single dispatch entry the
+    // dock rows use (AppClient maps the emits to the store).
+    function dialogueNodes(vm) {
+      const portrait = portraitFor(props.artPanel, vm.host.portraitRef);
+      const nodes = [];
+      nodes.push(
+        h("div", { key: "dlg-box", class: "dlg", "data-testid": "dialogue-box" }, [
+          portrait
+            ? h("img", { class: "av", src: portrait.url, alt: vm.host.displayName })
+            : h("div", { class: "av" }, [portraitGlyph(vm.host.displayName)]),
+          h("div", { class: "body" }, [
+            h("div", { class: "who", "data-testid": "dialogue-who" }, [
+              vm.host.displayName,
+              vm.bondStage == null
+                ? null
+                : h(
+                    "span",
+                    { class: "who-bond", "data-testid": "dialogue-bond" },
+                    `  ·  羈絆 ${vm.bondStage}`,
+                  ),
+            ]),
+            h("div", { class: "say", "data-testid": "dialogue-say" }, [vm.line]),
+          ]),
+        ]),
+      );
+      if (vm.picks.length > 0 || vm.freeRow) {
+        nodes.push(
+          h("div", { key: "dlg-choices", class: "choices" }, [
+            ...vm.picks.map((pick, index) =>
+              h(
+                "button",
+                {
+                  key: pick.key,
+                  type: "button",
+                  class: "pick",
+                  "data-testid": "dialogue-pick",
+                  "data-keyword-id": pick.payload.keyword_id,
+                  onClick: () => emit("dialogue-pick", pick),
+                },
+                [
+                  h("span", { class: "k" }, String(index + 1)),
+                  h("span", { class: "t" }, pick.label),
+                ],
+              ),
+            ),
+            vm.freeRow
+              ? h(
+                  "button",
+                  {
+                    key: vm.freeRow.key,
+                    type: "button",
+                    class: "pick",
+                    "data-testid": "dialogue-freeform",
+                    onClick: () => emit("dialogue-freeform"),
+                  },
+                  [
+                    h("span", { class: "k" }, "⌨"),
+                    h("span", { class: "t" }, "自由對話（輸入任意話語）→ 指令列"),
+                  ],
+                )
+              : null,
+          ]),
+        );
+      }
+      return nodes;
+    }
 
     return () =>
       h(
         "div",
         {
           ref: feedRoot,
-          class: "elosern elosern-narrative feed-inner",
+          class: ["elosern elosern-narrative feed-inner", dialogueVariant.value ? "m-dialogue" : null],
           role: "log",
           "aria-label": "敘事紀錄",
           tabindex: "-1",
@@ -183,20 +427,31 @@ export default {
                   jumpToLatest();
                 },
               }),
-              h(
-                "button",
-                {
-                  type: "button",
-                  class: "narrative-fulllog-control more",
-                  "data-testid": "narrative-fulllog-control",
-                  "data-openlog": "",
-                  onClick: () => emit("open-full-log"),
-                },
-                "完整日誌 ↑",
-              ),
+              // The reference's dialogue variant renders no log control — the
+              // capsule is suppressed only inside the available window (the
+              // transient-unavailable fallback keeps its plain presentation,
+              // capsule included).
+              dialogueVariant.value
+                ? null
+                : h(
+                    "button",
+                    {
+                      type: "button",
+                      class: "narrative-fulllog-control more",
+                      "data-testid": "narrative-fulllog-control",
+                      "data-openlog": "",
+                      onClick: () => emit("open-full-log"),
+                    },
+                    "完整日誌 ↑",
+                  ),
             ],
           ),
-          ...props.lines.flatMap((line, index) => lineNodes(line, index)),
+          ...renderedLines.value.flatMap((line, index) => lineNodes(line, index)),
+          // The dialogue variant sits at the stream tail: the box REPLACES the
+          // caption's duplicate stream tail for that exchange, so the auto-scroll
+          // that keeps the latest exchange in view keeps the box and its picks
+          // in view too (draft dialogue mode shows no history stream at all).
+          ...(dialogueVariant.value ? dialogueNodes(props.dialogue) : []),
         ],
       );
   },
@@ -334,5 +589,109 @@ export default {
   margin: var(--sp-3) auto 0;
   height: 1px;
   background: var(--line);
+}
+
+/* The dialogue variant (webclient-align-08-dialogue-surface, draft index.html
+   .dlg/.choices/.pick rules): the JRPG box — 64px rounded avatar tile with the
+   radial gold-initial ground, the gold speaker line, the serif reply — and
+   the numbered pick rows with mono digit badges. */
+.elosern-narrative .dlg {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.elosern-narrative .dlg .av {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  border-radius: 12px;
+  background: radial-gradient(60% 70% at 50% 38%, #4a3a2a, #1a150e 82%);
+  display: grid;
+  place-items: center;
+  font-family: var(--f-display);
+  font-size: 30px;
+  color: var(--gold-400);
+  border: 1px solid var(--ink-600);
+  box-shadow: 0 0 0 1px rgba(203, 161, 53, 0.28);
+  overflow: hidden;
+  object-fit: cover;
+}
+
+.elosern-narrative .dlg .av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.elosern-narrative .dlg .body {
+  flex: 1;
+  min-width: 0;
+}
+
+.elosern-narrative .dlg .who {
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--gold-400);
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+
+.elosern-narrative .dlg .who .who-bond {
+  color: var(--paper-500);
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.elosern-narrative .dlg .say {
+  font-family: var(--f-serif);
+  font-size: calc(16px * var(--prose-scale));
+  line-height: 1.78;
+  color: var(--paper-50);
+}
+
+.elosern-narrative .choices {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 13px;
+}
+
+.elosern-narrative .choices .pick {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  width: 100%;
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  border: 1px solid var(--ink-600);
+  border-radius: 9px;
+  padding: 9px 12px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, transform 0.12s;
+}
+
+.elosern-narrative .choices .pick:hover,
+.elosern-narrative .choices .pick:focus-visible {
+  border-color: var(--gold-500);
+  background: var(--panel-hi);
+  transform: translateX(3px);
+}
+
+.elosern-narrative .choices .pick .k {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--paper-500);
+  border: 1px solid var(--ink-600);
+  border-radius: 5px;
+  padding: 1px 6px;
+  flex: none;
+  width: 20px;
+  text-align: center;
+}
+
+.elosern-narrative .choices .pick .t {
+  font-size: 14.5px;
+  color: var(--paper-100);
 }
 </style>

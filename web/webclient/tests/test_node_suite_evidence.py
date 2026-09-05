@@ -451,5 +451,60 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class DialogueSurfaceEvidenceTest(unittest.TestCase):
+    """webclient-align-08: the dialogue surface's feed variant and dock mirror
+    are Vue-layer contracts; the Vitest files are their executed evidence."""
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-feed-presents-the-dialogue-variant-from-the-committed-panel",
+    )
+    def test_dialogue_feed_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/dialogue_feed.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/dialogue_view_model.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "dialogue-feed Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-dock-presents-the-dialogue-form-as-a-mirror-of-the-same-picks",
+    )
+    def test_dialogue_dock_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/dialogue_dock.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/dialogue_store.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "dialogue-dock Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

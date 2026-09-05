@@ -34,6 +34,7 @@ import ServiceMenu from "../lib/service_menu.js";
 import CommandEcho from "../lib/command_echo.js";
 import stableStringify from "../lib/stable_stringify.js";
 import { createFrameResolver } from "./frame-resolvers.js";
+import { dialogueViewModel } from "./dialogue-view.js";
 import { actionIntentForItem, dockItemKeys } from "../components/dock-items.js";
 import { classifyPane } from "../components/dock-panes.js";
 import { gaugeRatio, isLowHp } from "../components/vitals.js";
@@ -253,8 +254,20 @@ export const useElosernStore = defineStore("elosern", () => {
     exploration: EXPLORATION_ROOT_DESCRIPTOR,
     combat: Object.freeze({ source: "combat.root", params: Object.freeze({}) }),
     creation: Object.freeze({ source: "creation.root", params: Object.freeze({}) }),
+    dialogue: Object.freeze({ source: "dialogue.root", params: Object.freeze({}) }),
   });
   function rootDescriptorFor(rs) {
+    // webclient-align-08-dialogue-surface: the committed mode wins FIRST. A
+    // dialogue mode tears down to `dialogue.root` even while the combat panel
+    // form lingers, so the dialogue→combat flip re-homes correctly through the
+    // depth-1 descriptor comparison (the mode leaves dialogue, the dialogue
+    // descriptor no longer matches, the combat/creation/exploration heuristic
+    // below decides). A dialogue mode whose panel is transiently unavailable
+    // still gets `dialogue.root` — it resolves to the shared degradation
+    // marker with the server-authored reason (the spec's lost-frame rule).
+    if (rs && rs.mode === "dialogue") {
+      return MODE_ROOT_DESCRIPTORS.dialogue;
+    }
     // The combat family is keyed on the committed panel form (panel.kind),
     // exactly as the deleted copy push sites were; creation on the session
     // mode; everything else on the exploration root.
@@ -835,6 +848,9 @@ export const useElosernStore = defineStore("elosern", () => {
     // hierarchical root + submenus): root entries open Move/Look/Interact/Wait
     // submenus and the Character/Quests/Inventory sub-docks, submenu rows
     // dispatch their `explore.*` actions.
+    if (handleDialogueItem(item)) {
+      return;
+    }
     if (handleServiceItem(item)) {
       return;
     }
@@ -1324,6 +1340,67 @@ export const useElosernStore = defineStore("elosern", () => {
   // dispatch their `explore.*` action, and an interact target selection pushes
   // that target's affordance menu. Returns true when the item belonged to the
   // exploration dock.
+  // The dialogue family owns the router in dialogue mode
+  // (webclient-align-08-dialogue-surface): the scripted picks dispatch
+  // `explore.talk_scripted` through the same single dispatch entry the
+  // exploration rows use, and the trailing free-dialogue row borrows the
+  // command line through the same freeform path. Both feed picks and dock
+  // pane rows arrive here as ONE derived source (stores/dialogue-view.js),
+  // so pointer, Enter, and digit activation dispatch identically.
+  function handleDialogueItem(item) {
+    const rs = reducer.getState();
+    if (rs.mode !== "dialogue") {
+      return false;
+    }
+    const descriptor = router.currentDescriptor();
+    if (!descriptor || descriptor.source !== "dialogue.root") {
+      return false;
+    }
+    if (item.freeform) {
+      return borrowDialogueCommand();
+    }
+    if (item.actionId) {
+      dispatchAction(item.actionId, item.payload || {}, item.commandDisplay || null);
+      return true;
+    }
+    return false;
+  }
+
+  // Whether the dock/feed dialogue FORM is presented right now: committed
+  // dialogue mode AND the current frame resolved as the dialogue root (an
+  // unavailable panel resolves to the marker — no form, no key borrowing,
+  // no drawer request; the ArrowRight press falls through to the router's
+  // list-menu no-op).
+  function dialogueFormPresented() {
+    const rs = reducer.getState();
+    if (rs.mode !== "dialogue" || router.depth() === 0) {
+      return false;
+    }
+    const descriptor = router.currentDescriptor();
+    if (!descriptor || descriptor.source !== "dialogue.root") {
+      return false;
+    }
+    const menu = router.currentMenu();
+    return !!(menu && menu.dialogueForm === true);
+  }
+
+  // The free-dialogue borrow (the `→` key and the trailing free row): the
+  // SAME path the exploration 互動 → 自由對話 row uses — set the guarded
+  // freeform target to the committed host identity and request command-field
+  // focus (the field is permanently present, design D1). Dispatches nothing.
+  function borrowDialogueCommand() {
+    const rs = reducer.getState();
+    const vm = dialogueViewModel((rs.panels && rs.panels.dialogue) || null);
+    if (!vm) {
+      return false;
+    }
+    freeformTarget = vm.host.identity;
+    lastTarget = String(vm.host.identity);
+    drawerRequest += 1;
+    publishView();
+    return true;
+  }
+
   function handleExplorationItem(item) {
     const rs = reducer.getState();
     if (rs.mode !== "exploration") {
@@ -2541,6 +2618,15 @@ export const useElosernStore = defineStore("elosern", () => {
       // Any other key while the form is open is consumed locally.
       return true;
     }
+    // The dialogue form's `→` (webclient-align-08-dialogue-surface, legend
+    // `數字鍵 1–4 選 · <kbd>→</kbd> 指令列自由對話`): while the dialogue form is
+    // presented it focuses the borrowed command line for a freeform
+    // utterance and dispatches nothing. The bridge never routes keys out of
+    // an editable target, so the caret is never intercepted from the input
+    // field; outside the presented form ArrowRight keeps its router meaning.
+    if (key === "ArrowRight" && dialogueFormPresented()) {
+      return borrowDialogueCommand();
+    }
     // The dock's positional row picks (webclient-align-01-dock-chrome): the
     // legend `數字鍵 1-4 · Enter 執行 · Esc 返回` names the first four rows
     // of the current dock frame as reachable by the top-row number keys. A
@@ -2574,8 +2660,14 @@ export const useElosernStore = defineStore("elosern", () => {
       // one source of truth). Every other pane renders `back` as an
       // ordered row, so its slot is real there.
       const items = menu && menu.items ? menu.items : [];
-      const slots =
-        classifyPane({ items }) === "outlet"
+      // The dialogue form's digit slots address ONLY the rendered picks:
+      // the legend names digits for the scripted choices, and the freeform
+      // row is the command-line borrow (Enter/pointer/→), never a digit
+      // target. A degraded dialogue root presents no items at all, so its
+      // digits are unclaimed and keep command-line semantics.
+      const slots = dialogueFormPresented()
+        ? items.filter((i) => i && !i.freeform)
+        : classifyPane({ items }) === "outlet"
           ? items.filter((i) => i && i.key !== "back")
           : items;
       const item = slots[slot];
@@ -2700,6 +2792,8 @@ export const useElosernStore = defineStore("elosern", () => {
     appendText,
     sendText,
     clearFreeformTarget,
+    borrowDialogueCommand,
+    dialogueFormPresented,
     dispatchAction,
     requestCreationReset,
     focusPress,
