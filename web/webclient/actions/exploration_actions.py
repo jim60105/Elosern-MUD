@@ -415,6 +415,8 @@ def _talk_freeform_adapter(actor: Any, payload: dict[str, Any], session: Any = N
     npc = _resolve_llm_npc(actor, payload["npc_id"])
     if npc is None:
         return _rejected("no_npc", "這裡沒有可以自由交談的對象。")
+    if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
+        return _rejected("possessed", "他現在無法回應你。")
     reason = interaction_reason(npc, "talk")
     if reason is not None:
         return _rejected("schedule_blocked", reason)

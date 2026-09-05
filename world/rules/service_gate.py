@@ -227,4 +227,6 @@ def schedule_silenced(npc: Any) -> bool:
     change will OR in its second trigger (possessed NPCs go silent too);
     callers never re-decide silence at the call site.
     """
+    if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
+        return True
     return off_anchor_place_service(npc) is not None

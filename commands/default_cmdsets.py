@@ -57,6 +57,7 @@ from commands.guild import (
 from commands.invite import CmdInvite
 from commands.leave import CmdLeave
 from commands.lore import CmdLore
+from commands.possess import CmdPossess, CmdUnpossess
 from commands.localized import (
     CmdColorTest,
     CmdDrop,
@@ -213,6 +214,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdsTalk)
         self.add(CmdInvite)
         self.add(CmdLeave)
+        self.add(CmdPossess)
+        self.add(CmdUnpossess)
         self.add(CmdLore)
         self.add(CmdBackground)
         self.add(CmdPersonaPersonality)

@@ -134,6 +134,9 @@ class NPC(LivingEntity):
         the callback runs immediately.
         """
         super().at_post_move(source_location, **kwargs)
+        from typeclasses.characters import _schedule_action_options_after_move
+
+        _schedule_action_options_after_move(self)
         if source_location is None:
             return
         from django.db import transaction
@@ -531,6 +534,10 @@ class LLMNPC(NPC):
             is_stale_context,
         )
         from world.rules.npc_schedules import interaction_reason
+
+        if getattr(getattr(self, "db", None), "possessed_by", None) is not None:
+            character.msg("他現在無法回應你。")
+            return
 
         reason = interaction_reason(self, "talk")
         if reason is not None:

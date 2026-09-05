@@ -38,9 +38,11 @@ def _schedule_action_options_committed(actor: Any) -> None:
     diagnostic and swallowed: the trigger never alters movement and never
     raises into its caller.
     """
-    if not isinstance(actor, PlayerCharacter):
+    from world.rules.player_control import is_player_driven
+
+    if not is_player_driven(actor):
         return
-    if getattr(actor, "account", None) is None:
+    if isinstance(actor, PlayerCharacter) and getattr(actor, "account", None) is None:
         return
     try:
         from server.option_proposal_service import schedule_action_options

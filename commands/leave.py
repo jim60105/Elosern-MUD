@@ -12,6 +12,9 @@ from world.rules.party import (
     LEAVE_DISMISSED_MESSAGE,
     NOT_COMPANION_MESSAGE,
     is_companion,
+    PartyJoinError,
+    REASON_HANDBACK_FIRST,
+    HANDBACK_FIRST_MESSAGE,
     leave_party,
 )
 
@@ -44,5 +47,15 @@ class CmdLeave(Command):
         if not is_companion(npc, self.caller):
             self.caller.msg(NOT_COMPANION_MESSAGE)
             return
-        leave_party(npc, self.caller, reason="dismissed")
+        if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
+            if int(npc.db.possessed_by) == int(self.caller.pk):
+                self.caller.msg(HANDBACK_FIRST_MESSAGE)
+                return
+        try:
+            leave_party(npc, self.caller, reason="dismissed")
+        except PartyJoinError as error:
+            if error.reason == REASON_HANDBACK_FIRST:
+                self.caller.msg(HANDBACK_FIRST_MESSAGE)
+                return
+            raise
         self.caller.msg(LEAVE_DISMISSED_MESSAGE)

@@ -22,9 +22,9 @@ def charge_movement(traversing_object, cost_key: str) -> None:
     design); every other cost key charges normally.
     """
 
-    from typeclasses.characters import PlayerCharacter
+    from world.rules.player_control import is_player_driven
 
-    if not isinstance(traversing_object, PlayerCharacter):
+    if not is_player_driven(traversing_object):
         return
     from world.rules.clock import CLOCK_YAML, AdvanceSource, get_world_clock
 

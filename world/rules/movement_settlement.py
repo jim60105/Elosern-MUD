@@ -224,7 +224,9 @@ def _snapshot_movement_state(
     registry = None
     clock = None
     tick_snapshot = None
-    if isinstance(traversing_object, PlayerCharacter):
+    from world.rules.player_control import is_player_driven
+
+    if is_player_driven(traversing_object):
         clock = get_world_clock()
         # Widened to the one-day advance bound: the exact charge cost is not
         # known here, and a widened window is a strict superset of what the
@@ -237,7 +239,8 @@ def _snapshot_movement_state(
             (key, None): attribute_snapshot(traversing_object, key)
             for key in _TRAVERSER_SURFACES
         }
-        traverser_attrs[("quest_log", None)] = snapshot_quest_log(traversing_object)
+        if getattr(traversing_object, "quest_log", None) is not None:
+            traverser_attrs[("quest_log", None)] = snapshot_quest_log(traversing_object)
         entry = registry.get(id(traversing_object))
         if entry is None:
             registry[id(traversing_object)] = SurfaceSnapshot(attributes=traverser_attrs)
