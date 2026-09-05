@@ -117,6 +117,17 @@ REASON_WRITE_FAILED = "write_failed"
 REASON_MISMATCHED_POSSESSION = "mismatched_possession"
 REASON_TRANSFER_REFUSED = "transfer_refused"
 REASON_RELEASE_REFUSED = "release_refused"
+REASON_POSSESSED_SHOP = "possessed_shop"
+REASON_POSSESSED_TALK = "possessed_talk"
+REASON_POSSESSED_ENGAGE = "possessed_engage"
+
+# D10 stable refusal messages for possessed actor
+POSSESSED_REFUSAL_MESSAGES: dict[str, str] = {
+    REASON_POSSESSED_SHOP: "附身狀態下無法進行交易。",
+    REASON_POSSESSED_TALK: "附身狀態下無法與他人開啟對話。",
+    REASON_POSSESSED_ENGAGE: "附身狀態下無法主動發起戰鬥。",
+}
+
 
 # Player-facing localized messages
 POSSESSION_REJECTION_MESSAGES: dict[str, str] = {
@@ -480,6 +491,50 @@ def _dialogue_open(npc: Any, player: Any) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def is_possessed_actor(actor: Any) -> bool:
+    """Return True if ``actor`` is an NPC currently possessed by a player."""
+    return getattr(getattr(actor, "db", None), "possessed_by", None) is not None
+
+
+def possession_verdict(player: Any, npc: Any) -> str | None:
+    """Evaluate deterministic entry gates for possessing ``npc`` from ``player``.
+
+    Returns the rejection reason string if any gate fails, or ``None`` if all pass.
+    Gates run in deterministic order:
+    1. not_bound: target is a live bound companion of player
+    2. not_co_located: player and npc share a non-null location
+    3. in_combat: neither side is in an active combat session
+    4. dialogue_open: npc is not in an open dialogue session
+    5. already_possessing: player, npc, or account's characters do not hold possession
+    """
+    from world.rules.party import is_companion
+
+    if not is_companion(npc, player):
+        return REASON_NOT_BOUND
+
+    if player.location is None or npc.location is None or player.location != npc.location:
+        return REASON_NOT_CO_LOCATED
+
+    from world.rules.combat_session import is_in_active_session
+
+    if is_in_active_session(player) or is_in_active_session(npc):
+        return REASON_IN_COMBAT
+
+    if _dialogue_open(npc, player):
+        return REASON_DIALOGUE_OPEN
+
+    if current_possession(player) is not None or getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
+        return REASON_ALREADY_POSSESSING
+
+    account = getattr(player, "account", None)
+    if account is not None:
+        for char in _account_characters(account):
+            if char.pk != player.pk and current_possession(char) is not None:
+                return REASON_ALREADY_POSSESSING
+
+    return None
+
+
 def enter_possession(player: Any, npc: Any) -> None:
     """Enter possession of bound companion ``npc`` from ``player``.
 
@@ -492,36 +547,11 @@ def enter_possession(player: Any, npc: Any) -> None:
 
     All writes are atomic and serialized under database row locking.
     """
-    from world.rules.party import is_companion
-
-    if not is_companion(npc, player):
-        raise PossessionGateError(REASON_NOT_BOUND)
-
-    if (
-        player.location is None
-        or npc.location is None
-        or player.location != npc.location
-    ):
-        raise PossessionGateError(REASON_NOT_CO_LOCATED)
-
-    from world.rules.combat_session import is_in_active_session
-
-    if is_in_active_session(player) or is_in_active_session(npc):
-        raise PossessionGateError(REASON_IN_COMBAT)
-
-    if _dialogue_open(npc, player):
-        raise PossessionGateError(REASON_DIALOGUE_OPEN)
-
-    if current_possession(player) is not None:
-        raise PossessionGateError(REASON_ALREADY_POSSESSING)
-    if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
-        raise PossessionGateError(REASON_ALREADY_POSSESSING)
+    verdict = possession_verdict(player, npc)
+    if verdict is not None:
+        raise PossessionGateError(verdict)
 
     account = getattr(player, "account", None)
-    if account is not None:
-        for char in _account_characters(account):
-            if char.pk != player.pk and current_possession(char) is not None:
-                raise PossessionGateError(REASON_ALREADY_POSSESSING)
 
     from world.rules.clock import read_world_clock
 
@@ -540,14 +570,10 @@ def enter_possession(player: Any, npc: Any) -> None:
                         ids_to_lock.append(char.pk)
             list(ObjectDB.objects.select_for_update().filter(id__in=ids_to_lock))
 
-            if current_possession(player) is not None:
-                raise PossessionGateError(REASON_ALREADY_POSSESSING)
-            if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
-                raise PossessionGateError(REASON_ALREADY_POSSESSING)
-            if account is not None:
-                for char in _account_characters(account):
-                    if char.pk != player.pk and current_possession(char) is not None:
-                        raise PossessionGateError(REASON_ALREADY_POSSESSING)
+            # Authoritative re-check of all mutable gates under row lock
+            locked_verdict = possession_verdict(player, npc)
+            if locked_verdict is not None:
+                raise PossessionGateError(locked_verdict)
 
             player.db.possession = {
                 "npc_dbid": int(npc.pk),
@@ -561,8 +587,8 @@ def enter_possession(player: Any, npc: Any) -> None:
             npc.db.possessed_by = int(player.pk)
 
             # Seam call sites: transition change mounts puppet & cmdset here
-            _transfer_puppet(player, npc)  # possession: seam R1-transition
             _mount_cmdset(npc)  # possession: seam R1-transition
+            _transfer_puppet(player, npc)  # possession: seam R1-transition
     except PossessionGateError:
         restore_possession_surfaces(player, npc, player_before, npc_before)
         raise

@@ -134,6 +134,10 @@ const completionCandidates = computed(() => {
   return [...exits, ...targets];
 });
 
+const possessionBanner = computed(() => panel("possession_banner"));
+const contextAffordances = computed(() => panel("context_actions")?.affordances || []);
+const releaseAffordance = computed(() => contextAffordances.value.find((a) => a.action_id === "explore.possess_release") || null);
+
 // H1 contextual HUD (design D4/D9): the bounded caption card's `完整日誌`
 // control opens the full-log overlay; the overlay presents the complete
 // retained narrative through the same markup renderer (one markup path).
@@ -871,6 +875,7 @@ onMounted(() => {
         :roster-switch-locked="store.rosterSwitchLocked"
         :roster-lock-reason="store.rosterLockReason"
         :epoch="store.view.epoch"
+        :possession-banner="possessionBanner"
         @submit-command="onSubmitCommand"
         @focus-lost="store.clearFreeformTarget()"
         @open-full-log="openFullLog"
@@ -1058,6 +1063,8 @@ onMounted(() => {
         :mode="store.view.mode || 'exploration'"
         :available="store.partyAvailable"
         :reason="partyReason"
+        :release-affordance="releaseAffordance"
+        :affordances="contextAffordances"
         @action="onAction"
         @close="onHudDrawerClose"
       />

@@ -808,9 +808,16 @@ def character_presenter(context: PresentationContext) -> dict[str, Any]:
         model = build_character_read_model(actor)
     except StatusQueryError:
         raise PanelUnavailableError
+    possessed_by = getattr(getattr(actor, "db", None), "possessed_by", None)
+    persona_source = actor
+    if possessed_by is not None:
+        from world.rules.possession import _resolve_live_object
+        owner = _resolve_live_object(int(possessed_by))
+        if owner is not None:
+            persona_source = owner
     persona: dict[str, Any] = {}
     for field in PERSONA_PROSE_FIELDS:
-        value = actor.persona.get(field)
+        value = getattr(persona_source, "persona", {}).get(field)
         if value is not None and not isinstance(value, str):
             value = None
         if value is not None and not value.strip():

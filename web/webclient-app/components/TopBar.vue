@@ -23,6 +23,7 @@ defineProps({
   rosterLockReason: { type: String, default: null },
   locked: { type: Boolean, default: false },
   epoch: { type: [Number, String], default: null },
+  possessionBanner: { type: Object, default: null },
 });
 
 defineEmits({
@@ -40,6 +41,13 @@ defineEmits({
     伊洛瑟恩
   </div>
   <div class="topbar-right">
+    <div
+      v-if="possessionBanner && possessionBanner.available"
+      class="topbar-possession-banner"
+      data-testid="topbar-possession-banner"
+    >
+      你透過{{ possessionBanner.host_name }}的雙眼行動
+    </div>
     <CharacterSwitcher
       :available="rosterAvailable"
       :characters="rosterCharacters"
@@ -148,5 +156,20 @@ defineEmits({
   border: 1px dashed var(--warn);
   border-radius: var(--radius-sm);
   padding: 1px var(--sp-2);
+}
+
+.topbar-possession-banner {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: rgba(142, 68, 173, 0.25);
+  border: 1px solid rgba(175, 122, 197, 0.6);
+  border-radius: var(--radius-sm, 4px);
+  color: #e8daef;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  user-select: none;
 }
 </style>

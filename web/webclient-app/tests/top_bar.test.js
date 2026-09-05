@@ -163,4 +163,24 @@ describe("TopBar (H1 contextual HUD: brand + top-meta pill)", () => {
     expect(popoverComputed.position).toBe("absolute");
     expect(popoverComputed.zIndex).toBe("20");
   });
+
+  it("renders possession banner when available and omits it when unavailable", () => {
+    wrapper = mount(TopBar, {
+      props: {
+        connected: true,
+        possessionBanner: { available: true, host_name: "小艾", since_tick: 42 },
+      },
+    });
+    const banner = wrapper.find('[data-testid="topbar-possession-banner"]');
+    expect(banner.exists()).toBe(true);
+    expect(banner.text()).toBe("你透過小艾的雙眼行動");
+
+    wrapper = mount(TopBar, {
+      props: {
+        connected: true,
+        possessionBanner: { available: false },
+      },
+    });
+    expect(wrapper.find('[data-testid="topbar-possession-banner"]').exists()).toBe(false);
+  });
 });

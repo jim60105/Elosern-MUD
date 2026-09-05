@@ -1572,10 +1572,11 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.title_ballot, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.title_codex, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.roster, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.possession_banner, 1);
   assert.equal(
     Object.keys(Protocol.PANEL_ALLOWLIST).length,
-    15,
-    "PANEL_ALLOWLIST must list exactly the fifteen registered panels"
+    16,
+    "PANEL_ALLOWLIST must list exactly the sixteen registered panels"
   );
 });
 
@@ -5796,4 +5797,40 @@ test("roster is in the production panel allowlist and rejects atomically", () =>
   };
   envelope.revision = 7;
   assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
+});
+
+
+test("possession_banner is in the production panel allowlist and validates available/unavailable shapes", () => {
+  assert.equal(Protocol.PANEL_ALLOWLIST.possession_banner, 1);
+  const validAvailable = {
+    schema_version: 1,
+    available: true,
+    host_name: "小艾",
+    since_tick: 100,
+  };
+  assert.deepEqual(Protocol.validatePossessionBannerPanel(validAvailable), validAvailable);
+
+  const unavailable = {
+    schema_version: 1,
+    available: false,
+    reason: { code: "not_possessing", message: "目前未處於附身狀態" },
+  };
+  const envelope = {
+    protocol_version: 1,
+    presentation_epoch: VALID_EPOCH,
+    revision: 8,
+    mode: "exploration",
+    panels: { possession_banner: validAvailable },
+    layout_version: 1,
+    server_time: serverTime(),
+  };
+  assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
+  envelope.panels = { possession_banner: unavailable };
+  envelope.revision = 9;
+  assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
+
+  assert.throws(() => Protocol.validatePossessionBannerPanel({ schema_version: 2, available: true }));
+  assert.throws(() => Protocol.validatePossessionBannerPanel({ schema_version: 1, available: true, host_name: "" }));
+  assert.throws(() => Protocol.validatePossessionBannerPanel({ schema_version: 1, available: true, host_name: "小艾", since_tick: -1 }));
+  assert.throws(() => Protocol.validatePossessionBannerPanel({ schema_version: 1, available: true, host_name: "小艾", since_tick: 100, extra: true }));
 });

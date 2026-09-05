@@ -28,6 +28,8 @@ const props = defineProps({
   available: { type: Boolean, default: true },
   // Optional registry-owned reason message when unavailable.
   reason: { type: String, default: "" },
+  releaseAffordance: { type: Object, default: null },
+  affordances: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits(["action", "close"]);
@@ -111,6 +113,62 @@ function confirmLeave(slot) {
   confirmingLeaveId.value = null;
 }
 
+function possessPrecondition(slot) {
+  if (props.mode !== "exploration") {
+    return { visible: true, enabled: false, reason: "戰鬥中無法附身" };
+  }
+  const target = (props.interactTargets || []).find(
+    (t) => String(t.identity) === String(slot.identity),
+  );
+  let possessAffordance = null;
+  if (target) {
+    possessAffordance = (target.affordances || []).find(
+      (a) => a.action_id === "explore.possess",
+    );
+  }
+  if (!possessAffordance && Array.isArray(props.affordances)) {
+    possessAffordance = props.affordances.find(
+      (a) => a.action_id === "explore.possess" && String(a.params?.npc_id) === String(slot.identity),
+    );
+  }
+  if (!possessAffordance) {
+    return { visible: true, enabled: false, reason: "對方不在這裡。" };
+  }
+  const disabledMsg = possessAffordance.disabled_reason?.message || (Array.isArray(possessAffordance.disabled_reason) ? possessAffordance.disabled_reason[1] : null);
+  return {
+    visible: true,
+    enabled: possessAffordance.enabled !== false,
+    reason: disabledMsg,
+  };
+}
+
+function onPossess(slot) {
+  const prec = possessPrecondition(slot);
+  if (!prec.enabled) return;
+  emit("action", {
+    action_id: "explore.possess",
+    payload: { npc_id: slot.identity },
+  });
+}
+
+const activeReleaseAffordance = computed(() => {
+  if (props.releaseAffordance) return props.releaseAffordance;
+  if (Array.isArray(props.affordances)) {
+    return props.affordances.find((a) => a.action_id === "explore.possess_release") || null;
+  }
+  return null;
+});
+
+function onRelease() {
+  const aff = activeReleaseAffordance.value;
+  if (!aff) return;
+  const npcId = aff.params?.npc_id;
+  emit("action", {
+    action_id: "explore.possess_release",
+    payload: { npc_id: npcId },
+  });
+}
+
 // Deterministic invite target selection:
 // Choose the first target in committed target order with an enabled `explore.party_invite` affordance.
 // If none enabled, look for any target with an `explore.party_invite` affordance for its disabled reason.
@@ -164,6 +222,23 @@ function onInviteCurrentNpc() {
       同伴是正式 NPC，隨你移動與戰鬥。羈絆 7 階（數值隱藏）；戰鬥中 HP 歸零改為「失去意識」，時鐘重生。無法指揮同伴，只能管理自己的行動。
     </p>
 
+    <!-- Possession release banner -->
+    <div
+      v-if="activeReleaseAffordance"
+      class="party-drawer__release-banner"
+      data-testid="party-drawer__release-banner"
+    >
+      <span class="party-drawer__release-text">目前正處於附身狀態</span>
+      <button
+        type="button"
+        class="btn-release"
+        data-testid="party-drawer__release-btn"
+        @click="onRelease"
+      >
+        歸位
+      </button>
+    </div>
+
     <!-- Companion rows -->
     <div
       v-for="slot in safeSlots"
@@ -202,6 +277,21 @@ function onInviteCurrentNpc() {
           >參戰 {{ combatToken(slot) }}</span>
         </div>
         <div class="acts" data-testid="party-drawer__acts">
+          <button
+            type="button"
+            class="btn-possess"
+            data-testid="party-drawer__possess-btn"
+            :disabled="!possessPrecondition(slot).enabled"
+            :title="possessPrecondition(slot).reason || undefined"
+            @click="onPossess(slot)"
+          >
+            附身
+          </button>
+          <span
+            v-if="!possessPrecondition(slot).enabled && possessPrecondition(slot).reason"
+            class="act-reason"
+            data-testid="party-drawer__possess-reason"
+          >{{ possessPrecondition(slot).reason }}</span>
           <template v-if="confirmingLeaveId === slot.identity && leavePrecondition(slot).enabled">
             <button
               type="button"
@@ -455,5 +545,50 @@ function onInviteCurrentNpc() {
   font-size: 11.5px;
   color: var(--paper-400);
   line-height: 1.5;
+}
+
+.party-drawer__release-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: rgba(142, 68, 173, 0.15);
+  border: 1px solid rgba(175, 122, 197, 0.4);
+  border-radius: var(--radius-sm, 4px);
+  color: #e8daef;
+}
+.party-drawer__release-text {
+  font-size: 13px;
+  font-weight: 500;
+}
+.btn-release {
+  background: rgba(142, 68, 173, 0.4);
+  border: 1px solid #af7ac5;
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+}
+.btn-release:hover {
+  background: rgba(142, 68, 173, 0.7);
+}
+.btn-possess {
+  background: rgba(41, 128, 185, 0.3);
+  border: 1px solid rgba(52, 152, 219, 0.6);
+  color: #d6eaf8;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  font-size: 12px;
+}
+.btn-possess:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.act-reason {
+  font-size: 11px;
+  color: #e74c3c;
+  margin-left: 6px;
 }
 </style>

@@ -50,6 +50,7 @@ _PANEL_MODULES = (
     ("title_ballot", "title_ballot.py"),
     ("title_codex", "title_codex.py"),
     ("roster", "roster.py"),
+    ("possession_banner", "possession_banner.py"),
 )
 
 

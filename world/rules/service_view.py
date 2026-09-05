@@ -310,7 +310,17 @@ def _resolve_host(actor: Any, component_class: type) -> tuple[Any, str | None]:
 
 
 def _read_wallet(actor: Any) -> int:
-    raw = actor.db.wallet
+    raw = getattr(getattr(actor, "db", None), "wallet", None)
+    if raw is None:
+        possessed_by = getattr(getattr(actor, "db", None), "possessed_by", None)
+        if possessed_by is not None:
+            from world.rules.possession import _resolve_live_object
+            owner = _resolve_live_object(int(possessed_by))
+            if owner is not None:
+                return _read_wallet(owner)
+        from typeclasses.characters import PlayerCharacter
+        if not isinstance(actor, PlayerCharacter):
+            return 0
     if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
         raise ServicesViewError("wallet is malformed")
     return raw
@@ -820,11 +830,18 @@ def build_services_view(actor: Any) -> ServicesView:
         raise ServicesViewError("world clock is absent")
     tick = int(clock.tick)
     catalog = get_catalog()
-    wallet = _read_wallet(actor)
+    possessed_by = getattr(getattr(actor, "db", None), "possessed_by", None)
+    owner = None
+    if possessed_by is not None:
+        from world.rules.possession import _resolve_live_object
+        owner = _resolve_live_object(int(possessed_by))
 
-    player = _build_player(actor, wallet, catalog)
+    player_source = owner if owner is not None else actor
+    wallet = _read_wallet(player_source)
+
+    player = _build_player(player_source, wallet, catalog)
     in_combat = is_in_active_session(actor)
-    if in_combat:
+    if in_combat or owner is not None:
         guild, guild_reason = None, None
         shop, shop_reason = None, None
         host = None

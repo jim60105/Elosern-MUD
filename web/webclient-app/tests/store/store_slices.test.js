@@ -27,6 +27,7 @@ const PANEL_ALLOWLIST = [
   "title_ballot",
   "title_codex",
   "roster",
+  "possession_banner",
 ];
 
 function openActiveSession(store) {

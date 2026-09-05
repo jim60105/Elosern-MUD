@@ -424,6 +424,18 @@ def _exam_start_adapter(actor: Any, payload: dict[str, Any], session: Any = None
 def _buy_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Recheck open state, price, funds, and stock, then call ``economy.buy``."""
     del session
+    from world.rules.possession import (
+        POSSESSED_REFUSAL_MESSAGES,
+        REASON_POSSESSED_SHOP,
+        is_possessed_actor,
+    )
+
+    if is_possessed_actor(actor):
+        return {
+            "outcome": "rejected",
+            "code": REASON_POSSESSED_SHOP,
+            "message": POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP],
+        }
     item_key = payload["item_key"]
     quantity = payload["quantity"]
     merchant_host, reason = _resolve_local(
@@ -449,6 +461,18 @@ def _buy_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> di
 def _sell_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
     """Recheck open state, held items, and stock cap, then call ``economy.sell``."""
     del session
+    from world.rules.possession import (
+        POSSESSED_REFUSAL_MESSAGES,
+        REASON_POSSESSED_SHOP,
+        is_possessed_actor,
+    )
+
+    if is_possessed_actor(actor):
+        return {
+            "outcome": "rejected",
+            "code": REASON_POSSESSED_SHOP,
+            "message": POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP],
+        }
     item_key = payload["item_key"]
     quantity = payload["quantity"]
     merchant_host, reason = _resolve_local(

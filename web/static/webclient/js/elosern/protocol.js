@@ -387,6 +387,7 @@
     title_ballot: 1,
     title_codex: 1,
     roster: 1,
+    possession_banner: 1,
   };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
@@ -4837,6 +4838,36 @@
     return result;
   }
 
+  // ---------------------------------------------------------------------------
+  // possession_banner panel v1 (mirror of web.webclient.presentation.possession_banner)
+  // ---------------------------------------------------------------------------
+
+  var POSSESSION_BANNER_SCHEMA_VERSION = 1;
+  var POSSESSION_BANNER_MAX_HOST_NAME = 64;
+
+  function validatePossessionBannerPanel(payload) {
+    if (!payload || typeof payload !== "object") {
+      throw new Error("possession_banner panel must be an object");
+    }
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== POSSESSION_BANNER_SCHEMA_VERSION) {
+      throw new Error("unsupported possession_banner schema_version");
+    }
+    requireBool(payload.available, "available");
+    if (payload.available !== true) {
+      throw new Error("possession_banner panel must be available");
+    }
+    requireExactFields(payload, "possession_banner", ["schema_version", "available", "host_name", "since_tick"], []);
+    var hostName = requireString(payload.host_name, "host_name", POSSESSION_BANNER_MAX_HOST_NAME);
+    var sinceTick = requireInt(payload.since_tick, "since_tick", 0, MAX_SAFE_INTEGER);
+    return {
+      schema_version: POSSESSION_BANNER_SCHEMA_VERSION,
+      available: true,
+      host_name: hostName,
+      since_tick: sinceTick,
+    };
+  }
+
   // Panel discriminator dispatch: the unavailable form is common to every
   // registered panel; the available form is validated against its schema.
   function validateUnavailablePanel(payload, schemaVersion) {
@@ -4930,6 +4961,9 @@
     }
     if (name === "roster") {
       return validateRosterPanel(payload);
+    }
+    if (name === "possession_banner") {
+      return validatePossessionBannerPanel(payload);
     }
     throw new Error("panel " + name + " has no registered schema");
   }
@@ -5258,6 +5292,9 @@
     ROSTER_SCHEMA_VERSION: ROSTER_SCHEMA_VERSION,
     ROSTER_MAX_ROWS: ROSTER_MAX_ROWS,
     ROSTER_MAX_NAME: ROSTER_MAX_NAME,
+    validatePossessionBannerPanel: validatePossessionBannerPanel,
+    POSSESSION_BANNER_SCHEMA_VERSION: POSSESSION_BANNER_SCHEMA_VERSION,
+    POSSESSION_BANNER_MAX_HOST_NAME: POSSESSION_BANNER_MAX_HOST_NAME,
     ROSTER_LOCK_REASON: ROSTER_LOCK_REASON,
     validatePanel: validatePanel,
 

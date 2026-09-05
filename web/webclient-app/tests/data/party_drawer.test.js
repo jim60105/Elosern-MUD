@@ -259,4 +259,73 @@ describe("PartyDrawer (同伴 · 隊伍 drawer)", () => {
     });
     expect(w.find('[data-testid="party-drawer__empty-row"]').exists()).toBe(false);
   });
+
+  it("companion row renders possess button and clicking it dispatches explore.possess", async () => {
+    const w = mountDrawer({
+      affordances: [
+        {
+          action_id: "explore.possess",
+          label: "附身",
+          params: { npc_id: 101 },
+          enabled: true,
+          disabled_reason: null,
+        },
+      ],
+    });
+    const r1 = w.get('[data-testid="party-drawer__row-101"]');
+    const possessBtn = r1.get('[data-testid="party-drawer__possess-btn"]');
+    expect(possessBtn.text()).toBe("附身");
+    expect(possessBtn.attributes("disabled")).toBeUndefined();
+
+    await possessBtn.trigger("click");
+    expect(w.emitted("action")).toHaveLength(1);
+    expect(w.emitted("action")[0][0]).toEqual({
+      action_id: "explore.possess",
+      payload: { npc_id: 101 },
+    });
+  });
+
+  it("disabled possess button carries disabled reason and blocks dispatch", async () => {
+    const w = mountDrawer({
+      affordances: [
+        {
+          action_id: "explore.possess",
+          label: "附身",
+          params: { npc_id: 101 },
+          enabled: false,
+          disabled_reason: { code: "in_combat", message: "戰鬥中無法附身。" },
+        },
+      ],
+    });
+    const r1 = w.get('[data-testid="party-drawer__row-101"]');
+    const possessBtn = r1.get('[data-testid="party-drawer__possess-btn"]');
+    expect(possessBtn.attributes("disabled")).toBeDefined();
+    expect(possessBtn.attributes("title")).toBe("戰鬥中無法附身。");
+
+    await possessBtn.trigger("click");
+    expect(w.emitted("action")).toBeUndefined();
+  });
+
+  it("release banner renders when releaseAffordance is present and clicking it dispatches explore.possess_release", async () => {
+    const w = mountDrawer({
+      releaseAffordance: {
+        action_id: "explore.possess_release",
+        label: "歸位",
+        params: { npc_id: 101 },
+        enabled: true,
+      },
+    });
+    const banner = w.find('[data-testid="party-drawer__release-banner"]');
+    expect(banner.exists()).toBe(true);
+    expect(banner.text()).toContain("目前正處於附身狀態");
+
+    const releaseBtn = w.get('[data-testid="party-drawer__release-btn"]');
+    expect(releaseBtn.text()).toBe("歸位");
+    await releaseBtn.trigger("click");
+    expect(w.emitted("action")).toHaveLength(1);
+    expect(w.emitted("action")[0][0]).toEqual({
+      action_id: "explore.possess_release",
+      payload: { npc_id: 101 },
+    });
+  });
 });
