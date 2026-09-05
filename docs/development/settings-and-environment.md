@@ -88,6 +88,9 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 
 ## LLM endpoint knobs（23 個）
 
+> [!TIP]
+> 關於 7 個生成層的多模型分工範例、本地 Ollama/vLLM 與雲端 API 部署最佳實踐，請參閱專題指南 [端點配置與模型調優指南](/development/llm-configuration)。
+
 讀者一律是 `server/conf/settings.py`：名稱、型別與邊界由宣告式 knob 表
 `server/conf/llm_knobs.py`（純資料、零環境讀取）產生，解析結果注入
 `world/ai/profiles.py` 的 `default_profiles(defaults=...)`；`world/ai/profiles.py`

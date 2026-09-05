@@ -19,6 +19,11 @@
   - [Vue 元件展示](/development/frontend-developer-guide)
 
 - 開發者指南
+  - LLM 與生成系統
+    - [核心架構與邊界契約](/development/llm-architecture)
+    - [7 大業務情境與調度流程](/development/llm-scenarios)
+    - [護欄天梯與語意驗證機制](/development/llm-guardrails)
+    - [端點配置與模型調優指南](/development/llm-configuration)
   - [新增魔法指南](/development/adding-spells)
   - [新增物品指南](/development/adding-items)
   - [設定與環境變數](/development/settings-and-environment)

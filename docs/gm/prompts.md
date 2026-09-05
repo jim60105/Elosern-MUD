@@ -2,6 +2,9 @@
 
 所有由應用程式擁有的 LLM 提示詞（旁白、NPC 對話、任務企劃、思考回饋、美術描述）都存放在儲存庫根目錄的 `prompts/` 資料夾，作為唯一來源。調整提示詞不需要改 Python 程式碼或重建映像：編輯 YAML 檔案、驗證、然後重新啟動（或 reload）伺服器即可套用。
 
+> [!TIP]
+> 若要深入了解使用這些提示詞的業務情境、系統架構與防護機制，請參閱開發者指南中的 [核心架構與邊界契約](/development/llm-architecture)、[7 大業務情境與調度流程](/development/llm-scenarios) 以及 [護欄天梯與語意驗證機制](/development/llm-guardrails)。
+
 ## 檔案位置
 
 - 儲存庫：`prompts/`（本機裸機執行）
