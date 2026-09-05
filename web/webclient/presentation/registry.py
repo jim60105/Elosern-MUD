@@ -171,6 +171,10 @@ def build_production_registry() -> PresentationRegistry:
         CREATION_SCHEMA_VERSION,
         creation_presenter,
     )
+    from web.webclient.presentation.dialogue import (
+        DIALOGUE_SCHEMA_VERSION,
+        dialogue_presenter,
+    )
     from web.webclient.presentation.exploration import (
         EXPLORATION_SCHEMA_VERSION,
         exploration_presenter,
@@ -257,6 +261,14 @@ def build_production_registry() -> PresentationRegistry:
             # form (shared reason and semantics), not a bespoke reason.
             unavailable_reason=UNAVAILABLE_REASON,
             presenter=objectives_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="dialogue",
+            schema_version=DIALOGUE_SCHEMA_VERSION,
+            unavailable_reason=("dialogue_unavailable", "對話目前無法顯示"),
+            presenter=dialogue_presenter,
         )
     )
     registry.register(

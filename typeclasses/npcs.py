@@ -148,16 +148,25 @@ class NPC(LivingEntity):
         conditional clear (no-op unless the stored session names this object).
         A missing room degrades to a no-op. ``npc_id`` overrides the host
         identity for post-deletion callbacks, whose object has lost its pk.
+        Every session the conditional clear actually retired fans the
+        ``dialogue`` panel out to that character's live watchers
+        (webclient-align-10): this callback runs with no session context, and
+        without the push a connected explorer keeps the departed host's
+        available panel and dialogue mode until an unrelated snapshot. The
+        push is fire-and-forget (party_push contract), so it can never raise
+        back into the on-commit chain.
         """
         if room is None:
             return
         from typeclasses.characters import PlayerCharacter
         from world.rules.dialogue import clear_dialogue_session
+        from web.webclient.presentation.dialogue_push import push_dialogue_update
 
         host = self.pk if npc_id is None else npc_id
         for obj in room.contents:
             if isinstance(obj, PlayerCharacter):
-                clear_dialogue_session(obj, npc=host)
+                if clear_dialogue_session(obj, npc=host):
+                    push_dialogue_update(obj)
 
     def get_display_desc(self, looker=None, **kwargs) -> str:
         """Append the affinity stage line to the ordinary zh-tw description.

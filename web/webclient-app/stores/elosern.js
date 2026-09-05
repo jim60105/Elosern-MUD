@@ -75,6 +75,7 @@ const PANEL_ALLOWLIST = [
   "exploration",
   "character",
   "lineage",
+  "dialogue",
   "title_ballot",
   "title_codex",
 ];

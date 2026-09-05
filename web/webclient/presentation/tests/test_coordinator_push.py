@@ -39,8 +39,12 @@ class PublishPanelUpdateTests(EvenniaTestCase):
 
         # The envelope carries serialized server time from the world clock.
         get_world_clock()
-        # The coordinator's mode provider reads the puppet's canonical state.
-        self.actor = SimpleNamespace(pk="7", db=SimpleNamespace(active_combat=None))
+        # The coordinator's mode provider reads the puppet's canonical state
+        # (active combat + dialogue session); the real DBHandler returns None
+        # for unset attributes, so the fake mirrors that.
+        self.actor = SimpleNamespace(
+            pk="7", db=SimpleNamespace(active_combat=None, dialogue_session=None)
+        )
         self.session = _FakeSession(self.actor)
         self.registry = build_production_registry()
 

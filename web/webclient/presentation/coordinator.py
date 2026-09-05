@@ -129,7 +129,15 @@ class PresentationCoordinator:
 
     @staticmethod
     def mode_for(context: PresentationContext) -> str:
-        """Derive the snapshot mode from canonical puppet state only."""
+        """Derive the snapshot mode from canonical puppet state only.
+
+        Resolution order (webclient-align-10): creation-pending → ``creation``,
+        active combat → ``combat``, live dialogue session → ``dialogue``,
+        else ``exploration``. Combat outranks a live session object whose
+        cleanup seam has not run yet; ``live_dialogue_session`` is the sole
+        liveness gate, so a session naming a departed/stale host never
+        resolves the dialogue mode.
+        """
         actor = context.actor
         if bool(getattr(actor, "creation_pending", False)):
             return "creation"
@@ -137,6 +145,10 @@ class PresentationCoordinator:
 
         if is_in_active_session(actor):
             return "combat"
+        from world.rules.dialogue import live_dialogue_session
+
+        if live_dialogue_session(actor) is not None:
+            return "dialogue"
         return "exploration"
 
     def _render_all(self, context: PresentationContext) -> dict[str, Any]:

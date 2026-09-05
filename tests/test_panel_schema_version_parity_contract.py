@@ -46,6 +46,7 @@ _PANEL_MODULES = (
     ("exploration", "exploration.py"),
     ("character", "character.py"),
     ("lineage", "lineage.py"),
+    ("dialogue", "dialogue.py"),
     ("title_ballot", "title_ballot.py"),
     ("title_codex", "title_codex.py"),
 )

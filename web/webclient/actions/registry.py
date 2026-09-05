@@ -400,7 +400,7 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="explore.engage",
             validate_payload=validate_engage_payload,
             adapter=_engage_adapter,
-            affected_panels=("status", "context_actions"),
+            affected_panels=("status", "context_actions", "dialogue"),
         )
     )
     registry.register(

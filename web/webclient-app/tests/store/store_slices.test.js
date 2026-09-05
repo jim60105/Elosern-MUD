@@ -23,6 +23,7 @@ const PANEL_ALLOWLIST = [
   "exploration",
   "character",
   "lineage",
+  "dialogue",
   "title_ballot",
   "title_codex",
 ];
@@ -44,6 +45,38 @@ describe("store view slices", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     store = useElosernStore();
+  });
+
+  it("accepts a dialogue-mode snapshot and commits the dialogue panel", () => {
+    openActiveSession(store);
+    const dialoguePanel = {
+      schema_version: 1,
+      available: true,
+      kind: "dialogue",
+      host: { identity: 41, display_name: "公會職員", portrait_ref: null },
+      bond_stage: "熟人",
+      line: "歡迎來到冒險者公會。",
+      choices: [
+        { keyword_id: "公會", label: "公會" },
+        { keyword_id: "任務", label: "任務" },
+      ],
+    };
+    const result = store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          revision: 4,
+          presentation_epoch: fx.EPOCH_A,
+          mode: "dialogue",
+          panels: { status: fx.statusPanel(), dialogue: dialoguePanel },
+        }),
+      ],
+      {},
+    );
+    expect(result.accepted).toBe(true);
+    expect(store.view.mode).toBe("dialogue");
+    expect(store.view.panels.dialogue).toEqual(dialoguePanel);
   });
 
   it("exposes the status/time slice with the B1 TopBar fixture shape", () => {
