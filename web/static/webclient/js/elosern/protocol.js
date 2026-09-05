@@ -355,7 +355,10 @@
   // protocol ceiling) — the write path truncates to it, so over-bound
   // dialogue is corruption and rejects.
   var DIALOGUE_SCHEMA_VERSION = 1;
-  var DIALOGUE_MAX_CHOICES = 16;
+  // Panel-owned bound tracked in lockstep with
+  // web.webclient.presentation.dialogue.DIALOGUE_MAX_CHOICES (align-11: four,
+  // independent of the exploration keyword-pool bound).
+  var DIALOGUE_MAX_CHOICES = 4;
   var DIALOGUE_MAX_KEYWORD_ID = 64;
   var DIALOGUE_MAX_KEYWORD_LABEL = 128;
   var DIALOGUE_MAX_LINE = 2000;

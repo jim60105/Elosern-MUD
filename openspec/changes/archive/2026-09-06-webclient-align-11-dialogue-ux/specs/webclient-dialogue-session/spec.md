@@ -1,19 +1,14 @@
-## Purpose
+# Delta: webclient-dialogue-session
 
-The character-held dialogue session: deterministic-core-only persistent state
-naming the host NPC, the latest server-authored line, and an update marker —
-the single invisible source of truth the dialogue panel and mode (change 10)
-consume, with the only-writers boundary and stale-host rules pinned here.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: The dialogue session is deterministic-core-only character state
 The dialogue session SHALL be persistent JSON-safe state on the character (`db.dialogue_session`)
 naming the host NPC's database identity, the latest server-authored line, and an update marker.
 Its ONLY writers SHALL be the deterministic dialogue-session helpers: the `explore.talk_scripted`
 and `explore.talk_freeform` adapter success paths, the `talk` text-command path, the
-`explore.dialogue_leave` adapter success path, and the clear seams — a successful
-`settle_movement` of the character, an `engage` involving the actor, and
+`explore.dialogue_leave` adapter success path, and the clear
+seams — a successful `settle_movement` of the character, an `engage` involving the actor, and
 NPC leave-room, despawn, or leave-party cleanup naming the session NPC. No presenter, AI layer,
 client payload, or `ui_action` other than the `explore.dialogue_leave` adapter SHALL open,
 refresh, or clear a session directly. A session whose
@@ -91,30 +86,7 @@ live object or filesystem reference.
   field, a numeric `bond_stage`, or an over-bound line
 - **THEN** the server validator rejects it and the client mirror rejects it identically
 
-### Requirement: Dialogue mode resolves after combat and before exploration
-The coordinator SHALL resolve the committed presentation mode in the order creation-pending →
-`creation`, active combat → `combat`, live dialogue session → `dialogue`, else `exploration`.
-While mode is `dialogue`, the `exploration` and `character` panels SHALL keep shipping their
-ordinary exploration-mode payloads unchanged. Every session open, refresh, and clear SHALL mark
-the viewer's presentation dirty so the mode and `dialogue` panel commit atomically with the
-underlying state change, and a refresh SHALL keep the recorded line and choices current without
-re-opening ceremony. The client-side protocol mirrors (UMD and Vue store) SHALL accept mode
-`dialogue` and name the `dialogue` panel in lockstep with the server registry under the
-panel/mode agreement contract.
-
-#### Scenario: A reply commits dialogue mode atomically
-- **WHEN** a scripted reply is recorded for a connected viewer
-- **THEN** one committed presentation carries mode `dialogue`, the available `dialogue` panel, and
-  the unchanged exploration panel together
-
-#### Scenario: Combat outranks a live session
-- **WHEN** combat becomes active while a session object still exists before its cleanup seam runs
-- **THEN** the committed mode is `combat`, never `dialogue`
-
-#### Scenario: A refresh updates the line in place
-- **WHEN** the player exchanges another scripted keyword with the same host
-- **THEN** the committed `dialogue.line` equals the newest authored reply and the mode stays
-  `dialogue` without an intermediate unavailable commit
+## ADDED Requirements
 
 ### Requirement: explore.dialogue_leave ends the live session through the sole writer
 The production action registry SHALL register `explore.dialogue_leave` with a payload accepting

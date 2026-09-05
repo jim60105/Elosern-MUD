@@ -38,7 +38,7 @@ import TitleCodexPanel from "./components/TitleCodexPanel.vue";
 import ToastQueue from "./components/ToastQueue.vue";
 import PartyStrip from "./components/PartyStrip.vue";
 import PartyDrawer from "./components/PartyDrawer.vue";
-import { dialogueViewModel, DIALOGUE_TAB_KEY, DIALOGUE_TAB_LABEL } from "./stores/dialogue-view.js";
+import { dialogueViewModel } from "./stores/dialogue-view.js";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 
 const store = useElosernStore();
@@ -94,21 +94,12 @@ function panelAvailable(name) {
 }
 
 // The dialogue surface source (webclient-align-08-dialogue-surface): the ONE
-// derived view model over the committed `dialogue` panel, shared by the feed
-// variant (prop) and derived again per access by the dock's `dialogue.root`
-// resolver — the client never keeps a second copy of the picks.
+// derived view model over the committed `dialogue` panel (webclient-align-11:
+// the feed dialogue variant is its ONLY presentation — the dock has no
+// dialogue form) — the client never keeps a second copy of the picks.
 const dialogueVM = computed(() =>
   store.view.mode === "dialogue" ? dialogueViewModel(panel("dialogue")) : null,
 );
-// Whether the dock presents the dialogue FORM: the root frame resolved as the
-// dialogue form (an unavailable panel resolves to the marker instead, which
-// keeps the regular chrome shape and the shared degradation row).
-const dialogueRootForm = computed(() => !!(store.view.rootMenu && store.view.rootMenu.dialogueForm === true));
-// The CURRENT frame resolved as the dialogue form (pane rows source).
-const dialogueFramePresented = computed(
-  () => !!(store.view.combatMenu && store.view.combatMenu.dialogueForm === true),
-);
-
 // Feed-variant activation shares the dock's dispatch contract (the store owns
 // the single dispatch entry and the freeform-borrow path).
 function onDialoguePick(pick) {
@@ -116,6 +107,16 @@ function onDialoguePick(pick) {
 }
 function onDialogueFreeform() {
   store.borrowDialogueCommand();
+}
+// The caption's exit row (webclient-align-11-dialogue-ux): ends the live
+// session through the deterministic exit seam. The committed full snapshot
+// re-homes the mode; no client-side optimistic state.
+function onDialogueLeave() {
+  const vm = dialogueVM.value;
+  if (!vm) {
+    return;
+  }
+  store.dispatchAction("explore.dialogue_leave", { npc_id: vm.host.identity }, null);
 }
 
 // Tab-completion candidates from the committed exploration panel only
@@ -286,31 +287,6 @@ const dockItems = computed(() => {
       },
     ];
   }
-  // The dialogue form's pane rows (webclient-align-08-dialogue-surface): the
-  // SAME committed rows the router resolved for the dialogue root frame (one
-  // derived source shared with the feed). Normalization matches the
-  // exploration branch; activation routes through the router's confirm so
-  // pointer, Enter, and digit picks dispatch identically.
-  if (dialogueFramePresented.value) {
-    const items = (store.view.combatMenu && store.view.combatMenu.items) || [];
-    return items.map((item) => {
-      const normalized = {
-        key: item.key,
-        label: item.label,
-        enabled: item.enabled !== false,
-      };
-      if (item.actionId) {
-        normalized.action_id = item.actionId;
-        normalized.params = item.payload || {};
-      } else {
-        // The free-dialogue row is local navigation (it borrows the command
-        // line through the store; it is never an OOB action).
-        normalized.navigation = true;
-        normalized.surface = item.key;
-      }
-      return normalized;
-    });
-  }
   const p = panel("context_actions");
   if (!p || p.available !== true) {
     return [];
@@ -423,20 +399,6 @@ const dockPaneKind = computed(() => classifyPane({ items: dockItems.value }));
 // while the pane follows the current frame, both from one commit.
 const rootItems = computed(() => {
   const menu = store.view.rootMenu;
-  // The dialogue root renders as the draft's SINGLE `對話選項` tab: the root
-  // frame's rows belong to the pane, not the tab bar (one tab, one pane —
-  // the tab is inert navigation; clicking it focuses no pick).
-  if (dialogueRootForm.value) {
-    return [
-      {
-        key: DIALOGUE_TAB_KEY,
-        label: DIALOGUE_TAB_LABEL,
-        enabled: true,
-        navigation: true,
-        surface: DIALOGUE_TAB_KEY,
-      },
-    ];
-  }
   const items = (menu && menu.items) || [];
   return items.map((item) => {
     const normalized = {
@@ -881,6 +843,7 @@ onMounted(() => {
         @open-full-log="openFullLog"
         @dialogue-pick="onDialoguePick"
         @dialogue-freeform="onDialogueFreeform"
+        @dialogue-leave="onDialogueLeave"
         @open-overlay="onOpenOverlay"
         @switch-character="onSwitchCharacter"
         @create-character="onCreateCharacter"
@@ -962,7 +925,6 @@ onMounted(() => {
           :root-items="rootItems"
           :focused-key="store.view.focus.key"
           :view="store.view"
-          :dialogue-form="dialogueRootForm"
             @action="onAction"
           @tab-click="onTabClick"
           @back="onDockBack"

@@ -162,6 +162,7 @@
       "name": "exploration-8",
       "files_a": [
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_cancelled_freeform_dialogue_cannot_capture_a_later_command",
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_dialogue_surface_is_the_caption_and_the_dock_stays_ordinary",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_engage_transitions_to_combat",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_freeform_dialogue_degrades_offline_through_the_command_line",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_unsafe_skip_rejects_before_any_clock_advance",

@@ -168,9 +168,19 @@ class DialoguePresenterTests(EvenniaTest):
         )
         self.assertEqual(payload["bond_stage"], self.host.relations.stage_for(self.player).name)
         self.assertEqual(payload["line"], "任務板在右側。")
-        # Same vocabulary owner as the interact target descriptor, table order.
-        self.assertEqual(payload["choices"], _scripted_keyword_descriptors(self.host))
+        # Same vocabulary owner as the interact target descriptor, table order,
+        # truncated to the panel's own bound (align-11).
+        self.assertEqual(
+            payload["choices"],
+            _scripted_keyword_descriptors(self.host)[:DIALOGUE_MAX_CHOICES],
+        )
         self.assertTrue(payload["choices"])
+        # The guild_staff table authors six keywords: the panel shows exactly
+        # the first four, independent of the affordance pool's 16 bound.
+        self.assertEqual(len(payload["choices"]), 4)
+        self.assertGreater(
+            len(_scripted_keyword_descriptors(self.host)), 4
+        )
         # The raw affinity number never rides the wire.
         self.assertNotIn(affinity_value, payload.values())
 
@@ -179,6 +189,23 @@ class DialoguePresenterTests(EvenniaTest):
         payload = self._render()
         self.assertIsNone(payload["bond_stage"])
         self.assertIs(payload["available"], True)
+
+    def test_panel_choice_cap_is_independent_of_the_affordance_keyword_pool(self):
+        # The authored guild_staff table carries six keywords. The dialogue
+        # panel truncates to its own four-row bound while the shared keyword
+        # descriptor owner — the interact-target affordance pool — still
+        # exposes every authored entry up to its independent 16 bound
+        # (webclient-align-11 decoupling).
+        open_or_refresh_dialogue(self.player, self.host, "歡迎。")
+        full_pool = _scripted_keyword_descriptors(self.host)
+        self.assertEqual(len(full_pool), 6)
+        payload = self._render()
+        self.assertEqual(len(payload["choices"]), DIALOGUE_MAX_CHOICES)
+        self.assertEqual(payload["choices"], full_pool[:DIALOGUE_MAX_CHOICES])
+        self.assertEqual(
+            [row["keyword_id"] for row in payload["choices"]],
+            [row["keyword_id"] for row in full_pool[:DIALOGUE_MAX_CHOICES]],
+        )
 
     def test_no_session_renders_the_registered_unavailable_form(self):
         self.assertEqual(self._render(), UNAVAILABLE_PAYLOAD)
@@ -300,7 +327,7 @@ class DialogueValidatorTests(unittest.TestCase):
             _available(line=""),
             _available(line="言" * (MAX_DIALOGUE_SESSION_LINE_CODE_POINTS + 1)),
             _available(line="\ud800壞"),
-            # choice cap (seventeenth row)
+            # choice cap (one row over the panel-owned bound)
             _available(choices=[_choice(f"詞{i}") for i in range(DIALOGUE_MAX_CHOICES + 1)]),
             # duplicate keyword ids
             _available(choices=[_choice("公會"), _choice("公會")]),
@@ -445,7 +472,7 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
         self.assertIn("冒險者公會", committed["panels"]["dialogue"]["line"])
         self.assertEqual(
             committed["panels"]["dialogue"]["choices"],
-            _scripted_keyword_descriptors(self.host),
+            _scripted_keyword_descriptors(self.host)[:DIALOGUE_MAX_CHOICES],
         )
         # The exploration panel keeps shipping its ordinary available payload —
         # dialogue mode does not blank it (the talk's +1 affinity may flip

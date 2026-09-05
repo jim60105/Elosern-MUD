@@ -74,6 +74,26 @@ describe("NarrativeFeed dialogue variant", () => {
     expect(free.get(".t").text()).toBe("自由對話（輸入任意話語）→ 指令列");
   });
 
+  it("renders the trailing exit row after the free row with no digit badge (align-11)", () => {
+    const w = mountFeed();
+    const exit = w.get('[data-testid="dialogue-exit"]');
+    expect(exit.classes()).toContain("pick-exit");
+    expect(exit.get(".k").text()).toBe("✕");
+    expect(exit.get(".t").text()).toBe("結束對話");
+    // The exit row sits LAST in the choices unit, after the free row.
+    const rows = w.findAll(".choices .pick");
+    expect(rows[rows.length - 1].element).toBe(exit.element);
+    expect(rows.map((r) => r.element)).toContain(w.get('[data-testid="dialogue-freeform"]').element);
+  });
+
+  it("the exit row emits exactly one dialogue-leave and nothing else", async () => {
+    const w = mountFeed();
+    await w.get('[data-testid="dialogue-exit"]').trigger("click");
+    expect(w.emitted("dialogue-leave")).toHaveLength(1);
+    expect(w.emitted("dialogue-pick")).toBeUndefined();
+    expect(w.emitted("dialogue-freeform")).toBeUndefined();
+  });
+
   it("a pick activation emits exactly one row payload through the shared contract", async () => {
     const w = mountFeed();
     await w.findAll('[data-testid="dialogue-pick"]')[1].trigger("click");

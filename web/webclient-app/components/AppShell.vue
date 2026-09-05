@@ -105,6 +105,7 @@ const emit = defineEmits([
   "focus-lost",
   "dialogue-pick",
   "dialogue-freeform",
+  "dialogue-leave",
   "switch-character",
   "create-character",
 ]);
@@ -292,6 +293,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
           @open-full-log="() => emit('open-full-log')"
           @dialogue-pick="(pick) => emit('dialogue-pick', pick)"
           @dialogue-freeform="() => emit('dialogue-freeform')"
+          @dialogue-leave="() => emit('dialogue-leave')"
         />
       </template>
       <template #dock>

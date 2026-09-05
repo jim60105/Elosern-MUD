@@ -5572,9 +5572,14 @@ test("objectives is in the production panel allowlist and rejects atomically", (
 // dialogue panel v1 (mirror of web.webclient.presentation.dialogue,
 // webclient-align-10). Host reuses the NPC wire vocabulary; bond_stage is a
 // canonical stage NAME or null (the raw affinity never rides the wire);
-// choices are at most 16 unique {keyword_id, label} rows; the line obeys the
-// surrogate rules shared with the server.
+// choices are at most DIALOGUE_MAX_CHOICES (4 since align-11) unique
+// {keyword_id, label} rows; the line obeys the surrogate rules shared with
+// the server.
 // ---------------------------------------------------------------------------
+
+test("dialogue choice cap mirrors the panel-owned bound (align-11)", () => {
+  assert.equal(Protocol.DIALOGUE_MAX_CHOICES, 4);
+});
 
 function validDialogueChoice(overrides) {
   return Object.assign({ keyword_id: "公會", label: "公會" }, overrides || {});
@@ -5637,7 +5642,7 @@ test("dialogue validator mirrors the server drift rejections", () => {
     validDialoguePanel({ line: "言".repeat(2001) }),
     validDialoguePanel({ line: "\ud800壞" }),
     // choice cap and uniqueness
-    validDialoguePanel({ choices: Array.from({ length: 17 }, (_, i) => validDialogueChoice({ keyword_id: "詞" + i, label: "詞" + i })) }),
+    validDialoguePanel({ choices: Array.from({ length: Protocol.DIALOGUE_MAX_CHOICES + 1 }, (_, i) => validDialogueChoice({ keyword_id: "詞" + i, label: "詞" + i })) }),
     validDialoguePanel({ choices: [validDialogueChoice(), validDialogueChoice()] }),
     validDialoguePanel({ choices: [validDialogueChoice({ keyword_id: " " })] }),
     // a literal __proto__ keyword pair must hit the duplicate check: the

@@ -452,8 +452,9 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
 
 
 class DialogueSurfaceEvidenceTest(unittest.TestCase):
-    """webclient-align-08: the dialogue surface's feed variant and dock mirror
-    are Vue-layer contracts; the Vitest files are their executed evidence."""
+    """webclient-align-08/11: the dialogue surface's feed variant and the dock's
+    regular-form guarantee are Vue-layer contracts; the Vitest files are their
+    executed evidence."""
 
     @covers_requirement(
         "webclient-contextual-hud::the-feed-presents-the-dialogue-variant-from-the-committed-panel",
@@ -481,7 +482,7 @@ class DialogueSurfaceEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-contextual-hud::the-dock-presents-the-dialogue-form-as-a-mirror-of-the-same-picks",
+        "webclient-contextual-hud::the-dock-keeps-its-regular-exploration-form-in-dialogue-mode",
     )
     def test_dialogue_dock_vitest_evidence_passes(self):
         result = subprocess.run(

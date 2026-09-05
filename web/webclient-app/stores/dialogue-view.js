@@ -1,9 +1,9 @@
 // Dialogue surface view model (webclient-align-08-dialogue-surface): the ONE
 // derived shape over the committed `dialogue` panel, consumed by the feed
-// dialogue variant, the dock's `dialogue.root` resolver, and the ArrowRight
-// borrow. One source, two presentations — the feed and the dock pane derive
-// their rows from this helper; neither ever re-fetches or keeps a copy
-// (webclient-contextual-hud: the dock dialogue form is a mirror).
+// dialogue variant and the store's caption digit retarget
+// (webclient-align-11-dialogue-ux: the dock's `dialogue.root` mirror form is
+// deleted — the caption is the ONE presentation; feed rows and digit slots
+// derive from this helper, neither ever re-fetches or keeps a copy).
 //
 // The view model reads ONLY the committed panel form (available `dialogue`
 // panels); an unavailable or absent panel yields null and every consumer
@@ -12,8 +12,6 @@
 // exploration scripted-keyword/freeform rows (`exploration_menu.js
 // keywordMenuFor`) so activation routes through the same dispatch contract.
 
-export const DIALOGUE_TAB_LABEL = "對話選項";
-export const DIALOGUE_TAB_KEY = "dlg-options";
 export const DIALOGUE_FREE_ROW_KEY = "dlg-free";
 
 /**
@@ -59,4 +57,4 @@ export function dialogueViewModel(panel) {
   };
 }
 
-export default { dialogueViewModel, DIALOGUE_TAB_LABEL, DIALOGUE_TAB_KEY, DIALOGUE_FREE_ROW_KEY };
+export default { dialogueViewModel, DIALOGUE_FREE_ROW_KEY };

@@ -113,17 +113,4 @@ export const CreationEmptyBar = {
   },
 };
 
-// The dialogue form (webclient-align-08-dialogue-surface): ONE inert
-// `對話選項` tab (the picks live in the pane, not the tab bar) and the legend
-// swapped to the draft's dialogue hint — `數字鍵 1–4 選 · <kbd>→</kbd>
-// 指令列自由對話` — inside the SAME single legend element.
-export const DialogueForm = {
-  render: renderTabBar,
-  args: {
-    items: [{ key: "dlg-options", label: "對話選項", enabled: true, navigation: true, surface: "dlg-options" }],
-    focusedKey: "dlg-options",
-    view: makeView(),
-    depth: 1,
-    dialogueForm: true,
-  },
-};
+

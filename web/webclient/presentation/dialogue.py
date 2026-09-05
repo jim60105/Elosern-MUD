@@ -10,8 +10,9 @@ canonical affinity stage NAME (``null`` when the viewer has no relationship
 record with the host) and the raw affinity number never reaches the wire.
 ``choices`` is the same ``{keyword_id, label}`` keyword-pool vocabulary the
 exploration interact descriptor exposes, owned by
-``affordances._scripted_keyword_descriptors`` (authored-table order, capped by
-``MAX_SCRIPTED_KEYWORDS``).
+``affordances._scripted_keyword_descriptors`` (authored-table order; the panel
+truncates to its own ``DIALOGUE_MAX_CHOICES``, independent of the affordance
+pool's ``MAX_SCRIPTED_KEYWORDS`` bound — webclient-align-11).
 
 The panel is available EXACTLY when ``live_dialogue_session`` resolves; every
 other state — absent, corrupt-at-parse (tightened in the session parser: an
@@ -34,7 +35,6 @@ from web.webclient.presentation.affordances import (
     MAX_DISPLAY_NAME_CODE_POINTS,
     MAX_KEYWORD_ID_CHARS,
     MAX_KEYWORD_LABEL_CODE_POINTS,
-    MAX_SCRIPTED_KEYWORDS,
     _scripted_keyword_descriptors,
 )
 from web.webclient.presentation.context import PresentationContext
@@ -53,9 +53,14 @@ from world.rules.dialogue import MAX_DIALOGUE_SESSION_LINE_CODE_POINTS
 
 DIALOGUE_SCHEMA_VERSION = 1
 
-# Row-count cap: the panel mirrors the keyword vocabulary's own bound rather
-# than repeating a literal (parity contract pins the agreement).
-DIALOGUE_MAX_CHOICES = MAX_SCRIPTED_KEYWORDS
+# Row-count cap: panel-owned literal (webclient-align-11). Deliberately
+# decoupled from ``MAX_SCRIPTED_KEYWORDS`` (16, the interact-target keyword
+# pool bound): the dialogue caption stays compact so the narrative line never
+# gets pushed out of view, and the table-order prefix the panel shows is the
+# same prefix the affordance surface truncates with. The UMD mirror
+# ``protocol.js`` tracks this bound; the overflow keywords stay reachable
+# through the interact affordance surface.
+DIALOGUE_MAX_CHOICES = 4
 
 
 class DialoguePanelError(ProtocolValidationError):
@@ -257,7 +262,9 @@ def dialogue_presenter(context: PresentationContext) -> dict[str, Any]:
             },
             "bond_stage": bond_stage,
             "line": session.line,
-            "choices": _scripted_keyword_descriptors(npc),
+            # Table-order truncation to the panel's own bound (align-11): the
+            # first four authored keywords, matching the digit legend 1-4.
+            "choices": _scripted_keyword_descriptors(npc)[:DIALOGUE_MAX_CHOICES],
         }
     )
 

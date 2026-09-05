@@ -46,9 +46,15 @@ export default {
     // gold initial fallback is the exercised path).
     artPanel: { type: Object, default: null },
   },
-  emits: ["open-full-log", "dialogue-pick", "dialogue-freeform"],
+  emits: ["open-full-log", "dialogue-pick", "dialogue-freeform", "dialogue-leave"],
   setup(props, { expose, emit }) {
     const feedRoot = ref(null);
+    // The dedicated scroll viewport (webclient-align-11-dialogue-ux, design
+    // D5): the ONLY scrollable element. The head row is a static sibling
+    // ABOVE it (inside the card), so narrative content can never render
+    // between the card edge and the head. The scroll-keep, unread, and pin
+    // owners all live on this element.
+    const scrollRoot = ref(null);
     const unread = ref(0);
 
     const modeLabel = computed(() =>
@@ -171,7 +177,7 @@ export default {
     }
 
     function atBottom() {
-      const el = feedRoot.value;
+      const el = scrollRoot.value;
       if (!el) {
         return true;
       }
@@ -179,7 +185,7 @@ export default {
     }
 
     function scrollToBottom() {
-      const el = feedRoot.value;
+      const el = scrollRoot.value;
       if (el) {
         // The feed's stylesheet sets `scroll-behavior: smooth` for user
         // programmatic scrolls; the deterministic auto-scroll must be instant,
@@ -192,16 +198,17 @@ export default {
     }
 
     // The dialogue variant's focus pin: align the `.dlg` box with the head
-    // (the head row is sticky, so it stays under it). A reply + its picks can
-    // exceed the bounded caption (the panel allows up to 16 choices); the box
-    // is the newest exchange and keeps its top visible, and the player scrolls
-    // the remaining picks within the card.
+    // (the head is a static sibling ABOVE the scroll viewport, so the box
+    // pins to the viewport top). A reply + its picks can exceed the bounded
+    // caption (the panel caps the exchange at four picks + the trailing
+    // free/exit row pair); the box is the newest exchange and keeps its top
+    // visible, and the player scrolls the remaining rows within the viewport.
     // The pin holds across renders (a panel commit and its stream push land
     // in separate ticks) until the player scrolls the box away by hand.
     const dialoguePin = ref(false);
 
     function pinDialogueBox() {
-      const el = feedRoot.value;
+      const el = scrollRoot.value;
       const box = el?.querySelector(".dlg");
       if (!el || !box) {
         scrollToBottom();
@@ -209,8 +216,10 @@ export default {
       }
       const prevBehavior = el.style.scrollBehavior;
       el.style.scrollBehavior = "auto";
-      const head = el.querySelector(".narrative-head");
-      el.scrollTop = Math.max(0, box.offsetTop - (head?.offsetHeight ?? 0) - 8);
+      // The scroll viewport is positioned, so the box's offsetTop measures its
+      // distance from the viewport top; pinning puts the exchange exactly
+      // there (a hair of context above costs nothing but reads smoother).
+      el.scrollTop = Math.max(0, box.offsetTop - 8);
       el.style.scrollBehavior = prevBehavior;
     }
 
@@ -273,14 +282,12 @@ export default {
       if (dialoguePin.value) {
         // Manual scrolling that moves the box away from its pin releases the
         // pin; the pin's own scroll assignments keep it.
-        const el = feedRoot.value;
+        const el = scrollRoot.value;
         const box = el?.querySelector(".dlg");
-        const head = el?.querySelector(".narrative-head");
         if (box && el) {
           const drift = Math.abs(
             box.getBoundingClientRect().top -
               el.getBoundingClientRect().top -
-              (head?.offsetHeight ?? 0) -
               8,
           );
           dialoguePin.value = drift < 64;
@@ -292,7 +299,7 @@ export default {
     }
 
     function jumpToLatest() {
-      const el = feedRoot.value;
+      const el = scrollRoot.value;
       if (el) {
         el.focus({ preventScroll: true });
       }
@@ -305,7 +312,7 @@ export default {
     }
 
     function focusFeed() {
-      feedRoot.value?.focus({ preventScroll: true });
+      scrollRoot.value?.focus({ preventScroll: true });
     }
 
     onMounted(() => {
@@ -356,7 +363,7 @@ export default {
       );
       if (vm.picks.length > 0 || vm.freeRow) {
         nodes.push(
-          h("div", { key: "dlg-choices", class: "choices" }, [
+          h("div", { key: "dlg-choices", class: "choices", "data-testid": "dialogue-choices" }, [
             ...vm.picks.map((pick, index) =>
               h(
                 "button",
@@ -390,6 +397,22 @@ export default {
                   ],
                 )
               : null,
+            // The exit row (webclient-align-11-dialogue-ux, design D6): the
+            // caption's own way out — dispatches the deterministic
+            // `explore.dialogue_leave` seam through the parent wiring (no
+            // confirm: the clear is consequence-free, races reject
+            // idempotently). Takes no digit slot, like the free row.
+            h(
+              "button",
+              {
+                key: "dlg-exit",
+                type: "button",
+                class: "pick pick-exit",
+                "data-testid": "dialogue-exit",
+                onClick: () => emit("dialogue-leave"),
+              },
+              [h("span", { class: "k" }, "✕"), h("span", { class: "t" }, "結束對話")],
+            ),
           ]),
         );
       }
@@ -402,13 +425,10 @@ export default {
         {
           ref: feedRoot,
           class: ["elosern elosern-narrative feed-inner", dialogueVariant.value ? "m-dialogue" : null],
-          role: "log",
-          "aria-label": "敘事紀錄",
-          tabindex: "-1",
-          "data-testid": "narrative-feed",
-          onScroll,
         },
         [
+          // The head is a STATIC sibling above the scroll viewport (design
+          // D5): nothing can ever render between the card edge and the head.
           h(
             "div",
             { class: "narrative-head head", "data-testid": "narrative-head" },
@@ -446,12 +466,35 @@ export default {
                   ),
             ],
           ),
-          ...renderedLines.value.flatMap((line, index) => lineNodes(line, index)),
-          // The dialogue variant sits at the stream tail: the box REPLACES the
-          // caption's duplicate stream tail for that exchange, so the auto-scroll
-          // that keeps the latest exchange in view keeps the box and its picks
-          // in view too (draft dialogue mode shows no history stream at all).
-          ...(dialogueVariant.value ? dialogueNodes(props.dialogue) : []),
+          // The dedicated scroll viewport: the ONLY scrollable surface, and
+          // the `role="log"` live region (the scroll-keep/unread/pin owners
+          // all address this element).
+          h(
+            "div",
+            {
+              ref: scrollRoot,
+              class: "narrative-scroll",
+              role: "log",
+              "aria-label": "敘事紀錄",
+              tabindex: "-1",
+              // The feed test id lives on the scroll viewport: the managed
+              // browser suites drive `scrollTop`/`scrollHeight` against this
+              // element, and the id keeps its "the scrollable feed" meaning
+              // (webclient-align-11 DOM contract: the outer card carries no
+              // overflow, tabindex, role, or test id).
+              "data-testid": "narrative-feed",
+              onScroll,
+            },
+            [
+              ...renderedLines.value.flatMap((line, index) => lineNodes(line, index)),
+              // The dialogue variant sits at the stream tail: the box REPLACES
+              // the caption's duplicate stream tail for that exchange, so the
+              // auto-scroll that keeps the latest exchange in view keeps the
+              // box and its picks in view too (draft dialogue mode shows no
+              // history stream at all).
+              ...(dialogueVariant.value ? dialogueNodes(props.dialogue) : []),
+            ],
+          ),
         ],
       );
   },
@@ -461,14 +504,13 @@ export default {
 <style>
 /* Bounded caption card (design D4, draft .feed-inner): panel fill with
    backdrop blur, hairline border, shared radius and shadow, and the left
-   hairline gradient rule. Internal scrolling within bounded height. */
+   hairline gradient rule. webclient-align-11-dialogue-ux (design D5): the
+   card itself never scrolls — the head is a static sibling and the bounded
+   scrolling lives in `.narrative-scroll`, so content can never appear
+   between the card edge and the head. */
 .elosern-narrative {
   position: relative;
   box-sizing: border-box;
-  max-height: 32vh;
-  overflow-y: auto;
-  padding: 14px 20px 15px;
-  scroll-behavior: smooth;
   background: var(--panel);
   backdrop-filter: blur(7px);
   -webkit-backdrop-filter: blur(7px);
@@ -488,21 +530,29 @@ export default {
 }
 
 /* The caption's head row: mode label, unread indicator, and the `完整日誌 ↑`
-   capsule control. */
+   capsule control. Static (never sticky): it lives ABOVE the scroll viewport. */
 .elosern-narrative .narrative-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 8px;
-  padding: 4px 0;
+  padding: 12px 20px 0;
   background: var(--panel-solid);
   font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--paper-500);
   text-transform: uppercase;
+}
+
+/* The dedicated scroll viewport: the bounded region (the 32vh caption bound
+   moved here), positioned so the dialogue pin can measure the box's offsetTop
+   against the viewport itself. */
+.elosern-narrative .narrative-scroll {
+  position: relative;
+  box-sizing: border-box;
+  max-height: 32vh;
+  overflow-y: auto;
+  padding: 8px 20px 15px;
+  scroll-behavior: smooth;
 }
 
 .elosern-narrative .narrative-head .narrative-mode-label {
@@ -651,10 +701,20 @@ export default {
 }
 
 .elosern-narrative .choices {
-  display: flex;
-  flex-direction: column;
+  /* Two-column pick grid (design D5): with the four-choice panel cap the
+     exchange unit fits the bounded caption; the trailing free + exit rows
+     form one spanning row pair below the grid. Narrow viewports collapse to
+     one column. */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
   margin-top: 13px;
+}
+
+@media (max-width: 640px) {
+  .elosern-narrative .choices {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .elosern-narrative .choices .pick {
@@ -669,6 +729,23 @@ export default {
   padding: 9px 12px;
   cursor: pointer;
   transition: border-color 0.12s, background 0.12s, transform 0.12s;
+}
+
+/* The free + exit rows span the full grid width as the trailing pair. */
+.elosern-narrative .choices .pick[data-testid="dialogue-freeform"],
+.elosern-narrative .choices .pick[data-testid="dialogue-exit"] {
+  grid-column: 1 / -1;
+}
+
+/* The exit row reads as an exit, not another reply: the seal accent stays the
+   one deliberate red on the caption. */
+.elosern-narrative .choices .pick-exit .k {
+  color: var(--seal-400);
+}
+
+.elosern-narrative .choices .pick-exit:hover,
+.elosern-narrative .choices .pick-exit:focus-visible {
+  border-color: var(--seal-500);
 }
 
 .elosern-narrative .choices .pick:hover,
