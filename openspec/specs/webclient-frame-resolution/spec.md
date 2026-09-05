@@ -148,7 +148,7 @@ The suggestions frame SHALL be declarative but status-driven, never timer-driven
 
 ### Requirement: Teardown resets the stack to the mode root from one decision point
 
-Mode switch (exploration / combat / dialogue / creation), presentation epoch reset, transport loss, and no-puppet detach SHALL each replace the whole descriptor stack with exactly one declarative root frame of the new mode — the `exploration.root`, `combat.root`, `dialogue.root`, or `creation.root` descriptor — from the single existing teardown decision point. The stack SHALL never be empty in a live mode, and the wrapped empty-stack reset fuse SHALL no longer exist: an empty-stack read is a programmer error surfaced by the router, not a runtime re-home. Teardown SHALL remain the only event that replaces the whole stack; ordinary commits SHALL never pop or reset frames.
+Mode switch (exploration / combat / dialogue / creation), presentation epoch reset, transport loss, and no-puppet detach SHALL each replace the whole descriptor stack with exactly one declarative root frame of the new mode — the `exploration.root`, `combat.root`, or `creation.root` descriptor, the ordinary exploration root serving the dialogue mode — from the single existing teardown decision point. The stack SHALL never be empty in a live mode, and the wrapped empty-stack reset fuse SHALL no longer exist: an empty-stack read is a programmer error surfaced by the router, not a runtime re-home. Teardown SHALL remain the only event that replaces the whole stack; ordinary commits SHALL never pop or reset frames.
 
 #### Scenario: Combat adoption resets to the combat root
 
@@ -175,11 +175,11 @@ Mode switch (exploration / combat / dialogue / creation), presentation epoch res
 - **WHEN** the presentation epoch resets while creation-mode frames are open
 - **THEN** the stack holds exactly `creation.root` and no prior-frame payload can dispatch without a fresh player action
 
-#### Scenario: Dialogue mode tears down to the dialogue root
+#### Scenario: Dialogue mode tears down to the ordinary exploration root
 
 - **WHEN** a valid committed snapshot switches the mode from exploration to dialogue while exploration submenus are
   open
-- **THEN** the stack holds exactly the `dialogue.root` descriptor and no exploration row remains activatable
+- **THEN** the stack holds exactly the `exploration.root` descriptor and no stale submenu row remains activatable
 
 ### Requirement: Activation payloads read committed state at dispatch time
 
@@ -192,7 +192,7 @@ A row activation SHALL dispatch the server-authored action identifier and payloa
 
 ### Requirement: The resolver table completes with the services, combat, and creation families
 
-The resolver table SHALL additionally implement, and produce the menus the migrated push sites produce today: services family (panel `services`) — `services.root` `{}`, `services.guild` `{}`, `services.board` `{}`, `services.quests` `{}`, `services.quest-detail` `{questIndex}`, `services.shop` `{}`, `services.stock` `{}`, `services.sell` `{}`, `services.confirm` `{questIndex}` (the abandon-confirmation frame derived from that quest row's server-authored confirm fields); combat family (panel `context_actions` combat form, selection state owned by the combat model) — `combat.root` `{}`, `combat.categories` `{}`, `combat.category` `{categoryIndex}`, `combat.group` `{categoryIndex, groupIndex}`, `combat.skill` `{skillKey}`, `combat.target` `{skillKey}`, `combat.forfeit` `{}`; creation family (panel `creation`) — `creation.root` `{}`, `creation.presets` `{}`, `creation.form` `{view: "custom" | "concept"}` resolving to the wizard's empty marker frame, `creation.confirm` `{kind, presetKey?}`. The table SHALL additionally implement the dialogue family (panel `dialogue`) — `dialogue.root` `{}` resolving to the single `對話選項` tab whose pane lists the committed `dialogue.choices` rows with their `explore.talk_scripted` payloads read from committed state at resolve time, and resolving to the shared unresolvable marker — carrying the panel's server-authored reason — when the committed panel is unavailable. An out-of-range index or absent key SHALL resolve to the shared unresolvable marker like a lost identity.
+The resolver table SHALL additionally implement, and produce the menus the migrated push sites produce today: services family (panel `services`) — `services.root` `{}`, `services.guild` `{}`, `services.board` `{}`, `services.quests` `{}`, `services.quest-detail` `{questIndex}`, `services.shop` `{}`, `services.stock` `{}`, `services.sell` `{}`, `services.confirm` `{questIndex}` (the abandon-confirmation frame derived from that quest row's server-authored confirm fields); combat family (panel `context_actions` combat form, selection state owned by the combat model) — `combat.root` `{}`, `combat.categories` `{}`, `combat.category` `{categoryIndex}`, `combat.group` `{categoryIndex, groupIndex}`, `combat.skill` `{skillKey}`, `combat.target` `{skillKey}`, `combat.forfeit` `{}`; creation family (panel `creation`) — `creation.root` `{}`, `creation.presets` `{}`, `creation.form` `{view: "custom" | "concept"}` resolving to the wizard's empty marker frame, `creation.confirm` `{kind, presetKey?}`. The table SHALL NOT implement a dialogue family: the committed dialogue panel has no dock frame; the caption's dialogue variant derives its rows directly from the committed panel through the shared view model without any descriptor. An out-of-range index or absent key SHALL resolve to the shared unresolvable marker like a lost identity.
 
 #### Scenario: Every completed-table source resolves from a live snapshot
 
@@ -204,11 +204,11 @@ The resolver table SHALL additionally implement, and produce the menus the migra
 - **WHEN** `services.quest-detail` resolves with a `questIndex` the committed services panel no longer lists
 - **THEN** resolve returns the unresolvable marker, carrying the panel's server-authored reason when present
 
-#### Scenario: The dialogue root resolves from committed state
+#### Scenario: No dialogue descriptor is registered
 
-- **WHEN** `dialogue.root` resolves against a committed snapshot whose `dialogue` panel is available
-- **THEN** the pane rows carry the committed keyword identifiers and labels verbatim with payloads naming the
-  committed host identity, and an unavailable panel resolves to the unresolvable marker with the panel's reason
+- **WHEN** `dialogue.root` resolves against any committed state
+- **THEN** resolve returns the shared unresolvable marker (an unregistered source), and no router
+  frame in any live mode ever holds a `dialogue.root` descriptor
 
 ### Requirement: A drawer follows the stack when its hosted frame pops
 

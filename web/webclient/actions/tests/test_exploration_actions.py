@@ -1306,6 +1306,9 @@ class DialogueLeaveAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["outcome"], "success")
         self.assertIsNotNone(self.player.db.dialogue_session)
 
+    @covers_requirement(
+        "webclient-dialogue-session::explore-dialogue-leave-ends-the-live-session-through-the-sole-writer"
+    )
     def test_success_clears_the_session_and_only_the_session(self):
         self._open_session()
         with patch.object(self.player, "msg"):
