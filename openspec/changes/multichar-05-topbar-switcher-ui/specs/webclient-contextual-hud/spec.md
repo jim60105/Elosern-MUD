@@ -1,4 +1,4 @@
-# Delta spec: webclient-contextual-hud (multichar-04-topbar-switcher-ui)
+# Delta spec: webclient-contextual-hud (multichar-05-topbar-switcher-ui)
 
 The stage's top band gains a third element. The anchor/band non-overlap requirement is restated so
 the band's own contents are covered at both asserted viewports, and so a transient popover is

@@ -7,8 +7,12 @@
   (`characters: tuple[...]`, `max_characters: int`, `can_create: bool`, `switch_locked: bool`,
   `lock_reason: str | None`), plus `AccountRosterError` for an unreadable account. Module constant
   `MAX_ROSTER_ROWS = 10` (presenter-owned, independent of the configured cap).
-- [ ] 1.2 `build_account_roster(actor)`: resolve the owning account from `actor.account`, raise
-  `AccountRosterError` when it is absent or its character list cannot be read; build rows from
+- [ ] 1.2 `build_account_roster(actor)`: resolve the owning account defensively through
+  `getattr(actor, "account", None)` — `context.actor` itself can be `None` on the dispatcher's
+  stale path (`dispatcher.py:570-573`), and a plain attribute read would surface as an internal
+  presenter failure instead of a routine degrade. Raise
+  `AccountRosterError` when the actor or the account is absent or the character list cannot be
+  read; build rows from
   `account.characters` sorted by ascending `pk`, truncated to `MAX_ROSTER_ROWS`; bound each name
   by the shared display-name code-point bound; mark `current` by identity comparison with the
   actor; read `pending` from `creation_pending`.
@@ -54,11 +58,13 @@
   `current` flag; the `pending` flag; a foreign account's characters never appear; the row bound
   holds when the account somehow exceeds it; `max_characters` / `can_create` at and below the cap;
   `switch_locked` and its reason in and out of an active combat session; `AccountRosterError` when
-  `actor.account` is `None`.
+  `actor.account` is `None` **and** when `actor` itself is `None`.
 - [ ] 5.2 `web/webclient/presentation/tests/test_roster.py`: available-form field set; the panel
   is available for a `creation_pending` actor and for an actor in combat; a raised
   `AccountRosterError` yields the common non-internal unavailable form carrying
-  `schema_version: 1`; the portrait object matches the art catalog entry shape for an activated
+  `schema_version: 1` (asserting the reason code is the shared one, **not** the internal
+  `internal_presenter_error` form, for both the `None` actor and the `None` account); the portrait
+  object matches the art catalog entry shape for an activated
   character, a pending character (no-portrait placeholder, null URL, null subject key), and a
   not-yet-generated asset.
 - [ ] 5.3 Read-only assertion: rendering a full snapshot for an account owning several characters

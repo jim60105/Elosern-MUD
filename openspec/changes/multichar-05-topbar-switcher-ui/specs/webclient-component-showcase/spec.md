@@ -1,4 +1,4 @@
-# Delta spec: webclient-component-showcase (multichar-04-topbar-switcher-ui)
+# Delta spec: webclient-component-showcase (multichar-05-topbar-switcher-ui)
 
 The redesign roadmap's delivery table is complete (H1–H6 are all done), yet the manifest still has
 to grow whenever a feature change adds a backed surface — as this one does. The governance

@@ -1,6 +1,6 @@
 ## Why
 
-After `multichar-02` the browser holds a committed roster and after `multichar-03` it can act on
+After `multichar-02` the browser holds a committed roster and after `multichar-03`/`multichar-04` it can act on
 it, but nothing renders either. The account's other characters are reachable only by typing
 `進入世界 <角色>` into the command line, which is precisely the Telnet affordance the graphical
 client exists to replace.
@@ -52,7 +52,8 @@ None. The surface extends `webclient-character-roster`, introduced by `multichar
 - Modified: `web/webclient-app/components/TopBar.vue`,
   `web/webclient-app/components/AppShell.vue`, `web/webclient-app/AppClient.vue`,
   `web/webclient-app/component-manifest.json`.
-- Depends on `multichar-02-roster-read-model` (the store slice it binds to) and
-  `multichar-03-switch-create-actions` (the actions it dispatches). It is the last change in the
+- Depends on `multichar-02-roster-read-model` (the store slice it binds to),
+  `multichar-03-character-switch-action` (the switch it dispatches), and
+  `multichar-04-character-create-action` (the creation it dispatches). It is the last change in the
   chain and is pure client work.
 - No server change. No new panel, action, or protocol envelope.

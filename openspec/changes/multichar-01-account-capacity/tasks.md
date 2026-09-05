@@ -33,9 +33,11 @@
   upstream `charcreate` / `chardelete` keys and re-add project subclasses carrying
   `locks = "cmd:perm(Developer)"`, using the same remove-then-add mechanism as the localized
   wrappers. Keep their keys, aliases, and behaviour otherwise untouched.
-- [ ] 3.3 `docs/game/command-reference.md`: update the `charcreate` / `chardelete` rows to state
-  the Developer permission requirement explicitly, and check `docs/game/commands.md`'s admin
-  category for a matching mention.
+- [ ] 3.3 `docs/game/command-reference.md`: update the `charcreate` / `chardelete` rows
+  (lines 820-821) to state the Developer permission requirement explicitly. `docs/game/commands.md`
+  carries no row for either command today — add them to its admin category only if the drift
+  contract test requires the overview and the reference to agree for these keys; otherwise leave
+  the overview unchanged rather than inventing a row the test does not ask for.
 
 ## 4. Tests
 

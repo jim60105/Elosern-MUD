@@ -1,7 +1,8 @@
-# Delta spec: webclient-character-roster (multichar-04-topbar-switcher-ui)
+# Delta spec: webclient-character-roster (multichar-05-topbar-switcher-ui)
 
-Chain note: applies after `multichar-02-roster-read-model` (the committed panel) and
-`multichar-03-switch-create-actions` (the two actions). This delta adds the browser surface only.
+Chain note: applies after `multichar-02-roster-read-model` (the committed panel),
+`multichar-03-character-switch-action`, and `multichar-04-character-create-action` (the two
+actions). This delta adds the browser surface only.
 
 ## ADDED Requirements
 

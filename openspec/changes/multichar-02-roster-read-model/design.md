@@ -33,18 +33,18 @@ The relevant existing machinery:
 **Goals:**
 
 - One committed, read-only account-level panel that is available in **every** mode — creation
-  included — so change 04's switcher never needs a bespoke availability gate.
+  included — so the switcher change never needs a bespoke availability gate.
 - Truthful rows: identity, the object's current key, whether it is the live puppet, whether it is
   still pending, and its portrait resolution — nothing invented and nothing mutated.
 - The account-level capacity and lock facts (`max_characters`, `can_create`, `switch_locked`,
   `lock_reason`) computed once per snapshot from canonical state.
-- A store slice consumers can bind to, shipped with no consumer, so change 04 is pure UI.
+- A store slice consumers can bind to, shipped with no consumer, so the switcher change is pure UI.
 
 **Non-Goals:**
 
-- No actions. `account.character.switch` / `account.character.create` are change 03; this panel
+- No actions. `account.character.switch` / `account.character.create` are changes 03 and 04; this panel
   is display-only and its `switch_locked` field is advisory — change 03's adapters re-check the
-  same predicate server-side.
+  same predicates server-side.
 - No per-character status badge (HP, location, last-played). The original design's D11 keeps the
   row to name + portrait, and nothing on the wire should exist that the UI does not render.
 - No character deletion, renaming, or reordering.
@@ -71,9 +71,18 @@ a broken account read degrades the switcher alone instead of the vitals.
 publication path. `ObjectDB.db_account` is the account currently puppeting the object, so a
 rendered actor always has one; the wrapper property `actor.account` is the read.
 
-An actor with no resolvable account, or an account whose `characters` handler raises, raises
-`PanelUnavailableError`, which yields the registry-owned non-internal unavailable payload — the
-same degradation every other panel uses.
+The actor itself must be read defensively, not only its `account`. `build_presentation_context` is
+called with `getattr(session, "puppet", None)` on the dispatcher's stale path
+(`web/webclient/actions/dispatcher.py:570-573`), so `context.actor` can legitimately be `None` on
+an existing, reachable path. The read model therefore uses `getattr(actor, "account", None)`
+rather than `actor.account`: a plain attribute read would raise `AttributeError`, which
+`PresentationRegistry.render` catches and degrades into the **internal** unavailable form with a
+correlation ID and an operational error log — misreporting a routine "no account to show" as a
+presenter defect.
+
+An actor that is `None`, an actor with no resolvable account, or an account whose `characters`
+handler raises, all raise `PanelUnavailableError`, which yields the registry-owned non-internal
+unavailable payload — the same degradation every other panel uses.
 
 Alternative considered: add `account` to `PresentationContext`. Rejected for this change: it
 changes the single factory's signature and every construction site for one panel's benefit. If a
@@ -92,7 +101,7 @@ No generalization is needed: `world/art/presenter.py::resolve_character(entity)`
 any entity, resolves only from an explicit named `portrait_policy`, applies the adult gate, and
 returns the `無肖像` placeholder when no policy exists. The roster row serializes exactly the
 fields the `art` panel's catalog entries carry (`subject_key`, `status`, `url`, `aspect_ratio`,
-`alt`, `placeholder`), so change 04 reuses `ArtPanel.vue`'s existing placeholder treatment
+`alt`, `placeholder`), so the switcher change reuses `ArtPanel.vue`'s existing placeholder treatment
 verbatim instead of inventing a second portrait vocabulary.
 
 Consequence, stated rather than hidden: a still-pending character always resolves to the
@@ -106,7 +115,7 @@ pending shells that are both literally named after the account. The read model r
 disambiguating label server-side — inventing a name on the wire would be a presentation decision
 smuggled into the read model, and the object key is what `進入世界 <角色>` matches on.
 
-Change 04 renders a stable 「建立中」 marker on pending rows, which disambiguates them for the
+The switcher change renders a stable 「建立中」 marker on pending rows, which disambiguates them for the
 player without touching canonical identity.
 
 ### D6 — Rows are ordered by ascending character id and bounded
@@ -155,9 +164,11 @@ frozen façade surface (`window.Elosern.*`) is untouched.
 - **The panel exists with no consumer for one change.** → Accepted deliberately: it makes change
   04 a pure UI change and lets the read model be verified by unit tests and a snapshot assertion
   before any component depends on its shape.
-- **`actor.account` is `None` in an exotic state** (an object rendered while detaching). →
-  Mitigation: `PanelUnavailableError` yields the shared unavailable payload; the client renders
-  no switcher, which is the correct behaviour for a session with no account.
+- **`actor` or `actor.account` is `None`.** Not exotic: the dispatcher's stale path renders with
+  `getattr(session, "puppet", None)`. → Mitigation: both reads are defensive and both degrade
+  through `PanelUnavailableError` to the shared **non-internal** unavailable payload, so neither
+  raises an `AttributeError` that would be logged as a presenter defect. The client renders no
+  switcher, which is the correct behaviour for a session with no account.
 - **The adult gate could hide a row's portrait** for a character whose age fields are somehow
   invalid. → Accepted: `resolve_character` already returns the `無法提供` placeholder in that case,
   and the row itself still appears, so the character stays reachable.

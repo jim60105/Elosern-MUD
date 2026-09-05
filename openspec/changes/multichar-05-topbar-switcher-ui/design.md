@@ -10,7 +10,7 @@ at `top:64px`, so the band must stay bounded above them. `AppShell.vue` passes
 `multichar-02` adds the store slice this surface binds to (`rosterAvailable`,
 `rosterCharacters`, `rosterCanCreate`, `rosterMaxCharacters`, `rosterSwitchLocked`,
 `rosterLockReason`), with each row carrying identity, name, current/pending flags, and an art-panel
-shaped `portrait` object. `multichar-03` adds `account.character.switch` and
+shaped `portrait` object. `multichar-03` adds `account.character.switch` and `multichar-04` adds
 `account.character.create`.
 
 Existing conventions this surface must obey rather than reinvent:

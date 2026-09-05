@@ -55,6 +55,7 @@ path.
   `web/webclient-app/stores/elosern.js` (`rosterSlice`).
 - Depends on `multichar-01-account-capacity` (an account that can actually hold more than one
   character; without it every roster is a single row and the capacity facts are untestable).
-- Unblocks `multichar-03-switch-create-actions` (shares the lock/capacity semantics) and
-  `multichar-04-topbar-switcher-ui` (consumes the slice).
-- No player-facing behaviour changes: nothing renders the panel until change 04.
+- Unblocks `multichar-03-character-switch-action` and `multichar-04-character-create-action`
+  (which share the lock/capacity semantics) and `multichar-05-topbar-switcher-ui` (which consumes
+  the slice).
+- No player-facing behaviour changes: nothing renders the panel until the switcher change.

@@ -1,8 +1,8 @@
 # Delta spec: webclient-character-roster (multichar-02-roster-read-model)
 
 New capability. This change establishes the committed account-level read model only; the
-switch/create actions extend it in `multichar-03-switch-create-actions` and the TopBar surface in
-`multichar-04-topbar-switcher-ui`.
+switch/create actions extend it in `multichar-03-character-switch-action` and the TopBar surface in
+`multichar-05-topbar-switcher-ui`.
 
 ## ADDED Requirements
 

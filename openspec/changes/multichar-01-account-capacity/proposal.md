@@ -70,5 +70,5 @@ None. This change raises capacity and repairs existing behaviour; no new surface
 - Tests: `server/conf/tests/test_env_overrides.py`, `commands/tests/test_localized.py`,
   and a new account-capacity test beside the account typeclass tests.
 - Downstream: changes 02 (`multichar-02-roster-read-model`), 03
-  (`multichar-03-switch-create-actions`), and 04 (`multichar-04-topbar-switcher-ui`) all depend on
+  (`multichar-03-character-switch-action`), and 04 (`multichar-05-topbar-switcher-ui`) all depend on
   this landing first.
