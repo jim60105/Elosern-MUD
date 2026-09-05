@@ -158,7 +158,7 @@ Order inside the scheduled call:
 4. **Verify**: `account.get_puppet(session) is target`. This is the step that catches
    `puppet_object`'s silent returns, including the `MAX_NR_SIMULTANEOUS_PUPPETS` one that returns
    after the internal unpuppet.
-5. On success: `account.db._last_puppet = target`, then `synchronize_session(session, target)`.
+5. On success: `account.set_last_puppet(target)`, then `synchronize_session(session, target)`.
 
 ### D4 — An explicit three-rung recovery ladder
 

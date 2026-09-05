@@ -120,7 +120,7 @@ class CmdIC(_CmdIC):
 
         try:
             account.puppet_object(session, new_character)
-            account.db._last_puppet = new_character
+            account.set_last_puppet(new_character)
         except RuntimeError as exc:
             self.msg(f"|r你無法附身 |C{new_character.name}|n：{exc}")
 
@@ -148,7 +148,7 @@ class CmdOOC(_CmdOOC):
             self.msg("你已經在 OOC 狀態了。")
             return
 
-        account.db._last_puppet = old_char
+        account.set_last_puppet(old_char)
 
         try:
             account.unpuppet_object(session)

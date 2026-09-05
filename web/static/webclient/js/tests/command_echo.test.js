@@ -561,6 +561,7 @@ test("options.dismiss is a declared silent presentation control", () => {
 const COVERAGE_MANIFEST = require("./command_echo_coverage_manifest.json");
 
 const REGISTERED_MUTATION_ACTIONS = {
+  "account.character.switch": null,
   "combat.cast": { payload: { skill_key: "wind_blade" }, display: { skillLabel: "風刃術" } },
   "character.persona.update": { payload: { field: "habit", text: "清晨練劍" }, display: {} },
   "combat.flee": { payload: {}, display: { actionLabel: "逃跑" } },

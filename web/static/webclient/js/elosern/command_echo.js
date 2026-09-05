@@ -94,13 +94,16 @@
   }
 
   // Declared silent presentation controls (design D4): UI visibility
-  // controls with no game action and no typed equivalent. `commandLine`
-  // checks this list first, so the declaration and the silence share one
-  // code path.
+  // controls or account-level actions with no typed narrative equivalent.
+  // `commandLine` checks this list first, so the declaration and the silence
+  // share one code path.
   var SILENT_PRESENTATION_CONTROLS = [
+    // Account character switch is an account-level dropdown action; it does not
+    // route through the text command parser and emits no narrative command line.
     // The name-roll button has no typed-command equivalent (the corpus name
     // arrives through the result slot, not an input line): declared silent
     // rather than fabricating a command (namegen-creation-ui D5/D8).
+    "account.character.switch",
     "creation.roll_name",
     "options.dismiss",
   ];
