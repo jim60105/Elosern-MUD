@@ -131,7 +131,7 @@ frame 在使用當下派生後，`explore.move` 的 payload（`exit_ref` 加 `cu
 
 1. 先重現。沿用既有 browser 探索 fixture（三出口南門 move frame，commit `1de5d1d`）擴寫失敗回歸測試，開「移動」後按出口，斷言清單為新房間出口，現行碼必失敗即同時確認根因。
 2. 實施後轉綠，本機 browser 驗證控制在單一 class 預算內。
-3. 閘門依序為 `node --test web/static/webclient/js/tests/*.test.js`（無相依 Node gate）、`npm test`（Vitest）、`uv run --locked python -m tools.spec_traceability check`。完整 managed browser 套件與 `tools.spec_traceability verify --evidence` 維持 CI 所有。
+3. 閘門依序為 `node --test web/static/webclient/js/tests/*.test.js`（無相依 Node gate）、`pnpm test`（Vitest）、`uv run --locked python -m tools.spec_traceability check`。完整 managed browser 套件與 `tools.spec_traceability verify --evidence` 維持 CI 所有。
 4. Vitest 的 store 層回歸包含四項，開 Move frame 時快照提交則清單更新且焦點以 key 追蹤、目標 identity 消失則自動 pop 一層且焦點回到父框對應列、整棧不可解析時 cascade 回根框、suggestions 進入 `generating` 暫時態不觸發 pop，以及 mode 切換時以根描述符 teardown。
 
 驗收標準是任何已提交面板更新後，開著的每個 frame 在下一次渲染或按鍵時必然反映已提交內容，且客戶端程式碼中不存在任何 frame 專屬的重新整理函式。

@@ -248,7 +248,7 @@ stories／fixtures／測試中的 `guide` 輸入。無需主規格 delta
   仍存活的規格若失去承載測試，連同修剪後的規格文字改由存活測試承載。
 - `uv run --locked python -m tools.observability_lint check`：違反數只減不增。
 - `openspec validate --all --strict`。
-- npm 端：`npm test`、`npm run build-storybook`、`npm run showcase-coverage`。
+- pnpm 端：`pnpm test`、`pnpm run build-storybook`、`pnpm run showcase-coverage`。
 - 實作走 OpenSpec change（建議名 `remove-onboarding-tutorial`），依既有
   worktree→rubber-duck→merge 慣例。
 

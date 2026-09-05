@@ -384,14 +384,14 @@ against the UNCHANGED frozen required-set manifest.
 
 #### Scenario: v5 breakdown stories build
 
-- **WHEN** `npm run build-storybook` builds the updated stories
+- **WHEN** `pnpm run build-storybook` builds the updated stories
 - **THEN** the drawer, doll, and inventory stories render the version-5
   fixture's layers (including the 16-layer-bound row, all rendered without
   truncation) and adjustment strings
 
 #### Scenario: Coverage gate stays clean
 
-- **WHEN** `npm run showcase-coverage` runs after the change
+- **WHEN** `pnpm run showcase-coverage` runs after the change
 - **THEN** the frozen required-set manifest is unchanged and coverage
   passes
 

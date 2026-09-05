@@ -134,10 +134,12 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: "24"
-          package-manager-cache: true
+          package-manager-cache: false
 
-      - name: Install locked npm toolchain
-        run: npm ci --no-audit --no-fund
+      - name: Enable Corepack and install locked pnpm toolchain
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
 
       - name: Prepare Evennia runtime directories
         run: mkdir -p server/db server/logs
@@ -210,8 +212,8 @@ jobs:
       # (webclient-vue-01-foundation, design D2).
       - name: Build Vue dist in browser workspaces
         run: |
-          (cd w-a && npm ci --no-audit --no-fund && npm run build)
-          (cd w-b && npm ci --no-audit --no-fund && npm run build)
+          (cd w-a && corepack enable && pnpm install --frozen-lockfile && pnpm run build)
+          (cd w-b && corepack enable && pnpm install --frozen-lockfile && pnpm run build)
 
       - name: Install Chromium for browser acceptance
         run: uv run --locked playwright install --with-deps chromium
@@ -294,22 +296,24 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: "24"
-          package-manager-cache: true
+          package-manager-cache: false
 
-      - name: Install locked npm toolchain
-        run: npm ci --no-audit --no-fund
+      - name: Enable Corepack and install locked pnpm toolchain
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
 
       - name: Build Vue application with Vite
-        run: npm run build
+        run: pnpm run build
 
       - name: Run Vue component tests with Vitest
-        run: npm test
+        run: pnpm test
 
       - name: Build Storybook component showcase
-        run: npm run build-storybook
+        run: pnpm run build-storybook
 
       - name: Check component coverage
-        run: npm run showcase-coverage
+        run: pnpm run showcase-coverage
 
       - name: Verify dist artifact
         run: |
@@ -329,6 +333,9 @@ jobs:
         with:
           node-version: "24"
           package-manager-cache: false
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.0.0

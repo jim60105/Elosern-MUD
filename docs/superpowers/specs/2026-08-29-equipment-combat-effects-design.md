@@ -384,7 +384,7 @@ Deterministic throughout; no live LLM/SD, fixed seeds or patched RNG.
 - Evennia tests: end-to-end equip toggle, `status_query` breakdown model,
   character panel v5 validator, item adjustment prose, text status output.
 - JS: Vitest for breakdown rows and equipment adjustment rows, Storybook
-  stories, payload validator tests, `npm run showcase-coverage`.
+  stories, payload validator tests, `pnpm run showcase-coverage`.
 - Traceability: new main capability `equipment-effects`; every requirement
   annotated with `covers_requirement`, `tools.spec_traceability check` green.
 

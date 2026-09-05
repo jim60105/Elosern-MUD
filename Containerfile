@@ -57,14 +57,16 @@ ARG TARGETVARIANT
 
 WORKDIR /build
 
-COPY --chown=root:0 package.json package-lock.json vite.config.js ./
-RUN --mount=type=cache,id=npm-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.npm \
-    npm ci --no-audit --no-fund
+RUN corepack enable
+
+COPY --chown=root:0 package.json pnpm-lock.yaml vite.config.js ./
+RUN --mount=type=cache,id=pnpm-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 COPY --chown=root:0 web/ /build/web/
 # Emits the stable-entry dist (index.js + index.css + hashed assets/) into the
 # static tree; the app-layout stage copies it into the served image root.
-RUN npm run build
+RUN pnpm run build
 
 ########################################
 # Application layout stage

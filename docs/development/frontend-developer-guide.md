@@ -6,28 +6,28 @@
 
 ## 先決條件
 
-- **Node 24 + npm**（CI 品質閘門固定使用 Node 24；儲存庫的 Python 端由 uv 管理，與 Node 相互獨立）。
+- **Node 24 + pnpm**（CI 品質閘門固定使用 Node 24 搭配 Corepack 啟用的 pnpm；儲存庫的 Python 端由 uv 管理，與 Node 相互獨立）。
 - **uv 0.12.0+** 供 Python 與 Evennia 端使用（瀏覽器測試會啟動真實伺服器）。
-- 無其他安裝設定，前端僅為開發與 CI 期間的工具鏈，瀏覽器執行期絕不向遠端抓取 npm 套件或任何遠端資產。
+- 無其他安裝設定，前端僅為開發與 CI 期間的工具鏈，瀏覽器執行期絕不向遠端抓取 npm 或 pnpm 套件或任何遠端資產。
 
 ## 命令（儲存庫根目錄）
 
 | 命令 | 說明 | CI 擁有者 |
 | --- | --- | --- |
-| `npm ci` | 安裝鎖定版本的工具鏈（僅開發用相依套件） | `frontend` 工作、瀏覽器工作區 |
-| `npm run build` | Vite 生產建置 → `web/static/webclient/app/dist/`（穩定的 `index.js` + `index.css`，加上雜湊化 `assets/`；**不納入版本控制**） | `frontend` 工作、瀏覽器工作區 |
-| `npm test` | Vitest 元件閘門（`web/webclient-app/**/*.test.js`、jsdom、離線） | `frontend` 工作 + 最上層契約測試 |
-| `npm run build-storybook` | Storybook 靜態建置 → `.storybook-out/`（已被 git 忽略） | `frontend` 工作 |
-| `npm run showcase-coverage` | 對照 `web/webclient-app/component-manifest.json` 檢查元件覆蓋率 | `frontend` 工作 + 最上層契約測試 |
-| `npm run dev` | 本機工作用的 Vite 開發伺服器（HMR） | —（僅供本機） |
+| `pnpm install --frozen-lockfile` | 安裝鎖定版本的工具鏈（僅開發用相依套件） | `frontend` 工作、瀏覽器工作區 |
+| `pnpm run build` | Vite 生產建置 → `web/static/webclient/app/dist/`（穩定的 `index.js` + `index.css`，加上雜湊化 `assets/`；**不納入版本控制**） | `frontend` 工作、瀏覽器工作區 |
+| `pnpm test` | Vitest 元件閘門（`web/webclient-app/**/*.test.js`、jsdom、離線） | `frontend` 工作 + 最上層契約測試 |
+| `pnpm run build-storybook` | Storybook 靜態建置 → `.storybook-out/`（已被 git 忽略） | `frontend` 工作 |
+| `pnpm run showcase-coverage` | 對照 `web/webclient-app/component-manifest.json` 檢查元件覆蓋率 | `frontend` 工作 + 最上層契約測試 |
+| `pnpm run dev` | 本機工作用的 Vite 開發伺服器（HMR） | —（僅供本機） |
 | `node --test web/static/webclient/js/tests/*.test.js` | 針對保留的獨立於 DOM 邏輯執行無相依套件的 Node 閘門（約 1 秒） | preflight + 最上層契約測試 |
 
-**Python 與 npm 的分工：** `web/static/webclient/js/` 底下的所有程式碼（elosern 邏輯、外掛程式、文字主控台）皆無相依套件，且受 Node 24 `node --test` 閘門保護，不 `require` 任何 npm 套件，載入時無 `document` 或 `window`，並採用 `module.exports` UMD 模組格式。`web/webclient-app/` 底下的所有內容均為 Vue 應用程式（Vite、Vitest、Storybook）。`package.json` 保持在儲存庫根目錄，且**沒有執行期 `dependencies`**（受契約測試驗證）。
+**Python 與 pnpm 的分工：** `web/static/webclient/js/` 底下的所有程式碼（elosern 邏輯、外掛程式、文字主控台）皆無相依套件，且受 Node 24 `node --test` 閘門保護，不 `require` 任何外部套件，載入時無 `document` 或 `window`，並採用 `module.exports` UMD 模組格式。`web/webclient-app/` 底下的所有內容均為 Vue 應用程式（Vite、Vitest、Storybook）。`package.json` 保持在儲存庫根目錄，且**沒有執行期 `dependencies`**（受契約測試驗證）。
 
 ## 目錄結構
 
 ```
-package.json / package-lock.json / vite.config.js / vitest.config.js   (根目錄)
+package.json / pnpm-lock.yaml / vite.config.js / vitest.config.js   (根目錄)
 .storybook/                                     vue3-vite 設定 (根目錄)
 scripts/component-coverage.mjs                  Storybook 覆蓋率閘門
 web/webclient-app/
@@ -58,8 +58,8 @@ web/webclient/context_processors.py             webclient_vue_enabled 脈絡變�
 
 1. **切勿直接編輯 `web/static/webclient/js/elosern/*`**（或其 Node 測試）來配合 Vue 應用程式。請透過 `web/webclient-app/lib/*` 匯入；若包裝層需要微調，應修改包裝器，而非修改 UMD 原始碼。
 2. **禁止發出遠端執行期請求。** 建置後的頁面僅從專案來源端載入；不得加入任何 CDN、執行期的 registry 擷取，或絕對的第三方 URL。`base.html` 保持固定於本機來源。
-3. **不得引入執行期 npm 相依套件。** `package.json` 必須維持僅有 `devDependencies` 的結構；Node 閘門保持無外部相依。
-4. **執行瀏覽器測試前必須先建置 dist。** 受管瀏覽器套件會直接從工作樹提供靜態檔案；未執行 `npm run build` 會導致 Vue 分支檢查失敗（CI 會在兩個工作區中自動建置）。
+3. **不得引入執行期 npm 或 pnpm 相依套件。** `package.json` 必須維持僅有 `devDependencies` 的結構；Node 閘門保持無外部相依。
+4. **執行瀏覽器測試前必須先建置 dist。** 受管瀏覽器套件會直接從工作樹提供靜態檔案；未執行 `pnpm run build` 會導致 Vue 分支檢查失敗（CI 會在兩個工作區中自動建置）。
 5. **XOR 旗標採互斥載入。** 每個頁面只啟用一種檢視堆疊，`webclient_vue_enabled`（脈絡變數）會挑選 Vue 組合包**或**舊版復原分支（D10 原生文字主控台，無檢視程式碼）。正式環境預設為 **Vue 組合包**（於 C4 切換）；舊版分支僅能透過復原機制進入。`?__vue=1` 可強制切換至 Vue 分支以供審查或離線載入檢查；`ELOSERN_BROWSER_VUE_CLIENT=1`（瀏覽器測試設定）為 C3 使用的測試設定開關。
 
 ## 瀏覽器（受管執行期）測試
@@ -72,8 +72,8 @@ web/webclient/context_processors.py             webclient_vue_enabled 脈絡變�
 
 ## 容器
 
-`Containerfile` 的 `vue-dist` 階段（Node 24）會執行 `npm ci && npm run build`，應用程式佈局階段會將產生的 `dist` 複製至 `/app/web/static/webclient/app/dist/`；進入點在執行 `evennia migrate --noinput` 之後會執行 `evennia collectstatic --noinput` 以更新持久化的 `server/.static` 磁碟卷。本機工作流程為 `podman compose build && podman compose up`（請勿將 Ollama 或 sd-webui 加入此映像檔中）。
+`Containerfile` 的 `vue-dist` 階段（Node 24）會啟用 Corepack 並執行 `pnpm install --frozen-lockfile && pnpm run build`，應用程式佈局階段會將產生的 `dist` 複製至 `/app/web/static/webclient/app/dist/`；進入點在執行 `evennia migrate --noinput` 之後會執行 `evennia collectstatic --noinput` 以更新持久化的 `server/.static` 磁碟卷。本機工作流程為 `podman compose build && podman compose up`（請勿將 Ollama 或 sd-webui 加入此映像檔中）。
 
 ## 前端相關需求的可追溯性
 
-瀏覽器測試與最上層契約測試皆帶有 `@covers_requirement(...)` 標註（從 `tools.spec_traceability` 匯入）；請參閱 [`spec-test-traceability.md`](spec-test-traceability.md)。A2 閘門由 `tests/test_frontend_toolchain_contract.py`（npm 執行）、`tests/test_browser_verification_contract.py`（工作流程與靜態檢查）以及 `web/tests/browser/test_vue_foundation.py`（瀏覽器行為）所涵蓋。
+瀏覽器測試與最上層契約測試皆帶有 `@covers_requirement(...)` 標註（從 `tools.spec_traceability` 匯入）；請參閱 [`spec-test-traceability.md`](spec-test-traceability.md)。A2 閘門由 `tests/test_frontend_toolchain_contract.py`（pnpm 執行）、`tests/test_browser_verification_contract.py`（工作流程與靜態檢查）以及 `web/tests/browser/test_vue_foundation.py`（瀏覽器行為）所涵蓋。

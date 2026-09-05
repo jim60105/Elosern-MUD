@@ -128,38 +128,39 @@ uv run --locked -m world.imports.validate world/imports/examples/example_charact
 uv run --locked python -m compileall -q world typeclasses commands server
 ```
 
-### Frontend (npm)
+### Frontend (pnpm)
 
 The Vue 3 SPA webclient (view layer only) builds to `web/static/webclient/app/dist`
-from `web/webclient-app/` sources plus locked npm dependencies. The npm toolchain
-is a dev/CI-time dependency only (no runtime npm dependency); the built page is
+from `web/webclient-app/` sources plus locked pnpm dependencies. The pnpm toolchain
+is a dev/CI-time dependency only (no runtime npm or pnpm dependency); the built page is
 served entirely from the project origin.
 
 ```sh
-npm ci --no-audit --no-fund
-npm run build
-npm test
-npm run build-storybook
-npm run showcase-coverage
+corepack enable
+pnpm install --frozen-lockfile
+pnpm run build
+pnpm test
+pnpm run build-storybook
+pnpm run showcase-coverage
 ```
 
-- `npm run build` → the Vite production bundle (`web/static/webclient/app/dist`).
-- `npm test` → the Vitest component suite under `web/webclient-app/tests/`.
-- `npm run build-storybook` → the offline component showcase (Storybook).
-- `npm run showcase-coverage` → the component-coverage check against the frozen
+- `pnpm run build` → the Vite production bundle (`web/static/webclient/app/dist`).
+- `pnpm test` → the Vitest component suite under `web/webclient-app/tests/`.
+- `pnpm run build-storybook` → the offline component showcase (Storybook).
+- `pnpm run showcase-coverage` → the component-coverage check against the frozen
   required-set manifest.
 
-## Python-vs-npm split
+## Python-vs-pnpm split
 
 - **Python gates (uv-managed):** the non-browser Evennia suite, top-level
   regression tests, and the aggregate Python branch-coverage gate (exact-root,
   ≥80%).
-- **JS gates (npm/dev-time only):** the dependency-free Node gate
+- **JS gates (pnpm/dev-time only):** the dependency-free Node gate
   (`node --test web/static/webclient/js/tests/*.test.js`), the Vitest component
-  suite (`npm test`), and the Storybook component-coverage gate
-  (`npm run build-storybook` + `npm run showcase-coverage`).
+  suite (`pnpm test`), and the Storybook component-coverage gate
+  (`pnpm run build-storybook` + `pnpm run showcase-coverage`).
 - The browser-test workspaces and the container image build the `dist` bundle
-  from the authored sources plus locked npm dependencies (never hand-authored).
+  from the authored sources plus locked pnpm dependencies (never hand-authored).
 
 The Evennia commands run non-browser package tests. Managed Playwright tests,
 repository-wide contracts, and complete evidence verification are CI-owned.
@@ -186,8 +187,8 @@ changes or unexplained retained-state failures, omit `--keepdb` and add
 - Node tests (`node --test web/static/webclient/js/tests/*.test.js`) are fast;
   `tools.spec_traceability check` is the local traceability gate.
 - JS gates: the dependency-free Node gate, the Vitest component suite
-  (`npm test`), and the Storybook build + component-coverage
-  (`npm run build-storybook`, `npm run showcase-coverage`) are the applicable JS
+  (`pnpm test`), and the Storybook build + component-coverage
+  (`pnpm run build-storybook`, `pnpm run showcase-coverage`) are the applicable JS
   gates. The full managed browser suite, `tools.spec_traceability verify
   --evidence`, and the aggregate Python branch-coverage gate are CI-owned.
 - A browser test file that exceeds five minutes in CI must be split.

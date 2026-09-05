@@ -2,7 +2,8 @@
   "name": "elosern-webclient",
   "version": "0.0.0",
   "private": true,
-  "description": "Elosern WebClient Vue 3 SPA (view layer only). Deterministic game state, the OOB protocol, and the transport are owned by the Evennia server; this package builds an offline self-contained bundle from the project origin and is a dev/CI-time dependency only (no runtime npm dependency). The root stays CommonJS so the dependency-free Node gate under web/static/webclient/js keeps running under node --test; the Vue app sources are ESM via web/webclient-app/package.json.",
+  "description": "Elosern WebClient Vue 3 SPA (view layer only). Deterministic game state, the OOB protocol, and the transport are owned by the Evennia server; this package builds an offline self-contained bundle from the project origin and is a dev/CI-time dependency only (no runtime Node.js or pnpm dependency). The root stays CommonJS so the dependency-free Node gate under web/static/webclient/js keeps running under node --test; the Vue app sources are ESM via web/webclient-app/package.json.",
+  "packageManager": "pnpm@9.15.4",
   "engines": {
     "node": ">=24"
   },
@@ -27,7 +28,9 @@
     "vitest": "^3.2.4",
     "vue": "^3.5.16"
   },
-  "allowScripts": {
-    "esbuild@0.28.2": true
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
