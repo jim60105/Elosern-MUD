@@ -1,12 +1,13 @@
-// webclient-align-08-dialogue-surface (tasks 3.1/3.2/4.2): the store-side
-// dialogue form. A committed dialogue mode tears the frame stack down to
-// exactly `dialogue.root`; the resolver rows carry the committed keyword ids
-// and labels verbatim with payloads naming the committed host; digits pick
-// the rendered picks through the same confirm entry; `→` borrows the command
-// line while the form presents (never from the input field — the bridge owns
-// that gate, asserted at bridge level — and never while degraded); an
-// unavailable panel degrades to the shared marker with the server-authored
-// reason.
+// webclient-align-11-dialogue-ux (tasks 2.4): the store side of the retired
+// dock dialogue form. A committed dialogue mode keeps the dock on
+// `exploration.root` (the `dialogue.root` mirror is deleted); digits retarget
+// to the caption's scripted picks while the caption presents, and fall
+// through to the dock otherwise; the caption's free row keeps the
+// command-line borrow through `borrowDialogueCommand`; ArrowRight keeps its
+// router meaning; the exit row's `dialogue-leave` dispatch rides the single
+// dispatch entry; and exploration-form lifecycle guards widen to dialogue
+// mode (a services/character sub-dock opened while talking closes, re-homes,
+// and settles exactly as in exploration mode).
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -40,49 +41,55 @@ function dialogueSnapshot(overrides = {}) {
   return fx.snapshot({
     revision: 4,
     mode: "dialogue",
-    panels: { status: fx.statusPanel(), dialogue: DIALOGUE_PANEL, ...overrides },
+    panels: {
+      status: fx.statusPanel(),
+      exploration: fx.explorationPanel(),
+      local_map: fx.localMapPanel(),
+      dialogue: DIALOGUE_PANEL,
+      ...overrides,
+    },
   });
 }
 
-describe("dialogue frame resolver", () => {
-  function resolveIn(panels) {
+describe("dialogue frame vocabulary", () => {
+  function resolveIn(panels, source) {
     const state = { mode: "dialogue", panels: { status: fx.statusPanel(), ...panels } };
     return createFrameResolver({ getState: () => state }).resolve({
-      source: "dialogue.root",
+      source,
       params: {},
     });
   }
 
-  it("resolves the committed picks verbatim with payloads naming the committed host", () => {
-    const menu = resolveIn({ dialogue: DIALOGUE_PANEL });
-    expect(menu.dialogueForm).toBe(true);
-    expect(menu.items).toHaveLength(5);
-    const [first, , , , free] = menu.items;
-    expect(first).toMatchObject({
-      key: "dlg-kw-fare",
-      label: "「就五枚，走嗎？」",
-      actionId: "explore.talk_scripted",
-      payload: { npc_id: 41, keyword_id: "fare" },
-    });
-    expect(free).toMatchObject({ key: "dlg-free", freeform: true, npcId: 41 });
-    expect(menu.focusKey).toBe("dlg-kw-fare");
-  });
-
-  it("keeps the free row reachable when the panel carries zero choices", () => {
-    const menu = resolveIn({ dialogue: { ...DIALOGUE_PANEL, choices: [] } });
-    expect(menu.items).toHaveLength(1);
-    expect(menu.items[0].key).toBe("dlg-free");
-    expect(menu.focusKey).toBe("dlg-free");
-  });
-
-  it("degrades an unavailable panel to the marker with the server-authored reason", () => {
-    const menu = resolveIn({ dialogue: UNAVAILABLE_PANEL });
+  it("dialogue.root is no longer a registered source (the mirror form is deleted)", () => {
+    const menu = resolveIn({ dialogue: DIALOGUE_PANEL }, "dialogue.root");
+    // An unregistered source degrades to the shared marker, like any lost
+    // frame — nothing in the client references this descriptor anymore.
     expect(menu.unresolvable).toBe(true);
-    expect(menu.reason).toBe("對話目前無法顯示");
+  });
+
+  it("dialogue mode resolves the ordinary exploration root, not a dialogue frame", () => {
+    const state = {
+      mode: "dialogue",
+      panels: {
+        status: fx.statusPanel(),
+        exploration: fx.explorationPanel(),
+        dialogue: DIALOGUE_PANEL,
+      },
+    };
+    const menu = createFrameResolver({ getState: () => state }).resolve({
+      source: "exploration.root",
+      params: {},
+    });
+    // The exploration root keeps its ordinary rows and carries NO dialogue
+    // form flag: the 對話選項 mirror tab is gone.
+    expect(menu.dialogueForm).toBeUndefined();
+    const keys = (menu.items || []).map((i) => i.key);
+    expect(keys).toContain("move");
+    expect(keys).not.toContain("dlg-options");
   });
 });
 
-describe("dialogue store teardown + keys", () => {
+describe("dialogue store mode lifecycle", () => {
   let store;
   let sender;
 
@@ -98,82 +105,105 @@ describe("dialogue store teardown + keys", () => {
     store.setConnected(true);
     store.setLoggedIn(true);
     expect(
-      store.receive(1, "ui_snapshot", [fx.snapshot({ panels: { status: fx.statusPanel(), exploration: fx.explorationPanel(), local_map: fx.localMapPanel(), ...panels } })], {}).accepted,
+      store.receive(
+        1,
+        "ui_snapshot",
+        [
+          fx.snapshot({
+            panels: {
+              status: fx.statusPanel(),
+              exploration: fx.explorationPanel(),
+              local_map: fx.localMapPanel(),
+              ...panels,
+            },
+          }),
+        ],
+        {},
+      ).accepted,
     ).toBe(true);
   }
 
-  it("a dialogue mode switch tears the stack down to exactly dialogue.root", () => {
+  it("a dialogue mode switch keeps the dock on exploration.root", () => {
     openSession();
-    // Open one exploration submenu so the teardown has frames to replace.
+    // Open one exploration submenu so the switch has frames to replace.
     expect(store.focusConfirm("keyboard")).toBe(true); // root row -> move frame
     expect(store.view.dockDepth).toBe(2);
-    expect(
-      store.receive(1, "ui_snapshot", [dialogueSnapshot()], {}).accepted,
-    ).toBe(true);
+    expect(store.receive(1, "ui_snapshot", [dialogueSnapshot()], {}).accepted).toBe(true);
     expect(store.view.mode).toBe("dialogue");
     expect(store.view.dockDepth).toBe(1);
-    expect(store.view.rootMenu && store.view.rootMenu.dialogueForm).toBe(true);
-    expect(store.view.combatMenu.items.map((i) => i.key)).toEqual([
-      "dlg-kw-fare",
-      "dlg-kw-smell",
-      "dlg-kw-chest",
-      "dlg-kw-silence",
-      "dlg-free",
-    ]);
-    // No exploration row remains activatable: the stack holds exactly the
-    // dialogue root (depth 1 + the root's own rows, no submenu frame).
-    expect(store.view.dockTrail.filter((t) => t === "移動")).toHaveLength(0);
+    // The root frame is the ORDINARY exploration root: no dialogue form,
+    // no 對話選項 tab, ordinary rows still activatable.
+    expect(store.view.rootMenu && store.view.rootMenu.dialogueForm).toBeUndefined();
+    expect(store.view.rootMenu.items.map((i) => i.key)).toContain("move");
   });
 
-  it("digits 1–4 activate the rendered picks through the shared dispatch entry", () => {
+  it("digits 1–4 dispatch the caption's scripted picks while the caption presents", () => {
     openSession();
     store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
     expect(store.focusPress("2")).toBe(true);
-    expect(store.view.focus.key).toBe("dlg-kw-smell");
     expect(sender.sent.actions).toHaveLength(1);
     expect(sender.sent.actions[0]).toMatchObject({
       action_id: "explore.talk_scripted",
       payload: { npc_id: 41, keyword_id: "smell" },
     });
+    // The dock's own rows are NOT digit-claimed while the caption presents:
+    // no navigation frame opened.
+    expect(store.view.dockDepth).toBe(1);
   });
 
-  it("a digit beyond the rendered picks falls through unclaimed", () => {
+  it("digits beyond the rendered picks fall through unclaimed", () => {
     openSession();
     store.receive(
       1,
       "ui_snapshot",
-      [dialogueSnapshot({ dialogue: { ...DIALOGUE_PANEL, choices: [{ keyword_id: "one", label: "一句" }] } })],
+      [
+        dialogueSnapshot({
+          dialogue: { ...DIALOGUE_PANEL, choices: [{ keyword_id: "one", label: "一句" }] },
+        }),
+      ],
       {},
     );
-    // Digit slots address ONLY the rendered picks (the spec's "first four
-    // rendered picks"): with one pick, digits 2–4 have no slot — the free
-    // row is reachable by pointer/Enter, never by a digit.
+    // Digits address ONLY the rendered caption picks (max four). The free and
+    // exit rows take no digit slot, and digit 2 has no pick: the press is
+    // unclaimed (the caption branch owns the press and declines).
     expect(store.focusPress("2")).toBe(false);
-    expect(store.focusPress("3")).toBe(false);
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("a digit never activates the freeform row", () => {
+  it("an unavailable panel releases the digits back to the dock", () => {
     openSession();
     store.receive(
       1,
       "ui_snapshot",
-      [dialogueSnapshot({ dialogue: { ...DIALOGUE_PANEL, choices: [{ keyword_id: "one", label: "一句" }] } })],
+      [dialogueSnapshot({ dialogue: UNAVAILABLE_PANEL })],
       {},
     );
-    const before = store.view.drawerRequest;
-    // With one pick, the rendered rows are [pick, free row]: digit 2 used to
-    // land on the free row and borrow the command line. Slots are now
-    // picks-only, so the press is unclaimed and no borrow happens.
-    expect(store.focusPress("2")).toBe(false);
-    expect(store.view.drawerRequest).toBe(before);
+    expect(store.view.mode).toBe("dialogue");
+    // No caption: digit 1 addresses the exploration root grid (focus +
+    // confirm opens the Move submenu) — the ordinary dock semantics.
+    expect(store.focusPress("1")).toBe(true);
+    expect(store.view.dockDepth).toBe(2);
+    expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("→ borrows the command line for the committed host and dispatches nothing", () => {
+  it("a zero-choice panel releases the digits back to the dock", () => {
+    openSession();
+    store.receive(
+      1,
+      "ui_snapshot",
+      [dialogueSnapshot({ dialogue: { ...DIALOGUE_PANEL, choices: [] } })],
+      {},
+    );
+    expect(store.focusPress("1")).toBe(true);
+    expect(store.view.dockDepth).toBe(2);
+  });
+
+  it("the caption free row keeps the command-line borrow", () => {
     openSession();
     store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
     const before = store.view.drawerRequest;
-    expect(store.focusPress("ArrowRight")).toBe(true);
+    // AppClient maps the feed's dialogue-freeform emit onto this seam.
+    expect(store.borrowDialogueCommand()).toBe(true);
     expect(store.view.drawerRequest).toBe(before + 1);
     expect(sender.sent.actions).toHaveLength(0);
     expect(sender.sent.texts).toHaveLength(0);
@@ -186,55 +216,91 @@ describe("dialogue store teardown + keys", () => {
     });
   });
 
-  it("→ is not claimed while the dialogue frame is degraded", () => {
+  it("the borrow declines without a live caption", () => {
     openSession();
-    store.receive(
-      1,
-      "ui_snapshot",
-      [fx.snapshot({ revision: 4, mode: "dialogue", panels: { status: fx.statusPanel(), dialogue: UNAVAILABLE_PANEL } })],
-      {},
-    );
-    expect(store.view.mode).toBe("dialogue");
-    // The root frame degrades: the pane presents the marker row, and the
-    // dialogue form is NOT presented.
-    expect(store.view.degradedRoot && store.view.degradedRoot.reason).toBe("對話目前無法顯示");
     const before = store.view.drawerRequest;
-    store.focusPress("ArrowRight");
-    // No borrow: no focus request, no target capture, nothing dispatched —
-    // the press falls through to the router's degraded-menu no-op.
+    expect(store.borrowDialogueCommand()).toBe(false);
     expect(store.view.drawerRequest).toBe(before);
-    expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("ArrowRight keeps its router meaning outside dialogue mode", () => {
+  it("the exit dispatch rides the single dispatch entry", () => {
     openSession();
+    store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
+    // AppClient maps the feed's dialogue-leave emit onto the same entry.
+    store.dispatchAction("explore.dialogue_leave", { npc_id: 41 }, null);
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0]).toMatchObject({
+      action_id: "explore.dialogue_leave",
+      payload: { npc_id: 41 },
+    });
+  });
+
+  it("ArrowRight keeps its router meaning in dialogue mode (no form borrow)", () => {
+    openSession();
+    store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
     const before = store.view.drawerRequest;
-    // The G2 root single-row grid: ArrowRight walks the focus columns
-    // through the ROUTER (not the borrow path).
+    // The dock's root grid walks focus columns through the ROUTER.
     expect(store.focusPress("ArrowRight")).toBe(true);
     expect(store.view.focus.key).toBe("look");
     expect(store.view.drawerRequest).toBe(before);
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("leaving dialogue re-homes the stack through the mode-root decision point", () => {
+  it("leaving dialogue re-homes nothing further (the dock never left)", () => {
     openSession();
     store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
-    expect(store.view.rootMenu.dialogueForm).toBe(true);
     expect(
       store.receive(
         1,
         "ui_snapshot",
-        [fx.snapshot({ revision: 9, panels: { status: fx.statusPanel(), exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
+        [
+          fx.snapshot({
+            revision: 9,
+            panels: {
+              status: fx.statusPanel(),
+              exploration: fx.explorationPanel(),
+              local_map: fx.localMapPanel(),
+            },
+          }),
+        ],
         {},
       ).accepted,
     ).toBe(true);
     expect(store.view.mode).toBe("exploration");
     expect(store.view.dockDepth).toBe(1);
-    expect(store.view.rootMenu && store.view.rootMenu.dialogueForm).toBeUndefined();
-    // No dialogue row remains activatable: digit picks now address the
-    // exploration root grid, and no scripted keyword can dispatch.
+    // Digits address the dock again: no scripted keyword can dispatch.
     store.focusPress("1");
     expect(sender.sent.actions.every((a) => a.action_id !== "explore.talk_scripted")).toBe(true);
+  });
+
+  it("a character sub-dock opened while talking closes and re-homes on Escape", () => {
+    openSession();
+    store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
+    // The services sub-dock mid-conversation (the widened lifecycle guards):
+    // Escape pops the frame and the widened menu-close cleanup clears the
+    // sub-dock, exactly as in exploration mode.
+    store.setActiveSubDock("services");
+    store.router.pushFrame({ source: "exploration.move", params: {} }, "services");
+    expect(store.view.dockDepth).toBe(2);
+    expect(store.view.activeSubDock).toBe("services");
+    expect(store.focusEscape()).toBe(true);
+    expect(store.view.activeSubDock).toBe(null);
+    expect(store.view.dockDepth).toBe(1);
+    expect(store.view.focus.key).toBe("move");
+  });
+
+  it("an exploration-served drawer close while talking clears the sub-dock and re-homes", () => {
+    openSession();
+    store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
+    // The 狀態 drawer owns the character sub-dock (the frameless-drawer
+    // precedent): closing it while talking must clear the sub-dock and
+    // re-home the exploration root — the widened close guard (align-11 D8).
+    store.setActiveSubDock("character");
+    expect(store.openHudDrawer("status")).toBe(true);
+    expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
+    // The widened non-hosted close guard (align-11 D8): the sub-dock dies
+    // with the drawer and the root frame re-homes, exactly as in exploration.
+    expect(store.view.activeSubDock).toBe(null);
+    expect(store.router.currentMenu().title).toBe("探索");
   });
 });

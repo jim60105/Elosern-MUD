@@ -5,8 +5,14 @@ import NarrativeFeed from "../components/NarrativeFeed.vue";
 
 // Mock the scroll geometry jsdom does not compute; `scrollTop` is backed by
 // a real settable value so the component's scrollToBottom() is observable.
+// webclient-align-11-dialogue-ux (design D5): the scroll owner is the
+// `.narrative-scroll` viewport (which carries the feed test id), NOT the
+// outer card — the geometry mock targets that element.
 function mockScrollGeometry(wrapper, { scrollHeight, clientHeight, scrollTop }) {
-  const el = wrapper.element;
+  const el = wrapper.get('[data-testid="narrative-feed"]').element;
+  if (!el.classList.contains("narrative-scroll")) {
+    throw new Error("the feed test id must live on the scroll viewport");
+  }
   let value = scrollTop;
   Object.defineProperty(el, "scrollHeight", { configurable: true, value: scrollHeight });
   Object.defineProperty(el, "clientHeight", { configurable: true, value: clientHeight });
@@ -119,8 +125,9 @@ describe("NarrativeFeed (B1 core family)", () => {
     await flush();
     expect(wrapper.get('[data-testid="unread-indicator"]').attributes("data-count")).toBe("0");
     expect(wrapper.find('[data-testid="unread-indicator-button"]').exists()).toBe(false);
-    expect(wrapper.element.scrollTop).toBe(600);
-    expect(document.activeElement).toBe(wrapper.element);
+    const scrollEl = wrapper.get('[data-testid="narrative-feed"]').element;
+    expect(scrollEl.scrollTop).toBe(600);
+    expect(document.activeElement).toBe(scrollEl);
   });
 
   it("auto-scrolls to the bottom when the reader is at the bottom", async () => {
@@ -140,8 +147,28 @@ describe("NarrativeFeed (B1 core family)", () => {
     });
     await flush();
 
-    expect(wrapper.element.scrollTop).toBe(600);
+    expect(wrapper.get('[data-testid="narrative-feed"]').element.scrollTop).toBe(600);
     expect(wrapper.get('[data-testid="unread-indicator"]').attributes("data-count")).toBe("0");
+  });
+
+  it("keeps the head a static sibling ABOVE a single scroll viewport (align-11 DOM contract)", () => {
+    wrapper = mount(NarrativeFeed, {
+      props: { lines: [{ kind: "out", text: "晨霧漫卷。" }] },
+    });
+    const card = wrapper.get('[data-testid="narrative-feed"]').element.closest(".elosern-narrative");
+    const head = wrapper.get('[data-testid="narrative-head"]').element;
+    const scroll = wrapper.get('[data-testid="narrative-feed"]').element;
+    // Head and viewport are siblings inside the card; the head comes first,
+    // so narrative lines can never render between the card edge and the head.
+    expect(head.parentElement).toBe(card);
+    expect(scroll.parentElement).toBe(card);
+    expect(head.nextElementSibling).toBe(scroll);
+    // The scroll viewport owns the scrollable/labelled surface; the card does
+    // not carry the log role, tabindex, or scroll wiring.
+    expect(scroll.getAttribute("role")).toBe("log");
+    expect(scroll.getAttribute("tabindex")).toBe("-1");
+    expect(card.getAttribute("role")).toBeNull();
+    expect(card.getAttribute("tabindex")).toBeNull();
   });
 
   it("renders the head row with mode label 敘述 for exploration and 戰鬥日誌 for combat", async () => {
