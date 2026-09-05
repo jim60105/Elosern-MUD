@@ -46,11 +46,12 @@ behavior-neutral.
   deletes nothing
 
 ### Requirement: Roster convergence deletes service hosts absent from the roster
-Sync SHALL treat the roster as authoritative: every live NPC carrying a service component whose
-`service_id` matches no roster row is deleted, guarded by the legacy cleanup's identity-shape
-discipline (the anchor component must match; an ambiguous titled residue emits a named warning and
-is left for manual repair instead of guessed). Each deletion emits one info event with the host
-and service identifiers.
+Sync SHALL treat the roster as authoritative, and the roster's authority SHALL NOT depend on
+anchor-room resolution: the duplicate-anchor fail-closed probe and the convergence sweep run for
+every roster row on every sync. A live NPC whose EVERY service-component `service_id` matches no
+roster row is deleted; a host the roster still claims through ANY anchor is never destroyed —
+titled mixed residue is ambiguous, emits a named warning, and survives for manual repair. Each
+deletion emits one info event with the host and service identifiers.
 
 #### Scenario: A roster-shrunk host is deleted on next sync
 - **WHEN** a roster row is removed and sync runs

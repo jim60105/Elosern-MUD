@@ -41,6 +41,9 @@ None.
 
 - `guild-registration`: new requirement — service hosts are created and converged from the
   declarative roster, with its validation matrix and idempotent re-sync.
+- `npc-identity-titles`: the guild-service-host reuse requirement is restated — roster
+  convergence replaces the batch's one-time legacy-key cleanup as the deletion mechanism;
+  anchor-reuse, never-rename, no-backfill, and duplicate-anchor fail-closed survive verbatim.
 
 ## Impact
 

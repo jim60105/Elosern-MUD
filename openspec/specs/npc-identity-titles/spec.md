@@ -412,35 +412,37 @@ without mutating the shipped registries.
 
 ### Requirement: Guild service hosts reuse by service anchor and never rename
 `sync_guild_economy` SHALL locate a service host by the `service_id` recorded on its service
-component — never by display `key`. A missing host SHALL be created once under the registry's
-authored `host_name` as its `key` with the authored `host_title` persisted as its NPC title. An
-existing host located by its service anchor SHALL never be renamed and SHALL never have its title
-written at sync time — a host that predates authored identities is stale development state the
-unreleased project discards rather than backfills at runtime: the batch's one-time cleanup task
-deletes legacy-keyed hosts so the next sync recreates them under the full authored identity. The
-cleanup SHALL anchor deletion on the retired host's identity shape (retired key + matching anchor
-component + no authored title), never the key alone: an unrelated same-key NPC SHALL survive, and
-a same-key titled host carrying the anchor SHALL be kept with a named warning for manual repair.
-Locating an anchor claimed by more than one live host SHALL fail closed with a named integrity
-error before any mutation.
+component — never by display `key`. A missing host SHALL be created once under the roster row's
+authored `name` as its `key` with the authored `title` persisted as its NPC title. An existing
+host located by its service anchor SHALL never be renamed and SHALL never have its title written
+at sync time — a host that predates authored identities is reused as-is, never backfilled.
+Roster-authoritative convergence replaces the batch's one-time legacy-key cleanup as the
+deletion mechanism: deletion anchors on roster membership of the component `service_id`, never
+the entity key. A titleless candidate whose service anchors all match no roster row is
+unambiguous stale development state and SHALL be deleted so the roster pass recreates it under
+the full authored identity when its row returns; an NPC carrying no service component SHALL
+survive untouched, and a titled candidate that still holds at least one roster-matching anchor
+SHALL be kept with a named warning for manual repair. Locating an anchor claimed by more than
+one live host SHALL fail closed with a named integrity error before any mutation.
 
 #### Scenario: First sync creates the authored host
 - **WHEN** `sync_guild_economy` runs with no existing host for a service component
-- **THEN** exactly one NPC is created whose `key` is the registry `host_name`, whose `npc_title`
-  is the registry `host_title`, and which carries the service component
+- **THEN** exactly one NPC is created whose `key` is the roster row's authored `name`, whose
+  `npc_title` is the row's authored `title`, and which carries the service component
 
 #### Scenario: Re-sync neither duplicates nor renames
 - **WHEN** `sync_guild_economy` runs again after the host exists, including with a changed
-  registry `host_name`
+  roster `name`
 - **THEN** the same NPC is reused, no second host exists, and its `key` is unchanged
 
-#### Scenario: A legacy titleless host is discarded, not backfilled
-- **WHEN** a pre-existing host located by its service anchor carries no authored title
-- **THEN** the sync never writes a title into it; the one-time legacy-host cleanup removes it so
-  the next sync recreates it under the full authored identity
+#### Scenario: A host predating authored identities is reused, not backfilled
+- **WHEN** a pre-existing host located by its service anchor carries no authored title and its
+  `service_id` is on the roster
+- **THEN** the sync reuses it as-is: no title is written, nothing is renamed, and no second
+  authored host is created
 
-#### Scenario: An unrelated NPC sharing a retired key survives cleanup
-- **WHEN** the cleanup runs while an NPC carries a retired ASCII key but not the matching anchor
+#### Scenario: An unrelated NPC with no service component survives convergence
+- **WHEN** convergence runs while an NPC shares a retired host key but carries no service
   component
 - **THEN** the NPC is not deleted
 

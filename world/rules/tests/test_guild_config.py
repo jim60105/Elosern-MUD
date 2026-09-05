@@ -5,10 +5,12 @@ from tools.spec_traceability import covers_requirement
 import unittest
 from dataclasses import fields
 from pathlib import Path
+from unittest import mock
 
 import yaml
 
 from world.lore.economy import PRICE_TABLE
+from world.lore.guild import GUILD_BRANCH_REGISTRY
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.items import (
     ITEM_REGISTRY,
@@ -33,6 +35,7 @@ from world.rules.guild_config import (
     validate_exam_profiles,
     validate_merit_thresholds,
     validate_quest_rewards,
+    validate_service_hosts,
     validate_shop_configs,
 )
 from world.rules.guild_offers import (
@@ -431,6 +434,98 @@ class CatalogLoadingTests(CatalogRegistryIsolation):
         mutated = [{**raw[0], "reward": {**raw[0]["reward"], "copper": 10_000}}]
         with self.assertRaises(GuildConfigError):
             validate_quest_rewards(mutated, QUEST_DEFINITION_REGISTRY)
+
+
+class ServiceHostRosterTests(CatalogRegistryIsolation):
+    """Declarative service-host roster parsing and batch validation (tasks 1.2/4.1)."""
+
+    def _raw(self):
+        return raw_rulebook()["service_hosts"]
+
+    @covers_requirement(
+        "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
+    )
+    def test_shipped_roster_parses_to_two_rows_reproducing_the_hardcoded_pair(self):
+        rows = validate_service_hosts(self._raw())
+        self.assertEqual([row.service_id for row in rows], ["altoria_guild_master", "altoria_merchant"])
+        guild, merchant = rows
+        branch = GUILD_BRANCH_REGISTRY["guild_branch_altoria"]
+        store = SHOP_REGISTRY["altoria_general_store"]
+        self.assertEqual((guild.name, guild.title), (branch.host_name, branch.host_title))
+        self.assertEqual((merchant.name, merchant.title), (store.host_name, store.host_title))
+        self.assertEqual(guild.anchor_room, "altoria_guild_hall")
+        self.assertEqual(merchant.anchor_room, "altoria_general_store")
+        self.assertEqual(guild.profession.key, "guild_staff")
+        self.assertEqual(merchant.profession.key, "merchant")
+        self.assertEqual(
+            guild.authored_kwargs,
+            {"branch_key": "guild_branch_altoria", "dialogue_key": "guild_staff"},
+        )
+        self.assertEqual(merchant.authored_kwargs, {"shop_key": "altoria_general_store"})
+
+    def test_catalog_exposes_the_roster(self):
+        catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
+        self.assertEqual([row.service_id for row in catalog.service_hosts], ["altoria_guild_master", "altoria_merchant"])
+        self.assertEqual(set(catalog.host_by_service_id), {"altoria_guild_master", "altoria_merchant"})
+
+    def test_missing_roster_section_is_a_named_catalog_error(self):
+        # A rulebook without the required section surfaces through the
+        # catalog's named error family, never a raw KeyError.
+        from world.rules import guild_config
+
+        raw = raw_rulebook()
+        del raw["service_hosts"]
+        with mock.patch.object(guild_config, "load_config", return_value=raw):
+            with self.assertRaises(GuildConfigError):
+                load_guild_catalog(QUEST_DEFINITION_REGISTRY)
+
+    @covers_requirement(
+        "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
+    )
+    def test_named_offenses_raise_the_catalog_error_family_without_db_access(self):
+        base = self._raw()
+        cases = {
+            "roster must be a list": "not-a-list",
+        }
+        for message, payload in cases.items():
+            with self.subTest(message):
+                with self.assertRaises(GuildConfigError):
+                    validate_service_hosts(payload)
+        mutations = [
+            # Row is not a mapping.
+            ["just-a-string"],
+            # Unknown field.
+            [{**base[1], "shop_hours": "daily"}],
+            # Missing required field.
+            [{k: v for k, v in base[0].items() if k != "title"}],
+            # Empty (whitespace-only) required field.
+            [{**base[0], "anchor_room": "  "}],
+            # Non-string anchor tag.
+            [{**base[0], "anchor_room": 7}],
+            # Profession naming no registry row.
+            [{**base[0], "profession": "blacksmith"}],
+            # Duplicate service anchor.
+            [base[0], {**base[1], "service_id": base[0]["service_id"]}],
+            # Blueprint component identity kwargs the row fails to supply.
+            [{k: v for k, v in base[1].items() if k != "shop_key"}],
+            # Authored kwargs no blueprint component consumes.
+            [{**base[1], "branch_key": "guild_branch_altoria"}],
+        ]
+        for position, mutated in enumerate(mutations):
+            with self.subTest(mutation=position):
+                with self.assertRaises(GuildConfigError):
+                    validate_service_hosts(mutated)
+
+    def test_malformed_profession_rulebook_surfaces_as_catalog_error(self):
+        from world.rules import profession_config
+
+        with mock.patch.object(
+            profession_config,
+            "get_profession",
+            side_effect=profession_config.ProfessionConfigError("broken rulebook"),
+        ):
+            with self.assertRaises(GuildConfigError):
+                validate_service_hosts(self._raw())
 
 
 if __name__ == "__main__":

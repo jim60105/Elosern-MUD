@@ -20,6 +20,10 @@ from world.observability import log_info, log_warn
 from world.rules import profession_config
 from world.rules.npc_identity import validate_npc_title
 from world.rules.npc_schedules import set_npc_schedule
+from world.rules.profession_assembly import (
+    ProfessionAssemblyError,
+    assemble_profession_components,
+)
 from world.rules.traits import _trait_config, build_initial_traits, race_floor
 
 
@@ -148,24 +152,21 @@ def _apply_profession(
         raise ValueError(
             f"record {record['key']!r}: unknown profession {profession_key!r}"
         )
-    plan = assembly.resolve_plan(profession, record)
-    for type_key, kwargs in plan:
-        missing = assembly.missing_identity_kwargs(type_key, kwargs)
-        if missing:
-            raise ValueError(
-                f"record {record['key']!r}: profession component {type_key!r} "
-                f"is missing authored identity kwargs {missing}"
-            )
-    component_class_by_key = assembly.PROFESSION_COMPONENT_TYPES
-    attached: list[str] = []
-    for type_key, kwargs in plan:
-        component_class = component_class_by_key[type_key]
-        # The same attach path the guild service-host sync uses: add the class
-        # through the component holder only when the slot is free, so
-        # assembly never duplicates a component slot.
-        if not entity.components.has(component_class.name):
-            entity.components.add(component_class.create(entity, **kwargs))
-            attached.append(type_key)
+    # The shared deterministic-core attach mechanism (declarative-service-hosts):
+    # the same helper the guild service-host sync calls, so import and sync
+    # assembly can never drift. Its identity-gap check is this function's
+    # second gate, translated verbatim into the record-named ValueError the
+    # batch-rejection path expects.
+    try:
+        attached = assemble_profession_components(
+            entity, profession, assembly.explicit_map(record)
+        )
+    except ProfessionAssemblyError as error:
+        named = "; ".join(
+            f"component {type_key!r} is missing authored identity kwargs {fields}"
+            for type_key, fields in sorted(error.missing.items())
+        )
+        raise ValueError(f"record {record['key']!r}: profession {named}") from error
     if profession.schedule_template is not None and isinstance(entity, NPC):
         set_npc_schedule(
             entity,

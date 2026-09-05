@@ -342,3 +342,24 @@ shops:
         max_stock: 2
         initial_stock: 1
         restock_quantity: 1
+# Declarative service-host roster (declarative-service-hosts D7). One row per
+# permanent service NPC: `anchor_room` is a placement-only room tag (the
+# service-anchoring change owns its anchoring semantics); `service_id` is the
+# stable component anchor reuse identity (D8); the flat identity kwargs
+# (shop_key / branch_key / dialogue_key) are authored per row and projected
+# onto the profession blueprint's components. Surplus live hosts whose
+# service_id is absent from this roster are converged away (D9, no back-compat).
+service_hosts:
+  - name: 葛里安·衛登
+    title: 阿爾托利亞分會會長
+    profession: guild_staff
+    anchor_room: altoria_guild_hall
+    service_id: altoria_guild_master
+    branch_key: guild_branch_altoria
+    dialogue_key: guild_staff
+  - name: 瑪爾特·金秤
+    title: 阿爾托利亞雜貨商店老闆
+    profession: merchant
+    anchor_room: altoria_general_store
+    service_id: altoria_merchant
+    shop_key: altoria_general_store
