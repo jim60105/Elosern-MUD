@@ -10,8 +10,13 @@ pending transition and regardless of which of the two actions is being refused: 
 blocks a subsequent create and a scheduled create blocks a subsequent switch, because either one
 changes the same session's puppet. The refusal SHALL be decided at admission, before any account,
 character, or combat-session lookup, so it costs nothing beyond a session-scoped flag check. Once
-the pending transition finishes — whether by success or by any step of the recovery ladder —
-the session SHALL again accept a further character-changing action normally.
+the pending transition finishes — whether by success or by any step of the recovery ladder — the
+session SHALL no longer refuse a further character-changing action as `transition_pending`. When
+the session holds a puppet — because the transition succeeded or a recovery/cancellation step
+retained or restored one — a further `account.character.switch` or `account.character.create`
+SHALL be admitted and evaluated normally. The recovery rung that leaves the session holding no
+character clears the marker as well; a request from such a puppet-less session is answered by the
+ordinary no-character entry gate, never by the pending refusal.
 
 #### Scenario: A second switch while one is pending is refused
 - **WHEN** `account.character.switch` is submitted for a session that already has a puppet
@@ -32,9 +37,16 @@ the session SHALL again accept a further character-changing action normally.
   is scheduled
 
 #### Scenario: The next request is admitted once the pending transition completes
-- **WHEN** a session's pending transition finishes, by success or by any recovery-ladder step
-- **THEN** a subsequently submitted `account.character.switch` or `account.character.create` is
-  admitted and evaluated normally, not refused as pending
+- **WHEN** a session's pending transition finishes by success, or by a recovery/cancellation step
+  that retained or restored a puppet, and the session submits a further
+  `account.character.switch` or `account.character.create`
+- **THEN** the request is admitted and evaluated normally, not refused as pending
+
+#### Scenario: The pending refusal never shadows a puppet-less session
+- **WHEN** the recovery rung that leaves the session holding no character has finished and a
+  further character-changing action is submitted from that session
+- **THEN** the request is answered by the ordinary no-character entry gate rather than the
+  `transition_pending` refusal
 
 #### Scenario: A rapid double submission never reports a false success
 - **WHEN** two `account.character.switch` requests naming different owned characters are submitted
