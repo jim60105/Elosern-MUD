@@ -21,6 +21,7 @@ possibility to connect with a guest account. The setting file accepts
 several more options for customizing the Guest account system.
 
 """
+from typing import Any
 
 from evennia.accounts.accounts import DefaultAccount, DefaultGuest
 
@@ -197,6 +198,24 @@ class Account(DefaultAccount):
             self.db._last_puppet = character
             return True
         return False
+
+    def at_post_disconnect(self, **kwargs: Any) -> None:
+        """Release active possession on disconnect (companion-possession-transition)."""
+        super().at_post_disconnect(**kwargs)
+        # Multisession guard: if account still has other connected sessions,
+        # do not release possession if another session is still puppeting the possessed NPC.
+        if getattr(self, "is_connected", False) and hasattr(self, "sessions"):
+            has_npc_puppet = False
+            for sess in self.sessions.all():
+                puppet = getattr(sess, "puppet", None)
+                if puppet is not None and getattr(getattr(puppet, "db", None), "possessed_by", None) is not None:
+                    has_npc_puppet = True
+                    break
+            if has_npc_puppet:
+                return
+        from world.rules.possession import release_on_disconnect
+
+        release_on_disconnect(self)
 
 
 class Guest(DefaultGuest):

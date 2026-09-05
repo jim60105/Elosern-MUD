@@ -248,6 +248,10 @@ class LLMNPC(NPC):
     # library's npc.thinking key.
     thinking_messages: tuple | None = AttributeProperty(default=None)
 
+    def at_pre_puppet(self, account: Any, session: Any = None, **kwargs: Any) -> None:
+        """Accept puppeting by an account during possession (permit-only override)."""
+        super().at_pre_puppet(account, session=session, **kwargs)
+
     def _memory_key(self, character: Any) -> str:
         """Return the stable per-character memory partition key.
 
