@@ -98,9 +98,9 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         )
 
     def _open_suggestions_pane(self, page):
-        desc = page.evaluate("() => window.__elosernBridge.router.currentDescriptor()") or {}
+        desc = page.evaluate("() => (window.__elosernBridge && window.__elosernBridge.router.currentDescriptor()) || {}")
         if desc.get("source") != "exploration.suggestions":
-            page.locator('[data-testid="dock-menu"] [data-item-key="suggestions"]').click(force=True)
+            page.evaluate("() => window.__elosernBridge.store.tabToRootAndConfirm('suggestions')")
             page.wait_for_timeout(60)
 
     def _wait_section(self, page, timeout=30000):
