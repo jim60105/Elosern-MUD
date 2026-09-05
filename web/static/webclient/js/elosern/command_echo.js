@@ -106,6 +106,11 @@
     "account.character.create",
     "account.character.switch",
     "creation.roll_name",
+    // explore.dialogue_leave has no typed equivalent (the `talk` command
+    // requires a keyword; no farewell stop exists): the server's deterministic
+    // success line is the player-facing outcome, delivered as narrative by the
+    // commit itself (webclient-align-11).
+    "explore.dialogue_leave",
     "options.dismiss",
   ];
 

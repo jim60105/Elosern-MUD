@@ -13,6 +13,7 @@
     "creation.roll_name",
     "creation.reset",
     "explore.engage",
+    "explore.dialogue_leave",
     "explore.look",
     "explore.move",
     "explore.party_invite",
@@ -42,6 +43,7 @@
     "account.character.create",
     "account.character.switch",
     "creation.roll_name",
+    "explore.dialogue_leave",
     "options.dismiss"
   ]
 }

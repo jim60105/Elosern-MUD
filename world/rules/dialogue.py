@@ -21,6 +21,10 @@ as its ONLY read/write surface: ``open_or_refresh_dialogue`` /
 ``db.dialogue_session`` on the character is the single truth of WHO the
 character is speaking to and the latest server-authored LINE; no presenter,
 AI layer, or client payload may open, refresh, or clear it.
+The clear seams are: movement settlement, combat engage, NPC departure
+cleanup, and the ``explore.dialogue_leave`` adapter's explicit exit
+(webclient-align-11) — the adapter calls ``clear_dialogue_session`` here and
+never touches ``db`` itself.
 """
 
 from collections.abc import Mapping
@@ -357,6 +361,9 @@ def clear_dialogue_session(character: Any, npc: Any | None = None) -> bool:
     value is a no-op ``False``. ``npc`` may be a live object or a pre-captured
     positive dbid — deletion hooks run after the object's ``pk`` is gone, and
     an unresolvable host id is a no-op (it never matches a stored session).
+    The ``explore.dialogue_leave`` adapter's success path is the explicit
+    exit seam (webclient-align-11): it re-checks liveness itself and clears
+    unconditionally.
     """
     session = _parse_dialogue_session(character.db.dialogue_session)
     if session is None:

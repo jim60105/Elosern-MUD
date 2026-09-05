@@ -84,8 +84,9 @@ def build_production_action_registry() -> ActionRegistry:
     the six creation adapters (``creation.preset``, ``creation.custom``,
     ``creation.concept``, ``creation.roll_name``, ``creation.activate``,
     ``creation.reset``), and the
-    eight exploration adapters (``explore.move``, ``explore.look``,
-    ``explore.talk_scripted``, ``explore.talk_freeform``, ``explore.party_invite``,
+    nine exploration adapters (``explore.move``, ``explore.look``,
+    ``explore.talk_scripted``, ``explore.talk_freeform``,
+    ``explore.dialogue_leave``, ``explore.party_invite``,
     ``explore.party_leave``, ``explore.engage``, ``explore.wait``), the two
     title ballot adapters (``title.accept``, ``title.decline``), the two
     account adapters (``account.character.switch``, ``account.character.create``), and the
@@ -126,6 +127,7 @@ def build_production_action_registry() -> ActionRegistry:
         validate_creation_roll_name_payload,
     )
     from web.webclient.actions.exploration_actions import (
+        _dialogue_leave_adapter,
         _engage_adapter,
         _look_adapter,
         _move_adapter,
@@ -137,6 +139,7 @@ def build_production_action_registry() -> ActionRegistry:
         _talk_scripted_adapter,
         _wait_adapter,
         validate_engage_payload,
+        validate_dialogue_leave_payload,
         validate_look_payload,
         validate_move_payload,
         validate_party_invite_payload,
@@ -385,6 +388,16 @@ def build_production_action_registry() -> ActionRegistry:
             adapter=_talk_freeform_adapter,
             # Full snapshot so an applied intent (including a mode change)
             # refreshes atomically (design D5).
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.dialogue_leave",
+            validate_payload=validate_dialogue_leave_payload,
+            adapter=_dialogue_leave_adapter,
+            # Full snapshot so the mode recomputes back to exploration
+            # atomically with the cleared session (align-11 D1).
             affected_panels=(),
         )
     )

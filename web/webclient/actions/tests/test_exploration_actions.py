@@ -31,6 +31,7 @@ from web.webclient.actions.exploration_actions import (
     MAX_SPEECH_CODE_POINTS,
     ExplorationActionError,
     _current_node,
+    _dialogue_leave_adapter,
     _engage_adapter,
     _look_adapter,
     _move_adapter,
@@ -42,6 +43,7 @@ from web.webclient.actions.exploration_actions import (
     _talk_scripted_adapter,
     _wait_adapter,
     validate_engage_payload,
+    validate_dialogue_leave_payload,
     validate_look_payload,
     validate_move_payload,
     validate_party_invite_payload,
@@ -180,6 +182,21 @@ class ExplorationValidatorTests(unittest.TestCase):
         ):
             with self.assertRaises(ExplorationActionError):
                 validate_talk_freeform_payload(bad)
+
+    def test_dialogue_leave_payload_exact(self):
+        self.assertEqual(
+            validate_dialogue_leave_payload({"npc_id": 3}), {"npc_id": 3}
+        )
+        for bad in (
+            None,
+            {},
+            {"npc_id": 0},
+            {"npc_id": True},
+            {"npc_id": "3"},
+            {"npc_id": 3, "extra": 1},
+        ):
+            with self.assertRaises(ExplorationActionError):
+                validate_dialogue_leave_payload(bad)
 
     def test_party_invite_payload_exact(self):
         self.assertEqual(
@@ -1254,6 +1271,68 @@ class DialogueSessionRecordingAdapterTests(BattlefieldIsolation, EvenniaTestCase
             result = await_result(deferred)
         self.assertEqual(result["outcome"], "success")
         self.assertIn("離開", result["message"])
+        self.assertIsNone(self.player.db.dialogue_session)
+
+
+class DialogueLeaveAdapterTests(BattlefieldIsolation, EvenniaTestCase):
+    """``explore.dialogue_leave`` ends the live session through the sole writer
+    and writes nothing on rejection (webclient-align-11)."""
+
+    def setUp(self):
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
+        _reset_guardrail()
+        register_npc_dialogue()
+        get_world_clock()
+        self.room1 = create_object(Room, key="起點")
+        self.player = create_object(PlayerCharacter, key="對話.leave測試")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.host = create_object(NPC, key="公會職員", location=self.room1)
+        self.host.components.add(
+            ScriptedDialogue.create(self.host, dialogue_key="guild_staff")
+        )
+
+    def tearDown(self):
+        _reset_guardrail()
+        super().tearDown()
+
+    def _open_session(self) -> None:
+        result = _talk_scripted_adapter(
+            self.player, {"npc_id": int(self.host.pk), "keyword_id": "公會"}
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertIsNotNone(self.player.db.dialogue_session)
+
+    def test_success_clears_the_session_and_only_the_session(self):
+        self._open_session()
+        with patch.object(self.player, "msg"):
+            result = _dialogue_leave_adapter(
+                self.player, {"npc_id": int(self.host.pk)}
+            )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "dialogue_left")
+        self.assertIn("你結束了對話。", result["message"])
+        self.assertIsNone(self.player.db.dialogue_session)
+        # The full-snapshot affected set lets the dispatcher's completion
+        # publish recompute the mode back to exploration.
+        self.assertEqual(result["affected_panels"], ())
+
+    def test_mismatched_npc_id_rejects_with_zero_writes(self):
+        self._open_session()
+        other = create_object(NPC, key="路人", location=self.room1)
+        stored = self.player.db.dialogue_session
+        result = _dialogue_leave_adapter(self.player, {"npc_id": int(other.pk)})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "dialogue_inactive")
+        self.assertEqual(self.player.db.dialogue_session, stored)
+
+    def test_no_live_session_rejects(self):
+        result = _dialogue_leave_adapter(self.player, {"npc_id": int(self.host.pk)})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "dialogue_inactive")
         self.assertIsNone(self.player.db.dialogue_session)
 
 

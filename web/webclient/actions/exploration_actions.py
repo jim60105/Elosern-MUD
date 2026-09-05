@@ -1,8 +1,9 @@
 """Exact exploration action payload validators and narrow adapters.
 
-The eight production exploration actions are ``explore.move``, ``explore.look``,
-``explore.talk_scripted``, ``explore.talk_freeform``, ``explore.party_invite``,
-``explore.party_leave``, ``explore.engage``, and ``explore.wait``. Each
+The nine production exploration actions are ``explore.move``, ``explore.look``,
+``explore.talk_scripted``, ``explore.talk_freeform``, ``explore.dialogue_leave``,
+``explore.party_invite``, ``explore.party_leave``, ``explore.engage``, and
+``explore.wait``. Each
 validator enforces an exact bounded payload shape; each adapter re-resolves
 every referenced identity from the actor's **current** location's present
 contents and re-verifies the exact eligibility at commit time, calls only
@@ -23,8 +24,10 @@ from world.rules.clock import DaypartError, get_world_clock, seconds_until_daypa
 from world.rules.combat_session import CombatSessionError, SessionReason, engage
 from world.rules.dialogue import (
     DIALOGUE_TABLE,
+    clear_dialogue_session,
     dialogue_key_for,
     is_dialogue_host,
+    live_dialogue_session,
     open_or_refresh_dialogue,
     run_scripted_talk,
 )
@@ -165,6 +168,15 @@ def validate_talk_freeform_payload(payload: Any) -> dict[str, Any]:
             payload["speech"], "speech", MAX_SPEECH_CODE_POINTS
         ),
     }
+
+
+def validate_dialogue_leave_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact ``explore.dialogue_leave`` payload."""
+    if not isinstance(payload, dict):
+        raise ExplorationActionError("explore.dialogue_leave payload must be an object")
+    if set(payload) != {"npc_id"}:
+        raise ExplorationActionError("explore.dialogue_leave requires exactly npc_id")
+    return {"npc_id": _require_positive_int(payload["npc_id"], "npc_id")}
 
 
 def validate_party_invite_payload(payload: Any) -> dict[str, Any]:
@@ -431,6 +443,35 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
     message = f"{npc.key}說：{result.response}{hint}"
     actor.msg(message)
     return _success("talked", message, AFFECTED_FULL)
+
+
+def _dialogue_leave_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
+    """End the viewer's live session through the sole writer (align-11 D1).
+
+    Re-reads the actor's LIVE session: with none, or one naming another NPC,
+    the adapter rejects with the stable code ``dialogue_inactive`` before any
+    write. Success clears through ``clear_dialogue_session`` — the ONLY-writer
+    helper this seam was added to the spec to name — and the dispatcher's
+    post-action full snapshot recompute flips the mode back to ``exploration``
+    atomically; the adapter pushes nothing itself.
+    """
+    del session
+    from world.rules.possession import (
+        POSSESSED_REFUSAL_MESSAGES,
+        REASON_POSSESSED_TALK,
+        is_possessed_actor,
+    )
+
+    if is_possessed_actor(actor):
+        return _rejected(REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
+
+    live = live_dialogue_session(actor)
+    if live is None or live.npc_id != payload["npc_id"]:
+        return _rejected("dialogue_inactive", "你目前沒有在和這個對象交談。")
+    clear_dialogue_session(actor)
+    message = "你結束了對話。"
+    actor.msg(message)
+    return _success("dialogue_left", message, AFFECTED_FULL)
 
 
 def _talk_freeform_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> Deferred:
