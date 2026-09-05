@@ -42,6 +42,7 @@
     "Overlays/CreationOverlay",
     "Overlays/PartyStrip",
     "Overlays/PartyDrawer",
+    "Overlays/ObjectiveTracker",
     "Feedback/ToastQueue"
   ],
   "frozen": true

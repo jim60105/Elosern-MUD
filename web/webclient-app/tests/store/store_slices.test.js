@@ -17,6 +17,7 @@ const PANEL_ALLOWLIST = [
   "context_actions",
   "local_map",
   "party",
+  "objectives",
   "services",
   "creation",
   "exploration",
@@ -575,6 +576,68 @@ describe("store view slices", () => {
     expect(store.view.partyAvailable).toBe(false);
     expect(store.partyAvailable).toBe(false);
     expect(store.view.partySlots).toEqual([]);
+  });
+
+  it("derives objectivesAvailable and objectivesRows reactively from committed objectives panel (webclient-align-09-objective-tracker-ui)", () => {
+    openActiveSession(store);
+    // Initial snapshot has no objectives panel
+    expect(store.view.objectivesAvailable).toBe(false);
+    expect(store.objectivesAvailable).toBe(false);
+    expect(store.view.objectivesRows).toEqual([]);
+    expect(store.objectivesRows).toEqual([]);
+
+    // Commit objectives panel with rows
+    const objectivesData = {
+      schema_version: 1,
+      available: true,
+      rows: [
+        {
+          quest_id: "q_1042",
+          display_name: "磨坊糧運",
+          objective_line: "抵達霧骨渡口",
+          stage_index: 1,
+          stage_total: 2,
+          stage_progress: 1,
+          objective_quantity: 1,
+          reward_copper: null,
+          deadline_line: null,
+        },
+      ],
+    };
+    const r1 = store.receive(
+      1,
+      "ui_update",
+      [fx.update({ revision: 2, panels: { objectives: objectivesData } })],
+      {},
+    );
+    expect(r1.accepted).toBe(true);
+    expect(store.view.objectivesAvailable).toBe(true);
+    expect(store.objectivesAvailable).toBe(true);
+    expect(store.view.objectivesRows).toHaveLength(1);
+    expect(store.objectivesRows[0].objective_line).toBe("抵達霧骨渡口");
+
+    // Commit unavailable objectives panel
+    const r2 = store.receive(
+      1,
+      "ui_update",
+      [
+        fx.update({
+          revision: 3,
+          panels: {
+            objectives: {
+              schema_version: 1,
+              available: false,
+              reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
+            },
+          },
+        }),
+      ],
+      {},
+    );
+    expect(r2.accepted).toBe(true);
+    expect(store.view.objectivesAvailable).toBe(false);
+    expect(store.objectivesAvailable).toBe(false);
+    expect(store.view.objectivesRows).toEqual([]);
   });
 
   it("derives combatParticipants when context_actions is kind: combat (webclient-align-05-party-hud)", () => {

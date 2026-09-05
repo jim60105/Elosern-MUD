@@ -1869,6 +1869,14 @@ export const useElosernStore = defineStore("elosern", () => {
     const partyAvailable = !!partyPanel && partyPanel.available === true;
     const partySlots = partyAvailable && Array.isArray(partyPanel.slots) ? partyPanel.slots : [];
 
+    // Objectives read model (webclient-align-09-objective-tracker-ui): committed
+    // tracked quest rows from the available `objectives` panel (empty array when
+    // unavailable or absent).
+    const objectivesPanel = (rs.panels && rs.panels.objectives) || null;
+    const objectivesAvailable = !!objectivesPanel && objectivesPanel.available === true;
+    const objectivesRows =
+      objectivesAvailable && Array.isArray(objectivesPanel.rows) ? objectivesPanel.rows : [];
+
     // Combat participants (webclient-align-05-party-hud): committed combat participants
     // when context_actions is kind: 'combat' (empty array otherwise).
     const combatParticipants = panel && panel.kind === "combat" && Array.isArray(panel.participants)
@@ -1914,6 +1922,8 @@ export const useElosernStore = defineStore("elosern", () => {
        restFormRequest,
       partyAvailable,
       partySlots,
+      objectivesAvailable,
+      objectivesRows,
       combatParticipants,
       explorationInteract,
         activeSubDock: activeSubDock.value,
@@ -2654,6 +2664,8 @@ export const useElosernStore = defineStore("elosern", () => {
 
   const partyAvailable = computed(() => !!view.value.partyAvailable);
   const partySlots = computed(() => view.value.partySlots || []);
+  const objectivesAvailable = computed(() => !!view.value.objectivesAvailable);
+  const objectivesRows = computed(() => view.value.objectivesRows || []);
   const combatParticipants = computed(() => view.value.combatParticipants || []);
   const explorationInteract = computed(() => view.value.explorationInteract || []);
 
@@ -2704,6 +2716,8 @@ export const useElosernStore = defineStore("elosern", () => {
     clearUncertain,
     partyAvailable,
     partySlots,
+    objectivesAvailable,
+    objectivesRows,
     combatParticipants,
     explorationInteract,
     getSender,

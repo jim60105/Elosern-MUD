@@ -38,6 +38,7 @@ import TitleCodexPanel from "./components/TitleCodexPanel.vue";
 import ToastQueue from "./components/ToastQueue.vue";
 import PartyStrip from "./components/PartyStrip.vue";
 import PartyDrawer from "./components/PartyDrawer.vue";
+import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 
 const store = useElosernStore();
 
@@ -707,6 +708,14 @@ const partyReason = computed(() => {
   return p?.reason?.message || "隊伍資訊目前無法顯示";
 });
 
+const showObjectiveTracker = computed(() => {
+  return (
+    store.objectivesAvailable &&
+    store.objectivesRows.length > 0 &&
+    store.view.mode !== "creation"
+  );
+});
+
 // The skill drawer's footer: the client's own `/cast` syntax as static,
 // client-local presentation copy (no OOB field carries it).
 const SKILL_CAST_HINT = "施放入口：cast <技法>[@威力]=<代號>";
@@ -848,6 +857,12 @@ onMounted(() => {
              geometry and the caption's width reservation are untouched
              (task 7.5) — H2 re-tenants that anchor. -->
       </template>
+      <template #objectives>
+        <ObjectiveTracker
+          v-if="showObjectiveTracker"
+          :rows="store.objectivesRows"
+        />
+      </template>
       <template #action-dock>
         <ActionDock
           v-if="rootItems.length > 0 || !!store.view.degradedRoot || !!store.view.suggestions || (store.view.mode === 'creation' && panelAvailable('creation'))"
@@ -933,6 +948,7 @@ onMounted(() => {
         @quest_accept="onQuestAction"
         @quest_abandon="onQuestAction"
         @quest_turnin="onQuestAction"
+        @quest_track="onQuestAction"
         @exam_start="onQuestAction"
         @open_lore="() => store.openHudDrawer('lore')"
       />
