@@ -117,6 +117,7 @@ function chipGlyph(verb) {
    leaves the accessibility tree and the tab order. The gate must live at
    the stage root, so this block is unscoped. */
 .elosern-stage[data-elosern-mode="exploration"] .qwc-combat,
+.elosern-stage[data-elosern-mode="dialogue"] .qwc-combat,
 .elosern-stage[data-elosern-mode="creation"] .qwc-exploration,
 .elosern-stage[data-elosern-mode="creation"] .qwc-combat {
   display: none;

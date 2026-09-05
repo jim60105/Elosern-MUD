@@ -1485,6 +1485,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                     "creation",
                     "exploration",
                     "lineage",
+                    "dialogue",
                     "character",
                     "title_ballot",
                     "title_codex",

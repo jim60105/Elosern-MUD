@@ -62,7 +62,7 @@
   var MAX_RESULT_DATA_FIELDS = 8;
   var MAX_RESULT_DATA_BYTES = MAX_CANONICAL_JSON_BYTES - RESULT_DATA_STANDARD_RESERVE;
 
-  var MODES = ["creation", "exploration", "combat"];
+  var MODES = ["creation", "exploration", "combat", "dialogue"];
   var OUTCOMES = ["success", "rejected", "stale", "error"];
   // State-identity and diagnostic key names an adapter data slot must never
   // carry at any nesting level (dot-segment heads included), mirroring
@@ -346,6 +346,18 @@
   var OBJECTIVES_MAX_OBJECTIVE_LINE = 128;
   var OBJECTIVES_MAX_DEADLINE_LINE = 64;
 
+  // Dialogue panel bounds (mirror of web.webclient.presentation.dialogue,
+  // webclient-align-10): the choice cap mirrors MAX_SCRIPTED_KEYWORDS, the
+  // keyword bounds mirror the exploration keyword vocabulary, and the line
+  // bound is the shared dialogue-session prose bound (never the generic
+  // protocol ceiling) — the write path truncates to it, so over-bound
+  // dialogue is corruption and rejects.
+  var DIALOGUE_SCHEMA_VERSION = 1;
+  var DIALOGUE_MAX_CHOICES = 16;
+  var DIALOGUE_MAX_KEYWORD_ID = 64;
+  var DIALOGUE_MAX_KEYWORD_LABEL = 128;
+  var DIALOGUE_MAX_LINE = 2000;
+
   var PANEL_ALLOWLIST = {
     art: 1,
     status: 2,
@@ -358,6 +370,7 @@
     exploration: 1,
     character: 7,
     lineage: 1,
+    dialogue: 1,
     title_ballot: 1,
     title_codex: 1,
   };
@@ -4541,6 +4554,115 @@
     return result;
   }
 
+  // Dialogue panel validator (mirror of web.webclient.presentation.dialogue,
+  // webclient-align-10). Available form is exactly schema_version, available,
+  // kind, host (party-row triple with a null portrait_ref), bond_stage (a
+  // stage NAME or null — never a number), a bounded line, and at most
+  // DIALOGUE_MAX_CHOICES unique {keyword_id, label} rows. Every string
+  // rejects lone surrogates exactly like the Python validator; over-bound or
+  // corrupt values reject, never truncate.
+  function validateDialoguePanel(payload) {
+    requireExactFields(
+      payload,
+      "dialogue panel",
+      ["schema_version", "available", "kind", "host", "bond_stage", "line", "choices"],
+      []
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== DIALOGUE_SCHEMA_VERSION) {
+      throw new Error("unsupported dialogue schema_version");
+    }
+    if (payload.available !== true) {
+      throw new Error("dialogue panel must be available");
+    }
+    if (payload.kind !== "dialogue") {
+      throw new Error("dialogue kind must be dialogue");
+    }
+    requireExactFields(
+      payload.host,
+      "dialogue host",
+      ["identity", "display_name", "portrait_ref"],
+      []
+    );
+    requireInt(payload.host.identity, "identity", 1, MAX_SAFE_INTEGER);
+    var hostName = requireString(
+      payload.host.display_name,
+      "display_name",
+      PARTY_MAX_DISPLAY_NAME
+    );
+    if (!hostName.trim() || hasLoneSurrogate(hostName)) {
+      throw new Error("host display_name must be non-empty");
+    }
+    if (payload.host.portrait_ref !== null) {
+      throw new Error("portrait_ref must be null in this schema version");
+    }
+    if (payload.bond_stage !== null) {
+      var bondStage = requireString(
+        payload.bond_stage,
+        "bond_stage",
+        PARTY_MAX_DISPLAY_NAME
+      );
+      if (!bondStage.trim() || hasLoneSurrogate(bondStage)) {
+        throw new Error("bond_stage must be non-empty when set");
+      }
+    }
+    var line = requireString(payload.line, "line", DIALOGUE_MAX_LINE);
+    if (!line.trim() || hasLoneSurrogate(line)) {
+      throw new Error("dialogue line must be non-empty");
+    }
+    var choices = payload.choices;
+    if (!Array.isArray(choices)) {
+      throw new Error("dialogue choices must be a list");
+    }
+    if (choices.length > DIALOGUE_MAX_CHOICES) {
+      throw new Error(
+        "dialogue choices must hold at most " + DIALOGUE_MAX_CHOICES + " entries"
+      );
+    }
+    // Prototype-null registry: a plain object would let a literal
+    // "__proto__" keyword_id defeat the own-property duplicate check.
+    var seen = Object.create(null);
+    for (var i = 0; i < choices.length; i++) {
+      var choice = choices[i];
+      var name = "dialogue choice " + (i + 1);
+      requireExactFields(choice, name, ["keyword_id", "label"], []);
+      var keywordId = requireString(
+        choice.keyword_id,
+        "keyword_id",
+        DIALOGUE_MAX_KEYWORD_ID
+      );
+      if (!keywordId.trim() || hasLoneSurrogate(keywordId)) {
+        throw new Error(name + " keyword_id must be non-empty");
+      }
+      var label = requireString(
+        choice.label,
+        "label",
+        DIALOGUE_MAX_KEYWORD_LABEL
+      );
+      if (!label.trim() || hasLoneSurrogate(label)) {
+        throw new Error(name + " label must be non-empty");
+      }
+      if (Object.prototype.hasOwnProperty.call(seen, keywordId)) {
+        throw new Error("dialogue choice keyword ids must be unique");
+      }
+      seen[keywordId] = true;
+    }
+    var result = {
+      schema_version: DIALOGUE_SCHEMA_VERSION,
+      available: true,
+      kind: "dialogue",
+      host: payload.host,
+      bond_stage: payload.bond_stage,
+      line: line,
+      choices: choices,
+    };
+    // Envelope guarantee mirrors the Python validator's closing check.
+    if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("dialogue payload exceeds the OOB envelope limit");
+    }
+    return result;
+  }
+
   // Panel discriminator dispatch: the unavailable form is common to every
   // registered panel; the available form is validated against its schema.
   function validateUnavailablePanel(payload, schemaVersion) {
@@ -4616,6 +4738,9 @@
     }
     if (name === "objectives") {
       return validateObjectivesPanel(payload);
+    }
+    if (name === "dialogue") {
+      return validateDialoguePanel(payload);
     }
     if (name === "services") {
       return validateServicesPanel(payload);
@@ -4928,6 +5053,9 @@
     validateServicesPanel: validateServicesPanel,
     validatePartyPanel: validatePartyPanel,
     validateObjectivesPanel: validateObjectivesPanel,
+    validateDialoguePanel: validateDialoguePanel,
+    DIALOGUE_SCHEMA_VERSION: DIALOGUE_SCHEMA_VERSION,
+    DIALOGUE_MAX_CHOICES: DIALOGUE_MAX_CHOICES,
     PARTY_SCHEMA_VERSION: PARTY_SCHEMA_VERSION,
     PARTY_MAX_ROWS: PARTY_MAX_ROWS,
     OBJECTIVES_SCHEMA_VERSION: OBJECTIVES_SCHEMA_VERSION,

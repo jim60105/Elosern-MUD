@@ -86,7 +86,7 @@ FORBIDDEN_RESULT_DATA_KEYS = frozenset(
 # Epoch form: exactly 22 URL-safe ASCII characters from 128 random bits.
 EPOCH_LENGTH = 22
 
-MODES = ("creation", "exploration", "combat")
+MODES = ("creation", "exploration", "combat", "dialogue")
 OUTCOMES = ("success", "rejected", "stale", "error")
 PROTOCOL_ERROR_CODES = (
     "unsupported_version",

@@ -1556,7 +1556,7 @@ test("the unavailable forms differ only in schema_version", () => {
 });
 
 test("mirrors every registered panel schema version in the allowlist", () => {
-  // The allowlist must cover all thirteen registered panels so an unmirrored
+  // The allowlist must cover all fourteen registered panels so an unmirrored
   // panel can never slip through the registered-version gate.
   assert.equal(Protocol.PANEL_ALLOWLIST.status, 2);
   assert.equal(Protocol.PANEL_ALLOWLIST.local_map, 1);
@@ -1568,12 +1568,13 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.character, 7);
   assert.equal(Protocol.PANEL_ALLOWLIST.lineage, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.dialogue, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.title_ballot, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.title_codex, 1);
   assert.equal(
     Object.keys(Protocol.PANEL_ALLOWLIST).length,
-    13,
-    "PANEL_ALLOWLIST must list exactly the thirteen registered panels"
+    14,
+    "PANEL_ALLOWLIST must list exactly the fourteen registered panels"
   );
 });
 
@@ -5437,6 +5438,123 @@ test("objectives is in the production panel allowlist and rejects atomically", (
       schema_version: 1,
       available: false,
       reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
+    },
+  };
+  envelope.revision = 7;
+  assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
+});
+
+// ---------------------------------------------------------------------------
+// dialogue panel v1 (mirror of web.webclient.presentation.dialogue,
+// webclient-align-10). Host reuses the NPC wire vocabulary; bond_stage is a
+// canonical stage NAME or null (the raw affinity never rides the wire);
+// choices are at most 16 unique {keyword_id, label} rows; the line obeys the
+// surrogate rules shared with the server.
+// ---------------------------------------------------------------------------
+
+function validDialogueChoice(overrides) {
+  return Object.assign({ keyword_id: "公會", label: "公會" }, overrides || {});
+}
+
+function validDialoguePanel(overrides) {
+  return Object.assign(
+    {
+      schema_version: 1,
+      available: true,
+      kind: "dialogue",
+      host: { identity: 41, display_name: "公會職員", portrait_ref: null },
+      bond_stage: "熟人",
+      line: "歡迎來到冒險者公會。",
+      choices: [validDialogueChoice()],
+    },
+    overrides || {}
+  );
+}
+
+test("dialogue available form validates and empty choices and null stage are legal", () => {
+  assert.deepEqual(Protocol.validateDialoguePanel(validDialoguePanel()), validDialoguePanel());
+  assert.equal(Protocol.validateDialoguePanel(validDialoguePanel({ choices: [] })).choices.length, 0);
+  assert.equal(Protocol.validateDialoguePanel(validDialoguePanel({ bond_stage: null })).bond_stage, null);
+  // Paired astral code points are legal text on both mirrors.
+  assert.doesNotThrow(() =>
+    Protocol.validateDialoguePanel(validDialoguePanel({ line: "歡迎\u{1F600}。" }))
+  );
+});
+
+test("dialogue validator mirrors the server drift rejections", () => {
+  for (const bad of [
+    // prototype-named own keys from JSON.parse must read as unknown fields
+    JSON.parse(
+      '{"schema_version":1,"available":true,"kind":"dialogue","host":{"identity":41,"display_name":"a","portrait_ref":null},"bond_stage":"友","line":"嗯","choices":[],"__proto__":{}}'
+    ),
+    validDialoguePanel({ extra: 1 }),
+    (() => {
+      const missing = validDialoguePanel();
+      delete missing.choices;
+      return missing;
+    })(),
+    validDialoguePanel({ schema_version: 2 }),
+    // the unavailable form belongs to the registry, not this validator
+    { schema_version: 1, available: false },
+    validDialoguePanel({ available: false }),
+    validDialoguePanel({ kind: "party" }),
+    // host vocabulary drift
+    validDialoguePanel({ host: { identity: 41, display_name: "a", portrait_ref: "42" } }),
+    validDialoguePanel({ host: { identity: 0, display_name: "a", portrait_ref: null } }),
+    validDialoguePanel({ host: { identity: 41, display_name: "  ", portrait_ref: null } }),
+    validDialoguePanel({
+      host: { identity: 41, display_name: "同".repeat(129), portrait_ref: null },
+    }),
+    // numeric bond_stage can never reach the wire
+    validDialoguePanel({ bond_stage: 3 }),
+    validDialoguePanel({ bond_stage: "" }),
+    // line bounds and orphan surrogates
+    validDialoguePanel({ line: "" }),
+    validDialoguePanel({ line: "言".repeat(2001) }),
+    validDialoguePanel({ line: "\ud800壞" }),
+    // choice cap and uniqueness
+    validDialoguePanel({ choices: Array.from({ length: 17 }, (_, i) => validDialogueChoice({ keyword_id: "詞" + i, label: "詞" + i })) }),
+    validDialoguePanel({ choices: [validDialogueChoice(), validDialogueChoice()] }),
+    validDialoguePanel({ choices: [validDialogueChoice({ keyword_id: " " })] }),
+    // a literal __proto__ keyword pair must hit the duplicate check: the
+    // registry is prototype-null so the first row is an own property
+    validDialoguePanel({
+      choices: [
+        validDialogueChoice({ keyword_id: "__proto__" }),
+        validDialogueChoice({ keyword_id: "__proto__" }),
+      ],
+    }),
+    validDialoguePanel({ choices: [validDialogueChoice({ keyword_id: "\ud800" })] }),
+    validDialoguePanel({ choices: [{ keyword_id: "公會" }] }),
+    validDialoguePanel({ choices: [{ keyword_id: "公會", label: "公會", extra: 1 }] }),
+    validDialoguePanel({ choices: [{ keyword_id: "公會", label: "說".repeat(129) }] }),
+  ]) {
+    assert.throws(() => Protocol.validateDialoguePanel(bad));
+  }
+});
+
+test("dialogue is in the production panel allowlist with dialogue mode accepted", () => {
+  assert.equal(Protocol.PANEL_ALLOWLIST.dialogue, 1);
+  const envelope = {
+    protocol_version: 1,
+    presentation_epoch: VALID_EPOCH,
+    revision: 5,
+    mode: "dialogue",
+    panels: {
+      dialogue: { schema_version: 1, available: true, kind: "dialogue" },
+    },
+    layout_version: 1,
+    server_time: serverTime(),
+  };
+  assert.throws(() => Protocol.validateSnapshot(envelope));
+  envelope.panels = { dialogue: validDialoguePanel() };
+  envelope.revision = 6;
+  assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
+  envelope.panels = {
+    dialogue: {
+      schema_version: 1,
+      available: false,
+      reason: { code: "dialogue_unavailable", message: "對話目前無法顯示" },
     },
   };
   envelope.revision = 7;

@@ -1028,7 +1028,11 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         monster.apply_monster_tier("floor")
         result = _engage_adapter(self.player, {"monster_id": int(monster.pk)})
         self.assertEqual(result["outcome"], "success")
-        self.assertEqual(result["affected_panels"], ("status", "context_actions"))
+        # Engage clears the dialogue session inside the deterministic core, so
+        # the partial update must re-render ``dialogue`` too (webclient-align-10).
+        self.assertEqual(
+            result["affected_panels"], ("status", "context_actions", "dialogue")
+        )
         self.assertTrue(is_in_active_session(self.player))
 
     def test_engage_rejects_remote_or_dead_target_without_session(self):

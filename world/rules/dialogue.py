@@ -293,6 +293,16 @@ def _parse_dialogue_session(raw: Any) -> DialogueSession | None:
         return None
     if not isinstance(line, str):
         return None
+    # A stored line beyond the write bound or carrying unpaired surrogate code
+    # points is corruption (webclient-align-10): the write path truncates and
+    # never emits surrogates, so such a value can only come from damaged
+    # storage. Corrupt state is "not live" here, which makes the dialogue
+    # panel degrade through its REGISTERED unavailable form instead of
+    # failing available-form validation as an internal presenter error.
+    if len(line) > MAX_DIALOGUE_SESSION_LINE_CODE_POINTS:
+        return None
+    if any(0xD800 <= ord(char) <= 0xDFFF for char in line):
+        return None
     if updated_tick is not None and (
         not isinstance(updated_tick, int) or isinstance(updated_tick, bool)
     ):

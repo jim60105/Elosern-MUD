@@ -61,7 +61,10 @@ MAX_SPEECH_CODE_POINTS = 512
 # coordinator publishes a full snapshot (design D3/D5/D7): movement, dialogue,
 # and clock skips genuinely change many surfaces together.
 AFFECTED_FULL: tuple[str, ...] = ()
-AFFECTED_ENGAGE = ("status", "context_actions")
+# Engage clears any live dialogue session inside the deterministic core, so
+# the partial update must re-render ``dialogue`` too (webclient-align-10):
+# without it the pre-engage available panel stays committed under combat mode.
+AFFECTED_ENGAGE = ("status", "context_actions", "dialogue")
 
 
 class ExplorationActionError(ValueError):
