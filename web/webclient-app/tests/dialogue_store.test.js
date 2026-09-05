@@ -145,9 +145,28 @@ describe("dialogue store teardown + keys", () => {
       [dialogueSnapshot({ dialogue: { ...DIALOGUE_PANEL, choices: [{ keyword_id: "one", label: "一句" }] } })],
       {},
     );
-    // 2 rows render (one pick + free row): digit 3 has no row.
+    // Digit slots address ONLY the rendered picks (the spec's "first four
+    // rendered picks"): with one pick, digits 2–4 have no slot — the free
+    // row is reachable by pointer/Enter, never by a digit.
+    expect(store.focusPress("2")).toBe(false);
     expect(store.focusPress("3")).toBe(false);
     expect(sender.sent.actions).toHaveLength(0);
+  });
+
+  it("a digit never activates the freeform row", () => {
+    openSession();
+    store.receive(
+      1,
+      "ui_snapshot",
+      [dialogueSnapshot({ dialogue: { ...DIALOGUE_PANEL, choices: [{ keyword_id: "one", label: "一句" }] } })],
+      {},
+    );
+    const before = store.view.drawerRequest;
+    // With one pick, the rendered rows are [pick, free row]: digit 2 used to
+    // land on the free row and borrow the command line. Slots are now
+    // picks-only, so the press is unclaimed and no borrow happens.
+    expect(store.focusPress("2")).toBe(false);
+    expect(store.view.drawerRequest).toBe(before);
   });
 
   it("→ borrows the command line for the committed host and dispatches nothing", () => {

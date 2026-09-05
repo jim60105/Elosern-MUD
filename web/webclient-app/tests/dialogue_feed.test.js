@@ -102,6 +102,45 @@ describe("NarrativeFeed dialogue variant", () => {
     expect(streamTexts).toEqual(["码头的水声。"]);
   });
 
+  it("cuts the anchored 說：echo of the committed reply out of the stream", () => {
+    const w = mountFeed({
+      lines: [
+        { kind: "out", text: "码头的水声。" },
+        { kind: "in", text: "talk 灰婆婆 客套" },
+        { kind: "out", text: `灰婆婆說：${PANEL.line}` },
+      ],
+    });
+    // The box owns the reply; the input echo stays; the echo line is gone.
+    expect(w.findAll(".narrative-line.out").map((l) => l.text())).toEqual(["码头的水声。"]);
+    expect(w.findAll(".narrative-line.inp")).toHaveLength(1);
+  });
+
+  it("keeps only the daily-affinity hint residual of a capped echo", () => {
+    const hint = "（今天你們之間的交流已經夠多了，她看起來有些疲憊。）";
+    // The stored text carries the markup pipeline's shape: the newline before
+    // the hint arrives as a tag the strip removes, gluing 緊接 directly after
+    // the reply (the live-observed seam).
+    const w = mountFeed({
+      lines: [
+        { kind: "out", text: "码头的水声。" },
+        { kind: "out", text: `灰婆婆說：${PANEL.line}<br>${hint}` },
+      ],
+    });
+    expect(w.findAll(".narrative-line.out").map((l) => l.text())).toEqual([
+      "码头的水声。",
+      hint,
+    ]);
+  });
+
+  it("never suppresses a player input echo that repeats the reply text", () => {
+    const w = mountFeed({
+      lines: [{ kind: "out", text: "码头的水声。" }, { kind: "in", text: PANEL.line }],
+    });
+    // kind "in" keeps its literal line even when the text coincides.
+    expect(w.findAll(".narrative-line")).toHaveLength(2);
+    expect(w.findAll(".narrative-line.inp").map((l) => l.text())).toEqual([PANEL.line]);
+  });
+
   it("never removes an older identical line when the tail differs", () => {
     const w = mountFeed({
       lines: [

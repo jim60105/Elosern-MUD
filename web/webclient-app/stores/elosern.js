@@ -2660,8 +2660,14 @@ export const useElosernStore = defineStore("elosern", () => {
       // one source of truth). Every other pane renders `back` as an
       // ordered row, so its slot is real there.
       const items = menu && menu.items ? menu.items : [];
-      const slots =
-        classifyPane({ items }) === "outlet"
+      // The dialogue form's digit slots address ONLY the rendered picks:
+      // the legend names digits for the scripted choices, and the freeform
+      // row is the command-line borrow (Enter/pointer/→), never a digit
+      // target. A degraded dialogue root presents no items at all, so its
+      // digits are unclaimed and keep command-line semantics.
+      const slots = dialogueFormPresented()
+        ? items.filter((i) => i && !i.freeform)
+        : classifyPane({ items }) === "outlet"
           ? items.filter((i) => i && i.key !== "back")
           : items;
       const item = slots[slot];

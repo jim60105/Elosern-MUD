@@ -69,18 +69,61 @@ export default {
 
     // Announce-once invariant (design risk §): the `.dlg` box renders the
     // SAME committed line the narrative stream already carries. The variant
-    // owns presentation of that exchange, so a verbatim duplicate is dropped
-    // — ONLY when the FINAL stream line is exactly the committed reply (never
-    // searched backwards: an older unrelated line with the same text is
-    // never removed, and the polite live region keeps announcing each new
-    // committed line exactly once).
+    // owns presentation of that exchange, so the exchange's stream record is
+    // dropped — but ONLY through an anchored match on the FINAL output line:
+    // either the verbatim reply or the deterministic echo form
+    // `<host>說：<reply>` the scripted/freeform adapters emit for it. A player
+    // input echo (`kind: "in"`) is never suppressed even when its text
+    // coincides with the reply, and an older line is never searched
+    // backwards. The polite live region keeps announcing each new committed
+    // line exactly once.
     const renderedLines = computed(() => {
       const lines = props.lines;
       if (!dialogueVariant.value || lines.length === 0) {
         return lines;
       }
       const last = lines[lines.length - 1];
-      return last && lineText(last) === props.dialogue.line ? lines.slice(0, -1) : lines;
+      if (!last || (last && last.kind) === "in") {
+        return lines;
+      }
+      // Stored stream text carries the markup pipeline's inline spans; the
+      // committed reply is plain server-authored prose. The match runs on the
+      // markup-stripped text (the residual keeps the markup-free hint prose).
+      const text = lineText(last).replace(/<[^>]*>/g, "");
+      const reply = props.dialogue.line;
+      // The anchored echo form is `<npc key>說：<reply>` (the scripted and
+      // freeform adapters' message shape). The key differs from the panel's
+      // display_name (no title), so the match anchors on the speech-marker
+      // seam and a bounded speaker prefix. A settled exchange may carry the
+      // server's daily-affinity hint as a newline-delimited suffix on the
+      // same message. The exchange's reply is presentation-duplicated by the
+      // box, so the stream keeps ONLY the residual (the hint) after the
+      // anchored reply is cut — never the reply twice, never the hint lost.
+      const prefixCut = text.lastIndexOf("說：");
+      const suffix = prefixCut > 0 ? text.slice(prefixCut + 2) : "";
+      const exactEcho =
+        prefixCut > 0 &&
+        prefixCut <= 48 &&
+        !text.slice(0, prefixCut).includes("說：") &&
+        suffix.startsWith(reply);
+      // The residual is the markup-free remainder AFTER the anchored reply.
+      // A null/empty residual means the whole line was the exchange: it drops.
+      const remainder = exactEcho ? suffix.slice(reply.length).replace(/^(\n|<br\s*\/?>)+/i, "") : "";
+      const matches =
+        text === reply ||
+        (exactEcho &&
+          (suffix === reply ||
+            suffix[reply.length] === "\n" ||
+            // The markup pipeline turns the newline before the hint into a
+            // tag the strip above removes, so the parenthetical hint glyph
+            // is the observed seam on stored (markup-bearing) text.
+            suffix[reply.length] === "（"));
+      if (!matches) {
+        return lines;
+      }
+      return remainder === ""
+        ? lines.slice(0, -1)
+        : [...lines.slice(0, -1), { ...last, text: remainder }];
     });
 
     // One line → the vnodes that render it: a divider plus a literal `.inp`
@@ -182,13 +225,24 @@ export default {
       () => [props.lines.length, dialogueVariant.value ? props.dialogue.line : null],
       ([newLen, newLine], [oldLen, oldLine] = []) => {
         const added = Math.max(0, newLen - (oldLen ?? 0));
-        const lineChanged = newLine !== oldLine;
+        const variant = dialogueVariant.value;
+        // A reply change only owns the focus while the variant is presented;
+        // the null→line transition on ENTERING the variant counts as a new
+        // reply, and the line→null transition on EXITING it must not be
+        // mistaken for one (it would pin and scroll a box that no longer
+        // exists).
+        const replyChanged = variant && newLine !== oldLine;
         const wasAtBottom = atBottom();
+        if (!variant && dialoguePin.value) {
+          // Exiting the variant releases the pin — the box is gone and the
+          // pin must not survive to leak into a later dialogue mount.
+          dialoguePin.value = false;
+        }
         void nextTick().then(() => {
-          if (added === 0 && !lineChanged) {
+          if (added === 0 && !replyChanged) {
             return;
           }
-          if (lineChanged) {
+          if (replyChanged) {
             // A committed dialogue reply owns the caption's focus: the box is
             // pinned into view even when the player had scrolled the stream
             // away (the exchange it carries is the newest line).
@@ -198,7 +252,7 @@ export default {
             pinDialogueBox();
           } else if (wasAtBottom) {
             scrollToBottom();
-          } else if (added > 0 && !(dialoguePin.value && dialogueVariant.value)) {
+          } else if (added > 0 && !dialoguePin.value) {
             // While the dialogue variant pins, the newest exchange stays
             // visible in the box — nothing arrived unread.
             unread.value += added;
