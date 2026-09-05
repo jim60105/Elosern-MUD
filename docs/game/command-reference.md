@@ -817,8 +817,8 @@
 | `@reload` | 重新載入伺服器程式碼 |
 | `@reset` | 重置伺服器狀態 |
 | `@shutdown` | 關閉伺服器 |
-| `charcreate` | 為帳號建立新角色（管理員） |
-| `chardelete` | 刪除帳號的角色（管理員） |
+| `charcreate` | 為帳號建立新角色（管理員，需 Developer 權限） |
+| `chardelete` | 刪除帳號的角色（管理員，需 Developer 權限） |
 | `discord2chan` | 將 Discord 頻道連結到遊戲頻道 |
 | `grapevine2chan` | 將 Grapevine 頻道連結到遊戲頻道 |
 | `irc2chan` | 將 IRC 頻道連結到遊戲頻道 |

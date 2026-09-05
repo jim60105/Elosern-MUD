@@ -69,6 +69,7 @@ ENV_BACKED: dict[str, str] = {
     "ART_SCHEDULER_INTERVAL_SECONDS": "ART_SCHEDULER_INTERVAL_SECONDS",
     "ART_SCHEDULER_LIMIT": "ART_SCHEDULER_LIMIT",
     "ELOSERN_VUE_CLIENT": "ELOSERN_VUE_CLIENT",
+    "MAX_NR_CHARACTERS": "ELOSERN_MAX_CHARACTERS",
 }
 
 # repr() of each effective default, exactly as test_art_settings.py pins them.
@@ -99,6 +100,7 @@ DEFAULT_REPR: dict[str, str] = {
     "ART_SCHEDULER_INTERVAL_SECONDS": "30",
     "ART_SCHEDULER_LIMIT": "4",
     "ELOSERN_VUE_CLIENT": "True",
+    "MAX_NR_CHARACTERS": "5",
 }
 
 # One valid override per env-backed setting: (setting, variable, raw,
@@ -154,6 +156,9 @@ VALID_OVERRIDES: list[tuple[str, str, str, str]] = [
     ("ART_SCHEDULER_INTERVAL_SECONDS", "ART_SCHEDULER_INTERVAL_SECONDS", "15", "15"),
     ("ART_SCHEDULER_LIMIT", "ART_SCHEDULER_LIMIT", "8", "8"),
     ("ELOSERN_VUE_CLIENT", "ELOSERN_VUE_CLIENT", "off", "False"),
+    ("MAX_NR_CHARACTERS", "ELOSERN_MAX_CHARACTERS", "1", "1"),
+    ("MAX_NR_CHARACTERS", "ELOSERN_MAX_CHARACTERS", "10", "10"),
+    ("MAX_NR_CHARACTERS", "ELOSERN_MAX_CHARACTERS", " 5 ", "5"),
 ]
 
 # (env var, raw value, extra expected stderr substring) per fail-closed family.
@@ -189,6 +194,10 @@ INVALID_VALUES: list[tuple[str, str, str]] = [
     ("ART_SD_PROBE_CACHE_SECONDS", "4", "expected an integer between 5 and 3600"),
     ("ART_SD_PROBE_CACHE_SECONDS", "3601", "expected an integer between 5 and 3600"),
     ("ART_SD_PROBE_CACHE_SECONDS", "0", "expected an integer between 5 and 3600"),
+    ("ELOSERN_MAX_CHARACTERS", "0", "expected an integer between 1 and 10"),
+    ("ELOSERN_MAX_CHARACTERS", "11", "expected an integer between 1 and 10"),
+    ("ELOSERN_MAX_CHARACTERS", "-1", "expected an integer between 1 and 10"),
+    ("ELOSERN_MAX_CHARACTERS", "twelve", "expected an integer between 1 and 10"),
 ]
 
 _IMPORT = "import server.conf.settings as s"
@@ -245,7 +254,11 @@ class _SubprocessSettingsTests(unittest.TestCase):
             for key, value in os.environ.items()
             if key != "DJANGO_SETTINGS_MODULE"
             and not key.startswith("ART_")
-            and key not in ("SD_WEBUI_BASE_URL", "ELOSERN_VUE_CLIENT")
+            and key not in (
+                "SD_WEBUI_BASE_URL",
+                "ELOSERN_VUE_CLIENT",
+                "ELOSERN_MAX_CHARACTERS",
+            )
         }
 
     def _run(self, code: str, **overrides: str) -> subprocess.CompletedProcess[str]:

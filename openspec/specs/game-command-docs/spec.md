@@ -50,7 +50,11 @@ primary key, its aliases (including Traditional Chinese aliases and, for localiz
 retained full English alias set), its argument syntax, its availability context, and a non-empty
 Traditional Chinese description. The key and aliases SHALL match the command class definition, the
 syntax and context SHALL match the curated command manifest in `tests/test_command_docs.py`, and
-admin commands SHALL carry their permission requirement. The `rest` entry's syntax SHALL document the optional declared-practice clause
+admin commands SHALL carry their permission requirement. The account character-management
+commands `charcreate` and `chardelete` SHALL be mounted on the project `AccountCmdSet` locked to
+`Developer` permission rather than Evennia's default player permission, so the documented 管理員
+context is enforced by the mounted classes and the character-creation wizard remains the single
+player-facing creation path. The `rest` entry's syntax SHALL document the optional declared-practice clause
 (`rest <duration> [practice <skill>]`) and its description SHALL state that a declared practice
 settles hourly proficiency for the owned, uncapped skill while an unlabeled rest advances time
 with no growth; the curated manifest and the `docs/game/commands.md` rest row SHALL carry the
@@ -77,9 +81,17 @@ same clause.
 
 #### Scenario: Admin commands carry a permission note
 
-- **WHEN** a command class is locked to `Developer` permission (the `art` command family)
+- **WHEN** a command class is locked to `Developer` permission (the `art` command family and the
+  account character-management commands `charcreate` and `chardelete`)
 - **THEN** the reference entry SHALL mark the command as admin-only and the contract test SHALL
   verify the class locks require `Developer`
+
+#### Scenario: Raising the character cap does not open a player creation command
+
+- **WHEN** the configured character capacity is greater than one and an account holding only
+  Player permission enters `charcreate` or `chardelete`
+- **THEN** the command is refused by its lock, no character is created or deleted, and the
+  reference page's 管理員 rows remain accurate
 
 #### Scenario: Builder-gated commands carry a permission note
 

@@ -28,6 +28,10 @@ import evennia
 evennia._init()
 
 from evennia import default_cmds
+from evennia.commands.default.account import (
+    CmdCharCreate as _CmdCharCreate,
+    CmdCharDelete as _CmdCharDelete,
+)
 from evennia.commands.cmdhandler import CMD_NOMATCH
 
 from commands.character_creation import CharacterCreationCmdSet
@@ -238,7 +242,10 @@ def mounted_command_classes() -> dict[str, object]:
         for command in cmdset.commands
     }
     classes = {
-        key: command for key, command in merged.items() if type(command) not in default_classes
+        key: command
+        for key, command in merged.items()
+        if type(command) not in default_classes
+        and not isinstance(command, (_CmdCharCreate, _CmdCharDelete))
     }
     classes.update({command.key: command for command in ProjectXYZGridCmdSet().commands})
     classes.update(
@@ -630,6 +637,62 @@ class CommandDocsContractTests(unittest.TestCase):
                 locked_builder,
                 f"builder marking for {key!r} disagrees with its class locks",
             )
+        account_cmdset = AccountCmdSet()
+        for key in ("charcreate", "chardelete"):
+            cmd = account_cmdset.get(key)
+            self.assertIsNotNone(cmd, f"{key} must be mounted in AccountCmdSet")
+            self.assertIn(
+                "perm(Developer)",
+                cmd.locks or "",
+                f"{key} must require Developer permission",
+            )
+            self.assertRegex(
+                self.reference,
+                rf"\|\s*`{key}`\s*\|\s*.*管理員.*Developer.*\|",
+                f"reference table row for {key} must state Developer requirement",
+            )
+
+    @covers_requirement("game-command-docs::accurate-command-details")
+    def test_player_permission_cannot_execute_charcreate_or_chardelete(self):
+        """Scenario: Raising the character cap does not open a player creation command."""
+        account_cmdset = AccountCmdSet()
+        charcreate_cmd = account_cmdset.get("charcreate")
+        chardelete_cmd = account_cmdset.get("chardelete")
+
+        class DummyCaller:
+            is_superuser = False
+            account = None
+
+            def __init__(self, perms):
+                self._perms = perms
+
+            @property
+            def permissions(self):
+                perms = self._perms
+                class PermHandler:
+                    def all(self):
+                        return perms
+                return PermHandler()
+
+        caller_player = DummyCaller(["player"])
+        self.assertFalse(
+            charcreate_cmd.access(caller_player, "cmd"),
+            "charcreate must refuse access to a Player-permission account",
+        )
+        self.assertFalse(
+            chardelete_cmd.access(caller_player, "cmd"),
+            "chardelete must refuse access to a Player-permission account",
+        )
+
+        caller_dev = DummyCaller(["developer"])
+        self.assertTrue(
+            charcreate_cmd.access(caller_dev, "cmd"),
+            "charcreate must allow access to a Developer-permission account",
+        )
+        self.assertTrue(
+            chardelete_cmd.access(caller_dev, "cmd"),
+            "chardelete must allow access to a Developer-permission account",
+        )
 
     @covers_requirement("game-command-docs::drift-contract-test")
     def test_no_orphan_canonical_entries(self):

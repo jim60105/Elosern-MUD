@@ -55,6 +55,62 @@ class LoginIntroductionTests(EvenniaTest):
         self.assertNotIn("伊洛瑟恩大陸", messages)
         self.assertNotIn("你站在伊洛瑟恩大陸的門口", messages)
 
+    @covers_requirement("connection-screen::a-newly-registered-account-receives-a-world-introduction-before-character-creation")
+    def test_abandoned_pending_sibling_does_not_retrigger_introduction(self):
+        from world.rules.character_creation import (
+            CharacterCreationRequest,
+            activate_player_character,
+        )
+
+        activate_player_character(
+            self.account,
+            self.char1,
+            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+        )
+        char2, _ = self.account.create_character(key="Char2Pending")
+        self.assertTrue(char2.creation_pending)
+        self.assertFalse(self.char1.creation_pending)
+
+        self.account.db._last_puppet = self.char1
+        messages = self._messages_on_login()
+        self.assertNotIn("伊洛瑟恩大陸", messages)
+        self.assertNotIn("你站在伊洛瑟恩大陸的門口", messages)
+        self.assertNotIn("character preset", messages)
+
+    @covers_requirement("connection-screen::a-newly-registered-account-receives-a-world-introduction-before-character-creation")
+    def test_pending_sibling_login_sees_introduction_and_creation_screen(self):
+        from world.rules.character_creation import (
+            CharacterCreationRequest,
+            activate_player_character,
+        )
+
+        activate_player_character(
+            self.account,
+            self.char1,
+            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+        )
+        char2, _ = self.account.create_character(key="Char2Pending")
+
+        self.account.unpuppet_object(self.session)
+        self.session.puppet = None
+        self.account.db._last_puppet = char2
+        messages = self._messages_on_login()
+        self.assertIn("伊洛瑟恩大陸", messages)
+        self.assertIn("你站在伊洛瑟恩大陸的門口", messages)
+        self.assertIn("character preset", messages)
+
+    @covers_requirement("connection-screen::a-newly-registered-account-receives-a-world-introduction-before-character-creation")
+    def test_unpuppeted_login_shows_no_introduction(self):
+        self.account.unpuppet_object(self.session)
+        self.session.puppet = None
+        self.account.db._last_puppet = None
+
+        messages = self._messages_on_login()
+        self.assertNotIn("伊洛瑟恩大陸", messages)
+        self.assertNotIn("你站在伊洛瑟恩大陸的門口", messages)
+        self.assertNotIn("character preset", messages)
+        self.assertIsNone(self.session.puppet)
+
     @covers_requirement("webclient-login-gate::the-webclient-overlay-shows-the-waiting-for-login-state-for-anonymous-sessions")
     def test_login_emits_logged_in_oob_to_the_session(self):
         # The webclient login gate is driven by the server's `logged_in` OOB

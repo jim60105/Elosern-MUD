@@ -4,6 +4,7 @@ from tools.spec_traceability import covers_requirement
 
 from unittest.mock import patch
 
+from django.test import override_settings
 from evennia import default_cmds
 from evennia.objects.objects import DefaultObject
 from evennia.utils.create import create_object
@@ -611,6 +612,32 @@ class LocalizedAccountCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_ooc_look_while_puppeted_is_blocked(self):
         output = self.call(CmdOOCLook(), "", caller=self.account)
         self.assertIn("你目前沒有能力查看四周。", output)
+
+    def test_ooc_and_ooc_look_render_playable_list_at_cap_one_and_raised_cap(self):
+        # 1. Start puppeted, leave character (OOC) at MAX_NR_CHARACTERS=1
+        with override_settings(MAX_NR_CHARACTERS=1):
+            output = self.call(CmdOOC(), "", caller=self.account)
+            self.assertIn("你已離開角色", output)
+            self.assertNotIn("回到遊戲", output)
+            self.assertIn(self.char1.key, output)
+
+            # OOC Look while unpuppeted at MAX_NR_CHARACTERS=1
+            output_look = self.call(CmdOOCLook(), "", caller=self.account)
+            self.assertNotIn("回到遊戲", output_look)
+            self.assertIn(self.char1.key, output_look)
+
+        # 2. Re-puppet and test at raised cap (MAX_NR_CHARACTERS=5)
+        self.account.puppet_object(self.session, self.char1)
+        with override_settings(MAX_NR_CHARACTERS=5):
+            output = self.call(CmdOOC(), "", caller=self.account)
+            self.assertIn("你已離開角色", output)
+            self.assertNotIn("回到遊戲", output)
+            self.assertIn(self.char1.key, output)
+
+            # OOC Look while unpuppeted at MAX_NR_CHARACTERS=5
+            output_look = self.call(CmdOOCLook(), "", caller=self.account)
+            self.assertNotIn("回到遊戲", output_look)
+            self.assertIn(self.char1.key, output_look)
 
     def test_ic_command_puppets_the_only_matching_character(self):
         with patch.object(self.account, "puppet_object") as puppet:
