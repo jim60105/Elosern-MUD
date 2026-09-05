@@ -86,6 +86,7 @@ ACTION_IDS = (
     "explore.party_invite",
     "explore.party_leave",
     "explore.engage",
+    "explore.possess",
 )
 SURFACES = ("guild", "shop")
 ENTITY_KINDS = ("character", "npc", "monster")

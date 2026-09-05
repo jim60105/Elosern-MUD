@@ -541,15 +541,15 @@ def _target_affordance_entries(
     from typeclasses.npcs import LLMNPC, NPC
 
     entries: list[AffordanceView] = []
+    if isinstance(obj, NPC) and is_dialogue_host(obj):
+        entries.extend(_scripted_entries(obj, actor=actor))
+    if isinstance(obj, LLMNPC):
+        entries.append(_freeform_entry(obj, actor=actor))
     if isinstance(obj, NPC) and is_companion(obj, actor):
         entries.append(_party_leave_entry(obj))
         entries.append(_possess_entry(obj, actor))
     elif isinstance(obj, LLMNPC):
         entries.append(_party_invite_entry(obj, actor))
-    if isinstance(obj, NPC) and is_dialogue_host(obj):
-        entries.extend(_scripted_entries(obj, actor=actor))
-    if isinstance(obj, LLMNPC):
-        entries.append(_freeform_entry(obj, actor=actor))
     if isinstance(obj, Monster):
         entries.append(_engage_entry(obj, actor=actor))
     if guild_host is not None and obj is guild_host:
