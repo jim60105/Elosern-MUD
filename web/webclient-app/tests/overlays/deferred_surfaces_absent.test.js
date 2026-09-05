@@ -19,8 +19,8 @@ import { CREATION_PANEL_SAMPLE, LOCAL_MAP_SAMPLE, localMapModelFor } from "../..
 
 // B5 (webclient-vue-06-showcase-overlays): the deferred-surfaces-absent and
 // frozen-manifest contract. A surface with no backing OOB read model today
-// (roadmap §7 — no Party panel, no event-log Toasts, no persistent objective
-// tracker, no authored game-help browser) MUST NOT be built or mocked, and
+// (roadmap §7 — no event-log Toasts, no authored game-help browser) MUST NOT
+// be built or mocked, and
 // the required-component manifest is frozen at the complete set (design D2/D3;
 // the delta spec's "deferred surfaces are absent, not mocked" + "manifest is
 // frozen" scenarios). The intimate/adult status collapsible is NO LONGER
@@ -28,6 +28,12 @@ import { CREATION_PANEL_SAMPLE, LOCAL_MAP_SAMPLE, localMapModelFor } from "../..
 // `character` panel's `intimate` field (schema version 4), so it is removed
 // from the deferred-surface list; its presence/absence behaviour is governed
 // by the `webclient-contextual-hud` character-status drawer requirement.
+//
+// The persistent objective tracker is likewise NO LONGER deferred:
+// webclient-align-06/09 backed it with the `objectives` presentation panel, so
+// it is removed from the deferred-surface list; its presence/absence and
+// rendering behaviour is governed by `webclient-contextual-hud`'s objective
+// tracker requirement.
 //
 // add-action-feedback-toasts (webclient-action-feedback): the toast BAN is
 // narrowed, not dropped. The deferred item is the EVENT-LOG read-model-backed
@@ -95,7 +101,10 @@ function collectStoryTitles(dir) {
 // inside "Baggage").
 //
 // H1 (webclient-hud-01-shell-and-scene): the stage reserves no anchor for
-// a companion strip, a toast queue, or a persistent objective tracker
+// a toast queue (roadmap §2.4 — no backing read model; deferred surfaces are
+// absent, not mocked). (webclient-align-05-party-hud and
+// webclient-align-09-objective-tracker-ui backed the companion strip and
+// objective tracker, so they are no longer deferred.)
 // (roadmap §2.4 — no backing read model; deferred surfaces are absent, not
 // mocked). H2 (webclient-hud-02-status-islands) names the unbacked HUD
 // claims the draft makes: the companion strip, the head card's
@@ -103,7 +112,6 @@ function collectStoryTitles(dir) {
 const DEFERRED_TITLE_PATTERNS = [
   /\bIntimate\b/i,
   /\bEventLog\b/i,
-  /\bObjectives?\b/i,
    // H2 additions: the head-card identity line and the minimap's unbacked
    // figures (roadmap §2.4 — no race/class/faction field or bearing/distance
    // exists in the payloads).
@@ -143,11 +151,6 @@ const DEFERRED_SURFACES = [
     name: "event-log game-event toast queue",
     waitsOn: "the `event_log` read model (the game-event toast queue)",
     testidPrefixes: ["event-log-", "toast-"],
-  },
-  {
-    name: "persistent objective tracker",
-    waitsOn: "the `objectives` read model (the persistent objectives field)",
-    testidPrefixes: ["objective-"],
   },
 ];
 
@@ -194,7 +197,8 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
     // removes ChoicePointBlock (42 → 41).
     // webclient-align-05-party-hud adds Overlays/PartyStrip and
     // Overlays/PartyDrawer (41 → 43).
-    expect(manifest.required).toHaveLength(43);
+    // webclient-align-09-objective-tracker-ui adds Overlays/ObjectiveTracker (43 → 44).
+    expect(manifest.required).toHaveLength(44);
    // The four full overlays complete the required set (B5's new family).
    for (const title of [
      "Overlays/MapOverlay",
@@ -204,6 +208,7 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
      "Overlays/CreationOverlay",
      "Overlays/PartyStrip",
      "Overlays/PartyDrawer",
+     "Overlays/ObjectiveTracker",
      "Core/CommandLine",
      "Core/QuickWordChips",
      "Action/DockTabBar",

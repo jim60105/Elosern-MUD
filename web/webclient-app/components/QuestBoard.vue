@@ -15,6 +15,7 @@ const emit = defineEmits([
   "quest_accept",
   "quest_abandon",
   "quest_turnin",
+  "quest_track",
   "exam_start",
   "quest_register",
   "open_lore",
@@ -181,6 +182,42 @@ function confirmAbandonNow() {
           <p class="quest-board__detail" data-testid="quest-board__quest-detail">
             {{ quest.detail }}
           </p>
+          <template v-if="quest.state === 'in_progress'">
+           <button
+              v-if="!quest.tracked"
+             type="button"
+              class="quest-board__action"
+              data-testid="quest-board__track"
+              @click="emit('quest_track', { action_id: 'guild.quest_track', payload: { quest_id: quest.quest_id, tracked: true } })"
+            >
+              追蹤
+            </button>
+           <button
+              v-else
+             type="button"
+              class="quest-board__action"
+              data-testid="quest-board__untrack"
+              @click="emit('quest_track', { action_id: 'guild.quest_track', payload: { quest_id: quest.quest_id, tracked: false } })"
+            >
+              取消追蹤
+            </button>
+          </template>
+          <template v-else>
+           <button
+             type="button"
+              class="quest-board__action"
+              data-testid="quest-board__track"
+              disabled
+            >
+              追蹤
+            </button>
+            <span
+              class="quest-board__reason"
+              data-testid="quest-board__track-reason"
+            >
+              （非進行中任務無法追蹤）
+            </span>
+          </template>
            <button
              v-if="quest.abandon && quest.abandon.enabled"
              type="button"
@@ -389,6 +426,13 @@ function confirmAbandonNow() {
 .quest-board__action:hover {
   border-color: var(--seal-400);
   color: var(--seal-400);
+}
+
+.quest-board__action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: var(--ink-600);
+  color: var(--paper-700);
 }
 
 .quest-board__reason {

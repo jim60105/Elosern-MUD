@@ -281,7 +281,6 @@
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_local_map_unavailable_renders_registry_reason_in_map_overlay",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_command_line_never_overlaps_dock_caption_or_hud",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_status_drawer_tiles_and_pills_fit_with_no_overlap",
-        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_digit_keys_pick_the_first_four_rows_of_the_current_frame",
         "web.tests.browser.test_browser_lineage.LineagePanelBrowserTest"
       ]
     }

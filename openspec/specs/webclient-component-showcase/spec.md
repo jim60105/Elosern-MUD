@@ -273,9 +273,9 @@ cancel, and the activate transition) each carry a real outcome and are unaffecte
 `local_map` OOB read model is updated, so a replaced payload never leaves a stale state; because the
 overlay is mounted in the running client, this SHALL hold against live read-model replacement and not
 only against a story's args. A surface with no backing OOB read model today — the
-event-log Toasts surface, the design draft's category-to-entry
+event-log Toasts surface and the design draft's category-to-entry
 game-help browser (the `help` command's output reaches the client only as narrative text; no committed
-panel carries it), and a persistent objective tracker — MUST NOT be built or mocked to look real, and each
+panel carries it) — MUST NOT be built or mocked to look real, and each
 SHALL be named in the deferred-surface assertion together with the read model it waits on; the help overlay
 SHALL therefore render the client's own control reference, which the client authoritatively knows, and no
 authored game-help content. The held-item bag is
@@ -289,7 +289,9 @@ requirement), and its completeness and absence-when-`null` behaviour are governe
 party quickbar and the 同伴 · 隊伍 drawer are likewise NOT among the deferred surfaces: they are backed by
 the `party` panel read model (`webclient-party-panel`), and their rendering and mutation behaviour is
 governed by `webclient-contextual-hud`'s party quickbar and party drawer requirements, not this
-deferred-surface list. The
+deferred-surface list. The persistent objective tracker is likewise NOT among the deferred surfaces: it is
+backed by the `objectives` panel read model (`webclient-objectives-panel`), and its rendering behaviour is
+governed by `webclient-contextual-hud`'s objective tracker requirement, not this deferred-surface list. The
 client-local action-feedback toast queue (`webclient-action-feedback`) is likewise NOT among the deferred
 surfaces: it presents only client-composed or verbatim server-authored action messages rather than a
 backend read model, so its `ToastQueue` component and `feedback-` test-id family are built and
@@ -324,7 +326,11 @@ be re-frozen at the complete redesign set and the component-coverage gate SHALL 
 
 #### Scenario: Deferred surfaces are absent, not mocked
 - **WHEN** the complete component set is enumerated
-- **THEN** no event-log Toasts surface, authored game-help browser, or persistent objective tracker is present and none presents invented data
+- **THEN** no event-log Toasts surface or authored game-help browser is present and none presents invented data
+
+#### Scenario: The objective tracker is no longer deferred
+- **WHEN** the complete component set and its deferred-surface assertion are enumerated
+- **THEN** the persistent objective tracker is absent from the deferred-surface list, because it now has a backing OOB read model (the `objectives` panel), its component is manifest-listed with a deterministic offline story, and its behaviour is asserted by `webclient-contextual-hud`'s objective tracker requirement instead
 
 #### Scenario: The party surfaces are no longer deferred
 - **WHEN** the complete component set and its deferred-surface assertion are enumerated

@@ -84,6 +84,7 @@ defineExpose({ menuOpen });
     >
       <slot name="command-line" />
     </div>
+    <slot name="objectives" />
   </div>
 </template>
 
@@ -216,7 +217,8 @@ defineExpose({ menuOpen });
    the stage is visually recessed; the mark clears only when nothing is
    open. The transition is token-gated, so prefers-reduced-motion disables
    it at the token level while the recessed state still applies. */
-.elosern-stage[data-menu-open="true"] .stage-anchor {
+.elosern-stage[data-menu-open="true"] .stage-anchor,
+.elosern-stage[data-menu-open="true"] .obj {
   filter: var(--menu-open-filter);
   transition: filter var(--motion-base) var(--ease-standard);
 }

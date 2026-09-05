@@ -283,6 +283,9 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
           @focus-lost="() => emit('focus-lost')"
         />
       </template>
+      <template #objectives>
+        <slot name="objectives" />
+      </template>
     </HudFrame>
 
     <!-- The header split (design D5): the top-left brand element and the

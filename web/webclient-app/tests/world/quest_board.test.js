@@ -158,4 +158,64 @@ describe("QuestBoard (B4 services family)", () => {
     expect(w.findAll('[data-testid^="quest-board__board-row--"]')).toHaveLength(0);
     expect(w.findAll('[data-testid^="quest-board__quest-row--"]')).toHaveLength(0);
   });
+
+  it("renders enabled 追蹤 button for tracked=false in_progress quest, clicking emits guild.quest_track with tracked=true", async () => {
+    const services = {
+      ...SERVICES_PANEL_SAMPLE,
+      guild: {
+        ...SERVICES_PANEL_SAMPLE.guild,
+        quests: [{ ...SERVICES_PANEL_SAMPLE.guild.quests[0], state: "in_progress", tracked: false }],
+      },
+    };
+    const w = mountBoard({ services });
+    const trackBtn = w.get('[data-testid="quest-board__track"]');
+    expect(trackBtn.text()).toBe("追蹤");
+    expect(trackBtn.attributes("disabled")).toBeUndefined();
+    expect(w.find('[data-testid="quest-board__untrack"]').exists()).toBe(false);
+
+    await trackBtn.trigger("click");
+    expect(w.emitted("quest_track")).toEqual([
+      [{ action_id: "guild.quest_track", payload: { quest_id: "q_1042", tracked: true } }],
+    ]);
+  });
+
+  it("renders enabled 取消追蹤 button for tracked=true in_progress quest, clicking emits guild.quest_track with tracked=false", async () => {
+    const services = {
+      ...SERVICES_PANEL_SAMPLE,
+      guild: {
+        ...SERVICES_PANEL_SAMPLE.guild,
+        quests: [{ ...SERVICES_PANEL_SAMPLE.guild.quests[0], state: "in_progress", tracked: true }],
+      },
+    };
+    const w = mountBoard({ services });
+    const untrackBtn = w.get('[data-testid="quest-board__untrack"]');
+    expect(untrackBtn.text()).toBe("取消追蹤");
+    expect(untrackBtn.attributes("disabled")).toBeUndefined();
+    expect(w.find('[data-testid="quest-board__track"]').exists()).toBe(false);
+
+    await untrackBtn.trigger("click");
+    expect(w.emitted("quest_track")).toEqual([
+      [{ action_id: "guild.quest_track", payload: { quest_id: "q_1042", tracked: false } }],
+    ]);
+  });
+
+  it("renders disabled 追蹤 button with reason for completed quest, clicking emits nothing", async () => {
+    const services = {
+      ...SERVICES_PANEL_SAMPLE,
+      guild: {
+        ...SERVICES_PANEL_SAMPLE.guild,
+        quests: [{ ...SERVICES_PANEL_SAMPLE.guild.quests[0], state: "completed", tracked: false }],
+      },
+    };
+    const w = mountBoard({ services });
+    const trackBtn = w.get('[data-testid="quest-board__track"]');
+    expect(trackBtn.text()).toBe("追蹤");
+    expect(trackBtn.attributes("disabled")).toBeDefined();
+
+    const reason = w.get('[data-testid="quest-board__track-reason"]');
+    expect(reason.text()).toContain("非進行中任務無法追蹤");
+
+    await trackBtn.trigger("click");
+    expect(w.emitted("quest_track")).toBeUndefined();
+  });
 });
