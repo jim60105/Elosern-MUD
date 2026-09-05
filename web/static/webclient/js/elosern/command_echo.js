@@ -98,11 +98,12 @@
   // `commandLine` checks this list first, so the declaration and the silence
   // share one code path.
   var SILENT_PRESENTATION_CONTROLS = [
-    // Account character switch is an account-level dropdown action; it does not
-    // route through the text command parser and emits no narrative command line.
+    // Account character switch and create are account-level actions; they do not
+    // route through the text command parser and emit no narrative command lines.
     // The name-roll button has no typed-command equivalent (the corpus name
     // arrives through the result slot, not an input line): declared silent
     // rather than fabricating a command (namegen-creation-ui D5/D8).
+    "account.character.create",
     "account.character.switch",
     "creation.roll_name",
     "options.dismiss",

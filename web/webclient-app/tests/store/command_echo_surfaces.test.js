@@ -628,6 +628,15 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
     },
     {
+      id: "EXPECTED SILENCE: account.character.create presentation control",
+      ids: ["account.character.create"],
+      silence: true,
+      prepare() {
+        openExploration();
+        store.dispatchAction("account.character.create", {});
+      },
+    },
+    {
       id: "EXPECTED SILENCE: account.character.switch presentation control",
       ids: ["account.character.switch"],
       silence: true,
@@ -686,6 +695,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       ).toBe(true);
     }
     expect(SILENT_IDS).toEqual([
+      "account.character.create",
       "account.character.switch",
       "creation.roll_name",
       "options.dismiss",

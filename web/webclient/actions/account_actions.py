@@ -33,8 +33,10 @@ Architectural Contract
 
 from typing import Any
 
+from django.conf import settings
 from twisted.internet import reactor as _default_reactor
 
+from commands.character_creation import creation_start_screen
 from web.webclient.actions.dispatcher import retire_sequence
 from web.webclient.presentation.ingress import (
     reset_client_sequence,
@@ -53,9 +55,21 @@ INVALID_CHARACTER_MESSAGE = "那不是你的角色。"
 
 IN_COMBAT_CODE = "in_combat"
 IN_COMBAT_MESSAGE = "戰鬥中無法切換角色。"
+CREATE_IN_COMBAT_MESSAGE = "戰鬥中無法建立角色。"
 
 ALREADY_CURRENT_CODE = "already_current"
 ALREADY_CURRENT_MESSAGE = "你已經在這個角色上了。"
+
+CREATE_SUCCESS_CODE = "character_created"
+CREATE_SUCCESS_MESSAGE = "已建立角色。"
+
+CHARACTER_SLOTS_FULL_CODE = "character_slots_full"
+CHARACTER_SLOTS_FULL_MESSAGE = "角色數量已達上限。"
+
+CREATE_FAILED_MESSAGE = "建立角色失敗。"
+
+NO_ACTIVE_SESSION_CODE = "no_active_session"
+NO_ACTIVE_SESSION_MESSAGE = "目前沒有作用中的會話。"
 
 # Player narrative recovery templates
 RECOVERY_RETAINED_TEMPLATE = "角色切換未完成，你目前仍在使用「{name}」。"
@@ -104,6 +118,19 @@ def validate_account_character_switch_payload(payload: Any) -> dict[str, Any]:
             f"'character_id' must be a positive integer, got {value!r}"
         )
     return {"character_id": value}
+
+
+def validate_account_character_create_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact ``account.character.create`` payload.
+
+    Requires an empty dictionary payload ({}). Any field, non-dictionary type,
+    or extra keys are refused with an ``AccountActionError``.
+    """
+    if not isinstance(payload, dict) or len(payload) > 0:
+        raise AccountActionError(
+            "account.character.create accepts an empty payload"
+        )
+    return {}
 
 
 def _send_player_msg(account: Any, session: Any, text: str) -> None:
@@ -359,25 +386,203 @@ def _account_character_switch_adapter(
     }
 
 
+def _perform_create(
+    session: Any,
+    account: Any,
+    previous: Any,
+) -> None:
+    """Scheduled creation callback executed on the reactor turn after admission.
+
+    Re-validates that the session still holds previous, re-checks capacity and combat,
+    calls account.create_character() before detaching, attaches the new shell via
+    _attach_puppet, and recovers without destroying the shell on failure.
+    """
+    # Verify the session still holds the puppet that admitted the creation
+    current = account.get_puppet(session) if account is not None else None
+    if current is not previous:
+        log_warn(
+            "char_create_stale_puppet",
+            context={
+                "account": str(getattr(account, "pk", "?")),
+                "session": str(getattr(session, "sessid", "?")),
+                "previous": str(getattr(previous, "pk", "?")),
+                "actual": str(getattr(current, "pk", "?")),
+            },
+        )
+        if current is not None:
+            synchronize_session(session, current)
+        return
+
+    # Re-validate capacity
+    characters = getattr(account, "characters", None) or []
+    max_chars = getattr(settings, "MAX_NR_CHARACTERS", 5)
+    if len(characters) >= max_chars:
+        log_warn(
+            "char_create_capacity_reached",
+            context={
+                "account": str(getattr(account, "pk", "?")),
+                "session": str(getattr(session, "sessid", "?")),
+                "count": str(len(characters)),
+                "max": str(max_chars),
+            },
+        )
+        _send_player_msg(account, session, CHARACTER_SLOTS_FULL_MESSAGE)
+        return
+
+    # Re-validate combat
+    if is_in_active_session(previous):
+        log_warn(
+            "char_create_entered_combat",
+            context={
+                "account": str(getattr(account, "pk", "?")),
+                "session": str(getattr(session, "sessid", "?")),
+                "previous": str(getattr(previous, "pk", "?")),
+            },
+        )
+        _send_player_msg(account, session, CREATE_IN_COMBAT_MESSAGE)
+        return
+
+    # Create the shell before any detach or puppet change
+    shell = None
+    errors = None
+    try:
+        res = account.create_character()
+        if isinstance(res, tuple) and len(res) == 2:
+            shell, errors = res
+        else:
+            shell, errors = res, None
+    except Exception as exc:
+        log_warn(
+            "char_create_call_failed",
+            context={
+                "account": str(getattr(account, "pk", "?")),
+                "session": str(getattr(session, "sessid", "?")),
+                "previous": str(getattr(previous, "pk", "?")),
+            },
+            exc=exc,
+        )
+        _send_player_msg(account, session, CREATE_FAILED_MESSAGE)
+        return
+
+    if shell is None:
+        err_summary = str(errors[:3])[:100] if isinstance(errors, (list, tuple)) else str(errors)[:100]
+        log_warn(
+            "char_create_rejected",
+            context={
+                "account": str(getattr(account, "pk", "?")),
+                "session": str(getattr(session, "sessid", "?")),
+                "previous": str(getattr(previous, "pk", "?")),
+                "errors": err_summary,
+            },
+        )
+        _send_player_msg(account, session, CREATE_FAILED_MESSAGE)
+        return
+
+    # Shell created successfully; now attach the new shell
+    attached = False
+    try:
+        attached = _attach_puppet(session, account, shell)
+    except Exception as exc:  # observability: ignore R2: recovery ladder handles attach failure and logs facade event
+        # A shell that was created but could not be attached is left in place, not deleted:
+        # deleting it here would be a destructive write on an error branch, and the roster
+        # makes the orphaned shell recoverable via account.character.switch.
+        _recover_transition(session, account, previous, shell, cause=exc)
+        return
+
+    if attached:
+        _set_last_puppet(account, shell)
+        synchronize_session(session, shell)
+        # Deliver the reusable creation start presentation. World introduction is
+        # structurally not sent (login hook only).
+        account.msg(creation_start_screen(), session=session)
+    else:
+        # A shell that was created but could not be attached is left in place, not deleted:
+        # deleting it here would be a destructive write on an error branch, and the roster
+        # makes the orphaned shell recoverable via account.character.switch.
+        _recover_transition(
+            session, account, previous, shell, cause="attach_verification_failed"
+        )
+
+
+def _account_character_create_adapter(
+    actor: Any,
+    payload: dict[str, Any],
+    session: Any = None,
+) -> dict[str, Any]:
+    """Decide account.character.create synchronously and schedule the transition.
+
+    Synchronously verifies account existence, capacity against settings.MAX_NR_CHARACTERS,
+    and combat lock. Returns a result-only success response (no_presentation=True) and
+    schedules the creation and puppet transition on the next reactor turn.
+    """
+    account = getattr(actor, "account", None)
+    if account is None:
+        return {
+            "outcome": "rejected",
+            "code": NO_ACTIVE_SESSION_CODE,
+            "message": NO_ACTIVE_SESSION_MESSAGE,
+            "no_presentation": True,
+        }
+
+    characters = getattr(account, "characters", None) or []
+    max_chars = getattr(settings, "MAX_NR_CHARACTERS", 5)
+    if len(characters) >= max_chars:
+        return {
+            "outcome": "rejected",
+            "code": CHARACTER_SLOTS_FULL_CODE,
+            "message": CHARACTER_SLOTS_FULL_MESSAGE,
+            "no_presentation": True,
+        }
+
+    if is_in_active_session(actor):
+        return {
+            "outcome": "rejected",
+            "code": IN_COMBAT_CODE,
+            "message": CREATE_IN_COMBAT_MESSAGE,
+            "no_presentation": True,
+        }
+
+    clock = get_clock()
+    clock.callLater(0, _perform_create, session, account, actor)
+
+    return {
+        "outcome": "success",
+        "code": CREATE_SUCCESS_CODE,
+        "message": CREATE_SUCCESS_MESSAGE,
+        "no_presentation": True,
+    }
+
+
 __all__ = [
     "AFFECTED_PANELS",
     "ALREADY_CURRENT_CODE",
     "ALREADY_CURRENT_MESSAGE",
     "AccountActionError",
+    "CHARACTER_SLOTS_FULL_CODE",
+    "CHARACTER_SLOTS_FULL_MESSAGE",
+    "CREATE_FAILED_MESSAGE",
+    "CREATE_IN_COMBAT_MESSAGE",
+    "CREATE_SUCCESS_CODE",
+    "CREATE_SUCCESS_MESSAGE",
     "IN_COMBAT_CODE",
     "IN_COMBAT_MESSAGE",
     "INVALID_CHARACTER_CODE",
     "INVALID_CHARACTER_MESSAGE",
+    "NO_ACTIVE_SESSION_CODE",
+    "NO_ACTIVE_SESSION_MESSAGE",
     "RECOVERY_FAILED_MESSAGE",
     "RECOVERY_RESTORED_TEMPLATE",
     "RECOVERY_RETAINED_TEMPLATE",
     "SUCCESS_CODE",
     "SUCCESS_MESSAGE",
+    "_account_character_create_adapter",
     "_account_character_switch_adapter",
     "_attach_puppet",
+    "_perform_create",
     "_perform_switch",
     "_recover_transition",
     "get_clock",
     "set_clock_for_testing",
+    "validate_account_character_create_payload",
     "validate_account_character_switch_payload",
 ]

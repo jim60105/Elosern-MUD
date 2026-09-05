@@ -12,11 +12,17 @@ from tools.spec_traceability import covers_requirement
 from evennia.server.serversession import ServerSession
 from evennia.utils.test_resources import EvenniaTest
 from twisted.internet.defer import Deferred
+from twisted.internet.task import Clock
 
 from server.conf import inputfuncs
 from typeclasses.characters import PlayerCharacter
+from web.webclient.actions.account_actions import set_clock_for_testing
 from web.webclient.actions.dispatcher import handle_ui_action, retire_sequence
-from web.webclient.actions.registry import ActionRegistry, ActionSpec
+from web.webclient.actions.registry import (
+    ActionRegistry,
+    ActionSpec,
+    build_production_action_registry,
+)
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.registry import build_production_registry
 
@@ -379,6 +385,231 @@ class OocLifecycleIntegrationTests(EvenniaTest):
             build_production_registry(),
         )
         self.assertEqual(len(received), 1, "repuppet must not replay the old cache")
+
+
+class MultiCharacterActionIntegrationTests(EvenniaTest):
+    """End-to-end WebSocket integration tests for multi-character create and switch flows (MC4).
+
+    Note: The `roster` panel assertions in these tests require `multichar-02-roster-read-model`.
+    Exercises:
+    1. Activate character A
+    2. Dispatch account.character.create, advance clock
+    3. Complete creation wizard for character B (preset selection + activate)
+    4. Dispatch account.character.switch back to A, advance clock
+    5. Dispatch account.character.switch forward to B, advance clock
+    Asserts complete snapshot delivery for status, character, and roster after each transition,
+    and matching action results for all submitted requests.
+    """
+
+    character_typeclass = PlayerCharacter
+
+    def setUp(self):
+        super().setUp()
+        import evennia
+
+        self.sessionhandler = evennia.SESSION_HANDLER
+        self.ws_session = _make_websocket_session(self.sessionhandler, self.account)
+        self.ws_session.puppet = self.char1
+        self.account.characters.add(self.char1)
+        self.char1.account = self.account
+        self.char1.race = "human"
+        self.char1.apply_race_baseline()
+        self.char1.creation_pending = False
+
+        from world.rules.clock import get_world_clock
+
+        get_world_clock()
+
+        self.clock = Clock()
+        set_clock_for_testing(self.clock)
+
+        self.action_registry = build_production_action_registry()
+        self.presentation_registry = build_production_registry()
+        self.sessionhandler.data_out.reset_mock()
+
+    def tearDown(self):
+        self.sessionhandler.data_out.reset_mock()
+        set_clock_for_testing(None)
+        super().tearDown()
+
+    def _sync(self):
+        self.sessionhandler.data_out.reset_mock()
+        inputfuncs.ui_sync(self.ws_session, {"protocol_version": 1})
+        calls = [
+            call
+            for call in self.sessionhandler.data_out.call_args_list
+            if "ui_snapshot" in call.kwargs
+        ]
+        return calls[-1].kwargs["ui_snapshot"][0][0]
+
+    def _live_action(self, request_id, action_id, payload=None):
+        coordinator = attach_coordinator(self.ws_session, self.presentation_registry)
+        return {
+            "protocol_version": 1,
+            "presentation_epoch": coordinator.epoch,
+            "request_id": request_id,
+            "base_revision": coordinator.revision,
+            "action_id": action_id,
+            "payload": payload if payload is not None else {},
+        }
+
+    def _dispatch(self, request_id, action_id, payload=None):
+        action = self._live_action(request_id, action_id, payload)
+        handle_ui_action(
+            self.ws_session,
+            self.ws_session.puppet,
+            action,
+            self.action_registry,
+            self.presentation_registry,
+        )
+
+    def _get_snapshots(self):
+        return [
+            call.kwargs["ui_snapshot"][0][0]
+            for call in self.sessionhandler.data_out.call_args_list
+            if "ui_snapshot" in call.kwargs
+        ]
+
+    def _get_action_results(self):
+        return [
+            call.kwargs["ui_action_result"][0][0]
+            for call in self.sessionhandler.data_out.call_args_list
+            if "ui_action_result" in call.kwargs
+        ]
+
+    @covers_requirement(
+        "webclient-character-roster::creating-a-character-is-an-allowlisted-account-scoped-action"
+    )
+    def test_multicharacter_create_switch_e2e_scenario(self):
+        """End-to-end WebSocket scenario: create B, complete wizard, switch to A, switch to B."""
+        # 1. Initial sync on character A (char1)
+        initial_snapshot = self._sync()
+        self.assertEqual(initial_snapshot["mode"], "exploration")
+        initial_status = initial_snapshot["panels"]["status"]
+        self.assertEqual(initial_status["actor"]["identity"], str(self.char1.pk))
+        initial_roster = initial_snapshot["panels"]["roster"]
+        self.assertEqual(len(initial_roster["characters"]), 1)
+        self.assertTrue(initial_roster["characters"][0]["current"])
+
+        # 2. Dispatch account.character.create
+        self.sessionhandler.data_out.reset_mock()
+        self._dispatch("req:create", "account.character.create")
+
+        # Action result delivered synchronously before transition
+        results = self._get_action_results()
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["request_id"], "req:create")
+        self.assertEqual(results[0]["outcome"], "success")
+        self.assertEqual(results[0]["code"], "character_created")
+
+        # Puppet is still char1 before reactor turn
+        self.assertIs(self.ws_session.puppet, self.char1)
+
+        # Advance reactor clock to trigger _perform_create
+        self.clock.advance(0)
+
+        # Wire sequencing: result was first, then no_puppet protocol error, then fresh ui_snapshot
+        call_types = [
+            list(call.kwargs.keys())[0]
+            for call in self.sessionhandler.data_out.call_args_list
+            if any(k in call.kwargs for k in ("ui_action_result", "ui_protocol_error", "ui_snapshot"))
+        ]
+        self.assertEqual(call_types, ["ui_action_result", "ui_protocol_error", "ui_snapshot"])
+
+        # Session puppet is now newly created character B
+        char_b = self.ws_session.puppet
+        self.assertIsNot(char_b, self.char1)
+        self.assertTrue(getattr(char_b, "creation_pending", False))
+        self.assertIn(char_b, self.account.characters)
+
+        # Snapshot for character B is in creation mode
+        create_snapshots = self._get_snapshots()
+        self.assertTrue(create_snapshots)
+        b_snapshot = create_snapshots[-1]
+        self.assertEqual(b_snapshot["mode"], "creation")
+        b_status = b_snapshot["panels"]["status"]
+        self.assertFalse(b_status["available"])
+        b_roster = b_snapshot["panels"]["roster"]
+        self.assertEqual(len(b_roster["characters"]), 2)
+        # Verify roster states: B is current and pending, A is non-current
+        roster_map = {int(c["identity"]): c for c in b_roster["characters"]}
+        self.assertTrue(roster_map[int(char_b.pk)]["current"])
+        self.assertTrue(roster_map[int(char_b.pk)]["pending"])
+        self.assertFalse(roster_map[int(self.char1.pk)]["current"])
+        self.assertFalse(b_roster["switch_locked"])
+
+        # 3. Complete creation wizard for character B: select preset then activate
+        self.sessionhandler.data_out.reset_mock()
+        self._dispatch("req:preset", "creation.preset", {"preset_key": "human_wanderer"})
+        preset_results = self._get_action_results()
+        self.assertEqual(len(preset_results), 1)
+        self.assertEqual(preset_results[0]["outcome"], "success")
+
+        self.sessionhandler.data_out.reset_mock()
+        self._dispatch("req:activate", "creation.activate")
+        activate_results = self._get_action_results()
+        self.assertEqual(len(activate_results), 1)
+        self.assertEqual(activate_results[0]["outcome"], "success")
+        self.assertFalse(getattr(char_b, "creation_pending", True))
+
+        # Snapshot after activation is now in exploration mode
+        active_snapshots = self._get_snapshots()
+        self.assertTrue(active_snapshots)
+        post_act_snapshot = active_snapshots[-1]
+        self.assertEqual(post_act_snapshot["mode"], "exploration")
+        self.assertEqual(post_act_snapshot["panels"]["status"]["actor"]["identity"], str(char_b.pk))
+        self.assertTrue(post_act_snapshot["panels"]["character"]["available"])
+
+        # 4. Switch back to character A (char1)
+        self.sessionhandler.data_out.reset_mock()
+        self._dispatch("req:switch_to_a", "account.character.switch", {"character_id": int(self.char1.pk)})
+        switch_a_results = self._get_action_results()
+        self.assertEqual(len(switch_a_results), 1)
+        self.assertEqual(switch_a_results[0]["request_id"], "req:switch_to_a")
+        self.assertEqual(switch_a_results[0]["outcome"], "success")
+        self.assertEqual(switch_a_results[0]["code"], "character_switched")
+
+        # Advance reactor clock
+        self.clock.advance(0)
+        self.assertIs(self.ws_session.puppet, self.char1)
+
+        # Snapshot for character A
+        switch_a_snapshots = self._get_snapshots()
+        self.assertTrue(switch_a_snapshots)
+        a_snapshot = switch_a_snapshots[-1]
+        self.assertEqual(a_snapshot["mode"], "exploration")
+        self.assertEqual(a_snapshot["panels"]["status"]["actor"]["identity"], str(self.char1.pk))
+        self.assertTrue(a_snapshot["panels"]["character"]["available"])
+        a_roster = a_snapshot["panels"]["roster"]
+        roster_map_a = {int(c["identity"]): c for c in a_roster["characters"]}
+        self.assertTrue(roster_map_a[int(self.char1.pk)]["current"])
+        self.assertFalse(roster_map_a[int(char_b.pk)]["current"])
+        self.assertFalse(a_roster["switch_locked"])
+
+        # 5. Switch forward to character B (char_b)
+        self.sessionhandler.data_out.reset_mock()
+        self._dispatch("req:switch_to_b", "account.character.switch", {"character_id": int(char_b.pk)})
+        switch_b_results = self._get_action_results()
+        self.assertEqual(len(switch_b_results), 1)
+        self.assertEqual(switch_b_results[0]["request_id"], "req:switch_to_b")
+        self.assertEqual(switch_b_results[0]["outcome"], "success")
+
+        # Advance reactor clock
+        self.clock.advance(0)
+        self.assertIs(self.ws_session.puppet, char_b)
+
+        # Snapshot for character B
+        switch_b_snapshots = self._get_snapshots()
+        self.assertTrue(switch_b_snapshots)
+        b_switched_snapshot = switch_b_snapshots[-1]
+        self.assertEqual(b_switched_snapshot["mode"], "exploration")
+        self.assertEqual(b_switched_snapshot["panels"]["status"]["actor"]["identity"], str(char_b.pk))
+        self.assertTrue(b_switched_snapshot["panels"]["character"]["available"])
+        b_switched_roster = b_switched_snapshot["panels"]["roster"]
+        roster_map_b = {int(c["identity"]): c for c in b_switched_roster["characters"]}
+        self.assertTrue(roster_map_b[int(char_b.pk)]["current"])
+        self.assertFalse(roster_map_b[int(self.char1.pk)]["current"])
+        self.assertFalse(b_switched_roster["switch_locked"])
 
 
 if __name__ == "__main__":

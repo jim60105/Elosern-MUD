@@ -134,6 +134,7 @@ class RegistryTests(unittest.TestCase):
             registry.action_ids,
             frozenset(
                 {
+                    "account.character.create",
                     "account.character.switch",
                     "combat.cast",
                     "combat.flee",
