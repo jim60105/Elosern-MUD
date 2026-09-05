@@ -29,10 +29,6 @@ from evennia.commands.default.account import (
 from evennia.commands.default.comms import CmdPage as _CmdPage
 from evennia.utils import create, search, utils
 
-_AUTO_PUPPET_ON_LOGIN = settings.AUTO_PUPPET_ON_LOGIN
-_MAX_NR_CHARACTERS = settings.MAX_NR_CHARACTERS
-
-
 class CmdOOCLook(_CmdOOCLook):
     """在離開角色（OOC）狀態下查看
 
@@ -50,10 +46,6 @@ class CmdOOCLook(_CmdOOCLook):
         """執行 OOC 查看。"""
         if self.session.puppet:
             self.msg("你目前沒有能力查看四周。")
-            return
-
-        if _AUTO_PUPPET_ON_LOGIN and _MAX_NR_CHARACTERS == 1 and self.playable:
-            self.msg("你現在不在角色中（OOC）。\n使用 |w進入世界|n 回到遊戲。")
             return
 
         self.msg(self.account.at_look(target=self.playable, session=self.session))
@@ -175,10 +167,6 @@ class CmdOOC(_CmdOOC):
             retire_sequence(session)
             reset_client_sequence(session)
             self.msg("\n|G你已離開角色（OOC）。|n\n")
-
-            if _AUTO_PUPPET_ON_LOGIN and _MAX_NR_CHARACTERS == 1 and self.playable:
-                self.msg("你現在不在角色中（OOC）。\n使用 |w進入世界|n 回到遊戲。")
-                return
 
             self.msg(account.at_look(target=self.playable, session=session))
 

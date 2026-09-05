@@ -490,6 +490,17 @@ GLOBAL_SCRIPTS = {
 # rollback to the legacy webclient without a rebuild (=off, then restart).
 ELOSERN_VUE_CLIENT = _env_bool("ELOSERN_VUE_CLIENT", True)
 
+######################################################################
+# Multi-character capacity (multichar-01-account-capacity)
+######################################################################
+
+# Maximum number of characters an account may hold simultaneously.
+# The upper bound of 10 keeps the snapshot roster panel and the TopBar
+# dropdown within bounded size.
+MAX_NR_CHARACTERS = _env_int_bounded(
+    "ELOSERN_MAX_CHARACTERS", 5, low=1, high=10
+)
+
 # Expose the flag to the webclient templates through the project context
 # processor (Evennia's general_context does not carry it).
 TEMPLATES = [

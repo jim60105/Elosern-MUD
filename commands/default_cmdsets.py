@@ -15,6 +15,10 @@ own cmdsets by inheriting from them or directly from `evennia.CmdSet`.
 """
 
 from evennia import default_cmds
+from evennia.commands.default.account import (
+    CmdCharCreate as _CmdCharCreate,
+    CmdCharDelete as _CmdCharDelete,
+)
 
 from commands.action import CmdCast
 from commands.art import (
@@ -84,6 +88,19 @@ from commands.scene import CmdEnterScene
 from commands.skip import CmdRest, CmdSleep, CmdWaitUntil
 from commands.talk import CmdsTalk
 from commands.title import CmdTitle
+
+
+class CmdCharCreate(_CmdCharCreate):
+    """Create a new character on this account (Developer only)."""
+
+    locks = "cmd:perm(Developer)"
+
+
+class CmdCharDelete(_CmdCharDelete):
+    """Delete a character on this account (Developer only)."""
+
+    locks = "cmd:perm(Developer)"
+
 
 # The stock Evennia default keys replaced by the localized zh-tw wrappers
 # (commands/localized/). After ``super().at_cmdset_creation()`` the originals
@@ -225,6 +242,10 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
             self.remove(key)
         for wrapper in _LOCALIZED_ACCOUNT_WRAPPERS:
             self.add(wrapper)
+        self.remove("charcreate")
+        self.remove("chardelete")
+        self.add(CmdCharCreate)
+        self.add(CmdCharDelete)
 
 
 class UnloggedinCmdSet(default_cmds.UnloggedinCmdSet):

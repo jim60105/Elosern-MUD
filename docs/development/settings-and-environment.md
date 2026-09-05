@@ -27,7 +27,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 
 絕對不會靜默退回預設值、clamp 或延後到第一次使用時才報錯。
 
-## 本變更提供的 25 個環境變數（加上 SD_WEBUI_BASE_URL）
+## 本變更提供的 26 個環境變數（加上 SD_WEBUI_BASE_URL）
 
 `ART_SD_BASE_URL` 的變數名稱由 `internal-art-worker` 規格固定為 `SD_WEBUI_BASE_URL`；其餘變數與設定同名。
 
@@ -71,6 +71,12 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
 | --- | --- | --- | --- | --- |
 | `ELOSERN_VUE_CLIENT` | `ELOSERN_VUE_CLIENT` | 布林 | `True`（Vue SPA） | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；設為假值後重啟＝文件記載的緊急回退到 legacy webclient |
+
+### 多角色容量
+
+| 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
+| --- | --- | --- | --- | --- |
+| `MAX_NR_CHARACTERS` | `ELOSERN_MAX_CHARACTERS` | 整數 | `5` | 1 到 10 包含兩端（拒絕低於 1 或高於 10）；帳號可擁有的角色數量上限 |
 
 驗證細節：布林只接受上述固定字彙表（`bool("False")` 會是 `True`，這正是需要字彙表的原因）；「正的 8 倍數」同時拒絕 0、負數與非倍數；空白值對 typed／布林／選擇／URL knob 等同未設定；五個自由文字 knob 分兩族——`ART_SD_SAMPLER`／`ART_SD_SCHEDULER`／`ART_SD_CHECKPOINT` 空白＝正當的「伺服器預設」值，`ART_SD_STYLES`／`ART_SD_MODULES` 空白＝請求省略對應欄位。
 

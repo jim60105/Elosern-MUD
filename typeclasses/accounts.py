@@ -25,14 +25,6 @@ several more options for customizing the Guest account system.
 from evennia.accounts.accounts import DefaultAccount, DefaultGuest
 
 
-def _pending_character(account):
-    """Return the account's auto-created shell still awaiting activation, if any."""
-    for character in account.characters:
-        if getattr(character, "creation_pending", False):
-            return character
-    return None
-
-
 def render_pending_character_login(account, session=None):
     """Show the world introduction then the creation start screen.
 
@@ -164,19 +156,33 @@ class Account(DefaultAccount):
         super().at_post_create_character(character, **kwargs)
         character.creation_pending = True
 
+    def check_available_slots(self, **kwargs) -> str | None:
+        """Enforce character slot cap for all accounts up to MAX_NR_CHARACTERS.
+
+        Evennia's DefaultAccount.check_available_slots() exempts superusers and
+        Developers from the character slot limit. Elosern bounds account capacity
+        strictly between 1 and 10 for all accounts so the roster panel and UI
+        remain within bounded payload limits.
+        """
+        if (slots := self.get_available_character_slots()) is not None:
+            if slots <= 0:
+                plural = "" if (max_slots := self.get_character_slots()) == 1 else "s"
+                return f"You may only have a maximum of {max_slots} character{plural}."
+        return None
+
     def at_post_login(self, session=None, **kwargs):
         """Send the world introduction to a still-pending character.
 
         Calls the parent hook first so Evennia's default login flow (protocol
         flags, connect channel, auto-puppeting) is preserved. The introduction
-        and creation start screen are rendered only while the auto-created
-        character is still pending creation; activated accounts receive neither,
-        so reconnecting is pure "stay where you are": the character remains at
-        its persisted location and nothing teleports it.
+        and creation start screen are rendered only while the session's puppet
+        is still pending creation; activated accounts receive neither, so
+        reconnecting is pure "stay where you are": the character remains at its
+        persisted location and nothing teleports it.
         """
         super().at_post_login(session=session, **kwargs)
-        pending = _pending_character(self)
-        if pending is not None:
+        puppet = self.get_puppet(session)
+        if puppet is not None and getattr(puppet, "creation_pending", False):
             render_pending_character_login(self, session=session)
             return
 
