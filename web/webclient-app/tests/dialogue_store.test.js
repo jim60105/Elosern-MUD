@@ -303,4 +303,41 @@ describe("dialogue store mode lifecycle", () => {
     expect(store.view.activeSubDock).toBe(null);
     expect(store.router.currentMenu().title).toBe("探索");
   });
+
+  it("a panel loss while talking settles the sub-dock in one access", () => {
+    openSession();
+    store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
+    // The real route: an exploration sub-dock frame whose owning panel is
+    // withdrawn. The frame becomes unresolvable; the settle-driven cleanup
+    // (the widened dockOnExplorationForm gate, align-11 D8) must pop it,
+    // clear the sub-dock, and re-home — in ONE access, no stranded state.
+    store.setActiveSubDock("services");
+    // The genuine push route (the store's pop-policy push, driven through the
+    // widened exploration-row gate — itself the align-11 D8 behavior: rows
+    // work in dialogue mode).
+    expect(store.focusItemByKey("move")).toBe(true);
+    expect(store.focusConfirm()).toBe(true);
+    expect(store.view.dockDepth).toBe(2);
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          revision: 5,
+          mode: "dialogue",
+          panels: {
+            status: fx.statusPanel(),
+            local_map: fx.localMapPanel(),
+            dialogue: DIALOGUE_PANEL,
+          },
+        }),
+      ],
+      {},
+    );
+    expect(store.view.dockDepth).toBe(1);
+    expect(store.view.activeSubDock).toBe(null);
+    // The caption keeps working through the degradation: digits still
+    // address the committed dialogue picks.
+    expect(store.focusPress("1")).toBe(true);
+  });
 });

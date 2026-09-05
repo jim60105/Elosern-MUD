@@ -275,10 +275,25 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # Enter dialogue through the ordinary dock affordance path.
+        # Enter dialogue through the ordinary dock affordance path: the
+        # affordance opens the keywords frame, and the first scripted pick
+        # still rides the dock (the caption retarget only exists once the
+        # panel commits). The dispatch settles when its action result lands
+        # — the panel's (already-true) availability would race the in-flight
+        # lock and silently drop the next input.
+        result_before = (store_state(page).get("lastActionResult") or {}).get("requestId")
         self._open_root(page, 2)  # Interact
         _press(page, "Enter")  # the scripted host
-        _press(page, "Enter")  # 交談 (scripted affordance)
+        _press(page, "Enter")  # 交談 (scripted affordance -> keywords frame)
+        _press(page, "Enter")  # first scripted keyword -> talk_scripted
+        wait_for_store_state(
+            page,
+            lambda state: (
+                (state.get("lastActionResult") or {}).get("requestId")
+                not in (None, result_before)
+            ),
+        )
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
         self._wait_panel(
             page, "dialogue", lambda p: p.get("available") is True
         )
@@ -312,14 +327,33 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self.assertGreater(dom_shape["picks"], 0)
 
         # Digit activation addresses the caption pick, not the dock rows.
+        # A digit now addresses the caption's pick grid, NOT the dock rows:
+        # a second scripted talk dispatches through the caption exactly once.
+        result_before_pick = (
+            store_state(page).get("lastActionResult") or {}
+        ).get("requestId")
         _press(page, "1")
-        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
-        self._wait_panel(
-            page, "dialogue", lambda p: p.get("available") is True
+        wait_for_store_state(
+            page,
+            lambda state: (
+                (state.get("lastActionResult") or {}).get("requestId")
+                not in (None, result_before_pick)
+            ),
         )
+        self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 2)
 
         # The exit row dispatches the deterministic leave seam exactly once.
+        result_before_exit = (
+            store_state(page).get("lastActionResult") or {}
+        ).get("requestId")
         page.click('[data-testid="dialogue-exit"]')
+        wait_for_store_state(
+            page,
+            lambda state: (
+                (state.get("lastActionResult") or {}).get("requestId")
+                not in (None, result_before_exit)
+            ),
+        )
         self.assertEqual(sent_action_count(page, "explore.dialogue_leave"), 1)
         self._wait_panel(
             page, "dialogue", lambda p: p.get("available") is not True
@@ -341,6 +375,17 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # Back to the caption-free dock: no pick or exit row renders.
         self.assertEqual(
             page.locator('[data-testid="dialogue-exit"]').count(), 0
+        )
+        # The ordinary dock rows work again (movement parity after the
+        # session): open the Move outlet and press its first exit row.
+        self._open_root(page, 0)  # Move -> exit-outlet frame
+        _press(page, "Enter")  # first exit -> explore.move
+        self.assertEqual(sent_action_count(page, "explore.move"), 1)
+        self._wait_panel(
+            page,
+            "local_map",
+            lambda p: p.get("available") is True
+            and p["current_node"] != "grid:capital_altoria:2:0",
         )
 
     @covers_requirement("webclient-exploration-menu::explore-talk-freeform-runs-the-guarded-dialogue-seam-through-an-injected-client")
