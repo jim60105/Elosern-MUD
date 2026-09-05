@@ -82,10 +82,15 @@ class TalkTurnInBranchTests(TestCase):
             ),
         ) as response, patch(
             "commands.talk.dialogue_turn_in"
-        ) as turnin:
+        ) as turnin, patch(
+            # The scripted-success branch records the delivered line through
+            # the dialogue-session seam (webclient-align-07).
+            "commands.talk.open_or_refresh_dialogue"
+        ) as record:
             command.func()
         turnin.assert_not_called()
         response.assert_called_once_with(npc, command.caller, GUILD_STAFF_TURNIN_KEYWORD)
+        record.assert_called_once_with(command.caller, npc, "「目前沒有可以交回的任務。」")
         command.caller.msg.assert_called_once_with(
             f"{npc.key}說：「目前沒有可以交回的任務。」"
         )
@@ -157,8 +162,13 @@ class TalkTurnInBranchTests(TestCase):
             return_value=ScriptedTalkResult(response="公會回應", budget_capped=False),
         ) as response, patch(
             "commands.talk.dialogue_turn_in"
-        ) as turnin:
+        ) as turnin, patch(
+            # The scripted-success branch records the delivered line through
+            # the dialogue-session seam (webclient-align-07).
+            "commands.talk.open_or_refresh_dialogue"
+        ) as record:
             command.func()
         turnin.assert_not_called()
         response.assert_called_once_with(npc, command.caller, "公會")
+        record.assert_called_once_with(command.caller, npc, "公會回應")
         command.caller.msg.assert_called_once_with(f"{npc.key}說：公會回應")

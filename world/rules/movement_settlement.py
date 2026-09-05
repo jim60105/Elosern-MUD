@@ -157,6 +157,17 @@ def settle_movement(
         and traversing_object.location is not source_location
     ):
         _compensate_after_rollback(snapshot)
+    if traversing_object.location is not source_location:
+        # A settled relocation: any dialogue the character was holding belongs
+        # to the room it left (webclient-align-07). Checked against the
+        # post-compensation location, so a falsy wilderness return that was
+        # moved back never clears; the plain-exit lineage returns ``None`` on
+        # both branches, so the location is the only reliable success signal.
+        from typeclasses.characters import PlayerCharacter
+        from world.rules.dialogue import clear_dialogue_session
+
+        if isinstance(traversing_object, PlayerCharacter):
+            clear_dialogue_session(traversing_object)
     return result
 
 

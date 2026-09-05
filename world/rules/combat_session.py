@@ -637,6 +637,12 @@ def engage(actor: Any, target: Any) -> dict[str, Any]:
     battlefield = reconstruct_battlefield(actor, record)
     _persist(actor, record)
     register_active_battlefield(battlefield)
+    # Hostility ends a conversation (webclient-align-07): the session is
+    # retired in the same deterministic-core path that persisted the session,
+    # so no snapshot can ever render dialogue mode over a live combat session.
+    from world.rules.dialogue import clear_dialogue_session
+
+    clear_dialogue_session(actor)
     return {
         "record": record,
         "overwhelming_team": classify_overwhelm(battlefield),

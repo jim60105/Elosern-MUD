@@ -37,6 +37,7 @@
         "world.rules.tests.test_damage_bands",
         "world.rules.tests.test_damage_effect_handler",
         "world.rules.tests.test_dialogue",
+        "world.rules.tests.test_dialogue_session",
         "world.rules.tests.test_dice",
         "world.rules.tests.test_disengage",
         "world.rules.tests.test_disengage_integration",

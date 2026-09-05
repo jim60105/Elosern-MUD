@@ -1130,5 +1130,128 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["code"], "skip_failed")
 
 
+class DialogueSessionRecordingAdapterTests(BattlefieldIsolation, EvenniaTestCase):
+    """The talk adapters are the WS-side dialogue-session writers (align-07).
+
+    Every case observes only the persisted ``db.dialogue_session`` — the
+    state-only surface this change ships; the panel/mode land in
+    webclient-align-10.
+    """
+
+    def setUp(self):
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
+        _reset_guardrail()
+        register_npc_dialogue()
+        get_world_clock()
+        self.room1 = create_object(Room, key="起點")
+        self.player = create_object(PlayerCharacter, key="對話.session測試")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.destination = create_object(Room, key="目的地", location=None)
+
+    def tearDown(self):
+        _reset_guardrail()
+        super().tearDown()
+
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
+    )
+    def test_scripted_success_records_the_delivered_authored_line(self):
+        host = create_object(NPC, key="公會職員", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        result = _talk_scripted_adapter(
+            self.player, {"npc_id": int(host.pk), "keyword_id": "公會"}
+        )
+        self.assertEqual(result["outcome"], "success")
+        stored = self.player.db.dialogue_session
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored["npc_id"], int(host.pk))
+        self.assertIn("冒險者公會", stored["line"])
+        self.assertIn(stored["line"], result["message"])
+
+    def test_scripted_rejections_record_nothing(self):
+        host = create_object(NPC, key="公會職員", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        result = _talk_scripted_adapter(
+            self.player, {"npc_id": int(host.pk), "keyword_id": "不存在的話題"}
+        )
+        self.assertEqual(result["code"], "unregistered_keyword")
+        self.assertIsNone(self.player.db.dialogue_session)
+
+    def test_freeform_settled_reply_records_the_presented_line(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _reply_text(speech="我對你點頭。"))
+        with patch(
+            "web.webclient.actions.dialogue_composition.build_dialogue_client",
+            return_value=client,
+        ), patch.object(self.player, "msg"):
+            result = await_result(
+                _talk_freeform_adapter(
+                    self.player, {"npc_id": int(npc.pk), "speech": "你好"}
+                )
+            )
+        self.assertEqual(result["outcome"], "success")
+        stored = self.player.db.dialogue_session
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored["npc_id"], int(npc.pk))
+        self.assertEqual(stored["line"], "我對你點頭。")
+
+    def test_freeform_authored_degrade_greeting_records(self):
+        npc = create_object(LLMNPC, key="公會職員", location=self.room1)
+        npc.components.add(ScriptedDialogue.create(npc, dialogue_key="guild_staff"))
+        client = FakeLLMClient()
+        with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
+            with patch(
+                "web.webclient.actions.dialogue_composition.build_dialogue_client",
+                return_value=client,
+            ), patch.object(self.player, "msg"):
+                result = await_result(
+                    _talk_freeform_adapter(
+                        self.player, {"npc_id": int(npc.pk), "speech": "你好"}
+                    )
+                )
+        self.assertEqual(result["outcome"], "success")
+        stored = self.player.db.dialogue_session
+        self.assertIsNotNone(stored)
+        self.assertIn("歡迎來到冒險者公會", stored["line"])
+
+    def test_freeform_silent_degrade_records_nothing(self):
+        npc = create_object(LLMNPC, key="無表精靈", location=self.room1)
+        client = FakeLLMClient()
+        with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
+            with patch(
+                "web.webclient.actions.dialogue_composition.build_dialogue_client",
+                return_value=client,
+            ), patch.object(self.player, "msg"):
+                result = await_result(
+                    _talk_freeform_adapter(
+                        self.player, {"npc_id": int(npc.pk), "speech": "你好"}
+                    )
+                )
+        self.assertEqual(result["outcome"], "success")
+        self.assertIsNone(self.player.db.dialogue_session)
+
+    def test_freeform_mid_flight_stale_completion_records_nothing(self):
+        npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+        client = _HeldClient()
+        with patch(
+            "web.webclient.actions.dialogue_composition.build_dialogue_client",
+            return_value=client,
+        ), patch.object(self.player, "msg"):
+            deferred = _talk_freeform_adapter(
+                self.player, {"npc_id": int(npc.pk), "speech": "你好"}
+            )
+            self.player.location = self.destination
+            client.deferred.callback(_reply_text(speech="我對你點頭。"))
+            result = await_result(deferred)
+        self.assertEqual(result["outcome"], "success")
+        self.assertIn("離開", result["message"])
+        self.assertIsNone(self.player.db.dialogue_session)
+
+
 if __name__ == "__main__":
     unittest.main()
