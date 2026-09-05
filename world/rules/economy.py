@@ -18,6 +18,7 @@ from typeclasses.npcs import NPC
 from world.lore.items import ITEM_REGISTRY
 from world.rules.clock import CLOCK_YAML, get_world_clock
 from world.rules.guild_config import get_catalog
+from world.rules.service_gate import REASON_REMOTE, service_available
 from world.rules.surfaces import (
     attribute_snapshot,
     restore_traits,
@@ -40,6 +41,10 @@ class TradeReason(StrEnum):
     NOT_A_PLAYER = "not_a_player"
     NO_MERCHANT = "no_merchant"
     REMOTE_MERCHANT = "remote_merchant"
+    # Co-located but the shared anchoring gate refused (off-anchor place
+    # binding or malformed stored data); the player line is the gate's
+    # registry-owned message, not a shop-specific one.
+    SERVICE_UNAVAILABLE = "service_unavailable"
     CLOSED = "closed"
     UNKNOWN_ITEM = "unknown_item"
     NOT_OFFERED = "not_offered"
@@ -58,9 +63,13 @@ def _require_local_merchant(actor: Any, merchant_host: Any) -> Any:
         raise TradeError(TradeReason.NO_MERCHANT)
     if not hasattr(merchant_host, "components") or not merchant_host.components.has(Merchant.name):
         raise TradeError(TradeReason.NO_MERCHANT)
-    if actor.location is None or merchant_host.location != actor.location:
-        raise TradeError(TradeReason.REMOTE_MERCHANT)
-    return merchant_host.components.get(Merchant.get_component_slot())
+    merchant = merchant_host.components.get(Merchant.get_component_slot())
+    verdict = service_available(actor, merchant_host, merchant)
+    if not verdict.allowed:
+        if verdict.reason == REASON_REMOTE:
+            raise TradeError(TradeReason.REMOTE_MERCHANT)
+        raise TradeError(TradeReason.SERVICE_UNAVAILABLE)
+    return merchant
 
 
 def _require_positive_quantity(quantity: Any) -> int:

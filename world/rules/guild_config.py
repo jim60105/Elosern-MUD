@@ -374,6 +374,21 @@ def validate_service_hosts(raw: Any) -> tuple[ServiceHostRow, ...]:
                 f"service_hosts[{position}].profession {fields['profession']!r} "
                 "is not a profession rulebook row"
             )
+        # A roster row IS an anchor registration: its mandatory anchor_room
+        # only means something to ``place``-bound components. A ``person``
+        # component here would silently carry an anchor — the invalid
+        # combination the service-anchoring change forbids at authoring time.
+        person_bound = sorted(
+            component.type_key
+            for component in profession.components
+            if component.default_binding == "person"
+        )
+        if person_bound:
+            raise _error(
+                f"service_hosts[{position}] profession {fields['profession']!r} "
+                f"component(s) {person_bound} are person-bound; a roster row "
+                "anchors only place-bound components"
+            )
         authored = {
             name: _require_text(entry[name], f"service_hosts[{position}].{name}")
             for name in _SERVICE_HOST_KWARG_FIELDS

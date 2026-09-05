@@ -23,9 +23,11 @@ from world.rules.clock import AdvanceSource, DaypartError
 from world.rules.combat_session import CombatSessionError, SessionReason
 from world.rules.character_creation import CharacterCreationError
 from world.rules.economy import TradeError, TradeReason
-from world.rules.guild import GuildDataError, RewardClaimError
+from world.rules.guild import GuildDataError, GuildError, RewardClaimError
+from world.rules.guild import RegistrationReason
 from world.rules.guild_exams import ExamReason, GuildExamError
 from world.rules.guild_offers import BoardAccessError, GuildOfferError
+from world.rules.service_gate import MESSAGE_OFF_ANCHOR
 from world.rules.skip_safety import SkipRejectReason
 
 
@@ -46,6 +48,15 @@ class GuildCommandBranchTests(TestCase):
         with patch("commands.guild.register_adventurer", side_effect=GuildDataError("bad")):
             command.func()
         command.caller.msg.assert_called_with("註冊失敗：bad")
+
+        command.caller.msg.reset_mock()
+        with patch(
+            "commands.guild.register_adventurer",
+            side_effect=GuildError(RegistrationReason.SERVICE_UNAVAILABLE),
+        ):
+            command.func()
+        # The anchoring gate's line is NOT framed as a registration failure.
+        command.caller.msg.assert_called_with(MESSAGE_OFF_ANCHOR)
 
         command.caller.msg.reset_mock()
         with patch("commands.guild.register_adventurer", return_value={"branch_key": "north"}):
@@ -293,6 +304,7 @@ class CombatCommandBranchTests(TestCase):
     def test_exam_maps_every_rule_reason_and_success(self):
         expected = {
             ExamReason.UNREGISTERED: "你尚未註冊為冒險者。",
+            ExamReason.SERVICE_UNAVAILABLE: MESSAGE_OFF_ANCHOR,
             ExamReason.WRONG_BRANCH: "考核官與你的公會不符。",
             ExamReason.NOT_NEXT_RANK: "你只能接受下一個階級的考核。",
             ExamReason.BELOW_THRESHOLD: "你的功績尚未達到考核門檻。",
@@ -332,9 +344,11 @@ class EconomyCommandBranchTests(TestCase):
         cases = (
             (CmdBuy, "buy", TradeReason.INSUFFICIENT_FUNDS, "你的銅幣不足。"),
             (CmdBuy, "buy", TradeReason.INSUFFICIENT_STOCK, "商店庫存不足。"),
+            (CmdBuy, "buy", TradeReason.SERVICE_UNAVAILABLE, MESSAGE_OFF_ANCHOR),
             (CmdSell, "sell", TradeReason.UNSELLABLE, "這個物品無法販賣。"),
             (CmdSell, "sell", TradeReason.INSUFFICIENT_ITEMS, "你沒有足夠的這個物品。"),
             (CmdSell, "sell", TradeReason.STOCK_OVERFLOW, "商店收購上限已滿。"),
+            (CmdSell, "sell", TradeReason.SERVICE_UNAVAILABLE, MESSAGE_OFF_ANCHOR),
         )
         for command_type, function_name, reason, message in cases:
             command = _command(command_type, "meal 2")
@@ -396,6 +410,12 @@ class EconomyCommandBranchTests(TestCase):
         host.components.get.return_value.shop_key = "missing"
         command = _command(CmdShopStock)
         command.resolve_merchant = Mock(return_value=host)
+        # The stock branch is exercised with a co-located, at-anchor host:
+        # the anchoring gate must not pre-empt the config/stock branches.
+        shared_room = object()
+        command.caller.location = shared_room
+        host.location = shared_room
+        host.components.get.return_value.service_binding = "person"
         with patch(
             "commands.economy.get_catalog", return_value=SimpleNamespace(shop_configs={})
         ):

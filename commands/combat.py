@@ -22,6 +22,7 @@ from world.rules.guild_exams import (
 )
 from world.rules.event_log import render_plain_text
 from world.rules.player_messages import session_reason_message
+from world.rules.service_gate import MESSAGE_OFF_ANCHOR
 
 
 class CmdEngage(Command):
@@ -170,6 +171,7 @@ class CmdGuildExam(Command):
             reason = error.args[0]
             message = {
                 ExamReason.UNREGISTERED: "你尚未註冊為冒險者。",
+                ExamReason.SERVICE_UNAVAILABLE: MESSAGE_OFF_ANCHOR,
                 ExamReason.WRONG_BRANCH: "考核官與你的公會不符。",
                 ExamReason.NOT_NEXT_RANK: "你只能接受下一個階級的考核。",
                 ExamReason.BELOW_THRESHOLD: "你的功績尚未達到考核門檻。",

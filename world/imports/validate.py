@@ -423,6 +423,24 @@ def _check_profession_fields(
     profession_value = record.get("profession")
     entries = record.get("components")
     if profession_value is None:
+        if record.get("anchor_room"):
+            return [
+                Issue(
+                    "anchor_room",
+                    "an anchor room only anchors profession-assembled "
+                    "components; the record declares no profession",
+                )
+            ] + (
+                [
+                    Issue(
+                        "components",
+                        "explicit components require a profession blueprint; the "
+                        "assembly plan is defined only alongside a profession",
+                    )
+                ]
+                if "components" in record
+                else []
+            ), None
         # PRESENCE semantics, not truthiness: an explicitly declared empty
         # ``components`` array is still a declaration without a blueprint.
         if "components" in record:
@@ -447,6 +465,7 @@ def _check_profession_fields(
     from world.rules.profession_config import PROFESSION_COMPONENT_TYPES, get_profession
     from world.rules.profession_assembly import (
         component_field_names,
+        plan_bindings,
         missing_identity_kwargs,
     )
 
@@ -507,6 +526,32 @@ def _check_profession_fields(
                     f"missing authored identity kwargs {missing}",
                 )
             )
+    if issues:
+        return issues, None
+    # Authored binding/anchor consistency (service-anchoring D1/D8), decided
+    # DB-free from the resolved plan: an anchor exists exactly when the plan
+    # carries a place-bound component. A person-only plan with an anchor is
+    # the invalid "person carrying an anchor" combination; a place-bearing
+    # plan without one could never resolve its anchor.
+    bindings = plan_bindings(profession, assembly.explicit_map(record))
+    has_place = any(binding == "place" for binding in bindings.values())
+    anchor = record.get("anchor_room")
+    if anchor and not has_place:
+        issues.append(
+            Issue(
+                "anchor_room",
+                "person-bound components co-presence-only; an anchor room "
+                "is the invalid authored combination",
+            )
+        )
+    if has_place and not anchor:
+        issues.append(
+            Issue(
+                "anchor_room",
+                "the resolved plan contains place-bound components; an "
+                "anchor_room tag is required",
+            )
+        )
     if issues:
         return issues, None
     return issues, profession

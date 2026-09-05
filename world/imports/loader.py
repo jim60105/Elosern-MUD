@@ -152,6 +152,37 @@ def _apply_profession(
         raise ValueError(
             f"record {record['key']!r}: unknown profession {profession_key!r}"
         )
+    # Place-bound plans name their anchor by room tag; the record's location
+    # is authored elsewhere, so the anchor is resolved by tag inside this
+    # same all-or-nothing transaction. Validation decided the binding/anchor
+    # combination DB-free; room existence is a load-time fact here.
+    anchor_room = None
+    anchor_tag = record.get("anchor_room")
+    if anchor_tag:
+        from evennia.utils.search import search_object_by_tag
+
+        # A room tag names a ROOM: any tagged object (an NPC wearing the
+        # tag would make a person "anchor" a storefront) and an ambiguous
+        # multi-match are load-time rejections naming the record and tag —
+        # the anchor the components persist must be unambiguous or absent.
+        from typeclasses.rooms import Room
+
+        found = [
+            obj
+            for obj in search_object_by_tag(anchor_tag)
+            if isinstance(obj, Room)
+        ]
+        if not found:
+            raise ValueError(
+                f"record {record['key']!r}: anchor_room {anchor_tag!r} "
+                "resolves to no room"
+            )
+        if len(found) > 1:
+            raise ValueError(
+                f"record {record['key']!r}: anchor_room {anchor_tag!r} "
+                f"resolves to {len(found)} rooms; the anchor must be unique"
+            )
+        anchor_room = found[0]
     # The shared deterministic-core attach mechanism (declarative-service-hosts):
     # the same helper the guild service-host sync calls, so import and sync
     # assembly can never drift. Its identity-gap check is this function's
@@ -159,7 +190,7 @@ def _apply_profession(
     # batch-rejection path expects.
     try:
         attached = assemble_profession_components(
-            entity, profession, assembly.explicit_map(record)
+            entity, profession, assembly.explicit_map(record), anchor_room=anchor_room
         )
     except ProfessionAssemblyError as error:
         named = "; ".join(

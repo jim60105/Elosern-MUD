@@ -12,6 +12,11 @@ from world.rules.economy import (
     shop_is_open,
 )
 from world.rules.guild_config import get_catalog
+from world.rules.service_gate import (
+    MESSAGE_OFF_ANCHOR,
+    REASON_REMOTE,
+    service_available,
+)
 from world.lore.items import ITEM_REGISTRY
 from world.rules.equipment_effects import equipment_adjustment_text
 from world.rules.npc_schedules import interaction_reason
@@ -43,6 +48,15 @@ class CmdShopStock(_ShopCommandBase):
         if merchant_host is None:
             return
         merchant = merchant_host.components.get(Merchant.get_component_slot())
+        verdict = service_available(self.caller, merchant_host, merchant)
+        if not verdict.allowed:
+            # The room-presence resolver already refused a remote host at
+            # resolution; anything left is the gate's own anchoring refusal.
+            self.caller.msg(
+                "這裡沒有商人。" if verdict.reason == REASON_REMOTE
+                else MESSAGE_OFF_ANCHOR
+            )
+            return
         shop_key = merchant.shop_key
         config = get_catalog().shop_configs.get(shop_key)
         if config is None:
@@ -95,6 +109,7 @@ class CmdBuy(_ShopCommandBase):
             reason = error.args[0]
             message = {
                 TradeReason.CLOSED: "商店目前沒有營業。",
+                TradeReason.SERVICE_UNAVAILABLE: MESSAGE_OFF_ANCHOR,
                 TradeReason.UNKNOWN_ITEM: "商店不賣這個物品。",
                 TradeReason.NOT_OFFERED: "商店沒有這個商品。",
                 TradeReason.INSUFFICIENT_FUNDS: "你的銅幣不足。",
@@ -139,6 +154,7 @@ class CmdSell(_ShopCommandBase):
             reason = error.args[0]
             message = {
                 TradeReason.CLOSED: "商店目前沒有營業。",
+                TradeReason.SERVICE_UNAVAILABLE: MESSAGE_OFF_ANCHOR,
                 TradeReason.UNKNOWN_ITEM: "商店不收這個物品。",
                 TradeReason.UNSELLABLE: "這個物品無法販賣。",
                 TradeReason.INSUFFICIENT_ITEMS: "你沒有足夠的這個物品。",

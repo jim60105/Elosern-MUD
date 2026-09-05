@@ -160,6 +160,58 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
             buy(self.player, self.merchant_npc, "meal", 1)
         self.assertEqual(ctx.exception.args[0], TradeReason.REMOTE_MERCHANT)
 
+    def _make_place_bound(self):
+        # The sync writes these on every shipped host; the hand-built shop
+        # fixture emulates one converged place-bound merchant (service-
+        # anchoring): its anchor is the store it was assembled for.
+        self.merchant.service_binding = "place"
+        self.merchant.anchor_room_id = self.store.pk
+
+    @covers_requirement(
+        "shop-economy::player-facing-shop-commands-use-only-a-local-unambiguous-merchant"
+    )
+    def test_traveling_place_bound_merchant_refuses_without_state_change(self):
+        from commands.economy import CmdShopStock
+        from world.rules.service_gate import MESSAGE_OFF_ANCHOR
+
+        self._make_place_bound()
+        square = create_object(Room, key="town square")
+        self.merchant_npc.location = square
+        self.player.location = square
+        wallet_before = self.player.db.wallet
+        with self.assertRaises(TradeError) as ctx:
+            buy(self.player, self.merchant_npc, "meal", 1)
+        self.assertEqual(ctx.exception.args[0], TradeReason.SERVICE_UNAVAILABLE)
+        self.assertEqual(self.player.db.wallet, wallet_before)
+        self.assertEqual(list_items(self.player), [])
+        self.assertEqual(parse_merchant_stock(self.merchant)["meal"], 20)
+        self.assertFalse(self.merchant_npc.relations.has_record(self.player))
+        # Stock listing refuses with the gate's fixed line, not a stock dump.
+        output = self.call(CmdShopStock(), "", caller=self.player)
+        self.assertEqual(output, MESSAGE_OFF_ANCHOR)
+
+    def test_at_anchor_place_bound_merchant_behaves_as_before_the_gate(self):
+        self._make_place_bound()
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            result = buy(self.player, self.merchant_npc, "meal", 1)
+        self.assertEqual(result["total_copper"], 10)
+        self.assertEqual(self.player.db.wallet, 90)
+
+    @covers_requirement(
+        "shop-economy::player-facing-shop-commands-use-only-a-local-unambiguous-merchant"
+    )
+    def test_person_bound_merchant_trades_anywhere(self):
+        # A person-bound host travels with no anchor: co-presence is the only
+        # requirement, so the gate never fires away from any room.
+        self.merchant.service_binding = "person"
+        square = create_object(Room, key="market square")
+        self.merchant_npc.location = square
+        self.player.location = square
+        with patch("world.rules.economy.get_world_clock", return_value=self._open_clock()):
+            result = buy(self.player, self.merchant_npc, "meal", 1)
+        self.assertEqual(result["total_copper"], 10)
+        self.assertEqual(self.player.db.wallet, 90)
+
     @covers_requirement("affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths")
     def test_non_npc_merchant_host_is_rejected_before_any_write(self):
         from typeclasses.monsters import Monster

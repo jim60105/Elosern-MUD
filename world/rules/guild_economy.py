@@ -106,7 +106,11 @@ def _sync_service_host(row, room) -> NPC:
         host.race = "human"
         host.apply_race_baseline()
     ensure_npc_adult_identity(host)
-    assemble_profession_components(host, row.profession, authored_map)
+    # Binding/anchor convergence rides the shared assembly on EVERY sync,
+    # reused hosts included: service_binding/anchor_room_id are authored
+    # roster config re-applied idempotently, not runtime identity, so the
+    # never-rename/never-retitle contract is untouched (service-anchoring D2).
+    assemble_profession_components(host, row.profession, authored_map, anchor_room=room)
     return host
 
 

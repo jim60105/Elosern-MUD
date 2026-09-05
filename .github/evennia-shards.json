@@ -75,6 +75,8 @@
         "world.rules.tests.test_guild_exams",
         "world.rules.tests.test_guild_registration",
         "world.rules.tests.test_guild_rewards",
+      "world.rules.tests.test_service_gate",
+      "world.rules.tests.test_service_binding_persistence",
         "world.rules.tests.test_heal_effect_handler",
         "world.rules.tests.test_holy_water_cleanse",
         "world.rules.tests.test_initiative_and_turn_loop",

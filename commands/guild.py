@@ -19,6 +19,7 @@ from world.rules.guild import (
     GuildError,
     GuildServiceError,
     RewardClaimError,
+    RegistrationReason,
     parse_guild_registration,
     parse_reward_claims,
     register_adventurer,
@@ -35,6 +36,7 @@ from world.rules.guild_offers import (
 )
 from world.rules.guild_config import get_catalog
 from world.rules.npc_schedules import interaction_reason
+from world.rules.service_gate import MESSAGE_OFF_ANCHOR
 from world.rules.surfaces import read_counter_trait
 
 from server.ai_director_service import (
@@ -144,6 +146,10 @@ class CmdGuildRegister(_GuildCommandBase):
         try:
             record = register_adventurer(self.caller, staff)
         except (GuildDataError, GuildError) as error:
+            if error.args and error.args[0] == RegistrationReason.SERVICE_UNAVAILABLE:
+                # The gate owns this line; it is not a registration failure.
+                self.caller.msg(MESSAGE_OFF_ANCHOR)
+                return
             self.caller.msg(f"註冊失敗：{error}")
             return
         self.caller.msg(f"你已註冊為冒險者，階級 F。公會：{record['branch_key']}")

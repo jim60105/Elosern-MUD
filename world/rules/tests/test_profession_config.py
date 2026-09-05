@@ -183,7 +183,7 @@ class RejectionTests(ProfessionCacheIsolation):
         self.assert_rejected(mutate, "merchant", "unknown component type", "blacksmith")
 
     @covers_requirement(
-        "profession-registries::default-binding-is-a-validated-vocabulary-stored-for-later-consumers",
+        "profession-registries::default-binding-is-a-validated-vocabulary-consumed-by-the-anchoring-gate",
         "profession-registries::every-malformed-profession-file-is-rejected-by-name-before-anything-is-cached",
     )
     def test_binding_vocabulary_is_enforced_at_load(self):
@@ -278,7 +278,7 @@ class RejectionTests(ProfessionCacheIsolation):
         self.assertEqual(table["merchant"].default_tier, "human_commoner")
 
     @covers_requirement(
-        "profession-registries::default-binding-is-a-validated-vocabulary-stored-for-later-consumers",
+        "profession-registries::default-binding-is-a-validated-vocabulary-consumed-by-the-anchoring-gate",
     )
     def test_binding_is_stored_on_the_frozen_component_row(self):
         component = get_profession("merchant").components[0]
