@@ -166,7 +166,7 @@ def _art_fixture(character, room) -> None:
     )
 
     mode = os.environ.get("ELOSERN_BROWSER_ART", "")
-    if not mode:
+    if not mode or os.environ.get("ELOSERN_BROWSER_SERVICES"):
         return
 
     from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY

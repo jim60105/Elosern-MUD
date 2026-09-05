@@ -59,6 +59,7 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
     def setUp(self) -> None:
         runtime = fixtures.create_runtime()
         runtime.env["ELOSERN_BROWSER_SERVICES"] = self.SERVICES_MODE
+        runtime.env["ELOSERN_BROWSER_ART"] = ""
         for key, value in self.EXTRA_ENV.items():
             runtime.env[key] = value
         self.server = ManagedServer(runtime=runtime)

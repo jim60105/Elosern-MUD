@@ -32,18 +32,29 @@ from .browser_helpers import (
     wait_for_store_state,
 )
 
-# The stacking-guarantee tests open the scene/portrait full-views, which need
-# the art fixture. The managed server is a per-process singleton that seeds
-# from this env var at boot, so the var must be set before the shared server
-# first starts in the process. Setting it at module import (unittest discovery
-# time) guarantees that ordering; setting it only in a class's setUpClass is
-# too late when another test class in the same CI-shard process has already
-# booted the server.
-os.environ["ELOSERN_BROWSER_ART"] = "done"
-
 
 class ReconnectTest(BrowserAcceptanceTest):
     """Transport interruption and new-generation adoption through the real store."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        from . import fixtures
+        from .harness import ManagedServer
+
+        runtime = fixtures.create_runtime(prefix="elosern-reconnect-")
+        runtime.env["ELOSERN_BROWSER_ART"] = "done"
+        cls.server = ManagedServer(runtime=runtime)
+        cls.server.start()
+        cls.base_url = f"http://127.0.0.1:{cls.server.runtime.http_port}"
+        cls.webclient_url = cls.server.runtime.webclient_url
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        if getattr(cls, "server", None) is not None:
+            try:
+                cls.server.stop()
+            finally:
+                cls.server = None
 
     def _wait_transport_reopened(self, page, generation_before, timeout=30):
         """Wait for the reconnect to open a new transport generation.
