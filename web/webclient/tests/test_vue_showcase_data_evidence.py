@@ -156,6 +156,7 @@ class VueShowcaseDataEvidenceTest(unittest.TestCase):
             set(required) - set(DATA_FAMILY_KEYS),
             {
                 "Core/AppShell", "Core/TopBar", "Core/ConnectOverlay",
+                "Core/CharacterSwitcher",
                 "Core/NarrativeFeed", "Core/UnreadIndicator",
                 "Core/CommandLine", "Core/QuickWordChips", "Core/HudFrame",
                 "Core/SceneBackdrop",

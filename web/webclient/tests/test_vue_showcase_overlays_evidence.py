@@ -116,6 +116,7 @@ DEFERRED_TITLE_PATTERNS = (
 PREVIOUS_MANIFEST_KEYS = {
     "Core/AppShell",
     "Core/TopBar",
+    "Core/CharacterSwitcher",
     "Core/ConnectOverlay",
     "Core/NarrativeFeed",
     "Core/UnreadIndicator",

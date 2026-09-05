@@ -105,6 +105,7 @@ WORLD_FAMILY_STORY_IDS = {
 PREVIOUS_MANIFEST_KEYS = {
     "Core/AppShell",
     "Core/TopBar",
+    "Core/CharacterSwitcher",
     "Core/ConnectOverlay",
     "Core/NarrativeFeed",
     "Core/UnreadIndicator",

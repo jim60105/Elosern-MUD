@@ -165,6 +165,7 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
             set(required),
             {
                 "Core/AppShell", "Core/TopBar", "Core/ConnectOverlay",
+                "Core/CharacterSwitcher",
                 "Core/NarrativeFeed", "Core/UnreadIndicator",
                 "Core/CommandLine", "Core/QuickWordChips", "Core/HudFrame",
                 "Core/SceneBackdrop",
