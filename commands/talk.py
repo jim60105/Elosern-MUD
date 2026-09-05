@@ -17,6 +17,7 @@ from world.rules.dialogue import (
     dialogue_key_for,
     greeting_for,
     is_dialogue_host,
+    open_or_refresh_dialogue,
     run_scripted_talk,
 )
 from world.rules.guild import (
@@ -112,6 +113,10 @@ class CmdsTalk(Command):
             if result is None:
                 self.caller.msg(_NO_RESPONSE)
                 return
+            # The delivered authored line opens/refreshes the deterministic
+            # dialogue session (webclient-align-07); the greeting/no-keyword
+            # and turnin-listing paths below never touch the session seam.
+            open_or_refresh_dialogue(self.caller, npc, result.response)
             hint = f"\n{AFFINITY_DAILY_CAP_HINT}" if result.budget_capped else ""
             self.caller.msg(f"{npc.key}說：{result.response}{hint}")
             return

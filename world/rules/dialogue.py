@@ -14,18 +14,36 @@ keyword grants +1 talk affinity with the host through the sole-writer
 affinity API (``world/rules/affinity.py``) in one transaction, restoring the
 relations surface on failure. It lives here because ``world/rules/`` is the
 deterministic core and this is the dialogue subsystem's own writer.
+
+The module also owns the character-held dialogue session (webclient-align-07)
+as its ONLY read/write surface: ``open_or_refresh_dialogue`` /
+``clear_dialogue_session`` / ``live_dialogue_session``. Persistent
+``db.dialogue_session`` on the character is the single truth of WHO the
+character is speaking to and the latest server-authored LINE; no presenter,
+AI layer, or client payload may open, refresh, or clear it.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
 from typeclasses.components import ScriptedDialogue
 
+from world.observability import log_info
+
 GUILD_STAFF_DIALOGUE_KEY = "guild_staff"
 GUILD_STAFF_TURNIN_KEYWORD = "回報"
 
 NO_UNDERSTANDING_LINE = "對方皺起眉頭：「我不太明白你的意思。」"
+
+# The session line bound mirrors the accepted-prose bounds the dialogue
+# responses already respect (``world.ai.narrator.MAX_PROSE_LENGTH`` and
+# ``world.ai.npc_dialogue.MAX_SPEECH_LENGTH``, both 2000). The parity is a
+# deliberate local constant: the transport boundary forbids ``world.rules``
+# from importing ``world.ai``, and a session line can never exceed the bound
+# its own producer authored it under.
+MAX_DIALOGUE_SESSION_LINE_CODE_POINTS = 2000
 
 
 @dataclass(frozen=True)
@@ -234,3 +252,153 @@ def run_scripted_talk(npc: Any, character: Any, keyword: str) -> ScriptedTalkRes
         restore_attribute_best_effort(npc, "relations_data", relations_snapshot)
         raise
     return ScriptedTalkResult(response=response, budget_capped=outcome.budget_capped)
+
+
+# ---------------------------------------------------------------------------
+# Dialogue session (webclient-align-07): the ONLY writers of
+# ``db.dialogue_session`` on the character.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DialogueSession:
+    """One live dialogue session: the host dbid, the latest line, the tick.
+
+    ``npc_id`` is a database identity re-resolved per read — the session never
+    holds a live object reference. ``updated_tick`` is the world-clock tick at
+    write time, or ``None`` when no clock singleton exists yet.
+    """
+
+    npc_id: int
+    line: str
+    updated_tick: int | None
+
+
+def _parse_dialogue_session(raw: Any) -> DialogueSession | None:
+    """Parse a stored session value, or ``None`` for absent/corrupt state.
+
+    Read-only: a malformed value degrades to "no session" and is never repaired
+    or rewritten here — the next clear seam or talk retires it. Accepts exactly
+    the positive-int / str / ``int | None`` field shapes (``bool`` is rejected
+    as an id/tick even though it subclasses ``int``).
+    """
+    # Evennia's persisted attribute value is a ``_SaverDict`` (a Mapping, not a
+    # dict subclass) — the parse keys off the mapping interface.
+    if not isinstance(raw, Mapping):
+        return None
+    npc_id = raw.get("npc_id")
+    line = raw.get("line")
+    updated_tick = raw.get("updated_tick")
+    if not isinstance(npc_id, int) or isinstance(npc_id, bool) or npc_id <= 0:
+        return None
+    if not isinstance(line, str):
+        return None
+    if updated_tick is not None and (
+        not isinstance(updated_tick, int) or isinstance(updated_tick, bool)
+    ):
+        return None
+    return DialogueSession(npc_id=npc_id, line=line, updated_tick=updated_tick)
+
+
+def _session_updated_tick() -> int | None:
+    """Current world-clock tick, or ``None`` when no clock singleton exists.
+
+    Uses the read-only ``read_world_clock`` accessor — opening a dialogue never
+    materializes the clock Script.
+    """
+    from world.rules.clock import read_world_clock
+
+    clock = read_world_clock()
+    return None if clock is None else int(clock.tick)
+
+
+def open_or_refresh_dialogue(character: Any, npc: Any, line: str) -> DialogueSession:
+    """Record one delivered server-authored line as the character's session.
+
+    The ONLY opener: called from the deterministic-core success paths (the
+    scripted adapter/command branches and the freeform settled observer). The
+    line is truncated to ``MAX_DIALOGUE_SESSION_LINE_CODE_POINTS`` at write, so
+    the stored value is always within the bound no producer can exceed it.
+    Refreshing replaces the value in place (one session per character).
+    """
+    session = DialogueSession(
+        npc_id=int(npc.pk),
+        line=str(line)[:MAX_DIALOGUE_SESSION_LINE_CODE_POINTS],
+        updated_tick=_session_updated_tick(),
+    )
+    character.db.dialogue_session = {
+        "npc_id": session.npc_id,
+        "line": session.line,
+        "updated_tick": session.updated_tick,
+    }
+    log_info(
+        "dialogue_session_open",
+        context={"char": str(getattr(character, "pk", "?")), "npc": str(session.npc_id)},
+    )
+    return session
+
+
+def clear_dialogue_session(character: Any, npc: Any | None = None) -> bool:
+    """Retire the character's session, returning whether one was cleared.
+
+    With ``npc`` set, only a session naming that NPC is cleared (the departure
+    seams never touch another host's session); ``npc=None`` is the unconditional
+    clear used by movement settlement and combat engage. An absent or corrupt
+    value is a no-op ``False``. ``npc`` may be a live object or a pre-captured
+    positive dbid — deletion hooks run after the object's ``pk`` is gone, and
+    an unresolvable host id is a no-op (it never matches a stored session).
+    """
+    session = _parse_dialogue_session(character.db.dialogue_session)
+    if session is None:
+        if npc is None and character.db.dialogue_session is not None:
+            # Unconditional clear also retires a corrupt stored value.
+            character.db.dialogue_session = None
+            log_info(
+                "dialogue_session_clear",
+                context={
+                    "char": str(getattr(character, "pk", "?")),
+                    "npc": "corrupt",
+                    "reason": "unconditional",
+                },
+            )
+            return True
+        return False
+    if npc is not None:
+        host_id = npc if isinstance(npc, int) else getattr(npc, "pk", None)
+        if not isinstance(host_id, int) or int(host_id) != session.npc_id:
+            return False
+    character.db.dialogue_session = None
+    log_info(
+        "dialogue_session_clear",
+        context={
+            "char": str(getattr(character, "pk", "?")),
+            "npc": str(session.npc_id),
+            "reason": "named" if npc is not None else "unconditional",
+        },
+    )
+    return True
+
+
+def live_dialogue_session(character: Any) -> DialogueSession | None:
+    """The character's session iff its host still resolves as present+interactable.
+
+    A stale dbid (deleted object, departed NPC, or a host whose schedule state
+    no longer allows talk) is reported as not live — the stored value is left
+    in place for the next clear seam or talk to retire, mirroring the party
+    module's stale-dbid filtering. ``intent_context_ok`` is the canonical
+    co-location + talk-interactability gate.
+    """
+    from evennia.objects.objects import ObjectDB
+
+    from typeclasses.npcs import NPC
+    from world.rules.npc_intents import intent_context_ok
+
+    session = _parse_dialogue_session(character.db.dialogue_session)
+    if session is None:
+        return None
+    obj = ObjectDB.objects.filter(id=session.npc_id).first()
+    if obj is None or not isinstance(obj, NPC):
+        return None
+    if not intent_context_ok(obj, character):
+        return None
+    return session

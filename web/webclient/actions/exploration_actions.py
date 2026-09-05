@@ -24,6 +24,7 @@ from world.rules.dialogue import (
     DIALOGUE_TABLE,
     dialogue_key_for,
     is_dialogue_host,
+    open_or_refresh_dialogue,
     run_scripted_talk,
 )
 from world.rules.map_knowledge import KnowledgeError, decode_node
@@ -388,6 +389,11 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
         return _rejected("dialogue_failed", "交談失敗。")
     if result is None:
         return _rejected("no_response", "對方沒有理會你。")
+    # The delivered authored line IS the exchange: the deterministic-core
+    # session seam records it (webclient-align-07). The post-action full
+    # snapshot the dispatcher publishes after this result carries the session
+    # atomically with the delivered line.
+    open_or_refresh_dialogue(actor, npc, result.response)
     hint = f"\n{AFFINITY_DAILY_CAP_HINT}" if result.budget_capped else ""
     message = f"{npc.key}說：{result.response}{hint}"
     actor.msg(message)
@@ -412,7 +418,16 @@ def _talk_freeform_adapter(actor: Any, payload: dict[str, Any], session: Any = N
     from web.webclient.actions.dialogue_composition import build_dialogue_client
 
     client = build_dialogue_client()
-    deferred = npc.at_talked_to(payload["speech"], actor, client)
+
+    def _settled_line(line: str) -> None:
+        # Observer handed to the seam (webclient-align-07): invoked only after
+        # a reply or authored degrade line was actually presented and the
+        # completion gate still passed — a mid-flight-stale settlement and a
+        # silent degrade never call it. The record lands here, before the
+        # dispatcher's newer-revision snapshot publishes.
+        open_or_refresh_dialogue(actor, npc, line)
+
+    deferred = npc.at_talked_to(payload["speech"], actor, client, settled_line=_settled_line)
 
     def _on_success(result: Any) -> dict[str, Any]:
         if is_stale_context(result):

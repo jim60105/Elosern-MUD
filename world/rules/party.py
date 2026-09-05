@@ -412,6 +412,12 @@ def leave_party(npc: Any, player: Any, reason: str) -> None:
         [dbid for dbid in party if dbid != npc.pk],
         member_after,
     )
+    # A departed companion ends any conversation held with it
+    # (webclient-align-07): the conditional clear touches only sessions
+    # naming this NPC, inside the same transaction as the binding write.
+    from world.rules.dialogue import clear_dialogue_session
+
+    clear_dialogue_session(player, npc=npc)
 
 
 def purge_npc_memberships(npc: Any) -> None:

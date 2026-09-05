@@ -103,7 +103,61 @@ class NPC(LivingEntity):
             from web.webclient.presentation.party_push import push_party_update
 
             transaction.on_commit(lambda: push_party_update(owner))
+        departure_room = self.location
+        if departure_room is not None:
+            # Same deferral as the post-move seam: the deletion commits with
+            # the surrounding transaction, and a rolled-back deletion must not
+            # have burned anyone's session. The dbid is captured now — the
+            # object's pk is gone by the time the callback fires.
+            departed_id = int(self.pk)
+            transaction.on_commit(
+                lambda: self._clear_dialogue_sessions_naming_me(
+                    departure_room, npc_id=departed_id
+                )
+            )
         return True
+
+    def at_post_move(self, source_location, **kwargs):
+        """Retire dialogue sessions held by players the NPC just left behind.
+
+        Any move counts as departing the room for the dialogue-session seam
+        (webclient-align-07): schedule-driven moves, dismissals that walk the
+        NPC away, and manual ``move_to`` all run through Evennia's post-move
+        hook, so every leave-room path clears without each caller wiring it.
+        Only sessions naming THIS NPC clear — another host's session in the
+        same room is untouched. The fan-out rides ``transaction.on_commit``
+        (the established side-effect seam, mirroring the party push): a
+        companion's follow-move runs INSIDE the player's movement-settlement
+        transaction, whose rollback compensation cannot restore the attribute
+        cache — a later failed step would otherwise clear a bystander's live
+        session for a departure that never committed. Outside any transaction
+        the callback runs immediately.
+        """
+        super().at_post_move(source_location, **kwargs)
+        if source_location is None:
+            return
+        from django.db import transaction
+
+        room = source_location
+        transaction.on_commit(lambda: self._clear_dialogue_sessions_naming_me(room))
+
+    def _clear_dialogue_sessions_naming_me(self, room, npc_id: int | None = None) -> None:
+        """Clear every character session in ``room`` that names this NPC.
+
+        The scan is the cleanup seam; the deterministic-core helper applies the
+        conditional clear (no-op unless the stored session names this object).
+        A missing room degrades to a no-op. ``npc_id`` overrides the host
+        identity for post-deletion callbacks, whose object has lost its pk.
+        """
+        if room is None:
+            return
+        from typeclasses.characters import PlayerCharacter
+        from world.rules.dialogue import clear_dialogue_session
+
+        host = self.pk if npc_id is None else npc_id
+        for obj in room.contents:
+            if isinstance(obj, PlayerCharacter):
+                clear_dialogue_session(obj, npc=host)
 
     def get_display_desc(self, looker=None, **kwargs) -> str:
         """Append the affinity stage line to the ordinary zh-tw description.
@@ -420,7 +474,7 @@ class LLMNPC(NPC):
         return DialogueExchangeResult(degraded=False, reply=reply)
 
     @defer.inlineCallbacks
-    def at_talked_to(self, speech: str, character: Any, client: Any, *, reactor=None):
+    def at_talked_to(self, speech: str, character: Any, client: Any, *, reactor=None, settled_line=None):
         """Handle a player addressing this NPC through the guarded dialogue seam.
 
         Before any prompt construction or transport work, the seam consults
@@ -444,6 +498,12 @@ class LLMNPC(NPC):
             reactor: Optional Twisted reactor for the thinking timer; tests
                 inject ``twisted.internet.task.Clock`` for determinism and the
                 global reactor is used when omitted.
+            settled_line: Optional observer called with the line that was
+                actually presented (a reply's speech, or the authored degrade
+                greeting) once the completion gate still passes. Used by the
+                webclient-align-07 dialogue-session seam to record the
+                exchange through the deterministic-core writer. A mid-flight
+                stale settlement and a silent degrade invoke it never.
 
         Returns:
             A Deferred resolving after the reply is presented (or the degraded
@@ -484,9 +544,19 @@ class LLMNPC(NPC):
             greeting = greeting_for(self)
             if greeting is not None:
                 character.msg(f"{self.key}說：{greeting}")
+                # The authored degrade line is still a presented exchange: the
+                # session observer records it, but only while the completion
+                # gate still passes (the pair is together and talk-allowed).
+                if settled_line is not None and intent_context_ok(self, character):
+                    settled_line(greeting)
             return
 
         character.msg(f"{self.key}說：{result.reply.speech}")
+        # Record the exchange iff it settled while the pair is still together
+        # and talk-allowed — the same gate the intent applier uses, so a
+        # mid-flight-stale settlement records nothing (webclient-align-07).
+        if settled_line is not None and intent_context_ok(self, character):
+            settled_line(result.reply.speech)
         outcome = apply_npc_intent(
             self, character, result.reply.intent, context_ok=intent_context_ok
         )
