@@ -47,11 +47,26 @@ class _ItemActionBase(ServicesBrowserTest):
 
     def _open_inventory_drawer(self, page):
         focus_action_dock(page)
-        # Move, Look, Interact, Character, Quests, Inventory
-        for _ in range(5):
+        focused_key = None
+        for _ in range(12):
+            focused_key = (store_state_or_none(page) or {}).get("focus", {}).get("key")
+            if focused_key == "inventory":
+                break
             _press(page, "ArrowRight")
+        self.assertEqual(focused_key, "inventory")
         _press(page, "Enter")
-        page.wait_for_timeout(120)
+        wait_for_store_state(
+            page,
+            lambda s: ((s.get("panels") or {}).get("services") or {}).get("inventory") is not None,
+            dom_readiness={
+                "selector": '[data-testid="hud-drawer"][data-drawer="inventory"]',
+                "predicate": (
+                    "() => { const el = document.querySelector('[data-testid=\"hud-drawer\"][data-drawer=\"inventory\"]'); "
+                    "return !!el && el.offsetParent !== null; }"
+                ),
+                "description": "inventory drawer is open and visible",
+            },
+        )
         return self._services_panel(page)
 
     def _services_rows(self, page):
