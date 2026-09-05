@@ -1156,6 +1156,9 @@ class DialogueSessionRecordingAdapterTests(BattlefieldIsolation, EvenniaTestCase
         _reset_guardrail()
         super().tearDown()
 
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
+    )
     def test_scripted_success_records_the_delivered_authored_line(self):
         host = create_object(NPC, key="公會職員", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))

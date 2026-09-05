@@ -34,6 +34,7 @@ from world.rules.dialogue import (
 from world.rules.movement_settlement import settle_movement
 from world.rules.party import follow_companions, join_party, leave_party
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from tools.spec_traceability import covers_requirement
 
 
 def _all_profiles_off() -> dict:
@@ -59,6 +60,9 @@ class DialogueSessionHelperTests(EvenniaTest):
         self.other = create_object(NPC, key="路人", location=self.room1)
         self.away = create_object(Room, key="別處", location=None)
 
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
+    )
     def test_open_records_host_line_and_clock_tick(self):
         tick = get_world_clock().tick
         session = open_or_refresh_dialogue(self.player, self.host, "公會欢迎你。")
@@ -112,6 +116,9 @@ class DialogueSessionHelperTests(EvenniaTest):
         self.assertFalse(clear_dialogue_session(self.player))
         self.assertFalse(clear_dialogue_session(self.player, npc=self.host))
 
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
+    )
     def test_stale_dbid_is_never_live(self):
         # A dbid that never resolves (a deleted object): not live, and the
         # helper reports without repairing — the value stays for the next
@@ -158,6 +165,9 @@ class DialogueSessionClearSeamTests(BattlefieldIsolation, EvenniaTest):
     def _open(self):
         open_or_refresh_dialogue(self.player, self.host, "公會欢迎你。")
 
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
+    )
     def test_settled_movement_clears_the_session(self):
         self._open()
         settle_movement(
@@ -180,6 +190,9 @@ class DialogueSessionClearSeamTests(BattlefieldIsolation, EvenniaTest):
         self.assertIs(self.player.location, self.room1)
         self.assertIsNotNone(self.player.db.dialogue_session)
 
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
+    )
     def test_engage_clears_the_session(self):
         monster = create_object(Monster, key="哥布林")
         monster.threat_tier = "low"
@@ -189,6 +202,9 @@ class DialogueSessionClearSeamTests(BattlefieldIsolation, EvenniaTest):
         engage(self.player, monster)
         self.assertIsNone(self.player.db.dialogue_session)
 
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
+    )
     def test_npc_leave_room_clears_sessions_naming_it(self):
         self._open()
         other_player = create_object(PlayerCharacter, key="鄰居")
@@ -233,6 +249,9 @@ class DialogueSessionClearSeamTests(BattlefieldIsolation, EvenniaTest):
             self.host.delete()
         self.assertIsNone(self.player.db.dialogue_session)
 
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
+    )
     def test_leave_party_clears_the_session(self):
         join_party(self.host, self.player)
         self._open()
@@ -276,6 +295,9 @@ class TalkCommandSessionWriterTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn(greeting_for(self.staff), output)
         self.assertIsNone(self.char1.db.dialogue_session)
 
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
+    )
     def test_offline_scripted_dialogue_drives_the_whole_session(self):
         from commands.talk import CmdsTalk
 
