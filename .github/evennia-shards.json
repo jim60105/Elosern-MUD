@@ -75,8 +75,8 @@
         "world.rules.tests.test_guild_exams",
         "world.rules.tests.test_guild_registration",
         "world.rules.tests.test_guild_rewards",
-      "world.rules.tests.test_service_gate",
-      "world.rules.tests.test_service_binding_persistence",
+        "world.rules.tests.test_service_gate",
+        "world.rules.tests.test_service_binding_persistence",
         "world.rules.tests.test_heal_effect_handler",
         "world.rules.tests.test_holy_water_cleanse",
         "world.rules.tests.test_initiative_and_turn_loop",
@@ -176,23 +176,72 @@
     },
     {
       "index": 5,
-      "name": "maps-webclient-imports-prompts-tests",
-      "labels": [
-        "world.maps",
-        "web.webclient",
-        "world.imports",
-        "world.prompts",
-        "world.observability",
-        "world.tests"
-      ]
-    },
-    {
-      "index": 6,
       "name": "commands-server-typeclasses",
       "labels": [
         "commands",
         "server",
         "typeclasses"
+      ]
+    },
+    {
+      "index": 6,
+      "name": "webclient-actions",
+      "labels": [
+        "web.webclient.actions",
+        "world.tests"
+      ]
+    },
+    {
+      "index": 7,
+      "name": "webclient-evidence",
+      "labels": [
+        "web.webclient.tests"
+      ]
+    },
+    {
+      "index": 8,
+      "name": "maps-imports-prompts-observability",
+      "labels": [
+        "world.maps",
+        "world.imports",
+        "world.prompts",
+        "world.observability"
+      ]
+    },
+    {
+      "index": 9,
+      "name": "webclient-presentation-a",
+      "labels": [
+        "web.webclient.presentation.tests.test_affordances",
+        "web.webclient.presentation.tests.test_coordinator",
+        "web.webclient.presentation.tests.test_coordinator_push",
+        "web.webclient.presentation.tests.test_creation_panel",
+        "web.webclient.presentation.tests.test_dialogue_panel",
+        "web.webclient.presentation.tests.test_lineage_panel",
+        "web.webclient.presentation.tests.test_local_map",
+        "web.webclient.presentation.tests.test_party_panel",
+        "web.webclient.presentation.tests.test_possession_presentation",
+        "web.webclient.presentation.tests.test_presentation_context",
+        "web.webclient.presentation.tests.test_services_panel",
+        "web.webclient.presentation.tests.test_title_codex_panel"
+      ]
+    },
+    {
+      "index": 10,
+      "name": "webclient-presentation-b",
+      "labels": [
+        "web.webclient.presentation.tests.test_art_panel",
+        "web.webclient.presentation.tests.test_art_push",
+        "web.webclient.presentation.tests.test_character_panel",
+        "web.webclient.presentation.tests.test_combat_panel",
+        "web.webclient.presentation.tests.test_exploration_panel",
+        "web.webclient.presentation.tests.test_fingerprints",
+        "web.webclient.presentation.tests.test_objectives_panel",
+        "web.webclient.presentation.tests.test_protocol",
+        "web.webclient.presentation.tests.test_registry",
+        "web.webclient.presentation.tests.test_roster",
+        "web.webclient.presentation.tests.test_title_ballot_panel",
+        "web.webclient.presentation.tests.test_watchers"
       ]
     }
   ]
