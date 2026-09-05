@@ -56,7 +56,10 @@
       mirror (validator parity drift closed)
 - [x] 9.5 Tests: text-command `talk` e2e publishes `mode: dialogue` with the available
       panel; coordinator injection carries `dialogue` in unrelated subset updates;
-      node fixtures for `__proto__` duplicates and the mode/panel consistency rule;
-      dialogue push epoch-guard test
+      node fixtures for `__proto__` duplicates and lone-surrogate keyword ids. The
+      injection rule is server-emission behavior (the client must still accept a
+      subset update that omits `dialogue`), so it is defended by the coordinator
+      tests only; the departure push inherits the epoch guard of
+      ``publish_panel_update``, covered by ``test_coordinator_push``.
 - [x] 9.6 Delta spec: state the atomicity guarantee as a scenario in the
       `webclient-oob-protocol` delta; re-validate `--strict`

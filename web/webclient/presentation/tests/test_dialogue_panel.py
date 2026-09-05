@@ -6,14 +6,15 @@ table-order keyword choices, the recorded line), registered unavailable forms
 rendering, the pure validator's drift rejections, the coordinator mode matrix
 (creation > combat > dialogue-live > exploration), the live->clear committed
 transitions through the wire, and the NPC-departure panel push seam.
-``covers_requirement`` annotations for the two new ``webclient-dialogue-session``
-IDs land at the change's archive/sync commit (the checker resolves IDs only
-from ``openspec/specs/``).
+The two new ``webclient-dialogue-session`` IDs are annotated on their
+establishing tests (landed with the change's spec-sync commit).
 """
 
 from copy import deepcopy
 from types import SimpleNamespace
 import unittest
+
+from tools.spec_traceability import covers_requirement
 
 from evennia.server.serversession import ServerSession
 from evennia.utils.create import create_object
@@ -139,6 +140,9 @@ class DialoguePresenterTests(EvenniaTest):
     def _render(self):
         return self.registry.render("dialogue", self.context)
 
+    @covers_requirement(
+        "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
     def test_available_form_is_exact_vocabulary_for_a_bonded_host(self):
         apply_affinity_change(
             self.host, self.player, AffinitySource.QUEST_COMPLETION, 47
@@ -332,6 +336,9 @@ class DialogueModeResolutionTests(BattlefieldIsolation, EvenniaTest):
     def _mode(self):
         return PresentationCoordinator.mode_for(self.context)
 
+    @covers_requirement(
+        "webclient-dialogue-session::dialogue-mode-resolves-after-combat-and-before-exploration"
+    )
     def test_matrix(self):
         self.assertEqual(self._mode(), "exploration")
         open_or_refresh_dialogue(self.player, self.host, "歡迎。")
