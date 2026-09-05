@@ -1,9 +1,12 @@
-# Delta spec: profession-registries (profession-rulebook-registry)
+# profession-registries Specification
 
-New capability: the authored profession table as game data. Assembly-time semantics only; the
-`default_binding` value is stored here and first read by the service-anchoring gate.
+## Purpose
 
-## ADDED Requirements
+The authored profession table as game data: a validated rulebook registry of
+assembly-time NPC blueprints with keyed frozen reads, whose `default_binding`
+value is stored here and first read by the service-anchoring gate.
+
+## Requirements
 
 ### Requirement: Professions are one validated rulebook table with keyed frozen reads
 `world/rules/rulebook/professions.yaml` SHALL declare every authored profession as a list under
