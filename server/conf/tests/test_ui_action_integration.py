@@ -480,6 +480,12 @@ class MultiCharacterActionIntegrationTests(EvenniaTest):
     @covers_requirement(
         "webclient-character-roster::creating-a-character-is-an-allowlisted-account-scoped-action"
     )
+    @covers_requirement(
+        "webclient-character-roster::the-top-band-carries-a-character-switcher-rendered-from-the-committed-roster",
+        "webclient-character-roster::the-expanded-switcher-lists-every-roster-row-with-one-shared-lock-note",
+        "webclient-character-roster::switching-dispatches-once-and-commits-only-on-the-server-s-snapshot",
+        "webclient-character-roster::creating-a-character-is-a-confirmation-gated-trailing-control",
+    )
     def test_multicharacter_create_switch_e2e_scenario(self):
         """End-to-end WebSocket scenario: create B, complete wizard, switch to A, switch to B."""
         # 1. Initial sync on character A (char1)

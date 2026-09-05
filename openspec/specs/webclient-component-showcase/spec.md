@@ -354,14 +354,22 @@ be re-frozen at the complete redesign set and the component-coverage gate SHALL 
 
 ### Requirement: The frozen component set grows only through a governed redesign wave
 The required-component manifest SHALL remain the authoritative frozen set, and it SHALL grow only
-through a change named in the WebClient Contextual HUD Redesign roadmap's delivery table. A wave that
-adds a component SHALL, in the same change, add its title to the manifest, ship its Storybook story
-with deterministic offline args, and extend this capability's spec in lockstep — never a manifest edit
-alone. A component SHALL NOT be wired into the live application before its story exists. On completion
-of the redesign the manifest SHALL be re-frozen at the complete new set.
+through a change that names the growth as part of its own scope: a change in the WebClient
+Contextual HUD Redesign roadmap's delivery table, or a feature change that introduces a component
+backed by a committed presentation panel. A change that adds a component SHALL, in the same change,
+add its title to the manifest, ship its Storybook story with deterministic offline args, and extend
+this capability's spec in lockstep — never a manifest edit alone. A component whose surface has no
+committed backing read model SHALL NOT be added under either route; it belongs on the deferred list
+instead. A component SHALL NOT be wired into the live application before its story exists. On
+completion of the redesign the manifest SHALL be re-frozen at the complete set then current, and
+each later growth SHALL re-freeze it at its new complete set.
 
 #### Scenario: A wave adds a component with its story in the same change
 - **WHEN** a roadmap wave introduces a new component
+- **THEN** the same change adds its manifest title, its Storybook story with deterministic offline args, and the matching spec entry, and the component-coverage gate passes
+
+#### Scenario: A feature change adds a backed component under the same obligations
+- **WHEN** a feature change outside the redesign roadmap introduces a component rendered entirely from a committed presentation panel
 - **THEN** the same change adds its manifest title, its Storybook story with deterministic offline args, and the matching spec entry, and the component-coverage gate passes
 
 #### Scenario: A manifest edit without a story fails the gate

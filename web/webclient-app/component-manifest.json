@@ -2,6 +2,7 @@
   "required": [
     "Core/AppShell",
     "Core/TopBar",
+    "Core/CharacterSwitcher",
     "Core/ConnectOverlay",
     "Core/NarrativeFeed",
     "Core/UnreadIndicator",
