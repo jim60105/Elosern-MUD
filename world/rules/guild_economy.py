@@ -116,18 +116,18 @@ def _converge_service_hosts(roster_service_ids: set[str]) -> None:
     Roster membership is the component ``service_id``, never the entity key:
     an NPC is a convergence candidate when ANY service-bearing component
     (vocabulary class defining ``service_id``) carries an id absent from the
-    roster. Deletion stays under the legacy cleanup's identity-shape
-    discipline: a TITLELESS candidate is unambiguous development residue and
-    is deleted (the following roster pass recreates a titleless malformed
-    host from its row); a TITLED candidate that still holds at least one
-    roster-matching anchor is ambiguous residue — deleting it would destroy a
-    host the roster still wants, and a hand-authored NPC sharing a stale id
-    cannot be distinguished — so it is kept with a named warning for manual
-    repair. A titled candidate whose EVERY service anchor is roster-absent is
-    a shrunk-away roster host and is deleted. An NPC carrying no service
-    component is never touched, exactly as the pre-change cleanup. Each
-    deletion emits one commit-bound info event (party bindings purge through
-    the existing ``NPC.at_object_delete`` hook).
+    roster — but deletion fires only when EVERY claimed id is roster-absent,
+    so a host the roster still wants through ANY anchor is never destroyed.
+    A candidate still holding a roster-matching anchor survives: TITLED mixed
+    residue is ambiguous (a hand-authored NPC sharing a stale id cannot be
+    distinguished) and is kept with a named warning for manual repair; a
+    titleless one survives silently, its stray component outside the roster's
+    concern. A candidate whose EVERY service anchor is roster-absent is
+    either a shrunk-away roster host or unambiguous development residue and
+    is deleted (a roster row returning later recreates the full authored
+    identity). An NPC carrying no service component is never touched,
+    exactly as the pre-change cleanup. Each deletion emits one commit-bound
+    info event (party bindings purge through ``NPC.at_object_delete``).
     """
     service_classes = [
         component_class
@@ -145,15 +145,19 @@ def _converge_service_hosts(roster_service_ids: set[str]) -> None:
         stale = [service_id for service_id in claimed if service_id not in roster_service_ids]
         if not stale:
             continue
-        if host.npc_title and any(service_id in roster_service_ids for service_id in claimed):
-            log_warn(
-                "guild_service_host_convergence_ambiguous",
-                context={
-                    "char": host.key,
-                    "service": stale[0],
-                    "services": list(claimed),
-                },
-            )
+        if any(service_id in roster_service_ids for service_id in claimed):
+            # The roster still wants this host through some anchor; a stale
+            # extra component is never grounds to destroy it. Titled mixed
+            # residue is ambiguous — warn for manual repair, keep.
+            if host.npc_title:
+                log_warn(
+                    "guild_service_host_convergence_ambiguous",
+                    context={
+                        "char": host.key,
+                        "service": stale[0],
+                        "services": list(claimed),
+                    },
+                )
             continue
         host.delete()
         transaction.on_commit(
@@ -175,9 +179,13 @@ def sync_service_content() -> None:
     blueprint through the shared helper — never through a code-side component
     literal. A row whose room tag resolves to no room emits the named
     per-row warning and is skipped alone (the existing interiors-missing
-    retry still runs first). Roster convergence runs before creation/reuse so
-    a titleless malformed host is deleted and rebuilt from its row. Merchant
-    stock is initialized only for merchants whose roster row completed sync.
+    retry still runs first). Duplicate-anchor fail-closed and roster
+    convergence are room-INDEPENDENT and run for EVERY roster row on every
+    sync — an empty or wholly unresolvable roster still converges the hosts
+    it no longer authorises; only creation/reuse and merchant stock are
+    limited to rows whose room resolved. Convergence precedes creation/reuse
+    so a malformed host is deleted and rebuilt from its row. Merchant stock
+    is initialized only for merchants whose roster row completed sync.
     """
     catalog = get_catalog()
     roster = catalog.service_hosts
@@ -200,18 +208,20 @@ def sync_service_content() -> None:
                 },
             )
     processable = [row for row in roster if rooms[row.service_id] is not None]
+    # Fail closed on duplicate anchors BEFORE any mutation, convergence
+    # deletion included — the unchanged single-host invariant: a named
+    # integrity error means nothing is created, renamed, or deleted. The
+    # probe reads only live component anchors, so it covers EVERY row even
+    # when its room cannot resolve.
+    for row in roster:
+        _find_service_host(row.service_id, _row_anchor_class(row).get_component_slot())
+    _converge_service_hosts({row.service_id for row in roster})
     if not processable:
         log_warn(
             "guild_economy_service_interiors_still_missing",
             context={"action": "skip_service_content"},
         )
         return
-    # Fail closed on duplicate anchors BEFORE any mutation, convergence
-    # deletion included — the unchanged single-host invariant: a named
-    # integrity error means nothing is created, renamed, or deleted.
-    for row in processable:
-        _find_service_host(row.service_id, _row_anchor_class(row).get_component_slot())
-    _converge_service_hosts({row.service_id for row in roster})
     synced_service_ids: set[str] = set()
     for row in processable:
         _sync_service_host(row, rooms[row.service_id])

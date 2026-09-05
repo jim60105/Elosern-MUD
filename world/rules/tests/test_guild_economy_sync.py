@@ -2,6 +2,7 @@
 
 from tools.spec_traceability import covers_requirement
 
+import dataclasses
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -65,16 +66,21 @@ class ServiceContentIsolation(QuestRegistryIsolation):
     def _roster_minus(self, service_id):
         """Patch the cached catalog with one roster row removed."""
         catalog = get_catalog()
-        shrunk = guild_config.GuildCatalog(
+        self._patch_roster(
+            tuple(row for row in catalog.service_hosts if row.service_id != service_id)
+        )
+
+    def _patch_roster(self, rows):
+        """Patch the cached catalog to carry exactly ``rows`` as its roster."""
+        catalog = get_catalog()
+        patched = guild_config.GuildCatalog(
             merit_thresholds=catalog.merit_thresholds,
             exam_profiles=catalog.exam_profiles,
             shop_configs=catalog.shop_configs,
             quest_offers=catalog.quest_offers,
-            service_hosts=tuple(
-                row for row in catalog.service_hosts if row.service_id != service_id
-            ),
+            service_hosts=rows,
         )
-        patcher = patch.object(guild_economy, "get_catalog", return_value=shrunk)
+        patcher = patch.object(guild_economy, "get_catalog", return_value=patched)
         patcher.start()
         self._patchers.append(patcher)
         self.addCleanup(patcher.stop)
@@ -366,6 +372,16 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
     def test_roster_shrink_deletes_only_the_surplus_host(self):
         sync_service_content()
         merchant = self._merchant_host()
+        # Party bindings purge through NPC.at_object_delete on the deletion.
+        from typeclasses.characters import PlayerCharacter
+        from world.rules.party import join_party, party_ids
+
+        player = create_object(PlayerCharacter, key="收縮測試玩家")
+        player.race = "human"
+        player.apply_race_baseline()
+        player.location = merchant.location
+        join_party(merchant, player)
+        self.assertEqual(party_ids(player), [merchant.pk])
         self._roster_minus(MERCHANT_SERVICE_ID)
         with patch("world.rules.guild_economy.log_info") as logged:
             with self.captureOnCommitCallbacks(execute=True):
@@ -380,6 +396,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].kwargs["context"]["char"], MERCHANT_HOST_NAME)
         self.assertEqual(events[0].kwargs["context"]["service"], MERCHANT_SERVICE_ID)
+        self.assertEqual(party_ids(player), [])
 
     @covers_requirement(
         "guild-registration::roster-convergence-deletes-service-hosts-absent-from-the-roster"
@@ -481,6 +498,112 @@ class ServiceHostAnchorRoomTests(ServiceContentIsolation, EvenniaTestCase):
         # for the skipped row, and the skipped merchant's stock stayed absent.
         self.assertIsNotNone(NPC.objects.filter(db_key=GUILD_HOST_NAME).first())
         self.assertEqual(NPC.objects.filter(db_key=MERCHANT_HOST_NAME).count(), 0)
+
+
+class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
+    """Roster authority never depends on anchor-room resolution (design D9)."""
+
+    def _rows_with_tags(self, tag):
+        catalog = get_catalog()
+        return tuple(
+            dataclasses.replace(row, anchor_room=tag) for row in catalog.service_hosts
+        )
+
+    def _stale_host(self):
+        host = create_object(NPC, key="殘留服務人", location=None)
+        host.components.add(
+            Merchant.create(host, service_id="retired_shop_id", shop_key="altoria_general_store")
+        )
+        return host
+
+    @covers_requirement(
+        "guild-registration::roster-convergence-deletes-service-hosts-absent-from-the-roster"
+    )
+    def test_empty_roster_converges_every_host_even_with_no_rooms(self):
+        # The most direct roster shrink: an empty roster authorises nothing,
+        # so sync deletes both hosts even though no row's room can resolve.
+        sync_service_content()
+        guild = NPC.objects.filter(db_key=GUILD_HOST_NAME).first()
+        merchant = NPC.objects.filter(db_key=MERCHANT_HOST_NAME).first()
+        self._patch_roster(())
+        with patch("world.rules.guild_economy.log_warn") as warned:
+            with self.captureOnCommitCallbacks(execute=True):
+                sync_service_content()
+        for host in (guild, merchant):
+            with self.assertRaises(NPC.DoesNotExist):
+                host.refresh_from_db()
+        still_missing = [
+            call for call in warned.call_args_list
+            if call.args and call.args[0] == "guild_economy_service_interiors_still_missing"
+        ]
+        self.assertEqual(len(still_missing), 1)  # creation skipped; deletion was not
+
+    @covers_requirement(
+        "guild-registration::roster-convergence-deletes-service-hosts-absent-from-the-roster"
+    )
+    @covers_requirement(
+        "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
+    )
+    def test_all_rows_unresolvable_still_converge_and_never_touch_roster_hosts(self):
+        sync_service_content()
+        guild = NPC.objects.filter(db_key=GUILD_HOST_NAME).first()
+        merchant = NPC.objects.filter(db_key=MERCHANT_HOST_NAME).first()
+        stale = self._stale_host()
+        expected = NPC.objects.all_family().count() - 1  # only the stale host dies
+        self._patch_roster(self._rows_with_tags("no_such_room_tag"))
+        with self.captureOnCommitCallbacks(execute=True):
+            sync_service_content()
+        # The stale host is converged away...
+        with self.assertRaises(NPC.DoesNotExist):
+            stale.refresh_from_db()
+        # ...while roster-listed hosts stay byte-identical and unmoved.
+        guild.refresh_from_db()
+        merchant.refresh_from_db()
+        self.assertEqual(
+            guild.location, search_object_by_tag(GUILD_HALL_TAG)[0]
+        )
+        self.assertEqual(
+            merchant.location, search_object_by_tag(GENERAL_STORE_TAG)[0]
+        )
+        self.assertEqual(NPC.objects.all_family().count(), expected)
+
+    @covers_requirement(
+        "npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename"
+    )
+    @covers_requirement(
+        "guild-registration::roster-convergence-deletes-service-hosts-absent-from-the-roster"
+    )
+    def test_duplicate_anchor_on_unresolvable_row_fails_closed_before_any_mutation(self):
+        # A duplicate claim on a row whose room cannot resolve still fails
+        # closed: NOTHING is created, moved, or deleted — convergence included.
+        first = create_object(NPC, key="分身商人一", location=self._hall())
+        second = create_object(NPC, key="分身商人二", location=self._hall())
+        for host in (first, second):
+            host.components.add(
+                Merchant.create(
+                    host, service_id=MERCHANT_SERVICE_ID, shop_key="altoria_general_store"
+                )
+            )
+        stale = self._stale_host()
+        catalog = get_catalog()
+        self._patch_roster(
+            tuple(
+                dataclasses.replace(row, anchor_room="no_such_room_tag")
+                if row.service_id == MERCHANT_SERVICE_ID
+                else row
+                for row in catalog.service_hosts
+            )
+        )
+        with self.assertRaises(ServiceAnchorIntegrityError):
+            sync_service_content()
+        first.refresh_from_db()
+        second.refresh_from_db()
+        stale.refresh_from_db()  # convergence never ran
+        self.assertIsNone(NPC.objects.filter(db_key=GUILD_HOST_NAME).first())
+        self.assertIsNone(NPC.objects.filter(db_key=MERCHANT_HOST_NAME).first())
+
+    def _hall(self):
+        return search_object_by_tag(GUILD_HALL_TAG)[0]
 
 
 class ServiceContentWithoutInteriorsTests(EvenniaTestCase):

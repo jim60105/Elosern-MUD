@@ -468,6 +468,17 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         self.assertEqual([row.service_id for row in catalog.service_hosts], ["altoria_guild_master", "altoria_merchant"])
         self.assertEqual(set(catalog.host_by_service_id), {"altoria_guild_master", "altoria_merchant"})
 
+    def test_missing_roster_section_is_a_named_catalog_error(self):
+        # A rulebook without the required section surfaces through the
+        # catalog's named error family, never a raw KeyError.
+        from world.rules import guild_config
+
+        raw = raw_rulebook()
+        del raw["service_hosts"]
+        with mock.patch.object(guild_config, "load_config", return_value=raw):
+            with self.assertRaises(GuildConfigError):
+                load_guild_catalog(QUEST_DEFINITION_REGISTRY)
+
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
     )

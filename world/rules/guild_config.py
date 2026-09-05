@@ -479,7 +479,7 @@ class GuildCatalog:
         exam_profiles: dict[str, ExamProfile],
         shop_configs: dict[str, ShopConfig],
         quest_offers: list[GuildQuestOffer],
-        service_hosts: tuple[ServiceHostRow, ...] = (),
+        service_hosts: tuple[ServiceHostRow, ...],
     ):
         self.merit_thresholds = {**merit_thresholds}
         self.exam_profiles = {**exam_profiles}
@@ -503,6 +503,8 @@ def load_guild_catalog(definition_registry: Mapping[str, Any]) -> GuildCatalog:
     every other section validates against immutable lore registries alone.
     """
     raw = load_config()
+    if "service_hosts" not in raw:
+        raise _error("service_hosts section is required")
     return GuildCatalog(
         merit_thresholds=validate_merit_thresholds(raw["merit_thresholds"]),
         exam_profiles=validate_exam_profiles(raw["exam_profiles"]),
