@@ -1,0 +1,38 @@
+# Profession rulebook (change profession-rulebook-registry).
+#
+# A profession is an ASSEMBLY-TIME BLUEPRINT, never a runtime lens
+# (design 2026-09-05-profession-registries D1): after NPC construction the
+# authoritative state is the NPC's component instances and attributes; runtime
+# gates read component fields, never this table.
+#
+# `default_binding` is validated for vocabulary and STORED BUT NOT READ by any
+# runtime gate until the service-anchoring change consumes it (D6 seam).
+#
+# Row baselines:
+#   - `merchant` and `guild_staff` exactly mirror the component tuples
+#     `world/rules/guild_economy.py::sync_service_content` attaches today
+#     (store host: Merchant; guild-hall host: GuildStaff + GuildExaminer +
+#     ScriptedDialogue), so the later declarative-hosts conversion is provably
+#     behavior-neutral.
+#   - `guild_examiner` is the task-prescribed examiner/dialogue blueprint
+#     (a reusable subset; sync attaches no examiner-only host today).
+schema_version: 1
+professions:
+  - key: merchant
+    components:
+      - { type: merchant, default_binding: place }
+    schedule_template: null
+    default_tier: null
+  - key: guild_staff
+    components:
+      - { type: guild_staff, default_binding: place }
+      - { type: guild_examiner, default_binding: place }
+      - { type: scripted_dialogue, default_binding: place }
+    schedule_template: null
+    default_tier: null
+  - key: guild_examiner
+    components:
+      - { type: guild_examiner, default_binding: place }
+      - { type: scripted_dialogue, default_binding: place }
+    schedule_template: null
+    default_tier: null

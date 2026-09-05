@@ -1,9 +1,12 @@
-# Delta spec: profession-registries (profession-rulebook-registry)
+# profession-registries Specification
 
-New capability: the authored profession table as game data. Assembly-time semantics only; the
-`default_binding` value is stored here and first read by the service-anchoring gate.
+## Purpose
 
-## ADDED Requirements
+The authored profession table as game data: a validated rulebook registry of
+assembly-time NPC blueprints with keyed frozen reads, whose `default_binding`
+value is stored here and first read by the service-anchoring gate.
+
+## Requirements
 
 ### Requirement: Professions are one validated rulebook table with keyed frozen reads
 `world/rules/rulebook/professions.yaml` SHALL declare every authored profession as a list under
@@ -15,6 +18,9 @@ Each profession row SHALL carry exactly: a non-empty unique `key`; a `components
 The shipped table SHALL contain exactly the `merchant`, `guild_staff`, and `guild_examiner`
 professions replicating the component combinations `world/rules/guild_economy.py` assembles
 today, each with `schedule_template: null` and `default_tier: null`.
+The `merchant` and `guild_staff` rows SHALL mirror the store and guild-hall host component
+tuples that sync attaches today; `guild_examiner` is the prescribed examiner/dialogue blueprint
+(a reusable subset; sync attaches no examiner-only host today).
 
 #### Scenario: The shipped table loads and exposes the three replica professions
 - **WHEN** the professions rulebook is loaded
