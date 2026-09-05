@@ -155,6 +155,26 @@ describe("NarrativeFeed dialogue variant", () => {
     ]);
   });
 
+  it("never swallows a sys tail whose text coincides with the reply", () => {
+    const w = mountFeed({
+      lines: [{ kind: "out", text: "码头的水声。" }, { kind: "sys", text: PANEL.line }],
+    });
+    // A system record is a distinct event: the box never owns its kind.
+    expect(w.findAll(".narrative-line")).toHaveLength(2);
+    expect(w.findAll(".narrative-line.sys").map((l) => l.text())).toEqual([PANEL.line]);
+  });
+
+  it("keeps literal angle-bracket prose in the hint residual", () => {
+    const hint = "（提示：<任務名> 要寫全名）";
+    const w = mountFeed({
+      lines: [{ kind: "out", text: `灰婆婆說：${PANEL.line}<br>${hint}` }],
+    });
+    const out = w.findAll(".narrative-line.out");
+    expect(out).toHaveLength(1);
+    // The unrecognized tag survives the pipeline-normalizing strip verbatim.
+    expect(out[0].text()).toBe(hint);
+  });
+
   it("the head reads 對話 without the 完整日誌 capsule while the panel is available", () => {
     const w = mountFeed();
     expect(w.get('[data-testid="narrative-mode-label"]').text()).toBe("對話");

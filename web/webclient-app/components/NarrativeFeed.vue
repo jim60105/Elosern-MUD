@@ -83,13 +83,21 @@ export default {
         return lines;
       }
       const last = lines[lines.length - 1];
-      if (!last || (last && last.kind) === "in") {
+      // Only outgoing narrative records are echo candidates: player input
+      // echoes keep their literal line, and a sys/err record that coincides
+      // with the reply is a distinct event the feed must not swallow.
+      if (!last || (last.kind || "out") !== "out") {
         return lines;
       }
-      // Stored stream text carries the markup pipeline's inline spans; the
-      // committed reply is plain server-authored prose. The match runs on the
-      // markup-stripped text (the residual keeps the markup-free hint prose).
-      const text = lineText(last).replace(/<[^>]*>/g, "");
+      // Stored stream text carries the markup pipeline's inline tags; the
+      // committed reply is plain server-authored prose. The match runs on text
+      // normalized like the renderer sees it: `<br>` becomes a newline and
+      // only the pipeline's own recognized tags are removed, so any literal
+      // `<...>` prose a hint carries survives verbatim into the residual
+      // (where the strict tokenizer renders it as literal text).
+      const text = lineText(last)
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/?(?:span|a)(?: [^>]*)?>/gi, "");
       const reply = props.dialogue.line;
       // The anchored echo form is `<npc key>說：<reply>` (the scripted and
       // freeform adapters' message shape). The key differs from the panel's
@@ -114,9 +122,9 @@ export default {
         (exactEcho &&
           (suffix === reply ||
             suffix[reply.length] === "\n" ||
-            // The markup pipeline turns the newline before the hint into a
-            // tag the strip above removes, so the parenthetical hint glyph
-            // is the observed seam on stored (markup-bearing) text.
+            // Belt-and-braces: some markup forms glue the parenthetical hint
+            // directly after the reply, so the hint glyph itself is accepted
+            // as the seam alongside the newline form.
             suffix[reply.length] === "（"));
       if (!matches) {
         return lines;
