@@ -29,6 +29,16 @@ Architectural Contract
    that internal unpuppet, returning silently with no exception. The helper
    must therefore verify ``account.get_puppet(session) is target`` and walk an
    explicit recovery ladder rather than assuming success.
+
+3. **At Most One Scheduled Transition Per Session**:
+   ``account.character.switch`` and ``account.character.create`` share the session-scoped
+   ``session.ndb.elosern_char_transition_pending`` marker. Both adapters check it first at
+   admission and refuse a second character-changing request (``transition_pending``) while a
+   scheduled-but-unexecuted transition owns the session; the marker is set only after
+   ``callLater`` succeeds and cleared in a ``finally`` wrapping the whole scheduled callback.
+   A plain boolean suffices: the admission-time rejection makes two concurrently-scheduled
+   transitions structurally impossible (see change design D2/D3), so the session-level fact
+   "a transition is pending" needs no per-action or generation tracking.
 """
 
 from typing import Any
@@ -71,6 +81,9 @@ CREATE_FAILED_MESSAGE = "建立角色失敗。"
 NO_ACTIVE_SESSION_CODE = "no_active_session"
 NO_ACTIVE_SESSION_MESSAGE = "目前沒有作用中的會話。"
 
+TRANSITION_PENDING_CODE = "transition_pending"
+TRANSITION_PENDING_MESSAGE = "角色切換正在進行中，請稍候。"
+
 # Player narrative recovery templates
 RECOVERY_RETAINED_TEMPLATE = "角色切換未完成，你目前仍在使用「{name}」。"
 RECOVERY_RESTORED_TEMPLATE = "切換角色失敗，已為你恢復至原角色「{name}」。"
@@ -92,6 +105,34 @@ def set_clock_for_testing(clock: Any) -> None:
     """Override the active reactor for deterministic testing."""
     global _clock
     _clock = clock
+
+
+def _transition_pending(session: Any) -> bool:
+    """Return True while a scheduled-but-unexecuted transition owns this session."""
+    ndb = getattr(session, "ndb", None)
+    return bool(getattr(ndb, "elosern_char_transition_pending", False))
+
+
+def _set_transition_pending(session: Any) -> None:
+    """Record that a transition is now scheduled for this session.
+
+    Called by the adapters only after ``clock.callLater`` has returned (schedule-then-set),
+    so a scheduling failure can never leave the marker set with nothing to clear it.
+    """
+    ndb = getattr(session, "ndb", None)
+    if ndb is not None:
+        ndb.elosern_char_transition_pending = True
+
+
+def _clear_transition_pending(session: Any) -> None:
+    """Release the session's pending marker once its scheduled callback finishes.
+
+    Called from the ``finally`` of both scheduled callbacks, covering every exit path:
+    success, early returns, recovery rungs, and uncaught exceptions.
+    """
+    ndb = getattr(session, "ndb", None)
+    if ndb is not None:
+        ndb.elosern_char_transition_pending = False
 
 
 class AccountActionError(ValueError):
@@ -277,50 +318,53 @@ def _perform_switch(
     Re-validates committed state, verifies that the session still holds previous,
     attaches target, and handles verification or recovery.
     """
-    # Verify the session still holds the puppet that admitted the switch
-    current = account.get_puppet(session) if account is not None else None
-    if current is not previous:
-        log_warn(
-            "char_switch_stale_puppet",
-            context={
-                "account": str(getattr(account, "pk", "?")),
-                "session": str(getattr(session, "sessid", "?")),
-                "previous": str(getattr(previous, "pk", "?")),
-                "actual": str(getattr(current, "pk", "?")),
-            },
-        )
-        if current is not None:
-            synchronize_session(session, current)
-        return
-
-    # Re-validate target ownership
-    characters = getattr(account, "characters", None) or []
-    target = None
-    for char in characters:
-        if getattr(char, "pk", None) == character_id or getattr(char, "id", None) == character_id:
-            target = char
-            break
-
-    if target is None:
-        _recover_transition(session, account, previous, previous, cause="target_no_longer_owned")
-        return
-
-    if is_in_active_session(previous):
-        _recover_transition(session, account, previous, target, cause="entered_combat")
-        return
-
-    attached = False
     try:
-        attached = _attach_puppet(session, account, target)
-    except Exception as exc:  # observability: ignore R2: recovery ladder handles attach failure and logs facade event
-        _recover_transition(session, account, previous, target, cause=exc)
-        return
+        # Verify the session still holds the puppet that admitted the switch
+        current = account.get_puppet(session) if account is not None else None
+        if current is not previous:
+            log_warn(
+                "char_switch_stale_puppet",
+                context={
+                    "account": str(getattr(account, "pk", "?")),
+                    "session": str(getattr(session, "sessid", "?")),
+                    "previous": str(getattr(previous, "pk", "?")),
+                    "actual": str(getattr(current, "pk", "?")),
+                },
+            )
+            if current is not None:
+                synchronize_session(session, current)
+            return
 
-    if attached:
-        _set_last_puppet(account, target)
-        synchronize_session(session, target)
-    else:
-        _recover_transition(session, account, previous, target, cause="attach_verification_failed")
+        # Re-validate target ownership
+        characters = getattr(account, "characters", None) or []
+        target = None
+        for char in characters:
+            if getattr(char, "pk", None) == character_id or getattr(char, "id", None) == character_id:
+                target = char
+                break
+
+        if target is None:
+            _recover_transition(session, account, previous, previous, cause="target_no_longer_owned")
+            return
+
+        if is_in_active_session(previous):
+            _recover_transition(session, account, previous, target, cause="entered_combat")
+            return
+
+        attached = False
+        try:
+            attached = _attach_puppet(session, account, target)
+        except Exception as exc:  # observability: ignore R2: recovery ladder handles attach failure and logs facade event
+            _recover_transition(session, account, previous, target, cause=exc)
+            return
+
+        if attached:
+            _set_last_puppet(account, target)
+            synchronize_session(session, target)
+        else:
+            _recover_transition(session, account, previous, target, cause="attach_verification_failed")
+    finally:
+        _clear_transition_pending(session)
 
 
 def _account_character_switch_adapter(
@@ -334,6 +378,17 @@ def _account_character_switch_adapter(
     Returns a result-only success response (no_presentation=True) and schedules
     the puppet transition on the next reactor turn.
     """
+    # Admission gate first: a session already owning a scheduled-but-unexecuted
+    # transition is refused before any account, character, or combat lookup, so the
+    # pending refusal always takes precedence over other rejection reasons.
+    if _transition_pending(session):
+        return {
+            "outcome": "rejected",
+            "code": TRANSITION_PENDING_CODE,
+            "message": TRANSITION_PENDING_MESSAGE,
+            "no_presentation": True,
+        }
+
     account = getattr(actor, "account", None)
     if account is None:
         return {
@@ -377,6 +432,11 @@ def _account_character_switch_adapter(
 
     clock = get_clock()
     clock.callLater(0, _perform_switch, session, account, character_id, actor)
+    # Schedule-then-set: if callLater itself raised, the marker was never set, so
+    # nothing can leak a permanently-pending session (design D6). The reactor cannot
+    # run the callback before this call stack returns, so setting after scheduling
+    # cannot race it.
+    _set_transition_pending(session)
 
     return {
         "outcome": "success",
@@ -397,111 +457,114 @@ def _perform_create(
     calls account.create_character() before detaching, attaches the new shell via
     _attach_puppet, and recovers without destroying the shell on failure.
     """
-    # Verify the session still holds the puppet that admitted the creation
-    current = account.get_puppet(session) if account is not None else None
-    if current is not previous:
-        log_warn(
-            "char_create_stale_puppet",
-            context={
-                "account": str(getattr(account, "pk", "?")),
-                "session": str(getattr(session, "sessid", "?")),
-                "previous": str(getattr(previous, "pk", "?")),
-                "actual": str(getattr(current, "pk", "?")),
-            },
-        )
-        if current is not None:
-            synchronize_session(session, current)
-        return
-
-    # Re-validate capacity
-    characters = getattr(account, "characters", None) or []
-    max_chars = getattr(settings, "MAX_NR_CHARACTERS", 5)
-    if len(characters) >= max_chars:
-        log_warn(
-            "char_create_capacity_reached",
-            context={
-                "account": str(getattr(account, "pk", "?")),
-                "session": str(getattr(session, "sessid", "?")),
-                "count": str(len(characters)),
-                "max": str(max_chars),
-            },
-        )
-        _send_player_msg(account, session, CHARACTER_SLOTS_FULL_MESSAGE)
-        return
-
-    # Re-validate combat
-    if is_in_active_session(previous):
-        log_warn(
-            "char_create_entered_combat",
-            context={
-                "account": str(getattr(account, "pk", "?")),
-                "session": str(getattr(session, "sessid", "?")),
-                "previous": str(getattr(previous, "pk", "?")),
-            },
-        )
-        _send_player_msg(account, session, CREATE_IN_COMBAT_MESSAGE)
-        return
-
-    # Create the shell before any detach or puppet change
-    shell = None
-    errors = None
     try:
-        res = account.create_character()
-        if isinstance(res, tuple) and len(res) == 2:
-            shell, errors = res
+        # Verify the session still holds the puppet that admitted the creation
+        current = account.get_puppet(session) if account is not None else None
+        if current is not previous:
+            log_warn(
+                "char_create_stale_puppet",
+                context={
+                    "account": str(getattr(account, "pk", "?")),
+                    "session": str(getattr(session, "sessid", "?")),
+                    "previous": str(getattr(previous, "pk", "?")),
+                    "actual": str(getattr(current, "pk", "?")),
+                },
+            )
+            if current is not None:
+                synchronize_session(session, current)
+            return
+
+        # Re-validate capacity
+        characters = getattr(account, "characters", None) or []
+        max_chars = getattr(settings, "MAX_NR_CHARACTERS", 5)
+        if len(characters) >= max_chars:
+            log_warn(
+                "char_create_capacity_reached",
+                context={
+                    "account": str(getattr(account, "pk", "?")),
+                    "session": str(getattr(session, "sessid", "?")),
+                    "count": str(len(characters)),
+                    "max": str(max_chars),
+                },
+            )
+            _send_player_msg(account, session, CHARACTER_SLOTS_FULL_MESSAGE)
+            return
+
+        # Re-validate combat
+        if is_in_active_session(previous):
+            log_warn(
+                "char_create_entered_combat",
+                context={
+                    "account": str(getattr(account, "pk", "?")),
+                    "session": str(getattr(session, "sessid", "?")),
+                    "previous": str(getattr(previous, "pk", "?")),
+                },
+            )
+            _send_player_msg(account, session, CREATE_IN_COMBAT_MESSAGE)
+            return
+
+        # Create the shell before any detach or puppet change
+        shell = None
+        errors = None
+        try:
+            res = account.create_character()
+            if isinstance(res, tuple) and len(res) == 2:
+                shell, errors = res
+            else:
+                shell, errors = res, None
+        except Exception as exc:
+            log_warn(
+                "char_create_call_failed",
+                context={
+                    "account": str(getattr(account, "pk", "?")),
+                    "session": str(getattr(session, "sessid", "?")),
+                    "previous": str(getattr(previous, "pk", "?")),
+                },
+                exc=exc,
+            )
+            _send_player_msg(account, session, CREATE_FAILED_MESSAGE)
+            return
+
+        if shell is None:
+            err_summary = str(errors[:3])[:100] if isinstance(errors, (list, tuple)) else str(errors)[:100]
+            log_warn(
+                "char_create_rejected",
+                context={
+                    "account": str(getattr(account, "pk", "?")),
+                    "session": str(getattr(session, "sessid", "?")),
+                    "previous": str(getattr(previous, "pk", "?")),
+                    "errors": err_summary,
+                },
+            )
+            _send_player_msg(account, session, CREATE_FAILED_MESSAGE)
+            return
+
+        # Shell created successfully; now attach the new shell
+        attached = False
+        try:
+            attached = _attach_puppet(session, account, shell)
+        except Exception as exc:  # observability: ignore R2: recovery ladder handles attach failure and logs facade event
+            # A shell that was created but could not be attached is left in place, not deleted:
+            # deleting it here would be a destructive write on an error branch, and the roster
+            # makes the orphaned shell recoverable via account.character.switch.
+            _recover_transition(session, account, previous, shell, cause=exc)
+            return
+
+        if attached:
+            _set_last_puppet(account, shell)
+            synchronize_session(session, shell)
+            # Deliver the reusable creation start presentation. World introduction is
+            # structurally not sent (login hook only).
+            account.msg(creation_start_screen(), session=session)
         else:
-            shell, errors = res, None
-    except Exception as exc:
-        log_warn(
-            "char_create_call_failed",
-            context={
-                "account": str(getattr(account, "pk", "?")),
-                "session": str(getattr(session, "sessid", "?")),
-                "previous": str(getattr(previous, "pk", "?")),
-            },
-            exc=exc,
-        )
-        _send_player_msg(account, session, CREATE_FAILED_MESSAGE)
-        return
-
-    if shell is None:
-        err_summary = str(errors[:3])[:100] if isinstance(errors, (list, tuple)) else str(errors)[:100]
-        log_warn(
-            "char_create_rejected",
-            context={
-                "account": str(getattr(account, "pk", "?")),
-                "session": str(getattr(session, "sessid", "?")),
-                "previous": str(getattr(previous, "pk", "?")),
-                "errors": err_summary,
-            },
-        )
-        _send_player_msg(account, session, CREATE_FAILED_MESSAGE)
-        return
-
-    # Shell created successfully; now attach the new shell
-    attached = False
-    try:
-        attached = _attach_puppet(session, account, shell)
-    except Exception as exc:  # observability: ignore R2: recovery ladder handles attach failure and logs facade event
-        # A shell that was created but could not be attached is left in place, not deleted:
-        # deleting it here would be a destructive write on an error branch, and the roster
-        # makes the orphaned shell recoverable via account.character.switch.
-        _recover_transition(session, account, previous, shell, cause=exc)
-        return
-
-    if attached:
-        _set_last_puppet(account, shell)
-        synchronize_session(session, shell)
-        # Deliver the reusable creation start presentation. World introduction is
-        # structurally not sent (login hook only).
-        account.msg(creation_start_screen(), session=session)
-    else:
-        # A shell that was created but could not be attached is left in place, not deleted:
-        # deleting it here would be a destructive write on an error branch, and the roster
-        # makes the orphaned shell recoverable via account.character.switch.
-        _recover_transition(
-            session, account, previous, shell, cause="attach_verification_failed"
-        )
+            # A shell that was created but could not be attached is left in place, not deleted:
+            # deleting it here would be a destructive write on an error branch, and the roster
+            # makes the orphaned shell recoverable via account.character.switch.
+            _recover_transition(
+                session, account, previous, shell, cause="attach_verification_failed"
+            )
+    finally:
+        _clear_transition_pending(session)
 
 
 def _account_character_create_adapter(
@@ -515,6 +578,15 @@ def _account_character_create_adapter(
     and combat lock. Returns a result-only success response (no_presentation=True) and
     schedules the creation and puppet transition on the next reactor turn.
     """
+    # Admission gate first; see the switch adapter for the ordering rationale.
+    if _transition_pending(session):
+        return {
+            "outcome": "rejected",
+            "code": TRANSITION_PENDING_CODE,
+            "message": TRANSITION_PENDING_MESSAGE,
+            "no_presentation": True,
+        }
+
     account = getattr(actor, "account", None)
     if account is None:
         return {
@@ -544,6 +616,8 @@ def _account_character_create_adapter(
 
     clock = get_clock()
     clock.callLater(0, _perform_create, session, account, actor)
+    # Schedule-then-set; see the switch adapter (design D6).
+    _set_transition_pending(session)
 
     return {
         "outcome": "success",
@@ -575,9 +649,14 @@ __all__ = [
     "RECOVERY_RETAINED_TEMPLATE",
     "SUCCESS_CODE",
     "SUCCESS_MESSAGE",
+    "TRANSITION_PENDING_CODE",
+    "TRANSITION_PENDING_MESSAGE",
     "_account_character_create_adapter",
     "_account_character_switch_adapter",
     "_attach_puppet",
+    "_clear_transition_pending",
+    "_set_transition_pending",
+    "_transition_pending",
     "_perform_create",
     "_perform_switch",
     "_recover_transition",

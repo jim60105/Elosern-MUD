@@ -8,6 +8,8 @@ Tests the ``account.character.switch`` action:
 - Verify-and-recover ladder (rungs 1, 2, 3, unexpected puppet, stale puppet cancellation).
 - Dispatcher ordering: result delivered before detach signal and new-epoch snapshot.
 - Cross-puppet session presentation isolation (options state, barriers, proposals cleared).
+- MC6: transition-pending admission serialization — a second switch/create submitted while a
+  scheduled transition is still unexecuted is refused synchronously with ``transition_pending``.
 """
 
 from types import SimpleNamespace
@@ -42,17 +44,25 @@ from web.webclient.actions.account_actions import (
     RECOVERY_RETAINED_TEMPLATE,
     SUCCESS_CODE,
     SUCCESS_MESSAGE,
+    TRANSITION_PENDING_CODE,
+    TRANSITION_PENDING_MESSAGE,
     _account_character_create_adapter,
     _account_character_switch_adapter,
     _attach_puppet,
     _perform_create,
     _perform_switch,
+    _clear_transition_pending,
     _recover_transition,
+    _transition_pending,
     set_clock_for_testing,
     validate_account_character_create_payload,
     validate_account_character_switch_payload,
 )
-from web.webclient.actions.dispatcher import handle_ui_action, retire_sequence
+from web.webclient.actions.dispatcher import (
+    NO_PUPPET_CODE,
+    handle_ui_action,
+    retire_sequence,
+)
 from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.ingress import (
@@ -379,6 +389,14 @@ class AccountActionsIntegrationTests(EvenniaTest):
             snapshots = [call for call in self.session.sent if "ui_snapshot" in call]
             self.assertTrue(snapshots)
 
+            # MC6: the transition finished; the marker cleared and a fresh request is admitted
+            self.assertFalse(_transition_pending(self.session))
+            next_result = _account_character_switch_adapter(
+                self.char1, {"character_id": int(self.char3.pk)}, session=self.session
+            )
+            self.assertEqual(next_result["outcome"], "success")
+            self.assertNotEqual(next_result.get("code"), TRANSITION_PENDING_CODE)
+
     @covers_requirement(
         "webclient-character-roster::a-scheduled-puppet-transition-verifies-its-outcome-and-recovers-explicitly"
     )
@@ -432,8 +450,19 @@ class AccountActionsIntegrationTests(EvenniaTest):
             snapshots = [call for call in self.session.sent if "ui_snapshot" in call]
             self.assertTrue(snapshots)
 
+            # MC6: the transition finished; the marker cleared and a fresh request is admitted
+            self.assertFalse(_transition_pending(self.session))
+            next_result = _account_character_switch_adapter(
+                self.char1, {"character_id": int(self.char3.pk)}, session=self.session
+            )
+            self.assertEqual(next_result["outcome"], "success")
+            self.assertNotEqual(next_result.get("code"), TRANSITION_PENDING_CODE)
+
     @covers_requirement(
         "webclient-character-roster::a-scheduled-puppet-transition-verifies-its-outcome-and-recovers-explicitly"
+    )
+    @covers_requirement(
+        "webclient-character-roster::a-session-admits-at-most-one-scheduled-puppet-transition-at-a-time"
     )
     def test_recovery_rung_3_unrecoverable_failure_leaves_session_ooc(self):
         """Rung 3: both target attach and previous re-attach fail; leaves session OOC."""
@@ -479,6 +508,32 @@ class AccountActionsIntegrationTests(EvenniaTest):
             snapshots = [call for call in self.session.sent if "ui_snapshot" in call]
             self.assertEqual(len(snapshots), 0)
 
+            # MC6: even the terminal rung clears the marker, and the puppet-less session is
+            # answered by the ORDINARY no-puppet entry gate at the production surface — the
+            # pending refusal must never shadow it.
+            self.assertFalse(_transition_pending(self.session))
+            self.assertIsNone(self.session.puppet)
+            from server.conf import inputfuncs
+
+            inputfuncs.ui_action(
+                self.session,
+                self._envelope(
+                    {"character_id": int(self.char2.pk)}, request_id="r-after-ooc"
+                ),
+            )
+            results = [
+                call for call in self.session.sent if "ui_action_result" in call
+            ]
+            self.assertTrue(results)
+            rejection = results[-1]["ui_action_result"][0][0]
+            self.assertEqual(rejection["request_id"], "r-after-ooc")
+            self.assertEqual(rejection["outcome"], "rejected")
+            self.assertEqual(rejection["code"], NO_PUPPET_CODE)
+            self.assertNotEqual(rejection["code"], TRANSITION_PENDING_CODE)
+            # The gate path never schedules a transition and never re-arms the marker.
+            self.assertEqual(len(self.clock.getDelayedCalls()), 0)
+            self.assertFalse(_transition_pending(self.session))
+
     # -------------------------------------------------------------------------
     # Late Re-validation and Edge Cases
     # -------------------------------------------------------------------------
@@ -514,6 +569,15 @@ class AccountActionsIntegrationTests(EvenniaTest):
             self.assertEqual(mock_warn.call_args[0][0], "char_switch_retained")
             self.assertIn(RECOVERY_RETAINED_TEMPLATE.format(name=self.char1.name), account_msgs)
 
+        # MC6: the transition finished; the marker cleared and a fresh request is
+        # admitted (outside the combat patch, so the adapter sees the real state).
+        self.assertFalse(_transition_pending(self.session))
+        next_result = _account_character_switch_adapter(
+            self.char1, {"character_id": int(self.char3.pk)}, session=self.session
+        )
+        self.assertEqual(next_result["outcome"], "success")
+        self.assertNotEqual(next_result.get("code"), TRANSITION_PENDING_CODE)
+
     @covers_requirement(
         "webclient-character-roster::a-scheduled-puppet-transition-verifies-its-outcome-and-recovers-explicitly"
     )
@@ -534,6 +598,14 @@ class AccountActionsIntegrationTests(EvenniaTest):
             self.assertIs(self.session.puppet, self.char1)
             mock_warn.assert_called_once()
             self.assertEqual(mock_warn.call_args[0][0], "char_switch_retained")
+
+            # MC6: the transition finished; the marker cleared and a fresh request is admitted
+            self.assertFalse(_transition_pending(self.session))
+            next_result = _account_character_switch_adapter(
+                self.char1, {"character_id": int(self.char3.pk)}, session=self.session
+            )
+            self.assertEqual(next_result["outcome"], "success")
+            self.assertNotEqual(next_result.get("code"), TRANSITION_PENDING_CODE)
 
     def test_stale_puppet_session_cancels_transition_without_detach(self):
         """If the session puppet changed before the scheduled timer, transition cancels cleanly."""
@@ -558,6 +630,14 @@ class AccountActionsIntegrationTests(EvenniaTest):
             self.assertEqual(mock_warn.call_args[0][0], "char_switch_stale_puppet")
             # Session puppet remains char3
             self.assertIs(self.session.puppet, self.char3)
+
+            # MC6: the transition finished; the marker cleared and a fresh request is admitted
+            self.assertFalse(_transition_pending(self.session))
+            next_result = _account_character_switch_adapter(
+                self.char3, {"character_id": int(self.char1.pk)}, session=self.session
+            )
+            self.assertEqual(next_result["outcome"], "success")
+            self.assertNotEqual(next_result.get("code"), TRANSITION_PENDING_CODE)
 
     def test_unexpected_puppet_recovers_gracefully(self):
         """If transition unexpectedly results in a third puppet, logs error and syncs actual."""
@@ -1024,6 +1104,14 @@ class AccountActionsIntegrationTests(EvenniaTest):
         self.assertIs(self.session.puppet, self.char1)
         self.assertTrue(any(CHARACTER_SLOTS_FULL_MESSAGE in m for m in account_msgs))
 
+        # MC6: the cancelled create cleared the marker; a fresh request is admitted
+        self.assertFalse(_transition_pending(self.session))
+        next_result = _account_character_switch_adapter(
+            self.char1, {"character_id": int(self.char3.pk)}, session=self.session
+        )
+        self.assertEqual(next_result["outcome"], "success")
+        self.assertNotEqual(next_result.get("code"), TRANSITION_PENDING_CODE)
+
     @covers_requirement(
         "webclient-character-roster::creating-a-character-is-an-allowlisted-account-scoped-action"
     )
@@ -1062,6 +1150,14 @@ class AccountActionsIntegrationTests(EvenniaTest):
         self.assertIs(self.session.puppet, self.char1)
         self.assertTrue(any(CREATE_IN_COMBAT_MESSAGE in m for m in account_msgs))
 
+        # MC6: the cancelled create cleared the marker; a fresh request is admitted
+        self.assertFalse(_transition_pending(self.session))
+        next_result = _account_character_switch_adapter(
+            self.char1, {"character_id": int(self.char3.pk)}, session=self.session
+        )
+        self.assertEqual(next_result["outcome"], "success")
+        self.assertNotEqual(next_result.get("code"), TRANSITION_PENDING_CODE)
+
     def test_create_stale_puppet_cancels_before_transition(self):
         """If session puppet changed before scheduled create callback executes, callback cancels."""
         with patch("web.webclient.actions.account_actions.settings.MAX_NR_CHARACTERS", 10):
@@ -1080,6 +1176,14 @@ class AccountActionsIntegrationTests(EvenniaTest):
                 mock_create.assert_not_called()
 
         self.assertIs(self.session.puppet, self.char2)
+
+        # MC6: the cancelled create cleared the marker; a fresh request is admitted
+        self.assertFalse(_transition_pending(self.session))
+        next_result = _account_character_switch_adapter(
+            self.char2, {"character_id": int(self.char1.pk)}, session=self.session
+        )
+        self.assertEqual(next_result["outcome"], "success")
+        self.assertNotEqual(next_result.get("code"), TRANSITION_PENDING_CODE)
 
     @covers_requirement(
         "webclient-character-roster::the-new-character-shell-is-created-before-the-current-character-is-left"
@@ -1204,3 +1308,229 @@ class AccountActionsIntegrationTests(EvenniaTest):
             self.assertTrue(snapshots)
             snapshot_envelope = snapshots[-1]["ui_snapshot"][0][0]
             self.assertEqual(snapshot_envelope["mode"], "creation")
+
+    # -------------------------------------------------------------------------
+    # MC6: Transition-Pending Admission Serialization
+    # -------------------------------------------------------------------------
+
+    @covers_requirement(
+        "webclient-character-roster::a-session-admits-at-most-one-scheduled-puppet-transition-at-a-time"
+    )
+    def test_second_switch_while_pending_refused(self):
+        """A rapid double submission admits exactly one switch; the other gets transition_pending."""
+        epoch_before = self.coordinator.epoch
+
+        first = _account_character_switch_adapter(
+            self.char1, {"character_id": int(self.char2.pk)}, session=self.session
+        )
+        self.assertEqual(first["outcome"], "success")
+
+        # Do not advance the clock: the first transition is scheduled but unexecuted.
+        second = _account_character_switch_adapter(
+            self.char1, {"character_id": int(self.char3.pk)}, session=self.session
+        )
+        self.assertEqual(second["outcome"], "rejected")
+        self.assertEqual(second["code"], TRANSITION_PENDING_CODE)
+        self.assertEqual(second["message"], TRANSITION_PENDING_MESSAGE)
+        self.assertTrue(second["no_presentation"])
+
+        # Only the first transition was ever scheduled
+        self.assertEqual(len(self.clock.getDelayedCalls()), 1)
+        # Session and epoch untouched until the first transition runs
+        self.assertIs(self.account.get_puppet(self.session), self.char1)
+        self.assertEqual(self.coordinator.epoch, epoch_before)
+
+        # The refused second request leaves the first transition's outcome unaffected
+        self.clock.advance(0)
+        self.assertIs(self.account.get_puppet(self.session), self.char2)
+
+    @covers_requirement(
+        "webclient-character-roster::a-session-admits-at-most-one-scheduled-puppet-transition-at-a-time"
+    )
+    def test_create_while_switch_pending_refused(self):
+        """A scheduled switch blocks a subsequent create; no character is created."""
+        chars_before = list(self.account.characters)
+
+        first = _account_character_switch_adapter(
+            self.char1, {"character_id": int(self.char2.pk)}, session=self.session
+        )
+        self.assertEqual(first["outcome"], "success")
+
+        result = _account_character_create_adapter(self.char1, {}, session=self.session)
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], TRANSITION_PENDING_CODE)
+        self.assertTrue(result["no_presentation"])
+
+        # No character object was created, nothing extra scheduled
+        self.assertEqual(list(self.account.characters), chars_before)
+        self.assertEqual(len(self.clock.getDelayedCalls()), 1)
+
+    @covers_requirement(
+        "webclient-character-roster::a-session-admits-at-most-one-scheduled-puppet-transition-at-a-time"
+    )
+    def test_switch_while_create_pending_refused(self):
+        """A scheduled create blocks a subsequent switch; no second puppet change is scheduled."""
+        first = _account_character_create_adapter(self.char1, {}, session=self.session)
+        self.assertEqual(first["outcome"], "success")
+
+        result = _account_character_switch_adapter(
+            self.char1, {"character_id": int(self.char3.pk)}, session=self.session
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], TRANSITION_PENDING_CODE)
+        self.assertTrue(result["no_presentation"])
+
+        # Exactly the create remains scheduled
+        self.assertEqual(len(self.clock.getDelayedCalls()), 1)
+
+        # Advancing runs only the create: the puppet becomes the new shell, never char3
+        self.clock.advance(0)
+        self.assertIsNot(self.session.puppet, self.char3)
+        self.assertIsNot(self.session.puppet, self.char1)
+        self.assertTrue(getattr(self.session.puppet, "creation_pending", False))
+
+    @covers_requirement(
+        "webclient-character-roster::a-session-admits-at-most-one-scheduled-puppet-transition-at-a-time"
+    )
+    def test_pending_refusal_takes_precedence_over_other_reasons(self):
+        """While pending, a request that would fail for its own reason is refused as pending."""
+        first = _account_character_switch_adapter(
+            self.char1, {"character_id": int(self.char2.pk)}, session=self.session
+        )
+        self.assertEqual(first["outcome"], "success")
+
+        with self.subTest(reason="foreign_character"):
+            result = _account_character_switch_adapter(
+                self.char1, {"character_id": int(self.foreign_char.pk)}, session=self.session
+            )
+            self.assertEqual(result["code"], TRANSITION_PENDING_CODE)
+
+        with self.subTest(reason="already_current"):
+            result = _account_character_switch_adapter(
+                self.char1, {"character_id": int(self.char1.pk)}, session=self.session
+            )
+            self.assertEqual(result["code"], TRANSITION_PENDING_CODE)
+
+        with self.subTest(reason="in_combat"):
+            with patch(
+                "web.webclient.actions.account_actions.is_in_active_session", return_value=True
+            ):
+                result = _account_character_switch_adapter(
+                    self.char1, {"character_id": int(self.char3.pk)}, session=self.session
+                )
+            self.assertEqual(result["code"], TRANSITION_PENDING_CODE)
+
+        with self.subTest(reason="combat_lookup_never_reached"):
+            # The refusal is decided before any combat-session lookup: a combat check
+            # that explodes must never be reached while the marker is set.
+            with patch(
+                "web.webclient.actions.account_actions.is_in_active_session",
+                side_effect=AssertionError("combat lookup must not run while pending"),
+            ):
+                result = _account_character_switch_adapter(
+                    self.char1, {"character_id": int(self.char3.pk)}, session=self.session
+                )
+            self.assertEqual(result["code"], TRANSITION_PENDING_CODE)
+
+        # None of the refused requests scheduled anything
+        self.assertEqual(len(self.clock.getDelayedCalls()), 1)
+
+    @covers_requirement(
+        "webclient-character-roster::a-session-admits-at-most-one-scheduled-puppet-transition-at-a-time"
+    )
+    def test_third_request_while_pending_refused_same_way(self):
+        """Rejections never reset, clear, or extend the marker; the first transition still runs."""
+        first = _account_character_switch_adapter(
+            self.char1, {"character_id": int(self.char2.pk)}, session=self.session
+        )
+        self.assertEqual(first["outcome"], "success")
+
+        for n in (2, 3):
+            with self.subTest(request=n):
+                result = _account_character_switch_adapter(
+                    self.char1, {"character_id": int(self.char3.pk)}, session=self.session
+                )
+                self.assertEqual(result["outcome"], "rejected")
+                self.assertEqual(result["code"], TRANSITION_PENDING_CODE)
+                self.assertEqual(len(self.clock.getDelayedCalls()), 1)
+                self.assertTrue(_transition_pending(self.session))
+
+        # The marker still clears exactly when the first transition finishes
+        self.clock.advance(0)
+        self.assertIs(self.account.get_puppet(self.session), self.char2)
+        self.assertFalse(_transition_pending(self.session))
+
+    @covers_requirement(
+        "webclient-character-roster::a-session-admits-at-most-one-scheduled-puppet-transition-at-a-time"
+    )
+    def test_next_request_admitted_after_successful_transition(self):
+        """After a successful switch completes, further switch and create are admitted normally."""
+        first = _account_character_switch_adapter(
+            self.char1, {"character_id": int(self.char2.pk)}, session=self.session
+        )
+        self.assertEqual(first["outcome"], "success")
+        self.clock.advance(0)
+        self.assertIs(self.account.get_puppet(self.session), self.char2)
+
+        follow_switch = _account_character_switch_adapter(
+            self.char2, {"character_id": int(self.char3.pk)}, session=self.session
+        )
+        self.assertEqual(follow_switch["outcome"], "success")
+        self.assertNotEqual(follow_switch.get("code"), TRANSITION_PENDING_CODE)
+        self.clock.advance(0)
+
+        follow_create = _account_character_create_adapter(self.char3, {}, session=self.session)
+        self.assertEqual(follow_create["outcome"], "success")
+        self.assertNotEqual(follow_create.get("code"), TRANSITION_PENDING_CODE)
+        self.clock.advance(0)
+        self.assertTrue(getattr(self.session.puppet, "creation_pending", False))
+
+    @covers_requirement(
+        "webclient-character-roster::a-session-admits-at-most-one-scheduled-puppet-transition-at-a-time"
+    )
+    def test_exception_in_scheduled_callbacks_still_clears_marker(self):
+        """An uncaught exception escaping either callback must clear the pending marker (D4)."""
+        with self.subTest(callback="_perform_switch"):
+            first = _account_character_switch_adapter(
+                self.char1, {"character_id": int(self.char2.pk)}, session=self.session
+            )
+            self.assertEqual(first["outcome"], "success")
+
+            with patch.object(
+                self.account, "get_puppet", side_effect=RuntimeError("simulated crash")
+            ):
+                with self.assertRaises(RuntimeError):
+                    self.clock.advance(0)
+
+            self.assertFalse(_transition_pending(self.session))
+            next_result = _account_character_switch_adapter(
+                self.char1, {"character_id": int(self.char3.pk)}, session=self.session
+            )
+            self.assertEqual(next_result["outcome"], "success")
+            self.assertNotEqual(next_result.get("code"), TRANSITION_PENDING_CODE)
+            # Do not execute this second transition; each subTest owns its scenario
+            # state. Cancelling a scheduled call in tests (never possible in production)
+            # also removes its only finally-clear path, so release the marker here.
+            for call_ in self.clock.getDelayedCalls():
+                call_.cancel()
+            _clear_transition_pending(self.session)
+
+        with self.subTest(callback="_perform_create"):
+            first = _account_character_create_adapter(self.char1, {}, session=self.session)
+            self.assertEqual(first["outcome"], "success")
+
+            with patch.object(
+                self.account, "get_puppet", side_effect=RuntimeError("simulated crash")
+            ):
+                with self.assertRaises(RuntimeError):
+                    self.clock.advance(0)
+
+            self.assertFalse(_transition_pending(self.session))
+            next_result = _account_character_switch_adapter(
+                self.char1, {"character_id": int(self.char3.pk)}, session=self.session
+            )
+            self.assertEqual(next_result["outcome"], "success")
+            self.assertNotEqual(next_result.get("code"), TRANSITION_PENDING_CODE)
+            for call_ in self.clock.getDelayedCalls():
+                call_.cancel()
+            _clear_transition_pending(self.session)

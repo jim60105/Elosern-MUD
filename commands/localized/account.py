@@ -9,7 +9,6 @@ an alias has distinct upstream semantics (e.g. ``doing``).
 import time
 from codecs import lookup as codecs_lookup
 
-from django.conf import settings
 
 import evennia
 from evennia.commands.default.account import (
