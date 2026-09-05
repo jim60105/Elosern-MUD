@@ -59,10 +59,19 @@ class _ItemActionBase(ServicesBrowserTest):
             page,
             lambda s: ((s.get("panels") or {}).get("services") or {}).get("inventory") is not None,
             dom_readiness={
-                "selector": '[data-testid="hud-drawer"][data-drawer="inventory"]',
+                # HudDrawer renders its key as `data-drawer-key` and its open
+                # state as `data-open`. The root is position:fixed, where
+                # offsetParent is null by spec, so visibility is established
+                # with the bounding rect intersecting the viewport instead —
+                # width alone would also hold mid slide-in while the panel is
+                # still translated off-screen.
+                "selector": '[data-testid="hud-drawer"]',
                 "predicate": (
-                    "() => { const el = document.querySelector('[data-testid=\"hud-drawer\"][data-drawer=\"inventory\"]'); "
-                    "return !!el && el.offsetParent !== null; }"
+                    "() => { const el = document.querySelector('[data-testid=\"hud-drawer\"]'); "
+                    "if (!el || el.dataset.drawerKey !== 'inventory' || el.dataset.open !== 'true') return false; "
+                    "const r = el.getBoundingClientRect(); "
+                    "return r.width > 0 && r.height > 0 && r.right > 0 && r.left < window.innerWidth "
+                    "&& r.bottom > 0 && r.top < window.innerHeight; }"
                 ),
                 "description": "inventory drawer is open and visible",
             },
