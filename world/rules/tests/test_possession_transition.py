@@ -174,6 +174,7 @@ class PossessionTransitionTests(EvenniaTest):
             self.assertEqual(self.session.puppet, self.npc)
 
         # Now sess1 disconnects
+        self.account.unpuppet_object(self.session)
         self.account.is_connected = False
         self.account.at_post_disconnect()
 
@@ -245,6 +246,115 @@ class PossessionTransitionTests(EvenniaTest):
         self.assertIn("puppet", call_order)
         self.assertLess(call_order.index("retire"), call_order.index("puppet"))
         self.assertLess(call_order.index("reset"), call_order.index("puppet"))
+
+    @covers_requirement(
+        "companion-possession-transition::entering-possession-transfers-the-puppet-with-a-verify-then-recover-ladder"
+    )
+    def test_two_session_retire_all_before_grant(self):
+        """Ordering pin: with two acting sessions, all sessions retire before the single lock grant."""
+        sess2 = MagicMock()
+        sess2.sessid = 8888
+        sess2.logged_in = True
+        sess2.puppet = self.char1
+
+        puppet_map = {self.session: self.char1, sess2: self.char1}
+
+        def fake_puppet(session, target):
+            puppet_map[session] = target
+            session.puppet = target
+
+        def fake_get_puppet(session):
+            return puppet_map.get(session)
+
+        call_order = []
+
+        with patch.object(self.account.sessions, "all", return_value=[self.session, sess2]), \
+             patch.object(self.account, "puppet_object", side_effect=fake_puppet), \
+             patch.object(self.account, "get_puppet", side_effect=fake_get_puppet), \
+             patch("web.webclient.actions.dispatcher.retire_sequence", side_effect=lambda s: call_order.append(("retire", s))), \
+             patch("world.rules.possession._grant_puppet_lock", side_effect=lambda n, a: call_order.append(("grant", n))):
+            enter_possession(self.char1, self.npc)
+
+        # Both sessions retired
+        self.assertIn(("retire", self.session), call_order)
+        self.assertIn(("retire", sess2), call_order)
+        self.assertIn(("grant", self.npc), call_order)
+
+        # Both retires occur BEFORE the grant
+        self.assertLess(call_order.index(("retire", self.session)), call_order.index(("grant", self.npc)))
+        self.assertLess(call_order.index(("retire", sess2)), call_order.index(("grant", self.npc)))
+
+        # Exactly ONE grant occurred
+        self.assertEqual(call_order.count(("grant", self.npc)), 1)
+
+        # Both sessions finish puppeting the NPC
+        self.assertEqual(self.session.puppet, self.npc)
+        self.assertEqual(sess2.puppet, self.npc)
+
+    @covers_requirement(
+        "companion-possession-transition::entering-possession-transfers-the-puppet-with-a-verify-then-recover-ladder"
+    )
+    def test_no_session_refusal_never_grants_puppet_lock(self):
+        """If account has no live acting session, enter_possession refuses before any lock grant."""
+        self.char1.sessions.remove(self.session)
+        self.session.puppet = None
+
+        with patch("world.rules.possession._grant_puppet_lock") as mock_grant:
+            with self.assertRaises(PossessionGateError) as ctx:
+                enter_possession(self.char1, self.npc)
+            self.assertEqual(ctx.exception.reason, REASON_TRANSFER_REFUSED)
+            mock_grant.assert_not_called()
+
+        # Observable cleanup: no grant, mirrors untouched
+        puppet_lock = self.npc.locks.get("puppet") or ""
+        self.assertNotIn(f"id({self.account.id})", puppet_lock)
+        self.assertIsNone(self.char1.db.possession)
+        self.assertIsNone(self.npc.db.possessed_by)
+
+    @covers_requirement(
+        "companion-possession-transition::entering-possession-transfers-the-puppet-with-a-verify-then-recover-ladder"
+    )
+    def test_multi_session_transfer_failure_rolls_back_all_sessions(self):
+        """If session 1 succeeds but session 2 fails transfer, all sessions roll back to player."""
+        sess2 = MagicMock()
+        sess2.sessid = 7777
+        sess2.logged_in = True
+        sess2.puppet = self.char1
+        sess2.msg = MagicMock()
+
+        puppet_map = {self.session: self.char1, sess2: self.char1}
+
+        def fake_puppet(session, target):
+            if session == sess2 and target == self.npc:
+                # Session 2 fails to puppet NPC
+                return
+            puppet_map[session] = target
+            session.puppet = target
+
+        def fake_get_puppet(session):
+            return puppet_map.get(session)
+
+        with patch.object(self.account.sessions, "all", return_value=[self.session, sess2]), \
+             patch.object(self.account, "puppet_object", side_effect=fake_puppet), \
+             patch.object(self.account, "get_puppet", side_effect=fake_get_puppet):
+            with self.assertRaises(PossessionGateError) as ctx:
+                enter_possession(self.char1, self.npc)
+            self.assertEqual(ctx.exception.reason, REASON_TRANSFER_REFUSED)
+
+        # Observable postconditions: both sessions rolled back to char1
+        self.assertEqual(self.session.puppet, self.char1)
+        self.assertEqual(sess2.puppet, self.char1)
+
+        # Mirrors untouched / cleaned up
+        self.assertIsNone(self.char1.db.possession)
+        self.assertIsNone(self.npc.db.possessed_by)
+
+        # Puppet lock stripped
+        puppet_lock = self.npc.locks.get("puppet") or ""
+        self.assertNotIn(f"id({self.account.id})", puppet_lock)
+
+        # Both sessions received the refusal message
+        sess2.msg.assert_called_with(POSSESSION_REJECTION_MESSAGES[REASON_TRANSFER_REFUSED])
 
     @covers_requirement(
         "companion-possession-transition::the-possessed-npc-carries-a-trimmed-character-act-cmdset"
@@ -355,6 +465,7 @@ class PossessionTransitionTests(EvenniaTest):
         self.assertEqual(self.session.puppet, self.npc)
 
         # Simulate disconnect of the account
+        self.account.unpuppet_object(self.session)
         self.account.is_connected = False
         self.account.at_post_disconnect()
 
@@ -367,6 +478,68 @@ class PossessionTransitionTests(EvenniaTest):
 
         # A is not force-puppeted anywhere
         self.assertEqual(self.char1.sessions.count(), 0)
+
+    @covers_requirement(
+        "companion-possession-transition::disconnecting-while-possessing-releases-possession-through-the-account-disconnect-hook"
+    )
+    def test_direct_release_on_disconnect_skips_when_session_still_puppets_npc(self):
+        """release_on_disconnect directly returns without releasing if a session still puppets NPC."""
+        enter_possession(self.char1, self.npc)
+        self.assertEqual(self.session.puppet, self.npc)
+
+        # Calling release_on_disconnect while self.session still puppets self.npc
+        release_on_disconnect(self.account)
+
+        # Observable postconditions: mirrors, lock grant, and puppet are unchanged
+        self.assertIsNotNone(self.char1.db.possession)
+        self.assertEqual(self.npc.db.possessed_by, self.char1.pk)
+        self.assertIn(f"id({self.account.id})", self.npc.locks.get("puppet") or "")
+        self.assertEqual(self.session.puppet, self.npc)
+
+    @covers_requirement(
+        "companion-possession-transition::disconnecting-while-possessing-releases-possession-through-the-account-disconnect-hook"
+    )
+    def test_direct_release_on_disconnect_releases_when_driving_session_unpuppets(self):
+        """release_on_disconnect fully releases possession once driving session has unpuppeted."""
+        enter_possession(self.char1, self.npc)
+        self.account.unpuppet_object(self.session)
+        self.assertIsNone(self.session.puppet)
+
+        release_on_disconnect(self.account)
+
+        # Observable postconditions: mirrors cleared, grant stripped, account puppeting nothing
+        self.assertIsNone(self.char1.db.possession)
+        self.assertIsNone(self.npc.db.possessed_by)
+        self.assertNotIn(f"id({self.account.id})", self.npc.locks.get("puppet") or "")
+        self.assertEqual(self.char1.sessions.count(), 0)
+        self.assertEqual(self.npc.sessions.count(), 0)
+
+    @covers_requirement(
+        "companion-possession-transition::disconnecting-while-possessing-releases-possession-through-the-account-disconnect-hook"
+    )
+    def test_release_on_disconnect_not_blocked_by_session_puppeting_ordinary_character(self):
+        """A second session puppeting an ordinary character does not block release of possessed companion."""
+        enter_possession(self.char1, self.npc)
+
+        # Session 1 (which puppeted NPC) unpuppets on disconnect
+        self.account.unpuppet_object(self.session)
+        self.assertIsNone(self.session.puppet)
+
+        # Session 2 puppets an ordinary character (char2) with possessed_by = None
+        sess2 = MagicMock()
+        sess2.sessid = 8888
+        sess2.logged_in = True
+        sess2.puppet = self.char2
+        self.assertIsNone(getattr(self.char2.db, "possessed_by", None))
+
+        with patch.object(self.account.sessions, "all", return_value=[self.session, sess2]):
+            release_on_disconnect(self.account)
+
+        # Possession is released despite sess2 being connected and puppeting char2
+        self.assertIsNone(self.char1.db.possession)
+        self.assertIsNone(self.npc.db.possessed_by)
+        self.assertNotIn(f"id({self.account.id})", self.npc.locks.get("puppet") or "")
+        self.assertEqual(sess2.puppet, self.char2)
 
     @covers_requirement(
         "companion-possession-transition::disconnecting-while-possessing-releases-possession-through-the-account-disconnect-hook"
