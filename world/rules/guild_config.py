@@ -8,7 +8,7 @@ so deterministic APIs never duplicate balance constants.
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 import yaml
 
@@ -17,8 +17,6 @@ from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 from world.lore.races import STATIC_TIER_REGISTRY
 from world.lore.shops import SHOP_REGISTRY
-from world.quests.definitions import QUEST_DEFINITION_REGISTRY
-from world.skills.registry import SKILL_REGISTRY
 from world.rules.guild_offers import (
     GuildOfferError,
     GuildQuestOffer,
@@ -26,6 +24,11 @@ from world.rules.guild_offers import (
     QuestReward,
     register_guild_offer,
 )
+from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+from world.skills.registry import SKILL_REGISTRY
+
+if TYPE_CHECKING:
+    from world.rules.profession_config import Profession
 
 
 class GuildConfigError(ValueError):
@@ -83,8 +86,38 @@ class ShopConfig:
     offers: tuple[ItemOfferRule, ...]
 
 
+_SERVICE_HOST_REQUIRED_FIELDS = ("name", "title", "profession", "anchor_room", "service_id")
+_SERVICE_HOST_KWARG_FIELDS = ("shop_key", "branch_key", "dialogue_key")
+
+
+@dataclass(frozen=True)
+class ServiceHostRow:
+    """One declarative service-host roster row (declarative-service-hosts D7).
+
+    ``profession`` is the RESOLVED registry row, not a key: sync executes the
+    exact row config validation approved, so a rulebook reload between config
+    load and sync can never mix blueprints (the change-2 snapshot decision).
+    ``authored_kwargs`` holds the row's flat identity kwargs (``shop_key`` /
+    ``branch_key`` / ``dialogue_key``); the shared assembly helper projects
+    them per blueprint component.
+    """
+
+    name: str
+    title: str
+    profession: "Profession"
+    anchor_room: str
+    service_id: str
+    authored_kwargs: "Mapping[str, str]"
+
+
 def _error(message: str) -> GuildConfigError:
     return GuildConfigError(f"guild_economy.yaml: {message}")
+
+
+def _require_text(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise _error(f"{field} must be a non-empty string")
+    return value
 
 
 def _require_int(value: Any, field: str, *, minimum: int | None = None) -> int:
@@ -296,6 +329,87 @@ def validate_shop_configs(raw: Any) -> dict[str, ShopConfig]:
     return configs
 
 
+def validate_service_hosts(raw: Any) -> tuple[ServiceHostRow, ...]:
+    """Validate the declarative service-host roster (declarative-service-hosts D7).
+
+    Config load never touches the database: ``anchor_room`` is validated as a
+    non-empty tag string only (room existence is a sync-time fact), and the
+    profession prerequisite is the YAML-only profession registry. A malformed
+    professions rulebook surfaces inside this catalog's named error family
+    rather than escaping as ``ProfessionConfigError``.
+    """
+    from world.rules import profession_config
+    from world.rules.profession_assembly import identity_fields
+
+    if not isinstance(raw, list):
+        raise _error("service_hosts must be a list")
+    rows: list[ServiceHostRow] = []
+    seen_service_ids: set[str] = set()
+    for position, entry in enumerate(raw, start=1):
+        if not isinstance(entry, Mapping):
+            raise _error(f"service_hosts[{position}] must be a mapping")
+        unknown = sorted(set(entry) - set(_SERVICE_HOST_REQUIRED_FIELDS) - set(_SERVICE_HOST_KWARG_FIELDS))
+        if unknown:
+            raise _error(f"service_hosts[{position}] has unknown field(s) {unknown}")
+        fields = {
+            name: _require_text(entry.get(name), f"service_hosts[{position}].{name}")
+            for name in _SERVICE_HOST_REQUIRED_FIELDS
+        }
+        service_id = fields["service_id"]
+        if service_id in seen_service_ids:
+            raise _error(
+                f"duplicate service_id {service_id!r} in service_hosts; "
+                "one roster row per service anchor"
+            )
+        seen_service_ids.add(service_id)
+        try:
+            profession = profession_config.get_profession(fields["profession"])
+        except profession_config.ProfessionConfigError as error:
+            raise _error(
+                f"service_hosts[{position}].profession {fields['profession']!r} "
+                f"cannot load: {error}"
+            ) from error
+        if profession is None:
+            raise _error(
+                f"service_hosts[{position}].profession {fields['profession']!r} "
+                "is not a profession rulebook row"
+            )
+        authored = {
+            name: _require_text(entry[name], f"service_hosts[{position}].{name}")
+            for name in _SERVICE_HOST_KWARG_FIELDS
+            if name in entry
+        }
+        # Blueprint coverage: every component's identity fields except the
+        # row-level service_id anchor must be authored by the row.
+        consumed: set[str] = set()
+        for component in profession.components:
+            needed = set(identity_fields(component.type_key)) - {"service_id"}
+            lacking = sorted(needed - set(authored))
+            if lacking:
+                raise _error(
+                    f"service_hosts[{position}] profession {fields['profession']!r} "
+                    f"component {component.type_key!r} needs authored kwargs {lacking}"
+                )
+            consumed |= needed
+        dead = sorted(set(authored) - consumed)
+        if dead:
+            raise _error(
+                f"service_hosts[{position}] authors kwargs {dead} that no component "
+                f"of profession {fields['profession']!r} consumes"
+            )
+        rows.append(
+            ServiceHostRow(
+                name=fields["name"],
+                title=fields["title"],
+                profession=profession,
+                anchor_room=fields["anchor_room"],
+                service_id=service_id,
+                authored_kwargs=authored,
+            )
+        )
+    return tuple(rows)
+
+
 def validate_quest_rewards(raw: Any, definition_registry: Mapping[str, Any]) -> list[GuildQuestOffer]:
     """Validate YAML hand-written rewards into immutable offers.
 
@@ -365,15 +479,21 @@ class GuildCatalog:
         exam_profiles: dict[str, ExamProfile],
         shop_configs: dict[str, ShopConfig],
         quest_offers: list[GuildQuestOffer],
+        service_hosts: tuple[ServiceHostRow, ...] = (),
     ):
         self.merit_thresholds = {**merit_thresholds}
         self.exam_profiles = {**exam_profiles}
         self.shop_configs = {**shop_configs}
         self.quest_offers = tuple(quest_offers)
+        self.service_hosts = tuple(service_hosts)
 
     @property
     def offer_by_definition(self) -> dict[str, GuildQuestOffer]:
         return {offer.definition_key: offer for offer in self.quest_offers}
+
+    @property
+    def host_by_service_id(self) -> dict[str, ServiceHostRow]:
+        return {row.service_id: row for row in self.service_hosts}
 
 
 def load_guild_catalog(definition_registry: Mapping[str, Any]) -> GuildCatalog:
@@ -388,6 +508,7 @@ def load_guild_catalog(definition_registry: Mapping[str, Any]) -> GuildCatalog:
         exam_profiles=validate_exam_profiles(raw["exam_profiles"]),
         shop_configs=validate_shop_configs(raw["shops"]),
         quest_offers=validate_quest_rewards(raw["quest_rewards"], definition_registry),
+        service_hosts=validate_service_hosts(raw["service_hosts"]),
     )
 
 

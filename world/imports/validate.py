@@ -445,6 +445,10 @@ def _check_profession_fields(
         )
     from world.imports import assembly
     from world.rules.profession_config import PROFESSION_COMPONENT_TYPES, get_profession
+    from world.rules.profession_assembly import (
+        component_field_names,
+        missing_identity_kwargs,
+    )
 
     profession = get_profession(profession_value)
     if profession is None:
@@ -478,7 +482,7 @@ def _check_profession_fields(
                 )
                 continue
             seen.add(type_key)
-            allowed = assembly.component_field_names(type_key)
+            allowed = component_field_names(type_key)
             for kwarg in sorted(entry["kwargs"]):
                 if kwarg not in allowed:
                     issues.append(
@@ -494,7 +498,7 @@ def _check_profession_fields(
     # explicit-replacement components face the same non-empty identity rule
     # (the loader never invents a service anchor).
     for type_key, kwargs in assembly.resolve_plan(profession, record):
-        missing = assembly.missing_identity_kwargs(type_key, kwargs)
+        missing = missing_identity_kwargs(type_key, kwargs)
         if missing:
             issues.append(
                 Issue(

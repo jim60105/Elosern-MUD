@@ -1,4 +1,4 @@
-"""Integration tests for guild-economy service content sync (tasks 3.3-3.5)."""
+"""Integration tests for roster-driven service content sync (tasks 3.x, 4.2)."""
 
 from tools.spec_traceability import covers_requirement
 
@@ -8,7 +8,7 @@ from evennia.utils.create import create_object
 from evennia.utils.search import search_object_by_tag
 from evennia.utils.test_resources import EvenniaTestCase
 
-from typeclasses.components import GuildExaminer, GuildStaff, Merchant
+from typeclasses.components import GuildExaminer, GuildStaff, Merchant, ScriptedDialogue
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.maps.bootstrap import (
@@ -20,22 +20,22 @@ from world.maps.bootstrap import (
 from world.quests.catalog import register_catalog
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.tests._fixtures import QuestRegistryIsolation
+from world.rules import guild_config
+from world.rules import guild_economy
 from world.rules.guild_config import CATALOG, get_catalog
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
-from world.lore.guild import GUILD_BRANCH_REGISTRY, GuildBranch
-from world.lore.shops import SHOP_REGISTRY
 from world.rules.guild_economy import (
-    GUILD_SERVICE_KEY,
     ServiceAnchorIntegrityError,
-    _cleanup_legacy_service_hosts,
-    MERCHANT_SERVICE_KEY,
     sync_service_content,
 )
 
-GUILD_HOST_NAME = GUILD_BRANCH_REGISTRY["guild_branch_altoria"].host_name
-GUILD_HOST_TITLE = GUILD_BRANCH_REGISTRY["guild_branch_altoria"].host_title
-MERCHANT_HOST_NAME = SHOP_REGISTRY["altoria_general_store"].host_name
-MERCHANT_HOST_TITLE = SHOP_REGISTRY["altoria_general_store"].host_title
+GUILD_SERVICE_ID = "altoria_guild_master"
+MERCHANT_SERVICE_ID = "altoria_merchant"
+
+GUILD_HOST_NAME = "葛里安·衛登"
+GUILD_HOST_TITLE = "阿爾托利亞分會會長"
+MERCHANT_HOST_NAME = "瑪爾特·金秤"
+MERCHANT_HOST_TITLE = "阿爾托利亞雜貨商店老闆"
 
 MERCHANT_STOCK_COUNT = 30  # every offered item key
 
@@ -51,6 +51,7 @@ class ServiceContentIsolation(QuestRegistryIsolation):
         from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 
         self._previous_offers = list(GUILD_OFFER_REGISTRY.items())
+        self._patchers: list = []
 
     def tearDown(self):
         global CATALOG
@@ -60,6 +61,23 @@ class ServiceContentIsolation(QuestRegistryIsolation):
         GUILD_OFFER_REGISTRY.clear()
         GUILD_OFFER_REGISTRY.update(self._previous_offers)
         super().tearDown()
+
+    def _roster_minus(self, service_id):
+        """Patch the cached catalog with one roster row removed."""
+        catalog = get_catalog()
+        shrunk = guild_config.GuildCatalog(
+            merit_thresholds=catalog.merit_thresholds,
+            exam_profiles=catalog.exam_profiles,
+            shop_configs=catalog.shop_configs,
+            quest_offers=catalog.quest_offers,
+            service_hosts=tuple(
+                row for row in catalog.service_hosts if row.service_id != service_id
+            ),
+        )
+        patcher = patch.object(guild_economy, "get_catalog", return_value=shrunk)
+        patcher.start()
+        self._patchers.append(patcher)
+        self.addCleanup(patcher.stop)
 
 
 class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
@@ -74,6 +92,9 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
     def _guild_hall(self):
         return search_object_by_tag(GUILD_HALL_TAG)[0]
 
+    @covers_requirement(
+        "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
+    )
     @covers_requirement("sample-city-altoria::altoria-service-content-synchronizes-idempotently-without-resetting-live-state")
     def test_fresh_sync_creates_one_guild_and_one_merchant_host(self):
         sync_service_content()
@@ -83,12 +104,38 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertIsNotNone(merchant_host)
         self.assertTrue(guild_host.components.has(GuildStaff.get_component_slot()))
         self.assertTrue(guild_host.components.has(GuildExaminer.get_component_slot()))
+        self.assertTrue(guild_host.components.has(ScriptedDialogue.get_component_slot()))
         self.assertTrue(merchant_host.components.has(Merchant.get_component_slot()))
         self.assertEqual(
             guild_host.components.get(GuildStaff.get_component_slot()).branch_key,
             "guild_branch_altoria",
         )
+        self.assertEqual(
+            guild_host.components.get(GuildStaff.get_component_slot()).service_id,
+            GUILD_SERVICE_ID,
+        )
+        self.assertEqual(
+            guild_host.components.get(GuildExaminer.get_component_slot()).service_id,
+            GUILD_SERVICE_ID,
+        )
+        self.assertEqual(
+            guild_host.components.get(ScriptedDialogue.get_component_slot()).dialogue_key,
+            "guild_staff",
+        )
         self.assertEqual(merchant_host.components.get(Merchant.get_component_slot()).shop_key, "altoria_general_store")
+        self.assertEqual(merchant_host.components.get(Merchant.get_component_slot()).service_id, MERCHANT_SERVICE_ID)
+        # Bit-for-bit room placement matches the pre-change interpreter.
+        self.assertEqual(guild_host.location, self._guild_hall())
+        self.assertEqual(
+            merchant_host.location, search_object_by_tag(GENERAL_STORE_TAG)[0]
+        )
+        # Race baseline + adult identity are the unchanged creation guarantees.
+        for host in (guild_host, merchant_host):
+            self.assertEqual(host.race, "human")
+            self.assertEqual(int(host.attributes.get("age")), 18)
+            self.assertEqual(int(host.attributes.get("apparent_age")), 18)
+        self.assertEqual(guild_host.npc_title, GUILD_HOST_TITLE)
+        self.assertEqual(merchant_host.npc_title, MERCHANT_HOST_TITLE)
 
     def test_hosts_are_in_the_right_interiors(self):
         sync_service_content()
@@ -131,6 +178,9 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
         merchant = self._merchant_host().components.get(Merchant.get_component_slot())
         self.assertEqual(merchant.merchant_stock["healing_potion"], 1)
 
+    @covers_requirement(
+        "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
+    )
     def test_repeated_sync_creates_no_duplicates(self):
         sync_service_content()
         counts = (
@@ -166,11 +216,17 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
     def _guild_host(self):
         return NPC.objects.filter(db_key=GUILD_HOST_NAME).first()
 
+    def _merchant_host(self):
+        return NPC.objects.filter(db_key=MERCHANT_HOST_NAME).first()
+
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
     @covers_requirement("npc-identity-titles::host-and-examiner-creation-emit-boundary-info-events")
     def test_first_sync_creates_the_authored_host_once(self):
+        # The creation event is commit-bound (sync runs inside startup
+        # transactions); execute the callbacks to observe it.
         with patch("world.rules.guild_economy.log_info") as logged:
-            sync_service_content()
+            with self.captureOnCommitCallbacks(execute=True):
+                sync_service_content()
         host = self._guild_host()
         self.assertIsNotNone(host)
         self.assertEqual(host.npc_title, GUILD_HOST_TITLE)
@@ -180,9 +236,11 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         ]
         self.assertEqual(len(events), 2)  # guild host + merchant host
         self.assertEqual(events[0].kwargs["context"]["char"], GUILD_HOST_NAME)
-        self.assertEqual(events[0].kwargs["context"]["service"], GUILD_SERVICE_KEY)
+        self.assertEqual(events[0].kwargs["context"]["service"], GUILD_SERVICE_ID)
         self.assertEqual(events[0].kwargs["context"]["shop"], "guild_branch_altoria")
-        sync_service_content()  # reuse fires nothing
+        self.assertEqual(events[0].kwargs["context"]["profession"], "guild_staff")
+        with self.captureOnCommitCallbacks(execute=True):
+            sync_service_content()  # reuse fires nothing
         late = [
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
@@ -194,16 +252,32 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         sync_service_content()
         before = self._guild_host()
         self.assertIsNotNone(before)
-        # Simulate an author renaming the registry row: the anchor keeps the host.
-        branch = GUILD_BRANCH_REGISTRY["guild_branch_altoria"]
-        renamed = GuildBranch(
-            branch.key, branch.display_name_zh, "改名後", branch.host_title, branch.anchor_key
+        # Simulate an author renaming the roster row: the anchor keeps the host.
+        catalog = get_catalog()
+        renamed_row = guild_config.ServiceHostRow(
+            name="改名後",
+            title=before.npc_title,
+            profession=before_row_profession(catalog),
+            anchor_room="altoria_guild_hall",
+            service_id=GUILD_SERVICE_ID,
+            authored_kwargs={
+                "branch_key": "guild_branch_altoria",
+                "dialogue_key": "guild_staff",
+            },
         )
-        GUILD_BRANCH_REGISTRY["guild_branch_altoria"] = renamed
-        try:
+        rows = tuple(
+            renamed_row if row.service_id == GUILD_SERVICE_ID else row
+            for row in catalog.service_hosts
+        )
+        patched = guild_config.GuildCatalog(
+            merit_thresholds=catalog.merit_thresholds,
+            exam_profiles=catalog.exam_profiles,
+            shop_configs=catalog.shop_configs,
+            quest_offers=catalog.quest_offers,
+            service_hosts=rows,
+        )
+        with patch.object(guild_economy, "get_catalog", return_value=patched):
             sync_service_content()
-        finally:
-            GUILD_BRANCH_REGISTRY["guild_branch_altoria"] = branch
         self.assertEqual(NPC.objects.filter(db_key=GUILD_HOST_NAME).count(), 1)
         self.assertEqual(NPC.objects.filter(db_key="改名後").count(), 0)
         self.assertEqual(self._guild_host().pk, before.pk)
@@ -212,10 +286,10 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         # A pre-identity dev host anchored by service_id under a free key.
         legacy = create_object(NPC, key=key, location=self._guild_hallish())
         legacy.components.add(
-            GuildStaff.create(legacy, service_id=GUILD_SERVICE_KEY, branch_key="guild_branch_altoria")
+            GuildStaff.create(legacy, service_id=GUILD_SERVICE_ID, branch_key="guild_branch_altoria")
         )
         legacy.components.add(
-            GuildExaminer.create(legacy, service_id=GUILD_SERVICE_KEY, branch_key="guild_branch_altoria")
+            GuildExaminer.create(legacy, service_id=GUILD_SERVICE_ID, branch_key="guild_branch_altoria")
         )
         return legacy
 
@@ -224,33 +298,50 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         legacy = self._anchored_legacy_host("舊公會管理人")
         sync_service_content()
         legacy.refresh_from_db()
-        # Reused as-is: no runtime title write, no second authored host.
+        # Reused as-is (roster membership keeps it): no runtime title write,
+        # no second authored host.
         self.assertEqual(legacy.npc_title, "")
         self.assertEqual(NPC.objects.filter(db_key=GUILD_HOST_NAME).count(), 0)
 
-    def test_unrelated_npc_sharing_a_retired_key_survives_cleanup(self):
-        # Deletion anchors on the legacy identity shape (retired key + anchor
-        # component + no title), never the key alone: an unrelated NPC that
-        # merely carries a retired ASCII key is never destroyed.
-        unrelated = create_object(NPC, key=GUILD_SERVICE_KEY, location=self._guild_hallish())
-        _cleanup_legacy_service_hosts()
+    @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
+    def test_unrelated_npc_sharing_a_retired_key_survives_convergence(self):
+        # Deletion anchors on the service-component identity shape, never the
+        # key: an unrelated NPC with no service component is never destroyed.
+        unrelated = create_object(NPC, key=GUILD_SERVICE_ID, location=self._guild_hallish())
+        sync_service_content()
         unrelated.refresh_from_db()  # still alive
-        self.assertIsNone(unrelated.npc_title or None)
 
+    @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
     def test_ambiguous_titled_same_anchor_host_is_kept_with_warning(self):
-        # A same-key titled host with the anchor component is ambiguous
-        # residue; cleanup refuses to guess and names the condition instead.
-        host = self._anchored_legacy_host(GUILD_SERVICE_KEY)
+        # A titled NPC holding both a roster-matching anchor and a stale
+        # foreign service_id is ambiguous residue; convergence refuses to
+        # guess and names the condition instead.
+        host = self._anchored_legacy_host("可疑公會管理人")
         host.npc_title = "手工頭銜"
         host.save()
+        extra = create_object(NPC, key="殘留商人", location=self._guild_hallish())
+        extra.components.add(
+            Merchant.create(extra, service_id="retired_shop_id", shop_key="altoria_general_store")
+        )
+        # Attach a second, retired-anchor component to the SAME host so it
+        # holds both a roster-matching anchor and a stale one.
+        titled = host
+        titled.components.add(
+            Merchant.create(titled, service_id="retired_shop_id", shop_key="altoria_general_store")
+        )
         with patch("world.rules.guild_economy.log_warn") as warned:
-            _cleanup_legacy_service_hosts()
-        host.refresh_from_db()  # kept for manual repair
+            sync_service_content()
+        titled.refresh_from_db()  # kept for manual repair
+        host.refresh_from_db()
+        self.assertIsNotNone(titled.components.get(Merchant.get_component_slot()))
         events = [
             call for call in warned.call_args_list
-            if call.args and call.args[0] == "guild_service_host_legacy_cleanup_ambiguous"
+            if call.args and call.args[0] == "guild_service_host_convergence_ambiguous"
         ]
         self.assertEqual(len(events), 1)
+        # The unrelated titleless stale-merchant is deleted, not warned.
+        with self.assertRaises(NPC.DoesNotExist):
+            extra.refresh_from_db()
 
     @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
     def test_duplicate_service_anchors_fail_closed_before_mutation(self):
@@ -260,7 +351,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         second = create_object(NPC, key="分身公會管理人二", location=self._guild_hallish())
         second.components.add(
             GuildStaff.create(
-                second, service_id=GUILD_SERVICE_KEY, branch_key="guild_branch_altoria"
+                second, service_id=GUILD_SERVICE_ID, branch_key="guild_branch_altoria"
             )
         )
         with self.assertRaises(ServiceAnchorIntegrityError):
@@ -269,17 +360,47 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         second.refresh_from_db()  # untouched fail-closed, no arbitrary pick
         self.assertEqual(NPC.objects.filter(db_key=GUILD_HOST_NAME).count(), 0)
 
-    @covers_requirement("npc-identity-titles::guild-service-hosts-reuse-by-service-anchor-and-never-rename")
-    def test_legacy_keyed_host_is_discarded_and_recreated_authored(self):
-        # The one-time cleanup discards hosts still keyed by the retired ASCII
-        # anchors (clean cutover); the next sync recreates the full authored
-        # identity with components.
-        legacy = self._anchored_legacy_host(GUILD_SERVICE_KEY)
-        _cleanup_legacy_service_hosts()
-        self.assertIsNone(NPC.objects.filter(db_key=GUILD_SERVICE_KEY).first())
+    @covers_requirement(
+        "guild-registration::roster-convergence-deletes-service-hosts-absent-from-the-roster"
+    )
+    def test_roster_shrink_deletes_only_the_surplus_host(self):
+        sync_service_content()
+        merchant = self._merchant_host()
+        self._roster_minus(MERCHANT_SERVICE_ID)
+        with patch("world.rules.guild_economy.log_info") as logged:
+            with self.captureOnCommitCallbacks(execute=True):
+                sync_service_content()
+        with self.assertRaises(NPC.DoesNotExist):
+            merchant.refresh_from_db()
+        self.assertIsNotNone(self._guild_host())  # roster member survives
+        events = [
+            call for call in logged.call_args_list
+            if call.args and call.args[0] == "guild_service_host_convergence_removed"
+        ]
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].kwargs["context"]["char"], MERCHANT_HOST_NAME)
+        self.assertEqual(events[0].kwargs["context"]["service"], MERCHANT_SERVICE_ID)
+
+    @covers_requirement(
+        "guild-registration::roster-convergence-deletes-service-hosts-absent-from-the-roster"
+    )
+    def test_stale_keyed_host_is_converged_away_and_recreated_authored(self):
+        # A dev host still keyed by the roster service_id (the old sync shape)
+        # still matches roster membership through its component service_id, so
+        # it is reused as-is (never renamed); deleting the row converges it
+        # away, and restoring the row recreates the full authored identity.
+        legacy = self._anchored_legacy_host(GUILD_SERVICE_ID)
+        self._roster_minus(GUILD_SERVICE_ID)
+        with self.captureOnCommitCallbacks(execute=True):
+            sync_service_content()
         with self.assertRaises(NPC.DoesNotExist):
             legacy.refresh_from_db()
-        sync_service_content()
+        # Stop the shrunk-roster patcher: the next sync sees the full roster.
+        for patcher in reversed(self._patchers):
+            patcher.stop()
+        self._patchers.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            sync_service_content()  # roster restored
         host = self._guild_host()
         self.assertIsNotNone(host)
         self.assertEqual(host.npc_title, GUILD_HOST_TITLE)
@@ -287,6 +408,13 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
 
     def _guild_hallish(self):
         return search_object_by_tag(GUILD_HALL_TAG)[0]
+
+
+def before_row_profession(catalog):
+    for row in catalog.service_hosts:
+        if row.service_id == GUILD_SERVICE_ID:
+            return row.profession
+    raise AssertionError("shipped roster lost the guild row")
 
 
 class ServiceHostAnchorReuseTests(ServiceContentIsolation, EvenniaTestCase):
@@ -299,7 +427,8 @@ class ServiceHostAnchorReuseTests(ServiceContentIsolation, EvenniaTestCase):
         host.key = "手工改名的商人"
         host.save()
         with patch("world.rules.guild_economy.log_info") as logged:
-            sync_service_content()
+            with self.captureOnCommitCallbacks(execute=True):
+                sync_service_content()
         self.assertEqual(NPC.objects.filter(db_key="手工改名的商人").count(), 1)
         self.assertIsNone(NPC.objects.filter(db_key=MERCHANT_HOST_NAME).first())
         self.assertFalse(
@@ -308,6 +437,50 @@ class ServiceHostAnchorReuseTests(ServiceContentIsolation, EvenniaTestCase):
                 if call.args and call.args[0] == "guild_service_host_created"
             ]
         )
+
+
+class ServiceHostAnchorRoomTests(ServiceContentIsolation, EvenniaTestCase):
+    """Per-row anchor resolution: an unresolvable tag skips exactly one row."""
+
+    @covers_requirement(
+        "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
+    )
+    def test_unresolvable_anchor_room_skips_only_its_row(self):
+        catalog = get_catalog()
+        rows = tuple(
+            guild_config.ServiceHostRow(
+                row.name,
+                row.title,
+                row.profession,
+                "no_such_room_tag",
+                row.service_id,
+                row.authored_kwargs,
+            )
+            if row.service_id == MERCHANT_SERVICE_ID
+            else row
+            for row in catalog.service_hosts
+        )
+        patched = guild_config.GuildCatalog(
+            merit_thresholds=catalog.merit_thresholds,
+            exam_profiles=catalog.exam_profiles,
+            shop_configs=catalog.shop_configs,
+            quest_offers=catalog.quest_offers,
+            service_hosts=rows,
+        )
+        with patch.object(guild_economy, "get_catalog", return_value=patched):
+            with patch("world.rules.guild_economy.log_warn") as warned:
+                sync_service_content()
+        events = [
+            call for call in warned.call_args_list
+            if call.args and call.args[0] == "guild_service_host_anchor_room_missing"
+        ]
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].kwargs["context"]["service"], MERCHANT_SERVICE_ID)
+        self.assertEqual(events[0].kwargs["context"]["anchor_room"], "no_such_room_tag")
+        # The resolvable row processed exactly as before; nothing was created
+        # for the skipped row, and the skipped merchant's stock stayed absent.
+        self.assertIsNotNone(NPC.objects.filter(db_key=GUILD_HOST_NAME).first())
+        self.assertEqual(NPC.objects.filter(db_key=MERCHANT_HOST_NAME).count(), 0)
 
 
 class ServiceContentWithoutInteriorsTests(EvenniaTestCase):

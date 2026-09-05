@@ -14,6 +14,7 @@ from tools.spec_traceability import covers_requirement
 from world.imports import assembly
 from world.imports.tests.helpers import example_record
 from world.imports.validate import validate_character
+from world.rules import profession_assembly
 from world.rules import profession_config
 from world.rules.profession_config import Profession, ProfessionComponent
 
@@ -238,25 +239,26 @@ class AssemblyPlanTests(TestCase):
 
     def test_identity_fields_are_the_class_intersection(self):
         self.assertEqual(
-            assembly.identity_fields("merchant"), frozenset({"service_id", "shop_key"})
+            profession_assembly.identity_fields("merchant"),
+            frozenset({"service_id", "shop_key"}),
         )
         self.assertEqual(
-            assembly.identity_fields("scripted_dialogue"),
+            profession_assembly.identity_fields("scripted_dialogue"),
             frozenset({"dialogue_key"}),
         )
         self.assertEqual(
-            assembly.missing_identity_kwargs(
+            profession_assembly.missing_identity_kwargs(
                 "merchant", {"service_id": "s", "shop_key": "b"}
             ),
             [],
         )
         self.assertEqual(
-            assembly.missing_identity_kwargs("merchant", {}),
+            profession_assembly.missing_identity_kwargs("merchant", {}),
             ["service_id", "shop_key"],
         )
 
     def test_component_field_names_are_the_class_db_fields(self):
         self.assertEqual(
-            assembly.component_field_names("merchant"),
+            profession_assembly.component_field_names("merchant"),
             frozenset({"service_id", "shop_key", "merchant_stock", "last_restock_day"}),
         )
