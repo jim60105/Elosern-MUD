@@ -269,6 +269,99 @@ class SettlementMoveEntryTests(EvenniaTest):
         self.assertIs(self.npc.location, self.barracks)
 
 
+class SettlementSilenceTests(EvenniaTest):
+    """The traveling-place-bound silence skip (service-anchor D6 delta).
+
+    A bound companion with a place-bound service component outside its
+    anchor room settles NOTHING — no entries, no events, no state change —
+    exactly like a schedule-less NPC, while every other NPC in the same
+    window settles byte-identically to the pre-change settlement.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from typeclasses.components import Merchant
+
+        self.anchor = create_object(Room, key="店面")
+        self.wild = create_object(Room, key="野外")
+        self.owner = create_object(PlayerCharacter, key="沉默主人")
+        self.owner.race = "human"
+        self.owner.apply_race_baseline()
+        self.clerk = create_object(NPC, key="店員", location=self.wild)
+        component = Merchant.create(
+            self.clerk, service_id="silence_shop", branch_key="plaza_stall"
+        )
+        self.clerk.components.add(component)
+        component.service_binding = "place"
+        component.anchor_room_id = self.anchor.pk
+        # A REAL reciprocal binding: silence verifies the mirror through
+        # the party module's authoritative bound_owner_of read.
+        from world.rules.party import join_party
+
+        self.owner.location = self.wild
+        join_party(self.clerk, self.owner)
+        schedule = {
+            "schema_version": 1,
+            "entries": [
+                {"tick_offset": 50400, "kind": "state", "state": "resting"}
+            ],
+        }
+        set_npc_schedule(self.clerk, schedule)
+        self.guard = create_object(NPC, key="沉默對照衛", location=self.room1)
+        set_npc_schedule(self.guard, schedule)
+
+    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    def test_traveling_place_bound_companion_settles_nothing(self):
+        events = settle_npc_schedules(0, DAY_SECONDS)
+        # The control guard's entry settles; the silenced clerk's does not.
+        self.assertEqual(
+            events,
+            [
+                ScheduledEvent(
+                    "npc_state_changed",
+                    50400,
+                    {
+                        "npc_id": int(self.guard.pk),
+                        "npc": "沉默對照衛",
+                        "state": "resting",
+                    },
+                )
+            ],
+        )
+        self.assertIsNone(self.clerk.db.schedule_state)
+        self.assertIs(self.clerk.location, self.wild)
+
+    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    def test_returning_to_anchor_resumes_settlement(self):
+        # Dismissed back at the storefront, the clerk settles normally;
+        # boundary arithmetic tolerates the skipped windows.
+        self.clerk.location = self.anchor
+        events = settle_npc_schedules(0, DAY_SECONDS)
+        settled = {int(e.payload["npc_id"]) for e in events}
+        self.assertEqual(settled, {int(self.clerk.pk), int(self.guard.pk)})
+        self.assertEqual(self.clerk.db.schedule_state, "resting")
+
+    @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
+    def test_silence_emits_one_debug_trace_per_silenced_npc(self):
+        # The observability contract: exactly one schedule_settlement_silenced
+        # per silenced NPC carrying its identity and the stranding service;
+        # ordinary (settling) NPCs emit none.
+        from unittest.mock import patch
+
+        with patch("world.rules.npc_schedules.log_debug") as debugged:
+            settle_npc_schedules(0, DAY_SECONDS)
+        silenced = [
+            call
+            for call in debugged.call_args_list
+            if call.args[0] == "schedule_settlement_silenced"
+        ]
+        self.assertEqual(len(silenced), 1)
+        context = silenced[0].kwargs["context"]
+        self.assertEqual(context["npc"], "店員")
+        self.assertEqual(context["npc_id"], int(self.clerk.pk))
+        self.assertEqual(context["service"], "merchant")
+
+
 class SettlementFailureIsolationTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()

@@ -33,6 +33,12 @@ from world.rules.dialogue import DIALOGUE_TABLE, dialogue_key_for, is_dialogue_h
 from world.rules.npc_schedules import interaction_reason
 from world.rules.party import is_companion, party_size
 from world.rules.time_skip import unsafe_rejection
+from world.rules.service_gate import (
+    MESSAGE_OFF_ANCHOR,
+    REASON_REMOTE,
+    service_available,
+)
+from world.observability import log_warn
 
 # The eight action codes the vocabulary may emit. ``explore.interact`` is
 # deliberately absent: the exploration panel's interact group is a label over
@@ -223,7 +229,7 @@ def _exit_ref(exit_obj: Any) -> str:
 def _traversable(exit_obj: Any, actor: Any) -> bool:
     try:
         return bool(exit_obj.access(actor, "traverse"))
-    except Exception:
+    except Exception:  # observability: ignore R2: a failed access check reads as non-traversable; the move entry degrades to disabled, never a wrong traversal
         return False
 
 
@@ -232,7 +238,7 @@ def _resolve_single_host(actor: Any, component_class: type) -> Any | None:
 
     try:
         return resolve_local_service_host(actor, component_class)
-    except GuildServiceError:
+    except GuildServiceError:  # observability: ignore R2: "no/ambiguous local host" is the ordinary no-navigation-entry branch of every room scan, not an operational failure
         return None
 
 
@@ -386,14 +392,69 @@ def _engage_entry(monster: Any) -> AffordanceView:
     )
 
 
-def _service_entry(surface: str) -> AffordanceView:
-    """The navigate-kind service entry for one surface."""
+#: Shared registry code for the gate's fixed refusal (service_messages maps
+#: it onto MESSAGE_OFF_ANCHOR); navigation disabled_reason codes are free
+#: identifiers, never action ids.
+_SERVICE_DISABLED_REASON = ("service_unavailable", MESSAGE_OFF_ANCHOR)
+
+
+def _service_entry(surface: str, actor: Any, host: Any) -> AffordanceView:
+    """The navigate-kind service entry for one surface, gated honestly.
+
+    The emission key is unchanged (exact local host); this consults the one
+    read-only resolver for the entry's ENABLED state (design
+    2026-09-05-service-anchoring D5): ``allowed`` (including the person /
+    unset-binding default) is the unchanged enabled entry; ``off_anchor`` or
+    ``malformed_binding`` emits the same entry shape disabled, carrying the
+    gate's fixed registry message — a traveling clerk stands beside the
+    player but sells nothing here, and the entry says so instead of
+    promising a dead dock surface. ``remote`` is unreachable at this site
+    (hosts resolve from ``actor.location.contents``); if host resolution
+    ever breaks the invariant, the panel degrades to the same disabled
+    entry with a warn diagnostic instead of crashing. A host missing the
+    component slot entirely (unreachable via the resolve path) keeps the
+    enabled entry — presentation never fail-closes a whole panel on data
+    the resolver was never asked about.
+    """
+    from typeclasses.components import GuildStaff, Merchant
+
+    component_class = GuildStaff if surface == "guild" else Merchant
+    component = host.components.get(component_class.get_component_slot())
+    if component is None:
+        enabled = True
+    else:
+        verdict = service_available(actor, host, component)
+        if verdict.reason == REASON_REMOTE:
+            # Per-snapshot renders make an unbounded invariant warn spam the
+            # log while the broken condition persists; debounce per host +
+            # surface on ndb, the gate's malformed-binding warn idiom.
+            ndb = host.ndb
+            warned = set(getattr(ndb, "affordance_remote_warned", None) or ())
+            if surface not in warned:
+                ndb.affordance_remote_warned = warned | {surface}
+                log_warn(
+                    "affordance_service_host_remote",
+                    context={
+                        "char": getattr(host, "key", None),
+                        "surface": surface,
+                        "actor": getattr(actor, "key", None),
+                    },
+                )
+        enabled = verdict.allowed
+    if enabled:
+        return AffordanceView(
+            surface=surface,
+            label="公會服務" if surface == "guild" else "商店",
+            navigation=True,
+            enabled=True,
+            disabled_reason=None,
+        )
     return AffordanceView(
         surface=surface,
         label="公會服務" if surface == "guild" else "商店",
         navigation=True,
-        enabled=True,
-        disabled_reason=None,
+        enabled=False,
+        disabled_reason=_SERVICE_DISABLED_REASON,
     )
 
 
@@ -425,9 +486,9 @@ def _target_affordance_entries(
     if isinstance(obj, Monster):
         entries.append(_engage_entry(obj))
     if guild_host is not None and obj is guild_host:
-        entries.append(_service_entry("guild"))
+        entries.append(_service_entry("guild", actor, obj))
     if shop_host is not None and obj is shop_host:
-        entries.append(_service_entry("shop"))
+        entries.append(_service_entry("shop", actor, obj))
     return entries
 
 

@@ -7,6 +7,7 @@ schedule-state interaction gating.
 
 ## Requirements
 
+
 ### Requirement: The npc_schedules clock source settles due schedule entries
 
 `world/rules/npc_schedules.py` SHALL provide `settle_npc_schedules(start_tick, end_tick)` and
@@ -25,7 +26,11 @@ and emit `npc_departed` / `npc_arrived` events; a `state` entry SHALL update
 `npc.db.schedule_state` and emit `npc_state_changed`. Multi-day skips SHALL use boundary
 arithmetic, not per-second iteration. An NPC with no schedule SHALL produce no entries and no
 events. Every event SHALL carry a JSON-safe payload (the stable `npc_id`, a display `npc` key,
-and `state` or `from`/`to` target) and `due_tick = day_start + tick_offset`.
+and `state` or `from`/`to` target) and `due_tick = day_start + tick_offset`. Settlement SHALL
+first skip every NPC for which `world/rules/service_gate.py::schedule_silenced(npc)` is true —
+a bound party companion carrying a `place`-bound service component outside its anchor room —
+producing no entries, no events, and no state change for it, exactly as a schedule-less NPC;
+every other NPC SHALL settle byte-identically to the pre-change settlement.
 
 #### Scenario: A due state entry updates the NPC's schedule state
 - **WHEN** an NPC with a schedule whose next `state` entry falls within `(start_tick, end_tick]`
@@ -64,6 +69,22 @@ and `state` or `from`/`to` target) and `due_tick = day_start + tick_offset`.
 #### Scenario: The stage source is the registered one
 - **WHEN** the clock's registered `npc_schedules` source is inspected
 - **THEN** it is `settle_npc_schedules` and no other source is registered under that kind
+
+#### Scenario: A traveling place-bound companion settles nothing
+- **WHEN** the guild clerk is a bound companion standing in a wilderness room away from his
+  anchor, and the window crosses a full day of his authored shift
+- **THEN** no entry of his schedule settles, no `npc_departed` / `npc_arrived` /
+  `npc_state_changed` event names him, and his `schedule_state` is unchanged
+
+#### Scenario: Returning to anchor resumes settlement
+- **WHEN** the dismissed clerk stands again in his anchor room and a window crosses due entries
+- **THEN** those entries settle through the ordinary path (boundary arithmetic tolerates the
+  skipped windows)
+
+#### Scenario: Unrelated NPCs are byte-identical
+- **WHEN** the guard and resident NPCs (place-unbound) settle across the same window as the
+  silenced clerk
+- **THEN** their entries, events, and state match the pre-change settlement exactly
 
 ### Requirement: NPC movement through settlement never charges the clock, records map knowledge,
 or triggers companion follow

@@ -41,7 +41,7 @@ from typing import Any
 
 import yaml
 
-from world.observability import log_error, log_warn
+from world.observability import log_debug, log_error, log_warn
 from typeclasses.npcs import NPC
 from world.rules.clock import (
     CLOCK_YAML,
@@ -859,8 +859,17 @@ def settle_npc_schedules(start_tick: int, end_tick: int) -> list[ScheduledEvent]
     settlement, are individually exception-isolated with bounded logged
     skips -- so the returned stream contains only successful
     ``npc_departed`` / ``npc_arrived`` / ``npc_state_changed`` occurrences.
+
+    Settlement FIRST skips every NPC the service gate silences
+    (``service_gate.schedule_silenced``: a bound party companion carrying a
+    ``place``-bound service component outside its anchor room) -- exactly
+    like a schedule-less NPC: no entries, no events, no state change.
     """
     from evennia.utils.search import search_object_by_tag
+    from world.rules.service_gate import (
+        off_anchor_place_service,
+        schedule_silenced,
+    )
 
     tagged = [
         npc for npc in search_object_by_tag(SCHEDULE_TAG) if isinstance(npc, NPC)
@@ -868,6 +877,22 @@ def settle_npc_schedules(start_tick: int, end_tick: int) -> list[ScheduledEvent]
     work: list[tuple[int, int, int, Any, ParsedSchedule, ScheduleEntry]] = []
     for npc in tagged:
         try:
+            if schedule_silenced(npc):
+                # The predicate is total and read-only, so the skip precedes
+                # even the schedule parse -- "no work schedule while the
+                # storefront is elsewhere" (design 2026-09-05-service-
+                # anchoring D6). One debug trace per silenced NPC explains
+                # the absence; off_anchor_place_service re-reads the single
+                # stranding component for the trace's service context.
+                log_debug(
+                    "schedule_settlement_silenced",
+                    context={
+                        "npc": npc.key or "?",
+                        "npc_id": int(npc.pk),
+                        "service": off_anchor_place_service(npc),
+                    },
+                )
+                continue
             parsed = parse_stored_schedule(npc)
             if parsed is None:
                 continue

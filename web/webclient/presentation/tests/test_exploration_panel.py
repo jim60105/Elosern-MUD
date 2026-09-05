@@ -1155,6 +1155,73 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertFalse(hasattr(module, "_destination_node"))
 
 
+class OffAnchorNavigationPanelTests(BattlefieldIsolation, EvenniaTestCase):
+    """The v1 panel serializer carries the disabled navigate descriptor.
+
+    The shared emitter's off-anchor disabled state flows through the
+    version-1 descriptor shape untouched (kind navigate, enabled false,
+    the gate's fixed registry message) — the presenter needed no edits.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.anchor = create_object(Room, key="店面")
+        self.square = create_object(Room, key="廣場")
+        self.player = create_object(PlayerCharacter, key="門面測試")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.square
+        self.merchant = create_object(NPC, key="行腳商人", location=self.square)
+        component = Merchant.create(
+            self.merchant, service_id="silence_shop", branch_key="plaza_stall"
+        )
+        self.merchant.components.add(component)
+        component.service_binding = "place"
+        component.anchor_room_id = self.anchor.pk
+
+    def _navigate_entries(self):
+        payload = build_production_registry().render("exploration", _context(self.player))
+        target = next(
+            t for t in payload["interact"] if t["identity"] == int(self.merchant.pk)
+        )
+        return [a for a in target["affordances"] if a["kind"] == "navigate"]
+
+    @covers_requirement(
+        "exploration-affordances::navigation-entries-render-off-anchor-service-hosts-honestly"
+    )
+    def test_off_anchor_merchant_serializes_disabled_navigate_entry(self):
+        (entry,) = self._navigate_entries()
+        self.assertEqual(entry["surface"], "shop")
+        self.assertFalse(entry["enabled"])
+        self.assertEqual(
+            entry["disabled_reason"],
+            {
+                "code": "service_unavailable",
+                "message": "他的服務不在這裡營業。",
+            },
+        )
+        self.assertNotIn("action_id", entry)
+
+    @covers_requirement(
+        "exploration-affordances::navigation-entries-render-off-anchor-service-hosts-honestly"
+    )
+    def test_anchor_room_without_the_host_carries_no_entry(self):
+        watcher = create_object(PlayerCharacter, key="店面觀看者")
+        watcher.race = "human"
+        watcher.apply_race_baseline()
+        watcher.location = self.anchor
+        payload = build_production_registry().render("exploration", _context(watcher))
+        self.assertEqual(
+            [
+                a
+                for target in payload["interact"]
+                for a in target["affordances"]
+                if a["kind"] == "navigate"
+            ],
+            [],
+        )
+
+
 class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
     """The v1 payload is byte-stable while the panel delegates to the shared vocabulary.
 
