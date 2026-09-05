@@ -92,12 +92,12 @@ class BatchTests(BatchFileHarness, EvenniaTestCase):
         real_construct = loader._instantiate_validated_character
         calls = 0
 
-        def fail_second(record, typeclass):
+        def fail_second(record, typeclass, *args):
             nonlocal calls
             calls += 1
             if calls == 2:
                 raise RuntimeError("injected construction failure")
-            return real_construct(record, typeclass)
+            return real_construct(record, typeclass, *args)
 
         with patch(
             "world.imports.loader._instantiate_validated_character",
@@ -327,8 +327,12 @@ class ImportBoundaryEventTests(BatchFileHarness, EvenniaTestCase):
                 with patch("world.imports.loader.log_info") as info, patch(
                     "world.imports.loader.log_warn"
                 ) as warn:
-                    kwargs = {} if target is None else {"typeclass": target}
-                    load_batch([path], **kwargs)
+                    # The batch's atomic block never really commits inside the
+                    # test transaction, so on_commit callbacks (the profession
+                    # assembly event) must be captured to run.
+                    with self.captureOnCommitCallbacks(execute=True):
+                        kwargs = {} if target is None else {"typeclass": target}
+                        load_batch([path], **kwargs)
                 info.assert_called_once_with(
                     "import_batch_committed",
                     context={"records": 1, "typeclass": name},
@@ -401,7 +405,9 @@ class ImportBoundaryEventTests(BatchFileHarness, EvenniaTestCase):
         self.assertEqual(warn.call_args.kwargs["context"]["reason"], "existing_npc_name")
 
     def test_single_record_success_emits_one_info(self):
-        with patch("world.imports.loader.log_info") as info:
+        with patch("world.imports.loader.log_info") as info, (
+            self.captureOnCommitCallbacks(execute=True)
+        ):
             instantiate_character(example_record())
         info.assert_called_once_with(
             "import_batch_committed",

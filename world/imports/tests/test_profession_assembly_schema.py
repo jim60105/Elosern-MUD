@@ -88,6 +88,17 @@ class ProfessionSemanticTests(ProfessionSchemaHarness):
         )
 
     @covers_requirement("import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field")
+    def test_an_empty_components_declaration_without_a_profession_is_rejected(self):
+        # Presence, not emptiness, is the declaration: an explicit [] is still
+        # a components row riding alongside no blueprint.
+        record = example_record()
+        record["components"] = []
+        self.assert_rejected(record, "components", "profession")
+        # An explicit null profession does not make it a legal pair either.
+        record["profession"] = None
+        self.assert_rejected(record, "components", "profession")
+
+    @covers_requirement("import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field")
     def test_kwarg_outside_the_component_fields_is_a_named_issue(self):
         record = example_record()
         record["profession"] = "merchant"

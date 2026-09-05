@@ -270,6 +270,72 @@ class IdentityGateTests(ProfessionAssemblyHarness):
                 load_batch([path])
         self.assertFalse(NPC.objects.filter(db_key="attach_fail").exists())
 
+    @covers_requirement("import-loader::a-profession-bearing-npc-record-assembles-blueprint-components-with-explicit-precedence")
+    def test_later_record_failure_emits_no_assembly_event_for_earlier_success(self):
+        # The assembly event is commit-bound: a second record failing during
+        # construction rolls the whole batch back, and a success event must
+        # never describe an NPC that was never persisted.
+        first = example_record()
+        first["key"] = "rollback_first"
+        first["profession"] = "merchant"
+        first["components"] = [{"type": "merchant", "kwargs": merchant_kwargs()}]
+        second = example_record()
+        second["key"] = "rollback_second"
+        first_path = self.write("first.json", first)
+        second_path = self.write("second.json", second)
+        from world.imports import loader
+
+        real = loader._instantiate_validated_character
+        calls = 0
+
+        def fail_second(record, typeclass, profession_row=None):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise RuntimeError("injected construction failure")
+            return real(record, typeclass, profession_row)
+
+        with (
+            patch.object(loader, "_instantiate_validated_character", fail_second),
+            patch("world.imports.loader.log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            with self.assertRaises(RuntimeError):
+                load_batch([first_path, second_path])
+        events = [call.args[0] for call in info.call_args_list]
+        self.assertNotIn("import_profession_assembled", events)
+        self.assertFalse(
+            NPC.objects.filter(db_key__in=["rollback_first", "rollback_second"]).exists()
+        )
+
+    @covers_requirement("import-loader::a-profession-bearing-npc-record-assembles-blueprint-components-with-explicit-precedence")
+    def test_construction_never_reconsults_the_registry_after_validation(self):
+        # The loader assembles from the validator's resolved row snapshot: any
+        # registry read after the validation lookup would let a rulebook
+        # reload mix two rows inside one constructed NPC.
+        record = example_record()
+        record["key"] = "snapshot_import"
+        record["profession"] = "tiered_merchant"
+        record["components"] = [{"type": "merchant", "kwargs": merchant_kwargs()}]
+        path = self.write("snap.json", record)
+        seen: list[str] = []
+        real = profession_config.get_profession
+
+        def counted(key):
+            seen.append(key)
+            if len(seen) > 1:
+                raise AssertionError(
+                    "registry re-consulted after the validation lookup"
+                )
+            return real(key)
+
+        with patch.object(profession_config, "get_profession", counted):
+            npc = load_batch([path])[0]
+        self.assertEqual(seen, ["tiered_merchant"])
+        # The constructed state came from the validated row itself.
+        self.assertEqual(npc.db.schedule, {"schema_version": 1, "template": "guard"})
+        self.assertTrue(npc.components.has("merchant"))
+
 
 class TierAndScheduleTests(ProfessionAssemblyHarness):
     @covers_requirement("import-loader::loaded-trait-values-are-the-literal-imported-stats-merged-onto-the-race-floor-for-omitted-keys-never-re-derived-or-multiplied")
@@ -344,6 +410,8 @@ class ByteIdentityTests(ProfessionAssemblyHarness):
             "equipment": record["equipment"],
             "inventory": record["inventory"],
             "portrait_policy": {"mode": "named", "stable_key": "human_reference"},
+            "affinity_elements": ["fire", "wind"],
+            "skill_proficiency": {},
         }
         with patch.object(
             profession_config,
@@ -356,6 +424,7 @@ class ByteIdentityTests(ProfessionAssemblyHarness):
         self.assertEqual(npc.key, "human_reference")
         self.assertEqual(npc.race, "human")
         self.assertEqual(npc.subrace, "human_commoner")
+        self.assertEqual(npc.npc_title, "參考範例")
         for key, value in record["stats"].items():
             self.assertEqual(getattr(npc.traits, key).base, value, key)
         self.assertIsNone(npc.db.schedule)
@@ -370,7 +439,9 @@ class ByteIdentityTests(ProfessionAssemblyHarness):
             {"type": "merchant", "kwargs": merchant_kwargs()}
         ]
         path = self.write("event.json", record)
-        with patch("world.imports.loader.log_info") as info:
+        with patch("world.imports.loader.log_info") as info, (
+            self.captureOnCommitCallbacks(execute=True)
+        ):
             load_batch([path])
         events = [
             (call.args[0], call.kwargs.get("context"))

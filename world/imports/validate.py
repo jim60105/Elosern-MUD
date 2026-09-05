@@ -10,7 +10,10 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from world.rules.profession_config import Profession
 
 from jsonschema import Draft202012Validator
 
@@ -43,6 +46,11 @@ class RecordReport:
     record: dict[str, Any] | None = None
     rejections: list[Issue] = field(default_factory=list)
     warnings: list[Issue] = field(default_factory=list)
+    # The registry row the validator resolved for this record's ``profession``
+    # (None when absent). The loader constructs from THIS snapshot, never a
+    # fresh lookup, so a rulebook cache reload between the two gates can never
+    # mix rows inside one constructed entity.
+    profession_row: "Profession | None" = None
 
     @property
     def is_valid(self) -> bool:
@@ -62,6 +70,17 @@ class BatchReport:
     def character_records(self) -> list[dict[str, Any]]:
         return [
             report.record
+            for report in self.records
+            if report.is_valid
+            and report.record is not None
+            and report.record.get("record_type") == "character"
+        ]
+
+    @property
+    def character_reports(self) -> list["RecordReport"]:
+        """The same selection as :attr:`character_records`, report-first."""
+        return [
+            report
             for report in self.records
             if report.is_valid
             and report.record is not None
@@ -390,27 +409,31 @@ def _is_npc_target(typeclass: type | None) -> bool:
 
 def _check_profession_fields(
     record: dict[str, Any], is_npc_target: bool
-) -> list[Issue]:
+) -> tuple[list[Issue], "Profession | None"]:
     """Reject an incomplete or misplaced profession/components pair.
 
     Every rejection is decided from the record, the profession registry, and the
     component vocabulary alone, so the whole plan (blueprint expansion plus the
     authored identity kwargs) fails as a named ISSUE in the shared batch report
     BEFORE any entity is constructed. The loader re-runs the same
-    ``assembly.resolve_plan`` fail-closed as its second gate.
+    ``assembly.resolve_plan`` fail-closed as its second gate — on the ROW
+    returned here, never a fresh lookup, so a cache reload between the gates
+    cannot mix rows inside one constructed entity.
     """
     profession_value = record.get("profession")
     entries = record.get("components")
     if profession_value is None:
-        if entries:
+        # PRESENCE semantics, not truthiness: an explicitly declared empty
+        # ``components`` array is still a declaration without a blueprint.
+        if "components" in record:
             return [
                 Issue(
                     "components",
                     "explicit components require a profession blueprint; the "
                     "assembly plan is defined only alongside a profession",
                 )
-            ]
-        return []
+            ], None
+        return [], None
     issues: list[Issue] = []
     if not is_npc_target:
         issues.append(
@@ -466,7 +489,7 @@ def _check_profession_fields(
                         )
                     )
     if profession is None or issues:
-        return issues
+        return issues, None
     # Identity completeness on the FINAL resolved set: blueprint-only and
     # explicit-replacement components face the same non-empty identity rule
     # (the loader never invents a service anchor).
@@ -480,7 +503,9 @@ def _check_profession_fields(
                     f"missing authored identity kwargs {missing}",
                 )
             )
-    return issues
+    if issues:
+        return issues, None
+    return issues, profession
 
 
 def _check_skill_proficiency_keys(record: dict[str, Any]) -> list[Issue]:
@@ -584,9 +609,10 @@ def validate_character(
     report.warnings.extend(magic_warnings)
     report.rejections.extend(_check_affinity_elements(record))
     report.rejections.extend(_check_skills(record))
-    report.rejections.extend(
-        _check_profession_fields(record, _is_npc_target(typeclass))
+    profession_issues, report.profession_row = _check_profession_fields(
+        record, _is_npc_target(typeclass)
     )
+    report.rejections.extend(profession_issues)
     report.warnings.extend(_check_stats_band(record))
     return report
 

@@ -298,7 +298,8 @@ validator (see import-loader), not by schema constants.
   `validate_character` against `profession_config.PROFESSION_COMPONENT_TYPES` and the load target
 
 #### Scenario: A components list without a profession is rejected
-- **WHEN** a record declares `components` but omits `profession`
+- **WHEN** a record declares `components` — presence, not content, is the declaration, so an
+  explicit empty array counts — but carries no `profession` (absent or explicit `null`)
 - **THEN** validation rejects it naming the `components` field and the reason (the assembly plan
   exists only alongside a blueprint)
 
