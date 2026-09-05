@@ -50,6 +50,8 @@ ATTRIBUTE_EXEMPT = {"role", "aria-expanded", "disabled", "data-testid^"}
 # Probe selectors the suite uses only to assert an element is absent — not
 # contract hooks, so they are exempt from the completeness check.
 HELPER_EXEMPT = {"missing-el"}
+# Hex color literals within JS evaluate blocks falsely captured by the '#id' scanner.
+COLOR_EXEMPT = {"0c0a10", "151219", "3a3344"}
 # Known distinct-hook pairs where one hook name is a strict prefix of the other
 # without a `-`/`__` separator (the field id and its wrapper class).
 OVERLAP_EXEMPT = {("inputfield", "inputfieldwrapper")}
@@ -167,7 +169,7 @@ def _css_hooks(selector: str) -> set[str]:
                 hooks.add(frag.lstrip("."))
         return hooks
     if sel.startswith("."):
-        hooks.add(sel.split(":", 1)[0].split("[", 1)[0].lstrip("."))
+        hooks.add(sel.split(":", 1)[0].split("[", 1)[0].strip().lstrip("."))
         return hooks
     if sel.startswith("img.") or sel.startswith("svg."):
         hooks.add(sel.split(".", 1)[1].split(":", 1)[0].split("[", 1)[0])
@@ -425,6 +427,7 @@ class WebClientFrozenContractAudit(unittest.TestCase):
                     or identifier in LOGIN_PAGE_EXEMPT
                     or identifier in ATTRIBUTE_EXEMPT
                     or identifier in HELPER_EXEMPT
+                    or identifier in COLOR_EXEMPT
                 )
                 self.assertTrue(
                     covered,

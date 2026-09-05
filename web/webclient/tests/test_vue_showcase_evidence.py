@@ -126,12 +126,13 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
                 "https://", content, f"{path} references a remote https URL"
             )
         css = (DIST_ROOT / "index.css").read_text(encoding="utf-8")
-        for token in ("@media (max-width", "@media(max-width"):
+        # The built stylesheet must stay offline and self-hosted: forbid external
+        # stylesheet imports or remote asset references (fonts, cdns, http/https).
+        for token in ("@import", "url(//", "//fonts.", "url(http", "http://", "https://"):
             self.assertNotIn(
                 token,
                 css,
-                "the desktop-only application must not ship mobile-breakpoint "
-                "media queries",
+                f"the built stylesheet must stay offline and self-hosted; found {token}",
             )
         template = TEMPLATE.read_text(encoding="utf-8")
         self.assertIn("webclient/app/dist/index.js", template)

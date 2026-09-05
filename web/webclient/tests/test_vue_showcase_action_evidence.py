@@ -155,6 +155,8 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
         improve-webclient-map-overlay-scale change joins the frozen set.
         The Feedback/ToastQueue key from the add-action-feedback-toasts
         change joins it at the manifest's refreeze at 42.
+        The Overlays/PartyStrip, Overlays/PartyDrawer, and Overlays/ObjectiveTracker
+        keys join at the manifest refreeze at 44.
         """
         required = json.loads(
             (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
@@ -180,6 +182,9 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
                 "Overlays/CreationOverlay", "Overlays/HelpOverlay",
                 "Overlays/MapOverlay", "Overlays/SettingsOverlay",
                 "Overlays/OverlayHost",
+                "Overlays/PartyStrip",
+                "Overlays/PartyDrawer",
+                "Overlays/ObjectiveTracker",
                 # The client-local action-feedback toast queue joined the
                 # frozen set when add-action-feedback-toasts refroze the
                 # manifest at 42.

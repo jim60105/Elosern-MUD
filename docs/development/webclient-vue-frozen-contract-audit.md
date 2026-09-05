@@ -337,7 +337,7 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `elosern-stage` (carries `data-elosern-mode` + `data-menu-open`), `elosern-vue-root` | H1 | REMAP-TO-TESTID |
 | `status-panel` + `status-panel__<suffix>` (`status-panel__condition-overflow`, `status-panel__condition--<code>`, `status-panel__gauge-value--<gauge>`) | H2 | REMAP-TO-TESTID |
 | `character-head` + `character-head__<suffix>` (`__badge`, `__disguise`, `__glyph`, `__name`, `__rank`, `__wallet`) | H2 | REMAP-TO-TESTID |
-| `local-map`, `local-map-detail`, `local-map-remembered`, `local-map__<suffix>` (`local-map__lattice`, `local-map__legend`, `local-map__title`, `local-map__marker--current`, `local-map__unavailable`, `local-map__actionable`); H5 adds `local-map__expand` (the full-map control, mounted with the `MapOverlay` it opens) | H2, H5 | REMAP-TO-TESTID |
+| `local-map`, `local-map-detail`, `local-map-remembered`, `local-map-edge-markers-mirror`, `local-map__<suffix>` (`local-map__lattice`, `local-map__legend`, `local-map__title`, `local-map__marker--current`, `local-map__unavailable`, `local-map__actionable`); H5 adds `local-map__expand` (the full-map control, mounted with the `MapOverlay` it opens) | H2, H5 | REMAP-TO-TESTID |
 | `dock-menu`, `dock-crumb`, `dock-crumb__<suffix>` (covers the breadcrumb back control `dock-crumb__back`), `suggestions-section`, `suggestions-generating`, `dock-tab-<tab>` (prefix `dock-tab`: `dock-tab-flee`, `dock-tab-interact`, `dock-tab-move`, `dock-tab-look`, `dock-tab-suggestions`), `action-dock-description`, `exploration-detail`, `exploration-rest-form` | H3 | REMAP-TO-TESTID |
 | `command-line` + `command-line-<suffix>` (`command-line-input-field`, `command-line-prompt`, `command-line-settings`, `command-line-help`) | H5 | REMAP-TO-TESTID |
 | `map-overlay`, `map-overlay-content`, `map-overlay-unavailable` | H5 | REMAP-TO-TESTID |
@@ -365,10 +365,12 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `.dock-menu`, `.dock-menu__outlet`, `.dock-menu__outlet-tile`, `.dock-menu__nav-sub`, `.dock-menu__plain`, `.dock-menu .dock-menu__scale`, `.dock-menu .dock-menu__skill--on`, `.dock-menu .dock-menu__token--pressed` | REMAP-TO-TESTID |
 | `.dock-tab-bar__<suffix>` (prefix `dock-tab-bar`: `__badge`, `__tab--on`, `svg.dock-tab-bar__icon`) | REMAP-TO-TESTID |
 | `.hint` (the command-line hint cluster naming the history-recall keys; targeted by `test_browser_input_narrative.py`) | PRESERVE-SAME-HOOK |
+| `.qwc__chip-badge`, `.qwc__chip-label` (quick-word chip child nodes; targeted by `test_browser_input_narrative.py`) | PRESERVE-SAME-HOOK |
 | `.tt` (the toast-entry title hook — the verbatim server-authored title text node — targeted by `test_browser_action_feedback.py`; the pair hook `.ts` is never locator-targeted, and the queue container and per-entry hooks ride the `feedback-toast-*` testids in the re-mapped set above) | PRESERVE-SAME-HOOK |
 | `.drawer-entry`, `.header-mode`, `.meta-conn`, `.services-confirm`, `.skill-detail-pane__disabled`, `.narrative-divider` (preserved), `.inputfieldwrapper` (preserved wrapper for `inputfield`) | RETIRED-WITH-SHELL |
 | `.lm_header` (legacy GoldenLayout header assertion: must NOT render) | RETIRED-WITH-SHELL |
 | `.dock-menu-layout` (the removed dock pane wrapper per the remove-redundant-dock-menu-layout change: the managed suite asserts it must NOT render; no replacement selector) | RETIRED-WITH-SHELL |
+| `.action-dock__description` (the visually-hidden duplicate description asserted to not render; `test_browser_shell.py`) | RETIRED-WITH-SHELL |
 | `.elosern-*` retired visual classes (`.elosern-narrative`, `.elosern-placeholder`, `.elosern-header`, `.elosern-status`, `.elosern-action-dock`) — the managed suite asserts they no longer render on the Vue shell | RETIRED-WITH-SHELL |
 | `messagewindow` (the retired `default_out` fallback host; revealed on demand by `test_vue_foundation.py`) | RETIRED-WITH-SHELL |
 
