@@ -49,6 +49,7 @@ _PANEL_MODULES = (
     ("dialogue", "dialogue.py"),
     ("title_ballot", "title_ballot.py"),
     ("title_codex", "title_codex.py"),
+    ("roster", "roster.py"),
 )
 
 

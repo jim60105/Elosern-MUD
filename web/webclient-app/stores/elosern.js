@@ -79,6 +79,7 @@ const PANEL_ALLOWLIST = [
   "dialogue",
   "title_ballot",
   "title_codex",
+  "roster",
 ];
 
 // D5 (webclient-minimap-04-island-single-affordance): top-meta locationLabel
@@ -1955,6 +1956,22 @@ export const useElosernStore = defineStore("elosern", () => {
     const objectivesRows =
       objectivesAvailable && Array.isArray(objectivesPanel.rows) ? objectivesPanel.rows : [];
 
+    // Roster read model (webclient-character-roster, multichar-02-roster-read-model):
+    // committed account roster rows and capacity/lock facts (empty/default when
+    // unavailable or absent).
+    const rosterPanel = (rs.panels && rs.panels.roster) || null;
+    const rosterAvailable = !!rosterPanel && rosterPanel.available === true;
+    const rosterCharacters =
+      rosterAvailable && Array.isArray(rosterPanel.characters) ? rosterPanel.characters : [];
+    const rosterCanCreate =
+      rosterAvailable && typeof rosterPanel.can_create === "boolean" ? rosterPanel.can_create : false;
+    const rosterMaxCharacters =
+      rosterAvailable && typeof rosterPanel.max_characters === "number" ? rosterPanel.max_characters : 0;
+    const rosterSwitchLocked =
+      rosterAvailable && typeof rosterPanel.switch_locked === "boolean" ? rosterPanel.switch_locked : false;
+    const rosterLockReason =
+      rosterAvailable && typeof rosterPanel.lock_reason === "string" ? rosterPanel.lock_reason : null;
+
     // Combat participants (webclient-align-05-party-hud): committed combat participants
     // when context_actions is kind: 'combat' (empty array otherwise).
     const combatParticipants = panel && panel.kind === "combat" && Array.isArray(panel.participants)
@@ -2002,6 +2019,12 @@ export const useElosernStore = defineStore("elosern", () => {
       partySlots,
       objectivesAvailable,
       objectivesRows,
+      rosterAvailable,
+      rosterCharacters,
+      rosterCanCreate,
+      rosterMaxCharacters,
+      rosterSwitchLocked,
+      rosterLockReason,
       combatParticipants,
       explorationInteract,
         activeSubDock: activeSubDock.value,
@@ -2759,6 +2782,12 @@ export const useElosernStore = defineStore("elosern", () => {
   const partySlots = computed(() => view.value.partySlots || []);
   const objectivesAvailable = computed(() => !!view.value.objectivesAvailable);
   const objectivesRows = computed(() => view.value.objectivesRows || []);
+  const rosterAvailable = computed(() => !!view.value.rosterAvailable);
+  const rosterCharacters = computed(() => view.value.rosterCharacters || []);
+  const rosterCanCreate = computed(() => !!view.value.rosterCanCreate);
+  const rosterMaxCharacters = computed(() => view.value.rosterMaxCharacters || 0);
+  const rosterSwitchLocked = computed(() => !!view.value.rosterSwitchLocked);
+  const rosterLockReason = computed(() => view.value.rosterLockReason || null);
   const combatParticipants = computed(() => view.value.combatParticipants || []);
   const explorationInteract = computed(() => view.value.explorationInteract || []);
 
@@ -2813,6 +2842,12 @@ export const useElosernStore = defineStore("elosern", () => {
     partySlots,
     objectivesAvailable,
     objectivesRows,
+    rosterAvailable,
+    rosterCharacters,
+    rosterCanCreate,
+    rosterMaxCharacters,
+    rosterSwitchLocked,
+    rosterLockReason,
     combatParticipants,
     explorationInteract,
     getSender,

@@ -1556,7 +1556,7 @@ test("the unavailable forms differ only in schema_version", () => {
 });
 
 test("mirrors every registered panel schema version in the allowlist", () => {
-  // The allowlist must cover all fourteen registered panels so an unmirrored
+  // The allowlist must cover all fifteen registered panels so an unmirrored
   // panel can never slip through the registered-version gate.
   assert.equal(Protocol.PANEL_ALLOWLIST.status, 2);
   assert.equal(Protocol.PANEL_ALLOWLIST.local_map, 1);
@@ -1571,10 +1571,11 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.dialogue, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.title_ballot, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.title_codex, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.roster, 1);
   assert.equal(
     Object.keys(Protocol.PANEL_ALLOWLIST).length,
-    14,
-    "PANEL_ALLOWLIST must list exactly the fourteen registered panels"
+    15,
+    "PANEL_ALLOWLIST must list exactly the fifteen registered panels"
   );
 });
 
@@ -5555,6 +5556,242 @@ test("dialogue is in the production panel allowlist with dialogue mode accepted"
       schema_version: 1,
       available: false,
       reason: { code: "dialogue_unavailable", message: "對話目前無法顯示" },
+    },
+  };
+  envelope.revision = 7;
+  assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
+});
+
+// ---------------------------------------------------------------------------
+// roster panel v1 (mirror of web.webclient.presentation.roster,
+// webclient-character-roster). Bounded rows in identity order; exactly one
+// current row; reciprocal switch_locked / lock_reason invariant; same-origin
+// /art/ URLs or truthful placeholders.
+// ---------------------------------------------------------------------------
+
+function validRosterPortrait(overrides) {
+  return Object.assign(
+    {
+      subject_key: "character:1",
+      status: "done",
+      url: "/art/portraits/character_1.png",
+      aspect_ratio: "3:4",
+      alt: "英雄肖像",
+      placeholder: null,
+    },
+    overrides || {}
+  );
+}
+
+function validRosterCharacter(overrides) {
+  return Object.assign(
+    {
+      identity: 1,
+      name: "艾莉亞",
+      current: true,
+      pending: false,
+      portrait: validRosterPortrait(),
+    },
+    overrides || {}
+  );
+}
+
+function validRosterPanel(overrides) {
+  return Object.assign(
+    {
+      schema_version: 1,
+      available: true,
+      characters: [validRosterCharacter()],
+      max_characters: 5,
+      can_create: true,
+      switch_locked: false,
+      lock_reason: null,
+    },
+    overrides || {}
+  );
+}
+
+test("roster available form validates cleanly", () => {
+  assert.deepEqual(
+    Protocol.validateRosterPanel(validRosterPanel()),
+    validRosterPanel()
+  );
+});
+
+test("roster validator enforces exact one current row invariant", () => {
+  // 0 current rows -> rejected
+  const zeroCurrent = validRosterPanel({
+    characters: [validRosterCharacter({ current: false })],
+  });
+  assert.throws(
+    () => Protocol.validateRosterPanel(zeroCurrent),
+    /must contain exactly one current character/
+  );
+
+  // 2 current rows -> rejected
+  const twoCurrent = validRosterPanel({
+    characters: [
+      validRosterCharacter({ identity: 1, current: true }),
+      validRosterCharacter({ identity: 2, current: true }),
+    ],
+  });
+  assert.throws(
+    () => Protocol.validateRosterPanel(twoCurrent),
+    /must contain exactly one current character/
+  );
+
+  // Exactly 1 current among multiple -> accepted
+  const validMultiple = validRosterPanel({
+    characters: [
+      validRosterCharacter({ identity: 1, current: true }),
+      validRosterCharacter({ identity: 2, current: false }),
+    ],
+  });
+  assert.doesNotThrow(() => Protocol.validateRosterPanel(validMultiple));
+});
+
+test("roster validator enforces reciprocal lock/reason invariant", () => {
+  // switch_locked: false with non-null reason -> rejected
+  assert.throws(
+    () =>
+      Protocol.validateRosterPanel(
+        validRosterPanel({ switch_locked: false, lock_reason: "戰鬥中無法切換角色" })
+      ),
+    /lock_reason must be null when switch_locked is false/
+  );
+
+  // switch_locked: true with null reason -> rejected
+  assert.throws(
+    () =>
+      Protocol.validateRosterPanel(
+        validRosterPanel({ switch_locked: true, lock_reason: null })
+      ),
+    /lock_reason must be '戰鬥中無法切換角色' when switch_locked is true/
+  );
+
+  // switch_locked: true with wrong string -> rejected
+  assert.throws(
+    () =>
+      Protocol.validateRosterPanel(
+        validRosterPanel({ switch_locked: true, lock_reason: "非戰鬥原因" })
+      ),
+    /lock_reason must be '戰鬥中無法切換角色' when switch_locked is true/
+  );
+
+  // switch_locked: true with exact ROSTER_LOCK_REASON -> accepted
+  assert.doesNotThrow(() =>
+    Protocol.validateRosterPanel(
+      validRosterPanel({
+        switch_locked: true,
+        lock_reason: "戰鬥中無法切換角色",
+      })
+    )
+  );
+});
+
+test("roster validator mirrors server drift and bound rejections", () => {
+  for (const bad of [
+    validRosterPanel({ schema_version: 2 }),
+    validRosterPanel({ available: false }),
+    validRosterPanel({ characters: "not-a-list" }),
+    // Duplicate identities
+    validRosterPanel({
+      characters: [
+        validRosterCharacter({ identity: 1, current: true }),
+        validRosterCharacter({ identity: 1, current: false }),
+      ],
+    }),
+    // Non-ascending identities
+    validRosterPanel({
+      characters: [
+        validRosterCharacter({ identity: 2, current: true }),
+        validRosterCharacter({ identity: 1, current: false }),
+      ],
+    }),
+    // Over row bound (11 rows)
+    validRosterPanel({
+      characters: Array.from({ length: 11 }, (_, i) =>
+        validRosterCharacter({ identity: i + 1, current: i === 0 })
+      ),
+    }),
+    // Invalid portrait URL prefix
+    validRosterPanel({
+      characters: [
+        validRosterCharacter({
+          portrait: validRosterPortrait({ url: "https://evil.com/pic.png" }),
+        }),
+      ],
+    }),
+    // Both URL and placeholder set
+    validRosterPanel({
+      characters: [
+        validRosterCharacter({
+          portrait: validRosterPortrait({
+            url: "/art/pic.png",
+            placeholder: { kind: "missing", label: "未生成" },
+          }),
+        }),
+      ],
+    }),
+    // Neither URL nor placeholder set
+    validRosterPanel({
+      characters: [
+        validRosterCharacter({
+          portrait: validRosterPortrait({
+            url: null,
+            placeholder: null,
+          }),
+        }),
+      ],
+    }),
+    // Invalid aspect_ratio
+    validRosterPanel({
+      characters: [
+        validRosterCharacter({
+          portrait: validRosterPortrait({ aspect_ratio: "16:9" }),
+        }),
+      ],
+    }),
+    // Non-positive identity
+    validRosterPanel({
+      characters: [validRosterCharacter({ identity: 0 })],
+    }),
+    // Empty or surrogate name
+    validRosterPanel({
+      characters: [validRosterCharacter({ name: "  " })],
+    }),
+    validRosterPanel({
+      characters: [validRosterCharacter({ name: "bad\ud800name" })],
+    }),
+    // Extra field on panel
+    validRosterPanel({ extra_field: 123 }),
+  ]) {
+    assert.throws(() => Protocol.validateRosterPanel(bad));
+  }
+});
+
+test("roster is in the production panel allowlist and rejects atomically", () => {
+  assert.equal(Protocol.PANEL_ALLOWLIST.roster, 1);
+  const envelope = {
+    protocol_version: 1,
+    presentation_epoch: VALID_EPOCH,
+    revision: 5,
+    mode: "exploration",
+    panels: {
+      roster: { schema_version: 1, available: true, characters: "not-a-list" },
+    },
+    layout_version: 1,
+    server_time: serverTime(),
+  };
+  assert.throws(() => Protocol.validateSnapshot(envelope));
+  envelope.panels = { roster: validRosterPanel() };
+  envelope.revision = 6;
+  assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
+  envelope.panels = {
+    roster: {
+      schema_version: 1,
+      available: false,
+      reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
     },
   };
   envelope.revision = 7;
