@@ -335,3 +335,15 @@ Revised batches (parallel within a wave, serial across waves; ~9 workdays). The
 - W3: 7, 9
 - W4: 10
 - W5: 8
+
+### 2026-09-06 — Change 8 dialogue surface superseded by align-11
+
+`webclient-align-11-dialogue-ux` supersedes Change 8's dock mirror design: the
+`對話選項` dock tab, the `dialogue.root` frame, the dialogue legend swap, and
+the `→` dock borrow are deleted. The narrative caption is the ONE dialogue
+surface — digits 1–4 retarget to its scripted picks, it carries its own
+`結束對話` exit row (the new `explore.dialogue_leave` seam), and the dock
+keeps its ordinary exploration form while talking. The panel choice cap
+becomes a panel-owned literal (4), independent of the affordance keyword
+pool's 16 bound. The frozen `index.html` reference draft is NOT edited; this
+addendum records the decision against the normative design record.

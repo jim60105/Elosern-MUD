@@ -93,6 +93,7 @@
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_escape_from_character_panel_returns_keyboard_to_the_exploration_root",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_look_at_scripted_host_shows_the_affinity_stage_line",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_scripted_keyword_dialogue_completes",
+        "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_dialogue_surface_is_the_caption_and_the_dock_stays_ordinary",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_focus_follows_the_item_key_across_committed_re_resolution",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_identity_loss_pops_one_level_and_restores_opener_focus",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_whole_stack_loss_cascades_to_the_degraded_root_and_recovers",
