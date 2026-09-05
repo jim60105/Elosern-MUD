@@ -339,6 +339,7 @@ class PossessionExitPathTests(EvenniaTest):
         """Scenario: Disconnect release is account-keyed and idempotent."""
         enter_possession(self.char1, self.npc)
 
+        self.account.unpuppet_object(self.session)
         release_on_disconnect(self.account)
         self.assertIsNone(current_possession(self.char1))
         self.assertIsNone(self.npc.db.possessed_by)

@@ -112,7 +112,6 @@ REASON_NOT_CO_LOCATED = "not_co_located"
 REASON_IN_COMBAT = "in_combat"
 REASON_DIALOGUE_OPEN = "dialogue_open"
 REASON_ALREADY_POSSESSING = "already_possessing"
-REASON_HANDBACK_FIRST = "handback_first"
 REASON_WRITE_FAILED = "write_failed"
 REASON_MISMATCHED_POSSESSION = "mismatched_possession"
 REASON_TRANSFER_REFUSED = "transfer_refused"
@@ -136,7 +135,6 @@ POSSESSION_REJECTION_MESSAGES: dict[str, str] = {
     REASON_IN_COMBAT: "戰鬥中無法附身。",
     REASON_DIALOGUE_OPEN: "對方正在對話中，無法附身。",
     REASON_ALREADY_POSSESSING: "你目前已經在附身狀態。",
-    REASON_HANDBACK_FIRST: "請先歸位再執行此操作。",
     REASON_TRANSFER_REFUSED: "此刻無法附身於他。",
 }
 
@@ -290,14 +288,9 @@ def _transfer_puppet(player: Any, npc: Any) -> None:
     if account is None:
         return
 
-    _grant_puppet_lock(npc, account)
-
     sessions = _acting_sessions(player)
     if not sessions:
-        if account is not None:
-            _strip_puppet_lock(npc, account)
-            raise PossessionGateError(REASON_TRANSFER_REFUSED)
-        return
+        raise PossessionGateError(REASON_TRANSFER_REFUSED)
 
     from web.webclient.actions.dispatcher import retire_sequence
     from web.webclient.presentation.ingress import (
@@ -306,16 +299,49 @@ def _transfer_puppet(player: Any, npc: Any) -> None:
         synchronize_session,
     )
 
+    # Phase 2: retire/send/reset loop over ALL acting sessions
     for session in sessions:
         send_unpuppet_transition(session)
         retire_sequence(session)
         reset_client_sequence(session)
 
+    # Phase 3: grant puppet lock ONCE, then access/puppet/verify ladder
+    _grant_puppet_lock(npc, account)
+
+    successful_sessions: list[Any] = []
+
+    def _rollback_all(failing_session: Any) -> None:
+        sessions_to_restore = list(successful_sessions)
+        if failing_session not in sessions_to_restore:
+            sessions_to_restore.append(failing_session)
+        restore_failed = False
+        for s in sessions_to_restore:
+            try:
+                account.puppet_object(s, player)
+            except Exception:  # observability: ignore R2: best-effort recovery hop on puppet failure
+                pass
+            current_p = account.get_puppet(s)
+            if current_p is not player:
+                restore_failed = True
+            synchronize_session(s, current_p)
+            if hasattr(s, "msg"):
+                s.msg(POSSESSION_REJECTION_MESSAGES[REASON_TRANSFER_REFUSED])
+        _strip_puppet_lock(npc, account)
+        if restore_failed:
+            # observability: ignore R3: state-condition write error raised immediately after facade call
+            log_error(
+                "possession_puppet_transfer_rollback_incomplete",
+                context={
+                    "account": str(getattr(account, "pk", "?")),
+                    "npc": str(getattr(npc, "pk", "?")),
+                },
+            )
+            raise PossessionWriteError(REASON_WRITE_FAILED)
+        raise PossessionGateError(REASON_TRANSFER_REFUSED)
+
+    for session in sessions:
         if hasattr(npc, "access") and not npc.access(account, "puppet"):
-            _strip_puppet_lock(npc, account)
-            synchronize_session(session, player)
-            session.msg(POSSESSION_REJECTION_MESSAGES[REASON_TRANSFER_REFUSED])
-            raise PossessionGateError(REASON_TRANSFER_REFUSED)
+            _rollback_all(session)
 
         try:
             account.puppet_object(session, npc)
@@ -331,16 +357,9 @@ def _transfer_puppet(player: Any, npc: Any) -> None:
             )
 
         if account.get_puppet(session) is not npc:
-            # Recovery ladder on refusal
-            try:
-                account.puppet_object(session, player)
-            except Exception:  # observability: ignore R2: best-effort recovery hop on puppet failure
-                pass
-            _strip_puppet_lock(npc, account)
-            synchronize_session(session, account.get_puppet(session))
-            session.msg(POSSESSION_REJECTION_MESSAGES[REASON_TRANSFER_REFUSED])
-            raise PossessionGateError(REASON_TRANSFER_REFUSED)
+            _rollback_all(session)
 
+        successful_sessions.append(session)
         synchronize_session(session, npc)
 
 
@@ -781,21 +800,16 @@ def release_on_disconnect(account: Any) -> None:
     if account is None:
         return
 
-    # Find all characters owned by this account or referenced by its possessed NPCs
-    chars = _account_characters(account)
-    for npc_obj in ObjectDB.objects.filter(db_account=account):
-        possessed_by = getattr(getattr(npc_obj, "db", None), "possessed_by", None)
-        if possessed_by is not None:
-            owner = _resolve_live_object(int(possessed_by))
-            if owner is not None and owner not in chars:
-                chars.append(owner)
+    # Multisession guard: if any live session of the account still puppets
+    # an object holding possessed_by, possession is actively driven; do not release.
     if hasattr(getattr(account, "sessions", None), "all"):
         for sess in account.sessions.all():
             puppet = getattr(sess, "puppet", None)
             if puppet is not None and getattr(getattr(puppet, "db", None), "possessed_by", None) is not None:
-                owner = _resolve_live_object(int(puppet.db.possessed_by))
-                if owner is not None and owner not in chars:
-                    chars.append(owner)
+                return
+
+    # Find all characters owned by this account
+    chars = _account_characters(account)
 
     for char in chars:
         if current_possession(char) is not None:

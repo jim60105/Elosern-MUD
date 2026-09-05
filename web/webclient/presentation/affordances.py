@@ -451,20 +451,6 @@ def _possess_entry(npc: Any, actor: Any) -> AffordanceView:
 
 
 def _service_entry(surface: str, actor: Any, host: Any) -> AffordanceView:
-    from world.rules.possession import (
-        POSSESSED_REFUSAL_MESSAGES,
-        REASON_POSSESSED_SHOP,
-        is_possessed_actor,
-    )
-    if is_possessed_actor(actor):
-        disabled_msg = POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP]
-        return AffordanceView(
-            surface=surface,
-            label="公會服務" if surface == "guild" else "商店",
-            navigation=True,
-            enabled=False,
-            disabled_reason=(REASON_POSSESSED_SHOP, disabled_msg),
-        )
     """The navigate-kind service entry for one surface, gated honestly.
 
     The emission key is unchanged (exact local host); this consults the one
@@ -482,6 +468,20 @@ def _service_entry(surface: str, actor: Any, host: Any) -> AffordanceView:
     enabled entry — presentation never fail-closes a whole panel on data
     the resolver was never asked about.
     """
+    from world.rules.possession import (
+        POSSESSED_REFUSAL_MESSAGES,
+        REASON_POSSESSED_SHOP,
+        is_possessed_actor,
+    )
+    if is_possessed_actor(actor):
+        disabled_msg = POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP]
+        return AffordanceView(
+            surface=surface,
+            label="公會服務" if surface == "guild" else "商店",
+            navigation=True,
+            enabled=False,
+            disabled_reason=(REASON_POSSESSED_SHOP, disabled_msg),
+        )
     from typeclasses.components import GuildStaff, Merchant
 
     component_class = GuildStaff if surface == "guild" else Merchant

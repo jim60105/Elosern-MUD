@@ -200,19 +200,8 @@ class Account(DefaultAccount):
         return False
 
     def at_post_disconnect(self, **kwargs: Any) -> None:
-        """Release active possession on disconnect (companion-possession-transition)."""
+        """Release active possession on disconnect with rules-layer guard (companion-possession-transition)."""
         super().at_post_disconnect(**kwargs)
-        # Multisession guard: if account still has other connected sessions,
-        # do not release possession if another session is still puppeting the possessed NPC.
-        if getattr(self, "is_connected", False) and hasattr(self, "sessions"):
-            has_npc_puppet = False
-            for sess in self.sessions.all():
-                puppet = getattr(sess, "puppet", None)
-                if puppet is not None and getattr(getattr(puppet, "db", None), "possessed_by", None) is not None:
-                    has_npc_puppet = True
-                    break
-            if has_npc_puppet:
-                return
         from world.rules.possession import release_on_disconnect
 
         release_on_disconnect(self)
