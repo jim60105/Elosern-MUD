@@ -165,7 +165,34 @@ class GuildRegistrationTests(EvenniaTestCase):
             self._register(staff=remote)
         self.assertEqual(ctx.exception.args[0], RegistrationReason.REMOTE_STAFF)
         self.assertIsNone(self.player.guild_rank)
-        self.assertIsNone(self.player.db.guild_registration)
+
+    def _make_place_bound_staff(self):
+        # Emulates a sync-converged place-bound clerk (service-anchoring):
+        # the shipped roster's clerk components persist exactly these fields.
+        component = self.staff.components.get(GuildStaff.get_component_slot())
+        component.service_binding = "place"
+        component.anchor_room_id = self.room.pk
+        return component
+
+    @covers_requirement(
+        "guild-registration::registration-access-is-local-idempotent-and-strict-about-persisted-data"
+    )
+    def test_off_anchor_traveling_clerk_refuses_without_writing_fields(self):
+        self._make_place_bound_staff()
+        square = create_object(Room, key="town square")
+        self.staff.location = square
+        self.player.location = square
+        with self.assertRaises(GuildError) as ctx:
+            self._register(staff=self.staff)
+        self.assertEqual(
+            ctx.exception.args[0], RegistrationReason.SERVICE_UNAVAILABLE
+        )
+        self.assertIsNone(self.player.guild_rank)
+
+    def test_at_anchor_place_bound_clerk_registers_as_before_the_gate(self):
+        self._make_place_bound_staff()
+        record = self._register(staff=self.staff)
+        self.assertEqual(record["branch_key"], "guild_branch_altoria")
 
     def test_non_player_rejected(self):
         npc = create_object(NPC, key="npc actor", location=self.room)

@@ -53,14 +53,23 @@ supply or override it. Registration SHALL NOT derive rank from either displayed 
 - **THEN** the stored branch equals that component's branch and no caller-provided branch input exists
 
 ### Requirement: Registration access is local, idempotent, and strict about persisted data
-Registration SHALL reject non-player entities, absent or remote staff, and ambiguous multiple local
-GuildStaff hosts. Re-registering a valid member SHALL return the original record without replacing its
-branch, tick, or snapshot. A partial or malformed existing record SHALL raise `GuildDataError` without
-repair or rank mutation.
+Registration SHALL reject non-player entities, absent or remote staff, and ambiguous multiple
+local GuildStaff hosts. Local-host acceptance SHALL flow through
+`world/rules/service_gate.py::service_available` for the resolved staff component: `remote` keeps
+the existing remote-staff rejection, and an `off_anchor` or `malformed_binding` verdict SHALL
+refuse registration with the gate's fixed registry message and no guild field written.
+Re-registering a valid member SHALL return the original record without replacing its branch, tick,
+or snapshot. A partial or malformed existing record SHALL raise `GuildDataError` without repair or
+rank mutation.
 
 #### Scenario: Remote staff cannot register a player
 - **WHEN** a player invokes registration while the selected GuildStaff host is in another room
 - **THEN** registration is rejected and no guild field changes
+
+#### Scenario: An off-anchor traveling clerk refuses registration
+- **WHEN** the guild clerk host stands beside the player in a room other than its anchor and the
+  player invokes registration
+- **THEN** the gate's fixed message is returned and no guild field changes
 
 #### Scenario: Repeated registration preserves historical values
 - **WHEN** a registered player changes disguise and invokes registration again

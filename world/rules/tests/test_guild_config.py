@@ -516,6 +516,24 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                 with self.assertRaises(GuildConfigError):
                     validate_service_hosts(mutated)
 
+    def test_person_bound_profession_row_is_rejected_as_an_anchor(self):
+        # The roster row IS the anchor registration: anchoring a blueprint
+        # whose components co-presence by design (service-anchoring) is the
+        # invalid combination, rejected before any host is ever created.
+        from world.rules import profession_config
+        from world.rules.profession_config import Profession, ProfessionComponent
+
+        courier = Profession(
+            key="courier",
+            components=(ProfessionComponent("scripted_dialogue", "person"),),
+            schedule_template=None,
+            default_tier=None,
+        )
+        row = {**self._raw()[0], "profession": "courier"}
+        with mock.patch.object(profession_config, "TABLE", {"courier": courier}):
+            with self.assertRaises(GuildConfigError):
+                validate_service_hosts([row])
+
     def test_malformed_profession_rulebook_surfaces_as_catalog_error(self):
         from world.rules import profession_config
 

@@ -56,18 +56,25 @@ static-tier registry.
 - **WHEN** a row sets `default_tier: mythic` and `STATIC_TIER_REGISTRY` has no `mythic` key
 - **THEN** loading raises naming the row and the unknown tier key
 
-### Requirement: default_binding is a validated vocabulary stored for later consumers
+### Requirement: default_binding is a validated vocabulary consumed by the anchoring gate
 Each component entry's `default_binding` SHALL be one of `person` or `place`, validated at load;
-the value SHALL be stored on the frozen component row and SHALL NOT be read by any runtime gate,
-component, or presentation surface until the service-anchoring change consumes it.
+the value SHALL be stored on the frozen component row and SHALL be consumed by profession
+assembly, which copies it onto every component it creates (see the `service-anchoring`
+capability). No runtime service gate SHALL read the profession table directly — gates read the
+component's persisted binding.
 
 #### Scenario: Binding vocabulary is enforced at load
 - **WHEN** a row declares `default_binding: portable`
 - **THEN** loading raises naming the row and the invalid binding value
 
-#### Scenario: Nothing reads the binding yet
-- **WHEN** the repository is searched for consumers of `ProfessionComponent.default_binding`
-- **THEN** the only readers are the profession loader itself and its tests
+#### Scenario: Assembly copies the binding onto created components
+- **WHEN** assembly creates a component from a row whose `default_binding` is `place`
+- **THEN** the created component persists `service_binding` `place` exactly as authored
+
+#### Scenario: Runtime gates never read the profession table
+- **WHEN** `service_gate.py` and every rewired service caller are searched for
+  `profession_config` imports
+- **THEN** none exist; availability comes from persisted component bindings only
 
 ### Requirement: The component-type vocabulary is contract-pinned to the component classes
 The profession loader SHALL define a closed mapping from component `type` strings to the

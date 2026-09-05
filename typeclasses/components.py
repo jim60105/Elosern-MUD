@@ -15,6 +15,10 @@ class GuildStaff(Component):
     name = "guild_staff"
     service_id = DBField(default=None)
     branch_key = DBField(default=None)
+    # Authored availability binding (service-anchoring D2): copied from the
+    # profession blueprint by the shared assembly; only it writes them.
+    service_binding = DBField(default=None)
+    anchor_room_id = DBField(default=None)
 
 
 class GuildExaminer(Component):
@@ -23,6 +27,8 @@ class GuildExaminer(Component):
     name = "guild_examiner"
     service_id = DBField(default=None)
     branch_key = DBField(default=None)
+    service_binding = DBField(default=None)
+    anchor_room_id = DBField(default=None)
 
 
 class Merchant(Component):
@@ -38,6 +44,8 @@ class Merchant(Component):
     shop_key = DBField(default=None)
     merchant_stock = DBField(default=None)
     last_restock_day = DBField(default=None)
+    service_binding = DBField(default=None)
+    anchor_room_id = DBField(default=None)
 
 
 class ScriptedDialogue(Component):
@@ -49,3 +57,5 @@ class ScriptedDialogue(Component):
 
     name = "scripted_dialogue"
     dialogue_key = DBField(default=None)
+    service_binding = DBField(default=None)
+    anchor_room_id = DBField(default=None)

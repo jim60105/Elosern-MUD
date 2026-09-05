@@ -47,8 +47,17 @@ TIERED_PROBE = Profession(
     schedule_template="guard",
     default_tier="human_commoner",
 )
+COURIER_PROBE = Profession(
+    key="courier",
+    components=(ProfessionComponent("scripted_dialogue", "person"),),
+    schedule_template=None,
+    default_tier=None,
+)
 PROBE_TABLE = MappingProxyType(
-    {probe.key: probe for probe in (MERCHANT_PROBE, STAFF_PROBE, TIERED_PROBE)}
+    {
+        probe.key: probe
+        for probe in (MERCHANT_PROBE, STAFF_PROBE, TIERED_PROBE, COURIER_PROBE)
+    }
 )
 
 
@@ -72,8 +81,25 @@ class ProfessionAssemblyHarness(EvenniaTestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
         self.root = Path(self.tempdir.name)
+        # The probe professions are place-bound (mirroring the shipped
+        # rulebook), so every assembled record must name an anchor room the
+        # loader can resolve by tag (service-anchoring D8).
+        from evennia.utils.create import create_object
+        from typeclasses.rooms import Room
+
+        self.anchor_room = create_object(
+            Room, key="assembly anchor", tags=["assembly_anchor"]
+        )
 
     def write(self, name, record):
+        # Every place-bound probe needs its anchor tag to pass the
+        # binding-consistency validator; the injection spares every other
+        # test. Anchor-focused tests use raw_write to author records verbatim.
+        if record.get("profession") and "anchor_room" not in record:
+            record["anchor_room"] = "assembly_anchor"
+        return self.raw_write(name, record)
+
+    def raw_write(self, name, record):
         path = self.root / name
         path.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
         return path
@@ -457,4 +483,95 @@ class ByteIdentityTests(ProfessionAssemblyHarness):
                 },
             ),
             events,
+        )
+
+class AnchorRoomTests(ProfessionAssemblyHarness):
+    """Authored anchor matrix for import records (service-anchoring D8)."""
+
+    def _merchant_record(self, key):
+        record = example_record()
+        record["key"] = key
+        record["profession"] = "merchant"
+        record["components"] = [{"type": "merchant", "kwargs": merchant_kwargs()}]
+        return record
+
+    def _courier_record(self, key):
+        record = example_record()
+        record["key"] = key
+        record["profession"] = "courier"
+        record["components"] = [
+            {"type": "scripted_dialogue", "kwargs": {"dialogue_key": "dock"}}
+        ]
+        return record
+
+    def _rejection_blob(self, record, name):
+        path = self.raw_write(name, record)
+        with self.assertRaises(ImportRejected) as ctx:
+            load_batch([path])
+        return " ".join(
+            f"{issue.field} {issue.message}"
+            for report in ctx.exception.report.records
+            for issue in report.rejections
+        )
+
+    @covers_requirement(
+        "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
+    )
+    def test_place_bound_import_persists_the_resolved_anchor(self):
+        record = self._merchant_record("anchored_merchant")
+        npc = self.assembled(record)
+        component = npc.components.get("merchant")
+        self.assertEqual(component.service_binding, "place")
+        self.assertEqual(component.anchor_room_id, self.anchor_room.pk)
+
+    @covers_requirement(
+        "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
+    )
+    def test_person_bound_import_needs_no_anchor(self):
+        # The courier plan is person-bound: the harness never injects an
+        # anchor for it, and assembly writes binding with no anchor value.
+        record = self._courier_record("plain_courier")
+        path = self.raw_write("plain.json", record)
+        npc = load_batch([path])[0]
+        component = npc.components.get("scripted_dialogue")
+        self.assertEqual(component.service_binding, "person")
+        self.assertIsNone(component.anchor_room_id)
+
+    @covers_requirement(
+        "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
+    )
+    def test_person_plan_carrying_an_anchor_is_rejected_before_construction(self):
+        # The "person carrying an anchor" invalid combination: rejected at
+        # validation (DB-free), before any construction.
+        record = self._courier_record("anchored_courier")
+        record["anchor_room"] = "assembly_anchor"
+        blob = self._rejection_blob(record, "anchored.json")
+        self.assertIn("anchor_room", blob)
+        self.assertFalse(NPC.objects.filter(db_key="anchored_courier").exists())
+
+    @covers_requirement(
+        "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
+    )
+    def test_place_plan_without_an_anchor_is_rejected(self):
+        record = self._merchant_record("unanchored_merchant")
+        blob = self._rejection_blob(record, "unanchored.json")
+        self.assertIn("anchor_room", blob)
+        self.assertFalse(NPC.objects.filter(db_key="unanchored_merchant").exists())
+
+    @covers_requirement(
+        "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
+    )
+    def test_unresolvable_anchor_tag_aborts_the_batch_naming_the_record(self):
+        # Tag EXISTENCE is a load-time fact (validation is DB-free): the tag
+        # passes validation and the in-transaction resolution failure aborts
+        # the all-or-nothing batch naming the record and the tag.
+        record = self._merchant_record("ghost_anchor_merchant")
+        record["anchor_room"] = "no_such_room_tag"
+        path = self.raw_write("ghost.json", record)
+        with self.assertRaises(ValueError) as ctx:
+            load_batch([path])
+        self.assertIn("ghost_anchor_merchant", str(ctx.exception))
+        self.assertIn("no_such_room_tag", str(ctx.exception))
+        self.assertFalse(
+            NPC.objects.filter(db_key="ghost_anchor_merchant").exists()
         )

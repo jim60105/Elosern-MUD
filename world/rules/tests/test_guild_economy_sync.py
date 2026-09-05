@@ -606,6 +606,62 @@ class ServiceHostRosterAuthorityTests(ServiceContentIsolation, EvenniaTestCase):
         return search_object_by_tag(GUILD_HALL_TAG)[0]
 
 
+class ServiceHostBindingConvergenceTests(ServiceContentIsolation, EvenniaTestCase):
+    """Every sync converges binding fields on reused hosts without identity churn."""
+
+    @covers_requirement(
+        "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
+    )
+    def test_repeated_sync_converges_bindings_and_never_recreates_components(self):
+        sync_service_content()
+        guild = NPC.objects.filter(db_key=GUILD_HOST_NAME).first()
+        staff = guild.components.get(GuildStaff.get_component_slot())
+        self.assertEqual(staff.service_binding, "place")
+        self.assertEqual(
+            staff.anchor_room_id, search_object_by_tag(GUILD_HALL_TAG)[0].pk
+        )
+        dialogue = guild.components.get(ScriptedDialogue.get_component_slot())
+        self.assertEqual(dialogue.service_binding, "place")
+        staff_before = (staff.service_id, staff.branch_key)
+        slots_before = sorted(guild.components.db_names)
+        # A second sync on the reused host: bindings stay, identity intact,
+        # the slot is never duplicated.
+        sync_service_content()
+        guild.refresh_from_db()
+        staff2 = guild.components.get(GuildStaff.get_component_slot())
+        self.assertEqual((staff2.service_id, staff2.branch_key), staff_before)
+        self.assertEqual(staff2.service_binding, "place")
+        self.assertEqual(sorted(guild.components.db_names), slots_before)
+
+    @covers_requirement(
+        "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
+    )
+    def test_reuse_backfills_missing_binding_fields_on_legacy_hosts(self):
+        # A host whose components predate the anchoring change carries no
+        # binding fields; the next sync writes them without touching identity
+        # or moving the host.
+        hall = search_object_by_tag(GUILD_HALL_TAG)[0]
+        host = create_object(NPC, key=GUILD_HOST_NAME, location=hall)
+        host.components.add(
+            GuildStaff.create(
+                host,
+                service_id="altoria_guild_master",
+                branch_key="guild_branch_altoria",
+            )
+        )
+        legacy = host.components.get(GuildStaff.get_component_slot())
+        self.assertIsNone(legacy.service_binding)
+        sync_service_content()
+        host.refresh_from_db()
+        backfilled = host.components.get(GuildStaff.get_component_slot())
+        self.assertEqual(backfilled.service_binding, "place")
+        self.assertEqual(
+            backfilled.anchor_room_id, search_object_by_tag(GUILD_HALL_TAG)[0].pk
+        )
+        self.assertEqual(backfilled.branch_key, "guild_branch_altoria")
+        self.assertEqual(host.location, hall)
+
+
 class ServiceContentWithoutInteriorsTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()

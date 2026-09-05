@@ -102,6 +102,21 @@ class GuildCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
         self.char1.location = create_object(Room, key="empty")
         self.call(CmdGuildRegister(), "", "這裡沒有公會服務人員")
 
+    def test_off_anchor_clerk_refuses_with_the_gate_line(self):
+        # A sync-converged place-bound clerk traveling off its anchor is
+        # refused through the command surface with the gate's fixed message
+        # (service-anchoring), never framed as a registration failure.
+        from world.rules.service_gate import MESSAGE_OFF_ANCHOR
+
+        component = self.staff.components.get(GuildStaff.get_component_slot())
+        component.service_binding = "place"
+        component.anchor_room_id = self.hall.pk
+        square = create_object(Room, key="town square")
+        self.staff.location = square
+        self.char1.location = square
+        self.call(CmdGuildRegister(), "", MESSAGE_OFF_ANCHOR)
+        self.assertIsNone(self.char1.db.guild_registration)
+
     def test_ambiguous_staff_rejects(self):
         second = create_object(NPC, key="staff2", location=self.hall)
         second.components.add(

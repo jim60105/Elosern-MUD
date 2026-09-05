@@ -240,6 +240,19 @@ CHARACTER_SCHEMA_V1 = {
                 "profession; only for NPC-targeted imports."
             ),
         },
+        "anchor_room": {
+            "anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}],
+            "description": (
+                "Optional room tag naming the anchor for the record's "
+                "place-bound service components (service-anchoring D2/D8). "
+                "Required exactly when the resolved assembly plan contains a "
+                "place-bound component, forbidden when it contains a "
+                "person-bound one (co-presence carries no anchor), and "
+                "meaningless without a profession. The loader resolves the tag "
+                "inside the import transaction; an unknown tag rejects the "
+                "batch. null or an absent field means no anchor."
+            ),
+        },
     },
     "additionalProperties": False,
 }

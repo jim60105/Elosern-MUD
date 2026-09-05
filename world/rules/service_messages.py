@@ -34,6 +34,7 @@ from world.rules.guild_offers import (
     GuildOfferError,
     GuildOfferNotFound,
 )
+from world.rules.service_gate import MESSAGE_OFF_ANCHOR
 
 # The bounded generic fallback; never carries a traceback or raw payload.
 FALLBACK_CODE = "service_rejected"
@@ -47,6 +48,8 @@ SERVICE_REASON_MESSAGES: dict[str, str] = {
     "no_staff": "這裡沒有公會服務人員。",
     "ambiguous_staff": "這裡有多名公會服務人員。",
     "remote_staff": "公會服務人員不在這裡。",
+    # Shared anchoring-gate refusal; the prose is owned by service_gate.
+    "service_unavailable": MESSAGE_OFF_ANCHOR,
     "already_registered": "你已經是冒險者了。",
     "malformed_registration": "公會資料有誤。",
     "guild_data_error": "公會資料有誤。",

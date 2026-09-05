@@ -251,6 +251,31 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
             start_guild_exam(self.player, far, "E")
         self.assertEqual(ctx.exception.args[0], ExamReason.REMOTE_EXAMINER)
 
+    @covers_requirement(
+        "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself"
+    )
+    def test_off_anchor_examiner_is_refused_before_any_eligibility_write(self):
+        # Emulates a sync-converged place-bound examiner (service-anchoring).
+        component = self.examiner.components.get(
+            GuildExaminer.get_component_slot()
+        )
+        component.service_binding = "place"
+        component.anchor_room_id = self.hall.pk
+        square = create_object(Room, key="exam square")
+        self.examiner.location = square
+        self.player.location = square
+        self._give_merit(50)
+        with self.assertRaises(GuildExamError) as ctx:
+            start_guild_exam(self.player, self.examiner, "E")
+        self.assertEqual(
+            ctx.exception.args[0], ExamReason.SERVICE_UNAVAILABLE
+        )
+        # Nothing was created or granted.
+        self.assertIsNone(read_session(self.player))
+        self.assertFalse(self.examiner.relations.has_record(self.player))
+        self.assertEqual(read_counter_trait(self.player, "guild_merit"), 50)
+        self.assertEqual(self.player.guild_rank, "F")
+
     @covers_requirement("guild-rank-exams::rank-promotion-requires-cumulative-merit-and-exactly-the-next-examination")
     def test_threshold_alone_does_not_promote(self):
         self._give_merit(50)

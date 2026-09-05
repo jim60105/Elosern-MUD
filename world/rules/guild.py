@@ -17,6 +17,7 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff
 from typeclasses.npcs import NPC
 from world.rules.clock import get_world_clock
+from world.rules.service_gate import REASON_REMOTE, service_available
 from world.rules.surfaces import attribute_snapshot
 from world.rules.traits import get_display_value
 
@@ -52,6 +53,9 @@ class RegistrationReason(StrEnum):
     NO_STAFF = "no_staff"
     AMBIGUOUS_STAFF = "ambiguous_staff"
     REMOTE_STAFF = "remote_staff"
+    # Co-located but the shared anchoring gate refused (off-anchor place
+    # staff or malformed stored binding); the line is the gate's message.
+    SERVICE_UNAVAILABLE = "service_unavailable"
     ALREADY_REGISTERED = "already_registered"
     MALFORMED_REGISTRATION = "malformed_registration"
 
@@ -191,19 +195,21 @@ def register_adventurer(
             "guild_rank is set but guild_registration is missing its snapshot"
         )
 
-    if staff is not None and actor.location is not None:
-        if actor.location != staff.location:
-            raise GuildError(RegistrationReason.REMOTE_STAFF)
     if staff is None:
         staff = resolve_local_service_host(actor, GuildStaff)
     if not isinstance(staff, NPC):
         raise GuildError(RegistrationReason.NO_STAFF)
     if not hasattr(staff, "components") or not staff.components.has(GuildStaff.name):
         raise GuildError(RegistrationReason.NO_STAFF)
-    if actor.location is None or staff.location != actor.location:
-        raise GuildError(RegistrationReason.REMOTE_STAFF)
-
     guild_staff = staff.components.get(GuildStaff.get_component_slot())
+    # One availability answer from the shared gate (service-anchoring):
+    # co-location keeps the remote-staff lineage; an off-anchor place-bound
+    # clerk or malformed stored binding refuses with the gate's own reason.
+    verdict = service_available(actor, staff, guild_staff)
+    if not verdict.allowed:
+        if verdict.reason == REASON_REMOTE:
+            raise GuildError(RegistrationReason.REMOTE_STAFF)
+        raise GuildError(RegistrationReason.SERVICE_UNAVAILABLE)
     branch_key = guild_staff.branch_key
     if not isinstance(branch_key, str) or not branch_key:
         raise GuildDataError("GuildStaff component has no branch_key")

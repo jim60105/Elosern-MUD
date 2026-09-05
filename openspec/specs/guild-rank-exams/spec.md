@@ -26,8 +26,12 @@ promotion. Skipping ranks and examining from S SHALL be rejected.
 
 ### Requirement: start_guild_exam is the sole trigger and validates authority itself
 `start_guild_exam(actor, examiner, target_rank, requested_by=...)` SHALL be the only examination-start
-API. It SHALL require co-location, a matching GuildExaminer component, eligibility, and no active combat
-or examination. A successfully started examination SHALL additionally grant +1 affinity (`guild`
+API. It SHALL validate examiner authority through the shared `world/rules/service_gate.py::
+service_available` resolver applied to the examiner's `GuildExaminer` component — a `remote`
+verdict (actor and examiner not co-located) and an `off_anchor` verdict (place-bound examiner
+away from its anchor room) are both refused before any eligibility check, and a
+`malformed_binding` verdict fails closed — SHALL require a matching GuildExaminer component,
+eligibility, and no active combat or examination. A successfully started examination SHALL additionally grant +1 affinity (`guild`
 source) with the examiner through the sole-writer affinity API (`world/rules/affinity.py`), applied
 inside the same atomic block that creates the exam record and combat session (the temporary
 opponent is pre-spawned before any mutation); the examiner's affinity record SHALL join the
@@ -46,6 +50,12 @@ nothing. `requested_by` SHALL be audit metadata and SHALL NOT bypass validation.
 #### Scenario: Duplicate active exam is rejected
 - **WHEN** an actor with an active exam requests another
 - **THEN** no second opponent, record, or session is created and no affinity is granted
+
+#### Scenario: An off-anchor examiner cannot open examinations
+- **WHEN** a place-bound examiner is not in its anchor room and a co-located eligible actor
+  requests the next-rank examination
+- **THEN** the start is refused with the gate's fixed off-anchor message and no exam record,
+  opponent, combat session, merit, affinity, or rank change is created
 
 ### Requirement: Examination start is all-or-nothing across opponent, record, and session
 The exam trigger SHALL preflight all eligibility/profile/spawn inputs, then create the temporary opponent,

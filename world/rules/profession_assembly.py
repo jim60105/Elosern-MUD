@@ -24,6 +24,12 @@ from world.rules.profession_config import PROFESSION_COMPONENT_TYPES, Profession
 # assembly D4: assembly never invents identity values).
 _IDENTITY_KWARGS = frozenset({"service_id", "shop_key", "branch_key", "dialogue_key"})
 
+# The availability-binding fields are ASSEMBLY-OWNED, not authored kwargs: the
+# single writer copies them from the blueprint binding plus the caller's anchor
+# room (service-anchoring D2). Keeping them out of the authored vocabulary is
+# what makes "assembly is the only writer" structurally true.
+_ASSEMBLY_BOUND_FIELDS = frozenset({"service_binding", "anchor_room_id"})
+
 
 class ProfessionAssemblyError(ValueError):
     """A resolved attach plan lacks authored identity kwargs.
@@ -42,9 +48,13 @@ class ProfessionAssemblyError(ValueError):
 
 
 def component_field_names(type_key: str) -> frozenset[str]:
-    """Return the persistent DBField names the vocabulary class defines."""
+    """Return the persistent DBField names the vocabulary class defines.
+
+    The assembly-owned binding fields are excluded: authored kwargs (import
+    records, roster projections) can never set them, only the assembly can.
+    """
     component_class = PROFESSION_COMPONENT_TYPES[type_key]
-    return frozenset(component_class._fields.keys())
+    return frozenset(component_class._fields.keys()) - _ASSEMBLY_BOUND_FIELDS
 
 
 def identity_fields(type_key: str) -> frozenset[str]:
@@ -111,8 +121,30 @@ def project_row_kwargs(
     return projected
 
 
+def plan_bindings(
+    profession: Profession, authored_map: Mapping[str, Mapping[str, Any]]
+) -> dict[str, str]:
+    """Return each planned component type's availability binding.
+
+    Blueprint rows carry the authored ``default_binding`` (validated
+    vocabulary); a component an authored map ADDS beyond the blueprint has no
+    blueprint row to read, so it takes the design-D1 default: co-presence
+    (``person``) is the default and anchoring is the declared exception.
+    """
+    bindings = {
+        component.type_key: component.default_binding
+        for component in profession.components
+    }
+    for type_key in authored_map:
+        bindings.setdefault(type_key, "person")
+    return bindings
+
+
 def assemble_profession_components(
-    entity: Any, profession: Profession, authored_map: Mapping[str, Mapping[str, Any]]
+    entity: Any,
+    profession: Profession,
+    authored_map: Mapping[str, Mapping[str, Any]],
+    anchor_room: Any = None,
 ) -> list[str]:
     """Attach the profession's resolved plan onto ``entity``, fail-closed.
 
@@ -123,6 +155,17 @@ def assemble_profession_components(
     service-host sync has always used — add the class only when the slot is
     free, so assembly never duplicates a component slot. Returns the type keys
     actually attached (an already-present slot contributes nothing).
+
+    After attaching, the assembly converges the authored availability binding
+    on EVERY planned component (new or pre-existing): ``service_binding`` from
+    the blueprint row and ``anchor_room_id`` from ``anchor_room`` for
+    ``place``-bound components — ``person`` components persist no anchor
+    (design D1: an anchored person is an invalid combination). Binding and
+    anchor are authored config re-converged from the blueprint, not runtime
+    identity, so re-writing them for reused components is idempotent
+    convergence and the never-rename/never-retitle contract is untouched.
+    A ``place`` plan without an ``anchor_room`` raises: the caller failed to
+    supply the anchor its blueprint declares.
     """
     plan = resolve_component_plan(profession, authored_map)
     missing = {
@@ -132,10 +175,25 @@ def assemble_profession_components(
     missing = {type_key: fields for type_key, fields in missing.items() if fields}
     if missing:
         raise ProfessionAssemblyError(missing)
+    bindings = plan_bindings(profession, authored_map)
+    if anchor_room is None and any(b == "place" for b in bindings.values()):
+        raise ProfessionAssemblyError(
+            {"profession": ["place-bound components require an anchor room"]}
+        )
     attached: list[str] = []
     for type_key, kwargs in plan:
         component_class = PROFESSION_COMPONENT_TYPES[type_key]
         if not entity.components.has(component_class.name):
             entity.components.add(component_class.create(entity, **kwargs))
             attached.append(type_key)
+    for type_key, _kwargs in plan:
+        component = entity.components.get(
+            PROFESSION_COMPONENT_TYPES[type_key].get_component_slot()
+        )
+        if component is None:  # vocabulary class without a live slot (unreachable)
+            continue
+        component.service_binding = bindings[type_key]
+        component.anchor_room_id = (
+            anchor_room.pk if bindings[type_key] == "place" else None
+        )
     return attached

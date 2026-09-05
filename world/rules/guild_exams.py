@@ -25,6 +25,7 @@ from typeclasses.components import GuildExaminer
 from typeclasses.npcs import NPC, ensure_npc_adult_identity
 from world.rules.guild import parse_guild_registration
 from world.rules.guild_config import get_catalog
+from world.rules.service_gate import REASON_REMOTE, service_available
 from world.rules.surfaces import (
     attribute_snapshot,
     read_counter_trait,
@@ -68,6 +69,9 @@ class ExamReason(StrEnum):
     NOT_A_PLAYER = "not_a_player"
     NO_EXAMINER = "no_examiner"
     REMOTE_EXAMINER = "remote_examiner"
+    # Co-located but the shared anchoring gate refused (off-anchor place
+    # examiner or malformed stored binding); the line is the gate's message.
+    SERVICE_UNAVAILABLE = "service_unavailable"
     UNREGISTERED = "unregistered"
     WRONG_BRANCH = "wrong_branch"
     NOT_NEXT_RANK = "not_next_rank"
@@ -314,9 +318,16 @@ def start_guild_exam(
         raise GuildExamError(ExamReason.NO_EXAMINER)
     if not hasattr(examiner, "components") or not examiner.components.has(GuildExaminer.name):
         raise GuildExamError(ExamReason.NO_EXAMINER)
-    if actor.location is None or examiner.location != actor.location:
-        raise GuildExamError(ExamReason.REMOTE_EXAMINER)
     examiner_component = examiner.components.get(GuildExaminer.get_component_slot())
+    # Examiner authority consults the shared availability gate: a remote
+    # examiner keeps its refusal lineage; an off-anchor place-bound examiner
+    # or malformed stored binding is refused exactly like a remote one
+    # (service-anchoring delta), before any eligibility check or write.
+    verdict = service_available(actor, examiner, examiner_component)
+    if not verdict.allowed:
+        if verdict.reason == REASON_REMOTE:
+            raise GuildExamError(ExamReason.REMOTE_EXAMINER)
+        raise GuildExamError(ExamReason.SERVICE_UNAVAILABLE)
     branch_key = examiner_component.branch_key
     registration = parse_guild_registration(actor)
     if registration["branch_key"] != branch_key:

@@ -142,6 +142,9 @@ class ProfessionSemanticTests(ProfessionSchemaHarness):
                 "kwargs": {"service_id": "silver_scales", "shop_key": "plaza"},
             }
         ]
+        # The probe is place-bound: the authored anchor tag completes the plan
+        # (the validator is DB-free; tag existence is the loader's fact).
+        record["anchor_room"] = "plaza_corner"
         self.assertEqual(self.rejections(record), [])
 
     def test_player_character_target_rejects_a_profession(self):
@@ -155,6 +158,7 @@ class ProfessionSemanticTests(ProfessionSchemaHarness):
                 "kwargs": {"service_id": "s", "shop_key": "b"},
             }
         ]
+        record["anchor_room"] = "plaza_corner"
         issues = validate_character(record, PlayerCharacter).rejections
         blob = " ".join(f"{issue.field} {issue.message}" for issue in issues)
         self.assertIn("PlayerCharacter", blob)
