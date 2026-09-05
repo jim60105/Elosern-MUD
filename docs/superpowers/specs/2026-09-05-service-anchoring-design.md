@@ -100,3 +100,18 @@ control: they pass unmodified except new `off_anchor` cases.
 - Possession (next design), invite-gate changes (D7), new profession content, anchor as a
   gameplay entity (no multiple anchors per host, no anchor relocation surface — a place-bound
   host's anchor is authored, not movable), merchant wallet/purse economics.
+
+## 8. OpenSpec Change Mapping
+
+Lands as changes **4 `service-anchoring-gate`** and **5 `service-anchor-presentation-silence`**,
+after `profession-rulebook-registry` (1) → `profession-import-assembly` (2) →
+`declarative-service-hosts` (3), and before the companion-possession line (6–8). Full batch order
+is serial 1→8; see the profession-registries design §9 for the table.
+
+Amendment recorded during change authoring (rubber-duck review): **D2's per-NPC binding override
+is deliberately deferred** — no shipped content needs a host whose binding disagrees with its
+profession, and the documented traveling-antique-dealer exception is expressible today as its own
+`person`-bound profession row. When a second exception exists, the override travels with the
+roster row and import schema (change 3's surface), not the resolver; change 4's design records the
+deferral. The shared `off_anchor` fixed message was additionally made registry-owned in change 4
+(both consuming deltas cite one constant).

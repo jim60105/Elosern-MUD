@@ -40,7 +40,7 @@ recovery ladder, `retire_sequence`/epoch ordering) are reused wholesale.
 | D5 | **`is_player_driven(entity)` is the one unified predicate** (`world/rules/player_control.py`): true for puppeted `PlayerCharacter` or any NPC with `db.possessed_by`. It replaces the raw `isinstance(PlayerCharacter)` checks in `world/rules/movement.py::charge_movement`, the `commands/skip.py` safety gate, and the `characters.py` room-entry action-options trigger. | The world clock's "advances only on player action" rule (design D4 of the clock line) must keep holding with a puppeted NPC — the predicate widens *who counts as a player actor*, never when time moves. |
 | D6 | **Autonomy silencing while possessed**: `settle_npc_schedules` skips NPCs with `db.possessed_by` (same consumer slot as the R2 traveling-host silence gate); `LLMNPC` dialogue is gated closed against the possessed self; quest-observer companion-credit rules are untouched. | "Possessed = autonomy suspended" is one mechanism with two triggers (party-travel, possession). B still earning A's quest credit is a feature kept by explicit decision, reviewed and ratified in the design walkthrough. |
 | D7 | **Trimmed character cmdset mounts on B during possession** (movement, look, actions, out-of-combat act surface) via the same derive pattern `at_cmdset_get` uses, removed on handback. | Reuses the creation-gate cmdset idiom instead of inventing a second mechanism; keeps full character commands from leaking onto an NPC with stale expectations. |
-| D8 | **Handback is explicit and every exit path is covered**: command surface (歸位) plus automatic release on (a) affinity auto-leave targeting B — release first, then leave, inside the same transaction, (b) session loss / disconnect via `at_post_unpuppet`, (c) possession-into-full-party or other gate failures never enter state. | Possession must never survive its preconditions; the auto-leave ordering prevents a released-too-late or left-but-still-puppeted hybrid. |
+| D8 | **Handback is explicit and every exit path is covered**: command surface (歸位) plus automatic release on (a) affinity auto-leave targeting B — release first, then leave, release-then-commit (the release cannot join the affinity DB transaction atomically because puppet side effects are not transactional; a failed release aborts before any delta is written), (b) session loss / disconnect via `Account.at_post_disconnect` (amended during change authoring: `at_post_unpuppet` fires on EVERY deliberate unpuppet in Evennia 6.1 — including possession's own release of A — so wiring cleanup there would clear fresh mirrors mid-possession; `at_post_disconnect` fires only from `ServerSession.disconnect()`), (c) possession-into-full-party or other gate failures never enter state. | Possession must never survive its preconditions; the auto-leave ordering prevents a released-too-late or left-but-still-puppeted hybrid. |
 | D9 | **v1 presentation is honest hybrid**: actor re-points through the established epoch-reset transition; panels keep rendering **A's** wallet/quests/guild (NPCs own none of those fields) under a persistent banner 「你透過 B 的雙眼行動」; B's inventory/equipment render from **B's real attributes** (`toggle_equipment` already works on any `LivingEntity`); PartyDrawer gains `explore.possess` / `explore.possess_release` affordances. | The read-model adapters for NPC-owned panels are the last genuinely new work; deferring them keeps v1 shippable while everything B actually has already displays truthfully. |
 | D10 | **v1 refusals, each a fixed message**: shop buy/sell while possessed (A's wallet may not be spent by B's hands — a later change may design purses), combat entry, initiating dialogue as B. | Each refusal is a spec scenario, not debt; the economy/combat surfaces involve PC-keyed state that possession must not silently launder. |
 
@@ -75,8 +75,8 @@ step restores both mirror attributes through the party-core restore helper.
 |---|---|
 | `puppet_object` silent refusal mid-enter | Verify-then-recover ladder (multichar §11): attempt explicit re-puppet of A, end at an error-level log + 「你目前未附身任何角色，請使用「進入世界」」 — never a half-state |
 | Mirror write fails after puppet | Unpuppet back to A (restore ladder), raise `PossessionWriteError`, gates re-checked fresh on next try |
-| B auto-leaves (affinity < 70) while possessed | Same-transaction release then `leave_party`; notification after commit, per the affinity writer's caller-notify contract |
-| Session drops | `at_post_unpuppet` releases possession; B's attributes/schedule resume on the next settlement tick |
+| B auto-leaves (affinity < 70) while possessed | Release runs and commits BEFORE the affinity/party atomic opens (release-then-commit); notification after commit, per the affinity writer's caller-notify contract; a failed release leaves everything untouched |
+| Session drops | `Account.at_post_disconnect` releases possession; B's attributes/schedule resume on the next settlement tick |
 | B deleted while possessed | Entry gate requires a live bound companion; the deletion purge unwinds bindings — D8(b) session loss fires alongside and releases the puppet |
 | Server reload mid-possession | Persisted mirror attributes + Evennia's session restore resume the possession; nothing possession-specific needs reload handling |
 
@@ -100,3 +100,13 @@ step restores both mirror attributes through the party-core restore helper.
 - PC↔PC party membership (rejected route), possession of monsters or unbound NPCs, possession
   in combat, NPC-owned wallet/quest panels, purse/economy transfer while possessed, dialogue as
   B, multi-possession, GM/admin remote-view tooling.
+
+## 8. OpenSpec Change Mapping
+
+Lands as the possession line **6 `companion-possession-rules` → 7
+`companion-possession-transition` → 8 `companion-possession-webclient`**, after the profession
+line (1–3) and the anchoring line (4–5). Full batch order is serial 1→8; the table lives in the
+profession-registries design §9. Amendments from the pre-handoff rubber-duck review are woven
+into D5 (release-then-commit wording is in D8) and D8/§5 (`Account.at_post_disconnect` replaces
+`at_post_unpuppet` as the disconnect hook); the epoch bump is owned by
+`reset_client_sequence` (transition change D-T1).

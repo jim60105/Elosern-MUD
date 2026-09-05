@@ -159,3 +159,28 @@ change; its anchoring semantics arrive with the service-anchoring design.)
 - Professionizing AI blueprint NPCs (D3).
 - Any possession mechanics (companion-possession design).
 - New profession content beyond the three replicated service professions.
+
+## 9. OpenSpec Change Mapping
+
+This design lands as changes **R1 `profession-rulebook-registry` → R2
+`profession-import-assembly` → R3 `declarative-service-hosts`** (numbers below), plus the
+anchoring/presentation/possession line owned by the sibling designs:
+
+| # | Change | Source |
+|---|---|---|
+| 1 | `profession-rulebook-registry` | this design §3–§4, D1–D6 |
+| 2 | `profession-import-assembly` | this design §4, D4/D7 |
+| 3 | `declarative-service-hosts` | this design §5, D7–D9 |
+| 4 | `service-anchoring-gate` | service-anchoring design D1–D4 |
+| 5 | `service-anchor-presentation-silence` | service-anchoring design §4, D5–D7 |
+| 6 | `companion-possession-rules` | companion-possession design D1–D8 |
+| 7 | `companion-possession-transition` | companion-possession design D3/D7, §3/§5 |
+| 8 | `companion-possession-webclient` | companion-possession design D9/D10 |
+
+**Implementation batch order: fully serial `1 → 2 → 3 → 4 → 5 → 6 → 7 → 8`.**
+Reviewed in the pre-handoff rubber-duck pass: every candidate parallel wave was rejected — 3
+consumes 2's assembly helper; 4 reads 3's roster anchor fields and shared assembly; 5 renders 4's
+verdict vocabulary on the same gate module; 6 needs 5's `schedule_silenced`; the possession line
+(7, 8) layers on 6. There is no safe overlap; `tmp/propose.md`'s one-at-a-time rule matches the
+graph. Sizing notes in each proposal record the intra-change landing order if a slice exceeds one
+engineer day.
