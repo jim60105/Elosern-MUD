@@ -139,3 +139,92 @@ def service_available(actor: Any, host: Any, component: Any) -> ServiceVerdict:
     if anchor_pk != anchor_room_id:
         return _OFF_ANCHOR
     return _ALLOWED
+
+
+def off_anchor_place_service(npc: Any) -> str | None:
+    """Name the npc's place-bound service component that strands it, if any.
+
+    Returns the component class name of the first ``place``-bound service
+    component whose resolved anchor room does NOT cover the npc's current
+    location — or ``None`` when no such component exists. Exact legs, in
+    cost order:
+
+    1. a BOUND party companion (design 2026-09-05-service-anchoring D6):
+       the cheap raw ``npc.db.party_member`` mirror read gates the leg, and
+       the party module's authoritative ``bound_owner_of`` verifies it — a
+       stale, non-reciprocated, or dead-owner back-reference is NOT a
+       binding, so a corrupt leftover can never silence an NPC that no
+       longer travels with anyone. One membership interpretation, owned by
+       the party module (the same safe read ``typeclasses/npcs.py`` uses).
+    2. the npc carries at least one component with persisted
+       ``service_binding == "place"`` — component classes are imported
+       function-locally from ``typeclasses.components`` (this module never
+       imports ``profession_config``; it reads components, never the table).
+    3. the component's anchor does not cover the npc's current room. An
+       UNRESOLVABLE anchor (corrupt id, deleted or non-room row) counts as
+       off-anchor here: unlike the interaction resolver this predicate
+       guards a POLICY (skip settlement), where failing closed silences a
+       schedule rather than letting it teleport a companion away from the
+       party. A ``None`` location likewise reads as off-anchor — the
+       predicate is total and never raises.
+
+    Multiple place-bound components with differing anchors is unreachable
+    in authored data (one anchor per profession record); the rule is pinned
+    as "any place-bound component off its anchor strands the npc".
+    """
+    from typeclasses.components import (
+        GuildExaminer,
+        GuildStaff,
+        Merchant,
+        ScriptedDialogue,
+    )
+    from world.rules.party import bound_owner_of
+
+    db = getattr(npc, "db", None)
+    if db is None or db.party_member is None:
+        return None
+    if bound_owner_of(npc) is None:
+        return None
+    components = getattr(npc, "components", None)
+    if components is None:
+        return None
+    location_pk = getattr(getattr(npc, "location", None), "pk", None)
+    for component_class in (GuildStaff, GuildExaminer, Merchant, ScriptedDialogue):
+        if not components.has(component_class.name):
+            continue
+        component = components.get(component_class.get_component_slot())
+        if component is None:  # vocabulary class without a live slot
+            continue
+        if getattr(component, "service_binding", None) != "place":
+            continue
+        anchor_room_id = getattr(component, "anchor_room_id", None)
+        if isinstance(anchor_room_id, bool) or not isinstance(anchor_room_id, int):
+            return component_class.name  # corrupt anchor strands (fail closed)
+        # Room-typed existence check, the service_available idiom: the
+        # ObjectDB row converts to the stored typeclass, so a non-room row
+        # is corrupt; a plain Room.objects filter would blind subclasses.
+        from evennia.objects.models import ObjectDB
+        from typeclasses.rooms import Room
+
+        anchor_row = next(iter(ObjectDB.objects.filter(pk=anchor_room_id)), None)
+        if anchor_row is None or not isinstance(anchor_row, Room):
+            return component_class.name  # unresolvable anchor strands
+        if location_pk != anchor_room_id:
+            return component_class.name
+    return None
+
+
+def schedule_silenced(npc: Any) -> bool:
+    """Whether the npc's authored schedule must settle NOTHING this window.
+
+    True iff the npc is a bound party companion carrying a ``place``-bound
+    service component outside its anchor room: the traveling clerk keeps
+    walking with the party instead of being teleported back to the
+    storefront mid-shift (design 2026-09-05-service-anchoring D6). Skipped
+    windows are tolerated by the settlement's boundary arithmetic, so
+    returning to the anchor (e.g. dismissal there) resumes settlement
+    normally. This is the SINGLE gate slot where the companion-possession
+    change will OR in its second trigger (possessed NPCs go silent too);
+    callers never re-decide silence at the call site.
+    """
+    return off_anchor_place_service(npc) is not None
