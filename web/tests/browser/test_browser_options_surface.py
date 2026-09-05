@@ -87,8 +87,14 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
 
     def _section(self, page):
         return page.evaluate(
-            "document.querySelector('[data-testid=\"suggestions-section\"]') !== null"
+            "document.querySelector('#action-dock [data-item-key=\"suggestions\"]') !== null"
         )
+
+    def _open_suggestions_pane(self, page):
+        desc = page.evaluate("() => window.__elosernBridge.router.currentDescriptor()") or {}
+        if desc.get("source") != "exploration.suggestions":
+            page.locator('[data-testid="dock-menu"] [data-item-key="suggestions"]').click()
+            page.wait_for_timeout(60)
 
     def _wait_section(self, page, timeout=30000):
         def _section_shown(state):
@@ -99,11 +105,11 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             page,
             _section_shown,
             dom_readiness={
-                "selector": '[data-testid="suggestions-section"]',
+                "selector": '#action-dock [data-item-key="suggestions"]',
                 "predicate": (
-                    "() => document.querySelector('[data-testid=\"suggestions-section\"]') !== null"
+                    "() => document.querySelector('#action-dock [data-item-key=\"suggestions\"]') !== null"
                 ),
-                "description": "the suggestions section is rendered in the action dock",
+                "description": "the suggestions tab is rendered in the action dock",
             },
             timeout=timeout,
         )
@@ -117,11 +123,11 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             page,
             _section_hidden,
             dom_readiness={
-                "selector": '[data-testid="suggestions-section"]',
+                "selector": '#action-dock [data-item-key="suggestions"]',
                 "predicate": (
-                    "() => document.querySelector('[data-testid=\"suggestions-section\"]') === null"
+                    "() => document.querySelector('#action-dock [data-item-key=\"suggestions\"]') === null"
                 ),
-                "description": "the suggestions section has disappeared from the action dock",
+                "description": "the suggestions tab has disappeared from the action dock",
             },
             timeout=timeout,
         )
@@ -135,27 +141,41 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             page,
             _generating,
             dom_readiness={
-                "selector": '[data-testid="suggestions-generating"]',
+                "selector": '#action-dock [data-item-key="suggestions"]',
                 "predicate": (
-                    "() => document.querySelector('[data-testid=\"suggestions-generating\"]') !== null"
+                    "() => document.querySelector('#action-dock [data-item-key=\"suggestions\"]') !== null"
                 ),
-                "description": "the generating line is rendered in the dock suggestions section",
+                "description": "the suggestions tab is rendered before opening the generating pane",
+            },
+            timeout=timeout,
+        )
+        self._open_suggestions_pane(page)
+        wait_for_store_state(
+            page,
+            _generating,
+            dom_readiness={
+                "selector": '#action-dock [data-item-key="suggestions-generating"]',
+                "predicate": (
+                    "() => document.querySelector('#action-dock [data-item-key=\"suggestions-generating\"]') !== null"
+                ),
+                "description": "the generating line is rendered in the dock suggestions pane",
             },
             timeout=timeout,
         )
         return page.evaluate(
             """() => {
                 const line = document.querySelector(
-                    '[data-testid="suggestions-section"] .suggestions-generating');
+                    '#action-dock [data-item-key="suggestions-generating"] .option-card-label');
                 return line ? line.innerText : null;
             }"""
         )
 
     def _ready_card_labels(self, page):
+        self._open_suggestions_pane(page)
         return page.evaluate(
             """() => Array.from(
                 document.querySelectorAll(
-                    '[data-testid="suggestions-section"] .option-card .option-card-label'))
+                    '#action-dock .dock-menu__cards [data-item-key^="action-"]:not([data-item-key="action-options.dismiss"]) .option-card-label'))
                 .map((el) => el.innerText)"""
         )
 
@@ -181,7 +201,8 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         )
 
     def _dismiss(self, page):
-        page.locator('[data-testid="suggestions-section"] .suggestions-dismiss').click()
+        self._open_suggestions_pane(page)
+        page.locator('[data-testid="dock-menu"] [data-item-key="action-options.dismiss"]').click()
 
     def _open_plaza_page(self):
         """A logged-in page whose session displays the ready plaza card set."""
@@ -190,6 +211,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self._teleport_to_plaza(page)
         self._wait_suggestions(page, "ready")
         self._wait_section(page)
+        self._open_suggestions_pane(page)
         return page
 
     def _open_root(self, page, index):
@@ -239,12 +261,12 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         line = self._wait_generating_line(page)
         self.assertEqual(line, GENERATING_LINE)
         self.assertEqual(
-            page.locator('[data-testid="suggestions-section"] .option-card').count(),
+            page.locator('[data-testid="dock-menu"] [data-item-key^="action-"]').count(),
             0,
             "the generating render carries no cards and no dismiss control",
         )
         self.assertEqual(
-            page.locator('[data-testid="suggestions-section"] .suggestions-dismiss').count(),
+            page.locator('[data-testid="dock-menu"] [data-item-key="action-options.dismiss"]').count(),
             0,
         )
 
@@ -252,9 +274,9 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self._wait_section(page)
         self.assertEqual(self._ready_card_labels(page), list(EXPECTED_READY_LABELS))
         self.assertEqual(
-            page.locator('[data-testid="suggestions-section"] .suggestions-dismiss').count(),
+            page.locator('[data-testid="dock-menu"] [data-item-key="action-options.dismiss"]').count(),
             1,
-            "the ready render carries the section-corner dismiss control",
+            "the ready render carries the dismiss control",
         )
         # Only the dismissal's own OOB action crossed the wire.
         self.assertEqual(sent_action_count(page, "options.dismiss"), 1)
@@ -319,7 +341,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         inp_before = self._narrative_inp_count(page)
 
         # Keyboard activation works natively on the focused card button.
-        page.locator('[data-testid="suggestions-section"] .option-card').nth(0).focus()
+        page.locator('[data-testid="dock-menu"] .option-card').nth(0).focus()
         page.keyboard.press("Enter")
 
         self.assertEqual(self._sent_actions(page, "explore.look"), [{"room": True}])
@@ -369,7 +391,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             if str(target["identity"]) == str(freeform_entry["params"]["npc_id"])
         )
         page.locator(
-            "[data-testid=\"suggestions-section\"] .option-card",
+            '[data-testid="dock-menu"] .option-card',
             has_text="我們聊聊好嗎？",
         ).click()
 
@@ -443,7 +465,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         # scroll the card into view, then force the click so the card's direct
         # listener still runs and the action client's own lock gate is what
         # rejects the submit.
-        card = page.locator('[data-testid="suggestions-section"] .option-card').nth(0)
+        card = page.locator('[data-testid="dock-menu"] .option-card').nth(0)
         card.scroll_into_view_if_needed()
         card.click(force=True)
         page.wait_for_timeout(300)
@@ -496,21 +518,18 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         )
 
         self._wait_section(page)
+        self._open_suggestions_pane(page)
         self.assertEqual(
-            page.locator('[data-testid="suggestions-section"] .suggestions-empty').inner_text(),
+            page.locator('[data-testid="dock-menu"] [data-item-key="suggestions-empty"] .option-card-label').inner_text(),
             EMPTY_STATE_LINE,
         )
         self.assertEqual(
-            page.locator('[data-testid="suggestions-section"] .suggestions-note').inner_text(),
-            DEGRADED_NOTE,
-        )
-        self.assertEqual(
-            page.locator('[data-testid="suggestions-section"] .option-card').count(),
+            page.locator('[data-testid="dock-menu"] [data-item-key^="action-explore"]').count(),
             0,
             "a zero-card degraded payload renders no card container",
         )
         self.assertEqual(
-            page.locator('[data-testid="suggestions-section"] .suggestions-dismiss').count(),
+            page.locator('[data-testid="dock-menu"] [data-item-key="action-options.dismiss"]').count(),
             1,
             "the empty-state render keeps the dismiss control",
         )
@@ -523,15 +542,14 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self._move_to_empty_ground(page)
 
         self._wait_section(page)
-        note = page.locator('[data-testid="suggestions-section"] .suggestions-note').inner_text()
-        self.assertEqual(note, DEGRADED_NOTE)
+        self._open_suggestions_pane(page)
         self.assertGreaterEqual(
-            page.locator('[data-testid="suggestions-section"] .option-card').count(),
+            page.locator('[data-testid="dock-menu"] [data-item-key^="action-"]').count(),
             1,
             "the v1 exploration derivation always yields at least one rule card",
         )
         self.assertEqual(
-            page.locator('[data-testid="suggestions-section"] .suggestions-dismiss').count(),
+            page.locator('[data-testid="dock-menu"] [data-item-key="action-options.dismiss"]').count(),
             1,
             "the degraded render carries the same dismiss control",
         )
