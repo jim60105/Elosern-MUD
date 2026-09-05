@@ -24,6 +24,8 @@ from web.webclient.actions.exploration_actions import (
     validate_move_payload,
     validate_party_invite_payload,
     validate_party_leave_payload,
+    validate_possess_payload,
+    validate_possess_release_payload,
     validate_talk_scripted_payload,
     validate_wait_payload,
 )
@@ -66,6 +68,8 @@ _ACTION_PAYLOAD_VALIDATORS = {
     "explore.party_leave": validate_party_leave_payload,
     "explore.engage": validate_engage_payload,
     "explore.wait": validate_wait_payload,
+    "explore.possess": validate_possess_payload,
+    "explore.possess_release": validate_possess_release_payload,
 }
 
 
@@ -85,7 +89,11 @@ def _validate_affordance_params(action_id: str, params: Any) -> dict[str, Any]:
     if action_id == "explore.talk_freeform":
         _require_exact_fields(params, "freeform params", {"npc_id"}, {})
         return {"npc_id": _require_int(params, "npc_id", minimum=1, maximum=MAX_SAFE_INTEGER)}
-    validator = _ACTION_PAYLOAD_VALIDATORS[action_id]
+    validator = _ACTION_PAYLOAD_VALIDATORS.get(action_id)
+    if validator is None:
+        raise ProtocolValidationError(
+            f"unregistered action code for payload validation: {action_id}"
+        )
     try:
         return validator(params)
     except ExplorationActionError as error:

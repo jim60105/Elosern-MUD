@@ -138,6 +138,8 @@
     "explore.party_leave",
     "explore.engage",
     "explore.wait",
+    "explore.possess",
+    "explore.possess_release",
   ];
   var CONTEXT_ACTIONS_SURFACES = ["guild", "shop"];
   var CONTEXT_ACTIONS_DAYPARTS = ["midnight", "dawn", "noon", "dusk"];
@@ -1161,6 +1163,11 @@
     if (actionId === "explore.engage") {
       requireExactFields(params, "engage params", ["monster_id"], []);
       requireInt(params.monster_id, "monster_id", 1, MAX_SAFE_INTEGER);
+      return params;
+    }
+    if (actionId === "explore.possess" || actionId === "explore.possess_release") {
+      requireExactFields(params, actionId + " params", ["npc_id"], []);
+      requireInt(params.npc_id, "npc_id", 1, MAX_SAFE_INTEGER);
       return params;
     }
     if (actionId === "explore.wait") {
@@ -3093,6 +3100,8 @@
     "explore.party_invite",
     "explore.party_leave",
     "explore.engage",
+    "explore.possess",
+    "explore.possess_release",
   ];
   var EXPLORATION_SURFACES = ["guild", "shop"];
   var EXPLORATION_ENTITY_KINDS = ["character", "npc", "monster"];
@@ -5250,6 +5259,7 @@
     validateCharacterBreakdownLayer: validateCharacterBreakdownLayer,
     validateCharacterActiveSkillRow: validateCharacterActiveSkillRow,
     validateContextActionsPanel: validateContextActionsPanel,
+    validateContextActionsAffordanceParams: validateContextActionsAffordanceParams,
     validateSuggestions: validateSuggestions,
     validateSuggestionCard: validateSuggestionCard,
     OPTIONS_STATUSES: OPTIONS_STATUSES.slice(),
