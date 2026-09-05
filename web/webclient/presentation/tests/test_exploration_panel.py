@@ -1154,6 +1154,85 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(node_id_for_location(None))
         self.assertFalse(hasattr(module, "_destination_node"))
 
+    @covers_requirement(
+        "webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
+    def test_exploration_action_ids_derived_from_shared_allowlist(self):
+        from web.webclient.presentation.affordances import ACTION_CODE_ALLOWLIST
+        from web.webclient.presentation.exploration import ACTION_IDS
+
+        self.assertIs(ACTION_IDS, ACTION_CODE_ALLOWLIST)
+        self.assertEqual(set(ACTION_IDS), set(ACTION_CODE_ALLOWLIST))
+
+    @covers_requirement(
+        "webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
+    def test_bound_companion_renders_both_panels_with_possession_affordances(self):
+        from unittest.mock import patch
+        from world.rules.party import join_party
+        from world.rules.possession import enter_possession, release_possession
+
+        companion = create_object(LLMNPC, key="同伴測試", location=self.south_gate)
+        join_party(companion, self.player)
+
+        context = _context(self.player)
+
+        # Phase 1: Unpossessed state
+        with patch("web.webclient.presentation.registry.log_error") as mock_log:
+            exploration_payload = self._registry().render("exploration", context)
+            context_payload = self._registry().render("context_actions", context)
+            mock_log.assert_not_called()
+
+        self.assertTrue(exploration_payload["available"])
+        self.assertEqual(exploration_payload["kind"], "exploration")
+        self.assertTrue(context_payload["available"])
+        self.assertEqual(context_payload["kind"], "exploration")
+
+        # Exploration panel interact target has explore.possess
+        companion_target = next(
+            (t for t in exploration_payload["interact"] if t["identity"] == int(companion.pk)),
+            None,
+        )
+        self.assertIsNotNone(companion_target, "Bound companion must appear in interact targets")
+        possess_affordance = next(
+            (a for a in companion_target["affordances"] if a.get("action_id") == "explore.possess"),
+            None,
+        )
+        self.assertIsNotNone(possess_affordance, "Companion must carry explore.possess affordance")
+        self.assertEqual(possess_affordance["label"], "附身")
+        self.assertTrue(possess_affordance["enabled"])
+
+        # Context actions panel has explore.possess
+        ctx_possess = next(
+            (a for a in context_payload["affordances"] if a.get("action_id") == "explore.possess"),
+            None,
+        )
+        self.assertIsNotNone(ctx_possess, "Context actions must carry explore.possess affordance")
+        self.assertEqual(ctx_possess["params"], {"npc_id": int(companion.pk)})
+
+        # Phase 2: Possessed state (proves release affordance path)
+        enter_possession(self.player, companion)
+        try:
+            possessed_context = _context(companion)
+            with patch("web.webclient.presentation.registry.log_error") as mock_log_poss:
+                possessed_ctx_payload = self._registry().render("context_actions", possessed_context)
+                possessed_exp_payload = self._registry().render("exploration", possessed_context)
+                mock_log_poss.assert_not_called()
+
+            self.assertTrue(possessed_ctx_payload["available"])
+            self.assertTrue(possessed_exp_payload["available"])
+
+            release_affordance = next(
+                (a for a in possessed_ctx_payload["affordances"] if a.get("action_id") == "explore.possess_release"),
+                None,
+            )
+            self.assertIsNotNone(release_affordance, "Possessed actor must receive explore.possess_release affordance")
+            self.assertEqual(release_affordance["params"], {"npc_id": int(companion.pk)})
+            self.assertEqual(release_affordance["label"], "歸位")
+            self.assertTrue(release_affordance["enabled"])
+        finally:
+            release_possession(self.player, npc=companion, reason="handback")
+
 
 class OffAnchorNavigationPanelTests(BattlefieldIsolation, EvenniaTestCase):
     """The v1 panel serializer carries the disabled navigate descriptor.

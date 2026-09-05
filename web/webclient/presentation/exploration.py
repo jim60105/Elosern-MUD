@@ -26,6 +26,7 @@ from typing import Any
 
 from web.webclient.presentation import affordances as affordances_module
 from web.webclient.presentation.affordances import (
+    ACTION_CODE_ALLOWLIST,
     MAX_AFFORDANCES,
     MAX_DISPLAY_NAME_CODE_POINTS,
     MAX_EXIT_REF_CHARS,
@@ -80,14 +81,7 @@ MAX_KIND_CODE_POINTS = 32
 MAX_REASON_MESSAGE_CODE_POINTS = 128
 
 ACTION_KINDS = ("action", "navigate")
-ACTION_IDS = (
-    "explore.talk_scripted",
-    "explore.talk_freeform",
-    "explore.party_invite",
-    "explore.party_leave",
-    "explore.engage",
-    "explore.possess",
-)
+ACTION_IDS = ACTION_CODE_ALLOWLIST
 SURFACES = ("guild", "shop")
 ENTITY_KINDS = ("character", "npc", "monster")
 

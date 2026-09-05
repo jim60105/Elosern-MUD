@@ -17,6 +17,7 @@ from typing import Any
 from twisted.internet.defer import Deferred
 
 from web.webclient.actions.node_ids import node_id_for_location
+from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
 from world.rules.affinity import AFFINITY_DAILY_CAP_HINT
 from world.rules.clock import DaypartError, get_world_clock, seconds_until_daypart
 from world.rules.combat_session import CombatSessionError, SessionReason, engage
@@ -94,6 +95,8 @@ def _require_node_id(value: Any, field: str) -> str:
 def _require_positive_int(value: Any, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise ExplorationActionError(f"{field} must be a positive integer")
+    if value > MAX_SAFE_INTEGER:
+        raise ExplorationActionError(f"{field} exceeds the maximum safe integer")
     return value
 
 

@@ -2154,5 +2154,88 @@ class OptionsSnapshotFactoryTests(unittest.TestCase):
         self.assertEqual(card.as_dict()["params"], {"room": True})
 
 
+class ActionPayloadValidatorsLockstepTests(unittest.TestCase):
+    """Totality and lockstep tests for affordance payload validation (possession-validator-lockstep)."""
+
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-5-panel")
+    def test_action_payload_validators_covers_allowlist(self):
+        from web.webclient.presentation.affordances import ACTION_CODE_ALLOWLIST
+        from web.webclient.presentation.options import (
+            FREEFORM_ACTION_CODE,
+            _ACTION_PAYLOAD_VALIDATORS,
+            _validate_affordance_params,
+        )
+
+        expected_registered = set(ACTION_CODE_ALLOWLIST) - {FREEFORM_ACTION_CODE}
+        registered_set = set(_ACTION_PAYLOAD_VALIDATORS.keys())
+        self.assertTrue(
+            registered_set >= expected_registered,
+            f"Missing payload validators for: {expected_registered - registered_set}",
+        )
+        # Every code in the allowlist is known to _validate_affordance_params
+        for code in ACTION_CODE_ALLOWLIST:
+            try:
+                _validate_affordance_params(code, {})
+            except Exception as exc:
+                self.assertNotIn("unregistered action code", str(exc))
+
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-5-panel")
+    def test_unregistered_action_code_payload_validation_rejects_cleanly(self):
+        from web.webclient.presentation.options import _validate_affordance_params
+        from web.webclient.presentation.protocol import ProtocolValidationError
+
+        with self.assertRaises(ProtocolValidationError) as ctx:
+            _validate_affordance_params("explore.unregistered_bogus", {"npc_id": 1})
+        self.assertIn("explore.unregistered_bogus", str(ctx.exception))
+
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-5-panel")
+    def test_suggestion_params_validation_for_possession_codes(self):
+        from web.webclient.presentation.options import _validate_suggestion_params
+        from web.webclient.presentation.protocol import MAX_SAFE_INTEGER, ProtocolValidationError
+
+        for action_code in ("explore.possess", "explore.possess_release"):
+            # Valid canonical card params
+            result = _validate_suggestion_params(action_code, "known_action", {"npc_id": 42})
+            self.assertEqual(result, {"npc_id": 42})
+
+            # Boundary MAX_SAFE_INTEGER
+            result_max = _validate_suggestion_params(
+                action_code, "known_action", {"npc_id": MAX_SAFE_INTEGER}
+            )
+            self.assertEqual(result_max, {"npc_id": MAX_SAFE_INTEGER})
+
+            # Malformed payloads must raise ProtocolValidationError, never KeyError
+            for bad_payload in (
+                {},
+                {"npc_id": 0},
+                {"npc_id": -1},
+                {"npc_id": "42"},
+                {"npc_id": True},
+                {"npc_id": 1, "extra": True},
+                {"npc_id": MAX_SAFE_INTEGER + 1},
+            ):
+                with self.assertRaises(
+                    ProtocolValidationError,
+                    msg=f"Expected {action_code} with {bad_payload} to raise ProtocolValidationError",
+                ):
+                    _validate_suggestion_params(action_code, "known_action", bad_payload)
+
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-5-panel")
+    def test_possession_validators_boundary_enforcement(self):
+        from web.webclient.actions.exploration_actions import (
+            ExplorationActionError,
+            validate_possess_payload,
+            validate_possess_release_payload,
+        )
+        from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
+
+        for validator in (validate_possess_payload, validate_possess_release_payload):
+            # Safe boundary
+            self.assertEqual(validator({"npc_id": MAX_SAFE_INTEGER}), {"npc_id": MAX_SAFE_INTEGER})
+            # Overflow boundary
+            with self.assertRaises(ExplorationActionError):
+                validator({"npc_id": MAX_SAFE_INTEGER + 1})
+
+
 if __name__ == "__main__":
     unittest.main()

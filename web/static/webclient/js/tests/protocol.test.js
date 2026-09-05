@@ -3808,6 +3808,125 @@ test("party invite and leave affordances are closed exploration actions", () => 
   );
 });
 
+test("possession affordances are closed exploration and context actions with exact npc_id params", () => {
+  // update on vocabulary change: ACTION_CODE_ALLOWLIST in web/webclient/presentation/affordances.py
+  const EXPECTED_ACTION_CODES = [
+    "explore.move",
+    "explore.look",
+    "explore.talk_scripted",
+    "explore.talk_freeform",
+    "explore.party_invite",
+    "explore.party_leave",
+    "explore.engage",
+    "explore.wait",
+    "explore.possess",
+    "explore.possess_release",
+  ];
+  assert.deepEqual(Protocol.CONTEXT_ACTIONS_ACTION_CODES, EXPECTED_ACTION_CODES);
+
+  const EXPECTED_EXPLORATION_ACTION_IDS = [
+    "explore.talk_scripted",
+    "explore.talk_freeform",
+    "explore.party_invite",
+    "explore.party_leave",
+    "explore.engage",
+    "explore.possess",
+    "explore.possess_release",
+  ];
+  assert.deepEqual(Protocol.EXPLORATION_ACTION_IDS, EXPECTED_EXPLORATION_ACTION_IDS);
+
+  for (const actionId of ["explore.possess", "explore.possess_release"]) {
+    // Valid vectors through params validator
+    assert.deepEqual(
+      Protocol.validateContextActionsAffordanceParams(actionId, { npc_id: 1 }),
+      { npc_id: 1 }
+    );
+    assert.deepEqual(
+      Protocol.validateContextActionsAffordanceParams(actionId, { npc_id: 42 }),
+      { npc_id: 42 }
+    );
+    assert.deepEqual(
+      Protocol.validateContextActionsAffordanceParams(actionId, { npc_id: Protocol.MAX_SAFE_INTEGER }),
+      { npc_id: Protocol.MAX_SAFE_INTEGER }
+    );
+
+    // Invalid vectors through params validator
+    const invalidParams = [
+      {},
+      { npc_id: 0 },
+      { npc_id: -1 },
+      { npc_id: 1.5 },
+      { npc_id: "42" },
+      { npc_id: true },
+      { npc_id: null },
+      { npc_id: 1, extra: "junk" },
+      { npc_id: Protocol.MAX_SAFE_INTEGER + 1 },
+      "not an object",
+      null,
+      [1],
+    ];
+    for (const bad of invalidParams) {
+      assert.throws(
+        () => Protocol.validateContextActionsAffordanceParams(actionId, bad),
+        undefined,
+        `Expected ${actionId} with ${JSON.stringify(bad)} to throw`
+      );
+    }
+
+    // Drive real context_actions exploration panel validation
+    const label = actionId === "explore.possess" ? "附身" : "歸位";
+    const panel = validContextActionsExplorationPanel({
+      affordances: [
+        {
+          action_id: actionId,
+          label,
+          params: { npc_id: 5 },
+          freeform: false,
+          navigation: false,
+          enabled: true,
+          disabled_reason: null,
+        },
+      ],
+    });
+    assert.doesNotThrow(() => Protocol.validateContextActionsPanel(panel));
+
+    // Malformed params in panel must reject
+    const badPanel = validContextActionsExplorationPanel({
+      affordances: [
+        {
+          action_id: actionId,
+          label,
+          params: { npc_id: 0 },
+          freeform: false,
+          navigation: false,
+          enabled: true,
+          disabled_reason: null,
+        },
+      ],
+    });
+    assert.throws(() => Protocol.validateContextActionsPanel(badPanel));
+
+    // Drive real exploration panel validation
+    assert.ok(
+      Protocol.validateExplorationPanel(
+        validExplorationPanel({
+          interact: [
+            validExplorationTarget({
+              keywords: [],
+              affordances: [
+                validExplorationAffordance({
+                  action_id: actionId,
+                  label,
+                }),
+              ],
+            }),
+          ],
+        })
+      )
+    );
+  }
+});
+
 test("exploration portrait_ref must be null and entries exact", () => {
   assert.throws(() =>
     Protocol.validateExplorationPanel(
