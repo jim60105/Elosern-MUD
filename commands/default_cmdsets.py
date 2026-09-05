@@ -19,6 +19,7 @@ from evennia.commands.default.account import (
     CmdCharCreate as _CmdCharCreate,
     CmdCharDelete as _CmdCharDelete,
 )
+from commands.command import Command
 
 from commands.action import CmdCast
 from commands.art import (
@@ -226,6 +227,96 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(ProjectXYZGridCmdSet)
 
 
+POSSESSED_DENYLIST = (
+    # Switcher family
+    CmdIC,
+    CmdOOC,
+    CmdQuell,
+    CmdCharCreate,
+    CmdCharDelete,
+    # Guild commands
+    CmdGuildExam,
+    CmdGuildRegister,
+    CmdGuildList,
+    CmdGuildAccept,
+    CmdGuildLog,
+    CmdGuildShow,
+    CmdGuildAbandon,
+    CmdGuildTurnIn,
+    CmdGuildMerit,
+    CmdGuildRequest,
+    # PlayerCharacter-only panel commands
+    CmdPersonaPersonality,
+    CmdPersonaLifeStory,
+    CmdPersonaHabit,
+    CmdBackground,
+    CmdTitle,
+    CmdLineage,
+    # Re-possession
+    CmdPossess,
+)
+
+
+class CmdBlockedUnderPossession(Command):
+    """Command blocked while possessing a companion."""
+
+    key = "__blocked__"
+    locks = "cmd:all()"
+
+    def func(self) -> None:
+        self.msg("附身狀態下無法執行此操作，請先歸位（unpossess）。")
+
+
+
+class CmdBlockedOOC(CmdBlockedUnderPossession):
+    key = "ooc"
+    aliases = ("離開角色", "unpuppet")
+
+
+class CmdBlockedIC(CmdBlockedUnderPossession):
+    key = "ic"
+    aliases = ("進入遊戲", "play", "char")
+
+
+class CmdBlockedQuell(CmdBlockedUnderPossession):
+    key = "quell"
+    aliases = ("平定",)
+
+
+class CmdBlockedCharCreate(CmdBlockedUnderPossession):
+    key = "charcreate"
+    aliases = ("建立角色",)
+
+
+class CmdBlockedCharDelete(CmdBlockedUnderPossession):
+    key = "chardelete"
+    aliases = ("刪除角色",)
+
+
+_SWITCHER_BLOCK_COMMANDS = (
+    CmdBlockedOOC,
+    CmdBlockedIC,
+    CmdBlockedQuell,
+    CmdBlockedCharCreate,
+    CmdBlockedCharDelete,
+)
+
+
+class PossessedCharacterCmdSet(CharacterCmdSet):
+    """Trimmed CharacterCmdSet mounted on an NPC while possessed."""
+
+    key = "PossessedCharacter"
+    priority = 10
+    key_mergetypes = {"DefaultCharacter": "Replace"}
+
+    def at_cmdset_creation(self) -> None:
+        super().at_cmdset_creation()
+        for cmd_cls in POSSESSED_DENYLIST:
+            self.remove(cmd_cls)
+        for cmd_cls in _SWITCHER_BLOCK_COMMANDS:
+            self.add(cmd_cls)
+
+
 class AccountCmdSet(default_cmds.AccountCmdSet):
     """
     This is the cmdset available to the Account at all times. It is
@@ -249,6 +340,7 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
         self.remove("chardelete")
         self.add(CmdCharCreate)
         self.add(CmdCharDelete)
+        self.add(CmdUnpossess)
 
 
 class UnloggedinCmdSet(default_cmds.UnloggedinCmdSet):

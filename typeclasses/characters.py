@@ -132,9 +132,28 @@ class PlayerCharacter(LivingEntity):
 
     def at_post_unpuppet(self, account=None, session=None, **kwargs) -> None:
         """Fire the logout epithet-nomination rest point (change G)."""
+        loc_before = self.location
         super().at_post_unpuppet(account=account, session=session, **kwargs)
+        if getattr(getattr(self, "db", None), "possession", None) is not None:
+            # Design D4: Player character stays in the room while possessed
+            if loc_before is not None:
+                self.location = loc_before
         _schedule_nomination_on_logout(self)
 
+    def get_display_name(self, looker=None, **kwargs: Any) -> str:
+        """Render character name, appending entranced marker if possessed."""
+        name = super().get_display_name(looker=looker, **kwargs)
+        if getattr(getattr(self, "db", None), "possession", None) is not None:
+            return f"{name}（呆立入神）"
+        return name
+
+    def get_display_desc(self, looker=None, **kwargs: Any) -> str:
+        """Render character description, appending entranced line if possessed."""
+        desc = super().get_display_desc(looker=looker, **kwargs)
+        if getattr(getattr(self, "db", None), "possession", None) is not None:
+            line = "他的眼神空洞，軀體呆立入神，彷彿靈魂不在這裡。"
+            return f"{desc}\n\n{line}" if desc else line
+        return desc
 
 class Character(PlayerCharacter):
     """Evennia's conventional default-character path."""

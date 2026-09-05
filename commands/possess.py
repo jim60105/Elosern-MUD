@@ -14,9 +14,12 @@ from world.rules.party import is_companion
 from world.rules.possession import (
     POSSESSION_REJECTION_MESSAGES,
     REASON_NOT_BOUND,
+    REASON_RELEASE_REFUSED,
     UNPOSSESS_RELEASED_MESSAGE,
     PossessionGateError,
     PossessionWriteError,
+    _account_characters,
+    _resolve_live_object,
     current_possession,
     enter_possession,
     release_possession,
@@ -74,14 +77,34 @@ class CmdUnpossess(Command):
     help_category = "General"
 
     def func(self) -> None:
-        current = current_possession(self.caller)
-        if current is None:
+        caller = self.caller
+        player = None
+        target_npc = None
+
+        # 1. Caller is PlayerCharacter
+        current = current_possession(caller)
+        if current is not None:
+            player = caller
+        # 2. Caller is possessed NPC
+        elif getattr(getattr(caller, "db", None), "possessed_by", None) is not None:
+            player_id = int(caller.db.possessed_by)
+            player = _resolve_live_object(player_id)
+            target_npc = caller
+        # 3. Caller is Account
+        elif hasattr(caller, "characters"):
+            for char in _account_characters(caller):
+                if current_possession(char) is not None:
+                    player = char
+                    break
+
+        if player is None:
             self.caller.msg("你目前並未附身在任何同伴身上。")
             return
 
         try:
-            release_possession(self.caller, reason="handback")
-        except PossessionWriteError:
-            self.caller.msg("歸位操作失敗，請稍後再試。")
+            release_possession(player, npc=target_npc, reason="handback")
+        except PossessionWriteError as error:
+            if getattr(error, "reason", None) != REASON_RELEASE_REFUSED:
+                self.caller.msg("歸位操作失敗，請稍後再試。")
             return
         self.caller.msg(UNPOSSESS_RELEASED_MESSAGE)

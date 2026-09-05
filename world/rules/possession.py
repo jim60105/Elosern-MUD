@@ -1,4 +1,4 @@
-"""Deterministic companion possession writer and gates (companion-possession-rules).
+"""Deterministic companion possession writer, gates, and transitions.
 
 This module is the SINGLE WRITER of ``player.db.possession`` (mapping
 ``{"npc_dbid": int, "since_tick": int}``) and ``npc.db.possessed_by``
@@ -6,11 +6,7 @@ This module is the SINGLE WRITER of ``player.db.possession`` (mapping
 
 Documented order:
 - enter: gates -> mirrored write -> puppet-transfer hook -> cmdset-mount hook -> facade info event
-- release: unpuppet hook -> cmdset-unmount hook -> mirrored clear -> facade info event
-
-The puppet-transfer and cmdset-mount hooks are documented no-op seams in this
-capability (tagged with ``# possession: seam R1-transition``) and are replaced
-with real transitions in ``companion-possession-transition``.
+- release: unmount cmdset -> unpuppet hook -> mirrored clear -> facade info event
 """
 
 from copy import deepcopy
@@ -20,7 +16,50 @@ from typing import Any
 from django.db import transaction
 from evennia.objects.models import ObjectDB
 
-from world.observability import log_info, log_warn
+from world.observability import log_error, log_info, log_warn
+
+def _resolve_account(player: Any, npc: Any) -> Any | None:
+    """Resolve the owning account for player and npc, even when unpuppeted."""
+    account = getattr(player, "account", None) or getattr(npc, "account", None)
+    if account is not None:
+        return account
+    # Try account_id recorded in player possession mirror
+    curr = current_possession(player)
+    if curr is not None and "account_id" in curr:
+        from evennia.accounts.models import AccountDB
+
+        acc = AccountDB.objects.filter(id=curr["account_id"]).first()
+        if acc is not None:
+            return acc
+    # Try creator_id on player
+    creator_id = getattr(getattr(player, "db", None), "creator_id", None)
+    if creator_id is not None:
+        from evennia.accounts.models import AccountDB
+
+        acc = AccountDB.objects.filter(id=creator_id).first()
+        if acc is not None:
+            return acc
+    # Try live sessions
+    from evennia.server.sessionhandler import SESSION_HANDLER
+
+    for sess in SESSION_HANDLER.values():
+        acc = getattr(sess, "account", None)
+        if acc is not None:
+            if player in _account_characters(acc):
+                return acc
+            if npc is not None and getattr(sess, "puppet", None) is npc:
+                return acc
+    # Check ObjectDB for account that owns npc
+    npc_acc = getattr(npc, "db_account", None) if npc is not None else None
+    if npc_acc is not None:
+        return npc_acc
+    # Check AccountDB _last_puppet
+    from evennia.accounts.models import AccountDB
+
+    for acc in AccountDB.objects.all():
+        if getattr(getattr(acc, "db", None), "_last_puppet", None) == player:
+            return acc
+    return None
 
 
 def _account_characters(account: Any) -> list[Any]:
@@ -58,7 +97,14 @@ def _account_characters(account: Any) -> list[Any]:
             if c.pk not in seen:
                 seen.add(c.pk)
                 chars.append(c)
+
+    last_puppet = getattr(getattr(account, "db", None), "_last_puppet", None)
+    if last_puppet is not None and hasattr(last_puppet, "pk") and last_puppet.pk not in seen:
+        seen.add(last_puppet.pk)
+        chars.append(last_puppet)
+
     return chars
+
 
 # Stable gate & write reason codes
 REASON_NOT_BOUND = "not_bound"
@@ -69,6 +115,8 @@ REASON_ALREADY_POSSESSING = "already_possessing"
 REASON_HANDBACK_FIRST = "handback_first"
 REASON_WRITE_FAILED = "write_failed"
 REASON_MISMATCHED_POSSESSION = "mismatched_possession"
+REASON_TRANSFER_REFUSED = "transfer_refused"
+REASON_RELEASE_REFUSED = "release_refused"
 
 # Player-facing localized messages
 POSSESSION_REJECTION_MESSAGES: dict[str, str] = {
@@ -78,17 +126,19 @@ POSSESSION_REJECTION_MESSAGES: dict[str, str] = {
     REASON_DIALOGUE_OPEN: "對方正在對話中，無法附身。",
     REASON_ALREADY_POSSESSING: "你目前已經在附身狀態。",
     REASON_HANDBACK_FIRST: "請先歸位再執行此操作。",
+    REASON_TRANSFER_REFUSED: "此刻無法附身於他。",
 }
 
 UNPOSSESS_RELEASED_MESSAGE = "你的意識回到了自己的身體。"
+UNPOSSESS_REFUSED_RETURN_MESSAGE = "你的身體搖搖欲墜,彷彿從很深的水裡被拉回來。"
 
 
-class PossessionError(RuntimeError):
-    """Base error for possession failures."""
+class PossessionError(Exception):
+    """Base exception for possession failures."""
 
 
 class PossessionGateError(PossessionError):
-    """A deterministic entry gate refused possession."""
+    """A deterministic entry gate rejected possession."""
 
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
@@ -120,7 +170,10 @@ def current_possession(player: Any) -> dict[str, Any] | None:
         return None
     if not isinstance(since_tick, int) or isinstance(since_tick, bool) or since_tick < 0:
         return None
-    return {"npc_dbid": int(npc_dbid), "since_tick": int(since_tick)}
+    res = {"npc_dbid": int(npc_dbid), "since_tick": int(since_tick)}
+    if "account_id" in raw and isinstance(raw["account_id"], int) and not isinstance(raw["account_id"], bool):
+        res["account_id"] = int(raw["account_id"])
+    return res
 
 
 def restore_possession_surfaces(
@@ -138,48 +191,264 @@ def restore_possession_surfaces(
 
 
 # ---------------------------------------------------------------------------
-# Seam call sites for companion-possession-transition
+# Lock and Session Helpers
+# ---------------------------------------------------------------------------
+
+
+def _grant_puppet_lock(npc: Any, account: Any) -> None:
+    """Additively grant puppet access for account on npc.
+
+    Snapshots the pre-grant lock definition so release can restore it
+    deterministically without fragile string manipulation.
+    """
+    if npc is None or account is None or not hasattr(npc, "locks"):
+        return
+    existing = npc.locks.get("puppet") or ""
+    if getattr(getattr(npc, "db", None), "possession_lock_before", None) is None:
+        if hasattr(npc, "db"):
+            npc.db.possession_lock_before = existing
+
+    grant_func = f"id({account.id})"
+    if not existing:
+        npc.locks.add(f"puppet:{grant_func}")
+    elif grant_func not in existing:
+        npc.locks.add(f"{existing} or {grant_func}")
+
+
+def _strip_puppet_lock(npc: Any, account: Any) -> None:
+    """Restore npc's pre-grant puppet lock."""
+    if npc is None or not hasattr(npc, "locks"):
+        return
+    lock_before = getattr(getattr(npc, "db", None), "possession_lock_before", None)
+    if lock_before is not None:
+        if lock_before:
+            npc.locks.add(lock_before)
+        else:
+            npc.locks.remove("puppet")
+        if hasattr(npc, "db"):
+            npc.db.possession_lock_before = None
+    else:
+        existing = npc.locks.get("puppet") or ""
+        if account is not None:
+            grant_func = f"id({account.id})"
+            if grant_func in existing:
+                parts = existing.split(":", 1)
+                if len(parts) == 2:
+                    terms = [
+                        t.strip()
+                        for t in parts[1].split(" or ")
+                        if t.strip() != grant_func
+                    ]
+                    if terms:
+                        npc.locks.add(f"{parts[0]}:{' or '.join(terms)}")
+                    else:
+                        npc.locks.remove("puppet")
+
+
+def _acting_sessions(entity: Any) -> list[Any]:
+    """Find all active sessions currently puppeting entity or owned by its account."""
+    sessions: list[Any] = []
+    seen: set[int] = set()
+    if hasattr(getattr(entity, "sessions", None), "all"):
+        for sess in entity.sessions.all():
+            sessid = getattr(sess, "sessid", id(sess))
+            if sessid not in seen:
+                seen.add(sessid)
+                sessions.append(sess)
+    account = getattr(entity, "account", None)
+    if account is not None and hasattr(getattr(account, "sessions", None), "all"):
+        for sess in account.sessions.all():
+            sessid = getattr(sess, "sessid", id(sess))
+            if sessid not in seen and getattr(sess, "puppet", None) is entity:
+                seen.add(sessid)
+                sessions.append(sess)
+    return sessions
+
+
+# ---------------------------------------------------------------------------
+# Seam implementations for companion-possession-transition
 # ---------------------------------------------------------------------------
 
 
 def _transfer_puppet(player: Any, npc: Any) -> None:
-    """Transfer account puppet session from player to npc.
+    """Transfer account puppet session from player to npc with verify-then-recover ladder.
 
     # possession: seam R1-transition
-    No-op in companion-possession-rules; companion-possession-transition
-    replaces this call with the verified puppet-transfer ladder.
     """
-    del player, npc
+    account = getattr(player, "account", None)
+    if account is None:
+        return
+
+    _grant_puppet_lock(npc, account)
+
+    sessions = _acting_sessions(player)
+    if not sessions:
+        if account is not None:
+            _strip_puppet_lock(npc, account)
+            raise PossessionGateError(REASON_TRANSFER_REFUSED)
+        return
+
+    from web.webclient.actions.dispatcher import retire_sequence
+    from web.webclient.presentation.ingress import (
+        reset_client_sequence,
+        send_unpuppet_transition,
+        synchronize_session,
+    )
+
+    for session in sessions:
+        send_unpuppet_transition(session)
+        retire_sequence(session)
+        reset_client_sequence(session)
+
+        if hasattr(npc, "access") and not npc.access(account, "puppet"):
+            _strip_puppet_lock(npc, account)
+            synchronize_session(session, player)
+            session.msg(POSSESSION_REJECTION_MESSAGES[REASON_TRANSFER_REFUSED])
+            raise PossessionGateError(REASON_TRANSFER_REFUSED)
+
+        try:
+            account.puppet_object(session, npc)
+        except Exception as exc:
+            log_warn(
+                "possession_puppet_raised",
+                context={
+                    "account": str(getattr(account, "pk", "?")),
+                    "session": str(getattr(session, "sessid", "?")),
+                    "npc": str(getattr(npc, "pk", "?")),
+                },
+                exc=exc,
+            )
+
+        if account.get_puppet(session) is not npc:
+            # Recovery ladder on refusal
+            try:
+                account.puppet_object(session, player)
+            except Exception:  # observability: ignore R2: best-effort recovery hop on puppet failure
+                pass
+            _strip_puppet_lock(npc, account)
+            synchronize_session(session, account.get_puppet(session))
+            session.msg(POSSESSION_REJECTION_MESSAGES[REASON_TRANSFER_REFUSED])
+            raise PossessionGateError(REASON_TRANSFER_REFUSED)
+
+        synchronize_session(session, npc)
 
 
 def _mount_cmdset(npc: Any) -> None:
     """Mount trimmed possessed character cmdset onto npc.
 
     # possession: seam R1-transition
-    No-op in companion-possession-rules; companion-possession-transition
-    replaces this call with the dynamic cmdset mount.
     """
-    del npc
+    if npc is not None and hasattr(npc, "cmdset"):
+        from commands.default_cmdsets import PossessedCharacterCmdSet
+
+        npc.cmdset.add(PossessedCharacterCmdSet, persistent=False)
 
 
 def _unmount_cmdset(npc: Any) -> None:
     """Remove possessed character cmdset from npc.
 
     # possession: seam R1-transition
-    No-op in companion-possession-rules; companion-possession-transition
-    replaces this call with the dynamic cmdset unmount.
     """
-    del npc
+    if npc is not None and hasattr(npc, "cmdset"):
+        from commands.default_cmdsets import PossessedCharacterCmdSet
+
+        try:
+            npc.cmdset.remove(PossessedCharacterCmdSet)
+        except Exception:  # observability: ignore R2: cmdset unmount is best-effort idempotent cleanup
+            pass
 
 
-def _unpuppet(player: Any, npc: Any) -> None:
+def _unpuppet(player: Any, npc: Any, reason: str = "handback") -> None:
     """Hand back account puppet session from npc to player.
 
     # possession: seam R1-transition
-    No-op in companion-possession-rules; companion-possession-transition
-    replaces this call with the unpuppet/re-puppet ladder.
     """
-    del player, npc
+    if npc is None:
+        return
+
+    account = _resolve_account(player, npc)
+
+    if reason == "disconnect":
+        if account is not None:
+            for session in _acting_sessions(npc):
+                try:
+                    account.unpuppet_object(session)
+                except Exception:  # observability: ignore R2: best-effort session unpuppet on disconnect
+                    pass
+            _strip_puppet_lock(npc, account)
+        return
+
+    if account is None:
+        _strip_puppet_lock(npc, None)
+        return
+
+    sessions = _acting_sessions(npc)
+    if not sessions:
+        if account is not None and hasattr(getattr(account, "sessions", None), "all"):
+            sessions = [
+                s
+                for s in account.sessions.all()
+                if getattr(s, "logged_in", False)
+                and getattr(s, "puppet", None) in (npc, None)
+            ]
+
+    from web.webclient.actions.dispatcher import retire_sequence
+    from web.webclient.presentation.ingress import (
+        reset_client_sequence,
+        send_unpuppet_transition,
+        synchronize_session,
+    )
+
+    for session in sessions:
+        send_unpuppet_transition(session)
+        retire_sequence(session)
+        reset_client_sequence(session)
+        try:
+            account.unpuppet_object(session)
+        except Exception as exc:
+            log_warn(
+                "possession_unpuppet_raised",
+                context={
+                    "account": str(getattr(account, "pk", "?")),
+                    "session": str(getattr(session, "sessid", "?")),
+                    "npc": str(getattr(npc, "pk", "?")),
+                },
+                exc=exc,
+            )
+
+        try:
+            account.puppet_object(session, player)
+        except Exception as exc:
+            log_warn(
+                "possession_repuppet_raised",
+                context={
+                    "account": str(getattr(account, "pk", "?")),
+                    "session": str(getattr(session, "sessid", "?")),
+                    "player": str(getattr(player, "pk", "?")),
+                },
+                exc=exc,
+            )
+
+        if account.get_puppet(session) is not player:
+            # observability: ignore R3: silent refusal during release raises PossessionWriteError below
+            log_error(
+                "possession_release_failed",
+                context={
+                    "char": str(getattr(player, "pk", "?")),
+                    "npc": str(getattr(npc, "pk", "?")),
+                    "step": "possession_release",
+                },
+            )
+            session.msg(UNPOSSESS_REFUSED_RETURN_MESSAGE)
+            synchronize_session(session, account.get_puppet(session))
+            raise PossessionWriteError(
+                REASON_RELEASE_REFUSED,
+                "Re-puppeting player failed during possession release",
+            )
+
+        synchronize_session(session, player)
+
+    _strip_puppet_lock(npc, account)
 
 
 # ---------------------------------------------------------------------------
@@ -192,24 +461,17 @@ def _dialogue_open(npc: Any, player: Any) -> bool:
     from typeclasses.characters import PlayerCharacter
     from world.rules.dialogue import live_dialogue_session
 
-    # Check caller player
     session = live_dialogue_session(player)
     if session is not None and session.npc_id == getattr(npc, "pk", None):
         return True
 
-    # Check any player character in the same room
     location = getattr(npc, "location", None)
     if location is not None and hasattr(location, "contents"):
         for obj in location.contents:
-            if isinstance(obj, PlayerCharacter) and obj != player:
-                s = live_dialogue_session(obj)
-                if s is not None and s.npc_id == getattr(npc, "pk", None):
+            if isinstance(obj, PlayerCharacter) and obj.pk != player.pk:
+                other_sess = live_dialogue_session(obj)
+                if other_sess is not None and other_sess.npc_id == getattr(npc, "pk", None):
                     return True
-
-    # Check direct attribute fallback
-    if getattr(getattr(npc, "db", None), "dialogue_session", None) is not None:
-        return True
-
     return False
 
 
@@ -230,13 +492,11 @@ def enter_possession(player: Any, npc: Any) -> None:
 
     All writes are atomic and serialized under database row locking.
     """
-    # 1. not_bound
     from world.rules.party import is_companion
 
     if not is_companion(npc, player):
         raise PossessionGateError(REASON_NOT_BOUND)
 
-    # 2. not_co_located
     if (
         player.location is None
         or npc.location is None
@@ -244,17 +504,14 @@ def enter_possession(player: Any, npc: Any) -> None:
     ):
         raise PossessionGateError(REASON_NOT_CO_LOCATED)
 
-    # 3. in_combat
     from world.rules.combat_session import is_in_active_session
 
     if is_in_active_session(player) or is_in_active_session(npc):
         raise PossessionGateError(REASON_IN_COMBAT)
 
-    # 4. dialogue_open
     if _dialogue_open(npc, player):
         raise PossessionGateError(REASON_DIALOGUE_OPEN)
 
-    # 5. already_possessing (pre-check)
     if current_possession(player) is not None:
         raise PossessionGateError(REASON_ALREADY_POSSESSING)
     if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
@@ -266,7 +523,6 @@ def enter_possession(player: Any, npc: Any) -> None:
             if char.pk != player.pk and current_possession(char) is not None:
                 raise PossessionGateError(REASON_ALREADY_POSSESSING)
 
-    # Atomic write with serialization locking
     from world.rules.clock import read_world_clock
 
     clock = read_world_clock()
@@ -277,7 +533,6 @@ def enter_possession(player: Any, npc: Any) -> None:
 
     try:
         with transaction.atomic():
-            # Row-level locking to serialize concurrent possession requests
             ids_to_lock = [player.pk, npc.pk]
             if account is not None:
                 for char in _account_characters(account):
@@ -285,7 +540,6 @@ def enter_possession(player: Any, npc: Any) -> None:
                         ids_to_lock.append(char.pk)
             list(ObjectDB.objects.select_for_update().filter(id__in=ids_to_lock))
 
-            # Re-verify gate 5 under the lock
             if current_possession(player) is not None:
                 raise PossessionGateError(REASON_ALREADY_POSSESSING)
             if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
@@ -295,10 +549,14 @@ def enter_possession(player: Any, npc: Any) -> None:
                     if char.pk != player.pk and current_possession(char) is not None:
                         raise PossessionGateError(REASON_ALREADY_POSSESSING)
 
-            # Mirrored write
             player.db.possession = {
                 "npc_dbid": int(npc.pk),
                 "since_tick": tick,
+                "account_id": (
+                    int(account.pk)
+                    if account is not None and hasattr(account, "pk")
+                    else None
+                ),
             }
             npc.db.possessed_by = int(player.pk)
 
@@ -309,6 +567,18 @@ def enter_possession(player: Any, npc: Any) -> None:
         restore_possession_surfaces(player, npc, player_before, npc_before)
         raise
     except Exception as error:
+        # Compensation for post-transfer failures
+        _unmount_cmdset(npc)
+        if account is not None:
+            from web.webclient.presentation.ingress import synchronize_session
+
+            for session in _acting_sessions(npc):
+                try:
+                    account.puppet_object(session, player)
+                    synchronize_session(session, player)
+                except Exception:  # observability: ignore R2: best-effort compensation on entry failure
+                    pass
+            _strip_puppet_lock(npc, account)
         restore_possession_surfaces(player, npc, player_before, npc_before)
         raise PossessionWriteError(REASON_WRITE_FAILED, str(error)) from error
 
@@ -350,8 +620,18 @@ def release_possession(
                 REASON_MISMATCHED_POSSESSION,
                 f"NPC {getattr(npc, 'pk', '?')} is possessed by player {npc_possessed_by}, not {getattr(player, 'pk', '?')}",
             )
-        # Inconsistent mirror repair
+        # Full lifecycle repair for partial mirror under lock
         with transaction.atomic():
+            list(ObjectDB.objects.select_for_update().filter(id__in=sorted([player.pk, npc.pk])))
+            _unmount_cmdset(npc)
+            account = _resolve_account(player, npc)
+            if account is not None:
+                for session in _acting_sessions(npc):
+                    try:
+                        account.unpuppet_object(session)
+                    except Exception:  # observability: ignore R2: best-effort session unpuppet on repair
+                        pass
+                _strip_puppet_lock(npc, account)
             npc.db.possessed_by = None
         return
 
@@ -364,24 +644,63 @@ def release_possession(
 
     resolved_npc = npc if npc is not None else _resolve_live_object(canonical_npc_id)
 
-    # Reversal seams: transition change unmounts cmdset & unpuppets here
-    _unmount_cmdset(resolved_npc)  # possession: seam R1-transition
-    _unpuppet(player, resolved_npc)  # possession: seam R1-transition
+    if resolved_npc is None:
+        log_warn(
+            "possession_orphan_repaired",
+            context={
+                "char": str(getattr(player, "pk", "?")),
+                "npc_dbid": str(canonical_npc_id),
+                "step": "orphan_repair",
+            },
+        )
+        with transaction.atomic():
+            list(ObjectDB.objects.select_for_update().filter(id=player.pk))
+            player.db.possession = None
+        return
 
+    # Lock rows in deterministic ascending order before side effects
+    ids_to_lock = sorted([player.pk, resolved_npc.pk])
     player_before = deepcopy(getattr(player.db, "possession", None))
     npc_before = (
         deepcopy(getattr(resolved_npc.db, "possessed_by", None))
-        if resolved_npc is not None
+        if hasattr(resolved_npc, "db")
         else None
     )
 
     try:
         with transaction.atomic():
+            list(ObjectDB.objects.select_for_update().filter(id__in=ids_to_lock))
+            # Re-verify under lock
+            if current_possession(player) is None:
+                return
+
+            _unmount_cmdset(resolved_npc)
+            try:
+                _unpuppet(player, resolved_npc, reason=reason)
+            except Exception:
+                _mount_cmdset(resolved_npc)
+                raise
+
             player.db.possession = None
-            if resolved_npc is not None:
+            if hasattr(resolved_npc, "db"):
                 if getattr(resolved_npc.db, "possessed_by", None) == int(player.pk):
                     resolved_npc.db.possessed_by = None
+    except PossessionWriteError:
+        restore_possession_surfaces(player, resolved_npc, player_before, npc_before)
+        raise
     except Exception as error:
+        # Full inverse compensation if mirror clear fails after unpuppet
+        account = _resolve_account(player, resolved_npc)
+        if account is not None:
+            _grant_puppet_lock(resolved_npc, account)
+            _mount_cmdset(resolved_npc)
+            from web.webclient.presentation.ingress import synchronize_session
+            for session in _acting_sessions(player):
+                try:
+                    account.puppet_object(session, resolved_npc)
+                    synchronize_session(session, resolved_npc)
+                except Exception:  # observability: ignore R2: best-effort inverse compensation
+                    pass
         restore_possession_surfaces(player, resolved_npc, player_before, npc_before)
         raise PossessionWriteError(REASON_WRITE_FAILED, str(error)) from error
 
@@ -402,7 +721,6 @@ def release_for_party_change(npc: Any, player: Any) -> None:
     """
     if player is None or npc is None:
         return
-    # Only release if there is an active or partial possession involving them
     current = current_possession(player)
     npc_possessed = getattr(getattr(npc, "db", None), "possessed_by", None)
     if current is None and npc_possessed is None:
@@ -436,6 +754,33 @@ def release_on_disconnect(account: Any) -> None:
     """Scan account characters and release any active possession (idempotent)."""
     if account is None:
         return
-    for char in _account_characters(account):
+
+    # Find all characters owned by this account or referenced by its possessed NPCs
+    chars = _account_characters(account)
+    for npc_obj in ObjectDB.objects.filter(db_account=account):
+        possessed_by = getattr(getattr(npc_obj, "db", None), "possessed_by", None)
+        if possessed_by is not None:
+            owner = _resolve_live_object(int(possessed_by))
+            if owner is not None and owner not in chars:
+                chars.append(owner)
+    if hasattr(getattr(account, "sessions", None), "all"):
+        for sess in account.sessions.all():
+            puppet = getattr(sess, "puppet", None)
+            if puppet is not None and getattr(getattr(puppet, "db", None), "possessed_by", None) is not None:
+                owner = _resolve_live_object(int(puppet.db.possessed_by))
+                if owner is not None and owner not in chars:
+                    chars.append(owner)
+
+    for char in chars:
         if current_possession(char) is not None:
-            release_possession(char, reason="disconnect")
+            try:
+                release_possession(char, reason="disconnect")
+            except Exception as exc:
+                log_warn(
+                    "possession_disconnect_release_failed",
+                    context={
+                        "account": str(getattr(account, "pk", "?")),
+                        "char": str(getattr(char, "pk", "?")),
+                    },
+                    exc=exc,
+                )
