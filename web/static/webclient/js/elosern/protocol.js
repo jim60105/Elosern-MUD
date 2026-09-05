@@ -4619,7 +4619,9 @@
         "dialogue choices must hold at most " + DIALOGUE_MAX_CHOICES + " entries"
       );
     }
-    var seen = {};
+    // Prototype-null registry: a plain object would let a literal
+    // "__proto__" keyword_id defeat the own-property duplicate check.
+    var seen = Object.create(null);
     for (var i = 0; i < choices.length; i++) {
       var choice = choices[i];
       var name = "dialogue choice " + (i + 1);

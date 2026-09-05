@@ -31,6 +31,9 @@ LAYOUT_VERSION = 1
 SNAPSHOT_MESSAGE = "ui_snapshot"
 UPDATE_MESSAGE = "ui_update"
 
+# Panel whose payload the recomputed mode is coupled to: every update ships it.
+DIALOGUE_PANEL = "dialogue"
+
 
 class ClockUnavailable(RuntimeError):
     """The world-clock singleton is absent; presentation cannot continue."""
@@ -172,6 +175,16 @@ class PresentationCoordinator:
         ``panels`` must be a nonempty subset of registered panel names. Every
         included panel completely replaces its prior value; the update carries
         the same metadata as a snapshot.
+
+        The mode is recomputed at send time on every envelope, so a subset
+        that flips the client into or out of the dialogue mode must never
+        ship without the dialogue panel it implies. Every update whose
+        recomputed mode is ``dialogue`` always carries a freshly rendered
+        dialogue panel; every clear path already names the panel explicitly
+        (engage, departure/movement/leave-party pushes, full refreshes), so
+        the committed mode and the committed dialogue panel can never diverge
+        on the wire. Full snapshots render every panel, so this rule is
+        update-only.
         """
         if not panels:
             raise ValueError("panel update requires a nonempty panel subset")
@@ -180,6 +193,15 @@ class PresentationCoordinator:
             raise ValueError(
                 f"panel update references unknown panels {sorted(unknown)}"
             )
+        if (
+            self._mode_provider(context) == DIALOGUE_PANEL
+            and DIALOGUE_PANEL not in panels
+            and DIALOGUE_PANEL in self.registry.panel_names
+        ):
+            panels = {
+                **panels,
+                DIALOGUE_PANEL: self.registry.render(DIALOGUE_PANEL, context),
+            }
         envelope = self._build_presentation(context, panels)
         self._send(UPDATE_MESSAGE, envelope)
         return envelope

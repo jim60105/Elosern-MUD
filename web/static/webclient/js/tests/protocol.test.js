@@ -5516,6 +5516,15 @@ test("dialogue validator mirrors the server drift rejections", () => {
     validDialoguePanel({ choices: Array.from({ length: 17 }, (_, i) => validDialogueChoice({ keyword_id: "詞" + i, label: "詞" + i })) }),
     validDialoguePanel({ choices: [validDialogueChoice(), validDialogueChoice()] }),
     validDialoguePanel({ choices: [validDialogueChoice({ keyword_id: " " })] }),
+    // a literal __proto__ keyword pair must hit the duplicate check: the
+    // registry is prototype-null so the first row is an own property
+    validDialoguePanel({
+      choices: [
+        validDialogueChoice({ keyword_id: "__proto__" }),
+        validDialogueChoice({ keyword_id: "__proto__" }),
+      ],
+    }),
+    validDialoguePanel({ choices: [validDialogueChoice({ keyword_id: "\ud800" })] }),
     validDialoguePanel({ choices: [{ keyword_id: "公會" }] }),
     validDialoguePanel({ choices: [{ keyword_id: "公會", label: "公會", extra: 1 }] }),
     validDialoguePanel({ choices: [{ keyword_id: "公會", label: "說".repeat(129) }] }),

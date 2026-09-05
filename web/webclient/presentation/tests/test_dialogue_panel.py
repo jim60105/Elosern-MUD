@@ -302,6 +302,8 @@ class DialogueValidatorTests(unittest.TestCase):
             _available(choices=[_choice("公會"), _choice("公會")]),
             # empty keyword id
             _available(choices=[_choice(" ")]),
+            # lone surrogate in the keyword id (mirror parity with the UMD)
+            _available(choices=[{"keyword_id": "\ud800", "label": "公會"}]),
             # choice row key drift
             _available(choices=[{"keyword_id": "公會"}]),
             _available(choices=[{"keyword_id": "公會", "label": "公會", "extra": 1}]),
@@ -556,6 +558,85 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
         with self.captureOnCommitCallbacks(execute=True):
             self.host.move_to(away)
         self.assertIsNone(self.player.db.dialogue_session)
+
+    def test_dialogue_mode_update_injects_the_panel_into_unrelated_subsets(self):
+        session, coordinator = self._coordinator()
+        open_or_refresh_dialogue(self.player, self.host, "歡迎。")
+        context = PresentationContext(actor=self.player, protocol_version=1)
+        # A publisher naming only unrelated panels (e.g. a clock-tick status
+        # update) must never emit mode dialogue without the panel it implies:
+        # the coordinator injects a freshly rendered dialogue panel.
+        envelope = coordinator.panel_update(
+            context, {"status": self.registry.render("status", context)}
+        )
+        self.assertEqual(envelope["mode"], "dialogue")
+        self.assertIn("status", envelope["panels"])
+        self.assertIs(envelope["panels"]["dialogue"]["available"], True)
+
+    def test_non_dialogue_updates_do_not_widen_the_subset(self):
+        session, coordinator = self._coordinator()
+        context = PresentationContext(actor=self.player, protocol_version=1)
+        envelope = coordinator.panel_update(
+            context, {"status": self.registry.render("status", context)}
+        )
+        self.assertEqual(envelope["mode"], "exploration")
+        self.assertEqual(set(envelope["panels"]), {"status"})
+
+
+class DialogueTextCommandSettlementTests(BattlefieldIsolation, EvenniaTest):
+    """The ordinary ``talk`` text command commits dialogue presentation."""
+
+    character_typeclass = PlayerCharacter
+
+    @property
+    def sessionhandler(self):
+        import evennia
+
+        return evennia.SESSION_HANDLER
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+        watchers.clear_watchers()
+        self.player = _player("文字指令對話測試者")
+        self.player.location = self.room1
+        self.host = _host(self.room1, "公會職員")
+
+    def tearDown(self):
+        watchers.clear_watchers()
+        super().tearDown()
+
+    def test_text_talk_publishes_dialogue_mode_with_the_available_panel(self):
+        from server.conf import inputfuncs
+        from server.conf.tests.test_inputfuncs import _make_session
+        from web.webclient.presentation.coordinator import PresentationCoordinator
+        from web.webclient.presentation.registry import build_production_registry
+
+        session = _make_session(
+            self.sessionhandler, "webclient/websocket", account=self.account
+        )
+        session.puppet = self.player
+        self.player.sessions.add(session)
+        coordinator = PresentationCoordinator(
+            session, build_production_registry(), calendar_provider=lambda: CALENDAR
+        )
+        session.ndb.elosern_coordinator = coordinator
+        recorded: list[dict] = []
+        session.msg = lambda **kwargs: recorded.append(kwargs)
+
+        inputfuncs.text(session, f"talk {self.host.key} 註冊")
+
+        snapshots = [c["ui_snapshot"][0][0] for c in recorded if "ui_snapshot" in c]
+        self.assertTrue(snapshots, "the settled talk must refresh presentation")
+        committed = snapshots[-1]
+        # The post-command full refresh recomputes mode from canonical state:
+        # mode and the available dialogue panel commit in one envelope.
+        self.assertEqual(committed["mode"], "dialogue")
+        self.assertIs(committed["panels"]["dialogue"]["available"], True)
+        self.assertEqual(
+            committed["panels"]["dialogue"]["line"],
+            self.player.db.dialogue_session["line"],
+        )
 
 
 if __name__ == "__main__":

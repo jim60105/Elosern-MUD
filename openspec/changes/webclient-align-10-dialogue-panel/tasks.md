@@ -39,3 +39,24 @@
 
 - [x] 5.1 Apply AFTER webclient-align-07-dialogue-session-state (session
   helpers/writer/clear seams). Change 08 (dialogue surface) depends on this change.
+
+## 9. Post-critique hardening (rubber-duck `DuckChange10`)
+
+- [x] 9.1 確認 text-command `talk` 的 presentation 刷新真實存在（`inputfuncs.text` →
+      `observe_command_settlement` → full snapshot；以 e2e 測試固化，见 9.5）
+      — Blocking #1 為 false positive，證據：e2e probe `MODE: dialogue AVAIL: True`
+- [x] 9.2 Enforce the mode/panel atomicity invariant at the coordinator: every panel
+      update injects a freshly rendered `dialogue` panel (mirrors the UMD mirror;
+      closes the stale-panel window the critique found in the recompute/reconcile
+      split)
+- [x] 9.3 Close the UMD duplicate-keyword registry hole: `seen` is
+      `Object.create(null)` so a literal `__proto__` keyword_id cannot defeat the
+      own-property check
+- [x] 9.4 Python `keyword_id` validation rejects lone surrogates exactly like the UMD
+      mirror (validator parity drift closed)
+- [x] 9.5 Tests: text-command `talk` e2e publishes `mode: dialogue` with the available
+      panel; coordinator injection carries `dialogue` in unrelated subset updates;
+      node fixtures for `__proto__` duplicates and the mode/panel consistency rule;
+      dialogue push epoch-guard test
+- [x] 9.6 Delta spec: state the atomicity guarantee as a scenario in the
+      `webclient-oob-protocol` delta; re-validate `--strict`

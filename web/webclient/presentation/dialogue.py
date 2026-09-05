@@ -118,6 +118,8 @@ def _validate_choice(value: Any) -> dict[str, Any]:
     keyword_id = value["keyword_id"]
     if not isinstance(keyword_id, str) or not keyword_id.strip():
         raise DialoguePanelError("keyword_id must be a non-empty string")
+    # Mirror the UMD mirror exactly: an unpaired surrogate never ships.
+    _reject_lone_surrogates(keyword_id, "keyword_id")
     # Same bound as the exploration keyword vocabulary: authored keywords are
     # zh-TW words, so the cap is code points, not ASCII characters.
     if sum(1 for _ in keyword_id) > MAX_KEYWORD_ID_CHARS:
