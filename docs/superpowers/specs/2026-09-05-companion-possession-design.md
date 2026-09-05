@@ -62,8 +62,9 @@ step restores both mirror attributes through the party-core restore helper.
   walked. B following *other* party members is impossible mid-possession (A is stationary;
   `follow_companions` keys on the moving PlayerCharacter).
 - **Party truth unchanged**: A remains owner of B (and of any other companions, who keep
-  following A, not B). Dismissing B via another character's session is impossible (party is
-  account-starred per character and A is offline-controlled during possession; handback first).
+  following A, not B — their follow key is the moving owner, and the owner does not move while
+  possessing). Party membership itself is untouched; dismissal of the possessed B from the
+  same account is refused with "hand back first", never performed under possession.
 - **Presentation**: `session.ndb.elosern_actor_id` re-points to B; snapshot panels are
   actor-keyed as in D9. The unpuppet transition reuses `send_unpuppet_transition`/
   `retire_sequence` sequencing from the localized OOC path.
@@ -76,7 +77,7 @@ step restores both mirror attributes through the party-core restore helper.
 | Mirror write fails after puppet | Unpuppet back to A (restore ladder), raise `PossessionWriteError`, gates re-checked fresh on next try |
 | B auto-leaves (affinity < 70) while possessed | Same-transaction release then `leave_party`; notification after commit, per the affinity writer's caller-notify contract |
 | Session drops | `at_post_unpuppet` releases possession; B's attributes/schedule resume on the next settlement tick |
-| A logged out elsewhere / B deleted | Entry gate requires live bound companion; deletion purge already unwinds bindings — possession clears through the same D8(a) ordering |
+| B deleted while possessed | Entry gate requires a live bound companion; the deletion purge unwinds bindings — D8(b) session loss fires alongside and releases the puppet |
 | Server reload mid-possession | Persisted mirror attributes + Evennia's session restore resume the possession; nothing possession-specific needs reload handling |
 
 ## 6. Testing
