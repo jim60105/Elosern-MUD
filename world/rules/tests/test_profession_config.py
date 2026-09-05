@@ -236,6 +236,37 @@ class RejectionTests(ProfessionCacheIsolation):
             "mythic",
         )
 
+    @covers_requirement(
+        "profession-registries::every-malformed-profession-file-is-rejected-by-name-before-anything-is-cached",
+    )
+    def test_non_string_values_fail_closed_with_named_errors(self):
+        with self.subTest("unhashable binding"):
+            self.assert_rejected(
+                lambda raw: raw["professions"][0]["components"][0].update(default_binding=[]),
+                "default_binding",
+            )
+        with self.subTest("unhashable tier"):
+            self.assert_rejected(
+                lambda raw: raw["professions"][0].update(default_tier=[]),
+                "merchant",
+                "unknown default_tier",
+            )
+        with self.subTest("non-string template"):
+            self.assert_rejected(
+                lambda raw: raw["professions"][0].update(schedule_template=["guard"]),
+                "merchant",
+                "unknown schedule_template",
+            )
+        with self.subTest("non-string row key"):
+            self.assert_rejected(lambda raw: raw["professions"][0].update(key=7), "empty or non-string key")
+        with self.subTest("mixed non-string unknown top-level keys"):
+            self.assert_rejected(
+                lambda raw: raw.update({"extra": 1, 7: 2}),
+                "unknown top-level fields",
+            )
+        with self.subTest("row not a mapping"):
+            self.assert_rejected(lambda raw: raw.update(professions=["merchant"]), "must be a mapping")
+
     def test_known_template_and_tier_are_accepted(self):
         raw = base_file()
         raw["professions"][0].update(schedule_template="guard", default_tier="human_commoner")

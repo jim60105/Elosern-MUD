@@ -83,15 +83,15 @@ def _validate_component(entry: Any, key: str, position: int) -> ProfessionCompon
         raise _error(f"{path} must be a mapping, got {type(entry).__name__}")
     unknown = set(entry) - _COMPONENT_FIELDS
     if unknown:
-        raise _error(f"{path} has unknown fields {sorted(unknown)}")
+        raise _error(f"{path} has unknown fields {sorted(unknown, key=repr)}")
     missing = _COMPONENT_FIELDS - set(entry)
     if missing:
-        raise _error(f"{path} is missing fields {sorted(missing)}")
+        raise _error(f"{path} is missing fields {sorted(missing, key=repr)}")
     type_key = entry["type"]
     if not isinstance(type_key, str) or type_key not in PROFESSION_COMPONENT_TYPES:
         raise _error(f"{path} has unknown component type {type_key!r}")
     binding = entry["default_binding"]
-    if binding not in SERVICE_BINDINGS:
+    if not isinstance(binding, str) or binding not in SERVICE_BINDINGS:
         raise _error(
             f"{path} has default_binding {binding!r} outside {sorted(SERVICE_BINDINGS)}"
         )
@@ -103,10 +103,10 @@ def _validate_row(raw: Any, position: int, seen: set[str]) -> Profession:
         raise _error(f"professions[{position}] must be a mapping, got {type(raw).__name__}")
     unknown = set(raw) - _ROW_FIELDS
     if unknown:
-        raise _error(f"professions[{position}] has unknown fields {sorted(unknown)}")
+        raise _error(f"professions[{position}] has unknown fields {sorted(unknown, key=repr)}")
     missing = _ROW_FIELDS - set(raw)
     if missing:
-        raise _error(f"professions[{position}] is missing fields {sorted(missing)}")
+        raise _error(f"professions[{position}] is missing fields {sorted(missing, key=repr)}")
     key = raw["key"]
     if not isinstance(key, str) or not key:
         raise _error(f"professions[{position}] has empty or non-string key {key!r}")
@@ -127,7 +127,7 @@ def _validate_row(raw: Any, position: int, seen: set[str]) -> Profession:
             raise _error(f"profession {key!r} has unknown schedule_template {template!r}")
 
     tier = raw["default_tier"]
-    if tier is not None and tier not in STATIC_TIER_REGISTRY:
+    if tier is not None and (not isinstance(tier, str) or tier not in STATIC_TIER_REGISTRY):
         raise _error(f"profession {key!r} has unknown default_tier {tier!r}")
 
     return Profession(
@@ -164,10 +164,10 @@ def load_professions(path: Path | None = None) -> dict[str, Profession]:
     top_level_fields = {"schema_version", "professions"}
     unknown = set(raw) - top_level_fields
     if unknown:
-        raise _error(f"unknown top-level fields {sorted(unknown)}")
+        raise _error(f"unknown top-level fields {sorted(unknown, key=repr)}")
     missing = top_level_fields - set(raw)
     if missing:
-        raise _error(f"missing top-level fields {sorted(missing)}")
+        raise _error(f"missing top-level fields {sorted(missing, key=repr)}")
     if raw["schema_version"] != SCHEMA_VERSION:
         raise _error(f"schema_version must be {SCHEMA_VERSION}, got {raw['schema_version']!r}")
     raw_professions = raw["professions"]
