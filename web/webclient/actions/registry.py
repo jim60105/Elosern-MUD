@@ -87,8 +87,8 @@ def build_production_action_registry() -> ActionRegistry:
     eight exploration adapters (``explore.move``, ``explore.look``,
     ``explore.talk_scripted``, ``explore.talk_freeform``, ``explore.party_invite``,
     ``explore.party_leave``, ``explore.engage``, ``explore.wait``), the two
-    title ballot adapters (``title.accept``, ``title.decline``), the
-    account switch adapter (``account.character.switch``), and the
+    title ballot adapters (``title.accept``, ``title.decline``), the two
+    account adapters (``account.character.switch``, ``account.character.create``), and the
     ``options.dismiss`` action. Each action
     binds one exact payload validator and one narrow deterministic adapter; no
     action routes through the text parser.
@@ -102,7 +102,9 @@ def build_production_action_registry() -> ActionRegistry:
         validate_forfeit_payload,
     )
     from web.webclient.actions.account_actions import (
+        _account_character_create_adapter,
         _account_character_switch_adapter,
+        validate_account_character_create_payload,
         validate_account_character_switch_payload,
     )
     from web.webclient.actions.character_actions import (
@@ -487,6 +489,17 @@ def build_production_action_registry() -> ActionRegistry:
             # Result-only: the switch decision schedules the puppet transition
             # one reactor turn later and publishes no completion presentation
             # at the retiring epoch.
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="account.character.create",
+            validate_payload=validate_account_character_create_payload,
+            adapter=_account_character_create_adapter,
+            # Result-only: the creation decision schedules the shell creation
+            # and puppet transition one reactor turn later and publishes no
+            # completion presentation at the retiring epoch.
             affected_panels=(),
         )
     )

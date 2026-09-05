@@ -1,5 +1,6 @@
 {
   "registeredMutationActionIds": [
+    "account.character.create",
     "account.character.switch",
     "character.persona.update",
     "combat.cast",
@@ -36,6 +37,7 @@
     "title.remove"
   ],
   "silentPresentationControlIds": [
+    "account.character.create",
     "account.character.switch",
     "creation.roll_name",
     "options.dismiss"
