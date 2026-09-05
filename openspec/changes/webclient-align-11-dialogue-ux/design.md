@@ -42,6 +42,9 @@ teardown (`stores/elosern.js` `MODE_ROOT_DESCRIPTORS`) maps `dialogue` → `dial
 - No change to the interact-target keyword list (still bounded by `MAX_SCRIPTED_KEYWORDS = 16`
   in the exploration panel — overflow keywords stay reachable there).
 - No server-side "dialogue preference" or per-NPC exit prose.
+- No party-drawer capability change: `PartyDrawer.vue` keeps its own mode gates untouched
+  (Rubber-duck scope decision) — this change's "ordinary affordances stay usable" claim is
+  scoped to the action dock and its router lifecycle, not every visible surface.
 
 ## Decisions
 
@@ -124,6 +127,25 @@ The exit row renders inside the `.choices` unit as a distinct `.pick.pick-exit` 
 vm.host.identity})`. It sits after the freeform row. No confirm step: the action is
 consequence-free (a clear seam the movement settlement already performs silently), and the
 server rejects races idempotently.
+
+### D7 — Command-echo catalog: declared silent presentation control (Rubber-duck)
+
+Registering `explore.dialogue_leave` trips the registry-coverage contract
+(`webclient-input-narrative::catalog-coverage-is-pinned-against-the-action-registry`).
+Candidate resolver was a fabricated `leave <NPC>` echo — rejected: no such text command exists,
+and the catalog's own rule is to stay silent rather than invent a command. Chosen: add the id to
+`command_echo.js`'s `SILENT_PRESENTATION_CONTROLS` (the server success line is the player-facing
+outcome, mirroring `options.dismiss`'s reasoned-silence idiom), extend the manifest's
+`silentPresentationControlIds`, and pin the silence in the Node catalog gate.
+
+### D8 — One shared exploration-form predicate for the widened lifecycle (Rubber-duck)
+
+The dock-form lifecycle assumptions are not confined to the two submit gates: hosted/non-hosted
+drawer close, Escape/menu-close `activeSubDock` cleanup, and settle-driven sub-dock teardown all
+hard-check mode `exploration`. Chosen: one store-level predicate
+(`dockOnExplorationForm(rs)` ⇔ mode ∈ {exploration, dialogue}) replacing every such guard in the
+router lifecycle, so a services/character sub-dock opened while talking closes, re-homes, and
+settles exactly as in exploration mode. Partial widening is the known failure mode this guards.
 
 ## Risks / Trade-offs
 
