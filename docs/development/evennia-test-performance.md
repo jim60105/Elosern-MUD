@@ -176,3 +176,12 @@ Evennia 套件現已移出 CI 關鍵路徑：其最慢分片（2 分 46 秒）�
 - Run 31951788668：11 個瀏覽器分片中有 10 個通過；分片 4（創角，每個旅程皆啟動專用伺服器）有一項測試失敗，錯誤為 `twisted.internet.error.CannotListenError: Couldn't listen on 127.0.0.1:44951: [Errno 98] Address already in use`。這是測試架構記載的短期連接埠釋放後綁定競爭（`allocate_ports` 在 portal 綁定該連接埠前先行關閉其 socket）：在單一執行器上同時配置與啟動兩個測試架構行程時，競爭成為真實問題。此修復**修正了該變更「不改動 harness」的非目標**：當診斷顯示連接埠衝突標記（`CannotListenError` / `Address already in use`）時，`ManagedServer.start()` 現會以全新的執行期重試最多兩次，因此同級行程搶佔釋放的連接埠不再導致整個分片失敗。兩項快速單元測試鎖定了重試機制（衝突時使用新執行期，預算耗盡時拋出例外）。
 - Run 31952671241：11 個瀏覽器分片中有 10 個通過；分片 11（art-harness-shell）的 `test_image_load_failure_shows_fallback_without_refetch` 失敗，出現 `AssertionError: 2 != 1`，場景圖像 URL 被請求了兩次。這暴露了潛在的客戶端競爭條件：在 `img.src = url` 與圖像的 `error` 事件之間重新算繪的快照更新為相同 URL 建立了第二個 `<img>`，違反了「不得重複擷取」的需求。雙行程的 CPU 競爭擴大了該時間窗口。美術面板現依 URL 將進行中的圖像元素暫存（`pendingImages`），並在重新算繪時重用它們而非發出重複請求；該元素僅在 `load` 或 `error` 時移出快取。一項 Node 契約測試鎖定了此重用行為。
 - Run 31953234137：分片 10（art）的兩項全螢幕檢視測試失敗。上述重用引入了陳舊閉包回歸：附加至重用元素的接聽器閉包捕獲了 `renderScene` 的 `model` *參數*（首次算繪的快照），因此 `model.sceneFullView = true` 修改了失效的物件。該參數更名為 `panelModel`，使接聽器讀取外掛層級的 `model`，而 `render()` 始終保持其為最新狀態；完整的 `test_browser_art` 模組（14 項測試）再次全數通過。進一步 CI 觀察後的重新平衡仍維持為清單編輯加上契約測試。
+
+### 2026-09-06：依 CI 實測重新平衡為 10 個 Evennia 分片與 18 個瀏覽器分片
+
+CI run 33979656279 的分級實測（job 總時數）顯示僅兩個家族超出 5 分鐘預算：Evennia 分片 5（maps-webclient-imports-prompts-tests）為 5 分 06 秒（run-step 4.8 分鐘、1,568 項測試 268.6 秒），以及多個瀏覽器分片（5.2 至 9.1 分鐘）。瀏覽器 runner 的固定開銷（雙 checkout、雙 uv sync、pnpm install+build、Chromium 安裝）約為 54 秒，Evennia runner 約 15–55 秒，因此重打包直接以 run-step 預算為目標。
+
+- `.github/evennia-shards.json` 由 6 個分片重切為 **10 個**：rules-a/b/c 與 quests-skills-art-ai-lore 原封不動（實測 1.8–2.8 分鐘）；原分片 5 依成本拆為四個專責分片——`webclient-actions`（含 `world.tests`）、`webclient-evidence`（`web.webclient.tests`，節點/vitest 轉接子行程最昂貴）、`maps-imports-prompts-observability`，以及按測試數對半切分的 `webclient-presentation-a`/`-b`（684 項測試，341/343）；`commands-server-typeclasses` 移至索引 5。預計每個 Evennia run-step ≤ 約 2 分鐘。
+- `.github/browser-shards.json` 由 16 個分片重打包為 **18 個**（36 個行程清單）：以每個類別/method 的 CI 實測每測試權重（重型專用伺服器類別 40–55 秒、共享伺服器類別約 6–12 秒加一次開機）做 LPT 打包，單一走清單上限約 235 秒，預計最壞瀏覽器 job 總時數約 4.8 分鐘。重型類別維持方法層級分割（每清單最多 3–4 個 method），共享伺服器類別以類別層級標籤打包，確保每個類別只在單一行程執行一次開機。
+- 擁有權契約（`tests/test_evennia_test_optimization_contract.py`）在離線以相同 AST 解析演算法驗證：378 個非瀏覽器模組各由恰好一個分片擁有；269 個瀏覽器 method 各由 36 個行程清單中的恰好一個擁有。索引皆唯一且排序；本次未改動 workflow 與測試檔。
+- 並行工作數為 1 preflight + 10 evennia + 18 browser + 1 frontend + 1 top-level + 1 gate = 32；超出 20 並行上限的工作排隊執行，因每個 job 本身 ≤ 5 分鐘，僅影響總牆鐘時間而非單一 job 預算。
