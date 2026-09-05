@@ -186,6 +186,18 @@ class Account(DefaultAccount):
             render_pending_character_login(self, session=session)
             return
 
+    def set_last_puppet(self, character) -> bool:
+        """Record a verified character as the account's last active puppet.
+
+        Only characters owned by this account are persisted as _last_puppet.
+        Returns True if persisted, False otherwise.
+        """
+        characters = getattr(self, "characters", None) or []
+        if character is not None and character in characters:
+            self.db._last_puppet = character
+            return True
+        return False
+
 
 class Guest(DefaultGuest):
     """

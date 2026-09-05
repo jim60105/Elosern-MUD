@@ -628,6 +628,15 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
     },
     {
+      id: "EXPECTED SILENCE: account.character.switch presentation control",
+      ids: ["account.character.switch"],
+      silence: true,
+      prepare() {
+        openExploration();
+        store.dispatchAction("account.character.switch", { character_id: 2 });
+      },
+    },
+    {
       id: "blocked duplicate dispatch (in flight) adds no second line",
       ids: ["explore.wait"],
       prepare() {
@@ -676,7 +685,11 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         `${actionId} must have a behavioral table row (silent controls included)`,
       ).toBe(true);
     }
-    expect(SILENT_IDS).toEqual(["creation.roll_name", "options.dismiss"]);
+    expect(SILENT_IDS).toEqual([
+      "account.character.switch",
+      "creation.roll_name",
+      "options.dismiss",
+    ]);
   });
 
   it("a fill never overrides an explicitly provided descriptor field", () => {
