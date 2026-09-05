@@ -92,10 +92,15 @@ server validator rather than emitted. The client's global envelope gate (list-it
 clear the maximal affordance list so a large room's form is never rejected before panel
 validation. The production client mirror's action-code enumerations (context-action codes,
 exploration action ids) and its affordance `params` validation branches SHALL stay in lockstep
-with the server vocabulary: every code in `ACTION_CODE_ALLOWLIST` appears in each client
-enumeration and has a params branch accepting exactly the server validator's accepted shape and
-rejecting everything else; the parity SHALL be pinned by dependency-free Node test fixtures
-carrying the server's authoritative code list and accept/reject params vectors.
+with the server vocabulary. `CONTEXT_ACTIONS_ACTION_CODES` is the full 10-code sequence and
+SHALL contain every code in `ACTION_CODE_ALLOWLIST`. `EXPLORATION_ACTION_IDS` is intentionally
+the target-scoped subset (affordances that require an NPC target identity) — `explore.move`,
+`explore.look`, and `explore.wait` are intentionally absent because they are never emitted as
+per-target affordances; adding `explore.possess` and `explore.possess_release` brings this list
+to seven entries. Every code in each enumeration SHALL have a params branch accepting exactly the
+server validator's accepted shape and rejecting everything else; the parity SHALL be pinned by
+dependency-free Node test fixtures carrying the server's authoritative code lists and accept/reject
+params vectors.
 
 #### Scenario: The context form mirrors the vocabulary exactly
 - **WHEN** the exploration form is rendered for a fixture room

@@ -3824,6 +3824,9 @@ test("possession affordances are closed exploration and context actions with exa
   ];
   assert.deepEqual(Protocol.CONTEXT_ACTIONS_ACTION_CODES, EXPECTED_ACTION_CODES);
 
+  // EXPLORATION_ACTION_IDS is intentionally the target-scoped subset (affordances requiring an
+  // NPC target identity). explore.move, explore.look, and explore.wait are omitted because they
+  // are never emitted as per-target affordances. Update if target-scoped vocabulary changes.
   const EXPECTED_EXPLORATION_ACTION_IDS = [
     "explore.talk_scripted",
     "explore.talk_freeform",

@@ -2,7 +2,7 @@
 
 This module owns the shared, read-only affordance rules for a puppeted player
 in exploration mode: the frozen discriminated :class:`AffordanceView` contract
-(action vs navigation), the eight emitted action codes plus the guild/shop
+(action vs navigation), the ten emitted action codes plus the guild/shop
 surfaces, validator-normalized params, the freeform binding-only exception, the
 idle baseline, the suggestion-eligibility layer, and the deterministic
 ``default_cards()`` degradation derivation.
@@ -40,7 +40,7 @@ from world.rules.service_gate import (
 )
 from world.observability import log_warn
 
-# The eight action codes the vocabulary may emit. ``explore.interact`` is
+# The ten action codes the vocabulary may emit. ``explore.interact`` is
 # deliberately absent: the exploration panel's interact group is a label over
 # per-target affordances, never a dispatcher action.
 ACTION_CODE_ALLOWLIST = (
