@@ -253,9 +253,9 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
                 "selector": '[data-testid="narrative-feed"]',
                 "predicate": (
                     "() => { const el = document.querySelector('[data-testid=\"narrative-feed\"]'); "
-                    "return !!el && el.innerText.indexOf('冒險者公會') !== -1; }"
+                    "return !!el && el.innerText.indexOf('先在櫃檯註冊成為冒險者') !== -1; }"
                 ),
-                "description": "narrative feed shows the adventurers' guild",
+                "description": "narrative feed shows the registration dialogue line",
             },
         )
 
