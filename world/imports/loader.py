@@ -8,6 +8,7 @@ from evennia.utils.create import create_object
 
 from typeclasses.entities import LivingEntity
 from typeclasses.npcs import NPC
+from world.imports import assembly
 from world.imports.validate import (
     BatchReport,
     Issue,
@@ -16,8 +17,10 @@ from world.imports.validate import (
 )
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.observability import log_info, log_warn
+from world.rules import profession_config
 from world.rules.npc_identity import validate_npc_title
-from world.rules.traits import _trait_config, race_floor
+from world.rules.npc_schedules import set_npc_schedule
+from world.rules.traits import _trait_config, build_initial_traits, race_floor
 
 
 class ImportRejected(Exception):
@@ -86,10 +89,99 @@ def _flag_existing_npc_names(report: BatchReport) -> list[str]:
     return sorted(taken)
 
 
-def _resolve_trait_values(record: dict[str, Any]) -> dict[str, int]:
+def _resolve_trait_values(
+    record: dict[str, Any], tier: str | None = None
+) -> dict[str, int]:
+    """Build the trait values the record's stats describe.
+
+    The tier branch is the profession line's ONLY tier influence (design D4):
+    it runs when the caller passes a registry ``default_tier`` AND the record
+    declares no literal stats, and it routes through the race-baseline tiered
+    construction (``build_initial_traits(race, subrace, tier)`` — the same
+    construction ``initial_trait_config`` wraps). A record declaring any
+    literal stat keeps the unchanged race-floor-plus-literals path, and every
+    ``tier=None`` call is byte-identical to the pre-change loader.
+    """
+    stats = record["stats"]
+    if tier is not None and not stats:
+        return build_initial_traits(record["race"], record.get("subrace"), tier)
     values = race_floor(RACE_REGISTRY[record["race"]])
-    values.update(record["stats"])
+    values.update(stats)
     return values
+
+
+def _apply_profession(
+    record: dict[str, Any],
+    entity: LivingEntity,
+    typeclass: type[LivingEntity],
+    profession_row: profession_config.Profession | None = None,
+) -> None:
+    """Assemble the record's profession blueprint onto the constructed entity.
+
+    Runs inside the caller's all-or-nothing transaction, after the attribute
+    writes. The validation phase already rejected an incomplete plan as a
+    named batch issue; this is the second, fail-closed gate (the same
+    ``resolve_plan`` the validator ran), so the batch can never persist a
+    half-assembled or identity-less component set. Construction uses the
+    validator's resolved ROW snapshot (``profession_row``) whenever the caller
+    is the validated boundary, never a fresh cache lookup, so a rulebook
+    reload between the two gates cannot mix rows inside one entity. An absent
+    ``profession`` is a no-op on the first statement — the byte-identity
+    guarantee.
+    """
+    profession_key = record.get("profession")
+    if not profession_key:
+        return
+    if not issubclass(typeclass, NPC):
+        # Unreachable through the validated load boundary (validation names it
+        # as an issue); the explicit raise keeps a direct caller honest.
+        raise ValueError(
+            f"record {record['key']!r}: profession {profession_key!r} assembles "
+            f"NPC components only, not {typeclass.__name__}"
+        )
+    profession = (
+        profession_row
+        if profession_row is not None
+        else profession_config.get_profession(profession_key)
+    )
+    if profession is None:
+        raise ValueError(
+            f"record {record['key']!r}: unknown profession {profession_key!r}"
+        )
+    plan = assembly.resolve_plan(profession, record)
+    for type_key, kwargs in plan:
+        missing = assembly.missing_identity_kwargs(type_key, kwargs)
+        if missing:
+            raise ValueError(
+                f"record {record['key']!r}: profession component {type_key!r} "
+                f"is missing authored identity kwargs {missing}"
+            )
+    component_class_by_key = assembly.PROFESSION_COMPONENT_TYPES
+    attached: list[str] = []
+    for type_key, kwargs in plan:
+        component_class = component_class_by_key[type_key]
+        # The same attach path the guild service-host sync uses: add the class
+        # through the component holder only when the slot is free, so
+        # assembly never duplicates a component slot.
+        if not entity.components.has(component_class.name):
+            entity.components.add(component_class.create(entity, **kwargs))
+            attached.append(type_key)
+    if profession.schedule_template is not None and isinstance(entity, NPC):
+        set_npc_schedule(
+            entity,
+            {"schema_version": 1, "template": profession.schedule_template},
+        )
+    # Emitted only when the enclosing transaction commits: a later record can
+    # still fail and roll the whole batch back, and a success event must never
+    # describe an NPC that was never persisted. The context is frozen at
+    # registration time.
+    transaction.on_commit(
+        lambda context={
+            "char": record["key"],
+            "profession": profession_key,
+            "components": list(attached),
+        }: log_info("import_profession_assembled", context=context)
+    )
 
 
 def instantiate_character(
@@ -104,7 +196,7 @@ def instantiate_character(
     one import at a time); an ordinary transaction does not serialize a
     missing-row check.
     """
-    report = validate_character(record)
+    report = validate_character(record, typeclass)
     if not report.is_valid:
         rejected = BatchReport([report])
         _log_rejection(rejected, typeclass, "validation")
@@ -120,7 +212,9 @@ def instantiate_character(
         # The validated record carries the lineage auto-seed normalization
         # (use-driven-skill-lineage DC6): ownership closure and exact seeded
         # proficiency. Instantiate exactly what was validated.
-        entity = _instantiate_validated_character(report.record, typeclass)
+        entity = _instantiate_validated_character(
+            report.record, typeclass, report.profession_row
+        )
     # Only after the transaction exited successfully (same contract as
     # load_batch's commit event).
     log_info(
@@ -148,8 +242,26 @@ def _resolve_affinity_elements(record: dict[str, Any]) -> list[str]:
     return list(record.get("affinity_elements") or ())
 
 
+def _profession_default_tier(
+    record: dict[str, Any],
+    profession_row: profession_config.Profession | None = None,
+) -> str | None:
+    """The row's default tier, visible only to the empty-stats trait path."""
+    profession_key = record.get("profession")
+    if not profession_key or record["stats"]:
+        return None
+    profession = (
+        profession_row
+        if profession_row is not None
+        else profession_config.get_profession(profession_key)
+    )
+    return profession.default_tier if profession is not None else None
+
+
 def _instantiate_validated_character(
-    record: dict[str, Any], typeclass: type[LivingEntity] = NPC
+    record: dict[str, Any],
+    typeclass: type[LivingEntity] = NPC,
+    profession_row: profession_config.Profession | None = None,
 ) -> LivingEntity:
     # The title's second, fail-closed gate runs BEFORE construction (design
     # D3): a caller that reached this seam with an unvalidated record raises
@@ -169,7 +281,11 @@ def _instantiate_validated_character(
     if isinstance(entity, NPC):
         entity.npc_title = title
     entity._apply_trait_config(
-        _trait_config(_resolve_trait_values(record))
+        _trait_config(
+            _resolve_trait_values(
+                record, _profession_default_tier(record, profession_row)
+            )
+        )
     )
     entity.db.disguised_stats = record["disguised_stats"] or None
     entity.db.persona = record["persona"]
@@ -191,6 +307,7 @@ def _instantiate_validated_character(
     entity.db.age = record["age"]
     entity.db.apparent_age = record["apparent_age"]
     entity.db.portrait_policy = {"mode": "named", "stable_key": record["key"]}
+    _apply_profession(record, entity, typeclass, profession_row)
     return entity
 
 
@@ -206,7 +323,7 @@ def load_batch(
     one batch at a time); an ordinary transaction does not serialize a
     missing-row check.
     """
-    report = validate_batch(paths)
+    report = validate_batch(paths, typeclass)
     if not report.all_valid:
         _log_rejection(report, typeclass, "validation")
         raise ImportRejected(report)
@@ -218,8 +335,10 @@ def load_batch(
             _log_rejection(report, typeclass, "existing_npc_name")
             raise ImportRejected(report)
         entities = [
-            _instantiate_validated_character(record, typeclass)
-            for record in report.character_records
+            _instantiate_validated_character(
+                record_report.record, typeclass, record_report.profession_row
+            )
+            for record_report in report.character_reports
         ]
         # Post-commit portrait ensure, registered inside the all-or-nothing
         # batch so a rolled-back import emits nothing. The callback is the
