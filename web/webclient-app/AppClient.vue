@@ -91,6 +91,22 @@ function panelAvailable(name) {
   return !!p && p.available !== false;
 }
 
+// Tab-completion candidates from the committed exploration panel only
+// (webclient-align-02-quickbar-shortcuts): exit move-row labels and
+// interact-target display names. An unavailable or absent panel contributes
+// nothing — the client never reads uncommitted state.
+const completionCandidates = computed(() => {
+  const p = panelAvailable("exploration") ? panel("exploration") : null;
+  if (!p) {
+    return [];
+  }
+  const exits = Array.isArray(p.move) ? p.move.map((row) => row?.label).filter(Boolean) : [];
+  const targets = Array.isArray(p.interact)
+    ? p.interact.map((row) => row?.display_name).filter(Boolean)
+    : [];
+  return [...exits, ...targets];
+});
+
 // H1 contextual HUD (design D4/D9): the bounded caption card's `完整日誌`
 // control opens the full-log overlay; the overlay presents the complete
 // retained narrative through the same markup renderer (one markup path).
@@ -762,6 +778,7 @@ onMounted(() => {
         :low-hp="store.view.vitals.lowHp"
         :text-to-html="store.view.textToHtml"
         :in-flight="store.view.dispatch.inFlight !== null"
+        :completion-candidates="completionCandidates"
         @submit-command="onSubmitCommand"
         @focus-lost="store.clearFreeformTarget()"
         @open-full-log="openFullLog"

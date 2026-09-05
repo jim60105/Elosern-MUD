@@ -121,7 +121,7 @@ class CmdSleep(Command):
 
 class CmdWaitUntil(Command):
     key = "wait"
-    aliases = ("等待",)
+    aliases = ("等待", "w")
 
     def func(self) -> None:
         prefix = "until "

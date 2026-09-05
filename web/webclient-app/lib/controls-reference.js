@@ -29,8 +29,9 @@ export const CONTROLS_REFERENCE = [
   },
   {
     key: "Tab",
-    label: "Cycle focus within a focus-trapped surface",
-    detail: "Hidden and disabled controls are skipped.",
+    label: "Complete the command draft",
+    detail:
+      "Inside the command field: complete against history, chip badge letters, and the room's exits and targets; several matches cycle (Shift+Tab reverses), and focus never leaves the field (Escape returns it). Inside a focus-trapped surface it cycles focus; hidden and disabled controls are skipped.",
   },
   {
     key: "1-4",
@@ -41,7 +42,13 @@ export const CONTROLS_REFERENCE = [
   {
     key: "Quick-word chips",
     label: "Prepare a command without submitting",
-    detail: "The chip writes its verb plus a trailing space into the field and focuses it.",
+    detail: "The chip writes its badge letter plus a trailing space into the field and focuses it.",
+  },
+  {
+    key: "l g s t w / s c",
+    label: "Prepare a quick command by key",
+    detail:
+      "Outside any text field, in exploration l/g/s/t/w and in combat s/c insert the badge letter of that quick command and focus the field (creation binds none).",
   },
 ];
 

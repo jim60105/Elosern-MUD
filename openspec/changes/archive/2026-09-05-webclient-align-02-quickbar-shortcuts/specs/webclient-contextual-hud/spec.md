@@ -66,8 +66,9 @@ deduplicated). With exactly one matching candidate the field SHALL hold the full
 the caret at its end; with several the field SHALL hold the longest common prefix and successive
 Tab presses SHALL cycle the matching candidates, with Shift+Tab reversing the cycle. A draft that
 matches no candidate SHALL leave the field untouched, and Tab SHALL never move focus away from the
-field while candidates match. The completion cycle SHALL reset when the draft text is edited
-manually.
+field at all (the release path is Escape, which the dock's shortcut legend names). The completion
+cycle SHALL reset when the draft text is edited manually, and a change to the committed candidate
+sources SHALL drop any in-flight cycle.
 
 The history controls SHALL be labelled controls that drive the same history-walk state the recall
 keys drive — one walk reached by two input paths — and SHALL NOT submit. No surface of the command

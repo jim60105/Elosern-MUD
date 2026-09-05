@@ -128,7 +128,9 @@ describe("CommandLine (H5, webclient-hud-05-overlays-and-command-line)", () => {
     expect(chip.exists()).toBe(true);
     chip.trigger("click");
     await w.vm.$nextTick();
-    expect(input.element.value).toBe("看 ", "the chip's label plus a trailing space");
+    // webclient-align-02: the insert text is the badge letter (the installed
+    // command word), not the zh-TW label.
+    expect(input.element.value).toBe("l ", "the chip's badge letter plus a trailing space");
     expect(document.activeElement).toBe(input.element, "focus moves to the field");
     expect(w.emitted("submit")).toBeUndefined();
   });
@@ -155,6 +157,134 @@ describe("CommandLine (H5, webclient-hud-05-overlays-and-command-line)", () => {
       }
     });
     expect(ruleLoaded).toBe(true, "the mode-gate CSS rule is loaded and hides the group");
+  });
+
+  // webclient-align-02-quickbar-shortcuts: the truthful hint + Tab completion.
+  it("the hint cluster states exactly the draft's history + completion affordance", () => {
+    const w = mountLine();
+    expect(w.get(".hint").text()).toBe("↑↓ 歷史 · Tab 補全");
+  });
+
+  function pressTab(w, opts = {}) {
+    const input = w.get("textarea#inputfield");
+    pressKey(input.element, "Tab", opts);
+    return input;
+  }
+
+  function typeInto(w, text) {
+    const input = w.get("textarea#inputfield");
+    input.element.value = text;
+    input.trigger("input");
+    return input;
+  }
+
+  it("Tab completes a unique candidate with the caret at its end", async () => {
+    const w = mountLine({ completionCandidates: ["西風酒館"] });
+    const input = typeInto(w, "西風");
+    input.element.focus();
+    await w.vm.$nextTick();
+    pressTab(w);
+    await w.vm.$nextTick();
+    expect(input.element.value).toBe("西風酒館");
+    expect(document.activeElement).toBe(input.element, "focus never leaves the field");
+  });
+
+  it("Tab completes to the longest common prefix then cycles; Shift+Tab reverses", async () => {
+    const w = mountLine({
+      history: ["cast wind_blade", "cast wind_wall"],
+      completionCandidates: ["西風酒館", "北岸大道"],
+    });
+    typeInto(w, "cast w");
+    await w.vm.$nextTick();
+    pressTab(w);
+    await w.vm.$nextTick();
+    expect(w.get("textarea#inputfield").element.value).toBe("cast wind_");
+    pressTab(w);
+    await w.vm.$nextTick();
+    expect(w.get("textarea#inputfield").element.value).toBe("cast wind_blade");
+    pressTab(w);
+    await w.vm.$nextTick();
+    expect(w.get("textarea#inputfield").element.value).toBe("cast wind_wall");
+    // wraps back to the LCP rung
+    pressTab(w);
+    await w.vm.$nextTick();
+    expect(w.get("textarea#inputfield").element.value).toBe("cast wind_");
+    // Shift+Tab steps back onto the previous candidate
+    pressKey(w.get("textarea#inputfield").element, "Tab", { shiftKey: true });
+    await w.vm.$nextTick();
+    expect(w.get("textarea#inputfield").element.value).toBe("cast wind_wall");
+  });
+
+  it("Tab is stable across candidate kinds: mode chip letters join the set", async () => {
+    const w = mountLine({ mode: "exploration" });
+    typeInto(w, "s");
+    await w.vm.$nextTick();
+    pressTab(w);
+    await w.vm.$nextTick();
+    // only the chip letter `s` (and nothing else) matches — unique completion
+    expect(w.get("textarea#inputfield").element.value).toBe("s");
+  });
+
+  it("a manual edit resets the cycle and re-derives from the new draft", async () => {
+    const w = mountLine({
+      history: ["cast wind_blade", "cast wind_wall"],
+    });
+    typeInto(w, "cast w");
+    await w.vm.$nextTick();
+    pressTab(w);
+    await w.vm.$nextTick();
+    expect(w.get("textarea#inputfield").element.value).toBe("cast wind_");
+    typeInto(w, "西");
+    await w.vm.$nextTick();
+    pressTab(w);
+    await w.vm.$nextTick();
+    // no candidate matches 西 — the field is untouched by the stale cycle
+    expect(w.get("textarea#inputfield").element.value).toBe("西");
+  });
+
+  it("a candidate-source change drops the in-flight cycle", async () => {
+    // The draft stays untouched, but the stale cycle must not keep offering
+    // candidates the committed sources no longer contain.
+    const w = mountLine({
+      history: ["cast wind_blade", "cast wind_wall"],
+      completionCandidates: ["西風酒館", "北岸大道"],
+    });
+    typeInto(w, "cast w");
+    await w.vm.$nextTick();
+    pressTab(w);
+    await w.vm.$nextTick();
+    expect(w.get("textarea#inputfield").element.value).toBe("cast wind_");
+    // The room changes: the exit rows disappear and history is replaced.
+    w.setProps({
+      history: ["look"],
+      completionCandidates: [],
+    });
+    await w.vm.$nextTick();
+    // Re-deriving from the retained draft finds no candidate -> the field is
+    // left alone (a surviving stale cycle would instead re-offer wind_wall).
+    pressTab(w);
+    await w.vm.$nextTick();
+    expect(w.get("textarea#inputfield").element.value).toBe("cast wind_");
+  });
+
+  it("an unmatched draft leaves text and focus unchanged (Tab never escapes)", async () => {
+    const w = mountLine({ completionCandidates: ["西風酒館"] });
+    const input = typeInto(w, "zzz");
+    input.element.focus();
+    await w.vm.$nextTick();
+    pressTab(w);
+    await w.vm.$nextTick();
+    expect(input.element.value).toBe("zzz");
+    expect(document.activeElement).toBe(input.element, "Tab never moves focus out");
+  });
+
+  it("Tab completion matches the text before the caret", async () => {
+    const w = mountLine({ completionCandidates: ["西風酒館"] });
+    const input = typeInto(w, "西風酒館 殘尾");
+    input.element.setSelectionRange(2, 2);
+    pressTab(w);
+    await w.vm.$nextTick();
+    expect(w.get("textarea#inputfield").element.value).toBe("西風酒館");
   });
 
   it("the prompt line honors the text-to-HTML preference (task 7.7)", () => {
