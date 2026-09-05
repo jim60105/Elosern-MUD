@@ -17,6 +17,8 @@
     "explore.move",
     "explore.party_invite",
     "explore.party_leave",
+    "explore.possess",
+    "explore.possess_release",
     "explore.talk_freeform",
     "explore.talk_scripted",
     "explore.wait",

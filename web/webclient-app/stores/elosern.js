@@ -2462,7 +2462,8 @@ export const useElosernStore = defineStore("elosern", () => {
       actionId === "explore.talk_scripted" ||
       actionId === "explore.talk_freeform" ||
       actionId === "explore.party_invite" ||
-      actionId === "explore.party_leave"
+      actionId === "explore.party_leave" ||
+      actionId === "explore.possess"
     ) {
       if (!has("npcLabel")) {
         const name = explorationTargetName(payload.npc_id);

@@ -154,6 +154,13 @@
       var npc = label(display && display.npcLabel);
       return npc === null ? null : join(["leave", npc]);
     },
+    "explore.possess": function (payload, display) {
+      var npc = label(display && display.npcLabel);
+      return npc === null ? null : join(["possess", npc]);
+    },
+    "explore.possess_release": function (payload, display) {
+      return "unpossess";
+    },
     "explore.engage": function (payload, display) {
       var target = label(display && display.targetLabel);
       return target === null ? null : join(["engage", target]);

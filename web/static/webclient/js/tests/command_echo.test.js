@@ -82,6 +82,28 @@ test("explore.party_leave resolves to leave <NPC>", () => {
   );
 });
 
+test("explore.possess resolves to possess <NPC>", () => {
+  assert.strictEqual(
+    Echo.commandLine(
+      "explore.possess",
+      { npc_id: "innkeeper" },
+      { npcLabel: "艾洛希雅" }
+    ),
+    "possess 艾洛希雅"
+  );
+});
+
+test("explore.possess_release resolves to unpossess", () => {
+  assert.strictEqual(
+    Echo.commandLine(
+      "explore.possess_release",
+      { npc_id: "innkeeper" },
+      {}
+    ),
+    "unpossess"
+  );
+});
+
 test("explore.engage resolves to engage <target>", () => {
   assert.strictEqual(
     Echo.commandLine(
@@ -578,6 +600,8 @@ const REGISTERED_MUTATION_ACTIONS = {
   "explore.move": { payload: { exit_ref: "e1", current_node: "n1" }, display: { exitLabel: "北門" } },
   "explore.party_invite": { payload: { npc_id: "bard" }, display: { npcLabel: "吟遊詩人" } },
   "explore.party_leave": { payload: { npc_id: "bard" }, display: { npcLabel: "吟遊詩人" } },
+  "explore.possess": { payload: { npc_id: "bard" }, display: { npcLabel: "吟遊詩人" } },
+  "explore.possess_release": { payload: { npc_id: "bard" }, display: {} },
   "explore.talk_freeform": { payload: { npc_id: "bard", speech: "你好" }, display: { npcLabel: "吟遊詩人" } },
   "explore.talk_scripted": { payload: { npc_id: "bard", keyword_id: "guild" }, display: { npcLabel: "吟遊詩人", keywordLabel: "公會" } },
   "explore.wait": { payload: { daypart: "dusk" }, display: {} },

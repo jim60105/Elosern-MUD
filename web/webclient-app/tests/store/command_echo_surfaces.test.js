@@ -491,6 +491,24 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "leave 店長",
     },
     {
+      id: "possess intent (central fill)",
+      ids: ["explore.possess"],
+      prepare() {
+        openExploration();
+        store.dispatchAction("explore.possess", { npc_id: 7 });
+      },
+      expected: "possess 店長",
+    },
+    {
+      id: "possess release intent",
+      ids: ["explore.possess_release"],
+      prepare() {
+        openExploration();
+        store.dispatchAction("explore.possess_release", { npc_id: 7 });
+      },
+      expected: "unpossess",
+    },
+    {
       id: "exploration row: wait a daypart",
       ids: ["explore.wait"],
       prepare() {
