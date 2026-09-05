@@ -63,15 +63,19 @@ _MALFORMED = ServiceVerdict(False, REASON_MALFORMED_BINDING)
 
 
 def _warn_malformed(host: Any, component: Any) -> None:
-    """Emit at most ONE malformed-binding warn per host per session (ndb flag).
+    """Emit at most ONE malformed-binding warn per host per process (ndb flag).
 
-    The debounce flag lives on the host object (never-persistent): a
-    repeatedly-queried corrupt component must not spam the log per frame,
-    while a fresh session re-arms exactly one reminder.
+    The debounce flag lives on ``host.ndb`` (design 2026-09-05-service-
+    anchoring D3 — in-memory, never-persistent, keyed by object id): request
+    flows refetch typeclass instances, so a plain Python attribute would
+    re-arm per instance and spam the log. A repeatedly-queried corrupt
+    component emits exactly one warn per process; a restart re-arms one
+    reminder. The resolver's only write remains this bounded log flag.
     """
-    if getattr(host, "_service_gate_warned", None):
+    ndb = host.ndb
+    if getattr(ndb, "service_gate_malformed_warned", None):
         return
-    host._service_gate_warned = True
+    ndb.service_gate_malformed_warned = True
     log_warn(
         "service_gate_malformed_binding",
         context={
@@ -116,13 +120,19 @@ def service_available(actor: Any, host: Any, component: Any) -> ServiceVerdict:
     if isinstance(anchor_room_id, bool) or not isinstance(anchor_room_id, int):
         _warn_malformed(host, component)
         return _MALFORMED
-    # The anchor lives whenever its object row exists (Evennia deletes the
-    # location reference with the room, so no dangling-location state can
-    # masquerade as at-anchor); no object cache is populated for a room the
-    # resolver only needs to compare against.
+    # The anchor lives whenever a ROOM row with that id exists (Evennia
+    # deletes the location reference with the room, so no dangling-location
+    # state can masquerade as at-anchor). The query converts each row to its
+    # stored typeclass, so the isinstance gate rejects a stored id that
+    # points at a non-room object (import-time resolution pins rooms; this
+    # is the corruption defense in depth). A plain Room.objects filter would
+    # pin to one typeclass path and blind subclass rooms — same constraint
+    # world/maps/bootstrap.py documents.
     from evennia.objects.models import ObjectDB
+    from typeclasses.rooms import Room
 
-    if not ObjectDB.objects.filter(pk=anchor_room_id).exists():
+    anchor_row = next(iter(ObjectDB.objects.filter(pk=anchor_room_id)), None)
+    if anchor_row is None or not isinstance(anchor_row, Room):
         _warn_malformed(host, component)
         return _MALFORMED
     anchor_pk = getattr(host.location, "pk", None)

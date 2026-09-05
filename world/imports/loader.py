@@ -161,11 +161,26 @@ def _apply_profession(
     if anchor_tag:
         from evennia.utils.search import search_object_by_tag
 
-        found = search_object_by_tag(anchor_tag)
+        # A room tag names a ROOM: any tagged object (an NPC wearing the
+        # tag would make a person "anchor" a storefront) and an ambiguous
+        # multi-match are load-time rejections naming the record and tag —
+        # the anchor the components persist must be unambiguous or absent.
+        from typeclasses.rooms import Room
+
+        found = [
+            obj
+            for obj in search_object_by_tag(anchor_tag)
+            if isinstance(obj, Room)
+        ]
         if not found:
             raise ValueError(
                 f"record {record['key']!r}: anchor_room {anchor_tag!r} "
                 "resolves to no room"
+            )
+        if len(found) > 1:
+            raise ValueError(
+                f"record {record['key']!r}: anchor_room {anchor_tag!r} "
+                f"resolves to {len(found)} rooms; the anchor must be unique"
             )
         anchor_room = found[0]
     # The shared deterministic-core attach mechanism (declarative-service-hosts):

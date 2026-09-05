@@ -561,6 +561,53 @@ class AnchorRoomTests(ProfessionAssemblyHarness):
     @covers_requirement(
         "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
     )
+    def test_anchor_tag_on_a_non_room_object_is_rejected(self):
+        # A room tag names a ROOM: an NPC wearing the tag must never become
+        # a storefront's anchor.
+        from evennia.utils.create import create_object
+
+        squatter = create_object(NPC, key="tagged squatter")
+        squatter.tags.add("squatter_anchor")
+        record = self._merchant_record("npc_anchored_merchant")
+        record["anchor_room"] = "squatter_anchor"
+        blob = str(
+            self._raised_error(record, "squatter.json")
+        )
+        self.assertIn("npc_anchored_merchant", blob)
+        self.assertIn("squatter_anchor", blob)
+        self.assertFalse(
+            NPC.objects.filter(db_key="npc_anchored_merchant").exists()
+        )
+
+    @covers_requirement(
+        "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
+    )
+    def test_ambiguous_anchor_tag_is_rejected(self):
+        # Two rooms share the tag: the anchor must be unique or the batch is
+        # rejected — guessing silently persists a wrong storefront.
+        from evennia.utils.create import create_object
+        from typeclasses.rooms import Room
+
+        second = create_object(Room, key="second anchor")
+        second.tags.add("assembly_anchor")
+        record = self._merchant_record("ambiguous_anchor_merchant")
+        record["anchor_room"] = "assembly_anchor"
+        blob = str(self._raised_error(record, "ambiguous.json"))
+        self.assertIn("ambiguous_anchor_merchant", blob)
+        self.assertIn("assembly_anchor", blob)
+        self.assertFalse(
+            NPC.objects.filter(db_key="ambiguous_anchor_merchant").exists()
+        )
+
+    def _raised_error(self, record, name):
+        path = self.raw_write(name, record)
+        with self.assertRaises(ValueError) as ctx:
+            load_batch([path])
+        return ctx.exception
+
+    @covers_requirement(
+        "service-anchoring::service-components-carry-an-authored-person-or-place-binding"
+    )
     def test_unresolvable_anchor_tag_aborts_the_batch_naming_the_record(self):
         # Tag EXISTENCE is a load-time fact (validation is DB-free): the tag
         # passes validation and the in-transaction resolution failure aborts
