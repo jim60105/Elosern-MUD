@@ -38,11 +38,11 @@ GUILD_STAFF_TURNIN_KEYWORD = "回報"
 NO_UNDERSTANDING_LINE = "對方皺起眉頭：「我不太明白你的意思。」"
 
 # The session line bound mirrors the accepted-prose bounds the dialogue
-# responses already respect (``world.ai.narrator.MAX_PROSE_LENGTH`` and
-# ``world.ai.npc_dialogue.MAX_SPEECH_LENGTH``, both 2000). The parity is a
-# deliberate local constant: the transport boundary forbids ``world.rules``
-# from importing ``world.ai``, and a session line can never exceed the bound
-# its own producer authored it under.
+# responses already respect (the generative narrator's ``MAX_PROSE_LENGTH``
+# and the NPC-dialogue layer's ``MAX_SPEECH_LENGTH``, both 2000). The parity
+# is a deliberate local constant: the transport boundary forbids the rules
+# layer from importing the generative layer, and a session line can never
+# exceed the bound its own producer authored it under.
 MAX_DIALOGUE_SESSION_LINE_CODE_POINTS = 2000
 
 
