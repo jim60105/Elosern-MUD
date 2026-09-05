@@ -53,6 +53,9 @@ OVERLAYS_FAMILY_KEYS = (
     "Overlays/HelpOverlay",
     "Overlays/CreationOverlay",
     "Overlays/OverlayHost",
+    "Overlays/ObjectiveTracker",
+    "Overlays/PartyDrawer",
+    "Overlays/PartyStrip",
 )
 
 # The exact showcase story registration for the full overlays family: the
@@ -73,6 +76,18 @@ OVERLAYS_STORY_IDS = {
     "overlays-creationoverlay--custom-sex-roll",
     "overlays-creationoverlay--proposal",
     "overlays-creationoverlay--unavailable",
+    "overlays-partydrawer--two-companions",
+    "overlays-partydrawer--empty-party",
+    "overlays-partydrawer--full-party",
+    "overlays-partydrawer--combat-mode",
+    "overlays-partystrip--two-companions",
+    "overlays-partystrip--empty-party",
+    "overlays-partystrip--full-party",
+    "overlays-objectivetracker--active-objectives",
+    "overlays-objectivetracker--single-completed",
+    "overlays-objectivetracker--progress-counter",
+    "overlays-objectivetracker--with-deadline",
+    "overlays-objectivetracker--empty-rows",
 }
 
 # The deferred surfaces (roadmap §7): no dedicated Party panel, no
@@ -280,6 +295,7 @@ class VueShowcaseOverlaysEvidenceTest(unittest.TestCase):
             family_titles,
             {f"Overlays/{component}" for component in (
                 "MapOverlay", "SettingsOverlay", "HelpOverlay", "CreationOverlay",
+                "ObjectiveTracker", "PartyDrawer", "PartyStrip",
             )},
         )
 

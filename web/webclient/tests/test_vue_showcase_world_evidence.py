@@ -139,6 +139,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # The client-local action-feedback toast queue joined the frozen set
     # when add-action-feedback-toasts refroze the manifest at 42.
     "Feedback/ToastQueue",
+    "Overlays/ObjectiveTracker",
+    "Overlays/PartyDrawer",
+    "Overlays/PartyStrip",
 }
 
 
