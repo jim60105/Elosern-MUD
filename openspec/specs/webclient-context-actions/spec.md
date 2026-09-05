@@ -31,8 +31,13 @@ unavailable form otherwise:
 
 Every validation SHALL be server-side with a strict closed schema: unknown keys, wrong kinds,
 unpresent fields, underepresent fields, and out-of-bound values SHALL be rejected by the server
-validator, and the production client mirror SHALL enforce the same contract. The presenter SHALL
-be read-only: it SHALL NOT mutate traits, resources, buffs, sexual state, battlefield, session,
+validator, and the production client mirror SHALL enforce the same contract. Affordance
+`params` validation SHALL be a total function over the shared vocabulary's
+`ACTION_CODE_ALLOWLIST`: every code the vocabulary may emit SHALL have a registered payload
+validator (pinned by a test that the registered-key set covers the allowlist), and an
+unregistered code SHALL produce a structured protocol rejection naming the code — never a Python
+`KeyError` escaping into a calling presenter or suggestion validator. The presenter SHALL be
+read-only: it SHALL NOT mutate traits, resources, buffs, sexual state, battlefield, session,
 quest, location, party, or world time, and SHALL emit no live object or filesystem reference.
 
 #### Scenario: One available form per mode with suggestions
@@ -60,6 +65,13 @@ quest, location, party, or world time, and SHALL emit no live object or filesyst
 - **THEN** every combat field serializes exactly as it did at schema version 4, with only
   `schema_version` equal to 5 and the `suggestions` object `{"status": "unavailable"}` added
 
+#### Scenario: A possession affordance validates instead of raising
+- **WHEN** a bound companion in the room puts an `explore.possess` or `explore.possess_release`
+  affordance into the exploration form, or a suggestion card proposes one
+- **THEN** params validation runs the registered possession validator (accepting the canonical
+  shape, rejecting anything else structurally) and the panel/suggestion path never raises a
+  Python error
+
 ### Requirement: The exploration context form enumerates the complete canonical affordance list
 The exploration available form's `affordances` SHALL be a bounded list of exactly the
 `AffordanceView` objects produced by the shared vocabulary (`exploration-affordances`) in
@@ -78,7 +90,17 @@ exploration panel: the entry-count bound is a ceiling, not a guarantee that any 
 a form whose canonical serialization exceeds `MAX_CANONICAL_JSON_BYTES` SHALL be rejected by the
 server validator rather than emitted. The client's global envelope gate (list-item ceiling) SHALL
 clear the maximal affordance list so a large room's form is never rejected before panel
-validation.
+validation. The production client mirror's action-code enumerations (context-action codes,
+exploration action ids) and its affordance `params` validation branches SHALL stay in lockstep
+with the server vocabulary. `CONTEXT_ACTIONS_ACTION_CODES` is the full 10-code sequence and
+SHALL contain every code in `ACTION_CODE_ALLOWLIST`. `EXPLORATION_ACTION_IDS` is intentionally
+the target-scoped subset (affordances that require an NPC target identity) — `explore.move`,
+`explore.look`, and `explore.wait` are intentionally absent because they are never emitted as
+per-target affordances; adding `explore.possess` and `explore.possess_release` brings this list
+to seven entries. Every code in each enumeration SHALL have a params branch accepting exactly the
+server validator's accepted shape and rejecting everything else; the parity SHALL be pinned by
+dependency-free Node test fixtures carrying the server's authoritative code lists and accept/reject
+params vectors.
 
 #### Scenario: The context form mirrors the vocabulary exactly
 - **WHEN** the exploration form is rendered for a fixture room
@@ -91,3 +113,11 @@ validation.
   32 objects, baseline, navigation)
 - **THEN** the exploration form contains every vocabulary entry, passes the server validator, and
   is accepted by the client mirror without truncation
+
+#### Scenario: The client mirror accepts the possession codes
+- **WHEN** a version-5 exploration fixture carries an `explore.possess` entry with canonical
+  params and an `explore.possess_release` entry with canonical params (both codes carry exactly
+  the server validator's accepted `npc_id` shape)
+- **THEN** the client mirror's enumeration and params validation accept both, and reject mutated
+  params (missing or extra keys, wrong kinds, out-of-range ids) exactly as the server validator
+  does
