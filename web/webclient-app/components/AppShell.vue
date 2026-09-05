@@ -42,6 +42,12 @@ const props = defineProps({
   locationLabel: { type: String, default: null },
   timeLabel: { type: String, default: null },
   narrative: { type: Array, default: () => [] },
+  // The dialogue view model (webclient-align-08-dialogue-surface): forwarded
+  // verbatim to the feed's dialogue variant (null outside the available
+  // dialogue window).
+  dialogue: { type: Object, default: null },
+  // The committed `art` panel — the feed variant's portrait catalog source.
+  artPanel: { type: Object, default: null },
   connectionStatus: {
     type: String,
     default: "connecting",
@@ -84,7 +90,14 @@ const props = defineProps({
   completionCandidates: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(["submit-command", "open-full-log", "open-overlay", "focus-lost"]);
+const emit = defineEmits([
+  "submit-command",
+  "open-full-log",
+  "open-overlay",
+  "focus-lost",
+  "dialogue-pick",
+  "dialogue-freeform",
+]);
 
 const commandLine = ref(null);
 const feed = ref(null);
@@ -195,6 +208,10 @@ const HIDDEN_BY_MODE = {
   creation: "[data-anchor='feed'], [data-anchor='hud-left'], [data-anchor='command-line'], .local-map",
   combat: ".local-map",
   exploration: "",
+  // webclient-align-08-dialogue-surface: dialogue keeps the whole cockpit
+  // visible (the matrix's dialogue column) — nothing is hidden, so a mode
+  // flip into/out of dialogue never strands focus.
+  dialogue: "",
 };
 
 watch(
@@ -260,7 +277,11 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
           ref="feed"
           :mode="props.mode"
           :lines="props.narrative"
+          :dialogue="props.dialogue"
+          :art-panel="props.artPanel"
           @open-full-log="() => emit('open-full-log')"
+          @dialogue-pick="(pick) => emit('dialogue-pick', pick)"
+          @dialogue-freeform="() => emit('dialogue-freeform')"
         />
       </template>
       <template #dock>

@@ -37,6 +37,9 @@ const props = defineProps({
   // crumb trail (the shortcut legend lives in the tab bar's trailing hint
   // slot, task 4.7).
   guidancePrefix: { type: String, default: null },
+  // The dialogue-form flag (webclient-align-08-dialogue-surface): forwarded
+  // to the tab bar's legend branch (same single legend instance).
+  dialogueForm: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["action", "tab-click", "back"]);
@@ -92,6 +95,7 @@ function onPaneActivate(payload) {
       :focused-key="focusedKey"
       :view="view"
       :depth="depth"
+      :dialogue-form="dialogueForm"
       @tab-click="onTabClick"
     />
     <DockBreadcrumb

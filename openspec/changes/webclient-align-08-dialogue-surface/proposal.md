@@ -2,7 +2,7 @@
 
 ## Why
 
-Change 07 lands the `dialogue` panel, `dialogue` mode, and the session lifecycle, but the client
+Changes 07/10 landed the session lifecycle, the `dialogue` panel, and `dialogue` mode, but the client
 still presents conversation as plain narrative text: the draft's dialogue mode is a focused RPG
 dialogue box (64px avatar, gold speaker line with 羈絆 stage, serif reply) with numbered choice
 picks, a mirrored 對話選項 dock tab, and a HUD matrix where the whole cockpit STAYS visible while

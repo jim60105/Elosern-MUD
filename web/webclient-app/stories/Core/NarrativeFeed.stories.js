@@ -1,5 +1,6 @@
 import { h } from "vue";
 import NarrativeFeed from "../../components/NarrativeFeed.vue";
+import { dialogueViewModel } from "../../stores/dialogue-view.js";
 import {
   MARKUP_STRESS_SAMPLE,
   NARRATIVE_SAMPLE,
@@ -102,6 +103,39 @@ export const SemanticLines = {
   render: renderFeed,
   args: {
     mode: "exploration",
+    lines: [
+      { kind: "out", text: "晨霧貼著灰河的水面爬行，渡口的木棧浸在冷水裡。" },
+      { kind: "sys", text: "渡口有 1 名可互動的人物，並察覺到 1 處可疑痕跡。" },
+    ],
+  },
+};
+
+// The dialogue variant (webclient-align-08-dialogue-surface): the `.dlg` box
+// (avatar / gold speaker line with the bond stage / serif reply) over the
+// numbered picks and the trailing free-dialogue row, with the head reading
+// `對話` and no full-log capsule. The view model is the ONE derived shape over
+// the committed panel — the story builds it from the panel form, exactly as
+// AppClient does.
+const DIALOGUE_PANEL = {
+  schema_version: 1,
+  available: true,
+  kind: "dialogue",
+  host: { identity: 41, display_name: "灰婆婆", portrait_ref: null },
+  bond_stage: "親睦",
+  line: "「渡河要五枚銅板，多一子我也不走。」她瞥了你一眼，「倒是你，身上聞起來有點……不對味。別是背著什麼臟東西吧？」",
+  choices: [
+    { keyword_id: "fare", label: "「就五枚，走嗎？」" },
+    { keyword_id: "smell", label: "含糊帶過氣味" },
+    { keyword_id: "chest", label: "直接問箱櫃下落" },
+    { keyword_id: "silence", label: "保持沉默，觀察她下一步" },
+  ],
+};
+
+export const DialogueMode = {
+  render: renderFeed,
+  args: {
+    mode: "dialogue",
+    dialogue: dialogueViewModel(DIALOGUE_PANEL),
     lines: [
       { kind: "out", text: "晨霧貼著灰河的水面爬行，渡口的木棧浸在冷水裡。" },
       { kind: "sys", text: "渡口有 1 名可互動的人物，並察覺到 1 處可疑痕跡。" },

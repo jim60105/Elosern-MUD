@@ -117,6 +117,40 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     // The feed stays visible in combat, so focus is not rescued.
     expect(document.activeElement).toBe(feedEl);
   });
+
+  it("keeps the whole cockpit visible in dialogue mode (matrix dialogue column)", () => {
+    // webclient-align-08-dialogue-surface: the dialogue column hides nothing
+    // — the narrative caption, the HUD island stack, the minimap, the dock,
+    // and the command line all stay rendered; only the narrative
+    // presentation changes (the feed variant lives inside NarrativeFeed).
+    const dialogue = mountShell("dialogue", true);
+    expect(dialogue.find('[data-elosern-mode="dialogue"]').exists()).toBe(true);
+    expect(dialogue.find('[data-anchor="feed"]').exists()).toBe(true);
+    expect(dialogue.find('[data-anchor="hud-left"]').exists()).toBe(true);
+    expect(dialogue.find('[data-anchor="command-line"]').exists()).toBe(true);
+    expect(dialogue.find(".local-map").exists()).toBe(true);
+    expect(dialogue.find('[data-anchor="dock"]').exists()).toBe(true);
+
+    // The HudFrame gate rules name ONLY creation/combat — a dialogue mode
+    // can never match a display:none arm (source-level guard, the same
+    // style used by the dock-band ownership guard).
+    const css = styleBlock("components/HudFrame.vue");
+    // The gate arms exist (creation feed / combat minimap), and NO arm ever
+    // names the dialogue mode.
+    expect(css).toMatch(
+      /\.elosern-stage\[data-elosern-mode="creation"\] \[data-anchor="feed"\]/,
+    );
+    expect(css).toMatch(/\.elosern-stage\[data-elosern-mode="combat"\] \.local-map/);
+    expect(/data-elosern-mode="dialogue"/.test(css)).toBe(false);
+
+    // Flipping exploration → dialogue never strands focus: the shell's
+    // focus-rescue map carries an explicit empty dialogue row (nothing is
+    // hidden, so a focused feed keeps focus).
+    const feedEl = dialogue.find('[data-testid="narrative-feed"]').element;
+    feedEl.tabIndex = 0;
+    feedEl.focus();
+    expect(document.activeElement).toBe(feedEl);
+  });
 });
 
 describe("dock band ownership (webclient-align-01-dock-chrome)", () => {

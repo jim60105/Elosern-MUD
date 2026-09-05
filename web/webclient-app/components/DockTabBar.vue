@@ -28,6 +28,11 @@ const props = defineProps({
   // only while it is the active row container (depth 1); at depth ≥ 2 the
   // pane container takes over the hook (task 1.1).
   depth: { type: Number, default: 1 },
+  // The dialogue-form flag (webclient-align-08-dialogue-surface): while the
+  // dock presents the dialogue root form, the legend swaps to the draft's
+  // dialogue hint (`數字鍵 1–4 選 · <kbd>→</kbd> 指令列自由對話`) in the SAME
+  // single legend element.
+  dialogueForm: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["tab-click"]);
@@ -141,7 +146,8 @@ function onTabClick(tab) {
          frame); the `/` focus binding stays implemented but the draft's legend
          does not advertise it, and the legend stays truthful to the reference. -->
     <span class="dock-tab-bar__hint" data-testid="action-dock-description">
-      數字鍵 1–4 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回
+      <template v-if="dialogueForm">數字鍵 1–4 選 · <kbd>→</kbd> 指令列自由對話</template>
+      <template v-else>數字鍵 1–4 · <kbd>Enter</kbd> 執行 · <kbd>Esc</kbd> 返回</template>
     </span>
   </div>
 </template>

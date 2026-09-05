@@ -34,6 +34,7 @@ import ServiceMenu from "../lib/service_menu.js";
 import CombatMenu from "../lib/combat_menu.js";
 import CreationMenu from "../lib/creation_menu.js";
 import stableStringify from "../lib/stable_stringify.js";
+import { dialogueViewModel } from "./dialogue-view.js";
 
 // The one degradation marker shape. Frozen so a consumer can never mutate
 // the shared instance into a payload.
@@ -375,6 +376,7 @@ export function createFrameResolver(deps) {
 
     // --- creation family ----------------------------------------------------
     "creation.root": creationMenuSource("root"),
+
     "creation.presets": creationMenuSource("presets"),
     // The custom/concept forms render outside the dock (the overlay owns the
     // form); the frame exists so Escape has a level to pop. The empty marker
@@ -408,6 +410,29 @@ export function createFrameResolver(deps) {
         return marker(null);
       }
       return isolate(menu);
+    },
+
+    // --- dialogue family (webclient-align-08-dialogue-surface) ---------------
+    // The dialogue root frame carries the committed scripted picks plus the
+    // trailing free-dialogue row, derived through the ONE shared view model
+    // (the feed renders the same rows). `dialogueForm` marks the root shape
+    // the dock renders as one `對話選項` tab over a pane of picks; the empty
+    // focus key falls back to the free row so a zero-choice panel still keeps
+    // the free-dialogue affordance reachable. An unavailable panel degrades
+    // to the shared marker with the server-authored reason, like any lost
+    // frame.
+    "dialogue.root": () => {
+      const state = committed();
+      const panel = (state.panels && state.panels.dialogue) || null;
+      const vm = dialogueViewModel(panel);
+      if (!vm) return marker(panelReasonMessage(panel));
+      const items = [...vm.picks, vm.freeRow];
+      return isolate({
+        items,
+        focusKey: items.length > 0 ? items[0].key : null,
+        dialogueForm: true,
+        tabLabel: "對話選項",
+      });
     },
   };
 
