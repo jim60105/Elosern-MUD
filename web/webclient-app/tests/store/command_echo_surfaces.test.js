@@ -664,6 +664,18 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
     },
     {
+      // The caption exit row has no typed equivalent (the `talk` command
+      // requires a keyword): declared silent, dispatched with its exact wire
+      // payload; the server success line is the outcome (align-11 D7).
+      id: "EXPECTED SILENCE: explore.dialogue_leave exit control",
+      ids: ["explore.dialogue_leave"],
+      silence: true,
+      prepare() {
+        openExploration();
+        store.dispatchAction("explore.dialogue_leave", { npc_id: 41 });
+      },
+    },
+    {
       id: "blocked duplicate dispatch (in flight) adds no second line",
       ids: ["explore.wait"],
       prepare() {
@@ -716,6 +728,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       "account.character.create",
       "account.character.switch",
       "creation.roll_name",
+      "explore.dialogue_leave",
       "options.dismiss",
     ]);
   });
