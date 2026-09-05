@@ -358,6 +358,19 @@
   var DIALOGUE_MAX_KEYWORD_LABEL = 128;
   var DIALOGUE_MAX_LINE = 2000;
 
+  // Roster panel bounds (mirror of web.webclient.presentation.roster,
+  // webclient-character-roster): at most ten character rows in ascending
+  // identity order; exactly one current character; locked exactly when in
+  // active combat.
+  var ROSTER_SCHEMA_VERSION = 1;
+  var ROSTER_MAX_ROWS = 10;
+  var ROSTER_MAX_NAME = 128;
+  var ROSTER_MAX_SUBJECT_KEY = 128;
+  var ROSTER_MAX_ALT = 512;
+  var ROSTER_MAX_STATUS = 16;
+  var ROSTER_MAX_PLACEHOLDER_LABEL = 128;
+  var ROSTER_LOCK_REASON = "戰鬥中無法切換角色";
+
   var PANEL_ALLOWLIST = {
     art: 1,
     status: 2,
@@ -373,6 +386,7 @@
     dialogue: 1,
     title_ballot: 1,
     title_codex: 1,
+    roster: 1,
   };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
@@ -4663,6 +4677,166 @@
     return result;
   }
 
+  // Exact available roster panel v1 schema (mirror of
+  // web.webclient.presentation.roster, webclient-character-roster).
+  function validateRosterPortrait(value) {
+    requireExactFields(
+      value,
+      "roster portrait",
+      ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder"],
+      []
+    );
+    if (value.subject_key !== null) {
+      requireString(value.subject_key, "portrait subject_key", ROSTER_MAX_SUBJECT_KEY);
+    }
+    var status = value.status;
+    if (status !== null) {
+      requireString(status, "portrait status", ROSTER_MAX_STATUS);
+      if (["missing", "pending", "failed", "done"].indexOf(status) === -1) {
+        throw new Error("portrait status is not a stable value");
+      }
+    }
+    var url = value.url;
+    if (url !== null) {
+      requireString(url, "portrait url", ROSTER_MAX_SUBJECT_KEY);
+      if (url.indexOf("/art/") !== 0) {
+        throw new Error("portrait url must be a same-origin media URL");
+      }
+    }
+    if (value.aspect_ratio !== null && value.aspect_ratio !== "3:4") {
+      throw new Error("portrait aspect_ratio must be 3:4");
+    }
+    var alt = requireString(value.alt, "portrait alt", ROSTER_MAX_ALT);
+    if (!alt.trim()) {
+      throw new Error("portrait alt must be non-empty");
+    }
+    var placeholder = validateArtPlaceholder(value.placeholder);
+    if (url !== null && placeholder !== null) {
+      throw new Error("portrait cannot carry both url and placeholder");
+    }
+    if (url === null && placeholder === null) {
+      throw new Error("portrait must carry either url or placeholder");
+    }
+    return {
+      subject_key: value.subject_key,
+      status: status,
+      url: url,
+      aspect_ratio: value.aspect_ratio,
+      alt: alt,
+      placeholder: placeholder,
+    };
+  }
+
+  function validateRosterCharacter(value, index) {
+    var name = "roster character row " + index;
+    requireExactFields(
+      value,
+      name,
+      ["identity", "name", "current", "pending", "portrait"],
+      []
+    );
+    var identity = requireInt(value.identity, "identity", 1, MAX_SAFE_INTEGER);
+    var charName = requireString(value.name, "name", ROSTER_MAX_NAME);
+    if (!charName.trim() || hasLoneSurrogate(charName)) {
+      throw new Error(name + " name must be non-empty");
+    }
+    var current = requireBool(value.current, "current");
+    var pending = requireBool(value.pending, "pending");
+    var portrait = validateRosterPortrait(value.portrait);
+    return {
+      identity: identity,
+      name: charName,
+      current: current,
+      pending: pending,
+      portrait: portrait,
+    };
+  }
+
+  function validateRosterPanel(payload) {
+    requireExactFields(
+      payload,
+      "roster panel",
+      [
+        "schema_version",
+        "available",
+        "characters",
+        "max_characters",
+        "can_create",
+        "switch_locked",
+        "lock_reason",
+      ],
+      []
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== ROSTER_SCHEMA_VERSION) {
+      throw new Error("unsupported roster schema_version");
+    }
+    if (payload.available !== true) {
+      throw new Error("roster panel must be available");
+    }
+    var characters = payload.characters;
+    if (!Array.isArray(characters)) {
+      throw new Error("roster characters must be a list");
+    }
+    if (characters.length > ROSTER_MAX_ROWS) {
+      throw new Error(
+        "roster characters must hold at most " + ROSTER_MAX_ROWS + " entries"
+      );
+    }
+    var lastIdentity = 0;
+    var normalizedCharacters = [];
+    var currentCount = 0;
+    for (var i = 0; i < characters.length; i++) {
+      var row = validateRosterCharacter(characters[i], i + 1);
+      if (row.identity <= lastIdentity) {
+        throw new Error("roster character identities must be strictly ascending");
+      }
+      lastIdentity = row.identity;
+      if (row.current) {
+        currentCount++;
+      }
+      normalizedCharacters.push(row);
+    }
+    if (currentCount !== 1) {
+      throw new Error(
+        "roster characters must contain exactly one current character, found " + currentCount
+      );
+    }
+    var maxCharacters = requireInt(
+      payload.max_characters,
+      "max_characters",
+      1,
+      MAX_SAFE_INTEGER
+    );
+    var canCreate = requireBool(payload.can_create, "can_create");
+    var switchLocked = requireBool(payload.switch_locked, "switch_locked");
+    var lockReason = payload.lock_reason;
+    if (switchLocked) {
+      if (lockReason !== ROSTER_LOCK_REASON) {
+        throw new Error(
+          "lock_reason must be '" + ROSTER_LOCK_REASON + "' when switch_locked is true"
+        );
+      }
+    } else {
+      if (lockReason !== null) {
+        throw new Error("lock_reason must be null when switch_locked is false");
+      }
+    }
+    var result = {
+      schema_version: ROSTER_SCHEMA_VERSION,
+      available: true,
+      characters: normalizedCharacters,
+      max_characters: maxCharacters,
+      can_create: canCreate,
+      switch_locked: switchLocked,
+      lock_reason: lockReason,
+    };
+    if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("roster payload exceeds the OOB envelope limit");
+    }
+    return result;
+  }
+
   // Panel discriminator dispatch: the unavailable form is common to every
   // registered panel; the available form is validated against its schema.
   function validateUnavailablePanel(payload, schemaVersion) {
@@ -4753,6 +4927,9 @@
     }
     if (name === "title_ballot") {
       return validateTitleBallotPanel(payload);
+    }
+    if (name === "roster") {
+      return validateRosterPanel(payload);
     }
     throw new Error("panel " + name + " has no registered schema");
   }
@@ -5077,6 +5254,11 @@
     TITLE_CODEX_MAX_BALLOT: TITLE_CODEX_MAX_BALLOT,
     TITLE_CODEX_BASIS_WIRE_MAX: TITLE_CODEX_BASIS_WIRE_MAX,
     TITLE_CODEX_CATEGORIES: TITLE_CODEX_CATEGORIES.slice(),
+    validateRosterPanel: validateRosterPanel,
+    ROSTER_SCHEMA_VERSION: ROSTER_SCHEMA_VERSION,
+    ROSTER_MAX_ROWS: ROSTER_MAX_ROWS,
+    ROSTER_MAX_NAME: ROSTER_MAX_NAME,
+    ROSTER_LOCK_REASON: ROSTER_LOCK_REASON,
     validatePanel: validatePanel,
 
     // The only accepted client->server synchronization body.

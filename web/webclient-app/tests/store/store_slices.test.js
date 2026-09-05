@@ -26,6 +26,7 @@ const PANEL_ALLOWLIST = [
   "dialogue",
   "title_ballot",
   "title_codex",
+  "roster",
 ];
 
 function openActiveSession(store) {
@@ -719,5 +720,94 @@ describe("store view slices", () => {
     openActiveSession(store);
     expect(Array.isArray(store.view.explorationInteract)).toBe(true);
     expect(Array.isArray(store.explorationInteract)).toBe(true);
+  });
+
+  it("exposes roster slice when roster panel is available in snapshot", () => {
+    openActiveSession(store);
+    const rosterPanel = {
+      schema_version: 1,
+      available: true,
+      characters: [
+        {
+          identity: 1,
+          name: "艾莉亞",
+          current: true,
+          pending: false,
+          portrait: {
+            subject_key: "character:1",
+            status: "done",
+            url: "/art/portraits/character_1.png",
+            aspect_ratio: "3:4",
+            alt: "英雄肖像",
+            placeholder: null,
+          },
+        },
+        {
+          identity: 2,
+          name: "凱恩",
+          current: false,
+          pending: true,
+          portrait: {
+            subject_key: null,
+            status: null,
+            url: null,
+            aspect_ratio: null,
+            alt: "無肖像",
+            placeholder: { kind: "unavailable", label: "無肖像" },
+          },
+        },
+      ],
+      max_characters: 5,
+      can_create: true,
+      switch_locked: false,
+      lock_reason: null,
+    };
+    const result = store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          revision: 4,
+          presentation_epoch: fx.EPOCH_A,
+          panels: { status: fx.statusPanel(), roster: rosterPanel },
+        }),
+      ],
+      {}
+    );
+    expect(result.accepted).toBe(true);
+    expect(store.rosterAvailable).toBe(true);
+    expect(store.rosterCharacters).toHaveLength(2);
+    expect(store.rosterCharacters[0].name).toBe("艾莉亞");
+    expect(store.rosterCanCreate).toBe(true);
+    expect(store.rosterMaxCharacters).toBe(5);
+    expect(store.rosterSwitchLocked).toBe(false);
+    expect(store.rosterLockReason).toBe(null);
+  });
+
+  it("degrades roster slice to empty/unavailable when roster panel is unavailable or absent", () => {
+    openActiveSession(store);
+    const unavailableRoster = {
+      schema_version: 1,
+      available: false,
+      reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
+    };
+    store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          revision: 5,
+          presentation_epoch: fx.EPOCH_A,
+          panels: { status: fx.statusPanel(), roster: unavailableRoster },
+        }),
+      ],
+      {}
+    );
+    expect(store.rosterAvailable).toBe(false);
+    expect(store.rosterCharacters).toEqual([]);
+    expect(store.rosterCanCreate).toBe(false);
+    expect(store.rosterMaxCharacters).toBe(0);
+    expect(store.rosterSwitchLocked).toBe(false);
+    expect(store.rosterLockReason).toBe(null);
   });
 });

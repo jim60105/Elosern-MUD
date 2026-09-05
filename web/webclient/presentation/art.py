@@ -370,6 +370,7 @@ __all__ = [
     "MAX_SUBJECT_KEY",
     "PLACEHOLDER_KINDS",
     "ROLES",
+    "_placeholder_for",
     "art_presenter",
     "validate_art",
 ]

@@ -1489,6 +1489,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                     "character",
                     "title_ballot",
                     "title_codex",
+                    "roster",
                 }
             ),
         )

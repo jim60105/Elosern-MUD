@@ -4,6 +4,7 @@
       "index": 1,
       "name": "rules-a",
       "labels": [
+        "world.rules.tests.test_account_roster",
         "world.rules.tests.test_action_pipeline_atomicity",
         "world.rules.tests.test_action_pipeline_rejections",
         "world.rules.tests.test_action_preview",

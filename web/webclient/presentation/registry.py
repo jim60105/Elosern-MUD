@@ -195,6 +195,10 @@ def build_production_registry() -> PresentationRegistry:
         PARTY_SCHEMA_VERSION,
         party_presenter,
     )
+    from web.webclient.presentation.roster import (
+        ROSTER_SCHEMA_VERSION,
+        roster_presenter,
+    )
     from web.webclient.presentation.services import (
         SERVICES_SCHEMA_VERSION,
         services_presenter,
@@ -325,6 +329,14 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=TITLE_CODEX_SCHEMA_VERSION,
             unavailable_reason=("codex_unavailable", "稱號冊目前無法顯示"),
             presenter=title_codex_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="roster",
+            schema_version=ROSTER_SCHEMA_VERSION,
+            unavailable_reason=UNAVAILABLE_REASON,
+            presenter=roster_presenter,
         )
     )
     return registry
