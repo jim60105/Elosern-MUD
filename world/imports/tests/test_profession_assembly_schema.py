@@ -261,6 +261,28 @@ class AssemblyPlanTests(TestCase):
             ["service_id", "shop_key"],
         )
 
+    @covers_requirement(
+        "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline",
+    )
+    def test_issuer_key_is_not_a_required_identity_kwarg(self):
+        # issuer_key deliberately does NOT join the required-identity set:
+        # an absent value is the valid identity form, so the only required
+        # authored identity for a commissioner entry is service_id.
+        self.assertEqual(
+            profession_assembly.identity_fields("quest_issuer"),
+            frozenset({"service_id"}),
+        )
+        self.assertEqual(
+            profession_assembly.component_field_names("quest_issuer"),
+            frozenset({"service_id", "issuer_key"}),
+        )
+        self.assertEqual(
+            profession_assembly.missing_identity_kwargs(
+                "quest_issuer", {"issuer_key": "grey_granny"}
+            ),
+            ["service_id"],
+        )
+
     def test_component_field_names_are_the_class_db_fields(self):
         self.assertEqual(
             profession_assembly.component_field_names("merchant"),

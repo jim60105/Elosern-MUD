@@ -59,3 +59,23 @@ class ScriptedDialogue(Component):
     dialogue_key = DBField(default=None)
     service_binding = DBField(default=None)
     anchor_room_id = DBField(default=None)
+
+
+class QuestIssuer(Component):
+    """Capability marker and issuer identity of one private-commission host.
+
+    Carrying this component is the sole authored authority for issuing a
+    private commission; a primary key alone would make every NPC a potential
+    commissioner. ``issuer_key`` is the authored content key (``npc:<key>``
+    form); an absent value resolves to the host's database identity
+    (``npc:#<pk>``). ``service_id`` is load-bearing: the roster-sync reuse
+    path reads it unconditionally on whichever component class anchors a
+    profession row. Identity only — every commission registration, mutation,
+    and settlement delegates to the deterministic core.
+    """
+
+    name = "quest_issuer"
+    service_id = DBField(default=None)
+    issuer_key = DBField(default=None)
+    service_binding = DBField(default=None)
+    anchor_room_id = DBField(default=None)

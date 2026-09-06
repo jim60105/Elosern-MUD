@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from typeclasses.components import QuestIssuer
+
 from world.lore.items import ITEM_REGISTRY
 from world.observability import log_info
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
@@ -270,3 +272,36 @@ def resolve_issuance(definition_key: str, issuer_key: str) -> QuestIssuance | No
     if parsed.namespace == "npc":
         return QUEST_ISSUANCE_REGISTRY.get((definition_key, issuer_key))
     return None
+
+
+def resolve_issuer_key(host: Any) -> str | None:
+    """Resolve the issuer key of a private-commission host, or ``None``.
+
+    A host carrying :class:`QuestIssuer` resolves to exactly one key: a
+    non-empty authored ``issuer_key`` yields ``npc:<authored key>`` validated
+    against the shared grammar (a malformed value raises ``IssuerKeyError``
+    rather than being coerced), and an absent (``None``) or empty-string
+    value yields the host's identity form ``npc:#<primary key>``. Any other
+    stored value is malformed state and raises. A host without the component
+    carries no issuing authority and resolves to ``None``. Read-only: no
+    registry lookup, so a key resolves whether or not any commission is
+    registered for it.
+    """
+    holder = getattr(host, "components", None)
+    component = (
+        holder.get(QuestIssuer.get_component_slot())
+        if holder is not None
+        else None
+    )
+    if component is None:
+        return None
+    authored = component.issuer_key
+    if authored is None or (isinstance(authored, str) and authored == ""):
+        return npc_issuer_key(pk=host.pk)
+    if not isinstance(authored, str):
+        raise IssuerKeyError(
+            f"issuer_key must be a string, got {type(authored).__name__}"
+        )
+    key = f"npc:{authored}"
+    parse_issuer_key(key)
+    return key

@@ -51,10 +51,10 @@ after such a row exists.
 `QuestIssuer` therefore carries `service_id` like every other service component, which is what makes
 "structurally identical to `GuildStaff`" actually true and lets a commissioner blueprint anchor a row.
 
-The invariant behind this holds today only by convention: `ScriptedDialogue` also lacks `service_id`
-and simply never appears first in any row. A contract test now states it — every row's first
-component must define `service_id` — so the next component class that lacks it fails at authoring
-time rather than at startup.
+The invariant behind this is now enforced at both seams: `load_professions` rejects any row whose
+FIRST component class defines no `service_id` (a named `ProfessionConfigError`), and a contract
+test pins the shipped rulebook and the named rejection — so the next component class that lacks it
+fails at authoring time rather than at startup.
 
 `issuer_key` deliberately stays OUT of `_IDENTITY_KWARGS`. That set is the REQUIRED-identity
 contract: `missing_identity_kwargs` rejects an absent or blank value. An absent `issuer_key` is not a
@@ -70,12 +70,46 @@ gave you is still theirs. `place` binding would tie the commission to a room, wh
 model for a personal errand. The field is authored and validated today and consumed by the
 service-anchoring gate.
 
+### D5: Convergence claims only roster-manageable anchors (amends the parent design §4.2/§13)
+
+Adding a fifth `service_id`-bearing class silently changes the meaning of
+`_converge_service_hosts`, which deletes every live host whose every claimed service anchor is
+absent from the roster. A person-bound commissioner can NEVER appear in that roster: config
+validation rejects any roster row carrying a person-bound component, so an imported
+commissioner's `service_id` is always roster-absent and the next startup sync would delete the
+host as "development residue" — breaking the import-authoring path this change builds.
+
+The convergence candidate rule is therefore amended: person-bound service components are never
+candidacy evidence (the roster can neither claim nor re-create them), and a host carrying one is
+never converged away — when its roster-manageable (place-bound) anchors are all stale it is kept
+with the existing ambiguous-residue warning, mirroring the titled-mixed-residue precedent.
+Components with no binding set behave exactly as before (they read as roster-managed).
+
+### D6: Duplicate authored issuer keys reject at the import batch boundary
+
+The design risk notes that the grammar validates shape, not uniqueness, and two carriers sharing
+one authored `npc:<content key>` would share one commission list. The promised mitigation is
+implemented in the entity-key contract style — the loader's batch validator rejects a batch in
+which two valid character records author the same non-empty `issuer_key` (the same
+`_flag_duplicate_keys` mechanism that rejects duplicate record keys), rather than as a separate
+startup test: content reaches the world through imports, so the batch boundary is where
+duplicates are caught deterministically. The accepted residue, identical to entity keys, is a
+duplicate spanning two separate batches.
+
+### D7: `resolve_issuer_key` absence is narrow, and malformed state rejects
+
+Absence is exactly `None` or `""` — both resolve to the identity form `npc:#<pk>`. Every other
+stored value must be a string and parses under the shared grammar; a non-string (even a falsy
+one) raises `IssuerKeyError` instead of being coerced, and an identity-form resolution on an
+unpersisted host (no primary key) fails closed the same way.
+
 ## Risks / Trade-offs
 
 - **An authored `issuer_key` could collide with another NPC's** → The grammar validates shape, not
   uniqueness; a duplicate would make two NPCs share a commission list. Mitigated by the same
-  contract style used for entity keys: a startup contract test asserts authored issuer keys are
-  unique across loaded carriers.
+  contract style used for entity keys: the import batch validator rejects a batch in which two
+  records author the same non-empty `issuer_key` (D6). The accepted residue, identical to entity
+  keys, is a duplicate spanning two separate batches.
 - **`npc:#<pk>` keys are instance-scoped** → A partial world re-import leaves orphan commissions
   pointing at reassigned primary keys. Accepted for a pre-release project; authored keys are the
   recommended form for durable content and the proposal says so.
