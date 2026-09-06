@@ -110,7 +110,9 @@ describe("QuestBoard (B4 services family)", () => {
     const w = mountBoard();
     const exam = w.get('[data-testid="quest-board__exam"]');
     await exam.trigger("click");
-    expect(w.emitted("exam_start")).toEqual([[{ action_id: "guild.exam_start" }]]);
+    expect(w.emitted("exam_start")).toEqual([
+      [{ action_id: "guild.exam_start", payload: { target_rank: "B" } }],
+    ]);
   });
 
   it("renders the honest absent marker when the guild section is missing", () => {

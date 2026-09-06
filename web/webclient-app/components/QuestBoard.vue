@@ -275,7 +275,12 @@ function confirmAbandonNow() {
           type="button"
           class="quest-board__action"
           data-testid="quest-board__exam"
-          @click="emit('exam_start', { action_id: rank.exam_start?.action_id })"
+          @click="
+            emit('exam_start', {
+              action_id: rank.exam_start?.action_id,
+              payload: { target_rank: rank.next_rank },
+            })
+          "
         >
           {{ rank.exam_start?.label }}
         </button>
