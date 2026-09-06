@@ -239,6 +239,9 @@ def register_adventurer(
     except Exception:
         _restore_registration(actor, staff, snapshot)
         raise
+    from world.rules.lore_knowledge import reveal_lore_best_effort
+
+    reveal_lore_best_effort(actor, "guild", actor.guild_rank or "F")
     parsed = parse_guild_registration(actor)
     if parsed is None:
         raise GuildDataError("registration write produced no parseable record")

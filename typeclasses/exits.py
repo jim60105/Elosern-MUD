@@ -75,6 +75,13 @@ def after_successful_movement(
         wilderness_source_coordinates=wilderness_source_coordinates,
         wilderness_name=wilderness_name,
     )
+    from world.quests.room_observation import observe_arrival_lore
+
+    observe_arrival_lore(
+        traversing_object,
+        destination if destination is not None else traversing_object.location,
+        wilderness_coordinates=wilderness_coordinates,
+    )
     from world.rules.city_gates import reanchor_home_on_gate_arrival
 
     reanchor_home_on_gate_arrival(

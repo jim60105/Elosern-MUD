@@ -129,6 +129,9 @@ class PlayerCharacter(LivingEntity):
         """
         super().at_post_move(source_location, **kwargs)
         _schedule_action_options_after_move(self)
+        from world.quests.room_observation import observe_arrival_lore
+
+        observe_arrival_lore(self, self.location)
 
     def at_post_unpuppet(self, account=None, session=None, **kwargs) -> None:
         """Fire the logout epithet-nomination rest point (change G)."""

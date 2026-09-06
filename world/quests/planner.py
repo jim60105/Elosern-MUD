@@ -170,6 +170,12 @@ def _bound_defeat_owner(actor: Any, battlefield: Any) -> Any | None:
     return owner
 
 
+def _make_defeat_lore_apply(character: Any, tier: str) -> Any:
+    from world.rules.lore_knowledge import schedule_lore_reveal_best_effort
+
+    return lambda: schedule_lore_reveal_best_effort(character, "monster", tier)
+
+
 def quest_event_effect_planner(request: Any, event_log: Any) -> list[Any]:
     """Derive quest-log and instance-pin pending effects from one successful action.
 
@@ -198,6 +204,29 @@ def quest_event_effect_planner(request: Any, event_log: Any) -> list[Any]:
             owners.setdefault(player.pk, player)
 
     effects: list[Any] = []
+    crediting_player = (
+        actor if isinstance(actor, PlayerCharacter) else companion_owner
+    )
+    if crediting_player is not None:
+        from world.lore.monsters import MONSTER_TIER_REGISTRY
+        from world.rules.action import PendingEffect
+
+        registered_tiers = tuple(
+            dict.fromkeys(
+                tier
+                for _, tier in defeated
+                if isinstance(tier, str) and tier in MONSTER_TIER_REGISTRY
+            )
+        )
+        for tier in registered_tiers:
+            effects.append(
+                PendingEffect(
+                    entity=crediting_player,
+                    description=f"lore codex reveal monster tier {tier}",
+                    surfaces=frozenset(),
+                    apply=_make_defeat_lore_apply(crediting_player, tier),
+                )
+            )
     for owner in owners.values():
         records = read_records(owner)
         changes = _compute_owner_changes(
