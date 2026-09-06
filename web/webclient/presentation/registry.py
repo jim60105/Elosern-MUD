@@ -183,6 +183,10 @@ def build_production_registry() -> PresentationRegistry:
         LINEAGE_SCHEMA_VERSION,
         lineage_presenter,
     )
+    from web.webclient.presentation.lore_codex import (
+        LORE_CODEX_SCHEMA_VERSION,
+        lore_codex_presenter,
+    )
     from web.webclient.presentation.local_map import (
         LOCAL_MAP_SCHEMA_VERSION,
         local_map_presenter,
@@ -349,6 +353,14 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=POSSESSION_BANNER_SCHEMA_VERSION,
             unavailable_reason=("not_possessing", "目前未處於附身狀態"),
             presenter=possession_banner_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="lore_codex",
+            schema_version=LORE_CODEX_SCHEMA_VERSION,
+            unavailable_reason=("lore_codex_unavailable", "知識圖鑑目前無法顯示"),
+            presenter=lore_codex_presenter,
         )
     )
     return registry

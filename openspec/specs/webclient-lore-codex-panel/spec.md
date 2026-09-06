@@ -1,6 +1,11 @@
-# Delta spec: webclient-lore-codex-panel (webclient-lore-codex-panel)
+## Purpose
 
-## ADDED Requirements
+The version-1 `lore_codex` presentation panel: the server-owned discovered-lore read
+model (exact schema, discovered-only non-disclosure, canonical card rendering,
+corrupt-record degradation, explicit fail-closed bounds, and push-on-discovery
+timing) that the codex surface consumes.
+
+## Requirements
 
 ### Requirement: The lore codex panel is an exact read-only version-1 presentation panel
 
@@ -61,6 +66,10 @@ mid-value by the presenter. An entry present in the holder's record whose key no
 its registry SHALL be omitted from the payload rather than shipped with a fabricated card, and the
 omission SHALL NOT make the panel unavailable.
 
+A malformed identifier — empty category or key, or a key carrying extra delimiters — is corruption,
+not a vanished key: the reader SHALL reject it as a corrupt record rather than hand it to the
+presenter for omission.
+
 #### Scenario: A card matches the renderer exactly
 - **WHEN** an entry is serialized
 - **THEN** its card fields and their order equal `lore_card` output for that category and key
@@ -69,6 +78,11 @@ omission SHALL NOT make the panel unavailable.
 - **WHEN** the holder's record names an entry absent from its category's registry
 - **THEN** that entry is omitted, the rest of the codex ships normally, and the stored record is not
   rewritten
+
+#### Scenario: A malformed identifier is corruption, not a vanished key
+- **WHEN** the holder's record holds an identifier such as `race:` or `race:elf:extra`
+- **THEN** the reader treats it as a corrupt record and the whole panel degrades; it is not omitted
+  from an otherwise-available payload
 
 ### Requirement: The lore codex panel is host-independent
 
