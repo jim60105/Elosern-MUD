@@ -9,10 +9,9 @@ EventLog kinds with the observability boundary event, the guarded violation
 hook, the per-section rulebook loader, and the zero-uncaused-write battery.
 
 Annotation note: the ``covers_requirement`` annotations reference the
-canonical main-spec requirement IDs that exist since this change's delta
-synced into ``openspec/specs/``. The ``defeat-aftermath-recovery::*``
-deltas are withheld until this change's own archive/sync lands them —
-``tools.spec_traceability`` rejects unknown IDs and must stay green.
+canonical main-spec requirement IDs synced into ``openspec/specs/`` (the
+``defeat-aftermath-recovery`` capability plus the amended
+``defeat-aftermath-core`` expectations).
 """
 
 import math
@@ -333,6 +332,9 @@ class RetainedWinnerConsequenceTests(WildernessDefeatMixin, DefeatAftermathBase)
         charge_movement(self.player, "move")
         self.assertGreater(self.clock.tick, before)
 
+    @covers_requirement(
+        "defeat-aftermath-recovery::a-retained-quest-bound-winner-forces-the-move-and-rest-route"
+    )
     def test_defeat_then_move_then_rest_to_full(self):
         """Task 3.3 smoke: retained winner -> wake at target -> move -> rest."""
         self._defeat_by_forfeit()
@@ -484,6 +486,9 @@ class RecoveryAdvanceTests(DefeatAftermathBase):
             for entry in log.entries
         ]
 
+    @covers_requirement(
+        "defeat-aftermath-recovery::defeat-recovery-advances-the-clock-to-the-5-wake-target"
+    )
     def test_wakes_at_exactly_five_percent_with_the_new_source(self):
         before = self.clock.tick
         result, calls = self._spied_defeat()
@@ -503,6 +508,9 @@ class RecoveryAdvanceTests(DefeatAftermathBase):
         self.assertEqual(len(recovery), 1)
         self.assertEqual(recovery[0].data, {"seconds": 8, "hp_wake": 5})
 
+    @covers_requirement(
+        "defeat-aftermath-recovery::defeat-recovery-advances-the-clock-to-the-5-wake-target"
+    )
     def test_coarse_rate_overshoot_clamps_to_the_target(self):
         # Virtual scaled rate 0.65/s: t = ceil(4 / 0.65) = 7; the real 1.3/s
         # advance lands floor(1 + 9.1) = 10, and the clamp pins HP to 5.
@@ -511,6 +519,9 @@ class RecoveryAdvanceTests(DefeatAftermathBase):
         self.assertEqual(calls[1], (7, AdvanceSource.DEFEAT_AFTERMATH))
         self.assertEqual(self.player.traits.hp.current, 5)
 
+    @covers_requirement(
+        "defeat-aftermath-recovery::defeat-recovery-advances-the-clock-to-the-5-wake-target"
+    )
     def test_already_at_target_settles_inertly(self):
         # max 20 -> target ceil(1) = 1 == the floored HP: no advance, no
         # clamp, no recovery entry (delta requirement 1, inert scenario).
@@ -526,6 +537,9 @@ class RecoveryAdvanceTests(DefeatAftermathBase):
             [entry.kind for entry in self._aftermath_entries(result)],
         )
 
+    @covers_requirement(
+        "defeat-aftermath-recovery::unreachable-recovery-is-capped-and-reported-never-truncated-silently"
+    )
     def test_zero_rate_hits_the_cap_with_one_error_event(self):
         self.player.traits.hp.rate = 0
         with patch("world.rules.defeat_aftermath.log_error") as error:
@@ -545,6 +559,9 @@ class RecoveryAdvanceTests(DefeatAftermathBase):
             ["defeat_settle", "weak_granted", "recovery_advance"],
         )
 
+    @covers_requirement(
+        "defeat-aftermath-recovery::unreachable-recovery-is-capped-and-reported-never-truncated-silently"
+    )
     def test_positive_rate_cap_writes_the_virtual_model_state(self):
         # Virtual scaled rate 0.00005/s over the 21600s cap: the virtual
         # model lands at floor(1 + 1.08) = 2 with a .08 carried remainder,
@@ -601,6 +618,9 @@ class RecoveryWindowClockCausalityTests(
             "guild_merit": lambda: read_counter_trait(player, "guild_merit"),
         }
 
+    @covers_requirement(
+        "defeat-aftermath-recovery::clock-side-effects-during-the-recovery-window-are-the-only-quest-world-mutations"
+    )
     def test_window_fails_exactly_one_deadline_and_restocks_once(self):
         self.clock.tick = self.RESTOCK_TICK - 3600  # accepted tick 104400
         definition = register(quest("window_deadline", deadline_hours=1))
@@ -706,6 +726,9 @@ class RulebookLoaderTests(DefeatAftermathBase):
 
         return load_defeat_aftermath_sections(Path(path))
 
+    @covers_requirement(
+        "defeat-aftermath-recovery::the-recovery-rulebook-section-is-validated-by-its-own-loader"
+    )
     def test_shipped_rulebook_loads_with_owned_sections(self):
         self.assertTrue(DEFEAT_AFTERMATH_RULEBOOK.pg_lines)
         self.assertEqual(DEFEAT_AFTERMATH_RULEBOOK.weak_debuff_buff_key, "defeat_weak")
@@ -737,6 +760,9 @@ class RulebookLoaderTests(DefeatAftermathBase):
         with self.assertRaises(ValueError):
             self._load("pg_lines:\n  - '你醒了。'\n" + recovery)
 
+    @covers_requirement(
+        "defeat-aftermath-recovery::the-recovery-rulebook-section-is-validated-by-its-own-loader"
+    )
     def test_malformed_recovery_section_fails_load(self):
         header = "pg_lines:\n  - '你醒了。'\nweak_debuff:\n  buff_key: defeat_weak\n"
         for body in (
@@ -880,6 +906,9 @@ class RollbackTests(
     @covers_requirement(
         "defeat-aftermath-core::the-defeat-aftermath-joins-the-round-s-atomic-persistence-unit"
     )
+    @covers_requirement(
+        "defeat-aftermath-recovery::the-recovery-phase-commits-with-the-settlement"
+    )
     def test_persist_failure_rolls_back_the_whole_aftermath_and_retry_settles_once(self):
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=1):
@@ -913,6 +942,9 @@ class RollbackTests(
         # Combat 6s + recovery 8s (scale 0.5 over the 1.0/s stored rate).
         self.assertEqual(self.clock.tick, 20)
 
+    @covers_requirement(
+        "defeat-aftermath-recovery::the-recovery-phase-commits-with-the-settlement"
+    )
     def test_outer_commit_failure_restores_the_recovery_advance(self):
         """The outer-owner seam covers the recovery advance's registry (duck 6)."""
 
