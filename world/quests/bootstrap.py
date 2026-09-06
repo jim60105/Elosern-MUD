@@ -13,19 +13,20 @@ from world.rules.clock import register_event_source
 
 
 def restore_generated_quests() -> None:
-    """Repopulate the three process-local registries from the durable store.
+    """Repopulate the process-local registries from the durable store.
 
     Called at startup before any player quest-log read (D3): every stored
-    payload is reconstructed and registered definition-first (offer validation
-    requires the registered definition), then the offer and the spawn
-    requirements. Equal registrations are no-ops and the requirement entry is
-    written with ``setdefault``, so repeated restarts are idempotent and a
-    crash mid-restore self-heals on the next start; a payload that fails to
-    reconstruct or register raises loudly instead of being silently dropped.
+    payload is reconstructed into its compiled aggregate and registered
+    through its namespace's own writer -- a guild offer into the guild offer
+    registry, a private commission into the quest issuance registry (the
+    ``QuestIssuance`` constructor requires the registered definition, so the
+    definition always registers first). Equal registrations are no-ops, so
+    repeated restarts are idempotent and a crash mid-restore self-heals on
+    the next start; a payload that fails to reconstruct or register raises
+    loudly instead of being silently dropped.
     """
     for payload in list_payloads():
-        definition, offer, requirements = payload_to_registrations(payload)
-        register_restored_quest(definition, offer, requirements)
+        register_restored_quest(payload_to_registrations(payload))
 
 
 def sync_quest_runtime() -> None:

@@ -11,10 +11,12 @@ import unittest
 
 from world.quests.compile import (
     CompiledQuest,
+    IssuanceDescriptor,
     QuestCompileError,
     SCENE_REQUIREMENT_REGISTRY,
     compile_quest_blueprint,
     register_generated_quest,
+    register_restored_quest,
     scene_requirements_for,
 )
 from world.quests.definitions import (
@@ -28,7 +30,15 @@ from world.quests.tests._compile_helpers import (
     CompileRegistryIsolation,
     _defeat_payload,
 )
-from world.rules.guild_offers import GUILD_OFFER_REGISTRY, GuildQuestOffer, QuestReward
+from world.rules.guild_offers import (
+    GUILD_OFFER_REGISTRY,
+    GuildQuestOffer,
+    QuestReward,
+)
+from world.rules.quest_issuance import (
+    QUEST_ISSUANCE_REGISTRY,
+    Settlement,
+)
 
 from tools.spec_traceability import covers_requirement
 
@@ -123,7 +133,10 @@ class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
         compiled = CompiledQuest(
             definition=definition,
             reward=QuestReward(copper=50, items=(), merit=25),
-            issuer_branch_key="guild_branch_altoria",
+            issuance=IssuanceDescriptor(
+                issuer_key="guild:guild_branch_altoria",
+                settlement=Settlement.COUNTER,
+            ),
             stage_requirements=(),
         )
         with self.assertRaisesRegex(
@@ -255,6 +268,111 @@ class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase)
         register_quest_definition(INTRODUCTORY_HUNT)
         self.assertEqual(scene_requirements_for(INTRODUCTORY_HUNT.key), ())
         self.assertNotIn(INTRODUCTORY_HUNT.key, SCENE_REQUIREMENT_REGISTRY)
+
+class PrivateCommissionRegistrationTests(CompileRegistryIsolation, unittest.TestCase):
+    """Character-namespaced issuances publish into the issuance registry only.
+
+    Pure-unit like the guild-path classes: the durable store boundary is
+    patched, and the carrier-authorization seam is patched to authorize the
+    compiled key (the genuine scan runs in the Evennia-backed store tests).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._requirements_items = list(SCENE_REQUIREMENT_REGISTRY.items())
+        patcher = patch(
+            "world.quests.compile.append_generated_quest_payload", return_value=True
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        authorizer = patch(
+            "world.quests.compile.issuer_is_authorized", return_value=True
+        )
+        authorizer.start()
+        self.addCleanup(authorizer.stop)
+
+    def tearDown(self):
+        SCENE_REQUIREMENT_REGISTRY.clear()
+        SCENE_REQUIREMENT_REGISTRY.update(self._requirements_items)
+        super().tearDown()
+
+    def _npc_compiled(self, issuer="npc:grey_granny", copper=50):
+        return compile_quest_blueprint(
+            {
+                **_defeat_payload(),
+                "issuer": issuer,
+                "reward": {"copper": copper, "items": [], "merit": 0},
+            }
+        )
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_a_private_commission_registers_into_the_issuance_registry(self):
+        compiled = self._npc_compiled()
+        register_generated_quest(compiled)
+        self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
+        self.assertIn(
+            (compiled.definition.key, "npc:grey_granny"),
+            QUEST_ISSUANCE_REGISTRY,
+        )
+        self.assertEqual(len(GUILD_OFFER_REGISTRY), len(self._offer_items))
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_two_commissioners_of_one_definition_register_two_issuances(self):
+        first = self._npc_compiled(issuer="npc:grey_granny")
+        second = self._npc_compiled(issuer="npc:old_martha")
+        self.assertEqual(first.definition.key, second.definition.key)
+        register_generated_quest(first)
+        register_generated_quest(second)
+        self.assertEqual(
+            len(QUEST_DEFINITION_REGISTRY), len(self._registry_items) + 1
+        )
+        self.assertIn(
+            (first.definition.key, "npc:grey_granny"), QUEST_ISSUANCE_REGISTRY
+        )
+        self.assertIn(
+            (first.definition.key, "npc:old_martha"), QUEST_ISSUANCE_REGISTRY
+        )
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_a_conflicting_private_issuance_rolls_back_the_definition(self):
+        compiled = self._npc_compiled()
+        register_generated_quest(compiled)
+        before_definition = dict(QUEST_DEFINITION_REGISTRY)
+        before_issuance = dict(QUEST_ISSUANCE_REGISTRY)
+        before_requirements = dict(SCENE_REQUIREMENT_REGISTRY)
+
+        conflicting = self._npc_compiled(copper=60)
+        with self.assertRaises(QuestCompileError):
+            register_generated_quest(conflicting)
+        self.assertEqual(QUEST_DEFINITION_REGISTRY, before_definition)
+        self.assertEqual(QUEST_ISSUANCE_REGISTRY, before_issuance)
+        self.assertEqual(SCENE_REQUIREMENT_REGISTRY, before_requirements)
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_a_restored_conflicting_requirement_registers_nothing(self):
+        # The restore path must preflight before its first write: a
+        # conflicting spawn-requirement entry leaves no definition and no
+        # issuance registered (design D4).
+        compiled = self._npc_compiled()
+        SCENE_REQUIREMENT_REGISTRY[compiled.definition.key] = ()
+        before_definition = dict(QUEST_DEFINITION_REGISTRY)
+        before_issuance = dict(QUEST_ISSUANCE_REGISTRY)
+        with self.assertRaises(QuestCompileError):
+            register_restored_quest(compiled)
+        self.assertEqual(QUEST_DEFINITION_REGISTRY, before_definition)
+        self.assertEqual(QUEST_ISSUANCE_REGISTRY, before_issuance)
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_a_restored_guild_conflicting_requirement_registers_nothing(self):
+        compiled = compile_quest_blueprint(_defeat_payload())
+        SCENE_REQUIREMENT_REGISTRY[compiled.definition.key] = ()
+        before_definition = dict(QUEST_DEFINITION_REGISTRY)
+        before_offer = dict(GUILD_OFFER_REGISTRY)
+        with self.assertRaises(QuestCompileError):
+            register_restored_quest(compiled)
+        self.assertEqual(QUEST_DEFINITION_REGISTRY, before_definition)
+        self.assertEqual(GUILD_OFFER_REGISTRY, before_offer)
+
 
 class SharedPayloadContractTests(CompileRegistryIsolation, unittest.TestCase):
     @covers_requirement("scenario-director::the-canonical-payload-contract-is-versioned-and-shared-by-both-boundaries")

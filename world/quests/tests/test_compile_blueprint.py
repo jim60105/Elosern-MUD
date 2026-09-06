@@ -8,7 +8,10 @@ payload helpers come from ``_compile_helpers``.
 
 import json
 import unittest
+from unittest import mock
 
+from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+from world.rules.quest_issuance import QUEST_ISSUANCE_REGISTRY, Settlement
 from world.quests.compile import (
     CompiledQuest,
     QuestCompileError,
@@ -45,7 +48,8 @@ class CompileQuestBlueprintTests(CompileRegistryIsolation, unittest.TestCase):
         self.assertEqual(compiled.definition.stages[0].objective.monster_tier, "low")
         self.assertEqual(compiled.reward.copper, 50)
         self.assertEqual(compiled.reward.items[0].item_key, "healing_potion")
-        self.assertEqual(compiled.issuer_branch_key, "guild_branch_altoria")
+        self.assertEqual(compiled.issuance.issuer_key, "guild:guild_branch_altoria")
+        self.assertIs(compiled.issuance.settlement, Settlement.COUNTER)
 
     @covers_requirement("scenario-director::the-canonical-payload-contract-is-versioned-and-shared-by-both-boundaries")
     def test_every_stage_kind_has_one_deterministic_mapping(self):
@@ -509,6 +513,85 @@ class SceneBoundCompileTests(CompileRegistryIsolation, unittest.TestCase):
         self.assertTrue(guardrail_errors, "guardrail must reject the same payload")
         with self.assertRaises(QuestCompileError):
             compile_quest_blueprint(payload)
+
+class PrivateCommissionCompileTests(CompileRegistryIsolation, unittest.TestCase):
+    """Character-namespaced issuers compile to auto-settled npc descriptors.
+
+    The carrier-authorization lookup touches the world database, which a pure
+    unit test does not own, so the tests patch the compile module's binding of
+    the seam (the established caller-module patching pattern); the genuine
+    scan runs in the Evennia-backed generated-store tests.
+    """
+
+    def _npc_payload(self, issuer="npc:grey_granny", merit=0):
+        return _defeat_payload(
+            issuer=issuer,
+            reward={"copper": 50, "items": [], "merit": merit},
+        )
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_a_character_namespaced_issuer_compiles_to_an_auto_descriptor(self):
+        with mock.patch(
+            "world.quests.compile.issuer_is_authorized", return_value=True
+        ):
+            compiled = compile_quest_blueprint(self._npc_payload())
+        self.assertEqual(compiled.issuance.issuer_key, "npc:grey_granny")
+        self.assertIs(compiled.issuance.settlement, Settlement.AUTO)
+
+    def test_a_guild_full_form_issuer_compiles_to_the_namespaced_descriptor(self):
+        compiled = compile_quest_blueprint(
+            _defeat_payload(issuer="guild:guild_branch_altoria")
+        )
+        self.assertEqual(compiled.issuance.issuer_key, "guild:guild_branch_altoria")
+        self.assertIs(compiled.issuance.settlement, Settlement.COUNTER)
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_a_private_commission_carrying_merit_fails_compile(self):
+        with mock.patch(
+            "world.quests.compile.issuer_is_authorized", return_value=True
+        ):
+            with self.assertRaises(QuestCompileError):
+                compile_quest_blueprint(self._npc_payload(merit=25))
+
+    def test_a_private_commission_naming_an_unauthorized_carrier_fails_compile(self):
+        with mock.patch(
+            "world.quests.compile.issuer_is_authorized", return_value=False
+        ):
+            with self.assertRaises(QuestCompileError):
+                compile_quest_blueprint(self._npc_payload())
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_two_commissioners_of_identical_stages_share_a_definition_key(self):
+        with mock.patch(
+            "world.quests.compile.issuer_is_authorized", return_value=True
+        ):
+            first = compile_quest_blueprint(self._npc_payload(issuer="npc:grey_granny"))
+            second = compile_quest_blueprint(self._npc_payload(issuer="npc:old_martha"))
+        self.assertEqual(first.definition.key, second.definition.key)
+        self.assertNotEqual(first.issuance.issuer_key, second.issuance.issuer_key)
+
+    def test_malformed_issuers_fail_compile_without_mutation(self):
+        before_definition = dict(QUEST_DEFINITION_REGISTRY)
+        before_offer = dict(GUILD_OFFER_REGISTRY)
+        before_issuance = dict(QUEST_ISSUANCE_REGISTRY)
+        for issuer in (
+            None,
+            42,
+            "",
+            "npc:",
+            "npc:123",
+            "npc:#0",
+            "guild:",
+            "shopkeeper:grey",
+            "guild:not_a_branch",
+        ):
+            with self.subTest(issuer=issuer):
+                with self.assertRaises(QuestCompileError):
+                    compile_quest_blueprint(_defeat_payload(issuer=issuer))
+        self.assertEqual(QUEST_DEFINITION_REGISTRY, before_definition)
+        self.assertEqual(GUILD_OFFER_REGISTRY, before_offer)
+        self.assertEqual(QUEST_ISSUANCE_REGISTRY, before_issuance)
+
 
 class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
     @covers_requirement("blueprint-portrait-policy::the-compile-boundary-carries-the-characterization-fields")

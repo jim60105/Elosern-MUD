@@ -305,3 +305,30 @@ def resolve_issuer_key(host: Any) -> str | None:
     key = f"npc:{authored}"
     parse_issuer_key(key)
     return key
+
+
+def issuer_is_authorized(issuer_key: str) -> bool:
+    """Return whether an authorized carrier resolves to exactly ``issuer_key``.
+
+    A character-namespaced key names an authorized carrier when some NPC
+    carrying the ``QuestIssuer`` component resolves to that key (an authored
+    ``npc:<content key>`` or the identity form ``npc:#<pk>``). Guild keys
+    authorize through the guild branch registry, not through carriers, so
+    they never match here. Read-only world scan: authority stays authored,
+    never inferred (quest-issuer-authorization R1).
+    """
+    try:
+        parsed = parse_issuer_key(issuer_key)
+    except IssuerKeyError:  # observability: ignore R2: a malformed key names no carrier; False is the caller-visible answer
+        return False
+    if parsed.namespace != "npc":
+        return False
+    from typeclasses.npcs import NPC
+
+    for host in NPC.objects.all_family():
+        try:
+            if resolve_issuer_key(host) == issuer_key:
+                return True
+        except IssuerKeyError:  # observability: ignore R2: a host with a malformed authored key is corrupt state that can match no key; the scan answers only whether issuer_key has a carrier
+            continue
+    return False

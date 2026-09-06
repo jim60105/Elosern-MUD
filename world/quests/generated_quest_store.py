@@ -1,11 +1,13 @@
 """Durable mirror of every registered generated quest (design D1).
 
 One ``GeneratedQuestStore`` Evennia Script (key ``generated_quest_store``)
-holds a JSON-safe list of serialized payloads, one per generated quest key:
-``{"definition": {...}, "offer": {...}, "requirements": [...]}``. The Script
-survives server restarts and is the single write point
-``register_generated_quest`` appends to before touching the three
-process-local registries.
+holds a JSON-safe list of serialized payloads, one per issuance identity
+``(definition key, issuer key)`` -- two commissioners of one definition
+coexist as two entries:
+``{"definition": {...}, "issuance": {"issuer_key", "settlement", "reward"},
+"requirements": [...]}``. The Script survives server restarts and is the
+single write point ``register_generated_quest`` appends to before touching
+the process-local registries.
 
 This module deliberately imports nothing from ``world.quests``: the payloads
 are raw JSON-safe dicts here, and serialization plus reconstruction live in
@@ -47,17 +49,14 @@ def get_store() -> GeneratedQuestStore:
     return create_script(GeneratedQuestStore, key=STORE_KEY, persistent=True)
 
 
-def _definition_key(payload: dict) -> str:
-    """Return the definition key a payload mirrors."""
-    return payload["definition"]["key"]
+def _payload_identity(payload: dict) -> tuple[str, str]:
+    """Return the ``(definition key, issuer key)`` identity a payload mirrors.
 
-
-def _index_of(store: GeneratedQuestStore, definition_key: str) -> int | None:
-    """Return the position of one definition key in the store, or ``None``."""
-    for position, payload in enumerate(store.db.payloads or []):
-        if _definition_key(payload) == definition_key:
-            return position
-    return None
+    One definition can be issued by several carriers (two commissioners of
+    identical stages share the definition key and differ by issuance), so the
+    durable mirror holds one payload per issuance, not per definition.
+    """
+    return payload["definition"]["key"], payload["issuance"]["issuer_key"]
 
 
 def list_payloads() -> list[dict]:
@@ -66,40 +65,42 @@ def list_payloads() -> list[dict]:
 
 
 def append_payload(payload: dict) -> bool:
-    """Append one payload unless its definition key is already stored.
+    """Append one payload unless its issuance identity is already stored.
 
-    Idempotent by definition key with content verification: a payload whose
-    ``definition.key`` already exists is compared field by field -- an equal
-    payload leaves the store untouched and returns ``False``; a different
-    payload raises ``StorePayloadConflictError`` so a mid-crash divergence
-    (store holding an older offer for the same key) can never silently regress
-    the offer or reward after a restart. Returns ``True`` when the payload was
-    appended.
+    Idempotent by ``(definition key, issuer key)`` with content verification:
+    a payload whose identity already exists is compared field by field -- an
+    equal payload leaves the store untouched and returns ``False``; a
+    different payload raises ``StorePayloadConflictError`` so a mid-crash
+    divergence (store holding an older issuance for the same identity) can
+    never silently regress the issuance or reward after a restart. Payloads
+    with the same definition key but different issuer keys coexist as
+    separate entries. Returns ``True`` when the payload was appended.
     """
     store = get_store()
     payloads = list(store.db.payloads or [])
     for existing in payloads:
-        if _definition_key(existing) == _definition_key(payload):
+        if _payload_identity(existing) == _payload_identity(payload):
             if existing == payload:
                 return False
             raise StorePayloadConflictError(
                 f"generated-quest store already holds a different payload for "
-                f"definition {_definition_key(payload)!r}"
+                f"definition {_payload_identity(payload)[0]!r} under issuer "
+                f"{_payload_identity(payload)[1]!r}"
             )
     payloads.append(payload)
     store.db.payloads = payloads
     return True
 
 
-def remove_payload(definition_key: str) -> None:
-    """Remove one payload by definition key; a missing key is a no-op."""
+def remove_payload(definition_key: str, issuer_key: str) -> None:
+    """Remove one payload by issuance identity; a missing identity is a no-op."""
     store = get_store()
     payloads = list(store.db.payloads or [])
-    index = _index_of(store, definition_key)
-    if index is None:
-        return
-    del payloads[index]
-    store.db.payloads = payloads
+    for index, existing in enumerate(payloads):
+        if _payload_identity(existing) == (definition_key, issuer_key):
+            del payloads[index]
+            store.db.payloads = payloads
+            break
 
 
 def clear() -> None:

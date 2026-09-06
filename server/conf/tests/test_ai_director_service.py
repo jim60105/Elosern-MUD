@@ -114,7 +114,10 @@ class AiDirectorServiceTests(AiDirectorServiceIsolation, unittest.TestCase):
         self.assertEqual(len(client.calls), 1)
         self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
         self.assertIn(
-            (compiled.definition.key, compiled.issuer_branch_key),
+            (
+                compiled.definition.key,
+                compiled.issuance.issuer_key.removeprefix("guild:"),
+            ),
             GUILD_OFFER_REGISTRY,
         )
         self.assertEqual(
