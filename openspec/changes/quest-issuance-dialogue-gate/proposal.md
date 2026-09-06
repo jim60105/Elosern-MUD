@@ -39,6 +39,9 @@ separated from the content-pipeline work in `quest-issuance-generative` and revi
 - `dialogue-offer-quest`: the intent's deterministic verification admits an authorized private
   commissioner alongside a guild branch host, with the private path's own eligibility rule, and the
   applier names the resolved issuance when assigning.
+- `npc-dialogue`: the applier-routing requirement's `offer_quest` prose and its two offer-quest
+  scenarios no longer describe a `GuildStaff`-only gate; they name the authored issuing authority
+  and per-kind eligibility instead. Routing and failure semantics are unchanged.
 
 ## Impact
 

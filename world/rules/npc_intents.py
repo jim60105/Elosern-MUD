@@ -212,14 +212,26 @@ def _apply_party_invite(npc: Any, player: Any, intent: dict[str, Any]) -> Intent
 
 
 def _apply_offer_quest(npc: Any, player: Any, intent: dict[str, Any]) -> IntentOutcome:
-    """Assign a registered guild offer through the guild-offer surface.
+    """Assign a registered issuance through the issuer-aware offer surface.
 
     Payload is exactly ``{"quest_key": str}``. Verification order: the
-    speaking NPC carries ``GuildStaff`` with a ``branch_key``; a
-    ``GuildQuestOffer`` for ``quest_key`` is registered at that branch; and
-    the player is a registered member whose canonical rank is within the
-    offer's quest rank band (the same canonical eligibility ``list_guild_offers``
-    applies, including the unregistered and rankless rejection paths).
+    speaking NPC carries an authored issuing authority -- ``GuildStaff`` with
+    a ``branch_key`` or ``QuestIssuer`` -- and resolves that authority's
+    issuer key through the shared constructors (``guild_issuer_key`` /
+    ``resolve_issuer_key``; malformed authority identity data fails
+    verification rather than dispatching through the remaining authority);
+    a registered issuance for ``quest_key`` exists at the resolved key; and
+    the eligibility rule of that issuer kind passes. A ``GuildStaff`` speaker
+    keeps the guild checks unchanged: the player is a registered member whose
+    canonical rank is within the offer's quest rank band (the same canonical
+    eligibility ``list_guild_offers`` applies, including the unregistered and
+    rankless rejection paths). A ``QuestIssuer`` speaker's whole eligibility
+    rule is the existence of a registered private commission at its resolved
+    key -- a private errand has no rank band, so no registration or rank gate
+    applies. A dual-component speaker is resolved by the namespace holding
+    the issuance for ``quest_key``; one registered under both namespaces is a
+    content error that fails verification rather than letting the applier
+    choose an issuer.
     Duplicate-quest rejection is delegated to the quest runtime inside the
     atomic acceptance, whose quest-log and relations surfaces are restored on
     any failure -- a dialogue-assigned quest is economically and statefully
@@ -237,39 +249,93 @@ def _apply_offer_quest(npc: Any, player: Any, intent: dict[str, Any]) -> IntentO
             f"offer_quest quest_key must be at most {_MAX_INTENT_KEY_LENGTH} code points",
         )
 
-    from typeclasses.components import GuildStaff
+    from typeclasses.components import GuildStaff, QuestIssuer
     from typeclasses.npcs import NPC
 
     if not isinstance(npc, NPC):
         return IntentOutcome(False, "offer_quest requires an NPC speaker")
-    if not hasattr(npc, "components") or not npc.components.has(GuildStaff.name):
-        return IntentOutcome(False, "offer_quest requires a GuildStaff speaker")
-    guild_staff = npc.components.get(GuildStaff.get_component_slot())
-    branch_key = guild_staff.branch_key
-    if not isinstance(branch_key, str) or not branch_key:
-        return IntentOutcome(False, "offer_quest requires a GuildStaff branch_key")
+    has_staff = hasattr(npc, "components") and npc.components.has(GuildStaff.name)
+    has_issuer = (
+        hasattr(npc, "components") and npc.components.has(QuestIssuer.name)
+    )
+    if not has_staff and not has_issuer:
+        return IntentOutcome(
+            False, "offer_quest requires a GuildStaff or QuestIssuer speaker"
+        )
 
     from world.rules.guild import GuildDataError
     from world.rules.guild_offers import (
         BoardAccessError,
-        GuildOfferNotFound,
-        get_guild_offer,
         list_guild_offers,
     )
+    from world.rules.quest_issuance import (
+        IssuerKeyError,
+        guild_issuer_key,
+        resolve_issuance,
+        resolve_issuer_key,
+    )
 
-    try:
-        get_guild_offer(quest_key, branch_key)
-    except GuildOfferNotFound:
+    # Resolve each carried authority through the shared issuer-key
+    # constructors; the assignment site never concatenates a key.
+    guild_key: str | None = None
+    branch_key: str | None = None
+    if has_staff:
+        guild_staff = npc.components.get(GuildStaff.get_component_slot())
+        branch_key = guild_staff.branch_key
+        if not isinstance(branch_key, str) or not branch_key:
+            return IntentOutcome(False, "offer_quest requires a GuildStaff branch_key")
+        try:
+            guild_key = guild_issuer_key(branch_key)
+        except IssuerKeyError:
+            return IntentOutcome(
+                False, "offer_quest GuildStaff carries a malformed branch_key"
+            )
+    npc_key: str | None = None
+    if has_issuer:
+        try:
+            npc_key = resolve_issuer_key(npc)
+        except IssuerKeyError:
+            return IntentOutcome(
+                False, "offer_quest QuestIssuer carries a malformed issuer_key"
+            )
+
+    # One read seam probes both namespaces; each carried authority
+    # contributes its own probe and a dual-component speaker is resolved by
+    # whichever namespace registered the issuance.
+    guild_registered = (
+        resolve_issuance(quest_key, guild_key) is not None
+        if guild_key is not None
+        else False
+    )
+    npc_registered = (
+        resolve_issuance(quest_key, npc_key) is not None
+        if npc_key is not None
+        else False
+    )
+    if guild_registered and npc_registered:
+        return IntentOutcome(
+            False,
+            f"quest {quest_key!r} is issued under both this branch and this issuer",
+        )
+
+    if guild_registered:
+        try:
+            eligible = list_guild_offers(player, npc)
+        except (BoardAccessError, GuildDataError) as error:
+            return IntentOutcome(False, _reason_text(error))
+        if not any(offer.definition_key == quest_key for offer in eligible):
+            return IntentOutcome(False, f"quest {quest_key!r} is not rank-eligible")
+        issuer_key = guild_key
+    elif npc_registered:
+        # A private commission's eligibility is exactly the issuance's
+        # existence: no registration gate and no rank gate applies.
+        issuer_key = npc_key
+    elif guild_key is not None:
         return IntentOutcome(False, f"no guild offer {quest_key!r} at this branch")
-    try:
-        eligible = list_guild_offers(player, npc)
-    except (BoardAccessError, GuildDataError) as error:
-        return IntentOutcome(False, _reason_text(error))
-    if not any(offer.definition_key == quest_key for offer in eligible):
-        return IntentOutcome(False, f"quest {quest_key!r} is not rank-eligible")
+    else:
+        return IntentOutcome(False, f"no commission {quest_key!r} at this issuer")
 
     from world.quests.runtime import accept_quest
-    from world.rules.quest_issuance import guild_issuer_key
     from world.rules.affinity import AffinitySource
 
     quest_log_snapshot = attribute_snapshot(player, "quest_log")
@@ -277,7 +343,7 @@ def _apply_offer_quest(npc: Any, player: Any, intent: dict[str, Any]) -> IntentO
     affinity_capped = False
     try:
         with transaction.atomic():
-            accept_quest(player, quest_key, guild_issuer_key(branch_key))
+            accept_quest(player, quest_key, issuer_key)
             outcome = apply_affinity_change(npc, player, AffinitySource.GUILD, 1)
             if outcome.source_rejected:
                 # Defensive: the verified NPC and GUILD source cannot be

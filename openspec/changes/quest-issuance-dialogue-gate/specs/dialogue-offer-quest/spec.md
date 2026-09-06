@@ -1,4 +1,4 @@
-# Delta spec: dialogue-offer-quest (quest-issuance-generative)
+# Delta spec: dialogue-offer-quest (quest-issuance-dialogue-gate)
 
 ## MODIFIED Requirements
 
@@ -17,7 +17,9 @@ existence of that issuance SHALL be the whole eligibility rule — a private com
 band, so no registration or rank gate applies and none SHALL be invented. A speaker carrying both
 components SHALL be resolved by the namespace of the issuance registered for `quest_key`; an
 ambiguous case where both kinds hold an issuance for the same key SHALL fail verification rather
-than choosing one.
+than choosing one. A speaker whose carried authority carries malformed identity data (an authored
+`issuer_key` that fails the shared issuer-key grammar, or a `branch_key` that does) SHALL fail
+verification rather than dispatching through the remaining authority.
 
 Any verification failure SHALL
 return `applied=False` with a documented reason, preserve the speech, and change no state. The AI
