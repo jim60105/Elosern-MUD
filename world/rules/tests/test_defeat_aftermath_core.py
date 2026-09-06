@@ -90,6 +90,16 @@ class DefeatAftermathBase(BattlefieldIsolation, EvenniaTestCase):
 class WildernessDefeatMixin:
     """Materialize the real wilderness script and move the fight into it."""
 
+    def tearDown(self):
+        super().tearDown()
+        # The contrib wilderness stamps ndb.wilderness/ndb.wildernessscript on
+        # every occupant and room; TypedObject.at_idmapper_flush refuses to
+        # evict ndb-holding objects, so EvenniaTestCase's non-forced
+        # flush_cache leaves these rolled-back rows cached as idmapper ghosts.
+        # A later module's create_object would resolve DEFAULT_HOME (#2)
+        # through the stale cache entry and write a dangling db_home_id.
+        ObjectDB.flush_instance_cache(force=True)
+
     def setUp_wilderness(self):
         from evennia.contrib.grid.wilderness.wilderness import (
             WildernessScript,
