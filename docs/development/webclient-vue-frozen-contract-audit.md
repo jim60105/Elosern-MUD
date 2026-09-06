@@ -339,7 +339,7 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `character-head` + `character-head__<suffix>` (`__badge`, `__disguise`, `__glyph`, `__name`, `__rank`, `__wallet`) | H2 | REMAP-TO-TESTID |
 | `local-map`, `local-map-detail`, `local-map-remembered`, `local-map-edge-markers-mirror`, `local-map__<suffix>` (`local-map__lattice`, `local-map__legend`, `local-map__title`, `local-map__marker--current`, `local-map__unavailable`, `local-map__actionable`); H5 adds `local-map__expand` (the full-map control, mounted with the `MapOverlay` it opens) | H2, H5 | REMAP-TO-TESTID |
 | `dock-menu`, `dock-crumb`, `dock-crumb__<suffix>` (covers the breadcrumb back control `dock-crumb__back`), `suggestions-section`, `suggestions-generating`, `dock-tab-<tab>` (prefix `dock-tab`: `dock-tab-flee`, `dock-tab-interact`, `dock-tab-move`, `dock-tab-look`, `dock-tab-suggestions`), `action-dock-description`, `exploration-detail`, `exploration-rest-form` | H3 | REMAP-TO-TESTID |
-| `command-line` + `command-line-<suffix>` (`command-line-input-field`, `command-line-prompt`, `command-line-settings`, `command-line-help`) | H5 | REMAP-TO-TESTID |
+| `command-line` + `command-line-<suffix>` (`command-line-input-field`, `command-line-prompt`, `command-line-lore`, `command-line-settings`, `command-line-help`) | H5 | REMAP-TO-TESTID |
 | `map-overlay`, `map-overlay-content`, `map-overlay-unavailable` | H5 | REMAP-TO-TESTID |
 | `settings-overlay`, `help-overlay`, `creation-<suffix>` (prefix `creation`: `creation-body`, `creation-submit`, `creation-confirm`, `creation-reset`, `creation-concept-indicator`, `creation-preset-card`, `creation-race`, `creation-field-<name>`), `overlay-host`, `overlay-host-close` | H5 | REMAP-TO-TESTID |
 | `character-status-drawer__condition--<code>` (covers e.g. --regen), `character-status-drawer__guild-merit`, `character-status-drawer__guild-rank` (the re-chromed status-drawer condition and guild-counter rows, added by the align-webclient-character-status-drawer-chrome change) | chrome-align | REMAP-TO-TESTID |
@@ -357,6 +357,7 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `title-codex-panel`, `title-codex-<suffix>` (prefix `title-codex`: `title-codex-header`, `title-codex-preview`, `title-codex-star`, `title-codex-tab-epithet`, `title-codex-tab-ballot`, `title-codex-ballot-<i>`, `title-codex-ballot-accept-<i>`, `title-codex-epithet-equip-<i>`, `title-codex-epithet-remove-<i>`, `title-codex-fixed-equip-<rank_key>`, `title-codex-fixed-locked-<rank_key>`, `title-codex-removal-card`, `title-codex-removal-cancel`, `title-codex-removal-confirm`) (頭銜法典視窗：固定頭銜列、星等、綽號提名分頁、提名投票分頁與移除確認卡片；added by the feat/title-codex-removal work) | epithet-nomination | REMAP-TO-TESTID |
 | `feedback-toast-queue`, `feedback-toast-<id>` (prefix `feedback-toast`: the client-local action-feedback toast queue's container and per-entry testids — a late title-codex-style addition; the queue rides the shared modal tier + 100 so it outranks every product overlay, second only to the reserved `--z-offline`; the event-log-backed game-event toast variant remains deferred and its `toast-`/`event-log-` bindings stay banned in the authored view layer; added by the add-action-feedback-toasts change) | action-feedback | REMAP-TO-TESTID |
 | `dialogue-pick`, `dialogue-exit`, `narrative-head` (narrative dialogue surface: choice rows, exit action button, and card header pinned outside scroll area; added by the webclient-align-11-dialogue-ux change) | dialogue-ux | REMAP-TO-TESTID |
+| `lore-codex-drawer`, `lore-codex-drawer__<suffix>` (prefix `lore-codex-drawer__`: `__head`, `__title`, `__sub`, `__strip`, `__aggregate`, `__category--<key>`, `__entries`, `__entry--<category>-<key>`, `__card`, `__card-title`, `__empty`, `__unavailable`, `__absent`, `__note`) (世界圖鑑抽屜主體：分類藥丸列、逐分類已發現計數控制、項目列與選取項目卡，以及誠實空狀態／不可用形式；唯讀 `lore_codex` 面板的客戶端面，導航全為本地狀態；added by the webclient-lore-codex-drawer change) | lore-codex-drawer | REMAP-TO-TESTID |
 
 **CSS class hooks the managed browser suite targets**（重新對應至穩定掛鉤，無主要需求文字命名這些項目，故無規格增量）：
 
@@ -532,6 +533,12 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 ---
 
 ## 6. 修訂記錄
+
+### lore-codex-drawer — 2026-09-06（webclient-lore-codex-drawer）
+
+- **§2.3 新 family：** 加入 `lore-codex-drawer` / `lore-codex-drawer__<suffix>`（世界圖鑑抽屜主體：表頭、分類藥丸列、逐分類已發現計數控制、項目列、選取項目卡，以及誠實空狀態與不可用形式）。`command-line` 家族加入 `command-line-lore`：指令列工具列的第五個控制，開啟 `lore` 抽屜——經 store 的單一 `openHudDrawer` 進入點，既有的互斥與收合規則不變（`lore` 本就在 `HUD_DRAWER_NAMES` 內，store 無變更）。
+- **退役：** `LoreDrawer.vue`（公會任務散文，非圖鑑）連同其 story 與測試刪除；`quest-board__open-lore` 按鈕與其 `open_lore` emit 一併移除——任務抽屜不再含任何開啟圖鑑的控制。兩個退役識別碼皆未列於 §2.3（受管套件僅以 `REFERENCE_SURFACE_TESTIDS` 執行期清單引用前者），該清單已同步改指 `lore-codex-drawer`。
+- **§5 完整性聲明維持成立：** 本變更新增掛鉤，未遺留未註冊的受管目標；`command-line-lore` 由既有的 `command-line-<suffix>` 前綴涵蓋。
 
 ### action-feedback — 2026-09-03（add-action-feedback-toasts）
 

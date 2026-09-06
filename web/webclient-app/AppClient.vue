@@ -21,7 +21,7 @@ import CharacterStatusDrawer from "./components/CharacterStatusDrawer.vue";
 import HudDrawer from "./components/HudDrawer.vue";
 import InventoryPanel from "./components/InventoryPanel.vue";
 import LocalMap from "./components/LocalMap.vue";
-import LoreDrawer from "./components/LoreDrawer.vue";
+import LoreCodexDrawer from "./components/LoreCodexDrawer.vue";
 import MapOverlay from "./components/MapOverlay.vue";
 import QuestBoard from "./components/QuestBoard.vue";
 import RestForm from "./components/RestForm.vue";
@@ -611,6 +611,14 @@ function onOpenOverlay(name) {
   openOverlayByName(name);
 }
 
+// The command line's 圖鑑 utility control (webclient-lore-codex-drawer)
+// opens the codex reference drawer through the store's single open-drawer
+// entry point: at most one focus-trapped surface is open at a time and the
+// existing drawer teardown rules apply unchanged.
+function onOpenDrawer(name) {
+  store.openHudDrawer(name);
+}
+
 // The minimap island's 展開全地圖 control (task 6.2) opens the map surface.
 function onMapExpand() {
   openOverlayByName("map");
@@ -845,6 +853,7 @@ onMounted(() => {
         @dialogue-freeform="onDialogueFreeform"
         @dialogue-leave="onDialogueLeave"
         @open-overlay="onOpenOverlay"
+        @open-drawer="onOpenDrawer"
         @switch-character="onSwitchCharacter"
         @create-character="onCreateCharacter"
       >
@@ -1005,9 +1014,8 @@ onMounted(() => {
         @quest_turnin="onQuestAction"
         @quest_track="onQuestAction"
         @exam_start="onQuestAction"
-        @open_lore="() => store.openHudDrawer('lore')"
       />
-      <LoreDrawer v-else-if="store.view.hudDrawer === 'lore'" :services="panel('services') || {}" />
+      <LoreCodexDrawer v-else-if="store.view.hudDrawer === 'lore'" :codex="panel('lore_codex')" />
       <CharacterStatusDrawer
         v-else-if="store.view.hudDrawer === 'status'"
         :status="panel('status') || {}"

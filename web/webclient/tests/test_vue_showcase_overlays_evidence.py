@@ -147,7 +147,7 @@ PREVIOUS_MANIFEST_KEYS = {
     "World/ArtPanel",
     "World/ShopPanel",
     "World/QuestBoard",
-    "World/LoreDrawer",
+    "World/LoreCodexDrawer",
     "World/InventoryPanel",
     "World/MapLattice",
     # The client-local action-feedback toast queue joined the frozen set

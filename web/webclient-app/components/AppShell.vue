@@ -102,6 +102,7 @@ const emit = defineEmits([
   "submit-command",
   "open-full-log",
   "open-overlay",
+  "open-drawer",
   "focus-lost",
   "dialogue-pick",
   "dialogue-freeform",
@@ -166,6 +167,13 @@ function onOpenOverlay(name) {
   // The command line's 設定/說明 utility controls (H5, design D10): open the
   // settings/help overlays through the parent's overlay slice.
   emit("open-overlay", name);
+}
+
+function onOpenDrawer(name) {
+  // The command line's 圖鑑 utility control (webclient-lore-codex-drawer):
+  // open the codex reference drawer through the parent's drawer slice —
+  // the same single open-drawer entry point every drawer opener uses.
+  emit("open-drawer", name);
 }
 
 // Shell-wide key claims (H5, design D2/D3): outside any editable control,
@@ -313,6 +321,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
           @submit="onSubmit"
           @focus-parent="releaseCommandField(true)"
           @open-overlay="onOpenOverlay"
+          @open-drawer="onOpenDrawer"
           @focus-lost="() => emit('focus-lost')"
         />
       </template>

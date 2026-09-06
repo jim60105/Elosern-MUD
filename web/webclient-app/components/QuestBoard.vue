@@ -18,7 +18,6 @@ const emit = defineEmits([
   "quest_track",
   "exam_start",
   "quest_register",
-  "open_lore",
 ]);
 
 // The registry-owned unavailable form carries only `reason` — the guild
@@ -69,17 +68,6 @@ function confirmAbandonNow() {
 <template>
   <section class="quest-board" data-testid="quest-board">
     <h3 class="quest-board__title" data-testid="quest-board__title">公會任務板</h3>
-
-    <!-- H4 (task 5.5): the single labelled control that opens the lore
-         (圖鑑) drawer from the quest drawer. -->
-    <button
-      type="button"
-      class="quest-board__action"
-      data-testid="quest-board__open-lore"
-      @click="emit('open_lore')"
-    >
-      世界圖鑑
-    </button>
 
     <p
       v-if="unavailable"

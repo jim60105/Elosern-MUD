@@ -28,6 +28,15 @@ Test-to-requirement mapping (applied at archive):
   ``test_story_files_import_only_local_or_bundled_modules``, which walks
   every story file, plus ``test_world_family_stories_make_no_non_local_requests``,
   which scopes that check to the World family's seven story files).
+
+- ``webclient-lore-codex-panel::the-codex-drawer-renders-the-panel-in-two-navigation-levels``
+  and ``webclient-lore-codex-panel::the-codex-drawer-discloses-no-more-than-the-panel-does``
+  (change 10's drawer behavior, implemented and verified in the Vue layer):
+  ``test_vitest_world_family_suite_passes`` executes the world Vitest filter
+  that includes ``lore_codex_drawer.test.js`` — the suite pinning the
+  category strip with honest zero counts and the aggregate control, the
+  locally-dispatched two-level navigation, the panel-order card fields, and
+  the empty, unavailable, and absent states.
 """
 
 from __future__ import annotations
@@ -54,7 +63,7 @@ WORLD_FAMILY_KEYS = (
     "World/ArtPanel",
     "World/ShopPanel",
     "World/QuestBoard",
-    "World/LoreDrawer",
+    "World/LoreCodexDrawer",
     "World/InventoryPanel",
     "World/MapLattice",
 )
@@ -80,9 +89,11 @@ WORLD_FAMILY_STORY_IDS = {
     "world-maplattice--overlay-scale-sample",
     "world-maplattice--overlay-scale-wilderness",
     "world-maplattice--overlay-scale-minimal",
-    "world-loredrawer--bare",
-    "world-loredrawer--full-lore",
-    "world-loredrawer--section-unavailable",
+    "world-lorecodexdrawer--populated-codex",
+    "world-lorecodexdrawer--category-selected",
+    "world-lorecodexdrawer--entry-selected",
+    "world-lorecodexdrawer--empty-codex",
+    "world-lorecodexdrawer--unavailable",
     "world-questboard--full-guild",
     "world-questboard--no-guild",
     "world-questboard--section-unavailable",
@@ -188,6 +199,10 @@ class VueShowcaseWorldEvidenceTest(unittest.TestCase):
     @covers_requirement(
         "webclient-component-showcase::the-map-art-and-services-surfaces-render-oob-backed-data-truthfully"
     )
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-codex-drawer-renders-the-panel-in-two-navigation-levels",
+        "webclient-lore-codex-panel::the-codex-drawer-discloses-no-more-than-the-panel-does",
+    )
     def test_vitest_world_family_suite_passes(self):
         """Every world + services family SFC renders its contract states under Vitest.
 
@@ -196,7 +211,7 @@ class VueShowcaseWorldEvidenceTest(unittest.TestCase):
         with legend and detail line plus the actionable adjacent nodes, the
         art 16:9 cover plus truthful placeholder, the shop stock/sellable
         and equipped-only inventory, the guild board/quest-detail board, and
-        the services-backed lore drawer — each asserted only from the mock
+        the committed-panel codex drawer — each asserted only from the mock
         payloads (no invented bag or party panel).
         """
         result = run_npm(["test", "--", "world"], timeout=600)
@@ -286,7 +301,7 @@ class VueShowcaseWorldEvidenceTest(unittest.TestCase):
             family_titles,
             {f"World/{component}" for component in (
                 "LocalMap", "ArtPanel", "ShopPanel",
-                "QuestBoard", "LoreDrawer", "InventoryPanel",
+                "QuestBoard", "LoreCodexDrawer", "InventoryPanel",
                 "MapLattice",
             )},
         )

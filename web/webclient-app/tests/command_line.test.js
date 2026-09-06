@@ -300,4 +300,39 @@ describe("CommandLine (H5, webclient-hud-05-overlays-and-command-line)", () => {
     expect(literal.find(".color-111").exists()).toBe(false, "off: literal text, no pipeline");
     w2.unmount();
   });
+
+  it("the utility strip renders five controls in order and the codex control opens a drawer", async () => {
+    const w = mountLine();
+    const strip = w.get(".cmdutil");
+    const buttons = strip.findAll(".cmdutil__btn");
+    expect(buttons.map((b) => b.attributes("aria-label"))).toEqual([
+      "技能系譜",
+      "圖鑑",
+      "稱號冊",
+      "設定",
+      "說明",
+    ]);
+    // The 圖鑑 control opens the codex reference drawer (a drawer, not an
+    // overlay): a distinct emit the app host routes to openHudDrawer.
+    await buttons[1].trigger("click");
+    expect(w.emitted("open-drawer")).toEqual([["lore"]]);
+    // The overlay controls keep their own emit.
+    await buttons[3].trigger("click");
+    expect(w.emitted("open-overlay")).toEqual([["settings"]]);
+  });
+
+  it("the two codex controls carry distinct labels and distinct glyphs", () => {
+    const w = mountLine();
+    const lore = w.get('[data-testid="command-line-lore"]');
+    const codex = w.get('[data-testid="command-line-codex"]');
+    expect(lore.attributes("aria-label")).not.toBe(codex.attributes("aria-label"));
+    const lorePaths = lore.findAll("path, circle, ellipse").map((n) => n.attributes("d") ?? n.attributes("r") + n.attributes("rx"));
+    const codexPaths = codex.findAll("path, circle, ellipse").map((n) => n.attributes("d") ?? n.attributes("r") + n.attributes("rx"));
+    // The world codex (globe) shares no path data with the title codex
+    // (star book): the two systems sit side by side in the strip.
+    expect(lorePaths).not.toEqual(codexPaths);
+    for (const segment of lorePaths) {
+      expect(codexPaths).not.toContain(segment);
+    }
+  });
 });

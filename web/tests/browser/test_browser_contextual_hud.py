@@ -27,6 +27,7 @@ from .browser_helpers import (
     sent_action_count,
     store_state,
     valid_character_panel,
+    valid_lore_codex_panel,
     valid_local_map_panel,
     valid_status_panel,
     wait_for_store_state,
@@ -1454,7 +1455,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "inventory-panel",
         "shop-panel",
         "quest-board",
-        "lore-drawer",
+        "lore-codex-drawer",
         "character-status-drawer",
     ]
 
@@ -1590,6 +1591,172 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             stage.get_attribute("data-menu-open"), "false",
             "the recession mark clears when the last surface closes",
         )
+
+    # ------------------------------------------------------------------
+    # webclient-lore-codex-drawer: the world-codex drawer surface.
+    # ------------------------------------------------------------------
+
+    @covers_requirement(
+        "webclient-contextual-hud::an-open-drawer-or-overlay-dims-the-stage-behind-it"
+    )
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-codex-opens-from-the-command-line-utility-strip-not-from-the-quest-drawer",
+    )
+    def test_codex_drawer_opens_from_the_utility_strip(self):
+        """The command line's 圖鑑 utility control opens the codex reference
+        drawer with a real user click: the drawer body renders the committed
+        `lore_codex` panel's discovered entries, the stage recesses while it
+        is open, and Escape closes it."""
+        page = self.logged_in_page()
+        stage = page.locator('[data-testid="elosern-stage"]')
+        _inject_snapshot(page, {"lore_codex": valid_lore_codex_panel()}, mode="exploration")
+        _wait_mode(page, "exploration")
+
+        # The real trigger path: a clean-state click on the utility-strip
+        # control (no modal covers the command line).
+        page.locator('[data-testid="command-line-lore"]').click()
+        page.wait_for_selector('[data-testid="lore-codex-drawer"]', timeout=15000)
+        self.assertEqual(
+            page.locator('[data-testid="lore-codex-drawer"]').count(),
+            1,
+            "the utility-strip control opens exactly the codex reference drawer",
+        )
+        # The body renders the panel's discoveries (not the old guild-quest
+        # prose, not an empty stub): the aggregate control and both entries.
+        body_text = page.locator('[data-testid="lore-codex-drawer"]').inner_text()
+        self.assertIn("全部", body_text, "the aggregate control renders")
+        self.assertIn("人類", body_text, "the discovered race entry renders")
+        self.assertIn("霧骨渡口", body_text, "the discovered anchor entry renders")
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "true",
+            "the open codex drawer recesses the stage",
+        )
+
+        # Escape closes the drawer in one action.
+        _press(page, "Escape")
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"hud-drawer\"]') === null",
+            timeout=15000,
+        )
+        self.assertEqual(
+            stage.get_attribute("data-menu-open"),
+            "false",
+            "the recession mark clears when the codex drawer closes",
+        )
+        page.close()
+
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-codex-opens-from-the-command-line-utility-strip-not-from-the-quest-drawer",
+    )
+    def test_codex_drawer_replaces_the_open_drawer_or_overlay(self):
+        """At most one focus-trapped surface is open: opening the codex drawer
+        through the store's single open-drawer entry point closes an open
+        reference drawer, and opening an overlay closes the codex drawer."""
+        page = self.logged_in_page()
+        _inject_snapshot(page, {"lore_codex": valid_lore_codex_panel()}, mode="exploration")
+        _wait_mode(page, "exploration")
+
+        # Drawer-vs-drawer: the status drawer is open (the public test seam
+        # the H4 journeys use), then the codex opens through the same single
+        # store entry point the utility-strip control routes to.
+        self._open_status_drawer(page)
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s) s.openHudDrawer('lore'); }"
+        )
+        page.wait_for_selector('[data-testid="lore-codex-drawer"]', timeout=15000)
+        self.assertEqual(
+            page.locator('[data-testid="character-status-drawer"]').count(),
+            0,
+            "opening the codex drawer closes the open reference drawer",
+        )
+
+        # Drawer-vs-overlay: opening the settings overlay closes the codex
+        # drawer (the store keeps one open focus-trapped surface).
+        page.evaluate("window.__elosernBridge.store.openOverlay('settings')")
+        page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
+        self.assertEqual(
+            page.locator('[data-testid="lore-codex-drawer"]').count(),
+            0,
+            "opening the settings overlay closes the codex drawer",
+        )
+        page.locator('[data-testid="overlay-host-close"]').click()
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"settings-overlay\"]') === null",
+            timeout=15000,
+        )
+        page.close()
+
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-codex-opens-from-the-command-line-utility-strip-not-from-the-quest-drawer",
+    )
+    def test_quest_drawer_offers_no_codex_control(self):
+        """The quest drawer contains no control that opens the codex: the
+        世界圖鑑 button (and its `open_lore` emit) is removed outright."""
+        page = self.logged_in_page()
+        _inject_snapshot(page, {"lore_codex": valid_lore_codex_panel()}, mode="exploration")
+        _wait_mode(page, "exploration")
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s) s.openHudDrawer('quest'); }"
+        )
+        page.wait_for_selector('[data-testid="quest-board"]', timeout=15000)
+
+        quest_board = page.locator('[data-testid="quest-board"]')
+        self.assertEqual(
+            quest_board.locator('[data-testid="quest-board__open-lore"]').count(),
+            0,
+            "the removed 世界圖鑑 control is gone from the quest drawer",
+        )
+        self.assertEqual(
+            page.locator('[data-testid="lore-codex-drawer"]').count(),
+            0,
+            "no codex drawer is open beside the quest drawer",
+        )
+        # No control anywhere inside the quest-drawer body names the codex.
+        self.assertNotIn(
+            "世界圖鑑",
+            quest_board.inner_text(),
+            "the quest drawer renders no codex-opening control",
+        )
+        page.close()
+
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-codex-opens-from-the-command-line-utility-strip-not-from-the-quest-drawer",
+    )
+    def test_the_two_codex_controls_are_distinguishable(self):
+        """The world-codex control and the title-codex control in the utility
+        strip carry distinct accessible labels and distinct glyphs — they sit
+        side by side and open different systems."""
+        page = self.logged_in_page()
+        _wait_mode(page, "exploration")
+
+        lore = page.locator('[data-testid="command-line-lore"]')
+        codex = page.locator('[data-testid="command-line-codex"]')
+        lore_label = lore.get_attribute("aria-label")
+        codex_label = codex.get_attribute("aria-label")
+        self.assertNotEqual(
+            lore_label,
+            codex_label,
+            "the two codex controls carry distinct accessible labels",
+        )
+        lore_glyph = page.evaluate(
+            "() => { const b = document.querySelector('[data-testid=\"command-line-lore\"]');"
+            " return Array.from(b.querySelectorAll('path, circle, ellipse'))"
+            ".map((n) => n.outerHTML); }"
+        )
+        codex_glyph = page.evaluate(
+            "() => { const b = document.querySelector('[data-testid=\"command-line-codex\"]');"
+            " return Array.from(b.querySelectorAll('path, circle, ellipse'))"
+            ".map((n) => n.outerHTML); }"
+        )
+        self.assertNotEqual(
+            lore_glyph,
+            codex_glyph,
+            "the two codex controls carry distinct glyph shapes",
+        )
+        page.close()
 
     @covers_requirement(
         "webclient-contextual-hud::the-narrative-is-a-bounded-caption-whose-complete-log-is-reachable-in-one-action"

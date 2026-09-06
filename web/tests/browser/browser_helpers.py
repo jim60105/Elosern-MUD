@@ -634,6 +634,64 @@ def valid_art_panel() -> dict:
     }
 
 
+def valid_lore_codex_panel(**overrides) -> dict:
+    """A schema-valid available ``lore_codex`` panel for injected snapshots.
+
+    Mirrors the exact v1 shape the server presenter emits
+    (``web/webclient/presentation/lore_codex.py``): the eight codex
+    categories in ``CODE_CATEGORIES`` mapping order, ``count`` equal to each
+    category's entry length, and two discovered entries (one race, one
+    anchor) carrying renderer-shaped ``{name, value}`` card fields.
+    """
+
+    def category(key: str, label: str, entries: list) -> dict:
+        return {"key": key, "label": label, "count": len(entries), "entries": entries}
+
+    panel = {
+        "schema_version": 1,
+        "available": True,
+        "categories": [
+            category(
+                "race",
+                "種族",
+                [
+                    {
+                        "key": "human",
+                        "title": "人類",
+                        "card": [
+                            {"name": "代號", "value": "human"},
+                            {"name": "描述", "value": "適應力最強的短命種，遍布灰河沿岸。"},
+                        ],
+                    }
+                ],
+            ),
+            category("nation", "國家", []),
+            category("region", "地域", []),
+            category("monster", "魔物", []),
+            category("element", "元素", []),
+            category("magic", "魔法", []),
+            category(
+                "anchor",
+                "地點",
+                [
+                    {
+                        "key": "misty_ford",
+                        "title": "霧骨渡口",
+                        "card": [
+                            {"name": "名稱", "value": "霧骨渡口"},
+                            {"name": "描述", "value": "灰河上的主要渡口，旅人與貨物的集散地。"},
+                        ],
+                    }
+                ],
+            ),
+            category("guild", "公會", []),
+        ],
+        "discovered_total": 2,
+    }
+    panel.update(overrides)
+    return panel
+
+
 def valid_character_panel(**overrides) -> dict:
     """A schema-valid available character panel (schema version 7) for
     injected snapshots.

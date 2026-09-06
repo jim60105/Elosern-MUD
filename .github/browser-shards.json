@@ -266,13 +266,16 @@
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_action_dock_floating_panel_persists_across_modes",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_breadcrumb_tracks_router_depth",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_command_line_never_overlaps_dock_caption_or_hud",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_codex_drawer_opens_from_the_utility_strip",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_codex_drawer_replaces_the_open_drawer_or_overlay",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_dock_root_tab_bar_truthful_count_badges",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_h5_overlay_triggers_exclusion_and_focus_restoration",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_minimap_island_single_affordance_keyboard_and_movement",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_narrative_caption_bounded_full_log_one_action",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_open_drawer_or_overlay_dims_stage",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_scene_backdrop_renders_art_payload_truthfully",
-        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_surface_visibility_gated_by_committed_game_mode"
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_surface_visibility_gated_by_committed_game_mode",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_the_two_codex_controls_are_distinguishable"
       ]
     },
     {
@@ -300,6 +303,7 @@
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_digit_keys_pick_the_first_four_rows_of_the_current_frame",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_dock_panes_render_per_kind_vocabulary",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_local_map_unavailable_renders_registry_reason_in_map_overlay",
+        "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_quest_drawer_offers_no_codex_control",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_reference_drawer_close_focus_and_absent_surfaces",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_reference_drawer_recession_mark_lifecycle",
         "web.tests.browser.test_browser_contextual_hud.ContextualHudBrowserTest.test_status_drawer_tiles_and_pills_fit_with_no_overlap"
