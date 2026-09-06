@@ -9,6 +9,13 @@ consults no LLM, no image service, and no generative proposal. The deterministic
 reachable both from the web client, as the registered `explore.deliver` action, and from the text
 surface, as a player command. Neither route SHALL depend on an NPC dialogue intent, so a delivery
 quest SHALL be completable end to end with every generative profile failing.
+The deterministic path SHALL hand exactly the remaining objective quantity
+(`objective.quantity - stage_progress`) of the selected active stage in one invocation; the payload
+carries no quantity, and the quantity is re-derived server-side. When several in-progress records
+bind the same recipient and item key, one shared selection policy — used by both the deterministic
+rule and the affordance builder — SHALL select the stage with the lowest remaining quantity (ties
+breaking in quest-log order), so an advertised delivery is always satisfiable by the hand-over that
+follows it.
 
 #### Scenario: A delivery completes with all generative services failing
 - **WHEN** every `LLM_PROFILES` entry is configured to fail and the holder hands the objective item
@@ -20,6 +27,12 @@ quest SHALL be completable end to end with every generative profile failing.
   player command
 - **THEN** both invoke the identical deterministic rule and produce identical state changes and
   identical rejection reasons
+
+#### Scenario: A partially advanced stage is completed by one hand-over
+- **WHEN** the holder's delivery stage has already gained progress and the holder carries exactly
+  the remaining objective quantity
+- **THEN** the deterministic hand-over transfers exactly that remaining quantity and the stage
+  completes
 
 ### Requirement: The delivery action is registered with an exact bounded payload
 
@@ -51,7 +64,8 @@ payload through the text command parser.
 The deterministic rule SHALL refuse, with a stable reason code and a safe Traditional Chinese
 message, when the recipient is not co-located with the holder, when the holder has no active
 `DELIVER` stage bound to that recipient, when the holder does not hold the objective's item, or when
-the record is terminal. A refusal SHALL change no inventory, no quest log, and no other state.
+an active combat session blocks the holder. The combat refusal SHALL precede the other rule-level
+checks. A refusal SHALL change no inventory, no quest log, and no other state.
 
 #### Scenario: A distant recipient is refused
 - **WHEN** the named recipient is not in the holder's location
@@ -64,6 +78,12 @@ the record is terminal. A refusal SHALL change no inventory, no quest log, and n
 #### Scenario: An unbound recipient is refused
 - **WHEN** the named co-located entity is not the bound recipient of any active delivery stage
 - **THEN** the delivery is refused with a stable reason code and no state changes
+
+#### Scenario: A mid-fight delivery is refused before every other check
+- **WHEN** the holder has an active combat session and names a recipient or item that would
+  otherwise be deliverable
+- **THEN** the delivery is refused with the combat reason code before any co-location, binding, or
+  holding evaluation
 
 #### Scenario: A refusal leaves the world untouched
 - **WHEN** any refusal branch is taken

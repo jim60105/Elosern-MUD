@@ -205,6 +205,13 @@ mirroring how ACQUIRE advances only from a committed positive inventory delta.
 This also supplies the `給` verb the redesign document already anticipated for the exploration
 surface.
 
+**Amended 2026-09-06 (implementation review).** The premise that no give verb exists was wrong:
+`commands/localized/general.py::CmdGive` is the localized Evennia general give with `key = "給"`,
+mounted in `CharacterCmdSet` and documented in the command docs. This phase therefore supplies the
+`交付` command (no alias) rather than the `給` verb; the already-existing general give transfers
+inventory keys without the delivery observer, which remains a known gap for a separate change (see
+§13 "Follow-up notes from implementation").
+
 **Documentation obligation:** the change adds a player command, so `docs/game/commands.md` and
 `docs/game/command-reference.md` are updated in the same change and `tests/test_command_docs.py`
 stays green.
@@ -502,3 +509,31 @@ could have concluded 12 was safe before 2. Corrected in both places.
 are validator-normalized" untouched — and that requirement's text claims to enumerate the exact
 params shape of every allowlisted action. Archiving would have produced an internally inconsistent
 main spec. That requirement now carries a MODIFIED delta naming the delivery payload shape.
+
+### Follow-up notes from implementation (2026-09-06)
+
+**The general give advances no delivery.** Change 6's research falsified the §5.1 premise: a
+general give verb already exists — the localized Evennia `give`
+(`commands/localized/general.py::CmdGive`, `key = "給"`, mounted in `CharacterCmdSet`, documented
+in the command docs). It transfers `db.inventory` registry keys to a co-located target through
+`plan_inventory_delta` / `apply_inventory_plan` (materializing missing registry mirrors), but it
+does not route through `world/rules/npc_intents.py::_transfer_items`, so the DELIVER observer
+change 5 wired there never runs on its commits. Consequence: `給 <物品> = <對象>` moves the parcel
+into the bound recipient's inventory while the quest does not advance — a silent trap, not a
+refusal. The hole predates change 6 (change 5 hooked only `_transfer_items`), and change 6's delta
+specs own no general-give requirement, so its implementation left it open deliberately and
+recorded it in its design risks.
+
+Follow-up change (a separate, reviewed unit; do not fold into another workday-sized change):
+
+- Route `CmdGive`'s registry-key path — and its materialized-object branch — through the delivery
+  advance: call `compute_deliver_replacement`, apply the returned quest-log replacement and pin
+  operations inside the give's own transaction, snapshot and restore the same surfaces
+  `_transfer_items` protects, and emit the same delivery events.
+- Keep the honesty split: the general give stays a raw transfer — giving to an unbound recipient
+  legitimately transfers without advancing anything, and only the committed-transfer observer
+  decides progress. Quest-scoped refusal semantics (`not_colocated`, `no_active_delivery`,
+  `item_not_held`, `in_combat`) remain the contract of `交付` / `explore.deliver` through
+  `world/rules/quest_delivery.py`.
+- Until the follow-up lands, `交付` / `explore.deliver` is the only path that advances DELIVER;
+  authored delivery content should not assume `給` completes a delivery.

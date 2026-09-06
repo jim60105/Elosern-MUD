@@ -33,6 +33,28 @@ def _matching_active_stages(
     item_key: str,
 ) -> list[tuple[QuestRecord, Any]]:
     """Return active records whose current DELIVER objective matches the transfer."""
+    return [
+        (record, definition)
+        for record, definition, _objective in iter_bound_deliveries(
+            giver, receiver, item_key
+        )
+        if record.state is QuestState.IN_PROGRESS
+    ]
+
+
+def iter_bound_deliveries(
+    giver: Any,
+    receiver: Any,
+    item_key: str | None,
+) -> list[tuple[QuestRecord, Any, Any]]:
+    """Return every record whose current stage is a DELIVER objective bound to
+    ``receiver`` for ``item_key`` (or for any item when ``item_key`` is
+    ``None``), in any record state, in quest-log order.
+
+    The single matching source for both the delivery observer and the
+    deterministic hand-over rule, so the two can never disagree on what
+    counts as a bound delivery stage.
+    """
     receiver_id = getattr(receiver, "pk", None)
     if receiver_id is None:
         return []
@@ -41,21 +63,38 @@ def _matching_active_stages(
     except (TypeError, ValueError):  # observability: ignore R2: non-integer receiver pk cannot match stored integer target ids
         return []
 
-    records = read_records(giver)
-    matching: list[tuple[QuestRecord, Any]] = []
-    for record in records:
-        if record.state is not QuestState.IN_PROGRESS:
-            continue
+    bound: list[tuple[QuestRecord, Any, Any]] = []
+    for record in read_records(giver):
         definition = definition_for(record)
         objective = definition.stages[record.stage_index].objective
         if objective.kind is not ObjectiveKind.DELIVER:
             continue
-        if objective.item_key != item_key:
+        if item_key is not None and objective.item_key != item_key:
             continue
         if target_pk not in record.objective_target_ids:
             continue
-        matching.append((record, definition))
-    return matching
+        bound.append((record, definition, objective))
+    return bound
+
+
+def select_deliver_stage(
+    active: list[tuple[QuestRecord, Any]],
+) -> tuple[QuestRecord, Any, int] | None:
+    """Select the active stage a hand-over satisfies, with its remaining quantity.
+
+    The lowest remaining quantity wins (ties break in quest-log order), so an
+    advertised delivery is always satisfiable by the hand-over that follows it
+    and every enabled invocation makes progress. The delivery observer still
+    advances every matching active record by ``min(transferred, its own
+    remaining)``.
+    """
+    selected: tuple[QuestRecord, Any, int] | None = None
+    for record, definition in active:
+        objective = definition.stages[record.stage_index].objective
+        remaining = objective.quantity - record.stage_progress
+        if selected is None or remaining < selected[2]:
+            selected = (record, definition, remaining)
+    return selected
 
 
 def compute_deliver_replacement(

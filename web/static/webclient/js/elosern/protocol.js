@@ -128,6 +128,7 @@
   var CONTEXT_ACTIONS_MAX_EXIT_REF = 64;
   var CONTEXT_ACTIONS_MAX_NODE_ID = 128;
   var CONTEXT_ACTIONS_MAX_KEYWORD_ID = 64;
+  var CONTEXT_ACTIONS_MAX_ITEM_KEY = 64;
   var CONTEXT_ACTIONS_MAX_WEB_SKIP_SECONDS = 43200;
   var CONTEXT_ACTIONS_ACTION_CODES = [
     "explore.move",
@@ -140,6 +141,7 @@
     "explore.wait",
     "explore.possess",
     "explore.possess_release",
+    "explore.deliver",
   ];
   var CONTEXT_ACTIONS_SURFACES = ["guild", "shop"];
   var CONTEXT_ACTIONS_DAYPARTS = ["midnight", "dawn", "noon", "dusk"];
@@ -410,7 +412,7 @@
     objectives: 1,
     services: 4,
     creation: 5,
-    exploration: 1,
+    exploration: 2,
     character: 7,
     lineage: 1,
     dialogue: 1,
@@ -1197,6 +1199,23 @@
     if (actionId === "explore.possess" || actionId === "explore.possess_release") {
       requireExactFields(params, actionId + " params", ["npc_id"], []);
       requireInt(params.npc_id, "npc_id", 1, MAX_SAFE_INTEGER);
+      return params;
+    }
+    if (actionId === "explore.deliver") {
+      requireExactFields(params, "deliver params", ["npc_id", "item_key"], []);
+      requireInt(params.npc_id, "npc_id", 1, MAX_SAFE_INTEGER);
+      if (
+        typeof params.item_key !== "string" ||
+        params.item_key.length < 1 ||
+        params.item_key.length > CONTEXT_ACTIONS_MAX_ITEM_KEY
+      ) {
+        throw new Error(
+          "item_key must be 1.." + CONTEXT_ACTIONS_MAX_ITEM_KEY + " characters"
+        );
+      }
+      if (!/^[\x00-\x7F]*$/.test(params.item_key)) {
+        throw new Error("item_key must be ASCII");
+      }
       return params;
     }
     if (actionId === "explore.wait") {
@@ -3121,6 +3140,7 @@
   var EXPLORATION_MAX_LABEL = 128;
   var EXPLORATION_MAX_KEYWORD_ID = 64;
   var EXPLORATION_MAX_KEYWORD_LABEL = 128;
+  var EXPLORATION_MAX_ITEM_KEY = 64;
   var EXPLORATION_MAX_REASON_MESSAGE = 128;
   var EXPLORATION_ACTION_KINDS = ["action", "navigate"];
   var EXPLORATION_ACTION_IDS = [
@@ -3131,6 +3151,7 @@
     "explore.engage",
     "explore.possess",
     "explore.possess_release",
+    "explore.deliver",
   ];
   var EXPLORATION_SURFACES = ["guild", "shop"];
   var EXPLORATION_ENTITY_KINDS = ["character", "npc", "monster"];
@@ -3206,7 +3227,9 @@
       value,
       "affordance",
       ["kind", "label", "enabled", "disabled_reason"],
-      ["action_id", "surface"]
+      // `params` is the schema-version-2 delivery payload; the kind branches
+      // below enforce exactly which affordance may carry it.
+      ["action_id", "surface", "params"]
     );
     var label = requireString(value.label, "label", EXPLORATION_MAX_LABEL);
     if (!label.trim()) {
@@ -3227,36 +3250,68 @@
         value,
         "action affordance",
         ["kind", "action_id", "label", "enabled", "disabled_reason"],
-        []
+        // Schema version 2 (quest-deliver-action): exactly the
+        // explore.deliver affordance carries the server validator's
+        // normalized dispatch payload; every other action keeps the
+        // version-1 exact shape.
+        ["params"]
       );
       var actionId = validateIdentifier(value.action_id, "action_id");
       if (EXPLORATION_ACTION_IDS.indexOf(actionId) === -1) {
         throw new Error("action_id is not a registered exploration action");
       }
-      return {
+      if (actionId !== "explore.deliver" && value.params !== undefined) {
+        throw new Error("action affordance must not contain params");
+      }
+      var normalized = {
         kind: kind,
         action_id: actionId,
         label: label,
         enabled: enabled,
         disabled_reason: disabledReason,
       };
+      if (actionId === "explore.deliver") {
+        var deliverParams = value.params;
+        if (!isPlainObject(deliverParams)) {
+          throw new Error("explore.deliver params must be a JSON object");
+        }
+        requireExactFields(deliverParams, "deliver params", ["npc_id", "item_key"], []);
+        requireInt(deliverParams.npc_id, "npc_id", 1, MAX_SAFE_INTEGER);
+        if (
+          typeof deliverParams.item_key !== "string" ||
+          deliverParams.item_key.length < 1 ||
+          deliverParams.item_key.length > EXPLORATION_MAX_ITEM_KEY
+        ) {
+          throw new Error(
+            "item_key must be 1.." + EXPLORATION_MAX_ITEM_KEY + " characters"
+          );
+        }
+        if (!/^[\x00-\x7F]*$/.test(deliverParams.item_key)) {
+          throw new Error("item_key must be ASCII");
+        }
+        normalized.params = deliverParams;
+      }
+      return normalized;
     }
-    requireExactFields(
-      value,
-      "navigation affordance",
-      ["kind", "surface", "label", "enabled", "disabled_reason"],
-      []
-    );
-    if (EXPLORATION_SURFACES.indexOf(value.surface) === -1) {
-      throw new Error("surface is not a stable value");
+    if (kind === "navigate") {
+      requireExactFields(
+        value,
+        "navigation affordance",
+        ["kind", "surface", "label", "enabled", "disabled_reason"],
+        []
+      );
+      if (EXPLORATION_SURFACES.indexOf(value.surface) === -1) {
+        throw new Error("surface is not a stable value");
+      }
+      return {
+        kind: kind,
+        surface: value.surface,
+        label: label,
+        enabled: enabled,
+        disabled_reason: disabledReason,
+      };
     }
-    return {
-      kind: kind,
-      surface: value.surface,
-      label: label,
-      enabled: enabled,
-      disabled_reason: disabledReason,
-    };
+    throw new Error("affordance kind is not a stable value");
   }
 
   function validateExplorationLookEntity(value) {
@@ -3412,7 +3467,7 @@
       []
     );
     requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 1) {
+    if (payload.schema_version !== 2) {
       throw new Error("unsupported exploration schema_version");
     }
     if (payload.available !== true || payload.kind !== "exploration") {
@@ -3443,7 +3498,7 @@
     validateExplorationAvailability(payload.inventory, "inventory");
 
     var result = {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "exploration",
       move: payload.move,

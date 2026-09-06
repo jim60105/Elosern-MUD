@@ -1607,7 +1607,14 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         }
         self.assertEqual(
             ids,
-            set(ACTION_CODE_ALLOWLIST) - {"explore.engage", "explore.party_leave", "explore.possess", "explore.possess_release"},
+            set(ACTION_CODE_ALLOWLIST)
+            - {
+                "explore.engage",
+                "explore.party_leave",
+                "explore.possess",
+                "explore.possess_release",
+                "explore.deliver",
+            },
         )
         surfaces = {entry.surface for entry in vocabulary if entry.navigation}
         self.assertEqual(surfaces, {"guild", "shop"})

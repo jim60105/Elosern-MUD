@@ -159,6 +159,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     "拿": {"syntax": "拿 <物品>", "context": "一般"},
     "丟": {"syntax": "丟 <物品>", "context": "一般"},
     "給": {"syntax": "給 <物品> = <對象>", "context": "一般"},
+    "交付": {"syntax": "交付 <對象> <物品>", "context": "一般（探索中可用；戰鬥中拒絕）"},
     "回家": {"syntax": "回家", "context": "一般（需 home 權限或建造者權限）"},
     "耳語": {"syntax": "耳語 <角色> = <訊息>", "context": "一般"},
     "暱稱": {"syntax": "暱稱 <字串> = [<替換字串>]", "context": "一般"},
@@ -419,6 +420,24 @@ class CommandDocsContractTests(unittest.TestCase):
         self.assertIn("character concept <構想>", entry["語法"])
         self.assertIn("生成不可用，請手動創角", entry["說明"])
         self.assertIn("18", entry["說明"])
+
+    @covers_requirement(
+        "game-command-docs::the-command-reference-documents-the-delivery-command"
+    )
+    def test_delivery_entry_is_documented(self):
+        entry = self.entries["交付"]
+        self.assertEqual(entry["指令"], "交付")
+        self.assertEqual(parse_aliases(entry["別名"]), set())
+        self.assertEqual(entry["語法"], "交付 <對象> <物品>")
+        self.assertIn("戰鬥中拒絕", entry["情境"])
+        # The description states the bound-recipient rule, that only the
+        # bound recipient satisfies the delivery, and that a refusal changes
+        # nothing.
+        self.assertIn("綁定的交付對象", entry["說明"])
+        self.assertIn("不會改變", entry["說明"])
+        overview = parse_overview_links(OVERVIEW_PATH.read_text(encoding="utf-8"))
+        # The overview link set gains exactly the delivery fragment.
+        self.assertEqual(overview["交付"], "交付")
 
     @covers_requirement("game-command-docs::complete-command-reference")
     def test_persona_command_family_is_documented(self):

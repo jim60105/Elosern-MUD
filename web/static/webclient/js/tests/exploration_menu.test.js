@@ -13,11 +13,12 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
 const ExplorationMenu = require("../elosern/exploration_menu.js");
+const Protocol = require("../elosern/protocol.js");
 
 function validPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "exploration",
       move: [
@@ -375,4 +376,75 @@ test("party leave submits explore.party_leave with the server NPC id", () => {
   const leave = targetMenu.items.find((item) => item.key === "party-leave");
   assert.equal(leave.actionId, "explore.party_leave");
   assert.deepEqual(leave.payload, { npc_id: 12 });
+});
+
+test("deliver forwards the server-normalized params and echoes the server label", () => {
+  const panel = validPanel({
+    interact: [
+      {
+        identity: 13,
+        display_name: "灰婆婆",
+        portrait_ref: null,
+        affordances: [
+          {
+            kind: "action",
+            action_id: "explore.deliver",
+            label: "交付 治療藥水 給 灰婆婆",
+            params: { npc_id: 13, item_key: "healing_potion" },
+            enabled: true,
+            disabled_reason: null,
+          },
+        ],
+      },
+    ],
+  });
+  // End-to-end mirror assertion (quest-deliver-action): the production panel
+  // validator accepts the row the menu model is about to consume.
+  assert.doesNotThrow(() => Protocol.validateExplorationPanel(panel));
+  const model = ExplorationMenu.buildMenus(panel, {});
+  const target = ExplorationMenu.targetById(model, 13);
+  const targetMenu = ExplorationMenu.targetMenuFor(model, target);
+  const deliver = targetMenu.items.find((item) => item.key === "deliver");
+  assert.ok(deliver);
+  assert.equal(deliver.actionId, "explore.deliver");
+  // The menu forwards the server-normalized payload, never a reconstruction.
+  assert.deepEqual(deliver.payload, { npc_id: 13, item_key: "healing_potion" });
+  assert.deepEqual(deliver.commandDisplay, {
+    actionLabel: "交付 治療藥水 給 灰婆婆",
+  });
+});
+
+test("a disabled delivery keeps its reason and never submits", () => {
+  const panel = validPanel({
+    interact: [
+      {
+        identity: 13,
+        display_name: "灰婆婆",
+        portrait_ref: null,
+        affordances: [
+          {
+            kind: "action",
+            action_id: "explore.deliver",
+            label: "交付 治療藥水 給 灰婆婆",
+            params: { npc_id: 13, item_key: "healing_potion" },
+            enabled: false,
+            disabled_reason: {
+              code: "item_not_held",
+              message: "你沒有帶著足夠的任務物品。",
+            },
+          },
+        ],
+      },
+    ],
+  });
+  assert.doesNotThrow(() => Protocol.validateExplorationPanel(panel));
+  const model = ExplorationMenu.buildMenus(panel, {});
+  const target = ExplorationMenu.targetById(model, 13);
+  const targetMenu = ExplorationMenu.targetMenuFor(model, target);
+  const deliver = targetMenu.items.find((item) => item.key === "deliver");
+  assert.ok(deliver);
+  assert.equal(deliver.enabled, false);
+  assert.equal(deliver.actionId, null);
+  assert.equal(deliver.payload, null);
+  assert.match(deliver.description, /沒有帶著/);
 });

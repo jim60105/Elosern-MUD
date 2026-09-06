@@ -13,6 +13,7 @@
     "creation.roll_name",
     "creation.reset",
     "explore.engage",
+    "explore.deliver",
     "explore.dialogue_leave",
     "explore.look",
     "explore.move",

@@ -26,12 +26,14 @@ from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.rooms import Room, TerrainRoom
 from web.webclient.actions.exploration_actions import (
     MAX_EXIT_REF_CHARS,
+    MAX_ITEM_KEY_CHARS,
     MAX_KEYWORD_ID_CHARS,
     MAX_NODE_ID_CHARS,
     MAX_SPEECH_CODE_POINTS,
     ExplorationActionError,
     _current_node,
     _dialogue_leave_adapter,
+    _deliver_adapter,
     _engage_adapter,
     _look_adapter,
     _move_adapter,
@@ -43,6 +45,7 @@ from web.webclient.actions.exploration_actions import (
     _talk_scripted_adapter,
     _wait_adapter,
     validate_engage_payload,
+    validate_deliver_payload,
     validate_dialogue_leave_payload,
     validate_look_payload,
     validate_move_payload,
@@ -59,6 +62,7 @@ from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
 from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid
 from world.maps.wilderness_provider import WILDERNESS_NAME
+from world.quests.definitions import QuestStage
 from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
 from world.rules.combat_session import (
     CombatSessionError,
@@ -284,9 +288,39 @@ class ExplorationValidatorTests(unittest.TestCase):
                 validate_party_leave_payload,
                 validate_engage_payload,
                 validate_wait_payload,
+                validate_deliver_payload,
             ):
                 with self.assertRaises(ExplorationActionError):
                     validator({field: "x"})
+
+    def test_deliver_payload_exact(self):
+        self.assertEqual(
+            validate_deliver_payload({"npc_id": 5, "item_key": "healing_potion"}),
+            {"npc_id": 5, "item_key": "healing_potion"},
+        )
+        bad = (
+            {},
+            {"npc_id": 5},
+            {"item_key": "healing_potion"},
+            {"npc_id": 5, "item_key": "healing_potion", "extra": 1},
+            {"npc_id": 0, "item_key": "healing_potion"},
+            {"npc_id": -1, "item_key": "healing_potion"},
+            {"npc_id": 1.5, "item_key": "healing_potion"},
+            {"npc_id": "5", "item_key": "healing_potion"},
+            {"npc_id": True, "item_key": "healing_potion"},
+            {"npc_id": None, "item_key": "healing_potion"},
+            {"npc_id": 5, "item_key": ""},
+            {"npc_id": 5, "item_key": "治療藥水"},
+            {"npc_id": 5, "item_key": "x" * (MAX_ITEM_KEY_CHARS + 1)},
+            {"npc_id": 5, "item_key": 7},
+            {"npc_id": 5, "item_key": None},
+            "not an object",
+            None,
+            ["npc_id"],
+        )
+        for payload in bad:
+            with self.assertRaises(ExplorationActionError, msg=payload):
+                validate_deliver_payload(payload)
 
 
 class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
@@ -1337,6 +1371,91 @@ class DialogueLeaveAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "dialogue_inactive")
         self.assertIsNone(self.player.db.dialogue_session)
+
+
+class DeliverAdapterTests(BattlefieldIsolation, EvenniaTestCase):
+    """``explore.deliver`` re-resolves the recipient and delegates to the rule.
+
+    The adapter trusts no client-supplied quest state (delta: the adapter
+    re-resolves rather than trusting the client); the rule's refusal and
+    outcome contracts are pinned in world.rules.tests.test_quest_delivery.
+    """
+
+    def setUp(self):
+        from world.quests.binding import bind_stage_runtime
+        from world.quests.runtime import accept_quest
+        from world.quests.tests._fixtures import deliver, quest, register
+
+        self.room1 = create_object(Room, key="交付房")
+        self.player = create_object(PlayerCharacter, key="交付行動測試")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        self.recipient = create_object(NPC, key="灰婆婆", location=self.room1)
+        self.recipient.race = "human"
+        self.recipient.apply_race_baseline()
+
+        definition = register(
+            quest(
+                "deliver_adapter_quest",
+                stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
+            )
+        )
+        record = accept_quest(self.player, definition.key)
+        bind_stage_runtime(
+            self.player, record.quest_id, objective_targets=(self.recipient,)
+        )
+
+    def test_missing_recipient_rejects_as_no_npc(self):
+        result = _deliver_adapter(
+            self.player, {"npc_id": 999999, "item_key": "healing_potion"}
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "no_npc")
+
+    @covers_requirement(
+        "quest-delivery::the-delivery-action-is-registered-with-an-exact-bounded-payload"
+    )
+    def test_success_delegates_to_the_shared_rule_and_reports_full_snapshot(self):
+        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.recipient.db.inventory = []
+        with patch.object(self.player, "msg") as mock_msg:
+            result = _deliver_adapter(
+                self.player,
+                {"npc_id": int(self.recipient.pk), "item_key": "healing_potion"},
+            )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "delivered")
+        self.assertEqual(result["affected_panels"], ())
+        mock_msg.assert_called_once_with("你把 2 個治療藥水交給了灰婆婆。")
+        from world.quests.runtime import QuestState, read_records
+
+        self.assertEqual(read_records(self.player)[0].state, QuestState.COMPLETED)
+
+    @covers_requirement(
+        "quest-delivery::a-delivery-is-refused-honestly-and-changes-nothing-when-refused"
+    )
+    def test_rule_refusal_passes_through_unchanged(self):
+        self.player.db.inventory = []
+        result = _deliver_adapter(
+            self.player,
+            {"npc_id": int(self.recipient.pk), "item_key": "healing_potion"},
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "item_not_held")
+        self.assertEqual(result["message"], "你沒有帶著足夠的任務物品。")
+
+    @covers_requirement(
+        "quest-delivery::the-delivery-action-is-registered-with-an-exact-bounded-payload"
+    )
+    def test_production_registry_binds_the_exact_spec(self):
+        from web.webclient.actions.registry import build_production_action_registry
+
+        registry = build_production_action_registry()
+        spec = registry.spec("explore.deliver")
+        self.assertIs(spec.validate_payload, validate_deliver_payload)
+        self.assertIs(spec.adapter, _deliver_adapter)
+        self.assertEqual(spec.affected_panels, ())
 
 
 if __name__ == "__main__":

@@ -601,6 +601,10 @@ const REGISTERED_MUTATION_ACTIONS = {
   "creation.reset": { payload: {}, display: { actionLabel: "清除草稿" } },
   "creation.roll_name": null,
   "explore.engage": { payload: {}, display: { targetLabel: "哥布林" } },
+  "explore.deliver": {
+    payload: { npc_id: "granny", item_key: "healing_potion" },
+    display: { actionLabel: "交付 治療藥水 給 灰婆婆" },
+  },
   "explore.dialogue_leave": null,
   "explore.look": { payload: { room: true }, display: { room: true } },
   "explore.move": { payload: { exit_ref: "e1", current_node: "n1" }, display: { exitLabel: "北門" } },

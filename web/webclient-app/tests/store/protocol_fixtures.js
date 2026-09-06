@@ -99,7 +99,7 @@ export function explorationActions(overrides = undefined) {
 export function explorationPanel(overrides = undefined) {
   return deepMerge(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "exploration",
       move: [

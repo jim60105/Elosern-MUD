@@ -17,6 +17,7 @@ from commands.guild import (
     CmdGuildRequest,
     CmdGuildTurnIn,
 )
+from commands.quest_delivery import CmdDeliver
 from commands.skip import CmdRest, CmdSleep, CmdWaitUntil
 from world.quests.runtime import QuestNotFound, QuestState
 from world.rules.clock import AdvanceSource, DaypartError
@@ -29,6 +30,7 @@ from world.rules.guild_exams import ExamReason, GuildExamError
 from world.rules.guild_offers import BoardAccessError, GuildOfferError
 from world.rules.service_gate import MESSAGE_OFF_ANCHOR
 from world.rules.skip_safety import SkipRejectReason
+from world.rules.quest_delivery import DeliveryOutcome
 
 
 from tools.spec_traceability import covers_requirement
@@ -657,3 +659,87 @@ class SkipCommandBranchTests(TestCase):
             120, AdvanceSource.SKIP, [command.caller]
         )
         command.caller.msg.assert_called_with("時間經過了 120 秒。 新的一天開始了。")
+
+
+class DeliveryCommandBranchTests(TestCase):
+    """Branch coverage of the ``交付`` command's argument parsing and rendering.
+
+    The command parses recipient + item and delegates to the shared rule; the
+    rule's outcome contracts are pinned in world.rules.tests.test_quest_delivery.
+    """
+
+    def test_missing_arguments_print_usage(self):
+        for args in ("", "  ", "灰婆婆"):
+            command = _command(CmdDeliver, args)
+            command.func()
+            command.caller.msg.assert_called_with("用法：交付 <對象> <物品>")
+
+    def test_recipient_resolution_failures_render_their_messages(self):
+        for args, candidates, expected in (
+            ("灰婆婆 治療藥水", [], "這裡沒有這個對象。"),
+            ("治療藥水 治療藥水", [], "這裡沒有這個對象。"),
+        ):
+            command = _command(CmdDeliver, args)
+            command.caller.search.return_value = candidates
+            with patch(
+                "commands.quest_delivery.deliver_quest_item"
+            ) as deliver_rule:
+                command.func()
+            command.caller.msg.assert_called_with(expected)
+            deliver_rule.assert_not_called()
+
+    def test_ambiguous_recipient_never_delegates(self):
+        command = _command(CmdDeliver, "灰婆婆 治療藥水")
+        command.caller.search.return_value = [object(), object()]
+        with patch("commands.quest_delivery.deliver_quest_item") as deliver_rule:
+            command.func()
+        command.caller.msg.assert_called_with("這裡有好幾個對象，請說得更明確一些。")
+        deliver_rule.assert_not_called()
+
+    def test_unknown_item_never_delegates(self):
+        command = _command(CmdDeliver, "灰婆婆 不存在的物品")
+        command.caller.search.return_value = [object()]
+        with patch("commands.quest_delivery.deliver_quest_item") as deliver_rule, patch(
+            "commands.quest_delivery.ITEM_REGISTRY", {}
+        ):
+            command.func()
+        command.caller.msg.assert_called_with("你沒有帶著這種物品。")
+        deliver_rule.assert_not_called()
+
+    def test_display_name_and_raw_key_both_delegate(self):
+        for raw in ("治療藥水", "healing_potion"):
+            command = _command(CmdDeliver, f"灰婆婆 {raw}")
+            recipient = object()
+            command.caller.search.return_value = [recipient]
+            outcome = DeliveryOutcome(False, "no_active_delivery", "這裡沒有需要交付的任務物品。")
+            with patch(
+                "commands.quest_delivery.deliver_quest_item", return_value=outcome
+            ) as deliver_rule, patch(
+                "commands.quest_delivery.ITEM_REGISTRY",
+                {"healing_potion": SimpleNamespace(display_name_zh="治療藥水")},
+            ):
+                command.func()
+            deliver_rule.assert_called_once_with(
+                command.caller, recipient, "healing_potion"
+            )
+            command.caller.msg.assert_called_with(outcome.message)
+
+    def test_outcome_message_is_rendered_verbatim(self):
+        command = _command(CmdDeliver, "灰婆婆 治療藥水")
+        command.caller.search.return_value = [object()]
+        outcome = DeliveryOutcome(True, None, "你把治療藥水交給了灰婆婆。")
+        with patch(
+            "commands.quest_delivery.deliver_quest_item", return_value=outcome
+        ), patch(
+            "commands.quest_delivery.ITEM_REGISTRY",
+            {"healing_potion": SimpleNamespace(display_name_zh="治療藥水")},
+        ):
+            command.func()
+        command.caller.msg.assert_called_with("你把治療藥水交給了灰婆婆。")
+
+    def test_command_is_mounted_without_the_given_key(self):
+        from commands.default_cmdsets import CharacterCmdSet
+
+        keys = {command.key for command in CharacterCmdSet().commands}
+        self.assertIn("交付", keys)
+        self.assertIn("給", keys)  # the localized general give stays mounted

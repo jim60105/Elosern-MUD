@@ -64,6 +64,7 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
+from web.webclient.presentation.options import _validate_affordance_params
 from world.rules.dialogue import is_dialogue_host
 from world.rules.map_knowledge import (
     KnowledgeError,
@@ -72,7 +73,7 @@ from world.rules.map_knowledge import (
 from world.rules.npc_identity import npc_display_name
 from world.rules.service_view import build_services_view
 
-EXPLORATION_SCHEMA_VERSION = 1
+EXPLORATION_SCHEMA_VERSION = 2
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_LOOK_ENTITIES = 32
@@ -170,7 +171,13 @@ def _validate_affordance(value: Any) -> dict[str, Any]:
         value,
         "affordance",
         {"kind", "label", "enabled", "disabled_reason"},
-        {"action_id": "conditional", "surface": "conditional"},
+        # `params` is the schema-version-2 delivery payload; the kind branches
+        # below enforce exactly which affordance may carry it.
+        {
+            "action_id": "conditional",
+            "surface": "conditional",
+            "params": "conditional",
+        },
     )
     label = _require_str(value, "label", maximum=MAX_LABEL_CODE_POINTS)
     if not label.strip():
@@ -184,22 +191,33 @@ def _validate_affordance(value: Any) -> dict[str, Any]:
         raise ProtocolValidationError("an enabled affordance must not carry a disabled_reason")
 
     if kind == "action":
+        is_deliver = value.get("action_id") == "explore.deliver"
         _require_exact_fields(
             value,
             "action affordance",
             {"kind", "action_id", "label", "enabled", "disabled_reason"},
-            {},
+            # Schema version 2 (quest-deliver-action): exactly the
+            # explore.deliver affordance carries the server validator's
+            # normalized dispatch payload; every other action keeps the
+            # version-1 exact shape (its payload is re-derived from the target
+            # identity at the dock).
+            {"params": "required" if is_deliver else "forbidden"},
         )
         action_id = _validate_identifier(value["action_id"], "action_id")
         if action_id not in ACTION_IDS:
             raise ProtocolValidationError("action_id is not a registered exploration action")
-        return {
+        normalized = {
             "kind": kind,
             "action_id": action_id,
             "label": label,
             "enabled": enabled,
             "disabled_reason": disabled_reason,
         }
+        if action_id == "explore.deliver":
+            normalized["params"] = _validate_affordance_params(
+                action_id, value["params"]
+            )
+        return normalized
     _require_exact_fields(
         value,
         "navigation affordance",
@@ -610,20 +628,25 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
                 )
             elif entry.action_id in (
                 "explore.talk_freeform",
+                "explore.deliver",
                 "explore.party_invite",
                 "explore.party_leave",
                 "explore.engage",
                 "explore.possess",
             ):
-                affordances.append(
-                    {
-                        "kind": "action",
-                        "action_id": entry.action_id,
-                        "label": entry.label,
-                        "enabled": entry.enabled,
-                        "disabled_reason": _reason_dict(entry),
-                    }
-                )
+                row = {
+                    "kind": "action",
+                    "action_id": entry.action_id,
+                    "label": entry.label,
+                    "enabled": entry.enabled,
+                    "disabled_reason": _reason_dict(entry),
+                }
+                if entry.action_id == "explore.deliver":
+                    # The dock cannot re-derive a bound quest payload from the
+                    # target identity alone: the server-normalized params ride
+                    # the row (schema version 2, quest-deliver-action).
+                    row["params"] = dict(entry.params)
+                affordances.append(row)
         target: dict[str, Any] = {
             "identity": int(obj.pk),
             "display_name": _bounded_entity_name(obj),

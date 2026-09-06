@@ -1565,7 +1565,7 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.services, 4);
   assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.creation, 5);
-  assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 2);
   assert.equal(Protocol.PANEL_ALLOWLIST.character, 7);
   assert.equal(Protocol.PANEL_ALLOWLIST.lineage, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.dialogue, 1);
@@ -3558,7 +3558,7 @@ function validExplorationTarget(overrides) {
 function validExplorationPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "exploration",
       move: [validExplorationMoveRow()],
@@ -3578,13 +3578,22 @@ function validExplorationPanel(overrides) {
 
 test("validates the exploration panel available/unavailable discriminator", () => {
   assert.deepEqual(
-    Protocol.validatePanel("exploration", Protocol.PANEL_ALLOWLIST.exploration, unavailableStatusPanel()),
-    unavailableStatusPanel()
+    Protocol.validatePanel(
+      "exploration",
+      Protocol.PANEL_ALLOWLIST.exploration,
+      unavailableStatusPanel({ schema_version: 2 })
+    ),
+    unavailableStatusPanel({ schema_version: 2 })
   );
   assert.doesNotThrow(() => Protocol.validateExplorationPanel(validExplorationPanel()));
   assert.throws(() => Protocol.validateExplorationPanel(validExplorationPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateExplorationPanel(validExplorationPanel({ kind: "services" })));
-  assert.throws(() => Protocol.validateExplorationPanel(validExplorationPanel({ schema_version: 2 })));
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(validExplorationPanel({ schema_version: 1 }))
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(validExplorationPanel({ schema_version: 3 }))
+  );
 });
 
 test("enforces exploration D10 bounds", () => {
@@ -3824,6 +3833,7 @@ test("possession affordances are closed exploration and context actions with exa
     "explore.wait",
     "explore.possess",
     "explore.possess_release",
+    "explore.deliver",
   ];
   assert.deepEqual(Protocol.CONTEXT_ACTIONS_ACTION_CODES, EXPECTED_ACTION_CODES);
 
@@ -3838,6 +3848,7 @@ test("possession affordances are closed exploration and context actions with exa
     "explore.engage",
     "explore.possess",
     "explore.possess_release",
+    "explore.deliver",
   ];
   assert.deepEqual(Protocol.EXPLORATION_ACTION_IDS, EXPECTED_EXPLORATION_ACTION_IDS);
 
@@ -3933,6 +3944,106 @@ test("possession affordances are closed exploration and context actions with exa
   }
 });
 
+test("the delivery affordance is closed exploration and context actions with exact npc_id and item_key params", () => {
+  const actionId = "explore.deliver";
+  // Valid vectors through the params validator (mirrors the Python
+  // _require_ascii_identifier: 1..64 ASCII characters).
+  assert.deepEqual(
+    Protocol.validateContextActionsAffordanceParams(actionId, {
+      npc_id: 5,
+      item_key: "healing_potion",
+    }),
+    { npc_id: 5, item_key: "healing_potion" }
+  );
+  assert.deepEqual(
+    Protocol.validateContextActionsAffordanceParams(actionId, {
+      npc_id: Protocol.MAX_SAFE_INTEGER,
+      item_key: "a",
+    }),
+    { npc_id: Protocol.MAX_SAFE_INTEGER, item_key: "a" }
+  );
+
+  // Invalid vectors: extra, missing, mistyped, out-of-bound, non-ASCII.
+  const invalidParams = [
+    {},
+    { npc_id: 5 },
+    { item_key: "healing_potion" },
+    { npc_id: 5, item_key: "healing_potion", extra: "junk" },
+    { npc_id: 0, item_key: "healing_potion" },
+    { npc_id: -1, item_key: "healing_potion" },
+    { npc_id: 1.5, item_key: "healing_potion" },
+    { npc_id: "5", item_key: "healing_potion" },
+    { npc_id: true, item_key: "healing_potion" },
+    { npc_id: null, item_key: "healing_potion" },
+    { npc_id: 5, item_key: "" },
+    { npc_id: 5, item_key: "治療藥水" },
+    { npc_id: 5, item_key: "x".repeat(65) },
+    { npc_id: 5, item_key: 7 },
+    { npc_id: 5, item_key: null },
+    "not an object",
+    null,
+    [1],
+  ];
+  for (const bad of invalidParams) {
+    assert.throws(
+      () => Protocol.validateContextActionsAffordanceParams(actionId, bad),
+      undefined,
+      `Expected ${actionId} with ${JSON.stringify(bad)} to throw`
+    );
+  }
+
+  // Drive the real context_actions exploration panel validation.
+  const panel = validContextActionsExplorationPanel({
+    affordances: [
+      {
+        action_id: actionId,
+        label: "交付 治療藥水 給 灰婆婆",
+        params: { npc_id: 5, item_key: "healing_potion" },
+        freeform: false,
+        navigation: false,
+        enabled: true,
+        disabled_reason: null,
+      },
+    ],
+  });
+  assert.doesNotThrow(() => Protocol.validateContextActionsPanel(panel));
+
+  const badPanel = validContextActionsExplorationPanel({
+    affordances: [
+      {
+        action_id: actionId,
+        label: "交付 治療藥水 給 灰婆婆",
+        params: { npc_id: 5, item_key: "治療藥水" },
+        freeform: false,
+        navigation: false,
+        enabled: true,
+        disabled_reason: null,
+      },
+    ],
+  });
+  assert.throws(() => Protocol.validateContextActionsPanel(badPanel));
+
+  // Drive the real exploration panel validation (target-scoped affordance).
+  assert.ok(
+    Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        interact: [
+          validExplorationTarget({
+            keywords: [],
+            affordances: [
+              validExplorationAffordance({
+                action_id: actionId,
+                label: "交付 治療藥水 給 灰婆婆",
+                  params: { npc_id: 5, item_key: "healing_potion" },
+              }),
+            ],
+          }),
+        ],
+      })
+    )
+  );
+});
+
 test("exploration portrait_ref must be null and entries exact", () => {
   assert.throws(() =>
     Protocol.validateExplorationPanel(
@@ -4011,7 +4122,7 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
 });
 
 test("exploration and character are in the production panel allowlist", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 2);
   assert.equal(Protocol.PANEL_ALLOWLIST.character, 7);
   const envelope = {
     protocol_version: 1,

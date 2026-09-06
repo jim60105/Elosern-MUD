@@ -170,6 +170,13 @@
       var target = label(display && display.targetLabel);
       return target === null ? null : join(["engage", target]);
     },
+    "explore.deliver": function (payload, display) {
+      // The server-authored affordance label ("交付 <item> 給 <recipient>")
+      // is the echo: the recipient identity exists only as a bound id, so the
+      // exact typed command (`交付 <對象> <物品>`) cannot be composed here
+      // without guessing a name from an id (explore.move precedent).
+      return label(display && display.actionLabel);
+    },
     "explore.wait": function (payload, display) {
       if (payload && payload.sleep) {
         return "sleep";

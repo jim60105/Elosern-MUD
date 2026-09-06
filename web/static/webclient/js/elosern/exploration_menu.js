@@ -455,6 +455,35 @@
               targetLabel: target.display_name,
             };
           }
+        } else if (affordance.action_id === "explore.deliver") {
+          // The delivery payload is the server-normalized affordance params
+          // (npc_id + item_key) forwarded byte-for-byte; the menu never
+          // reconstructs a bound quest payload from the target identity.
+          items.push({
+            key: "deliver",
+            label: affordance.label || "交付",
+            enabled: !!affordance.enabled,
+            actionId: affordance.enabled ? "explore.deliver" : null,
+            payload: affordance.enabled
+              ? {
+                  npc_id: affordance.params && affordance.params.npc_id,
+                  item_key: affordance.params && affordance.params.item_key,
+                }
+              : null,
+            description: affordance.enabled
+              ? null
+              : (affordance.disabled_reason && affordance.disabled_reason.message) || null,
+            disabledReason: affordance.disabled_reason || null,
+          });
+          if (affordance.enabled) {
+            items[items.length - 1].commandDisplay = {
+              // The echo is the server-authored affordance label ("交付
+              // <item> 給 <recipient>"): the recipient identity exists only
+              // as a bound id, so the exact typed command cannot be composed
+              // here without guessing names (explore.move precedent).
+              actionLabel: affordance.label,
+            };
+          }
         }
       } else if (affordance.kind === "navigate") {
         // A navigate-kind service affordance is dock-navigation only; it is

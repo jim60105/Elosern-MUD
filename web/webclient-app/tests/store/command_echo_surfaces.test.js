@@ -464,6 +464,21 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "engage 店長",
     },
     {
+      id: "delivery intent (menu descriptor: the server-authored affordance label)",
+      ids: ["explore.deliver"],
+      prepare() {
+        openExploration();
+        // The exploration dock's deliver row forwards commandDisplay.actionLabel
+        // (the server-authored affordance label); the store echoes it verbatim.
+        store.dispatchAction(
+          "explore.deliver",
+          { npc_id: 7, item_key: "healing_potion" },
+          { actionLabel: "交付 治療藥水 給 店長" },
+        );
+      },
+      expected: "交付 治療藥水 給 店長",
+    },
+    {
       id: "look intent (central fill: target display name)",
       ids: ["explore.look"],
       prepare() {
