@@ -13,6 +13,12 @@ public acts (公開自慰, 公開表演, 獻身姿態, 無恥宣言) additionall
 observer-gated ``watched_during_activity`` event; the three that are
 themselves implicitly sexual acts (公開自慰, 公開表演, 無恥宣言) also declare
 ``public_sexual_activity``.
+挑釁凝視 (the battlefield taunt) mirrors ``hostile_act_count`` to its
+targets — a hostile act happened between two bodies, and the counter
+records participation from either side. The four public-exposure acts keep
+their counters actor-only: ``exposure_act_count`` records one's own
+exposure and ``watched_count`` records one's own watched experience, and an
+audience member undergoes neither (direction-bound counters).
 """
 
 from world.skills.registry import SkillDef, TargetSpec
@@ -127,7 +133,7 @@ SHAME_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         "腰腹",
         0.4,
         ("hostile_act_count",),
-        (),
+        ("hostile_act_count",),
         (),
         True,
     ),

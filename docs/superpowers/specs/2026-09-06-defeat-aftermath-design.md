@@ -145,8 +145,13 @@ path; there is no divergence.
   (the `sexual-act-effects` spec increments `participant_counters` on every
   other participant). Existing acts merely declare `participant_counters=()`;
   the change is act-definition data plus spec/test rewrites, not new
-  machinery. Default rule: every non-solo act credits the target the same
-  counter set it credits the actor.
+  machinery. Default rule (amended while applying DA3, change design D-1):
+  every non-solo act credits the target the same participation-counter set
+  it credits the actor — the direction-free `hostile_act_count` /
+  `interspecies_act_count`. The direction-bound `exposure_act_count` /
+  `watched_count` / `masturbation_count` stay actor-only: crediting an
+  audience member or gaze target with them would corrupt the counter's
+  meaning.
 - Semantics re-documented per counter (keys unchanged):
   `hostile_act_count` = hostile sexual acts participated in (either side);
   `interspecies_act_count` = acts with a different-species partner (either
@@ -168,10 +173,14 @@ path; there is no divergence.
   are not back-derived.
 - Spec surface to re-delta in the same change: `sexual-catalog-combat`
   ("credits … on the actor only" scenarios), `sexual-catalog-interspecies`,
-  `sexual-catalog-shame` (`shame_provocative_gaze`: the gaze target did get
-  watched — crediting them `watched_count` is the semantically correct
-  fix), `sexual-act-seeds` (combat seed only; solo seeds untouched), and
-  every pinned regression test rewritten to the symmetric expectation.
+  `sexual-catalog-shame` (`shame_provocative_gaze` mirrors
+  `hostile_act_count` to its targets — a hostile act happened between two
+  bodies; the brainstorm note to credit the gaze target `watched_count` was
+  not adopted while applying DA3 (change design D-1): `watched_count`
+  records one's own watched-while-active experience, which a provoked gaze
+  target does not undergo), `sexual-act-seeds` (combat seed only; solo
+  seeds untouched), and every pinned regression test rewritten to the
+  symmetric expectation.
 
 ## 4. Scene registry and narrative layer
 

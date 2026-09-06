@@ -81,6 +81,14 @@ _ACTOR_SCOPED_EVENTS = frozenset(
 class SexualActDef:
     """Immutable act-specific metadata paired with one ``SkillDef`` row.
 
+    Counter semantics (catalog-wide convention): direction-free counters
+    (``hostile_act_count``, ``interspecies_act_count``) record that an act
+    happened between two bodies, so ``participant_counters`` mirrors them to
+    every other participant alongside ``actor_counters``; direction-bound
+    counters (``exposure_act_count``, ``watched_count``,
+    ``masturbation_count``) record what one body did or underwent alone and
+    stay actor-only.
+
     ``unlock`` is frozen at construction: the dataclass's frozenness only
     blocks field reassignment, so the mapping is copied into a read-only
     ``MappingProxyType`` to keep the registry's unlock thresholds immutable

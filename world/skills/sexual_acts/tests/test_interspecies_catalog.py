@@ -1,8 +1,8 @@
 """Behaviour tests for the seven counter-gated 異種線 acts.
 
 Covers the full line this change registers: the tiered counter-threshold
-unlock gates (Tiers 1-4), the actor-only ``interspecies_act_count`` credit
-against a ``Monster`` target, the parless ``target_part=None`` contract and
+unlock gates (Tiers 1-4), the symmetric ``interspecies_act_count`` credit
+shared with the ``Monster`` target, the parless ``target_part=None`` contract and
 its ``resolve_part`` collapse to ``GENERIC_BODY_PART``, 異種交合's sole
 emission of ``sexual_activity_with_nonhuman``, and the design.md D-1/D-4
 regressions: the worst-case actor-gain ordering across Tiers 2→3 on the same
@@ -90,14 +90,14 @@ class InterspeciesActRegistrationTests(unittest.TestCase):
                 self.assertEqual(dict(SEXUAL_ACT_REGISTRY[key].unlock), expected)
 
     @covers_requirement("sexual-catalog-interspecies::seven-tier-1-4-interspecies-acts-are-registered-gated-by-hostile-act-count-and-or-climax-count-and-or-interspecies-act-count-thresholds")
-    def test_every_act_declares_single_spec_actor_only_counters_and_resistibility(self):
+    def test_every_act_declares_single_spec_symmetric_counters_and_resistibility(self):
         for key in _ALL_ACTS:
             with self.subTest(key=key):
                 skill = SKILL_REGISTRY[key]
                 act = SEXUAL_ACT_REGISTRY[key]
                 self.assertIs(skill.target_spec, TargetSpec.SINGLE)
                 self.assertEqual(act.actor_counters, ("interspecies_act_count",))
-                self.assertEqual(act.participant_counters, ())
+                self.assertEqual(act.participant_counters, ("interspecies_act_count",))
                 self.assertTrue(act.resistible)
 
     @covers_requirement("sexual-catalog-interspecies::every-act-declares-target-part-none-never-a-body-parts-member")
@@ -265,14 +265,36 @@ class InterspeciesCastTests(EvenniaTest):
         )
 
     @covers_requirement("sexual-catalog-interspecies::seven-tier-1-4-interspecies-acts-are-registered-gated-by-hostile-act-count-and-or-climax-count-and-or-interspecies-act-count-thresholds")
-    def test_cast_credits_interspecies_count_on_the_actor_only(self):
+    def test_cast_credits_interspecies_count_on_both_participants(self):
         _counter_up(self.actor, "hostile_act", 10)
         self.assertEqual(self.actor.sexual.interspecies_act_count, 0)
         self.assertEqual(self.monster.sexual.interspecies_act_count, 0)
-        result = self._cast("interspecies_touch", [self.monster])
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = self._cast("interspecies_touch", [self.monster])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.interspecies_act_count, 1)
-        self.assertEqual(self.monster.sexual.interspecies_act_count, 0)
+        self.assertEqual(self.monster.sexual.interspecies_act_count, 1)
+
+    @covers_requirement("sexual-catalog-interspecies::seven-tier-1-4-interspecies-acts-are-registered-gated-by-hostile-act-count-and-or-climax-count-and-or-interspecies-act-count-thresholds")
+    def test_same_species_target_keeps_the_shipped_crediting_behavior(self):
+        # The shipped targeting path permits a non-Monster target: the
+        # symmetric-crediting change neither adds nor changes any species
+        # validation rule, and the crediting handler has no species
+        # condition, so the human target is credited exactly what the
+        # shipped handler credits every other participant. The resist
+        # contest is forced to compliance (roll=1) so the target-side
+        # assertion stays deterministic.
+        other = create_object(
+            PlayerCharacter, key="same species target", location=self.room1
+        )
+        other.race = "human"
+        other.apply_race_baseline()
+        _counter_up(self.actor, "hostile_act", 10)
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = self._cast("interspecies_touch", [other])
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(self.actor.sexual.interspecies_act_count, 1)
+        self.assertEqual(other.sexual.interspecies_act_count, 1)
 
     @covers_requirement("sexual-catalog-interspecies::every-act-declares-target-part-none-never-a-body-parts-member")
     def test_monster_target_resolves_to_the_generic_channel(self):
