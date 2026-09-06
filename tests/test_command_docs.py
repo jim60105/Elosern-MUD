@@ -419,7 +419,7 @@ class CommandDocsContractTests(unittest.TestCase):
         self.assertEqual(parse_aliases(entry["別名"]), {"構想"})
         self.assertIn("character concept <構想>", entry["語法"])
         self.assertIn("生成不可用，請手動創角", entry["說明"])
-        self.assertIn("18", entry["說明"])
+        self.assertIn("0 至 10000", entry["說明"])
 
     @covers_requirement(
         "game-command-docs::the-command-reference-documents-the-delivery-command"

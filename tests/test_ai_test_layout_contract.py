@@ -133,7 +133,7 @@ PRE_SPLIT_ANNOTATIONS = {
         "test_overlong_display_name_rejects_and_retries": [
             "scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields"
         ],
-        "test_unpaired_underage_or_non_integer_declarations_reject_and_retry": [
+        "test_zero_ages_pass_and_unpaired_negative_or_non_integer_declarations_reject_and_retry": [
             "scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields"
         ],
         "test_valid_named_occupant_with_ages_passes_validation": [
@@ -395,7 +395,7 @@ PRE_SPLIT_ANNOTATIONS = {
         "test_instance_layer_template_validates_compiles_and_registers_with_requirements": [
             "scene-builder::the-hand-written-template-pool-gains-an-instance-layer-scene-so-offline-play-exercises-the-materializer"
         ],
-        "test_malformed_underage_template_is_rejected_at_registration": [
+        "test_malformed_negative_age_template_is_rejected_at_registration": [
             "blueprint-portrait-policy::the-hand-written-template-pool-may-carry-characterization-fields"
         ],
         "test_offline_request_can_produce_a_materializable_instance_quest": [

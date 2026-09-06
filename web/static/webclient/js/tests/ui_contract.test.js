@@ -27,7 +27,7 @@ test("the command line sends ordinary text, never a ui_action envelope", () => {
   // (`submit(text)`) still routes through the store's text transport
   // (Evennia.msg("text", ...)), never a ui_action envelope.
   const line = read("web/webclient-app/components/CommandLine.vue");
-  assert.match(line, /defineEmits\(\["submit", "focus-parent", "open-overlay", "focus-lost"\]\)/);
+  assert.match(line, /defineEmits\(\["submit", "focus-parent", "open-overlay", "open-drawer", "focus-lost"\]\)/);
   assert.match(line, /emit\("submit", text\)/);
   assert.strictEqual(
     /ui_action/.test(line),
