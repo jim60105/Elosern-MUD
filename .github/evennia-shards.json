@@ -127,6 +127,7 @@
         "world.rules.tests.test_possession_transition",
         "world.rules.tests.test_phase4_integration",
         "world.rules.tests.test_progression",
+        "world.rules.tests.test_quest_issuance",
         "world.rules.tests.test_race_scale",
         "world.rules.tests.test_rule_id_test_correspondence",
         "world.rules.tests.test_rulebook_schema",
