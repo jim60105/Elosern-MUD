@@ -18,7 +18,6 @@ from world.quests.runtime import (
     QuestDataError,
     QuestTransitionError,
     abandon_quest,
-    accept_quest,
     from_storage,
     read_records,
     to_storage,
@@ -30,6 +29,7 @@ from world.quests.transitions import (
 
 from ._fixtures import (
     QuestRegistryIsolation,
+    accept,
     anchor_locator,
     defeat,
     escort,
@@ -73,7 +73,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
         first = self._monster("first")
         second = self._monster("second")
         guard = self._npc("guard")
-        record = accept_quest(self.player, self.bound_defeat.key)
+        record = accept(self.player, self.bound_defeat.key)
         bound = bind_stage_runtime(
             self.player,
             record.quest_id,
@@ -92,7 +92,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
     def test_identical_binding_is_idempotent(self):
         room = self._room()
         first = self._monster("monster")
-        record = accept_quest(self.player, self.bound_defeat.key)
+        record = accept(self.player, self.bound_defeat.key)
         bind_stage_runtime(
             self.player,
             record.quest_id,
@@ -114,7 +114,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
         room = self._room()
         first = self._monster("monster")
         another_room = self._room("other-room")
-        record = accept_quest(self.player, self.bound_defeat.key)
+        record = accept(self.player, self.bound_defeat.key)
         bind_stage_runtime(self.player, record.quest_id, room=room, objective_targets=(first,))
         before_log = list(self.player.db.quest_log)
         before_pins = list(room.db.pin_reasons)
@@ -128,7 +128,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
     def test_overlapping_objective_and_protected_binding_is_rejected(self):
         room = self._room()
         monster = self._monster("shared")
-        record = accept_quest(self.player, self.bound_defeat.key)
+        record = accept(self.player, self.bound_defeat.key)
         before_log = list(self.player.db.quest_log)
         with self.assertRaises(QuestTransitionError):
             bind_stage_runtime(
@@ -143,7 +143,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
 
     def test_persisted_overlap_fails_before_any_lifecycle_operation(self):
         room = self._room()
-        record = accept_quest(self.player, self.bound_defeat.key)
+        record = accept(self.player, self.bound_defeat.key)
         conflicting = {
             **to_storage(record),
             "objective_target_ids": [11],
@@ -156,13 +156,13 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
             read_records(self.player)
 
     def test_non_instance_room_is_rejected(self):
-        record = accept_quest(self.player, self.bound_defeat.key)
+        record = accept(self.player, self.bound_defeat.key)
         with self.assertRaises(QuestTransitionError):
             bind_stage_runtime(self.player, record.quest_id, room=self.room1)
 
     def test_dead_or_non_living_targets_are_rejected(self):
         room = self._room()
-        record = accept_quest(self.player, self.bound_defeat.key)
+        record = accept(self.player, self.bound_defeat.key)
         dead = self._monster("dead")
         dead.traits.hp._data["current"] = 0
         with self.assertRaises(QuestTransitionError):
@@ -176,7 +176,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
     def test_pin_failure_rolls_back_binding_with_cache_restore(self):
         room = self._room()
         monster = self._monster("rollback")
-        record = accept_quest(self.player, self.bound_defeat.key)
+        record = accept(self.player, self.bound_defeat.key)
         before_log = list(self.player.db.quest_log)
         with patch(
             "world.quests.transitions._apply_pin_operations",
@@ -201,7 +201,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
     def test_quest_log_failure_restores_an_already_written_pin(self):
         room = self._room()
         monster = self._monster("log-rollback")
-        record = accept_quest(self.player, self.bound_defeat.key)
+        record = accept(self.player, self.bound_defeat.key)
         before_log = list(self.player.db.quest_log)
         original_add = room.attributes.add
 
@@ -224,7 +224,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
     def test_restore_itself_failing_still_degrades_to_cache_reset(self):
         room = self._room()
         monster = self._monster("restore-rollback")
-        record = accept_quest(self.player, self.bound_defeat.key)
+        record = accept(self.player, self.bound_defeat.key)
         before_log = list(self.player.db.quest_log)
 
         def injected_write(key, value, **kwargs):
@@ -258,7 +258,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
     def test_abandonment_releases_exact_pin(self):
         room = self._room()
         monster = self._monster("release")
-        record = accept_quest(self.player, self.bound_defeat.key)
+        record = accept(self.player, self.bound_defeat.key)
         bind_stage_runtime(self.player, record.quest_id, room=room, objective_targets=(monster,))
         failed = abandon_quest(self.player, record.quest_id)
         self.assertEqual(failed.failure_reason, "abandoned")
@@ -269,7 +269,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
         temp_id = temp.pk
         temp.delete()
         self.assertFalse(InstanceRoom.objects.filter(id=temp_id).exists())
-        record = accept_quest(self.player, self.bound_defeat.key)
+        record = accept(self.player, self.bound_defeat.key)
         bound = {
             **to_storage(record),
             "stage_room_id": temp_id,
@@ -284,7 +284,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
     def test_escort_binding_stores_only_protected_identities(self):
         room = self._room("escort-room")
         npc = self._npc("escort-npc")
-        record = accept_quest(self.player, self.escort_def.key)
+        record = accept(self.player, self.escort_def.key)
         bound = bind_stage_runtime(
             self.player,
             record.quest_id,

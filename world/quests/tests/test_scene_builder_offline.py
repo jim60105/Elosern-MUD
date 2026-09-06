@@ -24,7 +24,7 @@ from commands.scene import CmdEnterScene
 from world.maps.bootstrap import sync_grid
 from world.quests.catalog import register_catalog
 from world.quests.compile import compile_quest_blueprint, register_generated_quest
-from world.quests.runtime import QuestState, accept_quest, read_records
+from world.quests.runtime import QuestState, read_records
 from world.quests.compile import StageNpcCharacterization
 from world.quests.scene_builder import _spawn_npc, materialize_stage
 from world.quests.tests.test_scene_builder import (
@@ -33,6 +33,7 @@ from world.quests.tests.test_scene_builder import (
     _instance_bound_payload,
     _raw,
 )
+from world.quests.tests._fixtures import accept
 from world.rules.tests.combat_fixtures import grant_lineage
 
 from tools.spec_traceability import covers_requirement
@@ -88,7 +89,7 @@ class SceneBuilderOfflineLoopTests(SceneBuilderIsolation, EvenniaCommandTestMixi
     def _accept(self, payload):
         compiled = compile_quest_blueprint(payload)
         register_generated_quest(compiled)
-        return accept_quest(self.player, compiled.definition.key), compiled
+        return accept(self.player, compiled.definition.key), compiled
 
     def _fresh(self, quest_id):
         return next(r for r in read_records(self.player) if r.quest_id == quest_id)

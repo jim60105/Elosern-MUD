@@ -28,9 +28,8 @@ from world.quests.compile import (
     compile_quest_blueprint,
     register_generated_quest,
 )
-from world.quests.runtime import accept_quest
 from world.quests.scene_builder import apply_scene_flavor
-from world.quests.tests._fixtures import RegistryIsolationMixin
+from world.quests.tests._fixtures import RegistryIsolationMixin, accept
 
 from commands.scene import CmdEnterScene
 from tools.spec_traceability import covers_requirement
@@ -320,7 +319,7 @@ class SceneFlavorCommandCompositionTests(RegistryIsolationMixin, EvenniaTestCase
         self.player.location = self.anchor
         compiled = compile_quest_blueprint(_instance_bound_payload())
         register_generated_quest(compiled)
-        accept_quest(self.player, compiled.definition.key)
+        accept(self.player, compiled.definition.key)
 
     def tearDown(self):
         from world.ai import guardrail

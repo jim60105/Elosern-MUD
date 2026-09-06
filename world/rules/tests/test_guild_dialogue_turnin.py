@@ -27,6 +27,7 @@ from world.quests.runtime import (
 )
 from world.quests.tests._fixtures import (
     QuestRegistryIsolation,
+    accept,
     acquire,
     defeat,
     quest,
@@ -48,6 +49,7 @@ from world.rules.guild_offers import (
     QuestReward,
     register_guild_offer,
 )
+from world.rules.quest_issuance import guild_issuer_key
 from world.rules.surfaces import read_counter_trait
 
 ALTORIA_BRANCH = "guild_branch_altoria"
@@ -107,11 +109,17 @@ class ReportableQuestSummaryTests(DialogueTurnInRegistryIsolation, EvenniaTestCa
         ).offer_by_definition["introductory_hunt"]
         register_guild_offer(catalog_offer)
 
-    def _complete(self, definition_key: str) -> str:
+    def _complete(self, definition_key: str, *, npc_issued: bool = False) -> str:
         from world.quests.runtime import fulfill_record
         from world.quests.transitions import apply_quest_log_replacement
 
-        record = accept_quest(self.player, definition_key)
+        record = (
+            accept(self.player, definition_key)
+            if npc_issued
+            else accept_quest(
+                self.player, definition_key, guild_issuer_key(ALTORIA_BRANCH)
+            )
+        )
         completed = fulfill_record(
             record, QUEST_DEFINITION_REGISTRY[definition_key]
         )
@@ -121,6 +129,11 @@ class ReportableQuestSummaryTests(DialogueTurnInRegistryIsolation, EvenniaTestCa
         ]
         apply_quest_log_replacement(self.player, new_records)
         return completed.quest_id
+
+    def _complete_offer_less(self, definition_key: str) -> str:
+        """A deliberately offer-less completed record: only an npc commission
+        can produce one now that acceptance resolves the issuance first."""
+        return self._complete(definition_key, npc_issued=True)
 
     @covers_requirement("guild-quest-board::player-facing-guild-commands-resolve-one-local-service-host")
     def test_listing_orders_reportable_quests_by_accepted_tick_then_quest_id(self):
@@ -149,10 +162,10 @@ class ReportableQuestSummaryTests(DialogueTurnInRegistryIsolation, EvenniaTestCa
         register_guild_offer(_offer(gamma.key))
         alpha_id = self._complete(alpha.key)
         dialogue_turn_in(self.player, self.staff, alpha_id)  # claimed
-        beta_id = accept_quest(self.player, beta.key).quest_id  # in-progress
-        gamma_id = accept_quest(self.player, gamma.key).quest_id
+        beta_id = accept(self.player, beta.key).quest_id  # in-progress
+        gamma_id = accept(self.player, gamma.key).quest_id
         abandon_quest(self.player, gamma_id)  # failed
-        delta_id = self._complete(delta.key)  # completed but offer-less
+        delta_id = self._complete_offer_less(delta.key)  # completed but offer-less
         summary = reportable_quest_summary(self.player, self.staff)
         self.assertEqual(summary, _NOTHING_LINE)
         for quest_id in (alpha_id, beta_id, gamma_id, delta_id):
@@ -231,7 +244,9 @@ class DialogueTurnInTests(DialogueTurnInRegistryIsolation, EvenniaTestCase):
         from world.quests.runtime import fulfill_record
         from world.quests.transitions import apply_quest_log_replacement
 
-        record = accept_quest(self.player, "introductory_hunt")
+        record = accept_quest(
+            self.player, "introductory_hunt", guild_issuer_key(ALTORIA_BRANCH)
+        )
         completed = fulfill_record(
             record, QUEST_DEFINITION_REGISTRY["introductory_hunt"]
         )
@@ -293,7 +308,7 @@ class DialogueTurnInTests(DialogueTurnInRegistryIsolation, EvenniaTestCase):
                 stages=(QuestStage(0, acquire("healing_potion", quantity=2)),),
             )
         )
-        accept_quest(self.player, acquire_def.key)
+        accept(self.player, acquire_def.key)
         quest_id = self._complete()
         dialogue_turn_in(self.player, self.staff, quest_id)
         acquire_records = [

@@ -16,7 +16,6 @@ from world.quests.bootstrap import sync_quest_runtime
 from world.quests.deadlines import settle_quest_deadlines
 from world.quests.runtime import (
     QuestState,
-    accept_quest,
     read_records,
     to_storage,
 )
@@ -24,6 +23,7 @@ from world.rules.clock import AdvanceSource, get_world_clock, register_event_sou
 
 from ._fixtures import (
     QuestRegistryIsolation,
+    accept,
     bound_instance_locator,
     defeat,
     quest,
@@ -44,7 +44,7 @@ class DeadlineSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
 
     def _accept(self, key: str):
         with patch("world.quests.runtime._current_tick", return_value=0):
-            return accept_quest(self.player, key)
+            return accept(self.player, key)
 
     def _settle(self, end: int, start: int = 0):
         return settle_quest_deadlines(start, end)
@@ -107,7 +107,7 @@ class DeadlineSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
             )
         )
         with patch("world.quests.runtime._current_tick", return_value=0):
-            record = accept_quest(self.player, bound_room_def.key)
+            record = accept(self.player, bound_room_def.key)
         room = create_object(InstanceRoom, key="deadline-room")
         bind_stage_runtime(self.player, record.quest_id, room=room)
         self.assertEqual(room.db.pin_reasons, [f"quest:{self.player.pk}:{record.quest_id}:stage:0"])
@@ -124,7 +124,7 @@ class DeadlineSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
         good = create_object(PlayerCharacter, key="good-deadline")
         bad.db.quest_log = [{"quest_id": "broken", "definition_key": "??"}]
         with patch("world.quests.runtime._current_tick", return_value=0):
-            accept_quest(good, self.due.key)
+            accept(good, self.due.key)
         before_bad = list(bad.db.quest_log)
         with patch("world.quests.deadlines.log_warn") as logger:
             events = self._settle(2 * self.hours)
@@ -201,7 +201,7 @@ class StartupRecoveryDeadlineTests(QuestRegistryIsolation, EvenniaTest):
         from world.rules.guild_economy import restore_persisted_sessions
 
         with patch("world.quests.runtime._current_tick", return_value=0):
-            record = accept_quest(self.player, self.due.key)
+            record = accept(self.player, self.due.key)
         self.assertEqual(record.deadline_tick, self.hours)
         # A well-formed hostile session whose accumulated rounds cross the
         # deadline tick (600 rounds x 6 s = 3600 s), with its recorded enemy
@@ -246,7 +246,7 @@ class DeadlinePrecedesReclamationTests(QuestRegistryIsolation, EvenniaTestCase):
             )
         )
         with patch("world.quests.runtime._current_tick", return_value=0):
-            record = accept_quest(self.player, bound_def.key)
+            record = accept(self.player, bound_def.key)
         room = create_object(InstanceRoom, key="reclaim-room")
         bind_stage_runtime(self.player, record.quest_id, room=room)
         room.db.expire_tick = self.hours + 100
@@ -305,7 +305,7 @@ class DeadlineRollbackCacheTests(QuestRegistryIsolation, EvenniaTestCase):
             )
         )
         with patch("world.quests.runtime._current_tick", return_value=0):
-            record = accept_quest(self.player, bound_def.key)
+            record = accept(self.player, bound_def.key)
         room = create_object(InstanceRoom, key="deadline-rollback-room")
         bind_stage_runtime(self.player, record.quest_id, room=room)
         return room

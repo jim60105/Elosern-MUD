@@ -85,3 +85,24 @@ with `CLOCK_YAML`.
   definition from a private commissioner
 - **THEN** the new record carries the private issuer key while the terminal record retains the guild
   issuer key
+
+### Requirement: Quest lifecycle transitions emit boundary events
+Every successful quest lifecycle transition (accept, stage transition, abandon, complete, fail)
+SHALL emit one `quest_transition` info event through the `world.observability` facade at the
+transition's durable commit point, with `char`, `quest`, `issuer`, `stage_from`, and `stage_to`
+context. `issuer` SHALL name the governing commission: new and changed records carry the record's
+`issuer_key`, and a removed record carries the `issuer_key` of the pre-write stored entry (which the
+strict diff signature has already validated). Rolled-back lifecycle operations MUST NOT emit the
+event, and best-effort quest-log restore failures SHALL surface as `rollback_restore_failed` warn
+events instead of silent passes. Lifecycle atomicity and validation semantics MUST NOT change.
+
+#### Scenario: An acceptance event names the governing commission
+- **WHEN** a character accepts a definition under a registered issuance and the write commits
+  durably
+- **THEN** the `quest_transition` event's context carries the accepted record's `issuer_key` as
+  `issuer`
+
+#### Scenario: A removal event names the removed record's commission
+- **WHEN** a committed log replacement removes a stored record
+- **THEN** the `quest_transition` event's context carries that record's stored `issuer_key` as
+  `issuer`

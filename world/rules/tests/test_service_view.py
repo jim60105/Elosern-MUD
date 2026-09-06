@@ -27,6 +27,7 @@ from world.quests.definitions import (
     register_quest_definition,
 )
 from world.quests.runtime import QuestRecord, QuestState, to_storage
+from world.quests.tests._fixtures import TEST_ISSUER_KEY
 from world.rules.guild_config import CATALOG, load_catalog_into_cache, register_catalog_offers
 from world.rules.guild_offers import (
     GUILD_OFFER_REGISTRY,
@@ -185,6 +186,7 @@ def quest_record(quest_id="introductory_hunt:1", state=QuestState.IN_PROGRESS, p
     record = QuestRecord(
         quest_id=quest_id,
         definition_key="introductory_hunt",
+        issuer_key=TEST_ISSUER_KEY,
         state=state,
         stage_index=0,
         stage_progress=progress,
@@ -558,6 +560,7 @@ class QuestRenderingTests(ServiceRegistryIsolation):
         record = QuestRecord(
             quest_id="deadline:1",
             definition_key="introductory_hunt",
+            issuer_key=TEST_ISSUER_KEY,
             state=QuestState.IN_PROGRESS,
             stage_index=0,
             stage_progress=0,

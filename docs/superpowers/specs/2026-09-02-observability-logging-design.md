@@ -175,7 +175,7 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `action_commit` | `char`、`action`、`ms` |
 | `combat_round_settled` | `char`、`opponent`、`tick`、`hp_before`、`hp_after` |
 | `clock_advance` | `tick_from`、`tick_to`、`scope` |
-| `quest_transition` | `char`、`quest`、`stage_from`、`stage_to` |
+| `quest_transition` | `char`、`quest`、`issuer`（治理該任務的發單方 key）、`stage_from`、`stage_to` |
 | `settlement_done` | `char`、`ms`、`notifications`（數量） |
 | `rollback_restore_failed` | `key`、`obj`＋`exc`（warn 級，取代現有裸 `pass`） |
 

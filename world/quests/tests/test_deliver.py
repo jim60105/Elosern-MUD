@@ -23,9 +23,10 @@ from world.quests.definitions import (
 )
 from world.quests.deliver import compute_deliver_replacement
 from world.quests.describe import QuestDescribeError, describe_objective
-from world.quests.runtime import QuestState, accept_quest, read_records
+from world.quests.runtime import QuestState, read_records
 from world.quests.tests._fixtures import (
     QuestRegistryIsolation,
+    accept,
     anchor_locator,
     deliver,
     quest,
@@ -51,7 +52,7 @@ class DeliverDefinitionTests(QuestRegistryIsolation, EvenniaTest):
             )
         )
         player = create_object(PlayerCharacter, key="deliver player")
-        record = accept_quest(player, definition.key)
+        record = accept(player, definition.key)
         self.assertEqual(record.stage_progress, 0)
         self.assertEqual(record.state, QuestState.IN_PROGRESS)
 
@@ -151,7 +152,7 @@ class DeliverBindingTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(QuestStage(0, deliver("healing_potion", quantity=1)),),
             )
         )
-        self.record = accept_quest(self.player, self.definition.key)
+        self.record = accept(self.player, self.definition.key)
         bind_stage_runtime(
             self.player,
             self.record.quest_id,
@@ -200,7 +201,7 @@ class DeliverProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
             )
         )
-        self.record = accept_quest(self.player, self.definition.key)
+        self.record = accept(self.player, self.definition.key)
         bind_stage_runtime(
             self.player,
             self.record.quest_id,
@@ -285,7 +286,7 @@ class DeliverPurityAndAtomicityTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
             )
         )
-        self.record = accept_quest(self.player, self.definition.key)
+        self.record = accept(self.player, self.definition.key)
         bind_stage_runtime(
             self.player,
             self.record.quest_id,

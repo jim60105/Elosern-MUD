@@ -17,6 +17,7 @@ from world.quests.runtime import (
     QuestNotFound,
     QuestState,
     QuestTransitionError,
+    QuestIssuanceNotFound,
     abandon_quest,
     accept_quest,
     definition_for,
@@ -31,7 +32,22 @@ from world.quests.runtime import (
 )
 from world.quests.transitions import apply_quest_log_replacement
 
-from ._fixtures import QuestRegistryIsolation, quest, register
+from ._fixtures import TEST_ISSUER_KEY, QuestRegistryIsolation, accept, quest, register
+from world.rules.guild_offers import (
+    GUILD_OFFER_REGISTRY,
+    GuildQuestOffer,
+    QuestReward,
+    register_guild_offer,
+)
+from world.rules.quest_issuance import (
+    QUEST_ISSUANCE_REGISTRY,
+    IssuerKeyError,
+    QuestIssuance,
+    Settlement,
+    guild_issuer_key,
+    npc_issuer_key,
+    register_quest_issuance,
+)
 
 
 class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
@@ -47,7 +63,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
     def _accept_deadlined(self, hours: int = 72, tick: int = 1000):
         registered = register(quest(f"deadline_{hours}_{tick}", deadline_hours=hours))
         with self._tick(tick):
-            return accept_quest(self.player, registered.key)
+            return accept(self.player, registered.key)
 
     @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
     def test_record_round_trips_through_json(self):
@@ -55,6 +71,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
             {
                 "quest_id": "q:2",
                 "definition_key": "introductory_hunt",
+                "issuer_key": TEST_ISSUER_KEY,
                 "state": "in_progress",
                 "stage_index": 0,
                 "stage_progress": 1,
@@ -74,10 +91,37 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
             if isinstance(value, list):
                 self.assertTrue(all(isinstance(item, int) for item in value))
 
+    def test_record_round_trips_every_issuer_key_form(self):
+        for issuer_key in (
+            "guild:guild_branch_altoria",
+            "npc:grey_granny",
+            "npc:#12",
+        ):
+            with self.subTest(issuer_key=issuer_key):
+                original = from_storage(
+                    {
+                        "quest_id": "q:1",
+                        "definition_key": "introductory_hunt",
+                        "issuer_key": issuer_key,
+                        "state": "in_progress",
+                        "stage_index": 0,
+                        "stage_progress": 0,
+                        "deadline_tick": None,
+                        "accepted_tick": 0,
+                        "stage_room_id": None,
+                        "objective_target_ids": [],
+                        "protected_entity_ids": [],
+                        "failure_reason": None,
+                    }
+                )
+                rebuilt = from_storage(json.loads(json.dumps(to_storage(original))))
+                self.assertEqual(rebuilt, original)
+
     def test_from_storage_rejects_malformed_entries(self):
         base = {
             "quest_id": "q",
             "definition_key": "introductory_hunt",
+            "issuer_key": TEST_ISSUER_KEY,
             "state": "in_progress",
             "stage_index": 0,
             "stage_progress": 0,
@@ -90,7 +134,12 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
         }
         malformed = [
             ("missing", lambda d: {k: v for k, v in d.items() if k != "state"}),
+            ("missing-issuer", lambda d: {k: v for k, v in d.items() if k != "issuer_key"}),
             ("unknown", lambda d: {**d, "extra": 1}),
+            ("non-string-issuer", lambda d: {**d, "issuer_key": 3}),
+            ("empty-issuer", lambda d: {**d, "issuer_key": ""}),
+            ("malformed-issuer", lambda d: {**d, "issuer_key": "guild"}),
+            ("unknown-namespace", lambda d: {**d, "issuer_key": "shop:altoria"}),
             ("not-dict", lambda d: "oops"),
             ("bad-state", lambda d: {**d, "state": "warped"}),
             ("negative-index", lambda d: {**d, "stage_index": -1}),
@@ -101,8 +150,12 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
         ]
         for name, mutate in malformed:
             with self.subTest(name=name):
+                candidate = mutate(dict(base))
+                snapshot = dict(candidate) if isinstance(candidate, dict) else candidate
                 with self.assertRaises(QuestDataError):
-                    from_storage(mutate(dict(base)))
+                    from_storage(candidate)
+                # The strict reader never rewrites or coerces the stored entry.
+                self.assertEqual(candidate, snapshot)
 
     def test_unaccepted_definition_has_no_record(self):
         self.assertEqual(self.player.db.quest_log, [])
@@ -112,6 +165,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
             {
                 "quest_id": "ghost:1",
                 "definition_key": "no_such_definition",
+                "issuer_key": TEST_ISSUER_KEY,
                 "state": "in_progress",
                 "stage_index": 0,
                 "stage_progress": 0,
@@ -130,14 +184,14 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
     @covers_requirement("quest-lifecycle::every-lifecycle-operation-validates-before-replacing-the-quest-log")
     def test_malformed_log_fails_any_operation_without_partial_write(self):
         registered = register(quest("malformed_neighbor"))
-        accept_quest(self.player, registered.key)
+        accept(self.player, registered.key)
         before = list(self.player.db.quest_log)
         self.player.db.quest_log = [
             {"quest_id": "broken", "state": "in_progress", "definition_key": "??"},
             *before,
         ]
         with self.assertRaises(QuestDataError):
-            accept_quest(self.player, registered.key)
+            accept(self.player, registered.key)
         with self.assertRaises(QuestDataError):
             abandon_quest(self.player, f"{registered.key}:1")
         self.assertEqual(self.player.db.quest_log[1:], before)
@@ -145,7 +199,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
     def test_first_acceptance_creates_stage_zero_active_record(self):
         registered = register(quest("first_accept"))
         with self._tick(300):
-            record = accept_quest(self.player, registered.key)
+            record = accept(self.player, registered.key)
         self.assertEqual(record.quest_id, "first_accept:1")
         self.assertEqual(record.state, QuestState.IN_PROGRESS)
         self.assertEqual(record.stage_index, 0)
@@ -158,24 +212,91 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
 
     def test_duplicate_active_acceptance_is_rejected(self):
         registered = register(quest("duplicate_active"))
-        accept_quest(self.player, registered.key)
+        accept(self.player, registered.key)
         before = list(self.player.db.quest_log)
         with self.assertRaises(QuestAlreadyActive):
-            accept_quest(self.player, registered.key)
+            accept(self.player, registered.key)
         self.assertEqual(self.player.db.quest_log, before)
 
     @covers_requirement("quest-lifecycle::accept-quest-creates-one-deterministic-active-record")
     def test_terminal_quest_may_be_retried_deterministically(self):
         registered = register(quest("retryable"))
-        record = accept_quest(self.player, registered.key)
+        record = accept(self.player, registered.key)
         abandoned = abandon_quest(self.player, record.quest_id)
         self.assertEqual(abandoned.state, QuestState.FAILED)
-        retried = accept_quest(self.player, registered.key)
+        retried = accept(self.player, registered.key)
         self.assertEqual(retried.quest_id, "retryable:2")
         self.assertEqual(retried.state, QuestState.IN_PROGRESS)
         states = {entry["quest_id"]: entry for entry in self.player.db.quest_log}
         self.assertEqual(states["retryable:1"]["state"], "failed")
         self.assertEqual(states["retryable:2"]["state"], "in_progress")
+
+    @covers_requirement("quest-lifecycle::accept-quest-creates-one-deterministic-active-record")
+    def test_acceptance_under_a_registered_issuance_stores_the_key(self):
+        registered = register(quest("issued_accept"))
+        record = accept(self.player, registered.key)
+        self.assertEqual(record.issuer_key, TEST_ISSUER_KEY)
+        self.assertEqual(
+            read_records(self.player)[0].issuer_key, TEST_ISSUER_KEY
+        )
+
+    @covers_requirement("quest-lifecycle::accept-quest-creates-one-deterministic-active-record")
+    def test_acceptance_under_an_unregistered_issuance_is_rejected(self):
+        registered = register(quest("unregistered_issuer"))
+        before = list(self.player.db.quest_log)
+        with self.assertRaises(QuestIssuanceNotFound):
+            accept_quest(
+                self.player, registered.key, npc_issuer_key(content_key="no_such_commission")
+            )
+        # A malformed key is a grammar violation, a distinct named error.
+        with self.assertRaises(IssuerKeyError):
+            accept_quest(self.player, registered.key, "bogus")
+        self.assertEqual(self.player.db.quest_log, before)
+
+    @covers_requirement("quest-lifecycle::accept-quest-creates-one-deterministic-active-record")
+    def test_same_definition_held_twice_under_different_issuers(self):
+        registered = register(quest("two_issuers"))
+        # QuestRegistryIsolation does not cover the offer registry; this test
+        # is its only writer here, so it restores its own snapshot.
+        offer_items = list(GUILD_OFFER_REGISTRY.items())
+        self.addCleanup(
+            lambda: (
+                GUILD_OFFER_REGISTRY.clear(),
+                GUILD_OFFER_REGISTRY.update(offer_items),
+            )
+        )
+        register_guild_offer(
+            GuildQuestOffer(
+                definition_key=registered.key,
+                issuer_branch_key="guild_branch_altoria",
+                reward=QuestReward(copper=50, items=(), merit=0),
+            )
+        )
+        first = accept_quest(
+            self.player, registered.key, guild_issuer_key("guild_branch_altoria")
+        )
+        abandon_quest(self.player, first.quest_id)
+        register_quest_issuance(
+            QuestIssuance(
+                definition_key=registered.key,
+                issuer_key=TEST_ISSUER_KEY,
+                reward=QuestReward(copper=1, items=(), merit=0),
+                settlement=Settlement.COUNTER,
+            )
+        )
+        second = accept_quest(self.player, registered.key, TEST_ISSUER_KEY)
+        records = {record.quest_id: record for record in read_records(self.player)}
+        self.assertEqual(records["two_issuers:1"].issuer_key, "guild:guild_branch_altoria")
+        self.assertEqual(records["two_issuers:2"].issuer_key, TEST_ISSUER_KEY)
+
+    def test_record_stays_readable_after_its_issuance_is_unregistered(self):
+        # Design D2: an issuance unregistered after acceptance must not make
+        # the quest log unreadable; the grammar stays the corruption gate.
+        registered = register(quest("unregistered_after_accept"))
+        accept(self.player, registered.key)
+        QUEST_ISSUANCE_REGISTRY.clear()
+        records = read_records(self.player)
+        self.assertEqual(records[0].issuer_key, TEST_ISSUER_KEY)
 
     def test_explicit_deadline_is_converted_to_ticks(self):
         record = self._accept_deadlined(hours=72, tick=1000)
@@ -186,7 +307,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
 
     def test_no_deadline_definition_remains_without_a_deadline(self):
         registered = register(quest("no_deadline", deadline_hours=None))
-        record = accept_quest(self.player, registered.key)
+        record = accept(self.player, registered.key)
         self.assertIsNone(record.deadline_tick)
 
     def test_unknown_quest_id_raises_not_found_without_mutation(self):
@@ -197,7 +318,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
 
     def test_abandonment_records_failure_and_clears_bindings(self):
         registered = register(quest("abandonable"))
-        record = accept_quest(self.player, registered.key)
+        record = accept(self.player, registered.key)
         bound = from_storage(
             {
                 **to_storage(record),
@@ -218,7 +339,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
 
     def test_repeated_abandonment_is_harmless(self):
         registered = register(quest("abandon_twice"))
-        record = accept_quest(self.player, registered.key)
+        record = accept(self.player, registered.key)
         first = abandon_quest(self.player, record.quest_id)
         before = list(self.player.db.quest_log)
         second = abandon_quest(self.player, record.quest_id)
@@ -231,6 +352,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
             {
                 "quest_id": "sample:1",
                 "definition_key": "introductory_hunt",
+                "issuer_key": TEST_ISSUER_KEY,
                 "state": "in_progress",
                 "stage_index": 0,
                 "stage_progress": 0,
@@ -253,7 +375,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
 
     def test_duplicate_quest_ids_are_rejected(self):
         registered = register(quest("duplicate_ids"))
-        accept_quest(self.player, registered.key)
+        accept(self.player, registered.key)
         log = list(self.player.db.quest_log)
         self.player.db.quest_log = [log[0], dict(log[0])]
         with self.assertRaises(QuestDataError):
@@ -263,7 +385,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
 
     def test_active_record_with_out_of_range_stage_is_rejected(self):
         registered = register(quest("stale_stage"))
-        record = accept_quest(self.player, registered.key)
+        record = accept(self.player, registered.key)
         stale = {
             **to_storage(record),
             "stage_index": 5,
@@ -276,7 +398,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
 
     def test_terminal_record_with_residual_bindings_is_rejected(self):
         registered = register(quest("terminal_bindings"))
-        record = accept_quest(self.player, registered.key)
+        record = accept(self.player, registered.key)
         residual = {
             **to_storage(record),
             "state": "completed",
@@ -289,7 +411,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
 
     def test_terminal_record_with_out_of_range_stage_is_rejected(self):
         registered = register(quest("terminal_stage"))
-        record = accept_quest(self.player, registered.key)
+        record = accept(self.player, registered.key)
         stale = {**to_storage(record), "state": "completed", "stage_index": 5}
         apply_quest_log_replacement(self.player, [from_storage(stale)])
         with self.assertRaises(QuestDataError):
@@ -297,7 +419,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
 
     def test_failed_record_without_reason_is_rejected(self):
         registered = register(quest("reasonless"))
-        record = accept_quest(self.player, registered.key)
+        record = accept(self.player, registered.key)
         reasonless = {**to_storage(record), "state": "failed", "failure_reason": None}
         apply_quest_log_replacement(self.player, [from_storage(reasonless)])
         with self.assertRaises(QuestDataError):
@@ -341,6 +463,7 @@ class QuestCompletionObserverTests(unittest.TestCase):
             {
                 "quest_id": "observer_two_stage:1",
                 "definition_key": "observer_two_stage",
+                "issuer_key": TEST_ISSUER_KEY,
                 "state": "in_progress",
                 "stage_index": 0,
                 "stage_progress": 0,
@@ -423,7 +546,7 @@ class QuestTrackingTests(QuestRegistryIsolation, EvenniaTest):
 
     def _accept(self, key: str):
         registered = register(quest(key))
-        return accept_quest(self.player, registered.key)
+        return accept(self.player, registered.key)
 
     def test_record_round_trips_with_tracked(self):
         record = self._accept("tracked_rt")
@@ -434,10 +557,12 @@ class QuestTrackingTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(restored, tracked)
         self.assertTrue(restored.tracked)
 
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
     def test_legacy_entry_without_key_loads_untracked(self):
         entry = {
             "quest_id": "legacy:1",
             "definition_key": "introductory_hunt",
+            "issuer_key": TEST_ISSUER_KEY,
             "state": "in_progress",
             "stage_index": 0,
             "stage_progress": 0,

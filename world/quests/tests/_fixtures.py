@@ -1,6 +1,7 @@
 """Shared fixtures for quest-runtime tests (registry isolation and builders)."""
 
 from dataclasses import replace
+from typing import Any
 
 from world.quests.catalog import INTRODUCTORY_HUNT, register_catalog
 from world.quests.compile import SCENE_REQUIREMENT_REGISTRY
@@ -15,24 +16,36 @@ from world.quests.definitions import (
     RoomLocator,
     register_quest_definition,
 )
-from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+from world.rules.guild_offers import GUILD_OFFER_REGISTRY, QuestReward
+from world.rules.quest_issuance import (
+    QUEST_ISSUANCE_REGISTRY,
+    QuestIssuance,
+    Settlement,
+    npc_issuer_key,
+    register_quest_issuance,
+)
+from world.quests.runtime import QuestRecord, accept_quest
 
 
 class QuestRegistryIsolation:
-    """Snapshot and restore the process-global definition registry.
+    """Snapshot and restore the process-global quest registries.
 
-    ``QUEST_DEFINITION_REGISTRY`` is module-global and shared across the whole
-    test process, so every quest test restores whatever it found rather than
-    clearing state other tests (or the catalog) rely on.
+    ``QUEST_DEFINITION_REGISTRY`` and ``QUEST_ISSUANCE_REGISTRY`` are
+    module-global and shared across the whole test process, so every quest
+    test restores whatever it found rather than clearing state other tests
+    (or the catalog) rely on.
     """
 
     def setUp(self):
         super().setUp()
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
+        self._issuance_items = list(QUEST_ISSUANCE_REGISTRY.items())
 
     def tearDown(self):
         QUEST_DEFINITION_REGISTRY.clear()
         QUEST_DEFINITION_REGISTRY.update(self._registry_items)
+        QUEST_ISSUANCE_REGISTRY.clear()
+        QUEST_ISSUANCE_REGISTRY.update(self._issuance_items)
         super().tearDown()
 
 
@@ -41,18 +54,20 @@ _PROCESS_GLOBAL_REGISTRIES = (
     QUEST_DEFINITION_REGISTRY,
     GUILD_OFFER_REGISTRY,
     SCENE_REQUIREMENT_REGISTRY,
+    QUEST_ISSUANCE_REGISTRY,
 )
 
 
 class RegistryIsolationMixin:
-    """Snapshot and restore the three process-global registries.
+    """Snapshot and restore the four process-global quest registries.
 
-    ``QUEST_DEFINITION_REGISTRY``, ``GUILD_OFFER_REGISTRY``, and
-    ``SCENE_REQUIREMENT_REGISTRY`` are module-global and shared across the
-    whole test process. The snapshot is taken in ``setUp`` and the restoration
-    is registered via ``addCleanup`` immediately, so even a ``setUp`` that
-    raises after mutating cannot leak registry state into later tests
-    (``tearDown`` is skipped when ``setUp`` fails; cleanups are not).
+    ``QUEST_DEFINITION_REGISTRY``, ``GUILD_OFFER_REGISTRY``,
+    ``SCENE_REQUIREMENT_REGISTRY``, and ``QUEST_ISSUANCE_REGISTRY`` are
+    module-global and shared across the whole test process. The snapshot is
+    taken in ``setUp`` and the restoration is registered via ``addCleanup``
+    immediately, so even a ``setUp`` that raises after mutating cannot leak
+    registry state into later tests (``tearDown`` is skipped when ``setUp``
+    fails; cleanups are not).
     """
 
     def setUp(self):
@@ -153,3 +168,36 @@ def register_catalog_once() -> None:
 
 def intro_hunt_key() -> str:
     return INTRODUCTORY_HUNT.key
+
+
+#: The shared private commission every issuer-agnostic test acceptance rides.
+#: It resolves through ``resolve_issuance`` like any real issuance, so the
+#: resolve-before-create rule is exercised, but no test's board or counter
+#: assertions depend on it (``QUEST_ISSUANCE_REGISTRY`` is not read by any
+#: board or settlement surface this change touches).
+TEST_ISSUER_KEY = npc_issuer_key(content_key="test_commission")
+
+
+def _ensure_test_issuance(definition_key: str) -> str:
+    """Guarantee the shared test commission exists for ``definition_key``."""
+    if (definition_key, TEST_ISSUER_KEY) not in QUEST_ISSUANCE_REGISTRY:
+        register_quest_issuance(
+            QuestIssuance(
+                definition_key=definition_key,
+                issuer_key=TEST_ISSUER_KEY,
+                reward=QuestReward(copper=1, items=(), merit=0),
+                settlement=Settlement.COUNTER,
+            )
+        )
+    return TEST_ISSUER_KEY
+
+
+def accept(actor: Any, definition: QuestDefinition | str) -> QuestRecord:
+    """Accept ``definition`` under the shared test commission.
+
+    The quest-runtime tests care about record lifecycle, not which commission
+    backs the acceptance; this keeps their call sites one line while still
+    naming a registered issuance, as ``accept_quest`` now requires.
+    """
+    key = definition.key if isinstance(definition, QuestDefinition) else str(definition)
+    return accept_quest(actor, key, _ensure_test_issuance(key))

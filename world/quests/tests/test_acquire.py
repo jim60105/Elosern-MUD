@@ -15,9 +15,10 @@ from world.quests.definitions import (
     QuestDefinitionError,
     register_quest_definition,
 )
-from world.quests.runtime import QuestState, accept_quest, read_records
+from world.quests.runtime import QuestState, read_records
 from world.quests.tests._fixtures import (
     QuestRegistryIsolation,
+    accept,
     acquire,
     quest,
     register,
@@ -46,7 +47,7 @@ class AcquireDefinitionTests(QuestRegistryIsolation, EvenniaTest):
             )
         )
         self.player = create_object(PlayerCharacter, key="acquire player")
-        record = accept_quest(self.player, definition.key)
+        record = accept(self.player, definition.key)
         self.assertEqual(record.stage_progress, 0)
         self.assertEqual(record.state, QuestState.IN_PROGRESS)
 
@@ -106,7 +107,7 @@ class AcquireProgressTests(QuestRegistryIsolation, EvenniaTest):
         )
 
     def _accept(self):
-        return accept_quest(self.player, self.definition.key)
+        return accept(self.player, self.definition.key)
 
     def test_planning_is_side_effect_free(self):
         accept = self._accept()
@@ -173,7 +174,7 @@ class AcquireProgressTests(QuestRegistryIsolation, EvenniaTest):
             ))
         )
         self._accept()
-        accept_quest(self.player, second.key)
+        accept(self.player, second.key)
         plan = plan_inventory_delta(self.player, additions=("healing_potion", "healing_potion"))
         self.assertIsNotNone(plan.acquire)
         # Both quests advance at most one stage; the remaining surplus is not
@@ -227,7 +228,7 @@ class ImportNonProgressionTests(QuestRegistryIsolation, EvenniaTest):
                 ).QuestStage(0, acquire("healing_potion", quantity=3)),
             ))
         )
-        accepted = accept_quest(entity, definition.key)
+        accepted = accept(entity, definition.key)
         self.assertEqual(accepted.stage_progress, 0)
 
 

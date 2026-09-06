@@ -20,10 +20,12 @@ from world.quests.definitions import (
 )
 from world.quests.tests._fixtures import (
     QuestRegistryIsolation,
+    accept,
     defeat,
     quest,
     register,
 )
+from world.rules.quest_issuance import guild_issuer_key, resolve_issuance
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.guild import (
     RewardClaim,
@@ -281,6 +283,90 @@ class BoardAccessTests(OfferRegistryIsolation, EvenniaTestCase):
         self.assertEqual(self.staff.db.relations_data, relations_before)
 
 
+class BoardAcceptanceIssuerKeyTests(OfferRegistryIsolation, EvenniaTestCase):
+    """Board acceptance names the issuing branch as the record's issuer key."""
+
+    SECOND_BRANCH = "guild_branch_second"
+
+    def setUp(self):
+        super().setUp()
+        self.hall = create_object(Room, key="issuer hall")
+        self.staff_a = create_object(NPC, key="staff a", location=self.hall)
+        _attach_staff(self.staff_a)
+        self.player = create_object(PlayerCharacter, key="issuer player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.hall
+        register_adventurer(self.player, self.staff_a)
+        self.definition = register(
+            quest("branch_issuer_quest", stages=(QuestStage(0, defeat(tier="low")),))
+        )
+
+    def _inject_second_branch(self) -> None:
+        """A second branch, host, and offer for the same definition."""
+        from world.lore.guild import GUILD_BRANCH_REGISTRY, GuildBranch
+
+        branch_items = list(GUILD_BRANCH_REGISTRY.items())
+        self.addCleanup(
+            lambda: (
+                GUILD_BRANCH_REGISTRY.clear(),
+                GUILD_BRANCH_REGISTRY.update(branch_items),
+            )
+        )
+        GUILD_BRANCH_REGISTRY[self.SECOND_BRANCH] = GuildBranch(
+            self.SECOND_BRANCH,
+            "埃洛西恩冒險者公會 第二分會",
+            "測試會長",
+            "測試分會會長",
+            "capital_altoria",
+        )
+        self.staff_b = create_object(NPC, key="staff b", location=self.hall)
+        self.staff_b.components.add(
+            GuildStaff.create(
+                self.staff_b, service_id="staff-b", branch_key=self.SECOND_BRANCH
+            )
+        )
+
+    @covers_requirement("guild-quest-board::board-acceptance-and-abandonment-delegate-to-quest-lifecycle")
+    def test_board_acceptance_names_the_issuing_branch(self):
+        offer = _offer(self.definition.key, copper=50, items=())
+        register_guild_offer(offer)
+        record = accept_guild_offer(self.player, self.staff_a, self.definition.key)
+        self.assertEqual(record.issuer_key, f"guild:{ALTORIA_BRANCH}")
+        self.assertEqual(
+            resolve_issuance(record.definition_key, record.issuer_key).reward,
+            offer.reward,
+        )
+
+    @covers_requirement("guild-quest-board::board-acceptance-and-abandonment-delegate-to-quest-lifecycle")
+    def test_two_branches_offering_one_definition_produce_distinguishable_records(self):
+        self._inject_second_branch()
+        offer_a = _offer(self.definition.key, copper=50, items=())
+        offer_b = GuildQuestOffer(
+            definition_key=self.definition.key,
+            issuer_branch_key=self.SECOND_BRANCH,
+            reward=QuestReward(copper=60, items=(), merit=0),
+        )
+        register_guild_offer(offer_a)
+        register_guild_offer(offer_b)
+        first = accept_guild_offer(self.player, self.staff_a, self.definition.key)
+        abandon_guild_quest(self.player, self.staff_a, first.quest_id)
+        second = accept_guild_offer(self.player, self.staff_b, self.definition.key)
+        records = {r.quest_id: r for r in read_records(self.player)}
+        self.assertEqual(records[first.quest_id].issuer_key, f"guild:{ALTORIA_BRANCH}")
+        self.assertEqual(
+            records[second.quest_id].issuer_key, f"guild:{self.SECOND_BRANCH}"
+        )
+        self.assertEqual(
+            resolve_issuance(self.definition.key, f"guild:{ALTORIA_BRANCH}").reward,
+            offer_a.reward,
+        )
+        self.assertEqual(
+            resolve_issuance(self.definition.key, f"guild:{self.SECOND_BRANCH}").reward,
+            offer_b.reward,
+        )
+
+
 class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
@@ -304,7 +390,9 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
         from world.quests.runtime import fulfill_record
         from world.quests.transitions import apply_quest_log_replacement
 
-        record = accept_quest(self.player, self._definition_key)
+        record = accept_quest(
+            self.player, self._definition_key, guild_issuer_key(ALTORIA_BRANCH)
+        )
         completed = fulfill_record(
             record, QUEST_DEFINITION_REGISTRY[self._definition_key]
         )
@@ -383,7 +471,7 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
                 stages=(QuestStage(0, _acquire("healing_potion", quantity=2)),),
             )
         )
-        accept_quest(self.player, acquire_def.key)
+        accept(self.player, acquire_def.key)
         quest_id = self._complete()
         turn_in_quest(self.player, self.staff, quest_id)
         acquire_records = [

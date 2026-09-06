@@ -42,7 +42,7 @@ from world.quests.compile import (
     register_generated_quest,
 )
 from world.quests.definitions import DestinationKind, ObjectiveKind, RoomLocator
-from world.quests.runtime import accept_quest, read_records
+from world.quests.runtime import read_records
 from world.quests.scene_builder import (
     SCENE_OCCUPANT_PROTOTYPE_WHITELIST,
     SceneBuilderLocationError,
@@ -52,7 +52,7 @@ from world.quests.scene_builder import (
     _validate_occupant_parent,
     materialize_stage,
 )
-from world.quests.tests._fixtures import QuestRegistryIsolation
+from world.quests.tests._fixtures import QuestRegistryIsolation, accept
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.traits import build_initial_traits, trait_config_for_values
 
@@ -248,7 +248,7 @@ class SceneBuilderTestBase(SceneBuilderIsolation, EvenniaTest):
     def _accept(self, payload):
         compiled = compile_quest_blueprint(payload)
         register_generated_quest(compiled)
-        return accept_quest(self.player, compiled.definition.key), compiled
+        return accept(self.player, compiled.definition.key), compiled
 
     def _fresh(self, quest_id):
         return next(r for r in read_records(self.player) if r.quest_id == quest_id)
@@ -432,7 +432,7 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         with self.assertRaises(SceneBuilderNotActive):
             materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
 
-        hand_written = accept_quest(self.player, INTRODUCTORY_HUNT.key)
+        hand_written = accept(self.player, INTRODUCTORY_HUNT.key)
         with self.assertRaises(SceneBuilderNoRequirements):
             materialize_stage(self.player, hand_written.quest_id, origin_room=self.anchor)
 

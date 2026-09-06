@@ -17,7 +17,6 @@ from world.quests.definitions import QuestStage, QuestType
 from world.quests.planner import quest_event_effect_planner
 from world.quests.runtime import (
     QuestState,
-    accept_quest,
     read_records,
     to_storage,
 )
@@ -40,6 +39,7 @@ from world.skills.registry import (
 
 from ._fixtures import (
     QuestRegistryIsolation,
+    accept,
     anchor_locator,
     defeat,
     escort,
@@ -146,7 +146,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_player_defeat_advances_matching_tier_objective(self):
-        accept_quest(self.player, self.tier_hunt.key)
+        accept(self.player, self.tier_hunt.key)
         first = self._monster("a")
         self.assertEqual(self._resolve(self.player, "fire_ball", [first]).outcome, "success")
         self.assertEqual(self._records()[0]["stage_progress"], 1)
@@ -156,13 +156,13 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(self._records()[0]["state"], "in_progress")
 
     def test_wrong_tier_kill_grants_no_progress(self):
-        accept_quest(self.player, self.tier_hunt.key)
+        accept(self.player, self.tier_hunt.key)
         mid = self._monster("mid", tier="mid")
         self.assertEqual(self._resolve(self.player, "fire_ball", [mid]).outcome, "success")
         self.assertEqual(self._records()[0]["stage_progress"], 0)
 
     def test_bound_objective_matches_exact_dbref_not_display_key(self):
-        record = accept_quest(self.player, self.bound_hunt.key)
+        record = accept(self.player, self.bound_hunt.key)
         unbound = self._monster("decoy")
         bound = self._monster("real")
         bind_stage_runtime(self.player, record.quest_id, objective_targets=(bound,))
@@ -172,7 +172,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(self._records()[0]["stage_progress"], 1)
 
     def test_non_player_actor_grants_no_ordinary_kill_credit(self):
-        accept_quest(self.player, self.tier_hunt.key)
+        accept(self.player, self.tier_hunt.key)
         hunter = self._monster("hunter", hp=200, tier="mid")
         hunter.db.skills = {"active": ["claw"], "passive": []}
         prey = self._monster("prey")
@@ -182,7 +182,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(self._records()[0]["stage_progress"], 0)
 
     def test_area_defeat_aggregates_without_skipping_stages(self):
-        accept_quest(self.player, self.two_stage.key)
+        accept(self.player, self.two_stage.key)
         monsters = [self._monster(f"m{i}") for i in range(3)]
         self.player.db.skills = {"active": ["wind_blade"], "passive": []}
         result = self._resolve(self.player, "wind_blade", monsters)
@@ -192,7 +192,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(stored["stage_progress"], 0)
 
     def test_final_objective_completes_and_clears_bindings(self):
-        record = accept_quest(self.player, self.bound_hunt.key)
+        record = accept(self.player, self.bound_hunt.key)
         room = create_object(InstanceRoom, key="hunt-room")
         bound = self._monster("final")
         bind_stage_runtime(self.player, record.quest_id, room=room, objective_targets=(bound,))
@@ -207,7 +207,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::stage-completion-advances-exactly-once-and-releases-obsolete-runtime-bindings")
     def test_terminal_records_ignore_later_matching_events(self):
-        record = accept_quest(self.player, self.bound_hunt.key)
+        record = accept(self.player, self.bound_hunt.key)
         bound = self._monster("done")
         bind_stage_runtime(self.player, record.quest_id, objective_targets=(bound,))
         self._resolve(self.player, "fire_ball", [bound])
@@ -220,7 +220,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(after["state"], "completed")
 
     def test_protected_npc_death_fails_escort_quest(self):
-        record = accept_quest(self.player, self.escort_quest.key)
+        record = accept(self.player, self.escort_quest.key)
         guard = self._npc("guard")
         room = create_object(InstanceRoom, key="escort-room")
         bind_stage_runtime(
@@ -241,7 +241,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(room.db.pin_reasons, [])
 
     def test_same_display_key_creates_no_false_failure(self):
-        record = accept_quest(self.player, self.escort_quest.key)
+        record = accept(self.player, self.escort_quest.key)
         guard = self._npc("guard-identical")
         impostor = self._npc("guard-identical")
         guard.db.key = "guard"
@@ -255,7 +255,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(self._records()[0]["state"], "failed")
 
     def test_objective_target_death_cannot_trigger_protected_failure(self):
-        record = accept_quest(self.player, self.bound_hunt.key)
+        record = accept(self.player, self.bound_hunt.key)
         target = self._monster("objective-target")
         bind_stage_runtime(self.player, record.quest_id, objective_targets=(target,))
         self._resolve(self.player, "fire_ball", [target])
@@ -264,7 +264,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(stored["failure_reason"], None)
 
     def test_same_event_protected_failure_wins_over_defeat_progress(self):
-        record = accept_quest(self.player, self.bound_hunt.key)
+        record = accept(self.player, self.bound_hunt.key)
         target = self._monster("dual-target")
         npc_guard = self._npc("dual-guard")
         bind_stage_runtime(
@@ -284,7 +284,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-failure-conditions::defeat-of-an-exact-protected-entity-fails-its-active-quests-atomically")
     def test_commit_fault_rolls_back_death_and_quest_failure_together(self):
-        record = accept_quest(self.player, self.escort_quest.key)
+        record = accept(self.player, self.escort_quest.key)
         guard = self._npc("guard-rollback")
         room = create_object(InstanceRoom, key="escort-rollback")
         bind_stage_runtime(
@@ -314,7 +314,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     def test_simulated_defeat_grants_no_defeat_progress(self):
         # A guild examination is a simulated battle: even a tier-matching
         # lethal defeat must not advance a DEFEAT objective.
-        accept_quest(self.player, self.tier_hunt.key)
+        accept(self.player, self.tier_hunt.key)
         target = self._monster("simulated-victim")
         field = self._field(self.player, [target])
         request = ActionRequest(
@@ -335,7 +335,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     def test_simulated_defeat_never_fails_protected_entity(self):
         # A simulated lethal crossing on a bound protected entity must not
         # fail its active quest: the battle is a simulation.
-        record = accept_quest(self.player, self.escort_quest.key)
+        record = accept(self.player, self.escort_quest.key)
         guard = self._npc("simulated-guard")
         room = create_object(InstanceRoom, key="simulated-room")
         bind_stage_runtime(
@@ -443,7 +443,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         """Scenario: Possessed-companion combat still credits the owner's quest."""
         from world.rules.possession import enter_possession
 
-        accept_quest(self.player, self.tier_hunt.key)
+        accept(self.player, self.tier_hunt.key)
         companion = self._companion("possessed_killer")
         enter_possession(self.player, companion)
         prey = self._monster("prey_possessed")
@@ -455,7 +455,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
     @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_bound_companion_kill_advances_owner_objective(self):
-        accept_quest(self.player, self.tier_hunt.key)
+        accept(self.player, self.tier_hunt.key)
         companion = self._companion("first")
         prey = self._monster("prey")
         field = self._field(companion, [prey])
@@ -467,7 +467,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
     @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_knocked_out_companion_kill_grants_no_credit(self):
-        accept_quest(self.player, self.tier_hunt.key)
+        accept(self.player, self.tier_hunt.key)
         companion = self._companion("ko")
         prey = self._monster("prey-ko")
         field = self._field(
@@ -481,7 +481,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
     @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_unbound_npc_kill_grants_no_credit(self):
-        accept_quest(self.player, self.tier_hunt.key)
+        accept(self.player, self.tier_hunt.key)
         outsider = create_object(NPC, key="outsider", location=self.room)
         outsider.race = "human"
         outsider.apply_race_baseline()
@@ -495,7 +495,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
     def test_backref_mismatch_kill_grants_no_credit(self):
-        accept_quest(self.player, self.tier_hunt.key)
+        accept(self.player, self.tier_hunt.key)
         # The NPC claims the player as its owner but is absent from the
         # player's party list: the one-sided binding must fail closed.
         impostor = create_object(NPC, key="impostor", location=self.room)
@@ -512,7 +512,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
     def test_no_battlefield_credit_request_fails_closed(self):
-        accept_quest(self.player, self.tier_hunt.key)
+        accept(self.player, self.tier_hunt.key)
         companion = self._companion("striker")
         companion.db.skills = {"active": ["strike"], "passive": []}
         prey = self._monster("prey-ambush")
@@ -529,7 +529,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
     @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_companion_area_defeat_aggregates_without_skipping_stages(self):
-        accept_quest(self.player, self.two_stage.key)
+        accept(self.player, self.two_stage.key)
         companion = self._companion("reaver")
         companion.db.skills = {"active": ["wind_blade"], "passive": []}
         monsters = [self._monster(f"c-m{i}") for i in range(3)]
@@ -643,7 +643,7 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_upkeep_defeat_advances_and_caps_at_the_objective(self):
-        accept_quest(self.player, self.tier_hunt.key)
+        accept(self.player, self.tier_hunt.key)
         first = self._monster("u-a")
         second = self._monster("u-b")
         third = self._monster("u-c")
@@ -671,7 +671,7 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_upkeep_defeat_transitions_a_stage_exactly_once(self):
-        accept_quest(self.player, self.two_stage.key)
+        accept(self.player, self.two_stage.key)
         monster = self._monster("u-stage")
         effects = self._plan(self.player, [self._defeat_entry(self.player, monster)])
         self.assertTrue(effects)
@@ -679,7 +679,7 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_simulated_upkeep_defeat_grants_no_progress(self):
-        accept_quest(self.player, self.tier_hunt.key)
+        accept(self.player, self.tier_hunt.key)
         monster = self._monster("u-sim")
         effects = self._plan(
             self.player,
@@ -690,7 +690,7 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_unattributed_upkeep_defeat_grants_no_progress(self):
-        accept_quest(self.player, self.tier_hunt.key)
+        accept(self.player, self.tier_hunt.key)
         monster = self._monster("u-anon")
         # An unattributed upkeep tick emits no defeat entries at all; the
         # planner sees an empty event set and plans nothing.
@@ -700,7 +700,7 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_simulated_upkeep_defeat_never_fails_a_protected_entity(self):
-        record = accept_quest(self.player, self.escort_quest.key)
+        record = accept(self.player, self.escort_quest.key)
         guard = self._npc("u-guard")
         room = create_object(InstanceRoom, key="u-escort-room")
         bind_stage_runtime(
@@ -719,7 +719,7 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_attributed_upkeep_defeat_fails_a_protected_entity(self):
-        record = accept_quest(self.player, self.escort_quest.key)
+        record = accept(self.player, self.escort_quest.key)
         guard = self._npc("u-guard-2")
         room = create_object(InstanceRoom, key="u-escort-room-2")
         bind_stage_runtime(

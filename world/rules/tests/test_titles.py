@@ -699,10 +699,12 @@ class TitlePredicateTests(EvenniaTest):
         self.entity.db.quest_log = [{"not": "a record"}]
         self.assertFalse(predicate_satisfied(self.entity, _event_log(), predicate))
         from world.quests.runtime import QuestRecord, QuestState, to_storage
+        from world.quests.tests._fixtures import TEST_ISSUER_KEY
 
         record = QuestRecord(
             quest_id="q-1",
             definition_key="introductory_hunt",
+            issuer_key=TEST_ISSUER_KEY,
             state=QuestState.COMPLETED,
             stage_index=0,
             stage_progress=1,

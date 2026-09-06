@@ -26,7 +26,6 @@ from evennia.utils.test_resources import EvenniaTest
 
 from world.quests.runtime import (
     QuestState,
-    accept_quest,
     abandon_quest,
     read_records,
 )
@@ -37,7 +36,7 @@ from world.quests.transitions import (
     pending_effects_for_transition,
 )
 
-from ._fixtures import QuestRegistryIsolation, quest, register
+from ._fixtures import TEST_ISSUER_KEY, QuestRegistryIsolation, accept, quest, register
 
 from tools.spec_traceability import covers_requirement
 
@@ -62,19 +61,20 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
             patch("world.quests.transitions.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
-            record = accept_quest(self.actor, self.definition.key)
+            record = accept(self.actor, self.definition.key)
         events = self._events(info)
         self.assertEqual([event for event, _ in events], ["quest_transition"])
         (_, context), = events
         self.assertEqual(context["char"], str(self.actor.pk))
         self.assertEqual(context["quest"], self.definition.key)
+        self.assertEqual(context["issuer"], TEST_ISSUER_KEY)
         self.assertEqual(context["stage_from"], "none")
         self.assertEqual(context["stage_to"], "in_progress:0:unbound")
         self.assertEqual(record.state, QuestState.IN_PROGRESS)
 
     @covers_requirement("quest-lifecycle::quest-lifecycle-transitions-emit-boundary-events")
     def test_stage_advance_emits_stage_from_to_stage_to(self):
-        record = accept_quest(self.actor, self.definition.key)
+        record = accept(self.actor, self.definition.key)
         advanced = replace(record, stage_index=1, stage_room_id=None)
         with (
             patch("world.quests.transitions.log_info") as info,
@@ -83,6 +83,7 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
             apply_quest_log_replacement(self.actor, [advanced])
         events = [context for event, context in self._events(info) if event == "quest_transition"]
         self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["issuer"], TEST_ISSUER_KEY)
         self.assertEqual(events[0]["stage_from"], "in_progress:0:unbound")
         self.assertEqual(events[0]["stage_to"], "in_progress:1:unbound")
 
@@ -93,7 +94,7 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
         ):
             # The accept is captured too: its own event fires on the same
             # capture boundary so the assertion sees the full lifecycle.
-            record = accept_quest(self.actor, self.definition.key)
+            record = accept(self.actor, self.definition.key)
             abandoned = abandon_quest(self.actor, record.quest_id)
         events = [context for event, context in self._events(info) if event == "quest_transition"]
         # accept + abandon each emit one event; the abandon one names failed.
@@ -103,7 +104,7 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(abandoned.state, QuestState.FAILED)
 
     def test_unchanged_replacement_emits_no_event(self):
-        record = accept_quest(self.actor, self.definition.key)
+        record = accept(self.actor, self.definition.key)
         with (
             patch("world.quests.transitions.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
@@ -113,7 +114,7 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(events, [])
 
     def test_removed_record_emits_removed_transition(self):
-        accept_quest(self.actor, self.definition.key)
+        accept(self.actor, self.definition.key)
         with (
             patch("world.quests.transitions.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
@@ -121,6 +122,7 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
             apply_quest_log_replacement(self.actor, [])
         events = [context for event, context in self._events(info) if event == "quest_transition"]
         self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["issuer"], TEST_ISSUER_KEY)
         self.assertEqual(events[0]["stage_from"], "in_progress:0:unbound")
         self.assertEqual(events[0]["stage_to"], "removed")
 
@@ -131,6 +133,7 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
         candidate = QuestRecord(
             quest_id="obs_lifecycle:1",
             definition_key=self.definition.key,
+            issuer_key=TEST_ISSUER_KEY,
             state=QuestState.IN_PROGRESS,
             stage_index=0,
             stage_progress=0,
@@ -162,13 +165,13 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
             self.captureOnCommitCallbacks(execute=True),
             self.assertRaises(RuntimeError),
         ):
-            accept_quest(self.actor, self.definition.key)
+            accept(self.actor, self.definition.key)
         events = [context for event, context in self._events(info) if event == "quest_transition"]
         self.assertEqual(events, [])
         self.assertEqual(read_records(self.actor), [])
 
     def test_delta_writer_emits_inside_caller_transaction(self):
-        record = accept_quest(self.actor, self.definition.key)
+        record = accept(self.actor, self.definition.key)
         advanced = replace(record, stage_index=1)
         with (
             patch("world.quests.transitions.log_info") as info,
@@ -182,7 +185,7 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(events[0]["stage_to"], "in_progress:1:unbound")
 
     def test_delta_writer_rollback_with_caller_transaction_emits_no_event(self):
-        record = accept_quest(self.actor, self.definition.key)
+        record = accept(self.actor, self.definition.key)
         advanced = replace(record, stage_index=1)
         with (
             patch("world.quests.transitions.log_info") as info,
@@ -197,9 +200,9 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
         # rollback restore), so only the no-event contract is asserted here.
 
     def test_multi_record_write_emits_one_event_per_changed_quest(self):
-        first = accept_quest(self.actor, self.definition.key)
+        first = accept(self.actor, self.definition.key)
         second_definition = register(quest("obs_second"))
-        second = accept_quest(self.actor, second_definition.key)
+        second = accept(self.actor, second_definition.key)
         advanced = [
             replace(first, stage_index=1, stage_room_id=self.room1.pk),
             replace(second, stage_index=1),
@@ -222,7 +225,7 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(events["obs_second"]["stage_to"], "in_progress:1:unbound")
 
     def test_acceptance_numbering_emits_one_event_per_acceptance(self):
-        first = accept_quest(self.actor, self.definition.key)
+        first = accept(self.actor, self.definition.key)
         apply_quest_log_replacement(
             self.actor, [replace(first, state=QuestState.COMPLETED)]
         )
@@ -230,7 +233,7 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
             patch("world.quests.transitions.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
-            accept_quest(self.actor, self.definition.key)
+            accept(self.actor, self.definition.key)
         events = [context for event, context in self._events(info) if event == "quest_transition"]
         self.assertEqual(len(events), 1)
         # Two acceptances of one definition share the emitted quest key but
@@ -240,7 +243,7 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(read_records(self.actor)[-1].quest_id, "obs_lifecycle:2")
 
     def test_pending_effect_seam_emits_at_action_commit(self):
-        record = accept_quest(self.actor, self.definition.key)
+        record = accept(self.actor, self.definition.key)
         advanced = replace(record, stage_index=1)
         effects = pending_effects_for_transition(self.actor, [advanced])
         from world.rules.action import _commit
@@ -256,7 +259,7 @@ class QuestTransitionEventTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(events[0]["stage_to"], "in_progress:1:unbound")
 
     def test_pending_effect_seam_rollback_emits_no_event(self):
-        record = accept_quest(self.actor, self.definition.key)
+        record = accept(self.actor, self.definition.key)
         advanced = replace(record, stage_index=1)
         effects = pending_effects_for_transition(self.actor, [advanced])
         from world.rules.action import _commit

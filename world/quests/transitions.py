@@ -58,14 +58,18 @@ def _schedule_transition_events(
     Shared by ALL three quest-log writers (replacement, delta, and the
     pending-effect seam) so every lifecycle write path — accept, bind, stage
     advance, abandon, deadline/protected-entity failure, DEFEAT completion —
-    emits its events. ``old_entries`` is the raw stored log captured BEFORE
-    the write; callbacks registered through ``transaction.on_commit`` fire only
-    on the outermost commit and are discarded on rollback, so a rolled-back
+    emits its events. Every event context names the governing commission via
+    ``issuer`` (new records carry it on the record; removals carry it from the
+    pre-write stored entry, which the strict signature reader has already
+    validated). ``old_entries`` is the raw stored log captured BEFORE the
+    write; callbacks registered through ``transaction.on_commit`` fire only on
+    the outermost commit and are discarded on rollback, so a rolled-back
     operation leaves no event behind. Malformed logs skip the diff:
     observability must never affect a lifecycle write.
     """
     try:
         before: dict[str, tuple] = {}
+        before_issuers: dict[str, str] = {}
         for entry in (old_entries or []):
             signature = _record_signature(entry)
             if signature is None:
@@ -76,6 +80,7 @@ def _schedule_transition_events(
                 # arbitrate between — skip the whole diff.
                 return
             before[quest_id] = signature
+            before_issuers[quest_id] = str(entry["issuer_key"])
         events: list[dict[str, Any]] = []
         after_ids: set[str] = set()
         for record in new_records:
@@ -99,6 +104,7 @@ def _schedule_transition_events(
                 {
                     "char": str(actor.pk),
                     "quest": str(record.definition_key),
+                    "issuer": str(record.issuer_key),
                     "stage_from": from_stage,
                     "stage_to": to_stage,
                 }
@@ -109,6 +115,7 @@ def _schedule_transition_events(
                     {
                         "char": str(actor.pk),
                         "quest": previous[0],
+                        "issuer": before_issuers[quest_id],
                         "stage_from": _format_stage(*previous[1:]),
                         "stage_to": "removed",
                     }
