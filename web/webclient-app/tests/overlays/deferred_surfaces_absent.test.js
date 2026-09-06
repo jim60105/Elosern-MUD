@@ -199,7 +199,9 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
     // Overlays/PartyDrawer (41 → 43).
     // webclient-align-09-objective-tracker-ui adds Overlays/ObjectiveTracker (43 → 44).
     // multichar-05-topbar-switcher-ui adds Core/CharacterSwitcher (44 → 45).
-    expect(manifest.required).toHaveLength(45);
+    // webclient-quest-drawer-split replaces World/QuestBoard with
+    // World/QuestLog and World/GuildCounter (45 → 46).
+    expect(manifest.required).toHaveLength(46);
    // The four full overlays complete the required set (B5's new family).
    for (const title of [
      "Core/CharacterSwitcher",

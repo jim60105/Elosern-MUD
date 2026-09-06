@@ -387,6 +387,16 @@ def _services_fixture(character) -> None:
         write_counter_trait(character, "guild_merit", 50)
         character.db.wallet = 1000
         character.save()
+    elif mode == "quest_away_from_clerk":
+        # quest-drawer-split: an accepted guild quest held AWAY from any
+        # clerk — the quest book must read and track anywhere, and the
+        # drawer must replace the counter with its honest no-clerk marker.
+        original_room = character.location
+        register_adventurer(character, staff=staff)
+        character.db.wallet = 1000
+        accept_guild_offer(character, staff, "introductory_hunt")
+        place(original_room)
+        character.save()
     elif mode == "store_open":
         place(store)
         character.db.wallet = 1000

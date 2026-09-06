@@ -346,7 +346,9 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `fulllog-overlay`, `fulllog-close` | H1 | REMAP-TO-TESTID |
 | `hud-drawer`, `hud-drawer-scrim` + `.hud-drawer__title`; `character-status-drawer`, `equipment-doll` + `equipment-doll__<suffix>` (the drawer bodies H4 migrated out of the right column; the realigned doll adds `equipment-doll__title`, `equipment-doll__title-tag`, `equipment-doll__doll`, `equipment-doll__slots`, `equipment-doll__slot--<slot>`, `equipment-doll__slot-empty--<slot>`, `equipment-doll__description`, `equipment-doll__description-row--<slot>`, `equipment-doll__accessories`, `equipment-doll__accessory--<key>`, added by the realign-inventory-drawer-layout change) | H4 | REMAP-TO-TESTID |
 | `participant-frame`, `participant-portrait-placeholder` + `participant-frame__<suffix>` (`participant-frame__row`, `participant-frame__name`, `participant-frame__group-label`, `img.participant-frame__portrait`) | H3 | REMAP-TO-TESTID |
-| `quest-board` + `quest-board__<suffix>` (`quest-board__abandon`, `quest-board__register`, `quest-board__rankblock`, `quest-board__board-row--<state>`, `quest-board__quest-row--<state>`) | H4 | REMAP-TO-TESTID |
+| `quest-drawer` + `quest-drawer__<suffix>` (`quest-drawer__counter-absent` 任務抽屜內「公會櫃台需在公會職員面前才能辦理」的明示標記, `quest-drawer__counter-unavailable` 攜帶 `services` 面板自身註冊表原因的櫃台不可用標記) (split 後任務抽屜主體 wrapper：容納任務簿與公會櫃台兩個 surface；added by the webclient-quest-drawer-split change) | quest-drawer-split | REMAP-TO-TESTID |
+| `quest-log` + `quest-log__<suffix>` (prefix quest-log__: `quest-log__title`, `quest-log__unavailable`, `quest-log__absent`, `quest-log__empty`, `quest-log__group--<state>`, `quest-log__row--<quest_id>`, `quest-log__quest-state`, `quest-log__issuer`, `quest-log__settlement`, `quest-log__quest-stage`, `quest-log__quest-deadline`, `quest-log__quest-detail`, `quest-log__reward`, `quest-log__track`, `quest-log__untrack`, `quest-log__track-reason`, `quest-log__abandon`, `quest-log__abandon-reason`, `quest-log__abandon-confirm`, `quest-log__abandon-confirm-text`, `quest-log__abandon-confirm-yes`, `quest-log__abandon-confirm-no`, `quest-log__turnin`, `quest-log__turnin-reason`) (任務簿：host 無關的 `quest_log` 面板客戶端面，依狀態分組、逐列標示發布者與結算方式；追蹤控制一律在列，放棄／回報僅在櫃台端同 `quest_id` 列存在時鏡像其描述子；added by the webclient-quest-drawer-split change) | quest-drawer-split | REMAP-TO-TESTID |
+| `guild-counter` + `guild-counter__<suffix>` (prefix guild-counter__: `guild-counter__title`, `guild-counter__unavailable`, `guild-counter__absent`, `guild-counter__registration`, `guild-counter__register`, `guild-counter__register-reason`, `guild-counter__board-row--<definition_key>`, `guild-counter__accept`, `guild-counter__accept-reason`, `guild-counter__rankblock`, `guild-counter__merit`, `guild-counter__exam`, `guild-counter__exam-reason`) (公會櫃台：註冊、任務板接取與等級考核三節；不再列出持有者的任務紀錄——任務簿擁有它們；added by the webclient-quest-drawer-split change) | quest-drawer-split | REMAP-TO-TESTID |
 | `art-panel` + `.art-panel__<suffix>` (`.art-panel__portrait-tile`) | H1 (still mounted) | REMAP-TO-TESTID |
 | `connect-overlay` (the offline/connect overlay in the Vue root) | H1 | REMAP-TO-TESTID |
 | `combat-detail` | H3 | REMAP-TO-TESTID |
@@ -533,6 +535,12 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 ---
 
 ## 6. 修訂記錄
+
+### quest-drawer-split — 2026-09-06（webclient-quest-drawer-split）
+
+- **§2.3 新 families：** `quest-board` 家族退役，改為三個 family——`quest-drawer`（任務抽屜主體 wrapper：抽屜內兩個 quest surface 的穩定鉤點，含 `__counter-absent` 明示「櫃台需職員」標記與 `__counter-unavailable` 攜帶 `services` 註冊表原因的櫃台不可用標記）、`quest-log`（任務簿：host 無關的 `quest_log` 面板客戶端面——依狀態分組的 `__row--<quest_id>` 列、發布者與結算標示、永遠在列的追蹤控制，以及僅在櫃台端同 `quest_id` 列存在時鏡像的放棄／回報控制與兩段式放棄確認）、`guild-counter`（公會櫃台：註冊、任務板接取、等級考核三節；**不再**列出持有者的任務紀錄，任務不會在同一抽屜出現兩次）。
+- **退役：** `QuestBoard.vue`（496 行、單一資料源）連同其 story（`world-questboard--*`）與 `quest_board.test.js` 刪除；`quest-board__*` 識別碼自 §2.3 移除，受管瀏覽器套件的所有引用同步改指新 family。`manifest` 以 `World/QuestLog`、`World/GuildCounter` 取代 `World/QuestBoard`（凍結集 46 → 47）。`世界圖鑑` 按鈕不隨 split 帶回——圖鑑觸發點仍在指令列 `.cmdutil` 的 `command-line-lore`。
+- **§5 完整性聲明維持成立：** 受管瀏覽器套件的每個 `data-testid` 目標皆落入 §2.3 的 `quest-drawer__`、`quest-log__` 或 `guild-counter__` 前綴（或既有條目）；`tests/test_webclient_frozen_contract.py` 的完整清單檢查維持綠燈。
 
 ### lore-codex-drawer — 2026-09-06（webclient-lore-codex-drawer）
 

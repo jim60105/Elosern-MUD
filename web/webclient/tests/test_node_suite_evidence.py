@@ -429,14 +429,14 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
     @covers_requirement(
         "webclient-service-menus::the-quest-browser-exposes-the-tracking-toggle",
     )
-    def test_quest_board_tracking_toggle_node_suite_passes(self):
+    def test_quest_book_tracking_toggle_node_suite_passes(self):
         result = subprocess.run(
             [
                 "npx",
                 "--no-install",
                 "vitest",
                 "run",
-                str(REPO_ROOT / "web/webclient-app/tests/world/quest_board.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_log.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -446,7 +446,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertEqual(
             result.returncode,
             0,
-            "quest-board tracking toggle Vitest evidence failed:\n" + result.stdout + result.stderr,
+            "quest-log tracking toggle Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
 

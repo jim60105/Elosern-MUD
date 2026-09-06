@@ -503,16 +503,15 @@ class PointerServiceAcceptanceTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_services_available(page)
 
-        # H4 (task 9.3): the service UI now renders as a QuestBoard inside
-        # the open reference drawer, not as action-dock rows or a permanent
-        # right-column panel. Opening the quest drawer is the journey's first
-        # step; the register control lives inside the drawer body.
+        # H4 (task 9.3), quest-drawer-split: the service UI renders inside the
+        # open reference drawer — the register control lives in the
+        # GuildCounter surface of the split drawer body.
         page.evaluate(
             "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
             "if (s) s.openHudDrawer('quest'); }"
         )
-        register = page.locator('[data-testid="quest-board__register"]')
-        page.wait_for_selector('[data-testid="quest-board__register"]', timeout=15000)
+        register = page.locator('[data-testid="guild-counter__register"]')
+        page.wait_for_selector('[data-testid="guild-counter__register"]', timeout=15000)
         self.assertEqual(register.count(), 1)
         register.click()
         deadline = time.monotonic() + 20

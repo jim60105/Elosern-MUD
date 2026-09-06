@@ -13,9 +13,7 @@
 - [ ] 1.4 Abandon and turn-in rendered only from a `services.guild.quests` row matching by
   `quest_id`, mirroring that descriptor's enabled state, label, and disabled reason. Never synthesize
   or enable one the counter disabled. Keep the existing two-step abandon confirmation.
-- [ ] 1.5 Delivery control rendered when the exploration affordances carry an `explore.deliver` entry
-  whose recipient is that quest's bound recipient; dispatch the affordance's exact params.
-- [ ] 1.6 Stable `data-testid` on the surface, each row, and each control.
+- [ ] 1.5 Stable `data-testid` on the surface, each row, and each control.
 
 ## 2. GuildCounter.vue
 
