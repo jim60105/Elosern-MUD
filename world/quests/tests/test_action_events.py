@@ -232,24 +232,24 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(stored[0]["quest_id"], record.quest_id)
 
     def test_unsupported_planner_surface_rejects_before_mutation(self):
-        def inventory_planner(request, event_log):
+        def unsnapshotted_planner(request, event_log):
             return [
                 PendingEffect(
                     self.player,
-                    "inventory",
-                    frozenset({"inventory"}),
+                    "unregistered_surface",
+                    frozenset({"unregistered_surface"}),
                     lambda: None,
                 )
             ]
 
-        register_event_effect_planner("inventory", inventory_planner)
+        register_event_effect_planner("unsnapshotted", unsnapshotted_planner)
         try:
             monster = self._monster("inv")
             record, result = self._resolve_lethal(monster)
         finally:
             from world.rules.action import _EVENT_EFFECT_PLANNERS
 
-            _EVENT_EFFECT_PLANNERS.pop("inventory", None)
+            _EVENT_EFFECT_PLANNERS.pop("unsnapshotted", None)
         self.assertEqual(result.reason, RejectReason.UNSNAPSHOTTED_EFFECT_SURFACE)
         self.assertEqual(monster.traits.hp.current, 1)
         stored = self.player.db.quest_log

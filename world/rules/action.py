@@ -188,6 +188,9 @@ SNAPSHOTTED_SURFACES = frozenset(
         "battlefield",
         "quest_log",
         "instance_pin",
+        "wallet",
+        "inventory",
+        "reward_claims",
     }
 )
 _EFFECT_HANDLERS: dict[str, EffectHandler] = {}
@@ -2042,6 +2045,12 @@ def _snapshot_touched(obj: Any, surfaces: frozenset[str]) -> dict[str, Any]:
         snapshot["quest_log"] = _attribute_snapshot(obj, "quest_log")
     if "instance_pin" in surfaces:
         snapshot["instance_pin"] = _attribute_snapshot(obj, "pin_reasons")
+    if "wallet" in surfaces:
+        snapshot["wallet"] = _attribute_snapshot(obj, "wallet")
+    if "inventory" in surfaces:
+        snapshot["inventory"] = _attribute_snapshot(obj, "inventory")
+    if "reward_claims" in surfaces:
+        snapshot["reward_claims"] = _attribute_snapshot(obj, "guild_reward_claims")
     return snapshot
 
 
@@ -2069,6 +2078,12 @@ def _restore_touched(
         _restore_attribute(obj, "quest_log", snapshot["quest_log"])
     if "instance_pin" in surfaces and "instance_pin" in snapshot:
         _restore_attribute(obj, "pin_reasons", snapshot["instance_pin"])
+    if "wallet" in surfaces and "wallet" in snapshot:
+        _restore_attribute(obj, "wallet", snapshot["wallet"])
+    if "inventory" in surfaces and "inventory" in snapshot:
+        _restore_attribute(obj, "inventory", snapshot["inventory"])
+    if "reward_claims" in surfaces and "reward_claims" in snapshot:
+        _restore_attribute(obj, "guild_reward_claims", snapshot["reward_claims"])
 
 
 def _restore_touched_best_effort(

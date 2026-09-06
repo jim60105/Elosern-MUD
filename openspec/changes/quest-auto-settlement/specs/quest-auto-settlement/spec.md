@@ -64,6 +64,16 @@ restoring every snapshotted surface.
 - **THEN** the quest log, wallet, inventory, reward claims, and their in-process caches all equal
   their pre-transition values
 
+#### Scenario: A settlement reward completes another active ACQUIRE quest
+- **WHEN** a completing automatic quest's item rewards satisfy another active ACQUIRE objective
+- **THEN** that quest completes in the same transaction and its own automatic reward settles with
+  it, exactly as a counter-paid reward item would advance the objective
+
+#### Scenario: A counter reward completing an automatic quest keeps both claims
+- **WHEN** a counter turn-in's reward items complete an active ACQUIRE quest under an automatic
+  issuance
+- **THEN** both quest IDs appear exactly once in the shared ledger and both rewards are paid
+
 ### Requirement: Automatic settlement never grants merit and never needs a host
 
 Automatic settlement SHALL pay only copper and items. It SHALL NOT write guild merit, SHALL NOT

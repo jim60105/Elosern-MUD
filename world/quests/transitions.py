@@ -232,26 +232,59 @@ def apply_quest_log_replacement(
     new_records: list[Any],
     pin_operations: Iterable[tuple[Any, tuple[str, ...], tuple[str, ...]]] = (),
 ) -> None:
-    """Replace one quest log and apply a pin delta atomically with restore."""
+    """Replace one quest log and apply a pin delta atomically with restore.
+
+    Records that just reached COMPLETED under an ``AUTO`` issuance settle
+    inside the same transaction (quest-auto-settlement): the plan is computed
+    against the pre-write state, the reward surfaces join the snapshot/restore
+    set only when the plan pays, and the ACQUIRE completions the paid items
+    trigger are written as a follow-up replacement in the same
+    ``transaction.atomic()`` block.
+    """
+    from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
     from world.quests.runtime import to_storage
+    from world.quests.settlement import commit_auto_settlement, plan_auto_settlement_chain
 
     pin_operations = tuple(pin_operations)
+    old_entries = list(actor.db.quest_log or [])
+    plan = plan_auto_settlement_chain(actor, old_entries, new_records)
     actor_snapshot = snapshot_quest_log(actor)
     room_snapshots = {
         id(room): snapshot_pin_reasons(room) for room, _, _ in pin_operations
     }
-    old_entries: list[Any] = []
+    settlement_snapshots = [
+        (key, attribute_snapshot(actor, key))
+        for key in ("wallet", "inventory", "guild_reward_claims")
+    ] if plan.entries else []
+    settlement_pin_snapshots = [
+        (room, snapshot_pin_reasons(room)) for room, _, _ in plan.chain_pins
+    ]
     try:
         with transaction.atomic():
-            old_entries = list(actor.db.quest_log or [])
             actor.db.quest_log = [to_storage(record) for record in new_records]
             _apply_pin_operations(pin_operations)
+            commit_auto_settlement(actor, plan)
+            if plan.chain_records is not None:
+                actor.db.quest_log = [
+                    to_storage(record) for record in plan.chain_records
+                ]
+                _apply_pin_operations(plan.chain_pins)
     except Exception:
         restore_quest_log(actor, actor_snapshot)
         for room, _, _ in pin_operations:
             restore_pin_reasons(room, room_snapshots[id(room)])
+        for key, snapshot in settlement_snapshots:
+            restore_attribute_best_effort(actor, key, snapshot)
+        for room, snapshot in settlement_pin_snapshots:
+            restore_pin_reasons(room, snapshot)
         raise
     _schedule_transition_events(actor, old_entries, new_records)
+    if plan.chain_records is not None:
+        _schedule_transition_events(
+            actor,
+            [to_storage(record) for record in new_records],
+            list(plan.chain_records),
+        )
 
 
 def apply_quest_log_delta(
@@ -266,13 +299,43 @@ def apply_quest_log_delta(
     purchase) has already snapshotted every surface it owns and will restore
     them together on failure. Callers must pass this only between their own
     ``transaction.atomic()`` enter and exit.
+
+    Caller contract (quest-auto-settlement): a record completing under an
+    ``AUTO`` issuance settles inside this call, so the caller's snapshot set
+    MUST also cover the actor's ``wallet``, ``inventory``, and
+    ``guild_reward_claims``, and a raise from this function must abort the
+    whole surrounding operation. The ACQUIRE completions the paid items
+    trigger release stage pins on rooms the caller cannot know; those rooms
+    are snapshotted and restored here.
     """
+    from world.quests.settlement import commit_auto_settlement, plan_auto_settlement_chain
     from world.quests.runtime import to_storage
 
     old_entries = list(actor.db.quest_log or [])
+    plan = plan_auto_settlement_chain(actor, old_entries, new_records)
+    settlement_pin_snapshots = [
+        (room, snapshot_pin_reasons(room)) for room, _, _ in plan.chain_pins
+    ]
     actor.db.quest_log = [to_storage(record) for record in new_records]
     _apply_pin_operations(pin_operations)
+    try:
+        commit_auto_settlement(actor, plan)
+        if plan.chain_records is not None:
+            actor.db.quest_log = [
+                to_storage(record) for record in plan.chain_records
+            ]
+            _apply_pin_operations(plan.chain_pins)
+    except Exception:
+        for room, snapshot in settlement_pin_snapshots:
+            restore_pin_reasons(room, snapshot)
+        raise
     _schedule_transition_events(actor, old_entries, new_records)
+    if plan.chain_records is not None:
+        _schedule_transition_events(
+            actor,
+            [to_storage(record) for record in new_records],
+            list(plan.chain_records),
+        )
 
 
 def pending_effects_for_transition(
@@ -283,13 +346,28 @@ def pending_effects_for_transition(
     """Expose a computed transition as action ``PendingEffect`` values.
 
     Produces one ``quest_log`` effect for ``actor`` and one ``instance_pin``
-    effect per touched room so ``ActionResolver`` can commit them atomically
-    with the originating action's own effects (D-4/D-6).
+    effect per touched room — plus, when the transition completes quests
+    under an ``AUTO`` issuance, one settlement effect carrying the wallet,
+    inventory, and reward-claim writes — so ``ActionResolver`` commits them
+    atomically with the originating action's own effects (D-4/D-6). The
+    settlement's ACQUIRE chain is folded into the quest-log and pin effects
+    at planning time, so the resolver writes the final record state exactly
+    once.
     """
+    from world.quests.settlement import (
+        plan_auto_settlement_chain,
+        settlement_pending_effect,
+    )
     from world.quests.runtime import to_storage
     from world.rules.action import PendingEffect
 
     pin_operations = tuple(pin_operations)
+    old_entries = list(actor.db.quest_log or [])
+    plan = plan_auto_settlement_chain(actor, old_entries, new_records)
+    final_records = (
+        list(new_records) if plan.chain_records is None else list(plan.chain_records)
+    )
+    merged_pins = [*pin_operations, *plan.chain_pins]
 
     def _apply_quest_log(actor: Any, records: list[Any]) -> None:
         """Write the log and schedule its diff at APPLY time (inside commit)."""
@@ -302,10 +380,10 @@ def pending_effects_for_transition(
             actor,
             f"quest_log|{actor.pk}",
             frozenset({"quest_log"}),
-            lambda actor=actor, records=new_records: _apply_quest_log(actor, records),
+            lambda actor=actor, records=final_records: _apply_quest_log(actor, records),
         )
     ]
-    for room, adds, removes in pin_operations:
+    for room, adds, removes in merged_pins:
         effects.append(
             PendingEffect(
                 room,
@@ -316,4 +394,7 @@ def pending_effects_for_transition(
                 ),
             )
         )
+    settlement_effect = settlement_pending_effect(actor, plan)
+    if settlement_effect is not None:
+        effects.append(settlement_effect)
     return effects

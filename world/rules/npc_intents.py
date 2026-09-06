@@ -34,7 +34,7 @@ from world.rules.surfaces import (
 # deterministic capability surface.
 _FORWARD_DECLARED_KINDS: tuple[str, ...] = ()
 
-_INVENTORY_SURFACE_KEYS = ("inventory", "quest_log")
+_INVENTORY_SURFACE_KEYS = ("inventory", "quest_log", "wallet", "guild_reward_claims")
 
 _MAX_RELATION_DELTA = 10
 

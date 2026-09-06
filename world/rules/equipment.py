@@ -164,9 +164,17 @@ def plan_inventory_delta(
 
 
 def apply_inventory_plan(plan: InventoryPlan) -> None:
-    """Commit one plan's inventory write and ACQUIRE quest delta atomically."""
+    """Commit one plan's inventory write and ACQUIRE quest delta atomically.
+
+    The snapshot set covers ``wallet`` and ``guild_reward_claims`` alongside
+    the plan's own surfaces: a completing record under an ``AUTO`` issuance
+    settles inside the nested quest-log delta (quest-auto-settlement caller
+    contract), so a failure restores the settlement's payout too.
+    """
     entity = plan.entity
     inventory_snapshot = attribute_snapshot(entity, "inventory")
+    wallet_snapshot = attribute_snapshot(entity, "wallet")
+    claims_snapshot = attribute_snapshot(entity, "guild_reward_claims")
     trait_snapshot = snapshot_traits(entity)
     quest_snapshot = attribute_snapshot(entity, "quest_log")
     pin_snapshots = {}
@@ -183,6 +191,8 @@ def apply_inventory_plan(plan: InventoryPlan) -> None:
         from world.rules.surfaces import restore_attribute_best_effort
 
         restore_attribute_best_effort(entity, "inventory", inventory_snapshot)
+        restore_attribute_best_effort(entity, "wallet", wallet_snapshot)
+        restore_attribute_best_effort(entity, "guild_reward_claims", claims_snapshot)
         restore_traits(entity, trait_snapshot)
         restore_attribute_best_effort(entity, "quest_log", quest_snapshot)
         from world.quests.transitions import restore_pin_reasons
