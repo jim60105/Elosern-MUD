@@ -627,7 +627,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 # tab bar, and Enter on `move` pushes the move submenu whose
                 # only row is the disabled `move-empty` item.
                 "exploration": {
-                    "schema_version": 1,
+                    "schema_version": 2,
                     "available": True,
                     "kind": "exploration",
                     "move": [],

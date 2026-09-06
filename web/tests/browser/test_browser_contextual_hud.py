@@ -62,7 +62,7 @@ def _move_row(exit_ref: str, label: str, destination: str, enabled: bool = True)
 def _exploration_panel(interact_targets: list, move_rows: list | None = None) -> dict:
     """A schema-valid available exploration panel."""
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
         "kind": "exploration",
         "move": move_rows or [],

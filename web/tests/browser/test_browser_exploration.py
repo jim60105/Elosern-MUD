@@ -1024,7 +1024,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         """A schema-valid available exploration panel carrying exactly the
         named rows — the fabricated room a real commit would produce."""
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "available": True,
             "kind": "exploration",
             "move": list(move),
@@ -1234,7 +1234,7 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         withdrawn = "這片區域暫時無法操作"
         accepted = self._inject_panels(page, {
             "exploration": {
-                "schema_version": 1,
+                "schema_version": 2,
                 "available": False,
                 "reason": {"code": "exploration.unavailable", "message": withdrawn},
             },
