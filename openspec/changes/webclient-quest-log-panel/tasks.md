@@ -11,9 +11,11 @@
 - [x] 1.3 `issuer`: parse the record's stored issuer key for `kind` and `key`; derive `label` from
   the guild branch registry for a `guild:` key and from the resolved commissioner for an `npc:` key,
   truncated to the shared display-name bound. A label that cannot be resolved falls back to the key's
-  remainder rather than inventing a name.
+  remainder rather than inventing a name. The validator re-parses the key with the canonical grammar
+  and rejects a `kind` that contradicts the namespace.
 - [x] 1.4 `settlement` and `reward_line` from `resolve_issuance`; an unresolvable issuance yields
-  `reward_line` null and `settlement` null, and the row still renders every other field.
+  `reward_line` null and `settlement` null (null together or present together, enforced by both
+  validators), and the row still renders every other field.
   `reward_line` uses `describe_reward`.
 - [x] 1.5 `track`: the `guild.quest_track` descriptor, always enabled — the action is
   host-independent by contract.
@@ -23,8 +25,9 @@
 ## 2. Validator
 
 - [x] 2.1 Exact-shape validator: the panel key set, the row key set, per-field code-point bounds, the
-  bounded `state` vocabulary and the nullable bounded `settlement` vocabulary, non-negative
-  integers, the twelve-row cap, and unique `quest_id` values.
+  bounded `state` vocabulary and the nullable bounded `settlement` vocabulary, the settlement/
+  reward_line null-pair coherence, the issuer-key grammar with kind/namespace coherence,
+  non-negative integers, the twelve-row cap, and unique `quest_id` values.
 - [x] 2.2 Close with the shared `MAX_CANONICAL_JSON_BYTES` envelope guard, failing closed.
 - [x] 2.3 Reject lone surrogates in every string field, following the party and objectives panel
   precedent.

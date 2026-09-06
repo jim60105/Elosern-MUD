@@ -70,6 +70,7 @@ from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.runtime import QuestDataError, read_records
 from world.rules.clock import read_world_clock
 from world.rules.quest_issuance import (
+    IssuerKeyError,
     MAX_ISSUER_KEY_LENGTH,
     Settlement,
     parse_issuer_key,
@@ -161,6 +162,12 @@ def _validate_issuer(value: Any) -> dict[str, Any]:
         "issuer key",
         MAX_ISSUER_KEY_LENGTH,
     )
+    try:
+        parsed = parse_issuer_key(key)
+    except IssuerKeyError as error:
+        raise QuestLogPanelError(f"issuer key is not grammar-valid: {error}") from error
+    if parsed.namespace != kind:
+        raise QuestLogPanelError("issuer kind must match the key namespace")
     label = _bounded_line(
         _require_str(value, "label", maximum=MAX_DISPLAY_NAME_CODE_POINTS),
         "issuer label",
@@ -274,6 +281,13 @@ def _validate_row(value: Any) -> dict[str, Any]:
             _require_str(value, "reward_line", maximum=MAX_SUMMARY_CODE_POINTS),
             "reward_line",
             MAX_SUMMARY_CODE_POINTS,
+        )
+    # Commission coherence: a resolvable issuance carries both its settlement
+    # and its reward line; an unresolvable one discloses neither. A payload
+    # pairing one null with one present can only come from a producer bug.
+    if (settlement is None) != (reward_line is None):
+        raise QuestLogPanelError(
+            "settlement and reward_line must be null together or present together"
         )
     track = _validate_track(value["track"])
     return {

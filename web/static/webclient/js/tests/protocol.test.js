@@ -5748,6 +5748,25 @@ test("quest_log validator mirrors the server drift rejections", () => {
     validQuestLogPanel([
       validQuestLogRow({ issuer: { kind: "npc", key: "npc:grey_granny" } }),
     ]),
+    // malformed or kind-incoherent issuer keys
+    validQuestLogPanel([
+      validQuestLogRow({ issuer: Object.assign(validQuestLogRow().issuer, { key: "not-an-issuer" }) }),
+    ]),
+    validQuestLogPanel([
+      validQuestLogRow({ issuer: Object.assign(validQuestLogRow().issuer, { key: "guild:a:b" }) }),
+    ]),
+    validQuestLogPanel([
+      validQuestLogRow({ issuer: Object.assign(validQuestLogRow().issuer, { kind: "npc", key: "guild:guild_branch_altoria" }) }),
+    ]),
+    validQuestLogPanel([
+      validQuestLogRow({ issuer: Object.assign(validQuestLogRow().issuer, { kind: "guild", key: "npc:grey_granny" }) }),
+    ]),
+    validQuestLogPanel([
+      validQuestLogRow({ issuer: Object.assign(validQuestLogRow().issuer, { kind: "npc", key: "npc:#0" }) }),
+    ]),
+    // settlement and reward_line must be null together
+    validQuestLogPanel([validQuestLogRow({ settlement: null })]),
+    validQuestLogPanel([validQuestLogRow({ reward_line: null })]),
     // track descriptor drift
     validQuestLogPanel([
       validQuestLogRow({ track: Object.assign(validQuestLogRow().track, { action_id: "shop.buy" }) }),

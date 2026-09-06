@@ -32,9 +32,11 @@ all, so a host-gated read model cannot show them.
 - Registry registration plus a coordinator dirty-flag push on the existing quest-log mutation seams.
 - Client-side validator mirroring the exact Python bounds, covered by the existing dual-direction
   parity test.
-- The `objectives` panel is deliberately left unchanged. It serves the HUD tracker island with
-  different bounds (three tracked in-progress rows) and a different lifecycle; both derive from the
-  same describe seams, so the duplication cannot drift.
+- The `objectives` panel's schema and row-selection semantics are deliberately left unchanged. It
+  serves the HUD tracker island with different bounds (three tracked in-progress rows) and a
+  different lifecycle; both derive from the same describe seams, so the duplication cannot drift.
+  Its publication on the trade seams is intentionally widened in this change (with `quest_log`) so
+  an ACQUIRE quest completed by a buy or sell cannot leave the tracker island stale.
 
 ## Capabilities
 

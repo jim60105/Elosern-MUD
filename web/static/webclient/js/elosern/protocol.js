@@ -4702,12 +4702,36 @@
     if (value.kind !== "guild" && value.kind !== "npc") {
       throw new Error(name + " issuer kind must be guild or npc");
     }
-    validateQuestLogBoundedLine(
+    var issuerKey = validateQuestLogBoundedLine(
       value.key,
       name,
       "issuer key",
       QUEST_LOG_MAX_ISSUER_KEY
     );
+    // Closed issuer-key grammar (mirror of world.rules.quest_issuance
+    // parse_issuer_key): exactly one ':' separator, a guild or npc
+    // namespace, and an npc remainder that is '#<positive digits>' or a
+    // non-digit-only content key. The declared kind must match the
+    // namespace, so a producer bug cannot ship a contradictory identity.
+    var separator = issuerKey.indexOf(":");
+    var namespace = separator === -1 ? null : issuerKey.slice(0, separator);
+    var remainder = separator === -1 ? null : issuerKey.slice(separator + 1);
+    if (
+      separator === -1 ||
+      issuerKey.indexOf(":", separator + 1) !== -1 ||
+      namespace !== value.kind ||
+      !remainder
+    ) {
+      throw new Error(name + " issuer key is not grammar-valid");
+    }
+    if (namespace === "npc" && remainder.charAt(0) === "#") {
+      var pk = remainder.slice(1);
+      if (!/^[0-9]+$/.test(pk) || parseInt(pk, 10) <= 0) {
+        throw new Error(name + " npc issuer key must carry a positive pk");
+      }
+    } else if (namespace === "npc" && /^[0-9]+$/.test(remainder)) {
+      throw new Error(name + " authored npc issuer key cannot be digit-only");
+    }
     validateQuestLogBoundedLine(
       value.label,
       name,
@@ -4826,6 +4850,13 @@
         name,
         "reward_line",
         QUEST_LOG_MAX_REWARD_LINE
+      );
+    }
+    // Commission coherence (mirror of the Python validator): the settlement
+    // and the reward line are null together or present together.
+    if ((value.settlement === null) !== (value.reward_line === null)) {
+      throw new Error(
+        name + " settlement and reward_line must be null together or present together"
       );
     }
     validateQuestLogTrack(value.track, name);

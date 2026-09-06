@@ -72,6 +72,19 @@ commission terms the record's governing issuance carries — these coincide in e
 can currently produce (one branch, registration never transfers), and any future branch-transfer
 feature must reconcile the turn-in payment, the counter rows, and this panel together.
 
+### D6: Push coverage beyond the affected-panel tuples
+
+The affected-panel tuples (accept, abandon, turn-in, track, and the trade surfaces) plus the
+combat-round `AFFECTED_PANELS` are the targeted publications. Every other quest-log mutation seam —
+stage advance on movement and engagement, deadline settlement on `explore.wait`, dialogue and NPC
+intent acceptance, inventory actions, and ordinary text-command settlement — publishes through the
+existing full-snapshot path, which re-renders every registered panel including `quest_log`. The
+same split covers `objectives` after this change, so neither quest surface can lag the other.
+
+The `npc:#<pk>` label resolution performs one bounded database read per row per panel build (at
+most twelve on a combat-round republish). This is accepted for correctness first; a request-local
+lookup cache is the first optimization if profiling ever shows the cost.
+
 ## Risks / Trade-offs
 
 - **`objectives` and `quest_log` overlap** → Accepted and deliberate. Both derive from the same

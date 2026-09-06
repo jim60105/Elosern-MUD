@@ -400,6 +400,22 @@ class QuestLogPresenterTests(EvenniaTest):
         self.player.creation_pending = True
         self.assertEqual(self._render(), UNAVAILABLE_PAYLOAD)
 
+    def test_possessed_puppet_renders_the_owner_records(self):
+        definition = register(quest("possessed_owner_quest"))
+        record = accept_under_auto(self.player, definition)
+        npc = create_object(NPC, key="possessed scout", location=self.room)
+        npc.db.possessed_by = self.player.pk
+        self.player.db.possession = {"npc_dbid": npc.pk, "since_tick": TICK}
+
+        payload = self.registry.render(
+            "quest_log", PresentationContext(actor=npc, protocol_version=1)
+        )
+
+        self.assertTrue(payload["available"])
+        self.assertEqual(
+            [row["quest_id"] for row in payload["rows"]], [record.quest_id]
+        )
+
     def test_completed_record_renders_with_the_terminal_state(self):
         definition = register(
             QuestDefinition(
@@ -531,6 +547,16 @@ class QuestLogValidatorTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_quest_log(self._valid_payload(rows=[self._valid_row(settlement="later")]))
 
+    def test_settlement_and_reward_line_must_be_null_together(self):
+        with self.assertRaises(ProtocolValidationError):
+            validate_quest_log(
+                self._valid_payload(rows=[self._valid_row(settlement=None)])
+            )
+        with self.assertRaises(ProtocolValidationError):
+            validate_quest_log(
+                self._valid_payload(rows=[self._valid_row(reward_line=None)])
+            )
+
     def test_negative_or_bad_type_numbers_are_rejected(self):
         for field in ("stage_index", "stage_progress"):
             with self.assertRaises(ProtocolValidationError):
@@ -580,6 +606,35 @@ class QuestLogValidatorTests(unittest.TestCase):
             validate_quest_log(
                 self._valid_payload(rows=[self._valid_row(issuer={**issuer, "label": ""})])
             )
+
+    def test_issuer_key_grammar_and_kind_coherence_are_enforced(self):
+        issuer = self._valid_row()["issuer"]
+        # A malformed key rejects even though its kind is a legal namespace.
+        with self.assertRaises(ProtocolValidationError):
+            validate_quest_log(
+                self._valid_payload(rows=[self._valid_row(issuer={**issuer, "key": "not-an-issuer"})])
+            )
+        with self.assertRaises(ProtocolValidationError):
+            validate_quest_log(
+                self._valid_payload(rows=[self._valid_row(issuer={**issuer, "key": "guild:a:b"})])
+            )
+        # A grammar-valid key under the wrong declared kind rejects.
+        with self.assertRaises(ProtocolValidationError):
+            validate_quest_log(
+                self._valid_payload(rows=[self._valid_row(issuer={**issuer, "kind": "npc", "key": f"guild:{ALTORIA_BRANCH}"})])
+            )
+        with self.assertRaises(ProtocolValidationError):
+            validate_quest_log(
+                self._valid_payload(rows=[self._valid_row(issuer={**issuer, "kind": "guild", "key": "npc:grey_granny"})])
+            )
+        # Every valid form passes: guild, authored npc, and pk npc.
+        for kind, key in (
+            ("guild", f"guild:{ALTORIA_BRANCH}"),
+            ("npc", "npc:grey_granny"),
+            ("npc", "npc:#1234"),
+        ):
+            row = self._valid_row(issuer={**issuer, "kind": kind, "key": key})
+            self.assertEqual(validate_quest_log(self._valid_payload(rows=[row])), self._valid_payload(rows=[row]))
 
     def test_track_descriptor_is_pinned_enabled_without_bounds(self):
         track = self._valid_row()["track"]
