@@ -53,7 +53,7 @@ const props = defineProps({
   completionCandidates: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(["submit", "focus-parent", "open-overlay", "focus-lost"]);
+const emit = defineEmits(["submit", "focus-parent", "open-overlay", "open-drawer", "focus-lost"]);
 
 const field = ref(null);
 const draft = ref("");
@@ -354,6 +354,14 @@ function onOpenOverlay(name) {
   emit("open-overlay", name);
 }
 
+function onOpenDrawer(name) {
+  // The utility strip's world-codex control (webclient-lore-codex-drawer):
+  // the strip's first drawer-opening control — the codex is a reference
+  // drawer, not an overlay, and opens through the store's single
+  // open-drawer entry point (openHudDrawer) in the app host.
+  emit("open-drawer", name);
+}
+
 // The borrowed free-form dialogue release rule (design D6): the borrow is
 // released whenever focus leaves the field for any reason other than that
 // dock's own successful send — the parent clears the pending freeform
@@ -433,6 +441,19 @@ defineExpose({ focusField, insertText });
             <circle cx="5.5" cy="18.5" r="2.2" />
             <circle cx="18.5" cy="18.5" r="2.2" />
             <path d="M12 7.2v4.3M12 11.5 6.6 16.6M12 11.5l5.4 5.1" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="cmdutil__btn"
+          aria-label="圖鑑"
+          data-testid="command-line-lore"
+          @click="onOpenDrawer('lore')"
+        >
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="12" r="8.5" />
+            <ellipse cx="12" cy="12" rx="3.8" ry="8.5" />
+            <path d="M3.5 12h17" stroke-linecap="round" />
           </svg>
         </button>
         <button

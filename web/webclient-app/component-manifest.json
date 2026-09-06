@@ -33,7 +33,7 @@
     "World/ArtPanel",
     "World/ShopPanel",
     "World/QuestBoard",
-    "World/LoreDrawer",
+    "World/LoreCodexDrawer",
     "World/InventoryPanel",
     "World/MapLattice",
     "Overlays/MapOverlay",

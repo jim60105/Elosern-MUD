@@ -178,7 +178,7 @@ class VueShowcaseActionEvidenceTest(unittest.TestCase):
                 "Data/ConditionChips", "Data/ParticipantFrame",
                 "Data/EquipmentDoll", "Data/CharacterStatusDrawer",
                 "World/LocalMap", "World/ArtPanel", "World/ShopPanel",
-                "World/QuestBoard", "World/LoreDrawer", "World/InventoryPanel",
+                "World/QuestBoard", "World/LoreCodexDrawer", "World/InventoryPanel",
                 "World/MapLattice",
                 "Overlays/CreationOverlay", "Overlays/HelpOverlay",
                 "Overlays/MapOverlay", "Overlays/SettingsOverlay",

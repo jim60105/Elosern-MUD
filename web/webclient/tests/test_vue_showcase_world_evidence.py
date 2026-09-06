@@ -54,7 +54,7 @@ WORLD_FAMILY_KEYS = (
     "World/ArtPanel",
     "World/ShopPanel",
     "World/QuestBoard",
-    "World/LoreDrawer",
+    "World/LoreCodexDrawer",
     "World/InventoryPanel",
     "World/MapLattice",
 )
@@ -80,9 +80,11 @@ WORLD_FAMILY_STORY_IDS = {
     "world-maplattice--overlay-scale-sample",
     "world-maplattice--overlay-scale-wilderness",
     "world-maplattice--overlay-scale-minimal",
-    "world-loredrawer--bare",
-    "world-loredrawer--full-lore",
-    "world-loredrawer--section-unavailable",
+    "world-lorecodexdrawer--populated-codex",
+    "world-lorecodexdrawer--category-selected",
+    "world-lorecodexdrawer--entry-selected",
+    "world-lorecodexdrawer--empty-codex",
+    "world-lorecodexdrawer--unavailable",
     "world-questboard--full-guild",
     "world-questboard--no-guild",
     "world-questboard--section-unavailable",
@@ -196,7 +198,7 @@ class VueShowcaseWorldEvidenceTest(unittest.TestCase):
         with legend and detail line plus the actionable adjacent nodes, the
         art 16:9 cover plus truthful placeholder, the shop stock/sellable
         and equipped-only inventory, the guild board/quest-detail board, and
-        the services-backed lore drawer — each asserted only from the mock
+        the committed-panel codex drawer — each asserted only from the mock
         payloads (no invented bag or party panel).
         """
         result = run_npm(["test", "--", "world"], timeout=600)
@@ -286,7 +288,7 @@ class VueShowcaseWorldEvidenceTest(unittest.TestCase):
             family_titles,
             {f"World/{component}" for component in (
                 "LocalMap", "ArtPanel", "ShopPanel",
-                "QuestBoard", "LoreDrawer", "InventoryPanel",
+                "QuestBoard", "LoreCodexDrawer", "InventoryPanel",
                 "MapLattice",
             )},
         )

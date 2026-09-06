@@ -45,7 +45,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     inventory: "inventory-panel",
     shop: "shop-panel",
     quest: "quest-board",
-    lore: "lore-drawer",
+    lore: "lore-codex-drawer",
     status: "character-status-drawer",
     party: "party-drawer",
   };
