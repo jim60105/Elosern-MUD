@@ -375,6 +375,24 @@
   var OBJECTIVES_MAX_OBJECTIVE_LINE = 128;
   var OBJECTIVES_MAX_DEADLINE_LINE = 64;
 
+  // Quest log panel bounds (mirror of web.webclient.presentation.quest_log,
+  // quest-issuer-model change 8): at most MAX_QUEST_ROWS rows (the shared
+  // services quest-row cap) of the holder's stored records. The row cap and
+  // prose ceilings are shared with the server through a dual-direction
+  // parity contract.
+  var QUEST_LOG_SCHEMA_VERSION = 1;
+  var QUEST_LOG_MAX_ROWS = 12;
+  var QUEST_LOG_MAX_QUEST_ID = 64;
+  var QUEST_LOG_MAX_KEY = 64;
+  var QUEST_LOG_MAX_DISPLAY_NAME = 128;
+  var QUEST_LOG_MAX_ISSUER_KEY = 64;
+  var QUEST_LOG_MAX_LABEL = 128;
+  var QUEST_LOG_MAX_OBJECTIVE_LINE = 128;
+  var QUEST_LOG_MAX_DEADLINE_LINE = 64;
+  var QUEST_LOG_MAX_DETAIL = 512;
+  var QUEST_LOG_MAX_REWARD_LINE = 128;
+  var QUEST_LOG_MAX_TRACK_LABEL = 64;
+
   // Dialogue panel bounds (mirror of web.webclient.presentation.dialogue,
   // webclient-align-10): the choice cap mirrors MAX_SCRIPTED_KEYWORDS, the
   // keyword bounds mirror the exploration keyword vocabulary, and the line
@@ -421,6 +439,7 @@
     roster: 1,
     possession_banner: 1,
     lore_codex: 1,
+    quest_log: 1,
   };
 
   var EPOCH_RE = /^[A-Za-z0-9_-]{22}$/;
@@ -4662,6 +4681,202 @@
     return result;
   }
 
+  // Quest log panel validator (mirror of
+  // web.webclient.presentation.quest_log, quest-issuer-model change 8). At
+  // most MAX_QUEST_ROWS stored records in quest-log order; settlement and
+  // reward_line are null when the record's issuance can no longer be
+  // resolved; same surrogate guards as the party and objectives mirrors.
+  var QUEST_LOG_STATES = ["in_progress", "completed", "failed"];
+  var QUEST_LOG_SETTLEMENTS = ["counter", "auto"];
+
+  function validateQuestLogBoundedLine(value, name, field, maximum) {
+    var line = requireString(value, field, maximum);
+    if (!line.trim() || hasLoneSurrogate(line)) {
+      throw new Error(name + " " + field + " must be non-empty");
+    }
+    return line;
+  }
+
+  function validateQuestLogIssuer(value, name) {
+    requireExactFields(value, name + " issuer", ["kind", "key", "label"], []);
+    if (value.kind !== "guild" && value.kind !== "npc") {
+      throw new Error(name + " issuer kind must be guild or npc");
+    }
+    validateQuestLogBoundedLine(
+      value.key,
+      name,
+      "issuer key",
+      QUEST_LOG_MAX_ISSUER_KEY
+    );
+    validateQuestLogBoundedLine(
+      value.label,
+      name,
+      "issuer label",
+      QUEST_LOG_MAX_LABEL
+    );
+    return value;
+  }
+
+  function validateQuestLogTrack(value, name) {
+    requireExactFields(
+      value,
+      name + " track descriptor",
+      ["action_id", "label", "enabled", "disabled_reason", "quantity"],
+      []
+    );
+    if (value.action_id !== "guild.quest_track") {
+      throw new Error(name + " track must be guild.quest_track");
+    }
+    validateQuestLogBoundedLine(
+      value.label,
+      name,
+      "track label",
+      QUEST_LOG_MAX_TRACK_LABEL
+    );
+    if (value.enabled !== true) {
+      throw new Error(name + " track is always enabled");
+    }
+    if (value.disabled_reason !== null) {
+      throw new Error(name + " enabled track must not carry a disabled_reason");
+    }
+    if (value.quantity !== null) {
+      throw new Error(name + " track must not carry quantity bounds");
+    }
+    return value;
+  }
+
+  function validateQuestLogRow(value, index) {
+    var name = "quest_log row " + index;
+    requireExactFields(
+      value,
+      name,
+      [
+        "quest_id",
+        "definition_key",
+        "display_name",
+        "state",
+        "stage_index",
+        "stage_total",
+        "stage_progress",
+        "objective_quantity",
+        "objective_line",
+        "deadline_line",
+        "detail",
+        "tracked",
+        "issuer",
+        "settlement",
+        "reward_line",
+        "track",
+      ],
+      []
+    );
+    validateQuestLogBoundedLine(
+      value.quest_id,
+      name,
+      "quest_id",
+      QUEST_LOG_MAX_QUEST_ID
+    );
+    validateQuestLogBoundedLine(
+      value.definition_key,
+      name,
+      "definition_key",
+      QUEST_LOG_MAX_KEY
+    );
+    validateQuestLogBoundedLine(
+      value.display_name,
+      name,
+      "display_name",
+      QUEST_LOG_MAX_DISPLAY_NAME
+    );
+    if (QUEST_LOG_STATES.indexOf(value.state) === -1) {
+      throw new Error(name + " state is not a stable value");
+    }
+    requireInt(value.stage_index, "stage_index", 0, MAX_SAFE_INTEGER);
+    requireInt(value.stage_total, "stage_total", 1, MAX_SAFE_INTEGER);
+    requireInt(value.stage_progress, "stage_progress", 0, MAX_SAFE_INTEGER);
+    requireInt(value.objective_quantity, "objective_quantity", 1, MAX_SAFE_INTEGER);
+    validateQuestLogBoundedLine(
+      value.objective_line,
+      name,
+      "objective_line",
+      QUEST_LOG_MAX_OBJECTIVE_LINE
+    );
+    if (value.deadline_line !== null) {
+      validateQuestLogBoundedLine(
+        value.deadline_line,
+        name,
+        "deadline_line",
+        QUEST_LOG_MAX_DEADLINE_LINE
+      );
+    }
+    validateQuestLogBoundedLine(value.detail, name, "detail", QUEST_LOG_MAX_DETAIL);
+    if (typeof value.tracked !== "boolean") {
+      throw new Error(name + " tracked must be a boolean");
+    }
+    validateQuestLogIssuer(value.issuer, name);
+    if (
+      value.settlement !== null &&
+      QUEST_LOG_SETTLEMENTS.indexOf(value.settlement) === -1
+    ) {
+      throw new Error(name + " settlement is not a stable value");
+    }
+    if (value.reward_line !== null) {
+      validateQuestLogBoundedLine(
+        value.reward_line,
+        name,
+        "reward_line",
+        QUEST_LOG_MAX_REWARD_LINE
+      );
+    }
+    validateQuestLogTrack(value.track, name);
+    return value;
+  }
+
+  function validateQuestLogPanel(payload) {
+    requireExactFields(
+      payload,
+      "quest_log panel",
+      ["schema_version", "available", "rows"],
+      []
+    );
+    requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
+    if (payload.schema_version !== QUEST_LOG_SCHEMA_VERSION) {
+      throw new Error("unsupported quest_log schema_version");
+    }
+    if (payload.available !== true) {
+      throw new Error("quest_log panel must be available");
+    }
+    var rows = payload.rows;
+    if (!Array.isArray(rows)) {
+      throw new Error("quest_log rows must be a list");
+    }
+    if (rows.length > QUEST_LOG_MAX_ROWS) {
+      throw new Error(
+        "quest_log rows must hold at most " + QUEST_LOG_MAX_ROWS + " entries"
+      );
+    }
+    var normalized = [];
+    var seen = {};
+    for (var i = 0; i < rows.length; i++) {
+      var row = validateQuestLogRow(rows[i], i + 1);
+      if (Object.prototype.hasOwnProperty.call(seen, row.quest_id)) {
+        throw new Error("quest_log quest_ids must be unique");
+      }
+      seen[row.quest_id] = true;
+      normalized.push(row);
+    }
+    var result = {
+      schema_version: QUEST_LOG_SCHEMA_VERSION,
+      available: true,
+      rows: normalized,
+    };
+    // Envelope guarantee mirrors the Python validator's closing check.
+    if (jsonByteSize(result) > MAX_CANONICAL_JSON_BYTES) {
+      throw new Error("quest_log payload exceeds the OOB envelope limit");
+    }
+    return result;
+  }
+
   // Dialogue panel validator (mirror of web.webclient.presentation.dialogue,
   // webclient-align-10). Available form is exactly schema_version, available,
   // kind, host (party-row triple with a null portrait_ref), bond_stage (a
@@ -5224,6 +5439,9 @@
     if (name === "objectives") {
       return validateObjectivesPanel(payload);
     }
+    if (name === "quest_log") {
+      return validateQuestLogPanel(payload);
+    }
     if (name === "dialogue") {
       return validateDialoguePanel(payload);
     }
@@ -5555,6 +5773,9 @@
     PARTY_MAX_ROWS: PARTY_MAX_ROWS,
     OBJECTIVES_SCHEMA_VERSION: OBJECTIVES_SCHEMA_VERSION,
     OBJECTIVES_MAX_ROWS: OBJECTIVES_MAX_ROWS,
+    QUEST_LOG_SCHEMA_VERSION: QUEST_LOG_SCHEMA_VERSION,
+    QUEST_LOG_MAX_ROWS: QUEST_LOG_MAX_ROWS,
+    validateQuestLogPanel: validateQuestLogPanel,
     PARTY_MAX_DISPLAY_NAME: PARTY_MAX_DISPLAY_NAME,
     validateCreationPanel: validateCreationPanel,
     validateCreationPersona: validateCreationPersona,

@@ -243,6 +243,7 @@
         "web.webclient.presentation.tests.test_fingerprints",
         "web.webclient.presentation.tests.test_objectives_panel",
         "web.webclient.presentation.tests.test_protocol",
+        "web.webclient.presentation.tests.test_quest_log_panel",
         "web.webclient.presentation.tests.test_registry",
         "web.webclient.presentation.tests.test_roster",
         "web.webclient.presentation.tests.test_title_ballot_panel",

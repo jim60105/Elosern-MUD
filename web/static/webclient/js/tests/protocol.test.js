@@ -1556,7 +1556,7 @@ test("the unavailable forms differ only in schema_version", () => {
 });
 
 test("mirrors every registered panel schema version in the allowlist", () => {
-  // The allowlist must cover all fifteen registered panels so an unmirrored
+  // The allowlist must cover every registered panel so an unmirrored
   // panel can never slip through the registered-version gate.
   assert.equal(Protocol.PANEL_ALLOWLIST.status, 2);
   assert.equal(Protocol.PANEL_ALLOWLIST.local_map, 1);
@@ -1574,10 +1574,11 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.roster, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.possession_banner, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.lore_codex, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.quest_log, 1);
   assert.equal(
     Object.keys(Protocol.PANEL_ALLOWLIST).length,
-    17,
-    "PANEL_ALLOWLIST must list exactly the seventeen registered panels"
+    18,
+    "PANEL_ALLOWLIST must list exactly the eighteen registered panels"
   );
 });
 
@@ -5679,6 +5680,119 @@ test("objectives is in the production panel allowlist and rejects atomically", (
     },
   };
   envelope.revision = 7;
+  assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
+});
+
+function validQuestLogRow(overrides) {
+  return Object.assign(
+    {
+      quest_id: "introductory_hunt:1",
+      definition_key: "introductory_hunt",
+      display_name: "討伐低階魔物",
+      state: "in_progress",
+      stage_index: 0,
+      stage_total: 1,
+      stage_progress: 0,
+      objective_quantity: 1,
+      objective_line: "討伐 1 隻低階魔物",
+      deadline_line: "期限：剩餘 72 小時",
+      detail: "討伐低階魔物\n狀態：進行中\n階段：1",
+      tracked: false,
+      issuer: {
+        kind: "guild",
+        key: "guild:guild_branch_altoria",
+        label: "埃洛西恩冒險者公會 阿爾托利亞分會",
+      },
+      settlement: "counter",
+      reward_line: "獎勵：銅 50、功績 25",
+      track: {
+        action_id: "guild.quest_track",
+        label: "追蹤",
+        enabled: true,
+        disabled_reason: null,
+        quantity: null,
+      },
+    },
+    overrides || {}
+  );
+}
+
+function validQuestLogPanel(rows) {
+  return { schema_version: 1, available: true, rows: rows || [validQuestLogRow()] };
+}
+
+test("quest_log available form validates, empty rows and null commission fields are legal", () => {
+  assert.deepEqual(Protocol.validateQuestLogPanel(validQuestLogPanel()), validQuestLogPanel());
+  const empty = Protocol.validateQuestLogPanel(validQuestLogPanel([]));
+  assert.deepEqual(empty, { schema_version: 1, available: true, rows: [] });
+  const unresolved = validQuestLogRow({ settlement: null, reward_line: null, deadline_line: null });
+  assert.doesNotThrow(() => Protocol.validateQuestLogPanel(validQuestLogPanel([unresolved])));
+});
+
+test("quest_log validator mirrors the server drift rejections", () => {
+  for (const bad of [
+    // extra row field
+    validQuestLogPanel([Object.assign(validQuestLogRow(), { extra: 1 })]),
+    // thirteenth row
+    validQuestLogPanel(
+      Array.from({ length: 13 }, (_, i) => validQuestLogRow({ quest_id: `q:${i}` }))
+    ),
+    // unknown state
+    validQuestLogPanel([validQuestLogRow({ state: "running" })]),
+    // unknown settlement
+    validQuestLogPanel([validQuestLogRow({ settlement: "later" })]),
+    // issuer drift
+    validQuestLogPanel([
+      validQuestLogRow({ issuer: Object.assign(validQuestLogRow().issuer, { kind: "monster" }) }),
+    ]),
+    validQuestLogPanel([
+      validQuestLogRow({ issuer: { kind: "npc", key: "npc:grey_granny" } }),
+    ]),
+    // track descriptor drift
+    validQuestLogPanel([
+      validQuestLogRow({ track: Object.assign(validQuestLogRow().track, { action_id: "shop.buy" }) }),
+    ]),
+    validQuestLogPanel([
+      validQuestLogRow({ track: Object.assign(validQuestLogRow().track, { enabled: false }) }),
+    ]),
+    validQuestLogPanel([
+      validQuestLogRow({ track: Object.assign(validQuestLogRow().track, { quantity: { min: 1, max: 2 } }) }),
+    ]),
+    // duplicate quest IDs
+    validQuestLogPanel([validQuestLogRow({ quest_id: "q:1" }), validQuestLogRow({ quest_id: "q:1" })]),
+    // over-bound string
+    validQuestLogPanel([validQuestLogRow({ detail: "字".repeat(513) })]),
+    // lone surrogate
+    validQuestLogPanel([validQuestLogRow({ display_name: "bad\ud800name" })]),
+    // negative or non-int integers
+    validQuestLogPanel([validQuestLogRow({ stage_progress: -1 })]),
+    validQuestLogPanel([validQuestLogRow({ objective_quantity: 0 })]),
+    // non-bool tracked
+    validQuestLogPanel([validQuestLogRow({ tracked: "yes" })]),
+    // version drift and non-bool available
+    { schema_version: 2, available: true, rows: [] },
+    { schema_version: 1, available: false, rows: [] },
+  ]) {
+    assert.throws(() => Protocol.validateQuestLogPanel(bad));
+  }
+});
+
+test("quest_log is in the production panel allowlist and rejects atomically", () => {
+  assert.equal(Protocol.PANEL_ALLOWLIST.quest_log, 1);
+  const envelope = {
+    protocol_version: 1,
+    presentation_epoch: VALID_EPOCH,
+    revision: 5,
+    mode: "exploration",
+    panels: {
+      quest_log: { schema_version: 1, available: true, rows: "not-a-list" },
+    },
+    layout_version: 1,
+    server_time: serverTime(),
+  };
+  assert.throws(() => Protocol.validateSnapshot(envelope));
+  envelope.panels = { quest_log: validQuestLogPanel() };
+  envelope.revision = 6;
   assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
 });
 

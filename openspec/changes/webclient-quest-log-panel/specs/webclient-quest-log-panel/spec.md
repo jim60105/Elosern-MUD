@@ -8,14 +8,17 @@ The presentation registry SHALL register a `quest_log` panel at schema version 1
 SHALL contain exactly `schema_version`, `available`, and `rows`, where `rows` is the holder's stored
 quest records in quest-log order, at most the shared `MAX_QUEST_ROWS` bound of twelve, and the
 registered common unavailable form SHALL keep the shared field set, reason, and semantics.
+When the holder stores more records than the cap, the panel SHALL carry the first `MAX_QUEST_ROWS`
+records in stored quest-log order.
 
 Each row SHALL contain exactly `quest_id`, `definition_key`, `display_name`, `state`, `stage_index`,
 `stage_total`, `stage_progress`, `objective_quantity`, `objective_line`, `deadline_line`, `detail`,
 `tracked`, `issuer`, `settlement`, `reward_line`, and `track`. `state` SHALL be one of the bounded
 stored states `in_progress`, `completed`, `failed`. `issuer` SHALL contain exactly `kind` (`guild` or
 `npc`), `key` (the record's stored issuer key), and `label` (the bounded display name of the
-commissioner). `settlement` SHALL be `counter` or `auto`. `deadline_line` and `reward_line` SHALL be
-nullable. `track` SHALL be the `guild.quest_track` action descriptor.
+commissioner). `settlement` SHALL be the resolved issuance's settlement (`counter` or `auto`), or
+`null` when that issuance cannot be resolved. `deadline_line` and `reward_line` SHALL be nullable.
+`track` SHALL be the `guild.quest_track` action descriptor, always enabled.
 
 The presenter SHALL be read-only: it SHALL NOT mutate the quest log, tracking state, inventory,
 wallet, traits, or world state, and SHALL emit no live object or filesystem reference.
@@ -69,12 +72,14 @@ prose for the same record.
 ### Requirement: An unresolvable issuance yields no reward line rather than a fabricated one
 
 When a record's issuer key resolves to no registered issuance, the row SHALL carry `reward_line`
-`null` and SHALL still render every other field. The panel SHALL NOT fabricate a reward, substitute
-another issuance's reward, omit the row, or become unavailable.
+`null` and `settlement` `null`, and SHALL still render every other field. The panel SHALL NOT
+fabricate a reward or settlement, substitute another issuance's reward, omit the row, or become
+unavailable.
 
 #### Scenario: A withdrawn commission still lists its quest
 - **WHEN** a holder carries a record whose issuance has been unregistered
-- **THEN** the row is present with `reward_line` null and every other field intact
+- **THEN** the row is present with `reward_line` null, `settlement` null, and every other field
+  intact
 
 #### Scenario: No reward is ever invented
 - **WHEN** any row's issuance cannot be resolved
