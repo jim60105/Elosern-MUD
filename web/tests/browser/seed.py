@@ -392,6 +392,7 @@ def _services_fixture(character) -> None:
         # clerk — the quest book must read and track anywhere, and the
         # drawer must replace the counter with its honest no-clerk marker.
         original_room = character.location
+        place(hall)
         register_adventurer(character, staff=staff)
         character.db.wallet = 1000
         accept_guild_offer(character, staff, "introductory_hunt")

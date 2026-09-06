@@ -103,7 +103,8 @@
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_escape_from_quests_service_submenu_leaves_root_clean",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_outlet_and_nav_tiles_stay_within_the_pane_at_a_narrow_viewport",
         "web.tests.browser.test_browser_exploration.ExplorationBrowserTest.test_outlet_partial_last_row_fills_the_pane_at_a_narrower_viewport",
-        "web.tests.browser.test_browser_pointer.PointerServiceAcceptanceTest.test_pointer_service_submenu_submission"
+        "web.tests.browser.test_browser_pointer.PointerServiceAcceptanceTest.test_pointer_service_submenu_submission",
+        "web.tests.browser.test_browser_services.QuestBookAwayFromClerkJourneys.test_away_from_clerk_renders_book_with_no_clerk_marker"
       ],
       "files_b": [
         "web.tests.browser.test_browser_session_lifecycle.SessionLifecycleBrowserTest",
@@ -291,7 +292,8 @@
         "web.tests.browser.test_browser_local_map.LocalMapBrowserTest.test_tall_lattice_with_long_remembered_list_stays_within_the_island",
         "web.tests.browser.test_browser_services.GuildQuestJourneys.test_abandon_requires_confirmation",
         "web.tests.browser.test_browser_services.GuildQuestJourneys.test_quest_drawer_closes_with_the_hosted_frame",
-        "web.tests.browser.test_harness.RealServerBootTest.test_real_server_boots_and_cleans_up"
+        "web.tests.browser.test_harness.RealServerBootTest.test_real_server_boots_and_cleans_up",
+        "web.tests.browser.test_browser_services.GuildQuestJourneys.test_drawer_renders_book_and_counter_without_duplication"
       ],
       "files_b": [
         "web.tests.browser.test_browser_art.ArtMissingSceneTest.test_missing_scene_uses_the_placeholder_and_play_continues",
