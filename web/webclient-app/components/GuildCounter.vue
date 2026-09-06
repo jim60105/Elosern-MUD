@@ -122,7 +122,7 @@ const hasNextStep = computed(
         aria-label="公會等級"
       >
         <h4 class="guild-counter__section-title">公會等級</h4>
-        <p class="guild-counter__rank" data-testid="guild-counter__rank">
+        <p class="guild-counter__rank-level" data-testid="guild-counter__rank-level">
           等級 {{ rank.rank }}
         </p>
           <p class="guild-counter__merit" data-testid="guild-counter__merit">

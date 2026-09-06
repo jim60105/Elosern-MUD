@@ -43,7 +43,7 @@ describe("GuildCounter (quest-drawer-split)", () => {
       [{ action_id: "guild.quest_accept", payload: { definition_key: "quest_mill_grain" } }],
     ]);
     expect(w.get('[data-testid="guild-counter__rankblock"]').exists()).toBe(true);
-    expect(w.get('[data-testid="guild-counter__rank"]').text()).toContain("C");
+    expect(w.get('[data-testid="guild-counter__rank-level"]').text()).toContain("C");
     const exam = w.get('[data-testid="guild-counter__exam"]');
     await exam.trigger("click");
     expect(w.emitted("exam_start")).toEqual([
