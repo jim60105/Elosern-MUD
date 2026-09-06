@@ -75,8 +75,6 @@
         "world.rules.tests.test_guild_exams",
         "world.rules.tests.test_guild_registration",
         "world.rules.tests.test_guild_rewards",
-        "world.rules.tests.test_service_gate",
-        "world.rules.tests.test_service_binding_persistence",
         "world.rules.tests.test_heal_effect_handler",
         "world.rules.tests.test_holy_water_cleanse",
         "world.rules.tests.test_initiative_and_turn_loop",
@@ -85,6 +83,7 @@
         "world.rules.tests.test_item_effects_rulebook",
         "world.rules.tests.test_item_use",
         "world.rules.tests.test_lineage_query",
+        "world.rules.tests.test_lore_deterministic_reveals",
         "world.rules.tests.test_lore_knowledge",
         "world.rules.tests.test_map_knowledge",
         "world.rules.tests.test_map_knowledge_integration",
@@ -109,7 +108,9 @@
         "world.rules.tests.test_overwhelm_compression",
         "world.rules.tests.test_overwhelm_resolution",
         "world.rules.tests.test_profession_config",
-        "world.rules.tests.test_rules_observability"
+        "world.rules.tests.test_rules_observability",
+        "world.rules.tests.test_service_binding_persistence",
+        "world.rules.tests.test_service_gate"
       ]
     },
     {

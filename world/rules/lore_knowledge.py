@@ -20,6 +20,7 @@ from collections.abc import Mapping, Set as ABCSet
 from dataclasses import dataclass
 from typing import Any
 
+from world.observability import log_warn
 from world.lore.anchors import ANCHOR_REGISTRY
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.guild import GUILD_RANK_REGISTRY
@@ -130,6 +131,59 @@ def record_lore_reveal(player: Any, category: str, key: str) -> None:
     updated = set(current)
     updated.add(entry)
     player.db.lore_discovered = updated
+
+
+def reveal_lore_best_effort(player: Any, category: str, key: str) -> bool:
+    """Record one discovered lore entry, swallowing and logging any failure.
+
+    This is the best-effort boundary for deterministic gameplay callers
+    (arrival, defeat, origin). It delegates exclusively to
+    :func:`record_lore_reveal` and returns whether the reveal landed or was
+    already discovered; any failure is logged through the observability facade
+    with its exception and context dict.
+    """
+    try:
+        record_lore_reveal(player, category, key)
+        return True
+    except Exception as exc:
+        log_warn(
+            "lore_reveal_failed",
+            exc=exc,
+            context={
+                "char": str(getattr(player, "key", player)),
+                "category": category,
+                "key": key,
+            },
+        )
+        return False
+
+
+def schedule_lore_reveal_best_effort(
+    player: Any, category: str, key: str | None
+) -> None:
+    """Schedule a best-effort lore reveal to execute after transaction commit.
+
+    Protects both key validation and transaction registration so unexpected
+    failures never bubble into gameplay.
+    """
+    if not isinstance(key, str) or not key or not isinstance(category, str) or not category:
+        return
+    try:
+        from django.db import transaction
+
+        transaction.on_commit(
+            lambda: reveal_lore_best_effort(player, category, key)
+        )
+    except Exception as exc:
+        log_warn(
+            "lore_reveal_failed",
+            exc=exc,
+            context={
+                "char": str(getattr(player, "key", player)),
+                "category": category,
+                "key": key,
+            },
+        )
 
 
 def list_discovered(player: Any) -> tuple[tuple[str, str], ...]:

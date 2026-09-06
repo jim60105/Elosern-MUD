@@ -26,7 +26,7 @@ _CREATION_ATTRIBUTE_KEYS = (
     "age", "apparent_age", "race", "subrace", "creation_pending",
     "skill_proficiency", "skills", "skill_grants", "equipment",
     "inventory", "wallet", "quest_log", "guild_rank", "persona",
-    "portrait_policy", "affinity_elements", "sex",
+    "portrait_policy", "affinity_elements", "sex", "nation",
 )
 
 # The single deterministic race-bound mapping every identity channel and the
@@ -176,6 +176,7 @@ class CharacterCreationRequest:
     background: str | None = None
     affinity_elements: tuple[str, ...] | None = None
     sex: str | None = None
+    nation: str | None = None
 
 
 @dataclass(frozen=True)
@@ -199,6 +200,7 @@ class _ValidatedCreation:
     background: str | None = None
     affinity_elements: tuple[str, ...] = ()
     sex: str = DEFAULT_SEX
+    nation: str | None = None
 
 
 def resolve_starting_profile(race_key: str, subrace_key: str | None = None) -> StartingProfile:
@@ -415,9 +417,14 @@ def preflight_character_creation(
         else None
     )
     checked_sex = _validate_sex(request.sex)
+    nation = request.nation
+    if nation is None:
+        nation = getattr(character, "nation", None)
+        if nation is None and hasattr(character, "db"):
+            nation = getattr(character.db, "nation", None)
     return _ValidatedCreation(
         valid_name, valid_age, valid_apparent_age, race, subrace, values,
-        background, checked_affinity, checked_sex,
+        background, checked_affinity, checked_sex, nation,
     )
 
 
@@ -498,6 +505,7 @@ def activate_player_character(
         # ``SEX_VALUES`` member here (namegen-creation-ui D2); the wizard
         # draft is normalized through the same validator before it is stored.
         "sex": validated.sex,
+        "nation": validated.nation,
     }
     persona_record = None
     if persona is not None:
@@ -571,6 +579,12 @@ def activate_player_character(
         restore_traits(character, trait_snapshot)
         restore_attributes(character, attribute_snapshots)
         raise
+    from world.rules.lore_knowledge import reveal_lore_best_effort
+
+    if validated.race:
+        reveal_lore_best_effort(character, "race", validated.race)
+    if validated.nation:
+        reveal_lore_best_effort(character, "nation", validated.nation)
     return CharacterCreationResult(
         validated.display_name, validated.race, validated.subrace, validated.values["magic_power"]
     )

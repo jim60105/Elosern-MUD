@@ -35,6 +35,109 @@ def _reach_matches(room: Any, destination: RoomLocator, stage_room_id: int | Non
     return False
 
 
+def resolve_room_anchor(room: Any) -> str | None:
+    """Resolve a room to a registered ANCHOR_REGISTRY key, or None.
+
+    Reuses the REACH anchor resolution attribute (anchor_key).
+    """
+    if room is None:
+        return None
+    anchor_key = getattr(room, "anchor_key", None)
+    if anchor_key is None and hasattr(room, "db"):
+        anchor_key = getattr(room.db, "anchor_key", None)
+    if isinstance(anchor_key, str) and anchor_key:
+        from world.lore.anchors import ANCHOR_REGISTRY
+
+        if anchor_key in ANCHOR_REGISTRY:
+            return anchor_key
+    return None
+
+
+def resolve_room_region(
+    room: Any, coordinates: tuple[int, int] | None = None
+) -> str | None:
+    """Resolve a room or coordinates to a registered WILDERNESS_REGION_REGISTRY key, or None."""
+    from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+
+    if room is not None:
+        region_key = getattr(room, "region_key", None)
+        if region_key is None and hasattr(room, "db"):
+            region_key = getattr(room.db, "region_key", None)
+        if isinstance(region_key, str) and region_key in WILDERNESS_REGION_REGISTRY:
+            return region_key
+
+    coords = coordinates
+    if coords is None and room is not None:
+        coords = getattr(room, "coordinates", None)
+
+    if coords is not None and isinstance(coords, (tuple, list)) and len(coords) == 2:
+        try:
+            x, y = coords
+            if isinstance(x, int) and isinstance(y, int) and not isinstance(x, bool) and not isinstance(y, bool):
+                from world.maps.wilderness_provider import (
+                    WILDERNESS_MAX_X,
+                    WILDERNESS_MAX_Y,
+                    region_for_coordinates,
+                )
+
+                if 0 <= x <= WILDERNESS_MAX_X and 0 <= y <= WILDERNESS_MAX_Y:
+                    reg_key = region_for_coordinates(x, y)
+                    if reg_key in WILDERNESS_REGION_REGISTRY:
+                        return reg_key
+        except Exception:  # observability: ignore R2: invalid coordinates or non-wilderness room is treated as non-resolving
+            pass
+    return None
+
+
+def observe_arrival_lore(
+    character: Any,
+    room: Any = None,
+    *,
+    wilderness_coordinates: tuple[int, int] | None = None,
+) -> None:
+    """Observe character arrival at a room/coordinate and schedule lore reveals.
+
+    Called from multiple movement hooks (``observe_room_entry``,
+    ``after_successful_movement``, and ``PlayerCharacter.at_post_move``) whose
+    ordering is not guaranteed. Deduplication relies solely on the idempotent
+    ``record_lore_reveal`` writer: scheduling the same ``on_commit`` callback
+    twice is harmless because the second reveal finds the entry already present
+    and returns without writing. No ``ndb`` marker is used because setting it
+    before ``transaction.on_commit`` means a rollback discards the callback but
+    leaves the marker, silently suppressing the reveal on the next attempt.
+
+    Best-effort: any unexpected exception during resolution or scheduling is
+    logged through the facade and never bubbles into movement.
+    """
+    from typeclasses.characters import PlayerCharacter
+
+    if not isinstance(character, PlayerCharacter):
+        return
+    target_room = room if room is not None else getattr(character, "location", None)
+    try:
+        anchor_key = resolve_room_anchor(target_room)
+        region_key = resolve_room_region(target_room, wilderness_coordinates)
+
+        from world.rules.lore_knowledge import schedule_lore_reveal_best_effort
+
+        if anchor_key:
+            schedule_lore_reveal_best_effort(character, "anchor", anchor_key)
+        if region_key:
+            schedule_lore_reveal_best_effort(character, "region", region_key)
+    except Exception as exc:
+        from world.observability import log_warn
+
+        log_warn(
+            "lore_reveal_failed",
+            exc=exc,
+            context={
+                "char": str(getattr(character, "key", character)),
+                "category": "arrival",
+                "key": str(getattr(target_room, "key", target_room)),
+            },
+        )
+
+
 def _escort_ready(room: Any, protected_entity_ids: tuple[int, ...]) -> bool:
     """Require at least one protected entity, all alive and present in ``room``."""
     if not protected_entity_ids:
@@ -100,6 +203,7 @@ def observe_room_entry(room: Any, obj: Any) -> None:
 
     if not isinstance(obj, PlayerCharacter):
         return
+    observe_arrival_lore(obj, room)
     records = read_records(obj)
     if not any(
         record.state is QuestState.IN_PROGRESS
