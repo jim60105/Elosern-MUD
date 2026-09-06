@@ -23,9 +23,10 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
 from world.quests.definitions import QuestStage
-from world.quests.runtime import QuestState, accept_quest, read_records
+from world.quests.runtime import QuestState, read_records
 from world.quests.tests._fixtures import (
     QuestRegistryIsolation,
+    accept,
     acquire as _acquire,
     quest as _quest,
     register as _register_quest,
@@ -944,7 +945,7 @@ class AcquireRollbackTests(QuestRegistryIsolation, EvenniaTestCase):
                 stages=(QuestStage(0, _acquire("healing_potion", quantity=2)),),
             )
         )
-        accept_quest(self.player, definition.key)
+        accept(self.player, definition.key)
         self.quest_id = f"{definition.key}:1"
 
     def _snapshot(self):

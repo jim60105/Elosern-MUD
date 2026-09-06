@@ -29,7 +29,7 @@ from world.skills.registry import (
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.quests.planner import quest_event_effect_planner
 
-from ._fixtures import QuestRegistryIsolation, defeat, quest, register
+from ._fixtures import QuestRegistryIsolation, accept, defeat, quest, register
 
 
 def fire_field(actor, target) -> Battlefield:
@@ -167,9 +167,7 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTestCase):
         return monster
 
     def _resolve_lethal(self, monster: Monster):
-        from world.quests.runtime import accept_quest
-
-        record = accept_quest(self.player, self.low_hunt.key)
+        record = accept(self.player, self.low_hunt.key)
         field = fire_field(self.player, monster)
         request = ActionRequest(
             self.player,
@@ -193,9 +191,7 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(stored[0]["quest_id"], record.quest_id)
 
     def test_planner_stages_without_mutating_when_step8_rejects(self):
-        from world.quests.runtime import accept_quest
-
-        accept_quest(self.player, self.low_hunt.key)
+        accept(self.player, self.low_hunt.key)
         monster = self._monster("late-reject")
         field = fire_field(self.player, monster)
         request = ActionRequest(

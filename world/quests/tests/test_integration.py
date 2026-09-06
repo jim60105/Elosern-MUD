@@ -18,7 +18,6 @@ from world.quests.bootstrap import sync_quest_runtime
 from world.quests.catalog import register_catalog
 from world.quests.runtime import (
     QuestState,
-    accept_quest,
     read_records,
     to_storage,
 )
@@ -37,7 +36,7 @@ from world.rules.combat import (
 from world.rules.overwhelm import resolve_overwhelm
 from world.rules.tests.combat_fixtures import grant_lineage
 
-from ._fixtures import QuestRegistryIsolation, defeat, quest, register
+from ._fixtures import QuestRegistryIsolation, accept, defeat, quest, register
 
 QUESTS_ROOT = Path(__file__).resolve().parents[2]
 
@@ -79,7 +78,7 @@ class OfflineRuntimePathTests(QuestRegistryIsolation, EvenniaTestCase):
     # player-playable Phase-4 milestone can be claimed (design.md Open Questions).
     @covers_requirement("quest-progress-tracking::change-15-exposes-a-deterministic-no-ai-completion-seam-for-phase-4")
     def test_hand_written_hunt_completes_without_ai_or_manual_progress(self):
-        record = accept_quest(self.player, "introductory_hunt")
+        record = accept(self.player, "introductory_hunt")
         self.assertIs(record.state, QuestState.IN_PROGRESS)
         monster = self._monster("offline-goblin")
         result = self._resolve_lethal(monster)
@@ -198,7 +197,7 @@ class Change16ReadContractTests(QuestRegistryIsolation, EvenniaTestCase):
     def test_completed_record_is_readable_without_paying_a_reward(self):
         definition = register(quest("contract16_simple"))
         with patch("world.quests.runtime._current_tick", return_value=10):
-            record = accept_quest(self.player, definition.key)
+            record = accept(self.player, definition.key)
         self.assertIsNotNone(record)
         # Change 16 obligation: guild accept/turn-in, combat entry, and reward
         # settlement live outside this change; reading a COMPLETED record must
@@ -238,7 +237,7 @@ class Change21BindContractTests(QuestRegistryIsolation, EvenniaTestCase):
         target = create_object(NPC, key="contract21-target")
         target.race = "human"
         target.apply_race_baseline()
-        record = accept_quest(self.player, self.bound_def.key)
+        record = accept(self.player, self.bound_def.key)
         bound = bind_stage_runtime(
             self.player,
             record.quest_id,

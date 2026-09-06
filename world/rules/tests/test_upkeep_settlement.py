@@ -13,8 +13,14 @@ from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from world.quests.definitions import QuestStage
 from world.quests.planner import quest_event_effect_planner
-from world.quests.runtime import accept_quest, read_records, to_storage
-from world.quests.tests._fixtures import QuestRegistryIsolation, defeat, quest, register
+from world.quests.runtime import read_records, to_storage
+from world.quests.tests._fixtures import (
+    QuestRegistryIsolation,
+    accept,
+    defeat,
+    quest,
+    register,
+)
 from world.rules.action import (
     PendingEffect,
     RejectReason,
@@ -302,7 +308,7 @@ class UpkeepQuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
                 stages=(QuestStage(0, defeat()),),
             )
         )
-        accept_quest(self.actor, self.quest_def.key)
+        accept(self.actor, self.quest_def.key)
 
     def tearDown(self):
         _EVENT_EFFECT_PLANNERS.pop("quest", None)
@@ -388,7 +394,7 @@ class UpkeepKnockoutParityTests(QuestRegistryIsolation, EvenniaTestCase):
                 stages=(QuestStage(0, defeat()),),
             )
         )
-        accept_quest(self.owner, self.quest_def.key)
+        accept(self.owner, self.quest_def.key)
         self.companion = _npc("upkeep companion")
         self.companion.location = self.room
         join_party(self.companion, self.owner)

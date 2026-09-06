@@ -36,6 +36,7 @@ from world.rules.guild_offers import (
 from world.rules.clock import CLOCK_YAML
 
 from ._fixtures import (
+    TEST_ISSUER_KEY,
     anchor_locator,
     bound_instance_locator,
     defeat,
@@ -58,6 +59,7 @@ def _record(
     return QuestRecord(
         quest_id=f"{definition_key}:1",
         definition_key=definition_key,
+        issuer_key=TEST_ISSUER_KEY,
         state=state,
         stage_index=stage_index,
         stage_progress=stage_progress,

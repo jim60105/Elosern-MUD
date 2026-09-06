@@ -224,12 +224,17 @@ def accept_guild_offer(
     """Validate board eligibility, then delegate acceptance to the quest runtime.
 
     The guild layer never constructs or mutates quest records itself. The
-    quest-record creation and the +1 ``guild`` affinity gain with the issuing
-    host commit in one all-or-nothing operation: the actor's quest-log surface
-    and the host's affinity record are snapshotted before the writes and
-    restored on any failure.
+    issuing branch is named as the record's issuer key in the canonical
+    ``guild:<branch_key>`` form built with the shared issuer-key constructor,
+    so the board path and the resolve seam cannot disagree about the key's
+    spelling. The quest-record creation and the +1 ``guild`` affinity gain
+    with the issuing host commit in one all-or-nothing operation: the actor's
+    quest-log surface and the host's affinity record are snapshotted before
+    the writes and restored on any failure.
     """
+    from typeclasses.components import GuildStaff
     from world.rules.affinity import AffinitySource, apply_affinity_change
+    from world.rules.quest_issuance import guild_issuer_key
     from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 
     offers = list_guild_offers(actor, staff)
@@ -237,13 +242,19 @@ def accept_guild_offer(
         raise BoardAccessError(f"offer {definition_key!r} is not board-eligible")
     if not isinstance(staff, NPC):
         raise BoardAccessError("no local GuildStaff host")
+    guild_staff = staff.components.get(GuildStaff.get_component_slot())
+    if guild_staff is None:
+        raise BoardAccessError("no local GuildStaff host")
+    branch_key = guild_staff.branch_key
+    if not isinstance(branch_key, str) or not branch_key:
+        raise BoardAccessError("GuildStaff host has no branch_key")
     from world.quests.runtime import accept_quest
 
     quest_log_snapshot = attribute_snapshot(actor, "quest_log")
     relations_snapshot = attribute_snapshot(staff, "relations_data")
     try:
         with transaction.atomic():
-            record = accept_quest(actor, definition_key)
+            record = accept_quest(actor, definition_key, guild_issuer_key(branch_key))
             apply_affinity_change(staff, actor, AffinitySource.GUILD, 1)
     except Exception:
         restore_attribute_best_effort(actor, "quest_log", quest_log_snapshot)

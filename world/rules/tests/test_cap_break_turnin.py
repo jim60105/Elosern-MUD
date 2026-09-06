@@ -34,6 +34,7 @@ from world.rules.affinity import (
 from world.rules.affinity_config import load_config
 from world.rules.guild import register_adventurer, turn_in_quest
 from world.rules.guild_config import load_catalog_into_cache, register_catalog_offers
+from world.rules.quest_issuance import guild_issuer_key
 from world.rules.guild_offers import (
     GUILD_OFFER_REGISTRY,
     GuildQuestOffer,
@@ -86,7 +87,9 @@ class CapBreakTurnInBase(EvenniaTest):
     def _complete(self, acceptance: int = 1) -> str:
         from world.quests.transitions import apply_quest_log_replacement
 
-        record = accept_quest(self.player, "introductory_hunt")
+        record = accept_quest(
+            self.player, "introductory_hunt", guild_issuer_key(ALTORIA_BRANCH)
+        )
         completed = fulfill_record(
             record, QUEST_DEFINITION_REGISTRY["introductory_hunt"]
         )

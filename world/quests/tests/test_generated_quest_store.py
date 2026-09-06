@@ -48,11 +48,10 @@ from world.quests.generated_quest_store import (
 from world.quests.runtime import (
     QuestState,
     abandon_quest,
-    accept_quest,
     definition_for,
     read_records,
 )
-from world.quests.tests._fixtures import RegistryIsolationMixin
+from world.quests.tests._fixtures import RegistryIsolationMixin, accept
 from world.rules.action import ActionRequest, ActionResolver
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.guild import register_adventurer
@@ -389,7 +388,7 @@ class RestartRestoreIntegrationTests(RegistryIsolationMixin, EvenniaTestCase):
     def test_accepted_generated_quest_reads_resolves_and_abandons_after_restore(self):
         compiled = compile_quest_blueprint(_defeat_payload())
         register_generated_quest(compiled)
-        record = accept_quest(self.player, compiled.definition.key)
+        record = accept(self.player, compiled.definition.key)
         _clear_process_registries()
         restore_generated_quests()
         restore_generated_quests()
@@ -406,7 +405,7 @@ class RestartRestoreIntegrationTests(RegistryIsolationMixin, EvenniaTestCase):
 
         compiled = compile_quest_blueprint(_characterized_payload())
         register_generated_quest(compiled)
-        record = accept_quest(self.player, compiled.definition.key)
+        record = accept(self.player, compiled.definition.key)
         _clear_process_registries()
         restore_generated_quests()
 

@@ -29,6 +29,10 @@ class QuestAlreadyActive(ValueError):
     """accept_quest called while an active record for the definition exists."""
 
 
+class QuestIssuanceNotFound(ValueError):
+    """accept_quest named an issuer key with no registered issuance."""
+
+
 class QuestState(StrEnum):
     """The three stored record states; unaccepted is represented by absence."""
 
@@ -45,6 +49,7 @@ _RECORD_FIELDS = frozenset(
     {
         "quest_id",
         "definition_key",
+        "issuer_key",
         "state",
         "stage_index",
         "stage_progress",
@@ -65,6 +70,7 @@ class QuestRecord:
 
     quest_id: str
     definition_key: str
+    issuer_key: str
     state: QuestState
     stage_index: int
     stage_progress: int
@@ -82,6 +88,7 @@ def to_storage(record: QuestRecord) -> dict[str, Any]:
     return {
         "quest_id": record.quest_id,
         "definition_key": record.definition_key,
+        "issuer_key": record.issuer_key,
         "state": record.state.value,
         "stage_index": record.stage_index,
         "stage_progress": record.stage_progress,
@@ -106,6 +113,8 @@ def _require_int(data: dict[str, Any], key: str, *, nullable: bool = False) -> i
 
 def from_storage(data: dict[str, Any]) -> QuestRecord:
     """Strictly parse one storage dict, raising ``QuestDataError`` on any violation."""
+    from world.rules.quest_issuance import IssuerKeyError, parse_issuer_key
+
     if not isinstance(data, dict):
         raise QuestDataError(f"quest-log entry must be a dict, got {type(data).__name__}")
     unknown = set(data) - _RECORD_FIELDS
@@ -122,6 +131,11 @@ def from_storage(data: dict[str, Any]) -> QuestRecord:
         raise QuestDataError("quest_id must be a non-empty string")
     if not isinstance(definition_key, str) or not definition_key:
         raise QuestDataError("definition_key must be a non-empty string")
+    issuer_key = data["issuer_key"]
+    try:
+        parse_issuer_key(issuer_key)
+    except IssuerKeyError as error:
+        raise QuestDataError(f"record field 'issuer_key' is malformed: {error}") from error
     state_value = data["state"]
     if state_value not in {state.value for state in QuestState}:
         raise QuestDataError(f"unknown quest state {state_value!r}")
@@ -151,6 +165,7 @@ def from_storage(data: dict[str, Any]) -> QuestRecord:
     return QuestRecord(
         quest_id=quest_id,
         definition_key=definition_key,
+        issuer_key=issuer_key,
         state=state,
         stage_index=stage_index,
         stage_progress=stage_progress,
@@ -215,6 +230,18 @@ def validate_record_runtime(record: QuestRecord) -> None:
     runtime bindings) and, when failed, must carry a reason. Violations raise
     ``QuestDataError`` instead of silently reinterpreting the record.
     """
+    from world.rules.quest_issuance import IssuerKeyError, parse_issuer_key
+
+    try:
+        parse_issuer_key(record.issuer_key)
+    except IssuerKeyError as error:
+        raise QuestDataError(
+            f"quest {record.quest_id!r} has a malformed issuer key: {error}"
+        ) from error
+    # A well-formed issuer key whose issuance was unregistered after
+    # acceptance is deliberately tolerated here (design D2): the record stays
+    # readable and downstream consumers report no reward instead of the whole
+    # quest log failing the strict reader.
     definition = definition_for(record)
     if not (0 <= record.stage_index < len(definition.stages)):
         raise QuestDataError(
@@ -358,8 +385,16 @@ def _current_tick() -> int:
     return get_world_clock().tick
 
 
-def accept_quest(actor: Any, definition_key: str) -> QuestRecord:
-    """Create one deterministic stage-zero active record for ``definition_key``."""
+def accept_quest(actor: Any, definition_key: str, issuer_key: str) -> QuestRecord:
+    """Create one deterministic stage-zero active record for ``definition_key``.
+
+    The record is only created under a registered issuance: the issuer key
+    must resolve through the shared read seam before any write. A malformed
+    key raises ``IssuerKeyError``; a well-formed key with no registered
+    issuance raises ``QuestIssuanceNotFound``.
+    """
+    from world.rules.quest_issuance import resolve_issuance
+
     definition = QUEST_DEFINITION_REGISTRY.get(definition_key)
     if definition is None:
         raise QuestNotFound(f"unknown definition {definition_key!r}")
@@ -370,6 +405,10 @@ def accept_quest(actor: Any, definition_key: str) -> QuestRecord:
         for record in current
     ):
         raise QuestAlreadyActive(definition_key)
+    if resolve_issuance(definition_key, issuer_key) is None:
+        raise QuestIssuanceNotFound(
+            f"no registered issuance for {definition_key!r} under {issuer_key!r}"
+        )
     acceptance_number = (
         sum(1 for record in current if record.definition_key == definition_key) + 1
     )
@@ -383,6 +422,7 @@ def accept_quest(actor: Any, definition_key: str) -> QuestRecord:
     record = QuestRecord(
         quest_id=quest_id,
         definition_key=definition_key,
+        issuer_key=issuer_key,
         state=QuestState.IN_PROGRESS,
         stage_index=0,
         stage_progress=0,

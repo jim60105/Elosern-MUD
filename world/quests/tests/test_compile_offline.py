@@ -29,7 +29,8 @@ from world.quests.compile import (
     register_generated_quest,
     scene_requirements_for,
 )
-from world.quests.runtime import QuestState, accept_quest, read_records
+from world.quests.runtime import QuestState, read_records
+from world.quests.tests._fixtures import accept
 from world.quests.tests._compile_helpers import (
     CompileRegistryIsolation,
     _raw,
@@ -113,7 +114,7 @@ class OfflineDirectorEndToEndTests(CompileRegistryIsolation, EvenniaTestCase):
         register_generated_quest(compiled)
         self.assertTrue(scene_requirements_for(compiled.definition.key))
 
-        record = accept_quest(self.player, compiled.definition.key)
+        record = accept(self.player, compiled.definition.key)
         self.assertIs(record.state, QuestState.IN_PROGRESS)
         from world.quests.binding import bind_stage_runtime
 

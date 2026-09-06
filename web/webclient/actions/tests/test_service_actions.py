@@ -294,6 +294,7 @@ class ServiceAdapterTests(ServiceActionBase):
     def test_turnin_echoes_the_first_claim_epithet_then_stays_silent(self):
         self._register()
         from world.quests.runtime import accept_quest, definition_for, fulfill_record, to_storage
+        from world.rules.quest_issuance import guild_issuer_key
 
         messages: list[str] = []
         with patch.object(self.player, "msg", side_effect=lambda text, **kw: messages.append(text)):
@@ -308,7 +309,11 @@ class ServiceAdapterTests(ServiceActionBase):
             self.assertEqual(messages[-1], "獲得異名：南門新客")
             self.assertNotIn("你的第一個日子在這裡圓滿結束", "\n".join(messages))
             # A later distinct successful claim pays and stays title-silent.
-            second = accept_quest(self.player, "introductory_hunt")
+            second = accept_quest(
+                self.player,
+                "introductory_hunt",
+                guild_issuer_key("guild_branch_altoria"),
+            )
             second_completed = fulfill_record(second, definition_for(second))
             self.player.db.quest_log = [to_storage(second_completed)]
             messages.clear()
@@ -432,10 +437,9 @@ class ServiceAdapterTests(ServiceActionBase):
         self.assertEqual(result["code"], "quest_transition")
 
     def test_quest_track_rejects_beyond_cap(self):
-        from world.quests.tests._fixtures import quest, register
-        from world.quests.runtime import accept_quest
+        from world.quests.tests._fixtures import accept, quest, register
         defs = [register(quest(f"cap_test_{i}")) for i in range(4)]
-        records = [accept_quest(self.player, d.key) for d in defs]
+        records = [accept(self.player, d.key) for d in defs]
         for r in records[:3]:
             res = _quest_track_adapter(self.player, {"quest_id": r.quest_id, "tracked": True})
             self.assertEqual(res["outcome"], "success")

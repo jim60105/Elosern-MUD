@@ -114,8 +114,11 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         )
         self.assertIn("獲得異名：南門新客", first)
         from world.quests.runtime import accept_quest
+        from world.rules.quest_issuance import guild_issuer_key
 
-        second_record = accept_quest(self.char1, "introductory_hunt")
+        second_record = accept_quest(
+            self.char1, "introductory_hunt", guild_issuer_key("guild_branch_altoria")
+        )
         completed = fulfill_record(
             second_record, QUEST_DEFINITION_REGISTRY["introductory_hunt"]
         )

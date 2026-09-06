@@ -781,13 +781,11 @@ class OuterOwnerSeamTests(EvenniaTestCase):
         super().tearDown()
 
     def _accept_due(self):
-        from world.quests.tests._fixtures import quest, register
+        from world.quests.tests._fixtures import accept, quest, register
 
         self.due = register(quest("outer_seam_due", deadline_hours=1))
         with patch("world.quests.runtime._current_tick", return_value=0):
-            from world.quests.runtime import accept_quest
-
-            return accept_quest(self.player, self.due.key)
+            return accept(self.player, self.due.key)
 
     def _raw_attribute(self, obj, key):
         """The raw stored Attribute row value for ``key``, read via SQL only.

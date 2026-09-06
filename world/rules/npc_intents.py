@@ -269,6 +269,7 @@ def _apply_offer_quest(npc: Any, player: Any, intent: dict[str, Any]) -> IntentO
         return IntentOutcome(False, f"quest {quest_key!r} is not rank-eligible")
 
     from world.quests.runtime import accept_quest
+    from world.rules.quest_issuance import guild_issuer_key
     from world.rules.affinity import AffinitySource
 
     quest_log_snapshot = attribute_snapshot(player, "quest_log")
@@ -276,7 +277,7 @@ def _apply_offer_quest(npc: Any, player: Any, intent: dict[str, Any]) -> IntentO
     affinity_capped = False
     try:
         with transaction.atomic():
-            accept_quest(player, quest_key)
+            accept_quest(player, quest_key, guild_issuer_key(branch_key))
             outcome = apply_affinity_change(npc, player, AffinitySource.GUILD, 1)
             if outcome.source_rejected:
                 # Defensive: the verified NPC and GUILD source cannot be

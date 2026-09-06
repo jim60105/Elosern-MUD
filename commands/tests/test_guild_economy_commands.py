@@ -80,8 +80,11 @@ class GuildCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
         self.assertNotIn("你的第一個日子在這裡圓滿結束", output)
         # A later distinct successful claim pays normally and stays title-silent.
         from world.quests.runtime import accept_quest
+        from world.rules.quest_issuance import guild_issuer_key
 
-        second = accept_quest(self.char1, "introductory_hunt")
+        second = accept_quest(
+            self.char1, "introductory_hunt", guild_issuer_key("guild_branch_altoria")
+        )
         second_completed = fulfill_record(
             second, QUEST_DEFINITION_REGISTRY["introductory_hunt"]
         )
@@ -140,10 +143,13 @@ class QuestDetailCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evennia
 
         register_catalog_offers(load_catalog_into_cache())
         from world.quests.runtime import accept_quest
+        from world.rules.quest_issuance import guild_issuer_key
         from world.rules.guild import register_adventurer
 
         register_adventurer(self.char1, self.staff)
-        self.record = accept_quest(self.char1, "introductory_hunt")
+        self.record = accept_quest(
+            self.char1, "introductory_hunt", guild_issuer_key("guild_branch_altoria")
+        )
 
     @covers_requirement(
         "quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail",
@@ -168,9 +174,9 @@ class QuestDetailCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evennia
     @covers_requirement("quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail")
     def test_show_reward_omitted_when_definition_has_no_offer(self):
         register(quest("no_offer_hunt"))
-        from world.quests.runtime import accept_quest
+        from world.quests.tests._fixtures import accept
 
-        record = accept_quest(self.char1, "no_offer_hunt")
+        record = accept(self.char1, "no_offer_hunt")
         self.char1.location = create_object(Room, key="empty")
         output = self.call(CmdGuildShow(), record.quest_id, caller=self.char1)
         self.assertIn("測試任務 no_offer_hunt", output)
@@ -184,8 +190,11 @@ class QuestDetailCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evennia
         player = create_object(PlayerCharacter, key="unregistered")
         player.location = self.char1.location
         from world.quests.runtime import accept_quest
+        from world.rules.quest_issuance import guild_issuer_key
 
-        record = accept_quest(player, "introductory_hunt")
+        record = accept_quest(
+            player, "introductory_hunt", guild_issuer_key("guild_branch_altoria")
+        )
         output = self.call(CmdGuildShow(), record.quest_id, caller=player)
         self.assertIn("討伐低階魔物", output)
         self.assertNotIn("獎勵", output)
@@ -202,9 +211,9 @@ class QuestDetailCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evennia
         from unittest.mock import patch
 
         register(quest("deadline_hunt", deadline_hours=1))
-        from world.quests.runtime import accept_quest
+        from world.quests.tests._fixtures import accept
 
-        record = accept_quest(self.char1, "deadline_hunt")
+        record = accept(self.char1, "deadline_hunt")
         self.char1.location = create_object(Room, key="empty")
         from world.rules.clock import CLOCK_YAML
 
@@ -352,8 +361,9 @@ class ScheduleGateCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evenni
         register_adventurer(self.char1, self.staff)
         from world.quests.runtime import accept_quest, fulfill_record, read_records
         from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+        from world.quests.tests._fixtures import accept
 
-        record = accept_quest(self.char1, "introductory_hunt")
+        record = accept(self.char1, "introductory_hunt")
         completed = fulfill_record(record, QUEST_DEFINITION_REGISTRY["introductory_hunt"])
         from world.quests.transitions import apply_quest_log_replacement
 

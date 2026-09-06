@@ -42,11 +42,16 @@ from world.quests.runtime import (
     MAX_TRACKED_QUESTS,
     QuestRecord,
     QuestState,
-    accept_quest,
     set_quest_tracked,
     to_storage,
 )
-from world.quests.tests._fixtures import defeat, quest, register
+from world.quests.tests._fixtures import (
+    TEST_ISSUER_KEY,
+    accept,
+    defeat,
+    quest,
+    register,
+)
 from world.quests.transitions import apply_quest_log_replacement
 from world.rules.clock import get_world_clock
 from world.rules.guild import REGISTRATION_TRAIT_KEYS
@@ -136,11 +141,12 @@ class ObjectivesPresenterTests(EvenniaTest):
             )
         )
         self.player.db.guild_registration = _registration()
-        record = accept_quest(self.player, def_record.key)
+        record = accept(self.player, def_record.key)
         # Advance to stage 1, progress 2.
         advanced = QuestRecord(
             quest_id=record.quest_id,
             definition_key=record.definition_key,
+            issuer_key=TEST_ISSUER_KEY,
             state=QuestState.IN_PROGRESS,
             stage_index=1,
             stage_progress=2,
@@ -174,7 +180,7 @@ class ObjectivesPresenterTests(EvenniaTest):
     def test_host_independent_outside_guild_hall(self):
         # The room has no GuildStaff host, yet the objectives panel renders.
         def_record = register(quest("outdoor_quest"))
-        record = accept_quest(self.player, def_record.key)
+        record = accept(self.player, def_record.key)
         set_quest_tracked(self.player, record.quest_id, True)
         payload = self._render()
         self.assertTrue(payload["available"])
@@ -192,10 +198,10 @@ class ObjectivesPresenterTests(EvenniaTest):
         d3 = register(quest("q_active_tracked_2"))
         d4 = register(quest("q_failed_tracked"))
 
-        r1 = accept_quest(self.player, d1.key)
-        r2 = accept_quest(self.player, d2.key)
-        r3 = accept_quest(self.player, d3.key)
-        r4 = accept_quest(self.player, d4.key)
+        r1 = accept(self.player, d1.key)
+        r2 = accept(self.player, d2.key)
+        r3 = accept(self.player, d3.key)
+        r4 = accept(self.player, d4.key)
 
         set_quest_tracked(self.player, r1.quest_id, True)
         set_quest_tracked(self.player, r3.quest_id, True)
@@ -231,7 +237,7 @@ class ObjectivesPresenterTests(EvenniaTest):
 
     def test_presenter_is_read_only(self):
         d = register(quest("ro_quest"))
-        record = accept_quest(self.player, d.key)
+        record = accept(self.player, d.key)
         set_quest_tracked(self.player, record.quest_id, True)
         before = json.dumps(self.player.db.quest_log or [], default=self._json_default)
         self._render()

@@ -27,12 +27,13 @@ from world.quests.definitions import (
     QuestType,
 )
 from world.quests.room_observation import QuestObservableRoomMixin
-from world.quests.runtime import QuestState, accept_quest, read_records, to_storage
+from world.quests.runtime import QuestState, read_records, to_storage
 from world.maps.bootstrap import NORTH_GATE_XYZ, sync_grid, sync_wilderness
 from world.rules.party import join_party
 
 from ._fixtures import (
     QuestRegistryIsolation,
+    accept,
     anchor_locator,
     bound_instance_locator,
     escort,
@@ -111,7 +112,7 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(reach_stage(anchor_locator()),),
             )
         )
-        record = accept_quest(self.player, definition.key)
+        record = accept(self.player, definition.key)
         self.assertIs(record.state, QuestState.IN_PROGRESS)
         self._companion("同伴", self._anchor())
         self._enter(self._anchor())
@@ -127,7 +128,7 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(reach_stage(anchor_locator()),),
             )
         )
-        accept_quest(self.player, definition.key)
+        accept(self.player, definition.key)
         self._enter(self._anchor())
         self.assertEqual(self._records()[0]["state"], "in_progress")
 
@@ -140,7 +141,7 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(reach_stage(grid_locator(1, 1)),),
             )
         )
-        record = accept_quest(self.player, definition.key)
+        record = accept(self.player, definition.key)
         self._companion("同伴", self._grid_room(1, 1))
         self._enter(self._grid_room(1, 1))
         stored = self._records()[0]
@@ -155,7 +156,7 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(reach_stage(bound_instance_locator()),),
             )
         )
-        record = accept_quest(self.player, definition.key)
+        record = accept(self.player, definition.key)
         room = create_object(InstanceRoom, key="instance-arrival")
         bind_stage_runtime(self.player, record.quest_id, room=room)
         self._companion("同伴", room)
@@ -170,7 +171,7 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(escort_stage(anchor_locator()),),
             )
         )
-        record = accept_quest(self.player, definition.key)
+        record = accept(self.player, definition.key)
         first = self._npc("first")
         second = self._npc("second")
         bind_stage_runtime(
@@ -196,7 +197,7 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(escort_stage(anchor_locator()),),
             )
         )
-        record = accept_quest(self.player, definition.key)
+        record = accept(self.player, definition.key)
         guard = self._npc("dead-guard")
         bind_stage_runtime(self.player, record.quest_id, protected_entities=(guard,))
         anchor = self._anchor()
@@ -214,7 +215,7 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(reach_stage(bound_instance_locator()),),
             )
         )
-        record = accept_quest(self.player, definition.key)
+        record = accept(self.player, definition.key)
         room = create_object(InstanceRoom, key="interaction-room")
         bind_stage_runtime(self.player, record.quest_id, room=room)
         self._companion("同伴", room)
@@ -237,8 +238,8 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(reach_stage(anchor_locator()),),
             )
         )
-        accept_quest(self.player, first.key)
-        accept_quest(self.player, second.key)
+        accept(self.player, first.key)
+        accept(self.player, second.key)
         self._companion("同伴", self._anchor())
         self._enter(self._anchor())
         states = {entry["definition_key"]: entry["state"] for entry in self._records()}
@@ -253,7 +254,7 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(reach_stage(anchor_locator()),),
             )
         )
-        record = accept_quest(self.player, definition.key)
+        record = accept(self.player, definition.key)
         self._companion("同伴", self._anchor())
         self._enter(self._anchor())
         self.assertEqual(self._records()[0]["state"], "completed")
@@ -272,7 +273,7 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 ),
             )
         )
-        accept_quest(self.player, definition.key)
+        accept(self.player, definition.key)
         self._companion("同伴", self._anchor())
         self._enter(self._anchor())
         stored = self._records()[0]
@@ -293,7 +294,7 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
             stages=(QuestStage(0, reach(anchor_locator(), quantity=2)),),
         )
         QUEST_DEFINITION_REGISTRY[definition.key] = definition
-        accept_quest(self.player, definition.key)
+        accept(self.player, definition.key)
         self._companion("同伴", self._anchor())
         self._enter(self._anchor())
         stored = self._records()[0]
@@ -364,7 +365,7 @@ class PartyArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(reach_stage(anchor_locator()),),
             )
         )
-        accept_quest(self.player, definition.key)
+        accept(self.player, definition.key)
         self._companion("跟隨者")
         self.door.at_traverse(self.player, self.anchor)
         self.assertIs(self.player.location, self.anchor)
@@ -381,7 +382,7 @@ class PartyArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(reach_stage(anchor_locator()),),
             )
         )
-        accept_quest(self.player, definition.key)
+        accept(self.player, definition.key)
         companion = self._companion("等候者")
         companion.move_to(self.anchor, quiet=True)
         self.door.at_traverse(self.player, self.anchor)
@@ -397,7 +398,7 @@ class PartyArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(reach_stage(anchor_locator()),),
             )
         )
-        accept_quest(self.player, definition.key)
+        accept(self.player, definition.key)
         self._companion("往返者")
         self.door.at_traverse(self.player, self.anchor)
         first = self._records()[0]
@@ -418,7 +419,7 @@ class PartyArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(escort_stage(anchor_locator()),),
             )
         )
-        record = accept_quest(self.player, definition.key)
+        record = accept(self.player, definition.key)
         guard = create_object(NPC, key="stay-guard")
         guard.race = "human"
         guard.apply_race_baseline()
@@ -441,7 +442,7 @@ class PartyArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(escort_stage(anchor_locator()),),
             )
         )
-        record = accept_quest(self.player, definition.key)
+        record = accept(self.player, definition.key)
         guard = create_object(NPC, key="dead-traversal-guard")
         guard.race = "human"
         guard.apply_race_baseline()
@@ -461,7 +462,7 @@ class PartyArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
             stages=(QuestStage(0, reach(anchor_locator(), quantity=2)),),
         )
         QUEST_DEFINITION_REGISTRY[definition.key] = definition
-        accept_quest(self.player, definition.key)
+        accept(self.player, definition.key)
         waiting = self._companion("等候者")
         waiting.move_to(self.anchor, quiet=True)
         self._companion("跟隨者")
