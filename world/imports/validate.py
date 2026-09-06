@@ -656,6 +656,57 @@ def _flag_duplicate_keys(
             )
 
 
+def _flag_duplicate_issuer_keys(
+    reports: list[RecordReport],
+    records: Sequence[dict[str, Any]],
+) -> None:
+    """Append an issuer-key-uniqueness issue to every valid matching report.
+
+    The issuer-key grammar validates shape, not uniqueness; two carriers
+    sharing one authored ``npc:<content key>`` would share one commission
+    list (quest-issuer-model design risk). This applies the entity-key
+    contract style (``_flag_duplicate_keys``) to authored issuer keys: only
+    valid character reports carrying an explicit ``quest_issuer`` entry with
+    a non-empty ``issuer_key`` are flagged, and a record that already failed
+    earlier checks stays rejected on its own grounds.
+    """
+
+    def authored_keys(record: dict[str, Any]) -> list[str]:
+        keys: list[str] = []
+        entries = record.get("components") or []
+        if isinstance(entries, str) or not isinstance(entries, Sequence):
+            return keys
+        for entry in entries:
+            if not isinstance(entry, Mapping) or entry.get("type") != "quest_issuer":
+                continue
+            kwargs = entry.get("kwargs")
+            value = kwargs.get("issuer_key") if isinstance(kwargs, Mapping) else None
+            if isinstance(value, str) and value:
+                keys.append(value)
+        return keys
+
+    keys_by_record = {id(record): authored_keys(record) for record in records}
+    duplicates = {
+        key
+        for key, count in Counter(
+            key for keys in keys_by_record.values() for key in keys
+        ).items()
+        if count > 1
+    }
+    for report in reports:
+        record = report.record
+        if not (report.is_valid and record):
+            continue
+        offending = sorted(set(keys_by_record.get(id(record), [])) & duplicates)
+        if offending:
+            report.rejections.append(
+                Issue(
+                    "components",
+                    f"duplicate authored issuer key {offending[0]!r} in batch",
+                )
+            )
+
+
 def validate_character(
     record: dict[str, Any], typeclass: type | None = None
 ) -> RecordReport:
@@ -764,6 +815,7 @@ def validate_batch(
 
     _flag_duplicate_keys(reports, character_records, "character", "character")
     _flag_duplicate_keys(reports, world_records, "world_entry", "world-entry")
+    _flag_duplicate_issuer_keys(reports, character_records)
     return BatchReport(reports, collect_degraded_checks())
 
 

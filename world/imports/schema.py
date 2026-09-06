@@ -235,11 +235,11 @@ CHARACTER_SCHEMA_V1 = {
                 "[{type, kwargs}]. An entry's type must name a key of the "
                 "profession component vocabulary and its kwargs are the authored "
                 "service-identity values (service_id, shop_key, branch_key, "
-                "dialogue_key as the component class defines them); the loader "
-                "never invents identity. Entries override the profession "
-                "blueprint for their type (design D5) and may add vocabulary "
-                "components the blueprint omits. Valid only alongside a "
-                "profession; only for NPC-targeted imports."
+                "dialogue_key, issuer_key as the component class defines "
+                "them); the loader never invents identity. Entries override "
+                "the profession blueprint for their type (design D5) and may "
+                "add vocabulary components the blueprint omits. Valid only "
+                "alongside a profession; only for NPC-targeted imports."
             ),
         },
         "anchor_room": {

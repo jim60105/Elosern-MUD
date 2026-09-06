@@ -16,6 +16,11 @@
 #     behavior-neutral.
 #   - `guild_examiner` is the task-prescribed examiner/dialogue blueprint
 #     (a reusable subset; sync attaches no examiner-only host today).
+#   - `quest_issuer` is person-bound (quest-issuer-model D4): a commission
+#     travels with the commissioner, so the authority must not be tied to a
+#     room. A person-bound row can never anchor a roster row (config rejects
+#     person-bound roster components); commissioners arrive through authored
+#     import content instead.
 schema_version: 1
 professions:
   - key: merchant
@@ -34,5 +39,10 @@ professions:
     components:
       - { type: guild_examiner, default_binding: place }
       - { type: scripted_dialogue, default_binding: place }
+    schedule_template: null
+    default_tier: null
+  - key: quest_issuer
+    components:
+      - { type: quest_issuer, default_binding: person }
     schedule_template: null
     default_tier: null

@@ -42,6 +42,14 @@ lets authors write a commission list before any primary key exists.
   `npc:#<pk>`; a host without the component resolves to nothing.
 - `resolve_local_service_host(actor, QuestIssuer)` becomes usable with no change to that function —
   it is already generic over the component class.
+- The profession loader rejects any rulebook row whose FIRST component class defines no
+  `service_id` (named error), so the roster-sync reuse-path invariant is enforced at authoring time
+  and pinned by a contract test.
+- The startup service-host convergence never treats person-bound service components as
+  roster-managed anchors: an imported commissioner carries a service anchor the roster can neither
+  claim nor re-create, so its host is never converged away (design D5).
+- The import batch validator rejects a batch in which two records author the same non-empty
+  `issuer_key`, in the entity-key contract style (design D6).
 
 ## Capabilities
 
@@ -65,6 +73,8 @@ changes no requirement's behavior.)
   anchor-must-carry-`service_id` contract.
 - `world/rules/rulebook/professions.yaml`: commissioner blueprint row.
 - `world/rules/quest_issuance.py`: `resolve_issuer_key(host)`.
+- `world/rules/guild_economy.py`: convergence candidacy excludes person-bound service components.
+- `world/imports/validate.py`: batch-level duplicate authored-`issuer_key` rejection.
 - `world/imports/schema.py`: the component-entry description enumerates the identity fields each
   component class defines; `issuer_key` joins that list.
 - No behavior change for any existing NPC: nothing carries the new component until content authors

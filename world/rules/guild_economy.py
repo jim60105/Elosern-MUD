@@ -122,16 +122,21 @@ def _converge_service_hosts(roster_service_ids: set[str]) -> None:
     (vocabulary class defining ``service_id``) carries an id absent from the
     roster — but deletion fires only when EVERY claimed id is roster-absent,
     so a host the roster still wants through ANY anchor is never destroyed.
-    A candidate still holding a roster-matching anchor survives: TITLED mixed
-    residue is ambiguous (a hand-authored NPC sharing a stale id cannot be
-    distinguished) and is kept with a named warning for manual repair; a
-    titleless one survives silently, its stray component outside the roster's
-    concern. A candidate whose EVERY service anchor is roster-absent is
-    either a shrunk-away roster host or unambiguous development residue and
-    is deleted (a roster row returning later recreates the full authored
-    identity). An NPC carrying no service component is never touched,
-    exactly as the pre-change cleanup. Each deletion emits one commit-bound
-    info event (party bindings purge through ``NPC.at_object_delete``).
+    Person-bound service components (authored through imports, never anchorable
+    by a roster row — a roster row anchors only place-bound components) are
+    never candidacy evidence: the roster can neither claim nor re-create them,
+    so they are skipped when collecting claimed ids, and a host carrying one
+    is never deleted. A candidate still holding a roster-matching anchor
+    survives: TITLED mixed residue is ambiguous (a hand-authored NPC sharing a
+    stale id cannot be distinguished) and is kept with a named warning for
+    manual repair; a titleless one survives silently, its stray component
+    outside the roster's concern. A candidate whose EVERY service anchor is
+    roster-absent is either a shrunk-away roster host or unambiguous
+    development residue and is deleted (a roster row returning later recreates
+    the full authored identity). An NPC carrying no service component is never
+    touched, exactly as the pre-change cleanup. Each deletion emits one
+    commit-bound info event (party bindings purge through
+    ``NPC.at_object_delete``).
     """
     service_classes = [
         component_class
@@ -140,9 +145,16 @@ def _converge_service_hosts(roster_service_ids: set[str]) -> None:
     ]
     for host in list(NPC.objects.all_family()):
         claimed = []
+        carries_person_anchor = False
         for component_class in service_classes:
             component = host.components.get(component_class.get_component_slot())
             if component is not None:
+                if component.service_binding == "person":
+                    # Authored outside the roster; never candidacy evidence
+                    # (quest-issuer-model D5). The host is never converged
+                    # away for a commission the roster cannot re-create.
+                    carries_person_anchor = True
+                    continue
                 claimed.append(component.service_id)
         if not claimed:
             continue
@@ -161,6 +173,20 @@ def _converge_service_hosts(roster_service_ids: set[str]) -> None:
                         "service": stale[0],
                         "services": list(claimed),
                     },
+                )
+            continue
+        if carries_person_anchor:
+            # Mixed residue: a person-bound commission rides this host, and
+            # every roster-manageable anchor it carries is stale. Deleting it
+            # would destroy an identity the roster cannot re-create; keep and
+            # warn for manual repair (titled-ambiguous precedent).
+            log_warn(
+                "guild_service_host_convergence_ambiguous",
+                context={
+                    "char": host.key,
+                    "service": stale[0],
+                    "services": list(claimed),
+                },
                 )
             continue
         host.delete()

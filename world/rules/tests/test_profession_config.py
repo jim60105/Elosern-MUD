@@ -55,9 +55,11 @@ class ShippedTableTests(ProfessionCacheIsolation):
     @covers_requirement(
         "profession-registries::professions-are-one-validated-rulebook-table-with-keyed-frozen-reads",
     )
-    def test_shipped_table_exposes_the_three_blueprint_professions(self):
+    def test_shipped_table_exposes_the_four_blueprint_professions(self):
         table = load_professions()
-        self.assertEqual(set(table), {"merchant", "guild_staff", "guild_examiner"})
+        self.assertEqual(
+            set(table), {"merchant", "guild_staff", "guild_examiner", "quest_issuer"}
+        )
 
         merchant = table["merchant"]
         self.assertEqual([(c.type_key, c.default_binding) for c in merchant.components], [("merchant", "place")])
@@ -72,6 +74,12 @@ class ShippedTableTests(ProfessionCacheIsolation):
         self.assertEqual(
             [(c.type_key, c.default_binding) for c in examiner.components],
             [("guild_examiner", "place"), ("scripted_dialogue", "place")],
+        )
+
+        issuer = table["quest_issuer"]
+        self.assertEqual(
+            [(c.type_key, c.default_binding) for c in issuer.components],
+            [("quest_issuer", "person")],
         )
 
         for profession in table.values():
@@ -110,8 +118,10 @@ class ShippedTableTests(ProfessionCacheIsolation):
         logged.assert_called_once()
         event, kwargs = logged.call_args[0], logged.call_args[1]
         self.assertEqual(event, ("profession_rulebook_loaded",))
-        self.assertEqual(kwargs["context"]["count"], 3)
-        self.assertEqual(sorted(table), ["guild_examiner", "guild_staff", "merchant"])
+        self.assertEqual(kwargs["context"]["count"], 4)
+        self.assertEqual(
+            sorted(table), ["guild_examiner", "guild_staff", "merchant", "quest_issuer"]
+        )
 
 
 class RejectionTests(ProfessionCacheIsolation):
@@ -329,6 +339,82 @@ class ComponentVocabularyContractTests(unittest.TestCase):
                 self.assertTrue(isinstance(component_class, type))
                 self.assertIs(getattr(components, component_class.__name__), component_class)
                 self.assertEqual(component_class.name, type_key)
+
+
+class ServiceIdAnchorContractTests(ProfessionCacheIsolation):
+    """Contract: every profession row anchors on a class carrying service_id.
+
+    The roster-sync reuse path reads ``service_id`` unconditionally on the
+    FIRST component class of a row's profession (guild_economy's
+    ``_row_anchor_class`` then ``_find_service_host``); a row anchored on a
+    class without the field would raise ``AttributeError`` inside the startup
+    sync. The loader therefore rejects such a row at authoring time, and this
+    contract pins both the shipped rulebook and the named rejection.
+    """
+
+    SHIPPED_RULEBOOK = (
+        Path(profession_config.__file__).parent / "rulebook" / "professions.yaml"
+    )
+
+    def _anchor_offenders(self, rows: list[dict]) -> list[str]:
+        offenders: list[str] = []
+        for row in rows:
+            first_type = row["components"][0]["type"]
+            component_class = PROFESSION_COMPONENT_TYPES.get(first_type)
+            if component_class is None or "service_id" not in component_class._fields:
+                offenders.append(row["key"])
+        return offenders
+
+    def _shipped_rows(self) -> list[dict]:
+        raw = yaml.safe_load(self.SHIPPED_RULEBOOK.read_text(encoding="utf-8"))
+        return raw["professions"]
+
+    @covers_requirement(
+        "quest-issuer-authorization::every-profession-row-anchors-on-a-component-that-carries-a-service-identity",
+    )
+    def test_every_shipped_row_anchors_on_a_service_id_class(self):
+        self.assertEqual(self._anchor_offenders(self._shipped_rows()), [])
+
+    @covers_requirement(
+        "quest-issuer-authorization::every-profession-row-anchors-on-a-component-that-carries-a-service-identity",
+    )
+    def test_a_row_anchored_on_an_identity_less_class_is_named(self):
+        # The loader refuses to produce a table whose rows could crash the
+        # startup sync: the raised error names the offending row and anchor.
+        dialogue_first = {
+            "key": "dialogue_first",
+            "components": [{"type": "scripted_dialogue", "default_binding": "place"}],
+            "schedule_template": None,
+            "default_tier": None,
+        }
+        rows = [base_row("legit_merchant"), dialogue_first]
+        with tempfile.TemporaryDirectory() as home:
+            path = Path(home) / "professions.yaml"
+            path.write_text(yaml.safe_dump(base_file(*rows)), encoding="utf-8")
+            sentinel = object()
+            profession_config.TABLE = sentinel
+            with self.assertRaises(ProfessionConfigError) as caught:
+                load_professions(path)
+            self.assertIs(profession_config.TABLE, sentinel)
+        message = str(caught.exception)
+        self.assertIn("dialogue_first", message)
+        self.assertIn("scripted_dialogue", message)
+        self.assertIn("service_id", message)
+
+    @covers_requirement(
+        "quest-issuer-authorization::every-profession-row-anchors-on-a-component-that-carries-a-service-identity",
+    )
+    def test_quest_issuer_anchor_satisfies_the_contract(self):
+        row = base_row("commissioner_row")
+        row["components"] = [{"type": "quest_issuer", "default_binding": "person"}]
+        with tempfile.TemporaryDirectory() as home:
+            path = Path(home) / "professions.yaml"
+            path.write_text(yaml.safe_dump(base_file(row)), encoding="utf-8")
+            table = load_professions(path)
+        self.assertEqual(
+            [(c.type_key, c.default_binding) for c in table["commissioner_row"].components],
+            [("quest_issuer", "person")],
+        )
 
 
 if __name__ == "__main__":

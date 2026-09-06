@@ -413,3 +413,116 @@ class ImportBoundaryEventTests(BatchFileHarness, EvenniaTestCase):
             "import_batch_committed",
             context={"records": 1, "typeclass": "NPC"},
         )
+
+
+class DuplicateIssuerKeyTests(BatchFileHarness, EvenniaTestCase):
+    """quest-issuer-authorization: authored issuer keys stay batch-unique.
+
+    The issuer-key grammar validates shape, not uniqueness, so the loader
+    applies the entity-key contract style: two records authoring the same
+    non-empty ``issuer_key`` would share one commission list and fail the
+    whole batch, while distinct keys validate clean.
+    """
+
+    def _commissioner(self, key, service_id, issuer_key="grey_granny"):
+        record = example_record()
+        record["key"] = key
+        record["profession"] = "quest_issuer"
+        record["anchor_room"] = None  # person-bound: co-presence carries no anchor
+        record["components"] = [
+            {
+                "type": "quest_issuer",
+                "kwargs": {"service_id": service_id, "issuer_key": issuer_key},
+            },
+        ]
+        return record
+
+    @covers_requirement(
+        "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline",
+    )
+    def test_duplicate_authored_issuer_keys_reject_the_whole_batch(self):
+        first_path = self.write(
+            "granny_one.json", self._commissioner("granny_one", "slot_one")
+        )
+        second_path = self.write(
+            "granny_two.json", self._commissioner("granny_two", "slot_two")
+        )
+        report = validate_batch([first_path, second_path])
+        self.assertFalse(report.all_valid)
+        for record_report in report.records:
+            self.assertTrue(
+                any(
+                    issue.field == "components"
+                    and "duplicate authored issuer key 'grey_granny'" in issue.message
+                    for issue in record_report.rejections
+                ),
+                record_report.rejections,
+            )
+        with patch("world.imports.loader._instantiate_validated_character") as instantiate:
+            with self.assertRaises(ImportRejected):
+                load_batch([first_path, second_path])
+        instantiate.assert_not_called()
+
+    @covers_requirement(
+        "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline",
+    )
+    def test_distinct_authored_issuer_keys_validate_clean(self):
+        first_path = self.write(
+            "granny_one.json",
+            self._commissioner("granny_one", "slot_one", issuer_key="grey_granny"),
+        )
+        second_path = self.write(
+            "granny_two.json",
+            self._commissioner("granny_two", "slot_two", issuer_key="old_hobb"),
+        )
+        report = validate_batch([first_path, second_path])
+        self.assertTrue(report.all_valid, [r.rejections for r in report.records])
+
+    @covers_requirement(
+        "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline",
+    )
+    def test_an_unauthored_issuer_key_never_counts_toward_duplicates(self):
+        # An absent issuer_key is the identity form, not an authored value:
+        # two carriers resolving to their own primary keys never collide.
+        first_path = self.write(
+            "unnamed_one.json",
+            self._commissioner("unnamed_one", "slot_one", issuer_key=None),
+        )
+        second_path = self.write(
+            "unnamed_two.json",
+            self._commissioner("unnamed_two", "slot_two", issuer_key=None),
+        )
+        report = validate_batch([first_path, second_path])
+        self.assertTrue(report.all_valid, [r.rejections for r in report.records])
+
+    @covers_requirement(
+        "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline",
+    )
+    def test_invalid_records_and_world_entries_never_join_the_duplicate_scan(self):
+        # The scan covers only VALID character records: an invalid character
+        # sharing an issuer key stays rejected on its own grounds only, and a
+        # world entry is structurally outside the scan.
+        world = {
+            "record_type": "world_entry",
+            "schema_version": 1,
+            "key": "issuer_shaped_entry",
+            "content": "grey_granny",
+        }
+        world_path = self.write("world.json", world)
+        valid_path = self.write(
+            "granny_one.json", self._commissioner("granny_one", "slot_one")
+        )
+        invalid = self._commissioner("granny_two", "slot_two")
+        invalid["title"] = 12345  # own-ground rejection, not the issuer scan
+        invalid_path = self.write("granny_two.json", invalid)
+        report = validate_batch([valid_path, invalid_path, world_path])
+        self.assertFalse(report.all_valid)
+        for record_report in report.records:
+            if record_report.record.get("key") == "granny_one":
+                self.assertTrue(
+                    all(
+                        "duplicate authored issuer key" not in issue.message
+                        for issue in record_report.rejections
+                    ),
+                    record_report.rejections,
+                )

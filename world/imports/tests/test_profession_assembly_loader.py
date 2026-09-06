@@ -22,6 +22,7 @@ from world.imports.loader import ImportRejected, load_batch
 from world.imports.tests.helpers import example_record
 from world.rules import profession_config
 from world.rules.profession_config import Profession, ProfessionComponent
+from world.rules.quest_issuance import resolve_issuer_key
 from world.rules.traits import initial_trait_config
 
 
@@ -50,6 +51,12 @@ TIERED_PROBE = Profession(
 COURIER_PROBE = Profession(
     key="courier",
     components=(ProfessionComponent("scripted_dialogue", "person"),),
+    schedule_template=None,
+    default_tier=None,
+)
+COMMISSIONER_PROBE = Profession(
+    key="quest_issuer",
+    components=(ProfessionComponent("quest_issuer", "person"),),
     schedule_template=None,
     default_tier=None,
 )
@@ -621,4 +628,98 @@ class AnchorRoomTests(ProfessionAssemblyHarness):
         self.assertIn("no_such_room_tag", str(ctx.exception))
         self.assertFalse(
             NPC.objects.filter(db_key="ghost_anchor_merchant").exists()
+        )
+
+
+class QuestIssuerAssemblyTests(ProfessionAssemblyHarness):
+    """quest-issuer-authorization: authored commissioners ride the import path."""
+
+    def setUp(self):
+        super().setUp()
+        extended = dict(PROBE_TABLE)
+        extended["quest_issuer"] = COMMISSIONER_PROBE
+        patcher = patch.object(profession_config, "TABLE", MappingProxyType(extended))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    @covers_requirement(
+        "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline",
+    )
+    def test_an_authored_record_gains_the_component_with_its_identity(self):
+        record = example_record()
+        record["key"] = "authored_commissioner"
+        record["profession"] = "quest_issuer"
+        record["anchor_room"] = None  # person-bound: co-presence carries no anchor
+        record["components"] = [
+            {
+                "type": "quest_issuer",
+                "kwargs": {"service_id": "grey_granny_slot", "issuer_key": "grey_granny"},
+            },
+        ]
+        npc = self.assembled(record)
+        component = npc.components.get("quest_issuer")
+        self.assertEqual(component.service_id, "grey_granny_slot")
+        self.assertEqual(component.issuer_key, "grey_granny")
+
+    @covers_requirement(
+        "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline",
+    )
+    def test_a_merchant_can_also_be_a_commissioner(self):
+        record = example_record()
+        record["key"] = "merchant_commissioner"
+        record["profession"] = "merchant"  # place-bound: the harness injects the anchor
+        record["components"] = [
+            {
+                "type": "merchant",
+                "kwargs": {"service_id": "stall_slot", "shop_key": "side_stall"},
+            },
+            {
+                "type": "quest_issuer",
+                "kwargs": {"service_id": "granny_slot", "issuer_key": "grey_granny"},
+            },
+        ]
+        npc = self.assembled(record)
+        self.assertTrue(npc.components.has("merchant"))
+        self.assertTrue(npc.components.has("quest_issuer"))
+        self.assertEqual(npc.components.get("merchant").shop_key, "side_stall")
+        self.assertEqual(npc.components.get("quest_issuer").issuer_key, "grey_granny")
+
+    @covers_requirement(
+        "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline",
+    )
+    def test_the_loader_never_invents_an_issuer_key(self):
+        record = example_record()
+        record["key"] = "unauthored_commissioner"
+        record["profession"] = "quest_issuer"
+        record["anchor_room"] = None
+        record["components"] = [
+            {"type": "quest_issuer", "kwargs": {"service_id": "grey_granny_slot"}},
+        ]
+        npc = self.assembled(record)
+        component = npc.components.get("quest_issuer")
+        self.assertIsNone(component.issuer_key)
+        self.assertEqual(resolve_issuer_key(npc), f"npc:#{npc.pk}")
+
+    @covers_requirement(
+        "quest-issuer-authorization::commissioner-authority-is-authorable-through-the-import-pipeline",
+    )
+    def test_a_blueprint_only_commissioner_is_a_named_identity_rejection(self):
+        # quest_issuer carries service_id as its only identity kwarg, so a
+        # blueprint-only commissioner can never attach: named issue, not a
+        # silently identity-less component.
+        record = example_record()
+        record["key"] = "blueprint_only_commissioner"
+        record["profession"] = "quest_issuer"
+        record["anchor_room"] = None
+        path = self.write("blueprint_commissioner.json", record)
+        with self.assertRaises(ImportRejected) as ctx:
+            load_batch([path])
+        blob = " ".join(
+            f"{issue.field} {issue.message}"
+            for report in ctx.exception.report.records
+            for issue in report.rejections
+        )
+        self.assertIn("service_id", blob)
+        self.assertFalse(
+            NPC.objects.filter(db_key="blueprint_only_commissioner").exists()
         )

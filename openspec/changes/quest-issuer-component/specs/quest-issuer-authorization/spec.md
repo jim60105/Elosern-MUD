@@ -113,6 +113,15 @@ explicit and accepted — a roster-created commissioner receives no authored `is
 to its identity form, while the import path, which passes authored kwargs through verbatim, is where
 an authored content key is supplied.
 
+The loader SHALL apply the entity-key contract style to authored issuer keys: a batch in which two
+records author the same non-empty `issuer_key` SHALL be rejected naming the colliding key, because
+the grammar validates shape and not uniqueness, and two carriers sharing one authored content key
+would share one commission list.
+
+Because a person-bound component can never anchor a roster row, an imported commissioner carries a
+service anchor the roster can never claim or re-create; the startup service-host convergence SHALL
+NOT treat such a host as shrunken-away roster residue and SHALL NOT delete it.
+
 #### Scenario: An authored record gains the component with its identity
 - **WHEN** a character record declares an explicit `quest_issuer` component entry with an
   `issuer_key`
@@ -133,3 +142,13 @@ an authored content key is supplied.
 - **WHEN** the world is synchronized after this capability lands with no content authoring the
   component
 - **THEN** no NPC carries `QuestIssuer` and no entity's behavior changes
+
+#### Scenario: Two records cannot author the same commission identity
+- **WHEN** one batch declares two records whose explicit `quest_issuer` entries carry the same
+  non-empty `issuer_key`
+- **THEN** the batch is rejected naming the duplicate key, and no record of it is instantiated
+
+#### Scenario: An imported commissioner survives the startup service sync
+- **WHEN** the guild-economy roster synchronization runs after a person-bound commissioner was
+  assembled through the import path with a service anchor the roster does not list
+- **THEN** the commissioner is not converged away, and its component and resolved key are intact
