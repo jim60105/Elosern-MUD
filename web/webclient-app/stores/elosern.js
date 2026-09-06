@@ -82,6 +82,7 @@ const PANEL_ALLOWLIST = [
   "roster",
   "possession_banner",
   "lore_codex",
+  "quest_log",
 ];
 
 // D5 (webclient-minimap-04-island-single-affordance): top-meta locationLabel

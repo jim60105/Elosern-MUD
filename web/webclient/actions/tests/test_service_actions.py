@@ -227,7 +227,9 @@ class ServiceAdapterTests(ServiceActionBase):
         self._register()
         result = _quest_accept_adapter(self.player, {"definition_key": "introductory_hunt"})
         self.assertEqual(result["outcome"], "success")
-        self.assertEqual(result["affected_panels"], ("services", "objectives"))
+        self.assertEqual(
+            result["affected_panels"], ("services", "objectives", "quest_log")
+        )
         records = read_records(self.player)
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].definition_key, "introductory_hunt")
@@ -415,7 +417,9 @@ class ServiceAdapterTests(ServiceActionBase):
         )
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "tracked")
-        self.assertEqual(result["affected_panels"], ("services", "objectives"))
+        self.assertEqual(
+            result["affected_panels"], ("services", "objectives", "quest_log")
+        )
         self.assertTrue(read_records(self.player)[0].tracked)
 
         # Untrack succeeds.
@@ -715,3 +719,36 @@ class ServiceDispatchTests(ServiceActionBase):
         obj_rows = last_panels["objectives"]["rows"]
         self.assertEqual(len(obj_rows), 1)
         self.assertEqual(obj_rows[0]["quest_id"], record.quest_id)
+
+    @covers_requirement(
+        "webclient-quest-log-panel::the-panel-is-pushed-on-every-quest-log-mutation"
+    )
+    def test_track_action_publishes_the_quest_log_panel(self):
+        self._register()
+        record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        coordinator = self._coordinator()
+
+        handle_ui_action(
+            self.session,
+            self.player,
+            self._envelope(
+                coordinator,
+                "guild.quest_track",
+                {"quest_id": record.quest_id, "tracked": True},
+            ),
+            self.action_registry,
+            self.registry,
+        )
+
+        result = self._last_result()
+        self.assertEqual(result["outcome"], "success")
+        updates = [call for call in self.session.sent if "ui_update" in call]
+        self.assertTrue(updates)
+        last_panels = updates[-1]["ui_update"][0][0]["panels"]
+        self.assertIn("quest_log", last_panels)
+        rows = last_panels["quest_log"]["rows"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["quest_id"], record.quest_id)
+        self.assertTrue(rows[0]["tracked"])
+        self.assertEqual(rows[0]["issuer"]["kind"], "guild")
+        self.assertEqual(rows[0]["issuer"]["key"], "guild:guild_branch_altoria")

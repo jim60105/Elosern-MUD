@@ -29,6 +29,7 @@ const PANEL_ALLOWLIST = [
   "roster",
   "possession_banner",
   "lore_codex",
+  "quest_log",
 ];
 
 function openActiveSession(store) {

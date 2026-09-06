@@ -195,6 +195,10 @@ def build_production_registry() -> PresentationRegistry:
         OBJECTIVES_SCHEMA_VERSION,
         objectives_presenter,
     )
+    from web.webclient.presentation.quest_log import (
+        QUEST_LOG_SCHEMA_VERSION,
+        quest_log_presenter,
+    )
     from web.webclient.presentation.party import (
         PARTY_SCHEMA_VERSION,
         party_presenter,
@@ -361,6 +365,16 @@ def build_production_registry() -> PresentationRegistry:
             schema_version=LORE_CODEX_SCHEMA_VERSION,
             unavailable_reason=("lore_codex_unavailable", "知識圖鑑目前無法顯示"),
             presenter=lore_codex_presenter,
+        )
+    )
+    registry.register(
+        PresenterSpec(
+            name="quest_log",
+            schema_version=QUEST_LOG_SCHEMA_VERSION,
+            # The delta pins the panel to the registered COMMON unavailable
+            # form (shared reason and semantics), not a bespoke reason.
+            unavailable_reason=UNAVAILABLE_REASON,
+            presenter=quest_log_presenter,
         )
     )
     return registry

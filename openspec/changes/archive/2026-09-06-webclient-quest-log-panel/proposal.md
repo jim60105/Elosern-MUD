@@ -20,21 +20,23 @@ all, so a host-gated read model cannot show them.
 - Each row carries the record's identity and progress (`quest_id`, `definition_key`, `display_name`,
   `state`, `stage_index`, `stage_total`, `stage_progress`, `objective_quantity`, `tracked`), its
   prose (`objective_line`, `deadline_line`, `detail`), its commission (`issuer` with kind, key, and
-  display label; `settlement`; nullable `reward_line`), and the always-available `track` action
+  display label; nullable `settlement` and `reward_line`), and the always-available `track` action
   descriptor.
 - All prose comes from the canonical describe seams — `describe_objective`, `describe_deadline`,
   `describe_quest_detail`, `describe_reward` — so the quest book, the objective tracker, and the
   guild counter can never disagree.
 - An unresolvable issuance yields a null `reward_line` rather than a fabricated one; the row still
-  renders.
+  renders with a null `settlement` rather than an invented one.
 - A `QuestDataError` from the strict reader degrades the WHOLE panel to the registry-owned common
   unavailable form — never a partial row list.
 - Registry registration plus a coordinator dirty-flag push on the existing quest-log mutation seams.
 - Client-side validator mirroring the exact Python bounds, covered by the existing dual-direction
   parity test.
-- The `objectives` panel is deliberately left unchanged. It serves the HUD tracker island with
-  different bounds (three tracked in-progress rows) and a different lifecycle; both derive from the
-  same describe seams, so the duplication cannot drift.
+- The `objectives` panel's schema and row-selection semantics are deliberately left unchanged. It
+  serves the HUD tracker island with different bounds (three tracked in-progress rows) and a
+  different lifecycle; both derive from the same describe seams, so the duplication cannot drift.
+  Its publication on the trade seams is intentionally widened in this change (with `quest_log`) so
+  an ACQUIRE quest completed by a buy or sell cannot leave the tracker island stale.
 
 ## Capabilities
 

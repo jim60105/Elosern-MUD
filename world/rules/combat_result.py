@@ -56,7 +56,15 @@ def settle_to_messages(result: dict[str, Any]) -> tuple[tuple[str, ...], str]:
 # webclient-align-06: a settlement round can also advance a tracked quest
 # (DEFEAT planner), and the objectives panel always publishes together with
 # its paired services rows, so both ride the same partial update.
-AFFECTED_PANELS = ("status", "context_actions", "art", "party", "services", "objectives")
+AFFECTED_PANELS = (
+    "status",
+    "context_actions",
+    "art",
+    "party",
+    "services",
+    "objectives",
+    "quest_log",
+)
 
 
 def settle_to_oob_result(result: dict[str, Any]) -> dict[str, Any]:

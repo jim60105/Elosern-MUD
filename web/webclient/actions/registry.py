@@ -228,7 +228,7 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="guild.quest_accept",
             validate_payload=validate_quest_accept_payload,
             adapter=_quest_accept_adapter,
-            affected_panels=("services", "objectives"),
+            affected_panels=("services", "objectives", "quest_log"),
         )
     )
     registry.register(
@@ -236,7 +236,7 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="guild.quest_abandon",
             validate_payload=validate_quest_abandon_payload,
             adapter=_quest_abandon_adapter,
-            affected_panels=("services", "objectives"),
+            affected_panels=("services", "objectives", "quest_log"),
         )
     )
     registry.register(
@@ -244,7 +244,7 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="guild.quest_turnin",
             validate_payload=validate_quest_turnin_payload,
             adapter=_quest_turnin_adapter,
-            affected_panels=("status", "services", "objectives"),
+            affected_panels=("status", "services", "objectives", "quest_log"),
         )
     )
     registry.register(
@@ -252,7 +252,7 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="guild.quest_track",
             validate_payload=validate_quest_track_payload,
             adapter=_quest_track_adapter,
-            affected_panels=("services", "objectives"),
+            affected_panels=("services", "objectives", "quest_log"),
         )
     )
     registry.register(
@@ -268,7 +268,7 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="shop.buy",
             validate_payload=validate_buy_payload,
             adapter=_buy_adapter,
-            affected_panels=("status", "services"),
+            affected_panels=("status", "services", "objectives", "quest_log"),
         )
     )
     registry.register(
@@ -276,7 +276,7 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="shop.sell",
             validate_payload=validate_sell_payload,
             adapter=_sell_adapter,
-            affected_panels=("status", "services"),
+            affected_panels=("status", "services", "objectives", "quest_log"),
         )
     )
     registry.register(

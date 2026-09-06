@@ -52,6 +52,39 @@ Content edits can unregister a generated definition's issuance while a player ho
 quest is still real and still completable, so hiding it would be wrong. The row renders with a null
 reward line.
 
+The row also renders a null `settlement` in that case (review round two): the parent design pins
+`npc:` issuances to `auto` as a design intent, but the archived `quest-issuance` contract still
+admits either settlement value for a private commission — the shared test fixture itself registers
+an npc commission with `counter` — so a namespace-derived fallback could disclose a settlement the
+unregistered issuance never carried. Until a later change (the generative issuer work) narrows the
+construction contract to npc-implies-auto, an unresolvable row discloses `null` like its missing
+reward.
+
+### D5: Row cap truncation and counter-parity boundary
+
+The presenter carries the first `MAX_QUEST_ROWS` records in stored quest-log order (the services
+quest-row precedent); the validator still rejects an over-cap producer payload so drift fails
+closed. `detail` receives the resolved issuance, which keeps guild rows byte-identical to the
+`services` counter rows (same `.reward`) and omits the reward section exactly when the issuance is
+unresolvable. The counter parity scenario is stated for a clerk present at the record's issuing
+branch: `turn_in_quest` pays the offer at the serving staff's branch, and the quest book shows the
+commission terms the record's governing issuance carries — these coincide in every state the game
+can currently produce (one branch, registration never transfers), and any future branch-transfer
+feature must reconcile the turn-in payment, the counter rows, and this panel together.
+
+### D6: Push coverage beyond the affected-panel tuples
+
+The affected-panel tuples (accept, abandon, turn-in, track, and the trade surfaces) plus the
+combat-round `AFFECTED_PANELS` are the targeted publications. Every other quest-log mutation seam —
+stage advance on movement and engagement, deadline settlement on `explore.wait`, dialogue and NPC
+intent acceptance, inventory actions, and ordinary text-command settlement — publishes through the
+existing full-snapshot path, which re-renders every registered panel including `quest_log`. The
+same split covers `objectives` after this change, so neither quest surface can lag the other.
+
+The `npc:#<pk>` label resolution performs one bounded database read per row per panel build (at
+most twelve on a combat-round republish). This is accepted for correctness first; a request-local
+lookup cache is the first optimization if profiling ever shows the cost.
+
 ## Risks / Trade-offs
 
 - **`objectives` and `quest_log` overlap** → Accepted and deliberate. Both derive from the same

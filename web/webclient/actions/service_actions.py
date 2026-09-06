@@ -66,12 +66,12 @@ MIN_QUANTITY = 1
 # seam publishes the ``objectives`` panel beside its paired ``services`` rows
 # (webclient-align-06: the tracker island must never lag the quest log).
 AFFECTED_REGISTER = ("status", "services")
-AFFECTED_ACCEPT = ("services", "objectives")
-AFFECTED_ABANDON = ("services", "objectives")
-AFFECTED_TURNIN = ("status", "services", "objectives")
+AFFECTED_ACCEPT = ("services", "objectives", "quest_log")
+AFFECTED_ABANDON = ("services", "objectives", "quest_log")
+AFFECTED_TURNIN = ("status", "services", "objectives", "quest_log")
 AFFECTED_EXAM = ("status", "services", "context_actions")
-AFFECTED_TRADE = ("status", "services")
-AFFECTED_TRACK = ("services", "objectives")
+AFFECTED_TRADE = ("status", "services", "objectives", "quest_log")
+AFFECTED_TRACK = ("services", "objectives", "quest_log")
 
 
 class ServiceActionError(ValueError):
