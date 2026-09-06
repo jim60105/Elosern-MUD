@@ -6,8 +6,9 @@ Register the eight counter-gated 戰鬥線 acts across four tiers, filling the c
 one seed act to nine. Tier 1 opens at `hostile_act_count >= 5`, Tier 2 at `hostile_act_count >= 20`,
 Tier 3 at the compound `hostile_act_count >= 40` + `climax_count >= 30` gate, and Tier 5 at the
 compound `hostile_act_count >= 80` + `climax_extension_count >= 30` gate with the sole AREA act
-絕頂支配. Every act keeps the seed's asymmetric crediting convention (`actor_counters` only, never a
-counter on a hostile target) and declares no `sexual_events` — 魅惑/束縛愛撫's accuracy/agility-debuff
+絕頂支配. Every act credits `hostile_act_count` symmetrically (`actor_counters` and
+`participant_counters` — the counter records participation from either side) and declares no
+`sexual_events` — 魅惑/束縛愛撫's accuracy/agility-debuff
 flavour reuses the already-shipped `high_arousal_agility_accuracy_penalty` combat-modifier row
 unchanged.
 
@@ -25,8 +26,11 @@ unchanged.
 `unlock={"hostile_act_count": 40, "climax_count": 30}` (`combat_forced_climax`,
 `combat_relentless_torment`); and one act declaring the compound gate
 `unlock={"hostile_act_count": 80, "climax_extension_count": 30}` (`combat_climax_domination`).
-Every one of these eight acts SHALL declare `resistible=True`, `actor_counters=("hostile_act_count",)`,
-and `participant_counters=()`.
+Every one of these eight acts SHALL declare `resistible=True`,
+`actor_counters=("hostile_act_count",)`, and
+`participant_counters=("hostile_act_count",)`. A hostile sexual act happens
+between two bodies, and `hostile_act_count` records participation from
+either side.
 
 #### Scenario: A Tier 1 act is locked below its threshold and unlocked at it
 - **WHEN** `SkillHandler.owned_keys()` is read for an entity with `hostile_act_count == 4`
@@ -48,11 +52,11 @@ and `participant_counters=()`.
 - **WHEN** the same entity's `climax_extension_count` becomes `30`
 - **THEN** `combat_climax_domination` is present in the returned set
 
-#### Scenario: Casting any of the eight acts credits hostile_act_count on the actor only
+#### Scenario: Casting any of the eight acts credits hostile_act_count on every participant
 - **WHEN** entity A at the Tier 1 unlock threshold (`hostile_act_count == 5`) casts
   `combat_tease_whisper` targeting hostile entity B at `hostile_act_count == 0`
 - **THEN** afterward `A.sexual.hostile_act_count` equals `6` and `B.sexual.hostile_act_count`
-  remains `0`
+  equals `1`
 
 ### Requirement: combat_forced_climax, combat_relentless_torment, and combat_climax_domination reliably clear the climax extension threshold
 `combat_forced_climax`, `combat_relentless_torment`, and `combat_climax_domination` SHALL each
