@@ -147,6 +147,13 @@ ART_SD_PREPIN_SAMPLES_FORMAT = False
 ART_SCHEDULER_ENABLED = False
 ART_SCHEDULER_INTERVAL_SECONDS = 30
 ART_SCHEDULER_LIMIT = 4
+
+# Adult-scene guard for the defeat settlement's violation hook
+# (defeat-aftermath-core D-C4): mirrors the production default in
+# server/conf/settings.py. This module deliberately does not import the
+# developer settings, so every knob the deterministic core reads must be
+# declared here.
+DEFEAT_ADULT_SCENES = True
 # The browser harness is fully offline: every LLM profile stays enabled for the
 # layers that are never called, but ``npc_dialogue`` is disabled so the free-form
 # dialogue seam degrades to the authored greeting/silence deterministically with
