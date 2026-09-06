@@ -89,7 +89,7 @@
 | [`裝備`](/game/command-reference?id=裝備) | 裝備或卸下裝備；免費動作，飾品上限 5 件。 |
 | [`拿`](/game/command-reference?id=拿) | 撿起地上的物品，登錄物品會同步計入背包清單。 |
 | [`丟`](/game/command-reference?id=丟) | 丟棄背包中的物品，登錄物品的背包清單記錄會同步移除。 |
-| [`給`](/game/command-reference?id=給) | 將物品交給他人，登錄物品的背包清單記錄會同步移除。 |
+| [`給`](/game/command-reference?id=給) | 將物品交給他人，登錄物品的背包清單記錄會同步移除；把任務物品交給任務綁定的對象時，交付目標會隨之推進。任務專屬的交付請用 [`交付`](/game/command-reference?id=交付)。 |
 | [`交付`](/game/command-reference?id=交付) | 把任務物品交給任務指定的對象；對象不符或未持有足夠物品時，不會改變任何東西。 |
 
 ## 角色建立與個人化

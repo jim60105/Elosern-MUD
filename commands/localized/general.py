@@ -29,6 +29,7 @@ from evennia.typeclasses.attributes import NickTemplateInvalid
 from evennia.utils import utils
 
 from world.lore.items import ITEM_REGISTRY
+from world.observability import log_warn
 from world.rules.equipment import (
     EquippedRemovalError,
     InventoryError,
@@ -51,6 +52,8 @@ class NumberedTargetCommand(_NumberedTargetCommand):
         super().parse()
         if self.number and self.args.startswith("個"):
             self.args = self.args[1:].lstrip()
+        if self.number and self.lhs.startswith("個"):
+            self.lhs = self.lhs[1:].lstrip()
 
 
 def _search_held(
@@ -148,7 +151,7 @@ def _transfer_with_plan(
             for extra_plan in extra_plans:
                 if extra_plan is not None:
                     apply_inventory_plan(extra_plan)
-    except _TransferRefused:
+    except _TransferRefused:  # observability: ignore R2: player-facing refusal; the caller's 你無法把物品交給 message is the report
         _reconcile_rollback(objs, origin, destination)
         return []
     except Exception:
@@ -345,10 +348,10 @@ class CmdDrop(_CmdDrop, NumberedTargetCommand):
                 plan = plan_inventory_delta(
                     caller, removals=tuple(key for _ in range(quantity))
                 )
-            except EquippedRemovalError:
+            except EquippedRemovalError:  # observability: ignore R2: player-facing refusal; the message is the report
                 caller.msg("你無法丟下已裝備的物品。")
                 return
-            except InventoryError:
+            except InventoryError:  # observability: ignore R2: player-facing refusal; the message is the report
                 caller.msg(f"你沒有帶著 {key}。")
                 return
             try:
@@ -377,10 +380,10 @@ class CmdDrop(_CmdDrop, NumberedTargetCommand):
         )
         try:
             plan = plan_inventory_delta(caller, removals=removals) if removals else None
-        except EquippedRemovalError:
+        except EquippedRemovalError:  # observability: ignore R2: player-facing refusal; the message is the report
             caller.msg("你無法丟下已裝備的物品。")
             return
-        except InventoryError:
+        except InventoryError:  # observability: ignore R2: player-facing refusal; the message is the report
             caller.msg(f"你沒有帶著 {key}。")
             return
         moved = _transfer_with_plan(
@@ -445,12 +448,23 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
                     caller, removals=tuple(key for _ in range(quantity))
                 )
                 receiver_plan = _receiver_plan(target, tuple(key for _ in range(quantity)))
-            except EquippedRemovalError:
+            except EquippedRemovalError:  # observability: ignore R2: player-facing refusal; the message is the report
                 caller.msg("你無法給予已裝備的物品。")
                 return
-            except InventoryError:
+            except InventoryError:  # observability: ignore R2: player-facing refusal; the message is the report
                 caller.msg(f"你沒有帶著 {key}。")
                 return
+            from world.rules.npc_intents import (
+                _pin_snapshots,
+                _restore_pin_snapshots,
+                _restore_surface_snapshots,
+                _surface_snapshots,
+                advance_deliveries_for_transfer,
+            )
+
+            giver_surfaces = _surface_snapshots(caller)
+            receiver_surfaces = _surface_snapshots(target)
+            pin_snapshots = _pin_snapshots(receiver_plan)
             try:
                 with transaction.atomic():
                     for _ in range(quantity):
@@ -458,9 +472,24 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
                     apply_inventory_plan(plan)
                     if receiver_plan is not None:
                         apply_inventory_plan(receiver_plan)
-            except Exception:
+                    advance_deliveries_for_transfer(caller, target, key, quantity, pin_snapshots)
+            except Exception as error:
+                log_warn(
+                    "give_transfer_failed",
+                    exc=error,
+                    context={
+                        "char": str(caller.pk),
+                        "target": str(target.pk),
+                        "branch": "canonical_key",
+                        "item": key,
+                    },
+                )
+                _restore_surface_snapshots(caller, giver_surfaces)
+                _restore_surface_snapshots(target, receiver_surfaces)
+                _restore_pin_snapshots(pin_snapshots)
                 target.contents_cache.init()
-                raise
+                caller.msg("物品交接失敗，什麼都沒有發生。")
+                return
             caller.msg(f"你把{name}交給了 {target.get_display_name(caller)}。")
             target.msg(f"{caller.get_display_name(target)} 把{name}交給了你。")
             return
@@ -482,20 +511,59 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
         try:
             plan = plan_inventory_delta(caller, removals=removals) if removals else None
             receiver_plan = _receiver_plan(target, removals)
-        except EquippedRemovalError:
+        except EquippedRemovalError:  # observability: ignore R2: player-facing refusal; the message is the report
             caller.msg("你無法給予已裝備的物品。")
             return
-        except InventoryError:
+        except InventoryError:  # observability: ignore R2: player-facing refusal; the message is the report
             caller.msg(f"你沒有帶著 {key}。")
             return
-        moved = _transfer_with_plan(
-            to_give,
-            destination=target,
-            move_type="give",
-            plan=plan,
-            extra_plans=(receiver_plan,),
-            origin=caller,
+        from world.rules.npc_intents import (
+            _pin_snapshots,
+            _restore_pin_snapshots,
+            _restore_surface_snapshots,
+            _surface_snapshots,
+            advance_deliveries_for_transfer,
         )
+
+        giver_surfaces = _surface_snapshots(caller) if removals else None
+        receiver_surfaces = _surface_snapshots(target) if removals else None
+        pin_snapshots = _pin_snapshots(receiver_plan) if removals else {}
+        try:
+            with transaction.atomic():
+                moved = _transfer_with_plan(
+                    to_give,
+                    destination=target,
+                    move_type="give",
+                    plan=plan,
+                    extra_plans=(receiver_plan,),
+                    origin=caller,
+                )
+                if moved and removals:
+                    counts: dict[str, int] = {}
+                    for item_key in removals:
+                        counts[item_key] = counts.get(item_key, 0) + 1
+                    for item_key, count in counts.items():
+                        advance_deliveries_for_transfer(
+                            caller, target, item_key, count, pin_snapshots
+                        )
+        except Exception as error:
+            log_warn(
+                "give_transfer_failed",
+                exc=error,
+                context={
+                    "char": str(caller.pk),
+                    "target": str(target.pk),
+                    "branch": "materialized",
+                    "item": key,
+                },
+            )
+            _reconcile_rollback(to_give, caller, target)
+            if removals:
+                _restore_surface_snapshots(caller, giver_surfaces)
+                _restore_surface_snapshots(target, receiver_surfaces)
+                _restore_pin_snapshots(pin_snapshots)
+            caller.msg("物品交接失敗，什麼都沒有發生。")
+            return
         if not moved:
             caller.msg(
                 f"你無法把物品交給 {target.get_display_name(caller)}。"
@@ -731,7 +799,7 @@ class CmdNick(_CmdNick):
                     string += f"\n{nicktypestr} '|w{nickstring}|n' 對應到 '|w{replstring}|n'。"
                 try:
                     caller.nicks.add(nickstring, replstring, category=nicktype)
-                except NickTemplateInvalid:
+                except NickTemplateInvalid:  # observability: ignore R2: player-facing refusal; the message is the report
                     caller.msg(
                         "暱稱與替換字串中必須使用相同的 $-標記。"
                     )

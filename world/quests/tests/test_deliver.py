@@ -33,7 +33,11 @@ from world.quests.tests._fixtures import (
     register,
     register_catalog_once,
 )
-from world.rules.npc_intents import _transfer_items, apply_npc_intent
+from world.rules.npc_intents import (
+    _transfer_items,
+    advance_deliveries_for_transfer,
+    apply_npc_intent,
+)
 
 
 class DeliverDefinitionTests(QuestRegistryIsolation, EvenniaTest):
@@ -369,6 +373,117 @@ class DeliverPurityAndAtomicityTests(QuestRegistryIsolation, EvenniaTest):
 
         self.assertFalse(outcome.applied)
         mock_log.assert_not_called()
+
+
+class DeliverSeamTests(QuestRegistryIsolation, EvenniaTest):
+    """Contract of the shared advance seam both transfer callers route through."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="seam room")
+        self.player = create_object(PlayerCharacter, key="seam player")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room
+        self.recipient = create_object(NPC, key="seam recipient", location=self.room)
+        self.recipient.race = "human"
+        self.recipient.apply_race_baseline()
+        self.bystander = create_object(NPC, key="seam bystander", location=self.room)
+        self.bystander.race = "human"
+        self.bystander.apply_race_baseline()
+
+        self.definition = register(
+            quest(
+                "deliver_seam_quest",
+                stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
+            )
+        )
+        self.record = accept(self.player, self.definition.key)
+        bind_stage_runtime(
+            self.player,
+            self.record.quest_id,
+            objective_targets=(self.recipient,),
+        )
+
+    def test_seam_advances_a_matching_delivery(self):
+        with (
+            patch("world.quests.deliver.log_info") as mock_log,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            advance_deliveries_for_transfer(
+                self.player, self.recipient, "healing_potion", 1, pin_snapshots={}
+            )
+
+        self.assertEqual(read_records(self.player)[0].stage_progress, 1)
+        mock_log.assert_called_once_with(
+            "delivery_progress",
+            context={
+                "char": str(self.player.pk),
+                "quest": self.definition.key,
+                "step": "0",
+            },
+        )
+
+    def test_seam_advances_nothing_for_an_unbound_receiver(self):
+        advance_deliveries_for_transfer(
+            self.player, self.bystander, "healing_potion", 1, pin_snapshots={}
+        )
+
+        self.assertEqual(read_records(self.player)[0].stage_progress, 0)
+
+    def test_seam_multi_record_advance_applies_min_quantity_per_record(self):
+        second_definition = register(
+            quest(
+                "deliver_seam_quest_two",
+                stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
+            )
+        )
+        second_record = accept(self.player, second_definition.key)
+        bind_stage_runtime(
+            self.player,
+            second_record.quest_id,
+            objective_targets=(self.recipient,),
+        )
+
+        advance_deliveries_for_transfer(
+            self.player, self.recipient, "healing_potion", 3, pin_snapshots={}
+        )
+
+        progress = {
+            record.quest_id: (record.stage_progress, record.state)
+            for record in read_records(self.player)
+        }
+        self.assertEqual(
+            progress,
+            {
+                self.record.quest_id: (2, QuestState.COMPLETED),
+                second_record.quest_id: (2, QuestState.COMPLETED),
+            },
+        )
+
+    @covers_requirement("quest-delivery::the-delivery-observer-computes-a-replacement-and-writes-nothing")
+    def test_seam_fault_inside_caller_transaction_rolls_back(self):
+        before_log = [dict(entry) for entry in (self.player.db.quest_log or [])]
+
+        def failing_delta(*args, **kwargs):
+            raise RuntimeError("injected advance failure")
+
+        with (
+            patch(
+                "world.quests.transitions.apply_quest_log_delta",
+                side_effect=failing_delta,
+            ),
+            transaction.atomic(),
+            self.assertRaises(RuntimeError),
+        ):
+            advance_deliveries_for_transfer(
+                self.player, self.recipient, "healing_potion", 1, pin_snapshots={}
+            )
+
+        self.assertEqual(read_records(self.player)[0].stage_progress, 0)
+        self.assertEqual(
+            [dict(entry) for entry in (self.player.db.quest_log or [])], before_log
+        )
 
 
 class DeliverProseTests(unittest.TestCase):

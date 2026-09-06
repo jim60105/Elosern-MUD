@@ -94,6 +94,12 @@ dict are initialized exactly as in the canonical-key branch, including
 Self-give needs no new guard: both branches already return before transferring when
 `target == caller`, and no transfer means no advance.
 
+Implementation note: the numbered-command tests surfaced a pre-existing parse gap in the zh-tw
+`NumberedTargetCommand` wrapper — it stripped a leading 「個」 from `self.args` but not from
+`self.lhs`, so every rhs-taking command (`給`) mis-parsed `給 2 個 <物品> = <對象>` as the key
+「個 <物品>」. The wrapper now strips the classifier from `lhs` too; the numbered give tests pin
+the corrected parse.
+
 ## D4: Quantity and multi-record semantics are the observer's, unchanged
 
 The give advances by the transferred quantity per key — one invocation per distinct key. The
@@ -108,6 +114,10 @@ progress 1 with the affordance still advertising the remaining 1 — the same se
 - `cmd_in` / `cmd_done` bracket every `給` invocation through the repo command base class
   (`commands/command.py`), with the raw args in context — the operator already sees
   `給 治療藥水 = 灰婆婆` at the boundary.
+- The two give except paths convert a previously propagating crash into a safe rollback + message,
+  which would make `cmd_done` report `outcome=ok` for a fault. They therefore emit
+  `log_warn("give_transfer_failed", exc=..., context={char, target, branch, item})` before
+  restoring, keeping the exception chain visible at the command boundary.
 - The seam schedules the observer's `delivery_progress` events per advanced quest on durable
   commit, identical to `_transfer_items`.
 - No `delivery_handover` from the give path: that event is `world.rules.quest_delivery`'s
