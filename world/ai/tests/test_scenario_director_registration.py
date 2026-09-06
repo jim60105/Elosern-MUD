@@ -301,7 +301,10 @@ class ScenarioDirectorTemplatePoolTests(RegistryIsolationMixin, unittest.TestCas
                     register_generated_quest(compiled)
                 self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
                 self.assertIn(
-                    (compiled.definition.key, compiled.issuer_branch_key),
+                    (
+                        compiled.definition.key,
+                        compiled.issuance.issuer_key.removeprefix("guild:"),
+                    ),
                     GUILD_OFFER_REGISTRY,
                 )
 
@@ -346,7 +349,10 @@ class ScenarioDirectorTemplatePoolTests(RegistryIsolationMixin, unittest.TestCas
             register_generated_quest(compiled)
         self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
         self.assertIn(
-            (compiled.definition.key, compiled.issuer_branch_key),
+            (
+                compiled.definition.key,
+                compiled.issuance.issuer_key.removeprefix("guild:"),
+            ),
             GUILD_OFFER_REGISTRY,
         )
         requirements = scene_requirements_for(compiled.definition.key)
@@ -466,7 +472,10 @@ class RegistryRestoreRegressionTests(unittest.TestCase):
                 register_generated_quest(compiled)
             self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
             self.assertIn(
-                (compiled.definition.key, compiled.issuer_branch_key),
+                (
+                    compiled.definition.key,
+                    compiled.issuance.issuer_key.removeprefix("guild:"),
+                ),
                 GUILD_OFFER_REGISTRY,
             )
         finally:

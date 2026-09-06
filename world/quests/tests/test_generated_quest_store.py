@@ -1,14 +1,15 @@
 """Tests for the durable generated-quest store and startup restore.
 
-Covers the store Script CRUD (get/list/append/clear, idempotent by definition
-key), the payload serialization round-trip, durable-first registration with
-fault injection, startup restore healing the crash window between append and
-registration, the restart-then-read quest lifecycle, the guild-board surface
-after restore, and the ``sync_quest_runtime`` wiring. DB-backed behavior uses
-``EvenniaTest``; the pure fault-injection unit stays DB-free by patching the
-store boundary.
+Covers the store Script CRUD (get/list/append/clear, idempotent by issuance
+identity), the payload serialization round-trip, durable-first registration
+with fault injection, startup restore healing the crash window between append
+and registration, the restart-then-read quest lifecycle for both issuer
+kinds, the guild-board surface after restore, and the ``sync_quest_runtime``
+wiring. DB-backed behavior uses ``EvenniaTest``; the pure fault-injection
+unit stays DB-free by patching the store boundary.
 """
 
+from dataclasses import replace
 import unittest
 from unittest.mock import patch
 
@@ -17,7 +18,7 @@ from evennia.utils.search import search_script
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildStaff
+from typeclasses.components import GuildStaff, QuestIssuer
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.rooms import InstanceRoom, Room
@@ -48,6 +49,7 @@ from world.quests.generated_quest_store import (
 from world.quests.runtime import (
     QuestState,
     abandon_quest,
+    accept_quest,
     definition_for,
     read_records,
 )
@@ -61,6 +63,11 @@ from world.rules.guild_offers import (
     GuildQuestOffer,
     accept_guild_offer,
     list_guild_offers,
+)
+from world.rules.quest_issuance import (
+    QUEST_ISSUANCE_REGISTRY,
+    Settlement,
+    resolve_issuance,
 )
 from world.rules.service_view import build_services_view
 from world.rules.tests.combat_fixtures import grant_lineage
@@ -127,20 +134,21 @@ def _characterized_payload(**overrides):
     return payload
 
 
-def _offer_for(compiled):
-    return GuildQuestOffer(
-        definition_key=compiled.definition.key,
-        issuer_branch_key=compiled.issuer_branch_key,
-        reward=compiled.reward,
-    )
+def _npc_payload(**overrides):
+    payload = _defeat_payload()
+    payload["issuer"] = "npc:grey_granny"
+    payload["reward"] = {"copper": 50, "items": [], "merit": 0}
+    payload.update(overrides)
+    return payload
 
 
 def _clear_process_registries():
-    """Empty the three process-global quest registries (restart simulation)."""
+    """Empty the four process-global quest registries (restart simulation)."""
     from world.rules.guild_offers import GUILD_OFFER_REGISTRY as _offers
 
     QUEST_DEFINITION_REGISTRY.clear()
     _offers.clear()
+    QUEST_ISSUANCE_REGISTRY.clear()
     SCENE_REQUIREMENT_REGISTRY.clear()
 
 
@@ -154,19 +162,36 @@ class GeneratedQuestStoreTests(EvenniaTestCase):
         self.assertEqual(get_store(), store)
         self.assertEqual(list_payloads(), [])
 
-    def test_append_is_idempotent_by_definition_key(self):
+    def test_append_is_idempotent_by_issuance_identity(self):
         compiled = compile_quest_blueprint(_defeat_payload())
-        payload = _compiled_to_payload(compiled, _offer_for(compiled))
+        payload = _compiled_to_payload(compiled)
         self.assertTrue(append_payload(payload))
         self.assertFalse(append_payload(payload))
         self.assertEqual(len(list_payloads()), 1)
         other = compile_quest_blueprint(_characterized_payload())
-        self.assertTrue(append_payload(_compiled_to_payload(other, _offer_for(other))))
+        self.assertTrue(append_payload(_compiled_to_payload(other)))
         self.assertEqual(len(list_payloads()), 2)
+
+    def test_two_commissioners_of_one_definition_coexist_in_the_store(self):
+        with patch(
+            "world.quests.compile.issuer_is_authorized", return_value=True
+        ):
+            first = compile_quest_blueprint(_npc_payload(issuer="npc:grey_granny"))
+            second = compile_quest_blueprint(_npc_payload(issuer="npc:old_martha"))
+        self.assertEqual(first.definition.key, second.definition.key)
+        self.assertTrue(append_payload(_compiled_to_payload(first)))
+        self.assertTrue(append_payload(_compiled_to_payload(second)))
+        self.assertEqual(len(list_payloads()), 2)
+        from world.quests.generated_quest_store import remove_payload
+
+        remove_payload(first.definition.key, "npc:grey_granny")
+        remaining = list_payloads()
+        self.assertEqual(len(remaining), 1)
+        self.assertEqual(remaining[0]["issuance"]["issuer_key"], "npc:old_martha")
 
     def test_clear_empties_the_store(self):
         compiled = compile_quest_blueprint(_defeat_payload())
-        append_payload(_compiled_to_payload(compiled, _offer_for(compiled)))
+        append_payload(_compiled_to_payload(compiled))
         clear()
         self.assertEqual(list_payloads(), [])
         self.assertEqual(get_store().db.payloads, [])
@@ -184,10 +209,10 @@ class StoreConflictTests(RegistryIsolationMixin, EvenniaTestCase):
     def test_append_conflicting_payload_raises_and_keeps_the_store(self):
         compiled = compile_quest_blueprint(_defeat_payload())
         self.assertTrue(
-            append_payload(_compiled_to_payload(compiled, _offer_for(compiled)))
+            append_payload(_compiled_to_payload(compiled))
         )
-        conflicting = _compiled_to_payload(compiled, _offer_for(compiled))
-        conflicting["offer"]["reward"]["copper"] = 999
+        conflicting = _compiled_to_payload(compiled)
+        conflicting["issuance"]["reward"]["copper"] = 999
         with self.assertRaises(StorePayloadConflictError):
             append_payload(conflicting)
         self.assertEqual(len(list_payloads()), 1)
@@ -200,7 +225,7 @@ class StoreConflictTests(RegistryIsolationMixin, EvenniaTestCase):
         # the stored offer/reward silently.
         compiled = compile_quest_blueprint(_defeat_payload())
         self.assertTrue(
-            append_payload(_compiled_to_payload(compiled, _offer_for(compiled)))
+            append_payload(_compiled_to_payload(compiled))
         )
         _clear_process_registries()
         variant = compile_quest_blueprint(
@@ -210,7 +235,7 @@ class StoreConflictTests(RegistryIsolationMixin, EvenniaTestCase):
             register_generated_quest(variant)
         self.assertNotIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
         self.assertNotIn(
-            (compiled.definition.key, compiled.issuer_branch_key),
+            (compiled.definition.key, "guild_branch_altoria"),
             GUILD_OFFER_REGISTRY,
         )
         self.assertNotIn(compiled.definition.key, SCENE_REQUIREMENT_REGISTRY)
@@ -227,10 +252,9 @@ class PayloadRoundTripTests(RegistryIsolationMixin, EvenniaTestCase):
         register_generated_quest(compiled)
         payloads = list_payloads()
         self.assertEqual(len(payloads), 1)
-        definition, offer, requirements = payload_to_registrations(payloads[0])
-        self.assertEqual(definition, compiled.definition)
-        self.assertEqual(offer, _offer_for(compiled))
-        self.assertEqual(requirements, compiled.stage_requirements)
+        restored = payload_to_registrations(payloads[0])
+        self.assertEqual(restored, compiled)
+        requirements = restored.stage_requirements
         self.assertEqual(len(requirements), 1)
         self.assertEqual(requirements[0].characterizations[0].display_name, "黑鬍")
         self.assertEqual(requirements[0].characterizations[0].title, "林間盜匪首領")
@@ -269,15 +293,35 @@ class CorruptStorePayloadTests(RegistryIsolationMixin, EvenniaTestCase):
 
     def _payload(self):
         compiled = compile_quest_blueprint(_defeat_payload())
-        return _compiled_to_payload(compiled, _offer_for(compiled))
+        return _compiled_to_payload(compiled)
 
     def _restore_raises(self, payload):
         with self.assertRaises(QuestCompileError):
             restore_generated_quests()
 
-    def test_offer_bound_to_another_definition_is_rejected(self):
+    def test_issuance_naming_an_unknown_guild_branch_is_rejected(self):
         payload = self._payload()
-        payload["offer"]["definition_key"] = "ai_some_other_key"
+        payload["issuance"]["issuer_key"] = "guild:not_a_branch"
+        append_payload(payload)
+        self._restore_raises(payload)
+
+    def test_private_commission_issuance_carrying_merit_is_rejected(self):
+        payload = self._payload()
+        payload["issuance"]["issuer_key"] = "npc:grey_granny"
+        payload["issuance"]["settlement"] = "auto"
+        append_payload(payload)
+        self._restore_raises(payload)
+
+    def test_guild_issuance_with_auto_settlement_is_rejected(self):
+        payload = self._payload()
+        payload["issuance"]["settlement"] = "auto"
+        append_payload(payload)
+        self._restore_raises(payload)
+
+    def test_private_commission_with_counter_settlement_is_rejected(self):
+        payload = self._payload()
+        payload["issuance"]["issuer_key"] = "npc:grey_granny"
+        payload["issuance"]["settlement"] = "counter"
         append_payload(payload)
         self._restore_raises(payload)
 
@@ -313,11 +357,7 @@ class CorruptStorePayloadTests(RegistryIsolationMixin, EvenniaTestCase):
             npc_reqs=(),
         )
         with self.assertRaises(QuestCompileError):
-            register_restored_quest(
-                compiled.definition,
-                _offer_for(compiled),
-                (conflicting,),
-            )
+            register_restored_quest(replace(compiled, stage_requirements=(conflicting,)))
         self.assertEqual(
             scene_requirements_for(compiled.definition.key),
             compiled.stage_requirements,
@@ -330,7 +370,7 @@ class CrashWindowHealingTests(RegistryIsolationMixin, EvenniaTestCase):
     def test_restore_repopulates_all_three_registries_from_the_store(self):
         compiled = compile_quest_blueprint(_characterized_payload())
         self.assertTrue(
-            append_payload(_compiled_to_payload(compiled, _offer_for(compiled)))
+            append_payload(_compiled_to_payload(compiled))
         )
         _clear_process_registries()
         restore_generated_quests()
@@ -340,9 +380,13 @@ class CrashWindowHealingTests(RegistryIsolationMixin, EvenniaTestCase):
         )
         self.assertEqual(
             GUILD_OFFER_REGISTRY.get(
-                (compiled.definition.key, compiled.issuer_branch_key)
+                (compiled.definition.key, "guild_branch_altoria")
             ),
-            _offer_for(compiled),
+            GuildQuestOffer(
+                definition_key=compiled.definition.key,
+                issuer_branch_key="guild_branch_altoria",
+                reward=compiled.reward,
+            ),
         )
         self.assertEqual(
             scene_requirements_for(compiled.definition.key),
@@ -427,6 +471,62 @@ class RestartRestoreIntegrationTests(RegistryIsolationMixin, EvenniaTestCase):
             and r.state is QuestState.COMPLETED
         ]
         self.assertTrue(completed, "quest did not auto-complete after restore")
+
+
+    @covers_requirement("quest-lifecycle::generated-quest-definitions-resolve-after-a-server-restart")
+    def test_a_restored_private_commission_resolves_its_reward_and_settlement(self):
+        # The genuine carrier scan runs here: a real NPC carries QuestIssuer
+        # with an authored key, so compile authorization needs no patch.
+        carrier = create_object(NPC, key="grey granny")
+        carrier.components.add(QuestIssuer.create(carrier, issuer_key="grey_granny"))
+        compiled = compile_quest_blueprint(_npc_payload())
+        register_generated_quest(compiled)
+        record = accept_quest(self.player, compiled.definition.key, "npc:grey_granny")
+        _clear_process_registries()
+        restore_generated_quests()
+        restore_generated_quests()
+
+        issuance = resolve_issuance(compiled.definition.key, "npc:grey_granny")
+        self.assertIsNotNone(issuance)
+        self.assertEqual(issuance.reward, compiled.reward)
+        self.assertIs(issuance.settlement, Settlement.AUTO)
+        records = read_records(self.player)
+        self.assertEqual([r.quest_id for r in records], [record.quest_id])
+        self.assertEqual([r.issuer_key for r in records], ["npc:grey_granny"])
+
+    @covers_requirement("quest-lifecycle::generated-quest-definitions-resolve-after-a-server-restart")
+    def test_restored_issuances_of_both_kinds_register_exactly_once(self):
+        carrier = create_object(NPC, key="old martha")
+        carrier.components.add(QuestIssuer.create(carrier, issuer_key="old_martha"))
+        private = compile_quest_blueprint(_npc_payload(issuer="npc:old_martha"))
+        register_generated_quest(private)
+        guild = compile_quest_blueprint(_defeat_payload())
+        register_generated_quest(guild)
+        _clear_process_registries()
+        restore_generated_quests()
+        restore_generated_quests()
+
+        self.assertEqual(len(list_payloads()), 2)
+        self.assertEqual(
+            len(
+                [
+                    key
+                    for key in QUEST_ISSUANCE_REGISTRY
+                    if key[0] == private.definition.key
+                ]
+            ),
+            1,
+        )
+        self.assertEqual(
+            len(
+                [
+                    key
+                    for key in GUILD_OFFER_REGISTRY
+                    if key[0] == guild.definition.key
+                ]
+            ),
+            1,
+        )
 
 
 class GuildBoardRestoreTests(RegistryIsolationMixin, EvenniaTestCase):

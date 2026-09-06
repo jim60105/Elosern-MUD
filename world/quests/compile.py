@@ -5,9 +5,11 @@ sanctioned translator from a validated JSON-safe proposal payload to the closed
 runtime type. ``compile_quest_blueprint`` re-validates every constraint the
 ``scenario_director`` guardrail checked against the same immutable
 ``world.lore`` registries and maps the payload onto ``QuestDefinition`` plus a
-``QuestReward`` and issuer branch. ``register_generated_quest`` publishes the
-compiled definition, its offer, and the stage spawn requirements as one
-all-or-nothing, durable-first operation: the serialized payload is appended to
+``QuestReward`` and an issuance descriptor (issuer key and settlement mode).
+``register_generated_quest`` publishes the compiled definition, its issuance
+(a guild offer or a private commission, dispatched by the issuer namespace),
+and the stage spawn requirements as one all-or-nothing, durable-first
+operation: the serialized payload is appended to
 the ``generated_quest_store`` Script before any process-local registry is
 touched, and startup restore reconciles store to registries (design D2/D3).
 
@@ -60,6 +62,16 @@ from world.rules.guild_offers import (
     ItemQuantity,
     QuestReward,
     register_guild_offer,
+)
+from world.rules.quest_issuance import (
+    QUEST_ISSUANCE_REGISTRY,
+    IssuerKeyError,
+    QuestIssuance,
+    Settlement,
+    guild_issuer_key,
+    issuer_is_authorized,
+    parse_issuer_key,
+    register_quest_issuance,
 )
 
 
@@ -140,9 +152,24 @@ class StageSpawnRequirement:
 # Process-local spawn-requirement registry, keyed by definition key (D4). It
 # lives here -- the compile boundary -- because it is the only place the
 # transient ``CompiledQuest.stage_requirements`` is registered atomically with
-# the definition and offer. Like ``QUEST_DEFINITION_REGISTRY`` and
+# the definition and issuance. Like ``QUEST_DEFINITION_REGISTRY`` and
 # ``GUILD_OFFER_REGISTRY``, it does not survive a server restart.
 SCENE_REQUIREMENT_REGISTRY: dict[str, tuple[StageSpawnRequirement, ...]] = {}
+
+
+@dataclass(frozen=True)
+class IssuanceDescriptor:
+    """The issuer binding one compiled quest is published under.
+
+    ``issuer_key`` is always namespaced (``guild:<branch key>`` for a guild
+    offer, ``npc:<content key>`` or ``npc:#<pk>`` for a private commission)
+    and ``settlement`` is the closed settlement mode the issuance resolves
+    to. Guild issuances always settle by counter; private commissions settle
+    automatically (quest-issuer-model design §4.1).
+    """
+
+    issuer_key: str
+    settlement: Settlement
 
 
 @dataclass(frozen=True)
@@ -151,7 +178,7 @@ class CompiledQuest:
 
     definition: QuestDefinition
     reward: QuestReward
-    issuer_branch_key: str
+    issuance: IssuanceDescriptor
     stage_requirements: tuple[StageSpawnRequirement, ...]
 
 
@@ -635,11 +662,8 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
     if not isinstance(rank, str) or rank not in GUILD_RANK_REGISTRY:
         _reject(f"unknown quest rank {rank!r}")
 
-    issuer = payload.get("issuer")
-    if not isinstance(issuer, str) or issuer not in GUILD_BRANCH_REGISTRY:
-        _reject(f"unknown issuer branch {issuer!r}")
-
     reward = _validate_reward(rank, payload.get("reward"))
+    descriptor = _compile_issuance(payload.get("issuer"), reward)
 
     stages_payload = payload.get("stages")
     if not isinstance(stages_payload, list) or not stages_payload:
@@ -768,9 +792,47 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
     return CompiledQuest(
         definition=definition,
         reward=reward,
-        issuer_branch_key=issuer,
+        issuance=descriptor,
         stage_requirements=tuple(stage_requirements),
     )
+
+
+def _compile_issuance(issuer: Any, reward: QuestReward) -> IssuanceDescriptor:
+    """Map a payload's declared issuer onto its issuance descriptor.
+
+    The declared value is either a registered branch key (the pipeline's
+    guardrail declares the bare branch; a ``guild:<branch key>`` full form is
+    accepted equally) or a character-namespaced issuer key. A guild issuance
+    settles by counter; a private commission settles automatically and may
+    grant zero merit, and its key must name a carrier authorized to issue.
+    Every violation raises ``QuestCompileError`` before any mutation.
+    """
+    if not isinstance(issuer, str) or not issuer:
+        _reject(f"unknown issuer branch {issuer!r}")
+    if issuer in GUILD_BRANCH_REGISTRY:
+        return IssuanceDescriptor(
+            issuer_key=guild_issuer_key(issuer),
+            settlement=Settlement.COUNTER,
+        )
+    try:
+        parsed = parse_issuer_key(issuer)
+    except IssuerKeyError as error:
+        _reject(f"unknown issuer branch {issuer!r}: {error}")
+    if parsed.namespace == "guild":
+        if parsed.remainder not in GUILD_BRANCH_REGISTRY:
+            _reject(f"unknown issuer branch {parsed.remainder!r}")
+        return IssuanceDescriptor(
+            issuer_key=guild_issuer_key(parsed.remainder),
+            settlement=Settlement.COUNTER,
+        )
+    if not issuer_is_authorized(issuer):
+        _reject(f"issuer {issuer!r} names no carrier authorized to issue")
+    if reward.merit != 0:
+        _reject(
+            f"private commission {issuer!r} cannot grant guild merit, "
+            f"got {reward.merit}"
+        )
+    return IssuanceDescriptor(issuer_key=issuer, settlement=Settlement.AUTO)
 
 
 def scene_requirements_for(definition_key: str) -> tuple[StageSpawnRequirement, ...]:
@@ -803,18 +865,21 @@ def _db_safe(value: Any) -> Any:
 
 def _compiled_to_payload(
     compiled: CompiledQuest,
-    offer: GuildQuestOffer,
 ) -> dict[str, Any]:
-    """Serialize one compiled quest plus its offer into a JSON-safe payload.
+    """Serialize one compiled quest plus its issuance into a JSON-safe payload.
 
     The payload is the durable mirror of one ``register_generated_quest``
-    publication: the definition, the offer, and the stage spawn requirements,
-    all converted to plain JSON-safe values (enums to their ``.value``,
-    tuples to lists).
+    publication: the definition, the issuance (issuer key, settlement, and
+    reward), and the stage spawn requirements, all converted to plain
+    JSON-safe values (enums to their ``.value``, tuples to lists).
     """
     return {
         "definition": _db_safe(asdict(compiled.definition)),
-        "offer": _db_safe(asdict(offer)),
+        "issuance": {
+            "issuer_key": compiled.issuance.issuer_key,
+            "settlement": compiled.issuance.settlement.value,
+            "reward": _db_safe(asdict(compiled.reward)),
+        },
         "requirements": [
             _db_safe(asdict(requirement))
             for requirement in compiled.stage_requirements
@@ -889,15 +954,14 @@ def _requirement_from_payload(data: dict[str, Any]) -> StageSpawnRequirement:
 
 def payload_to_registrations(
     payload: Any,
-) -> tuple[QuestDefinition, GuildQuestOffer, tuple[StageSpawnRequirement, ...]]:
-    """Reconstruct one stored payload into its closed runtime values.
+) -> CompiledQuest:
+    """Reconstruct one stored payload into the closed runtime aggregate.
 
     The single reconstruction path for the durable mirror: every value is
-    converted back (enums via their ``.value``, lists back to tuples) and
-    every dataclass is rebuilt with the constructor
-    ``register_generated_quest`` uses, so a restored registration is equal to
-    the original. A malformed payload raises instead of being silently
-    dropped (design D3).
+    converted back (enums via their ``.value``, lists back to tuples), so the
+    restored ``CompiledQuest`` is equal to the original and publishes through
+    the same registration path. A malformed payload raises instead of being
+    silently dropped (design D3).
     """
     definition_data = payload["definition"]
     definition = QuestDefinition(
@@ -908,47 +972,82 @@ def payload_to_registrations(
         stages=tuple(_stage_from_payload(stage) for stage in definition_data["stages"]),
         deadline_hours=definition_data["deadline_hours"],
     )
-    offer_data = payload["offer"]
-    reward_data = offer_data["reward"]
-    offer = GuildQuestOffer(
-        definition_key=offer_data["definition_key"],
-        issuer_branch_key=offer_data["issuer_branch_key"],
-        reward=QuestReward(
-            copper=reward_data["copper"],
-            items=tuple(
-                ItemQuantity(item["item_key"], item["quantity"])
-                for item in reward_data["items"]
-            ),
-            merit=reward_data["merit"],
+    issuance_data = payload["issuance"]
+    reward_data = issuance_data["reward"]
+    reward = QuestReward(
+        copper=reward_data["copper"],
+        items=tuple(
+            ItemQuantity(item["item_key"], item["quantity"])
+            for item in reward_data["items"]
         ),
+        merit=reward_data["merit"],
     )
+    issuer_key = issuance_data["issuer_key"]
+    settlement_value = issuance_data["settlement"]
     requirements = tuple(
         _requirement_from_payload(requirement)
         for requirement in payload["requirements"]
     )
-    _validate_restored_payload(definition, offer, requirements)
-    return definition, offer, requirements
+    _validate_restored_payload(definition, issuer_key, settlement_value, reward, requirements)
+    return CompiledQuest(
+        definition=definition,
+        reward=reward,
+        issuance=IssuanceDescriptor(
+            issuer_key=issuer_key,
+            settlement=Settlement(settlement_value),
+        ),
+        stage_requirements=requirements,
+    )
 
 
 def _validate_restored_payload(
     definition: QuestDefinition,
-    offer: GuildQuestOffer,
+    issuer_key: str,
+    settlement: str,
+    reward: QuestReward,
     requirements: tuple[StageSpawnRequirement, ...],
 ) -> None:
     """Reject a stored payload whose reconstructed values cannot be consistent.
 
     A payload is trusted only when it reconstructs to a closed, self-consistent
-    registration: the offer must bind the exact definition, and every spawn
-    requirement must sit at its own position with the objective kind of the
-    definition stage it describes. Corrupt or schema-drifted payloads fail
-    loudly here (design D3) instead of silently registering an offer against
-    the wrong quest or leaving the SceneBuilder to fail mid-game.
+    registration: the issuance must parse against the shared issuer-key
+    grammar and obey its namespace rules (a guild key names a registered
+    branch; a character key settles automatically and grants zero merit), the
+    settlement must be a closed mode, and every spawn requirement must sit at
+    its own position with the objective kind of the definition stage it
+    describes. The issuance binds the exact definition structurally: the
+    payload carries one definition and its one issuance together. Corrupt or
+    schema-drifted payloads fail loudly here (design D3) instead of silently
+    registering a mismatched pair or leaving the SceneBuilder to fail
+    mid-game.
     """
-    if offer.definition_key != definition.key:
-        _reject(
-            f"stored payload offer binds {offer.definition_key!r} to "
-            f"definition {definition.key!r}"
-        )
+    try:
+        parsed = parse_issuer_key(issuer_key)
+    except IssuerKeyError as error:
+        _reject(f"stored payload issuance key is malformed: {error}")
+    try:
+        settlement_mode = Settlement(settlement)
+    except ValueError as error:
+        _reject(f"stored payload settlement {settlement!r} is unknown: {error}")
+    if parsed.namespace == "guild":
+        if parsed.remainder not in GUILD_BRANCH_REGISTRY:
+            _reject(f"stored payload names unknown guild branch {parsed.remainder!r}")
+        if settlement_mode is not Settlement.COUNTER:
+            _reject(
+                f"stored payload guild issuance must settle by counter, "
+                f"got {settlement_mode.value!r}"
+            )
+    else:
+        if settlement_mode is not Settlement.AUTO:
+            _reject(
+                f"stored payload private commission {issuer_key!r} must "
+                f"settle automatically, got {settlement_mode.value!r}"
+            )
+        if reward.merit != 0:
+            _reject(
+                f"stored payload private commission {issuer_key!r} grants "
+                f"guild merit {reward.merit}"
+            )
     for position, requirement in enumerate(requirements):
         if requirement.index != position:
             _reject(
@@ -969,97 +1068,147 @@ def _validate_restored_payload(
             )
 
 
-def register_restored_quest(
+def _publish_registration(
     definition: QuestDefinition,
-    offer: GuildQuestOffer,
+    descriptor: IssuanceDescriptor,
+    reward: QuestReward,
     requirements: tuple[StageSpawnRequirement, ...],
 ) -> None:
-    """Register one durable-mirror payload's values (design D3).
+    """Preflight every registry, then write one registration all-or-nothing.
 
-    The compile-boundary write used by startup restore: the definition and
-    offer register idempotently (equal content is a no-op, conflicting content
-    raises) and the spawn-requirement entry follows the same equal-or-reject
-    contract, so repeated restarts keep exactly one entry while a malformed or
-    conflicting payload fails loudly instead of being silently dropped.
-    Keeping every ``SCENE_REQUIREMENT_REGISTRY`` write inside this module
-    preserves the single-writer boundary the repository contract tests assert.
+    The single namespace-dispatching publication both registration paths use
+    (design D1): a guild issuance writes a ``GuildQuestOffer`` through
+    ``register_guild_offer`` and a character issuance writes a
+    ``QuestIssuance`` through ``register_quest_issuance``, so neither store
+    gains a second writer. The preflight checks the definition, the
+    namespace's own store, and the spawn-requirement entry before writing any
+    of them; the writes then go definition first, issuance second (the
+    ``QuestIssuance`` constructor requires the registered definition), and
+    the requirements last, and a defensive failure after preflight rolls back
+    every entry this call added.
     """
-    register_quest_definition(definition)
-    register_guild_offer(offer)
+    parsed = parse_issuer_key(descriptor.issuer_key)
+    offer: GuildQuestOffer | None = None
+    offer_current: GuildQuestOffer | None = None
+    issuance_current: QuestIssuance | None = None
+    if parsed.namespace == "guild":
+        offer = GuildQuestOffer(
+            definition_key=definition.key,
+            issuer_branch_key=parsed.remainder,
+            reward=reward,
+        )
+        offer_current = GUILD_OFFER_REGISTRY.get((definition.key, parsed.remainder))
+    else:
+        issuance_current = QUEST_ISSUANCE_REGISTRY.get(
+            (definition.key, descriptor.issuer_key)
+        )
+    definition_current = QUEST_DEFINITION_REGISTRY.get(definition.key)
     requirement_current = SCENE_REQUIREMENT_REGISTRY.get(definition.key)
+    if definition_current is not None and definition_current != definition:
+        _reject(f"conflicting definition already registered under {definition.key!r}")
+    if offer is not None and offer_current is not None and offer_current != offer:
+        _reject(
+            f"conflicting offer already registered for {definition.key!r} "
+            f"at branch {parsed.remainder!r}"
+        )
+    if issuance_current is not None and (
+        issuance_current.reward != reward
+        or issuance_current.settlement != descriptor.settlement
+    ):
+        _reject(
+            f"conflicting issuance already registered for {definition.key!r} "
+            f"under {descriptor.issuer_key!r}"
+        )
     if requirement_current is not None and requirement_current != requirements:
         _reject(
             f"conflicting spawn requirements already registered under "
             f"{definition.key!r}"
         )
-    SCENE_REQUIREMENT_REGISTRY[definition.key] = requirements
+
+    definition_added = definition_current is None
+    offer_added = offer is not None and offer_current is None
+    issuance_added = parsed.namespace == "npc" and issuance_current is None
+    requirement_added = requirement_current is None
+    try:
+        register_quest_definition(definition)
+        if offer is not None:
+            register_guild_offer(offer)
+        else:
+            register_quest_issuance(
+                QuestIssuance(
+                    definition_key=definition.key,
+                    issuer_key=descriptor.issuer_key,
+                    reward=reward,
+                    settlement=descriptor.settlement,
+                )
+            )
+        SCENE_REQUIREMENT_REGISTRY[definition.key] = requirements
+    except Exception:
+        if definition_added:
+            QUEST_DEFINITION_REGISTRY.pop(definition.key, None)
+        if offer_added:
+            GUILD_OFFER_REGISTRY.pop((definition.key, parsed.remainder), None)
+        if issuance_added:
+            QUEST_ISSUANCE_REGISTRY.pop(
+                (definition.key, descriptor.issuer_key), None
+            )
+        if requirement_added:
+            SCENE_REQUIREMENT_REGISTRY.pop(definition.key, None)
+        raise
+
+
+def register_restored_quest(compiled: CompiledQuest) -> None:
+    """Register one durable-mirror payload's aggregate (design D3).
+
+    The compile-boundary write used by startup restore. It preflights and
+    writes exactly like ``register_generated_quest`` but never touches the
+    durable store -- the payload being restored IS the store's content.
+    Equal registrations are no-ops and conflicting content raises before any
+    write, so repeated restarts keep exactly one entry per issuance while a
+    malformed or conflicting payload fails loudly instead of leaving a
+    definition registered without its issuance or requirements. Keeping every
+    ``SCENE_REQUIREMENT_REGISTRY`` write inside this module preserves the
+    single-writer boundary the repository contract tests assert.
+    """
+    _publish_registration(
+        compiled.definition,
+        compiled.issuance,
+        compiled.reward,
+        compiled.stage_requirements,
+    )
 
 
 def register_generated_quest(compiled: CompiledQuest) -> None:
-    """Register one compiled definition, its offer, and its spawn requirements
-    all-or-nothing and durable-first.
+    """Register one compiled definition, its issuance, and its spawn
+    requirements all-or-nothing and durable-first.
 
-    Preflights all three registries' equal/conflict states before writing any,
-    so a conflicting definition, offer, or spawn-requirement entry raises
-    ``QuestCompileError`` before any mutation. The compiled payload is then
-    appended to the durable generated-quest store FIRST (D2): a store failure
-    aborts registration with no in-memory entries. Only after the append
-    succeeds are the definition, the offer, and the requirement entry written;
-    if a later write still fails despite preflight (defensive), every entry
-    this call added -- the definition, the offer, the requirements, and the
-    store payload -- is rolled back together, so a generated definition is
-    never left registered without its durable mirror.
+    The compiled payload is appended to the durable generated-quest store
+    FIRST (D2): a store failure aborts registration with no in-memory
+    entries. Only after the append succeeds is the registration written
+    through ``_publish_registration``; if any write still fails despite
+    preflight (defensive), every entry this call added -- the definition, the
+    issuance, the requirements, and the store payload -- is rolled back
+    together, so a generated definition is never left registered without its
+    durable mirror.
     """
     definition = compiled.definition
-    requirements = compiled.stage_requirements
     for stage in definition.stages:
         if stage.objective.kind is ObjectiveKind.ESCORT:
             _reject(
                 "ESCORT stages cannot be published until a protected-entity "
                 "binding flow exists; the whole quest is refused"
             )
-    offer = GuildQuestOffer(
-        definition_key=definition.key,
-        issuer_branch_key=compiled.issuer_branch_key,
-        reward=compiled.reward,
-    )
-
-    definition_current = QUEST_DEFINITION_REGISTRY.get(definition.key)
-    offer_current = GUILD_OFFER_REGISTRY.get(
-        (definition.key, compiled.issuer_branch_key)
-    )
-    requirement_current = SCENE_REQUIREMENT_REGISTRY.get(definition.key)
-    if definition_current is not None and definition_current != definition:
-        _reject(f"conflicting definition already registered under {definition.key!r}")
-    if offer_current is not None and offer_current != offer:
-        _reject(
-            f"conflicting offer already registered for {definition.key!r} "
-            f"at branch {compiled.issuer_branch_key!r}"
-        )
-    if requirement_current is not None and requirement_current != requirements:
-        _reject(
-            f"conflicting spawn requirements already registered under "
-            f"{definition.key!r}"
-        )
-
-    payload_added = append_generated_quest_payload(
-        _compiled_to_payload(compiled, offer)
-    )
-
-    definition_added = definition_current is None
-    offer_added = offer_current is None
-    requirement_added = requirement_current is None
+    payload_added = append_generated_quest_payload(_compiled_to_payload(compiled))
     try:
-        register_quest_definition(definition)
-        register_guild_offer(offer)
-        SCENE_REQUIREMENT_REGISTRY[definition.key] = requirements
+        _publish_registration(
+            definition,
+            compiled.issuance,
+            compiled.reward,
+            compiled.stage_requirements,
+        )
     except Exception:
-        if definition_added:
-            QUEST_DEFINITION_REGISTRY.pop(definition.key, None)
-        if offer_added:
-            GUILD_OFFER_REGISTRY.pop((definition.key, compiled.issuer_branch_key), None)
-        if requirement_added:
-            SCENE_REQUIREMENT_REGISTRY.pop(definition.key, None)
         if payload_added:
-            remove_generated_quest_payload(definition.key)
+            remove_generated_quest_payload(
+                definition.key, compiled.issuance.issuer_key
+            )
         raise
