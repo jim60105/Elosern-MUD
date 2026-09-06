@@ -5,11 +5,13 @@ across four tiers: two at ``hostile_act_count >= 5``, three at
 ``hostile_act_count >= 20``, two at the compound ``hostile_act_count >= 40``
 + ``climax_count >= 30`` gate, and one AREA act at the compound
 ``hostile_act_count >= 80`` + ``climax_extension_count >= 30`` gate.
-Every act keeps the seed's asymmetric crediting convention: only the
-aggressor's own ``hostile_act_count`` grows, a hostile target is never
-credited a counter for having been targeted. 搾取 (Tier 4, an SP-transfer
-act) is deferred — no cross-entity resource-transfer effect exists in the
-schema (sexual-catalog-combat design.md D-2).
+Every act carries the catalog-wide symmetric crediting convention:
+``hostile_act_count`` records hostile-act participation from either side, so
+the aggressor and every compliant target gain one count per landed act (the
+catalog's direction-bound counters — ``exposure_act_count`` /
+``watched_count`` — stay actor-only). 搾取 (Tier 4, an SP-transfer act) is
+deferred — no cross-entity resource-transfer effect exists in the schema
+(sexual-catalog-combat design.md D-2).
 """
 
 from world.skills.registry import SkillDef, TargetSpec
@@ -28,7 +30,7 @@ COMBAT_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         "腰腹",
         0.4,
         ("hostile_act_count",),
-        (),
+        ("hostile_act_count",),
         (),
         True,
     ),
@@ -43,7 +45,7 @@ COMBAT_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         "耳朵",
         0.4,
         ("hostile_act_count",),
-        (),
+        ("hostile_act_count",),
         (),
         True,
     ),
@@ -58,7 +60,7 @@ COMBAT_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         "腰腹",
         0.4,
         ("hostile_act_count",),
-        (),
+        ("hostile_act_count",),
         (),
         True,
     ),
@@ -73,7 +75,7 @@ COMBAT_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         "頸項",
         0.4,
         ("hostile_act_count",),
-        (),
+        ("hostile_act_count",),
         (),
         True,
     ),
@@ -88,7 +90,7 @@ COMBAT_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         "大腿",
         0.4,
         ("hostile_act_count",),
-        (),
+        ("hostile_act_count",),
         (),
         True,
     ),
@@ -103,7 +105,7 @@ COMBAT_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         "私處",
         0.4,
         ("hostile_act_count",),
-        (),
+        ("hostile_act_count",),
         (),
         True,
     ),
@@ -118,7 +120,7 @@ COMBAT_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         "私處",
         0.4,
         ("hostile_act_count",),
-        (),
+        ("hostile_act_count",),
         (),
         True,
     ),
@@ -133,7 +135,7 @@ COMBAT_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         "臀部",
         0.6,
         ("hostile_act_count",),
-        (),
+        ("hostile_act_count",),
         (),
         True,
     ),
@@ -148,7 +150,7 @@ COMBAT_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         "私處",
         0.4,
         ("hostile_act_count",),
-        (),
+        ("hostile_act_count",),
         (),
         True,
     ),

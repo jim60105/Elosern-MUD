@@ -58,10 +58,10 @@ _None — this change modifies shipped requirements only._
 
 ## Impact
 
-- `world/skills/sexual_acts/combat.py`, `interspecies.py`, `shame.py`,
-  `solo.py` (combat seed row) — 17 rows' `participant_counters` field plus
-  their module docstrings (they currently document the asymmetric
-  convention).
+- `world/skills/sexual_acts/combat.py` (nine rows: the `combat_tease` seed
+  plus the eight gated acts), `interspecies.py`, `shame.py` — 17 rows'
+  `participant_counters` field plus the three module docstrings (they
+  currently document the asymmetric convention).
 - Pinned regression tests rewritten: `test_combat_catalog.py`,
   `test_interspecies_catalog.py`, `test_shame_catalog.py`,
   `test_seed_acts.py`; structural audit of `test_registry_structure.py` for

@@ -11,9 +11,10 @@ emitter of ``sexual_activity_with_nonhuman``), and two at
 Every act targets a single entity and declares no ``target_part``: 異種 is a
 parless line, so the target always resolves to ``GENERIC_BODY_PART`` through
 ``resolve_part``'s ``Monster`` collapse. Every act credits
-``interspecies_act_count`` on the actor only — a ``Monster`` target is never
-credited a lifetime counter, matching the asymmetric crediting the combat
-line established for hostile targets.
+``interspecies_act_count`` symmetrically — an interspecies act happens
+between two bodies of different species, so the actor and every compliant
+target (``Monster`` or otherwise; the crediting handler adds no species
+condition) gain one count.
 """
 
 from world.skills.registry import SkillDef, TargetSpec
@@ -32,7 +33,7 @@ INTERSPECIES_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         None,
         0.5,
         ("interspecies_act_count",),
-        (),
+        ("interspecies_act_count",),
         (),
         True,
     ),
@@ -47,7 +48,7 @@ INTERSPECIES_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         None,
         0.6,
         ("interspecies_act_count",),
-        (),
+        ("interspecies_act_count",),
         (),
         True,
     ),
@@ -62,7 +63,7 @@ INTERSPECIES_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         None,
         0.7,
         ("interspecies_act_count",),
-        (),
+        ("interspecies_act_count",),
         (),
         True,
     ),
@@ -77,7 +78,7 @@ INTERSPECIES_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         None,
         0.9,
         ("interspecies_act_count",),
-        (),
+        ("interspecies_act_count",),
         (),
         True,
     ),
@@ -92,7 +93,7 @@ INTERSPECIES_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         None,
         0.7,
         ("interspecies_act_count",),
-        (),
+        ("interspecies_act_count",),
         ("sexual_activity_with_nonhuman",),
         True,
     ),
@@ -107,7 +108,7 @@ INTERSPECIES_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         None,
         0.6,
         ("interspecies_act_count",),
-        (),
+        ("interspecies_act_count",),
         (),
         True,
     ),
@@ -122,7 +123,7 @@ INTERSPECIES_ACTS: tuple[tuple[SkillDef, SexualActDef], ...] = _act_family(
         None,
         0.6,
         ("interspecies_act_count",),
-        (),
+        ("interspecies_act_count",),
         (),
         True,
     ),

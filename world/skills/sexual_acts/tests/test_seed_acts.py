@@ -144,12 +144,18 @@ class SeedActCastingTests(EvenniaTest):
         self.assertEqual(self.actor.sexual.duo_act_count, 1)
         self.assertEqual(self.target.sexual.duo_act_count, 1)
 
-    @covers_requirement("sexual-act-seeds::the-combat-seed-credits-hostile-act-count-on-the-actor-only")
-    def test_combat_tease_increments_hostile_act_count_on_actor_only(self):
-        result = self._cast("combat_tease", [self.target])
+    @covers_requirement("sexual-act-seeds::the-combat-seed-credits-hostile-act-count-on-both-participants")
+    def test_combat_tease_increments_hostile_act_count_on_both_participants(self):
+        # combat_tease is resistible=True; the target's participant_counters
+        # credit is withheld on a resisted verdict, so force a compliant roll
+        # (both fixtures are floor humans with equal contest scores, making
+        # roll=1 a guaranteed comply) to keep the assertion deterministic
+        # (sexual-resist-cast-wiring design D-3a).
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = self._cast("combat_tease", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.hostile_act_count, 1)
-        self.assertEqual(self.target.sexual.hostile_act_count, 0)
+        self.assertEqual(self.target.sexual.hostile_act_count, 1)
 
     def test_single_target_seed_cannot_be_self_cast(self):
         # A SINGLE-target sex act is a two-participant act by construction;

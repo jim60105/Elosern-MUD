@@ -7,7 +7,7 @@ the full allotment the source catalog specifies. Tiers 1 and 2 open on `hostile_
 30), Tier 3 adds a `climax_count >= 20` compound gate on 異種交合 — the sole emitter of
 `sexual_activity_with_nonhuman` — and Tier 4 opens on `interspecies_act_count >= 20`. Every act
 targets a single `Monster`, declares no `target_part` (異種 is a parless line), credits
-`interspecies_act_count` on the actor only, and is `resistible=True`. No rulebook row is added:
+`interspecies_act_count` symmetrically on the actor and the target, and is `resistible=True`. No rulebook row is added:
 `experience_interspecies_added` has shipped since the transition rulebook landed.
 
 ## Requirements
@@ -20,7 +20,16 @@ each declaring `unlock={"hostile_act_count": 30}` (`interspecies_entangle`,
 "climax_count": 20}` (`interspecies_mating`); and two acts each declaring
 `unlock={"interspecies_act_count": 20}` (`interspecies_domination`, `interspecies_resonance`). Every
 one of these seven acts SHALL declare `target_spec=TargetSpec.SINGLE`, `target_part=None`,
-`resistible=True`, `actor_counters=("interspecies_act_count",)`, and `participant_counters=()`.
+`resistible=True`, `actor_counters=("interspecies_act_count",)`, and
+`participant_counters=("interspecies_act_count",)`. An interspecies act
+happens between two bodies of different species, and `interspecies_act_count`
+records the experience from either side.
+The line's species gate stays exactly as shipped: the acts are authored
+against Monster targets, and target validation is NOT changed by this delta.
+Mirroring applies whenever the act resolves; a same-species cast
+(a target that is not a `Monster`) keeps the shipped actor-credit behavior
+and credits the participant only if the shipped handler's own rules already
+do — this delta adds no species condition to the counter handler.
 
 #### Scenario: A Tier 1 act is locked below its threshold and unlocked at it
 - **WHEN** `SkillHandler.owned_keys()` is read for an entity with `hostile_act_count == 9`
@@ -40,11 +49,15 @@ one of these seven acts SHALL declare `target_spec=TargetSpec.SINGLE`, `target_p
   `hostile_act_count == 0`
 - **THEN** `interspecies_domination` is present in the returned set
 
-#### Scenario: Casting any of the seven acts credits interspecies_act_count on the actor only, never on the Monster target
+#### Scenario: Casting any of the seven acts credits interspecies_act_count on every participant, including the Monster target
 - **WHEN** entity A casts `interspecies_touch` targeting a `Monster` B, both starting at
   `interspecies_act_count == 0`
 - **THEN** afterward `A.sexual.interspecies_act_count` equals `1` and `B.sexual.interspecies_act_count`
-  remains `0`
+  equals `1`
+
+#### Scenario: A same-species target keeps the shipped crediting behavior
+- **WHEN** entity A casts `interspecies_touch` at a non-Monster target under the shipped target contract
+- **THEN** crediting matches exactly the shipped pre-change behavior for that path (pin: the species gate is untouched)
 
 ### Requirement: Every act declares target_part=None, never a BODY_PARTS member
 Every one of the seven acts added by this change SHALL declare `target_part=None`.

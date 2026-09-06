@@ -2,8 +2,8 @@
 
 The seed 挑逗 ships unconditionally (covered by ``test_seed_acts.py``); this
 module covers the eight rows this change adds: their counter-threshold unlock
-gates (including the two compound gates), the asymmetric
-``hostile_act_count`` crediting on the actor only, the D-4 worst-case
+gates (including the two compound gates), the symmetric
+``hostile_act_count`` crediting on every participant, the D-4 worst-case
 extension-threshold guarantee for the three ``base_pleasure=30`` acts, the
 D-3 actor-side ratio comparison, the sole AREA act, and the
 ``sexual_events=()``/no-new-modifier-row claim.
@@ -127,12 +127,12 @@ class CombatActRegistrationTests(unittest.TestCase):
                 self.assertEqual(dict(SEXUAL_ACT_REGISTRY[key].unlock), expected)
 
     @covers_requirement("sexual-catalog-combat::eight-tier-1-2-3-5-combat-acts-are-registered-gated-by-hostile-act-count-and-or-climax-count-and-or-climax-extension-count-thresholds")
-    def test_every_act_declares_the_actor_only_hostile_counter(self):
+    def test_every_act_declares_the_symmetric_hostile_counter(self):
         for key in _ALL_ACTS:
             with self.subTest(key=key):
                 act = SEXUAL_ACT_REGISTRY[key]
                 self.assertEqual(act.actor_counters, ("hostile_act_count",))
-                self.assertEqual(act.participant_counters, ())
+                self.assertEqual(act.participant_counters, ("hostile_act_count",))
 
     @covers_requirement("sexual-catalog-combat::eight-tier-1-2-3-5-combat-acts-are-registered-gated-by-hostile-act-count-and-or-climax-count-and-or-climax-extension-count-thresholds")
     def test_every_act_is_resistible(self):
@@ -276,18 +276,22 @@ class CombatCastTests(EvenniaTest):
         )
 
     @covers_requirement("sexual-catalog-combat::eight-tier-1-2-3-5-combat-acts-are-registered-gated-by-hostile-act-count-and-or-climax-count-and-or-climax-extension-count-thresholds")
-    def test_tease_whisper_credits_hostile_act_count_on_the_actor_only(self):
+    def test_tease_whisper_credits_hostile_act_count_on_both_participants(self):
         # The act's own unlock gate is hostile_act_count itself, so the actor
         # must be raised to the threshold before casting (the spec scenario's
         # "both starting at 0" is not reachable for the actor by construction
-        # of this line's gates); the pin that matters is the target's counter
-        # never moving.
+        # of this line's gates). resistible=True means the target's
+        # participant_counters credit is withheld on a resisted verdict, so
+        # force a compliant roll (two floor fixtures with equal contest
+        # scores, making roll=1 a guaranteed comply) to keep the target-side
+        # pin deterministic.
         _counter_up(self.actor, "hostile_act", 5)
         self.assertEqual(self.target.sexual.hostile_act_count, 0)
-        result = self._cast("combat_tease_whisper", [self.target])
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = self._cast("combat_tease_whisper", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.hostile_act_count, 6)
-        self.assertEqual(self.target.sexual.hostile_act_count, 0)
+        self.assertEqual(self.target.sexual.hostile_act_count, 1)
 
     @covers_requirement("sexual-catalog-combat::combat-forced-climax-combat-relentless-torment-and-combat-climax-domination-reliably-clear-the-climax-extension-threshold")
     def test_forced_climax_worst_case_target_gain_clears_the_threshold(self):
@@ -310,12 +314,12 @@ class CombatCastTests(EvenniaTest):
         self.assertEqual(self.target.sexual.pleasure.base, 21)
 
     @covers_requirement("sexual-catalog-combat::combat-climax-domination-is-the-sole-area-act-in-this-catalog-line")
-    def test_climax_domination_credits_the_actor_and_raises_each_targets_pleasure(self):
+    def test_climax_domination_credits_every_participant_and_raises_each_targets_pleasure(self):
         # The AREA act applies its pleasure effect to every target present and
-        # keeps the line's asymmetric crediting: the actor's hostile_act_count
-        # grows, targets' counters never move. resistible=True means each
+        # credits hostile_act_count symmetrically: the actor and each
+        # compliant target gain exactly one count. resistible=True means each
         # target runs a resist contest; force compliant rolls so the
-        # target-side pleasure assertions stay deterministic.
+        # target-side assertions stay deterministic.
         _counter_up(self.actor, "hostile_act", 80)
         _counter_up(self.actor, "climax_extension", 30)
         other = create_object(
@@ -329,7 +333,7 @@ class CombatCastTests(EvenniaTest):
         self.assertEqual(self.actor.sexual.hostile_act_count, 81)
         for entity in (self.target, other):
             with self.subTest(entity=entity.key):
-                self.assertEqual(entity.sexual.hostile_act_count, 0)
+                self.assertEqual(entity.sexual.hostile_act_count, 1)
                 self.assertGreater(entity.sexual.pleasure.base, 0)
 
 

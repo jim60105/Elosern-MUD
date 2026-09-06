@@ -217,11 +217,11 @@ class ShameActRegistrationTests(unittest.TestCase):
         self.assertIn("watched_during_activity", events)
         self.assertNotIn("public_sexual_activity", events)
 
-    @covers_requirement("sexual-catalog-shame::shame-provocative-gaze-credits-hostile-act-count-on-the-actor-only-never-on-a-target")
-    def test_provocative_gaze_declares_actor_only_hostile_counter(self):
+    @covers_requirement("sexual-catalog-shame::shame-provocative-gaze-credits-hostile-act-count-on-both-participants")
+    def test_provocative_gaze_declares_symmetric_hostile_counter(self):
         act = SEXUAL_ACT_REGISTRY["shame_provocative_gaze"]
         self.assertEqual(act.actor_counters, ("hostile_act_count",))
-        self.assertEqual(act.participant_counters, ())
+        self.assertEqual(act.participant_counters, ("hostile_act_count",))
 
     @covers_requirement("sexual-catalog-shame::the-three-area-acts-declare-target-part-as-a-body-parts-member-never-none")
     def test_every_area_act_declares_the_waist_target_part(self):
@@ -491,15 +491,20 @@ class ShameCastTests(EvenniaTest):
         self.assertNotIn("露出", self.target.sexual.experience_types)
         self.assertNotIn("被觀看", self.target.sexual.experience_types)
 
-    @covers_requirement("sexual-catalog-shame::shame-provocative-gaze-credits-hostile-act-count-on-the-actor-only-never-on-a-target")
-    def test_provocative_gaze_credits_hostile_act_count_on_the_actor_only(self):
+    @covers_requirement("sexual-catalog-shame::shame-provocative-gaze-credits-hostile-act-count-on-both-participants")
+    def test_provocative_gaze_credits_hostile_act_count_on_both_participants(self):
         _counter_up(self.actor, "watched", 10)
         self.assertEqual(self.actor.sexual.hostile_act_count, 0)
         self.assertEqual(self.target.sexual.hostile_act_count, 0)
-        result = self._cast("shame_provocative_gaze", [self.target])
+        # resistible=True means the target's participant_counters credit is
+        # withheld on a resisted verdict, so force a compliant roll (two
+        # floor fixtures with equal contest scores, making roll=1 a
+        # guaranteed comply) to keep the target-side pin deterministic.
+        with patch("world.rules.action.roll_d100", return_value=1):
+            result = self._cast("shame_provocative_gaze", [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.hostile_act_count, 1)
-        self.assertEqual(self.target.sexual.hostile_act_count, 0)
+        self.assertEqual(self.target.sexual.hostile_act_count, 1)
 
     def test_provocative_gaze_raises_a_targets_pleasure(self):
         # design.md D-2 regression: 挑釁凝視's "accuracy debuff" is delivered
