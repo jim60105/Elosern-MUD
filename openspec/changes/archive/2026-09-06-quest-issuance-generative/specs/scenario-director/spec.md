@@ -9,7 +9,9 @@ runtime type: a `QuestDefinition` (with `QuestType`, contiguous stages, objectiv
 and deadline) plus a `QuestReward`, an issuer key, and a settlement mode. The issuer key SHALL be
 either guild-namespaced or character-namespaced; a character-namespaced issuance SHALL carry zero
 merit and SHALL name a carrier authorized to issue, and a violation of either SHALL raise before any
-mutation. It SHALL raise a named
+mutation. The blueprint boundary accepts a registered branch declared either as its bare branch key
+(the form the request context and guardrail declare today) or as the full `guild:<branch key>` form;
+the compiled issuance key is always namespaced. It SHALL raise a named
 `QuestCompileError` on any invalid payload before any mutation. The generated `QuestDefinition.key`
 SHALL be a stable content digest over the canonical runtime definition serialization **plus the
 canonical serialization of the compiled per-stage spawn requirements**, so two blueprints with
@@ -32,8 +34,10 @@ never enter `QUEST_DEFINITION_REGISTRY` directly.
 
 #### Scenario: A valid blueprint compiles to a registrable definition
 - **WHEN** a validated blueprint passes through `compile_quest_blueprint`
-- **THEN** the compiled `QuestDefinition` passes `validate_definition` and its reward, issuer key,
-  and settlement mode are the blueprint's declared values
+- **THEN** the compiled `QuestDefinition` passes `validate_definition`, its reward is the
+  blueprint's declared reward, and its issuer key and settlement mode are deterministically derived
+  from the blueprint's declared issuer (a namespaced key; counter settlement for a guild branch,
+  automatic settlement for a character carrier)
 
 #### Scenario: An invalid proposal fails compile before any change
 - **WHEN** a payload declares reward copper outside its rank's band or an unknown item key
@@ -100,7 +104,7 @@ never enter `QUEST_DEFINITION_REGISTRY` directly.
 - **WHEN** a validated blueprint declaring a character-namespaced issuer with zero merit is compiled
   and registered
 - **THEN** one `QuestDefinition` entry and one `QuestIssuance` entry exist, the guild offer registry
-  is unchanged, and the settlement mode is the blueprint's declared value
+  is unchanged, and the registered issuance settles automatically under that issuer key
 
 #### Scenario: A private commission carrying merit fails compile
 - **WHEN** a blueprint declares a character-namespaced issuer with non-zero reward merit
