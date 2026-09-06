@@ -27,9 +27,12 @@ narrative, or economic cost.
   Enforced as regression assertions, not intentions.
 - **Adult content is the core** of the defeat fantasy (owner decision).
 - **Any defeating entity may initiate** an adult scene; the existing d100
-  resist contest (`_step4b_sexual_resist_gate`, `world/rules/action.py:407`)
-  is the hard rail — the victim resists, and full resistance collapses the
-  sequence into the PG variant.
+  resist contest — the pure `resist_verdict(actor, resister, rng=...)`
+  (`world/rules/sexual_resist.py`, called by
+  `_step4b_sexual_resist_gate`, `world/rules/action.py`) — is the hard
+  rail: the victim defends; a resisted attempt shrinks its deltas and
+  cancels that violator's remaining attempts (it gives up on prey that
+  fights back); a sequence in which zero attempts landed is the PG variant.
 - **No monetary or item loss.** Monsters do not use a coin economy, so
   looting gold is world-view-inconsistent and removed (owner decision).
   Items are also never removed.
@@ -69,16 +72,20 @@ recover" is fiction over an atomic settlement.
    arousal ≥ its archetype threshold (YAML), repeat up to the archetype's
    per-victory attempt cap:
    - Select a target from the non-fled allied roster (player + knocked-out
-     companions; the player is always in the pool). Selection uses the
-     seeded d100 pipeline (replayable, deterministic).
-   - One resist roll per attempt (existing resist-gate formula, victim
-     resisting). Success → that attempt's deltas shrink, sequence may
-     shorten; **full resistance across attempts → the sequence truncates
-     into the PG variant**.
-   - Each attempt applies its YAML-declared state deltas through existing
-     EventLog kinds (`sexual_transition`, `pleasure_gain`, `sexual_counter`,
-     counter records) and **advances the world clock** by its declared
-     duration.
+     companions; the player is always in the pool). Every d100 in the
+     sequence is state-derived — a pure function of
+     `(session_id, violator, victim, attempt_index)`; no persistent RNG
+     state exists in the session record, so a rolled-back retry re-derives
+     the identical sequence.
+   - One resist roll per attempt through `resist_verdict` with the selected
+     victim defending. A resisted attempt applies the row's shrunk delta
+     and its duration, then **cancels that violator's remaining attempts**
+     (first successful resistance ends that violator's pursuit; landed
+     attempts continue up the cap). **A sequence in which zero attempts
+     landed is the PG variant.**
+   - Each attempt applies its YAML-declared state deltas and credits the
+     declared counters, records its EventLog entry, and **advances the
+     world clock** by its declared duration.
    - Counter crediting is symmetric for every participant (§3.4).
 4. **Violators depart** (mechanically necessary: `skip_safety` forbids
    time-skip with a living monster in the room, which would strand the
@@ -86,22 +93,32 @@ recover" is fiction over an atomic settlement.
    - Wilderness population monsters: despawn and drop from
      `itemcoordinates`. The next coordinate activation respawns per the
      untouched population model.
-   - Quest-tracked / scene monsters are **never removed** (a vanished
-     extermination target would soft-lock its quest = disguised record
-     loss). They stay, narratively ignoring the player; the player may
-     leave (movement has no HP gate) and rest elsewhere.
-5. **Recovery advance**: the clock advances until HP reaches
-   `ceil(max_hp × 0.05)`, computed from regen rate reduced by the weak debuff.
-6. **Wake-up**: on the spot, HP at 5%, weak buff mounted, sexual state
-   rewritten, world time spent.
+   - Quest-bound monsters — pk listed in the settling player's persisted
+     `db.quest_log` records' `objective_target_ids` — are **never removed**
+     (a vanished extermination target would soft-lock its quest = disguised
+     record loss), and quest retention outranks the population marker when
+     one monster carries both. They stay, narratively ignoring the player;
+     the player may leave (movement has no HP gate) and rest in another
+     room (`skip_safety` still refuses to rest with a live monster present).
+5. **Recovery advance** (`defeat-aftermath-recovery`): the clock advances
+   by the minimum whole seconds for the stored regen model (times the
+   rulebook defeat scale) to first reach `ceil(max_hp × 0.05)`, then a
+   clamp write pins HP to exactly the target — regen may land on or above
+   it within the final interval but never past it. The buff engine's `rate`
+   modifier is an absolute per-interval delta, not a scale, so the regen
+   tax is settlement math reading the rulebook, not a buff effect.
+6. **Wake-up**: on the spot, HP at 5% (HP 1 until the recovery change
+   lands), weak buff mounted, sexual state rewritten, world time spent.
 
 ### 3.2 Loss menu (exhaustive)
 
 Only three loss channels exist, all on existing machinery:
 
 1. **World-clock time** (violation durations + recovery to the 5% threshold).
-2. **Weak debuff** (buffs surface, self-expiring; core effect is a reduced
-   regen rate, which is what kills the zero-cost loop).
+2. **Weak debuff** (marker buff on the shipped bounds surface,
+   self-expiring) plus the recovery-advance regen scale of step 5 — the
+   scale is what kills the zero-cost loop; the buff taxes combat stats
+   until it expires.
 3. **Sexual-state residue** on everyone violated — `combat_modifiers.yaml`
    already degrades agility/accuracy at high arousal, so a violated party
    walks into the next fight with a mechanically worse body. The punishment
@@ -109,9 +126,11 @@ Only three loss channels exist, all on existing machinery:
 
 ### 3.3 Content switch
 
-`settings` flag `DEFEAT_ADULT_SCENES` (default on — this project's genre).
-Off = skip step 3 entirely (one guard); HP floor, recovery, weak debuff,
-and PG wake-up still run.
+`settings` flag `DEFEAT_ADULT_SCENES` (default on — this project's genre)
+is declared in `defeat-aftermath-core`, which wraps the step-3 hook point
+in a guard whose body the adult layers register. Off = the hook is never
+called — there is no core-side on-branch; HP floor, weak debuff,
+departure, and the PG defeat lines run regardless.
 
 ### 3.4 Counter crediting (catalog-wide symmetric convention)
 
@@ -131,9 +150,10 @@ path; there is no divergence.
 - Semantics re-documented per counter (keys unchanged):
   `hostile_act_count` = hostile sexual acts participated in (either side);
   `interspecies_act_count` = acts with a different-species partner (either
-  side); `duo_act_count` / `group_act_count` fix an existing oddity where a
-  two-person act left the partner with no record. Solo seeds
-  (`masturbation_count`) have no target and are unchanged.
+  side). The partner line (duo/group) already mirrors counters to
+  participants today; the flip touches the combat, interspecies, and shame
+  lines (solo and divine lines declare no shared counters and are
+  unchanged).
 - Monster counters are usually transient (population monsters `delete()` on
   departure; the owner accepted this — records persist for surviving scene
   monsters and during any still-live session).
@@ -171,11 +191,16 @@ path; there is no divergence.
 
 ### 4.2 EventLog is the scene
 
-Attempts emit existing log kinds only — no schema change, so the webclient's
-current render path consumes defeat scenes for free. The Narrator overlay
-renders the EventLog into prose; offline it degrades to per-kind zh-tw
-template lines (same shape as `world/rules/action.py`'s built-in
-descriptions). Prose never gates state.
+`EventEntry.kind` is an open string field, so the aftermath's new kind
+strings (`defeat_settle`, `violator_depart`, `weak_granted`,
+`violation_attempt`, `violation_resisted`, `violation_act`, …) are a
+declared vocabulary addition, not a schema change — the webclient's current
+render path still consumes defeat scenes. Every change that introduces a
+kind also authors that kind's zh-tw offline template line and its
+`narrator.system` guidance entry in the same change. The Narrator overlay
+renders the EventLog into prose exactly once per entry (a pure render
+function over the entries; failure discards the overlay, never the
+deterministic template lines). Prose never gates state.
 
 ### 4.3 Companion handling (two layers only)
 
@@ -205,8 +230,8 @@ No layer writes affinity, gold, items, quests, or rank.
 | No companions present | Pool = {player}; sequence runs normally |
 | Fled companions | Excluded from the pool (not present) |
 | NPC defeating entity | Registry mechanism applies; v1 tables contain monster rows only |
-| Quest-tracked monster | Never despawned; stays in room, narratively ignoring; no soft-lock (movement is HP-free) |
-| Crash mid-settlement | Sequence + recovery advance + `settled_tick` marker are one transaction; the recovery path re-runs the full aftermath deterministically (seeded dice replay). `test_solo_defeat_settlement_never_revives_the_player` and `test_restored_dead_player_session_never_revives_the_player` are rewritten for the HP-1 outcome, kept as regression |
+| Quest-bound monster | Never despawned (precedence over the population marker); stays in room, narratively ignoring; no soft-lock — movement is HP-free, the player moves and rests in another room |
+| Crash mid-settlement | The aftermath runs inside the existing `settle_session` `transaction.atomic()` — marker, clock, despawns, buffs, dice, and session clearing commit or roll back together, so "marker durable, aftermath incomplete" is not observable. A pre-commit crash leaves the session durable for the existing recovery fallback, which re-runs settlement once; state-derived dice re-derive identically. `test_solo_defeat_settlement_never_revives_the_player` and `test_restored_dead_player_session_never_revives_the_player` are rewritten for the HP-1 outcome, kept as regression |
 | Server restart refreshes a fresh monster next to the weak player | Accepted risk: no outdoor monster-initiated-attack model exists; the player can move/flee |
 | `DEFEAT_ADULT_SCENES=False` | Sequence skipped; core losses unchanged |
 | Table missing / malformed | PG variant + `log_warn` (`archetype`, `tick` in context) |
@@ -230,15 +255,18 @@ Deterministic (fixed-seed) suites, no live LLM:
 
 - EventLog sequence golden: kind order/values per archetype fixture; clock
   delta per attempt; final HP == `ceil(max×0.05)`; weak buff mounted.
-- Zero-record-loss battery (same test): affinity, wallet, inventory, quest
-  progress, guild rank/merit all byte-identical after defeat.
-- Full resistance ⇒ PG variant: truncated sequence, shrunk deltas.
+- Zero-uncaused-write battery (declared-write manifest in test code):
+  affinity, wallet, inventory, quest progress, guild rank/merit unchanged
+  except for clock-crossed boundaries (deadline, daily reset, restock,
+  buff decay) enumerated as legitimate in-window mutations.
+- Zero landed attempts ⇒ PG variant: every violator stopped at its first
+  resisted attempt, shrunk deltas only, PG wake template.
 - Digest table three bands (high sens+climax / low sens+high shame / mid +
   full resist).
 - Emergent chain: player's sexual-magic cast raises monster arousal ⇒
   longer sequence.
-- Companion pool determinism (fixed seed replays same selection order);
-  fled companion excluded.
+- Companion pool determinism (state-derived dice: a rolled-back retry
+  re-derives the identical selection order); fled companion excluded.
 - Symmetric counter crediting: every participant's declared counters +1 per
   act (victim `interspecies_act_count`, aggressor monster credits); the
   skill-path catalog tests rewritten to the symmetric expectation (owned by
@@ -254,14 +282,31 @@ Deterministic (fixed-seed) suites, no live LLM:
 
 ## 8. Change split
 
-| Change | Contents | Independently shippable |
-|---|---|---|
-| `defeat-aftermath-core` | HP floor 1 + knockout, 5% recovery advance (regen-rate math), weak debuff, violator departure (population despawn / quest-tracked retain), PG wake-up, `DEFEAT_ADULT_SCENES` switch, zero-loss assertion battery, recovery-path rewrites | Yes — a usable PG defeat system |
-| `sexual-counter-symmetric-crediting` | Catalog-wide crediting flip: act-definition `participant_counters` declarations, counter semantics re-documentation, main-spec deltas + regression-test rewrites across combat/interspecies/shame lines (solo seeds untouched) | Yes — orthogonal to defeat; prerequisite for the adult layer's shared convention |
-| `defeat-aftermath-adult-scenes` | Victory-arousal table + per-archetype monster sexual baselines (owns the §6.4 deferred seam), violation sequence (registry, resist rolls, per-attempt clock advance, companion pool), digest table, companion buffs, Narrator overlay + offline templates | No — depends on core; sequenced after the crediting change so both writers share the one convention |
+Stable shorthand IDs (DA1–DA6, archive order) — every proposal carries its
+ID on the first line so it can be cited directly:
 
-Rationale: core changes the high-risk `settle_session` semantics (rewritten
-existing tests); the adult layer is purely additive on the seam core opens.
-The crediting flip rewrites shipped main specs and their pinned tests, so it
-gets its own change with its own delta specs and archive pass.
-Each change validates and archives on its own.
+| ID | Change | Contents | Independently shippable |
+|---|---|---|---|
+| **DA1** | `defeat-aftermath-core` | HP floor 1 + knockout, violator departure (population despawn / quest-bound retain with precedence), weak debuff mount, defeat EventLog kinds + zh-tw defeat lines, `DEFEAT_ADULT_SCENES` guard, per-section rulebook loader, zero-uncaused-write battery, never-revive test rewrites | Yes — playable PG defeat system (wake at HP 1) |
+| **DA2** | `defeat-aftermath-recovery` | The 5% recovery advance: minimum-whole-seconds solve against the stored regen model + clamp write to exactly `ceil(max×0.05)`, rulebook defeat regen scale, clock side-effect battery (deadline / daily decay / restock), rollback-injection tests, retained-winner move-and-rest smoke route | No — depends on DA1 |
+| **DA3** | `sexual-counter-symmetric-crediting` | Catalog-wide crediting flip: act-definition `participant_counters` declarations on the combat/interspecies/shame lines, counter semantics re-documented, main-spec deltas + regression-test rewrites (solo/partner/divine lines untouched) | Yes — orthogonal to defeat; prerequisite for the adult layer's shared convention |
+| **DA4** | `defeat-aftermath-violation-sequence` | Victory-arousal table + per-archetype monster sexual baselines (owns the §6.4 deferred seam), scene-family registry, violation sequence over the player pool (state-derived dice, `resist_verdict` rolls, per-attempt clock advance), zero-landed PG variant, registers the guarded hook body | No — depends on DA1 + DA3 |
+| **DA5** | `defeat-aftermath-companion-victims` | Companions as pool victims: per-companion own-state writes, symmetric crediting on the defeat path, knocked-out/fled pool tests, companion wake lines | No — depends on DA4 |
+| **DA6** | `defeat-aftermath-digest-narrative` | Sexual-state digest table, digest buffs, wake-up lines, Narrator overlay + offline template fallback with the once-per-entry render contract | No — depends on DA4 + DA5 |
+
+Rationale: every change is scoped to ≈ one working day (8-hour guideline).
+Core changes the high-risk `settle_session` semantics; recovery isolates
+the risky clock arithmetic; the adult layer is purely additive on the seam
+core opens, split mechanical sequence → companion breadth →
+digest/narrative polish. The crediting flip rewrites shipped main specs and
+their pinned tests, so it gets its own change and archive pass.
+
+Archive order (later deltas are written against the names this order
+produces; archive steps sync into `openspec/specs/`, migrate the
+`covers_requirement` IDs of renamed requirements, and finish with
+`openspec validate --all --strict`):
+DA1 `defeat-aftermath-core` → DA2 `defeat-aftermath-recovery` →
+DA3 `sexual-counter-symmetric-crediting` →
+DA4 `defeat-aftermath-violation-sequence` → DA5
+`defeat-aftermath-companion-victims` → DA6
+`defeat-aftermath-digest-narrative`.
