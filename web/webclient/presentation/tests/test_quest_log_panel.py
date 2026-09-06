@@ -5,9 +5,7 @@ describe-seam prose parity with the objectives tracker and the services
 counter, issuer label resolution, unresolvable-issuance degradation,
 host-independent availability, read-only guarantees), strict-reader
 degradation, and pure validator rejections. ``covers_requirement``
-annotations land at the change's archive/sync commit (objectives panel
-P1 precedent): the capability's requirement IDs are unknown to the
-current-contract index until then.
+annotations pin every capability requirement the module establishes.
 """
 
 import json
@@ -166,6 +164,9 @@ class QuestLogPresenterTests(EvenniaTest):
             tracked=True,
         )
 
+    @covers_requirement(
+        "webclient-quest-log-panel::the-quest-log-panel-is-an-exact-read-only-version-1-presentation-panel"
+    )
     def test_registry_uses_the_common_unavailable_reason(self):
         spec = self.registry.spec("quest_log")
         self.assertEqual(spec.schema_version, QUEST_LOG_SCHEMA_VERSION)
@@ -216,6 +217,9 @@ class QuestLogPresenterTests(EvenniaTest):
         self.assertEqual(self.player.db.wallet, 500)
         self.assertEqual(json.dumps(list(self.player.db.inventory or [])), before_inventory)
 
+    @covers_requirement(
+        "webclient-quest-log-panel::the-quest-log-panel-is-host-independent"
+    )
     def test_log_is_readable_far_from_any_counter(self):
         # The room holds no NPC of any kind; the book still renders every row.
         definition = register(quest("wilderness_quest"))
@@ -313,6 +317,9 @@ class QuestLogPresenterTests(EvenniaTest):
         self.assertIsNone(rows["orphan_branch:1"]["settlement"])
         self.assertIsNone(rows["orphan_branch:1"]["reward_line"])
 
+    @covers_requirement(
+        "webclient-quest-log-panel::row-prose-comes-only-from-the-canonical-describe-seams"
+    )
     def test_quest_book_and_tracker_agree_on_the_same_record(self):
         definition = register(quest("tracker_parity"))
         record = accept_under_auto(self.player, definition)
@@ -352,6 +359,9 @@ class QuestLogPresenterTests(EvenniaTest):
         self.assertEqual(quest_row["deadline_line"], counter_row["deadline_line"])
         self.assertEqual(quest_row["detail"], counter_row["detail"])
 
+    @covers_requirement(
+        "webclient-quest-log-panel::an-unresolvable-issuance-yields-no-reward-line-rather-than-a-fabricated-one"
+    )
     def test_withdrawn_commission_still_lists_its_quest(self):
         definition = register(quest("withdrawn_commission"))
         issuer_key = _register_auto_commission(definition.key, "grey_granny")
@@ -370,6 +380,9 @@ class QuestLogPresenterTests(EvenniaTest):
         for forbidden in ("銅", "功績", "獎勵", "治療藥水"):
             self.assertNotIn(forbidden, serialized)
 
+    @covers_requirement(
+        "webclient-quest-log-panel::a-corrupt-quest-log-degrades-the-whole-panel-never-a-partial-list"
+    )
     def test_one_malformed_entry_hides_the_whole_panel_without_repair(self):
         definition = register(quest("degrade_quest"))
         record = accept_under_auto(self.player, definition)
@@ -518,6 +531,9 @@ class QuestLogValidatorTests(unittest.TestCase):
         row = self._valid_row(settlement=None, reward_line=None, deadline_line=None)
         self.assertEqual(validate_quest_log(self._valid_payload(rows=[row])), self._valid_payload(rows=[row]))
 
+    @covers_requirement(
+        "webclient-quest-log-panel::the-panel-is-bounded-and-closes-with-the-shared-envelope-check"
+    )
     def test_thirteenth_row_is_rejected(self):
         rows = [self._valid_row(quest_id=f"q:{i}") for i in range(QUEST_LOG_MAX_ROWS + 1)]
         with self.assertRaises(ProtocolValidationError):

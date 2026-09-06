@@ -720,6 +720,9 @@ class ServiceDispatchTests(ServiceActionBase):
         self.assertEqual(len(obj_rows), 1)
         self.assertEqual(obj_rows[0]["quest_id"], record.quest_id)
 
+    @covers_requirement(
+        "webclient-quest-log-panel::the-panel-is-pushed-on-every-quest-log-mutation"
+    )
     def test_track_action_publishes_the_quest_log_panel(self):
         self._register()
         record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
