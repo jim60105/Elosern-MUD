@@ -98,6 +98,15 @@ def acquire(item_key: str, quantity: int = 1) -> QuestObjective:
     )
 
 
+def deliver(item_key: str, quantity: int = 1) -> QuestObjective:
+    return QuestObjective(
+        kind=ObjectiveKind.DELIVER,
+        quantity=quantity,
+        item_key=item_key,
+        requires_bound_targets=True,
+    )
+
+
 def anchor_locator() -> RoomLocator:
     return RoomLocator(DestinationKind.ANCHOR, anchor_key="capital_altoria")
 

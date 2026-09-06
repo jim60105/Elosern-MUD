@@ -79,6 +79,11 @@ def describe_objective(objective: QuestObjective) -> str:
         if item is None:
             raise QuestDescribeError(f"unknown item {objective.item_key!r}")
         return f"收集 {objective.quantity} 個{item.display_name_zh}"
+    if objective.kind is ObjectiveKind.DELIVER:
+        item = ITEM_REGISTRY.get(objective.item_key)
+        if item is None:
+            raise QuestDescribeError(f"unknown item {objective.item_key!r}")
+        return f"交付 {objective.quantity} 個{item.display_name_zh}"
     raise QuestDescribeError(f"unknown ObjectiveKind {objective.kind!r}")
 
 
