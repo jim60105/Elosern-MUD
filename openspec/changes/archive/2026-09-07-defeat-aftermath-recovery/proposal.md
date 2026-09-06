@@ -70,11 +70,15 @@ settlement outcome — is expressed as ADDED requirements of
 - `world/rules/defeat_aftermath.py` (recovery phase beside the core
   writer), `world/rules/rulebook/defeat_aftermath.yaml` (`recovery`
   section + validator).
-- No changes to `world/rules/clock.py` — the solve and clamp are aftermath
-  math over the shipped regen model; the clock itself is called through its
-  normal advance entry point with a source tag.
+- `world/rules/clock.py` changes are limited to the new
+  `AdvanceSource.DEFEAT_AFTERMATH` vocabulary member the `source
+  defeat_aftermath` contract requires — no regen-model or engine changes;
+  the solve and clamp are aftermath math over the shipped regen model, and
+  the clock is called through its normal advance entry point with a source
+  tag.
 - Tests: extends `world/rules/tests/test_defeat_aftermath_core.py`'s
-  battery with the recovery manifest rows + new recovery module tests;
-  shard manifest unchanged (same modules).
+  battery with the recovery manifest rows, the solve unit tests, and the
+  new recovery scenario tests in the same modules; shard manifest
+  unchanged (same modules).
 - Depends on `defeat-aftermath-core` (archives immediately after it per
   parent design §8). Blocks nothing.

@@ -11,14 +11,17 @@ defeat EventLog kinds, and the guarded adult-scene hook point.
 ### Requirement: Hostile defeat floors player HP at 1 and marks the player knocked out
 On a hostile-mode session settling `outcome == "defeat"`, the defeat
 aftermath writer (`world/rules/defeat_aftermath.py`, deterministic core)
-SHALL set the player's stored HP to `1` and record the player in the
-session's knockout set before clearing session state. No defeat settlement
-SHALL leave the player at stored HP 0. Guild-exam (`exam_failed`) outcomes
-are exempt and keep their full-restoration simulation semantics.
+SHALL set the player's stored HP to `1` at the floor phase and record the
+player in the session's knockout set before clearing session state. No
+defeat settlement SHALL leave the player at stored HP 0. The final wake
+state is the recovery advance's target defined by the
+defeat-aftermath-recovery capability; the floor remains the declared
+interim write. Guild-exam (`exam_failed`) outcomes are exempt and keep
+their full-restoration simulation semantics.
 
 #### Scenario: Defeated player settles at the nonlethal floor
 - **WHEN** a hostile session settles defeat with the player's HP driven to 0 mid-round
-- **THEN** after settlement the player's stored HP equals `1` and the session is cleared
+- **THEN** the floor phase stores HP `1` and the session is cleared; the recovery phase then wakes the player at exactly its 5% target before the settlement completes
 
 #### Scenario: Exam defeat keeps full restoration
 - **WHEN** a guild-exam session settles `exam_failed`
@@ -73,17 +76,20 @@ the ordinary decay stage without any special path.
 
 ### Requirement: Defeat aftermath emits EventLog entries and defeat lines
 The aftermath SHALL record ordered EventLog entries with kinds
-`defeat_settle`, `violator_depart`, and `weak_granted`, and SHALL render
-zh-tw defeat lines through the existing `player_messages.py` idiom. Each
-new kind is an open-vocabulary `EventEntry.kind` string accompanied by its
-own offline template line authored in this change (no schema change; the
-webclient's current render path is untouched). It SHALL emit one
-`defeat_aftermath` boundary info event through the observability facade
-carrying `{char, room, tick, hp_after}` context.
+`defeat_settle`, `violator_depart`, and `weak_granted` — followed by the
+recovery phase's `recovery_advance` entry when that phase advances the
+clock (defeat-aftermath-recovery) — and SHALL render zh-tw defeat lines
+through the existing `player_messages.py` idiom. Each new kind is an
+open-vocabulary `EventEntry.kind` string accompanied by its own offline
+template line authored in its change (no schema change; the webclient's
+current render path is untouched). It SHALL emit one `defeat_aftermath`
+boundary info event through the observability facade carrying
+`{char, room, tick, hp_after}` context, widened with `seconds` and
+`hp_wake` by the recovery phase.
 
 #### Scenario: Offline defeat produces the full event trail
 - **WHEN** a defeat settles with every LLM profile disabled
-- **THEN** the three aftermath EventLog kinds appear in order, the player receives the zh-tw defeat lines, and exactly one `defeat_aftermath` info event is logged
+- **THEN** the core aftermath EventLog kinds appear in order — followed by the recovery entry when the phase advances — the player receives the zh-tw defeat lines, and exactly one `defeat_aftermath` info event is logged
 
 ### Requirement: The DEFEAT_ADULT_SCENES setting exists and guards the violation hook
 The server settings SHALL define `DEFEAT_ADULT_SCENES` (default `True`).
@@ -107,7 +113,9 @@ clock advancing (a crossed deadline failing a quest, a crossed daily
 boundary changing a gauge, a crossed restock boundary restocking a
 merchant, a buff decaying). The settlement's own writes are only the
 declared ones: player HP floor, the knockout mark, the weak buff, the
-violator departure, and its own EventLog/observability records.
+violator departure, the recovery advance with its wake clamp (or its
+capped scaled-model settle), and the aftermath's EventLog/observability
+records.
 
 #### Scenario: Defeat battery pins the zero-uncaused-write contract
 - **WHEN** a defeat settles with an active quest, bound companions, guild rank, and nonzero copper, with the recovery window advanced no further than the settlement itself drives it

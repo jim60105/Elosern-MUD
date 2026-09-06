@@ -1,6 +1,13 @@
-# defeat-aftermath-recovery delta
+# defeat-aftermath-recovery Specification
 
-## ADDED Requirements
+## Purpose
+
+Price defeat in world time: the 5% recovery advance — the minimum-seconds
+solve over the stored regen model, the rulebook defeat scale, the
+exact-target clamp, the clock side-effect contract, and the bounded-failure
+edge.
+
+## Requirements
 
 ### Requirement: Defeat recovery advances the clock to the 5% wake target
 After the core's defeat phases, the aftermath SHALL compute the minimum
@@ -31,9 +38,10 @@ solve time, `t` is `0`: no advance, no clamp, no event.
 The `recovery` rulebook section SHALL declare `max_recovery_seconds`. If
 the solve yields `t` above the cap (a zero/tiny scaled rate or a
 pathologically low rate), the aftermath SHALL advance by the cap instead,
-settle at the HP the capped advance produces (no clamp above it), and emit
-one `log_error` facade event carrying `{char, tick, target, capped}`
-context.
+settle the player at the state the stored scaled model produces at the cap
+(current and carried remainder — a declared aftermath write, never
+clamped upward toward the target), and emit one `log_error` facade event
+carrying `{char, tick, target, capped}` context.
 
 #### Scenario: Degenerate rate hits the cap with an error event
 - **WHEN** the rulebook scale combined with the fixture rate makes the target unreachable within `max_recovery_seconds` (e.g. a zero HP regen rate)
