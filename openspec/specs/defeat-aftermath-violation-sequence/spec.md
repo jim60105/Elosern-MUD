@@ -1,6 +1,15 @@
-# defeat-aftermath-violation-sequence delta
+# defeat-aftermath-violation-sequence Specification
 
-## ADDED Requirements
+## Purpose
+
+Define the deterministic adult violation sequence that rides the defeat
+aftermath's guarded hook: archetype-keyed victory arousal and attempt caps,
+state-derived sequence dice, the shipped resist contest with the victim
+defending, per-attempt world-clock advances, the first-resistance violator
+stop with its zero-landed PG variant, and the in-memory digest-ready outcome
+handoff.
+
+## Requirements
 
 ### Requirement: Living defeat winners gain archetype victory arousal
 On a hostile defeat with the adult path enabled, each living foe-team
