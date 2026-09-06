@@ -201,3 +201,41 @@ def accept(actor: Any, definition: QuestDefinition | str) -> QuestRecord:
     """
     key = definition.key if isinstance(definition, QuestDefinition) else str(definition)
     return accept_quest(actor, key, _ensure_test_issuance(key))
+
+
+# The shared automatic commission: same registry-backed resolution as the
+# counter fixture, but completing records under it settle on the spot
+# (quest-auto-settlement). Reward defaults to copper only; ``accept_auto``
+# forwards a custom reward for item-bearing scenarios.
+AUTO_ISSUER_KEY = npc_issuer_key(content_key="test_auto_commission")
+
+
+def register_auto_issuance(
+    definition_key: str, reward: QuestReward | None = None
+) -> str:
+    """Guarantee an ``AUTO``-settled commission exists for ``definition_key``."""
+    if (definition_key, AUTO_ISSUER_KEY) not in QUEST_ISSUANCE_REGISTRY:
+        register_quest_issuance(
+            QuestIssuance(
+                definition_key=definition_key,
+                issuer_key=AUTO_ISSUER_KEY,
+                reward=(
+                    reward
+                    if reward is not None
+                    else QuestReward(copper=25, items=(), merit=0)
+                ),
+                settlement=Settlement.AUTO,
+            )
+        )
+    return AUTO_ISSUER_KEY
+
+
+def accept_auto(
+    actor: Any,
+    definition: QuestDefinition | str,
+    reward: QuestReward | None = None,
+) -> QuestRecord:
+    """Accept ``definition`` under the shared automatic commission."""
+    key = definition.key if isinstance(definition, QuestDefinition) else str(definition)
+    register_auto_issuance(key, reward)
+    return accept_quest(actor, key, AUTO_ISSUER_KEY)

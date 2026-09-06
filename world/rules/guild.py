@@ -310,6 +310,19 @@ def parse_reward_claims(actor: Any) -> list[str]:
     return claims
 
 
+def write_reward_claims(actor: Any, claims: list[str]) -> None:
+    """Persist one validated reward-claims list (the shared exactly-once ledger).
+
+    The single append point for BOTH settlement modes: the counter turn-in and
+    the automatic settlement write the same JSON-safe ``guild_reward_claims``
+    list through this helper under the same exactly-once-per-quest-ID rule.
+    The attribute name mentions the guild for historical reasons only; renaming
+    it is deliberately out of scope (quest-auto-settlement D4).
+    ``parse_reward_claims`` is the strict read seam.
+    """
+    actor.db.guild_reward_claims = list(claims)
+
+
 def _require_local_staff(actor: Any, staff: Any) -> None:
     if staff is None:
         raise RewardClaimError(RewardClaim.NO_STAFF)
@@ -442,6 +455,11 @@ def turn_in_quest(
             "guild_merit",
             read_counter_trait(actor, "guild_merit") + reward.merit,
         )
+        # The counter claim appends BEFORE the ACQUIRE delta: a nested
+        # automatic settlement (reward items completing an AUTO quest) merges
+        # its own claim into the just-written ledger instead of being erased
+        # by a stale pre-transaction list.
+        write_reward_claims(actor, [*claims, quest_id])
         if inventory_plan.acquire is not None:
             from world.quests.transitions import apply_quest_log_delta
 
@@ -450,7 +468,6 @@ def turn_in_quest(
                 list(inventory_plan.acquire[0]),
                 inventory_plan.acquire[1],
             )
-        actor.db.guild_reward_claims = [*claims, quest_id]
         if first_claim:
             from world.rules.titles import grant_first_quest_epithet
 

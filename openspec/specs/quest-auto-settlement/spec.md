@@ -1,6 +1,12 @@
-# Delta spec: quest-auto-settlement (quest-auto-settlement)
+# quest-auto-settlement Specification
 
-## ADDED Requirements
+## Purpose
+
+Define the automatic settlement of quests whose issuance declares `Settlement.AUTO`: a pure
+planner computes the payout, every quest-log write path commits it atomically with the completion,
+and both settlement modes share one exactly-once claim ledger.
+
+## Requirements
 
 ### Requirement: Automatic settlement is planned by a pure function
 
@@ -63,6 +69,16 @@ restoring every snapshotted surface.
 - **WHEN** persistence is fault-injected during the settlement write of a completing automatic quest
 - **THEN** the quest log, wallet, inventory, reward claims, and their in-process caches all equal
   their pre-transition values
+
+#### Scenario: A settlement reward completes another active ACQUIRE quest
+- **WHEN** a completing automatic quest's item rewards satisfy another active ACQUIRE objective
+- **THEN** that quest completes in the same transaction and its own automatic reward settles with
+  it, exactly as a counter-paid reward item would advance the objective
+
+#### Scenario: A counter reward completing an automatic quest keeps both claims
+- **WHEN** a counter turn-in's reward items complete an active ACQUIRE quest under an automatic
+  issuance
+- **THEN** both quest IDs appear exactly once in the shared ledger and both rewards are paid
 
 ### Requirement: Automatic settlement never grants merit and never needs a host
 

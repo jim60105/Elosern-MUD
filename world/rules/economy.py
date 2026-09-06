@@ -145,6 +145,7 @@ def _snapshot_trade(actor: Any, merchant: Any) -> dict[str, Any]:
         "wallet": attribute_snapshot(actor, "wallet"),
         "inventory": attribute_snapshot(actor, "inventory"),
         "quest_log": attribute_snapshot(actor, "quest_log"),
+        "guild_reward_claims": attribute_snapshot(actor, "guild_reward_claims"),
         "merchant_stock": attribute_snapshot(merchant.host, f"{merchant.get_component_slot()}::merchant_stock"),
         "last_restock_day": attribute_snapshot(merchant.host, f"{merchant.get_component_slot()}::last_restock_day"),
         "merchant_relations": attribute_snapshot(merchant.host, "relations_data"),
@@ -155,7 +156,7 @@ def _snapshot_trade(actor: Any, merchant: Any) -> dict[str, Any]:
 def _restore_trade(actor: Any, merchant: Any, snapshot: dict[str, Any]) -> None:
     from world.rules.surfaces import restore_attribute_best_effort
 
-    for key in ("wallet", "inventory", "quest_log"):
+    for key in ("wallet", "inventory", "quest_log", "guild_reward_claims"):
         restore_attribute_best_effort(actor, key, snapshot[key])
     restore_attribute_best_effort(
         merchant.host,

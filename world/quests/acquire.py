@@ -22,11 +22,10 @@ from .transitions import release_stage_binding
 
 
 def _matching_active_stages(
-    entity: Any,
+    records: list[Any],
     additions: Counter,
 ) -> list[Any]:
     """Return active records whose current ACQUIRE objective item matches."""
-    records = read_records(entity)
     matching: list[Any] = []
     for record in records:
         if record.state is not QuestState.IN_PROGRESS:
@@ -53,12 +52,29 @@ def compute_acquire_replacement(
     Counter semantics allow repeated item keys to satisfy repeated quantities
     without inventing fractions.
     """
+    return _compute_acquire_replacement_for(entity, read_records(entity), additions)
+
+
+def _compute_acquire_replacement_for(
+    entity: Any,
+    records: list[Any],
+    additions: Any,
+) -> tuple[list[Any], tuple[Any, ...]] | None:
+    """``compute_acquire_replacement`` against a supplied record set.
+
+    Identical computation, but the candidate records are passed in instead of
+    read from storage, so a caller holding a virtual (not-yet-written) record
+    list — the automatic-settlement chain planner — computes the same
+    replacement without a stale store read. ``entity`` still names the actor:
+    the completion-observer dispatch and the pin-release lookups stay
+    entity-aware.
+    """
     if isinstance(additions, Counter):
         counts = additions
     else:
         counts = Counter(additions)
 
-    matching = _matching_active_stages(entity, counts)
+    matching = _matching_active_stages(records, counts)
     if not matching:
         return None
 
@@ -86,6 +102,6 @@ def compute_acquire_replacement(
     if not replacements:
         return None
     return (
-        [replacements.get(record.quest_id, record) for record in read_records(entity)],
+        [replacements.get(record.quest_id, record) for record in records],
         tuple(pin_operations),
     )

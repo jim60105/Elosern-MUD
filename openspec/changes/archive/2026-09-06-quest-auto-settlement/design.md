@@ -57,6 +57,33 @@ what makes "exactly once per quest ID" true across both modes; two ledgers would
 once by each. The attribute name mentions the guild for historical reasons only, and renaming it is
 deliberately out of scope — the rename would touch every reward test for no behavioral gain.
 
+### D5: Reward items complete other ACQUIRE objectives (chain folded into the plan)
+
+`turn_in_quest` applies the ACQUIRE replacement of its reward items, so excluding the same items
+when they are paid automatically would make quest progress depend on the settlement mode rather
+than on the acquisition itself. `plan_auto_settlement_chain` therefore feeds every paid item to
+the ACQUIRE runtime against the VIRTUAL post-transition record set (the package-private
+`_compute_acquire_replacement_for` variant — no stale store read), and chain completions join the
+same plan. The loop terminates because every iteration either pays a new quest ID (claim
+identities are unique within one plan) or stops. On the pending-effects path the whole chain is
+computed at planning time and folded into the quest-log and pin effects, so the resolver writes
+the final record state exactly once and never applies a replacement computed against pre-action
+state.
+
+### D6: The counter claim appends before the nested ACQUIRE delta
+
+`turn_in_quest`'s writer appends its own claim BEFORE invoking the ACQUIRE quest-log delta. A
+counter reward whose items complete an AUTO quest settles inside that nested delta; appending the
+counter claim afterwards (the pre-transaction list) would erase the nested settlement's claim and
+let the quest be paid again later. The fix is a two-line reorder; the `first_claim` epithet
+decision stays precomputed from the pre-append list.
+
+### Retired: the "full inventory" reading of the rollback scenario
+
+`plan_inventory_delta` has no inventory-capacity concept — additions are always appendable. The
+only settlement failures are genuine write failures, and those roll the completion back together
+with the payout exactly as the delta spec requires. No capacity rule is introduced here.
+
 ## Risks / Trade-offs
 
 - **`apply_quest_log_delta`'s caller contract widens** → Callers must now also snapshot wallet,
@@ -65,9 +92,18 @@ deliberately out of scope — the rename would touch every reward test for no be
 - **`PendingEffect` ordering with the action's own economy effects** → Settlement effects are keyed
   per surface like the existing quest-log and instance-pin effects, so the resolver's existing
   per-surface commit ordering applies. A combat-completion test pins the behavior.
+  Implementation note: the settlement rides one `PendingEffect` declaring the union of the wallet,
+  inventory, and reward-claim surfaces (the resolver aggregates per-entity surfaces anyway), and
+  its apply re-checks claim eligibility before writing, so all three surfaces land together or the
+  commit fails and the action rolls back.
 - **A ledger named for the guild now records private settlements** → Cosmetic. Renaming is out of
   scope and noted; the docstring states the widened meaning.
 - **Detecting "just reached COMPLETED" at three sites** → All three already compute the new record
   list, so the transition is a diff between old and new entries at the write boundary — the same
   diff `_schedule_transition_events` already computes. Reuse that comparison rather than adding a
   second notion of "just completed".
+- **Path-test fidelity** → The replacement-path test drives `apply_quest_log_replacement` directly
+  — the same writer the REACH/ESCORT observation path calls — because the room-match and
+  companion-presence machinery above it is change-agnostic and already covered by the existing
+  room-observation tests. The delta and pending-effects tests likewise drive their writers, the
+  latter through the real `ActionResolver` combat pipeline.
