@@ -220,6 +220,7 @@
         "web.webclient.presentation.tests.test_creation_panel",
         "web.webclient.presentation.tests.test_dialogue_panel",
         "web.webclient.presentation.tests.test_lineage_panel",
+        "web.webclient.presentation.tests.test_lore_codex_panel",
         "web.webclient.presentation.tests.test_local_map",
         "web.webclient.presentation.tests.test_party_panel",
         "web.webclient.presentation.tests.test_possession_presentation",

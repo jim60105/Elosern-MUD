@@ -1540,6 +1540,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                     "title_codex",
                     "roster",
                     "possession_banner",
+                    "lore_codex",
                 }
             ),
         )

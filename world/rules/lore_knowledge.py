@@ -20,7 +20,6 @@ from collections.abc import Mapping, Set as ABCSet
 from dataclasses import dataclass
 from typing import Any
 
-from world.observability import log_warn
 from world.lore.anchors import ANCHOR_REGISTRY
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.guild import GUILD_RANK_REGISTRY
@@ -29,10 +28,23 @@ from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.nations import NATION_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+from world.observability import log_warn
 
 # The persisted codex attribute name. All stored entries are namespaced
 # ``category:key`` identifiers.
 KNOWLEDGE_ATTR = "lore_discovered"
+
+# Player-facing category labels used by the listing groups and presentation panels.
+CATEGORY_LABELS: dict[str, str] = {
+    "race": "種族",
+    "nation": "國家",
+    "region": "地域",
+    "monster": "魔物",
+    "element": "元素",
+    "magic": "魔法",
+    "anchor": "地點",
+    "guild": "公會",
+}
 
 
 class LoreCategoryError(ValueError):
@@ -82,13 +94,19 @@ def _namespaced_id(category: str, key: str) -> str:
     return f"{category}:{key}"
 
 
-def _validated_record(record: Any) -> set[str]:
+def _validated_record(record: Any, *, tolerant: bool = False) -> set[str]:
     """Strictly parse a stored codex record, raising on corrupt content.
 
     Every stored identifier must be a namespaced ``category:key`` string whose
     category is in ``CODE_CATEGORIES`` and whose key resolves in that
-    category's registry; anything else is a corrupt record. The returned set
-    is a fresh copy so the caller never mutates the stored value.
+    category's registry; anything else is a corrupt record. Structural shape
+    (exactly one delimiter, non-empty category and key) is ALWAYS enforced —
+    a malformed identifier is corruption, never a vanished key. When
+    ``tolerant`` is True (used by the presentation panel), well-formed
+    identifiers whose keys no longer resolve in their registry are preserved
+    so the presenter can omit them cleanly instead of degrading the entire
+    panel. The returned set is a fresh copy so the caller never mutates the
+    stored value.
     """
     if not isinstance(record, ABCSet) or not all(
         isinstance(item, str) for item in record
@@ -98,12 +116,48 @@ def _validated_record(record: Any) -> set[str]:
         if ":" not in item:
             raise LoreRecordError(f"lore codex entry {item!r} is not namespaced")
         category, _, key = item.partition(":")
+        if not category or not key or ":" in key:
+            raise LoreRecordError(f"lore codex entry {item!r} is malformed")
         codex = CODE_CATEGORIES.get(category)
         if codex is None:
             raise LoreRecordError(f"lore codex entry {item!r} has an unknown category")
-        if key not in codex.registry:
+        if not tolerant and key not in codex.registry:
             raise LoreRecordError(f"lore codex entry {item!r} has an unresolvable key")
     return set(record)
+
+
+def _schedule_lore_codex_push(player: Any) -> None:
+    """Register the codex push strictly after the surrounding transaction commits.
+
+    Django's ``on_commit`` already runs the callback synchronously in
+    autocommit mode; a registration failure (manual transaction management)
+    must NEVER fall back to an inline push, because an inline push could
+    publish state that the open transaction later rolls back. The callback
+    keeps the reveal write itself isolated from any presentation failure.
+    """
+
+    def _safe_push() -> None:
+        try:
+            from web.webclient.presentation.lore_codex_push import push_lore_codex_update
+
+            push_lore_codex_update(player)
+        except Exception as error:
+            log_warn(
+                "lore_codex_push_schedule_failed",
+                context={"char": str(getattr(player, "pk", "?"))},
+                exc=error,
+            )
+
+    from django.db import transaction
+
+    try:
+        transaction.on_commit(_safe_push)
+    except Exception as error:
+        log_warn(
+            "lore_codex_push_register_failed",
+            context={"char": str(getattr(player, "pk", "?"))},
+            exc=error,
+        )
 
 
 def record_lore_reveal(player: Any, category: str, key: str) -> None:
@@ -131,6 +185,7 @@ def record_lore_reveal(player: Any, category: str, key: str) -> None:
     updated = set(current)
     updated.add(entry)
     player.db.lore_discovered = updated
+    _schedule_lore_codex_push(player)
 
 
 def reveal_lore_best_effort(player: Any, category: str, key: str) -> bool:
@@ -186,7 +241,7 @@ def schedule_lore_reveal_best_effort(
         )
 
 
-def list_discovered(player: Any) -> tuple[tuple[str, str], ...]:
+def list_discovered(player: Any, *, tolerant: bool = False) -> tuple[tuple[str, str], ...]:
     """Return the discovered ``(category, key)`` pairs in deterministic order.
 
     The listing is ordered by category mapping order, then key, and never
@@ -197,7 +252,7 @@ def list_discovered(player: Any) -> tuple[tuple[str, str], ...]:
     current = player.db.lore_discovered
     if current is None:
         return ()
-    record = _validated_record(current)
+    record = _validated_record(current, tolerant=tolerant)
     by_category: dict[str, set[str]] = {
         category: set() for category in CODE_CATEGORIES
     }

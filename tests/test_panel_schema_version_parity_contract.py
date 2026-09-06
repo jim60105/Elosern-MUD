@@ -51,6 +51,7 @@ _PANEL_MODULES = (
     ("title_codex", "title_codex.py"),
     ("roster", "roster.py"),
     ("possession_banner", "possession_banner.py"),
+    ("lore_codex", "lore_codex.py"),
 )
 
 

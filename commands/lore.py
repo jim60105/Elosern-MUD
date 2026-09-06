@@ -11,24 +11,13 @@ entry the player has not revealed.
 from commands.command import Command
 
 from world.rules.lore_knowledge import (
+    CATEGORY_LABELS,
     LoreCategoryError,
     LoreKeyError,
     LoreRecordError,
     list_discovered,
     lore_card,
 )
-
-# Player-facing category labels used by the listing groups (display-only).
-CATEGORY_LABELS = {
-    "race": "種族",
-    "nation": "國家",
-    "region": "地域",
-    "monster": "魔物",
-    "element": "元素",
-    "magic": "魔法",
-    "anchor": "地點",
-    "guild": "公會",
-}
 
 _NOT_FOUND = "圖鑑中查無此知識。"
 _UNAVAILABLE = "你的知識圖鑑暫時無法閱讀。"
