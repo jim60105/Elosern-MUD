@@ -21,9 +21,10 @@ from typeclasses.rooms import Room
 from world.ai.profiles import default_profiles
 from world.quests.binding import bind_stage_runtime
 from world.quests.definitions import QuestStage
-from world.quests.runtime import QuestState, accept_quest, read_records
+from world.quests.runtime import QuestState, read_records
 from world.quests.tests._fixtures import (
     QuestRegistryIsolation,
+    accept,
     deliver,
     quest,
     register,
@@ -77,7 +78,7 @@ class _DeliveryWorldBase(QuestRegistryIsolation, EvenniaTest):
                 stages=(QuestStage(0, deliver("healing_potion", quantity=self.quantity)),),
             )
         )
-        self.record = accept_quest(self.player, self.definition.key)
+        self.record = accept(self.player, self.definition)
         bind_stage_runtime(
             self.player,
             self.record.quest_id,
@@ -182,7 +183,7 @@ class DeliveryParityTests(_DeliveryWorldBase):
         # Reset to the identical fixture and run the rule directly: identical
         # outcome, identical final state.
         self.player.db.quest_log = []
-        record = accept_quest(self.player, self.definition.key)
+        record = accept(self.player, self.definition)
         bind_stage_runtime(
             self.player, record.quest_id, objective_targets=(self.recipient,)
         )
@@ -334,7 +335,7 @@ class DeliverySelectionTests(_DeliveryWorldBase):
                 stages=(QuestStage(0, deliver("healing_potion", quantity=quantity)),),
             )
         )
-        record = accept_quest(self.player, second.key)
+        record = accept(self.player, second)
         bind_stage_runtime(
             self.player, record.quest_id, objective_targets=(self.recipient,)
         )

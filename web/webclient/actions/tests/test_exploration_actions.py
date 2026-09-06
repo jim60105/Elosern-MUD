@@ -1383,8 +1383,7 @@ class DeliverAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
     def setUp(self):
         from world.quests.binding import bind_stage_runtime
-        from world.quests.runtime import accept_quest
-        from world.quests.tests._fixtures import deliver, quest, register
+        from world.quests.tests._fixtures import accept, deliver, quest, register
 
         self.room1 = create_object(Room, key="交付房")
         self.player = create_object(PlayerCharacter, key="交付行動測試")
@@ -1401,7 +1400,7 @@ class DeliverAdapterTests(BattlefieldIsolation, EvenniaTestCase):
                 stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
             )
         )
-        record = accept_quest(self.player, definition.key)
+        record = accept(self.player, definition)
         bind_stage_runtime(
             self.player, record.quest_id, objective_targets=(self.recipient,)
         )

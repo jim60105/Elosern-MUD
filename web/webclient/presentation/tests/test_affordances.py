@@ -34,9 +34,10 @@ from web.webclient.presentation.affordances import (
 from web.webclient.actions.exploration_actions import validate_move_payload
 from world.quests.binding import bind_stage_runtime
 from world.quests.definitions import QuestStage
-from world.quests.runtime import QuestState, accept_quest, read_records
+from world.quests.runtime import QuestState, read_records
 from world.quests.tests._fixtures import (
     QuestRegistryIsolation,
+    accept,
     deliver,
     quest,
     register,
@@ -993,7 +994,7 @@ class DeliveryAffordanceTests(QuestRegistryIsolation, VocabularyTestCase):
                 stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
             )
         )
-        self.record = accept_quest(self.player, definition.key)
+        self.record = accept(self.player, definition)
         bind_stage_runtime(
             self.player,
             self.record.quest_id,
