@@ -1599,6 +1599,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-contextual-hud::an-open-drawer-or-overlay-dims-the-stage-behind-it"
     )
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-codex-opens-from-the-command-line-utility-strip-not-from-the-quest-drawer",
+    )
     def test_codex_drawer_opens_from_the_utility_strip(self):
         """The command line's 圖鑑 utility control opens the codex reference
         drawer with a real user click: the drawer body renders the committed
@@ -1643,6 +1646,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         page.close()
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-codex-opens-from-the-command-line-utility-strip-not-from-the-quest-drawer",
+    )
     def test_codex_drawer_replaces_the_open_drawer_or_overlay(self):
         """At most one focus-trapped surface is open: opening the codex drawer
         through the store's single open-drawer entry point closes an open
@@ -1682,6 +1688,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         page.close()
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-codex-opens-from-the-command-line-utility-strip-not-from-the-quest-drawer",
+    )
     def test_quest_drawer_offers_no_codex_control(self):
         """The quest drawer contains no control that opens the codex: the
         世界圖鑑 button (and its `open_lore` emit) is removed outright."""
@@ -1713,6 +1722,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         page.close()
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-codex-opens-from-the-command-line-utility-strip-not-from-the-quest-drawer",
+    )
     def test_the_two_codex_controls_are_distinguishable(self):
         """The world-codex control and the title-codex control in the utility
         strip carry distinct accessible labels and distinct glyphs — they sit

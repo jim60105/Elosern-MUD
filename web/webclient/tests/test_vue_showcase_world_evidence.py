@@ -28,6 +28,15 @@ Test-to-requirement mapping (applied at archive):
   ``test_story_files_import_only_local_or_bundled_modules``, which walks
   every story file, plus ``test_world_family_stories_make_no_non_local_requests``,
   which scopes that check to the World family's seven story files).
+
+- ``webclient-lore-codex-panel::the-codex-drawer-renders-the-panel-in-two-navigation-levels``
+  and ``webclient-lore-codex-panel::the-codex-drawer-discloses-no-more-than-the-panel-does``
+  (change 10's drawer behavior, implemented and verified in the Vue layer):
+  ``test_vitest_world_family_suite_passes`` executes the world Vitest filter
+  that includes ``lore_codex_drawer.test.js`` — the suite pinning the
+  category strip with honest zero counts and the aggregate control, the
+  locally-dispatched two-level navigation, the panel-order card fields, and
+  the empty, unavailable, and absent states.
 """
 
 from __future__ import annotations
@@ -189,6 +198,10 @@ class VueShowcaseWorldEvidenceTest(unittest.TestCase):
 
     @covers_requirement(
         "webclient-component-showcase::the-map-art-and-services-surfaces-render-oob-backed-data-truthfully"
+    )
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-codex-drawer-renders-the-panel-in-two-navigation-levels",
+        "webclient-lore-codex-panel::the-codex-drawer-discloses-no-more-than-the-panel-does",
     )
     def test_vitest_world_family_suite_passes(self):
         """Every world + services family SFC renders its contract states under Vitest.
