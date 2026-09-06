@@ -161,14 +161,19 @@ class ViolationHookGuardTests(DefeatAftermathBase):
 
     def setUp(self):
         super().setUp()
-        self.addCleanup(setattr, defeat_aftermath_module, "_VIOLATION_HOOK", None)
+        # DA4 registers the violation engine at import; save and restore that
+        # exact body so these guard tests can install their own probes without
+        # leaking hook state into other suites in the same process.
+        saved_hook = defeat_aftermath_module._VIOLATION_HOOK
+        self.addCleanup(setattr, defeat_aftermath_module, "_VIOLATION_HOOK", saved_hook)
+        defeat_aftermath_module._VIOLATION_HOOK = None
 
     @covers_requirement(
         "defeat-aftermath-core::the-defeat-adult-scenes-setting-exists-and-guards-the-violation-hook"
     )
     def test_flag_on_calls_the_registered_hook_body(self):
         calls = []
-        register_violation_hook(lambda battlefield, session: calls.append(session))
+        register_violation_hook(lambda context: calls.append(context))
         self._defeat_by_forfeit()
         self.assertEqual(len(calls), 1)
 
@@ -178,7 +183,7 @@ class ViolationHookGuardTests(DefeatAftermathBase):
     @override_settings(DEFEAT_ADULT_SCENES=False)
     def test_flag_off_never_calls_the_hook_and_settles_the_core_path(self):
         calls = []
-        register_violation_hook(lambda battlefield, session: calls.append(session))
+        register_violation_hook(lambda context: calls.append(context))
         result = self._defeat_by_forfeit()
         self.assertEqual(calls, [])
         # Core-only losses are unchanged with the flag off; the recovery
@@ -188,7 +193,7 @@ class ViolationHookGuardTests(DefeatAftermathBase):
         self.assertEqual(result["outcome"], "defeat")
 
     def test_duplicate_or_invalid_registrations_fail_loudly(self):
-        def hook(battlefield, session):
+        def hook(context):
             return None
 
         register_violation_hook(hook)
@@ -715,6 +720,23 @@ class RenderingTests(DefeatAftermathBase):
 class RulebookLoaderTests(DefeatAftermathBase):
     """The per-section loader (D-C8): owned sections fail closed, foreign ignored."""
 
+    # The DA4-owned violation section in its minimal valid shape: every
+    # loader fixture below carries it so a section-specific malformation is
+    # the only reason a load can fail.
+    VIOLATION_SECTION = (
+        "violation:\n"
+        "  violated_wake_line: '測試喚醒。'\n"
+        "  archetypes:\n"
+        "    哥布林:\n"
+        "      victory_pleasure_delta: 2\n"
+        "      threshold_ordinal: 1\n"
+        "      attempt_cap: 2\n"
+        "      attempt_duration_seconds: 120\n"
+        "      landed_deltas: {victim_pleasure: 16, aggressor_pleasure: 10}\n"
+        "      resisted_deltas: {victim_pleasure: 4, aggressor_pleasure: 3}\n"
+        "      credited_counters: [hostile_act_count, interspecies_act_count]\n"
+    )
+
     def _load(self, text):
         import tempfile
 
@@ -735,6 +757,11 @@ class RulebookLoaderTests(DefeatAftermathBase):
         self.assertEqual(DEFEAT_AFTERMATH_RULEBOOK.recovery.regen_scale, 0.5)
         self.assertEqual(DEFEAT_AFTERMATH_RULEBOOK.recovery.max_recovery_seconds, 21600)
         self.assertEqual(DEFEAT_AFTERMATH_RULEBOOK.recovery.wake_fraction, 0.05)
+        # The DA4-owned violation section ships validated rows keyed by lore
+        # species names and the violated wake line.
+        self.assertTrue(DEFEAT_AFTERMATH_RULEBOOK.violation.rows)
+        self.assertTrue(DEFEAT_AFTERMATH_RULEBOOK.violation.violated_wake_line)
+        self.assertIn("哥布林", DEFEAT_AFTERMATH_RULEBOOK.violation.rows)
 
     def test_unknown_section_is_ignored_with_one_warning(self):
         with patch("world.rules.defeat_aftermath.log_warn") as warn:
@@ -742,6 +769,7 @@ class RulebookLoaderTests(DefeatAftermathBase):
                 "pg_lines:\n  - '你醒了。'\nweak_debuff:\n  buff_key: defeat_weak\n"
                 "recovery:\n  regen_scale: 0.5\n  max_recovery_seconds: 21600\n"
                 "  wake_fraction: 0.05\nviolation_families: []\ndigest_table: {}\n"
+                + self.VIOLATION_SECTION
             )
         self.assertEqual(warn.call_count, 1)
         self.assertIn("violation_families", warn.call_args.kwargs["context"]["sections"])
@@ -754,17 +782,30 @@ class RulebookLoaderTests(DefeatAftermathBase):
             "  wake_fraction: 0.05\n"
         )
         with self.assertRaises(ValueError):
-            self._load("pg_lines: []\nweak_debuff:\n  buff_key: defeat_weak\n" + recovery)
+            self._load(
+                "pg_lines: []\nweak_debuff:\n  buff_key: defeat_weak\n"
+                + recovery
+                + self.VIOLATION_SECTION
+            )
         with self.assertRaises(ValueError):
-            self._load("pg_lines:\n  - '你醒了。'\nweak_debuff:\n  buff_key: no_such_buff\n" + recovery)
+            self._load(
+                "pg_lines:\n  - '你醒了。'\nweak_debuff:\n  buff_key: no_such_buff\n"
+                + recovery
+                + self.VIOLATION_SECTION
+            )
         with self.assertRaises(ValueError):
-            self._load("pg_lines:\n  - '你醒了。'\n" + recovery)
+            self._load(
+                "pg_lines:\n  - '你醒了。'\n" + recovery + self.VIOLATION_SECTION
+            )
 
     @covers_requirement(
         "defeat-aftermath-recovery::the-recovery-rulebook-section-is-validated-by-its-own-loader"
     )
     def test_malformed_recovery_section_fails_load(self):
-        header = "pg_lines:\n  - '你醒了。'\nweak_debuff:\n  buff_key: defeat_weak\n"
+        header = (
+            "pg_lines:\n  - '你醒了。'\nweak_debuff:\n  buff_key: defeat_weak\n"
+            + self.VIOLATION_SECTION
+        )
         for body in (
             # Missing section entirely: recovery is owned, absence fails closed.
             "weak_debuff:\n  buff_key: defeat_weak\n",

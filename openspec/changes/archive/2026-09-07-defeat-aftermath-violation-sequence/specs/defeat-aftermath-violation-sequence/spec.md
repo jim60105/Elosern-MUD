@@ -124,6 +124,10 @@ count, landed count, resisted count, climax delta, and a zero-landed
 flag — to the settlement call graph for the digest phase's use. The
 outcome is a pure derivation of the state-derived dice and declared rows,
 so a settlement replay reproduces it without storage.
+The climax delta counts climax onsets: one per `violation_act` entry
+whose victim-side application pushed the victim's climax phase into
+進行中, which keeps the outcome's counts equal to the EventLog's entry
+counts by construction.
 
 #### Scenario: The digest input object matches the emitted EventLog
 - **WHEN** a sequence of mixed landed/resisted attempts completes

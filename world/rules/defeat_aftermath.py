@@ -6,9 +6,10 @@ side of the single-writer boundary (parent design §4.1). The writer floors
 the defeated player at the nonlethal HP floor, marks the knockout, departs
 the living violators (population despawn; quest-bound monsters retained with
 precedence), mounts the weak debuff, and records the defeat EventLog kinds.
-The violation-sequence hook point is a guarded no-op registry entry the adult
-changes fill; with ``DEFEAT_ADULT_SCENES`` off the hook is never called and
-the core-only behavior is the entire settlement.
+The violation-sequence hook point is guarded by ``DEFEAT_ADULT_SCENES`` and
+its body is the defeat-aftermath-violation-sequence engine registered at the
+module bottom (DA4 D-V6); with the flag off the hook is never called and the
+core-only behavior is the entire settlement.
 
 Rollback contract (design D-C5): the database rows restore through the
 transaction, but Evennia's idmapper cache is not transaction-aware, so every
@@ -33,28 +34,36 @@ import math
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 import yaml
 from django.conf import settings
 
 from world.observability import log_error, log_info, log_warn
+from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.rules.action import (
+    _apply_pleasure_gain,
     _attribute_snapshot,
     _restore_attribute,
     _stored_trait_value,
 )
 from world.rules.buffs import _add_buff
-from world.rules.event_log import EventEntry, EventLog
-from world.rules.player_messages import defeat_aftermath_template
 from world.rules.clock import (
     MAX_ADVANCE_SECONDS,
     AdvanceSource,
+    _ADVANCE_ENTITY_SURFACES,
     _restore_advance_registry,
     _restore_clock_tick,
     _snapshot_clock_tick,
     build_advance_snapshot_registry,
 )
+from world.rules.event_log import EventEntry, EventLog
+from world.rules.player_messages import defeat_aftermath_template
+from world.rules.sexual_act_effects import mutator_name_for
+from world.rules.sexual_resist import resist_verdict
+from world.rules.sexual_state import AROUSAL_LEVELS
+from world.rules.state_derived_roll import derived_roll
 
 _DEFEAT_AFTERMATH_PATH = Path(__file__).parent / "rulebook" / "defeat_aftermath.yaml"
 class RecoveryConfig:
@@ -84,22 +93,25 @@ class DefeatAftermathResult:
     logs: tuple[EventLog, ...]
     undo: Callable[[], None]
     departed: tuple[Any, ...]
+    violation: tuple["ViolationOutcome", ...] = ()
 
 
 class DefeatAftermathRulebook:
     """Validated per-section rulebook data owned by this change."""
 
-    __slots__ = ("pg_lines", "weak_debuff_buff_key", "recovery")
+    __slots__ = ("pg_lines", "weak_debuff_buff_key", "recovery", "violation")
 
     def __init__(
         self,
         pg_lines: tuple[str, ...],
         weak_debuff_buff_key: str,
         recovery: RecoveryConfig,
+        violation: "ViolationConfig",
     ) -> None:
         self.pg_lines = pg_lines
         self.weak_debuff_buff_key = weak_debuff_buff_key
         self.recovery = recovery
+        self.violation = violation
 
 
 def _validate_pg_lines(raw: dict[str, Any], path: Path) -> tuple[str, ...]:
@@ -184,6 +196,211 @@ def _validate_recovery(raw: dict[str, Any], path: Path) -> RecoveryConfig:
     )
 
 
+@dataclass(frozen=True)
+class ViolationDeltas:
+    """One attempt's declared pleasure-point deltas (defeat-aftermath-
+    violation-sequence). Points ride the shipped ``_apply_pleasure_gain``
+    path, so wetness, arousal bands, and climax-phase edges follow for free.
+    """
+
+    victim_pleasure: int
+    aggressor_pleasure: int
+
+
+@dataclass(frozen=True)
+class ArchetypeViolationRow:
+    """One monster species' violation scene family (design §4.1)."""
+
+    archetype: str
+    victory_pleasure_delta: int
+    threshold_ordinal: int
+    attempt_cap: int
+    attempt_duration_seconds: int
+    landed: ViolationDeltas
+    resisted: ViolationDeltas
+    credited_counters: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ViolationConfig:
+    """The validated ``violation`` section owned by
+    defeat-aftermath-violation-sequence."""
+
+    rows: MappingProxyType
+    violated_wake_line: str
+
+
+_VIOLATION_ROW_KEYS = frozenset(
+    {
+        "victory_pleasure_delta",
+        "threshold_ordinal",
+        "attempt_cap",
+        "attempt_duration_seconds",
+        "landed_deltas",
+        "resisted_deltas",
+        "credited_counters",
+    }
+)
+_VIOLATION_DELTA_KEYS = ("victim_pleasure", "aggressor_pleasure")
+# The direction-bound counters record what one body did or underwent alone;
+# crediting an aggressor or victim with them would corrupt their meaning
+# (sexual-counter-symmetric-crediting D-1), so a row may never declare them.
+_DIRECTION_BOUND_COUNTERS = frozenset(
+    {"exposure_act_count", "watched_count", "masturbation_count"}
+)
+
+
+def _require_non_negative_int(value: Any, path: Path, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{path}: violation {label} must be a non-negative integer, got {value!r}")
+    return int(value)
+
+
+def _validate_violation_deltas(
+    raw: Any, path: Path, label: str
+) -> ViolationDeltas:
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError(
+            f"{path}: violation {label} must be a non-empty mapping of "
+            f"{list(_VIOLATION_DELTA_KEYS)}"
+        )
+    unknown = set(raw) - set(_VIOLATION_DELTA_KEYS)
+    if unknown:
+        raise ValueError(
+            f"{path}: violation {label} has unknown keys {sorted(unknown)}"
+        )
+    values = {
+        key: _require_non_negative_int(raw.get(key, 0), path, f"{label}.{key}")
+        for key in _VIOLATION_DELTA_KEYS
+    }
+    return ViolationDeltas(**values)
+
+
+def _validate_violation(raw: dict[str, Any], path: Path) -> ViolationConfig:
+    """Validate the ``violation`` section fail-closed (DA4 D-V2).
+
+    Archetype keys are the lore bestiary's monster species names
+    (``MONSTER_TIER_REGISTRY`` ``example_monsters_zh`` — the durable identity
+    a wilderness population monster carries as its key), so an unpublished
+    species can never enter the balance table unnoticed. A ``shame`` key is
+    rejected outright: a Monster's shame bounds are pinned at the floor by
+    construction, and no archetype row may set shame (D-V2).
+    """
+    section = raw.get("violation")
+    if not isinstance(section, dict):
+        raise ValueError(f"{path}: section 'violation' must be a mapping")
+    wake_line = section.get("violated_wake_line")
+    if not isinstance(wake_line, str) or not wake_line.strip():
+        raise ValueError(
+            f"{path}: violation violated_wake_line must be a non-empty string"
+        )
+    archetypes = section.get("archetypes")
+    if not isinstance(archetypes, dict) or not archetypes:
+        raise ValueError(
+            f"{path}: violation archetypes must be a non-empty mapping"
+        )
+    lore_species = frozenset(
+        name
+        for tier in MONSTER_TIER_REGISTRY.values()
+        for name in tier.example_monsters_zh
+    )
+    rows: dict[str, ArchetypeViolationRow] = {}
+    for key, raw_row in archetypes.items():
+        if key not in lore_species:
+            raise ValueError(
+                f"{path}: violation archetype {key!r} is not a lore monster "
+                "species name"
+            )
+        if not isinstance(raw_row, dict):
+            raise ValueError(
+                f"{path}: violation archetype {key!r} must be a mapping"
+            )
+        if "shame" in raw_row:
+            raise ValueError(
+                f"{path}: violation archetype {key!r} may not declare shame "
+                "(a monster's shame bounds are pinned at the floor, D-V2)"
+            )
+        unknown = set(raw_row) - _VIOLATION_ROW_KEYS
+        if unknown:
+            raise ValueError(
+                f"{path}: violation archetype {key!r} has unknown keys {sorted(unknown)}"
+            )
+        threshold = _require_non_negative_int(
+            raw_row.get("threshold_ordinal"), path, f"{key}.threshold_ordinal"
+        )
+        if threshold > len(AROUSAL_LEVELS) - 1:
+            raise ValueError(
+                f"{path}: violation {key}.threshold_ordinal must be an arousal "
+                f"ordinal in [0, {len(AROUSAL_LEVELS) - 1}], got {threshold!r}"
+            )
+        cap = _require_non_negative_int(
+            raw_row.get("attempt_cap"), path, f"{key}.attempt_cap"
+        )
+        if cap < 1:
+            raise ValueError(
+                f"{path}: violation {key}.attempt_cap must be at least 1"
+            )
+        duration = _require_non_negative_int(
+            raw_row.get("attempt_duration_seconds"),
+            path,
+            f"{key}.attempt_duration_seconds",
+        )
+        if not 1 <= duration <= MAX_ADVANCE_SECONDS:
+            raise ValueError(
+                f"{path}: violation {key}.attempt_duration_seconds must be an "
+                f"integer in [1, {MAX_ADVANCE_SECONDS}]"
+            )
+        counters_raw = raw_row.get("credited_counters")
+        if (
+            not isinstance(counters_raw, list)
+            or not counters_raw
+            or any(not isinstance(name, str) for name in counters_raw)
+        ):
+            raise ValueError(
+                f"{path}: violation {key}.credited_counters must be a non-empty "
+                "list of counter names"
+            )
+        if len(set(counters_raw)) != len(counters_raw):
+            raise ValueError(
+                f"{path}: violation {key}.credited_counters repeats a counter "
+                "name; a repeated name would double-credit one act"
+            )
+        for name in counters_raw:
+            if name in _DIRECTION_BOUND_COUNTERS:
+                raise ValueError(
+                    f"{path}: violation {key} may not credit the direction-bound "
+                    f"counter {name!r} symmetrically"
+                )
+            try:
+                mutator_name_for(name)
+            except ValueError as error:
+                raise ValueError(
+                    f"{path}: violation {key} credits unknown counter {name!r}"
+                ) from error
+        rows[key] = ArchetypeViolationRow(
+            archetype=key,
+            victory_pleasure_delta=_require_non_negative_int(
+                raw_row.get("victory_pleasure_delta"),
+                path,
+                f"{key}.victory_pleasure_delta",
+            ),
+            threshold_ordinal=threshold,
+            attempt_cap=cap,
+            attempt_duration_seconds=duration,
+            landed=_validate_violation_deltas(
+                raw_row.get("landed_deltas"), path, f"{key}.landed_deltas"
+            ),
+            resisted=_validate_violation_deltas(
+                raw_row.get("resisted_deltas"), path, f"{key}.resisted_deltas"
+            ),
+            credited_counters=tuple(counters_raw),
+        )
+    return ViolationConfig(
+        rows=MappingProxyType(rows),
+        violated_wake_line=wake_line,
+    )
+
+
 _SECTION_VALIDATORS: dict[str, Callable[[dict[str, Any], Path], Any]] = {}
 
 
@@ -199,6 +416,7 @@ def _register_section_validator(
 _register_section_validator("pg_lines", _validate_pg_lines)
 _register_section_validator("weak_debuff", _validate_weak_debuff)
 _register_section_validator("recovery", _validate_recovery)
+_register_section_validator("violation", _validate_violation)
 _OWNED_SECTIONS = frozenset(_SECTION_VALIDATORS)
 
 
@@ -224,6 +442,7 @@ def load_defeat_aftermath_sections(path: Path) -> DefeatAftermathRulebook:
         pg_lines=validated["pg_lines"],
         weak_debuff_buff_key=validated["weak_debuff"],
         recovery=validated["recovery"],
+        violation=validated["violation"],
     )
 
 
@@ -231,6 +450,43 @@ DEFEAT_AFTERMATH_RULEBOOK = load_defeat_aftermath_sections(_DEFEAT_AFTERMATH_PAT
 
 _VIOLATION_HOOK: Callable[..., None] | None = None
 _PENDING_OUTER_UNDOS: list[Callable[[], None]] = []
+
+
+@dataclass(frozen=True)
+class ViolationHookContext:
+    """The settlement context the guarded violation body receives (DA4).
+
+    ``entries`` is the aftermath's own EventLog sink, so entries the body
+    appends splice in exactly between ``defeat_settle`` and
+    ``violator_depart``; ``restores`` is the writer's undo registry, so the
+    body's snapshot/restore closures join the aftermath's failure boundary.
+    """
+
+    actor: Any
+    session: Any
+    battlefield: Any | None
+    entries: list[EventEntry]
+    restores: list[Callable[[], None]]
+
+
+@dataclass(frozen=True)
+class ViolationOutcome:
+    """The in-memory per-participant digest handoff (DA4 D-V7).
+
+    ``selected``/``landed``/``resisted``/``climax_delta`` count exactly the
+    ``violation_attempt``/``violation_act``/``violation_resisted`` EventLog
+    entries (and the climax flags on the acts) for this participant, so the
+    digest phase can consume either surface. ``zero_landed`` is the PG-
+    variant signal. The outcome is never persisted: it is a pure derivation
+    of the state-derived dice and declared rows, reproduced by any replay.
+    """
+
+    participant: str
+    selected: int
+    landed: int
+    resisted: int
+    climax_delta: int
+    zero_landed: bool
 
 
 def register_pending_undo(undo: Callable[[], None]) -> None:
@@ -326,17 +582,367 @@ def register_violation_hook(hook: Callable[..., None]) -> None:
     _VIOLATION_HOOK = hook
 
 
-def _call_violation_hook(battlefield: Any, session: Any) -> None:
+def _call_violation_hook(
+    context: ViolationHookContext,
+) -> tuple[ViolationOutcome, ...]:
     """Run the guarded violation hook point (design D-C4).
 
     Pure guard: with ``DEFEAT_ADULT_SCENES`` off the hook is never called and
     the core-only settlement is the entire behavior; with the flag on but no
-    adult body registered the call is a no-op.
+    adult body registered the call is a no-op. The flag is read exactly once,
+    at hook entry (no mid-sequence toggle semantics, DA4 delta requirement).
     """
     if not settings.DEFEAT_ADULT_SCENES:
-        return
-    if _VIOLATION_HOOK is not None:
-        _VIOLATION_HOOK(battlefield, session)
+        return ()
+    if _VIOLATION_HOOK is None:
+        return ()
+    outcomes = _VIOLATION_HOOK(context)
+    return outcomes if outcomes is not None else ()
+
+
+def _violation_scope(actor: Any) -> list[Any]:
+    """The attempt clock advance's entity scope: deliberately empty.
+
+    The attempts spend world time as fiction over the atomic settlement —
+    the downed body does not heal, decay, or climax-settle inside its own
+    violation. The shipped settlement stages are accumulator-based, so
+    every body (the victim included) is caught up unchanged at its next
+    in-scope advance (the recovery phase's allies scope, or any later
+    advance); boundary stages and world event sources still run, so
+    deadlines and restocks cross exactly like any other clock window. An
+    entity-scoped advance would regenerate the victim past the recovery
+    wake target pinned by defeat-aftermath-recovery and mutate companions
+    and violators the change declares untouched (rubber-duck plan review
+    finding 2).
+    """
+    del actor
+    return []
+
+
+def _snapshot_sexual_surfaces(entity: Any) -> Callable[[], None]:
+    """Snapshot every durable sexual surface one entity may expose (DA4).
+
+    The clock's advance registry restores what each advance itself touched;
+    the violation's deltas are applied between advances, so their surfaces
+    are captured here and restored by the caller's undo on any failure —
+    the transaction restores the database rows, the idmapper cache needs
+    this explicit restore (design D-C5 discipline).
+    """
+    snapshots = tuple(
+        (name, category, _attribute_snapshot(entity, name, category))
+        for name, category in _ADVANCE_ENTITY_SURFACES
+    )
+
+    def _restore() -> None:
+        for name, category, snapshot in snapshots:
+            _restore_attribute(entity, name, snapshot, category=category)
+        # Drop the materialized ``sexual`` handler so the next access re-mounts
+        # from the restored attributes — the same cache invalidation
+        # ``_restore_entity_state`` and the clock's advance restore perform
+        # (the idmapper-cached handler would otherwise outlive the rollback).
+        entity.__dict__.pop("sexual", None)
+
+    return _restore
+
+
+def _derived_resist_roll(
+    session_id: str,
+    violator: Any,
+    victim_key: str,
+    attempt_index: int,
+    rolls: list[int],
+) -> Callable[[], int]:
+    """Build the state-derived d100 source for one resist contest (D-V4).
+
+    The wrapper records every consumed value so the EventLog reports exactly
+    the roll the contest used, and nothing when ``resist_verdict``'s shipped
+    auto-comply branches return before the dice (finding 3).
+    """
+    violator_key = str(violator.pk)
+
+    def _roll() -> int:
+        value = derived_roll(
+            session_id, violator_key, victim_key, attempt_index, "resist"
+        )
+        rolls.append(value)
+        return value
+
+    return _roll
+
+
+def _apply_violation_deltas(
+    victim: Any, aggressor: Any, deltas: ViolationDeltas
+) -> None:
+    """Apply one attempt's declared pleasure points through the shipped path."""
+    if deltas.victim_pleasure:
+        _apply_pleasure_gain(victim, deltas.victim_pleasure)
+    if deltas.aggressor_pleasure:
+        _apply_pleasure_gain(aggressor, deltas.aggressor_pleasure)
+
+
+def _victim_climax_onset(
+    victim: Any, aggressor: Any, deltas: ViolationDeltas
+) -> bool:
+    """Apply the deltas and report one climax onset.
+
+    An onset is the victim's climax phase pushed into ``進行中`` by this very
+    attempt — the digest's climax count and one ``climax: true`` flag on the
+    attempt's ``violation_act`` entry, keeping outcome and EventLog counts
+    equal by construction.
+    """
+    was_in_progress = victim.sexual.climax_phase.level == "進行中"
+    _apply_violation_deltas(victim, aggressor, deltas)
+    return not was_in_progress and victim.sexual.climax_phase.level == "進行中"
+
+
+def _credit_violation_counters(
+    victim: Any, violator: Any, counters: tuple[str, ...]
+) -> None:
+    """Credit every declared counter on BOTH bodies (DA3 shared convention)."""
+    for name in counters:
+        mutator = mutator_name_for(name)
+        getattr(victim.sexual, mutator)()
+        getattr(violator.sexual, mutator)()
+
+
+def _advance_attempt_clock(
+    clock: Any,
+    seconds: int,
+    scope: list[Any],
+    restores: list[Callable[[], None]],
+) -> None:
+    """Advance the world clock by one attempt's declared duration (DA4).
+
+    Same discipline as the recovery phase: the advance registry and the
+    clock tick are snapshotted so the caller's failure boundary can restore
+    both the database (through the transaction) and the idmapper cache.
+    """
+    registry = build_advance_snapshot_registry(
+        clock, seconds, AdvanceSource.DEFEAT_AFTERMATH, scope
+    )
+    tick_snapshot = _snapshot_clock_tick(clock)
+    clock.advance(seconds, AdvanceSource.DEFEAT_AFTERMATH, scope)
+
+    def _restore(
+        clock=clock, registry=registry, tick=tick_snapshot, scope=tuple(scope)
+    ) -> None:
+        _restore_clock_tick(clock, tick)
+        _restore_advance_registry(registry, scope)
+
+    restores.append(_restore)
+
+
+def _violation_attempt_entry(
+    violator: Any,
+    victim: Any,
+    attempt_index: int,
+    verdict: Any,
+    rolls: list[int],
+) -> EventEntry:
+    """One ``violation_attempt`` entry: the contest exactly as it ran."""
+    return EventEntry(
+        kind="violation_attempt",
+        actor=str(violator.key),
+        target=str(victim.key),
+        data={
+            "attempt": attempt_index,
+            "roll": rolls[-1] if rolls else None,
+            "auto_comply": bool(verdict.auto_comply),
+            "actor_score": verdict.actor_score,
+            "resister_score": verdict.resister_score,
+        },
+        text_template=defeat_aftermath_template("violation_attempt"),
+    )
+
+
+def _violation_resisted_entry(
+    violator: Any, victim: Any, attempt_index: int
+) -> EventEntry:
+    """One ``violation_resisted`` entry: the contest outcome went to the prey."""
+    return EventEntry(
+        kind="violation_resisted",
+        actor=str(violator.key),
+        target=str(victim.key),
+        data={"attempt": attempt_index},
+        text_template=defeat_aftermath_template("violation_resisted"),
+    )
+
+
+def _violation_act_entry(
+    violator: Any, victim: Any, attempt_index: int, climax: bool
+) -> EventEntry:
+    """One ``violation_act`` entry: the landed attempt and its climax flag."""
+    return EventEntry(
+        kind="violation_act",
+        actor=str(violator.key),
+        target=str(victim.key),
+        data={"attempt": attempt_index, "climax": climax},
+        text_template=defeat_aftermath_template("violation_act"),
+    )
+
+
+def _rewrite_wake_line(entries: list[EventEntry], violated_wake_line: str) -> None:
+    """Swap the ``defeat_settle`` wake prose for the violated variant (DA4).
+
+    The replacement copies the entry's data mapping and changes only
+    ``wake``, preserving the core contract's remaining fields (finding 7);
+    the entry is rebuilt because ``EventEntry`` is frozen.
+    """
+    for index, entry in enumerate(entries):
+        if entry.kind == "defeat_settle":
+            entries[index] = replace(
+                entry, data={**entry.data, "wake": violated_wake_line}
+            )
+            return
+
+
+def _schedule_violation_boundary(
+    actor: Any,
+    clock: Any,
+    attempts: int,
+    landed: int,
+    resisted: int,
+    climaxes: int,
+) -> None:
+    """Schedule the violation phase's boundary info event (observability).
+
+    Fires only on the outermost durable commit, like the aftermath's own
+    boundary event; the context is snapshotted as primitives so the callback
+    carries no live objects.
+    """
+    from django.db import transaction
+
+    boundary = {
+        "char": str(actor.key),
+        "room": str(actor.location.pk) if actor.location is not None else None,
+        "tick": clock.tick,
+        "attempts": attempts,
+        "landed": landed,
+        "resisted": resisted,
+        "climax": climaxes,
+    }
+    transaction.on_commit(
+        lambda boundary=boundary: log_info(
+            "defeat_aftermath_violation", context=boundary
+        )
+    )
+
+
+def run_violation_sequence(
+    context: ViolationHookContext,
+) -> tuple[ViolationOutcome, ...]:
+    """The registered body of the core's guarded hook (DA4 D-V6).
+
+    Runs between the core's ``defeat_settle`` and ``violator_depart`` phases:
+    victory arousal -> archetype threshold gate -> the attempt loop (one
+    state-derived resist contest per attempt through the shipped pure
+    ``resist_verdict``, declared deltas through the shipped pleasure path,
+    symmetric counter credits, one ``defeat_aftermath``-source world-clock
+    advance per attempt, first successful resistance ends that violator's
+    pursuit) -> the violated wake line when any attempt landed. A sequence in
+    which zero attempts landed is the PG variant. Every die is a pure
+    function of durable record state (D-V4), so a rolled-back retry re-derives
+    the identical sequence; the sequence persists only its state writes,
+    counter credits, EventLog entries, and the clock advances themselves.
+    """
+    actor = context.actor
+    session = context.session
+    battlefield = context.battlefield
+    entries = context.entries
+    restores = context.restores
+    rulebook = DEFEAT_AFTERMATH_RULEBOOK.violation
+    candidates = sorted(
+        _living_foes(actor, session, battlefield),
+        key=lambda violator: int(violator.pk),
+    )
+    if not candidates:
+        return ()
+    from world.rules.clock import get_world_clock
+
+    clock = get_world_clock()
+    scope = _violation_scope(actor)
+    victim_key = str(actor.pk)
+    # Undo layering: the victim's sexual surfaces are snapshotted before any
+    # write; each row-carrying violator joins right before its victory
+    # arousal. Reversed-order undo then unwinds the advances before the
+    # deltas, converging on the pre-sequence state.
+    restores.append(_snapshot_sexual_surfaces(actor))
+    selected = 0
+    landed = 0
+    resisted = 0
+    climaxes = 0
+    any_landed = False
+    for violator in candidates:
+        row = rulebook.rows.get(str(violator.key))
+        if row is None:
+            # observability: ignore R3: a missing archetype row is the designed PG degradation (design §5), not an error; no exception object exists to chain
+            log_warn(
+                "defeat_aftermath_violation_archetype_missing",
+                context={
+                    "archetype": str(violator.key),
+                    "tick": clock.tick,
+                    "char": str(actor.key),
+                },
+            )
+            continue
+        restores.append(_snapshot_sexual_surfaces(violator))
+        # Victory arousal (parent design §3.1 step 2): the delta lands on top
+        # of whatever the fight raised, clamped by the pleasure gauge.
+        _apply_pleasure_gain(violator, row.victory_pleasure_delta)
+        if violator.sexual.arousal < row.threshold_ordinal:
+            continue
+        for attempt_index in range(row.attempt_cap):
+            selected += 1
+            rolls: list[int] = []
+            verdict = resist_verdict(
+                violator,
+                actor,
+                rng=_derived_resist_roll(
+                    session.session_id, violator, victim_key, attempt_index, rolls
+                ),
+            )
+            entries.append(
+                _violation_attempt_entry(
+                    violator, actor, attempt_index, verdict, rolls
+                )
+            )
+            if verdict.resisted:
+                resisted += 1
+                _apply_violation_deltas(actor, violator, row.resisted)
+                entries.append(
+                    _violation_resisted_entry(violator, actor, attempt_index)
+                )
+                _advance_attempt_clock(
+                    clock, row.attempt_duration_seconds, scope, restores
+                )
+                # D-V5: the first successful resistance cancels this
+                # violator's remaining attempts; the shrunk deltas and the
+                # spent duration of the resisted attempt are its last.
+                break
+            landed += 1
+            any_landed = True
+            climax = _victim_climax_onset(actor, violator, row.landed)
+            climaxes += int(climax)
+            _credit_violation_counters(actor, violator, row.credited_counters)
+            entries.append(_violation_act_entry(violator, actor, attempt_index, climax))
+            _advance_attempt_clock(
+                clock, row.attempt_duration_seconds, scope, restores
+            )
+    if any_landed:
+        _rewrite_wake_line(entries, rulebook.violated_wake_line)
+    if not selected:
+        return ()
+    _schedule_violation_boundary(actor, clock, selected, landed, resisted, climaxes)
+    return (
+        ViolationOutcome(
+            participant=str(actor.key),
+            selected=selected,
+            landed=landed,
+            resisted=resisted,
+            climax_delta=climaxes,
+            zero_landed=not any_landed,
+        ),
+    )
 
 
 def run_defeat_aftermath(
@@ -349,9 +955,10 @@ def run_defeat_aftermath(
     Phase order (tasks 1.2): HP floor + knockout mark -> guarded violation
     hook -> violator departure -> weak debuff -> recovery advance ->
     EventLog. The caller persists
-    the returned session record and clears the session afterwards. Nothing
-    here rolls dice, so a rolled-back retry re-derives the identical aftermath
-    (design D-C5). Returns a :class:`DefeatAftermathResult`: the
+    the returned session record and clears the session afterwards. Every die
+    the writer and its registered violation body use is a pure function of
+    durable record state, so a rolled-back retry re-derives the identical
+    aftermath (design D-C5, DA4 D-V4). Returns a :class:`DefeatAftermathResult`: the
     knockout-marked session record, the aftermath EventLog the caller
     appends to the settlement result, and an idempotent callable that undoes
     every in-process surface the writer touched. The caller MUST run
@@ -413,8 +1020,17 @@ def run_defeat_aftermath(
             )
         )
         # Phase 2: the guarded violation hook point (design D-C4). No core
-        # on-branch; the body is contributed by the adult changes.
-        _call_violation_hook(battlefield, session)
+        # on-branch; the body is contributed by the adult changes and its
+        # entries splice between defeat_settle and violator_depart.
+        violation = _call_violation_hook(
+            ViolationHookContext(
+                actor=actor,
+                session=session,
+                battlefield=battlefield,
+                entries=entries,
+                restores=restores,
+            )
+        )
         # Phase 3: violator departure (design D-C3).
         entries.extend(
             _depart_violators(actor, session, battlefield, restores, departed)
@@ -533,6 +1149,7 @@ def run_defeat_aftermath(
         ),
         undo=undo,
         departed=tuple(departed),
+        violation=violation,
     )
 
 
@@ -710,3 +1327,12 @@ def _schedule_boundary_event(actor: Any, seconds: int, hp_wake: int) -> None:
     transaction.on_commit(
         lambda boundary=boundary: log_info("defeat_aftermath", context=boundary)
     )
+
+
+# The DA4 violation sequence is the shipped body of the core's guarded hook:
+# registration happens at import, so the wiring needs no startup step and is
+# exercised by every defeat settlement, while the single-registration guard
+# still fails loudly on any second adult body. ``DEFEAT_ADULT_SCENES`` stays
+# the only switch — with it off the hook is never called and this
+# registration is structurally invisible (DA4 D-V6).
+register_violation_hook(run_violation_sequence)
