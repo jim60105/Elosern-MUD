@@ -11,8 +11,8 @@ import {
 } from "../../stories/fixtures.js";
 
 // CreationOverlay (B5 overlays family): the character-creation wizard over
-// the committed `creation` v2 panel — preset pick, custom form with the
-// adult gate on BOTH age fields (design D1), the transient concept proposal
+// the committed `creation` v5 panel — preset pick, custom form with the
+// age bounds gate on BOTH age fields (design D1), the transient concept proposal
 // fill (retool-concept-transient-fill), and the server-persisted draft
 // resume. Every assertion checks the exact `creation.*` envelopes (no
 // invented fields) and the registry-owned unavailable reason; the server
@@ -56,7 +56,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
     });
   });
 
-  // -- Custom state + adult gate --------------------------------------------
+  // -- Custom state + age bounds gate ---------------------------------------
   it("custom confirm emits creation.custom with the exact payload fields", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);
@@ -137,10 +137,10 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(event.payload.sex).toBe("female");
   });
 
-  it("the adult gate rejects age below 18 (gate error, no creation.custom)", async () => {
+  it("the age bounds gate rejects a negative age (gate error, no creation.custom)", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);
-    wrapper.get('[data-testid="creation-field-age"]').setValue(17);
+    wrapper.get('[data-testid="creation-field-age"]').setValue(-1);
     wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(21);
     setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 });
     wrapper.get('[data-testid="creation-submit"]').trigger("click");
@@ -149,11 +149,11 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(lastAction(wrapper, "creation.custom")).toBeNull();
   });
 
-  it("the adult gate rejects apparent_age below 18 (gate error, no creation.custom)", async () => {
+  it("the age bounds gate rejects a negative apparent_age (gate error, no creation.custom)", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);
     wrapper.get('[data-testid="creation-field-age"]').setValue(21);
-    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(17);
+    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(-1);
     setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 });
     wrapper.get('[data-testid="creation-submit"]').trigger("click");
     await nextTick();
@@ -161,17 +161,17 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(lastAction(wrapper, "creation.custom")).toBeNull();
   });
 
-  it("both ages at or above 18 pass the gate and emit creation.custom", async () => {
+  it("both ages at the 0 bound pass the gate and emit creation.custom end-to-end", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);
-    wrapper.get('[data-testid="creation-field-age"]').setValue(30);
-    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(25);
+    wrapper.get('[data-testid="creation-field-age"]').setValue(0);
+    wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(0);
     setAllocations(wrapper, { hp: 8, mp: 4, sp: 4, atk_phys: 4, agility: 2, defense: 2, magic_power: 4 });
     wrapper.get('[data-testid="creation-submit"]').trigger("click");
     const event = lastAction(wrapper, "creation.custom");
     expect(event).not.toBeNull();
-    expect(event.payload.age).toBe(30);
-    expect(event.payload.apparent_age).toBe(25);
+    expect(event.payload.age).toBe(0);
+    expect(event.payload.apparent_age).toBe(0);
     expect(wrapper.find('[data-testid="creation-form-message"]').exists()).toBe(false);
   });
 

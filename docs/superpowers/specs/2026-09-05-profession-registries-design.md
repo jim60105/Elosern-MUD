@@ -122,7 +122,7 @@ change; its anchoring semantics arrive with the service-anchoring design.)
 `world/rules/guild_economy.py::sync` becomes an interpreter:
 
 - For each roster row: find-or-create the host anchored on `service_id` (D8), set location to
-  `anchor_room`, ensure adult identity and race baseline exactly as today, and assemble
+  `anchor_room`, ensure canonical age and race baseline exactly as today, and assemble
   components through the profession blueprint (replacing the hardcoded `component_specs`).
 - The single-host invariant, idempotent sync, `ServiceAnchorIntegrityError`, and the
   observability events (`guild_service_host_created` etc.) are retained; the event context gains

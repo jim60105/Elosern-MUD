@@ -24,6 +24,12 @@ from world.art.subjects import (
 from world.imports.schema import CHARACTER_SCHEMA_V1, WORLD_SCHEMA_V1
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
+from world.rules.creation_wizard import (
+    AGE_MAXIMUM,
+    AGE_MINIMUM,
+    APPARENT_AGE_MAXIMUM,
+    APPARENT_AGE_MINIMUM,
+)
 from world.rules.npc_identity import validate_npc_title
 
 
@@ -214,6 +220,33 @@ def _check_disguised_stats_subset(record: dict[str, Any]) -> list[Issue]:
         for key in record.get("disguised_stats", {})
         if key not in stat_keys
     ]
+
+
+def _check_age_range(record: dict[str, Any]) -> list[Issue]:
+    """Reject a canonical or apparent age outside the shared reasonable range.
+
+    ``world.rules.creation_wizard`` is the single authority for the age
+    bounds every creation and import surface shares. The schema states the
+    same numbers structurally; this semantic mirror keeps enforcement
+    correct even if the schema literals ever drift looser than the
+    authority, and always names the offending field. Shape belongs to the
+    structural phase, so a missing value or any non-exact ``int`` (bool,
+    float, string) stays silent here exactly like every other semantic
+    check.
+    """
+    issues: list[Issue] = []
+    for name, low, high in (
+        ("age", AGE_MINIMUM, AGE_MAXIMUM),
+        ("apparent_age", APPARENT_AGE_MINIMUM, APPARENT_AGE_MAXIMUM),
+    ):
+        value = record.get(name)
+        if type(value) is not int:
+            continue
+        if not low <= value <= high:
+            issues.append(
+                Issue(name, f"{value} outside the {low}-{high} age range")
+            )
+    return issues
 
 
 def _check_race_subrace(record: dict[str, Any]) -> list[Issue]:
@@ -651,6 +684,7 @@ def validate_character(
     report.record = record
     report.rejections.extend(_check_entity_key_contract(record))
     report.rejections.extend(_check_npc_title(record))
+    report.rejections.extend(_check_age_range(record))
     report.rejections.extend(_check_disguised_stats_subset(record))
     report.rejections.extend(_check_race_subrace(record))
     magic_rejections, magic_warnings = _check_magic_power_band(record)

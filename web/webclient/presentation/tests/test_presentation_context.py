@@ -383,7 +383,7 @@ class ProposalSnapshotGateTests(EvenniaTestCase):
                 },
             ),
             "null transient-fill value": _proposal_state("1", age=None),
-            "out-of-band transient-fill age": _proposal_state("1", age=17),
+            "out-of-band transient-fill age": _proposal_state("1", age=-1),
             "unknown transient-fill element": _proposal_state(
                 "1", affinity_elements=["wood"]
             ),

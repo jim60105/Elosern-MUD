@@ -1,4 +1,4 @@
-"""Namespaced art-subject identity and deterministic adult-safe descriptions.
+"""Namespaced art-subject identity and deterministic subject descriptions.
 
 Art subjects are the immutable identities the deterministic art backend keys
 its records and jobs on. Three namespaces exist: ``scene:<archetype>``,
@@ -63,6 +63,28 @@ def is_reserved_player_stable_key(key: str) -> bool:
 
 class ArtSubjectError(ValueError):
     """Raised when an art subject is malformed or unresolvable."""
+
+
+def character_ages(entity) -> tuple[int, int]:
+    """Return the entity's validated canonical ``(age, apparent_age)`` pair.
+
+    Portrait enqueue and presentation read the pair through here immediately
+    before any queue write or payload render. The check is a pure function of
+    the character's canonical attributes: each field must be present and an
+    exact ``int`` (so booleans, strings, and ``None`` reject), and every
+    integer is eligible. A rejection names the offending field in its
+    diagnostic, produces no queue record and no prompt, and never reaches a
+    worker fixture (design D3).
+    """
+    values: list[int] = []
+    for field in ("age", "apparent_age"):
+        value = entity.attributes.get(field)
+        if value is None:
+            raise ArtSubjectError(f"portrait rejected: {field} is missing")
+        if type(value) is not int:
+            raise ArtSubjectError(f"portrait rejected: {field} must be an integer")
+        values.append(value)
+    return values[0], values[1]
 
 
 class ArtSubjectKind(StrEnum):
@@ -188,14 +210,14 @@ def _race_label(entity) -> str:
 
 
 def character_description(entity, age: int) -> str:
-    """One deterministic adult-safe description for a character portrait.
+    """One deterministic description for a character portrait.
 
     The template (rendered from the prompt library) covers only stable,
-    validated identity: the display name, race/subrace label, the adult age,
-    and the approved-visual-style fragment. Persona text, secret state, mutable
-    combat resources, and disguised stats are never included (design D6). A
-    broken library key degrades to a deterministic registry-driven fallback
-    (design D3) so the art pipeline never stalls.
+    validated identity: the display name, race/subrace label, the age, and the
+    approved-visual-style fragment. Persona text, secret state, mutable combat
+    resources, and disguised stats are never included (design D6). A broken
+    library key degrades to a deterministic registry-driven fallback (design
+    D3) so the art pipeline never stalls.
     """
     race = _race_label(entity)
     name = entity.db.display_name or entity.key or "<unknown>"
@@ -209,7 +231,7 @@ def character_description(entity, age: int) -> str:
             style=style,
         )
     except PromptUnavailableError:
-        return f"{name}（{race}，成年，{age} 歲）"
+        return f"{name}（{race}，{age} 歲）"
 
 
 def scene_description(subject: ArtSubject) -> str:
@@ -241,6 +263,6 @@ def description_for(subject: ArtSubject, *, entity=None, age=None) -> str:
         return monster_description(subject)
     if entity is None or age is None:
         raise ArtSubjectError(
-            "a character description requires the entity and adult age"
+            "a character description requires the entity and age"
         )
     return character_description(entity, age)

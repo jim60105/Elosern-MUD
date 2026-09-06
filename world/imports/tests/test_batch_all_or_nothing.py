@@ -37,7 +37,7 @@ class BatchTests(BatchFileHarness, EvenniaTestCase):
     @covers_requirement("import-validation::every-reported-issue-names-the-record-the-field-and-the-reason", "import-validation::validate-py-provides-a-cli-that-validates-one-or-more-record-files")
     def test_one_bad_record_fails_batch_but_reports_every_file(self):
         bad = example_record()
-        bad["age"] = 17
+        bad["age"] = 10001
         bad_path = self.write("bad.json", bad)
         report = validate_batch([EXAMPLE_PATH, bad_path])
         self.assertFalse(report.all_valid)
@@ -46,7 +46,7 @@ class BatchTests(BatchFileHarness, EvenniaTestCase):
 
     def test_rejected_batch_constructs_nothing_and_carries_report(self):
         bad = example_record()
-        bad["age"] = 17
+        bad["age"] = 10001
         bad_path = self.write("bad.json", bad)
         with patch("world.imports.loader._instantiate_validated_character") as instantiate:
             with self.assertRaises(ImportRejected) as ctx:
@@ -350,7 +350,7 @@ class ImportBoundaryEventTests(BatchFileHarness, EvenniaTestCase):
 
     def test_validation_rejection_warns_with_reason(self):
         bad = example_record()
-        bad["age"] = 17
+        bad["age"] = 10001
         bad_path = self.write("bad.json", bad)
         with patch("world.imports.loader.log_info") as info, patch(
             "world.imports.loader.log_warn"

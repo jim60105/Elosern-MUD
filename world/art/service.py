@@ -20,10 +20,10 @@ from django.db import transaction
 
 from world.observability import log_error, log_info, log_warn
 
-from world.art.adult import PortraitRejected, portrait_eligibility
 from world.art.queue import ensure as queue_ensure
 from world.art.subjects import (
     ArtSubjectError,
+    character_ages,
     character_subject_for,
     description_for,
     monster_subject_for,
@@ -34,33 +34,33 @@ from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 
 
 def _ensure_character_portrait(entity) -> None:
-    """Gate, derive, describe, and enqueue one character portrait subject.
+    """Validate ages, derive, describe, and enqueue one character portrait subject.
 
-    Runs the adult gate immediately before the queue write for every portrait
-    subject (design D3). The gate is a pure function of the canonical age
-    attributes, so a rejection is deterministic and produces no record, no
-    prompt, and no worker call.
+    Reads the canonical age pair immediately before the queue write for every
+    portrait subject (design D3). The eligibility check is a pure function of
+    the canonical age attributes, so a rejection is deterministic and produces
+    no record, no prompt, and no worker call.
     """
     subject = character_subject_for(entity)
     if subject is None:
         return
-    portrait_eligibility(entity)
+    character_ages(entity)
     age = int(entity.db.age)
     description = description_for(subject, entity=entity, age=age)
     queue_ensure(subject, description)
 
 
-def _gate_at_schedule(entity) -> bool:
-    """Run the adult gate at schedule time; return False if ineligible.
+def _ages_eligible_at_schedule(entity) -> bool:
+    """Check canonical ages at schedule time; return False if ineligible.
 
-    The spec requires the gate at schedule time *and* again immediately before
-    the queue write. A rejection at schedule time logs the named diagnostic and
-    no record/prompt/job is ever produced; a later correction re-enables the
-    next lifecycle attempt.
+    The spec requires the age check at schedule time *and* again immediately
+    before the queue write. A rejection at schedule time logs the named
+    diagnostic and no record/prompt/job is ever produced; a later correction
+    re-enables the next lifecycle attempt.
     """
     try:
-        portrait_eligibility(entity)
-    except PortraitRejected as error:
+        character_ages(entity)
+    except ArtSubjectError as error:
         log_info("art_portrait_skipped", context={"stage": "schedule"}, exc=error)
         return False
     return True
@@ -69,21 +69,22 @@ def _gate_at_schedule(entity) -> bool:
 def schedule_portrait_ensure(entity) -> None:
     """Register an exception-safe post-commit portrait ensure for an entity.
 
-    The adult gate runs at schedule time; if it rejects, nothing is scheduled
-    and no record is produced. Otherwise ``transaction.on_commit`` registers
-    the ensure, which re-runs the gate immediately before the queue write.
+    The canonical-age check runs at schedule time; if it rejects, nothing is
+    scheduled and no record is produced. Otherwise ``transaction.on_commit``
+    registers the ensure, which re-checks the ages immediately before the queue
+    write.
     Django runs on_commit callbacks synchronously on the committing thread
     after commit, so the callback catches every art error and never
     propagates: a committed creation or import is always reported as success
     (design D7).
     """
-    if not _gate_at_schedule(entity):
+    if not _ages_eligible_at_schedule(entity):
         return
 
     def _safe():
         try:
             _ensure_character_portrait(entity)
-        except PortraitRejected as error:
+        except ArtSubjectError as error:
             log_info("art_portrait_skipped", context={"stage": "ensure"}, exc=error)
         except Exception as error:  # noqa: BLE001 - bounded, never propagates
             log_warn("art_portrait_ensure_failed", context={"entity": entity.key}, exc=error)
@@ -121,10 +122,10 @@ def _living_entity_for_stable_key(stable_key: str):
 
 
 def retry_character_portrait(stable_key: str) -> None:
-    """Re-enqueue one failed character portrait through the adult gate.
+    """Re-enqueue one failed character portrait through the age check.
 
     The subject is re-derived from the living entity that owns the explicit
-    named policy for ``stable_key`` and the gate runs again; an unknown key,
+    named policy for ``stable_key`` and the ages are re-checked; an unknown key,
     a missing entity, or an ineligible character is a named rejection with no
     record change (staff retry path, design D3).
     """
@@ -137,9 +138,9 @@ def retry_character_portrait(stable_key: str) -> None:
 
 
 def requeue_character_portrait(stable_key: str) -> None:
-    """Force-regenerate one character portrait through the adult gate.
+    """Force-regenerate one character portrait through the age check.
 
-    Resolves the owning entity and re-runs the gate before resetting the
+    Resolves the owning entity and re-checks the canonical ages before resetting the
     record; an unknown key or an ineligible character is a named rejection
     with no record change (staff requeue path, design D3).
     """
@@ -148,7 +149,7 @@ def requeue_character_portrait(stable_key: str) -> None:
         raise ArtSubjectError(
             f"no living character carries portrait stable_key {stable_key!r}"
         )
-    portrait_eligibility(entity)
+    character_ages(entity)
     from world.art.queue import requeue as queue_requeue
 
     subject = character_subject_for(entity)
@@ -195,8 +196,8 @@ def _recover_named_portraits() -> None:
     """Rescan living characters with an explicit named policy and ensure them.
 
     Recovers an enqueue that failed after an earlier gameplay commit. The
-    adult gate re-runs; a permanently ineligible subject is skipped with a
-    diagnostic and never retried by a later recovery pass (design D7).
+    canonical-age check re-runs; a permanently ineligible subject is skipped
+    with a diagnostic and never retried by a later recovery pass (design D7).
     """
     from evennia.objects.models import ObjectDB
 
@@ -213,8 +214,8 @@ def _recover_named_portraits() -> None:
         if subject is None:
             continue
         try:
-            portrait_eligibility(entity)
-        except PortraitRejected as error:
+            character_ages(entity)
+        except ArtSubjectError as error:
             log_info("art_recovery_skipped", context={"kind": "portrait", "key": entity.key}, exc=error)
             continue
         _ensure_character_portrait(entity)

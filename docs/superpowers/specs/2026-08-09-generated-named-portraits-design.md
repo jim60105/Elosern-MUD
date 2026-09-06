@@ -18,8 +18,8 @@ design or the master design, those documents win unless this document explicitly
 `art-assets` delivered the deterministic portrait machinery: `_schedule_occupant_portraits`
 (`world/quests/scene_builder.py:236-257`) schedules a unique-portrait ensure for any spawned
 occupant carrying `db.portrait_policy` with `mode == "named"`; `character_subject_for()`
-(`world/art/subjects.py:89-112`) derives the subject from that policy; the adult gate
-(`world/art/adult.py`) re-checks `age >= 18` and `apparent_age >= 18` immediately before enqueue;
+(`world/art/subjects.py:89-112`) derives the subject from that policy; the subject-age validation
+(`world/art/subjects.py::character_ages`) re-checks both canonical age attributes immediately before enqueue;
 and the internal sd-webui client (`world/art/sd_worker.py`) renders the portrait prompt from the
 deterministic `character_description()` output plus the prompt library. Today's role-based scene
 NPCs carry no policy and resolve to no portrait.
@@ -36,10 +36,10 @@ applies them. The art layer needs no changes — it consumes the policy exactly 
 |---|---|---|
 | V1 | **Optional characterization fields flow through the whole pipeline**: `BlueprintNpcReq` (scenario-director) → `QuestBlueprint` validation → `StageSpawnRequirement` (compile) → SceneBuilder spawn. | Every layer is a data gatekeeper; a bad blueprint is rejected before it touches the DB. |
 | V2 | **Identity is authored by the LLM and format-validated deterministically.** The blueprint may carry `display_name`, and `portrait: {stable_key}`; validation: `stable_key` non-empty, no colon, bounded; `display_name` bounded text; content is not reviewed (same trust model as speech). | Owner decision: names are presentation identity, not world state; the anti-hallucination rule does not extend here. |
-| V3 | **Age is story-driven, race-bounded, and adult-gated.** `npc_req` may carry `age` / `apparent_age` (exact integers, paired or absent); both must be integers with `18 <= v` and `v <=` the race's `RaceProfile.lifespan` upper bound (resolved from the NPC tier's `race_key` — human ≤ 80, beastfolk ≤ 70, elf ≤ 1200). Absent fields default to the deterministic adult baseline 25. | Owner decision: the story's elderly man is a 68-year-old, not a random 25-year-old; lifespan bands come from the lore registry, never copied constants; the adult floor is a code-level invariant that no generative layer can bypass. |
+| V3 | **Age is story-driven and race-bounded.** `npc_req` may carry `age` / `apparent_age` (exact integers, paired or absent); both must be integers with `0 <= v` and `v <=` the race's `RaceProfile.lifespan` upper bound (resolved from the NPC tier's `race_key` — human ≤ 80, beastfolk ≤ 70, elf ≤ 1200). Absent fields default to the authored age baseline 25. | Owner decision: the story's elderly man is a 68-year-old, not a random 25-year-old; lifespan bands come from the lore registry, never copied constants; the age bound is a code-level invariant that no generative layer can bypass. |
 | V4 | **The portrait description stays deterministic.** `character_description(entity, age)` (race label + display name + the story-driven age + style template) is the only content source; with the internal client there is no LLM elaboration stage anywhere in the pipeline. | subjects.py D6 contract unchanged; an LLM-authored description would flow verbatim into the sd-webui prompt with no worker-side buffer. |
 | V5 | **No fields → status quo.** Role-based occupants without characterization keep today's no-portrait behavior; the same `stable_key` shares one portrait asset (existing art behavior). | No new rules; the key is identity. |
-| V6 | **Master-design scoping note.** §7.2's "the LLM never chooses numbers" rule covers mechanical/balance values (stats, rewards, bands). Characterization fields — `display_name`, `age`, `apparent_age` — are authored by the generative layer like speech, land only after deterministic bounded validation, and can never weaken the code-level adult gate. | Keeps the anti-hallucination line clean without making story-driven characters impossible. |
+| V6 | **Master-design scoping note.** §7.2's "the LLM never chooses numbers" rule covers mechanical/balance values (stats, rewards, bands). Characterization fields — `display_name`, `age`, `apparent_age` — are authored by the generative layer like speech, land only after deterministic bounded validation, and can never weaken the code-level age-range validation. | Keeps the anti-hallucination line clean without making story-driven characters impossible. |
 
 ---
 
@@ -55,7 +55,7 @@ applies them. The art layer needs no changes — it consumes the policy exactly 
   "tier": "civilian",
   "disposition": null,
   "display_name": "莉絲·晨星",           // optional; in-game + portrait description
-  "age": 68, "apparent_age": 68,         // optional; paired integers, 18..race lifespan max
+  "age": 68, "apparent_age": 68,         // optional; paired integers, 0..race lifespan max
   "portrait": { "stable_key": "library_keeper" }  // present => named portrait
 }
 ```
@@ -64,9 +64,9 @@ applies them. The art layer needs no changes — it consumes the policy exactly 
 
 - `world/ai/scenario_director.py`: `BlueprintNpcReq` gains optional `display_name`, `age`,
   `apparent_age`, `portrait_policy`. Schema + semantic validation:
-  - `age` and `apparent_age` must appear together; both integers; `18 <= v`; the race bound is
+  - `age` and `apparent_age` must appear together; both integers; `0 <= v`; the race bound is
     resolved through `NPC_TIER_REGISTRY[tier].race_key` → `RACE_REGISTRY[race].lifespan` (upper
-    bound only; the adult floor is the lower bound, not the lifespan floor).
+    bound only; the age floor `0` is the lower bound, not the lifespan floor).
   - `stable_key` obeys the subject-key rules (non-empty, no colon, bounded, no control
     characters); `display_name` bounded text.
 - `world/quests/compile.py`: `StageSpawnRequirement` carries the fields; compile validation
@@ -78,7 +78,7 @@ applies them. The art layer needs no changes — it consumes the policy exactly 
 
 ### 3.3 Art layer
 
-No changes. `character_subject_for()`, `character_description()`, the adult gate, the queue, and
+No changes. `character_subject_for()`, `character_description()`, the subject-age check, the queue, and
 the internal sd-webui client all consume the policy and ages exactly as designed.
 
 ---
@@ -90,7 +90,7 @@ the internal sd-webui client all consume the policy and ages exactly as designed
 | `world/ai/scenario_director.py` | Blueprint schema + validation; template pool may carry portrait fields |
 | `world/quests/compile.py` | Field carry-through + mirrored validation |
 | `world/quests/scene_builder.py` | Spawn applies display name, ages, portrait policy |
-| `world/art/subjects.py`, `adult.py`, `service.py`, `sd_worker.py` | Unchanged (existing seams consume) |
+| `world/art/subjects.py`, `service.py`, `sd_worker.py` | Unchanged (existing seams consume) |
 | `world/lore/races.py` / `npc_tiers.py` | Race lifespan bound source |
 
 ---
@@ -102,7 +102,7 @@ the internal sd-webui client all consume the policy and ages exactly as designed
 | Malformed characterization (bad mode/key/name, unpaired or non-integer or out-of-band age) | Blueprint/compile rejection before the DB |
 | Spawn failure | Existing SceneBuilder atomic rejection |
 | Art offline | Existing placeholder degrade; never blocks play |
-| Age missing (portrait present, no age fields) | Deterministic baseline 25; adult gate passes |
+| Age missing (portrait present, no age fields) | Deterministic baseline 25; subject-age check passes |
 | Same `stable_key` in two quests | Shared portrait (idempotent, no regeneration) |
 
 ---
@@ -111,10 +111,10 @@ the internal sd-webui client all consume the policy and ages exactly as designed
 
 | Area | Method |
 |---|---|
-| Blueprint | Accept/reject for every malformed case (unpaired age, non-integer, 17, race-lifespan overflow such as elf 1300, colon in key, missing bounds); valid 68-year-old human and 300-year-old elf pass |
+| Blueprint | Accept/reject for every malformed case (unpaired age, non-integer, -1, race-lifespan overflow such as elf 1300, colon in key, missing bounds); valid 68-year-old human and 300-year-old elf pass |
 | Compile | Field carry-through + mirrored validation |
 | Spawn | `db.portrait_policy`, `db.display_name`, `db.age`/`db.apparent_age` set correctly; no fields → nothing set, nothing scheduled |
-| Art integration | Named-policy spawn reaches the fake worker with an adult, story-driven description; same-key subjects share one asset; adult gate passes (68, 300) |
+| Art integration | Named-policy spawn reaches the fake worker with a story-driven description; same-key subjects share one asset; subject-age check passes (68, 300) |
 | Regression | Existing art-assets / scene-builder suites stay green |
 | Traceability | New main requirements annotated with `covers_requirement`; `spec_traceability check` passes |
 

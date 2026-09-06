@@ -16,9 +16,9 @@ shared NPC name rule) and `title` (the authored NPC title: single-line plain tex
 through the shared NPC title rule). It SHALL additionally accept three optional fields: `age` and
 `apparent_age` (paired integers), and `portrait` (an object with exactly one bounded `stable_key`
 field). A `portrait` block SHALL mean the occupant carries a named portrait policy with
-`mode == "named"` and that `stable_key`; there is no `mode` field in the blueprint. The adult
-invariant is a hard floor: every present `age`/`apparent_age` value SHALL satisfy
-`type(value) is int` (booleans and `None` reject) with `18 <= v`, and SHALL NOT exceed the race's
+`mode == "named"` and that `stable_key`; there is no `mode` field in the blueprint. The age floor is
+a hard bound: every present `age`/`apparent_age` value SHALL satisfy
+`type(value) is int` (booleans and `None` reject) with `0 <= v`, and SHALL NOT exceed the race's
 `RaceProfile.lifespan` upper bound resolved from the entry's tier through
 `NPC_TIER_REGISTRY[tier].race_key` — never a copied constant. `age` and `apparent_age` SHALL be
 paired (both present or both absent); a key present with a `None` value is not an absence and
@@ -48,9 +48,9 @@ construction guard (`_reject_mutable_containers`) is preserved.
   either key with a `None` value
 - **THEN** the blueprint is rejected before any compilation
 
-#### Scenario: An underage value is rejected
-- **WHEN** an `npc_req` entry declares `age: 17` or `apparent_age: 17`
-- **THEN** the blueprint is rejected — the adult floor is a hard invariant, never a warning
+#### Scenario: A negative age value is rejected
+- **WHEN** an `npc_req` entry declares `age: -1` or `apparent_age: -1`
+- **THEN** the blueprint is rejected — the age floor of 0 is a hard bound, never a warning
 
 #### Scenario: Boolean and non-integer ages are rejected
 - **WHEN** an `npc_req` entry declares `age: true`, `apparent_age: 30.5`, or any non-`int` value
@@ -120,7 +120,7 @@ title and name rules SHALL be obtained by delegating to the single shared valida
 inline or duplicate the character-set rules itself. The scenario director's blueprint validation
 and the deterministic compile boundary SHALL both call this helper (the scenario director imports
 it read-only, the same direction it already uses for `world/lore` registries); neither SHALL inline
-the age/name/title/key checks itself. The adult floor SHALL be a named constant in the helper.
+the age/name/title/key checks itself. The age floor SHALL be a named constant in the helper.
 
 #### Scenario: Both validation layers call the shared helper
 - **WHEN** the blueprint validator and the compiler each validate an entry carrying the fields
@@ -160,14 +160,14 @@ validation as AI proposals, so a template with a missing or malformed identity f
 registration rather than producing a broken quest.
 
 #### Scenario: A template with valid identity and characterization registers
-- **WHEN** a hand-written template declares a named occupant with a valid title and paired adult
-  ages within the race band
+- **WHEN** a hand-written template declares a named occupant with a valid title and paired
+  canonical ages within the race band
 - **THEN** the template registers and its quests carry the identity and characterization fields
 
 #### Scenario: A template without an authored title is rejected at registration
 - **WHEN** a template `npc_req` entry omits `title`
 - **THEN** template registration rejects it before any quest can use it
 
-#### Scenario: A template with an underage entry is rejected at registration
-- **WHEN** a template declares `age: 17`
+#### Scenario: A template with a negative-age entry is rejected at registration
+- **WHEN** a template declares `age: -1`
 - **THEN** template registration rejects it before any quest can use it

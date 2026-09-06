@@ -66,8 +66,8 @@ class CreationRejectionMappingTests(unittest.TestCase):
             "display name contains a control character": "invalid_name",
             "display name contains an Evennia markup delimiter": "markup_delimiter",
             "display name contains a reserved separator": "reserved_separator",
-            "age must be an integer of at least 18": "underage_age",
-            "apparent_age must be an integer of at least 18": "underage_apparent_age",
+            "age must be an integer from 0 to 10000": "age_out_of_range",
+            "apparent_age must be an integer from 0 to 10000": "apparent_age_out_of_range",
             "unknown race 'x'": "unknown_race",
             "race must be a registry key": "unknown_race",
             "unknown subrace 'x'": "unknown_subrace",
@@ -101,8 +101,10 @@ class CreationRejectionMappingTests(unittest.TestCase):
     def test_deterministic_rejections_round_trip_through_preflight(self):
         cases = [
             ("unknown preset", CharacterCreationRequest(mode="preset", preset_key="nope"), "unknown_preset"),
-            ("underage age", request(age=17), "underage_age"),
-            ("underage apparent age", request(apparent_age=17), "underage_apparent_age"),
+            ("negative age", request(age=-1), "age_out_of_range"),
+            ("negative apparent age", request(apparent_age=-1), "apparent_age_out_of_range"),
+            ("over-bound age", request(age=10001), "age_out_of_range"),
+            ("over-bound apparent age", request(apparent_age=10001), "apparent_age_out_of_range"),
             ("markup name", request(display_name="|rbad|n"), "markup_delimiter"),
             ("separator name", request(display_name="角色/名"), "reserved_separator"),
             ("incompatible subrace", request(race="human", subrace="foxkin"), "incompatible_subrace"),
@@ -116,17 +118,17 @@ class CreationRejectionMappingTests(unittest.TestCase):
                         preflight_character_creation(object(), FakeCharacter(), req)
                 self.assertEqual(rejection_code(ctx.exception), expected)
 
-    def test_adult_valid_request_passes_and_underage_fields_reject_independently(self):
+    def test_valid_request_passes_and_age_fields_reject_independently(self):
         with patch(
             "world.rules.character_creation._owned_character", return_value=True
         ):
             validated = preflight_character_creation(
-                object(), FakeCharacter(), request(age=18, apparent_age=18)
+                object(), FakeCharacter(), request(age=0, apparent_age=10000)
             )
-            self.assertEqual((validated.age, validated.apparent_age), (18, 18))
+            self.assertEqual((validated.age, validated.apparent_age), (0, 10000))
             for overrides, expected in (
-                ({"age": 17}, "underage_age"),
-                ({"apparent_age": 17}, "underage_apparent_age"),
+                ({"age": -1}, "age_out_of_range"),
+                ({"apparent_age": -1}, "apparent_age_out_of_range"),
             ):
                 with self.subTest(overrides=overrides):
                     with self.assertRaises(CharacterCreationError) as ctx:

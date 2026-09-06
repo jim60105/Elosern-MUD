@@ -263,7 +263,7 @@ preference SHALL continue to apply, and an explicit stored value — either dire
 does not implement, so a control with no outcome — a typeface choice the design system's role-assigned
 faces do not support, an audio level with no audio subsystem, an interface-scale slider, or a key
 remapping — SHALL NOT be rendered. The creation overlay SHALL implement a presets/custom/concept wizard
-with the adult gate applied to BOTH the age and the apparent_age fields and an activate transition, and
+with the age-range gate applied to BOTH the age and the apparent_age fields and an activate transition, and
 SHALL emit `creation.*`. Because its presence is owned by the committed `creation` panel and creation mode
 presents no surface behind it, the creation overlay SHALL render no client-side dismissal control: no
 close, exit, or hide-the-surface affordance in its header or body, and no such control SHALL be wired to a
@@ -300,9 +300,9 @@ game-event toast queue bound to a not-yet-existing `event-log` read model, asser
 `event-log-`/`toast-` test-id binding — and is distinct from the action-feedback queue. On completion of the contextual HUD redesign the required-component manifest SHALL
 be re-frozen at the complete redesign set and the component-coverage gate SHALL enforce that frozen set.
 
-#### Scenario: Creation gate rejects both underage fields
-- **WHEN** the creation wizard submits an age or an apparent_age below 18
-- **THEN** the adult gate rejects the record before activation
+#### Scenario: Creation gate rejects both out-of-range fields
+- **WHEN** the creation wizard submits an age or an apparent_age outside the 0..10000 range
+- **THEN** the age-range gate rejects the record before activation
 
 #### Scenario: Settings are client-local and honor reduced motion
 - **WHEN** a settings control changes

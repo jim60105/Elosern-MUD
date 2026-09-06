@@ -70,14 +70,14 @@ MAX_PROFILES = 16
 MAX_SEX_OPTIONS = 8
 
 # Custom-form bounds (design D2): identical to the command wizard's name rules
-# and the deterministic adult gate. The display-name bound mirrors the shared
-# entity-key contract (fix-import-key-validity D3) so the panel's advertised
-# maximum never exceeds what `_validate_name` accepts.
+# and the deterministic age-range validator. The display-name bound mirrors the
+# shared entity-key contract (fix-import-key-validity D3) so the panel's
+# advertised maximum never exceeds what `_validate_name` accepts.
 NAME_MIN_LENGTH = 1
 NAME_MAX_LENGTH = 64
-AGE_MINIMUM = 18
+AGE_MINIMUM = 0
 AGE_MAXIMUM = 10000
-APPARENT_AGE_MINIMUM = 18
+APPARENT_AGE_MINIMUM = 0
 APPARENT_AGE_MAXIMUM = 10000
 ALLOCATION_MAXIMUM = 10000
 # Stable Traditional Chinese axis labels and player-facing explanations for the
@@ -125,8 +125,8 @@ class NameBoundsView:
 
 
 @dataclass(frozen=True)
-class AdultBoundsView:
-    """The server-advertised adult age bounds for both age fields."""
+class AgeBoundsView:
+    """The server-advertised age bounds for both age fields."""
 
     age_minimum: int
     age_maximum: int
@@ -225,7 +225,7 @@ class CustomFormView:
     """The complete custom-form descriptor built from immutable registries."""
 
     name: NameBoundsView
-    adult: AdultBoundsView
+    age: AgeBoundsView
     races: tuple[RaceOptionView, ...]
     subraces: dict[str, SubraceView]
     profiles: tuple[ProfileView, ...]
@@ -362,7 +362,7 @@ def build_custom_form() -> CustomFormView:
             break
     return CustomFormView(
         name=NameBoundsView(min_length=NAME_MIN_LENGTH, max_length=NAME_MAX_LENGTH),
-        adult=AdultBoundsView(
+        age=AgeBoundsView(
             age_minimum=AGE_MINIMUM,
             age_maximum=AGE_MAXIMUM,
             apparent_age_minimum=APPARENT_AGE_MINIMUM,
@@ -468,10 +468,10 @@ def _normalize_draft(storage: Any) -> dict[str, Any] | None:
 
     Accepts any Mapping (Evennia returns lazy ``_SaverDict`` wrappers from the
     attribute store, not plain ``dict`` instances). A draft that fails its
-    structural shape OR its semantic bounds (unknown preset, underage, unknown
-    or incompatible race/subrace, malformed allocations, malformed persona
-    block) is treated as corrupt and degrades only the draft slot so the
-    creation panel stays schema-valid.
+    structural shape OR its semantic bounds (unknown preset, an age outside the
+    advertised range, unknown or incompatible race/subrace, malformed
+    allocations, malformed persona block) is treated as corrupt and degrades
+    only the draft slot so the creation panel stays schema-valid.
     """
     if not isinstance(storage, Mapping) or storage.get("version") != DRAFT_VERSION:
         return None
@@ -609,9 +609,9 @@ def save_preset_draft(account: Any, character: Any, preset_key: str) -> dict[str
     """Validate and persist the ``preset_selected`` staging draft.
 
     Re-runs the existing public ``preflight_character_creation`` for the preset
-    so the adult gate, registry membership, name rules, and allocation bounds
-    are authoritative before any value is persisted. The character remains
-    pending and no canonical identity or trait value changes.
+    so the age-range check, registry membership, name rules, and allocation
+    bounds are authoritative before any value is persisted. The character
+    remains pending and no canonical identity or trait value changes.
     """
     request = CharacterCreationRequest(mode="preset", preset_key=preset_key)
     preflight_character_creation(account, character, request)
@@ -632,9 +632,9 @@ def save_custom_draft(
 
     The request must already be ``mode="custom"``; the existing public
     ``preflight_character_creation`` validates ownership, pending state, the
-    adult gate, registry membership, name rules, allocation bounds, and budget
-    before the draft is written. The trimmed server-accepted display name is
-    persisted; no canonical identity or trait value changes.
+    age-range check, registry membership, name rules, allocation bounds, and
+    budget before the draft is written. The trimmed server-accepted display
+    name is persisted; no canonical identity or trait value changes.
 
     ``persona`` is the player-owned persona block (``None`` when the player
     submitted no persona): a non-null block is validated through the shared
@@ -742,9 +742,9 @@ __all__ = [
     "ALLOCATION_AXIS_LABELS",
     "APPARENT_AGE_MAXIMUM",
     "APPARENT_AGE_MINIMUM",
-    "AdultBoundsView",
     "AffinityElementView",
     "AffinityView",
+    "AgeBoundsView",
     "AllocationAxisView",
     "CreationView",
     "CustomFormView",

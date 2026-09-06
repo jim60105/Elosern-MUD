@@ -195,7 +195,7 @@ def _browser_concept_proposal(client=None, *, concept):
             },
             # The v3 transient-fill keys (bump-creation-panel-proposal-v3):
             # already-normalized values as the guarded layer would emit them
-            # (adult ages, in-band texts, human affinity bound of 2).
+            # (in-band ages and texts, human affinity bound of 2).
             display_name="燈下學徒",
             age=30,
             apparent_age=27,

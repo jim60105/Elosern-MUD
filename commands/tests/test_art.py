@@ -142,14 +142,14 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         )
 
     @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
-    @covers_requirement("adult-portrait-gate::the-gate-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker")
-    def test_requeue_underage_character_is_rejected_with_no_record_change(self):
+    @covers_requirement("art-asset-lifecycle::the-age-check-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker")
+    def test_requeue_character_with_missing_canonical_age_is_rejected_with_no_record_change(self):
         from evennia.utils.create import create_object
 
         from typeclasses.characters import PlayerCharacter
 
-        player = create_object(PlayerCharacter, key="underage-for-requeue")
-        player.db.age = 17
+        player = create_object(PlayerCharacter, key="missing-age-for-requeue")
+        player.db.age = None
         player.db.apparent_age = 22
         player.db.portrait_policy = {
             "mode": "named",
@@ -166,15 +166,15 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             0,
         )
 
-    @covers_requirement("adult-portrait-gate::the-gate-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker")
-    def test_retry_skips_an_underage_character_portrait(self):
+    @covers_requirement("art-asset-lifecycle::the-age-check-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker")
+    def test_retry_skips_a_character_portrait_with_a_non_integer_age(self):
         from evennia.utils.create import create_object
 
         from typeclasses.characters import PlayerCharacter
         from world.art.queue import source_hash
 
-        player = create_object(PlayerCharacter, key="underage-retry")
-        player.db.age = 17
+        player = create_object(PlayerCharacter, key="non-int-age-retry")
+        player.db.age = "twenty"
         player.db.apparent_age = 22
         player.db.portrait_policy = {
             "mode": "named",

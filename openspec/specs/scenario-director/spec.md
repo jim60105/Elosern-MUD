@@ -229,11 +229,11 @@ entry, in addition to the existing role/tier/disposition checks, and SHALL accep
 optional fields `age`/`apparent_age` (paired) and `portrait: {stable_key}`. Every field SHALL be
 validated through the shared bound helper under `world/quests/` (the single rule source, imported
 read-only): `display_name` and `title` required with their shared character-set rules;
-`age`/`apparent_age` paired values satisfying `type(value) is int` with the hard adult floor `18`
+`age`/`apparent_age` paired values satisfying `type(value) is int` with the hard age floor `0`
 and an upper bound from `NPC_TIER_REGISTRY[tier].race_key` → `RACE_REGISTRY[race].lifespan`;
 `portrait` a mapping with exactly one `stable_key` field that is subject-key-valid. A payload whose
 tier is unknown, whose occupant is missing `display_name` or `title`, whose ages are unpaired,
-non-integer, underage, or beyond the race lifespan, or whose portrait key is malformed SHALL be
+non-integer, negative, or beyond the race lifespan, or whose portrait key is malformed SHALL be
 rejected and retried within the budget exactly like today's other semantic failures.
 
 #### Scenario: A valid named occupant with a title and ages passes validation
@@ -246,8 +246,8 @@ rejected and retried within the budget exactly like today's other semantic failu
 - **THEN** the output is treated as a validation failure, the named error is appended, and the
   pipeline retries within the budget
 
-#### Scenario: An unpaired, underage, or non-integer declaration is rejected and retried
-- **WHEN** an `npc_req` entry declares `age` without `apparent_age`, either age below 18, or any
+#### Scenario: An unpaired, negative, or non-integer declaration is rejected and retried
+- **WHEN** an `npc_req` entry declares `age` without `apparent_age`, either age negative, or any
   age whose `type` is not exactly `int` (including booleans and `None`)
 - **THEN** the output is treated as a validation failure, the error is appended, and the pipeline
   retries within the budget

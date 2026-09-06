@@ -1339,7 +1339,7 @@
 
 <!-- ===================== CREATION (BUILD) FULL ===================== -->
 <section class="full" id="ov-creation" data-name="creation">
-  <div class="fh"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg><h3>建立角色</h3><span class="sub">所有角色皆為成年人（≥18）</span><button class="closebtn" data-close-full aria-label="關閉"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6 6 18" stroke-linecap="round"/></svg></button></div>
+  <div class="fh"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg><h3>建立角色</h3><span class="sub">年齡 0 至 10000</span><button class="closebtn" data-close-full aria-label="關閉"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6 6 18" stroke-linecap="round"/></svg></button></div>
   <div class="fbody">
     <div class="tabs" id="crtabs" style="margin-bottom:16px"><button class="on" data-crt="preset">預設角色</button><button data-crt="custom">自訂</button><button data-crt="concept">AI 構想</button></div>
     <div id="crt-preset"><div class="sugs" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr))">
@@ -1349,8 +1349,8 @@
     </div></div>
     <div id="crt-custom" hidden><div class="create-grid">
       <div class="field"><label for="f-name">名稱</label><input id="f-name" type="text" value="阿夜"></div>
-      <div class="field"><label for="f-age">實際年齡 <small>≥18</small></label><input id="f-age" type="number" value="27" min="18" max="99"><span class="ok">✓ 符合成人條件</span></div>
-      <div class="field"><label for="f-appage">外表年齡 <small>≥18</small></label><input id="f-appage" type="number" value="25" min="18" max="99"></div>
+      <div class="field"><label for="f-age">實際年齡 <small>0–10000</small></label><input id="f-age" type="number" value="27" min="0" max="10000"><span class="ok">✓ 符合範圍</span></div>
+      <div class="field"><label for="f-appage">外表年齡 <small>0–10000</small></label><input id="f-appage" type="number" value="25" min="0" max="10000"></div>
       <div class="field"><label for="f-race">種族 / 亞種</label><select id="f-race"><option>灰裔</option><option>北境人</option><option>精靈</option><option>獸人</option></select></div>
       <div class="field full"><label for="f-concept">概念背景 <small>≤500 字</small></label><input id="f-concept" type="text" value="一個欠了銀子、卻跑得比狼快的拾荒者"></div>
     </div>

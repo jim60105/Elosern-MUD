@@ -57,13 +57,16 @@ MAX_NAME_CODE_POINTS = 64
 # (``commands.character_creation.MAX_CONCEPT_LENGTH``) and the generative
 # layer's prompt cap; a parity test keeps all of them in lock step.
 MAX_CONCEPT_CODE_POINTS = 500
-# Structural age bounds. The 18 minimum is NOT enforced here: underage values
-# must reach the deterministic ``_validate_adult`` inside preflight so the
-# stable ``underage_age`` / ``underage_apparent_age`` codes come from the
-# creation service, exactly as the adult-gate contract requires.
-AGE_WIRE_MINIMUM = 0
+# Structural age bounds, mirroring the single creation authority
+# (``world.rules.creation_wizard`` AGE_MINIMUM / AGE_MAXIMUM) exactly: the
+# wire accepts exactly the legitimate 0..10000 range, so out-of-range values
+# are rejected structurally at this boundary. The deterministic
+# ``_validate_age`` inside preflight keeps producing the stable
+# ``age_out_of_range`` / ``apparent_age_out_of_range`` codes for any draft
+# the web layer surfaces from another path.
+AGE_MINIMUM = 0
 AGE_MAXIMUM = 10000
-APPARENT_AGE_WIRE_MINIMUM = 0
+APPARENT_AGE_MINIMUM = 0
 APPARENT_AGE_MAXIMUM = 10000
 ALLOCATION_MINIMUM = 0
 ALLOCATION_MAXIMUM = 10000
@@ -163,9 +166,9 @@ def validate_creation_custom_payload(payload: dict[str, Any]) -> dict[str, Any]:
     display_name = _require_non_empty_string(
         payload["display_name"], "display_name", MAX_NAME_CODE_POINTS
     )
-    age = _require_int_in_range(payload["age"], "age", AGE_WIRE_MINIMUM, AGE_MAXIMUM)
+    age = _require_int_in_range(payload["age"], "age", AGE_MINIMUM, AGE_MAXIMUM)
     apparent_age = _require_int_in_range(
-        payload["apparent_age"], "apparent_age", APPARENT_AGE_WIRE_MINIMUM, APPARENT_AGE_MAXIMUM
+        payload["apparent_age"], "apparent_age", APPARENT_AGE_MINIMUM, APPARENT_AGE_MAXIMUM
     )
     race = _require_non_empty_string(payload["race"], "race", MAX_KEY_CODE_POINTS)
     subrace = _require_non_empty_string(payload["subrace"], "subrace", MAX_KEY_CODE_POINTS)
@@ -682,11 +685,11 @@ def _creation_reset_adapter(actor: Any, payload: dict[str, Any], session: Any = 
 
 __all__ = [
     "AGE_MAXIMUM",
-    "AGE_WIRE_MINIMUM",
+    "AGE_MINIMUM",
     "ALLOCATION_MAXIMUM",
     "ALLOCATION_MINIMUM",
     "APPARENT_AGE_MAXIMUM",
-    "APPARENT_AGE_WIRE_MINIMUM",
+    "APPARENT_AGE_MINIMUM",
     "CreationActionError",
     "MAX_CONCEPT_CODE_POINTS",
     "MAX_KEY_CODE_POINTS",

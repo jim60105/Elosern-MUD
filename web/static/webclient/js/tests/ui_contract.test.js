@@ -169,11 +169,16 @@ test("the creation overlay and preserved menu model insert text via text APIs", 
   assert.strictEqual(/document\./.test(menu), false, "menu stays DOM-independent");
 });
 
-test("the creation form adult fields enforce the 18 minimum on both age fields", () => {
+test("the creation form reads both age minimums from the custom.age descriptor", () => {
+  // age-range-0-10000: the descriptor block is `custom.age` and the fallback
+  // minimum is 0. The fresh-form default age is a showcase-side UX choice
+  // and deliberately not pinned here.
   const source = read("web/webclient-app/components/CreationOverlay.vue");
-  assert.match(source, /const age = ref\(18\)/);
-  assert.match(source, /const apparentAge = ref\(18\)/);
+  assert.match(source, /custom\.value\?\.age\?\.age_minimum \?\? 0/);
+  assert.match(source, /custom\.value\?\.age\?\.apparent_age_minimum \?\? 0/);
   assert.match(source, /Number\(age\.value\) >= minimumAge\.value && Number\(apparentAge\.value\) >= minimumApparentAge\.value/);
+  // No trace of the retired `custom.adult` descriptor key.
+  assert.strictEqual(/custom(\.value)?\??\.adult/.test(source), false);
 });
 
 test("the scene backdrop reuses an in-flight scene image instead of refetching", () => {

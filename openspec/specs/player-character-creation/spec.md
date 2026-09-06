@@ -48,7 +48,7 @@ The deterministic core MAY additionally persist a bounded, versioned `creation_d
 - **THEN** the system derives the preset's validated identity and allocation, initializes the account-owned character, and marks it active
 
 #### Scenario: A player creates a custom character
-- **WHEN** a pending player completes the custom creation prompts with a valid name, adult identity, compatible race and required subrace, valid allocations, an optional background, and an optional sex
+- **WHEN** a pending player completes the custom creation prompts with a valid name, valid canonical ages, compatible race and required subrace, valid allocations, an optional background, and an optional sex
 - **THEN** the system initializes that account-owned character with the chosen identity and calculated trait values, persists the background in the persona record when supplied, persists the accepted sex on the character, then marks it active
 
 #### Scenario: A custom persona block persists at activation
@@ -83,15 +83,15 @@ The deterministic core MAY additionally persist a bounded, versioned `creation_d
 - **WHEN** a validated staging draft is activated through the deterministic service
 - **THEN** the draft (including any background text, persona block, and accepted sex) is cleared in the same all-or-nothing transaction that writes the character's identity, traits, and initial mechanical state, so no completed character retains a draft
 
-### Requirement: Character creation enforces adult identity and registry compatibility
-Both preset and custom activation SHALL require `age` and `apparent_age` to be independent integer values of at least 18. The selected race SHALL exist in `RACE_REGISTRY`. A subrace SHALL exist in `SUBRACE_REGISTRY` and belong to that race; in custom mode the subrace is required (every race has at least one registered subrace), while preset mode uses the preset's declared subrace. A supplied sex SHALL be a `SEX_VALUES` member or omitted/null, the latter normalizing to `DEFAULT_SEX`. Successful activation SHALL persist the accepted age, apparent age, race, subrace, display name, and sex on the player character (the sex written as the `entity.sex` attribute the character loader already honors, so creation and import paths converge on the same concrete value).
+### Requirement: Character creation enforces canonical identity and registry compatibility
+Both preset and custom activation SHALL require `age` and `apparent_age` to be independent integer values within the 0..10000 reasonable range. The selected race SHALL exist in `RACE_REGISTRY`. A subrace SHALL exist in `SUBRACE_REGISTRY` and belong to that race; in custom mode the subrace is required (every race has at least one registered subrace), while preset mode uses the preset's declared subrace. A supplied sex SHALL be a `SEX_VALUES` member or omitted/null, the latter normalizing to `DEFAULT_SEX`. Successful activation SHALL persist the accepted age, apparent age, race, subrace, display name, and sex on the player character (the sex written as the `entity.sex` attribute the character loader already honors, so creation and import paths converge on the same concrete value).
 
-#### Scenario: Actual age below adulthood is rejected
-- **WHEN** custom creation supplies `age=17` with an adult apparent age
+#### Scenario: Actual age below the range floor is rejected
+- **WHEN** custom creation supplies `age=-1` with an in-range apparent age
 - **THEN** activation is rejected, the character remains pending, and no traits are written
 
-#### Scenario: Apparent age below adulthood is rejected independently
-- **WHEN** custom creation supplies an adult actual age and `apparent_age=17`
+#### Scenario: Apparent age outside the range is rejected independently
+- **WHEN** custom creation supplies an in-range actual age and `apparent_age=-1`
 - **THEN** activation is rejected, the character remains pending, and no traits are written
 
 #### Scenario: A subrace belonging to another race is rejected
@@ -99,7 +99,7 @@ Both preset and custom activation SHALL require `age` and `apparent_age` to be i
 - **THEN** activation is rejected before persistence with an explanation of the mismatch
 
 #### Scenario: A custom creation with no subrace is rejected
-- **WHEN** custom creation supplies a race and a valid adult identity but no subrace
+- **WHEN** custom creation supplies a race and valid canonical ages but no subrace
 - **THEN** activation is rejected before persistence with an explanation, and the character remains pending
 
 #### Scenario: An imported character without a subrace is rejected

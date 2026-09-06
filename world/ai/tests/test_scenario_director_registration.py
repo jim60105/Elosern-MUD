@@ -400,7 +400,7 @@ class ScenarioDirectorTemplatePoolTests(RegistryIsolationMixin, unittest.TestCas
         self.assertTrue(compiled.definition.key)
 
     @covers_requirement("blueprint-portrait-policy::the-hand-written-template-pool-may-carry-characterization-fields")
-    def test_malformed_underage_template_is_rejected_at_registration(self):
+    def test_malformed_negative_age_template_is_rejected_at_registration(self):
         from world.ai.director_templates import QUEST_TEMPLATE_POOL
 
         named = next(
@@ -416,14 +416,14 @@ class ScenarioDirectorTemplatePoolTests(RegistryIsolationMixin, unittest.TestCas
         for stage in payload["stages"]:
             for requirement in stage.get("npc_req") or []:
                 if "age" in requirement:
-                    requirement["age"] = 17
-                    requirement["apparent_age"] = 17
+                    requirement["age"] = -1
+                    requirement["apparent_age"] = -1
         errors = [
             message
             for validator_fn in scenario_director._VALIDATORS.values()
             for message in validator_fn(payload)
         ]
-        self.assertTrue(errors, "an underage template must be rejected at registration")
+        self.assertTrue(errors, "a negative-age template must be rejected at registration")
 
 
 class RegistryRestoreRegressionTests(unittest.TestCase):

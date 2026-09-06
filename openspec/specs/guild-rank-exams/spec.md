@@ -74,7 +74,7 @@ record, opponent, or session.
 ### Requirement: Exam opponents use validated true-stat rank profiles
 Each target rank E through S SHALL map to one YAML exam profile with exact true traits and known combat
 skills. E/D profiles SHALL fit `human_adventurer`, C/B `human_elite`, A `human_veteran`, and S
-`human_swordmaster`. The spawned opponent SHALL be an adult temporary NPC and SHALL never derive stats
+`human_swordmaster`. The spawned opponent SHALL be a temporary NPC and SHALL never derive stats
 from the candidate's displayed or true values.
 
 #### Scenario: Every rank profile stays inside its lore band
@@ -144,14 +144,14 @@ when empty); a rolled-back promotion revokes the entry with the transaction.
 - **WHEN** PASS settlement is invoked again for an already settled exam ID
 - **THEN** rank and every exam surface remain unchanged
 
-### Requirement: Guild exam opponents carry adult identity
+### Requirement: Guild exam opponents carry canonical age
 
-The system SHALL persist adult `age`/`apparent_age` on every temporary exam
+The system SHALL persist canonical `age`/`apparent_age` on every temporary exam
 opponent spawned by `start_guild_exam`.
 
-#### Scenario: Exam opponent has adult age
+#### Scenario: Exam opponent has canonical age
 - **WHEN** `guild exam <rank>` spawns `guild-examiner-<rank>`
-- **THEN** the opponent has integer `age` and `apparent_age` of at least 18
+- **THEN** the opponent has integer `age` and `apparent_age` defaulting to the canonical default 18
 
 ### Requirement: Exam opponents use collision-free unique display keys
 `start_guild_exam` SHALL spawn each temporary opponent under the rank's authored examiner name,

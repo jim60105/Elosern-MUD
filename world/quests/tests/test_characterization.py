@@ -15,7 +15,7 @@ from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.rules.npc_identity import MAX_NPC_NAME_CODE_POINTS
 from world.quests.characterization import (
-    ADULT_MINIMUM,
+    AGE_FLOOR,
     MAX_DISPLAY_NAME_LENGTH,
     MAX_STABLE_KEY_LENGTH,
     characterize_errors,
@@ -56,7 +56,7 @@ class CharacterizationRaceBoundTests(unittest.TestCase):
 
 class CharacterizationEntryValidationTests(unittest.TestCase):
     @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
-    def test_valid_adult_values_pass(self):
+    def test_valid_age_values_pass(self):
         entry = _entry(
             display_name="莉絲·晨星",
             age=68,
@@ -139,8 +139,18 @@ class CharacterizationEntryValidationTests(unittest.TestCase):
         self.assertTrue(characterize_errors(_entry(age=25, apparent_age=30.5), lifespan_upper_bound=80))
 
     @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
-    def test_underage_value_rejects(self):
-        self.assertTrue(characterize_errors(_entry(age=17, apparent_age=17), lifespan_upper_bound=80))
+    def test_age_floor_boundary_passes_zero_and_rejects_negative(self):
+        self.assertEqual(AGE_FLOOR, 0)
+        self.assertEqual(
+            characterize_errors(_entry(age=0, apparent_age=0), lifespan_upper_bound=80),
+            [],
+        )
+        self.assertTrue(
+            characterize_errors(_entry(age=-1, apparent_age=0), lifespan_upper_bound=80)
+        )
+        self.assertTrue(
+            characterize_errors(_entry(age=0, apparent_age=-1), lifespan_upper_bound=80)
+        )
 
     @covers_requirement("blueprint-portrait-policy::quest-blueprint-npc-req-entries-may-declare-portrait-policy-and-characterization")
     def test_race_band_overflow_rejects(self):
@@ -315,12 +325,6 @@ class CharacterizationDuplicateKeyTests(unittest.TestCase):
             _entry(portrait={"stable_key": "only_one"}),
         ]
         self.assertEqual(duplicate_stable_key_errors(entries), [])
-
-
-class CharacterizationAdultFloorConstantTests(unittest.TestCase):
-    @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")
-    def test_adult_floor_is_the_named_constant(self):
-        self.assertEqual(ADULT_MINIMUM, 18)
 
 
 if __name__ == "__main__":

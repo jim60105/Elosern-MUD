@@ -27,13 +27,17 @@ class SchemaTests(TestCase):
             list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
         )
 
-    @covers_requirement("import-schema::stats-values-are-documented-as-base-pre-skill-multiplier-values", "import-schema::the-age-gate-is-documented-in-the-schema-s-own-description-text")
-    def test_schema_documents_hard_gates_and_base_values(self):
+    @covers_requirement("import-schema::stats-values-are-documented-as-base-pre-skill-multiplier-values", "import-schema::the-age-ranges-are-documented-in-the-schema-s-own-description-text")
+    def test_schema_documents_age_ranges_and_base_values(self):
         properties = CHARACTER_SCHEMA_V1["properties"]
         for key in ("age", "apparent_age"):
-            text = properties[key]["description"].lower()
-            self.assertIn("hard gate", text)
-            self.assertIn("never a warning", text)
+            schema = properties[key]
+            self.assertEqual(schema["minimum"], 0)
+            self.assertEqual(schema["maximum"], 10000)
+            description = schema["description"]
+            self.assertIn("0", description)
+            self.assertIn("10000", description)
+            self.assertIn("range", description.lower())
         stats = properties["stats"]["description"]
         for phrase in ("BASE", "88*1000", "88000"):
             self.assertIn(phrase, stats)

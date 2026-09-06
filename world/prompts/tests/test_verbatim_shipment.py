@@ -59,7 +59,7 @@ _NPC_DIALOGUE_TEMPLATE = (
     "你沒有把握能確實執行的行為，不要寫進 intent。"
 )
 _NPC_THINKING = "（{name} 沉思片刻……）"
-_ART_CHARACTER_TEMPLATE = "A {race} adult named {name} ({age}) in the {style}."
+_ART_CHARACTER_TEMPLATE = "A {race} character named {name} ({age}) in the {style}."
 _SCENE_BUILDER_SYSTEM = (
     "你是《伊洛瑟恩大陸》的場景氛圍描述者。場景句子：{scene_sentence}。"
     "任務脈絡：{quest_context}。房間名稱：{room_name}。地區：{region}。"
@@ -145,7 +145,7 @@ class VerbatimShipmentTests(unittest.TestCase):
             _NPC_THINKING.format(name="甲"),
         )
 
-    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-adult-safe-and-exclude-non-physical-truth")
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_art_character_description_is_shipped_verbatim(self):
         style = render_prompt("art.style")
         self.assertEqual(
@@ -168,7 +168,7 @@ class VerbatimShipmentTests(unittest.TestCase):
                 age="24",
                 style=style,
             ),
-            "A 貓人族 adult named 艾琳 (24) in the approved visual style.",
+            "A 貓人族 character named 艾琳 (24) in the approved visual style.",
         )
 
     @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
@@ -348,7 +348,7 @@ class LibrarySourceTests(unittest.TestCase):
             ),
         )
 
-    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-adult-safe-and-exclude-non-physical-truth")
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_art_descriptions_render_from_the_library_solely(self):
         from unittest.mock import Mock
 
@@ -373,7 +373,7 @@ class LibrarySourceTests(unittest.TestCase):
         character.key = "艾琳"
         self.assertEqual(
             character_description(character, 24),
-            "A 貓人族 adult named 艾琳 (24) in the approved visual style.",
+            "A 貓人族 character named 艾琳 (24) in the approved visual style.",
         )
 
         monster = monster_subject_for("low")

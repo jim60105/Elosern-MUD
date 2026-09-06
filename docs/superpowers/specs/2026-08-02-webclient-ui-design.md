@@ -442,8 +442,8 @@ Pending characters receive a creation mode rather than the normal exploration do
 and allocation choices are finite controls. Name and other free-form values are text fields. The UI
 invokes the same creation state service and all-or-nothing activation flow as the command wizard.
 
-The adult invariant remains non-negotiable. Both `age < 18` and `apparent_age < 18` are rejected by the
-server even if client validation is disabled or bypassed.
+The age-range bound is non-negotiable. Both `age` and `apparent_age` outside `0..10000` are rejected by
+the server even if client validation is disabled or bypassed.
 
 ---
 
@@ -508,11 +508,11 @@ The art subsystem uses namespaced keys:
 Whether an NPC is named is explicit creation/import metadata. Display-name shape or uniqueness is not a
 policy. A subject lacking validated identity and description data is not enqueued.
 
-### 9.2 Adult image invariant
+### 9.2 Portrait image invariant
 
-Portrait prompt data may be built only from a character record that has passed both adult gates. Prompt
-construction never invents a younger apparent age. A missing or invalid age record produces no portrait
-job and leaves the placeholder in the UI.
+Portrait prompt data may be built only from a character record whose canonical age attributes have
+passed validation. Prompt construction never invents a younger apparent age. A missing or invalid age
+record produces no portrait job and leaves the placeholder in the UI.
 
 ### 9.3 Queue and worker
 
@@ -649,8 +649,8 @@ those steps; browser tests do not silently become local-only checks.
 | Combat | Complete basic attack, skill selection, SINGLE/SELF/NONE/AREA targeting, flee, disabled reason, rejection, and reconnect without typing a command |
 | Map/Exploration | Verify vision, visited knowledge, legal adjacent movement, time charging, and layer-specific rendering for grid, wilderness, instance, and interior rooms |
 | Services | Complete guild, quest, shop, and inventory success/rejection/stale flows independently |
-| Art | Verify done, pending, failed, offline, client-local catalog focus switching, URL restriction, and adult prompt gate |
-| Creation | Complete preset and custom forms; permanently reject either age below 18 |
+| Art | Verify done, pending, failed, offline, client-local catalog focus switching, URL restriction, and subject-age gate |
+| Creation | Complete preset and custom forms; permanently reject either age outside `0..10000` |
 | Shell | Run one short smoke journey through mode changes and shared panel updates |
 
 No required test calls a live LLM, Stable Diffusion, or remote service. Python remains subject to the

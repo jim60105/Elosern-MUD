@@ -9,7 +9,7 @@ values, a three-field persona draft, and five optional transient-fill fields
 ``affinity_elements``) that the consumers may offer as editable defaults. An
 out-of-bounds transient-fill value is normalised in place on the validated
 proposal (clamped, truncated, or trimmed to the race bound) instead of
-discarding the reply; the deterministic adult gate at activation stays the
+discarding the reply; the deterministic age-range check at activation stays the
 final authority on every submission. When the layer is disabled, the transport
 fails, the prompt key is unavailable, or the validation retries are exhausted,
 ``generate_character_proposal`` resolves to ``None`` -- the single public
@@ -75,7 +75,7 @@ MAX_SUGGESTED_SKILLS = 8
 # ``character_creation._AFFINITY_INPUT_BOUNDS``) as local constants because the
 # transport-boundary contract forbids importing ``world.rules`` here; the
 # precedent is ``ALLOCATABLE_AXES`` above and a parity test locks every value.
-ADULT_AGE_MINIMUM = 18
+AGE_MINIMUM = 0
 AGE_MAXIMUM_BOUND = 10000
 MAX_DISPLAY_NAME_CODE_POINTS = 64
 _AFFINITY_INPUT_BOUNDS: dict[str, int] = {"human": 2, "beastfolk": 1, "elf": 0}
@@ -333,15 +333,14 @@ def _cap_string(value: str) -> str:
 
 
 def _clamp_age(value: int) -> int:
-    """Clamp one proposed age into the generation-policy band (design D1).
+    """Clamp one proposed age into the reasonable generation band (design D1).
 
-    The lower bound mirrors the deterministic adult gate; the upper bound
-    mirrors the wizard's age ceiling. Normalisation never appends an error and
-    never consumes a retry — the activation preflight remains the final
-    authority.
+    The bounds mirror the creation wizard's advertised age range (0..10000).
+    Normalisation never appends an error and never consumes a retry — the
+    activation preflight remains the final authority.
     """
-    if value < ADULT_AGE_MINIMUM:
-        return ADULT_AGE_MINIMUM
+    if value < AGE_MINIMUM:
+        return AGE_MINIMUM
     if value > AGE_MAXIMUM_BOUND:
         return AGE_MAXIMUM_BOUND
     return value

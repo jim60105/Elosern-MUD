@@ -65,7 +65,7 @@ class ImportPortraitSeamTests(EvenniaTestCase):
     @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     def test_rejected_import_batch_emits_no_job(self):
         bad = example_record()
-        bad["age"] = 17
+        bad["age"] = 10001
         paths = [self.write("bad.json", bad)]
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             with self.assertRaises(ImportRejected):

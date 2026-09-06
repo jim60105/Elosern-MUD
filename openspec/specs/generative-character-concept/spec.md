@@ -17,7 +17,7 @@ proposal summary and interactively collects the display name, actual age, and ap
 the existing prompts with the proposal's normalised values as prefilled defaults — an empty reply
 accepts the default, a non-empty reply overrides it, and an absent proposal field leaves the
 mandatory prompt, whose empty name reply re-prompts until answered or cancelled — checked by the
-deterministic adult gate, then activates through the
+deterministic age-range check, then activates through the
 ordinary `CharacterCreationRequest` preflight and all-or-nothing activation path carrying the
 proposal's background and affinity elements alongside its other values. When the LLM is offline,
 retry-exhausted, or the layer degrades, the command SHALL return the stable Traditional Chinese
@@ -32,8 +32,9 @@ deterministic wizard remains fully usable.
   name and both ages, and activates through the ordinary preflight and all-or-nothing activation
   with the proposal's values
 
-#### Scenario: The concept path cannot bypass the adult gate
-- **WHEN** a player completes a concept-guided flow whose entered age or apparent age is below 18
+#### Scenario: The concept path cannot bypass the age-range check
+- **WHEN** a player completes a concept-guided flow whose entered age or apparent age is outside the
+  0..10000 range
 - **THEN** activation is rejected by the deterministic preflight and the character remains pending
 
 #### Scenario: Offline generation degrades without touching state
@@ -62,13 +63,13 @@ incompatible subrace — SHALL be treated as a whole-proposal validation failure
 be retried with the error appended and, on exhaustion, degrade to the stable unavailable message;
 no partial proposal (for example race accepted but persona discarded) SHALL ever proceed. An
 in-range-typed but out-of-bounds transient-fill value SHALL instead be normalised in place on the
-validated proposal without any retry: an `age` or `apparent_age` below 18 SHALL be overwritten to
-18 and above 10000 to 10000; an over-long `display_name` SHALL be truncated to the 64-code-point
+validated proposal without any retry: a negative `age` or `apparent_age` SHALL be overwritten to
+0 and above 10000 to 10000; an over-long `display_name` SHALL be truncated to the 64-code-point
 display-name bound and an over-long `background` to the 600-character persona-field bound (each
 collapsing to absent when it trims to empty); `affinity_elements` SHALL drop unknown and duplicate
 keys in order and truncate to the chosen race's input bound, and an elf proposal's affinity set
 SHALL be forced empty. Normalisation SHALL never append an error to the LLM, consume a retry, or
-discard the proposal, and the deterministic adult gate SHALL remain the final authority on every
+discard the proposal, and the deterministic age-range check SHALL remain the final authority on every
 submission.
 
 #### Scenario: A valid proposal passes and guides the flow
@@ -95,9 +96,9 @@ submission.
 - **THEN** the whole proposal is rejected and retried with the named error; the race and
   allocations are never accepted independently of the persona
 
-#### Scenario: An underage proposal age is clamped to the adult floor
-- **WHEN** the proposal carries `age` or `apparent_age` below 18
-- **THEN** the validated proposal carries that field overwritten to 18, no retry was consumed, no
+#### Scenario: An out-of-range proposal age is clamped to the range floor
+- **WHEN** the proposal carries `age` or `apparent_age` below 0
+- **THEN** the validated proposal carries that field overwritten to 0, no retry was consumed, no
   error was appended to the LLM, and the rest of the proposal is delivered intact
 
 #### Scenario: An over-bound age and text are clamped and truncated, not discarded
@@ -153,8 +154,8 @@ The `character_creation.system` prompt SHALL render a blueprint contract that na
 contract fields including `display_name`, `age`, `apparent_age`, `background`, and
 `affinity_elements`, SHALL instruct that `affinity_elements` must not exceed the chosen race's
 listed bound and must be empty for an elf, and SHALL bound `background` to 600 characters. The
-authored prompt template (before player-concept interpolation) SHALL NOT state any adult-age
-constraint or otherwise instruct the model about the 18-year floor: adult enforcement is
+authored prompt template (before player-concept interpolation) SHALL NOT state any age-range
+constraint or otherwise instruct the model about the 0..10000 bounds: age enforcement is
 server-side clamping, and the template carries no age-related instruction beyond naming the field.
 The registry-derived race catalog SHALL name each race's affinity input bound and the registered
 element keys so the model can respect them without inventing values, and SHALL stay within its
@@ -166,9 +167,9 @@ existing bounded length with the established truncation marker.
   `affinity_elements` alongside the existing five keys, and contains no sentence forbidding an age
   field
 
-#### Scenario: The prompt template states no adult-age rule
+#### Scenario: The prompt template states no age rule
 - **WHEN** the authored prompt template (before player-concept interpolation) is inspected
-- **THEN** it names no age minimum, no adult wording, and no instruction to leave the age to the
+- **THEN** it names no age bound, no range wording, and no instruction to leave the age to the
   player, and retains no blanket prohibition that would contradict the `background` or age fields
   it now requests
 

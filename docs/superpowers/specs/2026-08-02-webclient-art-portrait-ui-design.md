@@ -63,7 +63,7 @@ forward-declared fake hook.
 - Add explicit portrait subjects with stable identity and reuse policy.
 - Give players and explicitly named NPCs unique portrait keys.
 - Reuse one portrait for generic monsters of one bestiary archetype.
-- Enforce the adult data invariant before any character portrait job is created.
+- Validate the canonical age attributes before any character portrait job is created.
 - Use one serialized queue, external worker command, idempotent store, and staff retry path.
 - Push art status/URL changes through the foundation OOB protocol.
 - Provide truthful placeholders and accessible alternative text while offline or pending.
@@ -116,19 +116,18 @@ Scene descriptions remain the one-sentence scene-archetype descriptions approved
 
 ---
 
-## 4. Adult Portrait Gate
+## 4. Canonical Age Validation
 
-A character portrait subject is eligible only when canonical validated data establishes:
+A character portrait subject is eligible only when canonical data establishes that `age` and
+`apparent_age` are present integers (any value in `0..10000`).
 
-- `age >= 18`; and
-- `apparent_age >= 18`.
+Both values are checked immediately before enqueue in addition to import/creation validation.
+Missing or malformed values reject the job with a named diagnostic and produce no queue record or
+prompt. Prompt construction renders the canonical age verbatim and never rewrites it.
 
-Both values are checked immediately before enqueue in addition to import/creation validation. Missing,
-malformed, or underage values reject the job with a named diagnostic and produce no queue record or
-prompt. Prompt construction cannot replace an adult apparent age with younger language.
-
-The permanent regression suite includes underage records for each field and asserts that neither reaches
-the worker fixture. The browser receives only an unavailable placeholder and no rejected prompt content.
+The permanent regression suite includes missing and malformed records for each field and asserts
+that neither reaches the worker fixture. The browser receives only an unavailable placeholder and
+no rejected prompt content.
 
 ---
 
@@ -157,9 +156,9 @@ The deterministic enqueue seams are:
 > enqueue on successful arrival as stated.
 
 Queue failure never rolls back character creation, import, NPC spawn, or movement. It logs a bounded
-diagnostic and leaves the asset missing for the next idempotent lifecycle ensure. Underage or invalid
-portrait data is a permanent eligibility rejection, not a transient queue failure. Generic bestiary
-subjects use immutable adult-safe archetype descriptions and do not derive age from a spawned instance.
+diagnostic and leaves the asset missing for the next idempotent lifecycle ensure. Missing or
+malformed portrait data is a permanent eligibility rejection, not a transient queue failure. Generic
+bestiary subjects use immutable archetype descriptions and do not derive age from a spawned instance.
 
 ---
 
@@ -192,7 +191,7 @@ The prior scene-only conceptual input is replaced with:
 {
   "kind": "portrait",
   "key": "portrait:monster:gray_wolf",
-  "description": "An adult gray-wolf monster archetype in the approved visual style.",
+  "description": "A gray-wolf monster archetype in the approved visual style.",
   "out_path": "server/.art/portrait/monster/gray_wolf.png",
   "aspect_ratio": "3:4"
 }
@@ -313,12 +312,12 @@ Status output never includes sensitive persona text or unrestricted local paths.
 - Output path confinement and mismatched worker output rejection.
 - Source-description hash behavior.
 
-### Adult invariant tests
+### Canonical age validation tests
 
-- `age=17` rejects before queue/worker.
-- `apparent_age=17` rejects before queue/worker.
+- `age` missing rejects before queue/worker.
+- `apparent_age` non-integer rejects before queue/worker.
 - Missing/malformed values reject.
-- Valid adult fixture reaches a fake worker with adult description.
+- Valid fixture reaches a fake worker with the plain-age description.
 - Browser payload never contains a rejected prompt.
 
 ### Presenter/panel tests

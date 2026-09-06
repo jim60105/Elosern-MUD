@@ -47,7 +47,7 @@ registry key or null), `allocations` (one integer per `ALLOCATABLE_AXES` axis â€
 set including `magic_power`), and `persona` (an object with exactly `personality`, `life_story`,
 and `habit`, each 1..600 non-empty code points), plus five optional transient-fill keys that are
 present only when the validated generative proposal carried a value: `display_name` (1..64 code
-points), `age` and `apparent_age` (integers in 18..10000), `background` (1..600 code points), and
+points), `age` and `apparent_age` (integers in 0..10000), `background` (1..600 code points), and
 `affinity_elements` (a list of at most 8 distinct registered element keys). An absent optional key
 SHALL NOT be encoded as null, and every value SHALL be deep-copied from the session snapshot with
 no live object reference. A worst-case proposal (three 600-code-point persona fields, a maximum

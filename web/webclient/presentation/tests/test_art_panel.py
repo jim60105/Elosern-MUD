@@ -328,7 +328,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(payload["scene"]["placeholder"]["kind"], "unavailable")
         self.assertIsNone(payload["scene"]["url"])
 
-    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-adult-gated-and-bounded")
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     def test_combat_catalog_mirrors_context_actions_participants(self):
         monster = _monster()
         monster.location = self.room
@@ -350,7 +350,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         monster_entry = payload["portrait_catalog"][str(monster.pk)]
         self.assertEqual(monster_entry["subject_key"], "portrait:monster:low")
 
-    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-adult-gated-and-bounded")
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     def test_exploration_catalog_contains_hosts_and_named_policy(self):
         host = create_object(NPC, key="innkeeper", location=self.room)
         host.components.add(
@@ -373,19 +373,22 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(catalog[str(host.pk)]["context"]["role"], "對話對象")
         self.assertEqual(catalog[str(named.pk)]["context"]["role"], "人物")
 
-    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-adult-gated-and-bounded")
-    def test_underage_character_renders_placeholder_without_url(self):
-        underage = _player(key="young guest")
-        underage.location = self.room
-        underage.db.portrait_policy = {"mode": "named", "stable_key": "young-guest"}
-        underage.age = 17
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
+    def test_ineligible_age_character_renders_placeholder_without_url(self):
+        # age-range-0-10000 removed the adult gate: portrait eligibility is
+        # subject-data quality. A character whose canonical age is missing
+        # resolves only to the unavailable placeholder, and the diagnostic
+        # naming the field never reaches the payload.
+        incomplete = _player(key="ageless guest")
+        incomplete.location = self.room
+        incomplete.db.portrait_policy = {"mode": "named", "stable_key": "ageless-guest"}
+        incomplete.db.age = None
         payload = self._render()
-        entry = payload["portrait_catalog"][str(underage.pk)]
+        entry = payload["portrait_catalog"][str(incomplete.pk)]
         self.assertEqual(entry["placeholder"]["kind"], "unavailable")
         self.assertIsNone(entry["subject_key"])
         self.assertIsNone(entry["url"])
-        self.assertNotIn("underage", repr(payload))
-        self.assertNotIn("17", repr(payload))
+        self.assertNotIn("portrait rejected", repr(payload))
 
     def test_creation_mode_renders_unavailable_form(self):
         self.player.db.creation_pending = True

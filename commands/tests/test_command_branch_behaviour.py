@@ -440,7 +440,7 @@ class CharacterCreationCommandBranchTests(TestCase):
             _integer(" cancel ", "age")
         with self.assertRaisesRegex(CharacterCreationError, "age 必須是整數"):
             _integer("old", "age")
-        self.assertEqual(_integer(" 18 ", "age"), 18)
+        self.assertEqual(_integer(" 20 ", "age"), 20)
 
     def test_activate_reports_domain_error(self):
         command = _command(CmdCharacter)
@@ -466,8 +466,8 @@ class CharacterCreationCommandBranchTests(TestCase):
     def test_wizard_cancellation_at_name_race_subrace_and_confirmation(self):
         responses = (
             ["cancel"],
-            ["name", "18", "18", "cancel"],
-            ["name", "18", "18", "human", "cancel"],
+            ["name", "20", "20", "cancel"],
+            ["name", "20", "20", "human", "cancel"],
         )
         for replies in responses:
             command = _command(CmdCharacter, "create")
@@ -496,8 +496,8 @@ class CharacterCreationCommandBranchTests(TestCase):
             generator = command.func()
             next(generator)
             generator.send("name")
-            generator.send("18")
-            generator.send("18")
+            generator.send("20")
+            generator.send("20")
             generator.send("human")
             generator.send("human_commoner")
             generator.send("")

@@ -10,7 +10,6 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
-from world.art.adult import ADULT_MINIMUM, PortraitRejected
 from world.art.queue import ensure, record_key, source_hash
 from world.art.service import (
     art_sync_all,
@@ -82,10 +81,10 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertIn(key, self._records())
 
     @covers_requirement("art-asset-lifecycle::startup-recovery-rescans-explicit-unique-portrait-policies")
-    @covers_requirement("adult-portrait-gate::the-gate-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker")
+    @covers_requirement("art-asset-lifecycle::the-age-check-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker")
     def test_recovery_skips_an_ineligible_subject_deterministically(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
-        self.player.age = ADULT_MINIMUM - 1
+        self.player.attributes.remove("age")
         art_sync_all()
         key = f"art:portrait:character:{self.player.pk}"
         self.assertNotIn(key, self._records())
@@ -103,17 +102,18 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertEqual(records.count(), 1)
         self.assertEqual(records.first().db.status, ArtAssetStatus.PENDING)
 
-    @covers_requirement("adult-portrait-gate::every-character-portrait-enqueue-re-checks-both-adult-age-fields-immediately-before-enqueue")
+    @covers_requirement("art-asset-lifecycle::portrait-character-enqueue-validates-canonical-age-attributes-immediately-before-enqueue")
     def test_rejected_portrait_produces_no_record_and_no_worker_call(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
-        self.player.age = ADULT_MINIMUM - 1
+        self.player.attributes.remove("age")
         with (
             self.captureOnCommitCallbacks(execute=True) as callbacks,
             patch("world.art.worker._run_and_settle_batch") as worker,
         ):
             schedule_portrait_ensure(self.player)
-        # The gate rejects at schedule time: no on_commit callback is even
-        # registered, and no record or worker call is produced.
+        # The missing canonical age rejects at schedule time: no on_commit
+        # callback is even registered, and no record or worker call is
+        # produced.
         self.assertEqual(len(callbacks), 0)
         worker.assert_not_called()
         key = f"art:portrait:character:{self.player.pk}"

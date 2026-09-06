@@ -3,12 +3,12 @@
 ## Purpose
 TBD - created by archiving change import-contract. Update Purpose after archive.
 ## Requirements
-### Requirement: One valid, adult-compliant reference character card exists and stays valid
+### Requirement: One valid reference character card exists and stays valid
 `world/imports/examples/example_character.json` SHALL be a single character record with
 `"record_type": "character"`, satisfying `CHARACTER_SCHEMA_V1` and every semantic validation rule
-with zero rejections, with `age` and `apparent_age` both at least 18. A permanent test SHALL load
-this file and assert it produces zero rejections and zero warnings against the current schema and
-lore registries.
+with zero rejections, with `age` and `apparent_age` inside the 0-10000 reasonable range. A permanent
+test SHALL load this file and assert it produces zero rejections and zero warnings against the
+current schema and lore registries.
 
 #### Scenario: The reference example sets the required record_type discriminator
 - **WHEN** `examples/example_character.json`'s `record_type` field is inspected
@@ -25,10 +25,10 @@ lore registries.
   against an available skill registry or is expected to warn only during the documented pre-change-5
   window
 
-#### Scenario: The reference example is an adult, not a boundary-value probe
+#### Scenario: The reference example carries plain in-range ages
 - **WHEN** `examples/example_character.json`'s `age` and `apparent_age` are inspected
-- **THEN** both are comfortably above 18 (not exactly 18), so the reference card reads as an
-  unambiguous adult character rather than an edge-case demonstration
+- **THEN** both are integers inside the 0-10000 reasonable range (the authored card carries 22),
+  so the reference reads as an ordinary character record rather than an edge-case demonstration
 
 ### Requirement: The reference example exercises every major schema branch
 `examples/example_character.json` SHALL set a `subrace` (exercising the race/subrace cross-check),

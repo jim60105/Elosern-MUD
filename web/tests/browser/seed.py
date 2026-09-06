@@ -5,7 +5,7 @@ Run as a one-off process against a freshly migrated browser-test database:
     ELOSERN_BROWSER_* uv run --locked python -m web.tests.browser.seed
 
 The harness runs ``evennia migrate`` first. This process then creates Account
-#1 (the superuser Evennia's launcher requires), an activated adult
+#1 (the superuser Evennia's launcher requires), an activated
 PlayerCharacter owned by that account, a start room, and places the character
 in it. The world bootstrap (lore sync, maps, clock) is left to the
 managed server's ``at_server_start`` hook. Everything is deterministic: no
@@ -186,7 +186,7 @@ def _art_fixture(character, room) -> None:
     }
     # A present named-policy NPC and a living monster so combat catalog tests
     # have both a dialogue host and a generic monster in the room.
-    from typeclasses.npcs import NPC, ensure_npc_adult_identity
+    from typeclasses.npcs import NPC, ensure_npc_canonical_age
 
     host = create_object(NPC, key="酒館老闆", location=art_room)
     from typeclasses.components import ScriptedDialogue
@@ -201,10 +201,10 @@ def _art_fixture(character, room) -> None:
         "mode": "named",
         "stable_key": "browser-host",
     }
-    # The host must pass the portrait adult gate (age/apparent_age >= 18),
-    # or the presenter resolves its catalog entry to the unavailable
-    # placeholder (status/url both None) even when its art record is done.
-    ensure_npc_adult_identity(host)
+    # The host must carry canonical age attributes, or the presenter resolves
+    # its catalog entry to the unavailable placeholder (status/url both None)
+    # even when its art record is done.
+    ensure_npc_canonical_age(host)
     host.save()
     monster = create_object(Monster, key="酒館灰狼", location=art_room, nohome=True)
     monster.threat_tier = "low"
@@ -648,8 +648,8 @@ def main() -> None:
 
     if os.environ.get("ELOSERN_BROWSER_CREATION") == "1":
         # A pending-creation account (webclient-character-creation-ui): the
-        # auto-created adult shell is creation-pending with an empty trait set
-        # and no activation, exactly as a freshly registered account sees it.
+        # auto-created shell is creation-pending with an empty trait set and no
+        # activation, exactly as a freshly registered account sees it.
         # Optionally a validated custom draft is saved so browser journeys can
         # resume at the custom_filled stage. The South Gate and world clock are
         # created by the managed server's own at_server_start bootstrap.

@@ -169,7 +169,7 @@
         "web.tests.browser.test_browser_local_map.LayoutVariantsBrowserTest"
       ],
       "files_b": [
-        "web.tests.browser.test_browser_creation.CustomCreationJourneys.test_underage_apparent_age_rejected_independently",
+        "web.tests.browser.test_browser_creation.CustomCreationJourneys.test_out_of_range_apparent_age_rejected_independently",
         "web.tests.browser.test_browser_shell.ShellAcceptanceTest.test_header_shows_location_time_and_connection_dot",
         "web.tests.browser.test_browser_shell.ShellAcceptanceTest.test_keyboard_field_focus_send_cancel_and_focus_restoration",
         "web.tests.browser.test_browser_shell.ShellAcceptanceTest.test_keydown_noise_is_gone_during_keyboard_navigation",
@@ -334,7 +334,7 @@
       "files_b": [
         "web.tests.browser.test_browser_creation.CustomCreationJourneys.test_custom_form_keyboard_journey_to_activation",
         "web.tests.browser.test_browser_creation.CustomCreationJourneys.test_rejected_custom_save_stays_on_the_form_without_confirmation",
-        "web.tests.browser.test_browser_creation.CustomCreationJourneys.test_underage_actual_age_rejected_despite_disabled_client_validation",
+        "web.tests.browser.test_browser_creation.CustomCreationJourneys.test_out_of_range_actual_age_rejected_despite_disabled_client_validation",
         "web.tests.browser.test_browser_input_narrative.InputEchoExplorationTest"
       ]
     },

@@ -13,7 +13,7 @@
 | `key` | 非空白的穩定物件識別。 |
 | `display_name` | 非空白顯示名稱。此版本要求它存在；目前載入器仍以 `key` 建立 Evennia 物件。 |
 | `title` | NPC 稱號（職稱／異名）：單行純文字；驗證與落庫前會先去除首尾空白，**限制套用在去除首尾空白後的正規形上**：1–32 個碼點、不得含任何空白（含全形空格 U+3000）、控制字元或 `\|`。完整規則由 `world.rules.npc_identity.validate_npc_title` 唯一執行。**只對 NPC 匯入生效**；以 `PlayerCharacter` 為目標時此欄為惰性，不會被持久化。 |
-| `age`、`apparent_age` | 皆為整數且至少 `18`。 |
+| `age`、`apparent_age` | 皆為 `0` 至 `10000` 的整數。 |
 | `race`、`subrace` | 必須分別存在於種族與亞種登錄表，亞種須屬於指定種族。 |
 | `sex` | 必須是 `female`、`male` 或 `other` 其中之一。 |
 | `stats` | 基礎數值。數值不得預先乘上技能倍率。 |
@@ -51,7 +51,7 @@ NPC 在遊戲中的顯示姓名來自 `key`（`display_name` 目前仍不被載�
     "virgin": false,
     "sensitivity": {"general": "普通"}
   },
-  "persona": {"identity": "負責巡邏城郊的成年斥候。"}
+  "persona": {"identity": "負責巡邏城郊的斥候。"}
 }
 ```
 
@@ -108,11 +108,12 @@ New accounts receive one inert, account-owned character shell. The player must
 activate that shell before world commands become available. `character` lists
 the two supported modes:
 
-- `character preset <key>` selects a shipped adult character.
-- `character create` prompts for a name, actual age, apparent age, race,
+- `character preset <key>` selects a shipped character.
+- `character create` prompts for a name, actual age (`實際年齡（0 至 10000，可輸入 cancel 取消）：`),
+  apparent age (`外表年齡（0 至 10000，可輸入 cancel 取消）：`), race,
   optional compatible subrace, and six stat allocations.
 
-Both ages must be at least 18. Custom allocations must remain inside the
+Both ages must be integers within `0..10000`. Custom allocations must remain inside the
 selected lore bands and spend the exact displayed budget. Magic level is not a
 player input; activation samples it inside ±10% of the selected race's average.
 After activation, ordinary commands such as `look`, `inventory`, and `rest 5s`

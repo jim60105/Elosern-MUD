@@ -22,8 +22,8 @@ left standing in `Limbo` with no introduction, no guidance, and no first event.
 This spec designs the complete first-session journey. It must remain fully deterministic and
 offline-playable: no LLM and no image-generation service may be required at any point.
 
-Content constraints carry over unchanged: every character is an adult (`age >= 18` and
-`apparent_age >= 18`); player-facing prose is Traditional Chinese; lore terms follow the canonical
+Content constraints carry over unchanged: character ages are integer values in `0..10000`;
+player-facing prose is Traditional Chinese; lore terms follow the canonical
 registry spellings.
 
 ---

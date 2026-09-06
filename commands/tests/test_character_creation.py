@@ -586,10 +586,10 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(self.char1.traits.all(), [])
 
     @covers_requirement("character-creation-ux::the-character-creation-restyle-does-not-change-activation-semantics")
-    def test_restyled_custom_prompts_still_reject_age_17(self):
+    def test_restyled_custom_prompts_still_reject_age_below_zero(self):
         old_key = self.char1.key
         replies = [
-            "新冒險者", "17", "20", "human", "human_commoner",
+            "新冒險者", "-1", "20", "human", "human_commoner",
             "fire", "100", "50", "31", "0", "0", "0", "43", "背景文字", "yes",
         ]
         output = self.call(
@@ -714,9 +714,9 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
         self.assertIn("已建立", output)
 
     @covers_requirement("generative-character-concept::the-character-concept-command-runs-a-guarded-generative-proposal-pipeline")
-    def test_concept_path_cannot_bypass_the_adult_gate(self):
+    def test_concept_path_cannot_bypass_the_age_range_check(self):
         self._propose(_proposal())
-        replies = ["新冒險者", "17", "20"]
+        replies = ["新冒險者", "-1", "20"]
         output = self.call(
             CmdCharacterConcept(),
             "構想 流浪的精靈劍士",
@@ -728,9 +728,9 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
         self.assertIsNone(self.char1.age)
 
     @covers_requirement("generative-character-concept::the-character-concept-command-runs-a-guarded-generative-proposal-pipeline")
-    def test_concept_path_cannot_bypass_the_apparent_adult_gate(self):
+    def test_concept_path_cannot_bypass_the_apparent_age_range_check(self):
         self._propose(_proposal())
-        replies = ["新冒險者", "20", "17"]
+        replies = ["新冒險者", "20", "-1"]
         output = self.call(
             CmdCharacterConcept(),
             "構想 流浪的精靈劍士",
@@ -1150,25 +1150,26 @@ class CharacterConceptPrefillTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
 
     @covers_requirement("generative-character-concept::the-character-concept-command-runs-a-guarded-generative-proposal-pipeline")
     def test_clamped_default_age_is_accepted_by_enter(self):
-        # A proposal age normalised to the adult floor passes the gate when
-        # Enter accepts it (the generative clamp + the deterministic gate).
-        self._propose(_proposal(age=18, apparent_age=18))
+        # A proposal age the generative layer clamped to the range floor (a
+        # raw -5 becomes 0) passes the deterministic range check when Enter
+        # accepts it (the generative clamp + the deterministic preflight).
+        self._propose(_proposal(age=0, apparent_age=0))
         output = self.call(
             CmdCharacterConcept(),
             "構想 流浪的精靈劍士",
             inputs=_stack("自訂者", "", ""),
         )
         self.assertIn("已建立", output)
-        self.assertEqual(self.char1.age, 18)
-        self.assertEqual(self.char1.apparent_age, 18)
+        self.assertEqual(self.char1.age, 0)
+        self.assertEqual(self.char1.apparent_age, 0)
 
     @covers_requirement("generative-character-concept::the-character-concept-command-runs-a-guarded-generative-proposal-pipeline")
-    def test_typed_minor_age_over_the_default_still_hits_the_adult_gate(self):
+    def test_typed_out_of_range_age_over_the_default_still_hits_the_range_check(self):
         self._propose(_proposal(age=20, apparent_age=20))
         output = self.call(
             CmdCharacterConcept(),
             "構想 流浪的精靈劍士",
-            inputs=_stack("自訂者", "17", "20"),
+            inputs=_stack("自訂者", "-1", "20"),
         )
         self.assertIn("角色建立失敗", output)
         self.assertTrue(self.char1.creation_pending)
@@ -1412,11 +1413,11 @@ class CharacterConceptPrefillTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
 
     def test_age_prompts_name_their_proposal_defaults(self):
         self.assertIn(
-            "實際年齡（預設：20，Enter 採納，至少 18",
+            "實際年齡（預設：20，Enter 採納，0 至 10000",
             _age_prompt("實際年齡", 20),
         )
         self.assertIn(
-            "外表年齡（預設：19，Enter 採納，至少 18",
+            "外表年齡（預設：19，Enter 採納，0 至 10000",
             _age_prompt("外表年齡", 19),
         )
         self.assertNotIn(

@@ -24,8 +24,8 @@ requires SHALL be rejected, with the rejection message naming both valid values.
 - **THEN** validation against the corresponding schema's `const` constraint fails
 
 #### Scenario: A record with a missing record_type is rejected before any other check runs
-- **WHEN** a character record — otherwise complete and valid, including `age`/`apparent_age` both
-  18 or above — omits `record_type` entirely
+- **WHEN** a character record — otherwise complete and valid, including in-range `age`/`apparent_age`
+  values — omits `record_type` entirely
 - **THEN** the record is rejected specifically for the missing `record_type`, and this rejection
   does not depend on, or get confused with, any other field's presence or absence
 
@@ -41,40 +41,40 @@ requires SHALL be rejected, with the rejection message naming both valid values.
 - **THEN** the record is rejected, and the rejection message names both `"character"` and
   `"world_entry"` as the only valid values
 
-### Requirement: CHARACTER_SCHEMA_V1 rejects any record where age or apparent_age is below 18
+### Requirement: CHARACTER_SCHEMA_V1 bounds age and apparent_age to the 0-10000 reasonable range
 `world/imports/schema.py` SHALL define `CHARACTER_SCHEMA_V1` as a JSON Schema (draft 2020-12)
-document whose `age` and `apparent_age` properties are each `{"type": "integer", "minimum": 18}`,
-enforced structurally by the schema itself, not only by a semantic-layer function. This constraint
-SHALL NOT be downgradable to a warning by any code path.
+document whose `age` and `apparent_age` properties are each `{"type": "integer", "minimum": 0,
+"maximum": 10000}`, enforced structurally by the schema itself, not only by a semantic-layer
+function. This constraint SHALL NOT be downgradable to a warning by any code path.
 
-#### Scenario: A record with age 17 fails schema validation
-- **WHEN** a character record identical to the valid reference example except `"age": 17` is
+#### Scenario: A record with age -1 fails schema validation
+- **WHEN** a character record identical to the valid reference example except `"age": -1` is
   validated against `CHARACTER_SCHEMA_V1`
 - **THEN** schema validation fails on the `age` property, and this failure is a hard rejection
 
-#### Scenario: A record with apparent_age 17 fails schema validation even if age is 18 or above
-- **WHEN** a character record has `"age": 22` and `"apparent_age": 17`
+#### Scenario: A record with apparent_age 10001 fails schema validation even if age is in range
+- **WHEN** a character record has `"age": 22` and `"apparent_age": 10001`
 - **THEN** schema validation fails on the `apparent_age` property, independently of `age` passing
 
-#### Scenario: A record with both age and apparent_age at exactly 18 passes the age gate
-- **WHEN** a character record has `"age": 18` and `"apparent_age": 18`
+#### Scenario: A record with both age and apparent_age at the range ends passes validation
+- **WHEN** a character record has `"age": 0` and `"apparent_age": 10000`, or both at `0`
 - **THEN** schema validation does not fail on either property
 
-#### Scenario: The age gate cannot be bypassed by omitting the fields
+#### Scenario: The age bounds cannot be bypassed by omitting the fields
 - **WHEN** a character record omits `age` or `apparent_age` entirely
 - **THEN** schema validation fails, since both fields are required properties of
   `CHARACTER_SCHEMA_V1`
 
-### Requirement: The age gate is documented in the schema's own description text
+### Requirement: The age ranges are documented in the schema's own description text
 `CHARACTER_SCHEMA_V1`'s `age` and `apparent_age` property definitions SHALL each carry a
-`description` stating that the minimum is a hard, code-level invariant that is never downgraded to
-a warning, so a reader of `schema.py` alone — without design doc access — understands the
-constraint's severity.
+`description` naming the reasonable `0`-`10000` range and stating that out-of-range values always
+reject, so a reader of `schema.py` alone — without design doc access — understands the constraint.
 
-#### Scenario: Both age-related description strings name the invariant explicitly
+#### Scenario: Both age-related description strings name the range explicitly
 - **WHEN** `CHARACTER_SCHEMA_V1["properties"]["age"]["description"]` and
   `CHARACTER_SCHEMA_V1["properties"]["apparent_age"]["description"]` are inspected
-- **THEN** each contains language stating the check is a hard rejection, never a warning
+- **THEN** each names `0`, `10000`, and the word "range", stating that values outside the range
+  always reject
 
 ### Requirement: stats values are documented as base, pre-skill-multiplier values
 `CHARACTER_SCHEMA_V1`'s `stats` property SHALL carry a `description` stating explicitly that every

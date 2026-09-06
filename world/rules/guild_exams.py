@@ -3,7 +3,7 @@
 ``start_guild_exam`` is the sole examination trigger; ``requested_by`` is audit
 metadata, never authority. It validates registration, exact next rank, the true
 cumulative merit threshold, and absence of active combat/exam, then spawns a
-temporary adult NPC opponent, restores both sides to full HP/MP/SP, and opens a
+temporary NPC opponent, restores both sides to full HP/MP/SP, and opens a
 ``guild_exam`` combat session as one all-or-nothing operation. The exam is a
 simulated lethal battle: combat follows ordinary lethal semantics, and both
 sides are restored to full HP/MP/SP again after settlement, win or lose
@@ -22,7 +22,7 @@ from world.observability import log_info, log_warn
 from world.rules.npc_identity import validate_npc_title
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer
-from typeclasses.npcs import NPC, ensure_npc_adult_identity
+from typeclasses.npcs import NPC, ensure_npc_canonical_age
 from world.rules.guild import parse_guild_registration
 from world.rules.guild_config import get_catalog
 from world.rules.service_gate import REASON_REMOTE, service_available
@@ -266,7 +266,7 @@ def _spawn_opponent(actor: Any, target_rank: str) -> NPC:
         )
         opponent.db.skills = {"active": list(profile.skills), "passive": []}
         opponent.npc_title = validate_npc_title(rank.examiner_title)
-        ensure_npc_adult_identity(opponent)
+        ensure_npc_canonical_age(opponent)
         opponent.location = actor.location
         # Occupancy check inside the same start_guild_exam transaction: no
         # check-then-create window. A later same-rank spawn always sees the

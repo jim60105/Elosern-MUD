@@ -19,7 +19,6 @@ from collections.abc import Mapping
 import unicodedata
 from typing import Any
 
-from world.art.adult import ADULT_MINIMUM
 from world.art.subjects import (
     FORBIDDEN_SUBJECT_KEY_CHARACTERS,
     MAX_SUBJECT_KEY_BYTES,
@@ -51,6 +50,10 @@ MAX_STABLE_KEY_LENGTH = MAX_SUBJECT_KEY_LENGTH
 # and a parity contract pins the two numbers together.
 MAX_PERSONA_FIELD_LENGTH = 600
 PERSONA_PROSE_KEYS = ("personality", "life_story", "habit")
+
+# The lower bound of a reasonable declared age: no age below zero is
+# meaningful, and the upper bound is the declared race's lifespan ceiling.
+AGE_FLOOR = 0
 
 _AGE_FIELDS = ("age", "apparent_age")
 
@@ -86,7 +89,7 @@ def characterize_errors(
       validators in ``world/rules/npc_identity.py``.
     - ``age``/``apparent_age``, when declared, are paired and each satisfies
       ``type(value) is int`` (so booleans, floats, and ``None`` reject) with
-      ``ADULT_MINIMUM <= value <= lifespan_upper_bound``. A key present with a
+      ``AGE_FLOOR <= value <= lifespan_upper_bound``. A key present with a
       ``None`` value is not an absence and rejects.
     - ``portrait``, when declared, is a mapping with exactly one ``stable_key``
       field whose value obeys the shared subject-key contract (bounded
@@ -137,8 +140,8 @@ def characterize_errors(
                 f"{field} must be an integer (booleans and None reject)"
             )
             continue
-        if value < ADULT_MINIMUM:
-            errors.append(f"{field} {value} is below the adult floor {ADULT_MINIMUM}")
+        if value < AGE_FLOOR:
+            errors.append(f"{field} {value} is negative")
         if value > lifespan_upper_bound:
             errors.append(
                 f"{field} {value} exceeds the race lifespan upper bound "

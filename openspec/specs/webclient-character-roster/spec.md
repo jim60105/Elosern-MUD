@@ -68,8 +68,8 @@ presented belongs to the client.
 
 ### Requirement: Roster portraits resolve through the named-portrait subject mechanism
 Each roster row's portrait SHALL be resolved through the same named-portrait resolution the art
-panel's portrait catalog uses: an explicit named `portrait_policy` on the character, the adult
-eligibility gate, and the resolved asset or its placeholder. A row SHALL carry the same portrait
+panel's portrait catalog uses: an explicit named `portrait_policy` on the character, the
+canonical-age eligibility check, and the resolved asset or its placeholder. A row SHALL carry the same portrait
 field vocabulary the art panel's catalog entries carry — the subject key, the asset status, the
 same-origin media URL, the aspect ratio, the alt text, and the placeholder descriptor — so the
 client renders roster portraits through its existing portrait treatment rather than a second

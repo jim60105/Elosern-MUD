@@ -1,4 +1,4 @@
-"""NPC typeclass tests: adult-identity helper and the title identity surface.
+"""NPC typeclass tests: canonical-age helper and the title identity surface.
 
 The title cases (npc-title-identity-core) pin the immutable-by-structure
 attribute, the opt-in ``full_identity`` display flag, and the deliberate
@@ -19,43 +19,43 @@ from commands.localized import ProjectXYZGridCmdSet
 from commands.title import CmdTitle
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
-from typeclasses.npcs import NPC, ensure_npc_adult_identity
+from typeclasses.npcs import NPC, ensure_npc_canonical_age
 from world.rules.npc_identity import validate_npc_title
 
 
-class EnsureNpcAdultIdentityTests(EvenniaTestCase):
+class EnsureNpcCanonicalAgeTests(EvenniaTestCase):
     def _fresh_npc(self):
         return create_object(NPC, key="identity-npc")
 
-    @covers_requirement("npc-adult-identity::procedurally-spawned-npcs-carry-canonical-adult-identity")
-    def test_missing_identity_gets_the_adult_baseline(self):
+    @covers_requirement("npc-canonical-age::procedurally-spawned-npcs-carry-canonical-age-attributes")
+    def test_missing_ages_get_the_default_age(self):
         npc = self._fresh_npc()
         self.assertIsNone(npc.attributes.get("age"))
         self.assertIsNone(npc.attributes.get("apparent_age"))
-        ensure_npc_adult_identity(npc)
+        ensure_npc_canonical_age(npc)
         self.assertEqual(int(npc.attributes.get("age")), 18)
         self.assertEqual(int(npc.attributes.get("apparent_age")), 18)
 
-    @covers_requirement("npc-adult-identity::procedurally-spawned-npcs-carry-canonical-adult-identity")
+    @covers_requirement("npc-canonical-age::procedurally-spawned-npcs-carry-canonical-age-attributes")
     def test_existing_canonical_ages_are_preserved(self):
         npc = self._fresh_npc()
         npc.attributes.add("age", 35)
         npc.attributes.add("apparent_age", 28)
-        ensure_npc_adult_identity(npc)
+        ensure_npc_canonical_age(npc)
         self.assertEqual(int(npc.attributes.get("age")), 35)
         self.assertEqual(int(npc.attributes.get("apparent_age")), 28)
 
-    @covers_requirement("npc-adult-identity::procedurally-spawned-npcs-carry-canonical-adult-identity")
+    @covers_requirement("npc-canonical-age::procedurally-spawned-npcs-carry-canonical-age-attributes")
     def test_partial_identity_fills_only_the_missing_field(self):
         npc = self._fresh_npc()
         npc.attributes.add("age", 35)
-        ensure_npc_adult_identity(npc)
+        ensure_npc_canonical_age(npc)
         self.assertEqual(int(npc.attributes.get("age")), 35)
         self.assertEqual(int(npc.attributes.get("apparent_age")), 18)
 
         reverse = self._fresh_npc()
         reverse.attributes.add("apparent_age", 28)
-        ensure_npc_adult_identity(reverse)
+        ensure_npc_canonical_age(reverse)
         self.assertEqual(int(reverse.attributes.get("apparent_age")), 28)
         self.assertEqual(int(reverse.attributes.get("age")), 18)
 

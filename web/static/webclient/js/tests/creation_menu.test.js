@@ -28,7 +28,7 @@ function validPanel(overrides) {
     Object.assign({}, axes[k])
   );
   const panel = {
-    schema_version: 4,
+    schema_version: 5,
     available: true,
     kind: "creation",
     draft: null,
@@ -54,10 +54,10 @@ function validPanel(overrides) {
     ],
     custom: {
       name: { min_length: 1, max_length: 64 },
-      adult: {
-        age_minimum: 18,
+      age: {
+        age_minimum: 0,
         age_maximum: 10000,
-        apparent_age_minimum: 18,
+        apparent_age_minimum: 0,
         apparent_age_maximum: 10000,
       },
       races: [
@@ -184,7 +184,7 @@ test("the allocation briefing mirrors the server profile exactly", () => {
   assert.equal(CreationMenu.briefingFor(panel, { raceKey: "human", subraceKey: null }), null);
 });
 
-test("advisory validation flags underage, name, and budget errors", () => {
+test("advisory validation flags out-of-range age, name, and budget errors", () => {
   const panel = validPanel();
   const state = CreationMenu.defaultCustomState(panel);
   state.displayName = "新角色";
@@ -194,10 +194,14 @@ test("advisory validation flags underage, name, and budget errors", () => {
   Object.assign(state.allocations, { hp: "50", mp: "50", sp: "50", atk_phys: "10", agility: "10", defense: "11", magic_power: "43" });
   assert.equal(CreationMenu.validateCustom(panel, state).valid, true);
 
-  const underage = Object.assign({}, state, { age: "17" });
-  const result = CreationMenu.validateCustom(panel, underage);
+  const outOfRange = Object.assign({}, state, { age: "-1" });
+  const result = CreationMenu.validateCustom(panel, outOfRange);
   assert.equal(result.valid, false);
   assert.ok(result.errors.age);
+
+  // 17 is a legitimate age under the 0..10000 range.
+  const age17 = Object.assign({}, state, { age: "17" });
+  assert.equal(CreationMenu.validateCustom(panel, age17).valid, true);
 
   const offBudget = Object.assign({}, state);
   offBudget.allocations = Object.assign({}, state.allocations, { hp: "0" });

@@ -7,7 +7,7 @@ record and a named-policy NPC plus a living monster. Journeys assert same-origin
 URL rendering, truthful placeholders, keyboard-only full view, portrait overlay
 with name/role context, client-local focus switching with no packet, no-focus
 no-card, combat results removing the catalog entry in the same update, and the
-adult-gate payload exclusion.
+subject-eligibility payload exclusion.
 """
 
 from __future__ import annotations

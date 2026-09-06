@@ -89,10 +89,10 @@ Generated assets use gitignored `server/.art/`, mounted at `/app/server/.art`. T
 replace the current compose mount at `/app/world/art`, which would hide the future importable
 `world/art/` Python package.
 
-### Adult portrait gate
+### Canonical age check
 
-Both `age >= 18` and `apparent_age >= 18` are checked before portrait enqueue. Missing, malformed, or
-underage records create no job or prompt. This is in addition to creation/import validation.
+Both canonical age attributes are validated (present, integer) before portrait enqueue. Missing or
+malformed records create no job or prompt. This is in addition to creation/import validation.
 
 ### Combat targets and Telnet parity
 

@@ -1,14 +1,14 @@
 <script setup>
 // CreationOverlay (B5 overlays family): the full-viewport character-creation
-// wizard for the committed `creation` v2 panel (web/webclient/presentation/
+// wizard for the committed `creation` v5 panel (web/webclient/presentation/
 // creation.py). Sub-states stay separate and testable (design D-risk): a
-// preset-pick state, the custom form (name/adult/race/subrace/allocation/
-// affinity/background/persona), and the concept state. The v2 panel carries
+// preset-pick state, the custom form (name/age/race/subrace/allocation/
+// affinity/background/persona), and the concept state. The panel carries
 // the player-owned draft `persona` block and the optional transient concept
 // `proposal` slot (retool-concept-transient-fill): the slot pre-fills the
-// custom form revision-gated and never auto-submits. The adult gate (design
-// D1) rejects BOTH the age and apparent_age fields below the descriptor's 18
-// minimum before activation. Every action emits the exact OOB `creation.*`
+// custom form revision-gated and never auto-submits. The age bounds gate
+// (design D1) rejects BOTH the age and apparent_age fields below the
+// descriptor's minimum before activation. Every action emits the exact OOB `creation.*`
 // envelope — no field is invented; the server remains authoritative.
 import { computed, reactive, ref, watch } from "vue";
 
@@ -20,7 +20,7 @@ import { computed, reactive, ref, watch } from "vue";
 const ACTION_RESULT_FALLBACK_MESSAGE = "動作未生效，請重試或返回上層。";
 
 const props = defineProps({
-  // The committed `creation` v2 panel payload (the available form, a
+  // The committed `creation` v5 panel payload (the available form, a
   // server-persisted wizard draft, or the registry-owned unavailable form).
   creation: { type: Object, required: true },
   open: { type: Boolean, default: true },
@@ -91,6 +91,8 @@ const mode = ref("preset");
 
 // Form state (custom + concept sub-states).
 const name = ref("");
+// A plain authored starting age for the fresh form (a suggested value, not a
+// bound): the descriptor's 0..10000 age bounds are the only gate.
 const age = ref(18);
 const apparentAge = ref(18);
 const race = ref("human");
@@ -259,7 +261,7 @@ function applyProposal() {
     // Transient-fill fields (retool-concept-fill-navigation D4): an absent
     // key never encodes as null — it leaves the local value untouched; a
     // present key replaces it. The generation layer already clamped ages
-    // into the adult band and truncated texts, so the local gates stay as
+    // into the 0..10000 range and truncated texts, so the local gates stay as
     // a second line of defence, never re-normalised here.
     if (typeof p.display_name === "string" && p.display_name !== "") {
       name.value = p.display_name;
@@ -372,8 +374,8 @@ function selectPreset(card) {
 }
 
 // -- Custom state -----------------------------------------------------------
-const minimumAge = computed(() => custom.value?.adult?.age_minimum ?? 18);
-const minimumApparentAge = computed(() => custom.value?.adult?.apparent_age_minimum ?? 18);
+const minimumAge = computed(() => custom.value?.age?.age_minimum ?? 0);
+const minimumApparentAge = computed(() => custom.value?.age?.apparent_age_minimum ?? 0);
 
 const races = computed(() => (Array.isArray(custom.value?.races) ? custom.value.races : []));
 
@@ -411,8 +413,8 @@ const budgetBriefing = computed(() => {
   return `點數額度 ${profile.budget}｜${ranges}｜總和須等於額度 ${profile.budget}`;
 });
 
-// The adult gate (design D1): reject when EITHER age field is below the
-// descriptor's minimum (18) — the server stays authoritative.
+// The age bounds gate (design D1): reject when EITHER age field is below the
+// descriptor's minimum — the server stays authoritative.
 const gatePassed = computed(
   () => Number(age.value) >= minimumAge.value && Number(apparentAge.value) >= minimumApparentAge.value,
 );

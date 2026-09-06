@@ -135,7 +135,7 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
         self.assertEqual(
             merchant_host.location, search_object_by_tag(GENERAL_STORE_TAG)[0]
         )
-        # Race baseline + adult identity are the unchanged creation guarantees.
+        # Race baseline + canonical ages are the unchanged creation guarantees.
         for host in (guild_host, merchant_host):
             self.assertEqual(host.race, "human")
             self.assertEqual(int(host.attributes.get("age")), 18)
@@ -151,15 +151,15 @@ class ServiceContentSyncTests(ServiceContentIsolation, EvenniaTestCase):
             search_object_by_tag(GENERAL_STORE_TAG)[0],
         )
 
-    @covers_requirement("sample-city-altoria::guild-service-hosts-carry-adult-identity")
-    def test_service_hosts_carry_adult_identity(self):
+    @covers_requirement("sample-city-altoria::guild-service-hosts-carry-canonical-age")
+    def test_service_hosts_carry_canonical_ages(self):
         sync_service_content()
         for host in (self._guild_host(), self._merchant_host()):
             self.assertEqual(int(host.attributes.get("age")), 18)
             self.assertEqual(int(host.attributes.get("apparent_age")), 18)
 
-    @covers_requirement("sample-city-altoria::guild-service-hosts-carry-adult-identity")
-    def test_resync_repairs_hosts_missing_adult_identity(self):
+    @covers_requirement("sample-city-altoria::guild-service-hosts-carry-canonical-age")
+    def test_resync_repairs_hosts_missing_canonical_ages(self):
         sync_service_content()
         for host in (self._guild_host(), self._merchant_host()):
             host.attributes.remove("age")

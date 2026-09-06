@@ -178,10 +178,10 @@ class CreationPayloadValidationTests(unittest.TestCase):
         valid = validate_creation_custom_payload(custom_payload())
         self.assertEqual(valid["display_name"], "  新角色  ")
         self.assertEqual(valid["age"], 20)
-        # Underage values pass the wire validator and are rejected by the
-        # deterministic adult gate, not the exact-schema layer.
+        # The wire mirrors the single creation authority exactly: the boundary
+        # values of the legitimate 0..10000 range pass the exact-schema layer.
         self.assertEqual(
-            validate_creation_custom_payload(custom_payload(age=17))["age"], 17
+            validate_creation_custom_payload(custom_payload(age=0))["age"], 0
         )
         for bad in (
             {**custom_payload(), "account": 1},
@@ -342,16 +342,19 @@ class CreationAdapterTests(CreationActionBase):
         self.assertFalse(self.character.creation_pending)
         self.assertEqual(self.character.db.affinity_elements, ["light"])
 
-    @covers_requirement("webclient-character-creation-ui::the-adult-gate-is-server-authoritative-for-both-age-fields")
-    def test_underage_fields_rejected_independently(self):
+    @covers_requirement("webclient-character-creation-ui::the-age-range-gate-is-server-authoritative-for-both-age-fields")
+    def test_age_fields_rejected_out_of_range_independently(self):
+        # Direct adapter calls bypass the wire validator, so out-of-range
+        # values reach the deterministic age validator in preflight and the
+        # stable codes come from the creation service.
         for label, overrides in (
-            ("age", {"age": 17}),
-            ("apparent_age", {"apparent_age": 17}),
+            ("age", {"age": -1}),
+            ("apparent_age", {"apparent_age": -1}),
         ):
             with self.subTest(label=label):
                 result = _creation_custom_adapter(self.character, custom_payload(**overrides))
                 self.assertEqual(result["outcome"], "rejected")
-                self.assertEqual(result["code"], f"underage_{label}")
+                self.assertEqual(result["code"], f"{label}_out_of_range")
                 self.assertIsNone(read_draft(self.character))
                 self.assertTrue(self.character.creation_pending)
                 self.assertEqual(self.character.traits.all(), [])
@@ -548,10 +551,10 @@ class CreationFingerprintBindingTests(CreationActionBase):
         # creation-ui "Save rejection followed by activation is refused").
         _creation_custom_adapter(self.character, custom_payload())
         rejected = _creation_custom_adapter(
-            self.character, custom_payload(age=17)
+            self.character, custom_payload(age=-1)
         )
         self.assertEqual(rejected["outcome"], "rejected")
-        self.assertEqual(rejected["code"], "underage_age")
+        self.assertEqual(rejected["code"], "age_out_of_range")
         result = _creation_activate_adapter(self.character, {})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_confirmed_save")
