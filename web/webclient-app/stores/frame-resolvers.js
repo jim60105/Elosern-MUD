@@ -69,6 +69,26 @@ function panelReasonMessage(panel) {
   return null;
 }
 
+// The canonical `current_node` fallback when `local_map` is unavailable.
+// `local_map` (the minimap) legitimately reports unavailable whenever the
+// actor has no recorded map-knowledge yet (map-knowledge spec's
+// "parse_knowledge isolates corrupt records" requirement treats a missing
+// record the same as a corrupt one) — most notably for a freshly created
+// character standing in 虛境 before its very first move. That does NOT mean
+// the exit itself is untraversable: `webclient-exploration-menu`'s move-row
+// `enabled` is server-authored independently of the minimap. `context_actions`
+// carries the same canonical `current_node` embedded in every `explore.move`
+// affordance's own `params` (`web/webclient/presentation/affordances.py`
+// `_move_entries`), with no map-knowledge dependency, so it is read here as
+// the fallback source instead of leaving every exit permanently disabled.
+function currentNodeFromAffordances(contextActions) {
+  const affordances = (contextActions && contextActions.affordances) || [];
+  const moveEntry = affordances.find(
+    (entry) => entry && entry.action_id === "explore.move" && entry.params,
+  );
+  return (moveEntry && moveEntry.params.current_node) || null;
+}
+
 /**
  * Build the frame resolver over the committed presentation state.
  *
@@ -88,8 +108,12 @@ export function createFrameResolver(deps) {
     const state = committed();
     const panels = state.panels || {};
     const panel = panels.exploration || {};
-    const currentNode = (panels.local_map && panels.local_map.current_node) || null;
-    const suggestions = (panels.context_actions && panels.context_actions.suggestions) || null;
+    const contextActions = panels.context_actions || null;
+    const currentNode =
+      (panels.local_map && panels.local_map.current_node) ||
+      currentNodeFromAffordances(contextActions) ||
+      null;
+    const suggestions = (contextActions && contextActions.suggestions) || null;
     return { panel, model: ExplorationMenu.buildMenus(panel, { currentNode, suggestions }) };
   }
 

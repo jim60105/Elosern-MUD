@@ -225,6 +225,39 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
     expect(menu.items[menu.items.length - 1].goBack).toBe(true);
   });
 
+  it("a traversable exit stays activatable when local_map is unavailable (fresh character, no map-knowledge yet)", () => {
+    // Reproduces the 虛境 (starting-room) bug: a brand-new character has no
+    // recorded map-knowledge yet, so `local_map` legitimately reports
+    // unavailable (map-knowledge spec), but the exit itself is still a
+    // perfectly traversable, server-enabled row — the move frame must not
+    // treat "no minimap" as "no movement".
+    const state = committedState();
+    state.panels.local_map = {
+      schema_version: 1,
+      available: false,
+      reason: { code: "map_unavailable", message: "區域地圖目前無法顯示" },
+    };
+    state.panels.context_actions = explorationActions({
+      affordances: [
+        {
+          action_id: "explore.move",
+          label: "西風酒館",
+          params: { exit_ref: "east", current_node: "room:42" },
+          freeform: false,
+          navigation: false,
+          enabled: true,
+          disabled_reason: null,
+        },
+      ],
+    });
+    const resolver = resolverFor(state);
+    const menu = resolver.resolve({ source: "exploration.move" });
+    const enabledRow = menu.items.find((item) => item.key === "exit-east");
+    expect(enabledRow.enabled).toBe(true);
+    expect(enabledRow.actionId).toBe("explore.move");
+    expect(enabledRow.payload).toEqual({ exit_ref: "east", current_node: "room:42" });
+  });
+
   it("look and target frames reproduce labels, sub-lines, actions, payloads, and disabled reasons verbatim", () => {
     const state = committedState();
     const resolver = resolverFor(state);
