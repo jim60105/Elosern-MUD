@@ -40,7 +40,7 @@ GUIDE_PATH = os.path.join(REPO_ROOT, "docs", "development", "settings-and-enviro
 SIDEBAR_PATH = os.path.join(REPO_ROOT, "docs", "_sidebar.md")
 PROMPTS_DOC_PATH = os.path.join(REPO_ROOT, "docs", "gm", "prompts.md")
 
-# The env-backed inventory: 23 same-named variables plus the URL knob whose
+# The env-backed inventory: 27 same-named variables plus the URL knob whose
 # variable name is fixed by the internal-art-worker spec.
 ENV_BACKED: dict[str, str] = {
     "ART_SD_BASE_URL": "SD_WEBUI_BASE_URL",
@@ -70,6 +70,7 @@ ENV_BACKED: dict[str, str] = {
     "ART_SCHEDULER_LIMIT": "ART_SCHEDULER_LIMIT",
     "ELOSERN_VUE_CLIENT": "ELOSERN_VUE_CLIENT",
     "MAX_NR_CHARACTERS": "ELOSERN_MAX_CHARACTERS",
+    "DEFEAT_ADULT_SCENES": "DEFEAT_ADULT_SCENES",
 }
 
 # repr() of each effective default, exactly as test_art_settings.py pins them.

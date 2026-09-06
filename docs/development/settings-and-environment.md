@@ -72,6 +72,12 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | --- | --- | --- | --- | --- |
 | `ELOSERN_VUE_CLIENT` | `ELOSERN_VUE_CLIENT` | 布林 | `True`（Vue SPA） | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；設為假值後重啟＝文件記載的緊急回退到 legacy webclient |
 
+### 敗戰後續內容開關
+
+| 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
+| --- | --- | --- | --- | --- |
+| `DEFEAT_ADULT_SCENES` | `DEFEAT_ADULT_SCENES` | 布林 | `True` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；False 時敗戰結算的違反 hook 永不呼叫，PG 敗戰（HP 1 醒來）即全部結算行為（defeat-aftermath-core D-C4） |
+
 ### 多角色容量
 
 | 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
