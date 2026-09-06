@@ -60,5 +60,7 @@
     followed); the establishing tests and their mapping are documented in the
     `world/quests/tests/test_settlement.py` module docstring. `.github/evennia-shards.json` needs no
     edit: shard 4 owns the `world.quests` package label, and the ownership contract test passes.
+  - Archive follow-up: the withheld annotations for all four `quest-auto-settlement` requirements
+    landed on their establishing tests as part of the archive-and-sync.
 - [x] 5.7 Run the observability lint plus the focused quest, transition, reward, and combat
   settlement test modules in the same batch.

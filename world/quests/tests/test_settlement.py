@@ -12,6 +12,8 @@ requirements are intentionally withheld while the change is an active delta:
 canonical only when the change archives and syncs into ``openspec/specs/``
 (the same convention batches 1-4 followed). The cross-mode tests annotate the
 already-canonical modified ``quest-reward-settlement`` requirement now.
+Establishing tests for all four requirements carry their annotations as of the
+archive-and-sync of this change.
 """
 
 from dataclasses import replace
@@ -119,6 +121,7 @@ class AutoSettlementPlannerTests(QuestRegistryIsolation, EvenniaTest):
     def _completed(self):
         return fulfill_record(self.record, self.definition)
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-is-planned-by-a-pure-function")
     def test_auto_commission_contributes_registered_reward(self):
         plan = plan_auto_settlement(self.actor, [self._completed()])
         (entry,) = plan.entries
@@ -143,16 +146,19 @@ class AutoSettlementPlannerTests(QuestRegistryIsolation, EvenniaTest):
         (entry,) = plan.entries
         self.assertEqual(entry.items, ("healing_potion", "healing_potion"))
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-is-planned-by-a-pure-function")
     def test_counter_commission_contributes_nothing(self):
         counter = register(quest("counter_plan"))
         record = accept(self.actor, counter)
         completed = fulfill_record(record, QUEST_DEFINITION_REGISTRY[counter.key])
         self.assertEqual(plan_auto_settlement(self.actor, [completed]).entries, ())
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-is-planned-by-a-pure-function")
     def test_already_claimed_contributes_nothing(self):
         self.actor.db.guild_reward_claims = [self.record.quest_id]
         self.assertEqual(plan_auto_settlement(self.actor, [self._completed()]).entries, ())
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-is-planned-by-a-pure-function")
     def test_unresolvable_issuance_contributes_nothing_without_raising(self):
         ghost = replace(
             self.record, issuer_key=npc_issuer_key(content_key="ghost_issuer")
@@ -160,6 +166,7 @@ class AutoSettlementPlannerTests(QuestRegistryIsolation, EvenniaTest):
         completed = fulfill_record(ghost, self.definition)
         self.assertEqual(plan_auto_settlement(self.actor, [completed]).entries, ())
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-is-planned-by-a-pure-function")
     def test_planning_writes_nothing(self):
         completed = self._completed()
         before = {
@@ -197,6 +204,7 @@ class ReplacementPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
         )
         return completed
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-commits-atomically-with-the-completing-transition")
     def test_completion_settles_record_wallet_inventory_and_claim_together(self):
         completed = self._complete()
         stored = {r.quest_id: r for r in read_records(self.actor)}
@@ -205,6 +213,7 @@ class ReplacementPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
         self.assertIn("healing_potion", self.actor.db.inventory)
         self.assertEqual(parse_reward_claims(self.actor), [completed.quest_id])
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-commits-atomically-with-the-completing-transition")
     def test_settlement_failure_rolls_back_every_surface(self):
         with patch(
             "world.rules.guild.write_reward_claims",
@@ -218,6 +227,7 @@ class ReplacementPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(list(self.actor.db.inventory or []), [])
         self.assertEqual(parse_reward_claims(self.actor), [])
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-commits-atomically-with-the-completing-transition")
     def test_chain_reward_completes_auto_acquire_quest(self):
         payer_reward = QuestReward(
             copper=10, items=(ItemQuantity("healing_potion", 2),), merit=0
@@ -301,6 +311,7 @@ class ReplacementPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(self.actor.db.inventory.count("healing_potion"), 2)
         self.assertEqual(self.actor.db.inventory.count("rough_iron_ore"), 1)
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-never-grants-merit-and-never-needs-a-host")
     def test_wilderness_completion_needs_no_host(self):
         from world.rules.service_view import resolve_local_service_host
 
@@ -350,6 +361,7 @@ class DeltaPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
         for key, snapshot in snapshots.items():
             restore_attribute_best_effort(actor, key, snapshot)
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-commits-atomically-with-the-completing-transition")
     def test_inventory_driven_completion_settles_inside_caller_transaction(self):
         new_records = self._new_records()
         snapshots = self._caller_snapshots()
@@ -472,6 +484,7 @@ class DefeatActionSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(_wallet(self.actor), 0)
         self.assertEqual(parse_reward_claims(self.actor), [])
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-emits-its-own-boundary-event")
     def test_counter_defeat_completes_without_payout(self):
         record = accept(self.actor, self.definition)
         monster = self._monster("counter goblin")
@@ -541,6 +554,21 @@ class GuildCrossModeSettlementTests(RegistryIsolationMixin, EvenniaTest):
         )
         self.assertEqual(after, before)
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-never-grants-merit-and-never-needs-a-host")
+    def test_auto_settlement_writes_no_merit(self):
+        definition = register(
+            quest("merit_free", stages=(QuestStage(0, defeat(tier="low")),))
+        )
+        record = accept_auto(
+            self.player,
+            definition,
+            reward=QuestReward(copper=10, items=(), merit=0),
+        )
+        completed = self._complete(definition, record)
+        self.assertEqual(_wallet(self.player), 10)
+        self.assertEqual(read_counter_trait(self.player, "guild_merit"), 0)
+        self.assertEqual(parse_reward_claims(self.player), [completed.quest_id])
+
     def test_both_modes_share_one_ledger(self):
         auto_definition = register(
             quest("ledger_auto", stages=(QuestStage(0, defeat(tier="low")),))
@@ -564,6 +592,7 @@ class GuildCrossModeSettlementTests(RegistryIsolationMixin, EvenniaTest):
             [auto_completed.quest_id, counter_completed.quest_id],
         )
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-commits-atomically-with-the-completing-transition")
     def test_counter_reward_completing_auto_acquire_keeps_both_claims(self):
         acquire_definition = register(
             quest(
@@ -607,6 +636,7 @@ class SettlementEventTests(QuestRegistryIsolation, EvenniaTest):
             if call.args and call.args[0] == "quest_auto_settlement"
         ]
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-emits-its-own-boundary-event")
     def test_payout_emits_one_event_per_settled_quest(self):
         actor = self.char1
         first = accept_auto(
@@ -643,6 +673,7 @@ class SettlementEventTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(events[0]["char"], str(actor.pk))
         self.assertEqual(events[0]["copper"], 25)
 
+    @covers_requirement("quest-auto-settlement::automatic-settlement-emits-its-own-boundary-event")
     def test_empty_plan_is_silent(self):
         actor = self.char1
         definition = register(
