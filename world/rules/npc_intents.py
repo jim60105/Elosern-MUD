@@ -392,7 +392,8 @@ def _transfer_items(
     *before* constructing the removal tuple (so a pathological ``qty`` can never
     allocate an unbounded tuple), precomputes both inventory plans, snapshots
     both entities' affected surfaces (inventory, quest log, traits, and the
-    receiver's ACQUIRE pin state), applies both plans inside one outer
+    receiver's ACQUIRE and giver's DELIVER pin state), applies both plans and
+    any giver delivery replacement inside one outer transaction, and restores both
     transaction, and restores both entities' in-process caches on any failure so
     no partial transfer is observable.
     """
@@ -413,6 +414,22 @@ def _transfer_items(
         with transaction.atomic():
             _apply_plan(removal_plan)
             _apply_plan(addition_plan)
+            from world.quests.deliver import compute_deliver_replacement, schedule_delivery_events
+            from world.quests.runtime import read_records
+            from world.quests.transitions import (
+                apply_quest_log_delta,
+                snapshot_pin_reasons,
+            )
+
+            giver_records_before = {r.quest_id: r for r in read_records(giver)}
+            delivery = compute_deliver_replacement(giver, receiver, item_key, qty)
+            if delivery is not None:
+                new_records, pin_ops = delivery
+                for room, _, _ in pin_ops:
+                    if room not in pin_snapshots:
+                        pin_snapshots[room] = snapshot_pin_reasons(room)
+                apply_quest_log_delta(giver, list(new_records), pin_ops)
+                schedule_delivery_events(giver, giver_records_before, new_records)
     except Exception:
         _restore_surface_snapshots(giver, giver_surfaces)
         _restore_surface_snapshots(receiver, receiver_surfaces)
@@ -449,15 +466,20 @@ def _restore_surface_snapshots(entity: Any, snapshots: dict[str, Any]) -> None:
     restore_traits(entity, snapshots["traits"])
 
 
-def _pin_snapshots(plan: Any) -> list[tuple[Any, Any]]:
+def _pin_snapshots(plan: Any) -> dict[Any, Any]:
     from world.quests.transitions import snapshot_pin_reasons
 
     pins = plan.acquire[1] if plan.acquire is not None else ()
-    return [(room, snapshot_pin_reasons(room)) for room, _, _ in pins]
+    snapshots: dict[Any, Any] = {}
+    for room, _, _ in pins:
+        if room not in snapshots:
+            snapshots[room] = snapshot_pin_reasons(room)
+    return snapshots
 
 
-def _restore_pin_snapshots(snapshots: list[tuple[Any, Any]]) -> None:
+def _restore_pin_snapshots(snapshots: dict[Any, Any] | list[tuple[Any, Any]]) -> None:
     from world.quests.transitions import restore_pin_reasons
 
-    for room, snapshot in snapshots:
+    items = snapshots.items() if isinstance(snapshots, dict) else snapshots
+    for room, snapshot in items:
         restore_pin_reasons(room, snapshot)

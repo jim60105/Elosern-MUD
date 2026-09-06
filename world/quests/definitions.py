@@ -33,6 +33,7 @@ class ObjectiveKind(StrEnum):
     REACH = "reach"
     ESCORT = "escort"
     ACQUIRE = "acquire"
+    DELIVER = "deliver"
 
 
 class DestinationKind(StrEnum):
@@ -210,6 +211,18 @@ def _validate_objective(
             _reject(definition, "ACQUIRE objective requires exactly one known item_key")
         if item_key not in ITEM_REGISTRY:
             _reject(definition, f"ACQUIRE objective references unknown item {item_key!r}")
+    elif objective.kind is ObjectiveKind.DELIVER:
+        if objective.destination is not None:
+            _reject(definition, "DELIVER objective cannot declare a destination")
+        if objective.monster_tier is not None:
+            _reject(definition, "DELIVER objective cannot declare a monster_tier")
+        if objective.requires_bound_targets is not True:
+            _reject(definition, "DELIVER objective requires requires_bound_targets to be True")
+        item_key = objective.item_key
+        if not isinstance(item_key, str) or not item_key:
+            _reject(definition, "DELIVER objective requires an item_key")
+        if item_key not in ITEM_REGISTRY:
+            _reject(definition, f"DELIVER objective references unknown item_key {item_key!r}")
     else:
         _reject(definition, f"unknown ObjectiveKind {objective.kind!r}")
 
