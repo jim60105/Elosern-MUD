@@ -4,8 +4,8 @@ Covers ``apply_npc_intent``: the ``request_guild_exam`` routing through
 ``start_guild_exam`` with ``requested_by="npc_intent"``, every failed exam gate
 discarding only the intent, the atomic give/take item transfer primitive, the
 ``adjust_relation`` routing through the sole-writer affinity API with the
-applied-amount report, the ``offer_quest`` routing through the guild-offer
-surface with its atomic acceptance and rejection paths, the ``reveal_lore``
+applied-amount report, the ``offer_quest`` routing through the issuer-aware
+offer surface with its atomic acceptance and rejection paths, the ``reveal_lore``
 routing through the lore codex sole writer, and the boundary rule that this
 module never imports the generative package.
 """
@@ -18,7 +18,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
-from typeclasses.components import GuildExaminer, GuildStaff
+from typeclasses.components import GuildExaminer, GuildStaff, QuestIssuer
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
@@ -48,6 +48,14 @@ from world.rules.npc_intents import (
     apply_npc_intent,
     intent_context_ok,
     is_stale_context,
+)
+from world.rules.quest_issuance import (
+    QuestIssuance,
+    Settlement,
+    guild_issuer_key,
+    npc_issuer_key,
+    register_quest_issuance,
+    resolve_issuance,
 )
 from world.rules.surfaces import write_counter_trait
 
@@ -523,7 +531,7 @@ class PartyInviteIntentTests(EvenniaTestCase):
 
 
 class OfferQuestIntentTests(ExamRegistryIsolation, EvenniaTestCase):
-    """The offer_quest intent routes through the registered guild-offer surface."""
+    """The offer_quest intent routes through the issuer-aware offer surface."""
 
     ALTORIA_BRANCH = "guild_branch_altoria"
 
@@ -560,6 +568,28 @@ class OfferQuestIntentTests(ExamRegistryIsolation, EvenniaTestCase):
     def _records(self):
         return read_records(self.player)
 
+    def _commissioner(self, issuer_key=None):
+        name = f"commissioner {issuer_key or 'pk'}"
+        commissioner = create_object(NPC, key=name, location=self.room)
+        commissioner.components.add(
+            QuestIssuer.create(
+                commissioner,
+                service_id=f"commission-{issuer_key or 'pk'}",
+                issuer_key=issuer_key,
+            )
+        )
+        return commissioner
+
+    def _register_commission(self, definition_key, issuer_key):
+        issuance = QuestIssuance(
+            definition_key=definition_key,
+            issuer_key=issuer_key,
+            reward=QuestReward(copper=30, items=(), merit=0),
+            settlement=Settlement.AUTO,
+        )
+        register_quest_issuance(issuance)
+        return issuance
+
     @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
     @covers_requirement("dialogue-offer-quest::a-verified-offer-quest-is-assigned-directly-and-atomically")
     def test_verified_offer_assigns_the_quest_and_applies_guild_affinity(self):
@@ -569,6 +599,7 @@ class OfferQuestIntentTests(ExamRegistryIsolation, EvenniaTestCase):
         records = self._records()
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].definition_key, self.quest_key)
+        self.assertEqual(records[0].issuer_key, guild_issuer_key(self.ALTORIA_BRANCH))
         self.assertEqual(records[0].state, QuestState.IN_PROGRESS)
         self.assertEqual(self._affinity().value, 2)
 
@@ -602,7 +633,9 @@ class OfferQuestIntentTests(ExamRegistryIsolation, EvenniaTestCase):
         plain = create_object(NPC, key="plain npc", location=self.room)
         outcome = apply_npc_intent(plain, self.player, self._offer_intent())
         self.assertFalse(outcome.applied)
-        self.assertEqual(outcome.reason, "offer_quest requires a GuildStaff speaker")
+        self.assertEqual(
+            outcome.reason, "offer_quest requires a GuildStaff or QuestIssuer speaker"
+        )
         self.assertEqual(self._records(), [])
         self.assertEqual(self._affinity().value, 1)
 
@@ -727,6 +760,207 @@ class OfferQuestIntentTests(ExamRegistryIsolation, EvenniaTestCase):
                 self.assertIsNotNone(outcome.reason)
                 self.assertEqual(self._records(), [])
                 self.assertEqual(self._affinity().value, 1)
+
+    # -- private commission path (quest-issuance-dialogue-gate) --
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    @covers_requirement("dialogue-offer-quest::a-verified-offer-quest-names-its-issuance-when-assigning")
+    @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
+    def test_authorized_commissioner_assigns_its_private_commission(self):
+        issuer_key = npc_issuer_key(content_key="grey_granny")
+        issuance = self._register_commission(self.quest_key, issuer_key)
+        commissioner = self._commissioner("grey_granny")
+        unregistered = create_object(PlayerCharacter, key="unregistered seeker")
+        unregistered.race = "human"
+        unregistered.apply_race_baseline()
+        unregistered.location = self.room
+        outcome = apply_npc_intent(
+            commissioner, unregistered, self._offer_intent(self.quest_key)
+        )
+        self.assertTrue(outcome.applied)
+        self.assertEqual(outcome.reason, "quest assigned")
+        records = read_records(unregistered)
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].definition_key, self.quest_key)
+        self.assertEqual(records[0].issuer_key, issuer_key)
+        resolved = resolve_issuance(records[0].definition_key, records[0].issuer_key)
+        self.assertEqual(resolved, issuance)
+        self.assertEqual(resolved.settlement, Settlement.AUTO)
+        self.assertEqual(commissioner.relations._load(unregistered).value, 1)
+
+    @covers_requirement("dialogue-offer-quest::a-verified-offer-quest-names-its-issuance-when-assigning")
+    def test_identity_form_commissioner_assigns_under_its_primary_key(self):
+        commissioner = self._commissioner()
+        issuer_key = npc_issuer_key(pk=commissioner.pk)
+        issuance = self._register_commission(self.quest_key, issuer_key)
+        outcome = apply_npc_intent(
+            commissioner, self.player, self._offer_intent(self.quest_key)
+        )
+        self.assertTrue(outcome.applied)
+        records = self._records()
+        self.assertEqual(records[0].issuer_key, issuer_key)
+        self.assertEqual(resolve_issuance(self.quest_key, issuer_key), issuance)
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_commissioner_without_issuance_for_the_key_is_rejected(self):
+        commissioner = self._commissioner("grey_granny")
+        self._register_commission(
+            self.quest_key, npc_issuer_key(content_key="other_commission")
+        )
+        outcome = apply_npc_intent(
+            commissioner, self.player, self._offer_intent(self.quest_key)
+        )
+        self.assertFalse(outcome.applied)
+        self.assertEqual(
+            outcome.reason, f"no commission {self.quest_key!r} at this issuer"
+        )
+        self.assertEqual(self._records(), [])
+        self.assertIsNone(commissioner.relations._load(self.player))
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_unauthorized_npc_cannot_issue_even_when_a_commission_exists(self):
+        self._register_commission(
+            self.quest_key, npc_issuer_key(content_key="grey_granny")
+        )
+        plain = create_object(NPC, key="plain bystander", location=self.room)
+        outcome = apply_npc_intent(plain, self.player, self._offer_intent(self.quest_key))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(
+            outcome.reason, "offer_quest requires a GuildStaff or QuestIssuer speaker"
+        )
+        self.assertEqual(self._records(), [])
+        self.assertIsNone(plain.relations._load(self.player))
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_payload_cannot_reach_another_issuers_commission(self):
+        self._register_commission(
+            self.quest_key, npc_issuer_key(content_key="grey_granny")
+        )
+        other = self._commissioner()
+        outcome = apply_npc_intent(other, self.player, self._offer_intent(self.quest_key))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(
+            outcome.reason, f"no commission {self.quest_key!r} at this issuer"
+        )
+        self.assertEqual(self._records(), [])
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_dual_authority_with_both_issuances_fails_verification(self):
+        dual = self._commissioner("grey_granny")
+        dual.components.add(
+            GuildStaff.create(
+                dual, service_id="dual-staff", branch_key=self.ALTORIA_BRANCH
+            )
+        )
+        self._register_commission(
+            self.quest_key, npc_issuer_key(content_key="grey_granny")
+        )
+        outcome = apply_npc_intent(dual, self.player, self._offer_intent(self.quest_key))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(
+            outcome.reason,
+            f"quest {self.quest_key!r} is issued under both this branch and this issuer",
+        )
+        self.assertEqual(self._records(), [])
+        self.assertEqual(self._affinity().value, 1)
+
+    @covers_requirement("dialogue-offer-quest::a-verified-offer-quest-names-its-issuance-when-assigning")
+    def test_dual_authority_resolves_by_the_guild_namespace(self):
+        dual = self._commissioner("grey_granny")
+        dual.components.add(
+            GuildStaff.create(
+                dual, service_id="dual-staff", branch_key=self.ALTORIA_BRANCH
+            )
+        )
+        outcome = apply_npc_intent(dual, self.player, self._offer_intent(self.quest_key))
+        self.assertTrue(outcome.applied)
+        records = self._records()
+        self.assertEqual(records[0].issuer_key, guild_issuer_key(self.ALTORIA_BRANCH))
+        self.assertEqual(dual.relations._load(self.player).value, 1)
+
+    @covers_requirement("dialogue-offer-quest::a-verified-offer-quest-names-its-issuance-when-assigning")
+    def test_dual_authority_resolves_by_the_private_namespace(self):
+        dual = self._commissioner("grey_granny")
+        dual.components.add(
+            GuildStaff.create(
+                dual, service_id="dual-staff", branch_key="guild_branch_other"
+            )
+        )
+        issuance = self._register_commission(
+            self.quest_key, npc_issuer_key(content_key="grey_granny")
+        )
+        outcome = apply_npc_intent(dual, self.player, self._offer_intent(self.quest_key))
+        self.assertTrue(outcome.applied)
+        records = self._records()
+        self.assertEqual(
+            records[0].issuer_key, npc_issuer_key(content_key="grey_granny")
+        )
+        self.assertEqual(resolve_issuance(self.quest_key, records[0].issuer_key), issuance)
+        self.assertEqual(dual.relations._load(self.player).value, 1)
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_malformed_authored_issuer_key_is_rejected(self):
+        commissioner = self._commissioner("bad:key")
+        outcome = apply_npc_intent(
+            commissioner, self.player, self._offer_intent(self.quest_key)
+        )
+        self.assertFalse(outcome.applied)
+        self.assertEqual(
+            outcome.reason, "offer_quest QuestIssuer carries a malformed issuer_key"
+        )
+        self.assertEqual(self._records(), [])
+        self.assertIsNone(commissioner.relations._load(self.player))
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_malformed_branch_key_is_rejected_without_state_change(self):
+        malformed = create_object(NPC, key="malformed staff", location=self.room)
+        malformed.components.add(
+            GuildStaff.create(
+                malformed, service_id="malformed-staff", branch_key="bad:branch"
+            )
+        )
+        outcome = apply_npc_intent(malformed, self.player, self._offer_intent(self.quest_key))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(
+            outcome.reason, "offer_quest GuildStaff carries a malformed branch_key"
+        )
+        self.assertEqual(self._records(), [])
+        self.assertEqual(self._affinity().value, 1)
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_malformed_issuer_key_fails_closed_over_a_valid_guild_offer(self):
+        dual = self._commissioner("bad:key")
+        dual.components.add(
+            GuildStaff.create(
+                dual, service_id="dual-staff", branch_key=self.ALTORIA_BRANCH
+            )
+        )
+        outcome = apply_npc_intent(dual, self.player, self._offer_intent(self.quest_key))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(
+            outcome.reason, "offer_quest QuestIssuer carries a malformed issuer_key"
+        )
+        self.assertEqual(self._records(), [])
+        self.assertIsNone(dual.relations._load(self.player))
+
+    @covers_requirement("dialogue-offer-quest::the-offer-quest-intent-is-verified-against-the-registered-guild-offer-surface")
+    def test_malformed_branch_key_fails_closed_over_a_valid_commission(self):
+        dual = self._commissioner("grey_granny")
+        self._register_commission(
+            self.quest_key, npc_issuer_key(content_key="grey_granny")
+        )
+        dual.components.add(
+            GuildStaff.create(
+                dual, service_id="dual-staff", branch_key="bad:branch"
+            )
+        )
+        outcome = apply_npc_intent(dual, self.player, self._offer_intent(self.quest_key))
+        self.assertFalse(outcome.applied)
+        self.assertEqual(
+            outcome.reason, "offer_quest GuildStaff carries a malformed branch_key"
+        )
+        self.assertEqual(self._records(), [])
+        self.assertIsNone(dual.relations._load(self.player))
 
 
 class RevealLoreIntentTests(EvenniaTestCase):
