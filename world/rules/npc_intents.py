@@ -450,6 +450,33 @@ def _apply_item_transfer(
     return _transfer_items(giver=player, receiver=npc, item_key=item_key, qty=qty)
 
 
+def advance_deliveries_for_transfer(
+    giver: Any, receiver: Any, item_key: str, qty: int, pin_snapshots: dict[Any, Any]
+) -> None:
+    """Advance the giver's DELIVER objectives for one committed transfer.
+
+    The quest-side observer computes the quest-log replacement; this seam owns
+    the write, exactly as ``_transfer_items`` has always done, so the caller
+    keeps owning the transaction and the surrounding snapshots. Rooms whose
+    pin state the advance touches are captured lazily into the caller-owned
+    ``pin_snapshots`` dict (one snapshot per room, before its first write), so
+    a later failure in the caller's transaction can restore them.
+    """
+    from world.quests.deliver import compute_deliver_replacement, schedule_delivery_events
+    from world.quests.runtime import read_records
+    from world.quests.transitions import apply_quest_log_delta, snapshot_pin_reasons
+
+    giver_records_before = {r.quest_id: r for r in read_records(giver)}
+    delivery = compute_deliver_replacement(giver, receiver, item_key, qty)
+    if delivery is not None:
+        new_records, pin_ops = delivery
+        for room, _, _ in pin_ops:
+            if room not in pin_snapshots:
+                pin_snapshots[room] = snapshot_pin_reasons(room)
+        apply_quest_log_delta(giver, list(new_records), pin_ops)
+        schedule_delivery_events(giver, giver_records_before, new_records)
+
+
 def _transfer_items(
     giver: Any, receiver: Any, item_key: str, qty: int
 ) -> IntentOutcome:
@@ -460,9 +487,9 @@ def _transfer_items(
     allocate an unbounded tuple), precomputes both inventory plans, snapshots
     both entities' affected surfaces (inventory, quest log, traits, and the
     receiver's ACQUIRE and giver's DELIVER pin state), applies both plans and
-    any giver delivery replacement inside one outer transaction, and restores both
-    transaction, and restores both entities' in-process caches on any failure so
-    no partial transfer is observable.
+    any giver delivery replacement inside one outer transaction, and restores
+    both entities' in-process caches on any failure so no partial transfer is
+    observable.
     """
     holdings = giver.db.inventory or []
     if holdings.count(item_key) < qty:
@@ -481,22 +508,7 @@ def _transfer_items(
         with transaction.atomic():
             _apply_plan(removal_plan)
             _apply_plan(addition_plan)
-            from world.quests.deliver import compute_deliver_replacement, schedule_delivery_events
-            from world.quests.runtime import read_records
-            from world.quests.transitions import (
-                apply_quest_log_delta,
-                snapshot_pin_reasons,
-            )
-
-            giver_records_before = {r.quest_id: r for r in read_records(giver)}
-            delivery = compute_deliver_replacement(giver, receiver, item_key, qty)
-            if delivery is not None:
-                new_records, pin_ops = delivery
-                for room, _, _ in pin_ops:
-                    if room not in pin_snapshots:
-                        pin_snapshots[room] = snapshot_pin_reasons(room)
-                apply_quest_log_delta(giver, list(new_records), pin_ops)
-                schedule_delivery_events(giver, giver_records_before, new_records)
+            advance_deliveries_for_transfer(giver, receiver, item_key, qty, pin_snapshots)
     except Exception:
         _restore_surface_snapshots(giver, giver_surfaces)
         _restore_surface_snapshots(receiver, receiver_surfaces)
@@ -534,9 +546,14 @@ def _restore_surface_snapshots(entity: Any, snapshots: dict[str, Any]) -> None:
 
 
 def _pin_snapshots(plan: Any) -> dict[Any, Any]:
+    """Snapshot the pin rooms of one inventory plan's ACQUIRE operations.
+
+    ``plan`` may be ``None`` (a receiver with no canonical inventory), which
+    yields no snapshots.
+    """
     from world.quests.transitions import snapshot_pin_reasons
 
-    pins = plan.acquire[1] if plan.acquire is not None else ()
+    pins = plan.acquire[1] if plan is not None and plan.acquire is not None else ()
     snapshots: dict[Any, Any] = {}
     for room, _, _ in pins:
         if room not in snapshots:
