@@ -79,7 +79,7 @@ recover" is fiction over an atomic settlement.
      EventLog kinds (`sexual_transition`, `pleasure_gain`, `sexual_counter`,
      counter records) and **advances the world clock** by its declared
      duration.
-   - Counter crediting is **symmetric in this writer** (§3.4).
+   - Counter crediting is symmetric for every participant (§3.4).
 4. **Violators depart** (mechanically necessary: `skip_safety` forbids
    time-skip with a living monster in the room, which would strand the
    player):
@@ -113,26 +113,45 @@ Only three loss channels exist, all on existing machinery:
 Off = skip step 3 entirely (one guard); HP floor, recovery, weak debuff,
 and PG wake-up still run.
 
-### 3.4 Counter crediting (intentional divergence)
+### 3.4 Counter crediting (catalog-wide symmetric convention)
 
-The sexual-act catalogs credit the actor only ("a `Monster` target is never
-credited a lifetime counter"). The defeat-aftermath writer deliberately
-credits **both parties**: the victim's body objectively experienced the act
-(`interspecies_act_count` semantics = "this body has been through N
-interspecies acts", direction-free), and the aggressor monster accumulates
-its own `hostile_act_count` + `interspecies_act_count`.
+Owner decision: the "actor-only" crediting convention is retired **across
+the whole sexual-act catalog**, not just in the defeat writer. Every
+consensual or non-consensual sexual act credits every participant's body —
+"the body that underwent the act has the record", direction-free. The
+defeat-aftermath writer therefore shares one convention with the skill
+path; there is no divergence.
 
-- Scope: the divergence lives in the defeat-aftermath writer only. Skill-path
-  asymmetric crediting and all its regression tests stay untouched.
+- Mechanism: the `participant_counters` field and its handler already ship
+  (the `sexual-act-effects` spec increments `participant_counters` on every
+  other participant). Existing acts merely declare `participant_counters=()`;
+  the change is act-definition data plus spec/test rewrites, not new
+  machinery. Default rule: every non-solo act credits the target the same
+  counter set it credits the actor.
+- Semantics re-documented per counter (keys unchanged):
+  `hostile_act_count` = hostile sexual acts participated in (either side);
+  `interspecies_act_count` = acts with a different-species partner (either
+  side); `duo_act_count` / `group_act_count` fix an existing oddity where a
+  two-person act left the partner with no record. Solo seeds
+  (`masturbation_count`) have no target and are unchanged.
 - Monster counters are usually transient (population monsters `delete()` on
   departure; the owner accepted this — records persist for surviving scene
   monsters and during any still-live session).
-- Downstream effects are real and accepted: victim counts feed the
-  異種支配/異種共鸣 unlock gates (`interspecies_act_count >= 20`) and the
-  title system's `COUNTER_THRESHOLD` / `SEXUAL_EXPERIENCE` predicates
+- Downstream effects are real and accepted: both sides' counts feed the
+  unlock gates (`hostile_act_count`, `interspecies_act_count >= 20`,
+  compound `climax_count` gates) and the title system's
+  `COUNTER_THRESHOLD` / `SEXUAL_EXPERIENCE` predicates
   (`world/lore/titles.py`). "Deliberately lose to goblins to unlock
-  interspecies acts" is an accepted farm route; its price is the §3.2 loss
-  menu, and the combat-act gates (`hostile_act_count`) are not fed by defeat.
+  interspecies acts" remains an accepted farm route; its price is the §3.2
+  loss menu.
+- No migration: no released users; existing characters' historical records
+  are not back-derived.
+- Spec surface to re-delta in the same change: `sexual-catalog-combat`
+  ("credits … on the actor only" scenarios), `sexual-catalog-interspecies`,
+  `sexual-catalog-shame` (`shame_provocative_gaze`: the gaze target did get
+  watched — crediting them `watched_count` is the semantically correct
+  fix), `sexual-act-seeds` (combat seed only; solo seeds untouched), and
+  every pinned regression test rewritten to the symmetric expectation.
 
 ## 4. Scene registry and narrative layer
 
@@ -220,8 +239,10 @@ Deterministic (fixed-seed) suites, no live LLM:
   longer sequence.
 - Companion pool determinism (fixed seed replays same selection order);
   fled companion excluded.
-- Symmetric counter crediting: victim `interspecies_act_count` +1 per act;
-  aggressor monster credits; skill-path asymmetry tests still green.
+- Symmetric counter crediting: every participant's declared counters +1 per
+  act (victim `interspecies_act_count`, aggressor monster credits); the
+  skill-path catalog tests rewritten to the symmetric expectation (owned by
+  `sexual-counter-symmetric-crediting`).
 - Population monster despawn + next-activation respawn; quest-tracked
   monster retained.
 - Offline guardrail: every LLM profile failing ⇒ full
@@ -236,8 +257,11 @@ Deterministic (fixed-seed) suites, no live LLM:
 | Change | Contents | Independently shippable |
 |---|---|---|
 | `defeat-aftermath-core` | HP floor 1 + knockout, 5% recovery advance (regen-rate math), weak debuff, violator departure (population despawn / quest-tracked retain), PG wake-up, `DEFEAT_ADULT_SCENES` switch, zero-loss assertion battery, recovery-path rewrites | Yes — a usable PG defeat system |
-| `defeat-aftermath-adult-scenes` | Victory-arousal table + per-archetype monster sexual baselines (owns the §6.4 deferred seam), violation sequence (registry, resist rolls, per-attempt clock advance, companion pool), symmetric counter crediting, digest table, companion buffs, Narrator overlay + offline templates | No — depends on core |
+| `sexual-counter-symmetric-crediting` | Catalog-wide crediting flip: act-definition `participant_counters` declarations, counter semantics re-documentation, main-spec deltas + regression-test rewrites across combat/interspecies/shame lines (solo seeds untouched) | Yes — orthogonal to defeat; prerequisite for the adult layer's shared convention |
+| `defeat-aftermath-adult-scenes` | Victory-arousal table + per-archetype monster sexual baselines (owns the §6.4 deferred seam), violation sequence (registry, resist rolls, per-attempt clock advance, companion pool), digest table, companion buffs, Narrator overlay + offline templates | No — depends on core; sequenced after the crediting change so both writers share the one convention |
 
 Rationale: core changes the high-risk `settle_session` semantics (rewritten
 existing tests); the adult layer is purely additive on the seam core opens.
+The crediting flip rewrites shipped main specs and their pinned tests, so it
+gets its own change with its own delta specs and archive pass.
 Each change validates and archives on its own.
