@@ -450,6 +450,61 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         )
         self.assertIn("pass", result.stdout)
 
+    @covers_requirement(
+        "webclient-service-menus::counter-only-quest-actions-appear-on-a-book-row-only-when-the-counter-offers-them",
+    )
+    def test_quest_book_merge_rule_vitest_evidence_passes(self):
+        """The quest_log merge-rule suite is the executed evidence for the
+        counter-only action join: tracking always offered, abandon/turn-in
+        only on a quest_id match mirroring the counter's descriptor, never
+        synthesized or re-enabled."""
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_log.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "quest-log merge rule Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-service-menus::the-quest-book-discloses-each-quest-s-commissioner-and-settlement",
+    )
+    def test_quest_book_disclosure_vitest_evidence_passes(self):
+        """The same suite pins the disclosure contract: issuer label and
+        settlement indication on every row, reward line only when the panel
+        carries one, nothing in its place when null."""
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/world/quest_log.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "quest-log disclosure Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
 
 class DialogueSurfaceEvidenceTest(unittest.TestCase):
     """webclient-align-08/11: the dialogue surface's feed variant and the dock's

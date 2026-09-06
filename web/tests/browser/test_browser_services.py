@@ -405,7 +405,9 @@ class GuildQuestJourneys(ServicesBrowserTest):
             len([m for m in outbound_messages(page) if m[0] == "ui_action"]), sent_before
         )
 
-    @covers_requirement("webclient-service-menus::the-quest-browser-exposes-the-tracking-toggle")
+    @covers_requirement(
+        "webclient-service-menus::the-quest-drawer-separates-the-player-s-quest-book-from-the-guild-counter",
+    )
     def test_drawer_renders_book_and_counter_without_duplication(self):
         """quest-drawer-split: in front of the clerk the drawer hosts both
         surfaces — the quest book and the counter — and the accepted quest
