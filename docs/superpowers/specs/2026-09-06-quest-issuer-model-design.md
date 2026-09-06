@@ -99,16 +99,28 @@ class QuestIssuance:
     reward: QuestReward
     settlement: Settlement
 
+# Holds npc-namespaced issuances only.
 QUEST_ISSUANCE_REGISTRY: dict[tuple[str, str], QuestIssuance]
+
+def resolve_issuance(definition_key: str, issuer_key: str) -> QuestIssuance | None:
+    """The single normalized read seam, dispatching on the key's namespace."""
 ```
 
-Registration is idempotent under an existing `(definition_key, issuer_key)` identity and rejects
-conflicting content before replacing — byte-for-byte the semantics `register_guild_offer` already
-has.
+**Amended 2026-09-06 (proposal decomposition).** The unified thing is a *read seam*, not a merged
+dict. `GUILD_OFFER_REGISTRY`, `GuildQuestOffer`, `register_guild_offer`, `get_guild_offer`, and
+`list_guild_offers` are left **byte-for-byte unchanged**; `QUEST_ISSUANCE_REGISTRY` stores only
+`npc:`-namespaced issuances; and `resolve_issuance()` dispatches by namespace — `guild:<branch>`
+builds the normalized view from the existing offer registry, `npc:<key>` reads the new one.
 
-`GuildQuestOffer` becomes the guild-namespaced view of an issuance. `register_guild_offer`,
-`get_guild_offer`, and `list_guild_offers` remain as thin wrappers over the unified registry so
-existing call sites and tests need no sweeping rewrite.
+The earlier "`GuildQuestOffer` becomes a view over one merged registry" formulation was rejected
+after measuring its blast radius: twenty-five test modules save, clear, and restore
+`GUILD_OFFER_REGISTRY` directly, and several index it expecting a `GuildQuestOffer` value. Merging
+the storage would force churn through all of them for no behavioural gain. Each issuer kind keeps
+exactly one writer, so the two stores cannot drift, and every consumer reads through the one seam.
+
+Registration into `QUEST_ISSUANCE_REGISTRY` is idempotent under an existing
+`(definition_key, issuer_key)` identity and rejects conflicting content before replacing — the same
+semantics `register_guild_offer` already has.
 
 **Validation:** an `npc:`-namespaced issuance must carry `reward.merit == 0`. Merit is guild
 currency; a private commission never grants it.
@@ -121,10 +133,19 @@ identical to `GuildStaff`:
 ```python
 class QuestIssuer(Component):
     name = "quest_issuer"
-    issuer_key = DBField(default=None)
+    service_id = DBField(default=None)      # required: the roster-sync reuse anchor
+    issuer_key = DBField(default=None)      # optional authored content key
     service_binding = DBField(default=None)
     anchor_room_id = DBField(default=None)
 ```
+
+**Amended 2026-09-06 (review).** `service_id` was missing from the first draft, which called the
+component "structurally identical to `GuildStaff`" while giving it three fields where `GuildStaff`
+has four. `world/rules/guild_economy.py::_find_service_host` reads `component.service_id`
+unconditionally on whichever class anchors a profession row, so a commissioner blueprint anchored on
+a field-less class would raise `AttributeError` inside `at_server_start` and take down the whole
+guild-economy sync. See §13's review findings for the full correction, including the contract test
+that now pins the underlying invariant.
 
 `issuer_key` resolution:
 
@@ -363,3 +384,121 @@ Each phase stands on its own tests.
    removal of `QuestBoard.vue` / `LoreDrawer.vue`.
 7. **Generative pipeline** — `compile.py` emitting `npc:` issuances, and the widened `offer_quest`
    intent gate.
+
+## 13. OpenSpec Change Decomposition
+
+**Added 2026-09-06; revised after review.** The seven phases above decompose into thirteen OpenSpec
+changes, each sized to one engineer-workday. Phases 1, 3, 5, 6, and 7 each split, because each
+combined more work than a single day holds.
+
+| # | Change | Owns | Depends on |
+|---|---|---|---|
+| 1 | `quest-issuance-registry` | Issuer-key grammar, `Settlement`, `QuestIssuance`, the private-commission registry, the `resolve_issuance` seam, the merit-free rule | — |
+| 2 | `quest-record-issuer-key` | `QuestRecord.issuer_key` (required), `accept_quest`'s issuer argument and resolve-before-create rule, the guild acceptance path | 1 |
+| 3 | `quest-issuer-component` | `QuestIssuer` component, vocabulary and rulebook entry, the row-anchor contract test, `resolve_issuer_key`, import authoring | 1 |
+| 4 | `quest-auto-settlement` | `plan_auto_settlement`, the three write paths, the shared claim ledger | 1, 2 |
+| 5 | `quest-deliver-objective` | `ObjectiveKind.DELIVER`, its validation and prose, the delivery observer, the transfer hook | — |
+| 6 | `quest-deliver-action` | `explore.deliver`, the player command, the exploration affordance, command docs | 5 |
+| 7 | `lore-deterministic-reveals` | Arrival, first-defeat, and origin reveal sources; the non-blocking rule | — |
+| 8 | `webclient-quest-log-panel` | The `quest_log` read model, its bounds, push timing, and JS mirror | 1, 2 |
+| 9 | `webclient-lore-codex-panel` | The `lore_codex` read model, its bounds, push timing, and JS mirror | — |
+| 10 | `webclient-lore-codex-drawer` | `LoreCodexDrawer.vue`, the `.cmdutil` icon, deletion of `LoreDrawer.vue` | 9 |
+| 11 | `webclient-quest-drawer-split` | `QuestLog.vue`, `GuildCounter.vue`, deletion of `QuestBoard.vue` | 8, 10 |
+| 12 | `quest-issuance-generative` | `compile.py` issuances, the durable store payload and restore path | 1, 2, 3 |
+| 13 | `quest-issuance-dialogue-gate` | The widened `offer_quest` speaker gate and per-kind eligibility | 1, 2, 3 |
+
+Change 13 was split out of 12 during review. Widening an AI-reachable boundary is the
+highest-risk edit in the feature and deserves its own reviewable unit rather than sitting inside a
+`CompiledQuest`-plus-durable-store refactor; the combined change also exceeded one workday. The two
+are siblings, not sequential — 13 verifies whatever issuances exist, however they were registered.
+
+### Code conflicts
+
+Only two pairs touch the same files:
+
+- **10 and 11** both edit `web/webclient-app/AppClient.vue` and
+  `docs/development/webclient-vue-frozen-contract-audit.md` §2.3. Change 10 also edits
+  `QuestBoard.vue`, which change 11 deletes. **Land 10 before 11** — the button removal is then a
+  two-line edit rather than a conflict against a deleted file.
+- **8 and 9** both edit `web/webclient/presentation/registry.py`,
+  `web/static/webclient/js/elosern/protocol.js`, and `.github/evennia-shards.json`. They land in
+  different batches, so they never run concurrently; if they are reordered, run them sequentially.
+
+Everything else is file-disjoint. Notably 2 and 3 both depend on 1 but touch nothing in common
+(`world/quests/runtime.py` and the guild acceptance path versus `typeclasses/components.py` and the
+profession registries). Changes 12 and 13 were one change until review; splitting them also split
+their files — 12 owns `world/quests/compile.py` and the durable store, 13 owns
+`world/rules/npc_intents.py` — so they are disjoint and may run in parallel.
+
+Change 2 also edits `world/rules/npc_intents.py` (task 2.3: the `offer_quest` applier passes the
+guild-derived key), which 13 later widens. They land in different batches, so they never run
+concurrently.
+
+### Advised parallel batch order
+
+| Batch | Changes | Rationale |
+|---|---|---|
+| **A** | 1, 5, 7, 9 | No dependencies and fully file-disjoint. Lands the issuance model, the delivery objective, the codex's data source, and the codex read model in parallel. |
+| **B** | 2, 3, 6, 10 | Each unblocked by exactly one batch-A change. Disjoint: quest runtime, components, the delivery player surface, the codex client surface. |
+| **C** | 4, 8, 12, 13 | Each needs 1 and 2 plus, for 12 and 13, change 3. Disjoint: settlement in `world/quests/transitions.py`, the quest read model, the compile pipeline, the dialogue gate. |
+| **D** | 11 | Needs both 8 and 10; conflicts with 10 on `AppClient.vue`, so it lands last and alone. |
+
+Three ordering constraints override any reshuffling: **2 before 4, 8, 12, and 13** (all four read
+`QuestRecord.issuer_key` or call `accept_quest` with an issuer argument), **3 before 12 and 13**
+(both verify an authorized carrier), and **10 before 11** (the `AppClient.vue` and audit-document
+conflict).
+
+### Breaking changes to development data
+
+Two changes invalidate existing development state. Neither writes a migration; the project has no
+released users.
+
+- **2** makes `issuer_key` a required record field, so quest-log entries written before it fail the
+  strict reader. Development quest logs must be recreated.
+- **12** changes the `GeneratedQuestStore` payload shape. The store must be cleared.
+
+### Deliberate interim states
+
+- After **1**, the issuance registry has no consumer. This is a forward-declared seam, which
+  `AGENTS.md` explicitly sanctions; its delta spec's scenarios are the guard.
+- After **5** and before **6**, `DELIVER` advances only through the LLM-driven transfer. No content
+  should author a delivery quest until **6** lands.
+- After **10** and before **7**, the codex drawer renders an honest empty state offline. That is
+  correct behavior for an empty codex; **7** fixes the cause.
+
+### Review findings folded in
+
+A rubber-duck review of the decomposition found one blocking defect and two gaps, all corrected
+above and in the affected changes.
+
+**Blocking — `QuestIssuer` would have crashed startup synchronization.** §4.2 originally gave the
+component three fields and called it "structurally identical to `GuildStaff`". It is not:
+`GuildStaff`, `GuildExaminer`, and `Merchant` all also carry `service_id`, and
+`world/rules/guild_economy.py::_find_service_host` reads `component.service_id` **unconditionally**
+on whichever class anchors a profession row (`_row_anchor_class` takes `row.profession.components[0]`).
+A commissioner blueprint anchored on a field-less `QuestIssuer` would raise `AttributeError` inside
+`at_server_start`, taking down the entire guild-economy sync on every restart — not just quest
+issuance.
+
+The component now carries `service_id`, making the "identical to `GuildStaff`" claim actually true.
+The underlying invariant — every profession row's first component must define `service_id` — holds
+today only by convention (`ScriptedDialogue` also lacks it and simply never appears first), so
+change 3 additionally lands a contract test stating it, and roster-sync tests that run the sync
+twice with a commissioner row present.
+
+Relatedly, `issuer_key` deliberately does **not** join `_IDENTITY_KWARGS`. That set is the
+required-identity contract and `missing_identity_kwargs` rejects a blank value, whereas an absent
+`issuer_key` is the valid identity form. The accepted consequence is that `project_row_kwargs` never
+projects an authored key onto a roster-created commissioner, which resolves to `npc:#<pk>`; authored
+content keys arrive through the import path, whose `resolve_component_plan` passes kwargs verbatim.
+
+**Missing dependency.** Change 12's declared dependencies omitted change 2, even though it calls
+`accept_quest` with an issuer argument. The batch table already sequenced it correctly, but the
+override-constraints list did not, so a reader following the constraints rather than the batches
+could have concluded 12 was safe before 2. Corrected in both places.
+
+**Spec completeness.** `quest-deliver-action` modified the affordance vocabulary requirement to admit
+`explore.deliver` into `ACTION_CODE_ALLOWLIST`, but left the sibling requirement "Affordance params
+are validator-normalized" untouched — and that requirement's text claims to enumerate the exact
+params shape of every allowlisted action. Archiving would have produced an internally inconsistent
+main spec. That requirement now carries a MODIFIED delta naming the delivery payload shape.
