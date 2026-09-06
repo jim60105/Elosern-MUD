@@ -96,6 +96,12 @@ DEFEAT_AFTERMATH_TEMPLATES: dict[str, str] = {
     "violator_depart": "{actor} 對倒地的你失去興趣，逕自離開了。",
     "weak_granted": "虛弱感籠罩全身——你暫時使不出全力。",
     "recovery_advance": "你昏迷了 {data[seconds]} 秒，意識回籠時四肢依然沉重——體力只恢復了一小部分。",
+    # The violation-sequence kinds (defeat-aftermath-violation-sequence):
+    # the tone anchor is embarrassed-flavor, light-adventure prose — the
+    # negative weight lands on the degraded body state, never on suffering.
+    "violation_attempt": "{actor} 撲了上來，把你壓在身下，熾熱的鼻息就落在頸邊——牠還沒有滿足。",
+    "violation_resisted": "你拚死扭動，總算掙開了 {actor} 的侵犯——牠不滿地低吼，動作收斂了許多。",
+    "violation_act": "{actor} 得逞了。你的身體被肆意擺布，不聽話地發熱發顫，那種難為情的感覺揮之不去。",
 }
 
 

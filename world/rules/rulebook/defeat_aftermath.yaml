@@ -1,13 +1,15 @@
 # Defeat aftermath rulebook (defeat-aftermath-core D-C8).
 #
-# Per-section registry: this change owns `pg_lines` and `weak_debuff`; each
-# downstream adult change registers its own section validator at load, and
-# unknown sections are ignored with one log_warn (forward-compatible single
-# YAML file). A malformed owned section fails closed at load.
+# Per-section registry: `pg_lines` and `weak_debuff` are the core change's own
+# sections, `recovery` belongs to defeat-aftermath-recovery, and `violation`
+# belongs to defeat-aftermath-violation-sequence (DA4). Each downstream adult
+# change registers its own section validator at load, and unknown sections are
+# ignored with one log_warn (forward-compatible single YAML file). A malformed
+# owned section fails closed at load.
 #
 # `pg_lines` holds the PG wake prose. The DA1 writer renders the first line
-# deterministically (index 0); richer per-variant selection arrives with the
-# adult changes that own their sections.
+# deterministically (index 0); the violation sequence rewrites the wake line
+# only when at least one violation attempt landed (its own `violated_wake_line`).
 pg_lines:
   - "你眼前一黑倒了下去——再次睜開眼時，世界仍在轉動，四肢沉重得不聽使喚。"
 weak_debuff:
@@ -21,3 +23,126 @@ recovery:
   regen_scale: 0.5
   max_recovery_seconds: 21600
   wake_fraction: 0.05
+# The violation sequence registry (defeat-aftermath-violation-sequence D-V2).
+#
+# `violated_wake_line` replaces the PG wake prose in the defeat_settle entry
+# only when at least one attempt landed; a zero-landed (fully resisted)
+# sequence keeps the PG wake template.
+#
+# `archetypes` keys are monster species names from the lore bestiary
+# (MONSTER_TIER_REGISTRY example_monsters_zh) — the durable identity a
+# wilderness population monster carries as its key. Every row declares:
+#   victory_pleasure_delta    pleasure points every living winner gains at
+#                             settlement, on top of mid-fight accumulation
+#                             (arousal is derived from pleasure)
+#   threshold_ordinal         the arousal ordinal (0..4) the violator must
+#                             reach before its sequence starts
+#   attempt_cap               maximum attempts for one violator per victory
+#   attempt_duration_seconds  world time each executed attempt spends
+#   landed_deltas             pleasure points applied to victim/aggressor
+#                             when the resist contest is beaten
+#   resisted_deltas           shrunk pleasure points applied on a resisted
+#                             attempt (no counter credits on resistance)
+#   credited_counters         lifetime counters credited symmetrically to
+#                             both bodies per landed attempt (DA3 convention)
+# A monster whose key has no row never starts a sequence: the miss is logged
+# and the PG variant proceeds (never raises, never blocks settlement).
+violation:
+  violated_wake_line: "意識回籠時，渾身酸軟、衣衫不整，身體深處殘留著陌生的餘溫——你狼狽地撐起身子，不太敢回想剛才發生了什麼事。"
+  archetypes:
+    史萊姆:
+      victory_pleasure_delta: 3
+      threshold_ordinal: 1
+      attempt_cap: 2
+      attempt_duration_seconds: 120
+      landed_deltas: {victim_pleasure: 16, aggressor_pleasure: 10}
+      resisted_deltas: {victim_pleasure: 4, aggressor_pleasure: 3}
+      credited_counters: [hostile_act_count, interspecies_act_count]
+    哥布林:
+      victory_pleasure_delta: 2
+      threshold_ordinal: 1
+      attempt_cap: 2
+      attempt_duration_seconds: 120
+      landed_deltas: {victim_pleasure: 16, aggressor_pleasure: 10}
+      resisted_deltas: {victim_pleasure: 4, aggressor_pleasure: 3}
+      credited_counters: [hostile_act_count, interspecies_act_count]
+    巨鼠:
+      victory_pleasure_delta: 2
+      threshold_ordinal: 2
+      attempt_cap: 1
+      attempt_duration_seconds: 90
+      landed_deltas: {victim_pleasure: 16, aggressor_pleasure: 10}
+      resisted_deltas: {victim_pleasure: 4, aggressor_pleasure: 3}
+      credited_counters: [hostile_act_count, interspecies_act_count]
+    狼型魔獸:
+      victory_pleasure_delta: 1
+      threshold_ordinal: 2
+      attempt_cap: 3
+      attempt_duration_seconds: 150
+      landed_deltas: {victim_pleasure: 20, aggressor_pleasure: 14}
+      resisted_deltas: {victim_pleasure: 5, aggressor_pleasure: 4}
+      credited_counters: [hostile_act_count, interspecies_act_count]
+    食人魔:
+      victory_pleasure_delta: 2
+      threshold_ordinal: 2
+      attempt_cap: 3
+      attempt_duration_seconds: 240
+      landed_deltas: {victim_pleasure: 20, aggressor_pleasure: 14}
+      resisted_deltas: {victim_pleasure: 5, aggressor_pleasure: 4}
+      credited_counters: [hostile_act_count, interspecies_act_count]
+    地龍:
+      victory_pleasure_delta: 2
+      threshold_ordinal: 3
+      attempt_cap: 2
+      attempt_duration_seconds: 300
+      landed_deltas: {victim_pleasure: 24, aggressor_pleasure: 18}
+      resisted_deltas: {victim_pleasure: 5, aggressor_pleasure: 4}
+      credited_counters: [hostile_act_count, interspecies_act_count]
+    魔法生物:
+      victory_pleasure_delta: 3
+      threshold_ordinal: 2
+      attempt_cap: 3
+      attempt_duration_seconds: 180
+      landed_deltas: {victim_pleasure: 24, aggressor_pleasure: 18}
+      resisted_deltas: {victim_pleasure: 5, aggressor_pleasure: 4}
+      credited_counters: [hostile_act_count, interspecies_act_count]
+    雙頭龍:
+      victory_pleasure_delta: 2
+      threshold_ordinal: 3
+      attempt_cap: 3
+      attempt_duration_seconds: 300
+      landed_deltas: {victim_pleasure: 24, aggressor_pleasure: 18}
+      resisted_deltas: {victim_pleasure: 5, aggressor_pleasure: 4}
+      credited_counters: [hostile_act_count, interspecies_act_count]
+    巨魔:
+      victory_pleasure_delta: 2
+      threshold_ordinal: 3
+      attempt_cap: 3
+      attempt_duration_seconds: 240
+      landed_deltas: {victim_pleasure: 24, aggressor_pleasure: 18}
+      resisted_deltas: {victim_pleasure: 5, aggressor_pleasure: 4}
+      credited_counters: [hostile_act_count, interspecies_act_count]
+    古龍:
+      victory_pleasure_delta: 3
+      threshold_ordinal: 3
+      attempt_cap: 4
+      attempt_duration_seconds: 360
+      landed_deltas: {victim_pleasure: 30, aggressor_pleasure: 24}
+      resisted_deltas: {victim_pleasure: 6, aggressor_pleasure: 5}
+      credited_counters: [hostile_act_count, interspecies_act_count]
+    魔神:
+      victory_pleasure_delta: 3
+      threshold_ordinal: 4
+      attempt_cap: 4
+      attempt_duration_seconds: 420
+      landed_deltas: {victim_pleasure: 30, aggressor_pleasure: 24}
+      resisted_deltas: {victim_pleasure: 6, aggressor_pleasure: 5}
+      credited_counters: [hostile_act_count, interspecies_act_count]
+    災獸:
+      victory_pleasure_delta: 3
+      threshold_ordinal: 3
+      attempt_cap: 4
+      attempt_duration_seconds: 360
+      landed_deltas: {victim_pleasure: 30, aggressor_pleasure: 24}
+      resisted_deltas: {victim_pleasure: 6, aggressor_pleasure: 5}
+      credited_counters: [hostile_act_count, interspecies_act_count]
