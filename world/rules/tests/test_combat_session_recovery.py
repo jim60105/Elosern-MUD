@@ -326,10 +326,11 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         # A hostile defeat settles the fallen player at the nonlethal HP-1
         # floor (defeat-aftermath-core D-C1): the roster scope excludes the
         # HP-0 member so settlement never regenerates a corpse, and the
-        # aftermath floors the stored HP at 1 — no regen applies past the
-        # floor — while the world clock still advances the accumulated rounds
-        # exactly once. (BREAKING rewrite: the pre-change corpse settled at
-        # 0 HP; no released users exist.)
+        # aftermath floors the stored HP at 1, then the recovery advance
+        # wakes the player at exactly ceil(max * 0.05) = 5 — never at 0, and
+        # never fully restored — while the world clock still advances the
+        # accumulated rounds exactly once. (BREAKING rewrite: the pre-change
+        # corpse settled at 0 HP; no released users exist.)
         self.monster.traits.atk_phys.base = 100
         self.player.traits.hp.base = 100
         self.player.traits.hp.current = 1
@@ -341,8 +342,9 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         ):
             result = submit_player_action(self.player, "fire_ball", [self.monster])
         self.assertEqual(result["outcome"], "defeat")
-        self.assertEqual(self.player.traits.hp.current, 1)
-        self.assertEqual(clock.tick, 6)
+        self.assertEqual(self.player.traits.hp.current, 5)
+        # Combat 6s + recovery 8s (scale 0.5 over the 1.0/s stored rate).
+        self.assertEqual(clock.tick, 14)
         self.assertIsNone(self.player.db.active_combat)
 
     @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
@@ -354,7 +356,8 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         # A terminal hostile session restored with the player dead at 0 HP
         # (the durable pre-settlement crash window) settles through the
         # recovery fallback: the defeat aftermath floors the stored HP at 1
-        # (defeat-aftermath-core D-C1), never leaving a 0-HP persisted statue,
+        # (defeat-aftermath-core D-C1) and the recovery advance wakes the
+        # player at the 5% target, never leaving a 0-HP persisted statue,
         # while the clock still advances. (BREAKING rewrite: no released
         # users exist.)
         self.monster.traits.atk_phys.base = 100
@@ -377,8 +380,8 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         clock = WorldClock()
         with patch("world.rules.clock.get_world_clock", return_value=clock):
             restore_active_session(self.player)
-        self.assertEqual(self.player.traits.hp.current, 1)
-        self.assertEqual(clock.tick, 6)
+        self.assertEqual(self.player.traits.hp.current, 5)
+        self.assertEqual(clock.tick, 14)
         self.assertIsNone(self.player.db.active_combat)
 
 class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):

@@ -57,7 +57,13 @@ so the world pays the long window and the player's actual HP lands at or
 above the target, and the clamp write pins it to exactly the target. The
 `defeat_weak` buff is the narrative handle the scale reads against; the
 clamp is the standard path, not an exception. `world/rules/clock.py` is
-never edited and no entity's stored rate is mutated.
+never edited beyond the new `AdvanceSource.DEFEAT_AFTERMATH` vocabulary
+member the spec's `source defeat_aftermath` requires — the regen model,
+stage machinery, and snapshot semantics are untouched — and no entity's
+stored rate is mutated. On the capped path the real un-scaled advance may
+land above the virtual target, so the aftermath writes the player's HP
+from the virtual scaled model at the cap (the same declared-write family
+as the clamp; plan-review finding 1).
 
 **D-R3: `max_recovery_seconds` bounds the pathological case loudly.**
 Zero/tiny scale or a degenerate rate could make the target unreachable;

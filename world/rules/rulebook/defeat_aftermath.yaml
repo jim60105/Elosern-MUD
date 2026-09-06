@@ -12,3 +12,12 @@ pg_lines:
   - "你眼前一黑倒了下去——再次睜開眼時，世界仍在轉動，四肢沉重得不聽使喚。"
 weak_debuff:
   buff_key: defeat_weak
+# The defeat recovery tax (defeat-aftermath-recovery D-R2): the wake target is
+# `ceil(max_hp * wake_fraction)`; the virtual solve runs the stored regen rate
+# scaled down by `regen_scale` (0 < scale <= 1), while the real clock advance
+# runs the ordinary un-scaled model. `max_recovery_seconds` bounds the
+# pathological case and must stay within the clock's one-advance day bound.
+recovery:
+  regen_scale: 0.5
+  max_recovery_seconds: 21600
+  wake_fraction: 0.05

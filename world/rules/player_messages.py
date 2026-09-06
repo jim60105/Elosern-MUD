@@ -95,6 +95,7 @@ DEFEAT_AFTERMATH_TEMPLATES: dict[str, str] = {
     "defeat_settle": "{data[wake]}",
     "violator_depart": "{actor} 對倒地的你失去興趣，逕自離開了。",
     "weak_granted": "虛弱感籠罩全身——你暫時使不出全力。",
+    "recovery_advance": "你昏迷了 {data[seconds]} 秒，意識回籠時四肢依然沉重——體力只恢復了一小部分。",
 }
 
 

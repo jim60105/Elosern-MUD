@@ -112,6 +112,7 @@ class AdvanceSource(StrEnum):
     COMMAND = "command"
     COMBAT = "combat"
     SKIP = "skip"
+    DEFEAT_AFTERMATH = "defeat_aftermath"
 
 
 @dataclass(frozen=True)
