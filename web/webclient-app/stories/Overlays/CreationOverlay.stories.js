@@ -10,8 +10,8 @@ import {
 } from "../fixtures.js";
 
 // CreationOverlay (B5 overlays family): the full-viewport character-creation
-// wizard for the committed `creation` v4 panel — preset pick, custom form
-// (adult gate on BOTH the age and apparent_age fields, design D1), the
+// wizard for the committed `creation` v5 panel — preset pick, custom form
+// (age bounds gate on BOTH the age and apparent_age fields, design D1), the
 // concept branch (transient proposal fill, retool-concept-transient-fill),
 // and the server-persisted wizard draft. Every action emits the exact
 // `creation.*` OOB envelope; the offline showcase stays truthful: no

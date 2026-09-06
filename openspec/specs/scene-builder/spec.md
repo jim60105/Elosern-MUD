@@ -41,7 +41,7 @@ attempts to supply a numeric stat, a typeclass path, or a prototype parent outsi
 SHALL be rejected with a named `SceneBuilderError` before any room or entity is created. The
 number ban SHALL cover mechanical and balance values — numeric stats, rewards, and bands. The
 validated characterization fields (`display_name`, paired `age`/`apparent_age` bounded by the
-adult floor and the race lifespan, and the portrait `stable_key`) are authored content like
+age floor and the race lifespan, and the portrait `stable_key`) are authored content like
 speech and SHALL NOT be treated as mechanical numbers; they never feed stored stats, which remain
 derived deterministically from the lore tables.
 
@@ -253,9 +253,9 @@ under `world/ai/` SHALL import the SceneBuilder.
 
 ### Requirement: The occupant spawn path exposes a post-commit portrait-eligibility seam with unchanged atomicity
 `world/quests/scene_builder.py`'s occupant spawn path SHALL apply the characterization carried by
-`StageSpawnRequirement` (display name, paired canonical adult ages, and the named portrait
+`StageSpawnRequirement` (display name, paired canonical ages, and the named portrait
 `stable_key` from `blueprint-portrait-policy`) when present: `db.display_name`, `db.age` /
-`db.apparent_age` (declared values, or the deterministic adult baseline 25 when a portrait policy
+`db.apparent_age` (declared values, or the deterministic age baseline 25 when a portrait policy
 is declared and the ages are absent), and `db.portrait_policy = {"mode": "named",
 "stable_key": ...}`. After materialization, the spawn path SHALL, inside the same atomic
 materialization, schedule a portrait ensure through `transaction.on_commit` for any occupant that
@@ -283,7 +283,7 @@ schedules nothing.
 #### Scenario: The portrait apply writes the full policy dict
 - **WHEN** a characterized occupant is spawned
 - **THEN** `db.portrait_policy` is exactly `{"mode": "named", "stable_key": ...}` and canonical
-  adult ages are present before the policy is set
+  ages are present before the policy is set
 
 ### Requirement: NPC characterization carries an optional authored persona block for look flavor
 The SceneBuilder's occupant characterization seam SHALL accept an optional bounded `background`

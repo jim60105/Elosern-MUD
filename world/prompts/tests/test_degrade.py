@@ -128,8 +128,8 @@ class BoundedFailureDegradeTests(PromptFixture):
         self.write_file(
             "art.yaml",
             "schema_version: 1\nprompts:\n  art.style: approved visual style\n"
-            "  art.character_description: A {race} adult named {name} ({age}) in the {style}.\n"
-            "  art.character_description: A {race} adult named {name} ({age}) in the {style}.\n"
+            "  art.character_description: A {race} character named {name} ({age}) in the {style}.\n"
+            "  art.character_description: A {race} character named {name} ({age}) in the {style}.\n"
             "  art.monster_description: \"{description} ({display_name}；例如：{examples})\"\n",
         )
 
@@ -203,7 +203,7 @@ class BoundedFailureDegradeTests(PromptFixture):
         )
         self.assertEqual(LLMNPC._thinking_text(npc), "")
 
-    @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer", "art-subject-model::subject-descriptions-are-deterministic-adult-safe-and-exclude-non-physical-truth")
+    @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer", "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_broken_art_file_degrades_to_deterministic_fallback_descriptions(self):
         from unittest.mock import Mock
 

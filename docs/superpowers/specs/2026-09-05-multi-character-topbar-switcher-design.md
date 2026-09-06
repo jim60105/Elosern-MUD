@@ -282,7 +282,7 @@ them; the original wording is kept for the record rather than edited in place.
 
 - **D10 is confirmed, not amended,** but needs no generalization work:
   `world/art/presenter.py::resolve_character(entity)` already accepts any entity, resolves only
-  from an explicit named `portrait_policy`, and applies the adult gate. Room presence was never a
+  from an explicit named `portrait_policy`, and validates the subject age attributes. Room presence was never a
   precondition. A still-pending shell carries no policy (it is written by
   `finalize_player_portrait` at activation), so it resolves to the `無肖像` placeholder.
 

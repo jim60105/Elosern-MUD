@@ -209,7 +209,7 @@ def run_migrate(runtime: BrowserRuntime) -> subprocess.CompletedProcess[str]:
 
 
 def run_seed(runtime: BrowserRuntime) -> subprocess.CompletedProcess[str]:
-    """Seed the deterministic account and activated adult character."""
+    """Seed the deterministic account and activated character."""
     env = _base_env(
         runtime,
         {"DJANGO_SETTINGS_MODULE": SEED_SETTINGS_DOTPATH},

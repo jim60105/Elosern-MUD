@@ -245,9 +245,17 @@ def _validate_name(value: Any) -> str:
     return name
 
 
-def _validate_adult(value: Any, field: str) -> int:
-    if type(value) is not int or value < 18:
-        raise CharacterCreationError(f"{field} must be an integer of at least 18")
+def _validate_age(value: Any, field: str) -> int:
+    """Validate one canonical age input as an exact integer in the reasonable range.
+
+    The bounds mirror the creation wizard's advertised presentation constants
+    (``AGE_MINIMUM``/``AGE_MAXIMUM``); this validator is the numeric authority
+    every creation entry point converges on.
+    """
+    if type(value) is not int or not 0 <= value <= 10000:
+        raise CharacterCreationError(
+            f"{field} must be an integer from 0 to 10000"
+        )
     return value
 
 
@@ -363,8 +371,8 @@ def preflight_character_creation(
         raise CharacterCreationError("creation mode must be 'preset' or 'custom'")
 
     valid_name = _validate_name(name)
-    valid_age = _validate_adult(age, "age")
-    valid_apparent_age = _validate_adult(apparent_age, "apparent_age")
+    valid_age = _validate_age(age, "age")
+    valid_apparent_age = _validate_age(apparent_age, "apparent_age")
     if not isinstance(race, str):
         raise CharacterCreationError("race must be a registry key")
     if request.mode == "custom":

@@ -122,7 +122,7 @@ component identity kwargs. `world/rules/guild_config.py` SHALL parse and batch-v
 a blueprint component type whose identity kwargs the row fails to supply, or a non-string
 `anchor_room` each raise the catalog's named error and cache nothing.
 `world/rules/guild_economy.py::sync_service_content` SHALL be an interpreter of the roster: per
-row it resolves the room by tag, finds-or-creates the adult host on the `service_id` anchor with
+row it resolves the room by tag, finds-or-creates the host NPC on the `service_id` anchor with
 the unchanged never-rename/never-retitle reuse contract, and assembles components through the
 shared `world/rules/profession_assembly.py` helper — never through a code-side component literal.
 The shipped roster SHALL reproduce the pre-change two hosts exactly (same names, titles, rooms,
@@ -132,7 +132,7 @@ behavior-neutral.
 #### Scenario: Shipped roster recreates today's two hosts bit-for-bit
 - **WHEN** sync runs against a database whose two service hosts were deleted
 - **THEN** the recreated guild master and merchant carry the same key, title, room, race
-  baseline, adult identity, and component kwargs as the pre-change sync produced
+  baseline, canonical ages, and component kwargs as the pre-change sync produced
 
 #### Scenario: Config-time roster validation rejects a nameable offense without DB access
 - **WHEN** a roster row declares `profession: blacksmith` (no such registry row) or omits the

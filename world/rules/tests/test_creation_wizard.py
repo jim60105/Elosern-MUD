@@ -74,8 +74,8 @@ class CreationWizardTests(EvenniaTest):
         self.assertIn("human_wanderer", keys)
         self.assertIn("elf_guardian", keys)
         self.assertEqual(view.custom.name.max_length, 64)
-        self.assertEqual(view.custom.adult.age_minimum, 18)
-        self.assertEqual(view.custom.adult.apparent_age_minimum, 18)
+        self.assertEqual(view.custom.age.age_minimum, 0)
+        self.assertEqual(view.custom.age.apparent_age_minimum, 0)
         race_keys = {race.key for race in view.custom.races}
         self.assertEqual(race_keys, {"human", "beastfolk", "elf"})
         elf = next(race for race in view.custom.races if race.key == "elf")
@@ -166,8 +166,8 @@ class CreationWizardTests(EvenniaTest):
     def test_invalid_custom_draft_rejected_without_mutation(self):
         save_custom_draft(self.account, self.character, self.custom_request())
         cases = {
-            "underage age": dict(age=17),
-            "underage apparent age": dict(apparent_age=17),
+            "negative age": dict(age=-1),
+            "negative apparent age": dict(apparent_age=-1),
             "markup delimiter": dict(display_name="|rbad|n"),
             "unknown race": dict(race="dragon"),
             "incompatible subrace": dict(race="human", subrace="foxkin"),
@@ -324,12 +324,12 @@ class CreationWizardTests(EvenniaTest):
                 "stage": "preset_selected",
                 "preset_key": "nope",
             },
-            "underage age": {
+            "negative age": {
                 "version": 3,
                 "mode": "custom",
                 "stage": "custom_filled",
                 "display_name": "角色",
-                "age": 17,
+                "age": -1,
                 "apparent_age": 20,
                 "race": "human",
                 "subrace": "human_commoner",

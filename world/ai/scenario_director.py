@@ -576,8 +576,11 @@ SCENARIO_DIRECTOR_OUTPUT_SCHEMA: dict[str, Any] = {
                                 "disposition": {"type": ["string", "null"]},
                                 "display_name": {"type": ["string", "null"]},
                                 "title": {"type": ["string", "null"]},
-                                "age": {"type": ["integer", "null"]},
-                                "apparent_age": {"type": ["integer", "null"]},
+                                "age": {"type": ["integer", "null"], "minimum": 0},
+                                "apparent_age": {
+                                    "type": ["integer", "null"],
+                                    "minimum": 0,
+                                },
                                 "portrait": {
                                     "type": ["object", "null"],
                                     "required": ["stable_key"],

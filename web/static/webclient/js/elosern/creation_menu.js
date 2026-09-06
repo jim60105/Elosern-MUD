@@ -3,9 +3,9 @@
  *
  * Reduces a validated `creation` panel into the logical preset cards, the
  * custom-form geometry (selected race/subrace, the seven allocation axes, and
- * the name plus two adult age fields), the saved-draft restoration, and the
+ * the name plus two age fields), the saved-draft restoration, and the
  * exact wire payloads consumed by KeyboardRouter and the creation dock. The
- * server is authoritative for every bound and the adult gate; this model only
+ * server is authoritative for every bound and the age gate; this model only
  * shapes the controls and produces advisory client feedback.
  *
  * No `document` or `window` access at load time; Node tests exercise the model
@@ -337,12 +337,12 @@
       errors.displayName = "角色姓名需為 1–64 個字元。";
     }
     var age = parseInt(state.age, 10);
-    if (isNaN(age) || age < 18 || age > 10000) {
-      errors.age = "實際年齡需為 18–10000 的整數。";
+    if (isNaN(age) || age < 0 || age > 10000) {
+      errors.age = "實際年齡需為介於 0 與 10000 之間的整數。";
     }
     var apparentAge = parseInt(state.apparentAge, 10);
-    if (isNaN(apparentAge) || apparentAge < 18 || apparentAge > 10000) {
-      errors.apparentAge = "外表年齡需為 18–10000 的整數。";
+    if (isNaN(apparentAge) || apparentAge < 0 || apparentAge > 10000) {
+      errors.apparentAge = "外表年齡需為介於 0 與 10000 之間的整數。";
     }
     var profile = profileFor(panel, state.raceKey, state.subraceKey);
     if (!profile) {

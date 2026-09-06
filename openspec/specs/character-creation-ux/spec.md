@@ -48,13 +48,13 @@ a dedicated prompt.
   or leave blank, and the accepted value is carried into activation
 
 ### Requirement: The character creation restyle does not change activation semantics
-The presentational restyle SHALL NOT alter the preset/custom activation logic, the adult identity
+The presentational restyle SHALL NOT alter the preset/custom activation logic, the age-range
 gate, subrace compatibility checks, display-name validation, or the all-or-nothing atomic activation
 in `world.rules.character_creation`. Existing activation behavior SHALL remain deterministic under the
 restyled output.
 
-#### Scenario: The restyled command still enforces the adult gate
-- **WHEN** custom creation supplies `age=17` through the restyled prompts
+#### Scenario: The restyled command still enforces the age-range gate
+- **WHEN** custom creation supplies `age=-1` through the restyled prompts
 - **THEN** activation is still rejected and the character remains pending
 
 ### Requirement: The interactive creation wizard collects every unmatched reply
@@ -97,8 +97,8 @@ no default, and an empty or whitespace-only name reply there re-prompts the same
 non-empty name or `cancel`) instead of proceeding to an activation doomed to be rejected. The completed request then flows through the ordinary `CharacterCreationRequest`
 preflight and all-or-nothing activation carrying the proposal's race, subrace, allocations, persona
 block, background, and affinity elements together with the accepted-or-entered name and ages. The
-concept path SHALL persist no wizard draft and SHALL NOT alter activation semantics, the adult
-identity gate, subrace compatibility checks, display-name validation, or the all-or-nothing atomic
+concept path SHALL persist no wizard draft and SHALL NOT alter activation semantics, the age-range
+gate, subrace compatibility checks, display-name validation, or the all-or-nothing atomic
 activation in `world/rules.character_creation`. With the LLM offline the command SHALL return the
 stable unavailable message and the ordinary preset/custom flows SHALL remain fully usable.
 
@@ -120,16 +120,16 @@ stable unavailable message and the ordinary preset/custom flows SHALL remain ful
 - **THEN** the name prompt shows no default and re-prompts the same prompt until a non-empty name
   is typed, while `cancel` still aborts the flow
 
-#### Scenario: The concept path cannot bypass the adult gate
-- **WHEN** a player completes a concept-guided flow after typing an age below 18 over the prefilled
-  default
+#### Scenario: The concept path cannot bypass the age-range gate
+- **WHEN** a player completes a concept-guided flow after typing an out-of-range age over the
+  prefilled default
 - **THEN** activation is still rejected by the deterministic preflight and the character remains
   pending
 
 #### Scenario: A clamped proposal age is accepted by Enter
-- **WHEN** the proposal's age was normalised to the adult floor of 18 and the player accepts the
+- **WHEN** the proposal's age was normalised to the range floor of 0 and the player accepts the
   prefilled default
-- **THEN** activation passes the adult gate with the clamped value
+- **THEN** activation passes the age-range gate with the clamped value
 
 #### Scenario: Offline concept input leaves the deterministic surface intact
 - **WHEN** every LLM profile is offline and a pending player runs `character concept`

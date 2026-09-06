@@ -45,8 +45,8 @@ under the queue lock, and the sync SHALL consolidate any duplicate records found
 ### Requirement: Startup recovery rescans explicit unique portrait policies
 `art_sync_all()` SHALL also scan living characters that carry an explicit `{"mode": "named",
 "stable_key": ...}` portrait policy and ensure each subject, recovering an enqueue that failed after an
-earlier gameplay commit. A subject that fails the adult gate SHALL be skipped with a named diagnostic
-and never retried by a later recovery pass for the same policy.
+earlier gameplay commit. A subject whose canonical ages fail the age check SHALL be skipped with a named
+diagnostic and never retried by a later recovery pass for the same policy.
 
 #### Scenario: A named policy without a record is recovered at startup
 - **WHEN** a character has an explicit named portrait policy but no asset record exists after a
@@ -54,7 +54,7 @@ and never retried by a later recovery pass for the same policy.
 - **THEN** the subject record is ensured and the record is created without any gameplay rollback
 
 #### Scenario: An ineligible recovered subject is skipped deterministically
-- **WHEN** a character with an explicit named policy fails the adult gate during recovery
+- **WHEN** a character with an explicit named policy fails the canonical-age check during recovery
 - **THEN** no record is created, a named diagnostic is logged, and the same policy is not retried by a
   later recovery pass without re-running the gate
 
@@ -75,7 +75,7 @@ or rejected creation/import SHALL emit no post-commit job.
 - **THEN** no portrait policy is persisted and no post-commit portrait job is emitted
 
 #### Scenario: A validated import schedules per eligible record
-- **WHEN** an all-or-nothing import batch commits with validated adult named records
+- **WHEN** an all-or-nothing import batch commits with validated named records carrying canonical ages
 - **THEN** each imported named NPC carries an explicit named policy and one post-commit ensure is
   scheduled per record
 
@@ -153,3 +153,68 @@ committed gameplay transaction is always reported as success even when the art h
 - **WHEN** `ensure_scene_asset()` fails during room entry
 - **THEN** the player's move completes normally and only a bounded diagnostic is logged
 
+### Requirement: Portrait-character enqueue validates canonical age attributes immediately before enqueue
+`world/art/subjects.py` SHALL expose `character_ages(entity)` that reads `age` and `apparent_age`
+from the character's canonical attributes and raises a named `ArtSubjectError` diagnostic identifying
+the failing field when either value is missing or non-integer. `world/art/service.py` SHALL run this
+check for every `portrait:character` subject immediately before any queue record is written, in
+addition to the schema/creation validation that already checked the same fields. A rejection SHALL
+produce no queue record and no prompt text, SHALL never reach a worker fixture, and SHALL be logged
+with the named diagnostic for staff review.
+
+#### Scenario: A valid integer record reaches the worker fixture
+- **WHEN** a character with `age = 22` and `apparent_age = 22` and an explicit named portrait policy is
+  enqueued
+- **THEN** the age check passes and a fixture worker receives a job whose description contains the
+  character's canonical identity
+
+#### Scenario: A zero age is a valid canonical value
+- **WHEN** a character with `age = 0` and `apparent_age = 0` and an explicit named portrait policy is
+  enqueued
+- **THEN** the age check passes, since any integer is a valid canonical age
+
+#### Scenario: A missing age rejects with a named diagnostic
+- **WHEN** a character's `age` or `apparent_age` attribute is absent
+- **THEN** a named `ArtSubjectError` is raised with the failing field identified, no queue record is
+  created, no prompt text is produced, and the worker fixture is never invoked
+
+#### Scenario: A non-integer age rejects with a named diagnostic
+- **WHEN** a character's `age` or `apparent_age` attribute is a string or otherwise non-integer
+- **THEN** a named `ArtSubjectError` is raised with the failing field identified, no queue record is
+  created, no prompt text is produced, and the worker fixture is never invoked
+
+### Requirement: The age check runs on every lifecycle path and rejects deterministically without a persisted marker
+`world/art/service.py` SHALL apply the canonical-age check at schedule time and again before the queue
+write for every lifecycle path that can produce a `portrait:character` subject — player creation,
+validated import, named-NPC spawn, staff retry, staff requeue, and startup recovery. Because the check
+is a pure function of the canonical age attributes, every attempt against the same bad data SHALL
+reject with the same named diagnostic; no separate persisted rejection marker is required, and no
+attempt SHALL be retried periodically (attempts occur only on lifecycle events). A subject that failed
+the check SHALL be eligible again once its canonical age data is corrected, at which point the next
+lifecycle attempt passes.
+
+#### Scenario: An import with malformed ages never enqueues
+- **WHEN** an import path is forced to schedule a portrait subject for a character whose canonical age
+  data is missing or non-integer
+- **THEN** the check rejects before any record write and the worker fixture receives nothing
+
+#### Scenario: An ineligible recovered subject is skipped deterministically
+- **WHEN** a character with an explicit named policy fails the canonical-age check during recovery
+- **THEN** no record is created, a named diagnostic is logged, and a later recovery pass for the same
+  bad data rejects identically without creating a record
+
+#### Scenario: A staff retry or requeue re-runs the check
+- **WHEN** a staff retry or requeue targets a character portrait whose owning entity carries missing or
+  non-integer canonical ages
+- **THEN** the check rejects with the named diagnostic, the record is unchanged, and no worker call
+  occurs
+
+### Requirement: Rejected prompt content never reaches the presenter or browser
+The presenter-facing surface SHALL never contain a rejected prompt or an ineligible character's
+identity. A `portrait:character` subject that failed the canonical-age check SHALL resolve only to the
+unavailable placeholder with its explanatory label and alternative text.
+
+#### Scenario: The presenter surface is free of rejected content
+- **WHEN** an age-check-rejected character is queried through the read-only presenter primitives
+- **THEN** the result is the unavailable placeholder with a label and safe alternative text, and no
+  prompt text or ineligible identity appears in the payload

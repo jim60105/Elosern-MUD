@@ -333,9 +333,10 @@ def _instantiate_validated_character(
     entity.db.equipment = record["equipment"]
     entity.db.inventory = record["inventory"]
     entity.db.affinity_elements = _resolve_affinity_elements(record)
-    # Persist the adult identity the art gate reads, and establish the explicit
-    # named portrait policy (design D2): the character's unique-portrait subject
-    # derives only from this policy, never from its display name or role.
+    # Persist the canonical ages the art subject model reads, and establish the
+    # explicit named portrait policy (design D2): the character's
+    # unique-portrait subject derives only from this policy, never from its
+    # display name or role.
     entity.db.age = record["age"]
     entity.db.apparent_age = record["apparent_age"]
     entity.db.portrait_policy = {"mode": "named", "stable_key": record["key"]}

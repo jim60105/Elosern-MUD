@@ -611,8 +611,8 @@ class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
         def unpaired(entry):
             del entry["apparent_age"]
 
-        def underage(entry):
-            entry.update(age=17, apparent_age=17)
+        def negative_age(entry):
+            entry.update(age=-1, apparent_age=-1)
 
         def boolean(entry):
             entry.update(age=True, apparent_age=35)
@@ -623,7 +623,7 @@ class CharacterizationCompileTests(CompileRegistryIsolation, unittest.TestCase):
         def empty_key(entry):
             entry.update(portrait={"stable_key": ""})
 
-        for mutate in (unpaired, underage, boolean, out_of_band, empty_key):
+        for mutate in (unpaired, negative_age, boolean, out_of_band, empty_key):
             with self.subTest(mutate=mutate.__name__):
                 bad = _characterized_payload()
                 mutate(bad["stages"][0]["npc_req"][0])

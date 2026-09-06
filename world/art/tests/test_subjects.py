@@ -242,7 +242,7 @@ class PortraitPolicyTests(EvenniaTestCase):
 
 
 class DescriptionTests(EvenniaTestCase):
-    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-adult-safe-and-exclude-non-physical-truth")
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_character_description_contains_only_allowed_stable_data(self):
         character = Mock()
         character.db.display_name = "艾琳"
@@ -258,7 +258,7 @@ class DescriptionTests(EvenniaTestCase):
         self.assertNotIn("secret tragic past", text)
         self.assertNotIn("99", text)
 
-    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-adult-safe-and-exclude-non-physical-truth")
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_scene_and_monster_descriptions_are_registry_text(self):
         scene = scene_subject_for("forest_path")
         monster = monster_subject_for("low")

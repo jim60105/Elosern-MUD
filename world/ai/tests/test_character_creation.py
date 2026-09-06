@@ -173,11 +173,12 @@ class CharacterCreationPromptTests(unittest.TestCase):
         "generative-character-concept::proposals-are-validated-deterministically-against-the-registries",
         "generative-character-concept::the-concept-prompt-requests-the-expanded-blueprint-and-the-race-affinity-bound",
     )
-    def test_prompt_template_requests_the_expanded_blueprint_without_adult_wording(self):
+    def test_prompt_template_requests_the_expanded_blueprint(self):
         # The authored template (before player-concept interpolation) must name
         # the five transient fields, instruct the affinity bound, and carry no
-        # adult-age wording. The rendered system message embeds the player's
-        # concept, so this reads the source template directly.
+        # retired age-field wording (retool-concept-transient-fill). The
+        # rendered system message embeds the player's concept, so this reads
+        # the source template directly.
         from pathlib import Path
 
         import yaml
@@ -199,8 +200,6 @@ class CharacterCreationPromptTests(unittest.TestCase):
         self.assertIn("親附上限", template)
         self.assertIn("精靈必須留空", template)
         self.assertIn("600 字以內", template)
-        self.assertNotIn("18", template)
-        self.assertNotIn("成年", template)
         self.assertNotIn("年齡一律由玩家自己輸入", template)
         self.assertNotIn("不得加入年齡欄位", template)
 
@@ -582,7 +581,7 @@ class TransientFillParityTests(unittest.TestCase):
         from world.rules import character_creation as rules_creation
 
         self.assertEqual(
-            character_creation.ADULT_AGE_MINIMUM, creation_wizard.AGE_MINIMUM
+            character_creation.AGE_MINIMUM, creation_wizard.AGE_MINIMUM
         )
         self.assertEqual(
             character_creation.AGE_MAXIMUM_BOUND, creation_wizard.AGE_MAXIMUM
@@ -635,9 +634,10 @@ class TransientFillNormalizationTests(unittest.TestCase):
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_ages_clamp_to_the_band_without_consuming_a_retry(self):
         cases = [
-            ({"age": 17, "apparent_age": 10}, 18, 18),
+            ({"age": -5, "apparent_age": -1}, 0, 0),
             ({"age": 10001, "apparent_age": 99999}, 10000, 10000),
-            ({"age": 18, "apparent_age": 10000}, 18, 10000),
+            ({"age": 0, "apparent_age": 10000}, 0, 10000),
+            ({"age": 10000, "apparent_age": 0}, 10000, 0),
             ({"age": 30, "apparent_age": 25}, 30, 25),
         ]
         for payload, age, apparent in cases:

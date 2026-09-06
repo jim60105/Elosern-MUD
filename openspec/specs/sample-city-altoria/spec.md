@@ -118,8 +118,8 @@ changes only which typeclass each of the twelve links spawns as.
 - **THEN** `get_world_clock().tick` increases by exactly `CLOCK_YAML["command_defaults"]["move"]`
 
 ### Requirement: Altoria service content synchronizes idempotently without resetting live state
-Guild-economy startup SHALL create or update by stable key/tag one adult guild-service NPC with
-GuildStaff and GuildExaminer components in the guild hall and one adult Merchant NPC in the general
+Guild-economy startup SHALL create or update by stable key/tag one guild-service NPC with
+GuildStaff and GuildExaminer components in the guild hall and one Merchant NPC in the general
 store. It SHALL create required bidirectional exits and exam spawn metadata exactly once. Repeated sync
 SHALL update authored descriptions/component definitions without duplicating objects or resetting
 merchant stock that has already been initialized.
@@ -137,14 +137,14 @@ merchant stock that has already been initialized.
 - **WHEN** a player buys an item and startup sync runs again
 - **THEN** the decremented stock remains rather than returning to initial stock
 
-### Requirement: Guild service hosts carry adult identity
+### Requirement: Guild service hosts carry canonical age
 
-The system SHALL persist adult `age`/`apparent_age` on the guild service host NPCs (guild master
+The system SHALL persist canonical `age`/`apparent_age` on the guild service host NPCs (guild master
 and merchant) created during `sync_guild_economy`. The hosts are identified by their service
 component anchors (`service_id`), not by their display keys — their display keys are the authored
 registry names.
 
-#### Scenario: Service host has adult age after sync
+#### Scenario: Service host has canonical age after sync
 - **WHEN** `sync_guild_economy` creates the guild-master host or the merchant host for their
   service components
-- **THEN** both NPCs have integer `age` and `apparent_age` of at least 18
+- **THEN** both NPCs have integer `age` and `apparent_age` defaulting to the canonical default 18

@@ -60,11 +60,11 @@ LLM wrote the NPC.
 - **WHEN** two characters share the same display name but only one carries an explicit named policy
 - **THEN** only the policy-bearing character resolves to a unique portrait subject
 
-### Requirement: Subject descriptions are deterministic, adult-safe, and exclude non-physical truth
+### Requirement: Subject descriptions are deterministic and exclude non-physical truth
 `world/art/subjects.py` (or the provider it composes) SHALL produce exactly one deterministic
 description per subject from allowed immutable or validated data: the one-sentence `scene_sentence`
 for scenes, the bestiary archetype description for generic monsters, and a template over
-`display_name`, race/subrace, and adult age for characters. The description templates and the
+`display_name`, race/subrace, and canonical age for characters. The description templates and the
 approved-visual-style fragment SHALL be rendered from the prompt library via
 `render_prompt("art.style")`, `render_prompt("art.character_description", …)`, and
 `render_prompt("art.monster_description", …)` — the library is the sole source of the style
@@ -75,7 +75,7 @@ description SHALL NOT include persona text, secret state, mutable combat resourc
 
 #### Scenario: Character descriptions contain only allowed stable data
 - **WHEN** a character description is generated for a character with a persona and a disguise
-- **THEN** it contains the display name, race/subrace, and adult age but no persona content, no
+- **THEN** it contains the display name, race/subrace, and canonical age but no persona content, no
   combat-resource values, and no disguised stats as physical truth
 
 #### Scenario: Scene and monster descriptions are registry text

@@ -23,10 +23,10 @@
 ## 2. 設計原則
 
 1. **提案即暫態填入器**的既有定位不變（2026-09-02 設計 §2.2）：概念零持久寫入，提案經 session 瞬態槽送達、填入表單。本期只擴大填入的欄位集合。
-2. **伺服端正規化、不棄回覆**：提案通過結構驗證後，界外值一律就地夾取／截斷／剔除，永不因單一欄位界外而降級整份提案。玩家要求「LLM 回年齡 < 18 時直接覆寫為 18，不棄回覆、不告知 LLM」——夾取因此是 guardrail validator 的語義的一部分，不是重試語義。
+2. **伺服端正規化、不棄回覆**：提案通過結構驗證後，界外值一律就地夾取／截斷／剔除，永不因單一欄位界外而降級整份提案。玩家要求「LLM 回年齡 < 0 時直接覆寫為 0，不棄回覆、不告知 LLM」——夾取因此是 guardrail validator 的語義的一部分，不是重試語義。
 3. **單一把關點**：五欄的正規化只在 `world/ai/character_creation.py` 的語義驗證器做一處，webclient 與 Telnet 兩條 surface 消費同一份已正規化的 `CharacterProposal`，規則不重複。
 4. **Toast 是客戶端動作回饋通道**：其狀態是純客戶端本地狀態（送出中／完成／失敗的回執），本就不需要後端 OOB 讀取模型。遊戲事件 toast（升級／任務／解鎖／金錢）仍待未來的 `event-log` 讀模型，屆時直接插入同一佇列——本期只留介面不做事件匯流排（範圍決策，玩家已確認）。
-5. **提示詞最小化原則**：要求 LLM 正常提出年齡與親和，不在提示詞裡敘述成年約束——成年把關完全由伺服端夾取承擔，降低 LLM 工作複雜度。
+5. **提示詞最小化原則**：要求 LLM 正常提出年齡與親和，不在提示詞裡敘述年齡範圍約束——範圍把關完全由伺服端夾取承擔，降低 LLM 工作複雜度。
 
 ## 3. Toast 基礎設施（D1）
 
@@ -90,7 +90,7 @@
 | 欄位 | 型別 | 提示詞指示 | 伺服端正規化（安全網） |
 |---|---|---|---|
 | `display_name` | `str` | 為角色取正體中文名字 | 去首尾空白；超 `MAX_NAME_CODE_POINTS` 截斷；正規化後為空 → 缺席 |
-| `age` | `int` | 提出角色年齡（**不敘述成年約束**） | 非整數 → 缺席；`< 18` → 覆寫 18；`> 10000` → 覆寫 10000 |
+| `age` | `int` | 提出角色年齡（**不敘述年齡範圍約束**） | 非整數 → 缺席；`< 0` → 覆寫 0；`> 10000` → 覆寫 10000 |
 | `apparent_age` | `int` | 同上（外表年齡） | 同 `age` |
 | `background` | `str` | 精簡背景故事（繁體中文） | 去首尾空白；超 `MAX_PERSONA_FIELD_LENGTH`(600) 截斷；空 → 缺席 |
 | `affinity_elements` | `tuple[str, ...]` | **依所選種族的親附上限選取，精靈不得選取**（上限寫進 `race_catalog`，見 §5.2） | 剔除未知鍵 → 去重 → 依 `max_affinity_elements(race_key)` 截斷；`race_key == "elf"` → 清空；清空後為空tuple |
@@ -113,7 +113,7 @@
 - 移除「不得替玩家決定年齡——年齡一律由玩家自己輸入」「不得加入年齡欄位」兩句（2026-09-02 設計「年齡由玩家」條款的翻案點，本文件為其修訂記錄）。
 - `race_catalog` 每個種族條目附帶 `親附上限：N`（由 `max_affinity_elements` registry 派生，不寫死），並指示「affinity_elements 的數量不得超過所選種族的親附上限；精靈留空」。
 - `background` 指示控制在 600 字內；名字指示為正體中文、簡短。
-- 提示詞不提「成年」「18」等約束——成年把關是伺服端夾取的職責（原則 5）。
+- 提示詞不提年齡範圍約束（如 0 或 10000）——範圍把關是伺服端夾取的職責（原則 5）。
 
 ### 5.3 線路（creation panel schema v2 → v3）
 
@@ -127,13 +127,13 @@
 
 - `display_name` → `name.value`（缺席 → `""`，維持使用者親打）。
 - `background` → `background.value`。
-- `age`／`apparent_age` → `age.value`／`apparentAge.value`（已經伺服端夾取，必 ≥ 18；本地成年閘自然通過）。
+- `age`／`apparent_age` → `age.value`／`apparentAge.value`（已經伺服端夾取，必在 0..10000 內；本地年齡範圍閘自然通過）。
 - `affinity_elements` → 先過新種族上限（`applyProposal` 既有 trim 路徑），再寫入 `affinitySelected` Set；缺席 → 維持現有選取。
 - 重新套用（新 revision）一律替換五欄，與 persona 三欄同語義；表單重建（同 revision 重發布）不覆寫玩家編輯——既有 revision 守門直接涵蓋。
 
 ### 5.5 Telnet `character concept` 流
 
-- 提案有名字時以其為提示預設值（Enter 接受、輸入即覆寫）；`age`／`apparent_age` 同理。成年閘照舊（正規化後必過）。
+- 提案有名字時以其為提示預設值（Enter 接受、輸入即覆寫）；`age`／`apparent_age` 同理。年齡範圍閘照舊（正規化後必過）。
 - 提案的 `background`／`affinity_elements` 在啟動時直接作為暫態填入值（與 webclient 表單同語義）。
 - 命令語法與命令文件（`docs/game/commands.md`、`docs/game/command-reference.md`）同步。
 
@@ -147,7 +147,7 @@
 
 | 失敗點 | 行為 |
 |---|---|
-| LLM 回 `age < 18`（或 `apparent_age < 18`） | 覆寫 18，提案照常送達（不重試、不告知 LLM） |
+| LLM 回 `age < 0`（或 `apparent_age < 0`） | 覆寫 0，提案照常送達（不重試、不告知 LLM） |
 | LLM 回超界年齡（> 10000） | 夾 10000 |
 | LLM 回非整數年齡／null | 欄位缺席 → 前端維持預設 18 |
 | LLM 回過量／精靈 affinity | 截斷／清空，提案照常送達 |
@@ -160,7 +160,7 @@
 
 ## 7. 測試與驗證
 
-- 純邏輯（`unittest`）：guardrail 正規化矩陣——`age`/`apparent_age` 的 `<18`、`>10000`、非整數、缺席；`affinity` 的未知鍵、重複、超種族上限截斷、elf 清空；`display_name`/`background` 的截斷與空白缺席；worst-case 信封位元組。
+- 純邏輯（`unittest`）：guardrail 正規化矩陣——`age`/`apparent_age` 的 `<0`、`>10000`、非整數、缺席；`affinity` 的未知鍵、重複、超種族上限截斷、elf 清空；`display_name`/`background` 的截斷與空白缺席；worst-case 信封位元組。
 - 整合（Evennia）：`creation.concept` adapter → panel v3 `proposal` 槽含五鍵；presenter 驗證器 v3；Telnet concept 預設值流。
 - Node／Vitest：`protocol.js` 鏡像 v3 新案（缺席鍵、夾取值通過）；`CreationOverlay` 的五欄映射、自動跳 custom、載入態進出、重連不重複跳轉；`ToastQueue` 佇列上限／FIFO／自動消失／點擊關閉；`deferred_surfaces_absent` 改寫案（`feedback-` 合法、事件 toast 仍禁）。
 - 瀏覽器（Playwright 單 class）：概念旅程——輸入概念 → 套用 → 載入態出現 → 自動跳自訂頁籤且名字/背景/年齡/親和已填 → toast 可見 → 儲存啟動。
@@ -216,7 +216,7 @@
 
 ## 9. 取捨與已接受代價
 
-1. 年齡決策翻案：2026-09-02 設計「年齡一律玩家輸入」由本設計修訂——LLM 提議、伺服端夾 18 保底、玩家仍可改。換得概念功能對「貓人少女」這類概念給出完整表單預填。
+1. 年齡決策翻案：2026-09-02 設計「年齡一律玩家輸入」由本設計修訂——LLM 提議、伺服端夾 0 保底、玩家仍可改。換得概念功能對「貓人少女」這類概念給出完整表單預填。
 2. 「不棄回覆」犧牲單欄語義把關（超量親和被截斷可能非玩家本意），換得提案送達率；玩家在表單上看見結果並可改。
 3. 動作回饋 toast 先落地、遊戲事件 toast 待讀模型：佇列介面重複使用，但凍結測試本期即改寫（已於 §3.4 給出不稀釋不變量的表述）。
 4. 五欄使提示詞與驗證器變大，但每處仍是既有精確模式（optional 鍵、鏡像驗證器、穩定正規化）的機械性擴充。

@@ -188,7 +188,7 @@ LLM 必須輸出 JSON 格式：
 * `allocations`：7 大屬性配點（`hp`、`mp`、`sp`、`atk_phys`、`agility`、`defense`、`magic_power`），總和必須精確等於該種族預算。
 * `suggested_skills`：推薦初始技能（最多 8 個）。
 * `persona`：三人設草稿（`personality` 性格、`life_story` 生平、`habit` 習慣）。
-* **成人鐵律（Adult Invariant）**：`age` 與 `apparent_age` 必須 $\ge 18$ 歲，未成年提案由底層驗證器直接攔截修正或拒絕。
+* **年齡合理值（Age Range Bound）**：`age` 與 `apparent_age` 為 $0$ 至 $10000$ 的整數，越界的提案由底層驗證器直接夾取修正。
 
 ---
 

@@ -194,9 +194,9 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         self.assertEqual(opponent.location, self.hall)
         self.assertEqual(self.examiner.relations.affinity_for(self.player), 1)
 
-    @covers_requirement("guild-rank-exams::guild-exam-opponents-carry-adult-identity")
-    def test_spawned_exam_opponent_carries_adult_identity(self):
-        from world.art.adult import portrait_eligibility
+    @covers_requirement("guild-rank-exams::guild-exam-opponents-carry-canonical-age")
+    def test_spawned_exam_opponent_carries_canonical_ages(self):
+        from world.art.subjects import character_ages
 
         self._give_merit(50)
         record = start_guild_exam(self.player, self.examiner, "E")
@@ -204,7 +204,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         self.assertIsNotNone(opponent)
         self.assertEqual(int(opponent.attributes.get("age")), 18)
         self.assertEqual(int(opponent.attributes.get("apparent_age")), 18)
-        self.assertEqual(portrait_eligibility(opponent), (18, 18))
+        self.assertEqual(character_ages(opponent), (18, 18))
 
     def test_npc_intent_has_no_extra_authority(self):
         # No merit -> rejected identically for both requesters.

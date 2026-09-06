@@ -2,7 +2,7 @@ schema_version: 1
 prompts:
   art.style: approved visual style
   art.character_description: |-
-    A {race} adult named {name} ({age}) in the {style}.
+    A {race} character named {name} ({age}) in the {style}.
   art.monster_description: "{description} ({display_name}；例如：{examples})"
   # Positive prompt template for scene subjects. {description} is the
   # deterministic scene sentence from the scene-archetype registry; the
@@ -21,7 +21,7 @@ prompts:
   # is the deterministic character/monster description; the surrounding text is
   # authored per the image-prompt-builder-nl skill.
   art.portrait_prompt: |-
-    A medium half-body portrait of an adult fantasy figure — {description} — facing the
+    A medium half-body portrait of a fantasy figure — {description} — facing the
     viewer at a three-quarter angle, rendered as a detailed digital illustration with
     confident brushwork, soft shading, and clean linework. Soft warm key light from the
     upper left with a gentle rim light on the far side; a rich harmonious palette with

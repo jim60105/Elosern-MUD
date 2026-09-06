@@ -12,7 +12,6 @@ from django.conf import settings
 
 from world.observability import log_warn
 
-from world.art.adult import portrait_eligibility
 from world.art.formats import STORE_EXTENSIONS
 from world.art.queue import record_key
 from world.art.store import ArtAssetRecord, ArtAssetStatus
@@ -20,6 +19,7 @@ from world.art.subjects import (
     ArtSubject,
     ArtSubjectError,
     ArtSubjectKind,
+    character_ages,
     character_subject_for,
     monster_subject_for,
 )
@@ -125,11 +125,11 @@ def resolve_subject(subject: ArtSubject) -> dict:
 
 
 def resolve_character(entity) -> dict:
-    """Resolve a character's portrait through the adult gate and named policy.
+    """Resolve a character's portrait through the canonical-age check and named policy.
 
-    A gate-rejected subject resolves only to the unavailable placeholder with
-    its explanatory label; the payload never contains a rejected prompt or an
-    underage identity.
+    A subject with missing or malformed canonical ages resolves only to the
+    unavailable placeholder with its explanatory label; the payload never
+    contains a rejected prompt or the offending age values.
     """
     try:
         subject = character_subject_for(entity)
@@ -138,8 +138,8 @@ def resolve_character(entity) -> dict:
     if subject is None:
         return _placeholder_unavailable("無肖像")
     try:
-        portrait_eligibility(entity)
-    except Exception:  # observability: ignore R2: adult-gate failure -> specified unavailable placeholder; eligibility errors must never leak
+        character_ages(entity)
+    except Exception:  # observability: ignore R2: age-eligibility failure -> specified unavailable placeholder; diagnostics must never leak
         return _placeholder_unavailable("無法提供")
     return resolve_subject(subject)
 
@@ -149,11 +149,11 @@ def resolve_entity(entity) -> dict:
 
     A generic monster (``threat_tier`` resolving in ``MONSTER_TIER_REGISTRY``)
     resolves ``portrait:monster:<threat_tier>`` through
-    ``monster_subject_for`` + ``resolve_subject`` with no adult gate. A
-    character resolves through :func:`resolve_character` (explicit named
-    policy plus both adult age gates). Anything else yields the unavailable
-    placeholder. A rejected subject never returns a prompt, a subject key, or
-    a URL.
+    ``monster_subject_for`` + ``resolve_subject`` with no canonical-age check.
+    A character resolves through :func:`resolve_character` (explicit named
+    policy plus both canonical age fields). Anything else yields the
+    unavailable placeholder. A rejected subject never returns a prompt, a
+    subject key, or a URL.
     """
     threat_tier = getattr(entity, "threat_tier", None)
     if threat_tier in MONSTER_TIER_REGISTRY:

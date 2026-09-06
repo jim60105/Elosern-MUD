@@ -124,11 +124,11 @@ class CharacterActivationTests(EvenniaTest):
                 )
             self.assertEqual(self.character.traits.all(), [])
 
-    @covers_requirement("player-character-creation::character-creation-enforces-adult-identity-and-registry-compatibility")
+    @covers_requirement("player-character-creation::character-creation-enforces-canonical-identity-and-registry-compatibility")
     def test_age_name_and_subrace_rejections_are_non_mutating(self):
         requests = (
-            self.request(age=17),
-            self.request(apparent_age=17),
+            self.request(age=-1),
+            self.request(apparent_age=10001),
             self.request(display_name="|rbad|n"),
             self.request(race="human", subrace="foxkin"),
         )
@@ -812,7 +812,7 @@ class SexCreationTests(EvenniaTest):
         values.update(overrides)
         return CharacterCreationRequest(**values)
 
-    @covers_requirement("player-character-creation::character-creation-enforces-adult-identity-and-registry-compatibility")
+    @covers_requirement("player-character-creation::character-creation-enforces-canonical-identity-and-registry-compatibility")
     def test_custom_sex_persists_on_the_activated_entity(self):
         activate_player_character(
             self.account, self.character, self.request(sex="female")
@@ -836,7 +836,7 @@ class SexCreationTests(EvenniaTest):
                 self.assertEqual(character.sex, DEFAULT_SEX)
                 self.assertEqual(character.attributes.get("sex"), DEFAULT_SEX)
 
-    @covers_requirement("player-character-creation::character-creation-enforces-adult-identity-and-registry-compatibility")
+    @covers_requirement("player-character-creation::character-creation-enforces-canonical-identity-and-registry-compatibility")
     def test_sex_outside_the_vocabulary_is_rejected_without_mutation(self):
         for value in ("x", "Female", "horse", 5):
             with self.subTest(value=value):
@@ -852,7 +852,7 @@ class SexCreationTests(EvenniaTest):
         self.assertEqual(self.character.attributes.get("sex"), DEFAULT_SEX)
         self.assertEqual(self.character.traits.all(), [])
 
-    @covers_requirement("player-character-creation::character-creation-enforces-adult-identity-and-registry-compatibility")
+    @covers_requirement("player-character-creation::character-creation-enforces-canonical-identity-and-registry-compatibility")
     def test_preset_activation_persists_the_default_sex(self):
         # The preset catalog declares no sex channel; activation still writes
         # the normalized member so creation and import paths converge.

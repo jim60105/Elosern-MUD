@@ -4,7 +4,7 @@ These journeys drive the real Evennia server's creation surface through the
 Vue creation overlay (CreationOverlay): preset selection → confirmation → activation →
 exploration snapshot with the creation dock torn down, custom form via
 keyboard-only finite controls and free-text fields, server rejection of both
-underage fields despite bypassed client validation, the destructive reset
+out-of-range age fields despite bypassed client validation, the destructive reset
 confirmation, stale and duplicate submission behavior, reconnect at a saved
 draft stage that never auto-resubmits activation, and viewport verification at
 1440x900 and 1280x720.
@@ -309,7 +309,7 @@ class CustomCreationJourneys(CreationBrowserTest):
         _press(page, "ArrowDown")  # 自訂角色
         _press(page, "Enter")
 
-        # Name and adult age fields: focus the name field, then Tab/Shift+Tab
+        # Name and age fields: focus the name field, then Tab/Shift+Tab
         # through the text/numeric fields exactly as a keyboard-only player does.
         page.evaluate("document.querySelector('[data-testid=\"creation-field-displayName\"]').focus()")
         page.keyboard.type("新冒險者")
@@ -465,8 +465,8 @@ class CustomCreationJourneys(CreationBrowserTest):
         self.assertEqual(self._dock_mode(page), "creation")
         self.assertIsNone(self._creation_panel(page)["draft"])
 
-    @covers_requirement("webclient-character-creation-ui::the-adult-gate-is-server-authoritative-for-both-age-fields")
-    def test_underage_actual_age_rejected_despite_disabled_client_validation(self):
+    @covers_requirement("webclient-character-creation-ui::the-age-range-gate-is-server-authoritative-for-both-age-fields")
+    def test_out_of_range_actual_age_rejected_despite_disabled_client_validation(self):
         page = self._login_creation()
         install_outbound_recorder(page)
         self._wait_creation_available(page)
@@ -485,12 +485,12 @@ class CustomCreationJourneys(CreationBrowserTest):
               Evennia.msg('ui_action', [{
                 protocol_version: 1,
                 presentation_epoch: s.epoch,
-                request_id: 'underage-age-1',
+                request_id: 'out-of-range-age-1',
                 base_revision: s.revision,
                 action_id: 'creation.custom',
                 payload: {
                   display_name: '年輕冒險者',
-                  age: 17,
+                  age: -1,
                   apparent_age: 24,
                   race: 'human',
                   subrace: "human_commoner",
@@ -504,11 +504,15 @@ class CustomCreationJourneys(CreationBrowserTest):
         )
         result = self._wait_result(
             page,
-            lambda r: r["outcome"] == "rejected" and r["code"] in ("underage_age", "malformed_payload"),
+            lambda r: r["outcome"] == "rejected" and r["code"] == "malformed_payload",
             timeout=15000,
         )
         self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "underage_age")
+        # The wire mirrors the single 0..10000 authority exactly, so a below-
+        # zero age is rejected structurally at the payload boundary before the
+        # creation service ever sees it; the deterministic age_out_of_range
+        # code stays reserved for drafts surfaced from other paths.
+        self.assertEqual(result["code"], "malformed_payload")
         panel = self._creation_panel(page)
         self.assertTrue(panel["available"])
         self.assertIsNone(panel["draft"])
@@ -516,8 +520,8 @@ class CustomCreationJourneys(CreationBrowserTest):
         # The dock remains the sole owner in creation mode.
         self.assertEqual(self._dock_mode(page), "creation")
 
-    @covers_requirement("webclient-character-creation-ui::the-adult-gate-is-server-authoritative-for-both-age-fields")
-    def test_underage_apparent_age_rejected_independently(self):
+    @covers_requirement("webclient-character-creation-ui::the-age-range-gate-is-server-authoritative-for-both-age-fields")
+    def test_out_of_range_apparent_age_rejected_independently(self):
         page = self._login_creation()
         install_outbound_recorder(page)
         self._wait_creation_available(page)
@@ -534,13 +538,13 @@ class CustomCreationJourneys(CreationBrowserTest):
               Evennia.msg('ui_action', [{
                 protocol_version: 1,
                 presentation_epoch: s.epoch,
-                request_id: 'underage-apparent-1',
+                request_id: 'out-of-range-apparent-1',
                 base_revision: s.revision,
                 action_id: 'creation.custom',
                 payload: {
                   display_name: '年輕冒險者',
                   age: 24,
-                  apparent_age: 17,
+                  apparent_age: -1,
                   race: 'human',
                   subrace: "human_commoner",
                   background: null,
@@ -553,11 +557,11 @@ class CustomCreationJourneys(CreationBrowserTest):
         )
         result = self._wait_result(
             page,
-            lambda r: r["outcome"] == "rejected" and r["code"] in ("underage_apparent_age", "malformed_payload"),
+            lambda r: r["outcome"] == "rejected" and r["code"] == "malformed_payload",
             timeout=15000,
         )
         self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "underage_apparent_age")
+        self.assertEqual(result["code"], "malformed_payload")
         self.assertIsNone(self._creation_panel(page)["draft"])
 
 
@@ -811,7 +815,7 @@ class ResetAndDraftJourneys(CreationBrowserTest):
             page,
             {
                 "creation": {
-                    "schema_version": 4,
+                    "schema_version": 5,
                     "available": False,
                     "reason": {"code": "registry_unavailable", "message": reason},
                 }

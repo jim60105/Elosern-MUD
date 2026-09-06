@@ -13,7 +13,7 @@
 This design makes finite service workflows discoverable without replacing their existing deterministic
 transactions. Guild registration, quest decisions, shop quantities, inventory inspection, and character
 creation become explicit panels and forms. Every action still resolves local service hosts, rank, state,
-stock, balance, ownership, and the adult gate on the server.
+stock, balance, ownership, and the age-range check on the server.
 
 Service menus and creation UI are separate delivery units because they run in different player modes and
 depend on different domain contracts. They share foundation form, focus, revision, and dispatcher rules.
@@ -30,7 +30,7 @@ depend on different domain contracts. They share foundation form, focus, revisio
 - Use bounded integer quantity fields while keeping copper arithmetic server-authoritative.
 - Give pending characters a graphical preset/custom creation flow.
 - Keep free-form names as text fields.
-- Preserve all-or-nothing activation and the permanent adult rejection.
+- Preserve all-or-nothing activation and the permanent out-of-range rejection.
 - Update affected panels together after every committed service action.
 
 ### Non-Goals
@@ -174,17 +174,17 @@ service. The browser does not submit calculated stats.
 
 Finite controls include race, available allocation choices, and every registry-backed option already
 supported by the custom wizard. Text fields include name and truly free-form supported values. Numeric
-adult fields use bounded integer inputs but are still server validated.
+age fields use bounded integer inputs but are still server validated.
 
 The exact form is derived from current creation requirements. The UI does not expose persona/import-only
 fields merely because they exist on a character card schema.
 
-### 7.4 Adult gate
+### 7.4 Age-range gate
 
-Client constraints communicate that both age values must be at least 18. The submission adapter rejects
-missing, malformed, `age < 18`, or `apparent_age < 18` values through the existing deterministic creation
-service. The browser cannot hide an age field, alter HTML constraints, or call activation directly to
-bypass the gate.
+Client constraints communicate that both age values are integers in `0..10000`. The submission adapter
+rejects missing, malformed, or out-of-range `age`/`apparent_age` values through the existing
+deterministic creation service. The browser cannot hide an age field, alter HTML constraints, or call
+activation directly to bypass the gate.
 
 ### 7.5 Activation transition
 
@@ -250,7 +250,7 @@ No canonical service or creation state is stored in localStorage.
 - Preset selection, confirmation, activation, and exploration snapshot.
 - Custom finite controls and free-text field focus.
 - Reconnect at each saved stage.
-- Server rejection of both underage fields despite bypassed client validation.
+- Server rejection of both out-of-range age fields despite bypassed client validation.
 - Failed activation transaction leaves pending state; failed post-activation relocation leaves activated
   state and reports degradation.
 

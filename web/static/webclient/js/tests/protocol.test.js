@@ -1564,7 +1564,7 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.objectives, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.services, 4);
   assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 4);
+  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 5);
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.character, 7);
   assert.equal(Protocol.PANEL_ALLOWLIST.lineage, 1);
@@ -2968,7 +2968,7 @@ function validCreationPanel(overrides) {
   }));
   return deepMerge(
     {
-      schema_version: 4,
+      schema_version: 5,
       available: true,
       kind: "creation",
       draft: null,
@@ -2994,10 +2994,10 @@ function validCreationPanel(overrides) {
       ],
       custom: {
         name: { min_length: 1, max_length: 64 },
-        adult: {
-          age_minimum: 18,
+        age: {
+          age_minimum: 0,
           age_maximum: 10000,
-          apparent_age_minimum: 18,
+          apparent_age_minimum: 0,
           apparent_age_maximum: 10000,
         },
         races: [
@@ -3073,7 +3073,7 @@ test("accepts a valid creation panel and the common unavailable form", () => {
       "creation",
       Protocol.PANEL_ALLOWLIST.creation,
       {
-        schema_version: 4,
+        schema_version: 5,
         available: false,
         reason: { code: "creation_unavailable", message: "角色建立畫面目前無法顯示" },
       }
@@ -3085,8 +3085,10 @@ test("creation panel rejects malformed and unknown-node fields", () => {
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ extra: 1 })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ kind: "services" })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 1 })));
-  // v3 is the pre-sex version: hard cutover, the exact gate rejects it.
+  // v4 is the pre-age-rename version and v3 the pre-sex version: hard
+  // cutover, the exact gate rejects both.
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 3 })));
+  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 4 })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 2 })));
   const badDraft = validCreationPanel({ draft: { mode: "preset", stage: "custom_filled", preset_key: "x" } });
   assert.throws(() => Protocol.validateCreationPanel(badDraft));
@@ -3101,7 +3103,7 @@ test("creation panel rejects malformed and unknown-node fields", () => {
   assert.throws(() => Protocol.validateCreationPanel(wrongAxes));
 });
 
-test("creation panel v4 carries the draft persona, sex, and the proposal slot", () => {
+test("creation panel v5 carries the draft persona, sex, and the proposal slot", () => {
   const customDraft = {
     mode: "custom",
     stage: "custom_filled",
@@ -3125,7 +3127,7 @@ test("creation panel v4 carries the draft persona, sex, and the proposal slot", 
   };
   const payload = validCreationPanel({ draft: customDraft, proposal });
   const validated = Protocol.validateCreationPanel(payload);
-  assert.equal(validated.schema_version, 4);
+  assert.equal(validated.schema_version, 5);
   assert.equal(validated.draft.sex, "other");
   assert.deepEqual(validated.draft.persona, customDraft.persona);
   assert.deepEqual(validated.proposal, proposal);
@@ -3233,12 +3235,12 @@ test("creation proposal v3 carries the optional transient-fill keys", () => {
   }
   // Bound violations reject on the mirrored validator.
   const rejects = [
-    { age: 17 },
+    { age: -1 },
     { age: 10001 },
     { age: 25.5 },
     { age: "25" },
     { age: true },
-    { apparent_age: 17 },
+    { apparent_age: -1 },
     { display_name: "" },
     { display_name: "莉".repeat(65) },
     { background: "" },
@@ -3301,12 +3303,12 @@ test("creation panel enforces per-field bounds", () => {
   const longPresetKey = validCreationPanel();
   longPresetKey.presets[0].key = "x".repeat(Protocol.CREATION_MAX_PRESET_KEY + 1);
   assert.throws(() => Protocol.validateCreationPanel(longPresetKey));
-  const underageDraft = validCreationPanel({
+  const outOfRangeDraft = validCreationPanel({
     draft: {
       mode: "custom",
       stage: "custom_filled",
       display_name: "新角色",
-      age: 17,
+      age: -1,
       apparent_age: 20,
       race: "human",
       subrace: "human_commoner",
@@ -3317,7 +3319,7 @@ test("creation panel enforces per-field bounds", () => {
       sex: "other",
     },
   });
-  assert.throws(() => Protocol.validateCreationPanel(underageDraft));
+  assert.throws(() => Protocol.validateCreationPanel(outOfRangeDraft));
   const badAllocations = validCreationPanel({
     draft: {
       mode: "custom",
@@ -3336,9 +3338,9 @@ test("creation panel enforces per-field bounds", () => {
   });
   assert.throws(() => Protocol.validateCreationPanel(badAllocations));
   // A custom draft missing the required persona key rejects (v2 exact-set).
-  const { persona, ...draftWithoutPersona } = underageDraft.draft;
+  const { persona, ...draftWithoutPersona } = outOfRangeDraft.draft;
   assert.throws(() =>
-    Protocol.validateCreationPanel({ ...underageDraft, draft: draftWithoutPersona })
+    Protocol.validateCreationPanel({ ...outOfRangeDraft, draft: draftWithoutPersona })
   );
 });
 
@@ -3444,17 +3446,17 @@ test("creation payload maximizing every string field fails the byte gate", () =>
     (key) => Object.assign({}, affinityElement, { key })
   );
   const payload = {
-    schema_version: 4,
+    schema_version: 5,
     available: true,
     kind: "creation",
     draft: null,
     presets: Array(Protocol.CREATION_MAX_PRESETS).fill(Object.assign({}, card)),
     custom: {
       name: { min_length: 1, max_length: 64 },
-      adult: {
-        age_minimum: 18,
+      age: {
+        age_minimum: 0,
         age_maximum: 10000,
-        apparent_age_minimum: 18,
+        apparent_age_minimum: 0,
         apparent_age_maximum: 10000,
       },
       races: Array(Protocol.CREATION_MAX_RACES).fill(Object.assign({}, race)),
@@ -3476,7 +3478,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
 });
 
 test("creation is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 4);
+  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 5);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,

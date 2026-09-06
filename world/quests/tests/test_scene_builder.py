@@ -714,7 +714,7 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
         )
 
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
-    def test_portrait_only_occupant_receives_the_adult_baseline(self):
+    def test_portrait_only_occupant_receives_the_default_age(self):
         npc = self._spawned_npc(
             self._characterized(portrait={"stable_key": "forest_bandit_chief"})
         )
@@ -735,9 +735,9 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
         )
         self.assertEqual(npc.db.age, 25)
         self.assertEqual(npc.db.apparent_age, 25)
-        from world.art.adult import portrait_eligibility
+        from world.art.subjects import character_ages
 
-        self.assertEqual(portrait_eligibility(npc), (25, 25))
+        self.assertEqual(character_ages(npc), (25, 25))
 
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
     def test_name_only_occupant_is_named_but_portrait_less(self):
@@ -761,8 +761,8 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
         """Repository guard: the policy is only materialized after the ages.
 
         A forged requirement carrying a portrait but no ages still lands on the
-        deterministic baseline, so the art adult gate's canonical inputs are
-        guaranteed present on every spawn path that sets a policy.
+        deterministic default age, so subject-age eligibility's canonical
+        inputs are guaranteed present on every spawn path that sets a policy.
         """
         record, _ = self._accept(_instance_bound_payload())
         forged = (
@@ -796,17 +796,17 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
 
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
     def test_forged_invalid_characterization_is_rejected_before_any_spawn(self):
-        """Defense in depth: forged requirements cannot bypass the adult floor.
+        """Defense in depth: forged requirements cannot bypass the age bounds.
 
         The compile boundary validated the accepted blueprint, but a forged
-        ``StageSpawnRequirement`` must still be re-checked: underage, non-int,
+        ``StageSpawnRequirement`` must still be re-checked: negative, non-int,
         and unpaired ages would otherwise be written to a spawned NPC (a
-        permanently adult-gated occupant). Each forged shape raises before any
-        room or occupant is created.
+        permanently portrait-ineligible occupant). Each forged shape raises
+        before any room or occupant is created.
         """
         _ids = {"display_name": "偽造者", "title": "偽造測試員"}
         forged_shapes = (
-            StageNpcCharacterization(**_ids, age=17, apparent_age=17),
+            StageNpcCharacterization(**_ids, age=-1, apparent_age=-1),
             StageNpcCharacterization(**_ids, age="30", apparent_age="30"),
             StageNpcCharacterization(**_ids, age=30, apparent_age=None),
             StageNpcCharacterization(**_ids, age=True, apparent_age=30),
@@ -882,7 +882,7 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
         return record, client, dispatched
 
     @covers_requirement("spawn-named-portraits::a-spawned-named-occupant-completes-the-full-portrait-pipeline")
-    def test_fake_worker_receives_the_story_driven_adult_description(self):
+    def test_fake_worker_receives_the_story_driven_description(self):
         record, client, dispatched = self._materialize_and_drain(
             self._characterized_payload()
         )

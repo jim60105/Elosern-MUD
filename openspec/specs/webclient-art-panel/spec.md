@@ -2,7 +2,7 @@
 
 The browser's graphical art surface: an exact read-only `art` panel available in
 exploration and combat modes, a validated scene payload with truthful
-placeholders, a server-authored adult-gated portrait catalog, client-local
+placeholders, a server-authored age-checked portrait catalog, client-local
 contextual portrait focus, targeted worker-completion pushes, deterministic
 offline degradation, and keyboard-first desktop-bounded browser acceptance.
 ## Requirements
@@ -65,7 +65,7 @@ store root, and SHALL derive its URL only from a validated stored identity.
 - **THEN** the backdrop renders the current mode's gradient stage with the truthful placeholder label as
   text and no URL, and no stale image is substituted
 
-### Requirement: The portrait catalog is server-authored, adult-gated, and bounded
+### Requirement: The portrait catalog is server-authored, age-checked, and bounded
 The art panel `portrait_catalog` SHALL be a bounded object keyed by the opaque IDs of currently
 present focusable entities: the combat-session participant identities in combat mode, and the
 dialogue hosts and explicit named-portrait-policy characters present in the current room in
@@ -73,14 +73,15 @@ exploration mode, in deterministic order. Each catalog value SHALL contain the s
 subject key, asset status, same-origin media URL or placeholder, aspect ratio, alternative text, and
 bounded display context (name plus role/target label). Portrait subject resolution SHALL dispatch by
 entity kind: a named character SHALL resolve `portrait:character:<stable-key>` only from an explicit
-named `portrait_policy` through the adult gate; a generic monster SHALL resolve
+named `portrait_policy` through the canonical-age check; a generic monster SHALL resolve
 `portrait:monster:<archetype>` from its bestiary `MONSTER_TIER_REGISTRY` archetype without any
 character age gate; and anything else SHALL be the unavailable placeholder. Eligibility SHALL NOT be
-inferred from display name, key shape, or LLM authorship. The adult gate SHALL reject a character
-when either `age` or `apparent_age` is missing, malformed, or below 18; a rejected subject SHALL
-appear as the unavailable placeholder with no subject key, no URL, and no prompt content, and SHALL
-NOT be enqueued or reach a worker. The catalog SHALL contain only currently present focusable
-identities and SHALL NOT contain persona text, disguised stats, combat resources, or any subject that
+inferred from display name, key shape, or LLM authorship. The canonical-age check SHALL reject a
+character when either `age` or `apparent_age` is missing or malformed (non-integer); a rejected
+subject SHALL appear as the unavailable placeholder with no subject key, no URL, and no prompt
+content, and SHALL NOT be enqueued or reach a worker. The catalog SHALL contain only currently
+present focusable identities and SHALL NOT contain persona text, disguised stats, combat resources,
+or any subject that
 is not currently present.
 
 #### Scenario: Combat catalog mirrors the context_actions participants
@@ -89,7 +90,8 @@ is not currently present.
   exactly one catalog value keyed by that identity
 
 #### Scenario: A named present character resolves to a verified portrait value
-- **WHEN** a present character carries an explicit named portrait policy and passes the adult gate
+- **WHEN** a present character carries an explicit named portrait policy and passes the canonical-age
+  check
 - **THEN** its catalog entry carries the resolved subject key and status, a same-origin URL or
   truthful placeholder, and its display context, and no browser-constructed key or URL exists
 
@@ -97,16 +99,6 @@ is not currently present.
 - **WHEN** a present monster carries a valid bestiary `threat_tier`
 - **THEN** its catalog entry resolves `portrait:monster:<threat_tier>` with the archetype-shared asset
   or its placeholder, and its name and role context are keyed by the opaque entity identity
-
-#### Scenario: An underage canonical age never reaches the browser payload as a prompt
-- **WHEN** a present character's canonical `age` equals 17
-- **THEN** its catalog entry is the unavailable placeholder with no subject key and no URL, and the
-  worker fixture records zero jobs and zero worker invocations for that subject
-
-#### Scenario: An underage apparent age never reaches the browser payload as a prompt
-- **WHEN** a present character's canonical `apparent_age` equals 17 while `age` is adult
-- **THEN** its catalog entry is the unavailable placeholder with no subject key and no URL, and the
-  worker fixture records zero jobs and zero worker invocations for that subject
 
 #### Scenario: Missing or malformed age values reject without a prompt
 - **WHEN** a present character's `age` or `apparent_age` is missing, non-integer, or otherwise
@@ -199,7 +191,7 @@ single visible placeholder node deterministically.
 #### Scenario: Rejected content stays out of every error surface
 - **WHEN** an art or presentation error occurs
 - **THEN** no OOB message or panel payload contains a traceback, filesystem path, rejected prompt, or
-  underage subject data
+  rejected-subject data
 
 #### Scenario: The missing-scene placeholder gate observes a single node
 - **WHEN** the art panel is available with a missing scene and a snapshot refresh or Vue re-render

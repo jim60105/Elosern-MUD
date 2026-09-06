@@ -16,11 +16,11 @@ A single-player, adult, AI-driven MUD set in 伊洛瑟恩大陸 (Elosern), a Jap
 sword-and-sorcery continent. One shared world foundation; the AI Director generates unlimited
 story arcs, main quests, and side quests on top of it.
 
-**Non-negotiable content constraint.** Every character that enters the game — player, NPC, or
-imported — is an adult. The import schema enforces `age >= 18` and `apparent_age >= 18` as a hard
-rejection, and a regression test asserts that an underage record fails import. This is a code-level
-invariant, not a documentation convention. The sample cards currently in `tmp/story_settings/`
-(gitignored, never committed) do not satisfy it and cannot be used as seed data.
+**Non-negotiable content constraint.** Character ages are reasonable-range values. The import
+schema enforces `age` and `apparent_age` as integers in `0..10000` as a hard rejection, and a
+regression test asserts that an out-of-range record fails import. This is a code-level invariant,
+not a documentation convention. The sample cards currently in `tmp/story_settings/` (gitignored,
+never committed) are not authoritative and cannot be used as seed data.
 
 **Developer background.** Python primary. Existing SillyTavern-style world and character data.
 No art capability; Stable Diffusion via external service. Runs on a single machine with a local
@@ -377,7 +377,7 @@ world/imports/
 
 | Check | On failure |
 |---|---|
-| `age >= 18` **and** `apparent_age >= 18` | **Reject** |
+| `age` or `apparent_age` outside `0..10000` | **Reject** |
 | `race` / `subrace` exists in the lore registry | **Reject** |
 | every `skills` key exists in the skill registry | **Reject** |
 | `disguised_stats` keys are a subset of `stats` keys | **Reject** |
@@ -835,8 +835,9 @@ a placeholder.
 > **Amended 2026-08-02 (approved Browser-First MUD WebClient Suite).** Scene behavior above remains
 > unchanged and D10 still forbids per-room scene images. The art queue additionally accepts portrait
 > subjects under a separate namespace: players and explicitly named NPCs have stable unique portrait
-> keys, while generic monsters share a portrait by bestiary archetype. Both adult age gates are checked
-> before portrait enqueue. Scene and portrait jobs share the same serialized external worker boundary.
+> keys, while generic monsters share a portrait by bestiary archetype. Both canonical age attributes
+> are validated (present, integer) before portrait enqueue. Scene and portrait jobs share the same
+> serialized external worker boundary.
 > Queue writes are owned by `world/art/service.py` and occur through startup synchronization, successful
 > room entry, or post-commit character/NPC lifecycle hooks; WebClient presenters and workers remain
 > read-only with respect to queue and game state.
@@ -979,14 +980,14 @@ One change per working day. Dependencies are listed; the rest may run in paralle
 
 | # | Change | Depends on | Content |
 |---|---|---|---|
-| 22 | `art-assets` | 3, 4, 12, 14, 21 | Scene and portrait subjects, generated named-NPC portrait lifecycle, serialized queue, internal sd-webui worker contract, adult portrait gate, `@art` commands, scheduler, placeholders |
+| 22 | `art-assets` | 3, 4, 12, 14, 21 | Scene and portrait subjects, generated named-NPC portrait lifecycle, serialized queue, internal sd-webui worker contract, subject-age portrait validation, `@art` commands, scheduler, placeholders |
 | 23a | `webclient-oob-foundation` | 16 | Versioned OOB protocol, input functions, snapshot coordinator, state store, keyboard router, Vue SPA shell, status panel |
 | 23b | `webclient-combat-menu` | 16, 23a | Skill/action/target menus, multi-target combat-session facade, Telnet target parity, reconnect UI |
 | 23c | `map-knowledge-minimap` | 12, 13, 14, 23a | Persistent visited nodes, grid/wilderness minimaps, coordinate-free instance/interior local graphs |
 | 23d | `webclient-exploration-menu` | 19, 23a, 23c | Movement, look, local interaction, scripted and free-form NPC dialogue, rest, and wait menus |
 | 23e | `webclient-service-menus` | 16, 23a | Guild, quest, shop, wallet, and inventory menus |
 | 23f | `webclient-art-panel` | 22, 23a | Scene renderer, contextual portrait overlay, zoom, and OOB art updates |
-| 23g | `webclient-character-creation-ui` | 23a, `login-creation-ux`, `onboarding-guide` | Pending-character mode, preset/custom forms, adult validation, activation transition |
+| 23g | `webclient-character-creation-ui` | 23a, `login-creation-ux`, `onboarding-guide` | Pending-character mode, preset/custom forms, age-range validation, activation transition |
 
 > **Amended 2026-08-02.** The original rows 22 (`art-queue`) and 23 (`webclient-panel`) were too broad
 > after the owner selected a browser-first, keyboard-menu interface with status, map memory, scene and

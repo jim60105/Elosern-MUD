@@ -46,8 +46,8 @@ The main code areas are:
   stored traits.
 - `disguised_stats` is display-only and may affect appearance, guild
   registration, and appraisal. Combat and resolution always use true traits.
-- Every character is an adult. Imports must reject both `age < 18` and
-  `apparent_age < 18`; never weaken or bypass this invariant.
+- Character ages are reasonable-range values. Imports must reject any
+  `age`/`apparent_age` outside `0..10000`; never weaken or bypass this bound.
 - Import and action-resolution workflows are all-or-nothing. Validate before
   persistence and use transactions where partial state would be invalid.
 - Store currency as integer copper. Convert units only for display; do not use

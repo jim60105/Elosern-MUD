@@ -14,23 +14,25 @@ from .entities import LivingEntity
 # current gauge value, never the maximum.
 _DISGUISE_SECRET_KEYS = ("atk_phys", "agility", "defense", "magic_power", "hp")
 
-# Canonical adult age baseline for procedurally spawned or synced NPCs
-# (fix-npc-adult-identity D1); every character must be an adult.
-NPC_ADULT_BASELINE = 18
+# Plain authored default age for procedurally spawned or synced NPCs; no
+# invariant is attached to the value.
+NPC_DEFAULT_AGE = 18
 
 
-def ensure_npc_adult_identity(npc: Any) -> None:
-    """Ensure an NPC persists canonical adult age attributes (set-if-absent).
+def ensure_npc_canonical_age(npc: Any) -> None:
+    """Ensure an NPC persists canonical age attributes (set-if-absent).
 
-    Sets ``age`` to 18 when missing and ``apparent_age`` to 18 when missing,
-    independently: an existing value is never overwritten, and a missing field
-    is never filled merely because the other field is absent. No-op for NPCs
-    whose identity already carries both values (import/characterization
-    paths), so it can run unconditionally on every spawn/sync site.
+    The default age for procedurally spawned or synced NPCs: sets ``age`` to
+    ``NPC_DEFAULT_AGE`` when missing and ``apparent_age`` to ``NPC_DEFAULT_AGE``
+    when missing, independently: an existing value is never overwritten, and a
+    missing field is never filled merely because the other field is absent.
+    No-op for NPCs whose identity already carries both values
+    (import/characterization paths), so it can run unconditionally on every
+    spawn/sync site.
     """
     for key in ("age", "apparent_age"):
         if npc.attributes.get(key) is None:
-            npc.attributes.add(key, NPC_ADULT_BASELINE)
+            npc.attributes.add(key, NPC_DEFAULT_AGE)
 
 
 @dataclass(frozen=True)

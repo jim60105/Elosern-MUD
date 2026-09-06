@@ -58,14 +58,14 @@ SCENE_OCCUPANT_PROTOTYPE_WHITELIST: tuple[str, ...] = ("scene_npc", "scene_monst
 RETURN_EXIT_KEY = "返回"
 _FALLBACK_SCENE_NAME = "任務場景"
 
-# The deterministic adult baseline for a portrait-bearing occupant whose
-# blueprint declared no ages (design D3). It is race-agnostic and always within
-# the adult-to-lifespan-maximum validation range for every race (18..80 human,
-# 18..1200 elf), so the art adult gate provably passes: the gate requires
+# The plain authored default age for a portrait-bearing occupant whose
+# blueprint declared no ages (design D3). It is race-agnostic and always
+# within the zero-to-lifespan validation range for every race (0..80 human,
+# 0..1200 elf), so subject-age eligibility provably passes: the check requires
 # canonical integer ages, and the portrait description needs them too. A
 # race-aware midpoint was rejected because it would make a default-age elf a
 # thousand-year elder.
-PORTRAIT_ADULT_BASELINE = 25
+PORTRAIT_DEFAULT_AGE = 25
 
 
 class SceneBuilderError(RuntimeError):
@@ -154,12 +154,13 @@ def _revalidate_characterization(
     """Re-validate one occupant's characterization through the shared helper.
 
     The compile boundary already validated the accepted blueprint, but a
-    forged ``StageSpawnRequirement`` could bypass it and write underage or
-    non-integer canonical ages (a permanently adult-gated NPC), a malformed
-    policy, or an occupant WITHOUT the authored identity. Every occupant MUST
-    carry a characterization with a valid ``display_name`` and ``title``:
-    re-running the same shared rules here keeps the adult invariant and the
-    authored-identity invariant hard floors on every spawn path (design D6).
+    forged ``StageSpawnRequirement`` could bypass it and write a negative or
+    non-integer canonical age (a permanently portrait-ineligible NPC), a
+    malformed policy, or an occupant WITHOUT the authored identity. Every
+    occupant MUST carry a characterization with a valid ``display_name`` and
+    ``title``: re-running the same shared rules here keeps the age-bounds rule
+    and the authored-identity invariant hard floors on every spawn path
+    (design D6).
     A missing or field-incomplete characterization raises
     ``SceneBuilderSpawnError`` and rolls the whole materialization back before
     any state change.
@@ -230,12 +231,12 @@ def _apply_characterization(
     Each carried field applies independently: ``display_name`` sets the display
     name; the paired ages set the canonical ``age``/``apparent_age``
     attributes; a portrait ``stable_key`` materializes the full named policy
-    dict (design D2) and, when the ages are absent, the deterministic adult
-    baseline ``PORTRAIT_ADULT_BASELINE`` so the art adult gate always has
+    dict (design D2) and, when the ages are absent, the deterministic default
+    age ``PORTRAIT_DEFAULT_AGE`` so subject-age eligibility always has
     canonical inputs (design D3). An occupant without a portrait policy never
-    receives the baseline or a policy (design D4). The policy is written only
-    after the ages, so a policy-bearing occupant always carries canonical adult
-    ages.
+    receives the default or a policy (design D4). The policy is written only
+    after the ages, so a policy-bearing occupant always carries canonical
+    integer ages.
     """
     characterizations = getattr(requirement, "characterizations", ())
     if position >= len(characterizations):
@@ -256,9 +257,9 @@ def _apply_characterization(
         npc.db.apparent_age = characterization.apparent_age
     if characterization.portrait_stable_key is not None:
         if npc.db.age is None:
-            npc.db.age = PORTRAIT_ADULT_BASELINE
+            npc.db.age = PORTRAIT_DEFAULT_AGE
         if npc.db.apparent_age is None:
-            npc.db.apparent_age = PORTRAIT_ADULT_BASELINE
+            npc.db.apparent_age = PORTRAIT_DEFAULT_AGE
         npc.db.portrait_policy = {
             "mode": "named",
             "stable_key": characterization.portrait_stable_key,

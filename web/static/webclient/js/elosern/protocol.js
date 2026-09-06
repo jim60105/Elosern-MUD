@@ -265,9 +265,9 @@
   var CREATION_MAX_PROFILES = 16;
   var CREATION_MIN_NAME_LENGTH = 1;
   var CREATION_MAX_NAME_LENGTH = 64;
-  var CREATION_AGE_MINIMUM = 18;
+  var CREATION_AGE_MINIMUM = 0;
   var CREATION_AGE_MAXIMUM = 10000;
-  var CREATION_APPARENT_AGE_MINIMUM = 18;
+  var CREATION_APPARENT_AGE_MINIMUM = 0;
   var CREATION_APPARENT_AGE_MAXIMUM = 10000;
   var CREATION_MAX_PRESET_KEY = 64;
   var CREATION_MAX_DISPLAY_NAME = 128;
@@ -310,7 +310,9 @@
   // D1/D3).
   // v4 adds the server-labelled `custom.sex` option list and the required
   // draft `sex` member (namegen-creation-ui).
-  var CREATION_SCHEMA_VERSION = 4;
+  // v5 renames the `custom.adult` descriptor block to `custom.age` and drops
+  // the advertised minimums to 0 (age-range-0-10000).
+  var CREATION_SCHEMA_VERSION = 5;
   // Affinity picker bounds (mirror of web.webclient.presentation.creation and
   // the deterministic max_affinity_elements mapping). The race maxima are
   // 2/1/0 for human/beastfolk/elf; the element set is exactly the eight lore
@@ -384,7 +386,7 @@
     party: 1,
     objectives: 1,
     services: 4,
-    creation: 4,
+    creation: 5,
     exploration: 1,
     character: 7,
     lineage: 1,
@@ -2556,25 +2558,25 @@
     return value;
   }
 
-  function validateCreationAdult(value) {
+  function validateCreationAge(value) {
     requireExactFields(
       value,
-      "adult bounds",
+      "age bounds",
       ["age_minimum", "age_maximum", "apparent_age_minimum", "apparent_age_maximum"],
       []
     );
-    var ageMinimum = requireInt(value.age_minimum, "age_minimum", 1, MAX_SAFE_INTEGER);
-    var ageMaximum = requireInt(value.age_maximum, "age_maximum", 1, MAX_SAFE_INTEGER);
+    var ageMinimum = requireInt(value.age_minimum, "age_minimum", 0, MAX_SAFE_INTEGER);
+    var ageMaximum = requireInt(value.age_maximum, "age_maximum", 0, MAX_SAFE_INTEGER);
     var apparentMinimum = requireInt(
       value.apparent_age_minimum,
       "apparent_age_minimum",
-      1,
+      0,
       MAX_SAFE_INTEGER
     );
     var apparentMaximum = requireInt(
       value.apparent_age_maximum,
       "apparent_age_maximum",
-      1,
+      0,
       MAX_SAFE_INTEGER
     );
     if (
@@ -2583,7 +2585,7 @@
       apparentMinimum !== CREATION_APPARENT_AGE_MINIMUM ||
       apparentMaximum !== CREATION_APPARENT_AGE_MAXIMUM
     ) {
-      throw new Error("adult bounds do not match the advertised contract");
+      throw new Error("age bounds do not match the advertised contract");
     }
     return value;
   }
@@ -2691,11 +2693,11 @@
     requireExactFields(
       value,
       "custom",
-      ["name", "adult", "races", "subraces", "profiles", "affinity", "sex"],
+      ["name", "age", "races", "subraces", "profiles", "affinity", "sex"],
       []
     );
     validateCreationName(value.name);
-    validateCreationAdult(value.adult);
+    validateCreationAge(value.age);
     if (!Array.isArray(value.races) || value.races.length === 0 || value.races.length > CREATION_MAX_RACES) {
       throw new Error("races must be a non-empty list within its bound");
     }

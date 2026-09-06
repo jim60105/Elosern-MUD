@@ -554,7 +554,13 @@ class CharacterizationValidatorTests(unittest.TestCase):
             self.assertEqual(validator_fn(payload), [], validator_fn.__name__)
 
     @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
-    def test_unpaired_underage_or_non_integer_declarations_reject_and_retry(self):
+    def test_zero_ages_pass_and_unpaired_negative_or_non_integer_declarations_reject_and_retry(self):
+        zero = self._instance_bound_payload()
+        zero["stages"][0]["npc_req"][0]["age"] = 0
+        zero["stages"][0]["npc_req"][0]["apparent_age"] = 0
+        for validator_fn in scenario_director._VALIDATORS.values():
+            self.assertEqual(validator_fn(zero), [], validator_fn.__name__)
+
         def apply_bad(bad, fields):
             entry = bad["stages"][0]["npc_req"][0]
             if fields == "age_only":
@@ -567,7 +573,7 @@ class CharacterizationValidatorTests(unittest.TestCase):
         bad_cases = [
             "age_only",
             "apparent_only",
-            {"age": 17, "apparent_age": 17},
+            {"age": -1, "apparent_age": -1},
             {"age": True, "apparent_age": 35},
             {"age": 35, "apparent_age": 30.5},
             {"age": None, "apparent_age": 35},

@@ -18,7 +18,7 @@ Test-to-requirement mapping (applied at archive):
 
 - ``webclient-component-showcase::the-full-overlays-are-complete-the-deferred-surfaces-are-absent-and-the-manifest-is-frozen``:
   ``test_vitest_overlays_family_suite_passes`` (every overlays SFC: settings
-  `options.*` emission, creation wizard with the both-fields adult gate,
+  `options.*` emission, creation wizard with the both-fields age-bounds gate,
   map overlay reusing B4's LocalMap and the static help overlay,
   ``test_component_coverage_gate_enforces_frozen_manifest`` (the
   frozen manifest plus the gate's complete-set enforcement, including the
@@ -205,7 +205,7 @@ class VueShowcaseOverlaysEvidenceTest(unittest.TestCase):
         (``web/webclient-app/tests/overlays/``): the settings overlay's
         `options.*` envelopes and reduced-motion token reflection, the
         creation wizard's presets/custom/concept sub-states with the
-        both-fields adult gate and `creation.*` intents, the map overlay
+        both-fields age-bounds gate and `creation.*` intents, the map overlay
         reusing B4's LocalMap (lattice states, legend, detail line,
         actionable nodes), the help overlay's static control reference, and
         the deferred-absent / frozen-manifest contract test in the same

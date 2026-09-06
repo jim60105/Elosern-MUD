@@ -14,7 +14,6 @@ from django.conf import settings
 from commands.command import Command
 import urllib.parse
 
-from world.art.adult import PortraitRejected
 from world.art.queue import failed_keys, record_key, requeue
 from world.art.store import ArtAssetRecord
 from world.art.subjects import (
@@ -144,7 +143,7 @@ class CmdArtRetry(_ArtCommand):
             if subject.kind is ArtSubjectKind.CHARACTER:
                 try:
                     retry_character_portrait(subject.key)
-                except (ArtSubjectError, PortraitRejected):
+                except ArtSubjectError:
                     continue
                 reenqueued += 1
                 continue
@@ -180,7 +179,7 @@ class CmdArtRequeue(_ArtCommand):
 
             try:
                 requeue_character_portrait(subject.key)
-            except (ArtSubjectError, PortraitRejected) as error:
+            except ArtSubjectError as error:
                 self.caller.msg(f"無法重新排入：{error}")
                 return
             self.caller.msg(f"已將 {subject.full()} 重新排入佇列。")

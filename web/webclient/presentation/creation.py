@@ -1,4 +1,4 @@
-"""Exact schema-version-4 ``creation`` panel and presenter (webclient-character-creation-ui).
+"""Exact schema-version-5 ``creation`` panel and presenter (webclient-character-creation-ui).
 
 The presenter serializes the frozen no-mutation creation view owned by
 ``world.rules.creation_wizard`` and validates its own output against the exact
@@ -12,7 +12,9 @@ optional top-level transient concept ``proposal`` slot
 or import-only field is ever exposed. Version 3 widened the transient
 ``proposal`` slot (bump-creation-panel-proposal-v3); version 4 adds the
 server-labelled ``custom.sex`` option list and the required draft ``sex``
-member (namegen-creation-ui).
+member (namegen-creation-ui); version 5 renames the ``custom.adult``
+descriptor block to ``custom.age`` and drops the advertised minimums to 0
+(age-range-0-10000).
 
 The payload shape and the exact shared bounds are mirrored by the client
 validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded by a
@@ -43,9 +45,9 @@ from world.rules.character_creation import (
 from world.rules.creation_wizard import (
     CUSTOM_STAGE,
     PRESET_STAGE,
-    AdultBoundsView,
     AffinityElementView,
     AffinityView,
+    AgeBoundsView,
     AllocationAxisView,
     CreationView,
     CustomFormView,
@@ -58,11 +60,11 @@ from world.rules.creation_wizard import (
     read_creation_view,
 )
 
-# Bumped to 4 for the sex-carrying custom descriptor and custom draft
-# (namegen-creation-ui D3): the option list, the required draft ``sex``
-# member, and the mirrored JS validator all move together; a stale v3 panel
-# or draft is rejected by the exact-schema gate on both ends.
-CREATION_SCHEMA_VERSION = 4
+# Bumped to 5 for the age-bounds custom descriptor (age-range-0-10000): the
+# descriptor block renames ``custom.adult`` -> ``custom.age``, the advertised
+# minimums drop to 0, and the mirrored JS validator moves together; a stale
+# v4 panel or draft is rejected by the exact-schema gate on both ends.
+CREATION_SCHEMA_VERSION = 5
 
 # Exact shared bounds (design D2) -- must stay equal in the JS validator and to
 # the creation-wizard view-builder caps (webclient-character-creation-ui D2).
@@ -72,9 +74,9 @@ MAX_SUBRACES = 16
 MAX_PROFILES = 16
 MIN_NAME_LENGTH = 1
 MAX_NAME_LENGTH = 64
-AGE_MINIMUM = 18
+AGE_MINIMUM = 0
 AGE_MAXIMUM = 10000
-APPARENT_AGE_MINIMUM = 18
+APPARENT_AGE_MINIMUM = 0
 APPARENT_AGE_MAXIMUM = 10000
 MAX_PRESET_KEY_CODE_POINTS = 64
 MAX_DISPLAY_NAME_CODE_POINTS = 128
@@ -165,20 +167,20 @@ def _validate_name(value: Any) -> dict[str, Any]:
     return {"min_length": minimum, "max_length": maximum}
 
 
-def _validate_adult(value: Any) -> dict[str, Any]:
+def _validate_age(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
-        "adult bounds",
+        "age bounds",
         {"age_minimum", "age_maximum", "apparent_age_minimum", "apparent_age_maximum"},
         {},
     )
-    age_minimum = _require_int(value, "age_minimum", minimum=1, maximum=MAX_SAFE_INTEGER)
-    age_maximum = _require_int(value, "age_maximum", minimum=1, maximum=MAX_SAFE_INTEGER)
+    age_minimum = _require_int(value, "age_minimum", minimum=0, maximum=MAX_SAFE_INTEGER)
+    age_maximum = _require_int(value, "age_maximum", minimum=0, maximum=MAX_SAFE_INTEGER)
     apparent_minimum = _require_int(
-        value, "apparent_age_minimum", minimum=1, maximum=MAX_SAFE_INTEGER
+        value, "apparent_age_minimum", minimum=0, maximum=MAX_SAFE_INTEGER
     )
     apparent_maximum = _require_int(
-        value, "apparent_age_maximum", minimum=1, maximum=MAX_SAFE_INTEGER
+        value, "apparent_age_maximum", minimum=0, maximum=MAX_SAFE_INTEGER
     )
     if (
         age_minimum != AGE_MINIMUM
@@ -186,9 +188,9 @@ def _validate_adult(value: Any) -> dict[str, Any]:
         or apparent_minimum != APPARENT_AGE_MINIMUM
         or apparent_maximum != APPARENT_AGE_MAXIMUM
     ):
-        raise ProtocolValidationError("adult bounds do not match the advertised contract")
+        raise ProtocolValidationError("age bounds do not match the advertised contract")
     if age_minimum > age_maximum or apparent_minimum > apparent_maximum:
-        raise ProtocolValidationError("adult bounds minimum must not exceed maximum")
+        raise ProtocolValidationError("age bounds minimum must not exceed maximum")
     return {
         "age_minimum": age_minimum,
         "age_maximum": age_maximum,
@@ -305,11 +307,11 @@ def _validate_custom(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "custom",
-        {"name", "adult", "races", "subraces", "profiles", "affinity", "sex"},
+        {"name", "age", "races", "subraces", "profiles", "affinity", "sex"},
         {},
     )
     name = _validate_name(value["name"])
-    adult = _validate_adult(value["adult"])
+    age = _validate_age(value["age"])
     races = value["races"]
     if not isinstance(races, list) or len(races) > MAX_RACES:
         raise ProtocolValidationError(f"races must be a list of at most {MAX_RACES} options")
@@ -329,7 +331,7 @@ def _validate_custom(value: Any) -> dict[str, Any]:
     sex = _validate_sex_options(value["sex"])
     return {
         "name": name,
-        "adult": adult,
+        "age": age,
         "races": races,
         "subraces": subraces,
         "profiles": profiles,
@@ -573,7 +575,7 @@ def _validate_proposal(value: Any) -> dict[str, Any]:
     five optional transient-fill keys present only when the validated
     generative proposal carried a value (bump-creation-panel-proposal-v3 D1):
     ``display_name`` (1..64 code points), ``age``/``apparent_age`` (integers
-    in the adult band — the generative layer clamps, so a bound violation on
+    in the advertised band — the generative layer clamps, so a bound violation on
     the wire is a bug-level structural rejection), ``background`` (1..600
     code points), and ``affinity_elements`` (a list of at most
     ``MAX_AFFINITY_ELEMENTS`` distinct registered element keys; the race bound
@@ -718,12 +720,12 @@ def _serialize_name(name: Any) -> dict[str, Any]:
     return {"min_length": name.min_length, "max_length": name.max_length}
 
 
-def _serialize_adult(adult: AdultBoundsView) -> dict[str, Any]:
+def _serialize_age(age: AgeBoundsView) -> dict[str, Any]:
     return {
-        "age_minimum": adult.age_minimum,
-        "age_maximum": adult.age_maximum,
-        "apparent_age_minimum": adult.apparent_age_minimum,
-        "apparent_age_maximum": adult.apparent_age_maximum,
+        "age_minimum": age.age_minimum,
+        "age_maximum": age.age_maximum,
+        "apparent_age_minimum": age.apparent_age_minimum,
+        "apparent_age_maximum": age.apparent_age_maximum,
     }
 
 
@@ -792,7 +794,7 @@ def _serialize_sex_option(option: SexOptionView) -> dict[str, Any]:
 def _serialize_custom(custom: CustomFormView) -> dict[str, Any]:
     return {
         "name": _serialize_name(custom.name),
-        "adult": _serialize_adult(custom.adult),
+        "age": _serialize_age(custom.age),
         "races": [_serialize_race_option(race) for race in custom.races],
         "subraces": _serialize_subraces(custom.subraces),
         "profiles": [_serialize_profile(profile) for profile in custom.profiles],

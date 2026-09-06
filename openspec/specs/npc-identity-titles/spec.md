@@ -345,7 +345,7 @@ entry's authored `title` in the shared title validator's normalized form as the 
 value. If any occupant lacks a characterization, its `display_name`, or its `title` at spawn time,
 the SceneBuilder SHALL raise `SceneBuilderSpawnError` and roll back the whole materialization
 before creating any room or entity — a missing authored identity fails closed exactly like the
-existing adult-invariant revalidation does.
+existing age-bounds revalidation does.
 
 #### Scenario: A materialized occupant answers to its authored name
 - **WHEN** a compiled stage with `npc_req: [{"role": "bandit", "tier": "bandit", "display_name": "黑鬍", "title": "林間盜匪頭目", ...}]` materializes

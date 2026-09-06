@@ -121,16 +121,16 @@ class CreationValidatorParityContract(unittest.TestCase):
         self.assertEqual(py_match.group(1), js_match.group(1))
         self.assertEqual(js_match.group(1), "600")
 
-    def test_panel_allowlist_contains_creation_v4(self):
+    def test_panel_allowlist_contains_creation_v5(self):
         js_source = _JS_PROTOCOL.read_text(encoding="utf-8")
-        self.assertIn("creation: 4", js_source)
+        self.assertIn("creation: 5", js_source)
         py_source = _PY_CREATION.read_text(encoding="utf-8")
         match = re.search(r"^CREATION_SCHEMA_VERSION\s*=\s*([0-9]+)", py_source, re.MULTILINE)
         self.assertIsNotNone(match, "Python CREATION_SCHEMA_VERSION missing")
         js_match = re.search(r"var CREATION_SCHEMA_VERSION\s*=\s*([0-9]+)", js_source)
         self.assertIsNotNone(js_match, "JS CREATION_SCHEMA_VERSION missing")
         self.assertEqual(match.group(1), js_match.group(1))
-        self.assertEqual(js_match.group(1), "4")
+        self.assertEqual(js_match.group(1), "5")
 
     def test_proposal_display_name_bound_matches_across_the_validators(self):
         # The v3 transient-fill display-name bound must stay equal between the

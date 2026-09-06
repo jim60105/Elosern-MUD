@@ -465,7 +465,7 @@ class RenderContractTests(PromptFixture):
         first = render_prompt("art.character_description", race="貓人族", name="艾琳", age="24", style="approved visual style")
         second = render_prompt("art.character_description", race="貓人族", name="艾琳", age="24", style="approved visual style")
         self.assertEqual(first, second)
-        self.assertEqual(first, "A 貓人族 adult named 艾琳 (24) in the approved visual style.")
+        self.assertEqual(first, "A 貓人族 character named 艾琳 (24) in the approved visual style.")
 
 
 class ArtGenerationPromptTests(PromptFixture):
@@ -511,7 +511,7 @@ class ArtGenerationPromptTests(PromptFixture):
             "prompts:\n"
             "  art.style: approved visual style\n"
             "  art.character_description: |-\n"
-            "    A {race} adult named {name} ({age}) in the {style}.\n"
+            "    A {race} character named {name} ({age}) in the {style}.\n"
             "  art.monster_description: '{description} ({display_name}；例如：{examples})'\n"
             "  art.negative_prompt: lowres, text\n"
             "  art.portrait_prompt: |-\n"

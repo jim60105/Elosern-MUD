@@ -68,9 +68,9 @@ class LoaderTraitTests(EvenniaTestCase):
         self.assertIsInstance(entity, PlayerCharacter)
         self.assertIsNone(entity.account)
 
-    def test_public_constructor_cannot_bypass_age_gate(self):
+    def test_public_constructor_cannot_bypass_age_bounds(self):
         record = example_record()
-        record["age"] = 17
+        record["age"] = 10001
         with self.assertRaises(ImportRejected):
             instantiate_character(record)
 
@@ -181,7 +181,7 @@ class LoaderLineageAutoSeedTests(EvenniaTestCase):
         record = example_record()
         record["key"] = "lineage malformed mage"
         record["skills"] = ["firestorm"]
-        record["age"] = 17
+        record["age"] = 10001
         with self.assertRaises(ImportRejected):
             instantiate_character(record)
         self.assertFalse(

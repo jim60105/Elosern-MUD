@@ -110,15 +110,15 @@ class ArtPresenterTests(EvenniaTestCase):
         self.assertEqual(payload["status"], ArtAssetStatus.FAILED)
         self.assertIsNone(payload["url"])
 
-    @covers_requirement("adult-portrait-gate::rejected-prompt-content-never-reaches-the-presenter-or-browser")
-    def test_gate_rejected_character_resolves_only_to_the_unavailable_placeholder(self):
+    @covers_requirement("art-asset-lifecycle::rejected-prompt-content-never-reaches-the-presenter-or-browser")
+    def test_malformed_subject_ages_resolve_only_to_the_unavailable_placeholder(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
-        self.player.age = 17
+        self.player.age = "twenty-two"
         payload = resolve_character(self.player)
         self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
         self.assertIsNone(payload["url"])
-        self.assertNotIn("underage", str(payload))
-        self.assertNotIn("17", str(payload))
+        self.assertNotIn("portrait rejected", str(payload))
+        self.assertNotIn("twenty-two", str(payload))
 
     def test_character_without_a_named_policy_resolves_to_the_placeholder(self):
         self.player.db.portrait_policy = None
@@ -296,13 +296,13 @@ class ResolveEntityTests(EvenniaTestCase):
         """Assert the fake client never received a generation for a subject."""
         self.assertNotIn(subject_key, self._generation_keys())
 
-    def test_named_character_resolves_through_the_adult_gate(self):
+    def test_named_character_resolves_through_the_canonical_age_check(self):
         payload = resolve_entity(self.player)
         self.assertEqual(payload["subject_key"], f"portrait:character:{self.player.pk}")
         self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
         self.assertIn("subject_key", payload)
 
-    def test_valid_adult_character_reaches_the_generation_client(self):
+    def test_valid_canonical_ages_reach_the_generation_client(self):
         from world.art.subjects import character_subject_for
 
         subject = character_subject_for(self.player)
@@ -318,16 +318,16 @@ class ResolveEntityTests(EvenniaTestCase):
         self.assertEqual(payload["subject_key"], "portrait:monster:low")
         self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
 
-    def test_age_seventeen_never_reaches_a_worker(self):
-        self.player.age = 17
+    def test_non_integer_age_never_reaches_a_worker(self):
+        self.player.age = "22"
         payload = resolve_entity(self.player)
         self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
         self.assertIsNone(payload["subject_key"])
         self.assertIsNone(payload["url"])
         self._assert_no_generation_requested(f"portrait:character:{self.player.pk}")
 
-    def test_apparent_age_seventeen_never_reaches_a_worker(self):
-        self.player.apparent_age = 17
+    def test_non_integer_apparent_age_never_reaches_a_worker(self):
+        self.player.apparent_age = "22"
         payload = resolve_entity(self.player)
         self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
         self.assertIsNone(payload["subject_key"])
@@ -341,7 +341,7 @@ class ResolveEntityTests(EvenniaTestCase):
         self.assertIsNone(payload["url"])
 
     def test_malformed_age_values_reject_without_a_prompt(self):
-        self.player.age = "adult"
+        self.player.age = "twenty"
         payload = resolve_entity(self.player)
         self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
         self.assertIsNone(payload["subject_key"])

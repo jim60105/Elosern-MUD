@@ -35,7 +35,7 @@ draft, and the player confirms through the existing activation path. The LLM nev
 |---|---|---|
 | C1 | **Proposal mapping.** The player's concept maps onto real registry keys (`race_key`, `subrace_key`, `allocations`, `suggested_skills`); the LLM chooses no numeric values. | Extends the §7.2 "LLM never chooses numbers" rule to creation. |
 | C2 | **Persona draft persists at activation.** A validated persona draft (personality / life_story / habit text) is written into `entity.db.persona` by `world/rules/character_creation.py` — the sole writer for creation-generated persona — in the same shape as import cards. | Created characters gain persona, so the PersonaStore handler (persona-dialogue design) applies to them; `world/rules` is the writer package, so the single-writer boundary holds. |
-| C3 | **Age is never delegated.** The adult gate stays player-entered and deterministically validated; the LLM proposal carries no age field. | The adult invariant is non-negotiable and never delegated to a generative layer. |
+| C3 | **Age is never delegated.** Ages stay player-entered and deterministically range-validated; the LLM proposal carries no age field. | The `0..10000` bound is non-negotiable and never delegated to a generative layer. |
 | C4 | **Dual surface.** A new `character concept <構想>` command (aliases 構想) and the WebClient creation-panel concept field share one guarded pipeline. | Telnet and browser get the same capability (browser-first, Telnet-parity convention). |
 | C5 | **Offline degradation.** With the LLM offline or retry-exhausted, the feature returns a stable Traditional Chinese message (生成不可用，請手動創角) and the deterministic wizard is untouched. | The offline-playability acceptance criterion holds unchanged. |
 
@@ -119,7 +119,7 @@ pipeline (actor from the session) and fills the draft form for confirmation.
 |---|---|
 | Generative layer | `FakeLLMClient` replays: valid proposal accepted; unregistered race/skill rejects; out-of-band allocations reject; invalid persona rejects the whole proposal; offline degrade |
 | Command | `character concept` success/failure/offline; command-docs drift contract green |
-| Activation | Persona written to `entity.db.persona` in import-card shape; no-persona draft writes nothing; adult gate regression (age 17/17 rejected) |
+| Activation | Persona written to `entity.db.persona` in import-card shape; no-persona draft writes nothing; age-range regression (age -1/-1 rejected) |
 | Guardrail | Malformed output leaves the DB untouched |
 | Traceability | New main requirements annotated with `covers_requirement`; `spec_traceability check` passes |
 

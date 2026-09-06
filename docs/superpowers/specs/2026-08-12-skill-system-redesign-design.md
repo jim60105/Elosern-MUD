@@ -23,7 +23,7 @@ does nothing. Casting the ACTIVE ones among them always rejects `UNKNOWN_EFFECT_
 
 Separately, `tmp/story_settings/` (five detailed character sheets plus world/rule lore, gitignored,
 never committed — see `docs/superpowers/specs/2026-07-29-ai-mud-engine-design.md`'s non-negotiable
-adult-content-only constraint for why these never become seed data directly) describes a much richer
+content constraint on why these never become seed data directly) describes a much richer
 skill and magic system than the registry currently implements: named element-mastery ranks tied to
 numeric magic level, a second non-elemental magic system (神之秘法, Divine Mystery), and several
 per-character unique passives/actives that have no registry entry at all.

@@ -57,7 +57,7 @@ living/fled/knocked-out state, current/maximum HP, and a nullable server-authore
 present in the `webclient-art-panel` portrait catalog — including an entry that resolves to a
 placeholder card — and SHALL be `null` only when the participant is absent from that catalog. The
 server SHALL derive the reference from the catalog it actually builds (character named-policy with
-adult gate, generic-monster bestiary archetype, or unavailable placeholder), and the browser SHALL
+the canonical-age check, generic-monster bestiary archetype, or unavailable placeholder), and the browser SHALL
 NOT construct a portrait subject key or URL from entity data. Lists and strings SHALL have explicit
 bounds and the serialized envelope SHALL remain within the OOB protocol limit.
 

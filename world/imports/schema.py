@@ -105,18 +105,20 @@ CHARACTER_SCHEMA_V1 = {
         },
         "age": {
             "type": "integer",
-            "minimum": 18,
+            "minimum": 0,
+            "maximum": 10000,
             "description": (
-                "HARD GATE: every imported character must be an adult. This is a "
-                "code-level invariant and always rejects; it is never a warning."
+                "Canonical age in years; reasonable range 0-10000. Values "
+                "outside the range always reject."
             ),
         },
         "apparent_age": {
             "type": "integer",
-            "minimum": 18,
+            "minimum": 0,
+            "maximum": 10000,
             "description": (
-                "Independent HARD GATE: characters who appear underage always "
-                "reject even when age is adult; this is never a warning."
+                "Apparent age in years; reasonable range 0-10000. Validated "
+                "independently of age: values outside the range always reject."
             ),
         },
         "race": {"type": "string", "minLength": 1},

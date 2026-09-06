@@ -63,11 +63,11 @@ describe("H1 preserved DOM contract (design D6)", () => {
     ];
   }
 
-  // A minimal valid `creation` panel (the exact schema v4 shape the
+  // A minimal valid `creation` panel (the exact schema v5 shape the
   // protocol validator accepts — a slotless panel carries no proposal key).
   function creationPanel() {
     return {
-      schema_version: 4,
+      schema_version: 5,
       available: true,
       kind: "creation",
       draft: null,
@@ -84,10 +84,10 @@ describe("H1 preserved DOM contract (design D6)", () => {
       ],
       custom: {
         name: { min_length: 1, max_length: 64 },
-        adult: {
-          age_minimum: 18,
+        age: {
+          age_minimum: 0,
           age_maximum: 10000,
-          apparent_age_minimum: 18,
+          apparent_age_minimum: 0,
           apparent_age_maximum: 10000,
         },
         races: [
@@ -120,7 +120,7 @@ describe("H1 preserved DOM contract (design D6)", () => {
           beastfolk: { maximum: 1, elements: affinityElements() },
           elf: { maximum: 0, elements: affinityElements() },
         },
-        // The server-labelled sex vocabulary (v4, namegen-creation-ui).
+        // The server-labelled sex vocabulary (v5, namegen-creation-ui).
         sex: [
           { key: "female", label: "女性" },
           { key: "male", label: "男性" },

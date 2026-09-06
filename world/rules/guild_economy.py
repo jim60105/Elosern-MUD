@@ -17,7 +17,7 @@ from django.db import transaction
 from evennia.utils.create import create_object
 
 from world.observability import log_info, log_warn
-from typeclasses.npcs import NPC, ensure_npc_adult_identity
+from typeclasses.npcs import NPC, ensure_npc_canonical_age
 from world.maps.bootstrap import sync_service_interiors
 from world.rules.guild_config import get_catalog, load_catalog_into_cache
 from world.rules.profession_assembly import (
@@ -71,7 +71,7 @@ def _row_anchor_class(row):
 
 
 def _sync_service_host(row, room) -> NPC:
-    """Create or reuse one stable adult NPC service host from a roster row.
+    """Create or reuse one stable NPC service host from a roster row.
 
     Reuse anchors on the component ``service_id``; a found host is never
     renamed and never has its authored title rewritten (runtime identity
@@ -105,7 +105,7 @@ def _sync_service_host(row, room) -> NPC:
     if host.race is None:
         host.race = "human"
         host.apply_race_baseline()
-    ensure_npc_adult_identity(host)
+    ensure_npc_canonical_age(host)
     # Binding/anchor convergence rides the shared assembly on EVERY sync,
     # reused hosts included: service_binding/anchor_room_id are authored
     # roster config re-applied idempotently, not runtime identity, so the
@@ -179,7 +179,7 @@ def sync_service_content() -> None:
     ``world/rules/rulebook/guild_economy.yaml``'s ``service_hosts`` roster is
     the single truth for which hosts exist and what they carry; this is its
     pure interpreter: per row, resolve the anchor room by tag, find-or-create
-    the adult host on the ``service_id`` anchor, and assemble the profession
+    the host on the ``service_id`` anchor, and assemble the profession
     blueprint through the shared helper — never through a code-side component
     literal. A row whose room tag resolves to no room emits the named
     per-row warning and is skipped alone (the existing interiors-missing

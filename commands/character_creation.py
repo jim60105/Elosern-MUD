@@ -109,7 +109,7 @@ def _activate_creation(
     """Activate one pending shell through the ordinary all-or-nothing path.
 
     Shared by every creation entry (preset, custom wizard, concept proposal):
-    the deterministic preflight (adult gate, registry checks, allocation
+    the deterministic preflight (age bounds, registry checks, allocation
     bands) is the only authority, and a failure leaves the shell pending with
     no state change. ``persona`` carries the server-owned persona block from
     the concept draft when one exists; the activation persists it in the
@@ -172,8 +172,8 @@ class CmdCharacter(Command):
             if name.strip().lower() == "cancel":
                 self.caller.msg("已取消角色建立。")
                 return
-            age = _integer((yield "實際年齡（至少 18，可輸入 cancel 取消）："), "實際年齡")
-            apparent_age = _integer((yield "外表年齡（至少 18，可輸入 cancel 取消）："), "外表年齡")
+            age = _integer((yield "實際年齡（0 至 10000，可輸入 cancel 取消）："), "實際年齡")
+            apparent_age = _integer((yield "外表年齡（0 至 10000，可輸入 cancel 取消）："), "外表年齡")
             race_explanations = "\n".join(
                 f"  {key}：{RACE_REGISTRY[key].description}" for key in RACE_REGISTRY
             )
@@ -375,9 +375,9 @@ def _name_prompt(default: str | None) -> str:
 def _age_prompt(label: str, default: int | None) -> str:
     """Render one age prompt, prefilled when the proposal carries a value."""
     if default is None:
-        return f"{label}（至少 18，可輸入 cancel 取消）："
+        return f"{label}（0 至 10000，可輸入 cancel 取消）："
     return (
-        f"{label}（預設：{default}，Enter 採納，至少 18，"
+        f"{label}（預設：{default}，Enter 採納，0 至 10000，"
         "可輸入 cancel 取消）："
     )
 
@@ -388,7 +388,7 @@ def _collect_age(reply: str, label: str, default: int | None) -> int:
     With no default the existing ``_integer`` authority stays fully in charge
     (empty input remains its format-error outcome); a non-empty reply always
     goes through ``_integer``, so the ``cancel`` parse and the deterministic
-    adult gate keep their exact current semantics
+    age-range check keep their exact current semantics
     (prefill-telnet-concept-from-proposal D1/D2).
     """
     if default is not None and not reply.strip():
@@ -522,7 +522,7 @@ class CmdCharacterConcept(Command):
         collected as proposal-prefilled defaults
         (prefill-telnet-concept-from-proposal D1/D2): each prompt names the proposal's
         normalised value for its field, an empty reply accepts that default,
-        and any non-empty reply overrides it — with the deterministic adult
+        and any non-empty reply overrides it — with the deterministic age-range
         gate staying the final authority over either source. A prompt whose
         proposal field is absent stays a mandatory input; for the name, an
         empty or whitespace-only reply re-prompts the same prompt instead of

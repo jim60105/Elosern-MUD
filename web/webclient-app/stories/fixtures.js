@@ -1519,13 +1519,13 @@ export const SERVICES_PANEL_MINIMAL_SAMPLE = {
 };
 
 // B5 (webclient-vue-06-showcase-overlays): full-overlays fixtures. The
-// `creation` panel (schema v4) mirrors web/webclient/presentation/creation.py
-// exactly: presets (at most 8 cards), the custom descriptor (name/adult
+// `creation` panel (schema v5) mirrors web/webclient/presentation/creation.py
+// exactly: presets (at most 8 cards), the custom descriptor (name/age
 // bounds, races, subraces, profiles, affinity, sex), and the optional saved
 // wizard draft (preset/custom + background + affinity + persona + sex) plus
-// the optional transient concept proposal slot. The adult
-// bounds advertise the 18 minimum on BOTH age and apparent_age (the
-// deterministic adult gate, webclient-character-creation-ui).
+// the optional transient concept proposal slot. The age
+// bounds advertise the 0 minimum on BOTH age and apparent_age (the
+// deterministic age bounds gate, webclient-character-creation-ui).
 const ELEMENTS = [
   { key: "fire", label: "火" },
   { key: "water", label: "水" },
@@ -1538,7 +1538,7 @@ const ELEMENTS = [
 ];
 
 export const CREATION_PANEL_SAMPLE = {
-  schema_version: 4,
+  schema_version: 5,
   available: true,
   kind: "creation",
   draft: null,
@@ -1573,10 +1573,10 @@ export const CREATION_PANEL_SAMPLE = {
   ],
   custom: {
     name: { min_length: 1, max_length: 64 },
-    adult: {
-      age_minimum: 18,
+    age: {
+      age_minimum: 0,
       age_maximum: 10000,
-      apparent_age_minimum: 18,
+      apparent_age_minimum: 0,
       apparent_age_maximum: 10000,
     },
     races: [
@@ -1721,7 +1721,7 @@ export const CREATION_PANEL_PROPOSAL_SAMPLE = {
 // five transient-fill keys. The race is human so the affinity cap (2) is
 // visible, and the wire carries three elements — the form must keep only
 // the first two (registered keys, cap-trimmed). The ages and prose are the
-// generation layer's already-normalized values (adult-clamped, truncated).
+// generation layer's already-normalized values (range-clamped, truncated).
 export const CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE = {
   ...CREATION_PANEL_SAMPLE,
   proposal: {
@@ -1745,7 +1745,7 @@ export const CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE = {
 // The `creation` panel unavailable form (registry-owned reason, the common
 // unavailable envelope).
 export const CREATION_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 4,
+  schema_version: 5,
   available: false,
   reason: { code: "creation_unavailable", message: "角色創建目前無法顯示" },
 };

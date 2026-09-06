@@ -159,7 +159,7 @@ class CreationPanelValidationTests(unittest.TestCase):
     @covers_requirement("webclient-character-creation-ui::creation-presentation-derives-finite-controls-from-immutable-registries")
     def test_custom_descriptor_ships_server_labelled_sex_options(self):
         payload = validate_creation(_valid_payload())
-        self.assertEqual(payload["schema_version"], 4)
+        self.assertEqual(payload["schema_version"], 5)
         self.assertEqual(
             payload["custom"]["sex"],
             [
@@ -262,14 +262,14 @@ class CreationPanelValidationTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(base))
 
-    def test_name_and_adult_bounds_are_exact(self):
+    def test_name_and_age_bounds_are_exact(self):
         for mutate, label in (
             (lambda c: c["name"].update(min_length=0), "min_length"),
             (lambda c: c["name"].update(max_length=81), "max_length"),
-            (lambda c: c["adult"].update(age_minimum=17), "age_minimum"),
-            (lambda c: c["adult"].update(age_maximum=10001), "age_maximum"),
-            (lambda c: c["adult"].update(apparent_age_minimum=17), "apparent_age_minimum"),
-            (lambda c: c["adult"].update(apparent_age_maximum=10001), "apparent_age_maximum"),
+            (lambda c: c["age"].update(age_minimum=1), "age_minimum"),
+            (lambda c: c["age"].update(age_maximum=10001), "age_maximum"),
+            (lambda c: c["age"].update(apparent_age_minimum=1), "apparent_age_minimum"),
+            (lambda c: c["age"].update(apparent_age_maximum=10001), "apparent_age_maximum"),
         ):
             with self.subTest(label=label):
                 payload = _valid_payload()
@@ -279,13 +279,13 @@ class CreationPanelValidationTests(unittest.TestCase):
         payload = _valid_payload()
         self.assertEqual(payload["custom"]["name"]["min_length"], MIN_NAME_LENGTH)
         self.assertEqual(payload["custom"]["name"]["max_length"], MAX_NAME_LENGTH)
-        self.assertEqual(payload["custom"]["adult"]["age_minimum"], AGE_MINIMUM)
-        self.assertEqual(payload["custom"]["adult"]["age_maximum"], AGE_MAXIMUM)
+        self.assertEqual(payload["custom"]["age"]["age_minimum"], AGE_MINIMUM)
+        self.assertEqual(payload["custom"]["age"]["age_maximum"], AGE_MAXIMUM)
         self.assertEqual(
-            payload["custom"]["adult"]["apparent_age_minimum"], APPARENT_AGE_MINIMUM
+            payload["custom"]["age"]["apparent_age_minimum"], APPARENT_AGE_MINIMUM
         )
         self.assertEqual(
-            payload["custom"]["adult"]["apparent_age_maximum"], APPARENT_AGE_MAXIMUM
+            payload["custom"]["age"]["apparent_age_maximum"], APPARENT_AGE_MAXIMUM
         )
 
     def test_race_option_bounds(self):
@@ -430,7 +430,7 @@ class CreationPanelValidationTests(unittest.TestCase):
         # (retool-concept-transient-fill D2/D3).
         self.assertIsNone(validated["draft"]["persona"])
         bad = deepcopy(payload)
-        bad["draft"]["age"] = 17
+        bad["draft"]["age"] = -1
         with self.assertRaises(Exception):
             validate_creation(bad)
         bad = deepcopy(payload)
@@ -608,7 +608,7 @@ class CreationPanelValidationTests(unittest.TestCase):
             "presets": [dict(card) for _ in range(MAX_PRESETS)],
             "custom": {
                 "name": {"min_length": 1, "max_length": MAX_NAME_LENGTH},
-                "adult": {
+                "age": {
                     "age_minimum": AGE_MINIMUM,
                     "age_maximum": AGE_MAXIMUM,
                     "apparent_age_minimum": APPARENT_AGE_MINIMUM,
@@ -653,8 +653,6 @@ class CreationPanelValidationTests(unittest.TestCase):
             "magic_level",
             "import",
             "portrait_ref",
-            "age",
-            "apparent_age",
         ):
             self.assertNotIn(forbidden, payload["custom"])
             for card in payload["presets"]:
@@ -776,10 +774,10 @@ class ProposalTransientFillValidationTests(unittest.TestCase):
 
     def test_bound_violations_reject(self):
         cases = {
-            "underage age": _proposal_wire(age=17),
+            "under-zero age": _proposal_wire(age=-1),
             "over-bound age": _proposal_wire(age=10001),
             "boolean age": _proposal_wire(age=True),
-            "underage apparent_age": _proposal_wire(apparent_age=17),
+            "under-zero apparent_age": _proposal_wire(apparent_age=-1),
             "float age": _proposal_wire(age=25.5),
             "empty display_name": _proposal_wire(display_name=""),
             "over-long display_name": _proposal_wire(
@@ -962,14 +960,15 @@ class CreationPanelPresenterTests(EvenniaTest):
         validate_creation(payload)
 
     def test_semantically_broken_draft_degrades_only_the_draft_slot(self):
-        # A draft that is structurally a custom draft but violates the adult
-        # gate (underage) must not take the whole panel unavailable.
+        # A draft that is structurally a custom draft but violates the
+        # advertised age range (below the 0 minimum) must not take the whole
+        # panel unavailable.
         self.character.creation_draft = {
             "version": 2,
             "mode": "custom",
             "stage": "custom_filled",
             "display_name": "年輕角色",
-            "age": 17,
+            "age": -1,
             "apparent_age": 20,
             "race": "human",
             "subrace": "human_commoner",

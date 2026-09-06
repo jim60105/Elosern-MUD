@@ -37,7 +37,7 @@
     }
   },
   "persona": {
-    "identity": "A reference adult human commoner.",
+    "identity": "A reference human commoner.",
     "personality": "Calm and observant.",
     "life_story": "A placeholder history for import validation.",
     "habit": "Keeps careful field notes.",
