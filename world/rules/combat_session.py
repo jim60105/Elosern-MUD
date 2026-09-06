@@ -1233,6 +1233,14 @@ def _submit_request(
                 actor, new_record, battlefield, logs, notification_count=len(notifications)
             )
     except Exception:
+        # A defeat settled inside this transaction armed its undo; run it
+        # BEFORE the round restore below so the pre-round values win (the
+        # undo restores the writer's post-round entry state, the round
+        # restore the pre-round state the database rolled back to).
+        from world.rules.defeat_aftermath import drain_pending_undos
+
+        for undo in drain_pending_undos():
+            undo()
         # The outer transaction rolled the database back; restore the item
         # journals first (they cover the actually-deleted mirrors and the
         # HP surface written by the item resolver), then the in-process
@@ -1256,6 +1264,11 @@ def _submit_request(
         restore_practice_dedupe(dedupe_before)
         register_active_battlefield(battlefield)
         raise
+    # The outer transaction committed: any armed aftermath undo is moot (the
+    # physical departure is scheduled via on_commit); drop it.
+    from world.rules.defeat_aftermath import drain_pending_undos
+
+    drain_pending_undos()
     # Deliver auto-leave notices only after the whole round committed, so a
     # rolled-back round never shows a fake disengagement notification.
     for line in notifications:
@@ -1340,7 +1353,12 @@ def _continue_or_settle(
             "logs": tuple(logs),
             "overwhelming_team": classify_overwhelm(battlefield),
         }
-    return settle_session(actor, record, battlefield, outcome, logs)
+    # nested_round: this settlement runs inside _submit_request's round
+    # transaction, so the aftermath arms its undo for that transaction's
+    # own failure boundary.
+    return settle_session(
+        actor, record, battlefield, outcome, logs, nested_round=True
+    )
 
 
 def settle_session(
@@ -1351,6 +1369,7 @@ def settle_session(
     logs=(),
     *,
     notification_count: int = 0,
+    nested_round: bool = False,
 ) -> dict[str, Any]:
     """Settle accumulated round time once and clear session state (D-6).
 
@@ -1374,73 +1393,116 @@ def settle_session(
 
     exam_result = None
     started = time.monotonic()
-    with transaction.atomic():
-        if record.mode == "guild_exam":
-            from world.rules.guild_exams import settle_exam_outcome
+    aftermath = None
+    try:
+        with transaction.atomic():
+            if record.mode == "guild_exam":
+                from world.rules.guild_exams import settle_exam_outcome
 
-            exam_result = settle_exam_outcome(actor, record, battlefield, outcome)
-        # Settlement regenerates every living, non-fled roster member
-        # (fix-combat-session-roster-and-overwhelm D1): companions and any
-        # non-defeated foe still present recover for the accumulated combat
-        # seconds, so a knocked-out companion can rise above the nonlethal
-        # HP floor and rejoin a later engagement. A member at 0 HP is dead
-        # and excluded (kill semantics). The actor alone keeps the historical
-        # scope only when the actor is still living (recovery fallback with a
-        # live actor, or a solo flee whose actor is alive); a dead actor is
-        # never passed, so settlement can never revive a defeated player.
-        participants = (
-            [
-                entity
-                for key, entity in battlefield.roster.items()
-                if key not in battlefield.fled
-                and _stored_trait_value(entity.traits.hp) > 0
-            ]
-            if battlefield is not None
-            else []
-        )
-        if not participants and _stored_trait_value(actor.traits.hp) > 0:
-            participants = [actor]
-        events = settle_combat_result(
-            SimpleNamespace(total_seconds=record.rounds_elapsed * _ROUND_SECONDS),
-            participants,
-        )
-        # Record the world tick at which the settlement committed; a non-None
-        # value marks the session as settled for any later reader.
-        _persist(
-            actor,
-            replace(record, settled_tick=get_world_clock().tick),
-        )
-        clear_session(actor, battlefield, record)
-        if record.mode == "guild_exam":
-            # Simulated battle: restore both sides inside the settlement
-            # transaction, so the full-restoration guarantee commits or rolls
-            # back with the exam outcome and can never strand a defeated
-            # candidate (exam-simulated-battle-redesign D3). Opponent deletion
-            # stays post-commit so a rolled-back settlement keeps it alive.
-            _restore_exam_participants(actor, record, battlefield)
-        # Boundary event fires only on the OUTERMOST durable commit: a
-        # settlement reached inside a round's transaction is a savepoint, and
-        # a rolled-back attempt must emit nothing (spec scenario).
-        settled_ms = int((time.monotonic() - started) * 1000)
-        # Context snapshotted at the boundary; callback carries only
-        # primitives (see the round-boundary note above).
-        boundary = {
-            "char": str(actor.pk),
-            "outcome": outcome,
-            "ms": settled_ms,
-            "notifications": notification_count,
-        }
-        transaction.on_commit(
-            lambda boundary=boundary: log_info(
-                "settlement_done", context=boundary
+                exam_result = settle_exam_outcome(
+                    actor, record, battlefield, outcome
+                )
+            # Settlement regenerates every living, non-fled roster member
+            # (fix-combat-session-roster-and-overwhelm D1): companions and any
+            # non-defeated foe still present recover for the accumulated combat
+            # seconds, so a knocked-out companion can rise above the nonlethal
+            # HP floor and rejoin a later engagement. A member at 0 HP is dead
+            # and excluded (kill semantics). The actor alone keeps the historical
+            # scope only when the actor is still living (recovery fallback with a
+            # live actor, or a solo flee whose actor is alive); a dead actor is
+            # never passed, so settlement can never revive a defeated player.
+            participants = (
+                [
+                    entity
+                    for key, entity in battlefield.roster.items()
+                    if key not in battlefield.fled
+                    and _stored_trait_value(entity.traits.hp) > 0
+                ]
+                if battlefield is not None
+                else []
             )
-        )
+            if not participants and _stored_trait_value(actor.traits.hp) > 0:
+                participants = [actor]
+            events = settle_combat_result(
+                SimpleNamespace(
+                    total_seconds=record.rounds_elapsed * _ROUND_SECONDS
+                ),
+                participants,
+            )
+            aftermath_logs: tuple = ()
+            if record.mode == "hostile" and outcome == "defeat":
+                from world.rules.defeat_aftermath import (
+                    finalize_departure,
+                    register_pending_undo,
+                    run_defeat_aftermath,
+                )
+
+                aftermath = run_defeat_aftermath(actor, record, battlefield)
+                record = aftermath.session
+                aftermath_logs = aftermath.logs
+                # The physical departure deletes only after the OUTERMOST
+                # durable commit: a settlement reached inside a round's
+                # transaction is a savepoint, and a rolled-back round must
+                # leave the winner alive (D-C3 two-phase departure).
+                transaction.on_commit(
+                    lambda actor=actor, tickets=aftermath.departed: (
+                        finalize_departure(actor, tickets)
+                    )
+                )
+                if nested_round:
+                    # Django has no rollback hook: arm the undo so the
+                    # enclosing round transaction can restore the aftermath
+                    # surfaces when it rolls back after this settlement
+                    # returned.
+                    register_pending_undo(aftermath.undo)
+            # Record the world tick at which the settlement committed; a non-None
+            # value marks the session as settled for any later reader.
+            _persist(
+                actor,
+                replace(record, settled_tick=get_world_clock().tick),
+            )
+            clear_session(actor, battlefield, record)
+            if record.mode == "guild_exam":
+                # Simulated battle: restore both sides inside the settlement
+                # transaction, so the full-restoration guarantee commits or rolls
+                # back with the exam outcome and can never strand a defeated
+                # candidate (exam-simulated-battle-redesign D3). Opponent deletion
+                # stays post-commit so a rolled-back settlement keeps it alive.
+                _restore_exam_participants(actor, record, battlefield)
+            # Boundary event fires only on the OUTERMOST durable commit: a
+            # settlement reached inside a round's transaction is a savepoint, and
+            # a rolled-back attempt must emit nothing (spec scenario).
+            settled_ms = int((time.monotonic() - started) * 1000)
+            # Context snapshotted at the boundary; callback carries only
+            # primitives (see the round-boundary note above).
+            boundary = {
+                "char": str(actor.pk),
+                "outcome": outcome,
+                "ms": settled_ms,
+                "notifications": notification_count,
+            }
+            transaction.on_commit(
+                lambda boundary=boundary: log_info(
+                    "settlement_done", context=boundary
+                )
+            )
+    except Exception:
+        # Any exception escaping the transaction — a body failure or the
+        # context manager's own commit/exit failure — must undo the
+        # idmapper-cached aftermath surfaces before propagating (D-C5); the
+        # undo is idempotent.
+        if aftermath is not None:
+            from world.rules.defeat_aftermath import drain_pending_undos
+
+            aftermath.undo()
+            drain_pending_undos()
+        raise
     if record.mode == "guild_exam":
         _delete_exam_opponent(actor, record)
     return {
         "outcome": outcome,
         "rounds_elapsed": record.rounds_elapsed,
-        "logs": tuple(logs),
+        "logs": (*logs, *aftermath_logs),
         "events": tuple(events),
         "exam": exam_result,
     }

@@ -338,6 +338,22 @@ LLM_PROFILES = {
 LLM_ENV_NAMES = frozenset(llm_env_names())
 
 ######################################################################
+# Defeat aftermath content switch (defeat-aftermath-core)
+######################################################################
+
+# Adult-scene guard for the defeat settlement's violation hook point
+# (defeat-aftermath-core D-C4). The deterministic core has no on-branch: with
+# the flag off the hook is never called and the PG defeat is the entire
+# behavior; the guarded body is contributed by the adult-layer changes.
+# Fail-closed env override, like every deployment knob in this module.
+DEFEAT_ADULT_SCENES = _env_typed(
+    "DEFEAT_ADULT_SCENES",
+    _env_bool_word,
+    True,
+    rule=_ENV_BOOL_RULE,
+)
+
+######################################################################
 # Deterministic art-assets backend (art-assets)
 ######################################################################
 

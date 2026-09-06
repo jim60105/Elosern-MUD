@@ -18,6 +18,7 @@ or event content are never deleted, moved, or modified.
 
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Any
 
 from evennia.utils.create import create_object
 
@@ -121,6 +122,68 @@ def _remove_monster(wilderness, monster: Monster) -> None:
     """Pop ``monster`` from the wilderness bookkeeping and delete it."""
     wilderness.db.itemcoordinates.pop(monster, None)
     monster.delete()
+
+
+@dataclass(frozen=True)
+class PopulationDepartureTicket:
+    """A committed logical departure awaiting its physical deletion.
+
+    ``revert`` undoes the logical departure (marker and bookkeeping back in
+    place) both in-process and in the database; it is idempotent for a
+    monster whose row no longer exists.
+    """
+
+    monster: Monster
+    wilderness: Any
+    saved_marker: str
+    saved_coordinates: tuple[int, int] | None
+
+    def revert(self) -> None:
+        """Restore the marker and the bookkeeping entry."""
+        if self.monster.pk is None:
+            # A deleted settlement is never restored.
+            return
+        self.monster.db.population_key = self.saved_marker
+        if self.saved_coordinates is not None:
+            self.wilderness.db.itemcoordinates[self.monster] = (
+                self.saved_coordinates
+            )
+
+
+def depart_population_monster(
+    wilderness, monster: Monster
+) -> PopulationDepartureTicket:
+    """In-transaction departure phase for the defeat aftermath (D-C3).
+
+    The defeat writer requests the departure, but this module stays the sole
+    writer of the population lifecycle: the ownership marker is cleared and
+    the bookkeeping entry dropped inside the caller's open transaction, so a
+    settlement rollback restores the winner together with every other
+    aftermath write — the population model reads the marker and the
+    bookkeeping, not object lifetime. The physical ``delete()`` is
+    deliberately NOT part of this primitive: Evennia cannot resurrect a
+    deleted instance in-process (the idmapper cache is not transaction-aware,
+    the same wall that keeps exam-opponent deletion post-commit), so the
+    caller deletes the departed monster only after its transaction commits.
+    A crash in that window leaves a marker-less live monster — the accepted
+    restart-refresh risk the parent design already carries.
+
+    Returns a :class:`PopulationDepartureTicket` whose ``revert`` serves both
+    the caller's rollback path and the post-commit delete-failure recovery.
+    """
+    if not monster.db.population_key:
+        raise ValueError(f"{monster} carries no population marker")
+    saved_marker = monster.db.population_key
+    saved_coordinates = wilderness.db.itemcoordinates.get(monster)
+    monster.db.population_key = None
+    wilderness.db.itemcoordinates.pop(monster, None)
+
+    return PopulationDepartureTicket(
+        monster=monster,
+        wilderness=wilderness,
+        saved_marker=saved_marker,
+        saved_coordinates=saved_coordinates,
+    )
 
 
 def _spawn(wilderness, coordinates: tuple[int, int], expected: MonsterPopulation) -> None:

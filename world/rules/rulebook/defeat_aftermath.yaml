@@ -1,0 +1,14 @@
+# Defeat aftermath rulebook (defeat-aftermath-core D-C8).
+#
+# Per-section registry: this change owns `pg_lines` and `weak_debuff`; each
+# downstream adult change registers its own section validator at load, and
+# unknown sections are ignored with one log_warn (forward-compatible single
+# YAML file). A malformed owned section fails closed at load.
+#
+# `pg_lines` holds the PG wake prose. The DA1 writer renders the first line
+# deterministically (index 0); richer per-variant selection arrives with the
+# adult changes that own their sections.
+pg_lines:
+  - "你眼前一黑倒了下去——再次睜開眼時，世界仍在轉動，四肢沉重得不聽使喚。"
+weak_debuff:
+  buff_key: defeat_weak

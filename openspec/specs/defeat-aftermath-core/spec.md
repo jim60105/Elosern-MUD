@@ -1,6 +1,12 @@
-# defeat-aftermath-core delta
+# defeat-aftermath-core Specification
 
-## ADDED Requirements
+## Purpose
+
+Define the deterministic, offline defeat settlement: the nonlethal HP floor,
+violator departure with quest-retention precedence, the weak debuff, the
+defeat EventLog kinds, and the guarded adult-scene hook point.
+
+## Requirements
 
 ### Requirement: Hostile defeat floors player HP at 1 and marks the player knocked out
 On a hostile-mode session settling `outcome == "defeat"`, the defeat
@@ -20,8 +26,16 @@ are exempt and keep their full-restoration simulation semantics.
 
 ### Requirement: Living winning violators depart the room, quest-bound monsters retained
 At defeat settlement, every living foe-team monster carrying the wilderness
-ownership marker `db.population_key` SHALL be deleted and dropped from the
-wilderness script's `itemcoordinates`. A living foe-team monster whose pk
+ownership marker `db.population_key` SHALL be logically departed inside the
+settlement transaction: its marker is cleared and it is dropped from the
+wilderness script's `itemcoordinates`. Its physical Evennia-object deletion
+SHALL be scheduled only after the outermost transaction commits (through
+`transaction.on_commit`), because a deleted idmapper instance cannot be
+restored on rollback. If the post-commit deletion fails, the logical
+departure SHALL be reverted deterministically so the monster remains a
+normal, reconcilable population monster; only a process crash in the
+post-commit window may leave a marker-less live monster (the parent
+design's accepted restart-refresh risk). A living foe-team monster whose pk
 appears in any of the settling player's persisted quest records
 (`db.quest_log` entries' `objective_target_ids`) SHALL NOT be removed and
 SHALL remain in the room — the quest-retention rule wins over the
@@ -31,7 +45,11 @@ left untouched.
 
 #### Scenario: Population winner despawns at defeat settlement
 - **WHEN** a player loses to a wilderness population monster carrying `population_key`
-- **THEN** after settlement the monster object is deleted and absent from `itemcoordinates`, and the next coordinate activation reconciles a fresh monster as today
+- **THEN** the monster is absent from `itemcoordinates` as part of the committed settlement and, after the post-commit departure callback completes, its object is deleted; the next coordinate activation reconciles a fresh monster as today
+
+#### Scenario: Post-commit deletion failure reverts the departure
+- **WHEN** the physical object deletion fails after the settlement committed
+- **THEN** the marker and the `itemcoordinates` entry are restored, the monster remains a normal live population monster, and the failure is logged at error level
 
 #### Scenario: Quest-bound winner is retained
 - **WHEN** a player loses to a monster whose pk is listed in a persisted quest record's `objective_target_ids`
@@ -98,9 +116,12 @@ violator departure, and its own EventLog/observability records.
 ### Requirement: The defeat aftermath joins the round's atomic persistence unit
 The defeat aftermath SHALL run inside `settle_session`'s existing
 `transaction.atomic()` block, before the session record is cleared.
-Because the `settled_tick` marker, the clock, the despawns, the buffs, and
-the aftermath commit or roll back together, there is no observable state
-in which the marker is durable but the aftermath is incomplete. A crash
+Because the `settled_tick` marker, the clock, the logical departures (the
+marker and `itemcoordinates` removal), the buffs, and the aftermath commit
+or roll back together, there is no observable state in which the marker is
+durable but the aftermath is incomplete. The physical deletions ride
+`transaction.on_commit`, so an outer round transaction's rollback discards
+them together with every other aftermath write. A crash
 before commit leaves the session durable for the existing recovery
 fallback, which re-runs settlement — including the aftermath — once;
 aftermath dice (contributed by adult layers) derive purely from durable
@@ -108,4 +129,4 @@ record state, so the replay produces the identical outcome.
 
 #### Scenario: Commit failure rolls back the whole aftermath
 - **WHEN** a fault is injected after the aftermath's last write and before commit
-- **THEN** the monster despawn, the weak buff, the HP floor, the EventLog entries, and the session clearing are all absent, and the next settlement attempt produces the full defeat outcome exactly once
+- **THEN** the logical departures (the monster keeps its marker and `itemcoordinates` entry), the weak buff, the HP floor, the EventLog entries, and the session clearing are all absent, and the next settlement attempt produces the full defeat outcome exactly once

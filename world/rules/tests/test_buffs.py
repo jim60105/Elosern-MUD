@@ -428,6 +428,26 @@ class BuffIntegrationTests(EvenniaTestCase):
         _add_buff(entity, "dark_curse")
         self.assertIn("dark_curse", entity_active_buffs(entity))
 
+    def test_buff_defeat_weak(self):
+        definition = BUFF_DEFINITIONS["defeat_weak"]
+        self.assertEqual(definition.duration, 300)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(
+            definition.modifiers,
+            {
+                "bounds": [
+                    {"target": "atk_phys", "ceiling": -5},
+                    {"target": "agility", "ceiling": -5},
+                    {"target": "defense", "ceiling": -5},
+                ]
+            },
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "defeat_weak")
+        self.assertIn("defeat_weak", entity_active_buffs(entity))
+
     @covers_requirement("skill-registry::skill-registry-contains-the-full-暗-element-spell-set")
     def test_buff_dark_corrosion(self):
         definition = BUFF_DEFINITIONS["dark_corrosion"]

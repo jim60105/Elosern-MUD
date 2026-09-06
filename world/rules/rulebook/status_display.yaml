@@ -86,6 +86,9 @@
 - code: dark_curse
   label: 詛咒
   severity: harmful
+- code: defeat_weak
+  label: 擊敗虛弱
+  severity: warning
 - code: dark_corrosion
   label: 腐蝕
   severity: harmful
