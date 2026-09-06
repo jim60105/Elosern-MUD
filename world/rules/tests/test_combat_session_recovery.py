@@ -318,11 +318,18 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(self.player.db.active_combat)
 
     @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
+    @covers_requirement(
+        "defeat-aftermath-core::hostile-defeat-floors-player-hp-at-1-and-marks-the-player-knocked-out",
+        "player-combat-session::the-knocked-out-player-settles-the-session-as-defeat",
+    )
     def test_solo_defeat_settlement_never_revives_the_player(self):
-        # A hostile defeat settles the dead player at 0 HP: the roster scope
-        # excludes HP-0 members and the actor-alive fallback guard means the
-        # settlement never regenerates a corpse (kill semantics), while the
-        # world clock still advances the accumulated rounds exactly once.
+        # A hostile defeat settles the fallen player at the nonlethal HP-1
+        # floor (defeat-aftermath-core D-C1): the roster scope excludes the
+        # HP-0 member so settlement never regenerates a corpse, and the
+        # aftermath floors the stored HP at 1 — no regen applies past the
+        # floor — while the world clock still advances the accumulated rounds
+        # exactly once. (BREAKING rewrite: the pre-change corpse settled at
+        # 0 HP; no released users exist.)
         self.monster.traits.atk_phys.base = 100
         self.player.traits.hp.base = 100
         self.player.traits.hp.current = 1
@@ -334,16 +341,22 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         ):
             result = submit_player_action(self.player, "fire_ball", [self.monster])
         self.assertEqual(result["outcome"], "defeat")
-        self.assertEqual(self.player.traits.hp.current, 0)
+        self.assertEqual(self.player.traits.hp.current, 1)
         self.assertEqual(clock.tick, 6)
         self.assertIsNone(self.player.db.active_combat)
 
     @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
+    @covers_requirement(
+        "defeat-aftermath-core::hostile-defeat-floors-player-hp-at-1-and-marks-the-player-knocked-out",
+        "player-combat-session::the-knocked-out-player-settles-the-session-as-defeat",
+    )
     def test_restored_dead_player_session_never_revives_the_player(self):
         # A terminal hostile session restored with the player dead at 0 HP
         # (the durable pre-settlement crash window) settles through the
-        # recovery fallback: the roster is unavailable, but the actor-alive
-        # guard keeps the corpse at 0 HP while the clock still advances.
+        # recovery fallback: the defeat aftermath floors the stored HP at 1
+        # (defeat-aftermath-core D-C1), never leaving a 0-HP persisted statue,
+        # while the clock still advances. (BREAKING rewrite: no released
+        # users exist.)
         self.monster.traits.atk_phys.base = 100
         self.player.traits.hp.base = 100
         self.player.traits.hp.current = 1
@@ -364,7 +377,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         clock = WorldClock()
         with patch("world.rules.clock.get_world_clock", return_value=clock):
             restore_active_session(self.player)
-        self.assertEqual(self.player.traits.hp.current, 0)
+        self.assertEqual(self.player.traits.hp.current, 1)
         self.assertEqual(clock.tick, 6)
         self.assertIsNone(self.player.db.active_combat)
 

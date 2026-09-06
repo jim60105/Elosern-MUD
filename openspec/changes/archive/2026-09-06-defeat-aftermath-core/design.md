@@ -60,10 +60,18 @@ regen through a buff would be a new effect kind, deliberately left to
 never scales regen.
 
 **D-C3: Violator departure is defeat-writer-owned, not population-owned.**
-`ensure_population` stays untouched. The aftermath despawns marker-carrying
-(`db.population_key` present) living winners — pop from the wilderness
-script's `itemcoordinates`, then `delete()`, the same primitive shape as
-the population service's own despawn path (`world/maps/wilderness_population.py:121`).
+`ensure_population` stays untouched. The aftermath departs marker-carrying
+(`db.population_key` present) living winners in two phases (as implemented;
+amends the original in-transaction `delete()` sketch): the logical
+departure — marker cleared and `itemcoordinates` entry dropped through
+`world/maps/wilderness_population.depart_population_monster` — commits
+inside the settlement transaction, while the physical `delete()` is
+scheduled through `transaction.on_commit` and runs only after the OUTERMOST
+durable commit (a settlement inside a round's transaction is a savepoint,
+and Evennia cannot resurrect a deleted instance in-process). A post-commit
+delete failure deterministically reverts the logical departure; only a
+process crash in the post-commit window leaves a marker-less live monster
+(the parent design's accepted restart-refresh risk).
 Quest-bound monsters — pk in the settling player's persisted
 `db.quest_log` records' `objective_target_ids` (`world/quests/runtime.py`
 storage shape) — are never removed, and quest retention outranks the

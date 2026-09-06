@@ -36,10 +36,6 @@ or Battlefield instances SHALL NOT be stored.
 - **WHEN** a player already has a valid active session
 - **THEN** a second `engage` request is rejected without replacing it
 
-#### Scenario: A session with a knocked-out player settles as defeat
-- **WHEN** the player is marked knocked out or at zero HP while companions stand
-- **THEN** the session settles elapsed rounds and clears combat state as an ordinary defeat
-
 ### Requirement: One preflight-valid player action drives one complete ordinary combat round
 During active combat, a selected skill SHALL build one player `ActionRequest` and a selected usable item SHALL build one `ItemUseRequest`. The combat-session facade SHALL call the matching side-effect-free preflight before any initiative action. A preflight rejection SHALL not run NPC actions/upkeep or consume a round. After successful preflight, a session action provider SHALL supply the selected request once for the player and deterministic behavior-policy `ActionRequest` values for every other participant — monsters and allied companions alike, each at most one per round, with targets selected from the opposing team. `run_round()` SHALL preserve initiative, resolution, and upkeep and SHALL dispatch the closed request union explicitly to `ActionResolver` or the deterministic item-use resolver. If an earlier initiative action makes the preflight-valid request reject at the player's turn, the already-started round SHALL remain consumed.
 
@@ -95,9 +91,20 @@ never settle the same rounds a second time.
 - **THEN** the companion's HP/MP/SP are regenerated for the accumulated combat seconds, and a knocked-out
   companion rises above the nonlethal HP floor when its regen allows
 
+### Requirement: The knocked-out player settles the session as defeat
+If the player is in the battlefield's knocked-out set at the round cap or
+when the round otherwise ends without a side eliminated, the session SHALL
+settle with outcome `defeat` — the defeated player SHALL be settled at HP
+1 (the nonlethal floor applied by the defeat aftermath), never left at a
+0-HP persisted statue.
+
+#### Scenario: Cap reached with the player knocked out
+- **WHEN** the player is in the knocked-out set when ROUND_CAP completes
+- **THEN** the session settles with outcome `defeat` and the player's stored HP equals the aftermath floor `1` before the recovery phase advances it
+
 ### Requirement: A round and its settlement form one atomic persistence unit
 
-`submit_player_action` SHALL persist the round's action effects (HP/resources/knockouts/quest effects), the updated session metadata (round count, fled/knockout sets), and any terminal settlement (exam outcome, clock advance, session clearing) as a single durable transaction with snapshot/restore of all touched entities, so a process termination can never leave half-round durable state. Upkeep-settled effects (damaging-tick HP, defeat entries, and quest effects staged by the upkeep settlement) SHALL commit inside the same unit: `submit_player_action` SHALL forward the session's `simulated` and companion `nonlethal_keys` policy to `run_round` and overwhelm compression, and an upkeep settlement failure SHALL roll back the whole round.
+`submit_player_action` SHALL persist the round's action effects (HP/resources/knockouts/quest effects), the updated session metadata (round count, fled/knockout sets), and any terminal settlement (exam outcome, clock advance, session clearing) as a single durable transaction with snapshot/restore of all touched entities, so a process termination can never leave half-round durable state. Upkeep-settled effects (damaging-tick HP, defeat entries, and quest effects staged by the upkeep settlement) SHALL commit inside the same unit: `submit_player_action` SHALL forward the session's `simulated` and companion `nonlethal_keys` policy to `run_round` and overwhelm compression, and an upkeep settlement failure SHALL roll back the whole round. On a hostile-defeat terminal outcome, the complete defeat aftermath (violator departure, weak buff grant, and the adult phases contributed by later changes) SHALL commit in that one transaction together with the `settled_tick` marker and the session-record clearing; the physical departure deletions ride `transaction.on_commit`, so an outer round transaction's rollback discards them too.
 
 #### Scenario: Termination mid-round leaves no half-committed round
 
@@ -118,6 +125,16 @@ never settle the same rounds a second time.
 
 - **WHEN** the upkeep settlement raises while staging defeat or quest effects after round actions applied
 - **THEN** the round actions, tick HP, session metadata, and in-process entity surfaces all roll back together
+
+#### Scenario: Settlement failure leaves no trace
+
+- **WHEN** settlement fails after staging effects
+- **THEN** the session record still shows the previous settled tick, every entity's attributes are unchanged, and no defeat-aftermath write (departure, buff, HP floor) is observable
+
+#### Scenario: Defeat aftermath commits with its round
+
+- **WHEN** a hostile defeat settles
+- **THEN** the `settled_tick` marker, the session clearing, and the whole aftermath are visible or absent together
 
 ### Requirement: Overwhelm waits for one player choice before compressed resolver-backed outcome
 At engagement the session SHALL record overwhelm classification but SHALL run no action before player input. After one selected skill or item request passes its matching preflight, a decided encounter SHALL call the landed overwhelm resolver only when the player's team is the overwhelming side. The selected request SHALL be used for the first simulated player turn; subsequent compressed player turns SHALL use deterministic `basic_attack` against the lowest-HP living enemy. Every turn SHALL remain a member of the closed deterministic request union and SHALL emit compressed EventLogs; no path SHALL directly assign HP, consume inventory outside the item resolver, or bypass quest planners. The facade SHALL pass the selected action's actor key, `action_kind` (`skill` or `item`), and `action_key` to the resolver so the compressed log emits exactly one matching first-round `commanded_action` entry. This identity plumbing SHALL affect only log identity, never round sequence, combat math, or settlement. A foe-overwhelming verdict SHALL remain informational and play one ordinary round per player submission, preserving full skill, flee, and item choice. Undecided encounters SHALL pause for player input between ordinary rounds.

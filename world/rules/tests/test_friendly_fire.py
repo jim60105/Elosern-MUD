@@ -188,6 +188,11 @@ class CombatFriendlyFireTests(FriendlyFireBase):
         from world.rules.combat_session import forfeit
 
         for skill_key in ("basic_attack", "fire_ball", "wind_blade", "shadow_slash"):
+            # The prior iteration's forfeit is a defeat settlement: the
+            # defeat aftermath floors the player at HP 1 (defeat-aftermath-core
+            # D-C1). Reset the fixture HP so every skill is exercised from the
+            # same standing the shipped row expectations assume.
+            self.player.traits.hp.current = 100
             companion = _companion(self.player, f"目標{skill_key}")
             _grant_affinity(companion, self.player, 10)
             self._equip(skill_key)

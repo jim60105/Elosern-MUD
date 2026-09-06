@@ -126,6 +126,19 @@
       - {target: atk_phys, ceiling: -10}
       - {target: magic_power, ceiling: -10}
       - {target: agility, ceiling: -10}
+# Defeat aftermath (defeat-aftermath-core D-C2): marker debuff mounted at
+# hostile-defeat settlement. Bounds ceilings on the physical axes only; it
+# never scales regen (the buff engine's rate modifier is an absolute
+# per-interval delta, and the regen tax belongs to defeat-aftermath-recovery).
+- key: defeat_weak
+  duration: 300
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    bounds:
+      - {target: atk_phys, ceiling: -5}
+      - {target: agility, ceiling: -5}
+      - {target: defense, ceiling: -5}
 - key: dark_corrosion
   duration: 300
   tick_interval: 10

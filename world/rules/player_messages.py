@@ -55,7 +55,7 @@ SESSION_REASON_MESSAGES: dict[str, str] = {
 # Stable terminal outcome announcements shared by command and adapter paths.
 TERMINAL_OUTCOME_MESSAGES: dict[str, str] = {
     "victory": "戰鬥結束，你取得了勝利。",
-    "defeat": "你被擊敗了。",
+    "defeat": "你被擊敗了，倒地不起，許久之後才在原地醒轉。",
     "fled": "你脫離了戰鬥。",
     "exam_passed": "你通過了公會考核。",
     "exam_failed": "你未能通過公會考核。",
@@ -83,3 +83,21 @@ def session_reason_message(reason: str) -> str:
 def terminal_outcome_message(outcome: str) -> str:
     """Return the stable announcement for one terminal session outcome."""
     return TERMINAL_OUTCOME_MESSAGES.get(outcome, CONTINUE_COMBAT_MESSAGE)
+
+
+# Stable defeat-aftermath EventLog templates (defeat-aftermath-core D-C6).
+# Every new aftermath kind ships its zh-tw offline template line here and the
+# rendered text flows through the ordinary EventLog path (Telnet and WebClient
+# alike). ``defeat_settle`` renders the PG wake prose carried in its entry
+# data; the prose itself lives in the rulebook's ``pg_lines`` section so the
+# rulebook stays the single content source.
+DEFEAT_AFTERMATH_TEMPLATES: dict[str, str] = {
+    "defeat_settle": "{data[wake]}",
+    "violator_depart": "{actor} 對倒地的你失去興趣，逕自離開了。",
+    "weak_granted": "虛弱感籠罩全身——你暫時使不出全力。",
+}
+
+
+def defeat_aftermath_template(kind: str) -> str:
+    """Return the stable offline template for one aftermath EventLog kind."""
+    return DEFEAT_AFTERMATH_TEMPLATES[kind]
