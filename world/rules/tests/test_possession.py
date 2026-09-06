@@ -254,6 +254,7 @@ class PossessionExitPathTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        register_catalog()
         self.npc = create_object(NPC, key="同伴A", location=self.room1)
         join_party(self.npc, self.char1)
 
