@@ -102,6 +102,15 @@ DEFEAT_AFTERMATH_TEMPLATES: dict[str, str] = {
     "violation_attempt": "{actor} 撲了上來，把你壓在身下，熾熱的鼻息就落在頸邊——牠還沒有滿足。",
     "violation_resisted": "你拚死扭動，總算掙開了 {actor} 的侵犯——牠不滿地低吼，動作收斂了許多。",
     "violation_act": "{actor} 得逞了。你的身體被肆意擺布，不聽話地發熱發顫，那種難為情的感覺揮之不去。",
+    # Companion victims (defeat-aftermath-companion-victims): the same
+    # light-adventure embarrassed tone observed from the player's side;
+    # {target} names the companion the attempt actually targeted.
+    "violation_attempt_companion": "{actor} 撲向了倒地的{target}，熾熱的鼻息就落在頸邊——牠還沒有滿足。",
+    "violation_resisted_companion": "{target} 拚死扭動，總算掙開了 {actor} 的侵犯——牠不滿地低吼，動作收斂了許多。",
+    "violation_act_companion": "{actor} 對{target}得逞了。她的身體被肆意擺布，不聽話地發熱發顫，那種難為情的感覺揮之不去。",
+    # The knocked-out companion's own wake observation (a read of the
+    # outcome, no new mutation): one line per selected companion victim.
+    "companion_wake": "{actor} 也悠悠轉醒——她狼狽地撐起身子，拍了拍凌亂的衣擺，紅著臉別開了視線。",
 }
 
 

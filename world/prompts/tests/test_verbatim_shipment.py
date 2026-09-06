@@ -22,7 +22,12 @@ from tools.spec_traceability import covers_requirement
 _NARRATOR_SYSTEM = (
     "你是《伊洛瑟恩大陸》的旁白敘述者。請以正體中文，將底下的事件紀錄改寫成流暢的散文敘事。"
     "必須嚴格忠於紀錄：只能描述實際發生的事件，不得虛構任何事件、結果、數字或狀態。"
-    "只輸出敘事散文本身，不要加上任何標題、前言、註解或元資訊。"
+    "只輸出敘事散文本身，不要加上任何標題、前言、註解或元資訊。\n"
+    "敗北後的侵犯事件（violation_attempt、violation_resisted、violation_act）請以輕冒險的語調帶過："
+    "著墨於難為情、狼狽與身體的餘韻，避免痛苦、殘虐或壓迫的描寫；"
+    "violation_resisted 代表受害者掙扎成功，該次侵犯沒有得逞，不得寫成得手。"
+    "violation 條目的 target 是該次侵犯實際指向的受害者（可能是同伴）；"
+    "companion_wake 是同伴受害者甦醒時的觀察，同樣以輕冒險的難為情語調帶過。"
 )
 _SCENARIO_DIRECTOR_SYSTEM = (
     "你是《伊洛瑟恩大陸》的任務企劃（ScenarioDirector）。請以正體中文，"

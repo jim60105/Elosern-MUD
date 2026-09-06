@@ -8,6 +8,7 @@ registration with its EventLog splice, and the in-memory digest handoff.
 """
 
 import unittest
+from dataclasses import replace as dataclass_replace
 from unittest.mock import patch
 
 from django.test import override_settings
@@ -20,10 +21,12 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
 from world.rules import clock as clock_module
+from world.rules import combat_session as combat_session_module
 from world.rules.combat_session import (
     engage,
     forfeit,
     read_session,
+    reconstruct_battlefield,
     submit_player_action,
 )
 from world.rules.defeat_aftermath import (
@@ -102,13 +105,22 @@ class ViolationBase(BattlefieldIsolation, EvenniaTestCase):
         monster.traits.atk_phys.base = atk
         return monster
 
-    def _equalize_scores(self):
+    def _companion(self, key):
+        """Create one co-located companion bound to the player's party."""
+        companion = create_object(NPC, key=key)
+        companion.location = self.room
+        companion.race = "human"
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        return companion
+
+    def _equalize_scores(self, *extra):
         """Make the resist contest a pure roll gate: resisted iff roll >= 51.
 
         With equal blended scores on both sides the shipped contest formula
         (roll + resister_score >= 51 + actor_score) reduces to the raw roll.
         """
-        for entity in (self.player, self.monster):
+        for entity in (self.player, self.monster, *extra):
             entity.traits.agility.base = 10
             entity.traits.atk_phys.base = 10
 
@@ -119,9 +131,36 @@ class ViolationBase(BattlefieldIsolation, EvenniaTestCase):
     def _defeat(self):
         """Drive one hostile defeat settlement through ``forfeit``."""
         engage(self.player, self.monster)
+        return self._settle()
+
+    def _settle(self):
+        """Lose and forfeit the already-engaged session."""
         with patch("world.rules.combat.roll_d100", return_value=1):
             submit_player_action(self.player, "basic_attack", [self.monster])
         return forfeit(self.player)
+
+    def _knock_out(self, companion):
+        """Mark one companion knocked out on the durable record (and floor)."""
+        companion.traits.hp.current = 1
+        record = read_session(self.player)
+        combat_session_module._persist(
+            self.player,
+            dataclass_replace(
+                record,
+                knocked_out_ids=(*record.knocked_out_ids, int(companion.pk)),
+            ),
+        )
+
+    def _flee(self, companion):
+        """Mark one companion fled on the durable record."""
+        record = read_session(self.player)
+        combat_session_module._persist(
+            self.player,
+            dataclass_replace(
+                record,
+                fled_ids=(*record.fled_ids, int(companion.pk)),
+            ),
+        )
 
     def _patch_rolls(self, rolls):
         """Patch the engine's derivation to return ``rolls`` by attempt index."""
@@ -129,6 +168,25 @@ class ViolationBase(BattlefieldIsolation, EvenniaTestCase):
             defeat_aftermath_module,
             "derived_roll",
             side_effect=lambda *args: rolls[args[3]],
+        )
+
+    def _patch_purpose_rolls(self, target_rolls, resist_rolls):
+        """Patch the derivation purpose-aware (companion-victims D-P1).
+
+        ``target_rolls[attempt_index]`` feeds the target-selection draws
+        (purpose ``target``); ``resist_rolls[attempt_index]`` feeds the
+        resist contests (purpose ``resist``).
+        """
+
+        def roll(session_id, violator_key, victim_key, attempt_index, purpose):
+            if purpose == "target":
+                return target_rolls[attempt_index]
+            return resist_rolls[attempt_index]
+
+        return patch.object(
+            defeat_aftermath_module,
+            "derived_roll",
+            side_effect=roll,
         )
 
 
@@ -520,12 +578,15 @@ class AttemptLoopTests(ViolationBase):
 
 
 class PoolAndDigestTests(ViolationBase):
-    """The player-only victim pool and the digest handoff (D-V7)."""
+    """The victim pool's player baseline and the digest handoff (D-V7)."""
 
     @covers_requirement(
         "defeat-aftermath-violation-sequence::violation-attempts-select-victims-from-the-target-pool",
     )
     def test_every_attempt_targets_the_player_and_the_companion_is_untouched(self):
+        # A conscious companion is not a victim: the full pool is the player
+        # plus KNOCKED-OUT companions, so a standing companion stays outside
+        # it and every attempt keeps targeting the player.
         companion = create_object(NPC, key="violation companion")
         companion.location = self.room
         join_party(companion, self.player)
@@ -570,9 +631,11 @@ class PoolAndDigestTests(ViolationBase):
         ):
             result = self._defeat()
         entries = _aftermath_entries(result)
-        (outcome,) = captured["violation"]
+        # The handoff is the per-participant mapping (companion-victims
+        # D-P3); a solo pool carries exactly the player's outcome.
+        self.assertEqual(set(captured["violation"]), {str(self.player.key)})
+        outcome = captured["violation"][str(self.player.key)]
         self.assertIsInstance(outcome, defeat_aftermath_module.ViolationOutcome)
-        self.assertEqual(outcome.participant, str(self.player.key))
         self.assertEqual(
             outcome.selected,
             _kinds(entries).count("violation_attempt"),
@@ -592,6 +655,304 @@ class PoolAndDigestTests(ViolationBase):
         self.assertFalse(outcome.zero_landed)
         # In-memory only: the settlement result exposes no violation record.
         self.assertNotIn("violation", result)
+
+
+class CompanionPoolTests(ViolationBase):
+    """The full violation pool: companion victims, exclusion, and wakes."""
+
+    @covers_requirement(
+        "defeat-aftermath-violation-sequence::violation-attempts-select-victims-from-the-target-pool",
+        "defeat-aftermath-violation-sequence::each-attempt-rolls-the-shipped-resist-contest-with-the-victim-defending",
+    )
+    def test_knocked_out_companion_takes_her_own_writes_and_credits(self):
+        companion = self._companion("violated companion")
+        self._equalize_scores(companion)
+        self._arouse(13)
+        engage(self.player, self.monster)
+        self._knock_out(companion)
+        # Pool = [player, companion]; both target draws pick slot 1 (the
+        # companion) and both contests land.
+        with self._patch_purpose_rolls([1, 1], [1, 1]):
+            result = forfeit(self.player)
+        entries = _aftermath_entries(result)
+        self.assertEqual(_kinds(entries).count("violation_attempt"), 2)
+        self.assertEqual(_kinds(entries).count("violation_act"), 2)
+        for entry in entries:
+            if entry.kind in ("violation_attempt", "violation_act"):
+                self.assertEqual(entry.target, str(companion.key))
+        # Her own deltas and counters, never proxied through the player.
+        self.assertEqual(companion.sexual.pleasure.value, 2 * 16)
+        self.assertEqual(companion.sexual.hostile_act_count, 2)
+        self.assertEqual(companion.sexual.interspecies_act_count, 2)
+        # Symmetric crediting: the violator credits exactly once per attempt.
+        self.assertEqual(self.monster.sexual.hostile_act_count, 2)
+        self.assertEqual(self.monster.sexual.interspecies_act_count, 2)
+        self.assertEqual(self.monster.sexual.pleasure.value, 13 + 2 + 2 * 10)
+        # The player was never targeted and stays untouched.
+        self.assertEqual(self.player.sexual.pleasure.value, 0)
+        self.assertEqual(self.player.sexual.hostile_act_count, 0)
+        # Attempts landed only on her: the player's wake prose stays PG.
+        settle = next(entry for entry in entries if entry.kind == "defeat_settle")
+        self.assertEqual(settle.data["wake"], DEFEAT_AFTERMATH_RULEBOOK.pg_lines[0])
+        # Two executed attempts spend their declared durations; the recovery
+        # solve then walks HP 1 to the 5% wake target (no round seconds).
+        self.assertEqual(self.clock.tick, 2 * 120 + 8)
+        self.assertEqual(self.player.traits.hp.current, 5)
+
+    def test_fled_companion_is_excluded_before_the_draw(self):
+        fled_companion = self._companion("zulu companion")
+        knocked = self._companion("alpha companion")
+        self._equalize_scores(knocked)
+        self._arouse(13)
+        engage(self.player, self.monster)
+        self._flee(fled_companion)
+        self._knock_out(knocked)
+        # Pool = [player, knocked]: the fled companion is filtered out
+        # before the draw, so slot 1 resolves to the knocked-out companion
+        # even though the fled companion's key sorts first.
+        with self._patch_purpose_rolls([1, 1], [1, 100]):
+            result = forfeit(self.player)
+        entries = _aftermath_entries(result)
+        self.assertEqual(_kinds(entries).count("violation_act"), 1)
+        self.assertEqual(
+            [entry.target for entry in entries if entry.kind == "violation_act"],
+            [str(knocked.key)],
+        )
+        # Landed deltas (16) plus the resisted attempt's shrunk delta (4).
+        self.assertEqual(knocked.sexual.pleasure.value, 16 + 4)
+        self.assertEqual(knocked.sexual.hostile_act_count, 1)
+        # The fled companion's records are untouched: never selected.
+        self.assertEqual(fled_companion.sexual.pleasure.value, 0)
+        self.assertEqual(fled_companion.sexual.hostile_act_count, 0)
+        self.assertEqual(fled_companion.sexual.interspecies_act_count, 0)
+
+    @covers_requirement(
+        "defeat-aftermath-violation-sequence::violation-attempts-select-victims-from-the-target-pool",
+    )
+    def test_all_allies_fled_settles_like_the_solo_baseline(self):
+        companion = self._companion("departed companion")
+        self._equalize_scores()
+        self._arouse(13)
+        engage(self.player, self.monster)
+        self._flee(companion)
+        with self._patch_purpose_rolls([1, 1], [1, 1]) as rolls:
+            result = forfeit(self.player)
+        kinds = _kinds(_aftermath_entries(result))
+        self.assertEqual(
+            kinds,
+            [
+                "defeat_settle",
+                "violation_attempt",
+                "violation_act",
+                "violation_attempt",
+                "violation_act",
+                "weak_granted",
+                "recovery_advance",
+            ],
+        )
+        # A solo pool never touches the target dice: the pinned baseline's
+        # derivation call shape (resist draws only) is preserved.
+        for call in rolls.call_args_list:
+            self.assertEqual(call.args[4], "resist")
+        # Every attempt targeted the player; the fled companion is untouched.
+        for entry in _aftermath_entries(result):
+            if entry.kind in ("violation_attempt", "violation_act"):
+                self.assertEqual(entry.target, str(self.player.key))
+        self.assertEqual(companion.sexual.pleasure.value, 0)
+        self.assertEqual(companion.sexual.hostile_act_count, 0)
+
+    def test_mixed_two_victim_sequence_credits_the_violator_once_per_attempt(self):
+        companion = self._companion("mixed companion")
+        self._equalize_scores(companion)
+        self._arouse(13)
+        engage(self.player, self.monster)
+        self._knock_out(companion)
+        # Attempt 0 draws slot 1 (the companion), attempt 1 slot 0 (the
+        # player); both contests land.
+        with patch.object(defeat_aftermath_module, "log_info") as info:
+            with self._patch_purpose_rolls([1, 0], [1, 1]):
+                with self.captureOnCommitCallbacks(execute=True):
+                    result = forfeit(self.player)
+        acts = [
+            entry
+            for entry in _aftermath_entries(result)
+            if entry.kind == "violation_act"
+        ]
+        self.assertEqual(
+            [entry.target for entry in acts],
+            [str(companion.key), str(self.player.key)],
+        )
+        # One credit per attempt against the violator — never one per victim
+        # per attempt (the double-credit risk D-P2 names).
+        self.assertEqual(self.monster.sexual.hostile_act_count, 2)
+        self.assertEqual(self.monster.sexual.interspecies_act_count, 2)
+        self.assertEqual(companion.sexual.hostile_act_count, 1)
+        self.assertEqual(self.player.sexual.hostile_act_count, 1)
+        # Boundary telemetry: victims counts distinct selected participants.
+        boundary = [
+            call.kwargs["context"]
+            for call in info.call_args_list
+            if call.args and call.args[0] == "defeat_aftermath_violation"
+        ]
+        self.assertEqual(len(boundary), 1)
+        self.assertEqual(boundary[0]["victims"], 2)
+        self.assertEqual(boundary[0]["attempts"], 2)
+        self.assertEqual(boundary[0]["landed"], 2)
+
+    def test_unselected_pool_companion_gets_no_outcome_and_no_wake_line(self):
+        companion = self._companion("overlooked companion")
+        self._equalize_scores(companion)
+        self._arouse(13)
+        engage(self.player, self.monster)
+        self._knock_out(companion)
+        captured = {}
+        real_writer = defeat_aftermath_module.run_defeat_aftermath
+
+        def spy(actor, record, battlefield):
+            outcome = real_writer(actor, record, battlefield)
+            captured["violation"] = outcome.violation
+            return outcome
+
+        with (
+            self._patch_purpose_rolls([0, 0], [1, 1]),
+            patch.object(
+                defeat_aftermath_module, "run_defeat_aftermath", side_effect=spy
+            ),
+        ):
+            result = forfeit(self.player)
+        # Both attempts drew slot 0 (the player): the companion is absent
+        # from the outcome mapping (D-P3) and gets no wake observation.
+        self.assertEqual(set(captured["violation"]), {str(self.player.key)})
+        self.assertNotIn("companion_wake", _kinds(_aftermath_entries(result)))
+        self.assertEqual(companion.sexual.pleasure.value, 0)
+        self.assertEqual(companion.sexual.hostile_act_count, 0)
+
+    @covers_requirement(
+        "defeat-aftermath-violation-sequence::knocked-out-companions-wake-with-their-own-digest-observation",
+    )
+    def test_companion_wake_observation_is_rendered_with_matching_counts(self):
+        companion = self._companion("waking companion")
+        self._equalize_scores(companion)
+        self._arouse(13)
+        engage(self.player, self.monster)
+        self._knock_out(companion)
+        with self._patch_purpose_rolls([1, 1], [1, 1]):
+            result = forfeit(self.player)
+        (log,) = _aftermath_logs(result)
+        wakes = [entry for entry in log.entries if entry.kind == "companion_wake"]
+        self.assertEqual(len(wakes), 1)
+        wake = wakes[0]
+        self.assertEqual(wake.actor, str(companion.key))
+        self.assertEqual(
+            wake.data,
+            {
+                "selected": 2,
+                "landed": 2,
+                "resisted": 0,
+                "climax": 0,
+                "zero_landed": False,
+            },
+        )
+        # The counts equal the EventLog's own entry counts for her.
+        self.assertEqual(
+            wake.data["selected"],
+            sum(
+                1
+                for entry in log.entries
+                if entry.kind == "violation_attempt"
+                and entry.target == str(companion.key)
+            ),
+        )
+        self.assertEqual(
+            wake.data["landed"],
+            sum(
+                1
+                for entry in log.entries
+                if entry.kind == "violation_act"
+                and entry.target == str(companion.key)
+            ),
+        )
+        # The observation renders exactly once, naming her.
+        lines = render_plain_text(log).splitlines()
+        rendered = [
+            line
+            for entry, line in zip(log.entries, lines)
+            if entry.kind == "companion_wake"
+        ]
+        self.assertEqual(len(rendered), 1)
+        self.assertIn(str(companion.key), rendered[0])
+
+    def test_companion_violation_entries_render_their_companion_templates(self):
+        from world.rules.player_messages import DEFEAT_AFTERMATH_TEMPLATES
+
+        companion = self._companion("observed companion")
+        self._equalize_scores(companion)
+        self._arouse(13)
+        engage(self.player, self.monster)
+        self._knock_out(companion)
+        # Attempt 0 lands on her; attempt 1 is resisted by her (and is the
+        # violator's last under the stop rule).
+        with self._patch_purpose_rolls([1, 1], [1, 100]):
+            result = forfeit(self.player)
+        (log,) = _aftermath_logs(result)
+        entries = [
+            entry for entry in log.entries if entry.kind.startswith("violation_")
+        ]
+        self.assertEqual(
+            [entry.kind for entry in entries],
+            [
+                "violation_attempt",
+                "violation_act",
+                "violation_attempt",
+                "violation_resisted",
+            ],
+        )
+        for entry in entries:
+            self.assertEqual(entry.target, str(companion.key))
+        self.assertEqual(
+            [entry.text_template for entry in entries],
+            [
+                DEFEAT_AFTERMATH_TEMPLATES["violation_attempt_companion"],
+                DEFEAT_AFTERMATH_TEMPLATES["violation_act_companion"],
+                DEFEAT_AFTERMATH_TEMPLATES["violation_attempt_companion"],
+                DEFEAT_AFTERMATH_TEMPLATES["violation_resisted_companion"],
+            ],
+        )
+        lines = render_plain_text(log).splitlines()
+        rendered = [
+            line
+            for entry, line in zip(log.entries, lines)
+            if entry.kind.startswith("violation_")
+        ]
+        for line in rendered:
+            self.assertIn(str(companion.key), line)
+
+    def test_pool_order_is_canonical_across_paths(self):
+        zulu = self._companion("zulu companion")  # created first: lower pk
+        alpha = self._companion("alpha companion")  # created second: higher pk
+        standing = self._companion("standing companion")
+        engage(self.player, self.monster)
+        self._knock_out(zulu)
+        self._knock_out(alpha)
+        record = read_session(self.player)
+        battlefield = reconstruct_battlefield(self.player, record)
+        pool_live = defeat_aftermath_module._violation_pool(
+            self.player, record, battlefield
+        )
+        pool_degraded = defeat_aftermath_module._violation_pool(
+            self.player, record, None
+        )
+        # Canonical order (player first, companions by ascending pk) is
+        # identical from both paths even though the keys sort differently.
+        self.assertEqual(pool_live, pool_degraded)
+        self.assertEqual(
+            [str(entity.key) for entity in pool_live],
+            [str(self.player.key), "zulu companion", "alpha companion"],
+        )
+        # A conscious companion is never a pool member.
+        self.assertNotIn(
+            str(standing.key), [str(entity.key) for entity in pool_live]
+        )
 
 
 class EventLogOrderTests(ViolationBase):
@@ -773,3 +1134,69 @@ class RollbackReplayTests(EventSourceIsolation, ViolationBase):
         self.assertEqual(self.player.traits.hp.current, 5)
         self.assertEqual(self.clock.tick, 6 + 2 * 120 + 8)
         self.assertIsNone(self.player.db.active_combat)
+
+    @covers_requirement(
+        "defeat-aftermath-violation-sequence::sequence-dice-are-state-derived-pure-values",
+        "defeat-aftermath-violation-sequence::violation-attempts-select-victims-from-the-target-pool",
+    )
+    def test_rolled_back_mixed_pool_rederives_the_identical_selection(self):
+        companion = self._companion("replayed companion")
+        self._equalize_scores(companion)
+        self._arouse(13)
+        # The monster towers over both victims: every contest lands through
+        # the shipped formula, so the real state-derived target draws and
+        # resist rolls both execute.
+        self.monster.traits.agility.base = 500
+        self.monster.traits.atk_phys.base = 500
+        engage(self.player, self.monster)
+        self._knock_out(companion)
+        real_roll = defeat_aftermath_module.derived_roll
+        calls = []
+
+        def recording_roll(*args):
+            value = real_roll(*args)
+            calls.append((*args, value))
+            return value
+
+        advancing = patch.object(
+            defeat_aftermath_module,
+            "_advance_attempt_clock",
+            side_effect=[None, RuntimeError("injected")],
+        )
+        with (
+            patch.object(
+                defeat_aftermath_module, "derived_roll", side_effect=recording_roll
+            ),
+            advancing,
+            self.assertRaises(RuntimeError),
+        ):
+            forfeit(self.player)
+        first_run_calls = list(calls)
+        # Each executed attempt consumed exactly one target draw and one
+        # resist roll; the first advance succeeded, the second failed.
+        self.assertEqual(len(first_run_calls), 4)
+        self.assertEqual(
+            [call[4] for call in first_run_calls],
+            ["target", "resist", "target", "resist"],
+        )
+        # The retry re-derives the identical draws (same victims, same
+        # contests) for the same durable state and completes exactly once.
+        with patch.object(
+            defeat_aftermath_module, "derived_roll", side_effect=recording_roll
+        ):
+            result = forfeit(self.player)
+        self.assertEqual(calls[len(first_run_calls):], first_run_calls)
+        acts = [
+            entry
+            for entry in _aftermath_entries(result)
+            if entry.kind == "violation_act"
+        ]
+        self.assertEqual(len(acts), 2)
+        # Per-victim consistency: each body's counters equal the acts that
+        # targeted it; the violator credited once per attempt overall.
+        for victim in (self.player, companion):
+            targeted = sum(
+                1 for entry in acts if entry.target == str(victim.key)
+            )
+            self.assertEqual(victim.sexual.hostile_act_count, targeted)
+        self.assertEqual(self.monster.sexual.hostile_act_count, 2)

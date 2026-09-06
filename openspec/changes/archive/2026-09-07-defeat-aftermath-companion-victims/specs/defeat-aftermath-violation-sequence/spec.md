@@ -38,3 +38,7 @@ allied member fled SHALL settle without error.
 #### Scenario: Solo party matches the pinned baseline
 - **WHEN** a solo player is defeated by a violator with cap 3 and every attempt lands
 - **THEN** all three attempts target the player, identical to the player-only baseline the violation change pins
+
+#### Scenario: The player's wake prose keys on her own landed attempts
+- **WHEN** every landed attempt of the sequence targeted a companion victim
+- **THEN** the player's `defeat_settle` wake prose stays the PG line and the companion victim's wake observation renders for the companion

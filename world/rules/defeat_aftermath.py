@@ -32,7 +32,7 @@ monster (the parent design's accepted restart-refresh risk).
 
 import math
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -86,14 +86,16 @@ class DefeatAftermathResult:
     ``session`` and ``logs`` feed the persisted record and the settlement
     result; ``undo`` is the caller's failure-boundary restoration hook;
     ``departed`` lists the violators whose departure committed and whose
-    physical deletion runs post-commit (exam-opponent shape).
+    physical deletion runs post-commit (exam-opponent shape); ``violation``
+    is the per-participant outcome mapping keyed by participant key
+    (defeat-aftermath-companion-victims D-P3).
     """
 
     session: Any
     logs: tuple[EventLog, ...]
     undo: Callable[[], None]
     departed: tuple[Any, ...]
-    violation: tuple["ViolationOutcome", ...] = ()
+    violation: dict[str, "ViolationOutcome"] = field(default_factory=dict)
 
 
 class DefeatAftermathRulebook:
@@ -473,12 +475,14 @@ class ViolationHookContext:
 class ViolationOutcome:
     """The in-memory per-participant digest handoff (DA4 D-V7).
 
-    ``selected``/``landed``/``resisted``/``climax_delta`` count exactly the
-    ``violation_attempt``/``violation_act``/``violation_resisted`` EventLog
-    entries (and the climax flags on the acts) for this participant, so the
-    digest phase can consume either surface. ``zero_landed`` is the PG-
-    variant signal. The outcome is never persisted: it is a pure derivation
-    of the state-derived dice and declared rows, reproduced by any replay.
+    ``participant`` is the selected victim (a pool member targeted at least
+    once); ``selected``/``landed``/``resisted``/``climax_delta`` count
+    exactly that victim's ``violation_attempt``/``violation_act``/
+    ``violation_resisted`` EventLog entries (the entries whose ``target`` is
+    this participant) and the climax flags on the acts, so the digest phase
+    can consume either surface. ``zero_landed`` is the PG-variant signal for
+    this victim. The outcome is never persisted: it is a pure derivation of
+    the state-derived dice and declared rows, reproduced by any replay.
     """
 
     participant: str
@@ -584,7 +588,7 @@ def register_violation_hook(hook: Callable[..., None]) -> None:
 
 def _call_violation_hook(
     context: ViolationHookContext,
-) -> tuple[ViolationOutcome, ...]:
+) -> dict[str, ViolationOutcome]:
     """Run the guarded violation hook point (design D-C4).
 
     Pure guard: with ``DEFEAT_ADULT_SCENES`` off the hook is never called and
@@ -593,11 +597,11 @@ def _call_violation_hook(
     at hook entry (no mid-sequence toggle semantics, DA4 delta requirement).
     """
     if not settings.DEFEAT_ADULT_SCENES:
-        return ()
+        return {}
     if _VIOLATION_HOOK is None:
-        return ()
+        return {}
     outcomes = _VIOLATION_HOOK(context)
-    return outcomes if outcomes is not None else ()
+    return outcomes if outcomes is not None else {}
 
 
 def _violation_scope(actor: Any) -> list[Any]:
@@ -738,8 +742,15 @@ def _violation_attempt_entry(
     attempt_index: int,
     verdict: Any,
     rolls: list[int],
+    *,
+    player_victim: bool,
 ) -> EventEntry:
-    """One ``violation_attempt`` entry: the contest exactly as it ran."""
+    """One ``violation_attempt`` entry: the contest exactly as it ran.
+
+    ``actor`` is the violator, ``target`` the selected victim; the template
+    follows the victim so the offline prose names whoever the attempt
+    actually targeted (the player-facing lines stay byte-identical).
+    """
     return EventEntry(
         kind="violation_attempt",
         actor=str(violator.key),
@@ -751,12 +762,14 @@ def _violation_attempt_entry(
             "actor_score": verdict.actor_score,
             "resister_score": verdict.resister_score,
         },
-        text_template=defeat_aftermath_template("violation_attempt"),
+        text_template=defeat_aftermath_template(
+            "violation_attempt" if player_victim else "violation_attempt_companion"
+        ),
     )
 
 
 def _violation_resisted_entry(
-    violator: Any, victim: Any, attempt_index: int
+    violator: Any, victim: Any, attempt_index: int, *, player_victim: bool
 ) -> EventEntry:
     """One ``violation_resisted`` entry: the contest outcome went to the prey."""
     return EventEntry(
@@ -764,12 +777,14 @@ def _violation_resisted_entry(
         actor=str(violator.key),
         target=str(victim.key),
         data={"attempt": attempt_index},
-        text_template=defeat_aftermath_template("violation_resisted"),
+        text_template=defeat_aftermath_template(
+            "violation_resisted" if player_victim else "violation_resisted_companion"
+        ),
     )
 
 
 def _violation_act_entry(
-    violator: Any, victim: Any, attempt_index: int, climax: bool
+    violator: Any, victim: Any, attempt_index: int, climax: bool, *, player_victim: bool
 ) -> EventEntry:
     """One ``violation_act`` entry: the landed attempt and its climax flag."""
     return EventEntry(
@@ -777,7 +792,31 @@ def _violation_act_entry(
         actor=str(violator.key),
         target=str(victim.key),
         data={"attempt": attempt_index, "climax": climax},
-        text_template=defeat_aftermath_template("violation_act"),
+        text_template=defeat_aftermath_template(
+            "violation_act" if player_victim else "violation_act_companion"
+        ),
+    )
+
+
+def _companion_wake_entry(victim: Any, outcome: ViolationOutcome) -> EventEntry:
+    """One ``companion_wake`` entry: the knocked-out companion's observation.
+
+    Observation-only (DA5 D-P4): the companion settles through the core's
+    normal survivor path and is not re-floored; the entry reads the outcome
+    and carries its counts for the digest phase, mutating nothing.
+    """
+    return EventEntry(
+        kind="companion_wake",
+        actor=str(victim.key),
+        target=None,
+        data={
+            "selected": outcome.selected,
+            "landed": outcome.landed,
+            "resisted": outcome.resisted,
+            "climax": outcome.climax_delta,
+            "zero_landed": outcome.zero_landed,
+        },
+        text_template=defeat_aftermath_template("companion_wake"),
     )
 
 
@@ -803,12 +842,15 @@ def _schedule_violation_boundary(
     landed: int,
     resisted: int,
     climaxes: int,
+    victims: int,
 ) -> None:
     """Schedule the violation phase's boundary info event (observability).
 
     Fires only on the outermost durable commit, like the aftermath's own
     boundary event; the context is snapshotted as primitives so the callback
-    carries no live objects.
+    carries no live objects. ``victims`` counts the distinct participants
+    selected at least once (D-P3's returned outcome set), never the pool
+    members no attempt targeted.
     """
     from django.db import transaction
 
@@ -820,6 +862,7 @@ def _schedule_violation_boundary(
         "landed": landed,
         "resisted": resisted,
         "climax": climaxes,
+        "victims": victims,
     }
     transaction.on_commit(
         lambda boundary=boundary: log_info(
@@ -828,22 +871,102 @@ def _schedule_violation_boundary(
     )
 
 
+_TARGET_PURPOSE = "target"
+# The target draw's victim dimension is a constant marker: the victim is the
+# draw's OUTPUT (a participant slot resolved through the pool), never an
+# input, so the key space stays (session id, violator, attempt index,
+# purpose) exactly as the companion-victims design D-P1 lists it.
+_TARGET_POOL_KEY = "pool"
+
+
+def _violation_pool(
+    actor: Any, session: Any, battlefield: Any | None
+) -> list[Any]:
+    """The violation target pool: the player plus knocked-out companions.
+
+    The pool is every non-fled allied participant (the defeated player plus
+    each companion in the knocked-out set; conscious companions are not
+    victims). Both resolution paths converge on one canonical order — the
+    player first, companions by ascending ``pk`` — so the same durable
+    session re-derives identical selection from either a reconstructed
+    battlefield or the degraded record-only path. The player is always in
+    the pool and always first.
+    """
+    companions: list[Any] = []
+    if battlefield is not None:
+        player_team = battlefield.team_of(str(actor.key))
+        ally_keys = (
+            battlefield.teams.get(player_team, set())
+            if player_team is not None
+            else set()
+        )
+        for key in ally_keys:
+            if key == str(actor.key) or key in battlefield.fled:
+                continue
+            if key not in battlefield.knocked_out:
+                continue
+            entity = battlefield.roster.get(key)
+            if entity is not None:
+                companions.append(entity)
+    else:
+        from evennia.objects.models import ObjectDB
+
+        for dbref in session.player_ids:
+            if dbref == int(actor.pk) or dbref in session.fled_ids:
+                continue
+            if dbref not in session.knocked_out_ids:
+                continue
+            entity = ObjectDB.objects.filter(id=dbref).first()
+            if entity is not None:
+                companions.append(entity)
+    companions.sort(key=lambda entity: int(entity.pk))
+    return [actor, *companions]
+
+
+def _select_violation_victim(
+    pool: list[Any], session_id: str, violator: Any, attempt_index: int
+) -> Any:
+    """One attempt's victim: a pure derived draw over the pool (D-P1).
+
+    A solo pool short-circuits to the player without touching the dice —
+    the pinned player-only baseline stays byte-identical and an
+    auto-complying victim still consumes no roll. Otherwise the state-
+    derived helper keys on (session id, violator, attempt index,
+    purpose="target") and the draw resolves a participant slot, so a
+    rolled-back retry re-derives the identical victim. Fled companions are
+    filtered out of the pool before the draw and can never be selected.
+    """
+    if len(pool) == 1:
+        return pool[0]
+    draw = derived_roll(
+        session_id,
+        str(violator.pk),
+        _TARGET_POOL_KEY,
+        attempt_index,
+        _TARGET_PURPOSE,
+    )
+    return pool[draw % len(pool)]
+
+
 def run_violation_sequence(
     context: ViolationHookContext,
-) -> tuple[ViolationOutcome, ...]:
-    """The registered body of the core's guarded hook (DA4 D-V6).
+) -> dict[str, ViolationOutcome]:
+    """The registered body of the core's guarded hook (DA4 D-V6, DA5 D-P1).
 
     Runs between the core's ``defeat_settle`` and ``violator_depart`` phases:
     victory arousal -> archetype threshold gate -> the attempt loop (one
-    state-derived resist contest per attempt through the shipped pure
-    ``resist_verdict``, declared deltas through the shipped pleasure path,
-    symmetric counter credits, one ``defeat_aftermath``-source world-clock
-    advance per attempt, first successful resistance ends that violator's
-    pursuit) -> the violated wake line when any attempt landed. A sequence in
-    which zero attempts landed is the PG variant. Every die is a pure
-    function of durable record state (D-V4), so a rolled-back retry re-derives
-    the identical sequence; the sequence persists only its state writes,
-    counter credits, EventLog entries, and the clock advances themselves.
+    state-derived victim draw and one state-derived resist contest per
+    attempt through the shipped pure ``resist_verdict``, declared deltas
+    through the shipped pleasure path onto the selected victim's own
+    records, symmetric counter credits, one ``defeat_aftermath``-source
+    world-clock advance per attempt, first successful resistance ends that
+    violator's pursuit) -> the violated wake line when attempts landed on
+    the player and one observation-only wake line per selected companion
+    victim. A sequence in which zero attempts landed is the PG variant.
+    Every die is a pure function of durable record state (D-V4, D-P1), so a
+    rolled-back retry re-derives the identical sequence; the sequence
+    persists only its state writes, counter credits, EventLog entries, and
+    the clock advances themselves.
     """
     actor = context.actor
     session = context.session
@@ -856,22 +979,24 @@ def run_violation_sequence(
         key=lambda violator: int(violator.pk),
     )
     if not candidates:
-        return ()
+        return {}
+    pool = _violation_pool(actor, session, battlefield)
     from world.rules.clock import get_world_clock
 
     clock = get_world_clock()
     scope = _violation_scope(actor)
-    victim_key = str(actor.pk)
-    # Undo layering: the victim's sexual surfaces are snapshotted before any
-    # write; each row-carrying violator joins right before its victory
-    # arousal. Reversed-order undo then unwinds the advances before the
-    # deltas, converging on the pre-sequence state.
+
+    # Undo layering: every pool member's sexual surfaces are snapshotted
+    # before any write (any companion may be selected); each row-carrying
+    # violator joins right before its victory arousal. Reversed-order undo
+    # then unwinds the advances before the deltas, converging on the
+    # pre-sequence state.
     restores.append(_snapshot_sexual_surfaces(actor))
-    selected = 0
-    landed = 0
-    resisted = 0
-    climaxes = 0
-    any_landed = False
+    for victim in pool[1:]:
+        restores.append(_snapshot_sexual_surfaces(victim))
+    # Per-participant tallies (D-P3): participant key -> [selected, landed,
+    # resisted, climaxes]. Only participants targeted at least once appear.
+    tallies: dict[str, list[int]] = {}
     for violator in candidates:
         row = rulebook.rows.get(str(violator.key))
         if row is None:
@@ -892,25 +1017,40 @@ def run_violation_sequence(
         if violator.sexual.arousal < row.threshold_ordinal:
             continue
         for attempt_index in range(row.attempt_cap):
-            selected += 1
+            victim = _select_violation_victim(
+                pool, session.session_id, violator, attempt_index
+            )
+            tally = tallies.setdefault(str(victim.key), [0, 0, 0, 0])
+            tally[0] += 1
             rolls: list[int] = []
             verdict = resist_verdict(
                 violator,
-                actor,
+                victim,
                 rng=_derived_resist_roll(
-                    session.session_id, violator, victim_key, attempt_index, rolls
+                    session.session_id, violator, str(victim.pk), attempt_index, rolls
                 ),
             )
+            player_victim = victim is actor
             entries.append(
                 _violation_attempt_entry(
-                    violator, actor, attempt_index, verdict, rolls
+                    violator,
+                    victim,
+                    attempt_index,
+                    verdict,
+                    rolls,
+                    player_victim=player_victim,
                 )
             )
             if verdict.resisted:
-                resisted += 1
-                _apply_violation_deltas(actor, violator, row.resisted)
+                tally[2] += 1
+                _apply_violation_deltas(victim, violator, row.resisted)
                 entries.append(
-                    _violation_resisted_entry(violator, actor, attempt_index)
+                    _violation_resisted_entry(
+                        violator,
+                        victim,
+                        attempt_index,
+                        player_victim=player_victim,
+                    )
                 )
                 _advance_attempt_clock(
                     clock, row.attempt_duration_seconds, scope, restores
@@ -919,30 +1059,54 @@ def run_violation_sequence(
                 # violator's remaining attempts; the shrunk deltas and the
                 # spent duration of the resisted attempt are its last.
                 break
-            landed += 1
-            any_landed = True
-            climax = _victim_climax_onset(actor, violator, row.landed)
-            climaxes += int(climax)
-            _credit_violation_counters(actor, violator, row.credited_counters)
-            entries.append(_violation_act_entry(violator, actor, attempt_index, climax))
+            tally[1] += 1
+            climax = _victim_climax_onset(victim, violator, row.landed)
+            tally[3] += int(climax)
+            _credit_violation_counters(victim, violator, row.credited_counters)
+            entries.append(
+                _violation_act_entry(
+                    violator,
+                    victim,
+                    attempt_index,
+                    climax,
+                    player_victim=player_victim,
+                )
+            )
             _advance_attempt_clock(
                 clock, row.attempt_duration_seconds, scope, restores
             )
-    if any_landed:
+    outcomes = {
+        key: ViolationOutcome(
+            participant=key,
+            selected=tally[0],
+            landed=tally[1],
+            resisted=tally[2],
+            climax_delta=tally[3],
+            zero_landed=tally[1] == 0,
+        )
+        for key, tally in tallies.items()
+    }
+    # The player's wake prose keys on the player's own landed attempts: a
+    # sequence that only landed on companions leaves the PG wake line.
+    player_outcome = outcomes.get(str(actor.key))
+    if player_outcome is not None and not player_outcome.zero_landed:
         _rewrite_wake_line(entries, rulebook.violated_wake_line)
-    if not selected:
-        return ()
-    _schedule_violation_boundary(actor, clock, selected, landed, resisted, climaxes)
-    return (
-        ViolationOutcome(
-            participant=str(actor.key),
-            selected=selected,
-            landed=landed,
-            resisted=resisted,
-            climax_delta=climaxes,
-            zero_landed=not any_landed,
-        ),
+    for victim in pool[1:]:
+        outcome = outcomes.get(str(victim.key))
+        if outcome is not None:
+            entries.append(_companion_wake_entry(victim, outcome))
+    if not outcomes:
+        return {}
+    _schedule_violation_boundary(
+        actor,
+        clock,
+        sum(outcome.selected for outcome in outcomes.values()),
+        sum(outcome.landed for outcome in outcomes.values()),
+        sum(outcome.resisted for outcome in outcomes.values()),
+        sum(outcome.climax_delta for outcome in outcomes.values()),
+        len(outcomes),
     )
+    return outcomes
 
 
 def run_defeat_aftermath(
