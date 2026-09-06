@@ -324,6 +324,20 @@ class CharacterActivationTests(EvenniaTest):
         self.assertIsNone(self.character.attributes.get("map_knowledge"))
 
 
+def _portrait_ensure_callbacks(callbacks):
+    """The captured on_commit callbacks that schedule the portrait ensure.
+
+    Activation may legitimately schedule other spec'd callbacks (the
+    lore-codex panel push rides the origin reveal); the art-asset-lifecycle
+    contract counts exactly one portrait-ensure registration.
+    """
+    return [
+        callback
+        for callback in callbacks
+        if getattr(callback, "__qualname__", "").startswith("schedule_portrait_ensure")
+    ]
+
+
 class PortraitFinalizationTests(EvenniaTest):
     """Shared portrait finalization on every activation path
     (fix-creation-finalization-safety D3 / art-asset-lifecycle)."""
@@ -365,7 +379,7 @@ class PortraitFinalizationTests(EvenniaTest):
             self.character.db.portrait_policy,
             {"mode": "named", "stable_key": str(self.character.pk)},
         )
-        self.assertEqual(len(callbacks), 1)
+        self.assertEqual(len(_portrait_ensure_callbacks(callbacks)), 1)
         records = ArtAssetRecord.objects.filter(db_key=self._portrait_key())
         self.assertEqual(records.count(), 1)
 
@@ -402,7 +416,7 @@ class PortraitFinalizationTests(EvenniaTest):
             web.db.portrait_policy,
             {"mode": "named", "stable_key": str(web.pk)},
         )
-        self.assertEqual(len(callbacks), 1)
+        self.assertEqual(len(_portrait_ensure_callbacks(callbacks)), 1)
         self.assertEqual(
             ArtAssetRecord.objects.filter(
                 db_key=f"art:portrait:character:{web.pk}"

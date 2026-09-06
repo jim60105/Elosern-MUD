@@ -114,6 +114,20 @@ def _proposal(**overrides):
     return CharacterProposal(**payload)
 
 
+def _portrait_ensure_callbacks(callbacks):
+    """The captured on_commit callbacks that schedule the portrait ensure.
+
+    Activation may legitimately schedule other spec'd callbacks (the
+    lore-codex panel push rides the origin reveal); the art-asset-lifecycle
+    contract counts exactly one portrait-ensure registration.
+    """
+    return [
+        callback
+        for callback in callbacks
+        if getattr(callback, "__qualname__", "").startswith("schedule_portrait_ensure")
+    ]
+
+
 class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     account_typeclass = Account
     character_typeclass = PlayerCharacter
@@ -610,7 +624,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             self.char1.db.portrait_policy,
             {"mode": "named", "stable_key": str(self.char1.pk)},
         )
-        self.assertEqual(len(callbacks), 1)
+        self.assertEqual(len(_portrait_ensure_callbacks(callbacks)), 1)
         records = ArtAssetRecord.objects.filter(
             db_key=f"art:portrait:character:{self.char1.pk}"
         )
@@ -641,7 +655,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         ):
             output = self.call(CmdCharacter(), "preset human_wanderer")
         self.assertIn("已建立", output)
-        self.assertEqual(len(callbacks), 1)
+        self.assertEqual(len(_portrait_ensure_callbacks(callbacks)), 1)
         self.assertFalse(self.char1.creation_pending)
 
 

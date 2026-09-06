@@ -134,9 +134,9 @@ class DisengageStagingTests(unittest.TestCase):
         )
         with self.assertRaises(UnsnapshottedSurfaceError):
             register_effect_handler(
-                "test_inventory_disengage",
+                "test_relations_disengage",
                 lambda actor, targets, effect_id, context, scale: [],
-                frozenset({"inventory"}),
+                frozenset({"relations_data"}),
                 requires_event_context=frozenset(),
             )
 

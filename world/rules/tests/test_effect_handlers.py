@@ -69,9 +69,9 @@ class EffectRegistryTests(unittest.TestCase):
     def test_unsupported_surface_fails_at_registration(self):
         with self.assertRaises(UnsnapshottedSurfaceError):
             register_effect_handler(
-                "test_inventory",
+                "test_relations",
                 lambda actor, targets, effect_id, context, scale: [],
-                frozenset({"inventory"}),
+                frozenset({"relations_data"}),
                 requires_event_context=frozenset(),
             )
 
@@ -99,7 +99,7 @@ class EffectRegistryTests(unittest.TestCase):
         effect = PendingEffect(
             entity=object(),
             description="bad",
-            surfaces=frozenset({"inventory"}),
+            surfaces=frozenset({"relations_data"}),
             apply=lambda: applied.append(True),
         )
         with self.assertRaises(Exception) as caught:
@@ -119,6 +119,9 @@ class EffectRegistryTests(unittest.TestCase):
                     "battlefield",
                     "quest_log",
                     "instance_pin",
+                    "wallet",
+                    "inventory",
+                    "reward_claims",
                 }
             ),
         )
