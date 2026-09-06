@@ -205,6 +205,12 @@ mirroring how ACQUIRE advances only from a committed positive inventory delta.
 This also supplies the `給` verb the redesign document already anticipated for the exploration
 surface.
 
+**Amended 2026-09-06 (implementation review).** The premise that no give verb exists was wrong:
+`commands/localized/general.py::CmdGive` is the localized Evennia general give with `key = "給"`,
+mounted in `CharacterCmdSet` and documented in the command docs. This phase therefore supplies the
+`交付` command (no alias) rather than the `給` verb; the already-existing general give transfers
+inventory keys without the delivery observer, which remains a known gap for a separate change.
+
 **Documentation obligation:** the change adds a player command, so `docs/game/commands.md` and
 `docs/game/command-reference.md` are updated in the same change and `tests/test_command_docs.py`
 stays green.

@@ -28,6 +28,7 @@ from web.webclient.actions.exploration_actions import (
     validate_possess_release_payload,
     validate_talk_scripted_payload,
     validate_wait_payload,
+    validate_deliver_payload,
 )
 from web.webclient.presentation.affordances import ACTION_CODE_ALLOWLIST
 from web.webclient.presentation.protocol import (
@@ -70,6 +71,7 @@ _ACTION_PAYLOAD_VALIDATORS = {
     "explore.wait": validate_wait_payload,
     "explore.possess": validate_possess_payload,
     "explore.possess_release": validate_possess_release_payload,
+    "explore.deliver": validate_deliver_payload,
 }
 
 

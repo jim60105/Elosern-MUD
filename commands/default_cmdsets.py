@@ -59,6 +59,7 @@ from commands.invite import CmdInvite
 from commands.leave import CmdLeave
 from commands.lore import CmdLore
 from commands.possess import CmdPossess, CmdUnpossess
+from commands.quest_delivery import CmdDeliver
 from commands.localized import (
     CmdColorTest,
     CmdDrop,
@@ -212,6 +213,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdInventory)
         self.add(CmdUseItem)
         self.add(CmdToggleEquip)
+        self.add(CmdDeliver)
         self.add(CmdsTalk)
         self.add(CmdInvite)
         self.add(CmdLeave)

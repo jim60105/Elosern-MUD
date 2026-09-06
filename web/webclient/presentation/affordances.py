@@ -40,7 +40,7 @@ from world.rules.service_gate import (
 )
 from world.observability import log_warn
 
-# The ten action codes the vocabulary may emit. ``explore.interact`` is
+# The eleven action codes the vocabulary may emit. ``explore.interact`` is
 # deliberately absent: the exploration panel's interact group is a label over
 # per-target affordances, never a dispatcher action.
 ACTION_CODE_ALLOWLIST = (
@@ -54,6 +54,7 @@ ACTION_CODE_ALLOWLIST = (
     "explore.wait",
     "explore.possess",
     "explore.possess_release",
+    "explore.deliver",
 )
 
 # The subset of action codes a suggestion may carry: party management is a
@@ -533,14 +534,17 @@ def _target_affordance_entries(
 ) -> list[AffordanceView]:
     """The untruncated affordance entries of one present NPC/monster target.
 
-    Mirrors the version-1 panel's per-target assembly order: scripted keyword
-    entries (authored order), freeform, party leave/invite, engage, then the
-    exact-local-host navigation entries.
+    Mirrors the version-1 panel's per-target assembly order: the quest delivery
+    first (a truncated delivery is an invisible quest verb, so it assembles
+    before the keyword pool per the possession-affordance truncation
+    precedent), then the scripted keyword entries (authored order), freeform,
+    party leave/invite, engage, and the exact-local-host navigation entries.
     """
     from typeclasses.monsters import Monster
     from typeclasses.npcs import LLMNPC, NPC
 
     entries: list[AffordanceView] = []
+    entries.extend(_deliver_entries(obj, actor))
     if isinstance(obj, NPC) and is_dialogue_host(obj):
         entries.extend(_scripted_entries(obj, actor=actor))
     if isinstance(obj, LLMNPC):
@@ -556,6 +560,44 @@ def _target_affordance_entries(
         entries.append(_service_entry("guild", actor, obj))
     if shop_host is not None and obj is shop_host:
         entries.append(_service_entry("shop", actor, obj))
+    return entries
+
+
+def _deliver_entries(obj: Any, actor: Any) -> list[AffordanceView]:
+    """One ``explore.deliver`` entry per bound delivery item of the recipient.
+
+    Emitted only for a co-located recipient an active ``DELIVER`` stage is
+    bound to (the delta's no-entry-without-a-bound-stage rule): enabled when
+    the holder carries the remaining objective quantity, otherwise disabled
+    with the shared rule's stable reason code and message. ``params`` are the
+    registered validator's normalized output, so the dispatched payload is
+    byte-for-byte what the dispatcher accepts.
+    """
+    from web.webclient.actions.exploration_actions import validate_deliver_payload
+    from world.rules.quest_delivery import (
+        active_deliveries_for_recipient,
+        item_display_name,
+    )
+
+    entries: list[AffordanceView] = []
+    for view in active_deliveries_for_recipient(actor, obj):
+        params = validate_deliver_payload(
+            {"npc_id": int(obj.pk), "item_key": view.item_key}
+        )
+        label = _bounded_label(
+            f"交付 {item_display_name(view.item_key)} 給 {_bounded_display_name(obj)}"
+        )
+        entries.append(
+            AffordanceView(
+                action_id="explore.deliver",
+                label=label,
+                params=params,
+                freeform=False,
+                navigation=False,
+                enabled=view.deliverable,
+                disabled_reason=view.reason,
+            )
+        )
     return entries
 
 

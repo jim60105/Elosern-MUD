@@ -1,9 +1,10 @@
 """Exact exploration action payload validators and narrow adapters.
 
-The nine production exploration actions are ``explore.move``, ``explore.look``,
+The production exploration actions are ``explore.move``, ``explore.look``,
 ``explore.talk_scripted``, ``explore.talk_freeform``, ``explore.dialogue_leave``,
-``explore.party_invite``, ``explore.party_leave``, ``explore.engage``, and
-``explore.wait``. Each
+``explore.party_invite``, ``explore.party_leave``, ``explore.engage``,
+``explore.wait``, ``explore.possess``, ``explore.possess_release``, and
+``explore.deliver``. Each
 validator enforces an exact bounded payload shape; each adapter re-resolves
 every referenced identity from the actor's **current** location's present
 contents and re-verifies the exact eligibility at commit time, calls only
@@ -59,6 +60,7 @@ from world.rules.time_skip import (
 MAX_EXIT_REF_CHARS = 64
 MAX_NODE_ID_CHARS = 128
 MAX_KEYWORD_ID_CHARS = 64
+MAX_ITEM_KEY_CHARS = 64
 MAX_SPEECH_CODE_POINTS = 512
 
 # Stable panels each admitted exploration action may publish. Empty means the
@@ -261,6 +263,25 @@ def validate_possess_release_payload(payload: Any) -> dict[str, Any]:
     if set(payload) != {"npc_id"}:
         raise ExplorationActionError("explore.possess_release requires exactly npc_id")
     return {"npc_id": _require_positive_int(payload["npc_id"], "npc_id")}
+
+
+def validate_deliver_payload(payload: Any) -> dict[str, Any]:
+    """Validate the exact ``explore.deliver`` payload (recipient + item key).
+
+    The payload names only the recipient's integer identity and the bounded
+    item key; the quest record, stage, and quantity are re-derived server-side
+    by the adapter and the shared delivery rule (design D4).
+    """
+    if not isinstance(payload, dict):
+        raise ExplorationActionError("explore.deliver payload must be an object")
+    if set(payload) != {"npc_id", "item_key"}:
+        raise ExplorationActionError("explore.deliver requires exactly npc_id and item_key")
+    return {
+        "npc_id": _require_positive_int(payload["npc_id"], "npc_id"),
+        "item_key": _require_ascii_identifier(
+            payload["item_key"], "item_key", MAX_ITEM_KEY_CHARS
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -852,15 +873,38 @@ def _possess_release_adapter(actor: Any, payload: dict[str, Any], session: Any =
     return _success("released", UNPOSSESS_RELEASED_MESSAGE, AFFECTED_FULL)
 
 
+def _deliver_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
+    """Hand the quest item to its bound recipient through the shared rule.
+
+    Re-resolves the recipient as a present entity by identity (bound
+    recipients are runtime identities, never client-named quest state) and
+    delegates to ``world.rules.quest_delivery.deliver_quest_item``, so the
+    action and the ``交付`` command refuse and succeed identically.
+    """
+    del session
+    from world.rules.quest_delivery import deliver_quest_item
+
+    recipient = _present_by_id(actor, payload["npc_id"])
+    if recipient is None:
+        return _rejected("no_npc", "這裡沒有這個對象。")
+    outcome = deliver_quest_item(actor, recipient, payload["item_key"])
+    if not outcome.applied:
+        return _rejected(outcome.code, outcome.message)
+    actor.msg(outcome.message)
+    return _success("delivered", outcome.message, AFFECTED_FULL)
+
+
 __all__ = [
     "AFFECTED_ENGAGE",
     "DAYPARTS",
     "ExplorationActionError",
     "MAX_EXIT_REF_CHARS",
+    "MAX_ITEM_KEY_CHARS",
     "MAX_KEYWORD_ID_CHARS",
     "MAX_NODE_ID_CHARS",
     "MAX_SPEECH_CODE_POINTS",
     "validate_engage_payload",
+    "validate_deliver_payload",
     "validate_look_payload",
     "validate_move_payload",
     "validate_party_invite_payload",

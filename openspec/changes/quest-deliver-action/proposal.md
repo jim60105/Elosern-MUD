@@ -16,14 +16,21 @@ The player needs a deterministic way to hand something over.
 
 - New OOB action `explore.deliver` with a bounded payload naming the recipient identity and the item
   key, validated by its own payload validator and dispatched through the existing action registry.
-- New player command (`交付`, with a `給` alias) covering the same capability from the text surface,
-  so the verb exists for telnet play too.
+- New player command (`交付`) covering the same capability from the text surface, so the verb exists
+  for telnet play too. It carries no alias: the natural `給` name is already owned by the localized
+  general give (`commands/localized/general.py::CmdGive`, mounted in `CharacterCmdSet`), contrary to
+  this proposal's earlier claim that no give verb existed. When the general give later grows a
+  quest-delivery branch, the shared deterministic rule is already its seam.
 - Both routes call one shared deterministic rule that reuses the existing `_transfer_items` primitive
   and therefore the delivery observer, so a hand-over advances the objective atomically with the item
   movement.
 - Honest gating: the action is offered and accepted only for a co-located recipient the holder has an
   active `DELIVER` stage bound to, for an item the holder actually holds. Every rejection carries a
   stable reason code, and a rejected attempt changes nothing.
+  Amended during implementation review: the earlier "record terminal" refusal is subsumed — the
+  strict reader guarantees a terminal record carries no runtime bindings
+  (`validate_record_runtime`), so a post-completion hand-over to the same recipient and item refuses
+  with `no_active_delivery`, and no separate terminal branch can exist.
 - The exploration affordance surface offers the delivery when one is available at the player's
   location, so the action is reachable by pointer as well as by keyboard and command line.
 - `docs/game/commands.md` and `docs/game/command-reference.md` updated in this change, keeping
@@ -51,6 +58,10 @@ surfaces, so the requirements belong in the existing capabilities below.)
 
 - `web/webclient/actions/registry.py` and `web/webclient/actions/exploration_actions.py`: the action
   id, payload validator, and adapter.
+- `web/webclient/presentation/exploration.py`: the exploration panel schema version bumps 1 → 2 —
+  exactly the `explore.deliver` action affordance carries a `params` field (the validator-normalized
+  dispatch payload), because the dock cannot re-derive a bound quest payload from the target
+  identity alone. The client panel validator mirrors the version and the conditional field.
 - `web/webclient/presentation/affordances.py`: the delivery affordance.
 - New command module or an addition to `commands/items.py`; `commands/default_cmdsets.py`
   registration.

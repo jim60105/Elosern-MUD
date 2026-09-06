@@ -166,6 +166,7 @@ class RegistryTests(unittest.TestCase):
                     "explore.wait",
                     "explore.possess",
                     "explore.possess_release",
+                    "explore.deliver",
                     "options.dismiss",
                     "title.accept",
                     "title.decline",

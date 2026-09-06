@@ -84,10 +84,11 @@ def build_production_action_registry() -> ActionRegistry:
     the six creation adapters (``creation.preset``, ``creation.custom``,
     ``creation.concept``, ``creation.roll_name``, ``creation.activate``,
     ``creation.reset``), and the
-    nine exploration adapters (``explore.move``, ``explore.look``,
+    twelve exploration adapters (``explore.move``, ``explore.look``,
     ``explore.talk_scripted``, ``explore.talk_freeform``,
     ``explore.dialogue_leave``, ``explore.party_invite``,
-    ``explore.party_leave``, ``explore.engage``, ``explore.wait``), the two
+    ``explore.party_leave``, ``explore.engage``, ``explore.wait``,
+    ``explore.possess``, ``explore.possess_release``, ``explore.deliver``), the two
     title ballot adapters (``title.accept``, ``title.decline``), the two
     account adapters (``account.character.switch``, ``account.character.create``), and the
     ``options.dismiss`` action. Each action
@@ -128,6 +129,7 @@ def build_production_action_registry() -> ActionRegistry:
     )
     from web.webclient.actions.exploration_actions import (
         _dialogue_leave_adapter,
+        _deliver_adapter,
         _engage_adapter,
         _look_adapter,
         _move_adapter,
@@ -139,6 +141,7 @@ def build_production_action_registry() -> ActionRegistry:
         _talk_scripted_adapter,
         _wait_adapter,
         validate_engage_payload,
+        validate_deliver_payload,
         validate_dialogue_leave_payload,
         validate_look_payload,
         validate_move_payload,
@@ -450,6 +453,17 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="explore.possess_release",
             validate_payload=validate_possess_release_payload,
             adapter=_possess_release_adapter,
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.deliver",
+            validate_payload=validate_deliver_payload,
+            adapter=_deliver_adapter,
+            # No affected panels: a hand-over changes the holder's inventory
+            # and quest log (and possibly the recipient's) together, so every
+            # completion publishes a full canonical snapshot (design D4).
             affected_panels=(),
         )
     )

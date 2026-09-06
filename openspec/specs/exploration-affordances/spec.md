@@ -18,7 +18,8 @@ panel presenter and the `context_actions` exploration presenter. Every emitted e
   (false), `enabled`, and nullable `disabled_reason`; `action_id` SHALL be one member of
   `ACTION_CODE_ALLOWLIST`, which SHALL contain exactly `explore.move`, `explore.look`,
   `explore.talk_scripted`, `explore.talk_freeform`, `explore.party_invite`, `explore.party_leave`,
-  `explore.engage`, `explore.wait`, `explore.possess`, and `explore.possess_release` — there SHALL
+  `explore.engage`, `explore.wait`, `explore.possess`, `explore.possess_release`, and
+  `explore.deliver` — there SHALL
   be no `explore.interact` entry (the exploration panel's interact group is a label over
   per-target affordances, not an action); there
   SHALL be no NPC or companion `explore.engage` (engagement is monsters-only);
@@ -87,6 +88,21 @@ quests, inventory, combat sessions, party, or world time.
 - **THEN** the engage and shop entries render disabled with stable possession-refusal codes and
   fixed messages rather than being omitted
 
+#### Scenario: An available delivery is offered for the bound recipient
+- **WHEN** the puppeted actor holds an active `DELIVER` stage bound to a co-located recipient and
+  holds the objective's item
+- **THEN** the vocabulary contains one `explore.deliver` action entry for that recipient, enabled,
+  carrying validator-normalized params naming the recipient identity and the item key
+
+#### Scenario: A delivery the actor cannot perform is not invented
+- **WHEN** the bound recipient is co-located but the actor no longer holds the objective's item
+- **THEN** the vocabulary contains that delivery entry disabled with a stable reason code and a safe
+  Traditional Chinese message, and no enabled delivery entry exists
+
+#### Scenario: No delivery entry exists without an active bound stage
+- **WHEN** the actor has no active `DELIVER` stage bound to any co-located entity
+- **THEN** the vocabulary contains no `explore.deliver` entry
+
 ### Requirement: Affordance params are validator-normalized
 Every action entry's `params` SHALL be the normalized output of that action's registered
 validator in `web/webclient/actions/exploration_actions.py` applied to a candid payload the
@@ -94,9 +110,9 @@ builder constructs (exact shapes: `explore.move` `{"exit_ref", "current_node"}`,
 `{"target_id"}` or `{"room": true}`, `explore.talk_scripted` `{"npc_id", "keyword_id"}`,
 `explore.party_invite` `{"npc_id", "message"}` (message empty by construction),
 `explore.party_leave` `{"npc_id"}`, `explore.engage` `{"monster_id"}`, `explore.wait`
-`{"daypart": "noon"}`, `explore.possess` `{"npc_id"}`, and `explore.possess_release`
-`{"npc_id"}`) — so the dispatched payload is byte-for-byte the payload the dispatcher
-accepts. The `explore.talk_freeform` entry SHALL be the single exception: its `params` SHALL be
+`{"daypart": "noon"}`, `explore.possess` `{"npc_id"}`, `explore.possess_release`
+`{"npc_id"}`, and `explore.deliver` `{"npc_id", "item_key"}`) — so the dispatched payload is
+byte-for-byte the payload the dispatcher accepts. The `explore.talk_freeform` entry SHALL be the single exception: its `params` SHALL be
 exactly `{"npc_id": int}` (binding-only), because no registered validator produces that shape
 without `speech`; the full validator SHALL run only on the client-composed dispatch payload
 (`speech` = the label text) defined by the later suggestions slices. A builder whose candid
@@ -121,6 +137,12 @@ affordance SHALL therefore share one byte-identical encoding implementation.
 - **WHEN** an `explore.talk_freeform` `AffordanceView` is constructed
 - **THEN** its `params` equals `{"npc_id": <present LLMNPC id>}` and no validator normalization
   is applied to it
+
+#### Scenario: The delivery entry carries its normalized dispatch payload
+- **WHEN** an `explore.deliver` `AffordanceView` is constructed for a co-located bound recipient
+- **THEN** its `params` is the registered delivery validator's normalized output for
+  `{"npc_id": <recipient id>, "item_key": <objective item key>}`, and dispatching it through the
+  production dispatcher produces no `malformed_payload` rejection
 
 ### Requirement: The idle baseline guarantees at least one executable entry
 In exploration mode with a puppeted player inside a location, the vocabulary SHALL always emit an

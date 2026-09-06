@@ -116,7 +116,7 @@ def _target(**overrides):
 
 def _valid_panel(**overrides):
     value = {
-        "schema_version": 1,
+        "schema_version": EXPLORATION_SCHEMA_VERSION,
         "available": True,
         "kind": "exploration",
         "move": [_move_row()],
@@ -156,7 +156,7 @@ class ExplorationSchemaTests(unittest.TestCase):
         with self.assertRaises(ExplorationPanelError):
             validate_exploration(_valid_panel(kind="services"))
         with self.assertRaises(ExplorationPanelError):
-            validate_exploration(_valid_panel(schema_version=2))
+            validate_exploration(_valid_panel(schema_version=3))
 
     def test_rejects_duplicate_interact_identities(self):
         payload = _valid_panel(
@@ -754,7 +754,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     def _render(self):
         return self._registry().render("exploration", _context(self.player))
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-1-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel")
     def test_room_renders_exploration_payload_without_mutation(self):
         before = {
             "location": self.player.location,
@@ -773,7 +773,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             self.player.attributes.get("map_knowledge"), before["map_knowledge"]
         )
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-1-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel")
     def test_move_lists_exits_with_canonical_destinations(self):
         destination = create_object(Room, key="南大道", location=None)
         exit_obj = create_object(
@@ -790,7 +790,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(row["destination"], f"room:{int(destination.pk)}")
         self.assertIsNone(row["disabled_reason"])
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-1-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel")
     def test_locked_exit_is_disclosed_but_disabled(self):
         destination = create_object(Room, key="密室", location=None)
         exit_obj = create_object(
@@ -808,7 +808,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(row["disabled_reason"]["code"], "locked")
         self.assertTrue(row["disabled_reason"]["message"].strip())
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-1-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel")
     def test_no_location_is_unavailable_without_fabrication(self):
         self.player.location = None
         payload = self._render()
@@ -985,7 +985,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             all_action_ids & {"explore.take", "explore.drop"}, set()
         )
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-1-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel")
     def test_quests_and_inventory_respect_the_services_capability(self):
         payload = self._render()
         self.assertTrue(payload["quests"]["available"])
@@ -998,7 +998,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertFalse(payload["quests"]["available"])
         self.assertFalse(payload["inventory"]["available"])
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-1-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel")
     def test_combat_mode_renders_unavailable_form(self):
         monster = create_object(Monster, key="哥布林", location=self.south_gate)
         monster.threat_tier = "low"
@@ -1155,7 +1155,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertFalse(hasattr(module, "_destination_node"))
 
     @covers_requirement(
-        "webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_exploration_action_ids_derived_from_shared_allowlist(self):
         from web.webclient.presentation.affordances import ACTION_CODE_ALLOWLIST
@@ -1165,7 +1165,7 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(set(ACTION_IDS), set(ACTION_CODE_ALLOWLIST))
 
     @covers_requirement(
-        "webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_bound_companion_renders_both_panels_with_possession_affordances(self):
         from unittest.mock import patch
@@ -1379,12 +1379,12 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
     def _render(self):
         return build_production_registry().render("exploration", _context(self.player))
 
-    def test_rule_table_fixture_payload_is_byte_identical_to_v1(self):
+    def test_rule_table_fixture_payload_is_byte_identical_to_v2(self):
         payload = self._render()
         self.assertEqual(
             payload,
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "available": True,
                 "kind": "exploration",
                 "move": [

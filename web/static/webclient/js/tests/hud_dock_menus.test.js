@@ -25,7 +25,7 @@ const CharacterMenu = require("../elosern/character_menu.js");
 function explorationPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "exploration",
       move: [
