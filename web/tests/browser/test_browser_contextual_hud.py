@@ -1454,7 +1454,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "skill-book",
         "inventory-panel",
         "shop-panel",
-        "quest-board",
+        "quest-drawer",
         "lore-codex-drawer",
         "character-status-drawer",
     ]
@@ -1693,7 +1693,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     )
     def test_quest_drawer_offers_no_codex_control(self):
         """The quest drawer contains no control that opens the codex: the
-        世界圖鑑 button (and its `open_lore` emit) is removed outright."""
+        世界圖鑑 button is removed outright, and the split drawer carries no
+        codex-opening control of any kind."""
         page = self.logged_in_page()
         _inject_snapshot(page, {"lore_codex": valid_lore_codex_panel()}, mode="exploration")
         _wait_mode(page, "exploration")
@@ -1701,11 +1702,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
             "if (s) s.openHudDrawer('quest'); }"
         )
-        page.wait_for_selector('[data-testid="quest-board"]', timeout=15000)
+        page.wait_for_selector('[data-testid="quest-drawer"]', timeout=15000)
 
-        quest_board = page.locator('[data-testid="quest-board"]')
+        quest_drawer = page.locator('[data-testid="quest-drawer"]')
         self.assertEqual(
-            quest_board.locator('[data-testid="quest-board__open-lore"]').count(),
+            quest_drawer.get_by_role("button", name="世界圖鑑").count(),
             0,
             "the removed 世界圖鑑 control is gone from the quest drawer",
         )
@@ -1717,7 +1718,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         # No control anywhere inside the quest-drawer body names the codex.
         self.assertNotIn(
             "世界圖鑑",
-            quest_board.inner_text(),
+            quest_drawer.inner_text(),
             "the quest drawer renders no codex-opening control",
         )
         page.close()

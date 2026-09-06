@@ -18,8 +18,6 @@ The component boundary should be the data boundary.
   - **Abandon / turn in** — rendered only when `services.guild.quests` carries a row with the same
     `quest_id` and that action is enabled. Matching by `quest_id` is the single merge point between
     the two panels.
-  - **Deliver** — rendered when the exploration affordances carry a delivery for that quest's bound
-    recipient at the current location.
 - New `GuildCounter.vue` reading `services.guild`: registration, the quest board (accepting new
   quests), and guild rank with the promotion examination. It does **not** re-list accepted quests, so
   nothing is shown twice.
@@ -30,6 +28,12 @@ The component boundary should be the data boundary.
 - The store's service-surface routing keeps opening the quest drawer for the guild frames; the drawer
   now also opens with content when no guild frame exists.
 - New test identifiers registered in the frozen contract audit §2.3.
+- **Amended 2026-09-06 (consistency review).** The earlier per-row **Deliver** bullet is removed. The
+  parent design (§9.1) lists per-row actions as track/abandon/turn-in only, and the `quest_log` v1
+  row carries no delivery binding while an `explore.deliver` affordance carries only
+  `{npc_id, item_key}` with no quest reference — a per-row delivery control would have to fabricate
+  the join. The delivery affordance is dispatched from the exploration interact surface (landed with
+  `quest-deliver-action`); the delta spec never carried a delivery requirement.
 
 ## Capabilities
 

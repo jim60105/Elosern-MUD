@@ -23,8 +23,9 @@ import InventoryPanel from "./components/InventoryPanel.vue";
 import LocalMap from "./components/LocalMap.vue";
 import LoreCodexDrawer from "./components/LoreCodexDrawer.vue";
 import MapOverlay from "./components/MapOverlay.vue";
-import QuestBoard from "./components/QuestBoard.vue";
 import RestForm from "./components/RestForm.vue";
+import GuildCounter from "./components/GuildCounter.vue";
+import QuestLog from "./components/QuestLog.vue";
 import SceneBackdrop from "./components/SceneBackdrop.vue";
 import SettingsOverlay from "./components/SettingsOverlay.vue";
 import ShopPanel from "./components/ShopPanel.vue";
@@ -673,6 +674,22 @@ const DRAWER_TITLES = {
 };
 const drawerTitle = computed(() => DRAWER_TITLES[store.view.hudDrawer] || "");
 
+// quest-drawer-split: the quest drawer hosts the player's quest book
+// (QuestLog, host-free) above the guild counter (GuildCounter, host-gated).
+// The counter mounts only when the guild section is available; an
+// unavailable services panel renders its registry-owned reason verbatim
+// (a read-model failure is never mislabeled as clerk absence) and an
+// available panel with no guild section renders the explicit clerk-needed
+// marker — the away-from-clerk honesty the split exists for.
+const questServicesPanel = computed(() => panel("services") || null);
+const questGuildAvailable = computed(() => {
+  const services = questServicesPanel.value;
+  return !!services && services.available !== false && services.guild != null;
+});
+const questServicesUnavailable = computed(
+  () => questServicesPanel.value?.available === false,
+);
+
 // The skill drawer's head subtitle: the owner's active/passive skill counts,
 // counted from the `character` panel exactly the way `SkillBook` counts its
 // rows (the counting logic moved up one level so the drawer head is the
@@ -1005,16 +1022,44 @@ onMounted(() => {
         @buy="onShopBuy"
         @sell="onShopSell"
       />
-      <QuestBoard
+      <div
         v-else-if="store.view.hudDrawer === 'quest'"
-        :services="panel('services') || {}"
-        @quest_register="onQuestAction"
-        @quest_accept="onQuestAction"
-        @quest_abandon="onQuestAction"
-        @quest_turnin="onQuestAction"
-        @quest_track="onQuestAction"
-        @exam_start="onQuestAction"
-      />
+        class="quest-drawer"
+        data-testid="quest-drawer"
+      >
+        <QuestLog
+          :quest-log="panel('quest_log')"
+          :services="panel('services') || {}"
+          @quest_track="onQuestAction"
+          @quest_abandon="onQuestAction"
+          @quest_turnin="onQuestAction"
+        />
+        <GuildCounter
+          v-if="questGuildAvailable"
+          :services="panel('services') || {}"
+          @quest_register="onQuestAction"
+          @quest_accept="onQuestAction"
+          @exam_start="onQuestAction"
+        />
+        <!-- The counter's two honest absence forms: the services panel's own
+             registry reason when the panel degraded, otherwise the explicit
+             no-clerk marker. -->
+        <p
+          v-else-if="questServicesUnavailable"
+          class="quest-drawer__counter-unavailable"
+          data-testid="quest-drawer__counter-unavailable"
+          :data-reason-code="questServicesPanel?.reason?.code"
+        >
+          {{ questServicesPanel?.reason?.message }}
+        </p>
+        <p
+          v-else
+          class="quest-drawer__counter-absent"
+          data-testid="quest-drawer__counter-absent"
+        >
+          公會櫃台需在公會職員面前才能辦理。
+        </p>
+      </div>
       <LoreCodexDrawer v-else-if="store.view.hudDrawer === 'lore'" :codex="panel('lore_codex')" />
       <CharacterStatusDrawer
         v-else-if="store.view.hudDrawer === 'status'"
@@ -1183,5 +1228,26 @@ onMounted(() => {
 .hud-drawer__body--dock > :not(.dock-menu):not(.dock-detail) {
   flex: 1 1 100%;
   min-width: 0;
+}
+
+/* quest-drawer-split: the drawer body's wrapper for the two quest surfaces.
+   It stacks the quest book above the guild counter (or the counter's honest
+   absence marker) and, when the drawer hosts a service frame, takes the
+   full-width flex row the `--dock` body grants its non-dock children. */
+.quest-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.quest-drawer__counter-absent,
+.quest-drawer__counter-unavailable {
+  margin: 0;
+  padding: var(--sp-1) var(--sp-2);
+  color: var(--paper-500);
+  font-size: 0.85em;
+  border: 1px dashed var(--ink-700);
+  border-radius: var(--radius-sm);
 }
 </style>

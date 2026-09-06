@@ -106,14 +106,14 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
             page,
             lambda s: True,
             dom_readiness={
-                "selector": '[data-testid="quest-board"]',
+                "selector": '[data-testid="quest-drawer"]',
                 "predicate": (
-                    "() => { const el = document.querySelector('[data-testid=\"quest-board\"]'); "
+                    "() => { const el = document.querySelector('[data-testid=\"quest-drawer\"]'); "
                     "if (!el) { return false; } "
                     "const r = el.getBoundingClientRect(); "
                     "return r.width > 0 && r.height > 0 && el.offsetParent !== null; }"
                 ),
-                "description": "quest drawer body (quest-board) rendered inside the open drawer",
+                "description": "quest drawer body (quest-drawer) rendered inside the open drawer",
             },
             timeout=timeout,
         )
@@ -399,11 +399,78 @@ class GuildQuestJourneys(ServicesBrowserTest):
         self.assertTrue(current["source"].startswith("exploration"), current)
         # The drawer's frame is gone, so no open drawer renders a service
         # surface: the body unmounts (discarding its local state with it).
-        self.assertEqual(page.locator('[data-testid="quest-board"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="quest-drawer"]').count(), 0)
         # Neither pop dispatched anything.
         self.assertEqual(
             len([m for m in outbound_messages(page) if m[0] == "ui_action"]), sent_before
         )
+
+    @covers_requirement(
+        "webclient-service-menus::the-quest-drawer-separates-the-player-s-quest-book-from-the-guild-counter",
+    )
+    def test_drawer_renders_book_and_counter_without_duplication(self):
+        """quest-drawer-split: in front of the clerk the drawer hosts both
+        surfaces — the quest book and the counter — and the accepted quest
+        appears exactly once: the counter lists no quest-record rows."""
+        page = self.logged_in_page()
+        self._wait_services_available(page)
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s) s.openHudDrawer('quest'); }"
+        )
+        page.wait_for_selector('[data-testid="quest-drawer"]', timeout=15000)
+        body = page.locator('[data-testid="quest-drawer"]')
+        # Exactly one book row for the held quest; the counter surface is
+        # present but carries no quest-record rows at all.
+        self.assertEqual(body.locator('[data-testid^="quest-log__row--"]').count(), 1)
+        self.assertEqual(page.locator('[data-testid="guild-counter"]').count(), 1)
+        self.assertEqual(
+            page.locator('[data-testid^="guild-counter__quest-row--"]').count(), 0
+        )
+
+
+class QuestBookAwayFromClerkJourneys(ServicesBrowserTest):
+    """quest-drawer-split task 4.3: the case that previously rendered
+    ``尚未取得公會資料`` — an accepted guild quest held away from any clerk.
+    The quest book (host-free) must read the record, the counter must be
+    replaced by its explicit no-clerk marker, and tracking must dispatch with
+    no guild host present (the host-independent panel contract's client face).
+    """
+
+    SERVICES_MODE = "quest_away_from_clerk"
+
+    @covers_requirement("webclient-quest-log-panel::the-quest-log-panel-is-host-independent")
+    def test_away_from_clerk_renders_book_with_no_clerk_marker(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._wait_services_available(page)
+        panel = self._services_panel(page)
+        # The fixture holds a quest but stands in no service interior.
+        self.assertIsNone(panel["guild"])
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s) s.openHudDrawer('quest'); }"
+        )
+        page.wait_for_selector('[data-testid="quest-drawer"]', timeout=15000)
+        body = page.locator('[data-testid="quest-drawer"]')
+        # The book renders the stored record; the counter is absent, replaced
+        # by the explicit clerk-needed marker.
+        self.assertEqual(body.locator('[data-testid^="quest-log__row--"]').count(), 1)
+        self.assertEqual(page.locator('[data-testid="quest-drawer__counter-absent"]').count(), 1)
+        self.assertEqual(page.locator('[data-testid="guild-counter"]').count(), 0)
+        self.assertNotIn("尚未取得公會資料", body.inner_text())
+        # Away from any clerk the row still offers tracking, and activating it
+        # submits exactly one host-free guild.quest_track.
+        row = body.locator('[data-testid^="quest-log__row--"]').first
+        track = row.locator('[data-testid="quest-log__track"]')
+        self.assertEqual(track.count(), 1)
+        track.click()
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            if sent_action_count(page, "guild.quest_track") >= 1:
+                break
+            page.wait_for_timeout(250)
+        self.assertEqual(sent_action_count(page, "guild.quest_track"), 1)
 
 
 class GuildTurninJourneys(ServicesBrowserTest):
@@ -967,12 +1034,12 @@ class KeyboardServiceDrawerJourneys(ServicesBrowserTest):
         self._wait_panel(page, lambda p: p["player"]["guild_registered"] is True)
         self.assertEqual(sent_action_count(page, "guild.register"), 1)
 
-        # The service frame (quest-board) renders inside the reference drawer
+        # The service frame (quest-drawer) renders inside the reference drawer
         # (H4: the right-column panels were emptied into drawers).
         inside_drawer = page.evaluate(
             """() => {
               const drawer = document.querySelector('[data-testid="hud-drawer"]');
-              const body = document.querySelector('[data-testid="quest-board"]');
+              const body = document.querySelector('[data-testid="quest-drawer"]');
               return !!(drawer && body && drawer.contains(body));
             }"""
         )
@@ -986,7 +1053,7 @@ class KeyboardServiceDrawerJourneys(ServicesBrowserTest):
             """() => {
               const body = document.querySelector('.hud-drawer__body');
               const list = document.querySelector('.dock-menu');
-              const surface = document.querySelector('[data-testid="quest-board"]');
+              const surface = document.querySelector('[data-testid="quest-drawer"]');
               if (!body || !list || !surface) return false;
               return body.classList.contains('hud-drawer__body--dock')
                 && list.parentElement === body
@@ -1062,24 +1129,24 @@ class ServicesUnavailableJourney(ServicesBrowserTest):
             "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
             "if (s) s.openHudDrawer('quest'); }"
         )
-        page.wait_for_selector('[data-testid="quest-board"]', timeout=15000)
-        board = page.locator('[data-testid="quest-board"]')
+        page.wait_for_selector('[data-testid="quest-drawer"]', timeout=15000)
+        board = page.locator('[data-testid="quest-drawer"]')
         board_text = board.inner_text()
         # The drawer body renders the registry-owned reason verbatim.
         self.assertIn(panel["reason"]["message"], board_text)
         # No fabricated board / quest / rank rows: the unavailable form carries
         # no guild section, so the board and quest-detail rows are absent.
         self.assertEqual(
-            page.locator('[data-testid="quest-board__board-row--"]').count(), 0,
-            "no fabricated quest-board rows in the unavailable form")
+            page.locator('[data-testid^="guild-counter__board-row--"]').count(), 0,
+            "no fabricated counter board rows in the unavailable form")
         self.assertEqual(
-            page.locator('[data-testid="quest-board__quest-row--"]').count(), 0,
+            page.locator('[data-testid^="quest-log__row--"]').count(), 0,
             "no fabricated active-quest rows in the unavailable form")
         self.assertEqual(
-            page.locator('[data-testid="quest-board__rankblock"]').count(), 0,
+            page.locator('[data-testid="guild-counter__rankblock"]').count(), 0,
             "no fabricated rank block in the unavailable form")
         self.assertEqual(
-            page.locator('[data-testid="quest-board__abandon"]').count(), 0,
+            page.locator('[data-testid="quest-log__abandon"]').count(), 0,
             "no fabricated abandon control in the unavailable form")
 
 

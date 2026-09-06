@@ -14,6 +14,7 @@ import { createPinia, setActivePinia } from "pinia";
 import AppClient from "../AppClient.vue";
 import {
   CHARACTER_PANEL_SAMPLE,
+  QUEST_LOG_PANEL_SAMPLE,
   SERVICES_PANEL_MINIMAL_SAMPLE,
   SERVICES_PANEL_SAMPLE,
   SERVICES_PANEL_UNAVAILABLE_SAMPLE,
@@ -44,7 +45,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     skill: "skill-book",
     inventory: "inventory-panel",
     shop: "shop-panel",
-    quest: "quest-board",
+    quest: "quest-drawer",
     lore: "lore-codex-drawer",
     status: "character-status-drawer",
     party: "party-drawer",
@@ -417,6 +418,103 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     await wrapper.get('[data-testid="character-status-drawer__persona-submit--habit"]').trigger("click");
     expect(sender.sent.actions).toHaveLength(2);
     expect(sender.sent.actions[1].payload).toEqual({ field: "habit", text: null });
+  });
+
+  // quest-drawer-split: the quest drawer away from any clerk. The real
+  // player route — the 任務 sub-dock tab pops to root, focuses the quests
+  // item, and confirms, pushing the services.quests frame and opening the
+  // drawer — must show the quest book (host-free) and the explicit
+  // clerk-needed marker in place of the counter, and tracking must dispatch
+  // with no guild host present.
+  it("opens the quest book away from any clerk and tracks from a row", async () => {
+    const sender = fx.createFakeSender();
+    store.setSender(sender);
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    store.beginTransport(1);
+    store.setConnected(true);
+    const received = store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          panels: {
+            status: fx.statusPanel(),
+            exploration: fx.explorationPanel(),
+            context_actions: fx.explorationActions(),
+            services: SERVICES_PANEL_MINIMAL_SAMPLE,
+            quest_log: QUEST_LOG_PANEL_SAMPLE,
+          },
+        }),
+      ],
+      {},
+    );
+    expect(received.accepted).toBe(true);
+    await wrapper.vm.$nextTick();
+    // The player route: 任務 tab → confirm. No clerk exists in this session.
+    expect(store.focusItemByKey("quests")).toBe(true);
+    expect(store.focusConfirm()).toBe(true);
+    expect(store.view.hudDrawer).toBe("quest");
+    await wrapper.vm.$nextTick();
+    const body = wrapper.get('[data-testid="quest-drawer"]');
+    expect(body.get('[data-testid="quest-log"]').exists()).toBe(true);
+    expect(body.find('[data-testid="quest-log__row--q_1042"]').exists()).toBe(true);
+    expect(body.get('[data-testid="quest-drawer__counter-absent"]').exists()).toBe(true);
+    expect(body.find('[data-testid="guild-counter"]').exists()).toBe(false);
+    // Away from any clerk only tracking is offered, and it dispatches once.
+    await body
+      .get('[data-testid="quest-log__row--q_2077"]')
+      .get('[data-testid="quest-log__track"]')
+      .trigger("click");
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0].action_id).toBe("guild.quest_track");
+    expect(sender.sent.actions[0].payload).toEqual({ quest_id: "q_2077", tracked: true });
+  });
+
+  // quest-drawer-split: in front of a clerk both surfaces render — the book
+  // first, the counter below it — and no accepted quest appears twice (the
+  // counter lists none of the holder's records).
+  it("renders the book and the counter together without listing a quest twice", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    store.beginTransport(1);
+    store.setConnected(true);
+    const received = store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          panels: {
+            status: fx.statusPanel(),
+            exploration: fx.explorationPanel(),
+            context_actions: fx.explorationActions(),
+            services: SERVICES_PANEL_SAMPLE,
+            quest_log: QUEST_LOG_PANEL_SAMPLE,
+          },
+        }),
+      ],
+      {},
+    );
+    expect(received.accepted).toBe(true);
+    await wrapper.vm.$nextTick();
+    store.openHudDrawer("quest");
+    await wrapper.vm.$nextTick();
+    const body = wrapper.get('[data-testid="quest-drawer"]');
+    expect(body.get('[data-testid="quest-log"]').exists()).toBe(true);
+    expect(body.get('[data-testid="guild-counter"]').exists()).toBe(true);
+    expect(body.find('[data-testid="quest-drawer__counter-absent"]').exists()).toBe(false);
+    // The counter carries no quest-record rows: each accepted quest appears
+    // exactly once, in the book.
+    const counter = body.get('[data-testid="guild-counter"]');
+    expect(counter.find('[data-testid^="guild-counter__quest-row--"]').exists()).toBe(false);
+    expect(counter.findAll('[data-testid^="quest-log__row--"]')).toHaveLength(0);
+    const book = body.get('[data-testid="quest-log"]');
+    expect(book.findAll('[data-testid^="quest-log__row--"]').map((n) => n.attributes("data-testid"))).toEqual([
+      "quest-log__row--q_1042",
+      "quest-log__row--q_2077",
+      "quest-log__row--q_0301",
+      "quest-log__row--q_0099",
+    ]);
   });
 
   it("renders the party quickbar on panel-left when party panel is available", async () => {
