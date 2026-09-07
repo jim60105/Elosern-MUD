@@ -112,6 +112,7 @@ class PlayerPresetTests(unittest.TestCase):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
                 subrace="human_commoner", allocations=(), emphasis="e", background="b",
+                sex="female",
             )
             values.update(overrides)
             return PlayerPreset(**values)
@@ -151,6 +152,7 @@ class PlayerPresetTests(unittest.TestCase):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
                 subrace="human_commoner", allocations=(), emphasis="e", background="b",
+                sex="female",
             )
             values.update(overrides)
             return PlayerPreset(**values)
@@ -174,6 +176,7 @@ class PlayerPresetTests(unittest.TestCase):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
                 subrace="human_commoner", allocations=(), emphasis="e", background="b",
+                sex="female",
             )
             values.update(overrides)
             return PlayerPreset(**values)
@@ -216,6 +219,7 @@ class PlayerPresetTests(unittest.TestCase):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
                 subrace="human_commoner", allocations=(), emphasis="e", background="b",
+                sex="female",
             )
             values.update(overrides)
             return PlayerPreset(**values)
@@ -232,3 +236,49 @@ class PlayerPresetTests(unittest.TestCase):
         _validate_preset_affinity_elements(
             {"x": make(race="elf", subrace="fionnen")}
         )
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-sex")
+    def test_sex_validation_rejects_values_outside_the_vocabulary(self):
+        from world.lore.player_presets import _validate_preset_sex
+
+        def make(**overrides):
+            values = dict(
+                key="x", display_name="x", age=18, apparent_age=18, race="human",
+                subrace="human_commoner", allocations=(), emphasis="e", background="b",
+                sex="female",
+            )
+            values.update(overrides)
+            return PlayerPreset(**values)
+
+        for preset, message in (
+            (make(sex="neuter"), "unknown sex"),
+            (make(sex="Female"), "unknown sex"),
+            (make(sex=""), "unknown sex"),
+            (make(sex=None), "unknown sex"),
+        ):
+            with self.subTest(message=message, sex=preset.sex), self.assertRaisesRegex(
+                ValueError, message
+            ):
+                _validate_preset_sex({"x": preset})
+        _validate_preset_sex({"x": make(sex="other")})
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-sex")
+    def test_constructing_a_preset_without_sex_raises_type_error(self):
+        # ``sex`` is keyword-only and required (KW_ONLY from the field-parity
+        # fields onward), so a card that omits it fails at construction
+        # instead of silently inheriting DEFAULT_SEX.
+        with self.assertRaisesRegex(TypeError, "sex"):
+            PlayerPreset(
+                "x", "x", 18, 18, "human", "human_commoner",
+                (), "e", "b",
+            )
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-sex")
+    def test_every_shipped_preset_declares_a_concrete_sex(self):
+        from world.lore.sex import SEX_VALUES
+
+        self.assertEqual(len(PLAYER_PRESET_REGISTRY), 8)
+        for key, preset in PLAYER_PRESET_REGISTRY.items():
+            with self.subTest(preset=key):
+                self.assertIn(preset.sex, SEX_VALUES)
+                self.assertEqual(preset.sex, "female")
