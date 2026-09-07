@@ -2,7 +2,6 @@
 
 import inspect
 import unittest
-from types import SimpleNamespace
 from tools.spec_traceability import covers_requirement
 
 from unittest.mock import patch
@@ -275,6 +274,7 @@ class PresetLineageParityTests(unittest.TestCase):
 
     @covers_requirement("skill-lineage::import-and-scene-build-auto-seed-prerequisite-proficiency-exactly")
     def test_preset_path_and_import_path_seed_the_same_values(self):
+        from world.lore.player_presets import PlayerPreset
         from world.rules.character_creation import _preset_lineage_state
         from world.rules.progression import normalize_lineage_record
 
@@ -297,9 +297,13 @@ class PresetLineageParityTests(unittest.TestCase):
                         "skill_proficiency": dict(explicit),
                     }
                 )
-                preset = SimpleNamespace(
-                    active_skills=active,
-                    passive_skills=passive,
+                # A real PlayerPreset (not a duck-typed stand-in), so a field
+                # or signature change surfaces here for the right reason.
+                preset = PlayerPreset(
+                    key="parity", display_name="parity", age=20,
+                    apparent_age=20, race="human", subrace="human_commoner",
+                    allocations=(), emphasis="e", sex="female",
+                    active_skills=active, passive_skills=passive,
                     skill_proficiency=tuple(explicit.items()),
                 )
                 skills_value, proficiency_value = _preset_lineage_state(preset)

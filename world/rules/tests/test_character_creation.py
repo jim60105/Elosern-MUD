@@ -333,7 +333,8 @@ class CharacterActivationTests(EvenniaTest):
     def test_declared_proficiency_below_the_seed_survives_activation(self):
         # Scenario "A declared proficiency beats the auto-seed": 120 XP is
         # level 2, below the scorching_wave >= 3 edge; the seed must not
-        # overwrite the declared value.
+        # overwrite the declared value -- while the seed still runs for every
+        # OTHER unsatisfied edge of the closed chain.
         preset = self._synthetic_preset(
             "test_lineage_declared",
             active_skills=("firestorm",),
@@ -342,7 +343,14 @@ class CharacterActivationTests(EvenniaTest):
         character = self._activate_synthetic_preset(
             preset, "shell-lineage-declared"
         )
-        self.assertEqual(character.db.skill_proficiency["scorching_wave"], 120.0)
+        self.assertEqual(
+            character.db.skill_proficiency,
+            {
+                "scorching_wave": 120.0,  # declared wins, below the edge
+                "fire_arrow": 150.0,  # the seed still runs for the rest
+                "fire_ball": 150.0,
+            },
+        )
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
     def test_declared_keys_keep_order_and_closure_added_keys_follow(self):
