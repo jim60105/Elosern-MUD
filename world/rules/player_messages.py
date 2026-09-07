@@ -111,6 +111,19 @@ DEFEAT_AFTERMATH_TEMPLATES: dict[str, str] = {
     # The knocked-out companion's own wake observation (a read of the
     # outcome, no new mutation): one line per selected companion victim.
     "companion_wake": "{actor} 也悠悠轉醒——她狼狽地撐起身子，拍了拍凌亂的衣擺，紅著臉別開了視線。",
+    # The digest phase (defeat-aftermath-digest-narrative D-D3): wake lines
+    # are digest-selected — the residue and humiliated families replace the
+    # fixed wake prose for their digest, and the none digest keeps the lines
+    # above. ``digest_outcome`` is the per-participant mechanical record
+    # (digest and buff ride its entry data) and ``wake_observation`` the
+    # conscious bystander's single observation line — never a digest.
+    "wake_self_residue": "意識回籠時，身體深處還殘留著方才的餘溫，微微發燙——你狼狽地撐起身子，那股熱意一時半會散不去。",
+    "wake_self_humiliated": "意識回籠時，全身的難為情湧了上來——你明明撐住了，卻還是這副狼狽模樣，紅著臉不敢回想剛才的事。",
+    "wake_companion_residue": "{actor} 也悠悠轉醒——她的身體深處還殘留著方才的餘溫，微微發燙，紅著臉狼狽地撐起身子。",
+    "wake_companion_humiliated": "{actor} 也悠悠轉醒——她明明撐住了，卻還是這副狼狽模樣，紅著臉別開視線，久久不敢看你。",
+    "digest_outcome": "你身體的餘韻沉澱下來——短時間內，那份沉重感都散不去。",
+    "digest_outcome_companion": "{actor} 的身體也沉澱下那份餘韻——她紅著臉，暫時使不上平時的力氣。",
+    "wake_bystander": "{actor} 一直守在你身邊——她看著你狼狽地醒來，紅著臉別開了視線。",
 }
 
 

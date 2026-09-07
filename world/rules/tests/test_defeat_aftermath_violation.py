@@ -341,6 +341,27 @@ class ViolationRulebookTests(unittest.TestCase):
         "pg_lines:\n  - '你醒了。'\nweak_debuff:\n  buff_key: defeat_weak\n"
         "recovery:\n  regen_scale: 0.5\n  max_recovery_seconds: 21600\n"
         "  wake_fraction: 0.05\n"
+        # The DA6-owned digest section: every owned section must be present
+        # and valid for any single section's mutation to be the only failure.
+        "digest:\n"
+        "  rows:\n"
+        "    - id: residue\n"
+        "      when:\n"
+        "        sensitivity_level: [高, 極高, 敏感異常]\n"
+        "        outcome.climax_count: {min: 1}\n"
+        "      outcome: residue\n"
+        "      buff: aftermath_residue\n"
+        "    - id: humiliated\n"
+        "      when:\n"
+        "        sensitivity_level: [普通]\n"
+        "        shame_level: [強烈, 成癮]\n"
+        "        outcome.zero_landed: true\n"
+        "      outcome: humiliated\n"
+        "      buff: aftermath_humiliated\n"
+        "    - id: none\n"
+        "      when: {}\n"
+        "      outcome: none\n"
+        "      buff: null\n"
     )
 
     def setUp(self):
@@ -748,6 +769,7 @@ class CompanionPoolTests(ViolationBase):
                 "violation_act",
                 "weak_granted",
                 "recovery_advance",
+                "digest_outcome",
             ],
         )
         # A solo pool never touches the target dice: the pinned baseline's
@@ -1001,6 +1023,7 @@ class EventLogOrderTests(ViolationBase):
                 "violation_act",
                 "weak_granted",
                 "recovery_advance",
+                "digest_outcome",
             ],
         )
 

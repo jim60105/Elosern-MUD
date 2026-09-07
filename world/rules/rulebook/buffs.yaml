@@ -139,6 +139,24 @@
       - {target: atk_phys, ceiling: -5}
       - {target: agility, ceiling: -5}
       - {target: defense, ceiling: -5}
+# Defeat digest markers (defeat-aftermath-digest-narrative D-D3): mounted by
+# the digest phase on violated entities whose row selected them. Bounds
+# ceilings on the shipped surface only, world-second durations; they are the
+# digest's mechanical footprint, never a regen or counter mutation.
+- key: aftermath_residue
+  duration: 900
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    bounds:
+      - {target: agility, ceiling: -2}
+- key: aftermath_humiliated
+  duration: 600
+  stacking: refresh
+  polarity: debuff
+  modifiers:
+    bounds:
+      - {target: accuracy, ceiling: -3}
 - key: dark_corrosion
   duration: 300
   tick_interval: 10
