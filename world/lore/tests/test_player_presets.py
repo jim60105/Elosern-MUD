@@ -111,7 +111,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e", background="b",
+                subrace="human_commoner", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -151,7 +151,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e", background="b",
+                subrace="human_commoner", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -175,7 +175,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e", background="b",
+                subrace="human_commoner", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -218,7 +218,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e", background="b",
+                subrace="human_commoner", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -244,7 +244,7 @@ class PlayerPresetTests(unittest.TestCase):
         def make(**overrides):
             values = dict(
                 key="x", display_name="x", age=18, apparent_age=18, race="human",
-                subrace="human_commoner", allocations=(), emphasis="e", background="b",
+                subrace="human_commoner", allocations=(), emphasis="e",
                 sex="female",
             )
             values.update(overrides)
@@ -269,8 +269,7 @@ class PlayerPresetTests(unittest.TestCase):
         # instead of silently inheriting DEFAULT_SEX.
         with self.assertRaisesRegex(TypeError, "sex"):
             PlayerPreset(
-                "x", "x", 18, 18, "human", "human_commoner",
-                (), "e", "b",
+                "x", "x", 18, 18, "human", "human_commoner", (), "e"
             )
 
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-sex")
@@ -282,3 +281,109 @@ class PlayerPresetTests(unittest.TestCase):
             with self.subTest(preset=key):
                 self.assertIn(preset.sex, SEX_VALUES)
                 self.assertEqual(preset.sex, "female")
+
+    @covers_requirement("player-character-creation::the-preset-registry-declares-a-full-persona-in-import-card-shape")
+    def test_persona_validation_rejects_malformed_structures(self):
+        from world.lore.player_presets import (
+            PresetAppearance,
+            PresetIdentity,
+            PresetPersona,
+            _validate_preset_personas,
+        )
+
+        def make(**overrides):
+            values = dict(
+                key="x", display_name="x", age=18, apparent_age=18, race="human",
+                subrace="human_commoner", allocations=(), emphasis="e",
+                sex="female",
+            )
+            values.update(overrides)
+            return PlayerPreset(**values)
+
+        for preset, message in (
+            (make(persona=PresetPersona(personality=1)), r"persona\.personality"),
+            (make(persona=PresetPersona(background=None)), r"persona\.background"),
+            (
+                make(persona=PresetPersona(identity=PresetIdentity(public=7))),
+                r"persona\.identity\.public",
+            ),
+            (make(persona=PresetPersona(identity="self")), "not a PresetIdentity"),
+            (
+                make(persona=PresetPersona(appearance=PresetAppearance(height=1.5))),
+                r"persona\.appearance\.height",
+            ),
+            (make(persona=PresetPersona(appearance={"height": "160cm"})), "not a PresetAppearance"),
+            (make(persona=PresetPersona(social_connection=("solo",))), "pair of strings"),
+            (make(persona=PresetPersona(social_connection=(("a", "b", "c"),))), "pair of strings"),
+            (make(persona=PresetPersona(social_connection=(("a", 1),))), "pair of strings"),
+            (make(persona=PresetPersona(social_connection=(["a", "b"],))), "pair of strings"),
+            (
+                make(persona=PresetPersona(
+                    social_connection=(("甲", "舊識"), ("甲", "宿敵")),
+                )),
+                "duplicate social_connection",
+            ),
+        ):
+            with self.subTest(message=message), self.assertRaisesRegex(
+                ValueError, message
+            ):
+                _validate_preset_personas({"x": preset})
+        # Empty values are always legal so a card can be authored incrementally.
+        _validate_preset_personas({"x": make()})
+        _validate_preset_personas({"x": make(persona=PresetPersona(
+            identity=PresetIdentity(public="公會註冊冒險者", hidden="流亡王女"),
+            personality="沉穩", life_story="邊境", habit="練劍",
+            appearance=PresetAppearance(height="160cm"),
+            social_connection=(("悠奈", "舊識"),),
+            background="背景",
+        ))})
+
+    @covers_requirement("player-character-creation::the-preset-registry-declares-a-full-persona-in-import-card-shape")
+    def test_shipped_presets_hold_background_inside_the_persona(self):
+        for key, preset in PLAYER_PRESET_REGISTRY.items():
+            with self.subTest(preset=key):
+                self.assertFalse(hasattr(preset, "background"))
+                self.assertTrue(preset.persona.background.strip())
+
+    @covers_requirement("player-character-creation::the-preset-registry-declares-a-full-persona-in-import-card-shape")
+    def test_to_record_expands_the_authored_persona_exactly(self):
+        from world.lore.player_presets import (
+            PresetAppearance,
+            PresetIdentity,
+            PresetPersona,
+        )
+
+        # An all-empty persona is the six-key import-card record with empty
+        # values and no background key.
+        self.assertEqual(
+            PresetPersona().to_record(),
+            {
+                "identity": {}, "personality": "", "life_story": "",
+                "habit": "", "appearance": {}, "social_connection": {},
+            },
+        )
+        self.assertEqual(
+            PresetPersona(
+                identity=PresetIdentity(public="冒險者", hidden="王女"),
+                personality="沉穩", life_story="邊境", habit="練劍",
+                appearance=PresetAppearance(height="160cm", attire="旅裝"),
+                social_connection=(("悠奈", "舊識"),),
+                background="背景",
+            ).to_record(),
+            {
+                "identity": {"public": "冒險者", "hidden": "王女"},
+                "personality": "沉穩", "life_story": "邊境", "habit": "練劍",
+                "appearance": {"height": "160cm", "attire": "旅裝"},
+                "social_connection": {"悠奈": "舊識"},
+                "background": "背景",
+            },
+        )
+        # Empty sub-entries are dropped; a hidden-only identity keeps its layer.
+        partial = PresetPersona(
+            identity=PresetIdentity(hidden="間諜"),
+            appearance=PresetAppearance(attire="斗篷"),
+        ).to_record()
+        self.assertEqual(partial["identity"], {"hidden": "間諜"})
+        self.assertEqual(partial["appearance"], {"attire": "斗篷"})
+        self.assertNotIn("background", partial)
+

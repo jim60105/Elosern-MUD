@@ -29,7 +29,9 @@ A preset whose persona is structurally malformed — a non-string prose value, a
 non-`PresetIdentity` identity, a non-`PresetAppearance` appearance, or a
 `social_connection` entry that is not a pair of strings — SHALL fail at registry
 load, never at player activation, matching the existing skill-kit, identity,
-affinity, and starting-item validators.
+affinity, and starting-item validators. Duplicate `social_connection` names
+SHALL be rejected the same way, because the stored name/relationship mapping
+would otherwise silently drop the earlier pair.
 
 Because `world/lore/` SHALL NOT import `world/rules/`, the prose length bound
 SHALL be enforced by a load-time sweep in `world/rules/character_creation.py`,

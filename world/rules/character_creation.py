@@ -9,7 +9,7 @@ from django.db import transaction
 
 from world.imports.schema import MAX_ENTITY_KEY_LENGTH
 from world.lore.elements import ELEMENT_REGISTRY
-from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+from world.lore.player_presets import PLAYER_PRESET_REGISTRY, PlayerPreset
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY, StatModifiers
 from world.lore.sex import DEFAULT_SEX, SEX_VALUES
 from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
@@ -593,3 +593,38 @@ def activate_player_character(
     return CharacterCreationResult(
         validated.display_name, validated.race, validated.subrace, validated.values["magic_power"]
     )
+
+
+def _validate_preset_persona_lengths(registry: Mapping[str, PlayerPreset]) -> None:
+    """Sweep every registered preset persona's prose against the field-length cap.
+
+    ``world/lore/`` must not import ``world/rules/``, so the lore-side persona
+    validator cannot see ``MAX_PERSONA_FIELD_LENGTH`` (field-parity design
+    3.1): this module — the constant's owner — runs the length bound over
+    every preset persona's ``to_record()`` at import instead, so an over-long
+    field fails the server start exactly as an invalid skill kit does. The
+    walk covers every string the record can carry: top-level prose, the
+    identity layers, the appearance sub-keys, and both sides of every
+    ``social_connection`` pair (``PersonaStore`` renders connection keys
+    verbatim, so they are prose too).
+    """
+    for preset in registry.values():
+        for field, value in preset.persona.to_record().items():
+            texts: list[tuple[str, str]] = []
+            if isinstance(value, str):
+                texts.append((f"persona.{field}", value))
+            elif isinstance(value, Mapping):
+                for sub_key, sub_value in value.items():
+                    if isinstance(sub_key, str):
+                        texts.append((f"persona.{field} key {sub_key!r}", sub_key))
+                    if isinstance(sub_value, str):
+                        texts.append((f"persona.{field}.{sub_key}", sub_value))
+            for label, text in texts:
+                if len(text) > MAX_PERSONA_FIELD_LENGTH:
+                    raise CharacterCreationError(
+                        f"preset {preset.key!r} {label} exceeds the "
+                        f"{MAX_PERSONA_FIELD_LENGTH}-character length cap"
+                    )
+
+
+_validate_preset_persona_lengths(PLAYER_PRESET_REGISTRY)

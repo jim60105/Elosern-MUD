@@ -557,5 +557,97 @@ class _SimpleLivingEntity:
         return desc
 
 
+
+class PresetPersonaRecordRenderingTests(unittest.TestCase):
+    """A preset persona record renders through PersonaStore like any import card.
+
+    ``PresetPersona.to_record()`` must produce exactly the storage shape the
+    custom-activation and ``persona_edit`` writers produce, so no consumer
+    needs a preset-specific branch (preset-persona-model).
+    """
+
+    @covers_requirement("player-character-creation::the-preset-registry-declares-a-full-persona-in-import-card-shape")
+    def test_full_persona_record_flattens_with_localized_identity_labels(self):
+        from world.lore.player_presets import (
+            PresetAppearance,
+            PresetIdentity,
+            PresetPersona,
+        )
+        from world.rules.character_creation import PERSONA_IMPORT_CARD_KEYS
+
+        record = PresetPersona(
+            identity=PresetIdentity(public="公會註冊冒險者", hidden="流亡王女"),
+            personality="沉穩",
+            life_story="邊境小村",
+            habit="清晨練劍",
+            appearance=PresetAppearance(height="160cm", attire="旅裝"),
+            social_connection=(("悠奈", "舊識"),),
+            background="來自南境的旅人",
+        ).to_record()
+        # Same six import-card keys the custom writers produce (parity pin).
+        self.assertEqual(
+            tuple(key for key in record if key in PERSONA_IMPORT_CARD_KEYS),
+            PERSONA_IMPORT_CARD_KEYS,
+        )
+        entity = _FakeEntity(record)
+        block = PersonaStore(entity).flatten(
+            ("identity", "appearance", "social_connection")
+        )
+        # identity follows _SUBKEY_ORDER with localized layer labels;
+        # appearance sub-keys render raw keys in declared order.
+        self.assertEqual(
+            block,
+            "身分：\n公開身分：公會註冊冒險者\n隱秘身分：流亡王女\n"
+            "外觀：\nheight：160cm\nattire：旅裝\n人脈：\n悠奈：舊識",
+        )
+        prose = PersonaStore(entity).flatten(
+            ("personality", "life_story", "habit", "background")
+        )
+        self.assertEqual(
+            prose,
+            "性格：沉穩\n人生經歷：邊境小村\n習慣：清晨練劍\n背景：來自南境的旅人",
+        )
+
+    @covers_requirement("player-character-creation::the-preset-registry-declares-a-full-persona-in-import-card-shape")
+    def test_empty_persona_record_is_the_six_key_record_flattening_to_none(self):
+        from world.lore.player_presets import PresetPersona
+        from world.rules.character_creation import PERSONA_IMPORT_CARD_KEYS
+
+        record = PresetPersona().to_record()
+        self.assertEqual(set(record), set(PERSONA_IMPORT_CARD_KEYS))
+        self.assertNotIn("background", record)
+        self.assertIsNone(PersonaStore(_FakeEntity(record)).flatten())
+        self.assertIsNone(
+            PersonaStore(_FakeEntity(record)).flatten(
+                ("identity", "personality", "life_story", "habit",
+                 "appearance", "social_connection", "background")
+            )
+        )
+
+    @covers_requirement("player-character-creation::the-preset-registry-declares-a-full-persona-in-import-card-shape")
+    def test_public_view_prunes_the_hidden_identity_layer(self):
+        from world.lore.player_presets import PresetIdentity, PresetPersona
+
+        record = PresetPersona(
+            identity=PresetIdentity(public="公會註冊冒險者", hidden="流亡王女"),
+        ).to_record()
+        public = PersonaStore(_FakeEntity(record)).public_view()
+        identity = public.get("identity")
+        self.assertEqual(identity, {"public": "公會註冊冒險者"})
+        block = public.flatten(("identity",))
+        self.assertEqual(block, "身分：\n公開身分：公會註冊冒險者")
+        self.assertNotIn("流亡王女", block)
+        # A hidden-only identity prunes to an empty subtree rendering nothing.
+        hidden_only = PresetPersona(
+            identity=PresetIdentity(hidden="間諜"),
+        ).to_record()
+        self.assertIsNone(
+            PersonaStore(_FakeEntity(hidden_only)).public_view().flatten(("identity",))
+        )
+        # The stored record itself is never mutated.
+        self.assertEqual(record["identity"], {"public": "公會註冊冒險者", "hidden": "流亡王女"})
+
+
+
 if __name__ == "__main__":
     unittest.main()
