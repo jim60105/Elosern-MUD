@@ -18,6 +18,7 @@ from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
     MAX_PERSONA_FIELD_LENGTH,
+    PERSONA_IMPORT_CARD_KEYS,
     CharacterCreationError,
     CharacterCreationRequest,
     activate_player_character,
@@ -800,6 +801,87 @@ class PersonaActivationTests(EvenniaTest):
             self.assertTrue(self.character.creation_pending)
             self.assertEqual(self.character.traits.all(), [])
             self.assertFalse(self.character.attributes.has("persona"))
+
+    @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-persona")
+    def test_preset_activation_persists_the_registry_persona_record(self):
+        # preset-persona-activation: the registry persona finally reaches
+        # entity.db.persona inside the same activation transaction.
+        preset = PLAYER_PRESET_REGISTRY["yuna_darknight"]
+        activate_player_character(
+            self.account, self.character,
+            CharacterCreationRequest(mode="preset", preset_key="yuna_darknight"),
+        )
+        self.assertFalse(self.character.creation_pending)
+        self.assertEqual(dict(self.character.db.persona), preset.persona.to_record())
+        self.assertTrue(self.character.db.persona["background"])
+
+    @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-persona")
+    def test_preset_and_custom_records_carry_the_import_card_key_set_plus_optional_background(self):
+        custom = create_object(PlayerCharacter, key="creator-shell-custom-keys")
+        self.account.at_post_create_character(custom)
+        activate_player_character(
+            self.account, custom, self.request(), persona=PERSONA_BLOCK
+        )
+        preset_shell = create_object(PlayerCharacter, key="creator-shell-preset-keys")
+        self.account.at_post_create_character(preset_shell)
+        activate_player_character(
+            self.account, preset_shell,
+            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+        )
+        # The six import-card keys are identical in both modes; ``background``
+        # is present in each record only when that source supplied one.
+        self.assertEqual(
+            set(custom.db.persona), set(PERSONA_IMPORT_CARD_KEYS)
+        )
+        self.assertEqual(
+            set(preset_shell.db.persona),
+            set(PERSONA_IMPORT_CARD_KEYS) | {"background"},
+        )
+
+    @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-persona")
+    def test_preset_persona_write_failure_rolls_back_the_whole_activation(self):
+        old_key = self.character.key
+
+        def fail(stage):
+            if stage == "persona":
+                raise RuntimeError("injected preset persona failure")
+
+        with self.assertRaisesRegex(RuntimeError, "injected preset persona failure"):
+            activate_player_character(
+                self.account, self.character,
+                CharacterCreationRequest(mode="preset", preset_key="foxkin_scout"),
+                write_observer=fail,
+            )
+        self.assertEqual(self.character.key, old_key)
+        self.assertTrue(self.character.creation_pending)
+        self.assertIsNone(self.character.db.persona)
+        self.assertEqual(self.character.traits.all(), [])
+        self.assertIsNone(self.character.db.age)
+        self.assertIsNone(self.character.db.skills)
+        self.assertIsNone(self.character.db.inventory)
+
+    def test_preset_mode_takes_precedence_over_a_custom_persona_argument(self):
+        # ``persona`` is custom-mode only: the shared builder's preset branch
+        # wins even if a mixed call hypothetically supplied one, so the
+        # registry record can never be silently replaced by draft prose.
+        from world.rules.character_creation import _ValidatedCreation, _persona_record_for
+
+        validated = _ValidatedCreation(
+            "艾琳", 24, 24, "human", "human_commoner", {}
+        )
+        record = _persona_record_for(
+            validated,
+            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+            PERSONA_BLOCK,
+        )
+        self.assertEqual(
+            record, PLAYER_PRESET_REGISTRY["human_wanderer"].persona.to_record()
+        )
+        # The shipped card's prose stays empty: the persona argument lost.
+        self.assertEqual(record["personality"], "")
 
 
 class SexCreationTests(EvenniaTest):

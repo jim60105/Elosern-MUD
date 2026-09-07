@@ -11,7 +11,7 @@ concept draft stage and its fingerprint-protected apply service).
 ## Requirements
 
 ### Requirement: Activation persists the persona block in the import-card shape
-When the custom draft carries a non-null persona block, `activate_player_character()` SHALL write `entity.db.persona` as a dict with the import-card keys (identity/personality/life_story/habit/appearance/social_connection), the block filling the three prose fields and the remaining keys stored as empty containers, inside the same all-or-nothing activation transaction; a persona write failure SHALL roll back activation, and a draft with a null persona SHALL write nothing beyond the background rule below. The persona block SHALL be read from the custom draft — no concept-stage state exists to consult. When the draft carries a player-authored bounded background field, the same activation transaction SHALL additionally store that text under the persona record's `background` key (kept separate from the three prose fields), so a custom character's background survives activation; a draft without a background SHALL omit the key. `world/rules/character_creation.py` SHALL be the sole writer of creation-generated persona; `world/imports/loader.py` remains the import-time writer and is unchanged.
+`activate_player_character()` SHALL persist a persona record for both creation modes through one shared record builder in `world/rules/character_creation.py`, written inside the same all-or-nothing activation transaction; a persona write failure SHALL roll back activation in either mode. In custom mode, when the draft carries a non-null persona block, the written `entity.db.persona` SHALL be a dict with the import-card keys (identity/personality/life_story/habit/appearance/social_connection), the block filling the three prose fields and the remaining keys stored as empty containers, and a custom draft with a null persona SHALL write nothing beyond the background rule below. The persona block SHALL be read from the custom draft — no concept-stage state exists to consult. When the draft carries a player-authored bounded background field, the same activation transaction SHALL additionally store that text under the persona record's `background` key (kept separate from the three prose fields), so a custom character's background survives activation; a draft without a background SHALL omit the key. In preset mode, the record SHALL come from the selected preset's declared persona and SHALL carry the same six import-card keys, so no downstream consumer needs a mode-dependent branch. `world/rules/character_creation.py` SHALL be the sole writer of creation-generated persona; `world/imports/loader.py` remains the import-time writer and is unchanged.
 
 #### Scenario: A custom draft persists its persona at activation
 - **WHEN** a pending character activates with a custom draft carrying a non-null persona block
@@ -25,9 +25,13 @@ When the custom draft carries a non-null persona block, `activate_player_charact
 - **WHEN** a write failure is injected into the persona-persistence step of the activation transaction
 - **THEN** activation rolls back entirely, the character remains pending, and no canonical identity, trait, or persona state is written
 
-#### Scenario: A draft without persona or background writes nothing
-- **WHEN** a pending character activates with a draft whose persona is null and that has no background
+#### Scenario: A custom draft without persona or background writes nothing
+- **WHEN** a pending character activates with a custom draft whose persona is null and that has no background
 - **THEN** `entity.db.persona` remains absent and activation behaves exactly as before
+
+#### Scenario: A preset draft persists the registry persona
+- **WHEN** a pending character activates with a preset draft
+- **THEN** `entity.db.persona` is written from the preset's declared persona with the same six import-card keys, inside the same all-or-nothing transaction
 
 
 ### Requirement: The background survives the draft, concept, custom-save, and activation journey
