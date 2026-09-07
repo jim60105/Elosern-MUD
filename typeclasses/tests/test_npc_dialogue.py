@@ -21,10 +21,11 @@ from tools.spec_traceability import covers_requirement
 from django.test import override_settings
 from twisted.internet import defer
 
-from evennia.utils.create import create_object
+from evennia.utils.create import create_account, create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
+from typeclasses.accounts import Account
 from typeclasses.components import ScriptedDialogue
 from typeclasses.npcs import LLMNPC
 from world.ai import guardrail
@@ -35,6 +36,10 @@ from world.ai.npc_dialogue import (
 )
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
+from world.rules.character_creation import (
+    CharacterCreationRequest,
+    activate_player_character,
+)
 from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
 from world.rules.affinity import apply_affinity_change
 from world.rules.npc_intents import is_stale_context
@@ -636,7 +641,114 @@ class LLMNPCSeamTests(EvenniaTest):
         self.assertEqual(self.npc.relations.affinity_for(self.player), 2)
 
 
+class PresetPersonaDialogueTests(EvenniaTest):
+    """A preset activation's persona record reaches the dialogue surface
+    (preset-persona-activation).
+
+    Every shipped card currently declares background prose only, which the
+    dialogue policy excludes from the player block in BOTH modes, so the
+    resolves-a-block scenario patches one registry entry (``patch.dict`` plus
+    ``dataclasses.replace`` on the frozen card) to declare dialogue-visible
+    fields — proving the write→PersonaStore→prompt seam — while the companion
+    test pins the shipped background-only outcome as the documented policy.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
+        _reset_all()
+        register_npc_dialogue()
+        self.account = create_account(
+            "preset-creator", "preset@example.test", "testpassword",
+            typeclass=Account,
+        )
+        self.character = create_object(PlayerCharacter, key="preset-shell")
+        self.account.at_post_create_character(self.character)
+        self.character.location = self.room1
+        self.npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
+
+    def tearDown(self):
+        _reset_all()
+        super().tearDown()
+
+    def _activate_preset(self, preset_key):
+        activate_player_character(
+            self.account, self.character,
+            CharacterCreationRequest(mode="preset", preset_key=preset_key),
+        )
+
+    @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    @covers_requirement("persona-dialogue-injection::the-player-s-persona-feeds-the-user-payload-as-player-persona")
+    def test_preset_declaring_public_fields_resolves_the_player_block(self):
+        from dataclasses import replace
+
+        from world.lore.player_presets import (
+            PLAYER_PRESET_REGISTRY,
+            PresetAppearance,
+            PresetIdentity,
+            PresetPersona,
+        )
+
+        base = PLAYER_PRESET_REGISTRY["human_wanderer"]
+        declared = replace(
+            base,
+            persona=replace(
+                base.persona,
+                identity=PresetIdentity(public="流浪劍士", hidden="亡國公主"),
+                appearance=PresetAppearance(overview="灰瞳長髮"),
+                social_connection=(("艾琳之父", "失散的家人"),),
+            ),
+        )
+        with patch.dict(
+            "world.lore.player_presets.PLAYER_PRESET_REGISTRY",
+            {"human_wanderer": declared},
+        ):
+            self._activate_preset("human_wanderer")
+        self.character.apply_race_baseline()
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _reply_text(speech="久等了。"))
+        with patch.object(self.character, "msg"):
+            await_result(self.npc.at_talked_to("你好", self.character, client))
+        parsed = json.loads(client.calls[0].messages[-1]["content"])
+        persona_block = parsed["player"]["persona"]
+        self.assertIn("公開身分：流浪劍士", persona_block)
+        self.assertIn("外觀：", persona_block)
+        self.assertIn("overview：灰瞳長髮", persona_block)
+        self.assertIn("人脈：", persona_block)
+        self.assertIn("艾琳之父：失散的家人", persona_block)
+        # The public-view policy keeps the hidden layer out by construction.
+        self.assertNotIn("隱秘身分", persona_block)
+        self.assertNotIn("亡國公主", persona_block)
+
+    @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    @covers_requirement("persona-dialogue-injection::the-player-s-persona-feeds-the-user-payload-as-player-persona")
+    def test_shipped_background_only_preset_writes_record_without_block(self):
+        # The shipped cards are background-only; the dialogue policy excludes
+        # background (and prose) from the player block in both creation modes.
+        # The record still survives activation for persona_edit and look.
+        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+
+        preset = PLAYER_PRESET_REGISTRY["elosia_shadowmoon"]
+        self._activate_preset("elosia_shadowmoon")
+        self.assertEqual(dict(self.character.db.persona), preset.persona.to_record())
+        self.assertTrue(self.character.db.persona["background"])
+        self.character.apply_race_baseline()
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, _reply_text(speech="幸會。"))
+        with patch.object(self.character, "msg"):
+            await_result(self.npc.at_talked_to("你好", self.character, client))
+        parsed = json.loads(client.calls[0].messages[-1]["content"])
+        self.assertNotIn("persona", parsed["player"])
+        system = client.calls[0].messages[0]["content"]
+        self.assertNotIn(preset.persona.background[:20], system)
+        self.assertNotIn("背景：", system)
+
+
 class LLMNPCDeferredImportTests(unittest.TestCase):
+    """Deferred-import contract for the dialogue typeclass."""
+
     @covers_requirement("npc-dialogue::the-llmnpc-entity-provides-chat-memory-thinking-state-and-a-dialogue-seam")
     def test_typeclass_import_stays_clear_of_module_scope_generative_imports(self):
         source = (

@@ -452,6 +452,62 @@ def finalize_player_portrait(character: Any) -> None:
     schedule_portrait_ensure(character)
 
 
+def _persona_record_for(
+    validated: _ValidatedCreation,
+    request: CharacterCreationRequest,
+    persona: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Build the persona record this activation writes, or ``None`` for no write.
+
+    The single shared record builder (preset-persona-activation): both
+    creation modes converge here, and ``activate_player_character`` stays the
+    sole creation-time persona writer.
+
+    Preset mode returns the registry's validated persona expanded through
+    ``PresetPersona.to_record()``, which always carries the six
+    ``PERSONA_IMPORT_CARD_KEYS`` and adds ``background`` only when authored;
+    the prose length bound was already swept at module import, so no
+    re-validation runs here. ``persona`` is custom-mode only: no caller ever
+    supplies it for a preset request, and the preset branch takes precedence.
+
+    Custom mode keeps its two historical branches byte-identical: the
+    validated draft persona block fills the three prose fields of the six-key
+    import-card record (empty containers for the rest), and a draft with only
+    a bounded background still persists an import-card-shaped record so the
+    owner can inspect and update the flavor text
+    (creation-persona-persistence D4). A draft with neither writes nothing.
+    """
+    if request.mode == "preset":
+        return PLAYER_PRESET_REGISTRY[request.preset_key].persona.to_record()
+    if persona is not None:
+        checked_persona = _validate_persona_block(persona)
+        persona_record: dict[str, Any] = {
+            "identity": {},
+            "personality": checked_persona["personality"],
+            "life_story": checked_persona["life_story"],
+            "habit": checked_persona["habit"],
+            "appearance": {},
+            "social_connection": {},
+        }
+        if validated.background is not None:
+            persona_record["background"] = validated.background
+        return persona_record
+    if validated.background is not None:
+        # A custom draft with a background but a null persona block still
+        # persists an import-card-shaped record so the owner can inspect and
+        # update the flavor text (creation-persona-persistence D4).
+        return {
+            "identity": {},
+            "personality": "",
+            "life_story": "",
+            "habit": "",
+            "appearance": {},
+            "social_connection": {},
+            "background": validated.background,
+        }
+    return None
+
+
 def activate_player_character(
     account: Any,
     character: Any,
@@ -466,6 +522,8 @@ def activate_player_character(
     (retool-concept-transient-fill D4): when present it is validated
     deterministically and persisted as the six-key import-card record inside
     the same all-or-nothing transaction; when absent nothing is written.
+    The parameter is custom-mode only -- preset mode always builds its record
+    from the registry's validated persona (preset-persona-activation).
 
     The retired magic sampler is gone (D-A5): ``magic_power`` arrives as the
     seventh allocated static axis, so activation writes exactly what the
@@ -512,32 +570,7 @@ def activate_player_character(
         "sex": validated.sex,
         "nation": validated.nation,
     }
-    persona_record = None
-    if persona is not None:
-        checked_persona = _validate_persona_block(persona)
-        persona_record = {
-            "identity": {},
-            "personality": checked_persona["personality"],
-            "life_story": checked_persona["life_story"],
-            "habit": checked_persona["habit"],
-            "appearance": {},
-            "social_connection": {},
-        }
-        if validated.background is not None:
-            persona_record["background"] = validated.background
-    elif validated.background is not None:
-        # A custom draft with a background but a null persona block still
-        # persists an import-card-shaped record so the owner can inspect and
-        # update the flavor text (creation-persona-persistence D4).
-        persona_record = {
-            "identity": {},
-            "personality": "",
-            "life_story": "",
-            "habit": "",
-            "appearance": {},
-            "social_connection": {},
-            "background": validated.background,
-        }
+    persona_record = _persona_record_for(validated, request, persona)
     old_key = character.key
     attribute_snapshots = snapshot_attributes(character, _CREATION_ATTRIBUTE_KEYS)
     trait_snapshot = snapshot_traits(character)

@@ -19,6 +19,10 @@ A preset-created character's persona record SHALL carry the same six
 `PERSONA_IMPORT_CARD_KEYS` a custom-created character's record carries, so no
 consumer — `PersonaStore`, the dialogue prompt builder, or
 `world/rules/persona_edit.py` — needs a mode-dependent branch.
+Whether any of those consumers renders anything is the consumer's own
+mode-blind policy: a record whose dialogue-visible fields are all empty
+produces no player dialogue block in either creation mode, exactly as
+`persona-dialogue-injection` already dictates for custom records.
 
 #### Scenario: A preset activation persists the registry persona
 - **WHEN** a pending player activates a shipped preset whose registry entry declares a persona
@@ -33,8 +37,12 @@ consumer — `PersonaStore`, the dialogue prompt builder, or
 - **THEN** activation rolls back entirely, the character remains pending, and no identity, trait, skill, inventory, or persona state survives
 
 #### Scenario: A preset character reaches the dialogue persona surface
-- **WHEN** an NPC builds its dialogue context for a preset-created character
-- **THEN** the player persona block resolves from the written record instead of being absent
+- **WHEN** an NPC builds its dialogue context for a preset-created character whose declared persona carries dialogue-visible fields (identity, appearance, or social_connection)
+- **THEN** the player persona block resolves from the written record instead of being absent, with the hidden identity layer excluded by the public-view policy
+
+#### Scenario: A background-only preset record renders no dialogue block
+- **WHEN** an NPC builds its dialogue context for a character created from a preset whose persona declares only a background
+- **THEN** the persona record is written with the background intact, and no player persona block is injected — the same policy-excluded outcome a custom background-only record produces
 
 #### Scenario: Custom activation output is unchanged
 - **WHEN** a custom draft carrying a persona block and a background activates

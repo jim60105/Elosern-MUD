@@ -7,11 +7,17 @@ supplied custom persona block, or a non-null `validated.background` — and
 so neither branch fires and `character.attributes.add("persona", ...)` never
 runs.
 
-The consequence is visible in play: `world/ai/npc_dialogue.py`'s
-`PLAYER_PERSONA_FIELDS` (`identity`, `appearance`, `social_connection`) resolves
-to nothing for a preset character, so NPCs converse with a blank slate. A
-hand-built custom character is richer in AI narrative than a shipped signature
-character — the opposite of the intent.
+The consequence is structural, not card-specific: whatever persona a preset
+declares, none of it is ever persisted, so `PersonaStore`, the
+`world/ai/npc_dialogue.py` player block (`identity`, `appearance`,
+`social_connection`), and `world/rules/persona_edit.py` all see a preset
+character with no record at all. A card that declares dialogue-visible fields
+would still reach NPCs as a blank slate, while an equivalent hand-built custom
+character reaches them in full — the opposite of the intent. (The eight cards
+currently shipped declare background prose only, which the dialogue policy
+already excludes from the player block in both modes; what this change fixes
+is the record itself, so every consumer's mode-blind policy finally has data
+to read.)
 
 `preset-persona-model` gave the registry a validated persona. This change makes
 activation persist it.
