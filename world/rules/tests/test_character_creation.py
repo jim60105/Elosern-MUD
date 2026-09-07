@@ -803,6 +803,7 @@ class PersonaActivationTests(EvenniaTest):
             self.assertFalse(self.character.attributes.has("persona"))
 
     @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-persona")
     def test_preset_activation_persists_the_registry_persona_record(self):
         # preset-persona-activation: the registry persona finally reaches
         # entity.db.persona inside the same activation transaction.
@@ -816,6 +817,7 @@ class PersonaActivationTests(EvenniaTest):
         self.assertTrue(self.character.db.persona["background"])
 
     @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-persona")
     def test_preset_and_custom_records_carry_the_import_card_key_set_plus_optional_background(self):
         custom = create_object(PlayerCharacter, key="creator-shell-custom-keys")
         self.account.at_post_create_character(custom)
@@ -839,6 +841,7 @@ class PersonaActivationTests(EvenniaTest):
         )
 
     @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-persona")
     def test_preset_persona_write_failure_rolls_back_the_whole_activation(self):
         old_key = self.character.key
 

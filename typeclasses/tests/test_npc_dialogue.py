@@ -681,6 +681,7 @@ class PresetPersonaDialogueTests(EvenniaTest):
 
     @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
     @covers_requirement("persona-dialogue-injection::the-player-s-persona-feeds-the-user-payload-as-player-persona")
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-persona")
     def test_preset_declaring_public_fields_resolves_the_player_block(self):
         from dataclasses import replace
 
@@ -724,6 +725,7 @@ class PresetPersonaDialogueTests(EvenniaTest):
 
     @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
     @covers_requirement("persona-dialogue-injection::the-player-s-persona-feeds-the-user-payload-as-player-persona")
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-persona")
     def test_shipped_background_only_preset_writes_record_without_block(self):
         # The shipped cards are background-only; the dialogue policy excludes
         # background (and prose) from the player block in both creation modes.
