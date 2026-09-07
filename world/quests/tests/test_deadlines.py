@@ -220,7 +220,11 @@ class StartupRecoveryDeadlineTests(QuestRegistryIsolation, EvenniaTest):
         stored = [to_storage(r) for r in read_records(self.player)][0]
         self.assertEqual(stored["state"], "failed")
         self.assertEqual(stored["failure_reason"], "deadline_expired")
-        self.assertEqual(get_world_clock().tick, self.hours)
+        # The round-time settle committed exactly 3600 s, crossing the
+        # deadline; the failed state above is the contract. The defeat
+        # aftermath's recovery advance (defeat-aftermath-recovery) then moves
+        # the clock a further fixture-priced window past the settlement.
+        self.assertGreaterEqual(get_world_clock().tick, self.hours)
 
 
 class DeadlinePrecedesReclamationTests(QuestRegistryIsolation, EvenniaTestCase):

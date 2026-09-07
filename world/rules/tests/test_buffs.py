@@ -448,6 +448,34 @@ class BuffIntegrationTests(EvenniaTestCase):
         _add_buff(entity, "defeat_weak")
         self.assertIn("defeat_weak", entity_active_buffs(entity))
 
+    def test_buff_aftermath_residue(self):
+        definition = BUFF_DEFINITIONS["aftermath_residue"]
+        self.assertEqual(definition.duration, 900)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(
+            definition.modifiers,
+            {"bounds": [{"target": "agility", "ceiling": -2}]},
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "aftermath_residue")
+        self.assertIn("aftermath_residue", entity_active_buffs(entity))
+
+    def test_buff_aftermath_humiliated(self):
+        definition = BUFF_DEFINITIONS["aftermath_humiliated"]
+        self.assertEqual(definition.duration, 600)
+        self.assertEqual(definition.stacking, "refresh")
+        self.assertEqual(definition.polarity, "debuff")
+        self.assertEqual(
+            definition.modifiers,
+            {"bounds": [{"target": "accuracy", "ceiling": -3}]},
+        )
+
+        entity = self._entity()
+        _add_buff(entity, "aftermath_humiliated")
+        self.assertIn("aftermath_humiliated", entity_active_buffs(entity))
+
     @covers_requirement("skill-registry::skill-registry-contains-the-full-暗-element-spell-set")
     def test_buff_dark_corrosion(self):
         definition = BUFF_DEFINITIONS["dark_corrosion"]

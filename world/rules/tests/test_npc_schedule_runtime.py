@@ -932,7 +932,13 @@ class StartupClockSourceOrderTests(BattlefieldIsolation, RegistryIsolationMixin,
             restore_persisted_sessions()
 
         self.assertEqual(captured["total_seconds"], 6)
-        self.assertEqual(get_world_clock().tick, 6)
+        # The core settlement committed its full 6 s (captured above) with the
+        # npc-schedule source registered, settling the tick-3 occurrence inside
+        # that window (asserted below). The defeat aftermath's recovery advance
+        # (defeat-aftermath-recovery) then moves the clock a further
+        # fixture-priced window, so the settlement itself is proven by the
+        # captured total and the settled occurrence, not an absolute total.
+        self.assertGreaterEqual(get_world_clock().tick, 6)
         self.assertEqual(self.npc.db.schedule_state, "resting")
         self.assertTrue(
             any(

@@ -446,11 +446,22 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
             #    session: the monster's solid hit floors the weakened player
             #    on its initiative turn. Both elapsed rounds settle (12 s).
             self.player.traits.hp.current = 40
+            settled: list[int] = []
+            from world.rules.combat_session import settle_combat_result as real_settle
+
+            def spy(result_, entities_):
+                settled.append(result_.total_seconds)
+                return real_settle(result_, entities_)
+
             with (
                 patch("world.rules.combat.roll_d100", return_value=100),
                 patch(
                     "world.rules.monster_behaviour._should_flee",
                     return_value=False,
+                ),
+                patch(
+                    "world.rules.combat_session.settle_combat_result",
+                    side_effect=spy,
                 ),
             ):
                 result = submit_player_action(
@@ -459,7 +470,12 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
                     [self.monster, self.companion],
                 )
             self.assertEqual(result["outcome"], "defeat")
-            self.assertEqual(clock.tick, 12)
+            # The round-time settlement ran exactly once for exactly 12 s.
+            # The defeat aftermath's recovery advance (defeat-aftermath-
+            # recovery) is a further, separately priced advance, so the
+            # final tick is the 12 s settle plus that fixture-priced window.
+            self.assertEqual(settled, [12])
+            self.assertGreaterEqual(clock.tick, 12)
             self.assertIsNone(self.player.db.active_combat)
             self.assertFalse(is_in_active_session(self.player))
 
