@@ -90,7 +90,7 @@ def creation_start_screen() -> str:
         race = RACE_REGISTRY[preset.race]
         lines.append(
             f"  {key}（{preset.display_name}）：{race.description} "
-            f"｜配點：{preset.emphasis}｜背景：{preset.background}"
+            f"｜配點：{preset.emphasis}｜背景：{preset.persona.background}"
         )
     lines.append("請選擇角色建立方式。")
     lines.append(f"預設角色：character preset <key>（{'、'.join(PLAYER_PRESET_REGISTRY)}）")

@@ -1,12 +1,95 @@
 """Immutable starter characters offered during account registration."""
 
-from dataclasses import KW_ONLY, dataclass
+from dataclasses import KW_ONLY, asdict, dataclass, fields
+from typing import Any
 
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.lore.sex import SEX_VALUES
 from world.skills.registry import SKILL_REGISTRY, SkillKind
+
+# The persona prose values the lore-side validator requires to be strings; the
+# identity layers and appearance sub-keys are checked through their own
+# dataclass field sets.
+_PERSONA_PROSE_FIELDS = ("personality", "life_story", "habit", "background")
+
+
+@dataclass(frozen=True)
+class PresetIdentity:
+    """The two identity layers PersonaStore renders (公開身分／隱秘身分)."""
+
+    public: str = ""
+    hidden: str = ""
+
+
+@dataclass(frozen=True)
+class PresetAppearance:
+    """The seven appearance sub-keys declared in persona.py::_SUBKEY_ORDER."""
+
+    height: str = ""
+    weight: str = ""
+    measurement: str = ""
+    style: str = ""
+    overview: str = ""
+    attire: str = ""
+    feature: str = ""
+
+
+@dataclass(frozen=True)
+class PresetPersona:
+    """One preset's authored persona, in import-card record shape.
+
+    Every value is optional and defaults to empty so a card can be authored
+    incrementally; mutable containers are tuples of pairs to keep the registry
+    immutable, and ``to_record()`` is the single place that expands them.
+    """
+
+    identity: PresetIdentity = PresetIdentity()
+    personality: str = ""
+    life_story: str = ""
+    habit: str = ""
+    appearance: PresetAppearance = PresetAppearance()
+    social_connection: tuple[tuple[str, str], ...] = ()  # name -> relationship
+    background: str = ""
+
+    def to_record(self) -> dict[str, Any]:
+        """Return the storage shape written to ``character.db.persona``.
+
+        All six ``PERSONA_IMPORT_CARD_KEYS`` are always present (``""`` for
+        unauthored prose, ``{}`` for unauthored structured keys), matching what
+        custom activation and ``world.rules.persona_edit`` already produce; an
+        empty ``identity`` layer is dropped from the identity subtree, empty
+        appearance sub-keys are dropped, and ``background`` appears only when
+        non-empty. ``social_connection`` stores the flat name -> relationship
+        mapping (the one-level shape PersonaStore renders as
+        ``名字：關係`` lines; the nested import-card form is its general case).
+        The literal key set below mirrors
+        ``world.rules.character_creation.PERSONA_IMPORT_CARD_KEYS``; lore must
+        not import rules, and a rules-side test
+        (``world/rules/tests/test_persona.py``) pins the two in lock step.
+        """
+        identity: dict[str, str] = {}
+        if self.identity.public:
+            identity["public"] = self.identity.public
+        if self.identity.hidden:
+            identity["hidden"] = self.identity.hidden
+        appearance = {
+            sub_key: value
+            for sub_key, value in asdict(self.appearance).items()
+            if value
+        }
+        record: dict[str, Any] = {
+            "identity": identity,
+            "personality": self.personality,
+            "life_story": self.life_story,
+            "habit": self.habit,
+            "appearance": appearance,
+            "social_connection": dict(self.social_connection),
+        }
+        if self.background:
+            record["background"] = self.background
+        return record
 
 
 @dataclass(frozen=True)
@@ -26,7 +109,6 @@ class PlayerPreset:
     subrace: str
     allocations: tuple[tuple[str, int], ...]
     emphasis: str
-    background: str
     active_skills: tuple[str, ...] = ()
     passive_skills: tuple[str, ...] = ()
     affinity_elements: tuple[str, ...] = ()
@@ -34,10 +116,12 @@ class PlayerPreset:
     # KW_ONLY from the first preset-parity field onward (field-parity design
     # 3.2): ``sex`` is a required keyword argument, so a new card that omits
     # it fails at construction instead of silently inheriting DEFAULT_SEX.
-    # The marker sits after every existing field, so all current positional
-    # bindings on the shipped cards stay unchanged.
+    # Removing the positional ``background`` slot shifted the former trailing
+    # positional arguments, so every shipped card now passes the skill,
+    # affinity, and persona fields by keyword.
     _: KW_ONLY
     sex: str
+    persona: PresetPersona = PresetPersona()
 
     def allocation_dict(self) -> dict[str, int]:
         """Return a mutable copy suitable for rules validation."""
@@ -62,114 +146,154 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         (("hp", 50), ("mp", 50), ("sp", 50), ("atk_phys", 10),
          ("agility", 10), ("defense", 11), ("magic_power", 43)),
         "生命力與魔力均衡的開局配點",
-        "來自南境的年輕旅人，腰間掛著一把磨亮的長劍，追逐著地圖邊緣未標記的空白。"
-        "剛在公會登記為新人冒險者，均衡的劍術與基礎強化讓她對什麼委託都躍躍欲試。",
-        ("light_sword_style",),
-        ("body_enhancement_basic",),
+        active_skills=("light_sword_style",),
+        passive_skills=("body_enhancement_basic",),
         starting_items=(("plain_sword", 1), ("leather_armor", 1),
                         ("guild_recruit_badge", 1), ("healing_potion", 2),
                         ("healing_herb", 2)),
         sex="female",
+        persona=PresetPersona(
+            background=(
+                "來自南境的年輕旅人，腰間掛著一把磨亮的長劍，追逐著地圖邊緣未標記的空白。"
+                "剛在公會登記為新人冒險者，均衡的劍術與基礎強化讓她對什麼委託都躍躍欲試。"
+            ),
+        ),
     ),
     "foxkin_scout": PlayerPreset(
         "foxkin_scout", "露芙", 22, 22, "beastfolk", "foxkin",
         (("hp", 25), ("mp", 10), ("sp", 25), ("atk_phys", 15),
          ("agility", 15), ("defense", 15), ("magic_power", 14)),
         "敏捷與近身作戰優先的斥候配點",
-        "出身獸王國瓦爾哈拉的狐人斥候，身手矯健，習慣走在隊伍前方探路。"
-        "疾風術與瞬步是她的雙腿，總能在危險降臨之前，先把消息帶回夥伴身邊。",
-        ("gale_step",),
-        ("flash_step",),
-        ("wind",),
+        active_skills=("gale_step",),
+        passive_skills=("flash_step",),
+        affinity_elements=("wind",),
         starting_items=(("hunters_longbow", 1), ("hunting_throwing_axe", 1),
                         ("leather_armor", 1), ("wolf_fang_necklace", 1),
                         ("healing_potion", 1), ("healing_herb", 3)),
         sex="female",
+        persona=PresetPersona(
+            background=(
+                "出身獸王國瓦爾哈拉的狐人斥候，身手矯健，習慣走在隊伍前方探路。"
+                "疾風術與瞬步是她的雙腿，總能在危險降臨之前，先把消息帶回夥伴身邊。"
+            ),
+        ),
     ),
     "elf_guardian": PlayerPreset(
         "elf_guardian", "瑟芮雅", 180, 24, "elf", "fionnen",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 12),
          ("agility", 12), ("defense", 13), ("magic_power", 400)),
         "防禦與均衡戰技優先的守護者配點",
-        "斐歐恩森林出身的精靈族護衛，以長壽的眼光看待短暫的人類王國。"
-        "硬化肌膚與防禦直覺讓她成為隊伍最可靠的盾，守護他人的意志遠勝於爭勝之心。",
-        ("hardened_skin",),
-        ("defense_instinct", "elf_longevity"),
+        active_skills=("hardened_skin",),
+        passive_skills=("defense_instinct", "elf_longevity"),
         starting_items=(("knight_blade", 1), ("iron_shield", 1),
                         ("chainmail", 1), ("pilgrim_medallion", 1),
                         ("healing_potion", 1)),
         sex="female",
+        persona=PresetPersona(
+            background=(
+                "斐歐恩森林出身的精靈族護衛，以長壽的眼光看待短暫的人類王國。"
+                "硬化肌膚與防禦直覺讓她成為隊伍最可靠的盾，守護他人的意志遠勝於爭勝之心。"
+            ),
+        ),
     ),
     "violet_altoria": PlayerPreset(
         "violet_altoria", "薇歐蕾特", 18, 18, "human", "human_royal",
         (("hp", 50), ("mp", 67), ("sp", 50), ("atk_phys", 4),
          ("agility", 5), ("defense", 5), ("magic_power", 43)),
         "魔力優先、體力與生命力兼顧的術師配點",
-        "阿爾托利亞王國的第一王女，成年禮後以風之術師的身份離開宮廷歷練。"
-        "過人的魔法陣理解與精準魔力控制，讓她的火球與風刃遠超同齡術師，"
-        "飛行術則使她習慣從高處俯瞰世界。",
-        ("fire_ball", "wind_blade"),
-        ("magic_circle_comprehension", "precise_mana_control", "flight"),
-        ("fire", "wind"),
+        active_skills=("fire_ball", "wind_blade"),
+        passive_skills=(
+            "magic_circle_comprehension", "precise_mana_control", "flight",
+        ),
+        affinity_elements=("fire", "wind"),
         starting_items=(("elven_traditional_robe", 1), ("royal_signet_ring", 1),
                         ("royal_heirloom_pendant", 1)),
         sex="female",
+        persona=PresetPersona(
+            background=(
+                "阿爾托利亞王國的第一王女，成年禮後以風之術師的身份離開宮廷歷練。"
+                "過人的魔法陣理解與精準魔力控制，讓她的火球與風刃遠超同齡術師，"
+                "飛行術則使她習慣從高處俯瞰世界。"
+            ),
+        ),
     ),
     "lidzia_rosenthal": PlayerPreset(
         "lidzia_rosenthal", "莉茲婭", 18, 18, "human", "human_noble",
         (("hp", 55), ("mp", 39), ("sp", 60), ("atk_phys", 9),
          ("agility", 10), ("defense", 8), ("magic_power", 43)),
         "體力與生命力優先、均衡的近侍劍術配點",
-        "世代侍奉王室的羅森塔爾家族之女，薇歐蕾特王女的貼身近侍。"
-        "輕劍術在護衛考核名列前茅，隨從武藝與護主本能，使她永遠站在主人與危險之間。",
-        ("light_sword_style",),
-        ("retainer_martial_training", "guardian_instinct"),
+        active_skills=("light_sword_style",),
+        passive_skills=("retainer_martial_training", "guardian_instinct"),
         starting_items=(("rose_crest_rapier", 1), ("black_maid_dress", 1),
                         ("silver_feather_earring", 1)),
         sex="female",
+        persona=PresetPersona(
+            background=(
+                "世代侍奉王室的羅森塔爾家族之女，薇歐蕾特王女的貼身近侍。"
+                "輕劍術在護衛考核名列前茅，隨從武藝與護主本能，使她永遠站在主人與危險之間。"
+            ),
+        ),
     ),
     "yuka_darknight": PlayerPreset(
         "yuka_darknight", "悠花", 18, 18, "elf", "ciaran",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 11),
          ("agility", 14), ("defense", 12), ("magic_power", 400)),
         "敏捷與攻擊優先的雙刀配點",
-        "暗影谷村出身的黑暗精靈雙刀使，罕見的黑短髮在銀髮同族中格外醒目。"
-        "宗師級雙刀流與影斬令她名聲在外，轉生祝福的武感使她總能先一步抵達對手要害。"
-        "陽光開朗，視戰鬥為與自身極限的對話。",
-        ("dual_blade_mastery", "shadow_slash"),
-        ("dual_wield_style", "blade_art_mastery", "extreme_endurance",
-         "body_enhancement_extreme", "reincarnation_boon_yuka"),
+        active_skills=("dual_blade_mastery", "shadow_slash"),
+        passive_skills=(
+            "dual_wield_style", "blade_art_mastery", "extreme_endurance",
+            "body_enhancement_extreme", "reincarnation_boon_yuka",
+        ),
         starting_items=(("shadow_blade", 1), ("shadow_blade_echo", 1),
                         ("dark_elf_ninja_garb", 1)),
         sex="female",
+        persona=PresetPersona(
+            background=(
+                "暗影谷村出身的黑暗精靈雙刀使，罕見的黑短髮在銀髮同族中格外醒目。"
+                "宗師級雙刀流與影斬令她名聲在外，轉生祝福的武感使她總能先一步抵達對手要害。"
+                "陽光開朗，視戰鬥為與自身極限的對話。"
+            ),
+        ),
     ),
     "yuna_darknight": PlayerPreset(
         "yuna_darknight", "悠奈", 18, 18, "elf", "ciaran",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 6),
          ("agility", 6), ("defense", 25), ("magic_power", 400)),
         "防禦特化的魔力體質配點",
-        "與雙胞胎妹妹一同離開暗影谷村的黑暗精靈，罕見的黑長髮與知性外表之下，"
-        "是將性魔法鑽研到極致的享樂主義者。精通火與闇屬性，"
-        "並以神之秘法觸及性愛系統的領域。",
-        ("divine_sexual_arts",),
-        ("fire_mastery", "dark_mastery", "divine_sexual_mastery",
-         "reincarnation_boon_yuna"),
+        active_skills=("divine_sexual_arts",),
+        passive_skills=(
+            "fire_mastery", "dark_mastery", "divine_sexual_mastery",
+            "reincarnation_boon_yuna",
+        ),
         starting_items=(("dark_elf_kimono", 1),),
         sex="female",
+        persona=PresetPersona(
+            background=(
+                "與雙胞胎妹妹一同離開暗影谷村的黑暗精靈，罕見的黑長髮與知性外表之下，"
+                "是將性魔法鑽研到極致的享樂主義者。精通火與闇屬性，"
+                "並以神之秘法觸及性愛系統的領域。"
+            ),
+        ),
     ),
     "elosia_shadowmoon": PlayerPreset(
         "elosia_shadowmoon", "伊洛希雅", 222, 24, "elf", "fionnen",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 10),
          ("agility", 10), ("defense", 17), ("magic_power", 400)),
         "防禦紮實、攻守均衡的魔導師配點",
-        "自稱兩百二十二歲的森林精靈術師，精通風與光的主宰級魔法，"
-        "也掌握統御術與狀態偽裝。她離開斐歐恩村落走入人類王國，"
-        "理由是「想看看短壽者們如何過日子」。",
-        ("dominion_art", "status_disguise"),
-        ("wind_mastery", "light_mastery", "body_enhancement",
-         "reincarnation_boon_elosia"),
+        active_skills=("dominion_art", "status_disguise"),
+        passive_skills=(
+            "wind_mastery", "light_mastery", "body_enhancement",
+            "reincarnation_boon_elosia",
+        ),
         starting_items=(("elven_traditional_robe", 1), ("crescent_earring", 1)),
         sex="female",
+        persona=PresetPersona(
+            background=(
+                "自稱兩百二十二歲的森林精靈術師，精通風與光的主宰級魔法，"
+                "也掌握統御術與狀態偽裝。她離開斐歐恩村落走入人類王國，"
+                "理由是「想看看短壽者們如何過日子」。"
+            ),
+        ),
     ),
 }
 
@@ -222,7 +346,7 @@ def _validate_preset_skill_kits(registry: dict[str, PlayerPreset]) -> None:
                 ):
                     raise ValueError(
                         f"preset {preset.key!r} declares divine-arts skill {key!r} "
-                        f"on a race without divine affinity"
+                        "on a race without divine affinity"
                     )
 
 
@@ -299,8 +423,79 @@ def _validate_preset_sex(registry: dict[str, PlayerPreset]) -> None:
             )
 
 
+def _validate_preset_personas(registry: dict[str, PlayerPreset]) -> None:
+    """Reject a persona that could never persist or render as an import-card record.
+
+    Mirrors the other preset validators' load-time stance: a non-string prose
+    value (including the identity layers and appearance sub-keys), a
+    non-``PresetIdentity`` identity, a non-``PresetAppearance`` appearance, or
+    a ``social_connection`` entry that is not a pair of strings raises at
+    import, so a malformed persona can never reach a player's activation.
+    Empty values are always legal so a card can be authored incrementally, and
+    duplicate ``social_connection`` names are rejected because the stored
+    name -> relationship mapping would silently drop the earlier pair. The
+    prose length bound is NOT checked here -- ``world/lore/`` must not import
+    ``world/rules/``, so ``world/rules/character_creation`` sweeps that bound
+    at its own import (field-parity design 3.1).
+    """
+    for preset in registry.values():
+        persona = preset.persona
+        if not isinstance(persona, PresetPersona):
+            raise ValueError(
+                f"preset {preset.key!r} declares a persona that is not a PresetPersona"
+            )
+        for field in _PERSONA_PROSE_FIELDS:
+            if not isinstance(getattr(persona, field), str):
+                raise ValueError(
+                    f"preset {preset.key!r} declares persona.{field} that is not text"
+                )
+        identity = persona.identity
+        if not isinstance(identity, PresetIdentity):
+            raise ValueError(
+                f"preset {preset.key!r} declares persona.identity that is not a "
+                "PresetIdentity"
+            )
+        for layer in ("public", "hidden"):
+            if not isinstance(getattr(identity, layer), str):
+                raise ValueError(
+                    f"preset {preset.key!r} declares persona.identity.{layer} "
+                    "that is not text"
+                )
+        appearance = persona.appearance
+        if not isinstance(appearance, PresetAppearance):
+            raise ValueError(
+                f"preset {preset.key!r} declares persona.appearance that is not a "
+                "PresetAppearance"
+            )
+        for sub_field in fields(PresetAppearance):
+            if not isinstance(getattr(appearance, sub_field.name), str):
+                raise ValueError(
+                    f"preset {preset.key!r} declares persona.appearance."
+                    f"{sub_field.name} that is not text"
+                )
+        seen_names: set[str] = set()
+        for entry in persona.social_connection:
+            if (
+                not isinstance(entry, tuple)
+                or len(entry) != 2
+                or not all(isinstance(part, str) for part in entry)
+            ):
+                raise ValueError(
+                    f"preset {preset.key!r} declares a social_connection entry that "
+                    "is not a (name, relationship) pair of strings"
+                )
+            name, _relationship = entry
+            if name in seen_names:
+                raise ValueError(
+                    f"preset {preset.key!r} declares duplicate social_connection "
+                    f"name {name!r}"
+                )
+            seen_names.add(name)
+
+
 _validate_preset_skill_kits(PLAYER_PRESET_REGISTRY)
 _validate_preset_identities(PLAYER_PRESET_REGISTRY)
 _validate_preset_affinity_elements(PLAYER_PRESET_REGISTRY)
 _validate_preset_starting_items(PLAYER_PRESET_REGISTRY)
 _validate_preset_sex(PLAYER_PRESET_REGISTRY)
+_validate_preset_personas(PLAYER_PRESET_REGISTRY)

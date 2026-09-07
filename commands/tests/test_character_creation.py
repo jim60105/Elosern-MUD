@@ -390,7 +390,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         for key, preset in PLAYER_PRESET_REGISTRY.items():
             self.assertIn(key, output)
             self.assertIn(preset.emphasis, output)
-            self.assertIn(preset.background, output)
+            self.assertIn(preset.persona.background, output)
         output = self.call(CmdCharacter(), "preset human_wanderer")
         self.assertIn("已建立", output)
         self.assertFalse(self.char1.creation_pending)
@@ -404,7 +404,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         for key, preset in PLAYER_PRESET_REGISTRY.items():
             self.assertIn(f"  {key}", screen)
             self.assertIn(preset.emphasis, screen)
-            self.assertIn(preset.background, screen)
+            self.assertIn(preset.persona.background, screen)
 
     @covers_requirement("character-creation-ux::custom-creation-mode-explains-its-prompts")
     def test_custom_prompts_carry_explanations(self):

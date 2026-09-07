@@ -41,7 +41,9 @@ real persona; the change that makes activation persist it follows separately.
   at or under `MAX_BACKGROUND_CODE_POINTS` (256), the bound the WebClient preset
   card descriptor already declares. Without it, an author using the full 600-code-point
   persona budget would silently overflow the creation panel's card contract.
-- `to_record()` omits empty strings and empty containers, so a minimally
+- `to_record()` always carries the six import-card keys (unauthored prose as
+  `""`, unauthored structured keys as `{}`) and omits only empty `identity`
+  layers, empty appearance sub-keys, and an empty `background`, so a minimally
   authored card still yields a valid import-card-shaped record.
 
 Activation still writes no persona for a preset; that is `preset-persona-activation`.

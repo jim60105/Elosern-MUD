@@ -277,7 +277,7 @@ def build_preset_cards() -> tuple[PresetCardView, ...]:
                 race_description=race.description,
                 subrace=preset.subrace,
                 emphasis=preset.emphasis,
-                background=preset.background,
+                background=preset.persona.background,
             )
         )
         if len(cards) >= MAX_PRESETS:

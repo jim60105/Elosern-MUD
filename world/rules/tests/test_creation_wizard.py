@@ -10,6 +10,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
+from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
     MAX_PERSONA_FIELD_LENGTH,
@@ -123,6 +124,27 @@ class CreationWizardTests(EvenniaTest):
         self.assertIsNone(view.draft["persona"])
         for card in view.presets:
             self.assertTrue(card.background.strip())
+
+    @covers_requirement(
+        "player-character-creation::the-preset-registry-declares-a-full-persona-in-import-card-shape"
+    )
+    def test_preset_cards_read_the_persona_background_unchanged(self):
+        # The selection-card blurb derives from persona.background after the
+        # field move (preset-persona-model): every card carries the same
+        # field set and the same background text as the registry persona.
+        view = read_creation_view(self.character)
+        card_fields = {
+            "key", "display_name", "race", "race_description", "subrace",
+            "emphasis", "background",
+        }
+        for card in view.presets:
+            with self.subTest(preset=card.key):
+                self.assertEqual(set(vars(card)), card_fields)
+                self.assertEqual(
+                    card.background,
+                    PLAYER_PRESET_REGISTRY[card.key].persona.background,
+                )
+                self.assertFalse(hasattr(PLAYER_PRESET_REGISTRY[card.key], "background"))
 
     # -- preset draft --------------------------------------------------------
 

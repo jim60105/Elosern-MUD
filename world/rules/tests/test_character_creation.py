@@ -11,6 +11,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
+from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.lore.sex import DEFAULT_SEX
 from world.lore.races import SUBRACE_REGISTRY
 from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
@@ -902,3 +903,54 @@ class SexCreationTests(EvenniaTest):
         # AttributeProperty default, not the rejected write's "male".
         self.assertEqual(self.character.attributes.get("sex"), DEFAULT_SEX)
         self.assertEqual(self.character.traits.all(), [])
+
+
+class PresetPersonaLengthSweepTests(unittest.TestCase):
+    """The rules-side sweep enforces the persona prose cap at module import.
+
+    ``world/lore/`` may not import ``world/rules/``, so
+    ``MAX_PERSONA_FIELD_LENGTH`` is checked over the registry HERE
+    (field-parity design 3.1): every string the persona record can carry —
+    top-level prose, identity layers, appearance sub-keys, and both sides of a
+    social-connection pair — must fit the cap.
+    """
+
+    @covers_requirement("player-character-creation::the-preset-registry-declares-a-full-persona-in-import-card-shape")
+    def test_registry_sweep_raises_for_over_long_persona_prose(self):
+        from world.lore.player_presets import (
+            PresetAppearance,
+            PresetIdentity,
+            PresetPersona,
+            PlayerPreset,
+        )
+        from world.rules.character_creation import (
+            _validate_preset_persona_lengths,
+        )
+
+        def make(persona):
+            return {"x": PlayerPreset(
+                "x", "x", 18, 18, "human", "human_commoner", (), "e",
+                sex="female", persona=persona,
+            )}
+
+        over = "長" * (MAX_PERSONA_FIELD_LENGTH + 1)
+        ok = "長" * MAX_PERSONA_FIELD_LENGTH
+        long_name = "名" * (MAX_PERSONA_FIELD_LENGTH + 1)
+        for persona, message in (
+            (PresetPersona(personality=over), r"persona\.personality"),
+            (PresetPersona(background=over), r"persona\.background"),
+            (PresetPersona(identity=PresetIdentity(hidden=over)), r"persona\.identity\.hidden"),
+            (PresetPersona(appearance=PresetAppearance(feature=over)), r"persona\.appearance\.feature"),
+            (PresetPersona(social_connection=(("甲", over),)), r"persona\.social_connection\.甲"),
+            (PresetPersona(social_connection=((long_name, "舊識"),)), r"persona\.social_connection key"),
+        ):
+            with self.subTest(message=message), self.assertRaisesRegex(
+                CharacterCreationError, message
+            ):
+                _validate_preset_persona_lengths(make(persona))
+        # At-bound values pass, and so does the shipped registry itself.
+        _validate_preset_persona_lengths(make(
+            PresetPersona(personality=ok, background=ok)
+        ))
+        _validate_preset_persona_lengths(PLAYER_PRESET_REGISTRY)
+

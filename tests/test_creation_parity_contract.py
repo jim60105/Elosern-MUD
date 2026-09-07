@@ -12,6 +12,8 @@ from pathlib import Path
 import re
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 _PY_CREATION = REPO_ROOT / "web/webclient/presentation/creation.py"
@@ -222,3 +224,25 @@ class CreationSexVocabularyParityContract(unittest.TestCase):
         )
         self.assertIsNotNone(menu_default, "menu DEFAULT_SEX_KEY missing")
         self.assertEqual(menu_default.group(1), DEFAULT_SEX)
+
+
+class PresetCardBackgroundBoundContract(unittest.TestCase):
+    """The registry persona blurb fits the WebClient preset-card descriptor bound.
+
+    The persona prose cap (``MAX_PERSONA_FIELD_LENGTH``, 600) is wider than
+    the WebClient preset-card descriptor bound; neither ``world/lore/`` nor
+    ``world/rules/`` may import the web layer, so this repo-wide test is the
+    only place the two bounds meet (preset-persona-model).
+    """
+
+    @covers_requirement("player-character-creation::the-preset-registry-declares-a-full-persona-in-import-card-shape")
+    def test_shipped_preset_backgrounds_fit_the_card_bound(self):
+        from web.webclient.presentation.creation import MAX_BACKGROUND_CODE_POINTS
+        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+
+        self.assertEqual(MAX_BACKGROUND_CODE_POINTS, 256)
+        for key, preset in PLAYER_PRESET_REGISTRY.items():
+            with self.subTest(preset=key):
+                self.assertLessEqual(
+                    len(preset.persona.background), MAX_BACKGROUND_CODE_POINTS
+                )
