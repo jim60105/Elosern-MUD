@@ -365,10 +365,15 @@ def preflight_character_creation(
         name, age, apparent_age = preset.display_name, preset.age, preset.apparent_age
         race, subrace, allocations = preset.race, preset.subrace, preset.allocation_dict()
         affinity_elements = preset.affinity_elements
+        # The preset registry is the source of truth for the sex channel
+        # (preset-sex-field): the value was validated against SEX_VALUES at
+        # load, and a preset-mode request never falls back to DEFAULT_SEX.
+        sex = preset.sex
     elif request.mode == "custom":
         name, age, apparent_age = request.display_name, request.age, request.apparent_age
         race, subrace, allocations = request.race, request.subrace, request.allocations
         affinity_elements = request.affinity_elements
+        sex = request.sex
     else:
         raise CharacterCreationError("creation mode must be 'preset' or 'custom'")
 
@@ -416,7 +421,7 @@ def preflight_character_creation(
         if request.mode == "custom"
         else None
     )
-    checked_sex = _validate_sex(request.sex)
+    checked_sex = _validate_sex(sex)
     nation = request.nation
     if nation is None:
         nation = getattr(character, "nation", None)

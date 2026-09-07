@@ -867,18 +867,24 @@ class SexCreationTests(EvenniaTest):
         self.assertEqual(self.character.traits.all(), [])
 
     @covers_requirement("player-character-creation::character-creation-enforces-canonical-identity-and-registry-compatibility")
-    def test_preset_activation_persists_the_default_sex(self):
-        # The preset catalog declares no sex channel; activation still writes
-        # the normalized member so creation and import paths converge.
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-sex")
+    def test_preset_activation_persists_the_declared_sex(self):
+        # The preset registry is the source of truth for the sex channel:
+        # every shipped card declares "female", and a preset-mode request
+        # (which never carries a sex) must not fall back to DEFAULT_SEX.
         from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 
-        preset_key = next(iter(PLAYER_PRESET_REGISTRY))
-        activate_player_character(
-            self.account, self.character,
-            CharacterCreationRequest(mode="preset", preset_key=preset_key),
-        )
-        self.assertEqual(self.character.sex, DEFAULT_SEX)
-        self.assertEqual(self.character.attributes.get("sex"), DEFAULT_SEX)
+        for preset_key, preset in PLAYER_PRESET_REGISTRY.items():
+            with self.subTest(preset=preset_key):
+                character = create_object(PlayerCharacter, key=f"shell-{preset_key}")
+                self.account.at_post_create_character(character)
+                activate_player_character(
+                    self.account, character,
+                    CharacterCreationRequest(mode="preset", preset_key=preset_key),
+                )
+                self.assertEqual(character.sex, preset.sex)
+                self.assertEqual(character.attributes.get("sex"), preset.sex)
+                self.assertNotEqual(character.sex, DEFAULT_SEX)
 
     @covers_requirement("player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation")
     def test_sex_write_failure_rolls_back_the_whole_activation(self):

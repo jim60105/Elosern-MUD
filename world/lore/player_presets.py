@@ -1,10 +1,11 @@
 """Immutable starter characters offered during account registration."""
 
-from dataclasses import dataclass
+from dataclasses import KW_ONLY, dataclass
 
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
+from world.lore.sex import SEX_VALUES
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 
@@ -30,6 +31,13 @@ class PlayerPreset:
     passive_skills: tuple[str, ...] = ()
     affinity_elements: tuple[str, ...] = ()
     starting_items: tuple[tuple[str, int], ...] = ()
+    # KW_ONLY from the first preset-parity field onward (field-parity design
+    # 3.2): ``sex`` is a required keyword argument, so a new card that omits
+    # it fails at construction instead of silently inheriting DEFAULT_SEX.
+    # The marker sits after every existing field, so all current positional
+    # bindings on the shipped cards stay unchanged.
+    _: KW_ONLY
+    sex: str
 
     def allocation_dict(self) -> dict[str, int]:
         """Return a mutable copy suitable for rules validation."""
@@ -61,6 +69,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         starting_items=(("plain_sword", 1), ("leather_armor", 1),
                         ("guild_recruit_badge", 1), ("healing_potion", 2),
                         ("healing_herb", 2)),
+        sex="female",
     ),
     "foxkin_scout": PlayerPreset(
         "foxkin_scout", "露芙", 22, 22, "beastfolk", "foxkin",
@@ -75,6 +84,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         starting_items=(("hunters_longbow", 1), ("hunting_throwing_axe", 1),
                         ("leather_armor", 1), ("wolf_fang_necklace", 1),
                         ("healing_potion", 1), ("healing_herb", 3)),
+        sex="female",
     ),
     "elf_guardian": PlayerPreset(
         "elf_guardian", "瑟芮雅", 180, 24, "elf", "fionnen",
@@ -88,6 +98,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         starting_items=(("knight_blade", 1), ("iron_shield", 1),
                         ("chainmail", 1), ("pilgrim_medallion", 1),
                         ("healing_potion", 1)),
+        sex="female",
     ),
     "violet_altoria": PlayerPreset(
         "violet_altoria", "薇歐蕾特", 18, 18, "human", "human_royal",
@@ -102,6 +113,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         ("fire", "wind"),
         starting_items=(("elven_traditional_robe", 1), ("royal_signet_ring", 1),
                         ("royal_heirloom_pendant", 1)),
+        sex="female",
     ),
     "lidzia_rosenthal": PlayerPreset(
         "lidzia_rosenthal", "莉茲婭", 18, 18, "human", "human_noble",
@@ -114,6 +126,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         ("retainer_martial_training", "guardian_instinct"),
         starting_items=(("rose_crest_rapier", 1), ("black_maid_dress", 1),
                         ("silver_feather_earring", 1)),
+        sex="female",
     ),
     "yuka_darknight": PlayerPreset(
         "yuka_darknight", "悠花", 18, 18, "elf", "ciaran",
@@ -128,6 +141,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
          "body_enhancement_extreme", "reincarnation_boon_yuka"),
         starting_items=(("shadow_blade", 1), ("shadow_blade_echo", 1),
                         ("dark_elf_ninja_garb", 1)),
+        sex="female",
     ),
     "yuna_darknight": PlayerPreset(
         "yuna_darknight", "悠奈", 18, 18, "elf", "ciaran",
@@ -141,6 +155,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         ("fire_mastery", "dark_mastery", "divine_sexual_mastery",
          "reincarnation_boon_yuna"),
         starting_items=(("dark_elf_kimono", 1),),
+        sex="female",
     ),
     "elosia_shadowmoon": PlayerPreset(
         "elosia_shadowmoon", "伊洛希雅", 222, 24, "elf", "fionnen",
@@ -154,6 +169,7 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
         ("wind_mastery", "light_mastery", "body_enhancement",
          "reincarnation_boon_elosia"),
         starting_items=(("elven_traditional_robe", 1), ("crescent_earring", 1)),
+        sex="female",
     ),
 }
 
@@ -268,7 +284,23 @@ def _validate_preset_starting_items(registry: dict[str, PlayerPreset]) -> None:
                 )
 
 
+def _validate_preset_sex(registry: dict[str, PlayerPreset]) -> None:
+    """Reject a preset whose declared sex is outside the canonical vocabulary.
+
+    Mirrors the identity validator's load-time stance: ``sex`` must be an
+    exact ``SEX_VALUES`` member, so a mistyped card raises at import instead
+    of shipping a value the sexual-state model, dialogue prompts, and namegen
+    would later consume as the character's sex.
+    """
+    for preset in registry.values():
+        if preset.sex not in SEX_VALUES:
+            raise ValueError(
+                f"preset {preset.key!r} declares unknown sex {preset.sex!r}"
+            )
+
+
 _validate_preset_skill_kits(PLAYER_PRESET_REGISTRY)
 _validate_preset_identities(PLAYER_PRESET_REGISTRY)
 _validate_preset_affinity_elements(PLAYER_PRESET_REGISTRY)
 _validate_preset_starting_items(PLAYER_PRESET_REGISTRY)
+_validate_preset_sex(PLAYER_PRESET_REGISTRY)

@@ -22,3 +22,4 @@ class SexVocabularyTests(TestCase):
     def test_module_docstring_names_its_consumers(self):
         self.assertIn("CHARACTER_SCHEMA_V1", sex.__doc__)
         self.assertIn("LivingEntity.sex", sex.__doc__)
+        self.assertIn("PlayerPreset.sex", sex.__doc__)

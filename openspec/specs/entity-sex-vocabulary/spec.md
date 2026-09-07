@@ -5,8 +5,9 @@
 TBD - created by syncing change entity-sex-field. Update Purpose after archive.
 
 Defines the canonical sex vocabulary (`SEX_VALUES`/`DEFAULT_SEX`) shared between character import
-validation (`CHARACTER_SCHEMA_V1`) and the living-entity typeclass attribute default
-(`LivingEntity.sex`), so the value set has exactly one owner.
+validation (`CHARACTER_SCHEMA_V1`), the living-entity typeclass attribute default
+(`LivingEntity.sex`), and the player preset registry (`PlayerPreset.sex`), so the value set has
+exactly one owner.
 
 ## Requirements
 
@@ -31,9 +32,11 @@ dependency-free vocabulary module.
 
 ### Requirement: The module documents itself as the single canonical source for this vocabulary
 `world/lore/sex.py`'s module docstring SHALL state that it is the single source for `SEX_VALUES` and
-`DEFAULT_SEX`, and SHALL name `CHARACTER_SCHEMA_V1` and `LivingEntity.sex` as its current consumers.
+`DEFAULT_SEX`, and SHALL name `CHARACTER_SCHEMA_V1`, `LivingEntity.sex`, and `PlayerPreset.sex` as
+its current consumers.
 
 #### Scenario: The module docstring names its consumers
 - **WHEN** `world/lore/sex.py`'s module docstring is inspected
-- **THEN** it names `CHARACTER_SCHEMA_V1` (import validation) and `LivingEntity.sex` (the typeclass
-  attribute default) as consumers of these constants
+- **THEN** it names `CHARACTER_SCHEMA_V1` (import validation), `LivingEntity.sex` (the typeclass
+  attribute default), and `PlayerPreset.sex` (the player preset registry) as consumers of these
+  constants
