@@ -146,3 +146,9 @@
 - code: pilgrim_medallion_grace
   label: 朝聖者銅符恩典
   severity: beneficial
+- code: aftermath_residue
+  label: 事後餘韻
+  severity: warning
+- code: aftermath_humiliated
+  label: 狼狽不堪
+  severity: warning
