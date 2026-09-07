@@ -2,8 +2,8 @@
 
 Date: 2026-09-08
 Status: approved by the project owner in a brainstorming session
-Change split: `player-preset-field-parity` (this document) →
-`preset-starting-companions` (§10.1) → `portrait-prompt-appearance` (§10.2)
+Change split: twelve OpenSpec changes, listed with dependencies and batch order
+in §10. Each is scoped to at most one engineer-workday.
 
 ## 1. Problem and current state
 
@@ -69,9 +69,9 @@ holding the same skill keys are not in the same state.
 | D5 | Declared equipment is applied through `world/rules/equipment.py::toggle_equipment` (line 531), never by writing `db.equipment` directly. |
 | D6 | Preset activation adopts the import path's lineage closure and proficiency seed. |
 | D7 | Lore validates identity, vocabulary, and shape. Bounds derived from rules constants are validated at rules-module import time, so `world/lore/` never imports `world/rules/`. |
-| D8 | All new fields default to empty. Except for `sex` and the existence of a persona record, this change alters no observable starting state. |
-| D9 | The eight shipped cards receive only mechanical edits in this change: `sex="female"`, and the existing `background` string moved into `PresetPersona`. Persona prose is authored later by the project owner as pure data. |
-| D10 | A docsify authoring guide ships with this change (§6). |
+| D8 | All new fields default to empty. Except for `sex` and the existence of a persona record, the field-parity changes alter no observable starting state. |
+| D9 | The eight shipped cards receive only mechanical edits across the field-parity changes: `sex="female"`, and the existing `background` string moved into `PresetPersona`. Persona prose is authored later by the project owner as pure data. |
+| D10 | A docsify authoring guide ships as its own change, `preset-authoring-guide` (§6, §10). |
 | D11 | `sex` is a required keyword argument on `PlayerPreset`, so omitting it on a new card fails at construction rather than silently defaulting (§3.2). |
 
 ## 3. Data model (lore layer)
@@ -113,8 +113,11 @@ class PresetPersona:
     def to_record(self) -> dict[str, Any]:
         """Return the storage shape written to ``character.db.persona``.
 
-        Empty strings and empty containers are omitted, so a minimally
-        authored preset still yields a valid import-card-shaped record.
+        All six ``PERSONA_IMPORT_CARD_KEYS`` are always present (``""`` for
+        unauthored prose, ``{}`` for unauthored structured keys), matching what
+        custom activation and ``persona_edit`` already produce; an empty
+        ``identity.hidden`` is dropped, and ``background`` appears only when
+        non-empty.
         """
 
 
@@ -180,18 +183,19 @@ that owns the constant:
   `world/rules/character_creation.py` and raises at import, so an over-long
   field fails the server start exactly as a bad skill kit does today.
 
-`preset-starting-companions` (§10.1) adds two more entries to the rules-side
-sweep for the same reason.
+`preset-companion-model` adds two more entries to the rules-side sweep for the
+same reason.
 
 ### 3.2 Field ordering
 
 `PlayerPreset` uses `dataclasses.KW_ONLY` from the first new field onward:
 `sex` is a **required keyword argument**, so a new card that omits it fails at
 construction instead of silently inheriting `DEFAULT_SEX` — the exact defect
-this change exists to close. Removing the positional `background` slot also
+`preset-sex-field` exists to close. Removing the positional `background` slot in
+`preset-persona-model` also
 means the eight cards must pass `active_skills`, `passive_skills`,
 `affinity_elements`, and every new field by keyword. All eight are edited in
-this change, so the transition is mechanical and the tests catch a miss.
+those two changes, so the transition is mechanical and the tests catch a miss.
 
 ## 4. Activation writes (rules layer)
 
@@ -241,7 +245,7 @@ Everything else takes its default:
 | `disguised_stats=()` | `None` is written, which every reader already treats as absent |
 | `skill_proficiency=()` | only the lineage seed is written |
 
-So the whole observable delta of this change is: preset characters are `female`
+So the whole observable delta of the field-parity changes is: preset characters are `female`
 instead of `other`, and they now own a persona record. Every validator accepts
 empty values, so the owner can fill fields later as pure data edits with no
 code change.
@@ -295,9 +299,13 @@ is a code change; `docs/gm/characters.md` documents the JSON path that is not.
   `persona.background` produces an unchanged `PresetCardView`, protecting the
   WebClient wire contract.
 
-No new test module is added, so `.github/evennia-shards.json` needs no change.
+The field-parity changes add no new test module, so `.github/evennia-shards.json`
+is untouched by them. `preset-companion-model` adds
+`world/rules/tests/test_starting_companions.py` and `preset-authoring-guide` may
+add a contract module; each registers its module in exactly one shard in its own
+change (§10.5).
 `tests/test_creation_parity_contract.py::test_sex_values_and_default_mirror_across_python_and_js`
-must stay green: this change adds a preset field and never touches
+must stay green: no change here adds to or alters
 `SEX_VALUES` or `DEFAULT_SEX`.
 
 ## 8. Non-goals
@@ -318,56 +326,178 @@ hosts (shops, guild windows). A player character has no sink for them.
 
 Also out of scope: authoring the persona prose for the eight cards (D9), any
 change to custom creation, any change to the import path, and any change to the
-portrait prompt (§10.2).
+portrait prompt (`portrait-prompt-appearance`, §10).
 
 ## 9. Incidental observations
 
-Recorded, not fixed by this change:
+Recorded, not fixed by any of the twelve changes:
 
 - `PERSONA_IMPORT_CARD_KEYS` is defined twice, at
   `world/rules/character_creation.py:136` and
   `world/rules/persona_edit.py:28`. One should import the other.
 - `world/art/subjects.py::character_description` (line 212) deliberately
   excludes persona text from the portrait prompt (design D6), so enriching
-  `appearance` has no effect on generated art until §10.2 lands. This is a
+  `appearance` has no effect on generated art until `portrait-prompt-appearance`
+  lands. This is a
   boundary, not an oversight.
 
-## 10. Follow-up changes
+## 10. Change decomposition, dependencies, and batch order
 
-### 10.1 `preset-starting-companions`
+The design ships as twelve OpenSpec changes under `openspec/changes/`, each
+scoped to at most one engineer-workday. All twelve validate `--strict`. The
+decomposition was revised after a rubber-duck review; §10.6 records what that
+review caught.
 
-Decided in the same session, blocked on this change:
+### 10.1 The changes
 
-A preset may ship with NPC companions that join the party at activation with
-high affinity. 悠奈 and 悠花 declare each other symmetrically.
+| # | Change | Layer | Est. | Delta specs |
+|---|---|---|---|---|
+| 1 | `preset-sex-field` | lore + preflight | ~4h | `player-character-creation` (A+M), `entity-sex-vocabulary` (M) |
+| 2 | `preset-persona-model` | lore + card/screen sources | ~6h | `player-character-creation` (A) |
+| 3 | `preset-persona-activation` | rules | ~4h | `player-character-creation` (A), `creation-persona-persistence` (M) |
+| 4 | `preset-value-resolver` | rules refactor | ~2h | `player-stat-allocation` (M) |
+| 5 | `preset-lineage-and-proficiency` | lore + rules | ~5h | `player-character-creation` (M), `skill-lineage` (M) |
+| 6 | `preset-starting-equipment` | lore + rules | ~7h | `player-character-creation` (M) |
+| 7 | `preset-disguise-and-sexual-baseline` | lore + rules | ~5h | `player-character-creation` (A), `disguised-stats-boundary` (M), `sexual-state-handler` (M) |
+| 8 | `affinity-seed-writer` | rules | ~3h | `affinity-system` (M) |
+| 9 | `preset-companion-model` | lore + new rules module | ~6h | `starting-companions` (new) |
+| 10 | `preset-companion-activation` | rules | ~5h | `starting-companions` (A), `party-system` (M) |
+| 11 | `preset-authoring-guide` | docs | ~4h | `preset-authoring-docs` (new) |
+| 12 | `portrait-prompt-appearance` | art + prompts | ~5h | `art-subject-model` (M) |
 
-- Companion stats mirror the partner's own `PlayerPreset` (zero data
-  duplication; the twin genuinely is that character).
-- Seeded affinity is **95** — well above `invite_threshold` 70, inside 至愛,
-  with headroom so one friendly-fire point does not drop a stage. `cap` stays
-  at `NATURAL_CAP` 99; the `cap_breaks` milestone table is untouched.
-- Name collisions take the `-{pk}` suffix, following
-  `world/rules/guild_exams.py::_key_taken_by_other`.
-- The companion is spawned **inside** the activation transaction; any failure
-  rolls the whole creation back and deletes the partial NPC, following
-  `_spawn_opponent`.
-- The companion is an `LLMNPC`, so `commands/invite.py` can re-invite her after
-  a dismissal.
-- Layering: `PlayerPreset` gains `starting_companions: tuple[StartingCompanion, ...]`
-  (`preset_key`, `affinity`, `relationship`); a new
-  `world/rules/starting_companions.py` owns assembly; `world/rules/affinity.py`
-  gains the seed writer so it remains the sole affinity writer;
-  `world/rules/party.py::join_party` performs the binding.
-- The rules-side load-time check validates `len(starting_companions) <=
-  PARTY_MAX_COMPANIONS` and `affinity <= NATURAL_CAP` (the D7 seam).
-- The companion's persona comes straight from the partner preset's
-  `PresetPersona`, plus a `social_connection` entry naming the owning player —
-  which is why this change lands first.
+(A) = ADDED requirements, (M) = MODIFIED requirements.
 
-### 10.2 `portrait-prompt-appearance`
+Change 6 carries a `design.md` because widening the activation rollback surface
+is the riskiest single step; the others record their decisions in `proposal.md`.
 
-Whether authored `appearance` sub-keys should reach the SD WebUI prompt.
-Today `character_description` uses only display name, race/subrace label, age,
-and the style fragment, so two cards of the same race and age produce nearly
-identical prompts. That change must address why the design D6 boundary exists,
-which sub-keys may cross it, and how the hidden identity layer stays excluded.
+Changes 4 and 8 exist only because the review found changes 9 and 10 over a
+workday. Change 4 pulls the `resolve_preset_values` extraction out of the
+companion work so a behavior difference in that refactor is attributable on its
+own; change 8 pulls the affinity seed writer out so a change to the affinity
+capability's sole-writer contract is reviewed and tested in isolation rather
+than buried inside a companion feature.
+
+### 10.2 Logical dependencies
+
+```
+ 1 ──▶ 2 ──▶ 3 ──▶ 12
+ 1 ──▶ 5
+ 1 ──▶ 6
+ 1 ──▶ 7
+ 2 ──▶ 9 ──▶ 10
+ 4 ──▶ 9
+ 8 ──▶ 10
+ 1,2,5,6,7,9 ──▶ 11
+```
+
+- **2 → 1**: change 1 introduces the `KW_ONLY` marker change 2 builds on, and
+  both edit every card literal.
+- **3 → 2**: activation cannot write a persona the registry cannot express.
+- **9 → 2, 4**: the companion's persona is the partner preset's `PresetPersona`,
+  and its trait values come from the extracted resolver.
+- **10 → 9, 8**: the binding needs the builder and the seed writer.
+- **12 → 3**: the portrait prompt reads `entity.db.persona`, which for a preset
+  character only exists once change 3 lands.
+- **11 → the field changes**: the guide documents the final field set, so writing
+  it earlier guarantees it ships stale.
+
+Changes 4, 5, 6, and 7 have **no logical dependency on each other**; their order
+among themselves is free. Change 10 has no logical dependency on change 3 —
+the companion's persona comes from `to_record()`, not the player-side record
+builder — but the two edit the same function (§10.3).
+
+### 10.3 Code conflicts
+
+Two files are the serialization points. Changes sharing a cell cannot run in
+parallel regardless of their logical independence.
+
+| File | Touched by |
+|---|---|
+| `world/lore/player_presets.py` | 1, 2, 5, 6, 7, 9 |
+| `world/rules/character_creation.py` | 1, 2, 3, 4, 5, 6, 7, 10 |
+| `world/rules/creation_wizard.py`, `commands/character_creation.py` | 2 |
+| `world/rules/starting_companions.py` (new) | 9, 10 |
+| `world/rules/affinity.py` | 8 |
+| `world/art/subjects.py`, `prompts/art.yaml`, `world/prompts/registry.py` | 12 |
+| `docs/`, contract tests | 11 |
+| `.github/evennia-shards.json` | 9, possibly 11 |
+
+Changes 8, 11, and 12 touch neither serialization point and are the only ones
+freely schedulable.
+
+### 10.4 Recommended batch order
+
+| Batch | Changes | Rationale |
+|---|---|---|
+| 1 | **1 ‖ 8** | Foundation plus the fully independent affinity primitive |
+| 2 | 2 | Persona model; the largest card edit, and the one with the most consumers |
+| 3 | 3 | Activation writes the persona — unblocks 12 |
+| 4 | **4 ‖ 12** | Disjoint files (`character_creation.py` vs `art/subjects.py`) |
+| 5 | 5 | Lineage closure and proficiency |
+| 6 | 6 | Rollback-surface widening; the riskiest step, run alone |
+| 7 | 7 | Disguise and sexual baseline |
+| 8 | 9 | Companion model and builder |
+| 9 | **10 ‖ 11** | Disjoint files (rules vs docs) |
+
+Three batches admit a second engineer. The critical path is
+1 → 2 → 3 → 4 → 5 → 6 → 7 → 9 → 10, about 44 hours (roughly five and a half
+engineer-days) with 8, 11, and 12 absorbed into the parallel slots.
+
+Changes 4, 5, 6, and 7 may be reordered freely among batches 4-7; they are
+serialized only by `world/rules/character_creation.py`. Splitting that file
+first would collapse four batches into one.
+
+### 10.5 Cross-cutting obligations
+
+Every change carries these in its own `tasks.md`; they are listed here so a
+reviewer can check them at a glance.
+
+- Each new main-spec requirement needs a `covers_requirement` annotation on a
+  real behavior test, with IDs from
+  `uv run --locked python -m tools.spec_traceability list` — never
+  hand-constructed.
+- Change 9 adds `world/rules/tests/test_starting_companions.py` and change 11
+  may add a contract module; each MUST be registered in exactly one shard of
+  `.github/evennia-shards.json` **in the same change**, or
+  `tests.test_evennia_test_optimization_contract` fails on every later branch.
+- Changes 8, 9, and 10 add observability events and must pass
+  `uv run --locked python -m tools.observability_lint check`.
+- `tests/test_creation_parity_contract.py` must stay green throughout; no change
+  here adds to or alters `SEX_VALUES` or `DEFAULT_SEX`.
+- Every `## MODIFIED Requirements` block reproduces its source requirement in
+  full, scenarios included — see §10.6.
+- No change adds a backward-compatibility layer or data migration: the project
+  has no released users.
+
+### 10.6 What the rubber-duck review caught
+
+Recorded because three of the defects were the same mistake, and the pattern is
+easy to repeat.
+
+- **A removed field had an unaccounted-for consumer.** Change 2 deletes
+  `PlayerPreset.background`, and `commands/character_creation.py::creation_start_screen()`
+  reads it directly — the first screen every pending player sees, reused by
+  `Account.at_post_login`. Two existing tests assert on it. The change now names
+  the module, both tests, and a repo-wide grep for a third consumer.
+- **An ADDED requirement contradicted an existing scenario.** The main spec's
+  "Character creation enforces canonical identity and registry compatibility"
+  carries a scenario asserting *"a preset-mode activation... holds `DEFAULT_SEX`
+  (the preset catalog declares no sex)"*. Change 1 originally only ADDED a
+  requirement saying the opposite, which would have archived two contradictory
+  requirements into the same spec. It now also MODIFIES that requirement.
+- **Two MODIFIED blocks silently dropped scenarios.** The affinity delta kept 3
+  of 10 scenarios and the disguise delta kept 2 of 3, losing documented
+  guarantees (`quest_completion` bypassing the daily cap, negative deltas never
+  restoring budget, source and non-NPC rejection, promotion using canonical
+  state) that neither change was touching. Both now reproduce their source block
+  verbatim. **When writing a MODIFIED delta, extract the whole requirement block
+  programmatically — a paged `sed` range is how all three of these were
+  truncated.**
+- **Two changes were over a workday**; changes 4 and 8 were split out (§10.1).
+- Smaller corrections folded in: the companion is explicitly untitled (a stated
+  non-goal rather than an oversight); a same-account test where one character is
+  literally named 悠奈 while another's companion is also 悠奈; the guide's
+  field-coverage test requires an inline-code span so short names like `key` or
+  `age` cannot pass incidentally; and change 2 records *why* the card-blurb bound
+  is a contract test rather than a load-time validator (the constant lives in the
+  web layer, which neither lore nor rules may import).
