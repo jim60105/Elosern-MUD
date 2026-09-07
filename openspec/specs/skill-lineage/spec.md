@@ -203,7 +203,11 @@ record SHALL always win over auto-seed, even when it leaves an edge unmet. Every
 `skill_proficiency` key SHALL resolve in `SKILL_REGISTRY` — the check runs against the RAW record
 before normalization, so an unregistered key names itself and rejects the whole record instead of
 being silently dropped or silently persisted by the seed.
-`world/quests/scene_builder.py`'s NPC spawn path SHALL share the same helper.
+`world/quests/scene_builder.py`'s NPC spawn path SHALL share the same helper, and so SHALL
+`world/rules/character_creation.py`'s preset activation path, which composes
+`lineage_ownership_closure` and `seed_lineage_proficiency` directly over the preset's declared keys
+rather than through the import-record wrapper. The closure and seed helpers SHALL therefore have
+exactly three production callers, and no caller SHALL reimplement either algorithm.
 
 #### Scenario: A deep imported skill arrives usable
 - **WHEN** an import record owns `firestorm` (prereq `scorching_wave >= 3`) and carries no proficiency for `scorching_wave`
@@ -224,3 +228,7 @@ being silently dropped or silently persisted by the seed.
 #### Scenario: An unregistered proficiency key rejects the record
 - **WHEN** a record carries `skill_proficiency: {"not_a_skill": 50}`
 - **THEN** validation rejects the record naming the key, and nothing persists
+
+#### Scenario: Preset activation shares the same helpers
+- **WHEN** a preset activation seeds a prerequisite edge
+- **THEN** the seeded value equals what the import path would write for the same skill set, produced by the same two helpers rather than a parallel implementation

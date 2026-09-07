@@ -169,6 +169,46 @@ class PlayerPresetTests(unittest.TestCase):
                 _validate_preset_skill_kits({"x": preset})
         _validate_preset_skill_kits({"x": make(race="elf", subrace="fionnen", passive_skills=("divine_sexual_mastery",))})
 
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
+    def test_proficiency_validation_rejects_unknown_duplicate_bad_value(self):
+        from world.lore.player_presets import _validate_preset_skill_proficiency
+
+        def make(**overrides):
+            values = dict(
+                key="x", display_name="x", age=18, apparent_age=18, race="human",
+                subrace="human_commoner", allocations=(), emphasis="e",
+                sex="female",
+            )
+            values.update(overrides)
+            return PlayerPreset(**values)
+
+        cases = (
+            # (declared entries, expected message fragment)
+            ((("not_a_skill", 1.0),), "unknown skill 'not_a_skill'"),
+            (
+                (("fire_ball", 1.0), ("fire_ball", 2.0)),
+                "duplicate proficiency for 'fire_ball'",
+            ),
+            ((("fire_ball", -1.0),), "non-numeric or negative proficiency for 'fire_ball'"),
+            ((("fire_ball", "50"),), "non-numeric or negative proficiency for 'fire_ball'"),
+            # bool is an int subclass; a declared boolean must be rejected as
+            # non-numeric, not silently read as 1/0 (tasks 1.2).
+            ((("fire_ball", True),), "non-numeric or negative proficiency for 'fire_ball'"),
+            ((("fire_ball", float("nan")),), "non-numeric or negative proficiency for 'fire_ball'"),
+            ((("fire_ball", float("inf")),), "non-numeric or negative proficiency for 'fire_ball'"),
+            (("fire_ball",), "malformed skill_proficiency entry"),
+        )
+        for entries, message in cases:
+            preset = make(skill_proficiency=entries)
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                _validate_preset_skill_proficiency({"x": preset})
+        # A well-formed declaration (including zero) passes, and the shipped
+        # registry validates clean at load.
+        _validate_preset_skill_proficiency(
+            {"x": make(skill_proficiency=(("fire_ball", 0), ("fire_arrow", 150.5)))}
+        )
+        _validate_preset_skill_proficiency(PLAYER_PRESET_REGISTRY)
+
     def test_identity_validation_rejects_unknown_and_incompatible_subraces(self):
         from world.lore.player_presets import _validate_preset_identities
 
