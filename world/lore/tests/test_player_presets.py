@@ -133,6 +133,67 @@ class PlayerPresetTests(unittest.TestCase):
             {"x": make(starting_items=(("healing_potion", 2), ("plain_sword", 1)))}
         )
 
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
+    def test_starting_equipment_validation_rejects_the_five_invalid_declarations(self):
+        from world.lore.player_presets import _validate_preset_starting_equipment
+
+        def make(**overrides):
+            values = dict(
+                key="x", display_name="x", age=18, apparent_age=18, race="human",
+                subrace="human_commoner", allocations=(), emphasis="e",
+                sex="female",
+                starting_items=(("plain_sword", 1), ("hunters_longbow", 1),
+                                ("leather_armor", 1), ("healing_potion", 2),
+                                ("wolf_fang_necklace", 1),
+                                ("pilgrim_medallion", 1),
+                                ("protective_ring", 1), ("prism_charm", 1),
+                                ("storage_pouch", 1), ("gliding_cloak", 1)),
+            )
+            values.update(overrides)
+            return PlayerPreset(**values)
+
+        cases = (
+            (
+                make(starting_equipment=("knight_blade",)),
+                "absent from its starting_items",
+            ),
+            (
+                make(starting_equipment=("healing_potion",)),
+                "that is not equipment",
+            ),
+            (
+                make(starting_equipment=("plain_sword", "plain_sword")),
+                "duplicate starting equipment",
+            ),
+            (
+                # plain_sword and hunters_longbow are both WEAPON_MAIN items.
+                make(starting_equipment=("plain_sword", "hunters_longbow")),
+                "claiming the same weapon_main slot",
+            ),
+            (
+                # Six carried accessories exceed ACCESSORY_MAX_SLOTS (5).
+                make(starting_equipment=(
+                    "wolf_fang_necklace", "pilgrim_medallion", "protective_ring",
+                    "prism_charm", "storage_pouch", "gliding_cloak",
+                )),
+                "more than 5 starting accessories",
+            ),
+        )
+        for preset, message in cases:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                _validate_preset_starting_equipment({"x": preset})
+        # A well-formed declaration passes: subset, distinct singleton slots,
+        # accessories within the bound.
+        _validate_preset_starting_equipment(
+            {"x": make(starting_equipment=(
+                "plain_sword", "leather_armor", "wolf_fang_necklace",
+                "pilgrim_medallion", "protective_ring", "prism_charm",
+                "storage_pouch",
+            ))}
+        )
+        # Every shipped card (empty defaults included) validates clean.
+        _validate_preset_starting_equipment(PLAYER_PRESET_REGISTRY)
+
     def test_skill_lists_returns_the_storage_shape_in_declared_order(self):
         preset = PLAYER_PRESET_REGISTRY["yuna_darknight"]
         self.assertEqual(

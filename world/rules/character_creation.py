@@ -13,6 +13,7 @@ from world.lore.player_presets import PLAYER_PRESET_REGISTRY, PlayerPreset
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY, StatModifiers
 from world.lore.sex import DEFAULT_SEX, SEX_VALUES
 from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
+from world.rules.equipment import toggle_equipment
 from world.rules.progression import (
     lineage_ownership_closure,
     seed_lineage_proficiency,
@@ -30,7 +31,7 @@ _CREATION_ATTRIBUTE_KEYS = (
     "age", "apparent_age", "race", "subrace", "creation_pending",
     "skill_proficiency", "skills", "skill_grants", "equipment",
     "inventory", "wallet", "quest_log", "guild_rank", "persona",
-    "portrait_policy", "affinity_elements", "sex", "nation",
+    "portrait_policy", "affinity_elements", "sex", "nation", "buffs",
 )
 
 # The single deterministic race-bound mapping every identity channel and the
@@ -610,11 +611,15 @@ def activate_player_character(
     if request.mode == "preset":
         preset = PLAYER_PRESET_REGISTRY[request.preset_key]
         inventory_value = preset.inventory_list()
+        starting_equipment = preset.starting_equipment
         skills_value, proficiency_value = _preset_lineage_state(
             preset
         )
     else:
         skills_value, proficiency_value = {"active": [], "passive": []}, {}
+        # Custom mode never declares worn gear: the subrace kit stays
+        # entirely unequipped (preset-starting-equipment non-goal).
+        starting_equipment: tuple[str, ...] = ()
         # Custom mode hands out the chosen subrace's basic starting kit
         # (add-subrace-starting-kits D2). Load-time coverage guarantees the
         # lookup succeeds; the guarded get keeps even a future registry bug
@@ -669,6 +674,29 @@ def activate_player_character(
                 character.attributes.add("persona", persona_record)
                 if write_observer:
                     write_observer("persona")
+            # Declared starting equipment is applied through the sole
+            # equipment writer (preset-starting-equipment D1/D2), LAST among
+            # the mechanical writes: the toggle preflight requires canonical
+            # inventory ownership (so the ``inventory`` attribute write above
+            # must have landed) and ``sync_equipment_gauge_limits``
+            # recomputes ceilings on the already-applied trait config. A
+            # rejected toggle is a hard failure (D3): the registry validators
+            # make one a genuine bug, and silently skipping it would ship a
+            # character contradicting its own card. ``buffs`` joins the
+            # activation snapshot (D5) because the toggle writes it and the
+            # idmapper cache is not transaction-aware.
+            if starting_equipment:
+                for equipment_key in starting_equipment:
+                    toggle_result = toggle_equipment(character, equipment_key)
+                    if toggle_result.outcome == "rejected":
+                        raise CharacterCreationError(
+                            f"preset starting equipment {equipment_key!r} was "
+                            f"rejected: {toggle_result.reason}"
+                        )
+                # The stage fires only when toggles actually ran, so an
+                # observed stage always means a real write attempt.
+                if write_observer:
+                    write_observer("starting_equipment")
             # Every activation path (Telnet command, WebClient ``activate_draft``)
             # clears the staging creation draft in the SAME atomic transaction, so
             # a completed character never retains a draft (webclient-character-
