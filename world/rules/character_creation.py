@@ -297,6 +297,43 @@ def _validate_allocations(profile: StartingProfile, allocations: Any) -> dict[st
     return checked
 
 
+def _resolve_values(profile: StartingProfile, allocations: Any) -> dict[str, int]:
+    """Compute final trait values from one profile plus one raw allocation map.
+
+    The single bounds-plus-allocation-plus-modifier implementation every
+    consumer shares: lower bound plus allocation, then the subrace static
+    modifiers, then the pinned guild counter. Allocation validation is part of
+    the computation because the preset registry's span/budget guarantees live
+    in a CI test, not an import-time validator.
+    """
+    checked = _validate_allocations(profile, allocations)
+    bounds = profile.bounds_dict()
+    values = {key: bounds[key][0] + checked[key] for key in ALLOCATABLE_AXES}
+    for key in STATIC_KEYS:
+        # Subrace static modifiers cover the three physical axes only; the
+        # fourth axis (magic_power) is allocable but modifier-free (D-A5).
+        values[key] = round(
+            values[key] * (1 + getattr(profile.static_modifiers, key, 0.0))
+        )
+    values["guild_merit"] = 0
+    return values
+
+
+def resolve_preset_values(preset: PlayerPreset) -> dict[str, int]:
+    """Resolve one preset card's final trait values. Pure and read-only.
+
+    The single definition of "what this card is worth" shared by player
+    activation preflight and every later non-player consumer of the same card
+    (the companion builder is the first), so their numbers cannot drift. Takes
+    only a preset: no account, no character, no database or world-clock read,
+    and no write. The returned mapping is a fresh caller-owned dict per call.
+    """
+    return _resolve_values(
+        resolve_starting_profile(preset.race, preset.subrace),
+        preset.allocation_dict(),
+    )
+
+
 def _validate_background(value: Any) -> str | None:
     """Validate one optional player-authored background (flavor) text field.
 
@@ -363,7 +400,9 @@ def preflight_character_creation(
         if preset is None:
             raise CharacterCreationError("unknown player preset")
         name, age, apparent_age = preset.display_name, preset.age, preset.apparent_age
-        race, subrace, allocations = preset.race, preset.subrace, preset.allocation_dict()
+        # The preset's allocations are consumed inside resolve_preset_values
+        # below, so this branch reads only the identity channels directly.
+        race, subrace = preset.race, preset.subrace
         affinity_elements = preset.affinity_elements
         # The preset registry is the source of truth for the sex channel
         # (preset-sex-field): the value was validated against SEX_VALUES at
@@ -395,17 +434,13 @@ def preflight_character_creation(
             raise CharacterCreationError("custom creation requires a registered subrace")
     elif subrace is not None and not isinstance(subrace, str):
         raise CharacterCreationError("subrace must be a registry key or omitted")
-    profile = resolve_starting_profile(race, subrace)
-    checked = _validate_allocations(profile, allocations)
-    bounds = profile.bounds_dict()
-    values = {key: bounds[key][0] + checked[key] for key in ALLOCATABLE_AXES}
-    for key in STATIC_KEYS:
-        # Subrace static modifiers cover the three physical axes only; the
-        # fourth axis (magic_power) is allocable but modifier-free (D-A5).
-        values[key] = round(
-            values[key] * (1 + getattr(profile.static_modifiers, key, 0.0))
-        )
-    values["guild_merit"] = 0
+    if request.mode == "preset":
+        # The preset branch delegates the whole computation to the shared pure
+        # resolver (preset-value-resolver); the custom branch resolves its own
+        # player inputs through the same single arithmetic helper.
+        values = resolve_preset_values(preset)
+    else:
+        values = _resolve_values(resolve_starting_profile(race, subrace), allocations)
     if request.mode == "custom":
         # Custom-mode affinity is race-bounded player input (D4): an elf
         # rejects any player-supplied set, and the race-dependent bound

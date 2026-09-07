@@ -3,11 +3,13 @@
 from tools.spec_traceability import covers_requirement
 
 from copy import deepcopy
+import inspect
+from inspect import signature
 from unittest.mock import patch
 import unittest
 
 from evennia.utils.create import create_account, create_object
-from evennia.utils.test_resources import EvenniaTest
+from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
@@ -23,6 +25,7 @@ from world.rules.character_creation import (
     CharacterCreationRequest,
     activate_player_character,
     preflight_character_creation,
+    resolve_preset_values,
     resolve_starting_profile,
 )
 
@@ -1035,4 +1038,61 @@ class PresetPersonaLengthSweepTests(unittest.TestCase):
             PresetPersona(personality=ok, background=ok)
         ))
         _validate_preset_persona_lengths(PLAYER_PRESET_REGISTRY)
+
+
+class PresetValueResolverPurityTests(EvenniaTestCase):
+    """``resolve_preset_values`` is callable with only a preset and writes nothing.
+
+    Covers the delta scenario "The resolver is pure": one preset argument, no
+    account, no character, no database, no world clock.
+    """
+
+    @covers_requirement("player-stat-allocation::player-starting-profiles-are-derived-from-immutable-lore-bands")
+    def test_resolver_reads_nothing_but_the_registry_and_writes_nothing(self):
+        # Signature: exactly one positional parameter — no account, no character.
+        params = list(signature(resolve_preset_values).parameters.values())
+        self.assertEqual(
+            [(p.name, p.kind) for p in params],
+            [("preset", inspect.Parameter.POSITIONAL_OR_KEYWORD)],
+        )
+        preset = PLAYER_PRESET_REGISTRY["elf_guardian"]
+        # Zero queries proves no database read and no write; the world-clock
+        # accessor always issues a search_script query, so a clock read fails
+        # here too. Registries are plain in-memory dicts, so the resolver's
+        # only legal inputs cost no queries.
+        with self.assertNumQueries(0):
+            first = resolve_preset_values(preset)
+            second = resolve_preset_values(preset)
+        self.assertEqual(first, second)
+        # Each call hands back a fresh caller-owned mapping.
+        self.assertIsNot(first, second)
+
+
+class PresetValueResolverParityTests(EvenniaTest):
+    """One resolver owns the computation for every shipped preset."""
+
+    def setUp(self):
+        super().setUp()
+        self.account = create_account(
+            "resolver", "resolver@example.test", "testpassword", typeclass=Account
+        )
+
+    @covers_requirement("player-stat-allocation::player-starting-profiles-are-derived-from-immutable-lore-bands")
+    def test_resolver_matches_activated_traits_axis_for_axis(self):
+        axes = ALLOCATABLE_AXES + ("guild_merit",)
+        for preset_key, preset in PLAYER_PRESET_REGISTRY.items():
+            with self.subTest(preset=preset_key):
+                expected = resolve_preset_values(preset)
+                character = create_object(PlayerCharacter, key=f"value-shell-{preset_key}")
+                self.account.at_post_create_character(character)
+                activate_player_character(
+                    self.account, character,
+                    CharacterCreationRequest(mode="preset", preset_key=preset_key),
+                )
+                for axis in axes:
+                    self.assertEqual(
+                        character.traits[axis].value, expected[axis],
+                        msg=f"{preset_key}/{axis}",
+                    )
+                self.assertFalse(character.creation_pending)
 
