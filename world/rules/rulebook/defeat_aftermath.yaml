@@ -146,3 +146,40 @@ violation:
       landed_deltas: {victim_pleasure: 30, aggressor_pleasure: 24}
       resisted_deltas: {victim_pleasure: 6, aggressor_pleasure: 5}
       credited_counters: [hostile_act_count, interspecies_act_count]
+#
+# The digest table (defeat-aftermath-digest-narrative D-D1/D-D2): first-match
+# rows evaluated per selected participant at settlement-terminal state. The
+# condition vocabulary is CLOSED — `sensitivity_level` / `shame_level` (lists
+# of canonical sexual-state labels), `arousal_ordinal` / `outcome.climax_count`
+# ({min?,max?} integer ranges) and `outcome.zero_landed` (boolean); the
+# `outcome.*` fields read the in-memory ViolationOutcome (climax_count is the
+# mapped climax_delta), never persisted state. Any race/species/persona
+# condition key fails the load. An empty `when` is the fallback row. Rows are
+# evaluated in file order, first match wins; `residue`/`humiliated` must
+# declare a rulebook buff, `none` must not.
+digest:
+  rows:
+    # High sensitivity and a sequence-recorded climax leave the body's own
+    # residue behind — the one digest a pinned-shame Monster can reach: the
+    # humiliated row's 普通 sensitivity band can never match its seeded-max
+    # sensitivity, so residue-or-none holds without any species read.
+    - id: residue
+      when:
+        sensitivity_level: [高, 極高, 敏感異常]
+        outcome.climax_count: {min: 1}
+      outcome: residue
+      buff: aftermath_residue
+    # Nothing landed, but a low-sensitivity body with high shame still burns
+    # with the humiliation of barely holding on.
+    - id: humiliated
+      when:
+        sensitivity_level: [普通]
+        shame_level: [強烈, 成癮]
+        outcome.zero_landed: true
+      outcome: humiliated
+      buff: aftermath_humiliated
+    # Ordinary dishevelment: no residue, no shame burn, no digest buff.
+    - id: none
+      when: {}
+      outcome: none
+      buff: null

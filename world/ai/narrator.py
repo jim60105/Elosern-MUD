@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any
 
 from twisted.internet import defer
@@ -277,6 +277,39 @@ def build_narrator_prompt(
     system = {"role": "system", "content": render_prompt("narrator.system")}
     user = {"role": "user", "content": _bounded_serialization(event_logs)}
     return system, user
+
+
+def render_aftermath(
+    entries: Sequence[Mapping[str, Any]],
+    profile: Callable[[Sequence[Mapping[str, Any]]], Sequence[str]] | None,
+) -> str:
+    """Render aftermath entries with an optional narrator overlay (D-D5).
+
+    The deterministic base is one rendered ``line`` per entry, joined in
+    entry order — the fixed wake lines and template lines. When a profile
+    is supplied, exactly one overlay prose paragraph per entry is appended
+    after the base. Any failure, timeout, malformed answer (wrong count or
+    blank/non-string paragraph), or disabled (``None``) profile discards
+    the overlay wholesale, so the return stays byte-identical to the
+    offline template render. Pure: nothing outside the given arguments is
+    read or written.
+    """
+    lines = [str(entry["line"]) for entry in entries]
+    base = "\n".join(lines)
+    if profile is None:
+        return base
+    try:
+        paragraphs = list(profile(entries))
+    except Exception:
+        return base
+    if len(paragraphs) != len(entries):
+        return base
+    if any(
+        not isinstance(paragraph, str) or not paragraph.strip()
+        for paragraph in paragraphs
+    ):
+        return base
+    return "\n\n".join((base, *paragraphs))
 
 
 def _is_registered() -> bool:

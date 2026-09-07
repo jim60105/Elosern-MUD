@@ -736,6 +736,29 @@ class RulebookLoaderTests(DefeatAftermathBase):
         "      resisted_deltas: {victim_pleasure: 4, aggressor_pleasure: 3}\n"
         "      credited_counters: [hostile_act_count, interspecies_act_count]\n"
     )
+    # The DA6-owned digest section: every owned section must be present and
+    # valid for a section-specific malformation to stay the only failure.
+    DIGEST_SECTION = (
+        "digest:\n"
+        "  rows:\n"
+        "    - id: residue\n"
+        "      when:\n"
+        "        sensitivity_level: [高, 極高, 敏感異常]\n"
+        "        outcome.climax_count: {min: 1}\n"
+        "      outcome: residue\n"
+        "      buff: aftermath_residue\n"
+        "    - id: humiliated\n"
+        "      when:\n"
+        "        sensitivity_level: [普通]\n"
+        "        shame_level: [強烈, 成癮]\n"
+        "        outcome.zero_landed: true\n"
+        "      outcome: humiliated\n"
+        "      buff: aftermath_humiliated\n"
+        "    - id: none\n"
+        "      when: {}\n"
+        "      outcome: none\n"
+        "      buff: null\n"
+    )
 
     def _load(self, text):
         import tempfile
@@ -770,6 +793,7 @@ class RulebookLoaderTests(DefeatAftermathBase):
                 "recovery:\n  regen_scale: 0.5\n  max_recovery_seconds: 21600\n"
                 "  wake_fraction: 0.05\nviolation_families: []\ndigest_table: {}\n"
                 + self.VIOLATION_SECTION
+                + self.DIGEST_SECTION
             )
         self.assertEqual(warn.call_count, 1)
         self.assertIn("violation_families", warn.call_args.kwargs["context"]["sections"])
@@ -786,16 +810,21 @@ class RulebookLoaderTests(DefeatAftermathBase):
                 "pg_lines: []\nweak_debuff:\n  buff_key: defeat_weak\n"
                 + recovery
                 + self.VIOLATION_SECTION
+                + self.DIGEST_SECTION
             )
         with self.assertRaises(ValueError):
             self._load(
                 "pg_lines:\n  - '你醒了。'\nweak_debuff:\n  buff_key: no_such_buff\n"
                 + recovery
                 + self.VIOLATION_SECTION
+                + self.DIGEST_SECTION
             )
         with self.assertRaises(ValueError):
             self._load(
-                "pg_lines:\n  - '你醒了。'\n" + recovery + self.VIOLATION_SECTION
+                "pg_lines:\n  - '你醒了。'\n"
+                + recovery
+                + self.VIOLATION_SECTION
+                + self.DIGEST_SECTION
             )
 
     @covers_requirement(
@@ -805,6 +834,7 @@ class RulebookLoaderTests(DefeatAftermathBase):
         header = (
             "pg_lines:\n  - '你醒了。'\nweak_debuff:\n  buff_key: defeat_weak\n"
             + self.VIOLATION_SECTION
+            + self.DIGEST_SECTION
         )
         for body in (
             # Missing section entirely: recovery is owned, absence fails closed.

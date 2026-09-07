@@ -28,6 +28,8 @@ _NARRATOR_SYSTEM = (
     "violation_resisted 代表受害者掙扎成功，該次侵犯沒有得逞，不得寫成得手。"
     "violation 條目的 target 是該次侵犯實際指向的受害者（可能是同伴）；"
     "companion_wake 是同伴受害者甦醒時的觀察，同樣以輕冒險的難為情語調帶過。"
+    "digest_outcome 是侵犯結束後身體餘韻沉澱的紀錄，wake_observation 是未被選中的同伴旁觀者的觀察；"
+    "兩者同樣以輕冒險的難為情語調帶過，不得添加任何新的結果或數值。"
 )
 _SCENARIO_DIRECTOR_SYSTEM = (
     "你是《伊洛瑟恩大陸》的任務企劃（ScenarioDirector）。請以正體中文，"

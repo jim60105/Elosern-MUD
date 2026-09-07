@@ -73,6 +73,10 @@ A failure, timeout, or disabled profile discards the overlay wholesale —
 the deterministic wake/template render stands byte-identical to the no-LLM
 run. Three stub profiles (disabled / failing / succeeding) pin this. The
 sequence stays fully playable with LLMs off (guardrail test).
+Like the narrator layer itself (2026-08-03-narrator), the function ships as
+a consumable seam: `render_aftermath` is delivered and contract-pinned in
+this change, while the live presentation wiring belongs to the webclient
+narrative changes — the change declares no narrator transport impact.
 
 **D-D6: Phase position — digest after the recovery advance.**
 Order: violation sequence → departure → weak buff → recovery advance (wake

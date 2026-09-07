@@ -42,6 +42,7 @@ from django.conf import settings
 
 from world.observability import log_error, log_info, log_warn
 from world.lore.monsters import MONSTER_TIER_REGISTRY
+from world.lore.sexual_vocab import SENSITIVITY_LEVELS, SHAME_LEVELS
 from world.rules.action import (
     _apply_pleasure_gain,
     _attribute_snapshot,
@@ -80,6 +81,32 @@ class RecoveryConfig:
 
 
 @dataclass(frozen=True)
+class DigestOutcome:
+    """One selected participant's digest result (D-D1/D-D7).
+
+    ``digest`` is the first matching rulebook row's outcome; ``buff`` is
+    the mounted rulebook buff key, ``None`` for the ``none`` outcome.
+    """
+
+    participant: str
+    digest: str
+    buff: str | None
+
+
+@dataclass(frozen=True)
+class WakeObservation:
+    """One conscious unselected bystander's observation line (D-D7).
+
+    A separate shape from :class:`DigestOutcome`, so a bystander digest —
+    a digest row or a buff for an entity the sequence never selected — is
+    unrepresentable.
+    """
+
+    participant: str
+    line: str
+
+
+@dataclass(frozen=True)
 class DefeatAftermathResult:
     """The writer's full handoff to ``settle_session``.
 
@@ -96,12 +123,20 @@ class DefeatAftermathResult:
     undo: Callable[[], None]
     departed: tuple[Any, ...]
     violation: dict[str, "ViolationOutcome"] = field(default_factory=dict)
+    digests: tuple[DigestOutcome, ...] = ()
+    wake_observations: tuple[WakeObservation, ...] = ()
 
 
 class DefeatAftermathRulebook:
     """Validated per-section rulebook data owned by this change."""
 
-    __slots__ = ("pg_lines", "weak_debuff_buff_key", "recovery", "violation")
+    __slots__ = (
+        "pg_lines",
+        "weak_debuff_buff_key",
+        "recovery",
+        "violation",
+        "digest",
+    )
 
     def __init__(
         self,
@@ -109,11 +144,13 @@ class DefeatAftermathRulebook:
         weak_debuff_buff_key: str,
         recovery: RecoveryConfig,
         violation: "ViolationConfig",
+        digest: "DigestConfig",
     ) -> None:
         self.pg_lines = pg_lines
         self.weak_debuff_buff_key = weak_debuff_buff_key
         self.recovery = recovery
         self.violation = violation
+        self.digest = digest
 
 
 def _validate_pg_lines(raw: dict[str, Any], path: Path) -> tuple[str, ...]:
@@ -403,6 +440,211 @@ def _validate_violation(raw: dict[str, Any], path: Path) -> ViolationConfig:
     )
 
 
+# The digest table's closed schema (defeat-aftermath-digest-narrative D-D2).
+# Any condition key outside this frozenset — race, species, persona, or a
+# typo — fails the load before the section is consulted, so persona flavor
+# can never become a rule input.
+_DIGEST_ROW_KEYS = frozenset({"id", "when", "outcome", "buff"})
+_DIGEST_CONDITION_KEYS = frozenset(
+    {
+        "sensitivity_level",
+        "shame_level",
+        "arousal_ordinal",
+        "outcome.climax_count",
+        "outcome.zero_landed",
+    }
+)
+_DIGEST_OUTCOMES = frozenset({"residue", "humiliated", "none"})
+_DIGEST_CLIMAX_CEILING = 2**31 - 1
+
+
+@dataclass(frozen=True)
+class DigestRow:
+    """One first-match digest row (D-D2).
+
+    ``when`` holds the normalized conditions keyed by the closed
+    vocabulary: label-list conditions are tuples of canonical labels,
+    range conditions are ``(min, max)`` ordinal pairs, and
+    ``outcome.zero_landed`` is a bool.
+    """
+
+    id: str
+    when: MappingProxyType
+    outcome: str
+    buff: str | None
+
+
+@dataclass(frozen=True)
+class DigestConfig:
+    """The validated ``digest`` section owned by
+    defeat-aftermath-digest-narrative."""
+
+    rows: tuple[DigestRow, ...]
+
+
+def _validate_digest_labels(
+    raw: Any, path: Path, label: str, vocabulary: tuple[str, ...]
+) -> tuple[str, ...]:
+    if (
+        not isinstance(raw, list)
+        or not raw
+        or any(not isinstance(name, str) for name in raw)
+    ):
+        raise ValueError(
+            f"{path}: digest {label} must be a non-empty list of level labels"
+        )
+    unknown = sorted(set(raw) - set(vocabulary))
+    if unknown:
+        raise ValueError(
+            f"{path}: digest {label} has labels outside the closed "
+            f"vocabulary {list(vocabulary)}: {unknown}"
+        )
+    return tuple(raw)
+
+
+def _validate_digest_range(
+    raw: Any, path: Path, label: str, low: int, high: int | None = None
+) -> tuple[int, int]:
+    if not isinstance(raw, dict) or set(raw) - {"min", "max"}:
+        raise ValueError(
+            f"{path}: digest {label} must be a mapping with only 'min'/'max'"
+        )
+    minimum = raw.get("min", low)
+    maximum = raw.get("max", _DIGEST_CLIMAX_CEILING if high is None else high)
+    for name, value in (("min", minimum), ("max", maximum)):
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"{path}: digest {label}.{name} must be an integer")
+    if minimum < low or maximum < minimum or (high is not None and maximum > high):
+        raise ValueError(
+            f"{path}: digest {label} must satisfy {low} <= min <= max"
+            + (f" <= {high}" if high is not None else "")
+        )
+    return minimum, maximum
+
+
+def _validate_digest(raw: dict[str, Any], path: Path) -> DigestConfig:
+    """Validate the ``digest`` section fail-closed (delta requirement 1).
+
+    The condition vocabulary is closed (``_DIGEST_CONDITION_KEYS``): any
+    race/species/persona key fails the load. ``residue``/``humiliated``
+    must declare a rulebook buff and ``none`` must not. The final row MUST
+    be the empty-``when`` fallback, so first-match evaluation always yields
+    exactly one outcome per selected participant.
+    """
+    section = raw.get("digest")
+    if not isinstance(section, dict):
+        raise ValueError(f"{path}: section 'digest' must be a mapping")
+    rows_raw = section.get("rows")
+    if not isinstance(rows_raw, list) or not rows_raw:
+        raise ValueError(f"{path}: digest rows must be a non-empty list of mappings")
+    from world.rules.buffs import BUFF_DEFINITIONS
+
+    rows: list[DigestRow] = []
+    seen_ids: set[str] = set()
+    for index, raw_row in enumerate(rows_raw):
+        if not isinstance(raw_row, dict):
+            raise ValueError(f"{path}: digest row {index} must be a mapping")
+        unknown = set(raw_row) - _DIGEST_ROW_KEYS
+        if unknown:
+            raise ValueError(
+                f"{path}: digest row {index} has unknown keys {sorted(unknown)}"
+            )
+        row_id = raw_row.get("id")
+        if not isinstance(row_id, str) or not row_id.strip():
+            raise ValueError(f"{path}: digest row {index} needs a non-empty 'id'")
+        if row_id in seen_ids:
+            raise ValueError(f"{path}: digest row id {row_id!r} is duplicated")
+        seen_ids.add(row_id)
+        outcome = raw_row.get("outcome")
+        if outcome not in _DIGEST_OUTCOMES:
+            raise ValueError(
+                f"{path}: digest row {row_id!r} outcome must be one of "
+                f"{sorted(_DIGEST_OUTCOMES)}, got {outcome!r}"
+            )
+        buff = raw_row.get("buff")
+        if outcome == "none":
+            if buff is not None:
+                raise ValueError(
+                    f"{path}: digest row {row_id!r} (none) must not declare a buff"
+                )
+        elif not isinstance(buff, str) or not buff:
+            raise ValueError(
+                f"{path}: digest row {row_id!r} ({outcome}) must declare a buff key"
+            )
+        elif buff not in BUFF_DEFINITIONS:
+            raise ValueError(
+                f"{path}: digest row {row_id!r} buff {buff!r} is not a rulebook buff"
+            )
+        else:
+            # The digest's mechanical footprint is a marker: world-second
+            # duration and bounds-surface modifiers only (delta requirement
+            # 2). A rate/decay buff or an unbounded duration would turn the
+            # cosmetic digest table into a state-mutating periodic effect.
+            definition = BUFF_DEFINITIONS[buff]
+            if not isinstance(definition.duration, int) or isinstance(
+                definition.duration, bool
+            ) or definition.duration < 1:
+                raise ValueError(
+                    f"{path}: digest row {row_id!r} buff {buff!r} must carry a "
+                    "positive world-second duration"
+                )
+            if set(definition.modifiers) != {"bounds"} or not definition.modifiers[
+                "bounds"
+            ]:
+                raise ValueError(
+                    f"{path}: digest row {row_id!r} buff {buff!r} must declare a "
+                    "non-empty bounds-only modifier surface"
+                )
+        when_raw = raw_row.get("when", {})
+        if not isinstance(when_raw, dict):
+            raise ValueError(f"{path}: digest row {row_id!r} 'when' must be a mapping")
+        unknown_conditions = set(when_raw) - _DIGEST_CONDITION_KEYS
+        if unknown_conditions:
+            raise ValueError(
+                f"{path}: digest row {row_id!r} has condition keys outside the "
+                f"closed vocabulary {sorted(_DIGEST_CONDITION_KEYS)}: "
+                f"{sorted(unknown_conditions)}"
+            )
+        conditions: dict[str, Any] = {}
+        for key, value in when_raw.items():
+            if key == "sensitivity_level":
+                conditions[key] = _validate_digest_labels(
+                    value, path, f"{row_id}.{key}", SENSITIVITY_LEVELS
+                )
+            elif key == "shame_level":
+                conditions[key] = _validate_digest_labels(
+                    value, path, f"{row_id}.{key}", SHAME_LEVELS
+                )
+            elif key == "outcome.zero_landed":
+                if not isinstance(value, bool):
+                    raise ValueError(
+                        f"{path}: digest {row_id}.{key} must be a boolean"
+                    )
+                conditions[key] = value
+            elif key == "arousal_ordinal":
+                conditions[key] = _validate_digest_range(
+                    value, path, f"{row_id}.{key}", 0, len(AROUSAL_LEVELS) - 1
+                )
+            else:  # outcome.climax_count
+                conditions[key] = _validate_digest_range(
+                    value, path, f"{row_id}.{key}", 0
+                )
+        if index == len(rows_raw) - 1 and conditions:
+            raise ValueError(
+                f"{path}: the last digest row ({row_id!r}) must be the "
+                "empty-when fallback so every participant digests exactly once"
+            )
+        rows.append(
+            DigestRow(
+                id=row_id,
+                when=MappingProxyType(conditions),
+                outcome=outcome,
+                buff=buff,
+            )
+        )
+    return DigestConfig(rows=tuple(rows))
+
+
 _SECTION_VALIDATORS: dict[str, Callable[[dict[str, Any], Path], Any]] = {}
 
 
@@ -419,6 +661,7 @@ _register_section_validator("pg_lines", _validate_pg_lines)
 _register_section_validator("weak_debuff", _validate_weak_debuff)
 _register_section_validator("recovery", _validate_recovery)
 _register_section_validator("violation", _validate_violation)
+_register_section_validator("digest", _validate_digest)
 _OWNED_SECTIONS = frozenset(_SECTION_VALIDATORS)
 
 
@@ -445,6 +688,7 @@ def load_defeat_aftermath_sections(path: Path) -> DefeatAftermathRulebook:
         weak_debuff_buff_key=validated["weak_debuff"],
         recovery=validated["recovery"],
         violation=validated["violation"],
+        digest=validated["digest"],
     )
 
 
@@ -871,6 +1115,245 @@ def _schedule_violation_boundary(
     )
 
 
+def _max_sensitivity_label(entity: Any) -> str:
+    """The entity's own most sensitive materialized channel (D-D1).
+
+    Reads only the sensitivity traits already present — ``items()`` never
+    lazily creates traits, so the digest performs no storage write. An
+    entity with no seeded channel reads 普通.
+    """
+    traits = list(entity.sexual.sensitivity.items())
+    if not traits:
+        return SENSITIVITY_LEVELS[0]
+    return SENSITIVITY_LEVELS[max(trait.value for _, trait in traits)]
+
+
+def _digest_snapshot(entity: Any, outcome: "ViolationOutcome") -> dict[str, Any]:
+    """One participant's terminal digest inputs (D-D1).
+
+    Own-body observations only: the entity's sexual state plus the
+    sequence's in-memory outcome handoff. No affinity value, no other
+    entity's state, no persisted digest input.
+    """
+    return {
+        "sensitivity_level": _max_sensitivity_label(entity),
+        "shame_level": entity.sexual.shame.level,
+        "arousal_ordinal": entity.sexual.arousal.value,
+        "outcome.climax_count": outcome.climax_delta,
+        "outcome.zero_landed": outcome.zero_landed,
+    }
+
+
+def _digest_row_matches(row: DigestRow, snapshot: dict[str, Any]) -> bool:
+    """Evaluate one row's normalized conditions against the snapshot."""
+    for key, condition in row.when.items():
+        value = snapshot[key]
+        if isinstance(condition, bool):
+            if value is not condition:
+                return False
+        elif isinstance(condition[0], str):
+            if value not in condition:
+                return False
+        else:
+            low, high = condition
+            if not low <= value <= high:
+                return False
+    return True
+
+
+def _match_digest_row(entity: Any, outcome: "ViolationOutcome") -> DigestRow:
+    """First matching digest row for one participant (D-D2).
+
+    The loader guarantees the final row is the empty-``when`` fallback, so
+    the loop below always returns; the ``LookupError`` documents the
+    invariant rather than guarding a reachable path.
+    """
+    snapshot = _digest_snapshot(entity, outcome)
+    for row in DEFEAT_AFTERMATH_RULEBOOK.digest.rows:
+        if _digest_row_matches(row, snapshot):
+            return row
+    raise LookupError("digest rulebook shipped without its fallback row")
+
+
+def _rewrite_companion_wake(
+    entries: list[EventEntry], victim_key: str, wake_line: str
+) -> None:
+    """Reselect one selected companion's wake line by digest (D-D3).
+
+    The ``companion_wake`` entry stays the companion's sole wake-up
+    record; only its line family changes, so no duplicate wake entry is
+    rendered (D-D5's no-duplication discipline). The entry is rebuilt
+    because ``EventEntry`` is frozen.
+    """
+    for index, entry in enumerate(entries):
+        if entry.kind == "companion_wake" and entry.actor == victim_key:
+            entries[index] = replace(entry, text_template=wake_line)
+            return
+
+
+def _digest_bystanders(
+    actor: Any,
+    session: Any,
+    battlefield: Any | None,
+    violation: dict[str, "ViolationOutcome"],
+) -> list[Any]:
+    """Conscious companions who were never selected (D-D7).
+
+    Mirror of the violation pool's two resolution paths restricted to
+    companions neither knocked out nor fled and absent from the outcome
+    handoff: an untouched knocked-out companion was unconscious (D-P3's
+    wake contract keeps it silent) and the defeated player's wake prose
+    is the settlement's own, so neither can be a bystander.
+    """
+    selected = set(violation)
+    actor_key = str(actor.key)
+    if battlefield is not None:
+        player_team = battlefield.team_of(actor_key)
+        ally_keys = (
+            battlefield.teams.get(player_team, set())
+            if player_team is not None
+            else set()
+        )
+        return [
+            battlefield.roster[key]
+            for key in ally_keys
+            if key != actor_key
+            and key not in battlefield.fled
+            and key not in battlefield.knocked_out
+            and key not in selected
+            and key in battlefield.roster
+        ]
+    from evennia.objects.models import ObjectDB
+
+    return [
+        entity
+        for dbref in session.player_ids
+        if dbref != int(actor.pk)
+        and dbref not in session.fled_ids
+        and dbref not in session.knocked_out_ids
+        for entity in (ObjectDB.objects.filter(id=dbref).first(),)
+        if entity is not None and str(entity.key) not in selected
+    ]
+
+
+def _schedule_digest_boundary(
+    actor: Any,
+    digests: list[DigestOutcome],
+    wake_observations: list[WakeObservation],
+) -> None:
+    """Schedule the digest phase's boundary info event (observability)."""
+    from django.db import transaction
+
+    from world.rules.clock import get_world_clock
+
+    boundary = {
+        "char": str(actor.key),
+        "room": str(actor.location.pk) if actor.location is not None else None,
+        "tick": get_world_clock().tick,
+        "selected": len(digests),
+        "residue": sum(digest.digest == "residue" for digest in digests),
+        "humiliated": sum(digest.digest == "humiliated" for digest in digests),
+        "none": sum(digest.digest == "none" for digest in digests),
+        "bystanders": len(wake_observations),
+    }
+    transaction.on_commit(
+        lambda boundary=boundary: log_info(
+            "defeat_aftermath_digest", context=boundary
+        )
+    )
+
+
+def _run_digest_phase(
+    actor: Any,
+    session: Any,
+    battlefield: Any | None,
+    entries: list[EventEntry],
+    restores: list[Callable[[], None]],
+    violation: dict[str, "ViolationOutcome"],
+) -> tuple[tuple[DigestOutcome, ...], tuple[WakeObservation, ...]]:
+    """The digest phase (defeat-aftermath-digest-narrative D-D1/D-D6).
+
+    Runs after the recovery advance: one first-match rulebook row per
+    selected participant reads only its own terminal sexual state plus the
+    sequence's in-memory outcome handoff. ``residue``/``humiliated`` mount
+    their buff through the shipped attach path (companion snapshots join
+    the writer's undo registry; the actor's own buffs are already covered
+    by the run-entry snapshot), every participant gets one
+    ``digest_outcome`` entry, and a digest other than ``none`` reselects
+    the participant's wake-line family. Conscious unselected companions
+    get a ``wake_observation`` entry and a ``WakeObservation`` row —
+    never a digest row or a buff (D-D7).
+    """
+    entities = {
+        str(entity.key): entity
+        for entity in _violation_pool(actor, session, battlefield)
+    }
+    digests: list[DigestOutcome] = []
+    wake_observations: list[WakeObservation] = []
+    for key, outcome in violation.items():
+        entity = entities[key]
+        row = _match_digest_row(entity, outcome)
+        if row.buff is not None:
+            if entity is not actor:
+                snapshot = _attribute_snapshot(entity, "buffs")
+
+                def _restore_digest_buffs(
+                    entity=entity, snapshot=snapshot
+                ) -> None:
+                    _restore_attribute(entity, "buffs", snapshot)
+
+                restores.append(_restore_digest_buffs)
+            _add_buff(entity, row.buff)
+        if entity is actor:
+            if row.outcome != "none":
+                _rewrite_wake_line(
+                    entries,
+                    defeat_aftermath_template(f"wake_self_{row.outcome}"),
+                )
+        elif row.outcome != "none":
+            _rewrite_companion_wake(
+                entries,
+                key,
+                defeat_aftermath_template(f"wake_companion_{row.outcome}"),
+            )
+        digests.append(
+            DigestOutcome(participant=key, digest=row.outcome, buff=row.buff)
+        )
+        entries.append(
+            EventEntry(
+                kind="digest_outcome",
+                actor=key,
+                target=None,
+                data={"digest": row.outcome, "buff": row.buff},
+                text_template=defeat_aftermath_template(
+                    "digest_outcome"
+                    if entity is actor
+                    else "digest_outcome_companion"
+                ),
+            )
+        )
+    for entity in _digest_bystanders(actor, session, battlefield, violation):
+        key = str(entity.key)
+        template = defeat_aftermath_template("wake_bystander")
+        wake_observations.append(
+            WakeObservation(
+                participant=key,
+                line=template.format(actor=key, target=None, data={}),
+            )
+        )
+        entries.append(
+            EventEntry(
+                kind="wake_observation",
+                actor=key,
+                target=None,
+                data={},
+                text_template=template,
+            )
+        )
+    _schedule_digest_boundary(actor, digests, wake_observations)
+    return tuple(digests), tuple(wake_observations)
+
+
 _TARGET_PURPOSE = "target"
 # The target draw's victim dimension is a constant marker: the victim is the
 # draw's OUTPUT (a participant slot resolved through the pool), never an
@@ -1118,7 +1601,7 @@ def run_defeat_aftermath(
 
     Phase order (tasks 1.2): HP floor + knockout mark -> guarded violation
     hook -> violator departure -> weak debuff -> recovery advance ->
-    EventLog. The caller persists
+    digest -> EventLog. The caller persists
     the returned session record and clears the session afterwards. Every die
     the writer and its registered violation body use is a pure function of
     durable record state, so a rolled-back retry re-derives the identical
@@ -1296,6 +1779,16 @@ def run_defeat_aftermath(
                 )
         else:
             hp_wake = int(_stored_trait_value(gauge))
+        # Phase 6: the digest (defeat-aftermath-digest-narrative D-D6). The
+        # body wakes at its settled HP first; the digest then reads what it
+        # remembers. Gated on the violation handoff: with no sequence there
+        # is nothing to digest and no bystander observing a violation.
+        digests: tuple[DigestOutcome, ...] = ()
+        wake_observations: tuple[WakeObservation, ...] = ()
+        if violation:
+            digests, wake_observations = _run_digest_phase(
+                actor, session, battlefield, entries, restores, violation
+            )
     except Exception:
         undo()
         raise
@@ -1314,6 +1807,8 @@ def run_defeat_aftermath(
         undo=undo,
         departed=tuple(departed),
         violation=violation,
+        digests=digests,
+        wake_observations=wake_observations,
     )
 
 
