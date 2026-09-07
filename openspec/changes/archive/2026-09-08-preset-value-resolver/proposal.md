@@ -20,8 +20,11 @@ behavior difference would be much harder to attribute.
 
 - A pure `resolve_preset_values(preset)` is extracted from
   `preflight_character_creation` into `world/rules/character_creation.py`'s
-  module surface: no account, no character, no writes, no validation beyond what
-  the registry already guarantees at load.
+  module surface: no account, no character, no writes, and no re-validation of
+  the identity, affinity, or sex channels the preset branch already reads
+  straight from the registry. The allocation span/budget check stays inside the
+  extracted computation because the registry guarantees it only in a CI test,
+  not an import-time validator.
 - `preflight_character_creation` calls it, so the player path is byte-identical.
   The existing creation tests are the regression net and MUST pass unedited.
 - Nothing else changes. No new consumer is added in this change; the companion
@@ -43,8 +46,10 @@ None.
 
 ## Impact
 
-- `world/rules/character_creation.py` — one function extracted; no behavior
-  change.
+- `world/rules/character_creation.py` — the computation extracted as the
+  public `resolve_preset_values(preset)` delegating to one private
+  `_resolve_values(profile, allocations)` arithmetic helper shared with the
+  custom branch; no behavior change.
 - `world/rules/tests/test_character_creation.py` — a test pinning that the
   resolver's output equals what activation persists for each shipped preset.
 - Unaffected: every caller of `preflight_character_creation`, custom creation,
