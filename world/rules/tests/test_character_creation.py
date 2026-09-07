@@ -412,6 +412,170 @@ class CharacterActivationTests(EvenniaTest):
                 self.assertGreater(len(expected), 0)
                 self.assertFalse(character.creation_pending)
 
+    # --- preset-starting-equipment ---------------------------------------
+
+    _EQUIP_ITEMS = (
+        ("plain_sword", 1), ("leather_armor", 1), ("guild_recruit_badge", 1),
+        ("apothecary_beads", 1), ("wolf_fang_necklace", 1), ("healing_potion", 2),
+    )
+
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
+    def test_preset_activation_wears_the_declared_starting_equipment(self):
+        # Scenario "Declared starting equipment is worn at activation" plus
+        # "Undeclared items stay in the pack": every declared key lands in
+        # its registry slot through the sole writer, the carried-but-
+        # undeclared accessory stays in the pack only, and equipped keys
+        # remain in canonical inventory.
+        preset = self._synthetic_preset(
+            "test_equip_worn",
+            starting_items=self._EQUIP_ITEMS,
+            starting_equipment=(
+                "plain_sword", "leather_armor", "guild_recruit_badge",
+                "apothecary_beads",
+            ),
+        )
+        character = self._activate_synthetic_preset(preset, "shell-equip-worn")
+        self.assertEqual(
+            dict(character.db.equipment),
+            {
+                "weapon_main": "plain_sword",
+                "weapon_off": None,
+                "armor": "leather_armor",
+                "accessories": ["guild_recruit_badge", "apothecary_beads"],
+            },
+        )
+        # Scenario 3.3: the beads' attached buff instance arrives with it.
+        self.assertIn("item_regen_light:apothecary_beads", character.db.buffs)
+        self.assertEqual(
+            character.db.buffs["item_regen_light:apothecary_beads"][
+                "definition_key"
+            ],
+            "item_regen_light",
+        )
+        # The undeclared carried accessory occupies no slot but stays held,
+        # and equipped keys stay in canonical inventory.
+        stored = set(character.db.equipment["accessories"])
+        stored.update(
+            v for v in (
+                character.db.equipment["weapon_main"],
+                character.db.equipment["weapon_off"],
+                character.db.equipment["armor"],
+            ) if v
+        )
+        self.assertNotIn("wolf_fang_necklace", stored)
+        for key in ("wolf_fang_necklace", "plain_sword", "leather_armor",
+                    "guild_recruit_badge", "apothecary_beads"):
+            self.assertIn(key, character.db.inventory)
+        self.assertFalse(character.creation_pending)
+
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
+    def test_worn_equipment_ceilings_are_computed_from_the_final_traits(self):
+        # Scenario (risk pin, design R2): knight_platemail caps hp at +15;
+        # the ceiling recomputation runs after _apply_trait_config, so the
+        # stored mod is exactly the worn set's cap against the final base.
+        preset = self._synthetic_preset(
+            "test_equip_gauge",
+            starting_items=(("knight_platemail", 1), ("apothecary_beads", 1)),
+            starting_equipment=("knight_platemail", "apothecary_beads"),
+        )
+        character = self._activate_synthetic_preset(preset, "shell-equip-gauge")
+        # The sole writer recomputes the hp ceiling's mod from scratch as
+        # exactly the worn set's cap; GaugeTrait.max is derived as
+        # (base + mod) * mult, so pinning mod pins the ceiling.
+        self.assertEqual(character.traits.hp.mod, 15)
+        self.assertIn("item_regen_light:apothecary_beads", character.db.buffs)
+
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
+    def test_rejected_equipment_toggle_rolls_activation_back(self):
+        # Scenario "A rejected toggle rolls activation back" (design D3):
+        # activation raises naming the key and the stable reason, and the
+        # shell stays exactly as it was.
+        from world.rules.equipment import EquipmentToggleReason, EquipmentToggleResult
+        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+
+        preset = self._synthetic_preset(
+            "test_equip_reject",
+            starting_items=(("plain_sword", 1),),
+            starting_equipment=("plain_sword",),
+        )
+        character = create_object(PlayerCharacter, key="shell-equip-reject")
+        self.account.at_post_create_character(character)
+        old_key = character.key
+        rejected = EquipmentToggleResult(
+            outcome="rejected", reason=EquipmentToggleReason.ITEM_NOT_HELD
+        )
+        with patch.dict(PLAYER_PRESET_REGISTRY, {preset.key: preset}), patch(
+            "world.rules.character_creation.toggle_equipment",
+            return_value=rejected,
+        ):
+            with self.assertRaisesRegex(
+                CharacterCreationError,
+                r"plain_sword.*item_not_held",
+            ):
+                activate_player_character(
+                    self.account, character,
+                    CharacterCreationRequest(
+                        mode="preset", preset_key=preset.key
+                    ),
+                )
+        self.assertEqual(character.key, old_key)
+        self.assertTrue(character.creation_pending)
+        self.assertFalse(character.attributes.has("equipment"))
+        self.assertFalse(character.attributes.has("buffs"))
+
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
+    def test_failure_after_equipment_toggles_leaves_no_residue(self):
+        # Scenario "A failed activation leaves no equipment or buff residue"
+        # (design D5): the failure lands on the stage right after the toggle
+        # loop, so equipment, buffs, and the gauge ceilings must ALL read
+        # back at their pre-activation state in the in-process cache.
+        preset = self._synthetic_preset(
+            "test_equip_residue",
+            starting_items=(("knight_platemail", 1), ("apothecary_beads", 1)),
+            starting_equipment=("knight_platemail", "apothecary_beads"),
+        )
+        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+
+        character = create_object(PlayerCharacter, key="shell-equip-residue")
+        self.account.at_post_create_character(character)
+        old_key = character.key
+        before_traits = deepcopy(dict(character.traits.trait_data))
+
+        def fail(stage):
+            if stage == "starting_equipment":
+                raise RuntimeError("injected after toggles")
+
+        with patch.dict(PLAYER_PRESET_REGISTRY, {preset.key: preset}):
+            with self.assertRaisesRegex(RuntimeError, "injected after toggles"):
+                activate_player_character(
+                    self.account, character,
+                    CharacterCreationRequest(
+                        mode="preset", preset_key=preset.key
+                    ),
+                    write_observer=fail,
+                )
+        self.assertEqual(character.key, old_key)
+        self.assertTrue(character.creation_pending)
+        # Assert through the attribute layer, never character.buffs: reading
+        # the BuffHandler auto-creates an empty cache and would mask residue.
+        self.assertFalse(character.attributes.has("equipment"))
+        self.assertFalse(character.attributes.has("buffs"))
+        self.assertEqual(dict(character.traits.trait_data), before_traits)
+        self.assertEqual(character.traits.all(), [])
+
+    @covers_requirement("player-character-creation::custom-activation-grants-the-chosen-subrace-s-basic-starting-kit")
+    def test_custom_activation_leaves_every_equipment_slot_empty(self):
+        activate_player_character(self.account, self.character, self.request())
+        self.assertEqual(
+            dict(self.character.db.equipment),
+            {
+                "weapon_main": None,
+                "weapon_off": None,
+                "armor": None,
+                "accessories": [],
+            },
+        )
+
     def test_fault_after_trait_write_restores_all_state_and_handler_cache(self):
         self.character.db.guild_rank = "preserve-me"
         before_traits = deepcopy(dict(self.character.traits.trait_data))

@@ -8,6 +8,7 @@ from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.lore.sex import SEX_VALUES
+from world.skills.equipment import ACCESSORY_MAX_SLOTS, EquipmentSlot
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 # The persona prose values the lore-side validator requires to be strings; the
@@ -129,6 +130,14 @@ class PlayerPreset:
     # entry has. An entry may name a key outside the preset's closed kit; it
     # is then persisted verbatim exactly as the import path persists one.
     skill_proficiency: tuple[tuple[str, float], ...] = ()
+    # Which of the declared starting items are WORN at activation
+    # (preset-starting-equipment). Every key SHALL be a subset of
+    # ``starting_items`` (the pack stays the single source of what the
+    # character owns) and name registry equipment; activation applies each
+    # through ``world/rules/equipment.py::toggle_equipment``, the sole
+    # equipment writer. The empty default keeps every shipped card's
+    # observable starting state unchanged until an author fills the field.
+    starting_equipment: tuple[str, ...] = ()
     persona: PresetPersona = PresetPersona()
 
     def allocation_dict(self) -> dict[str, int]:
@@ -416,6 +425,75 @@ def _validate_preset_starting_items(registry: dict[str, PlayerPreset]) -> None:
                 )
 
 
+def _validate_preset_starting_equipment(registry: dict[str, PlayerPreset]) -> None:
+    """Reject a declared starting loadout the activation could never wear.
+
+    Mirrors the starting-item validator's load-time stance: every declaration
+    is an authoring contract whose runtime alternative is silent corruption,
+    because ``world/rules/equipment.py::toggle_equipment`` TOGGLES rather than
+    equips (a repeated key would equip then unequip), silently replaces a
+    singleton occupant, and rejects a sixth accessory at runtime. So the
+    subset rule, the equipment-slot rule, duplicates, singleton-slot
+    collisions, and accessory overflow all raise at import instead of
+    mid-activation. The singleton/accessory arithmetic reads
+    ``world/skills/equipment.py`` (lore already depends on
+    ``world/skills/``), never ``world.rules``.
+    """
+    for preset in registry.values():
+        # Defensive shape check: the starting-items validator already rejects
+        # a malformed kit at import, but this validator must name the preset
+        # rather than crash on tuple unpacking when driven directly.
+        carried: set[str] = set()
+        for entry in preset.starting_items:
+            if not isinstance(entry, tuple) or len(entry) != 2:
+                raise ValueError(
+                    f"preset {preset.key!r} declares a malformed starting-item entry"
+                )
+            carried.add(entry[0])
+        seen: set[str] = set()
+        singleton_owner: dict[EquipmentSlot, str] = {}
+        accessory_count = 0
+        for item_key in preset.starting_equipment:
+            if not isinstance(item_key, str) or not item_key:
+                raise ValueError(
+                    f"preset {preset.key!r} declares a malformed starting-equipment entry"
+                )
+            if item_key not in carried:
+                raise ValueError(
+                    f"preset {preset.key!r} declares starting equipment {item_key!r} "
+                    "absent from its starting_items"
+                )
+            if item_key in seen:
+                raise ValueError(
+                    f"preset {preset.key!r} declares duplicate starting "
+                    f"equipment {item_key!r}"
+                )
+            seen.add(item_key)
+            definition = ITEM_REGISTRY.get(item_key)
+            if definition is None or definition.equipment_slot is None:
+                raise ValueError(
+                    f"preset {preset.key!r} declares starting equipment {item_key!r} "
+                    "that is not equipment"
+                )
+            slot = definition.equipment_slot
+            if slot is EquipmentSlot.ACCESSORY:
+                accessory_count += 1
+                if accessory_count > ACCESSORY_MAX_SLOTS:
+                    raise ValueError(
+                        f"preset {preset.key!r} declares more than "
+                        f"{ACCESSORY_MAX_SLOTS} starting accessories"
+                    )
+            else:
+                prior = singleton_owner.get(slot)
+                if prior is not None:
+                    raise ValueError(
+                        f"preset {preset.key!r} declares starting equipment "
+                        f"{item_key!r} and {prior!r} claiming the same "
+                        f"{slot.value} slot"
+                    )
+                singleton_owner[slot] = item_key
+
+
 def _validate_preset_sex(registry: dict[str, PlayerPreset]) -> None:
     """Reject a preset whose declared sex is outside the canonical vocabulary.
 
@@ -547,6 +625,7 @@ _validate_preset_skill_kits(PLAYER_PRESET_REGISTRY)
 _validate_preset_identities(PLAYER_PRESET_REGISTRY)
 _validate_preset_affinity_elements(PLAYER_PRESET_REGISTRY)
 _validate_preset_starting_items(PLAYER_PRESET_REGISTRY)
+_validate_preset_starting_equipment(PLAYER_PRESET_REGISTRY)
 _validate_preset_sex(PLAYER_PRESET_REGISTRY)
 _validate_preset_personas(PLAYER_PRESET_REGISTRY)
 _validate_preset_skill_proficiency(PLAYER_PRESET_REGISTRY)
