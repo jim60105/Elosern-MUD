@@ -13,6 +13,10 @@ from world.lore.player_presets import PLAYER_PRESET_REGISTRY, PlayerPreset
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY, StatModifiers
 from world.lore.sex import DEFAULT_SEX, SEX_VALUES
 from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
+from world.rules.progression import (
+    lineage_ownership_closure,
+    seed_lineage_proficiency,
+)
 from world.rules.surfaces import (
     restore_attributes,
     restore_traits,
@@ -543,6 +547,38 @@ def _persona_record_for(
     return None
 
 
+def _preset_lineage_state(
+    preset: PlayerPreset,
+) -> tuple[dict[str, list[str]], dict[str, float]]:
+    """Return the closed ``(skills, skill_proficiency)`` state one preset activates with.
+
+    The third shared caller of the lineage auto-seed (preset-lineage-and-
+    proficiency): composes ``lineage_ownership_closure`` and
+    ``seed_lineage_proficiency`` directly over the preset's declared keys --
+    the same two helpers the import loader and the scene builder share, not
+    the import-record wrapper ``normalize_lineage_record``. The declared keys
+    keep their declared order and closure-added keys follow them per list;
+    the seed satisfies every unsatisfied prerequisite edge to exactly its
+    required value, with the preset's declared ``skill_proficiency`` entries
+    winning over a seeded value even when one leaves an edge unmet -- the
+    same precedence an explicit import-record entry has.
+    """
+    declared_active = list(preset.active_skills)
+    declared_passive = list(preset.passive_skills)
+    add_active, add_passive = lineage_ownership_closure(
+        [*declared_active, *declared_passive]
+    )
+    closed = [*declared_active, *add_active, *declared_passive, *add_passive]
+    skills_value = {
+        "active": [*declared_active, *add_active],
+        "passive": [*declared_passive, *add_passive],
+    }
+    proficiency_value = seed_lineage_proficiency(
+        closed, dict(preset.skill_proficiency)
+    )
+    return skills_value, proficiency_value
+
+
 def activate_player_character(
     account: Any,
     character: Any,
@@ -568,14 +604,17 @@ def activate_player_character(
 
     values = validated.values
     trait_config = trait_config_for_values(values)
-    skills_value = (
-        PLAYER_PRESET_REGISTRY[request.preset_key].skill_lists()
-        if request.mode == "preset"
-        else {"active": [], "passive": []}
-    )
+    # Custom mode grants no skills, so its closure and seed are the empty
+    # state; preset mode closes the declared kit over its prerequisite chain
+    # and seeds the resulting edges (preset-lineage-and-proficiency).
     if request.mode == "preset":
-        inventory_value = PLAYER_PRESET_REGISTRY[request.preset_key].inventory_list()
+        preset = PLAYER_PRESET_REGISTRY[request.preset_key]
+        inventory_value = preset.inventory_list()
+        skills_value, proficiency_value = _preset_lineage_state(
+            preset
+        )
     else:
+        skills_value, proficiency_value = {"active": [], "passive": []}, {}
         # Custom mode hands out the chosen subrace's basic starting kit
         # (add-subrace-starting-kits D2). Load-time coverage guarantees the
         # lookup succeeds; the guarded get keeps even a future registry bug
@@ -589,7 +628,7 @@ def activate_player_character(
         "apparent_age": validated.apparent_age,
         "race": validated.race,
         "subrace": validated.subrace,
-        "skill_proficiency": {},
+        "skill_proficiency": proficiency_value,
         "skills": skills_value,
         "skill_grants": [],
         "equipment": {"weapon_main": None, "weapon_off": None, "armor": None, "accessories": []},

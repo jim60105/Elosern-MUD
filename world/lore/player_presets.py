@@ -1,6 +1,7 @@
 """Immutable starter characters offered during account registration."""
 
 from dataclasses import KW_ONLY, asdict, dataclass, fields
+from math import isfinite
 from typing import Any
 
 from world.lore.elements import ELEMENT_REGISTRY
@@ -121,6 +122,13 @@ class PlayerPreset:
     # affinity, and persona fields by keyword.
     _: KW_ONLY
     sex: str
+    # Declared starting practice XP as ``(skill_key, xp)`` pairs
+    # (preset-lineage-and-proficiency). A declared entry always wins over the
+    # activation auto-seed, even when it leaves a prerequisite edge unmet --
+    # the same precedence an explicit import-record ``skill_proficiency``
+    # entry has. An entry may name a key outside the preset's closed kit; it
+    # is then persisted verbatim exactly as the import path persists one.
+    skill_proficiency: tuple[tuple[str, float], ...] = ()
     persona: PresetPersona = PresetPersona()
 
     def allocation_dict(self) -> dict[str, int]:
@@ -493,9 +501,52 @@ def _validate_preset_personas(registry: dict[str, PlayerPreset]) -> None:
             seen_names.add(name)
 
 
+def _validate_preset_skill_proficiency(registry: dict[str, PlayerPreset]) -> None:
+    """Reject declared practice XP an activation could never apply.
+
+    Mirrors the other preset validators' load-time stance and the raw-record
+    check the import validator performs: every ``skill_proficiency`` key must
+    exist in ``SKILL_REGISTRY``, may appear at most once (a repeat would let
+    ``dict()`` silently drop the earlier entry), and its value must be a
+    finite non-negative number -- a boolean is rejected as non-numeric and a
+    NaN/Infinity never reaches the seed arithmetic. An invalid entry raises at
+    import naming the preset and the key, so it can never reach activation.
+    """
+    for preset in registry.values():
+        seen: set[str] = set()
+        for entry in preset.skill_proficiency:
+            if not isinstance(entry, tuple) or len(entry) != 2:
+                raise ValueError(
+                    f"preset {preset.key!r} declares a malformed skill_proficiency entry"
+                )
+            skill_key, value = entry
+            if skill_key not in SKILL_REGISTRY:
+                raise ValueError(
+                    f"preset {preset.key!r} declares proficiency for unknown "
+                    f"skill {skill_key!r}"
+                )
+            if skill_key in seen:
+                raise ValueError(
+                    f"preset {preset.key!r} declares duplicate proficiency for "
+                    f"{skill_key!r}"
+                )
+            seen.add(skill_key)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not isfinite(value)
+                or value < 0
+            ):
+                raise ValueError(
+                    f"preset {preset.key!r} declares a non-numeric or negative "
+                    f"proficiency for {skill_key!r}"
+                )
+
+
 _validate_preset_skill_kits(PLAYER_PRESET_REGISTRY)
 _validate_preset_identities(PLAYER_PRESET_REGISTRY)
 _validate_preset_affinity_elements(PLAYER_PRESET_REGISTRY)
 _validate_preset_starting_items(PLAYER_PRESET_REGISTRY)
 _validate_preset_sex(PLAYER_PRESET_REGISTRY)
 _validate_preset_personas(PLAYER_PRESET_REGISTRY)
+_validate_preset_skill_proficiency(PLAYER_PRESET_REGISTRY)

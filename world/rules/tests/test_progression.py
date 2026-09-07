@@ -2,6 +2,7 @@
 
 import inspect
 import unittest
+from types import SimpleNamespace
 from tools.spec_traceability import covers_requirement
 
 from unittest.mock import patch
@@ -261,6 +262,59 @@ class ProgressionTests(EvenniaTestCase):
         ):
             with self.subTest(token=token):
                 self.assertNotIn(token, source)
+
+
+class PresetLineageParityTests(unittest.TestCase):
+    """Preset activation is the third caller of the SAME two seed helpers.
+
+    Scenario "Preset activation shares the same helpers": for one skill set
+    the preset path's composed closure + seed must equal what the import
+    record wrapper produces — ordered closed lists and seeded values alike,
+    explicit entries winning identically.
+    """
+
+    @covers_requirement("skill-lineage::import-and-scene-build-auto-seed-prerequisite-proficiency-exactly")
+    def test_preset_path_and_import_path_seed_the_same_values(self):
+        from world.rules.character_creation import _preset_lineage_state
+        from world.rules.progression import normalize_lineage_record
+
+        cases = (
+            ("violet kit", ("fire_ball", "wind_blade"), (), {}),
+            ("deep kit", ("firestorm",), (), {}),
+            (
+                "explicit below edge",
+                ("firestorm",),
+                (),
+                {"scorching_wave": 120.0},
+            ),
+        )
+        for label, active, passive, explicit in cases:
+            with self.subTest(case=label):
+                record = normalize_lineage_record(
+                    {
+                        "skills": list(active),
+                        "passives": list(passive),
+                        "skill_proficiency": dict(explicit),
+                    }
+                )
+                preset = SimpleNamespace(
+                    active_skills=active,
+                    passive_skills=passive,
+                    skill_proficiency=tuple(explicit.items()),
+                )
+                skills_value, proficiency_value = _preset_lineage_state(preset)
+                self.assertEqual(
+                    skills_value["active"], record["skills"],
+                    "preset closure must order identically to the import path",
+                )
+                self.assertEqual(
+                    skills_value["passive"], record["passives"]
+                )
+                self.assertEqual(
+                    proficiency_value,
+                    record.get("skill_proficiency") or {},
+                    "preset seed must equal the import seed exactly",
+                )
 
 
 class NpcPolicyAffordabilityIntegrationTests(EvenniaTestCase):

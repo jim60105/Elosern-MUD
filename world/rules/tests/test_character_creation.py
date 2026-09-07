@@ -205,7 +205,165 @@ class CharacterActivationTests(EvenniaTest):
                     character.db.skills,
                     PLAYER_PRESET_REGISTRY[preset_key].skill_lists(),
                 )
+                # None of these kits touches a lineage edge, so the closed
+                # state is the declared state and the seed stays empty.
+                self.assertEqual(dict(character.db.skill_proficiency or {}), {})
                 self.assertFalse(character.creation_pending)
+
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
+    def test_preset_activation_closes_the_shipped_deep_kit(self):
+        # violet_altoria is the one shipped preset touching the fire-tree
+        # edges: its declared fire_ball needs fire_arrow >= 3. Activation
+        # closes the chain (closure-added keys AFTER the declared ones) and
+        # seeds the edge to exactly its required value, and clears the
+        # preset-mode creation draft in the same transaction.
+        character = create_object(PlayerCharacter, key="shell-violet-lineage")
+        self.account.at_post_create_character(character)
+        character.db.creation_draft = {
+            "mode": "preset", "stage": "preset_selected",
+            "preset_key": "violet_altoria",
+        }
+        activate_player_character(
+            self.account, character,
+            CharacterCreationRequest(mode="preset", preset_key="violet_altoria"),
+        )
+        self.assertEqual(
+            character.db.skills,
+            {
+                "active": ["fire_ball", "wind_blade", "fire_arrow"],
+                "passive": [
+                    "magic_circle_comprehension", "precise_mana_control", "flight",
+                ],
+            },
+        )
+        self.assertEqual(character.db.skill_proficiency, {"fire_arrow": 150.0})
+        self.assertFalse(character.attributes.has("creation_draft"))
+        self.assertFalse(character.creation_pending)
+
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
+    def test_every_shipped_preset_declared_active_skill_is_usable_after_activation(self):
+        # Scenario coverage for every shipped kit: after closure + seed,
+        # can_use_skill passes for every declared active key.
+        from world.rules.progression import can_use_skill
+        from world.skills.registry import SKILL_REGISTRY
+
+        for preset_key, preset in PLAYER_PRESET_REGISTRY.items():
+            with self.subTest(preset_key=preset_key):
+                character = create_object(
+                    PlayerCharacter, key=f"gate-shell-{preset_key}"
+                )
+                self.account.at_post_create_character(character)
+                activate_player_character(
+                    self.account, character,
+                    CharacterCreationRequest(mode="preset", preset_key=preset_key),
+                )
+                for skill_key in preset.active_skills:
+                    with self.subTest(skill=skill_key):
+                        self.assertTrue(
+                            can_use_skill(character, SKILL_REGISTRY[skill_key])
+                        )
+
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
+    def test_custom_activation_writes_empty_skills_and_proficiency(self):
+        # Custom mode grants no skills, so the closure and seed are no-ops.
+        activate_player_character(self.account, self.character, self.request())
+        self.assertEqual(self.character.db.skills, {"active": [], "passive": []})
+        self.assertEqual(dict(self.character.db.skill_proficiency or {}), {})
+
+    def _synthetic_preset(self, key, **overrides):
+        from world.lore.player_presets import PlayerPreset
+
+        values = dict(
+            key=key, display_name=f"合成{key}", age=20, apparent_age=20,
+            race="human", subrace="human_commoner",
+            allocations=tuple(balanced_allocations("human", "human_commoner").items()),
+            emphasis="測試", sex="female",
+        )
+        values.update(overrides)
+        return PlayerPreset(**values)
+
+    def _activate_synthetic_preset(self, preset, shell_key):
+        """Activate a registry-patched synthetic preset on a fresh shell."""
+        from unittest.mock import patch
+        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+
+        with patch.dict(PLAYER_PRESET_REGISTRY, {preset.key: preset}):
+            character = create_object(PlayerCharacter, key=shell_key)
+            self.account.at_post_create_character(character)
+            activate_player_character(
+                self.account, character,
+                CharacterCreationRequest(mode="preset", preset_key=preset.key),
+            )
+        return character
+
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
+    def test_synthetic_deep_preset_kit_arrives_gate_usable(self):
+        # Scenario "A deep preset kit arrives gate-usable": firestorm's edge
+        # (scorching_wave >= 3) is satisfied by nothing declared, so the
+        # closure adds the whole chain and the seed lands on EXACTLY three
+        # levels for every unsatisfied edge of the chain.
+        from world.rules.progression import (
+            SKILL_PROFICIENCY_XP_PER_LEVEL,
+            can_use_skill,
+        )
+        from world.skills.registry import SKILL_REGISTRY
+
+        preset = self._synthetic_preset(
+            "test_lineage_deep", active_skills=("firestorm",)
+        )
+        character = self._activate_synthetic_preset(preset, "shell-lineage-deep")
+        self.assertEqual(
+            character.db.skills,
+            {
+                "active": ["firestorm", "fire_arrow", "fire_ball", "scorching_wave"],
+                "passive": [],
+            },
+        )
+        self.assertEqual(
+            character.db.skill_proficiency,
+            {
+                "fire_arrow": 3 * SKILL_PROFICIENCY_XP_PER_LEVEL,
+                "fire_ball": 3 * SKILL_PROFICIENCY_XP_PER_LEVEL,
+                "scorching_wave": 3 * SKILL_PROFICIENCY_XP_PER_LEVEL,
+            },
+        )
+        self.assertTrue(can_use_skill(character, SKILL_REGISTRY["firestorm"]))
+
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
+    def test_declared_proficiency_below_the_seed_survives_activation(self):
+        # Scenario "A declared proficiency beats the auto-seed": 120 XP is
+        # level 2, below the scorching_wave >= 3 edge; the seed must not
+        # overwrite the declared value.
+        preset = self._synthetic_preset(
+            "test_lineage_declared",
+            active_skills=("firestorm",),
+            skill_proficiency=(("scorching_wave", 120.0),),
+        )
+        character = self._activate_synthetic_preset(
+            preset, "shell-lineage-declared"
+        )
+        self.assertEqual(character.db.skill_proficiency["scorching_wave"], 120.0)
+
+    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
+    def test_declared_keys_keep_order_and_closure_added_keys_follow(self):
+        # Declared (fire_ball, firestorm) keeps its order; the closure-added
+        # keys (sorted registry order) follow the declared ones.
+        preset = self._synthetic_preset(
+            "test_lineage_order",
+            active_skills=("fire_ball", "firestorm"),
+            passive_skills=("defense_instinct",),
+        )
+        character = self._activate_synthetic_preset(preset, "shell-lineage-order")
+        self.assertEqual(
+            character.db.skills,
+            {
+                "active": [
+                    "fire_ball", "firestorm",  # declared order
+                    "fire_arrow", "scorching_wave",  # closure-added, sorted
+                ],
+                "passive": ["defense_instinct"],
+            },
+        )
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
     def test_preset_activation_grants_the_declared_starting_inventory(self):
