@@ -325,7 +325,7 @@ class CompanionBuildTests(_BuilderCase):
         self.assertEqual(ObjectDB.objects.count(), before)
 
 
-class CompanionBoundsSweepRegistration(_BuilderCase):
+class CompanionBoundsSweepRegistrationTests(_BuilderCase):
     """The sweep is a real import-time gate, not a dormant helper."""
 
     @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")

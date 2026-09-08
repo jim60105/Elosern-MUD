@@ -1,6 +1,14 @@
-# starting-companions delta
+# starting-companions Specification
 
-## ADDED Requirements
+## Purpose
+
+Let a player preset declare NPC starting companions as references to their own preset
+cards, validate those declarations at load (lore-side shape plus rules-side
+bounds), and build each declaration into a live, fully-configured LLMNPC that
+mechanically mirrors the player version of the same card. Party binding and
+affinity seeding are deliberately out of scope (preset-companion-activation).
+
+## Requirements
 
 ### Requirement: A preset declares its starting companions by partner preset key
 `world/lore/player_presets.py` SHALL define a frozen `StartingCompanion` carrying
@@ -25,8 +33,10 @@ validation SHALL reject an unregistered `preset_key`, a preset naming itself,
 or the same partner declared twice by one preset. Because `world/lore/` SHALL
 NOT import `world/rules/`, the two bounds derived from rules constants SHALL be
 swept at `world/rules/` import time: a preset SHALL declare at most
-`PARTY_MAX_COMPANIONS` companions, and each `affinity` SHALL be an integer in
-`1..NATURAL_CAP`.
+`PARTY_MAX_COMPANIONS` companions, each `affinity` SHALL be an integer in
+`1..NATURAL_CAP`, and each `relationship` label SHALL fit the persona prose
+field cap (`MAX_PERSONA_FIELD_LENGTH`) because the label is injected into the
+built persona's `social_connection`, which `PersonaStore` renders as prose.
 
 #### Scenario: The twins declare each other
 - **WHEN** `PLAYER_PRESET_REGISTRY` is inspected
@@ -41,7 +51,7 @@ swept at `world/rules/` import time: a preset SHALL declare at most
 - **THEN** importing `world.lore.player_presets` raises
 
 #### Scenario: An out-of-bounds declaration is rejected at rules load
-- **WHEN** a preset declares more than `PARTY_MAX_COMPANIONS` companions, or an affinity below 1 or above `NATURAL_CAP`
+- **WHEN** a preset declares more than `PARTY_MAX_COMPANIONS` companions, an affinity below 1 or above `NATURAL_CAP`, or a relationship label beyond the persona field cap
 - **THEN** importing `world.rules.starting_companions` raises from its registry sweep, naming the offending preset
 
 ### Requirement: A companion is built from its partner preset as a live LLMNPC
