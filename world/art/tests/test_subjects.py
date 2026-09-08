@@ -1,10 +1,13 @@
 """Tests for the art subject model (pure, no database)."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 import unittest
 
 from evennia.utils.test_resources import EvenniaTestCase
 
+from world.prompts.tests.fixtures import PromptFixture
+
+from world.art import subjects
 from world.art.subjects import (
     DIGITS_ONLY_KEY_PATTERN,
     FORBIDDEN_SUBJECT_KEY_CHARACTERS,
@@ -23,6 +26,7 @@ from world.art.subjects import (
     scene_description,
     scene_subject_for,
 )
+from world.prompts.loader import PromptUnavailableError
 
 from tools.spec_traceability import covers_requirement
 
@@ -269,6 +273,212 @@ class DescriptionTests(EvenniaTestCase):
         monster_text = description_for(monster)
         self.assertIn("Threats a beginning adventurer", monster_text)
         self.assertEqual(monster_text, monster_description(monster))
+
+
+def _persona_entity(persona):
+    """A DB-free stand-in character with a fixed identity and the given persona."""
+    entity = Mock()
+    entity.db.display_name = "艾琳"
+    entity.db.race = "beastfolk"
+    entity.db.subrace = "catkin"
+    entity.db.persona = persona
+    entity.key = "艾琳"
+    return entity
+
+
+_APPEARANCE = {
+    "height": "tall",
+    "weight": "slender",
+    "measurement": "narrow-shouldered",
+    "style": "travel-worn leather",
+    "overview": "a sharp-eyed scout",
+    "attire": "a hooded cloak",
+    "feature": "a silver ear piercing",
+}
+
+
+class AppearanceDescriptionTests(PromptFixture):
+    """The admitted persona ``appearance`` block in character descriptions
+    (portrait-prompt-appearance): ordering, exclusion, determinism, emptiness."""
+
+    def _full_persona(self):
+        # Insertion order deliberately shuffled away from _SUBKEY_ORDER so the
+        # declared rendering order is what the ordering assertions observe.
+        return {
+            "appearance": {
+                "attire": "a hooded cloak",
+                "overview": "a sharp-eyed scout",
+                "height": "tall",
+                "style": "travel-worn leather",
+                "measurement": "narrow-shouldered",
+                "feature": "a silver ear piercing",
+                "weight": "slender",
+            },
+            "personality": "guarded beneath a warm smile",
+            "habit": "hums old road songs",
+            "background": "raised in the border caravans",
+            "life_story": "lost her patrol at the Ashford crossing",
+            "identity": {
+                "public": "village scout",
+                "hidden": "exiled crown courier",
+            },
+            "social_connection": {"貝莎": "apprenticed smith"},
+        }
+
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    def test_full_persona_contributes_every_appearance_subkey_and_nothing_else(self):
+        self.load()
+        text = character_description(_persona_entity(self._full_persona()), 31)
+        self.assertIn("艾琳", text)
+        self.assertIn("貓人族", text)
+        self.assertIn("31", text)
+        for value in _APPEARANCE.values():
+            self.assertIn(value, text)
+        for excluded in (
+            "guarded beneath a warm smile",
+            "hums old road songs",
+            "raised in the border caravans",
+            "lost her patrol at the Ashford crossing",
+            "village scout",
+            "exiled crown courier",
+            "貝莎",
+            "apprenticed smith",
+        ):
+            self.assertNotIn(excluded, text)
+
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    def test_hidden_identity_layer_never_reaches_the_prompt(self):
+        self.load()
+        persona = self._full_persona()
+        persona["identity"] = {"public": "村落的偵察員", "hidden": "流放的王室信使"}
+        text = character_description(_persona_entity(persona), 31)
+        self.assertNotIn("流放的王室信使", text)
+        self.assertNotIn("村落的偵察員", text)
+        self.assertIn("a silver ear piercing", text)
+
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    def test_description_is_byte_identical_with_declared_subkey_order(self):
+        self.load()
+        entity = _persona_entity(self._full_persona())
+        first = character_description(entity, 31)
+        second = character_description(entity, 31)
+        self.assertEqual(first, second)
+        # The contracted shape: base sentence, then the labeled appearance
+        # block in _SUBKEY_ORDER order (unknown sub-keys would follow in
+        # insertion order).
+        self.assertEqual(
+            first,
+            "A 貓人族 character named 艾琳 (31) in the approved visual style.\n"
+            "外觀：\n"
+            "height：tall\n"
+            "weight：slender\n"
+            "measurement：narrow-shouldered\n"
+            "style：travel-worn leather\n"
+            "overview：a sharp-eyed scout\n"
+            "attire：a hooded cloak\n"
+            "feature：a silver ear piercing",
+        )
+        positions = [first.index(_APPEARANCE[key]) for key in (
+            "height", "weight", "measurement", "style", "overview", "attire", "feature"
+        )]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(len(set(positions)), len(positions))
+
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    def test_empty_appearance_renders_the_pre_change_description(self):
+        self.load()
+        expected = "A 貓人族 character named 艾琳 (24) in the approved visual style."
+        for persona in (
+            {},
+            {"appearance": {}, "personality": "guarded"},
+            {"appearance": {"height": "", "attire": ""}},
+            None,
+            "secret tragic past",
+        ):
+            with self.subTest(persona=persona):
+                self.assertEqual(character_description(_persona_entity(persona), 24), expected)
+
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    def test_disguised_stats_never_appear_as_physical_truth(self):
+        self.load()
+        entity = _persona_entity(self._full_persona())
+        entity.db.disguised_stats = {
+            "str": 87,
+            "physique": 154,
+            "grace": 43,
+            "vigour": 106,
+        }
+        entity.db.age = 61
+        text = character_description(entity, 31)
+        for value in (87, 154, 43, 106):
+            self.assertNotIn(str(value), text)
+        self.assertIn("a silver ear piercing", text)
+
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    def test_overlong_appearance_is_capped_to_the_persona_field_bound(self):
+        # The section inherits PersonaStore's per-field cap, so a pathological
+        # authored block can never smuggle an unbounded prompt to the pipeline.
+        self.load()
+        persona = {"appearance": {"overview": "長" * 900}}
+        text = character_description(_persona_entity(persona), 31)
+        section = text.removeprefix(
+            "A 貓人族 character named 艾琳 (31) in the approved visual style.\n"
+        )
+        self.assertEqual(len(section), 600)
+        self.assertTrue(section.endswith("…"))
+
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    def test_degraded_fallback_reads_no_persona(self):
+        # Only art.character_description is broken, so the PromptUnavailableError
+        # fallback branch is what runs. Any persona read raises through the trap.
+        self.write_file(
+            "art.yaml",
+            "schema_version: 1\nprompts:\n"
+            "  art.style: approved visual style\n"
+            "  art.character_description: A {race} character named {name} ({age}) in the {style} {oops}.\n"
+            '  art.monster_description: "{description} ({display_name}；例如：{examples})"\n',
+        )
+        self.load()
+
+        class _DbTrap:
+            """Identity fields resolve; touching persona fails the test."""
+
+            display_name = "艾琳"
+            race = "beastfolk"
+            subrace = "catkin"
+
+            @property
+            def persona(self):
+                raise AssertionError("the degraded fallback must read no persona")
+
+        entity = Mock()
+        entity.db = _DbTrap()
+        entity.key = "艾琳"
+        self.assertEqual(character_description(entity, 24), "艾琳（貓人族，24 歲）")
+
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    def test_library_turning_unavailable_mid_render_keeps_the_base(self):
+        # A reload that breaks the key between the base render and the
+        # appearance render must degrade to the appearance-free base, never
+        # raise and never lose the portrait.
+        self.load()
+        entity = _persona_entity({"appearance": {"feature": "a silver ear piercing"}})
+        real = subjects.render_prompt
+        calls = []
+
+        def stub(key, **values):
+            if key == "art.character_description":
+                calls.append(values["appearance"])
+                if len(calls) == 2:
+                    raise PromptUnavailableError("art.yaml", key, "swapped mid-call")
+            return real(key, **values)
+
+        with patch.object(subjects, "render_prompt", stub):
+            text = character_description(entity, 31)
+        self.assertEqual(calls, ["", "\n外觀：\nfeature：a silver ear piercing"])
+        self.assertEqual(
+            text, "A 貓人族 character named 艾琳 (31) in the approved visual style."
+        )
 
 
 if __name__ == "__main__":

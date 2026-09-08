@@ -66,7 +66,7 @@ _NPC_DIALOGUE_TEMPLATE = (
     "你沒有把握能確實執行的行為，不要寫進 intent。"
 )
 _NPC_THINKING = "（{name} 沉思片刻……）"
-_ART_CHARACTER_TEMPLATE = "A {race} character named {name} ({age}) in the {style}."
+_ART_CHARACTER_TEMPLATE = "A {race} character named {name} ({age}) in the {style}.{appearance}"
 _SCENE_BUILDER_SYSTEM = (
     "你是《伊洛瑟恩大陸》的場景氛圍描述者。場景句子：{scene_sentence}。"
     "任務脈絡：{quest_context}。房間名稱：{room_name}。地區：{region}。"
@@ -162,9 +162,10 @@ class VerbatimShipmentTests(unittest.TestCase):
                 name="艾琳",
                 age="24",
                 style=style,
+                appearance="",
             ),
             _ART_CHARACTER_TEMPLATE.format(
-                race="貓人族", name="艾琳", age="24", style=style
+                race="貓人族", name="艾琳", age="24", style=style, appearance=""
             ),
         )
         self.assertEqual(
@@ -174,6 +175,7 @@ class VerbatimShipmentTests(unittest.TestCase):
                 name="艾琳",
                 age="24",
                 style=style,
+                appearance="",
             ),
             "A 貓人族 character named 艾琳 (24) in the approved visual style.",
         )

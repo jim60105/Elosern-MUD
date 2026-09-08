@@ -42,7 +42,7 @@ def _build() -> dict[str, PromptSpec]:
         PromptSpec(
             "art.character_description",
             "art.yaml",
-            ("race", "name", "age", "style"),
+            ("race", "name", "age", "style", "appearance"),
         ),
         PromptSpec(
             "art.monster_description",

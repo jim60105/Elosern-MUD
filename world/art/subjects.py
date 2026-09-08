@@ -20,6 +20,7 @@ from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.races import SUBRACE_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.prompts.loader import PromptUnavailableError, render_prompt
+from world.rules.persona import PersonaStore
 
 # The single shared stable-key contract (fix-art-pipeline-contracts D1): every
 # producer of a portrait/scene stable key validates against these same rules.
@@ -209,29 +210,71 @@ def _race_label(entity) -> str:
     return str(entity.db.race or "unknown race")
 
 
+def _appearance_fragment(entity) -> str:
+    """The persona ``appearance`` block as one bounded prompt fragment.
+
+    Reads exactly the one ``appearance`` field through the read-only
+    ``PersonaStore`` — personality, life_story, habit, background, identity
+    (public or hidden), and social_connection are never touched — and reuses
+    the store's shipped guarantees: ``_SUBKEY_ORDER`` declared sub-key order
+    with the insertion-order tail, empty/numeric-value skipping, the per-field
+    600-character cap, and a never-raising non-mapping record that renders as
+    the empty string. The labeled block (``外觀：`` plus one line per sub-key)
+    is appended after the base sentence, so a character with no appearance
+    data contributes nothing.
+    """
+    block = PersonaStore(entity).flatten(("appearance",))
+    if block is None:
+        return ""
+    return "\n" + block
+
+
 def character_description(entity, age: int) -> str:
     """One deterministic description for a character portrait.
 
     The template (rendered from the prompt library) covers only stable,
     validated identity: the display name, race/subrace label, the age, and the
-    approved-visual-style fragment. Persona text, secret state, mutable combat
-    resources, and disguised stats are never included (design D6). A broken
+    approved-visual-style fragment, and — as the one admitted persona
+    exception — the authored physical ``appearance`` block rendered in the
+    declared ``_SUBKEY_ORDER`` order (portrait-prompt-appearance). Every other
+    persona key, secret state, mutable combat resources, and disguised stats
+    are never included (design D6 as narrowed by that change). A broken
     library key degrades to a deterministic registry-driven fallback (design
-    D3) so the art pipeline never stalls.
+    D3) so the art pipeline never stalls; the fallback reads no persona at
+    all, which is why both library renders complete before any persona read.
     """
     race = _race_label(entity)
     name = entity.db.display_name or entity.key or "<unknown>"
     try:
         style = render_prompt("art.style")
+        base = render_prompt(
+            "art.character_description",
+            race=race,
+            name=name,
+            age=str(age),
+            style=style,
+            appearance="",
+        )
+    except PromptUnavailableError:
+        return f"{name}（{race}，{age} 歲）"
+    appearance = _appearance_fragment(entity)
+    if not appearance:
+        return base
+    try:
         return render_prompt(
             "art.character_description",
             race=race,
             name=name,
             age=str(age),
             style=style,
+            appearance=appearance,
         )
     except PromptUnavailableError:
-        return f"{name}（{race}，{age} 歲）"
+        # observability: ignore R2: the library is frozen after the startup
+        # load, so a key can only turn unavailable between the two renders
+        # when a test swaps it; the appearance-free base is a valid
+        # deterministic description and must never lose the portrait.
+        return base
 
 
 def scene_description(subject: ArtSubject) -> str:
