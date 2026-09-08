@@ -131,6 +131,9 @@ characterization and monster-tier startup ensure behave likewise.
 
 ### 4.4 Offline behavior (D13)
 
+> Superseded during decomposition — see §12.3.1: the request never probes; an
+> unreachable server is a bounded failed settle that appends no card.
+
 `request_gallery_image` checks SD availability the way the existing queue
 drain does and raises/returns a named unavailable result without queueing.
 Nothing in §5 depends on generation ever having succeeded.
@@ -156,6 +159,9 @@ the sole URL-issuing boundary: gallery paths go through the same
 symlink/path-confinement validation as today.
 
 ## 6. Face rect and avatar (D9)
+
+> Not delivered by the change decomposition — see §12.4: the rectangle ships,
+> but no change wires it into the live client's avatar frames.
 
 - Constant `DEFAULT_FACE_RECT = {x: 0.25, y: 0.06, w: 0.5, h: 0.5}` (upper-half
   anchor) — used for auto-generated cards and for any card lacking a rect.
@@ -183,6 +189,9 @@ symlink/path-confinement validation as today.
 - Seed cards are regular cards: user-deletable, default-settable.
 
 ### 7.2 Built-in fallback set (in git)
+
+> Refined during decomposition — see §12.3.3: the set is served through the
+> `/art/defaults/<key>.<ext>` route rather than as raw static assets.
 
 - A handful of static images in the served static tree
   (`web/static/art/defaults/`), keyed `man`, `woman`, `boy`, `girl`, `elder`,
@@ -238,6 +247,9 @@ Recorded intent only; the Vue rewrite owns implementation:
 
 ## 11. Explicitly out of scope
 
+> Refined during decomposition — see §12.3.2: the resolution chain keeps the
+> classic asset record as one lower-priority step, so nothing needs migrating.
+
 - Face detection, server-side cropping, second avatar asset.
 - Frontend gallery UI implementation (intent only, §8).
 - Any new player-facing command or `docs/game/commands.md` change.
@@ -245,3 +257,105 @@ Recorded intent only; the Vue rewrite owns implementation:
 - Backward-compat shims for pre-existing single-portrait outputs (no released
   users; the migration is simply "re-resolve": old fixed-identity files remain
   readable until deleted, but new resolution reads only galleries).
+
+## 12. Change decomposition (OpenSpec proposals)
+
+Written 2026-09-08 after this design was approved. The design above is the
+contract; this section records how it was carved into independently shippable
+OpenSpec changes, in what order they may run, and the three points where the
+decomposition deliberately departs from the text above.
+
+### 12.1 The seven changes
+
+| # | Change | New capability | Scope | Depends on |
+|---|---|---|---|---|
+| 1 | `gallery-card-model` | `art-gallery-model` | `world/art/gallery.py`: `GalleryRecord`, the card contract, face-rect and binding validation, the no-create equipment snapshot reader, the monster one-card cap, the single-writer boundary, tolerant reads. Plus `world/art/paths.py`, the one store-root confinement helper. | — |
+| 2 | `gallery-generation-jobs` | `art-gallery-generation` | Per-image job records keyed `art:<subject>:gen:<image-id>`, job-key-resolved settle, record-derived output identity, settle-as-card-append, spent-job deletion, orphan prune at startup, `gallery_generate` / `gallery_settle`. Request seam without field selection. | 1 |
+| 3 | `gallery-prompt-composition` | `art-gallery-prompt-fields` | The closed field catalog (`appearance` plus the four equipment slots), `ItemPresentation` fragments, the bounded free-text field, `requested_fields` provenance, the two new `art.character_description` slots. | 2, 7 |
+| 4 | `gallery-resolution-chain` | `art-gallery-resolution` | `world/art/gallery_match.py`, presenter integration, the `gallery/` and `defaults/` media-route branches, `face_rect` on every payload and in the `art` / `roster` wire validators. | 1 |
+| 5 | `gallery-builtin-fallbacks` | `art-gallery-fallback` | The six committed images, the closed key vocabulary, declaration → sex/age band → deterministic hash resolution, the per-key rectangles, `gallery_fallback_used`. | 4 |
+| 6 | `gallery-seed-sync` | `art-gallery-seed-sync` | `ART_SEED_ROOT`, the compose `:ro,z` mount, the gitignore entry, `world/art/gallery_seed.py::sync_all()`, path-derived idempotency, the optional per-subject manifest. | 1 |
+| 7 | `gallery-autogen-retrofit` | `art-gallery-autogen` | The D7 retrofit: every automatic character path routes to the gallery as one unbound appearance-only card, gallery-based idempotency, the player-creation skip flag, the `@art requeue` character branch. | 2 |
+
+Modified existing capabilities: `art-queue-worker` (by 2 and 4, different
+requirement blocks), `art-subject-model` (by 3), `container-image` (by 6),
+`art-asset-lifecycle`, `spawn-named-portraits`, `art-staff-commands` (by 7),
+`webclient-art-panel` and `webclient-character-roster` (by 4).
+
+Each change is sized for roughly one engineer-workday.
+
+### 12.2 Parallel batch order
+
+- **Batch 1** — `gallery-card-model`. Every other change builds on the card
+  contract, so it lands alone.
+- **Batch 2** — `gallery-generation-jobs`, `gallery-resolution-chain`. The first
+  owns `queue.py` / `worker.py` / `service.py`; the second owns `presenter.py` /
+  `web/art_media.py` / the webclient payloads. No shared files.
+- **Batch 3** — `gallery-builtin-fallbacks`, `gallery-seed-sync`,
+  `gallery-autogen-retrofit`. Each depends on a batch-1 or batch-2 change and
+  touches a distinct area (the fallback set, settings/compose/startup, and the
+  auto-generation seams respectively).
+- **Batch 4** — `gallery-prompt-composition`, alone. It must land AFTER
+  `gallery-autogen-retrofit`: both rewrite
+  `world/art/service.py::_ensure_character_portrait` and the startup recovery
+  scan, and this change's job there is to make the already-retrofitted request's
+  field selection explicit. Running the two in parallel is a guaranteed rewrite
+  conflict in the same functions. `gallery-autogen-retrofit` is written so it does
+  NOT need the `fields` keyword this change introduces.
+
+Known coordination points:
+
+- `gallery-generation-jobs` and `gallery-seed-sync` each add one startup step to
+  `server/conf/at_server_startstop.py` (a two-line merge if they overlap).
+- `gallery-generation-jobs` and `gallery-resolution-chain` each carry a delta for
+  the `art-queue-worker` capability, but for different requirement blocks; archive
+  them in landing order.
+- `gallery-builtin-fallbacks` carries an authoring dependency outside the code:
+  six license-clear images (`man`, `woman`, `boy`, `girl`, `elder`,
+  `monster_anon`), size-bounded, with no sexualized content in any of them. It is
+  the one change engineering cannot finish on its own.
+
+### 12.3 Deliberate deviations from this design
+
+1. **§4.4 offline probe → reported failure.** `request_gallery_image` does NOT
+   probe sd-webui availability. Probing would require a module under `world/art/`
+   other than `connectivity.py` to import `world.art.connectivity`, which the
+   `art-service-connectivity-surface` requirement forbids and an import-boundary
+   test enforces. Instead the request enqueues unconditionally; an unreachable
+   server settles the job `failed` with its existing bounded named error code,
+   appends no card, and records that code on the `GalleryRecord`. This delivers
+   D13's actual guarantee — a reported unavailable outcome with the resolution
+   chain untouched — without breaking the connectivity boundary.
+2. **§11 "new resolution reads only galleries" → one extra chain step.** The
+   resolution chain keeps the classic `ArtAssetRecord` `done` asset as the step
+   after the subject default and before the fallback. Monsters, scenes, and any
+   not-yet-migrated portrait therefore keep resolving exactly as they do today,
+   and the retrofit needs no migration at all. The cost is one strictly
+   lower-priority step in the chain.
+3. **§7.2 static serving → the `/art/defaults/` route.** The built-in fallback
+   images are served through the existing `/art/` route from a fixed in-repo
+   defaults directory rather than as raw static assets, so `/art/...` stays the
+   single media URL vocabulary the wire validators accept and one confinement
+   discipline covers every served image.
+
+Two naming refinements, both following the `PROMPT_ROOT` / `PROMPTS_DIR`
+precedent §7.1 cites: the engine setting is `ART_SEED_ROOT` (read from the
+environment variable of the same name, defaulting to `<GAME_DIR>/art-seed`),
+while `ART_SEED_DIR` stays the compose-only interpolation variable for the host
+bind mount. The gallery store path's `<kind>` segment is the closed set
+`character` / `monster`, so a stored identity is always four path segments.
+
+### 12.4 Known gap: face_rect ships with no live consumer
+
+D12 was written on the premise that the Vue rewrite had left no frontend to
+integrate with. That is not the current state: `web/webclient-app/` is the
+production client, and `ArtPanel`, `ParticipantFrame`, `CharacterSwitcher`,
+`PartyStrip`, `PartyDrawer`, and `NarrativeFeed` all render portraits with
+`object-fit: cover` — exactly the blind centre crop §1 and §6 set out to replace.
+
+Adding `face_rect` to the payload is additive and safe for that client (it reads
+entries by key and performs no `schema_version` check), but none of the seven
+changes wires the rectangle into a CSS offset. D12's deferral stands, so the
+consequence is recorded rather than resolved: **§6's avatar behaviour is NOT
+delivered by this decomposition** and needs a separate frontend change once the
+rewrite settles.
