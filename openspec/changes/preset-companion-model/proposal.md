@@ -55,6 +55,12 @@ companion into the party at activation follows separately.
 
 No backward compatibility or data migration: the project has no released users.
 
+Interim boot note: nothing in the runtime import graph pulls
+`world/rules/starting_companions.py` until `preset-companion-activation` wires
+the builder into activation, so within this change the rules-side bounds sweep
+runs wherever the module is imported (its tests) rather than at server boot;
+the delta scenario pins the sweep to this module's import deliberately.
+
 ## Capabilities
 
 ### New Capabilities
