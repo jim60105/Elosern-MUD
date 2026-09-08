@@ -26,10 +26,14 @@ at `entity.db.sexual` (change 4's loader convention), never confused with or ove
 When `entity.db.sexual` is a populated dict, `SexualState`'s construction
 SHALL derive every field's initial value from that dict, defaulting any optional field the dict omits
 (`wetness`, `shame`, `exposure`, `climax_phase`) to its vocabulary's first (lowest) level. Two
-production paths SHALL produce that dict: the character import loader, and preset activation in
-`world/rules/character_creation.py` when the selected preset declares a `sexual_baseline`. A preset
-declaring no baseline SHALL leave the attribute absent, so the existing default-construction rules
-apply unchanged.
+production construction paths SHALL produce that dict: the character import loader, and preset
+activation in `world/rules/character_creation.py` when the selected preset declares a
+`sexual_baseline`. The companion builder `world/rules/starting_companions.py` writes the same
+raw record onto each built companion NPC from the partner preset's own declared baseline,
+conditioned identically (an undeclared baseline writes nothing), so it is the same
+preset-activation production path applied to companion construction, not a third writer class.
+A preset declaring no baseline SHALL leave the attribute absent, so the existing
+default-construction rules apply unchanged.
 
 #### Scenario: A fully-specified baseline is used verbatim
 - **WHEN** `entity.db.sexual` is `{"arousal": "微興奮", "virgin": true, "sensitivity": {}}`
@@ -431,6 +435,13 @@ raise an exposure field-change event. Every player-facing read surface
 effective ordinal with unchanged row/payload schemas. Every shipped consumer
 of stored exposure SHALL be classified (stored vs effective) in a structural
 allowlist test, and a new raw consumer outside the allowlist SHALL fail it.
+Modules that name `exposure` only as preset-declaration vocabulary — authored
+baseline card keywords and the validator's level table in
+`world/lore/player_presets.py` — are enumerated in the same structural
+allowlist as declaration-only exemptions: they construct baseline records and
+SHALL NOT read `entity.sexual`, stored `sexual_traits` state, or an effective
+overlay. The exemption is per-module and auditable; a live-state read added to
+an exempt module SHALL still be classified as a consumer.
 
 #### Scenario: Progression ignores what is worn
 

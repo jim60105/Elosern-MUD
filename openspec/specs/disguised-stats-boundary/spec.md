@@ -80,7 +80,10 @@ resolve a gameplay stat from it; they are not consumers and are unchanged by thi
 Seeding the layer is a separate, bounded set of WRITERS: `world/imports/loader.py` (import
 records) and `world/rules/character_creation.py` (preset activation) SHALL be the only production
 modules that seed `entity.db.disguised_stats` from an authored declaration at entity
-construction, each never reading the mapping back to make a decision. The runtime write for
+construction, each never reading the mapping back to make a decision. The companion builder
+`world/rules/starting_companions.py` seeds each declared partner preset's own authored card
+during preset activation — the same construction-time seeding class, derived entirely from the
+partner's registry declaration and never read back. The runtime write for
 `status_disguise`, `world/rules/skill_effects.py::apply_disguise_effect`, is sanctioned and bound
 by the `skill-handler` capability's own requirement (it touches only the display layer).
 Snapshot/restore machinery (the activation, action, clock, and cast-settlement rollback surfaces)
@@ -99,10 +102,11 @@ forbidden-module list (`world/rules/combat.py`, `world/rules/dice.py`,
   `disguised_stats`
 - **THEN** the sanctioned readers are exactly the `look <target>` displayed-stats block and the
   guild-registration snapshot path, the sanctioned writers are exactly the import loader and preset
-  activation at construction (beside the skill-handler-owned runtime write and value-carrying
-  restores), and no other module reads the raw disguise mapping directly to resolve a gameplay
-  stat value (perception injection and secret-set comparison are perception material, not
-  stat resolution)
+  activation at construction, plus the companion builder seeding each declared partner's own
+  preset card during activation (beside the skill-handler-owned runtime write and
+  value-carrying restores), and no other module reads the raw disguise mapping directly to
+  resolve a gameplay stat value (perception injection and secret-set comparison are perception
+  material, not stat resolution)
 
 #### Scenario: Promotion uses canonical state
 - **WHEN** a registered actor changes or clears disguise before a guild examination

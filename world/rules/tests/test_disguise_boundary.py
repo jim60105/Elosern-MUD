@@ -19,8 +19,10 @@ FORBIDDEN_MODULES = (
 )
 
 # Every production module that assigns entity.db.disguised_stats, classified
-# (preset-disguise-and-sexual-baseline writer clause). The two SEEDERS author
-# a declaration at entity construction; the typeclass shell init is the
+# (preset-disguise-and-sexual-baseline writer clause). The three SEEDERS
+# author a declaration at entity construction — the import loader, player
+# preset activation, and the companion builder binding each partner preset's
+# own authored card during activation; the typeclass shell init is the
 # storage convention entity-traits declared, and the status_disguise runtime
 # write is bound by the skill-handler capability's own requirement — neither
 # authors a preset/import declaration. Snapshot/restore machinery re-assigns
@@ -29,6 +31,7 @@ FORBIDDEN_MODULES = (
 ASSIGNED_BY = {
     "world/imports/loader.py": "import-record seeder",
     "world/rules/character_creation.py": "preset-activation seeder",
+    "world/rules/starting_companions.py": "companion-activation seeder (partner-preset declaration)",
     "typeclasses/entities.py": "storage-convention shell init to None",
     "world/rules/skill_effects.py": "skill-handler runtime write",
 }
@@ -74,8 +77,10 @@ class DisguiseBoundaryTests(EvenniaTest):
         # The writer half of the reader/writer split: every production
         # assignment of the attribute is accounted in ASSIGNED_BY, so the
         # only modules seeding an AUTHORED declaration at construction remain
-        # the import loader and preset activation. A new write site has to be
-        # classified here deliberately rather than silently widening the set.
+        # the import loader, player preset activation, and the companion
+        # builder seeding each declared partner's own preset card. A new
+        # write site has to be classified here deliberately rather than
+        # silently widening the set.
         root = Path(__file__).resolve().parents[3]
         assigned = set()
         for tree in PRODUCTION_ROOTS:
@@ -101,4 +106,5 @@ class DisguiseBoundaryTests(EvenniaTest):
         self.assertIn("writers", doc)
         self.assertIn("world/imports/loader.py", doc)
         self.assertIn("world/rules/character_creation.py", doc)
+        self.assertIn("world/rules/starting_companions.py", doc)
         self.assertIn("skill_effects.py", doc)

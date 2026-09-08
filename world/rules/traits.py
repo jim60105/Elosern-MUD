@@ -216,7 +216,10 @@ def get_display_value(entity: Any, trait_key: str) -> int:
     ``world/rules/character_creation.py`` (preset activation) are the only
     production modules that seed ``entity.db.disguised_stats`` from an
     authored declaration at entity construction, each never reading the
-    mapping back to make a decision. The runtime write for
+    mapping back to make a decision. The companion builder
+    ``world/rules/starting_companions.py`` re-seeds each declared partner
+    preset's own authored card inside preset activation, the same
+    construction-time seeding class. The runtime write for
     ``status_disguise`` (``world/rules/skill_effects.py``) is bound by the
     skill-handler capability's own requirement, and snapshot/restore
     machinery may re-assign a previously recorded value; neither authors a
