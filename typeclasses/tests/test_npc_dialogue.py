@@ -645,12 +645,12 @@ class PresetPersonaDialogueTests(EvenniaTest):
     """A preset activation's persona record reaches the dialogue surface
     (preset-persona-activation).
 
-    Every shipped card currently declares background prose only, which the
-    dialogue policy excludes from the player block in BOTH modes, so the
-    resolves-a-block scenario patches one registry entry (``patch.dict`` plus
-    ``dataclasses.replace`` on the frozen card) to declare dialogue-visible
-    fields — proving the write→PersonaStore→prompt seam — while the companion
-    test pins the shipped background-only outcome as the documented policy.
+    The story-derived cards declare dialogue-visible persona fields, while the
+    generic cards (``human_wanderer`` and friends) remain background-only,
+    which the dialogue policy excludes from the player block in BOTH modes.
+    The resolves-a-block scenario activates a story card directly; the
+    companion test pins the shipped background-only outcome as the documented
+    policy.
     """
 
     def setUp(self):
@@ -727,13 +727,14 @@ class PresetPersonaDialogueTests(EvenniaTest):
     @covers_requirement("persona-dialogue-injection::the-player-s-persona-feeds-the-user-payload-as-player-persona")
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-persona")
     def test_shipped_background_only_preset_writes_record_without_block(self):
-        # The shipped cards are background-only; the dialogue policy excludes
-        # background (and prose) from the player block in both creation modes.
-        # The record still survives activation for persona_edit and look.
+        # The generic shipped cards are still background-only; the dialogue
+        # policy excludes background (and prose) from the player block in both
+        # creation modes. The record still survives activation for
+        # persona_edit and look.
         from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 
-        preset = PLAYER_PRESET_REGISTRY["elosia_shadowmoon"]
-        self._activate_preset("elosia_shadowmoon")
+        preset = PLAYER_PRESET_REGISTRY["human_wanderer"]
+        self._activate_preset("human_wanderer")
         self.assertEqual(dict(self.character.db.persona), preset.persona.to_record())
         self.assertTrue(self.character.db.persona["background"])
         self.character.apply_race_baseline()

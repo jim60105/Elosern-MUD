@@ -205,7 +205,10 @@ class PlayerPresetTests(unittest.TestCase):
                 "passive": list(preset.passive_skills),
             },
         )
-        self.assertEqual(preset.skill_lists()["active"], ["divine_sexual_arts"])
+        self.assertEqual(
+            preset.skill_lists()["active"],
+            ["divine_sexual_arts", "status_disguise"],
+        )
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
     def test_kit_validation_rejects_unknown_kind_mismatch_and_divine_gate(self):
@@ -641,9 +644,38 @@ class StartingCompanionDeclarationTests(unittest.TestCase):
             self.assertTrue(declaration.relationship)
 
     @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
+    def test_the_altoria_party_cards_declare_their_traveling_pair(self):
+        # The story settings have the Altoria trio travelling together; the
+        # declarations mirror each card's own relationship to the partner.
+        violet = PLAYER_PRESET_REGISTRY["violet_altoria"]
+        lidzia = PLAYER_PRESET_REGISTRY["lidzia_rosenthal"]
+        elosia = PLAYER_PRESET_REGISTRY["elosia_shadowmoon"]
+        self.assertEqual(
+            violet.starting_companions,
+            (
+                StartingCompanion("lidzia_rosenthal", 95, "貼身近侍"),
+                StartingCompanion("elosia_shadowmoon", 95, "師父"),
+            ),
+        )
+        self.assertEqual(
+            lidzia.starting_companions,
+            (StartingCompanion("violet_altoria", 95, "主人"),),
+        )
+        self.assertEqual(
+            elosia.starting_companions,
+            (
+                StartingCompanion("violet_altoria", 95, "弟子"),
+                StartingCompanion("lidzia_rosenthal", 60, "小隊同伴"),
+            ),
+        )
+
+    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
     def test_every_other_preset_declares_no_companions(self):
         for key, preset in PLAYER_PRESET_REGISTRY.items():
-            if key in ("yuna_darknight", "yuka_darknight"):
+            if key in (
+                "yuna_darknight", "yuka_darknight",
+                "violet_altoria", "lidzia_rosenthal", "elosia_shadowmoon",
+            ):
                 continue
             with self.subTest(preset=key):
                 self.assertEqual(preset.starting_companions, ())

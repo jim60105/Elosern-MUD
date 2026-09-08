@@ -223,6 +223,9 @@ class CharacterActivationTests(EvenniaTest):
         # preset-mode creation draft in the same transaction.
         character = create_object(PlayerCharacter, key="shell-violet-lineage")
         self.account.at_post_create_character(character)
+        # violet_altoria now binds its companions during activation, which
+        # spawns at the shell's location (preset-companion-activation).
+        character.location = self.room1
         character.db.creation_draft = {
             "mode": "preset", "stage": "preset_selected",
             "preset_key": "violet_altoria",
@@ -1069,6 +1072,8 @@ class AffinityCreationTests(EvenniaTest):
 
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-affinity-set")
     def test_human_preset_persists_declared_affinity(self):
+        # violet_altoria binds companions at activation; the shell needs a room.
+        self.character.location = self.room1
         activate_player_character(
             self.account, self.character,
             CharacterCreationRequest(mode="preset", preset_key="violet_altoria"),
