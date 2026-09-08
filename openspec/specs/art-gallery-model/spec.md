@@ -1,4 +1,17 @@
-## ADDED Requirements
+# art-gallery-model Specification
+
+## Purpose
+
+Define the gallery record model that later gallery changes build on: one
+lazily created `GalleryRecord` per portrait subject (`world/art/gallery.py`,
+the sole writer), the exact ten-key image-card contract with its reproduction,
+placement, and provenance fields, the shared `DEFAULT_FACE_RECT`, the
+slot-masked equipment binding with the no-create snapshot reader, the monster
+one-card cap, the `world/art/paths.py` store-root confinement helper behind
+every gallery file deletion, and tolerant reads that skip malformed stored
+cards instead of failing.
+
+## Requirements
 
 ### Requirement: One gallery record per art subject carries an ordered card list and a default
 `world/art/gallery.py` SHALL persist at most one `GalleryRecord` (an Evennia `DefaultScript`) per
