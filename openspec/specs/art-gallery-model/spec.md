@@ -1,13 +1,26 @@
-## ADDED Requirements
+# art-gallery-model Specification
+
+## Purpose
+
+Define the gallery record model that later gallery changes build on: one
+lazily created `GalleryRecord` per portrait subject (`world/art/gallery.py`,
+the sole writer), the exact ten-key image-card contract with its reproduction,
+placement, and provenance fields, the shared `DEFAULT_FACE_RECT`, the
+slot-masked equipment binding with the no-create snapshot reader, the monster
+one-card cap, the `world/art/paths.py` store-root confinement helper behind
+every gallery file deletion, and tolerant reads that skip malformed stored
+cards instead of failing.
+
+## Requirements
 
 ### Requirement: One gallery record per art subject carries an ordered card list and a default
 `world/art/gallery.py` SHALL persist at most one `GalleryRecord` (an Evennia `DefaultScript`) per
 art subject, keyed `gallery:<full-subject-key>`, carrying the subject kind and un-prefixed subject
 key (mirroring `ArtAssetRecord`), an append-ordered `cards` list, a nullable `default_image_id`, and
 the subject's last generation error code and timestamp. The record SHALL hold no live object
-reference. Records SHALL be created lazily — on the first card append or the first explicit default
-set — never by a startup scan, so a subject with no record is a legal state that yields an empty
-card list. The first card appended to an empty record SHALL become that record's default; a later
+reference. Records SHALL be created lazily — on the first card append, the first recorded generation
+error, or the first explicit default set — never by a startup scan, so a subject with no record is a
+legal state that yields an empty card list. The first card appended to an empty record SHALL become that record's default; a later
 append SHALL NOT change the default. An explicit default set SHALL name an existing card of that
 record and SHALL be rejected otherwise.
 
@@ -34,7 +47,9 @@ inside its record), `stored_identity` (the store-relative path
 mapping of exactly `positive` and `negative` verbatim prompt text), `seed` (a non-negative integer
 or `None`), `checkpoint` (a non-empty string or `None`), `requested_fields` (a list of field ids,
 possibly empty), `face_rect`, `binding`, `source` (one of `generated`, `seed`), and `created_at` (a
-float epoch timestamp). Environment-driven generation parameters — steps, CFG scale, dimensions,
+float epoch timestamp). A write MAY omit `face_rect` and `created_at`, which the API fills with
+`DEFAULT_FACE_RECT` and the current epoch time respectively; every other contract key is required on
+the write. Environment-driven generation parameters — steps, CFG scale, dimensions,
 sampler, scheduler — SHALL NOT be stored on a card. A write whose card violates this contract SHALL
 raise a typed validation error at the API boundary and SHALL NOT be persisted.
 
@@ -47,7 +62,8 @@ raise a typed validation error at the API boundary and SHALL NOT be persisted.
 - **THEN** the stored card carries `prompt` `None` and `seed` `None`, and the write succeeds
 
 #### Scenario: A card with an unknown or missing key is rejected
-- **WHEN** a card write carries an extra key, omits a contract key, or carries a wrongly typed value
+- **WHEN** a card write carries an extra key, omits a contract key other than the API-defaulted
+  `face_rect` and `created_at`, or carries a wrongly typed value
 - **THEN** a typed validation error is raised and no card is persisted
 
 #### Scenario: A duplicate image id is rejected
