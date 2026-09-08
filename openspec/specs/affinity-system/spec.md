@@ -69,8 +69,8 @@ be Traditional Chinese forms (信賴, 絕對).
 - **THEN** the displayed stage is 絕對羈絆 and no numeric value or cap is rendered anywhere
 
 ### Requirement: apply_affinity_change is the sole affinity writer with a source-capped daily budget
-`world/rules/affinity.py` SHALL expose `apply_affinity_change(npc, player, source, delta)` as the
-only function that writes affinity values. The source SHALL be a member of the closed set
+`world/rules/affinity.py` SHALL be the only module that writes affinity values, and
+`apply_affinity_change(npc, player, source, delta)` SHALL be its only *interaction* writer. The source SHALL be a member of the closed set
 (`talk`, `trade`, `guild`, `ai_dialogue`, `quest_completion`, `friendly_fire`, `sexual_forced`); an
 unknown source SHALL be rejected without writing. The writer SHALL reject a non-NPC owner without
 writing. Before budgeting a capped positive delta it SHALL lazily reset the daily-gain counter when
@@ -83,6 +83,19 @@ applied increase, and a delta that applies zero SHALL consume no budget. Positiv
 clamp to the record's `cap`; negative deltas SHALL apply unclamped downward (floor 0) and always
 run the party auto-leave recheck hook. The function SHALL return a structured outcome (applied,
 delta used, budget capped) so callers can render feedback.
+
+The same module SHALL additionally expose exactly one *seed* writer,
+`seed_affinity(npc, player, value)`, for establishing a starting relationship that no interaction
+produced. It SHALL create a fresh record whose value is `value`, whose `cap` is `NATURAL_CAP`, and
+whose daily counter is zero stamped with the current world day. It SHALL reject a value outside
+`1..NATURAL_CAP` -- booleans and non-integers included -- and SHALL refuse to overwrite an existing
+record for the pair, so it can never be used to launder an interaction gain past the daily budget.
+It SHALL reject a non-NPC owner the same way. Every refusal SHALL raise `AffinitySeedError` with a
+stable reason, writing nothing. The write SHALL run inside one transaction with the host's
+in-process `relations_data` surface restored on failure, and a committed seed SHALL emit one
+`affinity_seed` boundary info event at the outermost durable commit. It SHALL NOT consume daily
+budget, resolve a source, or run the auto-leave recheck, because a seed is not an interaction. No
+module outside `world/rules/affinity.py` SHALL write an affinity record.
 
 #### Scenario: Capped sources exhaust the daily budget
 - **WHEN** capped-source gains total 5 in one world day and a sixth capped gain is attempted
@@ -128,6 +141,26 @@ delta used, budget capped) so callers can render feedback.
 #### Scenario: A non-NPC owner is rejected without writing
 - **WHEN** a call supplies a player or monster as the affinity owner
 - **THEN** the outcome is rejected and no state changes
+
+#### Scenario: A seed establishes a starting relationship
+- **WHEN** `seed_affinity` is called for a pair with no existing record and a value inside `1..NATURAL_CAP`
+- **THEN** the record is created at that value with `cap` equal to `NATURAL_CAP`, a zero daily counter stamped with the current world day, and no auto-leave recheck runs
+
+#### Scenario: A seed never overwrites an existing relationship
+- **WHEN** `seed_affinity` is called for a pair that already holds a record
+- **THEN** it raises without writing, so an interaction history can never be replaced by a seed
+
+#### Scenario: A seed rejects an out-of-range value
+- **WHEN** `seed_affinity` is called with a value below 1 or above `NATURAL_CAP`
+- **THEN** it raises without writing
+
+#### Scenario: A seed consumes no daily budget
+- **WHEN** a relationship is seeded and a capped interaction gain is attempted on the same world day
+- **THEN** the full daily budget is still available to that interaction
+
+#### Scenario: A seed rejects a non-NPC owner or a non-integer value
+- **WHEN** `seed_affinity` is called with a player or monster as the affinity owner, or with a boolean or non-integer value
+- **THEN** it raises without writing
 
 ### Requirement: Deterministic gains apply at talk, trade, and guild success paths
 A known-keyword talk answer SHALL grant +1 affinity (`talk` source) with the host NPC through a

@@ -2,11 +2,15 @@
 
 Every NPC holds one affinity record per player it has interacted with, stored
 as serialized data on the NPC's ``relations_data`` attribute through the
-``RelationHandler`` mounted on ``LivingEntity.relations``. ``apply_affinity_change``
-is the only function that writes affinity values; callers (talk, trade, guild)
-invoke it inside their own all-or-nothing commits and restore the host's
-``relations_data`` surface on failure. Reads never materialize a record, so a
-mere look can never create one.
+``RelationHandler`` mounted on ``LivingEntity.relations``. This module is the
+only one that writes affinity values. Its value writers are
+``apply_affinity_change`` for interaction deltas (budgeted, source-resolved,
+auto-leave-checked) and ``seed_affinity`` for establishing a starting
+relationship that no interaction produced (one-shot, unbudgeted, never
+overwriting); ``raise_affinity_cap`` changes only a record's ``cap``. Callers
+invoke the writers inside their own all-or-nothing commits and restore the
+host's ``relations_data`` surface on failure. Reads never materialize a
+record, so a mere look can never create one.
 """
 
 from dataclasses import dataclass, replace
@@ -15,7 +19,7 @@ from typing import Any
 
 from django.db import transaction
 
-from world.observability import log_warn
+from world.observability import log_info, log_warn
 from world.rules.affinity_config import AffinityStage, get_config
 from world.rules.clock import CLOCK_YAML
 
@@ -24,6 +28,20 @@ _DAY_SECONDS = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
 NATURAL_CAP = 99
 
 AFFINITY_DAILY_CAP_HINT = "（今天你們之間的交流已經夠多了，她看起來有些疲憊。）"
+
+
+class AffinitySeedError(Exception):
+    """A seed write was refused, or failed after the surface was restored.
+
+    ``reason`` is stable (``not_npc``, ``value_out_of_range``,
+    ``record_exists``, ``write_failed``); refusals raise before anything is
+    written or snapshotted, so only ``write_failed`` carries a restoration.
+    """
+
+    def __init__(self, reason: str, detail: str = "") -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.detail = detail
 
 
 class AffinitySource(StrEnum):
@@ -307,6 +325,67 @@ def apply_affinity_change(
         applied=applied != 0,
         budget_capped=budget_capped,
         source_rejected=False,
+    )
+
+
+def seed_affinity(npc: Any, player: Any, value: int) -> None:
+    """The module's second writer: establish a fresh relationship at ``value``.
+
+    A seed is not an interaction: it resolves no ``AffinitySource``, consumes
+    no daily budget, and runs no auto-leave recheck. It writes a brand-new
+    record (``value``, ``cap`` ``NATURAL_CAP``, ``daily_gain`` 0 stamped with
+    the current world day) and refuses -- raising ``AffinitySeedError`` without
+    writing -- when the pair already holds a record, so a seed can never
+    launder an interaction gain past the daily budget or erase a real history.
+    A value outside ``1..NATURAL_CAP`` (booleans excluded) and a non-NPC owner
+    are refused the same way. On a write failure the host's in-process
+    ``relations_data`` surface is restored before the error propagates,
+    following ``apply_affinity_change``'s discipline.
+
+    Caller obligation (same as every affinity writer): the idmapper attribute
+    cache is not transaction-aware. A caller that wraps this seed in its own
+    transaction must snapshot ``npc.db.relations_data`` itself and restore it
+    via ``restore_relations_surfaces`` when that outer transaction rolls back;
+    this function's own restore only covers its own failure.
+    """
+    from typeclasses.npcs import NPC
+
+    if not isinstance(npc, NPC):
+        raise AffinitySeedError("not_npc")
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not 1 <= value <= NATURAL_CAP
+    ):
+        raise AffinitySeedError("value_out_of_range")
+    handler = npc.relations
+    if handler.has_record(player):
+        raise AffinitySeedError("record_exists")
+
+    # A reference, not a copy: RelationHandler._save always assigns a fresh
+    # container dict, so nothing mutated during the write can reach the
+    # snapshotted value in-process.
+    relations_before = npc.db.relations_data
+    day = _current_day()
+    try:
+        with transaction.atomic():
+            handler._save(
+                player,
+                AffinityRecord(
+                    value=value, cap=NATURAL_CAP, daily_gain=0, daily_tick=day
+                ),
+            )
+    except Exception as error:
+        npc.db.relations_data = relations_before
+        raise AffinitySeedError("write_failed", str(error)) from error
+    context = {
+        "char": str(getattr(player, "pk", "?")),
+        "npc": str(getattr(npc, "pk", "?")),
+        "value": value,
+        "day": day,
+    }
+    transaction.on_commit(
+        lambda context=context: log_info("affinity_seed", context=context)
     )
 
 
