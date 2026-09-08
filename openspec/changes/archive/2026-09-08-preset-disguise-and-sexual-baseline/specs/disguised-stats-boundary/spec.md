@@ -12,13 +12,27 @@ displayed-stat snapshot. Appraisal items MAY remain deferred. No other guild ope
 board eligibility, reward settlement, merit checks, examiner profile selection, combat, or
 promotion, SHALL call the accessor or read `disguised_stats`.
 
-This requirement bounds READERS. Seeding the layer is a separate, bounded set of WRITERS:
-`world/imports/loader.py` (import records) and `world/rules/character_creation.py` (preset
-activation) SHALL be the only production modules that assign `entity.db.disguised_stats`, each
-writing an authored declaration once at entity construction and never reading the mapping back to
-make a decision. A writer SHALL NOT be counted as a consumer, and the forbidden-module list
-(`world/rules/combat.py`, `world/rules/dice.py`, `world/rules/targeting.py`) SHALL remain closed to
-both reads and writes.
+This requirement bounds READERS. A CONSUMER is a module that surfaces or resolves a displayed stat
+value from the mapping for a player-facing view or a persisted record: the `look <target>`
+displayed-stats block and the guild-registration snapshot path, with the status read model
+(`world/rules/status_query.py`) being the status-side face of the same appearance-rendering
+consumer (master design D2 counts "look / the status read model" as that one consumer).
+Perception paths — the NPC-dialogue prompt injection and its no-leak secret set
+(`typeclasses/npcs.py` feeding `world/ai/npc_dialogue.py`) and the `status_disguise` cast event
+context (`commands/action.py`) — pass the mapping as opaque perceived-display material and never
+resolve a gameplay stat from it; they are not consumers and are unchanged by this requirement.
+
+Seeding the layer is a separate, bounded set of WRITERS: `world/imports/loader.py` (import
+records) and `world/rules/character_creation.py` (preset activation) SHALL be the only production
+modules that seed `entity.db.disguised_stats` from an authored declaration at entity
+construction, each never reading the mapping back to make a decision. The runtime write for
+`status_disguise`, `world/rules/skill_effects.py::apply_disguise_effect`, is sanctioned and bound
+by the `skill-handler` capability's own requirement (it touches only the display layer).
+Snapshot/restore machinery (the activation, action, clock, and cast-settlement rollback surfaces)
+may re-assign the attribute to a previously recorded value; a restore carries its writer's value
+and authors none of its own. A writer SHALL NOT be counted as a consumer, and the
+forbidden-module list (`world/rules/combat.py`, `world/rules/dice.py`,
+`world/rules/targeting.py`) SHALL remain closed to both reads and writes.
 
 #### Scenario: Accessor documentation still names exactly three consumers
 - **WHEN** `get_display_value`'s docstring is inspected
@@ -30,7 +44,10 @@ both reads and writes.
   `disguised_stats`
 - **THEN** the sanctioned readers are exactly the `look <target>` displayed-stats block and the
   guild-registration snapshot path, the sanctioned writers are exactly the import loader and preset
-  activation, and no other module reads the raw disguise mapping directly
+  activation at construction (beside the skill-handler-owned runtime write and value-carrying
+  restores), and no other module reads the raw disguise mapping directly to resolve a gameplay
+  stat value (perception injection and secret-set comparison are perception material, not
+  stat resolution)
 
 #### Scenario: Promotion uses canonical state
 - **WHEN** a registered actor changes or clears disguise before a guild examination

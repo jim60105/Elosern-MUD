@@ -2,6 +2,8 @@
 
 from tools.spec_traceability import covers_requirement
 
+import inspect
+import re
 from pathlib import Path
 
 from evennia.utils.create import create_object
@@ -14,6 +16,29 @@ FORBIDDEN_MODULES = (
     "world/rules/combat.py",
     "world/rules/dice.py",
     "world/rules/targeting.py",
+)
+
+# Every production module that assigns entity.db.disguised_stats, classified
+# (preset-disguise-and-sexual-baseline writer clause). The two SEEDERS author
+# a declaration at entity construction; the typeclass shell init is the
+# storage convention entity-traits declared, and the status_disguise runtime
+# write is bound by the skill-handler capability's own requirement — neither
+# authors a preset/import declaration. Snapshot/restore machinery re-assigns
+# previously recorded values through its own helpers and so never appears as
+# a raw assignment below. Anything outside this ledger fails the scan.
+ASSIGNED_BY = {
+    "world/imports/loader.py": "import-record seeder",
+    "world/rules/character_creation.py": "preset-activation seeder",
+    "typeclasses/entities.py": "storage-convention shell init to None",
+    "world/rules/skill_effects.py": "skill-handler runtime write",
+}
+
+# Production source trees the writer scan covers.
+PRODUCTION_ROOTS = ("world", "typeclasses", "commands")
+
+_ASSIGNMENT = re.compile(
+    r"db\.disguised_stats\s*=|attributes\.add\(\s*[\"']disguised_stats[\"']"
+    r"|\[[\"']disguised_stats[\"']\]\s*="
 )
 
 
@@ -43,3 +68,37 @@ class DisguiseBoundaryTests(EvenniaTest):
         # disguise layer renders 30 through the sanctioned accessor.
         self.assertEqual(entity.traits.magic_power.value, 100)
         self.assertEqual(get_display_value(entity, "magic_power"), 30)
+
+    @covers_requirement("disguised-stats-boundary::disguised-stats-keys-are-readable-by-exactly-three-consumers-including-implemented-guild-registration")
+    def test_production_writers_of_the_layer_are_the_documented_ledger(self):
+        # The writer half of the reader/writer split: every production
+        # assignment of the attribute is accounted in ASSIGNED_BY, so the
+        # only modules seeding an AUTHORED declaration at construction remain
+        # the import loader and preset activation. A new write site has to be
+        # classified here deliberately rather than silently widening the set.
+        root = Path(__file__).resolve().parents[3]
+        assigned = set()
+        for tree in PRODUCTION_ROOTS:
+            for path in sorted((root / tree).rglob("*.py")):
+                relative = path.relative_to(root).as_posix()
+                if "/tests/" in f"/{relative}":
+                    continue
+                if _ASSIGNMENT.search(path.read_text(encoding="utf-8")):
+                    assigned.add(relative)
+        self.assertEqual(
+            assigned,
+            set(ASSIGNED_BY),
+            f"unclassified production writer of disguised_stats: "
+            f"{sorted(assigned ^ set(ASSIGNED_BY))}",
+        )
+
+    @covers_requirement("disguised-stats-boundary::disguised-stats-keys-are-readable-by-exactly-three-consumers-including-implemented-guild-registration")
+    def test_accessor_docstring_names_the_reader_and_writer_split(self):
+        # The docstring is the normative record of the split: it keeps naming
+        # the three readers and names both construction-time seeding writers.
+        doc = inspect.getdoc(get_display_value).lower()
+        self.assertIn("readers", doc)
+        self.assertIn("writers", doc)
+        self.assertIn("world/imports/loader.py", doc)
+        self.assertIn("world/rules/character_creation.py", doc)
+        self.assertIn("skill_effects.py", doc)

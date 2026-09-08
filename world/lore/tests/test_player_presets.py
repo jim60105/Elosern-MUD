@@ -488,3 +488,133 @@ class PlayerPresetTests(unittest.TestCase):
         self.assertEqual(partial["appearance"], {"attire": "斗篷"})
         self.assertNotIn("background", partial)
 
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-disguise-layer-and-sexual-baseline")
+    def test_disguised_stats_validation_rejects_bad_keys_values_and_duplicates(self):
+        from world.lore.player_presets import _validate_preset_disguised_stats
+
+        def make(**overrides):
+            values = dict(
+                key="x", display_name="x", age=18, apparent_age=18, race="human",
+                subrace="human_commoner", allocations=(), emphasis="e",
+                sex="female",
+            )
+            values.update(overrides)
+            return PlayerPreset(**values)
+
+        for preset, message in (
+            (make(disguised_stats=((5, 60),)), "key that is not text"),
+            (make(disguised_stats=(("atk_phys", "60"),)), "non-integer disguise"),
+            (make(disguised_stats=(("atk_phys", 60.0),)), "non-integer disguise"),
+            (make(disguised_stats=(("atk_phys", True),)), "non-integer disguise"),
+            (make(disguised_stats=("atk_phys",)), "malformed disguised_stats"),
+            (
+                make(disguised_stats=(("atk_phys", 60), ("atk_phys", 70))),
+                "duplicate disguised_stats",
+            ),
+        ):
+            with self.subTest(preset=preset.disguised_stats), self.assertRaisesRegex(
+                ValueError, message
+            ):
+                _validate_preset_disguised_stats({"x": preset})
+        # Any string axis is legal (no whitelist): the schema constrains the
+        # field only to integer values, and the layer is display-only.
+        _validate_preset_disguised_stats(
+            {"x": make(disguised_stats=(("atk_phys", 60), ("legendary_axis", -5)))}
+        )
+        _validate_preset_disguised_stats({"x": make()})
+        _validate_preset_disguised_stats(PLAYER_PRESET_REGISTRY)
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-disguise-layer-and-sexual-baseline")
+    def test_sexual_baseline_validation_rejects_bad_levels_and_body_parts(self):
+        from world.lore.player_presets import (
+            PresetSexualBaseline,
+            _validate_preset_sexual_baselines,
+        )
+
+        def make(**overrides):
+            values = dict(
+                key="x", display_name="x", age=18, apparent_age=18, race="human",
+                subrace="human_commoner", allocations=(), emphasis="e",
+                sex="female",
+            )
+            values.update(overrides)
+            return PlayerPreset(**values)
+
+        def baseline(**overrides):
+            values = dict(
+                arousal="微興奮", virgin=False,
+                sensitivity=(("私處", "極高"), ("軀體", "普通")),
+            )
+            values.update(overrides)
+            return PresetSexualBaseline(**values)
+
+        for preset, message in (
+            (make(sexual_baseline=baseline(arousal="狂暴")), "arousal"),
+            # Required arousal may never be empty: to_record() always emits
+            # it, so an empty level would reach the pleasure-band lookup and
+            # crash the handler instead of failing at load.
+            (make(sexual_baseline=baseline(arousal="")), "arousal"),
+            (make(sexual_baseline=baseline(wetness="潮濕")), "wetness"),
+            (make(sexual_baseline=baseline(shame="羞恥")), "shame"),
+            (make(sexual_baseline=baseline(exposure="爆表")), "exposure"),
+            (make(sexual_baseline=baseline(climax_phase="已結束")), "climax_phase"),
+            (make(sexual_baseline=baseline(virgin=1)), "not a boolean"),
+            (
+                make(sexual_baseline=baseline(sensitivity=(("尾巴", "高"),))),
+                "unknown body part",
+            ),
+            (
+                make(
+                    sexual_baseline=baseline(
+                        sensitivity=(("私處", "極高"), ("私處", "普通"))
+                    )
+                ),
+                "duplicate sensitivity",
+            ),
+            (
+                make(sexual_baseline=baseline(sensitivity=(("私處", "失控"),))),
+                "outside its vocabulary",
+            ),
+            (
+                make(sexual_baseline=baseline(sensitivity=("私處",))),
+                "pair of strings",
+            ),
+            (make(sexual_baseline="微興奮"), "not a PresetSexualBaseline"),
+        ):
+            with self.subTest(message=message), self.assertRaisesRegex(
+                ValueError, message
+            ):
+                _validate_preset_sexual_baselines({"x": preset})
+        # None and a fully/partially authored baseline pass; empty optional
+        # levels are legal because to_record() omits them.
+        _validate_preset_sexual_baselines({"x": make()})
+        _validate_preset_sexual_baselines({"x": make(sexual_baseline=baseline())})
+        _validate_preset_sexual_baselines(
+            {"x": make(sexual_baseline=baseline(wetness="微濕", climax_phase="接近"))}
+        )
+        _validate_preset_sexual_baselines(PLAYER_PRESET_REGISTRY)
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-disguise-layer-and-sexual-baseline")
+    def test_sexual_baseline_to_record_omits_every_empty_optional(self):
+        from world.lore.player_presets import PresetSexualBaseline
+
+        # Required keys always present; empty optionals omitted so
+        # SexualState's lowest-level defaulting applies to them.
+        self.assertEqual(
+            PresetSexualBaseline(
+                arousal="微興奮", virgin=True, sensitivity=(("耳朵", "高"),)
+            ).to_record(),
+            {"arousal": "微興奮", "virgin": True, "sensitivity": {"耳朵": "高"}},
+        )
+        self.assertEqual(
+            PresetSexualBaseline(
+                arousal="極限", virgin=False, sensitivity=(),
+                wetness="泛濫", shame="成癮", exposure="極高", climax_phase="餘韻",
+            ).to_record(),
+            {
+                "arousal": "極限", "virgin": False, "sensitivity": {},
+                "wetness": "泛濫", "shame": "成癮", "exposure": "極高",
+                "climax_phase": "餘韻",
+            },
+        )
+

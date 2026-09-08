@@ -23,9 +23,13 @@ at `entity.db.sexual` (change 4's loader convention), never confused with or ove
   or more times, and `entity.sexual` itself is never a dict
 
 ### Requirement: SexualState is constructed from entity.db.sexual when a raw baseline is present
-When `entity.db.sexual` is a populated dict (change 4's import path), `SexualState`'s construction
+When `entity.db.sexual` is a populated dict, `SexualState`'s construction
 SHALL derive every field's initial value from that dict, defaulting any optional field the dict omits
-(`wetness`, `shame`, `exposure`, `climax_phase`) to its vocabulary's first (lowest) level.
+(`wetness`, `shame`, `exposure`, `climax_phase`) to its vocabulary's first (lowest) level. Two
+production paths SHALL produce that dict: the character import loader, and preset activation in
+`world/rules/character_creation.py` when the selected preset declares a `sexual_baseline`. A preset
+declaring no baseline SHALL leave the attribute absent, so the existing default-construction rules
+apply unchanged.
 
 #### Scenario: A fully-specified baseline is used verbatim
 - **WHEN** `entity.db.sexual` is `{"arousal": "微興奮", "virgin": true, "sensitivity": {}}`
@@ -35,6 +39,10 @@ SHALL derive every field's initial value from that dict, defaulting any optional
 #### Scenario: An omitted optional field defaults to its vocabulary's lowest level
 - **WHEN** `entity.db.sexual` omits `wetness` entirely
 - **THEN** the constructed `entity.sexual.wetness.level` equals `"乾燥"` (`WETNESS_LEVELS[0]`)
+
+#### Scenario: A preset-declared baseline reaches the handler
+- **WHEN** a character is activated from a preset declaring a `sexual_baseline` and its `entity.sexual` is first constructed
+- **THEN** every field derives from the preset's declared record rather than from the generic default baseline
 
 ### Requirement: Monster entities without an imported baseline default to 普通 sensitivity with shame clamped to 無
 When `entity.db.sexual` is absent and the entity is a `Monster`, `SexualState`'s construction SHALL

@@ -658,6 +658,153 @@ class CharacterActivationTests(EvenniaTest):
         self.assertEqual(clock.tick, tick_before)
         self.assertIsNone(self.character.attributes.get("map_knowledge"))
 
+    # -- preset disguise layer + sexual baseline (preset-disguise-and-sexual-baseline)
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-disguise-layer-and-sexual-baseline")
+    @covers_requirement("disguised-stats-boundary::disguised-stats-keys-are-readable-by-exactly-three-consumers-including-implemented-guild-registration")
+    def test_preset_activation_persists_declared_disguise_without_touching_true_traits(self):
+        # Scenario "A declared disguise layer is persisted": the mapping is
+        # written inside the activation transaction, and the boundary holds
+        # -- true traits are unchanged while the sanctioned accessor shows
+        # the disguise.
+        from world.rules.traits import get_display_value
+
+        preset = self._synthetic_preset(
+            "disguised_scout", disguised_stats=(("atk_phys", 99999), ("agility", 99998))
+        )
+        observed = []
+        character = create_object(PlayerCharacter, key="creator-shell-disguise")
+        self.account.at_post_create_character(character)
+        with patch.dict(PLAYER_PRESET_REGISTRY, {preset.key: preset}):
+            activate_player_character(
+                self.account, character,
+                CharacterCreationRequest(mode="preset", preset_key=preset.key),
+                write_observer=observed.append,
+            )
+        self.assertIn("disguised_stats", observed)
+        self.assertEqual(
+            character.db.disguised_stats, {"atk_phys": 99999, "agility": 99998}
+        )
+        self.assertEqual(get_display_value(character, "atk_phys"), 99999)
+        self.assertEqual(get_display_value(character, "agility"), 99998)
+        self.assertNotEqual(
+            character.traits.atk_phys.value, character.db.disguised_stats["atk_phys"]
+        )
+        self.assertNotEqual(
+            character.traits.agility.value, character.db.disguised_stats["agility"]
+        )
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-disguise-layer-and-sexual-baseline")
+    def test_preset_activation_writes_none_for_an_empty_disguise_declaration(self):
+        # Scenario "An empty disguise declaration writes None": the fresh
+        # shell already reads None, so the write itself is evidenced through
+        # the activation observer; the value stays the absent-reading None.
+        preset = self._synthetic_preset("plain_scout")
+        observed = []
+        character = create_object(PlayerCharacter, key="creator-shell-plain")
+        self.account.at_post_create_character(character)
+        with patch.dict(PLAYER_PRESET_REGISTRY, {preset.key: preset}):
+            activate_player_character(
+                self.account, character,
+                CharacterCreationRequest(mode="preset", preset_key=preset.key),
+                write_observer=observed.append,
+            )
+        self.assertIn("disguised_stats", observed)
+        self.assertIsNone(character.db.disguised_stats)
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-disguise-layer-and-sexual-baseline")
+    @covers_requirement("sexual-state-handler::sexualstate-is-constructed-from-entity-db-sexual-when-a-raw-baseline-is-present")
+    def test_preset_activation_seeds_the_handler_from_a_declared_baseline(self):
+        # Scenario "A declared sexual baseline seeds the handler": db.sexual
+        # equals to_record(), the lazily constructed entity.sexual derives
+        # from it, and each omitted optional field floors through the
+        # existing construction rule.
+        from world.lore.player_presets import PresetSexualBaseline
+
+        baseline = PresetSexualBaseline(
+            arousal="微興奮", virgin=False, sensitivity=(("私處", "極高"),)
+        )
+        preset = self._synthetic_preset("hedonist_scout", sexual_baseline=baseline)
+        character = self._activate_synthetic_preset(preset, "creator-shell-baseline")
+        self.assertEqual(
+            character.db.sexual,
+            {"arousal": "微興奮", "virgin": False, "sensitivity": {"私處": "極高"}},
+        )
+        state = character.sexual
+        self.assertFalse(state.virgin)
+        self.assertEqual(state.sensitivity["私處"].level, "極高")
+        self.assertEqual(state.wetness.level, "乾燥")
+        self.assertEqual(state.shame.level, "無")
+        self.assertEqual(state.exposure.level, "極低")
+        self.assertEqual(state.climax_phase.level, "未達")
+        self.assertEqual(state.arousal.level, "微興奮")
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-disguise-layer-and-sexual-baseline")
+    def test_preset_without_a_baseline_keeps_the_lazy_generic_default(self):
+        # Scenario "An undeclared sexual baseline preserves the lazy
+        # default": the key stays absent and the generic floor state builds.
+        preset = self._synthetic_preset("default_scout")
+        character = self._activate_synthetic_preset(preset, "creator-shell-default")
+        self.assertFalse(character.attributes.has("sexual"))
+        state = character.sexual
+        self.assertEqual(state.arousal.level, "平靜")
+        self.assertTrue(state.virgin)
+        self.assertEqual(state.wetness.level, "乾燥")
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-disguise-layer-and-sexual-baseline")
+    def test_custom_activation_writes_neither_disguise_nor_baseline(self):
+        # Task 3.4: custom mode preserves today's behavior exactly -- the
+        # disguise layer stays at its shell-initialized None and the sexual
+        # attribute is never written.
+        observed = []
+        activate_player_character(
+            self.account, self.character, self.request(),
+            write_observer=observed.append,
+        )
+        self.assertNotIn("disguised_stats", observed)
+        self.assertNotIn("sexual", observed)
+        self.assertFalse(self.character.attributes.has("sexual"))
+        self.assertIsNone(self.character.db.disguised_stats)
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-disguise-layer-and-sexual-baseline")
+    def test_failure_after_both_writes_restores_disguise_and_baseline(self):
+        # Scenario "A failed activation leaves no disguise or baseline
+        # residue": the observer fails at the ``sexual`` stage, which fires
+        # only after both writes landed in the idmapper cache. Restore
+        # returns each surface to its PRE-ACTIVATION state: the shell
+        # pre-initializes disguised_stats to None (so it reads back None,
+        # not absent) and never had a sexual key (so it is removed again);
+        # the handler's derived sexual_traits must never have been built.
+        from world.lore.player_presets import PresetSexualBaseline
+
+        preset = self._synthetic_preset(
+            "rolledback_scout",
+            disguised_stats=(("atk_phys", 5),),
+            sexual_baseline=PresetSexualBaseline(
+                arousal="中等", virgin=False, sensitivity=(("耳朵", "高"),)
+            ),
+        )
+        character = create_object(PlayerCharacter, key="creator-shell-rollback")
+        self.account.at_post_create_character(character)
+        old_key = character.key
+
+        def fail(stage):
+            if stage == "sexual":
+                raise RuntimeError(stage)
+
+        with patch.dict(PLAYER_PRESET_REGISTRY, {preset.key: preset}):
+            with self.assertRaisesRegex(RuntimeError, "sexual"):
+                activate_player_character(
+                    self.account, character,
+                    CharacterCreationRequest(mode="preset", preset_key=preset.key),
+                    write_observer=fail,
+                )
+        self.assertEqual(character.key, old_key)
+        self.assertTrue(character.creation_pending)
+        self.assertIsNone(character.attributes.get("disguised_stats"))
+        self.assertFalse(character.attributes.has("sexual"))
+        self.assertFalse(character.attributes.has("sexual_traits"))
+
 
 def _portrait_ensure_callbacks(callbacks):
     """The captured on_commit callbacks that schedule the portrait ensure.

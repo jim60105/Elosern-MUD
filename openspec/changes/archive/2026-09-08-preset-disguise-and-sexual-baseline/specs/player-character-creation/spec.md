@@ -29,6 +29,9 @@ vocabulary tuple in `world/lore/sexual_vocab.py`, or when a `sensitivity` key is
 `BODY_PARTS` plus `GENERIC_BODY_PART`. `disguised_stats` keys SHALL NOT be restricted to a
 whitelist: `CHARACTER_SCHEMA_V1` constrains the field only to integer values, and preset parity with
 the import card is the point of the field.
+Duplicate `disguised_stats` keys, duplicate `sensitivity` body parts, and a non-boolean
+`sexual_baseline.virgin` SHALL likewise fail at load — the same silent-`dict()`-collapse and
+builder-laundering defects the proficiency validator already rejects.
 
 #### Scenario: A declared disguise layer is persisted
 - **WHEN** a pending player activates a preset declaring `disguised_stats`
