@@ -197,6 +197,10 @@ class CharacterActivationTests(EvenniaTest):
             with self.subTest(preset_key=preset_key):
                 character = create_object(PlayerCharacter, key=f"shell-{preset_key}")
                 self.account.at_post_create_character(character)
+                # Companion presets build their twin at the shell's location
+                # (preset-companion-activation); production shells live in a
+                # room at activation time, so tests place theirs too.
+                character.location = self.room1
                 activate_player_character(
                     self.account, character,
                     CharacterCreationRequest(mode="preset", preset_key=preset_key),
@@ -253,6 +257,7 @@ class CharacterActivationTests(EvenniaTest):
                     PlayerCharacter, key=f"gate-shell-{preset_key}"
                 )
                 self.account.at_post_create_character(character)
+                character.location = self.room1
                 activate_player_character(
                     self.account, character,
                     CharacterCreationRequest(mode="preset", preset_key=preset_key),
@@ -381,6 +386,7 @@ class CharacterActivationTests(EvenniaTest):
             with self.subTest(preset_key=preset_key):
                 character = create_object(PlayerCharacter, key=f"kit-shell-{preset_key}")
                 self.account.at_post_create_character(character)
+                character.location = self.room1
                 activate_player_character(
                     self.account, character,
                     CharacterCreationRequest(mode="preset", preset_key=preset_key),
@@ -1288,6 +1294,7 @@ class PersonaActivationTests(EvenniaTest):
         # preset-persona-activation: the registry persona finally reaches
         # entity.db.persona inside the same activation transaction.
         preset = PLAYER_PRESET_REGISTRY["yuna_darknight"]
+        self.character.location = self.room1
         activate_player_character(
             self.account, self.character,
             CharacterCreationRequest(mode="preset", preset_key="yuna_darknight"),
@@ -1441,6 +1448,7 @@ class SexCreationTests(EvenniaTest):
             with self.subTest(preset=preset_key):
                 character = create_object(PlayerCharacter, key=f"shell-{preset_key}")
                 self.account.at_post_create_character(character)
+                character.location = self.room1
                 activate_player_character(
                     self.account, character,
                     CharacterCreationRequest(mode="preset", preset_key=preset_key),
@@ -1562,6 +1570,7 @@ class PresetValueResolverParityTests(EvenniaTest):
                 expected = resolve_preset_values(preset)
                 character = create_object(PlayerCharacter, key=f"value-shell-{preset_key}")
                 self.account.at_post_create_character(character)
+                character.location = self.room1
                 activate_player_character(
                     self.account, character,
                     CharacterCreationRequest(mode="preset", preset_key=preset_key),

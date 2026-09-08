@@ -13,9 +13,10 @@ The module also owns the rules-side import-time sweep over the preset
 registry's companion bounds (companion count against ``PARTY_MAX_COMPANIONS``,
 affinity against ``NATURAL_CAP``) because ``world/lore/`` must not import
 ``world/rules/`` and the lore-side validator cannot see those constants -- the
-same split the persona prose cap established. The builder is this module's
-first consumer; until the activation binding wires it into preset activation,
-the sweep runs wherever this module is imported (its tests today).
+same split the persona prose cap established. Activation lazy-imports this
+module inside the bind step, and ``at_server_start`` runs an explicit
+``starting_companion_validation`` boot step that imports it, so the sweep is a
+server-boot gate, not a test-only side effect.
 
 The builder deliberately owns no transaction of its own, following
 ``world/rules/guild_exams.py::_spawn_opponent``'s delete-compensation idiom:
@@ -26,12 +27,14 @@ the failure degrades to that transaction's rollback instead.
 
 from typing import Any
 
+from django.db import transaction
+
 from evennia.utils.create import create_object
 
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY, PlayerPreset, StartingCompanion
 from world.lore.races import SUBRACE_REGISTRY
 from world.observability import log_info, log_warn
-from world.rules.affinity import NATURAL_CAP
+from world.rules.affinity import NATURAL_CAP, seed_affinity
 # The lineage state and portrait finalization are consumed from their sole
 # player-activation owners rather than recomposed here, so companion and
 # player builds can never drift. ``_preset_lineage_state`` is an intentional
@@ -39,13 +42,15 @@ from world.rules.affinity import NATURAL_CAP
 # serialization point, and importing its composition beats duplicating it.
 from world.rules.character_creation import (
     MAX_PERSONA_FIELD_LENGTH,
+    CharacterCreationError,
     _preset_lineage_state,
     finalize_player_portrait,
     resolve_preset_values,
     validate_affinity_seed,
 )
 from world.rules.equipment import toggle_equipment
-from world.rules.party import PARTY_MAX_COMPANIONS
+from world.rules.party import PARTY_MAX_COMPANIONS, join_party
+from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.traits import trait_config_for_values
 from typeclasses.npcs import LLMNPC, ensure_npc_canonical_age
 
@@ -235,6 +240,94 @@ def build_starting_companion(player: Any, declaration: StartingCompanion) -> LLM
             )
         raise
     return npc
+
+
+def _discard_built_companions(built: list[LLMNPC]) -> None:
+    """Delete every companion built during a failed bind, best-effort.
+
+    The caller's transaction rollback removes the persisted rows; this pass
+    clears the in-process objects so no idmapper entry or room contents-cache
+    pk outlives the failed activation: ``create_object`` cached each NPC on
+    ``post_save`` and Django rollback never flushes the idmapper. Runs both
+    inside bind's own except (still in the doomed transaction, where the
+    deletes are pure cache eviction) and from activation's except after the
+    rollback, when a failure lands AFTER a completed bind (portrait
+    finalization, the write observer): without this pass a phantom companion
+    with a stale ``party_member`` backref keeps surfacing in ``room.contents``
+    until process restart. A companion may already be gone (``join_party``
+    restores both surfaces on its own write failure, and the builder deletes
+    a half-build), so a failing delete is logged, never raised -- raising
+    here would replace the original activation failure. If the delete itself
+    dies before Evennia's cache pop (on Postgres an aborted transaction makes
+    ``at_object_delete``'s purge raise first; SQLite is unaffected), evict the
+    instance directly so the rollback cannot strand it in the idmapper.
+    """
+    for npc in built:
+        try:
+            npc.delete()
+        except Exception as error:
+            try:
+                npc.flush_from_cache(force=True)
+            except Exception:  # observability: ignore R2: last-ditch eviction of an object that may already be flushed; the original failure is already surfaced
+                pass
+            log_warn(
+                "starting_companion_delete_failed",
+                exc=error,
+                context={"stage": "bind_companion", "obj": str(npc)},
+            )
+
+
+def bind_starting_companions(player: Any, preset: PlayerPreset) -> list[LLMNPC]:
+    """Build, seed, and bind every companion one preset declares (design 10.2).
+
+    Runs inside the caller's ``transaction.atomic()`` (preset activation).
+    For each declaration, in registry order: build the NPC, seed its affinity
+    toward ``player`` through the sole seed writer at the declared value, and
+    bind it through the sole membership writer ``join_party`` -- never by
+    touching ``player.db.party`` or ``npc.db.party_member`` directly. The
+    ``starting_companion_joined`` event is deferred with ``on_commit`` so a
+    rolled-back activation never announces a companion.
+
+    Any failure deletes every NPC built during this call and surfaces as
+    ``CharacterCreationError`` (domain errors wrapped with ``from``), so
+    activation's own except branch restores the player's snapshotted
+    surfaces -- including ``party``, which joined the creation snapshot for
+    this window -- and the whole activation rolls back. A companion is never
+    best-effort: silently arriving without the twin the card declares would
+    contradict the card the player chose.
+
+    Returns the built companions so the caller's rollback path can run
+    ``_discard_built_companions`` itself when a LATER activation step fails
+    after this binding committed in-transaction.
+    """
+    party_before = attribute_snapshot(player, "party")
+    built: list[LLMNPC] = []
+    try:
+        for declaration in preset.starting_companions:
+            npc = build_starting_companion(player, declaration)
+            built.append(npc)
+            seed_affinity(npc, player, declaration.affinity)
+            join_party(npc, player)
+            transaction.on_commit(
+                lambda npc=npc, declaration=declaration: log_info(
+                    "starting_companion_joined",
+                    context={
+                        "owner": player.key,
+                        "preset": declaration.preset_key,
+                        "char": npc.key,
+                        "value": declaration.affinity,
+                    },
+                )
+            )
+    except Exception as error:
+        _discard_built_companions(built)
+        restore_attribute_best_effort(player, "party", party_before)
+        if isinstance(error, CharacterCreationError):
+            raise
+        raise CharacterCreationError(
+            f"preset {preset.key!r} starting companion binding failed: {error}"
+        ) from error
+    return built
 
 
 _validate_preset_companion_bounds(PLAYER_PRESET_REGISTRY)

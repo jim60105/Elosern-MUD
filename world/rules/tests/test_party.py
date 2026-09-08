@@ -25,8 +25,15 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
+from world.quests.definitions import QuestStage, QuestType
+from world.quests.runtime import QuestState, read_records, to_storage
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.affinity_config import get_config
+from world.rules.character_creation import (
+    CharacterCreationRequest,
+    activate_player_character,
+)
+from world.rules.party import combat_companions, follow_companions
 from world.rules.party import (
     ALREADY_COMPANION_MESSAGE,
     AUTO_LEAVE_MESSAGE,
@@ -41,9 +48,24 @@ from world.rules.party import (
     join_party,
     leave_party,
     live_companion_ids,
+    live_companions,
     party_ids,
     party_size,
     purge_npc_memberships,
+)
+from world.maps.bootstrap import sync_grid
+from typeclasses.rooms import AnchorRoom
+from evennia.utils.create import create_account
+from evennia.utils.test_resources import EvenniaTest
+from typeclasses.accounts import Account
+
+from world.quests.tests._fixtures import (
+    QuestRegistryIsolation,
+    accept,
+    anchor_locator,
+    quest,
+    reach,
+    register,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -370,6 +392,102 @@ class AutoLeaveIntegrationTests(EvenniaTestCase):
         self.assertEqual(self.npc.relations.affinity_for(self.player), self.threshold)
         self.assertTrue(is_companion(self.npc, self.player))
         self.assertEqual(msg.call_count, 0)
+
+
+class ActivationBoundParityTests(QuestRegistryIsolation, EvenniaTest):
+    """Activation-bound companions behave exactly like invited ones.
+
+    Party membership is origin-agnostic: the sole-writer surfaces are the
+    same, so every consumer (follow, combat, quest-assist arrival
+    observation, dismissal) must treat an activation-bound companion and an
+    invited NPC identically (party-system delta).
+    """
+
+    def setUp(self):
+        super().setUp()
+        create_object(Room, key="虛境", location=None)
+        sync_grid()
+        register_catalog()
+        self.anchor = AnchorRoom.objects.filter(db_key="中央廣場").first()
+        self.assertIsInstance(self.anchor, AnchorRoom)
+        self.account = create_account(
+            "parity-maker", "parity@example.test", "testpassword", typeclass=Account
+        )
+        self.invited = create_object(NPC, key="受邀夥伴", location=self.room1)
+        self.invited.race = "human"
+        self.invited.apply_race_baseline()
+        self.player = None
+
+    def _activate_parity_player(self, key: str) -> PlayerCharacter:
+        """A freshly activated 由奈 holder with her bound twin in ``room1``."""
+        shell = create_object(PlayerCharacter, key=key)
+        self.account.at_post_create_character(shell)
+        shell.location = self.room1
+        activate_player_character(
+            self.account, shell,
+            CharacterCreationRequest(mode="preset", preset_key="yuna_darknight"),
+        )
+        return shell
+
+    def _records(self, player):
+        return [to_storage(record) for record in read_records(player)]
+
+    @covers_requirement("party-system::party-membership-is-bounded-persistent-and-single-writer")
+    def test_activation_binding_writes_the_same_membership_surfaces(self):
+        # The activation writes exactly what a join_party() writes: the same
+        # party/party_member surfaces, so consumers never branch on origin.
+        player = self._activate_parity_player("parity-shell")
+        bound = player.db.party
+        self.assertEqual(len(bound), 1)
+        companion = self.invited
+        join_party(companion, player)
+        self.assertEqual(party_size(player), 2)
+        for npc in (
+            live_companions(player)[0],
+            companion,
+        ):
+            self.assertEqual(int(npc.db.party_member), int(player.pk))
+        self.assertTrue(is_companion(companion, player))
+
+    @covers_requirement("party-system::party-membership-is-bounded-persistent-and-single-writer")
+    def test_follow_combat_and_dismissal_treat_both_origins_identically(self):
+        player = self._activate_parity_player("parity-shell-2")
+        bound = live_companions(player)[0]
+        join_party(self.invited, player)
+        # Follow: both origins move together with the player.
+        player.move_to(self.room2, quiet=True)
+        follow_companions(player, self.room1, destination=self.room2)
+        self.assertIs(player.location, self.room2)
+        self.assertIs(bound.location, self.room2)
+        self.assertIs(self.invited.location, self.room2)
+        # Combat: both are collected at the destination.
+        engaged = {int(npc.pk) for npc in combat_companions(player)}
+        self.assertEqual(engaged, {int(bound.pk), int(self.invited.pk)})
+        # Quest assist: the followed companion's presence drives the arrival
+        # observation at the anchor stage (party-follow D-2 re-observation).
+        definition = register(
+            quest(
+                "reach_activation_bound",
+                quest_type=QuestType.EXPLORE,
+                stages=(QuestStage(0, reach(anchor_locator())),),
+            )
+        )
+        record = accept(player, definition.key)
+        self.assertIs(record.state, QuestState.IN_PROGRESS)
+        player.move_to(self.anchor, quiet=True)
+        follow_companions(player, self.room2, destination=self.anchor)
+        stored = self._records(player)[0]
+        self.assertEqual(stored["state"], "completed")
+        self.assertEqual(stored["quest_id"], record.quest_id)
+        # Dismissal: leave unwrites both identically.
+        leave_party(bound, player, reason="dismissed")
+        leave_party(self.invited, player, reason="dismissed")
+        self.assertFalse(is_companion(bound, player))
+        self.assertFalse(is_companion(self.invited, player))
+        self.assertEqual(party_ids(player), [])
+        self.assertEqual(party_size(player), 0)
+        self.assertIsNone(bound.db.party_member)
+        self.assertIsNone(self.invited.db.party_member)
 
 
 if __name__ == "__main__":
