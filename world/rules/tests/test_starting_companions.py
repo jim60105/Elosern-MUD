@@ -31,11 +31,23 @@ from world.rules.character_creation import (
     CharacterCreationRequest,
     activate_player_character,
 )
-from world.rules.starting_companions import (
-    StartingCompanionError,
-    _validate_preset_companion_bounds,
-    build_starting_companion,
-)
+from world.rules import starting_companions as starting_companions_module
+
+# The import-gate test below reloads the module (exercising the module-bottom
+# sweep on the real import path) and a reload rebinds the module's own
+# functions, so every call routes through the live module object. The
+# exception name below is rebound by the reload test's repair step so every
+# later assertRaises sees the class the live module actually raises.
+StartingCompanionError = starting_companions_module.StartingCompanionError
+
+
+def _validate_preset_companion_bounds(registry):
+    return starting_companions_module._validate_preset_companion_bounds(registry)
+
+
+def build_starting_companion(player, declaration):
+    return starting_companions_module.build_starting_companion(player, declaration)
+
 
 _YUKA = "yuka_darknight"
 _YUNA = "yuna_darknight"
@@ -83,8 +95,10 @@ class CompanionBoundsSweepTests(unittest.TestCase):
 
     @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
     def test_out_of_range_affinity_names_the_offending_preset(self):
+        from world.rules.affinity import NATURAL_CAP
+
         partner = next(key for key in PLAYER_PRESET_REGISTRY if key != "probe")
-        for affinity in (0, -1, 100, True, False, "50", None):
+        for affinity in (0, -1, NATURAL_CAP + 1, True, False, "50", None):
             preset = _probe_preset(
                 starting_companions=(StartingCompanion(partner, affinity, "夥伴"),)
             )
@@ -93,7 +107,7 @@ class CompanionBoundsSweepTests(unittest.TestCase):
             ):
                 _validate_preset_companion_bounds({"probe": preset})
         # The 1 and NATURAL_CAP boundaries pass.
-        for affinity in (1, 99):
+        for affinity in (1, NATURAL_CAP):
             _validate_preset_companion_bounds(
                 {
                     "probe": _probe_preset(
@@ -315,11 +329,39 @@ class CompanionBoundsSweepRegistration(_BuilderCase):
     """The sweep is a real import-time gate, not a dormant helper."""
 
     @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
-    def test_importing_the_module_sweeps_the_shipped_registry(self):
-        # Re-running the module-bottom sweep must be clean on the shipped
-        # registry, and the twins sit at exactly the seeded affinity bound
-        # family the sweep protects (95 <= NATURAL_CAP).
-        _validate_preset_companion_bounds(PLAYER_PRESET_REGISTRY)
-        for preset in (PLAYER_PRESET_REGISTRY[_YUNA], PLAYER_PRESET_REGISTRY[_YUKA]):
-            for declaration in preset.starting_companions:
-                self.assertEqual(declaration.affinity, 95)
+    def test_module_import_runs_the_sweep_and_refuses_an_out_of_bounds_card(self):
+        # The delta scenario: importing world.rules.starting_companions raises
+        # from its registry sweep when a card declares more companions than
+        # the party cap. Poison the real registry with one over-bound card and
+        # reload the module: the module-bottom sweep must refuse the import.
+        import importlib
+
+        from world.rules import starting_companions as module
+        from world.rules.party import PARTY_MAX_COMPANIONS
+
+        bad = _probe_preset(
+            key="reload_probe",
+            starting_companions=tuple(
+                StartingCompanion(key, 50, "夥伴")
+                for key in list(PLAYER_PRESET_REGISTRY)[: PARTY_MAX_COMPANIONS + 1]
+            ),
+        )
+        PLAYER_PRESET_REGISTRY["reload_probe"] = bad
+        try:
+            with self.assertRaises(ValueError) as caught:
+                importlib.reload(module)
+            self.assertRegex(str(caught.exception), "more than the party cap")
+            self.assertRegex(str(caught.exception), "reload_probe")
+        finally:
+            PLAYER_PRESET_REGISTRY.pop("reload_probe", None)
+            # Repair reload: re-executes the sweep clean over the shipped
+            # registry and restores every public name.
+            importlib.reload(module)
+            # A reload re-executes every statement, so even the freshly
+            # repaired module now carries NEW function and exception class
+            # objects. Rebind this test module's exception name to the live
+            # class so later assertRaises checks match what the reloaded
+            # builder actually raises.
+            globals()["StartingCompanionError"] = module.StartingCompanionError
+        self.assertIs(module.PLAYER_PRESET_REGISTRY, PLAYER_PRESET_REGISTRY)
+        self.assertTrue(callable(module.build_starting_companion))
