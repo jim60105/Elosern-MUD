@@ -423,11 +423,18 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
 
         # Guarantee overflow so the narrative can be scrolled up.
         _append_narrative_fillers(page, 80)
-        # Scroll to the top, then gate on the scroll actually reaching the top
-        # (the feed uses smooth scrolling, so a fixed timeout can race the
-        # animation and the at-bottom decision is captured mid-scroll).
+        # The feed stylesheet sets `scroll-behavior: smooth`, so a direct
+        # `scrollTop = 0` triggers an animation that races the gate. Force an
+        # instant scroll for this single assignment (the same override pattern
+        # the feed's own `scrollToBottom` and the scrolled-away test use) so
+        # the exact-top gate and the assertion below cannot observe a
+        # mid-flight animation frame.
         page.evaluate(
-            "() => { document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop = 0; }"
+            "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
+            " const prev = f.style.scrollBehavior;"
+            " f.style.scrollBehavior = 'auto';"
+            " f.scrollTop = 0;"
+            " f.style.scrollBehavior = prev; }"
         )
         wait_for_store_state(
             page,
@@ -435,9 +442,10 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             dom_readiness={
                 "selector": '[data-testid="narrative-feed"]',
                 "predicate": (
-                    "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop <= 8"
+                    "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
+                    " return f && f.scrollTop === 0 && f.scrollHeight - f.scrollTop - f.clientHeight >= 8; }"
                 ),
-                "description": "narrative feed scrolled to the top",
+                "description": "narrative feed scrolled to the top (and not at the bottom)",
             },
             timeout=30000,
         )
@@ -500,9 +508,10 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             dom_readiness={
                 "selector": '[data-testid="narrative-feed"]',
                 "predicate": (
-                    "() => document.querySelector('[data-testid=\"narrative-feed\"]').scrollTop <= 8"
+                    "() => { const f = document.querySelector('[data-testid=\"narrative-feed\"]');"
+                    " return f && f.scrollTop === 0 && f.scrollHeight - f.scrollTop - f.clientHeight >= 8; }"
                 ),
-                "description": "narrative feed scrolled to the top",
+                "description": "narrative feed scrolled to the top (and not at the bottom)",
             },
             timeout=30000,
         )
