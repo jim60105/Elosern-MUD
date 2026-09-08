@@ -67,6 +67,10 @@ node_modules/
 # directory wipe cannot unlink the locked inode (sees _showcase_build.py).
 .storybook-out.lock
 
+# Stray per-package lockfile: pnpm resolution is root-locked (single root
+# pnpm-lock.yaml); one in a subdirectory means pnpm was run in the wrong cwd.
+web/webclient-app/pnpm-lock.yaml
+
 # ==========================================
 # CodeGraph
 # ==========================================
