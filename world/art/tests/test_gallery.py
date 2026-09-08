@@ -8,10 +8,11 @@ tolerant reads against a temporary store root.
 """
 
 import ast
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from unittest.mock import patch
 import uuid
+import unittest
 
 from django.test import override_settings
 from evennia.utils.test_resources import EvenniaTestCase
@@ -20,6 +21,7 @@ from world.art.gallery import (
     DEFAULT_FACE_RECT,
     GalleryRecord,
     GalleryRecordError,
+    SLOT_ORDER,
     append_card,
     cards_for,
     clear_error,
@@ -40,14 +42,6 @@ from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-RECORD_MODEL = "art-gallery-model::one-gallery-record-per-art-subject-carries-an-ordered-card-list-and-a-default"
-CARD_CONTRACT = "art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract"
-FACE_RECT = "art-gallery-model::face-rectangles-are-normalized-bounded-and-default-to-the-shared-upper-half-constant"
-BINDING = "art-gallery-model::a-card-binding-is-a-non-empty-slot-mask-plus-a-normalized-snapshot-over-exactly-the-masked-slots"
-SNAPSHOT = "art-gallery-model::equipment-snapshots-are-read-from-stored-state-without-materializing-a-handler"
-MONSTER_CAP = "art-gallery-model::monster-subjects-hold-at-most-one-card"
-SOLE_WRITER = "art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles"
-TOLERANT_READ = "art-gallery-model::malformed-stored-cards-are-skipped-never-fatal"
 
 
 def _character(key="heron"):
@@ -120,12 +114,12 @@ class StoreRootConfinementTests(unittest.TestCase):
         self.settings_override.disable()
         self.tempdir.cleanup()
 
-    @covers_requirement(SOLE_WRITER)
+    @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
     def test_confined_identity_resolves_to_the_real_file(self):
         resolved = resolved_under_store_root("gallery/character/a.png")
         self.assertEqual(resolved, self.root / "gallery" / "character" / "a.png")
 
-    @covers_requirement(SOLE_WRITER)
+    @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
     def test_parent_traversal_and_absolute_paths_are_rejected(self):
         outside = Path(self.tempdir.name).parent / "outside.png"
         outside.write_bytes(b"keep me")
@@ -139,7 +133,7 @@ class StoreRootConfinementTests(unittest.TestCase):
                 self.assertIsNone(resolved_under_store_root(identity))
         self.assertTrue(outside.exists())
 
-    @covers_requirement(SOLE_WRITER)
+    @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
     def test_symlinked_components_are_rejected_even_inside_the_root(self):
         external = Path(self.tempdir.name).parent / "external.png"
         external.write_bytes(b"do not touch")
@@ -157,7 +151,7 @@ class StoreRootConfinementTests(unittest.TestCase):
             resolved_under_store_root("monsterlinks/character/a.png")
         )
 
-    @covers_requirement(SOLE_WRITER)
+    @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
     def test_root_itself_and_empty_identity_are_refused(self):
         for identity in ("", ".", "gallery/.."):
             with self.subTest(identity=identity):
@@ -165,19 +159,19 @@ class StoreRootConfinementTests(unittest.TestCase):
 
 
 class FaceRectValidationTests(unittest.TestCase):
-    @covers_requirement(FACE_RECT)
+    @covers_requirement("art-gallery-model::face-rectangles-are-normalized-bounded-and-default-to-the-shared-upper-half-constant")
     def test_the_shared_constant_is_the_upper_half_rect(self):
         self.assertEqual(
             DEFAULT_FACE_RECT, {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
         )
         self.assertEqual(validate_face_rect(DEFAULT_FACE_RECT), DEFAULT_FACE_RECT)
 
-    @covers_requirement(FACE_RECT)
+    @covers_requirement("art-gallery-model::face-rectangles-are-normalized-bounded-and-default-to-the-shared-upper-half-constant")
     def test_a_valid_rect_is_stored_verbatim(self):
         rect = {"x": 0.1, "y": 0.0, "w": 0.9, "h": 1.0}
         self.assertEqual(validate_face_rect(rect), rect)
 
-    @covers_requirement(FACE_RECT)
+    @covers_requirement("art-gallery-model::face-rectangles-are-normalized-bounded-and-default-to-the-shared-upper-half-constant")
     def test_every_out_of_bounds_form_is_rejected(self):
         malformed = {
             "x_plus_w_over_one": {"x": 0.6, "y": 0.0, "w": 0.5, "h": 0.1},
@@ -199,11 +193,11 @@ class FaceRectValidationTests(unittest.TestCase):
 
 
 class BindingValidationTests(unittest.TestCase):
-    @covers_requirement(BINDING)
+    @covers_requirement("art-gallery-model::a-card-binding-is-a-non-empty-slot-mask-plus-a-normalized-snapshot-over-exactly-the-masked-slots")
     def test_none_is_a_legal_unbound_binding(self):
         self.assertIsNone(validate_binding(None))
 
-    @covers_requirement(BINDING)
+    @covers_requirement("art-gallery-model::a-card-binding-is-a-non-empty-slot-mask-plus-a-normalized-snapshot-over-exactly-the-masked-slots")
     def test_the_mask_is_stored_in_declared_order(self):
         binding = validate_binding(
             {
@@ -213,7 +207,7 @@ class BindingValidationTests(unittest.TestCase):
         )
         self.assertEqual(binding["mask"], ["weapon_main", "armor"])
 
-    @covers_requirement(BINDING)
+    @covers_requirement("art-gallery-model::a-card-binding-is-a-non-empty-slot-mask-plus-a-normalized-snapshot-over-exactly-the-masked-slots")
     def test_accessory_keys_are_stored_sorted(self):
         binding = validate_binding(
             {
@@ -223,7 +217,7 @@ class BindingValidationTests(unittest.TestCase):
         )
         self.assertEqual(binding["snapshot"]["accessories"], ["amulet_a", "ring_b", "ring_c"])
 
-    @covers_requirement(BINDING)
+    @covers_requirement("art-gallery-model::a-card-binding-is-a-non-empty-slot-mask-plus-a-normalized-snapshot-over-exactly-the-masked-slots")
     def test_an_all_empty_snapshot_is_a_legal_binding(self):
         binding = validate_binding(
             {
@@ -236,13 +230,13 @@ class BindingValidationTests(unittest.TestCase):
                 },
             }
         )
-        self.assertEqual(binding["mask"], list(snapshot_slots()))
+        self.assertEqual(binding["mask"], list(SLOT_ORDER))
         self.assertEqual(
             binding["snapshot"],
             {"weapon_main": None, "weapon_off": None, "armor": None, "accessories": []},
         )
 
-    @covers_requirement(BINDING)
+    @covers_requirement("art-gallery-model::a-card-binding-is-a-non-empty-slot-mask-plus-a-normalized-snapshot-over-exactly-the-masked-slots")
     def test_every_malformed_form_is_rejected(self):
         malformed = {
             "empty_mask": {"mask": [], "snapshot": {}},
@@ -284,21 +278,13 @@ class BindingValidationTests(unittest.TestCase):
                     validate_binding(binding)
 
 
-def snapshot_slots():
-    from world.art.gallery import SLOT_ORDER
-
-    return SLOT_ORDER
-
-
 class CardContractTests(unittest.TestCase):
     def setUp(self):
         self.subject = _character()
 
-    @covers_requirement(CARD_CONTRACT)
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_a_generated_card_stores_exactly_the_contract_keys(self):
         stored = validate_card(
-            _card_fields(self.subject), self.subject, api_defaults=False
-        ) if False else validate_card(
             _card_fields(self.subject, face_rect=dict(DEFAULT_FACE_RECT)),
             self.subject,
         )
@@ -327,7 +313,7 @@ class CardContractTests(unittest.TestCase):
         ):
             self.assertNotIn(environment_key, stored)
 
-    @covers_requirement(CARD_CONTRACT)
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_extra_missing_and_wrongly_typed_keys_are_rejected(self):
         base = _card_fields(self.subject)
         complete = dict(base, face_rect=dict(DEFAULT_FACE_RECT))
@@ -358,13 +344,13 @@ class CardContractTests(unittest.TestCase):
         with self.assertRaises(GalleryRecordError):
             validate_card(missing_created, self.subject, api_defaults=False)
 
-    @covers_requirement(CARD_CONTRACT)
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_face_rect_and_created_at_may_be_omitted_at_the_write_boundary(self):
         stored = validate_card(_card_fields(self.subject), self.subject)
         self.assertEqual(stored["face_rect"], DEFAULT_FACE_RECT)
         self.assertIsInstance(stored["created_at"], float)
 
-    @covers_requirement(CARD_CONTRACT)
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_a_non_canonical_uuid_image_id_is_rejected(self):
         for image_id in (
             _new_id().upper(),
@@ -383,7 +369,7 @@ class CardContractTests(unittest.TestCase):
                 with self.assertRaises(GalleryRecordError):
                     validate_card(fields, self.subject)
 
-    @covers_requirement(CARD_CONTRACT)
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_a_store_identity_outside_the_gallery_shape_is_rejected(self):
         image_id = _new_id()
         subject = self.subject
@@ -404,7 +390,7 @@ class CardContractTests(unittest.TestCase):
                         subject,
                     )
 
-    @covers_requirement(CARD_CONTRACT)
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_a_scene_subject_can_have_no_cards(self):
         scene = _scene()
         image_id = _new_id()
@@ -423,7 +409,7 @@ class CardContractTests(unittest.TestCase):
                 scene,
             )
 
-    @covers_requirement(TOLERANT_READ)
+    @covers_requirement("art-gallery-model::malformed-stored-cards-are-skipped-never-fatal")
     def test_a_stored_entry_needs_the_complete_contract(self):
         # The read-side validation (api_defaults=False) rejects an entry that
         # lacks face_rect even though the write API would have defaulted it.
@@ -433,7 +419,7 @@ class CardContractTests(unittest.TestCase):
 
 
 class EquipmentSnapshotTests(unittest.TestCase):
-    @covers_requirement(SNAPSHOT)
+    @covers_requirement("art-gallery-model::equipment-snapshots-are-read-from-stored-state-without-materializing-a-handler")
     def test_missing_equipment_reads_empty_without_touching_the_entity(self):
         entity = _FakeEntity()
         self.assertEqual(
@@ -443,7 +429,7 @@ class EquipmentSnapshotTests(unittest.TestCase):
         # The read wrote nothing: the namespace still holds no equipment key.
         self.assertNotIn("equipment", entity.db._values)
 
-    @covers_requirement(SNAPSHOT)
+    @covers_requirement("art-gallery-model::equipment-snapshots-are-read-from-stored-state-without-materializing-a-handler")
     def test_a_worn_loadout_reads_back_with_sorted_accessories(self):
         entity = _FakeEntity(
             {
@@ -463,7 +449,7 @@ class EquipmentSnapshotTests(unittest.TestCase):
             },
         )
 
-    @covers_requirement(SNAPSHOT)
+    @covers_requirement("art-gallery-model::equipment-snapshots-are-read-from-stored-state-without-materializing-a-handler")
     def test_every_malformed_storage_shape_fails_closed_to_empty(self):
         malformed = {
             "string": "wearing a hat",
@@ -487,7 +473,7 @@ class EquipmentSnapshotTests(unittest.TestCase):
                     },
                 )
 
-    @covers_requirement(SNAPSHOT)
+    @covers_requirement("art-gallery-model::equipment-snapshots-are-read-from-stored-state-without-materializing-a-handler")
     def test_missing_keys_read_as_their_empty_defaults(self):
         entity = _FakeEntity({"weapon_main": "short_sword"})
         self.assertEqual(
@@ -500,7 +486,7 @@ class EquipmentSnapshotTests(unittest.TestCase):
             },
         )
 
-    @covers_requirement(SOLE_WRITER)
+    @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
     def test_only_the_gallery_module_touches_gallery_records(self):
         """AST scan: no other production module names GalleryRecord in code."""
         offenders = []
@@ -548,14 +534,14 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         target.write_bytes(b"image")
         return target
 
-    @covers_requirement(RECORD_MODEL)
+    @covers_requirement("art-gallery-model::one-gallery-record-per-art-subject-carries-an-ordered-card-list-and-a-default")
     def test_an_unwritten_subject_reads_empty_and_creates_nothing(self):
         subject = _character("nobody")
         self.assertEqual(cards_for(subject), [])
         self.assertIsNone(record_for(subject))
         self.assertEqual(GalleryRecord.objects.filter(db_key=record_key(subject)).count(), 0)
 
-    @covers_requirement(RECORD_MODEL)
+    @covers_requirement("art-gallery-model::one-gallery-record-per-art-subject-carries-an-ordered-card-list-and-a-default")
     def test_the_first_append_creates_the_record_and_becomes_the_default(self):
         subject = _character()
         image_id = _new_id()
@@ -568,7 +554,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         self.assertEqual([card["image_id"] for card in cards_for(subject)], [image_id])
         self.assertEqual(stored["image_id"], image_id)
 
-    @covers_requirement(RECORD_MODEL)
+    @covers_requirement("art-gallery-model::one-gallery-record-per-art-subject-carries-an-ordered-card-list-and-a-default")
     def test_a_later_append_keeps_the_default_and_appends_in_order(self):
         subject = _character("twocards")
         first = _new_id()
@@ -581,7 +567,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
             [card["image_id"] for card in cards_for(subject)], [first, second]
         )
 
-    @covers_requirement(RECORD_MODEL)
+    @covers_requirement("art-gallery-model::one-gallery-record-per-art-subject-carries-an-ordered-card-list-and-a-default")
     def test_setting_an_unknown_default_is_rejected_and_changes_nothing(self):
         subject = _character("defaultme")
         first = _new_id()
@@ -594,7 +580,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         set_default(subject, second)
         self.assertEqual(record_for(subject).db.default_image_id, second)
 
-    @covers_requirement(RECORD_MODEL)
+    @covers_requirement("art-gallery-model::one-gallery-record-per-art-subject-carries-an-ordered-card-list-and-a-default")
     def test_set_default_rejects_a_record_a_scene_and_an_unwritten_subject(self):
         with self.assertRaises(GalleryRecordError):
             set_default(_character("ghost"), _new_id())
@@ -603,7 +589,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         with self.assertRaises(GalleryRecordError):
             append_card(_scene(), **{"image_id": _new_id()})
 
-    @covers_requirement(CARD_CONTRACT)
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_a_duplicate_image_id_is_rejected_and_the_list_is_unchanged(self):
         subject = _character("dupes")
         image_id = _new_id()
@@ -612,7 +598,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
             append_card(subject, **_card_fields(subject, image_id=image_id))
         self.assertEqual(len(cards_for(subject)), 1)
 
-    @covers_requirement(CARD_CONTRACT)
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_a_seed_provenance_card_without_prompt_or_seed_is_accepted(self):
         subject = _character("seeded")
         stored = append_card(
@@ -625,7 +611,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         self.assertIsNone(stored["seed"])
         self.assertEqual(len(cards_for(subject)), 1)
 
-    @covers_requirement(FACE_RECT)
+    @covers_requirement("art-gallery-model::face-rectangles-are-normalized-bounded-and-default-to-the-shared-upper-half-constant")
     def test_append_applies_the_shared_rect_and_stores_explicit_rects_verbatim(self):
         subject = _character("rects")
         stored = append_card(subject, **_card_fields(subject))
@@ -644,7 +630,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
             )
         self.assertEqual(len(cards_for(subject)), 2)
 
-    @covers_requirement(BINDING)
+    @covers_requirement("art-gallery-model::a-card-binding-is-a-non-empty-slot-mask-plus-a-normalized-snapshot-over-exactly-the-masked-slots")
     def test_a_bound_character_card_stores_the_normalized_binding(self):
         subject = _character("bound")
         stored = append_card(
@@ -666,7 +652,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
             {"weapon_main": "short_sword", "armor": "leather_vest"},
         )
 
-    @covers_requirement(MONSTER_CAP)
+    @covers_requirement("art-gallery-model::monster-subjects-hold-at-most-one-card")
     def test_a_second_monster_card_replaces_the_first_and_deletes_its_file(self):
         subject = _monster()
         first = _new_id()
@@ -681,7 +667,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         self.assertFalse(first_file.exists())
         self.assertTrue(second_file.exists())
 
-    @covers_requirement(MONSTER_CAP)
+    @covers_requirement("art-gallery-model::monster-subjects-hold-at-most-one-card")
     def test_a_bound_monster_card_is_rejected_and_the_record_is_unchanged(self):
         subject = _monster("boundgoblin")
         first = _new_id()
@@ -707,7 +693,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
             )
         self.assertIsNone(record_for(_monster("freshgoblin")))
 
-    @covers_requirement(SOLE_WRITER)
+    @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
     def test_deleting_a_card_unlinks_exactly_its_confined_file(self):
         subject = _character("delfile")
         image_id = _new_id()
@@ -721,7 +707,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         self.assertTrue(kept.exists())
         self.assertEqual([card["image_id"] for card in cards_for(subject)], [keep])
 
-    @covers_requirement(SOLE_WRITER)
+    @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
     def test_an_unresolvable_identity_is_removed_with_a_bounded_log_and_no_unlink(self):
         subject = _character("delink")
         image_id = _new_id()
@@ -742,7 +728,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         self.assertEqual(events[0].kwargs["context"]["subject"], subject.full())
         self.assertEqual(cards_for(subject), [])
 
-    @covers_requirement(SOLE_WRITER)
+    @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
     def test_a_missing_file_is_a_bounded_debug_not_a_raise(self):
         subject = _character("nofile")
         image_id = _new_id()
@@ -753,7 +739,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         events = [c for c in debug.call_args_list if c.args and c.args[0] == "gallery_card_file_missing"]
         self.assertEqual(len(events), 1)
 
-    @covers_requirement(SOLE_WRITER)
+    @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
     def test_deleting_the_default_card_clears_the_default(self):
         subject = _character("deldefault")
         first = _new_id()
@@ -767,7 +753,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         with self.assertRaises(GalleryRecordError):
             remove_card(subject, "not-an-uuid-at-all-xyz")
 
-    @covers_requirement(TOLERANT_READ)
+    @covers_requirement("art-gallery-model::malformed-stored-cards-are-skipped-never-fatal")
     def test_a_malformed_entry_is_skipped_and_logged_once(self):
         subject = _character("malformed")
         valid = _new_id()
@@ -782,7 +768,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         self.assertEqual(events[0].kwargs["context"]["subject"], subject.full())
         self.assertIsNone(events[0].kwargs["context"]["image_id"])
 
-    @covers_requirement(TOLERANT_READ)
+    @covers_requirement("art-gallery-model::malformed-stored-cards-are-skipped-never-fatal")
     def test_a_contract_broken_entry_logs_its_readable_image_id(self):
         subject = _character("brokenid")
         good = _new_id()
@@ -799,7 +785,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].kwargs["context"]["image_id"], broken["image_id"])
 
-    @covers_requirement(TOLERANT_READ)
+    @covers_requirement("art-gallery-model::malformed-stored-cards-are-skipped-never-fatal")
     def test_an_all_malformed_record_reads_empty(self):
         subject = _character("allbad")
         append_card(subject, **_card_fields(subject))
@@ -808,7 +794,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         with patch("world.art.gallery.log_warn"):
             self.assertEqual(cards_for(subject), [])
 
-    @covers_requirement(RECORD_MODEL)
+    @covers_requirement("art-gallery-model::one-gallery-record-per-art-subject-carries-an-ordered-card-list-and-a-default")
     def test_record_error_and_clear_error_round_trip_lazily(self):
         subject = _character("errored")
         record_error(subject, "sd_connection_error")
@@ -825,7 +811,7 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         with self.assertRaises(GalleryRecordError):
             record_error(subject, "")
 
-    @covers_requirement(RECORD_MODEL)
+    @covers_requirement("art-gallery-model::one-gallery-record-per-art-subject-carries-an-ordered-card-list-and-a-default")
     def test_a_recreated_cards_list_survives_fetch(self):
         subject = _character("listreload")
         first = _new_id()

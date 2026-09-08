@@ -34,7 +34,7 @@ keeping the deterministic-path and connectivity import-boundary contracts
 intact.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 import threading
 import time
@@ -168,6 +168,17 @@ def _is_real_number(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _is_list_like(value: object) -> bool:
+    """True for any non-string sequence.
+
+    Evennia's DB round-trip replaces plain lists with ``_SaverList`` (a
+    ``MutableSequence``, not a ``list``), so every stored-shape list check
+    accepts the sequence ABC and rejects only what a list would reject —
+    strings and bytes included.
+    """
+    return isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray))
+
+
 def validate_face_rect(rect: object) -> dict:
     """Return the rect verbatim after enforcing the placement contract.
 
@@ -210,7 +221,7 @@ def validate_binding(binding: object) -> dict | None:
             "binding must be None or a mapping of exactly mask and snapshot"
         )
     mask = binding["mask"]
-    if not isinstance(mask, list) or not mask:
+    if not _is_list_like(mask) or not mask:
         raise GalleryRecordError("binding mask must be a non-empty list")
     if len(set(mask)) != len(mask):
         raise GalleryRecordError("binding mask must not repeat a slot")
@@ -226,7 +237,7 @@ def validate_binding(binding: object) -> dict | None:
             continue
         value = snapshot[slot]
         if slot == "accessories":
-            if not isinstance(value, list) or not all(
+            if not _is_list_like(value) or not all(
                 isinstance(item, str) and item for item in value
             ):
                 raise GalleryRecordError(
@@ -268,7 +279,7 @@ def snapshot_for(entity) -> dict:
             if value is None:
                 snapshot[slot] = []
                 continue
-            if not isinstance(value, list) or not all(
+            if not _is_list_like(value) or not all(
                 isinstance(item, str) and item for item in value
             ):
                 return _empty_snapshot()
@@ -382,7 +393,7 @@ def validate_card(
         raise GalleryRecordError("checkpoint must be a non-empty string or None")
 
     requested_fields = card["requested_fields"]
-    if not isinstance(requested_fields, list) or not all(
+    if not _is_list_like(requested_fields) or not all(
         isinstance(field, str) and field for field in requested_fields
     ):
         raise GalleryRecordError("requested_fields must be a list of field-id strings")
