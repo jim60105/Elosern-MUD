@@ -546,7 +546,7 @@ class MultiCharacterActionIntegrationTests(EvenniaTest):
 
         # 3. Complete creation wizard for character B: select preset then activate
         self.sessionhandler.data_out.reset_mock()
-        self._dispatch("req:preset", "creation.preset", {"preset_key": "human_wanderer"})
+        self._dispatch("req:preset", "creation.preset", {"preset_key": "elysa_snow"})
         preset_results = self._get_action_results()
         self.assertEqual(len(preset_results), 1)
         self.assertEqual(preset_results[0]["outcome"], "success")

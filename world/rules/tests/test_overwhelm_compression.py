@@ -151,7 +151,7 @@ class MarkerTests(unittest.TestCase):
 
     @covers_requirement("event-log-compression::compress-event-logs-marks-the-player-s-commanded-action-with-a-commanded-action-entry")
     def test_marker_prepends_to_the_first_matching_window_log(self):
-        player = "瑟芮雅"
+        player = "希爾溫"
         commanded = self._action_log(player, "basic_attack", target=player, hit=False)
         companion = self._action_log("夥伴", "fire_ball")
         auto = self._action_log(player, "basic_attack", amount=40)
@@ -182,7 +182,7 @@ class MarkerTests(unittest.TestCase):
 
     @covers_requirement("event-log-compression::compress-event-logs-marks-the-player-s-commanded-action-with-a-commanded-action-entry")
     def test_marker_follows_window_order_not_raw_order(self):
-        player = "瑟芮雅"
+        player = "希爾溫"
         first = self._action_log("夥伴", "fire_ball")
         second = self._action_log(player, "basic_attack", hit=False)
         # The window lists the player's log first, inverting the raw order;
@@ -201,7 +201,7 @@ class MarkerTests(unittest.TestCase):
 
     @covers_requirement("event-log-compression::compress-event-logs-marks-the-player-s-commanded-action-with-a-commanded-action-entry")
     def test_invalidated_round1_command_yields_no_marker(self):
-        player = "瑟芮雅"
+        player = "希爾溫"
         companion = self._action_log("夥伴", "fire_ball")
         auto = self._action_log(player, "basic_attack", amount=40)
         window = (companion,)
@@ -242,7 +242,7 @@ class MarkerTests(unittest.TestCase):
 
     @covers_requirement("event-log-compression::compress-event-logs-marks-the-player-s-commanded-action-with-a-commanded-action-entry")
     def test_unknown_commanded_skill_falls_back_to_raw_key(self):
-        player = "瑟芮雅"
+        player = "希爾溫"
         log = self._action_log(player, "mystery_art")
         result = compress_event_logs(
             [log],
@@ -257,7 +257,7 @@ class MarkerTests(unittest.TestCase):
 
     @covers_requirement("event-log-compression::compress-event-logs-marks-the-player-s-commanded-action-with-a-commanded-action-entry")
     def test_marked_log_renders_player_perspective_line(self):
-        player = "瑟芮雅"
+        player = "希爾溫"
         log = self._action_log(player, "basic_attack", target=player, hit=False)
         result = compress_event_logs(
             [log],

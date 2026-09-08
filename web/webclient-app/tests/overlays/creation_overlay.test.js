@@ -294,7 +294,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
           ],
           confirmLabel: "確認啟用此預設角色？",
           confirmAction: "creation.activate",
-          pendingPresetKey: "human_wanderer",
+          pendingPresetKey: "elysa_snow",
         },
       },
     });
@@ -363,7 +363,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
           confirmItems: [{ key: "confirm-creation.activate", label: "確認啟用？", actionId: "creation.activate" }],
           confirmLabel: "確認啟用？",
           confirmAction: "creation.activate",
-          pendingPresetKey: "human_wanderer",
+          pendingPresetKey: "elysa_snow",
         },
       },
     });

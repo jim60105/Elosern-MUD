@@ -49,7 +49,7 @@ class LoginIntroductionTests(EvenniaTest):
         activate_player_character(
             self.account,
             self.char1,
-            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
         )
         messages = self._messages_on_login()
         self.assertNotIn("伊洛瑟恩大陸", messages)
@@ -65,7 +65,7 @@ class LoginIntroductionTests(EvenniaTest):
         activate_player_character(
             self.account,
             self.char1,
-            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
         )
         char2, _ = self.account.create_character(key="Char2Pending")
         self.assertTrue(char2.creation_pending)
@@ -87,7 +87,7 @@ class LoginIntroductionTests(EvenniaTest):
         activate_player_character(
             self.account,
             self.char1,
-            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
         )
         char2, _ = self.account.create_character(key="Char2Pending")
 
@@ -147,7 +147,7 @@ class LoginIntroductionTests(EvenniaTest):
         activate_player_character(
             self.account,
             self.char1,
-            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
         )
         elsewhere = create_object(Room, key="重連測試房", location=None)
         self.char1.location = elsewhere

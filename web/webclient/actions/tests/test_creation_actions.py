@@ -159,16 +159,16 @@ class CreationActionBase(EvenniaTest):
 class CreationPayloadValidationTests(unittest.TestCase):
     def test_preset_payload_is_exact(self):
         self.assertEqual(
-            validate_creation_preset_payload({"preset_key": "human_wanderer"}),
-            {"preset_key": "human_wanderer"},
+            validate_creation_preset_payload({"preset_key": "elysa_snow"}),
+            {"preset_key": "elysa_snow"},
         )
         for bad in (
             {"preset_key": ""},
             {"preset_key": "x" * 65},
             {"preset_key": 5},
             {},
-            {"preset_key": "human_wanderer", "actor": 1},
-            {"preset_key": "human_wanderer", "account": 1},
+            {"preset_key": "elysa_snow", "actor": 1},
+            {"preset_key": "elysa_snow", "account": 1},
         ):
             with self.subTest(payload=bad):
                 with self.assertRaises(Exception):
@@ -262,13 +262,13 @@ class CreationPayloadValidationTests(unittest.TestCase):
 class CreationAdapterTests(CreationActionBase):
     @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
     def test_preset_selection_success(self):
-        result = _creation_preset_adapter(self.character, {"preset_key": "human_wanderer"})
+        result = _creation_preset_adapter(self.character, {"preset_key": "elysa_snow"})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "preset_saved")
         self.assertEqual(result["affected_panels"], ("creation",))
         draft = read_draft(self.character)
         self.assertEqual(draft["mode"], "preset")
-        self.assertEqual(draft["preset_key"], "human_wanderer")
+        self.assertEqual(draft["preset_key"], "elysa_snow")
         self.assertTrue(self.character.creation_pending)
 
     def test_preset_unknown_key_rejected_without_mutation(self):
@@ -533,7 +533,7 @@ class CreationFingerprintBindingTests(CreationActionBase):
         self.assertTrue(self.character.creation_pending)
 
     def test_preset_save_also_binds_the_confirmation_fingerprint(self):
-        result = _creation_preset_adapter(self.character, {"preset_key": "human_wanderer"})
+        result = _creation_preset_adapter(self.character, {"preset_key": "elysa_snow"})
         self.assertEqual(result["outcome"], "success")
         fingerprint = draft_fingerprint(self.character)
         self.assertEqual(result["fingerprint"], fingerprint)
@@ -563,7 +563,7 @@ class CreationFingerprintBindingTests(CreationActionBase):
         self.assertEqual(self.character.key, "pending-shell")
 
     def test_rejected_preset_save_also_invalidates_the_confirmation(self):
-        _creation_preset_adapter(self.character, {"preset_key": "human_wanderer"})
+        _creation_preset_adapter(self.character, {"preset_key": "elysa_snow"})
         rejected = _creation_preset_adapter(
             self.character, {"preset_key": "nonexistent_preset"}
         )

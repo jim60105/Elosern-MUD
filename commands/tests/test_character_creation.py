@@ -391,7 +391,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             self.assertIn(key, output)
             self.assertIn(preset.emphasis, output)
             self.assertIn(preset.persona.background, output)
-        output = self.call(CmdCharacter(), "preset human_wanderer")
+        output = self.call(CmdCharacter(), "preset elysa_snow")
         self.assertIn("已建立", output)
         self.assertFalse(self.char1.creation_pending)
         self.char1.at_cmdset_get()
@@ -537,7 +537,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         command.args = "create"
         generator = command.func()
         replies = (
-            ["瑟芮雅", "180", "24", "elf", "fionnen"]
+            ["希爾溫", "180", "24", "elf", "fionnen"]
             + ["0", "0", "0", "12", "12", "13", "400"]
             + ["", "yes"]
         )
@@ -553,7 +553,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertNotIn("屬性親和（可選擇", joined)
 
     def test_real_rest_reaches_clock_after_activation(self):
-        self.call(CmdCharacter(), "preset human_wanderer")
+        self.call(CmdCharacter(), "preset elysa_snow")
         original_msg = self.char1.msg
         self.char1.msg = Mock()
         try:
@@ -617,7 +617,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     def test_committed_creation_schedules_exactly_one_portrait_ensure(self):
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            output = self.call(CmdCharacter(), "preset human_wanderer")
+            output = self.call(CmdCharacter(), "preset elysa_snow")
         self.assertIn("已建立", output)
         self.assertFalse(self.char1.creation_pending)
         self.assertEqual(
@@ -653,7 +653,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 side_effect=RuntimeError("art boom"),
             ),
         ):
-            output = self.call(CmdCharacter(), "preset human_wanderer")
+            output = self.call(CmdCharacter(), "preset elysa_snow")
         self.assertIn("已建立", output)
         self.assertEqual(len(_portrait_ensure_callbacks(callbacks)), 1)
         self.assertFalse(self.char1.creation_pending)
@@ -802,7 +802,7 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
         self.assertIn("生成不可用，請手動創角", output)
         self.assertTrue(self.char1.creation_pending)
         self.assertEqual(self.char1.traits.all(), [])
-        output = self.call(CmdCharacter(), "preset human_wanderer")
+        output = self.call(CmdCharacter(), "preset elysa_snow")
         self.assertIn("已建立", output)
         self.assertFalse(self.char1.creation_pending)
 
@@ -820,7 +820,7 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
 
     @covers_requirement("character-creation-ux::the-creation-surface-offers-a-concept-driven-custom-entry")
     def test_deterministic_preset_and_custom_flows_still_work(self):
-        output = self.call(CmdCharacter(), "preset human_wanderer")
+        output = self.call(CmdCharacter(), "preset elysa_snow")
         self.assertIn("已建立", output)
         self.assertFalse(self.char1.creation_pending)
 
@@ -841,7 +841,7 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
                 },
             )
         )
-        replies = ["瑟芮雅", "180", "24"]
+        replies = ["希爾溫", "180", "24"]
         output = self.call(
             CmdCharacterConcept(),
             "構想 長壽的精靈守護者",
@@ -1039,7 +1039,7 @@ class CharacterConceptCommandTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
             generator = command.func()
             with self.assertRaises(StopIteration):
                 next(generator)
-            output = self.call(CmdCharacter(), "preset human_wanderer")
+            output = self.call(CmdCharacter(), "preset elysa_snow")
             self.assertIn("已建立", output)
             self.assertFalse(self.char1.creation_pending)
             held.callback(_proposal())
@@ -1357,7 +1357,7 @@ class CharacterConceptPrefillTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
             next(generator)
         held.callback(_proposal(display_name="雪貓"))
         self.assertTrue(self.char1.cmdset.has("ConceptPrompt"))
-        output = self.call(CmdCharacter(), "preset human_wanderer")
+        output = self.call(CmdCharacter(), "preset elysa_snow")
         self.assertIn("已建立", output)
         activated_key = self.char1.key
         self.char1.execute_cmd("20", session=self.session)
@@ -1386,7 +1386,7 @@ class CharacterConceptPrefillTests(_ConceptFixtureMixin, EvenniaCommandTestMixin
                 )
                 queue.drain()
                 self.assertTrue(self.char1.ndb._getinput)
-                output = self.call(CmdCharacter(), "preset human_wanderer")
+                output = self.call(CmdCharacter(), "preset elysa_snow")
                 self.assertIn("已建立", output)
                 activated_key = self.char1.key
                 self.char1.execute_cmd("20", session=self.session)

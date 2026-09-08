@@ -645,12 +645,11 @@ class PresetPersonaDialogueTests(EvenniaTest):
     """A preset activation's persona record reaches the dialogue surface
     (preset-persona-activation).
 
-    The story-derived cards declare dialogue-visible persona fields, while the
-    generic cards (``human_wanderer`` and friends) remain background-only,
-    which the dialogue policy excludes from the player block in BOTH modes.
-    The resolves-a-block scenario activates a story card directly; the
-    companion test pins the shipped background-only outcome as the documented
-    policy.
+    Every shipped card now declares dialogue-visible persona fields. The
+    resolves-a-block scenario activates a card directly; the companion test
+    pins the documented exclusion policy with a background-only variant of a
+    shipped card, which the dialogue policy keeps out of the player block in
+    BOTH modes.
     """
 
     def setUp(self):
@@ -692,21 +691,21 @@ class PresetPersonaDialogueTests(EvenniaTest):
             PresetPersona,
         )
 
-        base = PLAYER_PRESET_REGISTRY["human_wanderer"]
+        base = PLAYER_PRESET_REGISTRY["elysa_snow"]
         declared = replace(
             base,
             persona=replace(
                 base.persona,
                 identity=PresetIdentity(public="流浪劍士", hidden="亡國公主"),
                 appearance=PresetAppearance(overview="灰瞳長髮"),
-                social_connection=(("艾琳之父", "失散的家人"),),
+                social_connection=(("艾莉莎之父", "失散的家人"),),
             ),
         )
         with patch.dict(
             "world.lore.player_presets.PLAYER_PRESET_REGISTRY",
-            {"human_wanderer": declared},
+            {"elysa_snow": declared},
         ):
-            self._activate_preset("human_wanderer")
+            self._activate_preset("elysa_snow")
         self.character.apply_race_baseline()
         client = FakeLLMClient()
         client.add_response(lambda d: True, _reply_text(speech="久等了。"))
@@ -718,7 +717,7 @@ class PresetPersonaDialogueTests(EvenniaTest):
         self.assertIn("外觀：", persona_block)
         self.assertIn("overview：灰瞳長髮", persona_block)
         self.assertIn("人脈：", persona_block)
-        self.assertIn("艾琳之父：失散的家人", persona_block)
+        self.assertIn("艾莉莎之父：失散的家人", persona_block)
         # The public-view policy keeps the hidden layer out by construction.
         self.assertNotIn("隱秘身分", persona_block)
         self.assertNotIn("亡國公主", persona_block)
@@ -727,14 +726,30 @@ class PresetPersonaDialogueTests(EvenniaTest):
     @covers_requirement("persona-dialogue-injection::the-player-s-persona-feeds-the-user-payload-as-player-persona")
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-persona")
     def test_shipped_background_only_preset_writes_record_without_block(self):
-        # The generic shipped cards are still background-only; the dialogue
+        # A background-only persona stays out of the dialogue surface: the
         # policy excludes background (and prose) from the player block in both
         # creation modes. The record still survives activation for
         # persona_edit and look.
+        from dataclasses import replace
+
         from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 
-        preset = PLAYER_PRESET_REGISTRY["human_wanderer"]
-        self._activate_preset("human_wanderer")
+        from world.lore.player_presets import PresetIdentity, PresetPersona
+
+        base = PLAYER_PRESET_REGISTRY["elysa_snow"]
+        background_only = replace(
+            base,
+            persona=PresetPersona(
+                identity=PresetIdentity(),
+                background=base.persona.background,
+            ),
+        )
+        preset = background_only
+        with patch.dict(
+            "world.lore.player_presets.PLAYER_PRESET_REGISTRY",
+            {"elysa_snow": background_only},
+        ):
+            self._activate_preset("elysa_snow")
         self.assertEqual(dict(self.character.db.persona), preset.persona.to_record())
         self.assertTrue(self.character.db.persona["background"])
         self.character.apply_race_baseline()

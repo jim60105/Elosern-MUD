@@ -104,9 +104,9 @@ class CreationPanelValidationTests(unittest.TestCase):
         self.assertEqual(
             [card["key"] for card in validated["presets"]],
             [
-                "human_wanderer",
-                "foxkin_scout",
-                "elf_guardian",
+                "elysa_snow",
+                "nazka_bloodfang",
+                "sylwen_stillwater",
                 "violet_altoria",
                 "lidzia_rosenthal",
                 "yuka_darknight",
@@ -121,9 +121,9 @@ class CreationPanelValidationTests(unittest.TestCase):
         self.assertEqual(
             [card["key"] for card in payload["presets"]],
             [
-                "human_wanderer",
-                "foxkin_scout",
-                "elf_guardian",
+                "elysa_snow",
+                "nazka_bloodfang",
+                "sylwen_stillwater",
                 "violet_altoria",
                 "lidzia_rosenthal",
                 "yuka_darknight",
@@ -212,12 +212,12 @@ class CreationPanelValidationTests(unittest.TestCase):
             card["key"] = "x" * (MAX_PRESET_KEY_CODE_POINTS + 1)
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(base))
-        card["key"] = "human_wanderer"
+        card["key"] = "elysa_snow"
         with self.subTest("display_name"):
             card["display_name"] = "x" * (MAX_DISPLAY_NAME_CODE_POINTS + 1)
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(base))
-        card["display_name"] = "艾琳"
+        card["display_name"] = "艾莉莎"
         with self.subTest("race"):
             card["race"] = "x" * (MAX_RACE_KEY_CODE_POINTS + 1)
             with self.assertRaises(Exception):
@@ -253,7 +253,7 @@ class CreationPanelValidationTests(unittest.TestCase):
                 card[field] = "   "
                 with self.assertRaises(Exception):
                     validate_creation(deepcopy(base))
-        card["display_name"] = "艾琳"
+        card["display_name"] = "艾莉莎"
         card["race_description"] = "描述"
         card["emphasis"] = "配點"
         card["background"] = "背景"
@@ -397,10 +397,10 @@ class CreationPanelValidationTests(unittest.TestCase):
                 self.assertEqual((axis["minimum"], axis["maximum"]), (0, bound[1] - bound[0]))
 
     def test_draft_preset_stage_shape(self):
-        draft = {"mode": "preset", "stage": "preset_selected", "preset_key": "human_wanderer"}
+        draft = {"mode": "preset", "stage": "preset_selected", "preset_key": "elysa_snow"}
         payload = _valid_payload(draft=draft)
         validated = validate_creation(payload)
-        self.assertEqual(validated["draft"]["preset_key"], "human_wanderer")
+        self.assertEqual(validated["draft"]["preset_key"], "elysa_snow")
         bad = deepcopy(payload)
         bad["draft"]["stage"] = "custom_filled"
         with self.assertRaises(Exception):

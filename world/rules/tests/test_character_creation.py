@@ -181,10 +181,10 @@ class CharacterActivationTests(EvenniaTest):
     )
     def test_preset_activation_fixes_magic_power_deterministically(self):
         # The retired race-average sampler is replaced by the preset's own
-        # allocation: elf_guardian allocates 400 over the elf floor (100).
+        # allocation: sylwen_stillwater allocates 400 over the elf floor (100).
         result = activate_player_character(
             self.account, self.character,
-            CharacterCreationRequest(mode="preset", preset_key="elf_guardian"),
+            CharacterCreationRequest(mode="preset", preset_key="sylwen_stillwater"),
         )
         self.assertEqual(result.magic_power, 500)
         self.assertEqual(self.character.race, "elf")
@@ -193,7 +193,7 @@ class CharacterActivationTests(EvenniaTest):
     def test_preset_activation_grants_the_declared_skill_kit(self):
         from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 
-        for preset_key in ("yuna_darknight", "human_wanderer", "elf_guardian"):
+        for preset_key in ("yuna_darknight", "elysa_snow", "sylwen_stillwater"):
             with self.subTest(preset_key=preset_key):
                 character = create_object(PlayerCharacter, key=f"shell-{preset_key}")
                 self.account.at_post_create_character(character)
@@ -385,7 +385,7 @@ class CharacterActivationTests(EvenniaTest):
     def test_preset_activation_grants_the_declared_starting_inventory(self):
         from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 
-        for preset_key in ("yuka_darknight", "violet_altoria", "human_wanderer"):
+        for preset_key in ("yuka_darknight", "violet_altoria", "elysa_snow"):
             with self.subTest(preset_key=preset_key):
                 character = create_object(PlayerCharacter, key=f"kit-shell-{preset_key}")
                 self.account.at_post_create_character(character)
@@ -1084,7 +1084,7 @@ class AffinityCreationTests(EvenniaTest):
     def test_neutral_human_preset_stays_neutral(self):
         activate_player_character(
             self.account, self.character,
-            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
         )
         self.assertEqual(self.character.db.affinity_elements, [])
 
@@ -1092,7 +1092,7 @@ class AffinityCreationTests(EvenniaTest):
     def test_elf_preset_seeds_affinity_from_subrace(self):
         activate_player_character(
             self.account, self.character,
-            CharacterCreationRequest(mode="preset", preset_key="elf_guardian"),
+            CharacterCreationRequest(mode="preset", preset_key="sylwen_stillwater"),
         )
         self.assertEqual(self.character.db.affinity_elements, ["light"])
 
@@ -1320,7 +1320,7 @@ class PersonaActivationTests(EvenniaTest):
         self.account.at_post_create_character(preset_shell)
         activate_player_character(
             self.account, preset_shell,
-            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
         )
         # The six import-card keys are identical in both modes; ``background``
         # is present in each record only when that source supplied one.
@@ -1344,7 +1344,7 @@ class PersonaActivationTests(EvenniaTest):
         with self.assertRaisesRegex(RuntimeError, "injected preset persona failure"):
             activate_player_character(
                 self.account, self.character,
-                CharacterCreationRequest(mode="preset", preset_key="foxkin_scout"),
+                CharacterCreationRequest(mode="preset", preset_key="nazka_bloodfang"),
                 write_observer=fail,
             )
         self.assertEqual(self.character.key, old_key)
@@ -1362,18 +1362,23 @@ class PersonaActivationTests(EvenniaTest):
         from world.rules.character_creation import _ValidatedCreation, _persona_record_for
 
         validated = _ValidatedCreation(
-            "艾琳", 24, 24, "human", "human_commoner", {}
+            "艾莉莎", 24, 24, "human", "human_commoner", {}
         )
         record = _persona_record_for(
             validated,
-            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
             PERSONA_BLOCK,
         )
         self.assertEqual(
-            record, PLAYER_PRESET_REGISTRY["human_wanderer"].persona.to_record()
+            record, PLAYER_PRESET_REGISTRY["elysa_snow"].persona.to_record()
         )
-        # The shipped card's prose stays empty: the persona argument lost.
-        self.assertEqual(record["personality"], "")
+        # The persona argument lost: the prose is the registry card's, not the
+        # draft block's (the shipped card now authors full prose).
+        self.assertEqual(
+            record["personality"],
+            PLAYER_PRESET_REGISTRY["elysa_snow"].persona.personality,
+        )
+        self.assertNotEqual(record["personality"], PERSONA_BLOCK["personality"])
 
 
 class SexCreationTests(EvenniaTest):
@@ -1545,7 +1550,7 @@ class PresetValueResolverPurityTests(EvenniaTestCase):
             [(p.name, p.kind) for p in params],
             [("preset", inspect.Parameter.POSITIONAL_OR_KEYWORD)],
         )
-        preset = PLAYER_PRESET_REGISTRY["elf_guardian"]
+        preset = PLAYER_PRESET_REGISTRY["sylwen_stillwater"]
         # Zero queries proves no database read and no write; the world-clock
         # accessor always issues a search_script query, so a clock read fails
         # here too. Registries are plain in-memory dicts, so the resolver's

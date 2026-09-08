@@ -2976,8 +2976,8 @@ function validCreationPanel(overrides) {
       draft: null,
       presets: [
         {
-          key: "human_wanderer",
-          display_name: "艾琳",
+          key: "elysa_snow",
+          display_name: "艾莉莎",
           race: "human",
           race_description: "人類",
           subrace: "human_commoner",
@@ -2985,8 +2985,8 @@ function validCreationPanel(overrides) {
           background: "旅人",
         },
         {
-          key: "elf_guardian",
-          display_name: "瑟芮雅",
+          key: "sylwen_stillwater",
+          display_name: "希爾溫",
           race: "elf",
           race_description: "精靈",
           subrace: "fionnen",

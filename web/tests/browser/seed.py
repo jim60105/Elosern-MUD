@@ -697,7 +697,7 @@ def main() -> None:
         if os.environ.get("ELOSERN_BROWSER_CREATION_PRESET_DRAFT") == "1":
             from world.rules.creation_wizard import save_preset_draft
 
-            save_preset_draft(creator, pending, "human_wanderer")
+            save_preset_draft(creator, pending, "elysa_snow")
             pending.save()
         elif os.environ.get("ELOSERN_BROWSER_CREATION_DRAFT") == "1":
             from world.rules.creation_wizard import save_custom_draft

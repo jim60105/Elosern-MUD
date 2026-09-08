@@ -231,10 +231,10 @@ class PresetCreationJourneys(CreationBrowserTest):
         # Focus the action dock and open the preset list (keyboard only).
         self._focus_dock(page)
         _press(page, "Enter")  # 預設角色
-        _press(page, "Enter")  # human_wanderer card (first preset)
+        _press(page, "Enter")  # elysa_snow card (first preset)
         self.assertEqual(sent_action_count(page, "creation.preset"), 1)
         payloads = self._sent_payloads(page, "creation.preset")
-        self.assertEqual(payloads, [{"preset_key": "human_wanderer"}])
+        self.assertEqual(payloads, [{"preset_key": "elysa_snow"}])
 
         # The confirmation appears only after the preset save result arrives.
         self._wait_confirm_ready(page)
@@ -253,7 +253,7 @@ class PresetCreationJourneys(CreationBrowserTest):
         self._wait_creation_available(page)
         self._focus_dock(page)
         _press(page, "Enter")  # 預設角色
-        _press(page, "Enter")  # human_wanderer card -> confirmation screen
+        _press(page, "Enter")  # elysa_snow card -> confirmation screen
         self._wait_confirm_ready(page)
         self.assertEqual(page.locator(".creation-confirm").count(), 1)
         _press(page, "Escape")  # pop exactly one level back to the preset list

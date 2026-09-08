@@ -425,8 +425,12 @@ def _sexual_level(entity: Any, field: str) -> Any:
 
     Returns a read-only :class:`_LevelRef` for ordinal comparison, the stored
     level string when only a baseline is available, or ``None`` when the
-    record is entirely absent. A present-but-malformed record fails closed.
-    Never creates ``entity.sexual``.
+    record is entirely absent. A baseline field the seed intentionally omitted
+    (``PresetSexualBaseline.to_record`` and the import card keep optionals
+    absent, floored later by ``SexualState._build_from_baseline``) resolves to
+    ``None`` exactly like ``stored_sexual_reads.stored_sexual_level``, so the
+    panel's condition chips can never disagree with the combat no-create path.
+    A present-but-malformed record fails closed. Never creates ``entity.sexual``.
     """
     traits = _read_attribute(
         entity, _SEXUAL_TRAITS_KEY, default=None, category=_SEXUAL_TRAITS_CATEGORY
@@ -458,9 +462,14 @@ def _sexual_level(entity: Any, field: str) -> Any:
     baseline = _read_attribute(entity, "sexual", default=None)
     if baseline is None:
         return None
-    if not isinstance(baseline, Mapping) or not isinstance(baseline.get(field), str):
+    if not isinstance(baseline, Mapping):
         raise StatusQueryError(f"sexual state {field!r} is malformed")
-    return baseline[field]
+    value = baseline.get(field)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise StatusQueryError(f"sexual state {field!r} is malformed")
+    return value
 
 
 def _ordinal_of(levels: tuple[str, ...], label: str) -> int:
@@ -552,7 +561,10 @@ def _read_intimate(entity: Any) -> IntimateView | None:
     handler always writes every intimate entry, so a missing entry is
     corruption that fails the panel closed, never a silent baseline fallback).
     Absent a materialized record, level fields resolve from the import-time
-    baseline; absent both, the whole view is ``None``.
+    baseline; a level field the baseline seed omitted floors to its
+    vocabulary's lowest level — the exact value ``SexualState``'s baseline
+    construction will materialize for it — and absent both records, the whole
+    view is ``None``.
 
     The exposure row renders the EFFECTIVE level (stored ordinal plus worn
     equipment ``exposure_bias``, clamped) while the stored trait is never
@@ -592,8 +604,10 @@ def _read_intimate(entity: Any) -> IntimateView | None:
     for field, vocabulary in (("arousal", AROUSAL_LEVELS), *_INTIMATE_LEVEL_FIELDS):
         value = baseline.get(field)
         if value is None:
-            raise StatusQueryError(f"sexual baseline is missing {field!r}")
-        if isinstance(value, str) and value in vocabulary:
+            # Omitted optional levels are legal on an import/preset seed and
+            # floor exactly as SexualState._build_from_baseline seeds them.
+            values[field] = vocabulary[0]
+        elif isinstance(value, str) and value in vocabulary:
             values[field] = value
         else:
             raise StatusQueryError(f"sexual baseline {field!r} is malformed")

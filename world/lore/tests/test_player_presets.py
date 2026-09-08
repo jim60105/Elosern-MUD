@@ -34,9 +34,9 @@ class PlayerPresetTests(unittest.TestCase):
         self.assertEqual(
             list(PLAYER_PRESET_REGISTRY),
             [
-                "human_wanderer",
-                "foxkin_scout",
-                "elf_guardian",
+                "elysa_snow",
+                "nazka_bloodfang",
+                "sylwen_stillwater",
                 "violet_altoria",
                 "lidzia_rosenthal",
                 "yuka_darknight",
@@ -63,17 +63,17 @@ class PlayerPresetTests(unittest.TestCase):
 
     def test_shipped_starting_kits_are_the_approved_loadouts(self):
         expected = {
-            "human_wanderer": (
+            "elysa_snow": (
                 ("plain_sword", 1), ("leather_armor", 1),
                 ("guild_recruit_badge", 1), ("healing_potion", 2),
                 ("healing_herb", 2),
             ),
-            "foxkin_scout": (
+            "nazka_bloodfang": (
                 ("hunters_longbow", 1), ("hunting_throwing_axe", 1),
                 ("leather_armor", 1), ("wolf_fang_necklace", 1),
                 ("healing_potion", 1), ("healing_herb", 3),
             ),
-            "elf_guardian": (
+            "sylwen_stillwater": (
                 ("knight_blade", 1), ("iron_shield", 1),
                 ("chainmail", 1), ("pilgrim_medallion", 1),
                 ("healing_potion", 1),
@@ -302,15 +302,15 @@ class PlayerPresetTests(unittest.TestCase):
             ("fire", "wind"),
         )
         self.assertEqual(
-            PLAYER_PRESET_REGISTRY["foxkin_scout"].affinity_elements,
+            PLAYER_PRESET_REGISTRY["nazka_bloodfang"].affinity_elements,
             ("wind",),
         )
-        for key in ("human_wanderer", "lidzia_rosenthal"):
+        for key in ("elysa_snow", "lidzia_rosenthal"):
             self.assertEqual(PLAYER_PRESET_REGISTRY[key].affinity_elements, ())
 
     @covers_requirement("element-affinity::affinity-elements-is-one-validated-per-entity-source-of-truth")
     def test_elf_presets_must_declare_an_empty_affinity_set(self):
-        for key in ("elf_guardian", "yuka_darknight", "yuna_darknight", "elosia_shadowmoon"):
+        for key in ("sylwen_stillwater", "yuka_darknight", "yuna_darknight", "elosia_shadowmoon"):
             with self.subTest(preset=key):
                 self.assertEqual(PLAYER_PRESET_REGISTRY[key].race, "elf")
                 self.assertEqual(
@@ -704,19 +704,19 @@ class StartingCompanionDeclarationTests(unittest.TestCase):
             ),
             (
                 make(starting_companions=(
-                    StartingCompanion("human_wanderer", 95, "夥伴"),
-                    StartingCompanion("human_wanderer", 40, "舊識"),
+                    StartingCompanion("elysa_snow", 95, "夥伴"),
+                    StartingCompanion("elysa_snow", 40, "舊識"),
                 )),
                 "more than once",
             ),
-            (make(starting_companions=("human_wanderer",)), "not a StartingCompanion"),
+            (make(starting_companions=("elysa_snow",)), "not a StartingCompanion"),
         )
         for preset, message in cases:
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 _validate_preset_starting_companions(
                     {
                         "x": preset,
-                        "human_wanderer": PLAYER_PRESET_REGISTRY["human_wanderer"],
+                        "elysa_snow": PLAYER_PRESET_REGISTRY["elysa_snow"],
                     }
                 )
         # The empty default and a well-formed cross-reference both pass, and

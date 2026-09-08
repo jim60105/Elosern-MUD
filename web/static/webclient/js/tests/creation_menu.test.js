@@ -34,8 +34,8 @@ function validPanel(overrides) {
     draft: null,
     presets: [
       {
-        key: "human_wanderer",
-        display_name: "艾琳",
+        key: "elysa_snow",
+        display_name: "艾莉莎",
         race: "human",
         race_description: "人類",
         subrace: "human_commoner",
@@ -43,8 +43,8 @@ function validPanel(overrides) {
         background: "來自南境的旅人",
       },
       {
-        key: "elf_guardian",
-        display_name: "瑟芮雅",
+        key: "sylwen_stillwater",
+        display_name: "希爾溫",
         race: "elf",
         race_description: "精靈",
         subrace: "fionnen",
@@ -119,8 +119,8 @@ test("root and preset menus route with exact payloads", () => {
   const presets = CreationMenu.presetItems(validPanel());
   assert.equal(presets.length, 2);
   assert.equal(presets[0].actionId, "creation.preset");
-  assert.deepEqual(presets[0].payload, { preset_key: "human_wanderer" });
-  assert.equal(presets[1].presetKey, "elf_guardian");
+  assert.deepEqual(presets[0].payload, { preset_key: "elysa_snow" });
+  assert.equal(presets[1].presetKey, "sylwen_stillwater");
 });
 
 test("disabled empty preset list stays focusable and submits nothing", () => {
@@ -272,7 +272,7 @@ test("saved custom draft restores the form at the saved stage", () => {
     draft: {
       mode: "custom",
       stage: "custom_filled",
-      display_name: "露芙",
+      display_name: "娜茲卡",
       age: 22,
       apparent_age: 22,
       race: "elf",
@@ -282,7 +282,7 @@ test("saved custom draft restores the form at the saved stage", () => {
     },
   });
   const state = CreationMenu.stateFromDraft(panel, panel.draft);
-  assert.equal(state.displayName, "露芙");
+  assert.equal(state.displayName, "娜茲卡");
   assert.equal(state.age, "22");
   assert.equal(state.raceKey, "elf");
   assert.equal(state.subraceKey, "ciaran");
@@ -372,7 +372,7 @@ test("saved custom draft restores the affinity set", () => {
 });
 
 test("confirmation screens gate activation", () => {
-  const preset = CreationMenu.activateConfirm("human_wanderer");
+  const preset = CreationMenu.activateConfirm("elysa_snow");
   assert.equal(preset.items[0].actionId, "creation.activate");
   assert.deepEqual(preset.items[0].payload, {});
   assert.equal(preset.items[1].label, "取消");
@@ -409,7 +409,7 @@ test("stateFromDraft restores the saved sex and defaults a legacy-less draft", (
   const draft = {
     mode: "custom",
     stage: "custom_filled",
-    display_name: "露芙",
+    display_name: "娜茲卡",
     age: 22,
     apparent_age: 22,
     race: "elf",

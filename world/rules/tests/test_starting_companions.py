@@ -487,7 +487,7 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
     @covers_requirement("starting-companions::preset-activation-builds-seeds-and-binds-every-declared-companion-atomically")
     def test_a_companionless_preset_activation_binds_nothing(self):
         shell = self._shell("maker-shell-wanderer")
-        self._activate(shell, "human_wanderer")
+        self._activate(shell, "elysa_snow")
         self.assertFalse(shell.creation_pending)
         self.assertFalse(shell.attributes.has("party"))
         self.assertFalse(ObjectDB.objects.filter(db_key="悠花").exists())
@@ -605,7 +605,7 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
         from dataclasses import replace
 
         synthetic = replace(
-            PLAYER_PRESET_REGISTRY["human_wanderer"],
+            PLAYER_PRESET_REGISTRY["elysa_snow"],
             key="twin_pair",
             display_name="雙生者",
             starting_companions=(

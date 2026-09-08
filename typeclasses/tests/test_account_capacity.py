@@ -111,7 +111,7 @@ class AccountCapacityTests(EvenniaTest):
         activate_player_character(
             account,
             char1,
-            CharacterCreationRequest(mode="preset", preset_key="human_wanderer"),
+            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
         )
         self.assertFalse(char1.creation_pending)
         self.assertTrue(char2.creation_pending)

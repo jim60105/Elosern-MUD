@@ -72,8 +72,8 @@ class CreationWizardTests(EvenniaTest):
     def test_read_view_derives_presets_and_custom_descriptor_from_registries(self):
         view = read_creation_view(self.character)
         keys = {card.key for card in view.presets}
-        self.assertIn("human_wanderer", keys)
-        self.assertIn("elf_guardian", keys)
+        self.assertIn("elysa_snow", keys)
+        self.assertIn("sylwen_stillwater", keys)
         self.assertEqual(view.custom.name.max_length, 64)
         self.assertEqual(view.custom.age.age_minimum, 0)
         self.assertEqual(view.custom.age.apparent_age_minimum, 0)
@@ -149,23 +149,23 @@ class CreationWizardTests(EvenniaTest):
     # -- preset draft --------------------------------------------------------
 
     def test_preset_draft_persists_and_survives_reload(self):
-        draft = save_preset_draft(self.account, self.character, "human_wanderer")
+        draft = save_preset_draft(self.account, self.character, "elysa_snow")
         self.assertEqual(draft["mode"], "preset")
         self.assertEqual(draft["stage"], PRESET_STAGE)
-        self.assertEqual(draft["preset_key"], "human_wanderer")
+        self.assertEqual(draft["preset_key"], "elysa_snow")
         self.assertTrue(self.character.creation_pending)
         # The draft is a stored attribute and survives a reload of the object.
         reloaded = PlayerCharacter.objects.get(id=self.character.id)
-        self.assertEqual(read_draft(reloaded)["preset_key"], "human_wanderer")
+        self.assertEqual(read_draft(reloaded)["preset_key"], "elysa_snow")
         self.assertEqual(reloaded.creation_pending, True)
         self.assertEqual(reloaded.age, None)
 
     def test_invalid_preset_rejected_leaving_prior_draft_unchanged(self):
-        save_preset_draft(self.account, self.character, "human_wanderer")
+        save_preset_draft(self.account, self.character, "elysa_snow")
         with self.assertRaises(CharacterCreationError) as ctx:
             save_preset_draft(self.account, self.character, "nope")
         self.assertEqual(rejection_code(ctx.exception), "unknown_preset")
-        self.assertEqual(read_draft(self.character)["preset_key"], "human_wanderer")
+        self.assertEqual(read_draft(self.character)["preset_key"], "elysa_snow")
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(self.character.traits.all(), [])
 
@@ -301,10 +301,10 @@ class CreationWizardTests(EvenniaTest):
         self.assertEqual(self.character.traits.all(), [])
 
     def test_preset_activation_uses_the_stored_preset_key(self):
-        save_preset_draft(self.account, self.character, "elf_guardian")
+        save_preset_draft(self.account, self.character, "sylwen_stillwater")
         result = activate_draft(self.account, self.character)
         self.assertEqual(result.race, "elf")
-        self.assertEqual(result.display_name, "瑟芮雅")
+        self.assertEqual(result.display_name, "希爾溫")
         self.assertFalse(self.character.creation_pending)
         self.assertIsNone(read_draft(self.character))
 
