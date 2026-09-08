@@ -36,6 +36,11 @@ _CREATION_ATTRIBUTE_KEYS = (
     # the idmapper cache is not transaction-aware, so both join the
     # rollback snapshot.
     "disguised_stats", "sexual",
+    # Preset activation binds declared starting companions through
+    # ``join_party`` (preset-companion-activation); a failed companion step
+    # must restore the player-side membership cache alongside every other
+    # in-process surface this snapshot covers.
+    "party",
 )
 
 # The single deterministic race-bound mapping every identity channel and the
@@ -670,6 +675,9 @@ def activate_player_character(
     old_key = character.key
     attribute_snapshots = snapshot_attributes(character, _CREATION_ATTRIBUTE_KEYS)
     trait_snapshot = snapshot_traits(character)
+    # Companions built during THIS activation attempt, kept for the except
+    # branch below (preset-companion-activation).
+    built_companions: list[Any] = []
     try:
         with transaction.atomic():
             character.key = validated.display_name
@@ -723,6 +731,28 @@ def activate_player_character(
                 if write_observer:
                     write_observer("creation_draft")
                 character.attributes.remove("creation_draft")
+            # Declared starting companions are built, seeded, and bound LAST
+            # among the player-side writes, before portrait finalization
+            # (preset-companion-activation): the builder places each NPC at
+            # ``player.location`` and ``join_party`` requires a persisted
+            # player key and co-location, so both only hold after the
+            # identity/attribute writes above. The binding owns its failure
+            # path (delete built NPCs, restore surfaces, surface as
+            # ``CharacterCreationError``); this branch then rolls the whole
+            # activation back through the except below. The lazy import keeps
+            # the module-cycle-free: ``starting_companions`` imports this
+            # module at top level, so this side must not import it there.
+            if request.mode == "preset" and preset.starting_companions:
+                from world.rules.starting_companions import (
+                    _discard_built_companions,
+                    bind_starting_companions,
+                )
+
+                built_companions = bind_starting_companions(character, preset)
+                # The stage fires only when a binding actually ran, so an
+                # observed stage always means a real companion-write attempt.
+                if write_observer:
+                    write_observer("starting_companions")
             # Every player-activation path (Telnet command, WebClient
             # ``activate_draft``) establishes the named portrait policy and
             # schedules the post-commit portrait ensure INSIDE this activation
@@ -732,6 +762,16 @@ def activate_player_character(
             if write_observer:
                 write_observer("portrait_policy")
     except Exception:
+        # A failure AFTER a completed bind (the write observer, portrait
+        # finalization): the rollback removed the companion rows but the
+        # idmapper and the departure room's contents cache still hold them.
+        # Evict them BEFORE the attribute restore below: the eviction's
+        # ``at_object_delete`` purge rewrites ``player.db.party`` (binding
+        # removal), and the snapshot restore must run last so the purged
+        # surface cannot outlive the restore. Best-effort, never raises, so
+        # no phantom companion survives the failed activation in-process.
+        if built_companions:
+            _discard_built_companions(built_companions)
         character.key = old_key
         restore_traits(character, trait_snapshot)
         restore_attributes(character, attribute_snapshots)

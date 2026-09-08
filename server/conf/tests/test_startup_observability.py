@@ -113,6 +113,39 @@ class StartupStepEventTests(_StubbedStartup):
         self.assertIsInstance(error.call_args.kwargs["exc"], RuntimeError)
         warn.assert_not_called()
         # Steps before the failure emitted their events; nothing after ran.
+        self.assertEqual(
+            self._steps(info),
+            [
+                "world_clock_init",
+                "equipment_rulebook_validation",
+                "starting_companion_validation",
+            ],
+        )
+
+    def test_starting_companion_import_failure_aborts_boot(self):
+        # preset-companion-activation: the bounds sweep is a boot gate. The
+        # name-aware side effect raises only for the companion module, so the
+        # abort is provably attributed to that step, not to the generic
+        # import seam.
+        from unittest.mock import MagicMock
+
+        def import_module(name, *args, **kwargs):
+            if name == "world.rules.starting_companions":
+                raise RuntimeError("bad companion bounds")
+            return MagicMock()
+
+        info, warn, error = self._run(
+            {"import_module": {"side_effect": import_module}},
+            assert_raises=RuntimeError,
+        )
+        error.assert_called_once()
+        self.assertEqual(error.call_args.args[0], "startup_step_failed")
+        self.assertEqual(
+            error.call_args.kwargs["context"],
+            {"step": "starting_companion_validation"},
+        )
+        warn.assert_not_called()
+        # The failure is fail-loud and precedes every sync step.
         self.assertEqual(self._steps(info), ["world_clock_init", "equipment_rulebook_validation"])
 
     def test_tolerant_registration_failure_degrades_and_startup_continues(self):

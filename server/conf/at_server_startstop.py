@@ -46,6 +46,7 @@ def _late(module: str, name: str):
 STARTUP_STEP_ORDER: tuple[str, ...] = (
     "world_clock_init",
     "equipment_rulebook_validation",
+    "starting_companion_validation",
     "sync_all",
     "sync_limbo",
     "sync_grid",
@@ -374,6 +375,15 @@ def at_server_start():
     _startup_step(
         "equipment_rulebook_validation",
         lambda: importlib.import_module("world.rules.equipment_effects"),
+    )
+    # Fail-loud starting-companion bounds validation (preset-companion-
+    # activation): importing the module runs its registry sweep against the
+    # party cap and affinity ceiling, so an out-of-bounds companion
+    # declaration aborts boot before any world sync, exactly like the
+    # equipment rulebook gate above.
+    _startup_step(
+        "starting_companion_validation",
+        lambda: importlib.import_module("world.rules.starting_companions"),
     )
     _startup_step("sync_all", sync_all)
     _startup_step("sync_limbo", sync_limbo)
