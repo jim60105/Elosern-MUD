@@ -2,7 +2,7 @@ schema_version: 1
 prompts:
   art.style: approved visual style
   art.character_description: |-
-    A {race} character named {name} ({age}) in the {style}.
+    A {race} character named {name} ({age}) in the {style}.{appearance}
   art.monster_description: "{description} ({display_name}；例如：{examples})"
   # Positive prompt template for scene subjects. {description} is the
   # deterministic scene sentence from the scene-archetype registry; the

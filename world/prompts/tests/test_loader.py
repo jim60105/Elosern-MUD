@@ -11,6 +11,7 @@ from __future__ import annotations
 import unittest
 
 from world.prompts.loader import (
+    _PLACEHOLDER_RE,
     PromptLibraryError,
     PromptUnavailableError,
     UnexpectedPromptValueError,
@@ -462,8 +463,8 @@ class RenderContractTests(PromptFixture):
     @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
     def test_render_is_byte_identical_for_identical_input(self):
         self.load()
-        first = render_prompt("art.character_description", race="貓人族", name="艾琳", age="24", style="approved visual style")
-        second = render_prompt("art.character_description", race="貓人族", name="艾琳", age="24", style="approved visual style")
+        first = render_prompt("art.character_description", race="貓人族", name="艾琳", age="24", style="approved visual style", appearance="")
+        second = render_prompt("art.character_description", race="貓人族", name="艾琳", age="24", style="approved visual style", appearance="")
         self.assertEqual(first, second)
         self.assertEqual(first, "A 貓人族 character named 艾琳 (24) in the approved visual style.")
 
@@ -523,6 +524,19 @@ class ArtGenerationPromptTests(PromptFixture):
         after = render_prompt("art.scene_prompt", description="desc")
         self.assertNotEqual(before, after)
         self.assertEqual(library.unavailable, frozenset())
+
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    def test_character_description_placeholder_set_matches_the_template(self):
+        """Every shipped-template slot is allowlisted and every allowlisted
+        name is slotted — the registry and prompts/art.yaml cannot drift."""
+        import yaml
+
+        declared = yaml.safe_load((REPO_PROMPTS / "art.yaml").read_text("utf-8"))
+        text = declared["prompts"]["art.character_description"]
+        tokens = set(_PLACEHOLDER_RE.findall(text))
+        allowed = set(PROMPT_SPECS["art.character_description"].allowed_placeholders)
+        self.assertEqual(tokens, allowed)
+        self.assertIn("appearance", tokens)
 
 
 class LoadLifecycleTests(unittest.TestCase):

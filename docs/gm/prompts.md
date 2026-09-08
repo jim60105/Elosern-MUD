@@ -44,7 +44,7 @@ prompts:
 | `scenario_director.system` | `scenario_director.yaml` | 無 |
 | `npc.thinking` | `npc.yaml` | `{name}` |
 | `art.style` | `art.yaml` | 無 |
-| `art.character_description` | `art.yaml` | `{race}`、`{name}`、`{age}`、`{style}` |
+| `art.character_description` | `art.yaml` | `{race}`、`{name}`、`{age}`、`{style}`、`{appearance}` |
 | `art.monster_description` | `art.yaml` | `{description}`、`{display_name}`、`{examples}` |
 | `art.scene_prompt` | `art.yaml` | `{description}` |
 | `art.portrait_prompt` | `art.yaml` | `{description}` |
@@ -59,6 +59,8 @@ prompts:
 - 兩個大括號包住的名稱（如 `{{name}}`）是字面文字，不會被替換。
 - 提示詞內的 JSON 範例（如 `{"speech": "你要說的話", "intent": {"kind": "..."}}`）原樣保留，不會被當成預留位置。
 - 不在允許清單內的 `{token}`（例如把 `{name}` 打成 `{nmme}`）會在載入時回報錯誤，不會靜默忽略。
+
+`art.character_description` 的 `{appearance}` 槽位是外觀資訊進入肖像提示詞的唯一路徑：把該槽位從（部署的）`art.yaml` 範本移除，外觀區塊就會從提示詞消失但不會報錯——範本仍是唯一來源，移除槽位是合法編輯。
 
 ## 編輯流程
 
