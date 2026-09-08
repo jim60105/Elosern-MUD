@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import ast
+import copy
 import re
 from pathlib import Path
 from unittest.mock import patch
@@ -14,15 +15,20 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
+from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
 from world.rules.affinity import (
     AFFINITY_DAILY_CAP_HINT,
+    NATURAL_CAP,
     AffinityRecord,
     AffinitySource,
+    AffinitySeedError,
     apply_affinity_change,
+    seed_affinity,
     raise_affinity_cap,
 )
-from world.rules.affinity_config import load_config
+from world.rules.affinity_config import get_config, load_config
+from world.rules.party import is_companion, join_party
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
 _DAY_SECONDS = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
@@ -374,3 +380,153 @@ class CapBreakWriterTests(EvenniaTestCase):
         stage = self.npc.relations.stage_for(self.player)
         self.assertEqual(stage.id, "absolute_bond")
         self.assertEqual(stage.name, "絕對羈絆")
+
+
+class SeedAffinityWriterTests(EvenniaTestCase):
+    """The seed writer ``seed_affinity`` (affinity-seed-writer)."""
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+        self.room = create_object(Room, key="seed room")
+        self.npc = create_object(NPC, key="seed host", location=self.room)
+        self.player = create_object(PlayerCharacter, key="seed player")
+        self.player.location = self.room
+
+    def _day_clock(self, day: int):
+        get_world_clock()._persist(day * _DAY_SECONDS)
+        return get_world_clock()
+
+    @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
+    def test_seed_creates_a_fresh_record_at_the_requested_value(self):
+        self._day_clock(3)
+        seed_affinity(self.npc, self.player, 40)
+        self.assertTrue(self.npc.relations.has_record(self.player))
+        record = self.npc.relations._load(self.player)
+        self.assertEqual(record.value, 40)
+        self.assertEqual(record.cap, NATURAL_CAP)
+        self.assertEqual(record.daily_gain, 0)
+        self.assertEqual(record.daily_tick, 3)
+
+    @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
+    def test_seed_accepts_the_range_boundaries(self):
+        other = create_object(PlayerCharacter, key="seed boundary player")
+        seed_affinity(self.npc, self.player, 1)
+        seed_affinity(self.npc, other, NATURAL_CAP)
+        self.assertEqual(self.npc.relations.affinity_for(self.player), 1)
+        self.assertEqual(self.npc.relations.affinity_for(other), NATURAL_CAP)
+
+    @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
+    def test_seed_never_overwrites_an_existing_record(self):
+        apply_affinity_change(self.npc, self.player, AffinitySource.TALK, 2)
+        stored_before = copy.deepcopy(self.npc.db.relations_data)
+        with self.assertRaises(AffinitySeedError) as caught:
+            seed_affinity(self.npc, self.player, 90)
+        self.assertEqual(caught.exception.reason, "record_exists")
+        self.assertEqual(self.npc.db.relations_data, stored_before)
+        self.assertEqual(self.npc.relations.affinity_for(self.player), 2)
+
+    @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
+    def test_seed_rejects_out_of_range_values_without_writing(self):
+        for value in (0, -1, NATURAL_CAP + 1, True, False, "40", None):
+            with self.assertRaises(AffinitySeedError) as caught:
+                seed_affinity(self.npc, self.player, value)
+            self.assertEqual(caught.exception.reason, "value_out_of_range")
+        self.assertFalse(self.npc.relations.has_record(self.player))
+        self.assertIsNone(self.npc.db.relations_data)
+
+    @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
+    def test_seed_rejects_a_non_npc_owner_without_writing(self):
+        monster = create_object(Monster, key="seed monster")
+        with self.assertRaises(AffinitySeedError) as caught:
+            seed_affinity(monster, self.player, 40)
+        self.assertEqual(caught.exception.reason, "not_npc")
+        self.assertFalse(monster.relations.has_record(self.player))
+        with self.assertRaises(AffinitySeedError) as caught:
+            seed_affinity(self.player, self.player, 40)
+        self.assertEqual(caught.exception.reason, "not_npc")
+        self.assertIsNone(self.player.db.relations_data)
+
+    @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
+    def test_seed_leaves_the_full_daily_budget_for_interactions(self):
+        seed_affinity(self.npc, self.player, 40)
+        for _ in range(5):
+            outcome = apply_affinity_change(
+                self.npc, self.player, AffinitySource.TALK, 1
+            )
+            self.assertTrue(outcome.applied)
+        blocked = apply_affinity_change(
+            self.npc, self.player, AffinitySource.TALK, 1
+        )
+        self.assertFalse(blocked.applied)
+        self.assertTrue(blocked.budget_capped)
+        self.assertEqual(self.npc.relations.affinity_for(self.player), 45)
+
+    @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
+    def test_seed_below_threshold_keeps_a_bound_companion(self):
+        self.assertGreater(get_config().invite_threshold, 5)
+        join_party(self.npc, self.player)
+        with patch("world.rules.affinity.run_auto_leave_recheck") as recheck:
+            seed_affinity(self.npc, self.player, 5)
+        recheck.assert_not_called()
+        self.assertTrue(is_companion(self.npc, self.player))
+        self.assertEqual(self.npc.relations.affinity_for(self.player), 5)
+
+    @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
+    def test_injected_write_failure_restores_the_in_process_surface(self):
+        original_add = self.npc.attributes.add
+        armed = {"active": True}
+
+        def _failing_add(key, *args, **kwargs):
+            if armed["active"] and key == "relations_data":
+                armed["active"] = False
+                raise RuntimeError("injected relations_data write failure")
+            return original_add(key, *args, **kwargs)
+
+        relations_before = self.npc.db.relations_data
+        with patch.object(self.npc.attributes, "add", side_effect=_failing_add):
+            with self.assertRaises(AffinitySeedError) as caught:
+                seed_affinity(self.npc, self.player, 40)
+        self.assertEqual(caught.exception.reason, "write_failed")
+        # Without any cache reset, the in-process surface reads the pre-write
+        # value: the writer restored the idmapper-visible state.
+        self.assertEqual(self.npc.db.relations_data, relations_before)
+        self.assertFalse(self.npc.relations.has_record(self.player))
+
+    @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
+    def test_committed_seed_emits_exactly_one_boundary_event(self):
+        self._day_clock(2)
+        with (
+            patch("world.rules.affinity.log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            seed_affinity(self.npc, self.player, 30)
+        info.assert_called_once()
+        (event,), kwargs = info.call_args
+        self.assertEqual(event, "affinity_seed")
+        context = kwargs["context"]
+        self.assertEqual(context["char"], str(self.player.pk))
+        self.assertEqual(context["npc"], str(self.npc.pk))
+        self.assertEqual(context["value"], 30)
+        self.assertEqual(context["day"], 2)
+
+    @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
+    def test_failed_seed_emits_no_boundary_event(self):
+        armed = {"active": True}
+        original_add = self.npc.attributes.add
+
+        def _failing_add(key, *args, **kwargs):
+            if armed["active"] and key == "relations_data":
+                armed["active"] = False
+                raise RuntimeError("injected relations_data write failure")
+            return original_add(key, *args, **kwargs)
+
+        with (
+            patch("world.rules.affinity.log_info") as info,
+            patch.object(self.npc.attributes, "add", side_effect=_failing_add),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            with self.assertRaises(AffinitySeedError):
+                seed_affinity(self.npc, self.player, 30)
+        events = [call.args[0] for call in info.call_args_list if call.args]
+        self.assertNotIn("affinity_seed", events)
