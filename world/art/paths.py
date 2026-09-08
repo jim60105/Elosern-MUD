@@ -29,8 +29,10 @@ def resolved_under_store_root(identity: str) -> Path | None:
     between the root and the target — even a symlink whose target is another
     location inside the root, so a planted link can never masquerade as a
     confined file. ``resolve()`` failures (``OSError``) are ``None`` too.
+    A ``ValueError`` from ``resolve()`` (e.g. an embedded NUL) refuses the
+    identity the same way.
     """
-    if not isinstance(identity, str) or not identity:
+    if not isinstance(identity, str) or not identity or "\x00" in identity:
         return None
     candidate = Path(identity)
     if candidate.is_absolute() or ".." in candidate.parts:
@@ -39,7 +41,7 @@ def resolved_under_store_root(identity: str) -> Path | None:
     try:
         root_resolved = root.resolve()
         target = (root / candidate).resolve()
-    except OSError:  # observability: ignore R2: unresolvable path is the caller's refusal signal
+    except (OSError, ValueError):  # observability: ignore R2: unresolvable path is the caller's refusal signal
         return None
     if target == root_resolved or root_resolved not in target.parents:
         return None

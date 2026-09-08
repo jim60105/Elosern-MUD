@@ -35,7 +35,7 @@ intact.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
-from pathlib import Path
+import math
 import threading
 import time
 import uuid
@@ -223,6 +223,8 @@ def validate_binding(binding: object) -> dict | None:
     mask = binding["mask"]
     if not _is_list_like(mask) or not mask:
         raise GalleryRecordError("binding mask must be a non-empty list")
+    if not all(isinstance(slot, str) for slot in mask):
+        raise GalleryRecordError("binding mask slots must be strings")
     if len(set(mask)) != len(mask):
         raise GalleryRecordError("binding mask must not repeat a slot")
     for slot in mask:
@@ -399,15 +401,15 @@ def validate_card(
         raise GalleryRecordError("requested_fields must be a list of field-id strings")
 
     source = card["source"]
-    if source not in GALLERY_CARD_SOURCES:
+    if not isinstance(source, str) or source not in GALLERY_CARD_SOURCES:
         raise GalleryRecordError("source must be one of generated, seed")
 
     if api_defaults and "created_at" not in card:
         created_at = time.time()
     else:
         created_at = card["created_at"]
-    if not _is_real_number(created_at):
-        raise GalleryRecordError("created_at must be a real epoch timestamp")
+    if not _is_real_number(created_at) or not math.isfinite(created_at):
+        raise GalleryRecordError("created_at must be a finite epoch timestamp")
 
     if api_defaults and "face_rect" not in card:
         face_rect = dict(DEFAULT_FACE_RECT)

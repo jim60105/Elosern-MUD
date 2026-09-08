@@ -152,6 +152,14 @@ class StoreRootConfinementTests(unittest.TestCase):
         )
 
     @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
+    def test_an_embedded_nul_identity_is_refused_without_raising(self):
+        # resolve() raises ValueError (not OSError) on NUL paths; the helper
+        # must refuse, not propagate.
+        self.assertIsNone(
+            resolved_under_store_root("gallery/character/a\x00.png")
+        )
+
+    @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
     def test_root_itself_and_empty_identity_are_refused(self):
         for identity in ("", ".", "gallery/.."):
             with self.subTest(identity=identity):
@@ -240,6 +248,7 @@ class BindingValidationTests(unittest.TestCase):
     def test_every_malformed_form_is_rejected(self):
         malformed = {
             "empty_mask": {"mask": [], "snapshot": {}},
+            "nested_mask_members": {"mask": [["armor"]], "snapshot": {"armor": None}},
             "unknown_slot": {
                 "mask": ["shield"],
                 "snapshot": {"shield": None},
@@ -343,6 +352,21 @@ class CardContractTests(unittest.TestCase):
         # validator even though the write API is allowed to omit it.
         with self.assertRaises(GalleryRecordError):
             validate_card(missing_created, self.subject, api_defaults=False)
+
+    @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
+    def test_unhashable_and_non_finite_violations_stay_typed_errors(self):
+        # Corruption must never escape as a bare TypeError/ValueError from
+        # the validators (readers only catch GalleryRecordError).
+        base = _card_fields(self.subject)
+        complete = dict(base, face_rect=dict(DEFAULT_FACE_RECT))
+        for label, card in {
+            "unhashable_source": dict(complete, source=["generated"]),
+            "unhashable_created_at": dict(complete, created_at=float("nan")),
+            "infinite_created_at": dict(complete, created_at=float("inf")),
+        }.items():
+            with self.subTest(card=label):
+                with self.assertRaises(GalleryRecordError):
+                    validate_card(card, self.subject)
 
     @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
     def test_face_rect_and_created_at_may_be_omitted_at_the_write_boundary(self):
@@ -487,8 +511,14 @@ class EquipmentSnapshotTests(unittest.TestCase):
         )
 
     @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
-    def test_only_the_gallery_module_touches_gallery_records(self):
-        """AST scan: no other production module names GalleryRecord in code."""
+    def test_only_the_gallery_module_references_gallery_records(self):
+        """AST scan: no other production module names GalleryRecord at all.
+
+        Read-only gallery API imports (cards_for, ...) stay legal for later
+        changes; any reference to the record CLASS — by name, attribute
+        chain, import alias, or string (create_script-style) — is the
+        record-mutation foothold the single-writer rule forbids.
+        """
         offenders = []
         for root in ("world", "typeclasses", "commands", "server", "web"):
             for path in sorted((REPO_ROOT / root).rglob("*.py")):
@@ -498,19 +528,26 @@ class EquipmentSnapshotTests(unittest.TestCase):
                 if relative.as_posix() == "world/art/gallery.py":
                     continue
                 tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-                names = {
-                    node.id
+                referenced = any(
+                    (isinstance(node, ast.Name) and node.id == "GalleryRecord")
+                    or (isinstance(node, ast.Attribute) and node.attr == "GalleryRecord")
+                    or (
+                        isinstance(node, ast.Import)
+                        and any(alias.name.startswith("world.art.gallery") and "GalleryRecord" in alias.name for alias in node.names)
+                    )
+                    or (
+                        isinstance(node, ast.ImportFrom)
+                        and node.module == "world.art.gallery"
+                        and any(alias.name == "GalleryRecord" for alias in node.names)
+                    )
+                    or (
+                        isinstance(node, ast.Constant)
+                        and isinstance(node.value, str)
+                        and "GalleryRecord" in node.value
+                    )
                     for node in ast.walk(tree)
-                    if isinstance(node, ast.Name)
-                }
-                modules = {
-                    node.module
-                    for node in ast.walk(tree)
-                    if isinstance(node, ast.ImportFrom)
-                }
-                if "GalleryRecord" in names or any(
-                    module == "world.art.gallery" for module in modules
-                ):
+                )
+                if referenced:
                     offenders.append(relative.as_posix())
         self.assertEqual(offenders, [])
 
@@ -767,6 +804,47 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         self.assertEqual(len(events), 1, events)
         self.assertEqual(events[0].kwargs["context"]["subject"], subject.full())
         self.assertIsNone(events[0].kwargs["context"]["image_id"])
+
+    @covers_requirement("art-gallery-model::malformed-stored-cards-are-skipped-never-fatal")
+    def test_unhashable_corrupted_members_never_raise_out_of_a_read(self):
+        subject = _character("unhashable")
+        valid = _new_id()
+        append_card(subject, **_card_fields(subject, image_id=valid))
+        record = record_for(subject)
+        bad = dict(
+            _card_fields(subject, face_rect=dict(DEFAULT_FACE_RECT)),
+            source=["generated"],
+        )
+        record.db.cards = [*record.db.cards, bad]
+        with patch("world.art.gallery.log_warn"):
+            cards = cards_for(subject)  # must not raise TypeError
+        self.assertEqual([card["image_id"] for card in cards], [valid])
+
+    @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
+    def test_a_nul_identity_card_is_removed_with_a_bounded_log(self):
+        subject = _character("nulfile")
+        image_id = _new_id()
+        append_card(subject, **_card_fields(subject, image_id=image_id))
+        record = record_for(subject)
+        poisoned = dict(record.db.cards[0])
+        poisoned["stored_identity"] = f"gallery/character/{subject.key}/{image_id}\x00.png"
+        record.db.cards = [poisoned]
+        with patch("world.art.gallery.log_warn"):
+            remove_card(subject, image_id)  # must not raise ValueError
+        self.assertEqual(cards_for(subject), [])
+
+    @covers_requirement("art-gallery-model::equipment-snapshots-are-read-from-stored-state-without-materializing-a-handler")
+    def test_a_real_character_without_equipment_reads_empty_untouched(self):
+        from evennia.utils.create import create_object
+        from typeclasses.characters import PlayerCharacter
+
+        character = create_object(PlayerCharacter, key="gallery-snapshot-host")
+        snapshot = snapshot_for(character)
+        self.assertEqual(
+            snapshot,
+            {"weapon_main": None, "weapon_off": None, "armor": None, "accessories": []},
+        )
+        self.assertIsNone(character.db.equipment)
 
     @covers_requirement("art-gallery-model::malformed-stored-cards-are-skipped-never-fatal")
     def test_a_contract_broken_entry_logs_its_readable_image_id(self):
