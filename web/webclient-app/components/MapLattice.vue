@@ -650,11 +650,12 @@ const latticeStyle = computed(() => {
 </script>
 
 <template>
-  <!-- The stateless lattice surface: connector edges, state-distinguished
-       node markers, single-line truncated labels, and the state legend.
-       The root is a fragment (svg + legend) so both callers' surrounding
-       chrome stays the only structural difference between the minimap and
-       the overlay. -->
+  <!-- The overlay scrolls the diagram independently of its legend.
+       display:contents leaves the minimap's existing SVG sizing unchanged. -->
+  <div
+    class="local-map__viewport"
+    :class="{ 'local-map__viewport--canvas': overlayChrome }"
+  >
   <svg
     class="local-map__lattice"
     :class="{ 'local-map__lattice--canvas': overlayChrome }"
@@ -662,8 +663,8 @@ const latticeStyle = computed(() => {
     :height="canvasHeight"
     :viewBox="`0 0 ${canvasWidth} ${canvasHeight}`"
     :style="latticeStyle"
-    role="img"
-    aria-label="區域地圖縮圖"
+    :role="overlayChrome ? 'group' : 'img'"
+    :aria-label="overlayChrome ? '區域地圖' : '區域地圖縮圖'"
     data-testid="local-map__lattice"
     @mouseleave="emit('leave')"
   >
@@ -740,7 +741,7 @@ const latticeStyle = computed(() => {
       class="local-map__pin"
       data-testid="local-map__pin"
       :transform="`translate(${currentPos.x}, ${currentPos.y}) scale(${markerScale})`"
-      d="M0 -16 l-7 24 6 -5 5 7 5 -7 6 5 z"
+      d="M0 -18 C-2 -21 -7 -26 -7 -30 a7 7 0 0 1 14 0 C7 -26 2 -21 0 -18 Z"
       aria-hidden="true"
     />
     <g
@@ -832,8 +833,13 @@ const latticeStyle = computed(() => {
       :data-node="node.id"
       :data-node-id="node.id"
       :data-visibility="node.visibility"
+      :role="overlayChrome && node.action?.kind === 'move' ? 'button' : null"
+      :tabindex="overlayChrome && node.action?.kind === 'move' ? 0 : null"
+      :aria-label="overlayChrome ? node.label : null"
       :transform="`translate(${nodePos(node).x}, ${nodePos(node).y})`"
       @click="activateNode(node)"
+      @keydown.enter.prevent="activateNode(node)"
+      @keydown.space.prevent="activateNode(node)"
       @mouseenter="emit('hover', node)"
     >
       <!-- The draft marker ladder (webclient-map-01-draft-chrome D2): the
@@ -900,6 +906,7 @@ const latticeStyle = computed(() => {
       </text>
     </g>
   </svg>
+  </div>
 
   <!-- The draft dot-chip state legend (webclient-map-01-draft-chrome D6):
        an 11px radius-3 colour chip paired with its text label. The chip
@@ -931,6 +938,25 @@ const latticeStyle = computed(() => {
 </template>
 
 <style scoped>
+.local-map__viewport {
+  display: contents;
+}
+
+.local-map__viewport--canvas {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 12px;
+  scrollbar-color: var(--gold-500) transparent;
+  scrollbar-width: thin;
+}
+
+.local-map__viewport--canvas > svg {
+  margin: 0 auto;
+}
+
 .local-map__dot-field {
   pointer-events: none;
 }
@@ -992,6 +1018,12 @@ const latticeStyle = computed(() => {
 
 .local-map__node {
   cursor: pointer;
+  scroll-margin: 12px;
+}
+
+.local-map__node:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: 6px;
 }
 
 .local-map__node-label {
@@ -1056,8 +1088,8 @@ const latticeStyle = computed(() => {
 }
 
 .local-map__actionable {
-  fill: var(--seal-glow);
-  stroke: var(--seal-light);
+  fill: var(--gold-glow);
+  stroke: var(--gold-500);
   stroke-width: 2;
 }
 

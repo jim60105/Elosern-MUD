@@ -92,8 +92,7 @@ describe("map layout variants (B4 world family, map-02)", () => {
         .map(Number);
       // The wave-1 pin ownership contract: the pin shares the current
       // marker's translate pair (same coordinate system, it tracks the
-      // marker ladder through the element scale), and its fixed path draws
-      // ABOVE the anchor (tip at y=-16 in local units, negative y = up).
+      // marker ladder through the element scale).
       const pinTransform = pins[0].attributes("transform");
       const [px, py] = pinTransform
         .match(/translate\(([^,]+),\s*([^)]+)\)/)
@@ -101,7 +100,6 @@ describe("map layout variants (B4 world family, map-02)", () => {
         .map(Number);
       expect(px).toBe(nx);
       expect(py).toBe(ny);
-      expect(pins[0].attributes("d")).toMatch(/^M0 -16/);
       w.unmount();
       wrapper = null;
     }

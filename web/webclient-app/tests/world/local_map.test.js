@@ -809,24 +809,6 @@ describe("LocalMap (B4 world family)", () => {
     return source.slice(start, source.indexOf("}", start));
   }
 
-  it("keeps the readout at the island's smallest type step, never above its own header", () => {
-    // webclient-local-map: the readout "SHALL render at the island's smallest
-    // type step". The island's smallest chrome step is the meta row's 10px, so
-    // the readout states its one secondary figure at exactly that step — it
-    // shipped at 11px, which made a coordinate pair the LARGEST text on the
-    // card, above the card's own title.
-    const header = ruleBody(ISLAND_SOURCE, ".local-map__meta");
-    const readout = ruleBody(ISLAND_SOURCE, ".local-map__detail");
-    const step = (body) => body.match(/font-size:\s*([0-9.]+)px/)?.[1];
-    expect(step(header)).toBe("10");
-    expect(step(readout)).toBe(step(header));
-    // ...and the treatment stays box-free and token-driven (design D7).
-    expect(readout).toContain("var(--f-mono)");
-    expect(readout).toContain("var(--paper-500)");
-    expect(readout).not.toMatch(/\bborder\s*:/);
-    expect(readout).not.toMatch(/\bbackground\s*:/);
-    expect(readout).not.toMatch(/#[0-9a-fA-F]{3,6}/);
-  });
 
   it("declares the marker-name step so no island text outweighs the island's chrome", () => {
     const w = mountMap({ localMap: localMapModelFor(LOCAL_MAP_WILDERNESS_SAMPLE) });

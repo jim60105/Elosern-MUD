@@ -10,22 +10,22 @@
 
 :root {
   /* ---- ink night palette ---- */
-  --ink-950: #08070a;
-  --ink-900: #100e12;
-  --ink-860: #151219;
-  --ink-820: #1b1720;
-  --ink-780: #221d29;
-  --ink-700: #2c2634;
-  --ink-600: #3a3344;
-  --panel: rgba(21, 17, 25, 0.78);
-  --panel-solid: #151219;
-  --panel-hi: rgba(43, 36, 52, 0.72);
+  --ink-950: #0b0d10;
+  --ink-900: #101216;
+  --ink-860: #15171b;
+  --ink-820: #1b1d21;
+  --ink-780: #232529;
+  --ink-700: #363638;
+  --ink-600: #55524b;
+  --panel: rgba(15, 17, 21, 0.9);
+  --panel-solid: #121519;
+  --panel-hi: rgba(43, 42, 39, 0.8);
 
   /* ---- warm paper text ---- */
   --paper-50: #f2ecdf;
   --paper-100: #e7e0d1;
-  --paper-300: #c3b9a3;
-  --paper-500: #8d8370;
+  --paper-300: #c9c4b9;
+  --paper-500: #aaa69e;
   --paper-700: #615a4c;
 
   /* ---- single seal-red accent ---- */
@@ -36,28 +36,21 @@
   --seal-glow: rgba(207, 68, 68, 0.32);
 
   /* ---- gold (focus ring / location) ---- */
-  --gold-400: #e2c06a;
-  --gold-500: #cba135;
-  --gold-glow: rgba(203, 161, 53, 0.3);
+  --gold-400: #e4c88e;
+  --gold-500: #b99a60;
+  --gold-glow: rgba(222, 189, 129, 0.24);
 
-  /* ---- draft map chrome (webclient-map-01-draft-chrome, design D3) ----
-     Draft-specific values the map surfaces need and the tokens above lack.
-     `--seal-deep` is the draft's current-node fill, deliberately distinct
-     from --seal-600 (#a9322a): redefining the global seal ramp would repaint
-     every other surface, so the draft-map pair gets its own tokens.
-     Sources: docs/design/elosern-redesign/index.html `.mini` / `.mapcanvas`
-     island + overlay SVGs and the `maplegend` chips. */
-  --seal-deep: #a52c31; /* draft .mini current-node circle fill */
-  --seal-light: #e06b6b; /* draft current-node stroke + pin stroke */
-  --ink-edge: #3a3344; /* draft node-dot stroke and connector-edge ink */
-  --map-canvas-hi: #1a1420; /* draft .mapcanvas gradient near stop */
-  --map-canvas-lo: #0c0a10; /* draft .mapcanvas gradient far stop / pin fill */
-  /* Node label tiers (draft island labels): current / landmark / visited /
-     unvisited, lightest to faintest. */
-  --map-label-here: #f2ecdf;
-  --map-label-gold: #e2c06a;
-  --map-label-seen: #8d8370;
-  --map-label-far: #615a4c;
+  /* Shared minimap and full-map palette. Current position keeps its red
+     state marker; paths and labels use the shell's charcoal and gold. */
+  --seal-deep: #a52c31;
+  --seal-light: #e06b6b;
+  --ink-edge: #5c5850;
+  --map-canvas-hi: #1e2024;
+  --map-canvas-lo: #0d0f12;
+  --map-label-here: var(--paper-50);
+  --map-label-gold: var(--gold-400);
+  --map-label-seen: #c1b8a6;
+  --map-label-far: #a6a095;
 
   /* ---- vitals & status colors ---- */
   --vit-hp: #e0574f;
@@ -126,15 +119,18 @@
   --menu-open-filter: brightness(0.5) blur(1.5px);
 
   /* ---- shape & chrome ---- */
-  --radius: 12px;
-  --radius-sm: 8px;
+  --radius: 7px;
+  --radius-sm: 5px;
   --line: 1px solid var(--ink-700);
   --shadow: 0 18px 44px -26px rgba(0, 0, 0, 0.9);
    --focus: 0 0 0 2px var(--ink-950), 0 0 0 4px var(--gold-400);
-    --dock-h: clamp(150px, 22vh, 184px);
+    --header-h: 80px;
+    --left-column: clamp(220px, 20vw, 330px);
+    --right-column: clamp(230px, 22vw, 360px);
+    --dock-h: clamp(126px, 17vh, 160px);
     /* The persistent command line's own height (HudFrame's
        [data-anchor="command-line"] rule consumes it). */
-    --command-line-h: 46px;
+    --command-line-h: 64px;
     /* How far above the stage bottom the dock's top edge sits: the dock's own
        height plus the command line beneath it. Every surface positioned above
        the dock derives its offset from this single token, never re-deriving

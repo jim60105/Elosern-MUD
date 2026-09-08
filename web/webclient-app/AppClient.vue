@@ -41,8 +41,13 @@ import PartyStrip from "./components/PartyStrip.vue";
 import PartyDrawer from "./components/PartyDrawer.vue";
 import { dialogueViewModel } from "./stores/dialogue-view.js";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
+import DesktopNavigation from "./components/DesktopNavigation.vue";
+import ReferenceArtwork from "./components/ReferenceArtwork.vue";
 
 const store = useElosernStore();
+const currentPortrait = computed(
+  () => store.view.rosterCharacters?.find((character) => character.current)?.portrait ?? null,
+);
 
 // The shell instance handle (H5, design D1/D6): the store-driven freeform
 // dialogue entry point (a freeform affordance) requests command-line field
@@ -429,6 +434,12 @@ const rootItems = computed(() => {
 // stray `ui_action`. Bounded by `router.depth()`.
 function onTabClick(key) {
   store.tabToRootAndConfirm(key, "pointer");
+}
+
+function onNavigateHome() {
+  if (store.view.hudDrawer) store.closeHudDrawer({ popFrame: true });
+  store.resetFramesToRoot();
+  shellRef.value?.restoreDockFocus();
 }
 
 // H3 (task 4.6): the crumb's back chevron pops exactly one router level —
@@ -874,12 +885,29 @@ onMounted(() => {
         @switch-character="onSwitchCharacter"
         @create-character="onCreateCharacter"
       >
+        <template #navigation>
+          <DesktopNavigation
+            :mode="store.view.mode"
+            :items="rootItems"
+            :drawer="store.view.hudDrawer"
+            @navigate="onTabClick"
+            @overlay="onOpenOverlay"
+            @home="onNavigateHome"
+          />
+        </template>
         <!-- The scene backdrop is the lowest stage layer (design D3/D8):
              it renders the committed `art` panel's scene truthfully — the
              done image, the dimmed prior image, or the mode gradient with a
              truthful placeholder. -->
         <template #backdrop>
           <SceneBackdrop ref="sceneBackdropRef" :art="panel('art') || {}" :mode="store.view.mode || 'exploration'" />
+          <ReferenceArtwork v-if="store.view.mode !== 'creation'" :portrait="currentPortrait" class="stage-portrait" />
+          <ReferenceArtwork v-if="store.view.mode === 'combat' && !panel('art')?.scene?.url" subject="wolf" class="stage-opponent" />
+          <div v-if="store.view.mode !== 'creation'" class="scene-heading">
+            <span class="scene-heading__eyebrow">{{ store.view.mode === "combat" ? "戰鬥" : "探索伊洛瑟恩" }}</span>
+            <h1>{{ store.view.statusSlice.locationLabel }}</h1>
+            <p>{{ store.view.statusSlice.timeLabel }}</p>
+          </div>
         </template>
         <template #panel-left>
         <StatusPanel
@@ -1006,6 +1034,12 @@ onMounted(() => {
       :body-class="drawerHostsServiceFrame ? 'hud-drawer__body--dock' : ''"
       @close="onHudDrawerClose"
     >
+      <template #art>
+        <ReferenceArtwork
+          :subject="store.view.hudDrawer === 'quest' ? 'clerk' : 'adventurer'"
+          :portrait="store.view.hudDrawer === 'quest' ? null : currentPortrait"
+        />
+      </template>
       <SkillBook v-if="store.view.hudDrawer === 'skill'" :skills="panel('character') || {}" />
       <InventoryPanel
         v-else-if="store.view.hudDrawer === 'inventory'"

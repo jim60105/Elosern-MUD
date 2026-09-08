@@ -160,8 +160,13 @@ function onScrimClick() {
         </svg>
       </button>
     </div>
-    <div class="hud-drawer__body" :class="bodyClass">
-      <slot />
+    <div class="hud-drawer__workspace">
+      <aside v-if="$slots.art" class="hud-drawer__art">
+        <slot name="art" />
+      </aside>
+      <div class="hud-drawer__body" :class="bodyClass">
+        <slot />
+      </div>
     </div>
     <div v-if="$slots.foot" class="hud-drawer__foot">
       <slot name="foot" />

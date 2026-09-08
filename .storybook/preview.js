@@ -5,6 +5,6 @@ export const parameters = {
   layout: "fullscreen",
   backgrounds: {
     default: "ink-950",
-    values: [{ name: "ink-950", value: "#08070a" }],
+    values: [{ name: "ink-950", value: "#0b0d10" }],
   },
 };

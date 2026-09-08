@@ -35,7 +35,6 @@ describe("AppShell root (B1 core family)", () => {
     expect(root.attributes("data-elosern-stage")).toBe("contextual-hud");
     expect(root.attributes("data-elosern-mode")).toBe("exploration");
     expect(w.get('[data-testid="topbar"]')).toBeTruthy();
-    expect(w.get('[data-testid="topbar-title"]').text()).toBe("伊洛瑟恩");
     expect(w.get('[data-testid="connection-state"]').text()).toBe("○ 未連線");
     expect(w.get('[data-testid="narrative-feed"]')).toBeTruthy();
     expect(w.get('[data-testid="narrative-fulllog-control"]')).toBeTruthy();

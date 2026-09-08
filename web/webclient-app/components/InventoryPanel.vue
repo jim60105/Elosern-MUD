@@ -1,15 +1,7 @@
 <script setup>
-// InventoryPanel (H4, webclient-hud-04-reference-drawers, tasks 6.1/6.2/6.5;
-// relocate-inventory-drawer-essentials; redesign-inventory-item-grid;
-// realign-inventory-drawer-layout): the 背包 · 裝備 drawer body — the
-// redesign's three-section stack rendered directly on the transparent drawer
-// body (no panel-card wrapper): the `裝備` section (the read-only equipment
-// doll built from the committed `character` panel), an `物品` section whose
-// tracked heading carries the shipped listing size as its tag over the
-// responsive grid of native-button item tiles driven by the committed
-// `services` panel's presentation metadata, and a `金錢` section rendering
-// the committed wallet as one labelled row with grouped integer copper. One
-// non-interactive inspector is shared by pointer hover and keyboard focus;
+// The inventory workspace presents committed equipment, item tiles, integer
+// copper, and a reserved detail column without inventing capacity or items.
+// One non-interactive inspector is shared by pointer hover and keyboard focus;
 // selection is client-local and resets when the committed panel data is
 // replaced (which also retires an open item-use confirmation). Deliberate
 // activation follows the row's committed action descriptor: inspect-only and
@@ -158,10 +150,6 @@ function rarityWord(row) {
 // by pointer hover and keyboard focus. It shows only the committed display
 // name, kind word, rarity word, held count, equipped state, and summary —
 // it never invents numeric stats or comparison values.
-const panelEl = ref(null);
-const inspectorEl = ref(null);
-const inspectorStyle = ref({});
-
 function onTileEnter(event) {
   selectedKey.value = event.currentTarget.dataset.key;
 }
@@ -287,42 +275,10 @@ watch(confirming, (open) => {
   }
 });
 
-// Keep the inspector contained in the drawer body: positioned below the
-// anchor tile, flipping above when it would leave the panel's visible
-// bounds, and clamped horizontally.
-watch(selectedKey, () => {
-  if (!selectedKey.value) {
-    inspectorStyle.value = {};
-    return;
-  }
-  nextTick(() => {
-    const panel = panelEl.value;
-    const tip = inspectorEl.value;
-    if (!panel || !tip) {
-      return;
-    }
-    const anchor = panel.querySelector(`[data-testid="inventory-panel__tile--${selectedKey.value}"]`);
-    if (!anchor) {
-      return;
-    }
-    const panelRect = panel.getBoundingClientRect();
-    const anchorRect = anchor.getBoundingClientRect();
-    const tipW = tip.offsetWidth;
-    const tipH = tip.offsetHeight;
-    const pad = 8;
-    let left = anchorRect.left + anchorRect.width / 2 - panelRect.left - tipW / 2;
-    left = Math.max(pad, Math.min(left, panelRect.width - tipW - pad));
-    let top = anchorRect.bottom - panelRect.top + pad;
-    if (top + tipH > panelRect.height - pad) {
-      top = Math.max(pad, anchorRect.top - panelRect.top - tipH - pad);
-    }
-    inspectorStyle.value = { left: `${left}px`, top: `${top}px` };
-  });
-});
 </script>
 
 <template>
-  <aside ref="panelEl" class="inventory-panel" data-testid="inventory-panel">
+  <aside class="inventory-panel" data-testid="inventory-panel">
     <p
       v-if="unavailable"
       class="inventory-panel__unavailable"
@@ -411,18 +367,20 @@ watch(selectedKey, () => {
       </section>
     </template>
 
-    <!-- The single transient item inspector (task 1.2): non-focusable
-         `role="tooltip"` surface shared by hover and focus, positioned within
-         the drawer body and flipped above/below as needed. -->
+    <!-- A reserved column avoids covering held items while inspecting them. -->
+    <section v-if="bagVisible" class="inventory-panel__details">
+      <h4 class="inventory-panel__heading">物品詳情</h4>
+      <p v-if="!activeRow" class="inventory-panel__details-empty">將游標移到物品上，或以鍵盤選取，查看詳細資訊。</p>
     <div
       v-if="activeRow"
-      ref="inspectorEl"
       id="inventory-panel-inspector"
       class="inventory-panel__inspector"
       data-testid="inventory-panel__inspector"
       role="tooltip"
-      :style="inspectorStyle"
     >
+      <svg class="inventory-panel__detail-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path :d="tileIconPath(activeRow)" stroke="currentColor" stroke-width="1" />
+      </svg>
       <div class="inventory-panel__inspector-head">
         <span class="inventory-panel__inspector-name" data-testid="inventory-panel__inspector-name">{{ activeRow.display_name }}</span>
         <span
@@ -463,6 +421,7 @@ watch(selectedKey, () => {
         </span>
       </div>
     </div>
+    </section>
 
     <!-- The labelled item-use confirmation modal (task 6.2), teleported to
          the document body so drawer overflow never clips it. Focus enters
@@ -514,10 +473,7 @@ watch(selectedKey, () => {
 </template>
 
 <style scoped>
-/* The drawer body is the mock's `.draw .body`: the sections sit directly on
-   the transparent drawer body (no panel-card wrapper, no own padding — the
-   drawer chrome pads), with the mock's 18px section rhythm. `position:
-   relative` remains so the transient inspector positions inside the body. */
+/* Standalone component flow; the desktop shell supplies the wide workspace. */
 .inventory-panel {
   position: relative;
   display: flex;
@@ -714,12 +670,10 @@ watch(selectedKey, () => {
   font-size: 0.8em;
 }
 
-/* The single transient item inspector (task 1.2): non-interactive,
-   non-focusable, positioned by JS within the drawer body. */
+/* Item details remain non-interactive and follow the same hover/focus state. */
 .inventory-panel__inspector {
-  position: absolute;
-  z-index: 5;
-  width: 270px;
+  position: relative;
+  width: auto;
   background: var(--panel-solid);
   border: 1px solid var(--ink-600);
   border-radius: 11px;

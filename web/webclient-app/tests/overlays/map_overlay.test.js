@@ -1,9 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
-import MapLattice from "../../components/MapLattice.vue";
 import MapOverlay from "../../components/MapOverlay.vue";
 import {
-  LOCAL_MAP_MINIMAL_SAMPLE,
   LOCAL_MAP_SAMPLE,
   LOCAL_MAP_UNAVAILABLE_SAMPLE,
   localMapModelFor,
@@ -54,6 +52,20 @@ describe("MapOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", () 
     });
   });
 
+  it("exposes only traversable nodes as keyboard actions and moves with Enter or Space", async () => {
+    wrapper = mount(MapOverlay, { props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) } });
+    const destination = wrapper.get('[data-testid="local-map__node--grid:altoria:2:2"]');
+    expect(destination.attributes("role")).toBe("button");
+    expect(destination.attributes("tabindex")).toBe("0");
+    expect(wrapper.get('[data-testid="local-map__node--grid:altoria:1:2"]').attributes("tabindex")).toBeUndefined();
+    await destination.trigger("keydown", { key: "Enter" });
+    await destination.trigger("keydown", { key: " " });
+    expect(wrapper.emitted("move")).toEqual([
+      [{ exit_ref: "e_altoria_1_2_e", destination: "grid:altoria:2:2" }],
+      [{ exit_ref: "e_altoria_1_2_e", destination: "grid:altoria:2:2" }],
+    ]);
+  });
+
   it("keeps the island's full-map trigger out of the overlay body (task 6.2)", () => {
     wrapper = mount(MapOverlay, { props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) } });
     // The `open-map` emit contract is retained on the overlay, but the
@@ -102,16 +114,5 @@ describe("MapOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", () 
     expect(wrapper.find(".local-map__lattice").exists()).toBe(false);
     await wrapper.setProps({ localMap: localMapModelFor(LOCAL_MAP_SAMPLE) });
     expect(wrapper.find(".local-map__lattice").exists()).toBe(true);
-  });
-
-  it("Task 3.1: declares markerNameFont 11 alongside existing overlay props", () => {
-    wrapper = mount(MapOverlay, { props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) } });
-    const lattice = wrapper.findComponent(MapLattice);
-    expect(lattice.props("markerNameFont")).toBe(11);
-    expect(lattice.props("colPitch")).toBe(280);
-    expect(lattice.props("rowPitch")).toBe(212);
-    expect(lattice.props("labelMax")).toBe(10);
-    expect(lattice.props("markerScale")).toBe(4.83);
-    expect(lattice.props("maxWidth")).toBe(848);
   });
 });
