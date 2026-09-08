@@ -4,7 +4,11 @@ import unittest
 
 from tools.spec_traceability import covers_requirement
 
-from world.lore.player_presets import PLAYER_PRESET_REGISTRY, PlayerPreset
+from world.lore.player_presets import (
+    PLAYER_PRESET_REGISTRY,
+    PlayerPreset,
+    StartingCompanion,
+)
 from world.lore.races import RACE_REGISTRY
 from world.rules.character_creation import resolve_starting_profile
 from world.skills.registry import SKILL_REGISTRY, SkillKind
@@ -617,4 +621,76 @@ class PlayerPresetTests(unittest.TestCase):
                 "climax_phase": "餘韻",
             },
         )
+
+
+class StartingCompanionDeclarationTests(unittest.TestCase):
+    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
+    def test_the_twins_declare_each_other_symmetrically_at_95(self):
+        yuna = PLAYER_PRESET_REGISTRY["yuna_darknight"]
+        yuka = PLAYER_PRESET_REGISTRY["yuka_darknight"]
+        self.assertEqual(
+            yuna.starting_companions,
+            (StartingCompanion("yuka_darknight", 95, "雙胞胎妹妹"),),
+        )
+        self.assertEqual(
+            yuka.starting_companions,
+            (StartingCompanion("yuna_darknight", 95, "雙胞胎姊姊"),),
+        )
+        for declaration in (*yuna.starting_companions, *yuka.starting_companions):
+            partner = PLAYER_PRESET_REGISTRY[declaration.preset_key]
+            # The partner's own card answers every mechanical question.
+            self.assertIsInstance(partner, PlayerPreset)
+            self.assertTrue(declaration.relationship)
+
+    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
+    def test_every_other_preset_declares_no_companions(self):
+        for key, preset in PLAYER_PRESET_REGISTRY.items():
+            if key in ("yuna_darknight", "yuka_darknight"):
+                continue
+            with self.subTest(preset=key):
+                self.assertEqual(preset.starting_companions, ())
+
+    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
+    def test_companion_validation_rejects_unregistered_self_and_duplicate(self):
+        from world.lore.player_presets import _validate_preset_starting_companions
+
+        def make(**overrides):
+            values = dict(
+                key="x", display_name="x", age=18, apparent_age=18, race="human",
+                subrace="human_commoner", allocations=(), emphasis="e",
+                sex="female",
+            )
+            values.update(overrides)
+            return PlayerPreset(**values)
+
+        cases = (
+            (
+                make(starting_companions=(StartingCompanion("not_a_preset", 95, "夥伴"),)),
+                "not registered",
+            ),
+            (
+                make(starting_companions=(StartingCompanion("x", 95, "夥伴"),)),
+                "its own companion",
+            ),
+            (
+                make(starting_companions=(
+                    StartingCompanion("human_wanderer", 95, "夥伴"),
+                    StartingCompanion("human_wanderer", 40, "舊識"),
+                )),
+                "more than once",
+            ),
+            (make(starting_companions=("human_wanderer",)), "not a StartingCompanion"),
+        )
+        for preset, message in cases:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                _validate_preset_starting_companions(
+                    {
+                        "x": preset,
+                        "human_wanderer": PLAYER_PRESET_REGISTRY["human_wanderer"],
+                    }
+                )
+        # The empty default and a well-formed cross-reference both pass, and
+        # the shipped registry validates clean at load.
+        _validate_preset_starting_companions({"x": make()})
+        _validate_preset_starting_companions(PLAYER_PRESET_REGISTRY)
 

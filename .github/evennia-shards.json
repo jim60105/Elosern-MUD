@@ -153,6 +153,7 @@
         "world.rules.tests.test_skill_lineage",
         "world.rules.tests.test_skip_commands",
         "world.rules.tests.test_skip_safety",
+        "world.rules.tests.test_starting_companions",
         "world.rules.tests.test_stat_breakdown",
         "world.rules.tests.test_status_boundary",
         "world.rules.tests.test_status_display",

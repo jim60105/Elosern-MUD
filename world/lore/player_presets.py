@@ -147,6 +147,25 @@ class PresetSexualBaseline:
 
 
 @dataclass(frozen=True)
+class StartingCompanion:
+    """One preset's declared NPC companion, keyed by the partner's own card.
+
+    ``preset_key`` names the companion's OWN ``PLAYER_PRESET_REGISTRY`` entry,
+    so the companion's stats, skills, items, persona, and identity always come
+    from the same card a player could have chosen -- never a second authored
+    copy. ``affinity`` is the value the activation binding seeds into the
+    relationship record (its numeric bounds derive from ``world.rules``
+    constants and are swept rules-side, because lore must not import rules);
+    ``relationship`` is the label written into the built companion's persona
+    ``social_connection`` under the owning player's name.
+    """
+
+    preset_key: str
+    affinity: int
+    relationship: str
+
+
+@dataclass(frozen=True)
 class PlayerPreset:
     """A complete player-owned identity, raw stat allocation, and skill kit.
 
@@ -203,6 +222,15 @@ class PlayerPreset:
     # change). ``None`` writes nothing, so ``SexualState`` keeps applying
     # ``_generic_default_baseline()`` lazily exactly as before.
     sexual_baseline: PresetSexualBaseline | None = None
+    # The declared NPC companions (starting-companions). Each entry names the
+    # partner's own preset card, the affinity the activation binding seeds,
+    # and the persona relationship label. The empty default keeps every
+    # shipped card's observable starting state unchanged until an author fills
+    # the field. Presence/self/duplicate shape is validated lore-side at load;
+    # the bounds reading rules constants (companion count against
+    # ``PARTY_MAX_COMPANIONS``, affinity against ``NATURAL_CAP``) are swept at
+    # ``world/rules/starting_companions.py`` import time.
+    starting_companions: tuple[StartingCompanion, ...] = ()
 
     def allocation_dict(self) -> dict[str, int]:
         """Return a mutable copy suitable for rules validation."""
@@ -335,6 +363,10 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
                 "陽光開朗，視戰鬥為與自身極限的對話。"
             ),
         ),
+        # The twins arrive together: 悠花's own card is her companion, seeded
+        # at 95 (above the invite threshold, inside 至愛 with headroom), with
+        # 悠奈 as the elder sister.
+        starting_companions=(StartingCompanion("yuna_darknight", 95, "雙胞胎姊姊"),),
     ),
     "yuna_darknight": PlayerPreset(
         "yuna_darknight", "悠奈", 18, 18, "elf", "ciaran",
@@ -355,6 +387,9 @@ PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
                 "並以神之秘法觸及性愛系統的領域。"
             ),
         ),
+        # The symmetric half of the pair: 悠奈 arrives with 悠花, the younger
+        # twin, at the same affinity.
+        starting_companions=(StartingCompanion("yuka_darknight", 95, "雙胞胎妹妹"),),
     ),
     "elosia_shadowmoon": PlayerPreset(
         "elosia_shadowmoon", "伊洛希雅", 222, 24, "elf", "fionnen",
@@ -809,6 +844,43 @@ def _validate_preset_sexual_baselines(registry: dict[str, PlayerPreset]) -> None
                 )
 
 
+def _validate_preset_starting_companions(registry: dict[str, PlayerPreset]) -> None:
+    """Reject a companion declaration an activation could never resolve.
+
+    Mirrors the starting-item validator's load-time stance: every entry must
+    be a ``StartingCompanion``, its ``preset_key`` must name a registered card
+    (the companion IS that card), a preset may never name itself, and one
+    preset may name a given partner at most once. The numeric bounds that read
+    rules constants (``PARTY_MAX_COMPANIONS``, ``NATURAL_CAP``) cannot live
+    here because lore must not import rules, so they are swept at
+    ``world/rules/starting_companions.py`` import time instead -- the same
+    split the persona prose cap established.
+    """
+    for preset in registry.values():
+        seen: set[str] = set()
+        for entry in preset.starting_companions:
+            if not isinstance(entry, StartingCompanion):
+                raise ValueError(
+                    f"preset {preset.key!r} declares a starting companion "
+                    f"that is not a StartingCompanion"
+                )
+            if entry.preset_key not in registry:
+                raise ValueError(
+                    f"preset {preset.key!r} declares companion preset "
+                    f"{entry.preset_key!r} that is not registered"
+                )
+            if entry.preset_key == preset.key:
+                raise ValueError(
+                    f"preset {preset.key!r} declares itself as its own companion"
+                )
+            if entry.preset_key in seen:
+                raise ValueError(
+                    f"preset {preset.key!r} declares companion "
+                    f"{entry.preset_key!r} more than once"
+                )
+            seen.add(entry.preset_key)
+
+
 _validate_preset_skill_kits(PLAYER_PRESET_REGISTRY)
 _validate_preset_identities(PLAYER_PRESET_REGISTRY)
 _validate_preset_affinity_elements(PLAYER_PRESET_REGISTRY)
@@ -819,3 +891,4 @@ _validate_preset_personas(PLAYER_PRESET_REGISTRY)
 _validate_preset_skill_proficiency(PLAYER_PRESET_REGISTRY)
 _validate_preset_disguised_stats(PLAYER_PRESET_REGISTRY)
 _validate_preset_sexual_baselines(PLAYER_PRESET_REGISTRY)
+_validate_preset_starting_companions(PLAYER_PRESET_REGISTRY)
