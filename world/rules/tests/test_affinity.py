@@ -494,6 +494,31 @@ class SeedAffinityWriterTests(EvenniaTestCase):
         self.assertFalse(self.npc.relations.has_record(self.player))
 
     @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
+    def test_injected_update_failure_restores_a_populated_surface(self):
+        # The surface is already populated with another player's record, so
+        # the failing write's target attribute exists and the restore must
+        # re-write over the cached value without disturbing the kept record.
+        other = create_object(PlayerCharacter, key="seed kept player")
+        seed_affinity(self.npc, other, 20)
+        original_add = self.npc.attributes.add
+        armed = {"active": True}
+
+        def _failing_add(key, *args, **kwargs):
+            if armed["active"] and key == "relations_data":
+                armed["active"] = False
+                raise RuntimeError("injected relations_data update failure")
+            return original_add(key, *args, **kwargs)
+
+        relations_before = copy.deepcopy(self.npc.db.relations_data)
+        with patch.object(self.npc.attributes, "add", side_effect=_failing_add):
+            with self.assertRaises(AffinitySeedError) as caught:
+                seed_affinity(self.npc, self.player, 40)
+        self.assertEqual(caught.exception.reason, "write_failed")
+        self.assertEqual(self.npc.db.relations_data, relations_before)
+        self.assertFalse(self.npc.relations.has_record(self.player))
+        self.assertEqual(self.npc.relations.affinity_for(other), 20)
+
+    @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
     def test_committed_seed_emits_exactly_one_boundary_event(self):
         self._day_clock(2)
         with (

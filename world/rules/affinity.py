@@ -3,13 +3,14 @@
 Every NPC holds one affinity record per player it has interacted with, stored
 as serialized data on the NPC's ``relations_data`` attribute through the
 ``RelationHandler`` mounted on ``LivingEntity.relations``. This module is the
-only one that writes affinity values, and it exposes exactly two narrowly-scoped
-writers: ``apply_affinity_change`` for interaction deltas (budgeted, source-
-resolved, auto-leave-checked) and ``seed_affinity`` for establishing a starting
+only one that writes affinity values. Its value writers are
+``apply_affinity_change`` for interaction deltas (budgeted, source-resolved,
+auto-leave-checked) and ``seed_affinity`` for establishing a starting
 relationship that no interaction produced (one-shot, unbudgeted, never
-overwriting). Callers invoke them inside their own all-or-nothing commits and
-restore the host's ``relations_data`` surface on failure. Reads never
-materialize a record, so a mere look can never create one.
+overwriting); ``raise_affinity_cap`` changes only a record's ``cap``. Callers
+invoke the writers inside their own all-or-nothing commits and restore the
+host's ``relations_data`` surface on failure. Reads never materialize a
+record, so a mere look can never create one.
 """
 
 from dataclasses import dataclass, replace

@@ -22,10 +22,14 @@ The same module SHALL additionally expose exactly one *seed* writer,
 `seed_affinity(npc, player, value)`, for establishing a starting relationship that no interaction
 produced. It SHALL create a fresh record whose value is `value`, whose `cap` is `NATURAL_CAP`, and
 whose daily counter is zero stamped with the current world day. It SHALL reject a value outside
-`1..NATURAL_CAP` and SHALL refuse to overwrite an existing record for the pair, so it can never be
-used to launder an interaction gain past the daily budget. It SHALL NOT consume daily budget,
-resolve a source, or run the auto-leave recheck, because a seed is not an interaction. No module
-outside `world/rules/affinity.py` SHALL write an affinity record.
+`1..NATURAL_CAP` -- booleans and non-integers included -- and SHALL refuse to overwrite an existing
+record for the pair, so it can never be used to launder an interaction gain past the daily budget.
+It SHALL reject a non-NPC owner the same way. Every refusal SHALL raise `AffinitySeedError` with a
+stable reason, writing nothing. The write SHALL run inside one transaction with the host's
+in-process `relations_data` surface restored on failure, and a committed seed SHALL emit one
+`affinity_seed` boundary info event at the outermost durable commit. It SHALL NOT consume daily
+budget, resolve a source, or run the auto-leave recheck, because a seed is not an interaction. No
+module outside `world/rules/affinity.py` SHALL write an affinity record.
 
 #### Scenario: Capped sources exhaust the daily budget
 - **WHEN** capped-source gains total 5 in one world day and a sixth capped gain is attempted
@@ -87,3 +91,7 @@ outside `world/rules/affinity.py` SHALL write an affinity record.
 #### Scenario: A seed consumes no daily budget
 - **WHEN** a relationship is seeded and a capped interaction gain is attempted on the same world day
 - **THEN** the full daily budget is still available to that interaction
+
+#### Scenario: A seed rejects a non-NPC owner or a non-integer value
+- **WHEN** `seed_affinity` is called with a player or monster as the affinity owner, or with a boolean or non-integer value
+- **THEN** it raises without writing
