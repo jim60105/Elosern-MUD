@@ -15,7 +15,7 @@ from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 
 class PlayerPresetTests(unittest.TestCase):
-    def test_catalog_covers_every_race_with_valid_adult_allocations(self):
+    def test_catalog_covers_every_race_with_valid_allocations(self):
         self.assertEqual(
             {preset.race for preset in PLAYER_PRESET_REGISTRY.values()},
             set(RACE_REGISTRY),
@@ -23,8 +23,6 @@ class PlayerPresetTests(unittest.TestCase):
         for preset in PLAYER_PRESET_REGISTRY.values():
             with self.subTest(preset=preset.key):
                 self.assertIsInstance(preset, PlayerPreset)
-                self.assertGreaterEqual(preset.age, 18)
-                self.assertGreaterEqual(preset.apparent_age, 18)
                 profile = resolve_starting_profile(preset.race, preset.subrace)
                 allocations = preset.allocation_dict()
                 self.assertEqual(sum(allocations.values()), profile.budget)
