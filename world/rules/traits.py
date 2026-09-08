@@ -209,6 +209,18 @@ def get_display_value(entity: Any, trait_key: str) -> int:
     remain a forward-declared seam. A non-mapping ``disguised_stats`` record
     reads as "no disguise" and falls back to the true trait value. Combat,
     resolution, and damage must read true traits directly and must never call this function.
+
+    This bound is on READERS; the reader set is exactly the three above.
+    Seeding the layer is a separate, bounded set of WRITERS:
+    ``world/imports/loader.py`` (import records) and
+    ``world/rules/character_creation.py`` (preset activation) are the only
+    production modules that seed ``entity.db.disguised_stats`` from an
+    authored declaration at entity construction, each never reading the
+    mapping back to make a decision. The runtime write for
+    ``status_disguise`` (``world/rules/skill_effects.py``) is bound by the
+    skill-handler capability's own requirement, and snapshot/restore
+    machinery may re-assign a previously recorded value; neither authors a
+    new declaration.
     """
     disguised = entity.db.disguised_stats
     if isinstance(disguised, Mapping) and trait_key in disguised:

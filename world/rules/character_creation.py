@@ -32,6 +32,10 @@ _CREATION_ATTRIBUTE_KEYS = (
     "skill_proficiency", "skills", "skill_grants", "equipment",
     "inventory", "wallet", "quest_log", "guild_rank", "persona",
     "portrait_policy", "affinity_elements", "sex", "nation", "buffs",
+    # Preset activation may seed both (preset-disguise-and-sexual-baseline);
+    # the idmapper cache is not transaction-aware, so both join the
+    # rollback snapshot.
+    "disguised_stats", "sexual",
 )
 
 # The single deterministic race-bound mapping every identity channel and the
@@ -649,6 +653,19 @@ def activate_player_character(
         "sex": validated.sex,
         "nation": validated.nation,
     }
+    if request.mode == "preset":
+        # The disguise layer and sexual baseline are preset-only writes
+        # (custom mode declares neither and writes neither key, preserving
+        # today's behavior). ``disguised_stats`` normalizes an empty
+        # declaration to ``None`` exactly like the import loader's
+        # ``record["disguised_stats"] or None``; ``sexual`` is written ONLY
+        # when the preset declares a baseline, so an undeclared card keeps
+        # the lazy ``_generic_default_baseline()`` construction. Inserted
+        # after ``nation`` so the ``creation_pending=False`` write always
+        # precedes them in the shared write loop.
+        attribute_values["disguised_stats"] = dict(preset.disguised_stats) or None
+        if preset.sexual_baseline is not None:
+            attribute_values["sexual"] = preset.sexual_baseline.to_record()
     persona_record = _persona_record_for(validated, request, persona)
     old_key = character.key
     attribute_snapshots = snapshot_attributes(character, _CREATION_ATTRIBUTE_KEYS)

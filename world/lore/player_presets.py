@@ -8,6 +8,16 @@ from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.lore.sex import SEX_VALUES
+from world.lore.sexual_vocab import (
+    AROUSAL_LEVELS,
+    BODY_PARTS,
+    CLIMAX_PHASE_LEVELS,
+    EXPOSURE_LEVELS,
+    GENERIC_BODY_PART,
+    SENSITIVITY_LEVELS,
+    SHAME_LEVELS,
+    WETNESS_LEVELS,
+)
 from world.skills.equipment import ACCESSORY_MAX_SLOTS, EquipmentSlot
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
@@ -95,6 +105,48 @@ class PresetPersona:
 
 
 @dataclass(frozen=True)
+class PresetSexualBaseline:
+    """One preset's authored sexual baseline, in import-card record shape.
+
+    Mirrors the import card's ``sexual_baseline`` object: ``arousal``,
+    ``virgin``, and ``sensitivity`` are required; ``wetness``, ``shame``,
+    ``exposure``, and ``climax_phase`` are optional, each empty value
+    omitted from the record so ``SexualState``'s existing "default the
+    omitted field to its vocabulary's lowest level" construction rule
+    applies unchanged. ``sensitivity`` is a tuple of ``(body_part, level)``
+    pairs so the registry stays immutable; ``to_record()`` expands it.
+    """
+
+    arousal: str
+    virgin: bool
+    sensitivity: tuple[tuple[str, str], ...]
+    wetness: str = ""
+    shame: str = ""
+    exposure: str = ""
+    climax_phase: str = ""
+
+    def to_record(self) -> dict[str, Any]:
+        """Return the storage shape written to ``character.db.sexual``.
+
+        The three required keys are always present and ``sensitivity``
+        becomes the flat body-part -> level mapping ``SexualState`` seeds
+        from; each empty optional level is omitted rather than written as
+        a literal, and ``climax_today`` / ``experience_types`` are never
+        written because the builder already floors them at construction.
+        """
+        record: dict[str, Any] = {
+            "arousal": self.arousal,
+            "virgin": self.virgin,
+            "sensitivity": dict(self.sensitivity),
+        }
+        for field in ("wetness", "shame", "exposure", "climax_phase"):
+            value = getattr(self, field)
+            if value:
+                record[field] = value
+        return record
+
+
+@dataclass(frozen=True)
 class PlayerPreset:
     """A complete player-owned identity, raw stat allocation, and skill kit.
 
@@ -139,6 +191,18 @@ class PlayerPreset:
     # observable starting state unchanged until an author fills the field.
     starting_equipment: tuple[str, ...] = ()
     persona: PresetPersona = PresetPersona()
+    # The display-only disguise layer (preset-disguise-and-sexual-baseline)
+    # as ``(axis_key, value)`` pairs. Keys are NOT whitelisted:
+    # ``CHARACTER_SCHEMA_V1`` constrains the field only to integer values
+    # (its subset-of-stats rule is an import-path semantic check the preset
+    # path cannot mirror, because presets declare allocations, not absolute
+    # stats), and display values never reach combat or resolution. The empty
+    # default writes ``None``, which every reader treats as absent.
+    disguised_stats: tuple[tuple[str, int], ...] = ()
+    # The authored sexual baseline seeding ``entity.db.sexual`` (same
+    # change). ``None`` writes nothing, so ``SexualState`` keeps applying
+    # ``_generic_default_baseline()`` lazily exactly as before.
+    sexual_baseline: PresetSexualBaseline | None = None
 
     def allocation_dict(self) -> dict[str, int]:
         """Return a mutable copy suitable for rules validation."""
@@ -621,6 +685,130 @@ def _validate_preset_skill_proficiency(registry: dict[str, PlayerPreset]) -> Non
                 )
 
 
+def _validate_preset_disguised_stats(registry: dict[str, PlayerPreset]) -> None:
+    """Reject a disguise layer an activation could never persist sanely.
+
+    Mirrors the other preset validators' load-time stance: every
+    ``disguised_stats`` entry must be a ``(key, value)`` pair with a string
+    axis key and an exact ``int`` value (a boolean is rejected as
+    non-numeric). There is deliberately NO axis whitelist --
+    ``CHARACTER_SCHEMA_V1`` constrains the field only to integer values,
+    and the layer is display-only per ``get_display_value``. A duplicate
+    key is rejected because ``dict()`` would silently drop the earlier
+    entry, the same reason the proficiency validator rejects repeats.
+    """
+    for preset in registry.values():
+        seen: set[str] = set()
+        for entry in preset.disguised_stats:
+            if not isinstance(entry, tuple) or len(entry) != 2:
+                raise ValueError(
+                    f"preset {preset.key!r} declares a malformed disguised_stats entry"
+                )
+            axis_key, value = entry
+            if not isinstance(axis_key, str):
+                raise ValueError(
+                    f"preset {preset.key!r} declares a disguised_stats key that "
+                    "is not text"
+                )
+            if axis_key in seen:
+                raise ValueError(
+                    f"preset {preset.key!r} declares duplicate disguised_stats "
+                    f"key {axis_key!r}"
+                )
+            seen.add(axis_key)
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise ValueError(
+                    f"preset {preset.key!r} declares a non-integer disguise "
+                    f"value for {axis_key!r}"
+                )
+
+
+def _validate_preset_sexual_baselines(registry: dict[str, PlayerPreset]) -> None:
+    """Reject a declared sexual baseline the handler could never build from.
+
+    Mirrors the other preset validators' load-time stance: ``None`` (no
+    declaration) always passes; otherwise the value must be a
+    ``PresetSexualBaseline`` whose ``arousal`` and every optional level are
+    members of the matching vocabulary tuple in
+    ``world/lore/sexual_vocab.py``, whose ``virgin`` is an exact boolean,
+    and whose ``sensitivity`` entries are ``(body_part, level)`` pairs with
+    the part in ``BODY_PARTS`` plus ``GENERIC_BODY_PART`` and the level in
+    ``SENSITIVITY_LEVELS``. Empty optional levels are legal -- they are
+    omitted from ``to_record()`` so the builder floors them -- everything
+    else raises at import naming the field, so a card can never reach
+    activation with a value the builder's ``OrderedLevelTrait`` would
+    reject.
+    """
+    vocabularies = {
+        "arousal": AROUSAL_LEVELS,
+        "wetness": WETNESS_LEVELS,
+        "shame": SHAME_LEVELS,
+        "exposure": EXPOSURE_LEVELS,
+        "climax_phase": CLIMAX_PHASE_LEVELS,
+    }
+    valid_parts = (*BODY_PARTS, GENERIC_BODY_PART)
+    for preset in registry.values():
+        baseline = preset.sexual_baseline
+        if baseline is None:
+            continue
+        if not isinstance(baseline, PresetSexualBaseline):
+            raise ValueError(
+                f"preset {preset.key!r} declares a sexual_baseline that is not a "
+                "PresetSexualBaseline"
+            )
+        if not isinstance(baseline.virgin, bool):
+            raise ValueError(
+                f"preset {preset.key!r} declares a sexual_baseline.virgin that is "
+                "not a boolean"
+            )
+        for field, vocabulary in vocabularies.items():
+            level = getattr(baseline, field)
+            if not isinstance(level, str):
+                raise ValueError(
+                    f"preset {preset.key!r} declares sexual_baseline.{field} that "
+                    "is not text"
+                )
+            # Only the four OPTIONAL levels may be empty (to_record() omits
+            # them so the builder floors them); required ``arousal`` is
+            # always emitted, so an empty arousal would reach the pleasure
+            # band lookup and raise there instead of at load.
+            empty_allowed = field != "arousal"
+            if level not in vocabulary and not (empty_allowed and level == ""):
+                raise ValueError(
+                    f"preset {preset.key!r} declares sexual_baseline.{field} "
+                    f"{level!r} outside its vocabulary"
+                )
+        seen_parts: set[str] = set()
+        for entry in baseline.sensitivity:
+            if (
+                not isinstance(entry, tuple)
+                or len(entry) != 2
+                or not isinstance(entry[0], str)
+                or not isinstance(entry[1], str)
+            ):
+                raise ValueError(
+                    f"preset {preset.key!r} declares a sensitivity entry that is "
+                    "not a (body_part, level) pair of strings"
+                )
+            part, level = entry
+            if part not in valid_parts:
+                raise ValueError(
+                    f"preset {preset.key!r} declares sensitivity for unknown "
+                    f"body part {part!r}"
+                )
+            if part in seen_parts:
+                raise ValueError(
+                    f"preset {preset.key!r} declares duplicate sensitivity for "
+                    f"body part {part!r}"
+                )
+            seen_parts.add(part)
+            if level not in SENSITIVITY_LEVELS:
+                raise ValueError(
+                    f"preset {preset.key!r} declares sensitivity level {level!r} "
+                    f"for {part!r} outside its vocabulary"
+                )
+
+
 _validate_preset_skill_kits(PLAYER_PRESET_REGISTRY)
 _validate_preset_identities(PLAYER_PRESET_REGISTRY)
 _validate_preset_affinity_elements(PLAYER_PRESET_REGISTRY)
@@ -629,3 +817,5 @@ _validate_preset_starting_equipment(PLAYER_PRESET_REGISTRY)
 _validate_preset_sex(PLAYER_PRESET_REGISTRY)
 _validate_preset_personas(PLAYER_PRESET_REGISTRY)
 _validate_preset_skill_proficiency(PLAYER_PRESET_REGISTRY)
+_validate_preset_disguised_stats(PLAYER_PRESET_REGISTRY)
+_validate_preset_sexual_baselines(PLAYER_PRESET_REGISTRY)
