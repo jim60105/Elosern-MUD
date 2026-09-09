@@ -68,6 +68,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "register_nomination_triggers",
     "art_sync_all",
     "art_gallery_prune",
+    "art_seed_sync",
     "connect_art_push",
 )
 
@@ -476,6 +477,20 @@ def at_server_start():
     _startup_step(
         "art_gallery_prune",
         lambda: _late("world.art.service", "prune_gallery_orphans"),
+        fail_loud=False,
+        tolerant_on=_ALL_ERRORS,
+        degrade_level="error",
+    )
+
+    # Bulk seed-art mirror (gallery-seed-sync): copies operator-prepared images
+    # from the read-only ART_SEED_ROOT into the store and appends seed cards.
+    # Runs after the orphan prune so freshly copied files are never scanned as
+    # orphans in the same boot. The seam is internally bounded and never raises;
+    # the tolerant wrapper is the last-resort guard — a seed tree must NEVER
+    # abort startup, degrading at error level like the prune.
+    _startup_step(
+        "art_seed_sync",
+        lambda: _late("world.art.gallery_seed", "sync_all"),
         fail_loud=False,
         tolerant_on=_ALL_ERRORS,
         degrade_level="error",
