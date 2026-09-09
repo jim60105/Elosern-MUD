@@ -342,3 +342,74 @@ later branch.
 - Opening combat against NPCs (D-3).
 - Any change to `settle_out_of_combat_cast` and the non-damaging /
   sexual-skill-on-NPC path.
+
+## 13. Proposal decomposition and apply batch order
+
+This design was split into five sequential OpenSpec changes under
+`openspec/changes/`, each sized to roughly one engineer-day. All five pass
+`openspec validate --strict`.
+
+| # | Change | Implements | Depends on |
+| --- | --- | --- | --- |
+| 1 | `combat-opening-seams` | §5's `run_round(first_actor=...)`, `resolve_overwhelm(first_actor=...)` (round-one only), and the pure `commanded_damage_reaches_enemy()` query. Purely additive — no caller changes, no behaviour change. | — |
+| 2 | `out-of-combat-damage-gate` | The damage-requires-battlefield invariant (§4 step "S has DamageEffect ⇒ rejected") at `action.py`/`action_preview.py`, installed while still provably inert. Also updates `test_no_combat_branching.py`, an existing structural tripwire that currently pins exactly one combat-state gate and would otherwise break silently. | — |
+| 3 | `skill-field-availability` | §"Supporting edits" registry audit (D-7, D-8): every skill's `usable_out_of_combat` reviewed on the merits, `basic_attack` flipped to `True`, pinned by a frozen-inventory test. | 2 (safety, not compilation — see below) |
+| 4 | `combat-session-opening-dispatch` | §5's `combat_session.py` table: `_submit_request(opening=, first_actor=)` with `"round"` as the default, `engage_group()`, `submit_opening_action()` as the sole compression seam. | 1 |
+| 5 | `field-combat-initiation` | §4's flow, §5's `combat_initiation.py` module, and §§6-9 (edge cases, transaction safety, world clock, observability). | 3, 4 |
+
+Dependency graph:
+
+```
+1 combat-opening-seams ─────────────► 4 combat-session-opening-dispatch ──┐
+                                                                            ├─► 5 field-combat-initiation
+2 out-of-combat-damage-gate ───► 3 skill-field-availability ───────────────┘
+```
+
+**Why 3 depends on 2.** Flipping damage skills' `usable_out_of_combat` to
+`True` before the gate exists would let a player kill an NPC in the open world
+through `settle_out_of_combat_cast()` under `RoomActionContext` — which reports
+every co-located non-self entity as an ally — with no combat, no session, and
+no defeat handling. This dependency is about safety at every intermediate
+commit, not about either change failing to compile without the other.
+
+### Apply batch order
+
+- **Batch A (parallel):** `combat-opening-seams` + `out-of-combat-damage-gate`
+- **Batch B (parallel):** `skill-field-availability` + `combat-session-opening-dispatch`
+- **Batch C (alone):** `field-combat-initiation`
+
+File-level conflicts are minimal: `single-shot-resolution/spec.md` is touched
+by both change 1 and change 4 (resolved by landing order), and
+`.github/evennia-shards.json` is touched only by change 5 (a new test module);
+changes 1-4 are each scoped to extend an already-registered test module.
+
+**Known intermediate state.** After Batch B lands and before Batch C,
+compression (`resolve_overwhelm()`) has no production caller at all: a player
+who engages a trivially weak monster via `explore.engage` must grind it down
+round by round, since the one-shot path only exists behind the field-combat
+entry this last batch adds. This is an accepted forward-declared-seam state
+(`AGENTS.md`), not a regression to ship as a stopping point — the sequence is
+functionally complete only once Batch C lands.
+
+### Fixes found during self-review, folded into the specs above
+
+Independent review (rubber-duck) could not complete — three consecutive
+subagent spawns stalled on a 600-second stream-watchdog timeout unrelated to
+prompt content. Self-review in its place surfaced two issues, both corrected in
+`field-combat-initiation`'s and `combat-session-opening-dispatch`'s specs
+before those proposals were committed:
+
+- **Stranded-session risk on rollback (§7 extended).** `engage_group()` writes
+  `actor.db.active_combat` and clears `actor.db.dialogue_session` through
+  Evennia's idmapper cache, which is not transaction-aware. A rollback of the
+  outer transaction (per §7) leaves those attributes at their post-engagement
+  values in process even though the database row is gone.
+  `initiate_field_combat()` must snapshot both attributes *before*
+  `engage_group()` runs (not reuse `_submit_request()`'s own
+  `_snapshot_round_touched()`, which snapshots too late in this flow) and
+  restore them on the failure path, alongside `unregister_participants()`.
+- **Silent AREA-shorthand fallback (§5 extended).** `commanded_damage_reaches_enemy()`
+  takes concrete roster keys only. `submit_opening_action()` must reject an
+  approved AREA shorthand (`all-enemies`/`all-allies`/`all`) before initiative
+  rather than let it reach the predicate, where it would fail to intersect the
+  enemy team and silently select `opening="round"` with no diagnostic.
