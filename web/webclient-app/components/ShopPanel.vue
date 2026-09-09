@@ -262,23 +262,25 @@ function sellNow(row) {
 </template>
 
 <style scoped>
+/* Drawer-body surface: sections sit on the drawer's own padding; rows are
+   charcoal list lines with a fluid name column so long item names never
+   push the controls out of the panel. */
 .shop-panel {
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
+  min-width: 0;
   box-sizing: border-box;
-  padding: var(--sp-3) var(--sp-4);
-  background: var(--panel);
-  border: var(--line);
-  border-radius: var(--radius);
   font-family: var(--f-sans);
 }
 
 .shop-panel__title {
   margin: 0;
-  color: var(--paper-100);
-  font-family: var(--f-display);
-  font-size: 1em;
+  color: var(--paper-500);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .shop-panel__open {
@@ -310,45 +312,72 @@ function sellNow(row) {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
-  padding-top: var(--sp-2);
-  border-top: var(--line);
+  min-width: 0;
+  padding: var(--sp-3);
+  background: linear-gradient(130deg, rgba(34, 36, 38, 0.44), rgba(16, 18, 21, 0.75));
+  border: var(--line);
+  border-radius: var(--radius);
 }
 
 .shop-panel__section-title {
   margin: 0;
-  color: var(--paper-300);
-  font-size: 0.85em;
-  font-weight: 700;
+  padding-bottom: var(--sp-2);
+  border-bottom: var(--line);
+  color: var(--gold-400);
+  font-family: var(--f-serif);
+  font-size: 15px;
+  letter-spacing: 0.04em;
 }
 
+/* The row is a fluid grid: the item name owns the flexible track
+   (`minmax(0, 1fr)`); prices/stock are content-sized mono cells; the
+   quantity + action pair rides the second line's trailing edge. Everything
+   fits the drawer without horizontal overflow. */
 .shop-row {
   display: grid;
-  grid-template-columns: minmax(6em, auto) repeat(6, auto);
-  gap: var(--sp-2);
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: var(--sp-1) var(--sp-3);
   align-items: center;
-  padding: var(--sp-1) 0;
+  min-width: 0;
+  padding: var(--sp-2) 0;
   border-bottom: 1px solid var(--ink-700);
   font-size: 0.9em;
 }
 
 .shop-row__name {
+  grid-row: 1;
   color: var(--paper-50);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .shop-row__price {
-  color: var(--paper-50);
+  color: var(--paper-300);
   font-family: var(--f-mono);
+  white-space: nowrap;
 }
 
 .shop-row__stock,
 .shop-row__held {
   color: var(--paper-500);
   font-family: var(--f-mono);
+  white-space: nowrap;
+}
+
+/* The quantity editor rides with the action at the row's trailing edge. */
+.shop-row__qty-wrap {
+  grid-row: 2;
+  grid-column: 3;
+  justify-self: end;
+}
+
+.shop-row__reason {
+  grid-column: 1 / -1;
 }
 
 .shop-row__qty {
   width: 4.5rem;
-  padding: 2px var(--sp-1);
+  padding: var(--sp-1);
   color: var(--paper-50);
   background: var(--ink-820);
   border: var(--line);
@@ -358,33 +387,45 @@ function sellNow(row) {
   text-align: right;
 }
 
+/* Buy/sell are the row's decisive actions: gold emphasis chrome, riding the
+   second line's trailing edge. */
 .shop-row__buy,
 .shop-row__sell {
-  padding: 2px var(--sp-2);
-  color: var(--paper-50);
-  background: var(--ink-860);
-  border: 1px solid var(--seal-500);
+  grid-row: 2;
+  grid-column: 4;
+  justify-self: end;
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-3);
+  color: var(--gold-400);
+  background: linear-gradient(rgba(185, 154, 96, 0.16), rgba(185, 154, 96, 0.06));
+  border: 1px solid var(--gold-500);
   border-radius: var(--radius-sm);
+  font-family: var(--f-sans);
   font-size: 0.85em;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .shop-row__buy:hover:not(:disabled),
 .shop-row__sell:hover:not(:disabled) {
-  border-color: var(--seal-400);
+  color: var(--paper-50);
+  border-color: var(--gold-400);
 }
 
 .shop-row__buy:disabled,
 .shop-row__sell:disabled {
   color: var(--paper-500);
+  background: var(--ink-820);
   border-color: var(--ink-700);
   cursor: default;
 }
 
+/* Disabled reasons are cautionary guidance, not errors: warn tone. */
 .shop-row__reason {
-  grid-column: 1 / -1;
   color: var(--warn);
   font-size: 0.85em;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 

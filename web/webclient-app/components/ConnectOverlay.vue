@@ -33,6 +33,7 @@ defineProps({
     data-testid="connect-overlay"
     :data-status="status"
   >
+    <div class="connect-overlay__wordmark" aria-hidden="true">ELOSERN</div>
     <div class="connect-overlay__brand" data-testid="connect-overlay-brand">
       伊洛瑟恩
     </div>
@@ -52,13 +53,33 @@ defineProps({
   align-items: center;
   justify-content: center;
   gap: var(--sp-4);
-  background: var(--ink-950);
+  box-sizing: border-box;
+  padding: 32px;
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 40%, var(--ink-780), var(--ink-950) 70%);
   color: var(--paper-100);
 }
 
+.connect-overlay::before,
+.connect-overlay::after {
+  content: "";
+  width: min(320px, 80%);
+  height: 1px;
+  margin: 20px 0;
+  background: linear-gradient(90deg, transparent, var(--gold-500), transparent);
+}
+
+.connect-overlay__wordmark {
+  color: var(--gold-400);
+  font: clamp(32px, 6vw, 68px)/1.2 var(--f-serif);
+  letter-spacing: 0.18em;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 .connect-overlay__brand {
-  font-family: var(--f-display);
-  font-size: 44px;
+  font-family: var(--f-serif);
+  font-size: 20px;
   letter-spacing: 0.2em;
   color: var(--paper-50);
 }
@@ -66,10 +87,12 @@ defineProps({
 .connect-overlay__status {
   font-family: var(--f-mono);
   font-size: var(--text-body);
-  color: var(--paper-500);
+  margin-top: 24px;
+  color: var(--gold-400);
   border: var(--line);
   border-radius: var(--radius-sm);
-  padding: 2px var(--sp-3);
+  padding: 12px 24px;
+  background: var(--panel);
 }
 
 .connect-overlay[data-status="offline"] .connect-overlay__status {

@@ -91,10 +91,10 @@ onMounted(focusForm);
 .exploration-rest-form {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
-  padding: var(--sp-2) var(--sp-3);
+  gap: 12px;
+  padding: 18px;
   background: var(--panel-hi);
-  border: 1px solid var(--line);
+  border: var(--line);
   border-radius: var(--radius-sm);
   font-family: var(--f-sans);
   font-size: var(--text-sm);
@@ -102,16 +102,17 @@ onMounted(focusForm);
 }
 
 .exploration-rest-form:focus {
-  outline: 2px solid var(--seal-500);
+  outline: 2px solid var(--gold-400);
   outline-offset: 1px;
 }
 
 .exploration-rest-label {
-  color: var(--paper-500);
+  color: var(--paper-300);
 }
 
 .exploration-rest-value {
   font-family: var(--f-mono, var(--f-sans));
-  color: var(--paper-100);
+  font-size: 24px;
+  color: var(--gold-400);
 }
 </style>

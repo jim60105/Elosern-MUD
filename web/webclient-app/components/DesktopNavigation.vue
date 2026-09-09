@@ -1,26 +1,23 @@
 <script setup>
-import { computed } from "vue";
 import { glyphPath } from "./dock-icons.js";
 
-const props = defineProps({
+defineProps({
   mode: { type: String, default: "exploration" },
   items: { type: Array, default: () => [] },
   drawer: { type: String, default: null },
 });
 defineEmits(["navigate", "overlay", "home"]);
-const referenceKeys = new Set(["character", "inventory", "bag", "quests"]);
-const entries = computed(() => props.items.filter((item) => referenceKeys.has(item.key)));
 const drawerKeys = { character: "status", inventory: "inventory", bag: "inventory", quests: "quest" };
 </script>
 
 <template>
-  <nav v-if="mode !== 'creation'" class="desktop-navigation" aria-label="主要導覽">
+  <nav v-if="mode !== 'creation'" class="desktop-navigation" aria-label="主要導覽" @keydown.enter.stop @keydown.space.stop>
     <button type="button" :aria-current="!drawer ? 'page' : undefined" @click="$emit('home')">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="glyphPath(mode === 'combat' ? 'attack' : 'look')" /></svg>
       <span>{{ mode === "combat" ? "戰鬥" : "探索" }}</span>
     </button>
     <button
-      v-for="item in entries"
+      v-for="item in items"
       :key="item.key"
       type="button"
       :disabled="!item.enabled"
@@ -54,6 +51,7 @@ const drawerKeys = { character: "status", inventory: "inventory", bag: "inventor
 }
 .desktop-navigation button {
   width: clamp(58px, 5.3vw, 86px);
+  white-space: nowrap;
   display: flex;
   flex-direction: column;
   align-items: center;

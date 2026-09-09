@@ -53,6 +53,7 @@ const ACTION_RESULT_FALLBACK_MESSAGE = "動作未生效，請重試或返回上�
 // feed (webclient-action-result-feedback D-A/D-B).
 const NON_SUCCESS_OUTCOMES = ["rejected", "stale", "error"];
 const MAX_COMMAND_HISTORY = 50;
+const NAVIGATION_ITEM_KEYS = new Set(["character", "quests", "inventory", "bag"]);
 // The action-feedback toast queue (webclient-action-feedback D1): client-local
 // view state — never persisted, never part of the protocol reducer snapshot.
 // The bounded lifetime and FIFO cap mirror the redesign draft's queue
@@ -241,7 +242,24 @@ export const useElosernStore = defineStore("elosern", () => {
   // declarative-frame-stack D-A); the router never copies a resolved menu.
   const router = KeyboardRouter.createRouter({
     onEvent: onRouterEvent,
-    resolve: (descriptor) => frameResolver.resolve(descriptor),
+    resolve: (descriptor) => {
+      const menu = frameResolver.resolve(descriptor);
+      if (
+        (descriptor.source === "exploration.root" || descriptor.source === "combat.root") &&
+        Array.isArray(menu.items)
+      ) {
+        // Top navigation entries must not remain invisible keyboard stops.
+        menu.items = menu.items.filter((item) => !NAVIGATION_ITEM_KEYS.has(item.key));
+      }
+      if (
+        ["exploration.suggestions", "exploration.target", "exploration.keywords"].includes(descriptor.source) &&
+        Array.isArray(menu.items)
+      ) {
+        // Readable cards and action choices share a vertical keyboard list.
+        menu.gridCols = 1;
+      }
+      return menu;
+    },
   });
 
   // The exploration root descriptor (webclient-declarative-frame-stack): the
@@ -1903,6 +1921,7 @@ export const useElosernStore = defineStore("elosern", () => {
     // where frame-content reads would throw. `mounted` guards every read.
     const mounted = router.depth() > 0;
     const currentItem = mounted ? router.currentItem() : null;
+    const navigationMenu = mounted ? frameResolver.resolve(rootDescriptorFor(rs)) : null;
     // The combat selection reads resolve through the resolver's one model —
     // calling it here is the adoption point; outside combat form it is null.
     const combatNow = panel && panel.kind === "combat" ? frameResolver.combatModel() : null;
@@ -2062,6 +2081,7 @@ export const useElosernStore = defineStore("elosern", () => {
        // row is pane content (below), never a tab (the router keeps it out
        // of `rootMenu` for exactly this reason).
        rootMenu: mounted ? router.rootMenu() : null,
+       navigationItems: (navigationMenu?.items || []).filter((item) => NAVIGATION_ITEM_KEYS.has(item.key)),
        // The degraded-root presentation (webclient-frame-resolution): the
        // single disabled marker-reason row the pane host renders while the
        // root frame itself is unresolvable; null in every normal state.
@@ -2070,6 +2090,7 @@ export const useElosernStore = defineStore("elosern", () => {
        // frame is active). The action dock's detail pane renders only at
        // depth 2+ (or in combat mode), not at the exploration root.
        dockDepth: router.depth(),
+       dockSource: mounted ? router.currentDescriptor().source : null,
        // H3: the full frame stack (root -> current), the data source for
        // the dock's breadcrumb (HudFrame's crumb strip renders these).
        dockTrail: mounted ? router.trail() : [],
@@ -2710,15 +2731,18 @@ export const useElosernStore = defineStore("elosern", () => {
     return router.focusItemByKey(key);
   }
 
-  // H3 (task 4.5): the pointer tab click — return the router to the root
-  // frame (bounded pop loop, task 8.7: exactly one deliberate activation,
-  // no stray `ui_action`), focus the clicked tab's item, and confirm it with
-  // `source="pointer"`.
+  // Both navigation bars use the committed root's intents. Reference entries
+  // live only in the top bar, so activating one must not focus a hidden row.
   function tabToRootAndConfirm(itemKey, source) {
+    if (router.isMutationInFlight() || router.isAwaitingRevision()) return;
     while (router.depth() > 1) {
-      router.popMenu();
+      if (!router.popMenu()) return;
     }
-    if (router.focusItemByKey(itemKey)) {
+    const navigationItem = view.value.navigationItems.find((item) => item.key === itemKey);
+    if (navigationItem) {
+      if (!navigationItem.enabled) return;
+      onRouterEvent("submit", { item: navigationItem, itemKey });
+    } else if (router.focusItemByKey(itemKey)) {
       focusConfirm(source || "pointer");
     }
     publishView();

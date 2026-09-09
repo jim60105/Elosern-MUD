@@ -43,6 +43,7 @@ import { dialogueViewModel } from "./stores/dialogue-view.js";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
 import ReferenceArtwork from "./components/ReferenceArtwork.vue";
+import { portraitFor, portraitGlyph } from "./components/party-helpers.js";
 
 const store = useElosernStore();
 const currentPortrait = computed(
@@ -399,13 +400,25 @@ const dockItems = computed(() => {
 // dock's tab bar + pane render from one commit; the pane host (DockMenu)
 // re-derives the same kind internally for its row variants.
 const dockPaneKind = computed(() => classifyPane({ items: dockItems.value }));
+const interactionOpen = computed(() =>
+  ["exploration.interact", "exploration.target", "exploration.keywords"].includes(store.view.dockSource),
+);
+const interactionTarget = computed(() => interactionOpen.value ? store.view.combatMenu?.target : null);
+const interactionChoices = computed(() => store.explorationInteract.map((target) => ({
+  ...target,
+  portrait: portraitFor(panel("art"), target.portrait_ref),
+})));
 
-// H3 (task 3.2): the root frame's items (the stable hierarchical root or the
-// combat root) normalized for the dock's tab bar — the tab bar renders these
-// while the pane follows the current frame, both from one commit.
-const rootItems = computed(() => {
-  const menu = store.view.rootMenu;
-  const items = (menu && menu.items) || [];
+function onInteractionTarget(identity) {
+  if (identity === interactionTarget.value?.identity) return;
+  store.tabToRootAndConfirm("interact", "pointer");
+  if (store.focusItemByKey(`target-${identity}`)) {
+    store.focusConfirm("pointer");
+  }
+}
+
+// Normalize the committed top navigation and action-root entries identically.
+function normalizeRootItems(items) {
   return items.map((item) => {
     const normalized = {
       key: item.key,
@@ -427,7 +440,9 @@ const rootItems = computed(() => {
     }
     return normalized;
   });
-});
+}
+const rootItems = computed(() => normalizeRootItems(store.view.rootMenu?.items || []));
+const navigationItems = computed(() => normalizeRootItems(store.view.navigationItems));
 
 // H3 (task 4.5): a non-current tab click pops to the root frame, focuses the
 // tab's item, and confirms it ("pointer") — one deliberate activation, no
@@ -888,7 +903,7 @@ onMounted(() => {
         <template #navigation>
           <DesktopNavigation
             :mode="store.view.mode"
-            :items="rootItems"
+            :items="navigationItems"
             :drawer="store.view.hudDrawer"
             @navigate="onTabClick"
             @overlay="onOpenOverlay"
@@ -983,18 +998,52 @@ onMounted(() => {
           @tab-click="onTabClick"
           @back="onDockBack"
         >
-          <div class="dock-pane-host">
+          <div
+            class="dock-pane-host"
+            :class="{ 'interaction-workspace': interactionOpen, 'interaction-workspace--selected': !!interactionTarget }"
+          >
+            <section v-if="interactionTarget" class="interaction-targets" aria-label="互動對象">
+              <h3 class="interaction-heading"><span>1</span>選擇互動對象</h3>
+              <div class="interaction-target-grid">
+                <button
+                  v-for="target in interactionChoices"
+                  :key="target.identity"
+                  type="button"
+                  class="interaction-target"
+                  :aria-pressed="target.identity === interactionTarget.identity"
+                  :disabled="!target.affordances.length"
+                  @keydown.enter.stop
+                  @keydown.space.stop
+                  @click="onInteractionTarget(target.identity)"
+                >
+                  <span class="interaction-avatar" aria-hidden="true">
+                    <img v-if="target.portrait" :src="target.portrait.url" alt="" />
+                    <span v-else>{{ portraitGlyph(target.display_name) }}</span>
+                  </span>
+                  <span>{{ target.display_name }}</span>
+                </button>
+              </div>
+            </section>
+            <h3 v-if="interactionOpen" class="interaction-heading interaction-heading--active">
+              <span>{{ interactionTarget ? "2" : "1" }}</span>
+              {{ interactionTarget ? "選擇對話或行動" : "選擇互動對象" }}
+            </h3>
+            <section v-if="interactionOpen && !interactionTarget" class="interaction-prompt">
+              <h3 class="interaction-heading"><span>2</span>選擇對話或行動</h3>
+              <p>先選擇左側的對象，即可查看可用的互動。</p>
+            </section>
              <DockMenu
                v-if="dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain' && !store.view.degradedRoot) && !drawerHostsServiceFrame"
                :items="dockItems"
               :focused-key="store.view.focus.key"
               :id-prefix="rowPrefix"
               :detail-test-id="detailTestId"
-              :show-detail="showDetail"
+              :show-detail="showDetail && !interactionOpen"
               :detail-message="restFormError"
               :grid-cols="store.view.combatMenu ? store.view.combatMenu.gridCols : null"
               :depth="store.view.dockDepth"
               :view="store.view"
+              :art-panel="panel('art')"
               :target-name="store.view.combatMenu ? store.view.combatMenu.title : null"
               :hide-generic-detail="!!store.view.focusedSkill"
               @focus-change="onDockFocusChange"

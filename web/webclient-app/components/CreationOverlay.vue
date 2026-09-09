@@ -989,7 +989,8 @@ applyProposal();
   margin: 0;
   color: var(--paper-50);
   font-family: var(--f-display);
-  font-size: 20px;
+  font-size: 22px;
+  letter-spacing: 0.05em;
 }
 
 /* Chrome and controls come from the shared control layer in styles/tokens.css
@@ -1001,7 +1002,10 @@ applyProposal();
   flex-direction: column;
   gap: var(--sp-3);
   padding: var(--sp-4) var(--sp-6);
+  min-height: 0;
   overflow: auto;
+  scrollbar-color: var(--ink-600) transparent;
+  scrollbar-width: thin;
 }
 
 /* The display-name row pairs the input with the dice button (🎲) at its
@@ -1010,12 +1014,21 @@ applyProposal();
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+  min-width: 0;
+}
+
+/* The name input flex-grows inside the row and never forces the row wider
+   than the form column (long typed names scroll in place). */
+.creation-overlay__name-row input {
+  flex: 1;
+  min-width: 0;
 }
 
 .creation-overlay__name-line {
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
+  min-width: 0;
 }
 
 /* The name-line roll control (the dice button): the shared `.ui-icon-btn`
@@ -1042,22 +1055,35 @@ applyProposal();
   flex-direction: column;
   gap: var(--sp-1);
   box-sizing: border-box;
-  padding: var(--sp-3);
+  min-width: 0;
+  padding: var(--sp-3) var(--sp-4);
   color: var(--paper-100);
   background: var(--ink-860);
   border: var(--line);
-  border-left: 3px solid var(--seal-500);
+  border-left: 3px solid var(--gold-500);
   border-radius: var(--radius-sm);
   font-family: var(--f-sans);
   font-size: var(--text-sm);
   line-height: 1.5;
   text-align: left;
   cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
 }
 
+.creation-preset-card:hover {
+  border-color: var(--gold-500);
+  border-left-color: var(--gold-400);
+}
+
+/* Selection is gold (the shell's accent for chosen state); red stays reserved
+   for errors elsewhere in this overlay. */
 .creation-preset-card[data-selected="true"] {
-  border-color: var(--seal-500);
-  box-shadow: 0 0 0 2px var(--seal-glow);
+  border-color: var(--gold-500);
+  border-left-color: var(--gold-400);
+  background: var(--ink-820);
+  box-shadow: 0 0 0 2px var(--gold-glow);
 }
 
 .creation-preset-card__name {
@@ -1102,6 +1128,7 @@ applyProposal();
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
+  min-width: 0;
   color: var(--paper-300);
   font-size: var(--text-sm);
 }
@@ -1109,19 +1136,35 @@ applyProposal();
 .creation-overlay__field input,
 .creation-overlay__field select,
 .creation-overlay__field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   color: var(--paper-100);
   background: var(--ink-860);
   border: var(--line);
   border-radius: var(--radius-sm);
-  padding: var(--sp-1) var(--sp-2);
+  padding: var(--sp-2);
   font-family: var(--f-sans);
   font-size: var(--text-sm);
 }
 
+.creation-overlay__field input:focus-visible,
+.creation-overlay__field select:focus-visible,
+.creation-overlay__field textarea:focus-visible {
+  outline: none;
+  border-color: var(--gold-500);
+  box-shadow: var(--focus);
+}
+
+.creation-overlay__field textarea {
+  resize: vertical;
+}
+
 .creation-allocations {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--sp-2);
+  min-width: 0;
 }
 
 .creation-allocation-total {
@@ -1144,6 +1187,7 @@ applyProposal();
 
 .creation-affinity legend {
   color: var(--paper-500);
+  padding: 0 var(--sp-1);
 }
 
 .creation-affinity-item {
@@ -1153,6 +1197,8 @@ applyProposal();
   color: var(--paper-300);
 }
 
+/* These two lines are real failures (server rejection / failed local
+   validation): they keep the seal error treatment. */
 .creation-result-message,
 .creation-form-message {
   margin: 0;
@@ -1193,6 +1239,16 @@ applyProposal();
   font-size: var(--text-sm);
 }
 
+/* The proposal-review status line is neutral guidance, not an error. */
+.creation-proposal-review {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--gold-400);
+  background: var(--gold-glow);
+  border: 1px solid var(--gold-500);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
 
 /* The sticky action bar: pulled out to the body's padding edges so it reads
    as a bar, and pinned to the bottom of the scroll box. `margin-top: auto`
@@ -1203,6 +1259,7 @@ applyProposal();
   z-index: 1;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--sp-2);
   margin: auto calc(-1 * var(--sp-6)) calc(-1 * var(--sp-4));
   padding: var(--sp-3) var(--sp-6);
@@ -1221,18 +1278,20 @@ applyProposal();
   gap: var(--sp-4);
   padding: var(--sp-4);
   border: 1px solid var(--warn);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius);
   background: var(--panel-hi);
 }
 
 .creation-confirm-title {
   margin: 0;
   color: var(--paper-50);
-  font-size: var(--text-lg);
+  font-family: var(--f-serif);
+  font-size: 17px;
 }
 
 .creation-confirm-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--sp-2);
 }
 
@@ -1245,5 +1304,21 @@ applyProposal();
   border: 1px dashed var(--warn);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
+}
+
+/* Narrow-window collapse: the wizard keeps its structure with tighter gutters
+   so every step (including the longest custom form) stays scrollable. */
+@media (max-width: 760px) {
+  .creation-overlay__header {
+    padding: var(--sp-3) var(--sp-4);
+  }
+  .creation-overlay__body {
+    padding: var(--sp-3) var(--sp-4);
+  }
+  .creation-overlay__footer {
+    bottom: calc(-1 * var(--sp-3));
+    margin: auto calc(-1 * var(--sp-4)) calc(-1 * var(--sp-4));
+    padding: var(--sp-2) var(--sp-4);
+  }
 }
 </style>

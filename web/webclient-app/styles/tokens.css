@@ -310,16 +310,16 @@
 }
 
 .ui-btn--primary {
-  color: #fff;
-  background: linear-gradient(180deg, var(--seal-500), var(--seal-700));
-  border-color: var(--seal-400);
+  color: var(--ink-950);
+  background: linear-gradient(180deg, var(--gold-400), var(--gold-500));
+  border-color: var(--gold-400);
   font-weight: 600;
 }
 
 .ui-btn--primary:hover:enabled {
-  color: #fff;
-  background: linear-gradient(180deg, var(--seal-500), var(--seal-700));
-  border-color: var(--seal-400);
+  color: var(--ink-950);
+  background: linear-gradient(180deg, var(--gold-400), var(--gold-500));
+  border-color: var(--gold-400);
   filter: brightness(1.08);
 }
 
@@ -344,7 +344,7 @@
 .ui-btn--ghost:hover:enabled {
   color: var(--paper-50);
   background: var(--ink-780);
-  border-color: var(--seal-500);
+  border-color: var(--gold-500);
 }
 
 .ui-btn--sm {
@@ -387,7 +387,7 @@
 
 .ui-icon-btn:hover:enabled {
   color: var(--paper-50);
-  border-color: var(--seal-500);
+  border-color: var(--gold-500);
 }
 
 .ui-icon-btn:disabled,
@@ -403,6 +403,7 @@
  */
 .ui-tabs {
   display: inline-flex;
+  flex-wrap: wrap;
   align-self: flex-start;
   gap: var(--sp-1);
   box-sizing: border-box;
@@ -441,12 +442,12 @@
 }
 
 .ui-tabs__tab.is-active {
-  color: var(--paper-50);
-  background: var(--ink-700);
+  color: var(--gold-400);
+  background: var(--gold-glow);
   font-weight: 600;
 }
 
-/* Not color alone (design D5): the selected tab also carries a seal underline,
+/* Not color alone (design D5): the selected tab also carries a gold underline,
    so the selection survives a monochrome or colorblind rendering. */
 .ui-tabs__tab.is-active::after {
   content: "";
@@ -456,7 +457,7 @@
   left: var(--sp-3);
   height: 2px;
   border-radius: 2px;
-  background: var(--seal-500);
+  background: var(--gold-500);
 }
 
 .ui-tabs__tab:disabled {

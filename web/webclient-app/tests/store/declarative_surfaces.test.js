@@ -90,10 +90,9 @@ describe("declarative service/combat/creation surfaces (store)", () => {
     expect(result.accepted).toBe(true);
   }
 
-  // Walk the realistic keyboard path into the guild quest log.
+  // Open the guild quest log through the top navigation.
   function enterQuests() {
-    expect(store.focusItemByKey("quests")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    store.tabToRootAndConfirm("quests", "pointer");
     expect(store.router.currentDescriptor().source).toBe("services.quests");
     expect(store.view.hudDrawer).toBe("quest");
   }

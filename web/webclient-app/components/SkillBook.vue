@@ -305,11 +305,8 @@ function castText(row) {
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
+  min-width: 0;
   box-sizing: border-box;
-  padding: var(--sp-3) var(--sp-4);
-  background: var(--panel);
-  border: var(--line);
-  border-radius: var(--radius);
   font-family: var(--f-sans);
 }
 
@@ -324,19 +321,29 @@ function castText(row) {
 
 .skill-book__tab {
   flex: 1;
-  padding: 4px var(--sp-3);
+  min-height: 30px;
+  padding: var(--sp-1) var(--sp-3);
   text-align: center;
   color: var(--paper-500);
-  background: none;
+  background: transparent;
   border: var(--line);
   border-radius: var(--radius-sm);
-  font-size: 0.85em;
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
   cursor: pointer;
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
 }
 
+/* Selection reads gold (the shell's chosen-state accent), never the old
+   seal border; the aria-selected state is the source of truth. */
 .skill-book__tab.on {
   color: var(--paper-50);
-  border-color: var(--seal-600);
+  background: var(--gold-glow);
+  border-color: var(--gold-500);
+  font-weight: 600;
 }
 
 /* One single-bordered control (the reference's `.searchbox`): the wrapper
@@ -378,13 +385,16 @@ function castText(row) {
 
 .skill-book__empty {
   margin: 0;
+  padding: var(--sp-2) var(--sp-3);
   color: var(--paper-500);
-  font-size: 0.85em;
+  font-size: var(--text-sm);
+  border: 1px dashed var(--ink-600);
+  border-radius: var(--radius-sm);
 }
 
 .skill-book__category {
   border-top: var(--line);
-  padding-top: var(--sp-2);
+  padding-top: var(--sp-3);
 }
 
 /* The reference's `details>summary` layout: the count and chevron trail the
@@ -393,16 +403,20 @@ function castText(row) {
 .skill-book__category-summary {
   cursor: pointer;
   color: var(--paper-100);
-  font-size: 0.9em;
+  font-size: 0.95em;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--sp-2);
+  min-width: 0;
 }
 
 /* The reference's `details.cat>summary` label / count / chevron rules. */
 .skill-book__category-label {
+  font-family: var(--f-serif);
+  letter-spacing: 0.04em;
   color: var(--gold-400);
-  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .skill-book__category-count {
@@ -410,10 +424,12 @@ function castText(row) {
   font-family: var(--f-mono);
   font-size: 11px;
   color: var(--paper-500);
+  flex: none;
 }
 
 .skill-book__category-chevron {
   color: var(--paper-500);
+  flex: none;
   transition: transform 0.2s;
 }
 
@@ -425,24 +441,29 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
    one flex line; the dot's spacing comes from the `gap`, not a margin, and
    the label carries the `.grp` margin itself. */
 .skill-book__group-label {
-  margin: 11px 2px 3px;
-  font-size: 10.5px;
+  margin: var(--sp-3) var(--sp-1) var(--sp-1);
+  font-size: 11px;
   letter-spacing: .08em;
   color: var(--paper-500);
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--sp-2);
+  min-width: 0;
 }
 
-/* Sexual-act group labels read in the reference's `.grp .line` seal tone. */
+/* Sexual-act group labels keep the reference's seal tone as a deliberate
+   content-caution marker (the label text carries the same meaning — the
+   colour is never the only signal). */
 .skill-book__group-label--seal {
   color: var(--seal-400);
 }
 
 .skill-book__group-dot {
+  flex: none;
   width: 7px;
   height: 7px;
   border-radius: 2px;
+  border: 1px solid var(--ink-700);
 }
 
 /* Label-less groups render no `.grp` label, so they keep the previous 8px
@@ -456,12 +477,15 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--sp-2);
-  padding: 1px 0;
+  padding: 2px var(--sp-1);
+  border-radius: var(--radius-sm);
   font-size: 0.9em;
 }
 
 .skill-book__skill-name {
   color: var(--paper-100);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* The reference's `.srow .cost` / `.cost.sp` / `.cost.free` cascade: the
@@ -474,6 +498,8 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
   color: var(--paper-500);
   font-family: var(--f-mono);
   font-size: 0.85em;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .skill-book__cost {
@@ -481,6 +507,7 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
   font-family: var(--f-mono);
   font-size: 0.85em;
   margin-left: auto;
+  white-space: nowrap;
 }
 
 .skill-book__cost.mp {
@@ -499,6 +526,7 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
    in the row's flex layout, so the draft's `margin-left` is dropped (the
    parent's `gap` already provides 8px of spacing). */
 .skill-book__ooc {
+  flex: none;
   font-size: 9px;
   letter-spacing: .04em;
   color: var(--ok);
@@ -513,13 +541,14 @@ details[open] > .skill-book__category-summary .skill-book__category-chevron {
   font-family: var(--f-mono);
   font-size: 10px;
   color: var(--paper-700);
-  margin-left: 8px;
+  flex: none;
 }
 
 /* The reference's `.log` legend, rendered above the active-tab list. */
 .skill-book__legend {
   font-size: 12.5px;
+  line-height: 1.6;
   color: var(--paper-500);
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-1);
 }
 </style>

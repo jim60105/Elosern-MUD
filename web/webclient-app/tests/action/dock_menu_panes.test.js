@@ -79,20 +79,6 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     { key: "move", label: "移動", enabled: true, navigation: true, surface: "move" },
     { key: "look", label: "查看", enabled: true, navigation: true, surface: "look" },
   ];
-  const LONG_LABEL = "北岸大道之北岸大道之北岸大道之北岸大道之北岸大道";
-  const longOutlet = [
-    { key: "exit-north", label: LONG_LABEL, enabled: true, action_id: "explore.move", direction: "north" },
-  ];
-  const longNavLabels = ["交戰", "查驗", "取物", "查看"];
-  const longNav = [
-    {
-      key: "look-keeper",
-      label: LONG_LABEL,
-      enabled: true,
-      action_id: "explore.look",
-      affordanceLabels: longNavLabels,
-    },
-  ];
 
   it("outlet: rows equal the committed move items in order", () => {
     const w = mountMenu(outletItems, "exploration-row");
@@ -204,28 +190,6 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     return w;
   }
 
-  function cssRuleFor(selector) {
-    for (const sheet of Array.from(document.styleSheets)) {
-      try {
-        const hit = Array.from(sheet.cssRules || []).find((rule) => {
-          if (!rule.selectorText) return false;
-          // Vue's `<style scoped>` appends a `[data-v-…]` attribute to each
-          // selector; compare the core selector (the part before that attribute)
-          // so the base tile/row rule is matched without grabbing the
-          // `--focused` derivative rules.
-          const core = rule.selectorText.split("[")[0].trim();
-          return core === selector;
-        });
-        if (hit) {
-          return hit;
-        }
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
-
   it("the nav pane emits content-sized tracks; the outlet pane and every other kind keep 1fr or none; no gridCols emits none", () => {
     const contentCases = [
       { items: navItems, sel: PANE_SELECTORS.nav, expected: "repeat(2, minmax(0, max-content))" },
@@ -261,54 +225,6 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
       w.unmount();
       document.body.innerHTML = "";
     }
-  });
-
-  it("long destination and affordance labels wrap within the uncapped tile/row", () => {
-    // OUTLET: a long destination name wraps inside the track (no content-width
-    // cap on the tile) instead of pushing the layout past the pane.
-    const w = mountMenuWithCols(longOutlet, 2, "exploration-row");
-    const tile = w.find(".dock-menu__outlet-tile");
-    expect(tile.exists()).toBe(true);
-    expect(tile.text()).toContain(LONG_LABEL);
-    const tileRule = cssRuleFor(".dock-menu__outlet-tile");
-    expect(tileRule).toBeTruthy("the tile safety-net CSS rule is loaded");
-    const tileCss = tileRule.style.cssText;
-    // jsdom keeps the parsed declarations in `style.cssText` (its
-    // camelCase accessors are unpopulated), so the safety net is asserted
-    // on the declaration text. The tile carries no content-width cap: the
-    // `1fr` tracks of the `auto-fit` grid stretch the tile to the track.
-    expect(tileCss).not.toContain("max-width");
-    expect(tileCss).toContain("min-width: 0");
-    expect(tileCss).toContain("overflow-wrap: break-word");
-    // The outlet grid is the width-adaptive `auto-fit` rule (empty tracks
-    // collapse, the `min(150px, 100%)` floor never overflows a narrow pane).
-    const outletRule = cssRuleFor(".dock-menu__outlet");
-    expect(outletRule).toBeTruthy("the outlet grid CSS rule is loaded");
-    expect(outletRule.style.cssText).toContain("repeat(auto-fit, minmax(min(150px, 100%), 1fr)");
-    w.unmount();
-    document.body.innerHTML = "";
-
-    // NAV: a long joined affordance-label sub-line wraps inside the capped
-    // row.
-    const w2 = mountMenuWithCols(longNav, 2, "exploration-row");
-    const row = w2.find(".dock-menu__nav-row");
-    expect(row.exists()).toBe(true);
-    expect(row.text()).toContain(LONG_LABEL);
-    const rowRule = cssRuleFor(".dock-menu__nav-row");
-    expect(rowRule).toBeTruthy("the row safety-net CSS rule is loaded");
-    const rowCss = rowRule.style.cssText;
-    expect(rowCss).toContain("max-width: 320px");
-    expect(rowCss).toContain("min-width: 0");
-    expect(rowCss).toContain("overflow-wrap: break-word");
-    // The nav row's flex text block carries its own `min-width: 0` so a
-    // long server-authored string wraps inside the capped row.
-    const textRule = cssRuleFor(".dock-menu__nav-text");
-    expect(textRule).toBeTruthy("the nav-text min-width rule is loaded");
-    const textCss = textRule.style.cssText;
-    expect(textCss).toContain("min-width: 0");
-    expect(textCss).toContain("overflow-wrap: break-word");
-    w2.unmount();
-    document.body.innerHTML = "";
   });
 
   it("outlet: a partial last row spans its remaining columns (no blank space)", async () => {

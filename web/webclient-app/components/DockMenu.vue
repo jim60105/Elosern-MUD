@@ -15,6 +15,7 @@ import { classifyPane } from "./dock-panes.js";
 import { glyphPath } from "./dock-icons.js";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "./dock-items.js";
 import OptionCard from "./OptionCard.vue";
+import { portraitFor, portraitGlyph } from "./party-helpers.js";
 
 const props = defineProps({
   items: { type: Array, required: true },
@@ -36,20 +37,29 @@ const props = defineProps({
   // The target's display_name for the affordance pane's head (task 5.6): the
   // frame's own `target.display_name` (the targetMenuFor title).
   targetName: { type: String, default: null },
+  artPanel: { type: Object, default: null },
 });
 
 const emit = defineEmits(["activate", "focus-change"]);
 
 const paneKind = computed(() => classifyPane({ items: props.items }));
+const interactionTargets = computed(() => new Map(
+  (props.view?.explorationInteract || []).map((target) => [`target-${target.identity}`, target]),
+));
 
 const rows = computed(() =>
-  dockItemKeys(props.items).map((key, index) => ({
-    key,
-    item: props.items[index],
-    rowId: `${props.idPrefix}-${index}`,
-    intent: actionIntentForItem(props.items[index]),
-    reason: disabledReasonText(props.items[index]),
-  })),
+  dockItemKeys(props.items).map((key, index) => {
+    const target = interactionTargets.value.get(key);
+    return {
+      key,
+      item: props.items[index],
+      rowId: `${props.idPrefix}-${index}`,
+      intent: actionIntentForItem(props.items[index]),
+      reason: disabledReasonText(props.items[index]),
+      target,
+      portrait: target ? portraitFor(props.artPanel, target.portrait_ref) : null,
+    };
+  }),
 );
 
 // The exit-outlet pane renders one tile per exit: the standard `back` row
@@ -308,7 +318,11 @@ watch(
           tabindex="-1"
           @click="onCellClick(row)"
         >
-          <span v-if="glyphPath(row.item.kind)" class="dock-menu__nav-icon" aria-hidden="true"></span>
+          <span v-if="row.target" class="dock-menu__nav-avatar" aria-hidden="true">
+            <img v-if="row.portrait" :src="row.portrait.url" alt="" />
+            <span v-else>{{ portraitGlyph(row.target.display_name) }}</span>
+          </span>
+          <span v-else-if="glyphPath(row.item.kind)" class="dock-menu__nav-icon" aria-hidden="true"></span>
           <div class="dock-menu__nav-text">
             <span class="dock-menu__nav-name">{{ row.item.label }}</span>
             <span v-if="row.item.kind" class="dock-menu__nav-sub">{{ row.item.kind }}</span>
@@ -352,16 +366,29 @@ watch(
       <!-- CARDS: the suggestions frame (task 5.7): the `.sug` card in row
            mode (`role="option"` + row id) — a card is a listbox option. -->
       <div v-else-if="paneKind === 'cards'" class="dock-menu__cards" :style="paneGridStyle">
-        <OptionCard
-          v-for="row in rows"
-          :id="row.rowId"
-          :item-key="row.key"
-          :card="row.item"
-          :focused="row.key === focusedKey"
-          :row-mode="true"
-          @focus="onCellFocus"
-          @activate="(k) => onCellActivate(k, row)"
-        />
+        <template v-for="row in rows" :key="row.key">
+          <OptionCard
+            v-if="row.intent"
+            :id="row.rowId"
+            :item-key="row.key"
+            :card="row.item"
+            :focused="row.key === focusedKey"
+            :row-mode="true"
+            @focus="onCellFocus"
+            @activate="(k) => onCellActivate(k, row)"
+          />
+          <button
+            v-else
+            :id="row.rowId"
+            type="button"
+            role="option"
+            :aria-selected="row.key === focusedKey"
+            :data-item-key="row.key"
+            tabindex="-1"
+            class="dock-menu__card-nav"
+            @click="onCellClick(row)"
+          >{{ row.item.label }}</button>
+        </template>
       </div>
 
       <!-- SKILLS: the master-detail skill rows (task 6.4): label and cost
@@ -574,8 +601,8 @@ watch(
    focus-only caret glyph is stacked on the tile's persistent direction
    glyph (outlet-tile-presentation). */
 .dock-menu__outlet-tile--focused {
-  background: var(--seal-600);
-  border-color: var(--seal-500);
+  background: var(--gold-glow);
+  border-color: var(--gold-500);
   color: var(--paper-50);
 }
 
@@ -583,7 +610,7 @@ watch(
    `›` chevron on rows that open a deeper frame. */
 .dock-menu__nav {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
   gap: 9px;
 }
 .dock-menu__nav-row {
@@ -596,13 +623,12 @@ watch(
   border-radius: 10px;
   padding: 10px 12px;
   cursor: pointer;
-  max-width: 320px;
   min-width: 0;
   overflow-wrap: break-word;
 }
 .dock-menu__nav-row--focused {
-  background: var(--seal-600);
-  border-color: var(--seal-500);
+  background: var(--gold-glow);
+  border-color: var(--gold-500);
   color: var(--paper-50);
   transform: translateY(-1px);
 }
@@ -621,14 +647,42 @@ watch(
   min-width: 0;
   overflow-wrap: break-word;
 }
+.dock-menu__nav-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 54px;
+  overflow: hidden;
+  border: 1px solid var(--gold-500);
+  border-radius: var(--radius-sm);
+  background: var(--ink-820);
+  color: var(--gold-400);
+  font: 26px var(--f-serif);
+}
+.dock-menu__nav-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.dock-menu__card-nav {
+  min-height: 36px;
+  padding: 8px 12px;
+  color: var(--paper-300);
+  background: var(--panel-hi);
+  border: var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.dock-menu__card-nav[aria-selected="true"] {
+  color: var(--gold-400);
+  border-color: var(--gold-500);
+}
 .dock-menu__nav-name {
   font-size: 14px;
   color: var(--paper-50);
   font-weight: 600;
 }
 .dock-menu__nav-sub {
-  font-size: 11px;
-  color: var(--paper-500);
+  font-size: 12px;
+  color: var(--paper-300);
+  line-height: 1.6;
   margin-top: 2px;
 }
 .dock-menu__nav-chevron {
@@ -646,6 +700,8 @@ watch(
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
 }
 .dock-menu__aff-head b {
   color: var(--gold-400);
@@ -659,6 +715,9 @@ watch(
 .dock-menu__aff-btn {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   gap: 9px;
   background: linear-gradient(180deg, var(--panel-hi), var(--panel));
   border: 1px solid var(--ink-600);
@@ -669,8 +728,8 @@ watch(
   cursor: pointer;
 }
 .dock-menu__aff-btn--focused {
-  background: var(--seal-600);
-  border-color: var(--seal-500);
+  background: var(--gold-glow);
+  border-color: var(--gold-500);
   color: var(--paper-50);
   transform: translateY(-1px);
 }
@@ -687,7 +746,7 @@ watch(
 /* CARDS (task 5.7): the `.sug` card in row mode (OptionCard). */
 .dock-menu__cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr));
   gap: 10px;
 }
 
@@ -702,6 +761,8 @@ watch(
 .dock-menu__skill {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
   gap: 8px;
   background: var(--ink-780);
   border: 1px solid transparent;
@@ -781,9 +842,9 @@ watch(
   gap: 2px;
 }
 .dock-menu__scale--on {
-  background: var(--seal-600);
-  border-color: var(--seal-500);
-  color: #fff;
+  background: var(--gold-glow);
+  border-color: var(--gold-500);
+  color: var(--paper-50);
 }
 .dock-menu__scale-cost {
   font-size: 10px;
@@ -811,6 +872,7 @@ watch(
 }
 .dock-menu__confirm-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
 }
@@ -838,6 +900,8 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 0;
+  min-height: 38px;
   gap: var(--sp-1);
   padding: var(--sp-2) var(--sp-3);
   color: var(--paper-100);
@@ -847,12 +911,13 @@ watch(
   font-family: var(--f-sans);
   font-size: var(--text-sm);
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 .dock-menu-item--focused {
-  background: var(--seal-600);
-  border-color: var(--seal-500);
+  background: var(--gold-glow);
+  border-color: var(--gold-500);
   color: var(--paper-50);
 }
 .dock-menu-item--focused::before {
@@ -893,7 +958,7 @@ watch(
   flex: 0 0 220px;
   padding: var(--sp-2) var(--sp-3);
   background: var(--panel);
-  border: 1px solid var(--line);
+  border: var(--line);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   color: var(--paper-100);

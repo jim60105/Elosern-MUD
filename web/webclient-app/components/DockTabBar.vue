@@ -57,12 +57,9 @@ const tabs = computed(() =>
   }),
 );
 
-// The sub-dock tabs (character/quests/inventory) open a re-homed sub-dock;
-// they are "open" while `view.activeSubDock` equals the tab's key. The
-// navigation tabs (move/look/interact/wait) open a router submenu; they are
+// The action tabs (move/look/interact/wait) open a router submenu; they are
 // "open" when the current frame (the last `dockTrail` entry) is that tab's
 // submenu.
-const SUBDOCK_TAB_KEYS = ["character", "quests", "inventory"];
 const NAV_TAB_TITLES = {
   move: "移動",
   look: "查看",
@@ -72,9 +69,6 @@ const NAV_TAB_TITLES = {
 
 function isTabOpen(tab) {
   const view = props.view || {};
-  if (SUBDOCK_TAB_KEYS.includes(tab.key)) {
-    return view.activeSubDock === tab.key;
-  }
   const title = NAV_TAB_TITLES[tab.key];
   if (title && view.dockDepth >= 2 && Array.isArray(view.dockTrail) && view.dockTrail.length >= 2) {
     return view.dockTrail[view.dockTrail.length - 1] === title;
@@ -187,13 +181,13 @@ function onTabClick(tab) {
 /* The open/focused tab carries the seal-red gradient fill (the draft's
    `.tab.on`). */
 .dock-tab-bar__tab--on {
-  background: linear-gradient(180deg, var(--seal-600), var(--seal-700));
-  border-color: var(--seal-500);
-  color: #fff;
+  background: var(--gold-glow);
+  border-color: var(--gold-400);
+  color: var(--gold-400);
 }
 
 .dock-tab-bar__tab--on .dock-tab-bar__icon {
-  color: #ffd9d9;
+  color: var(--gold-400);
 }
 
 .dock-tab-bar__tab[disabled] {

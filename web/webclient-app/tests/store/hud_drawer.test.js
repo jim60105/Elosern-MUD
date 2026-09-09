@@ -128,20 +128,15 @@ describe("H4 store reference-drawer controller", () => {
 
   it("hosts a current service frame in its drawer (task 4.3): pushing the 任務記錄 frame opens the quest drawer", () => {
     openSession();
-    // Navigate the exploration root's 任務 entry to push the guild quest-log
-    // service frame (the realistic keyboard path; no state where a service
-    // frame is current while its drawer is closed).
-    expect(store.focusItemByKey("quests")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    // The top navigation opens the quest-log service frame and its drawer.
+    store.tabToRootAndConfirm("quests", "pointer");
     expect(store.view.hudDrawer).toBe("quest");
   });
 
   it("closeHudDrawer with popFrame pops exactly one menu level (task 4.2)", () => {
     openSession();
-    // Enter the services dock and push the 任務記錄 service frame (the
-    // realistic keyboard path), so a service frame is the current frame.
-    expect(store.focusItemByKey("quests")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    // The top navigation pushes the hosted 任務記錄 service frame.
+    store.tabToRootAndConfirm("quests", "pointer");
     const depthAtServiceFrame = store.router.depth();
     // The frame-hosting sync opened the quest drawer.
     expect(store.view.hudDrawer).toBe("quest");

@@ -364,38 +364,48 @@ function onInviteCurrentNpc() {
 </template>
 
 <style scoped>
+/* The drawer body sits directly on HudDrawer's scrolled body: companion
+   rows are charcoal panel groups with the shell's gold accents; red is
+   reserved for the destructive leave flow. */
 .party-drawer {
   display: flex;
   flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
   font-family: var(--f-sans);
   color: var(--paper-100);
 }
 
 .party-drawer__unavailable {
-  font-size: 13px;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
   color: var(--paper-500);
-  margin: 12px 0;
+  font-size: var(--text-sm);
+  border: 1px dashed var(--ink-600);
+  border-radius: var(--radius-sm);
 }
 
 .party-drawer__intro {
+  margin: 0;
   font-size: 12.5px;
   color: var(--paper-500);
-  margin: 0 0 14px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .compbig {
   display: flex;
-  gap: 12px;
+  gap: var(--sp-3);
   align-items: flex-start;
-  background: var(--ink-820);
-  border: 1px solid var(--ink-700);
-  border-radius: 11px;
-  padding: 12px;
-  margin-bottom: 11px;
+  box-sizing: border-box;
+  min-width: 0;
+  background: linear-gradient(130deg, rgba(34, 36, 38, 0.44), rgba(16, 18, 21, 0.75));
+  border: var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
 }
 
 .compbig--empty {
+  border-style: dashed;
   opacity: 0.85;
 }
 
@@ -403,7 +413,7 @@ function onInviteCurrentNpc() {
   width: 52px;
   height: 52px;
   flex: none;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: radial-gradient(60% 70% at 50% 38%, #4a3a2a, #1a150e 82%);
   display: grid;
   place-items: center;
@@ -415,7 +425,8 @@ function onInviteCurrentNpc() {
 }
 
 .empty-av {
-  color: var(--paper-500) !important;
+  color: var(--paper-700) !important;
+  background: var(--ink-820);
 }
 
 .av-img {
@@ -434,9 +445,10 @@ function onInviteCurrentNpc() {
 }
 
 .compbig .nm {
-  font-size: 15px;
+  font-family: var(--f-serif);
+  font-size: 16px;
   color: var(--paper-50);
-  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .empty-nm {
@@ -444,9 +456,9 @@ function onInviteCurrentNpc() {
 }
 
 .compbig .bondrow {
-  font-size: 11px;
-  color: var(--gold-400);
-  margin: 5px 0 7px;
+  font-size: 11.5px;
+  color: var(--gold-500);
+  margin: var(--sp-1) 0 6px;
 }
 
 .compbig .bondrow i {
@@ -455,9 +467,10 @@ function onInviteCurrentNpc() {
 }
 
 .compbig .cbar {
-  height: 7px;
+  height: 6px;
   border-radius: 99px;
   background: var(--ink-780);
+  border: 1px solid var(--ink-700);
   overflow: hidden;
 }
 
@@ -471,9 +484,10 @@ function onInviteCurrentNpc() {
 .compbig .meta {
   font-size: 10.5px;
   color: var(--paper-500);
-  margin-top: 6px;
+  margin-top: var(--sp-2);
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -482,113 +496,147 @@ function onInviteCurrentNpc() {
   font-weight: 600;
 }
 
+/* The row's action group reads as one cluster: neutral chrome, gold hover;
+   it wraps to a second line instead of overflowing on narrow drawers. */
 .compbig .acts {
   display: flex;
-  gap: 6px;
-  margin-top: 9px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: 10px;
 }
 
 .compbig .acts button {
-  font-size: 11.5px;
-  padding: 5px 10px;
-  border-radius: 7px;
+  font-family: var(--f-sans);
+  font-size: 12px;
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-sm);
   background: var(--ink-780);
   border: 1px solid var(--ink-600);
   color: var(--paper-300);
   cursor: pointer;
-  transition: all var(--motion-base, 150ms) var(--ease-standard, ease);
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
 }
 
 .compbig .acts button:hover:not(:disabled) {
-  border-color: var(--seal-500);
+  border-color: var(--gold-500);
   color: var(--paper-50);
 }
 
 .compbig .acts button:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
+/* The destructive confirm keeps the seal danger treatment (leave-party is
+   irreversible from the client's point of view). */
 .compbig .acts .btn-danger {
-  border-color: var(--seal-500);
+  border-color: var(--seal-700);
   color: var(--seal-400);
 }
 
 .compbig .acts .btn-danger:hover:not(:disabled) {
-  background: var(--seal-900);
-  color: #fff;
+  background: var(--seal-700);
+  border-color: var(--seal-500);
+  color: var(--paper-50);
 }
 
 .quest {
-  background: var(--ink-820);
-  border: 1px solid rgba(127, 191, 127, 0.4);
-  border-radius: 11px;
-  padding: 12px 14px;
-  margin-top: 4px;
-  margin-bottom: 11px;
+  background: var(--ink-860);
+  border: var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-3) var(--sp-4);
 }
 
 .quest .qh {
-  font-size: 13px;
-  color: var(--buff, #7fbf7f);
-  margin-bottom: 8px;
-  font-weight: 600;
+  font-family: var(--f-serif);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--gold-400);
+  margin-bottom: var(--sp-2);
+  padding-bottom: var(--sp-2);
+  border-bottom: var(--line);
 }
 
 .quest .objs {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-2);
 }
 
 .quest .objs .o {
-  font-size: 11.5px;
-  color: var(--paper-400);
-  line-height: 1.5;
+  font-size: 12.5px;
+  color: var(--paper-300);
+  line-height: 1.6;
 }
 
+/* The possession banner is a state notice, not an error: gold on charcoal. */
 .party-drawer__release-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  margin-bottom: 12px;
-  background: rgba(142, 68, 173, 0.15);
-  border: 1px solid rgba(175, 122, 197, 0.4);
-  border-radius: var(--radius-sm, 4px);
-  color: #e8daef;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--gold-glow);
+  border: 1px solid var(--gold-500);
+  border-radius: var(--radius-sm);
+  color: var(--gold-400);
 }
 .party-drawer__release-text {
   font-size: 13px;
   font-weight: 500;
 }
 .btn-release {
-  background: rgba(142, 68, 173, 0.4);
-  border: 1px solid #af7ac5;
-  color: #fff;
-  padding: 3px 10px;
-  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  border: 1px solid var(--gold-500);
+  color: var(--gold-400);
+  font-family: var(--f-sans);
+  font-size: 12px;
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
 }
 .btn-release:hover {
-  background: rgba(142, 68, 173, 0.7);
+  background: var(--gold-glow);
+  color: var(--paper-50);
 }
+/* 附身 is the row's decisive affordance: gold emphasis, never the old blue. */
 .btn-possess {
-  background: rgba(41, 128, 185, 0.3);
-  border: 1px solid rgba(52, 152, 219, 0.6);
-  color: #d6eaf8;
-  padding: 2px 8px;
-  border-radius: var(--radius-sm, 4px);
+  background: linear-gradient(rgba(185, 154, 96, 0.16), rgba(185, 154, 96, 0.06));
+  border: 1px solid var(--gold-500);
+  color: var(--gold-400);
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 12px;
 }
 .btn-possess:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
+/* The disabled-reason hint reads as a caution, not an error. */
 .act-reason {
-  font-size: 11px;
-  color: #e74c3c;
-  margin-left: 6px;
+  font-size: 11.5px;
+  color: var(--warn);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Narrow-drawer collapse: shrink the avatar so the info column keeps room
+   for long names. */
+@media (max-width: 400px) {
+  .compbig .av {
+    width: 42px;
+    height: 42px;
+    font-size: 20px;
+  }
 }
 </style>
