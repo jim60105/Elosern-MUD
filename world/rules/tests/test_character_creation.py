@@ -857,8 +857,20 @@ class PortraitFinalizationTests(EvenniaTest):
     def _portrait_key(self):
         return f"art:portrait:character:{self.character.pk}"
 
+    def _gallery_jobs(self):
+        from world.art.store import ArtAssetRecord
+
+        return [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if str(record.db.gallery_image_id or "")
+        ]
+
     @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     @covers_requirement("art-asset-lifecycle::every-player-activation-path-finalizes-the-portrait-lifecycle")
+    @covers_requirement(
+        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+    )
     def test_activation_sets_the_named_policy_and_schedules_exactly_one_ensure(self):
         from world.art.store import ArtAssetRecord
 
@@ -871,8 +883,14 @@ class PortraitFinalizationTests(EvenniaTest):
             {"mode": "named", "stable_key": str(self.character.pk)},
         )
         self.assertEqual(len(_portrait_ensure_callbacks(callbacks)), 1)
-        records = ArtAssetRecord.objects.filter(db_key=self._portrait_key())
-        self.assertEqual(records.count(), 1)
+        # The retrofit: the committed creation owns exactly one gallery job,
+        # never a classic fixed-identity record.
+        jobs = self._gallery_jobs()
+        self.assertEqual(len(jobs), 1)
+        self.assertTrue(jobs[0].db_key.startswith(f"{self._portrait_key()}:gen:"))
+        self.assertEqual(
+            ArtAssetRecord.objects.filter(db_key=self._portrait_key()).count(), 0
+        )
 
     @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     @covers_requirement("art-asset-lifecycle::every-player-activation-path-finalizes-the-portrait-lifecycle")
@@ -908,11 +926,14 @@ class PortraitFinalizationTests(EvenniaTest):
             {"mode": "named", "stable_key": str(web.pk)},
         )
         self.assertEqual(len(_portrait_ensure_callbacks(callbacks)), 1)
+        # Same retrofit on the web activation path: one gallery job, no
+        # classic fixed-identity record.
+        self.assertEqual(len(self._gallery_jobs()), 1)
         self.assertEqual(
             ArtAssetRecord.objects.filter(
                 db_key=f"art:portrait:character:{web.pk}"
             ).count(),
-            1,
+            0,
         )
 
     @covers_requirement("art-asset-lifecycle::every-player-activation-path-finalizes-the-portrait-lifecycle")
@@ -938,6 +959,72 @@ class PortraitFinalizationTests(EvenniaTest):
             ArtAssetRecord.objects.filter(db_key=self._portrait_key()).count(),
             0,
         )
+        self.assertEqual(self._gallery_jobs(), [])
+
+    @covers_requirement(
+        "art-gallery-autogen::player-creation-may-skip-the-automatic-portrait"
+    )
+    def test_skipped_activation_establishes_the_policy_and_enqueues_nothing(self):
+        from world.art import gallery as gallery_api
+        from world.art.presenter import PLACEHOLDER_MISSING, resolve_entity
+        from world.art.subjects import ArtSubject, ArtSubjectKind
+
+        with self.captureOnCommitCallbacks(execute=True):
+            activate_player_character(
+                self.account, self.character, self.request(skip_portrait=True),
+            )
+        # The named policy exists on the skipped path too — the character
+        # stays eligible for a later request.
+        self.assertEqual(
+            self.character.db.portrait_policy,
+            {"mode": "named", "stable_key": str(self.character.pk)},
+        )
+        self.assertEqual(self._gallery_jobs(), [])
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, str(self.character.pk))
+        self.assertEqual(gallery_api.cards_for(subject), [])
+        # Empty-gallery resolution reaches the chain's terminal fallback seam
+        # (world.art.gallery_match.fallback_for): today the seam provides no
+        # image, so the honest outcome is the placeholder; the moment the
+        # gallery-builtin-fallbacks capability fills the seam this resolves to
+        # an asset payload. Both halves are asserted against the same chain.
+        payload = resolve_entity(self.character)
+        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        with patch(
+            "world.art.presenter.fallback_for",
+            return_value={"identity": "fallback/character/default.png"},
+        ):
+            served = resolve_entity(self.character)
+        self.assertEqual(served["kind"], "asset")
+
+    @covers_requirement(
+        "art-gallery-autogen::player-creation-may-skip-the-automatic-portrait"
+    )
+    def test_default_activation_still_schedules_one_generation(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            activate_player_character(
+                self.account, self.character, self.request(),
+            )
+        self.assertEqual(len(self._gallery_jobs()), 1)
+
+    @covers_requirement(
+        "art-gallery-autogen::player-creation-may-skip-the-automatic-portrait"
+    )
+    def test_a_rolled_back_skipped_activation_leaves_nothing(self):
+        from world.rules.creation_wizard import activate_draft, save_custom_draft
+
+        save_custom_draft(
+            self.account, self.character, self.request(skip_portrait=True)
+        )
+
+        def fail(stage):
+            if stage == "portrait_policy":
+                raise RuntimeError("injected portrait failure")
+
+        with self.assertRaisesRegex(RuntimeError, "injected portrait failure"):
+            activate_draft(self.account, self.character, write_observer=fail)
+        self.assertFalse(self.character.attributes.has("portrait_policy"))
+        self.assertIsNone(self.character.db.portrait_policy)
+        self.assertEqual(self._gallery_jobs(), [])
 
 
 class AffinityCreationTests(EvenniaTest):

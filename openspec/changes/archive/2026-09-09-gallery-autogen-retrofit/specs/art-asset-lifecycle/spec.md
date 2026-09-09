@@ -19,11 +19,6 @@ one unbound auto-generated card, never a classic asset record.
 - **WHEN** recovery runs for a character whose gallery already holds a card, or whose generation is already in flight
 - **THEN** nothing is requested and the gallery is unchanged
 
-#### Scenario: A named policy without a record is recovered at startup
-- **WHEN** a character has an explicit named portrait policy but no asset record exists after a
-  restart
-- **THEN** the subject record is ensured and the record is created without any gameplay rollback
-
 #### Scenario: An ineligible recovered subject is skipped deterministically
 - **WHEN** a character with an explicit named policy fails the canonical-age check during recovery
 - **THEN** no record is created, a named diagnostic is logged, and the same policy is not retried by a

@@ -1,4 +1,17 @@
-## ADDED Requirements
+# art-gallery-autogen Specification
+
+## Purpose
+
+Define how every automatic character-portrait path — player creation, validated
+import, named-NPC spawn, startup recovery, and staff retry/requeue — routes
+through the gallery generation seam: exactly one unbound card built from the
+subject's standard deterministic description with the shared default face
+rectangle and no classic fixed-identity record, guarded for idempotency
+against the subject's gallery, with the existing age-check, post-commit, and
+failure-isolation guarantees intact. Player creation carries an explicit skip
+flag that establishes the named policy without requesting anything.
+
+## Requirements
 
 ### Requirement: Automatic character portraits produce exactly one unbound default card
 Every automatic character-portrait path — player creation, validated import, named-NPC spawn, and
@@ -55,12 +68,14 @@ yields exactly one auto-generated card.
 defaulting to generating. It SHALL establish the explicit named `portrait_policy` on every path,
 including the skipped one, so the character stays eligible for a later request. A skipped creation
 SHALL enqueue nothing and SHALL leave the character with an empty gallery, which resolves through the
-standard chain to the fallback image. The flag SHALL be read inside the activation transaction like
+standard chain's terminal fallback seam (inert until the gallery-fallback capability fills it — today
+the honest outcome is the truthful placeholder, owned by ``gallery-builtin-fallbacks``). The flag SHALL
+be read inside the activation transaction like
 the rest of the finalization, so a rollback leaves no portrait state either way.
 
 #### Scenario: A skipped creation starts with an empty gallery
 - **WHEN** a character is activated with the skip flag set
-- **THEN** it carries the named portrait policy, its gallery is empty, no job is enqueued, and it resolves to a fallback image rather than a placeholder
+- **THEN** it carries the named portrait policy, its gallery is empty, no job is enqueued, and it resolves through the standard chain's terminal fallback seam rather than owning any portrait state of its own
 
 #### Scenario: The default path still generates
 - **WHEN** a character is activated without the skip flag

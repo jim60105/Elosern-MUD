@@ -739,6 +739,10 @@ def main() -> None:
         race="human",
         subrace="human_commoner",
         allocations=balanced_allocations("human", "human_commoner"),
+        # The art fixture below settles classic records deterministically;
+        # the automatic gallery request (gallery-autogen-retrofit) must never
+        # race it, so the seeded activation carries the explicit skip flag.
+        skip_portrait=True,
     )
     result = activate_player_character(account, character, request)
 

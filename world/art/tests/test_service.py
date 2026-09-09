@@ -88,11 +88,24 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertEqual(records.first().db.status, ArtAssetStatus.DONE)
 
     @covers_requirement("art-asset-lifecycle::startup-recovery-rescans-explicit-unique-portrait-policies")
-    def test_recovery_creates_a_missing_named_policy_record(self):
+    @covers_requirement(
+        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+    )
+    def test_recovery_requests_a_gallery_job_for_a_missing_named_policy(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         art_sync_all()
-        key = f"art:portrait:character:{self.player.pk}"
-        self.assertIn(key, self._records())
+        jobs = [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if str(record.db.gallery_image_id or "")
+        ]
+        self.assertEqual(len(jobs), 1)
+        self.assertTrue(
+            jobs[0].db_key.startswith(f"art:portrait:character:{self.player.pk}:gen:")
+        )
+        self.assertEqual(jobs[0].db.status, ArtAssetStatus.PENDING)
+        # The retrofit: no classic fixed-identity record is ever created.
+        self.assertNotIn(f"art:portrait:character:{self.player.pk}", self._records())
 
     @covers_requirement("art-asset-lifecycle::startup-recovery-rescans-explicit-unique-portrait-policies")
     @covers_requirement("art-asset-lifecycle::the-age-check-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker")
@@ -106,15 +119,24 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertNotIn(key, self._records())
 
     @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
-    def test_schedule_portrait_ensure_runs_the_gate_and_writes_one_record(self):
+    @covers_requirement(
+        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+    )
+    def test_schedule_portrait_ensure_runs_the_gate_and_enqueues_one_gallery_job(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             schedule_portrait_ensure(self.player)
         self.assertEqual(len(callbacks), 1)
         key = f"art:portrait:character:{self.player.pk}"
-        records = ArtAssetRecord.objects.filter(db_key=key)
-        self.assertEqual(records.count(), 1)
-        self.assertEqual(records.first().db.status, ArtAssetStatus.PENDING)
+        jobs = [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if str(record.db.gallery_image_id or "")
+        ]
+        self.assertEqual(len(jobs), 1)
+        self.assertTrue(jobs[0].db_key.startswith(f"{key}:gen:"))
+        self.assertEqual(jobs[0].db.status, ArtAssetStatus.PENDING)
+        self.assertNotIn(key, self._records())
 
     @covers_requirement("art-asset-lifecycle::portrait-character-enqueue-validates-canonical-age-attributes-immediately-before-enqueue")
     def test_rejected_portrait_produces_no_record_and_no_worker_call(self):
@@ -170,6 +192,242 @@ class ArtServiceTests(EvenniaTestCase):
         ):
             ensure_scene_asset("forest_path")
         self.assertEqual(self._records(), {})
+
+
+class AutogenRetrofitTests(EvenniaTestCase):
+    """Every automatic character path is one guarded, unbound gallery request."""
+
+    def setUp(self):
+        super().setUp()
+        self.player = create_object(PlayerCharacter, key="autogen-player")
+        self.player.age = 28
+        self.player.apparent_age = 25
+        self.player.db.portrait_policy = {
+            "mode": "named",
+            "stable_key": str(self.player.pk),
+        }
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.root = Path(self.tempdir.name)
+        self.art_settings = override_settings(
+            ART_STORE_ROOT=str(self.root),
+            ART_SD_CLIENT="world.art.fake_sd_client.FakeSDWebUIClient",
+        )
+        self.art_settings.enable()
+        self.addCleanup(self.art_settings.disable)
+        self.subject = ArtSubject(ArtSubjectKind.CHARACTER, str(self.player.pk))
+        self.classic_key = f"art:portrait:character:{self.player.pk}"
+
+    def _gallery_jobs(self):
+        return [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if str(record.db.gallery_image_id or "")
+        ]
+
+    def _seed_card(self, image_id):
+        identity = f"gallery/character/{self.player.pk}/{image_id}.png"
+        (self.root / identity).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / identity).write_bytes(b"seeded")
+        return gallery_api.append_card(
+            self.subject,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="seed",
+        )
+
+    def _drain(self):
+        from world.art.worker import drain_synchronous
+
+        with patch(
+            "world.art.worker.resolve_sd_client", return_value=FakeSDWebUIClient()
+        ):
+            # Startup sync enqueues the classic registry subjects too; drain
+            # past them so the gallery job is always claimed.
+            drain_synchronous(200)
+
+    def _schedule(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_portrait_ensure(self.player)
+
+    @covers_requirement(
+        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+    )
+    def test_a_committed_path_drains_to_exactly_one_unbound_default_card(self):
+        self._schedule()
+        self.assertEqual(len(self._gallery_jobs()), 1)
+        self.assertNotIn(self.classic_key,
+                         {record.db_key for record in ArtAssetRecord.objects.all()})
+        self._drain()
+        cards = gallery_api.cards_for(self.subject)
+        self.assertEqual(len(cards), 1)
+        self.assertIsNone(cards[0]["binding"])
+        self.assertEqual(cards[0]["face_rect"], dict(gallery_api.DEFAULT_FACE_RECT))
+        record = gallery_api.record_for(self.subject)
+        self.assertEqual(record.db.default_image_id, cards[0]["image_id"])
+        self.assertTrue(
+            (self.root / cards[0]["stored_identity"]).exists()
+        )
+        # No classic fixed-identity record was ever created on any path.
+        self.assertNotIn(
+            self.classic_key,
+            {record.db_key for record in ArtAssetRecord.objects.all()},
+        )
+
+    @covers_requirement(
+        "art-gallery-autogen::automatic-generation-is-idempotent-against-the-subject-s-gallery"
+    )
+    def test_repeated_recovery_after_a_drain_appends_nothing(self):
+        art_sync_all()
+        self.assertEqual(len(self._gallery_jobs()), 1)
+        self._drain()
+        self.assertEqual(len(gallery_api.cards_for(self.subject)), 1)
+        # Consecutive restarts: recovery sees the occupied gallery and stops.
+        art_sync_all()
+        art_sync_all()
+        self.assertEqual(self._gallery_jobs(), [])
+        self.assertEqual(len(gallery_api.cards_for(self.subject)), 1)
+
+    @covers_requirement(
+        "art-gallery-autogen::automatic-generation-is-idempotent-against-the-subject-s-gallery"
+    )
+    def test_a_seed_synced_subject_is_never_auto_generated(self):
+        self._seed_card("a1b2c3d4-0000-4000-8000-000000000001")
+        art_sync_all()
+        self._schedule()
+        self.assertEqual(self._gallery_jobs(), [])
+        self.assertEqual(len(gallery_api.cards_for(self.subject)), 1)
+
+    @covers_requirement(
+        "art-gallery-autogen::automatic-generation-is-idempotent-against-the-subject-s-gallery"
+    )
+    def test_an_in_flight_job_suppresses_a_second_request(self):
+        self._schedule()
+        first = self._gallery_jobs()
+        self.assertEqual(len(first), 1)
+        # Recovery and a second schedule both see the pending job.
+        art_sync_all()
+        self._schedule()
+        self.assertEqual(len(self._gallery_jobs()), 1)
+        # A spent (terminal, not yet pruned) job never blocks a later request.
+        job = self._gallery_jobs()[0]
+        job.db.status = ArtAssetStatus.FAILED
+        job.save()
+        self._schedule()
+        self.assertEqual(len(self._gallery_jobs()), 2)
+
+    @covers_requirement(
+        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+    )
+    def test_the_failed_card_path_still_asks_again_next_time(self):
+        # A failed generation leaves no card and no in-flight job, so the
+        # next automatic pass is allowed to request again.
+        self._schedule()
+        job = self._gallery_jobs()[0]
+        job.db.status = ArtAssetStatus.FAILED
+        job.save()
+        self.assertEqual(gallery_api.cards_for(self.subject), [])
+        art_sync_all()
+        self.assertEqual(len(self._gallery_jobs()), 2)
+
+    @covers_requirement(
+        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+    )
+    def test_a_failing_request_never_rolls_back_gameplay_and_logs_bounded(self):
+        with (
+            patch(
+                "world.art.service.request_gallery_image",
+                side_effect=RuntimeError("gallery boom"),
+            ),
+            patch("world.art.service.log_warn") as warn,
+        ):
+            # Nested INSIDE the patches: on_commit callbacks run when the
+            # capture block exits, while the failing seam is still patched.
+            with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                schedule_portrait_ensure(self.player)
+        self.assertEqual(len(callbacks), 1)
+        self.assertEqual(self._gallery_jobs(), [])
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == "art_portrait_ensure_failed"
+                for call in warn.call_args_list
+            )
+        )
+
+    @covers_requirement(
+        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+    )
+    def test_retry_reports_truthfully_through_the_guard(self):
+        from world.art.service import retry_character_portrait
+
+        self.assertTrue(retry_character_portrait(str(self.player.pk)))
+        self.assertEqual(len(self._gallery_jobs()), 1)
+        self.assertNotIn(
+            self.classic_key,
+            {record.db_key for record in ArtAssetRecord.objects.all()},
+        )
+        # The in-flight guard suppresses the second attempt honestly.
+        self.assertFalse(retry_character_portrait(str(self.player.pk)))
+        self.assertEqual(len(self._gallery_jobs()), 1)
+        # A carded subject is left alone too.
+        for job in self._gallery_jobs():
+            job.db.status = ArtAssetStatus.FAILED
+            job.save()
+        self._seed_card("a1b2c3d4-0000-4000-8000-000000000002")
+        self.assertFalse(retry_character_portrait(str(self.player.pk)))
+        # The spent FAILED job survives; no NEW job was enqueued.
+        self.assertEqual(len(self._gallery_jobs()), 1)
+
+    @covers_requirement(
+        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+    )
+    def test_requeue_forces_one_card_beyond_the_idempotency_guard(self):
+        from world.art.service import requeue_character_portrait
+
+        self._schedule()
+        self._drain()
+        cards = gallery_api.cards_for(self.subject)
+        self.assertEqual(len(cards), 1)
+        # Staff force path: an occupied gallery does not suppress the request.
+        with patch("world.art.service.log_info"):
+            requeue_character_portrait(str(self.player.pk))
+        jobs = self._gallery_jobs()
+        self.assertEqual(len(jobs), 1)
+        # The existing card is untouched until the new card is appended.
+        self.assertEqual(gallery_api.cards_for(self.subject), cards)
+        self._drain()
+        after = gallery_api.cards_for(self.subject)
+        self.assertEqual(len(after), 2)
+        self.assertEqual(after[0], cards[0])
+        self.assertIsNone(after[1]["binding"])
+        self.assertEqual(after[1]["face_rect"], dict(gallery_api.DEFAULT_FACE_RECT))
+        # The default stays the first card.
+        self.assertEqual(
+            gallery_api.record_for(self.subject).db.default_image_id,
+            cards[0]["image_id"],
+        )
+
+    @covers_requirement(
+        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+    )
+    def test_an_ineligible_subject_still_rejects_before_anything(self):
+        self.player.attributes.remove("age")
+        with patch("world.art.sd_worker.render_prompt_pair") as render:
+            with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                schedule_portrait_ensure(self.player)
+            self.assertEqual(len(callbacks), 0)
+            from world.art.service import requeue_character_portrait
+
+            with self.assertRaises(ArtSubjectError):
+                requeue_character_portrait(str(self.player.pk))
+        render.assert_not_called()
+        self.assertEqual(self._gallery_jobs(), [])
+        self.assertEqual(gallery_api.cards_for(self.subject), [])
 
 
 class GalleryRequestSeamTests(EvenniaTestCase):

@@ -167,6 +167,61 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             0,
         )
 
+    @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
+    @covers_requirement(
+        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+    )
+    def test_requeue_character_requests_a_gallery_job_with_no_classic_record(self):
+        from evennia.utils.create import create_object
+
+        from typeclasses.characters import PlayerCharacter
+        from world.art import gallery as gallery_api
+
+        player = create_object(PlayerCharacter, key="requeue-character")
+        player.db.age = 30
+        player.db.apparent_age = 30
+        player.db.portrait_policy = {
+            "mode": "named",
+            "stable_key": str(player.pk),
+        }
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, str(player.pk))
+        # An occupied gallery: requeue is the force path and still requests.
+        seeded = gallery_api.append_card(
+            subject,
+            image_id="a1b2c3d4-0000-4000-8000-000000000009",
+            stored_identity=(
+                "gallery/character/"
+                f"{player.pk}/a1b2c3d4-0000-4000-8000-000000000009.png"
+            ),
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="seed",
+        )
+        cards_before = gallery_api.cards_for(subject)
+        output = self.call(CmdArtRequeue(), f"portrait:character:{player.pk}")
+        self.assertIn("已將", output)
+        jobs = [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if str(record.db.gallery_image_id or "")
+        ]
+        self.assertEqual(len(jobs), 1)
+        self.assertTrue(
+            jobs[0].db_key.startswith(f"art:portrait:character:{player.pk}:gen:")
+        )
+        # No classic fixed-identity record, and the existing card is untouched
+        # until the new card is appended.
+        self.assertFalse(
+            ArtAssetRecord.objects.filter(
+                db_key=f"art:portrait:character:{player.pk}"
+            ).exists()
+        )
+        self.assertEqual(gallery_api.cards_for(subject), cards_before)
+        self.assertEqual(seeded["image_id"], cards_before[0]["image_id"])
+
     @covers_requirement("art-asset-lifecycle::the-age-check-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker")
     def test_retry_skips_a_character_portrait_with_a_non_integer_age(self):
         from evennia.utils.create import create_object

@@ -145,10 +145,11 @@ class CmdArtRetry(_ArtCommand):
                 continue
             if subject.kind is ArtSubjectKind.CHARACTER:
                 try:
-                    retry_character_portrait(subject.key)
+                    requested = retry_character_portrait(subject.key)
                 except ArtSubjectError:
                     continue
-                reenqueued += 1
+                if requested:
+                    reenqueued += 1
                 continue
             record = ArtAssetRecord.objects.filter(
                 db_key=record_key(subject)
