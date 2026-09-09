@@ -900,6 +900,54 @@ class GalleryWorkerTests(WorkerStoreIsolation):
             (self.root / "gallery" / "character" / "42" / f"{self._IMAGE_ID}.png").exists()
         )
 
+    @covers_requirement("art-gallery-generation::generation-while-the-image-server-is-unreachable-is-a-reported-failure-never-a-gate")
+    def test_a_successful_settle_clears_the_recorded_error(self):
+        # A previously recorded failure is last-attempt state: the settle
+        # that appends a card clears it as part of the same publish.
+        gallery_api.record_error(self.character, "sd_connection_error")
+        job = self._gallery_job()
+        with self._client(FakeSDWebUIClient()):
+            drain_synchronous(10)
+        self.assertEqual(len(gallery_api.cards_for(self.character)), 1)
+        record = gallery_api.record_for(self.character)
+        self.assertIsNone(record.db.last_error_code)
+        self.assertIsNone(record.db.last_error_at)
+        self.assertIsNone(self._gallery_job_for())
+        # A clear failure never rewrites the settle's outcome: the appended
+        # card is the authoritative publish.
+        gallery_api.record_error(self.character, "sd_timeout")
+        job = self._gallery_job(image_id="bbbbbbbb-2222-4222-8222-222222222222")
+        with self._client(FakeSDWebUIClient()):
+            with patch(
+                "world.art.gallery.clear_error", side_effect=RuntimeError("db down")
+            ):
+                drain_synchronous(10)
+        cards = gallery_api.cards_for(self.character)
+        self.assertEqual(len(cards), 2)
+        self.assertIsNone(self._gallery_job_for("bbbbbbbb-2222-4222-8222-222222222222"))
+
+    @covers_requirement("art-gallery-generation::generation-while-the-image-server-is-unreachable-is-a-reported-failure-never-a-gate")
+    def test_a_failed_settle_after_a_success_records_the_new_code(self):
+        # Success first: one card, no error.
+        with self._client(FakeSDWebUIClient()):
+            self._gallery_job()
+            drain_synchronous(10)
+        cards_before = gallery_api.cards_for(self.character)
+        self.assertEqual(len(cards_before), 1)
+        self.assertIsNone(
+            gallery_api.record_for(self.character).db.last_error_code
+        )
+        # Then a failure: the new bounded code lands, every card survives.
+        failing = FakeSDWebUIClient()
+        failing.fail_every_call(SDError("sd_connection_error", "offline"))
+        self._gallery_job(image_id="cccccccc-3333-4333-8333-333333333333")
+        with self._client(failing):
+            drain_synchronous(10)
+        record = gallery_api.record_for(self.character)
+        self.assertEqual(record.db.last_error_code, "sd_connection_error")
+        self.assertIsInstance(record.db.last_error_at, float)
+        self.assertEqual(gallery_api.cards_for(self.character), cards_before)
+
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_an_unresolvable_client_still_settles_gallery_jobs_failed(self):
         # A mixed batch: one classic scene record AND one gallery job for a

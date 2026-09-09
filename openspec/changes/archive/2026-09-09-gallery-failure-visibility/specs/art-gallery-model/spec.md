@@ -24,10 +24,12 @@ mutation and SHALL emit their existing bounded facade events.
 `world/art/gallery.py` SHALL expose one read-only accessor returning the subjects whose record carries
 a recorded generation error, each with its bounded code and timestamp. The single-writer rule keeps the
 record class inside that module, so operator surfaces SHALL read cross-record gallery state ONLY
-through this accessor and SHALL NOT query the record class themselves. The accessor SHALL create no
-record, SHALL write nothing, and SHALL be tolerant: a record whose persisted kind or subject key no
-longer parses SHALL be skipped rather than raising, so one corrupt row can never blind the whole
-surface.
+through the gallery module's read-only accessors and SHALL NOT query the record class themselves. The
+erroring-subject accessor is the sole cross-record ERROR read; the gallery module MAY expose additional
+read-only accessors of the same discipline (for example per-record state summaries for the staff status
+surface). Every such accessor SHALL create no record, SHALL write nothing, and SHALL be tolerant: a
+record whose persisted kind or subject key no longer parses SHALL be skipped rather than raising, so one
+corrupt row can never blind the whole surface.
 
 #### Scenario: Only erroring subjects are reported
 - **WHEN** the accessor runs against a store holding one subject with a recorded error and two without

@@ -36,6 +36,7 @@ intact.
 
 from collections.abc import Iterable, Mapping, Sequence
 import math
+from dataclasses import dataclass
 import threading
 import time
 import uuid
@@ -46,7 +47,12 @@ from evennia.utils.create import create_script
 
 from world.art.formats import STORE_EXTENSIONS
 from world.art.paths import resolved_under_store_root
-from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.art.subjects import (
+    ArtSubject,
+    ArtSubjectError,
+    ArtSubjectKind,
+    parse_subject,
+)
 from world.observability import log_debug, log_info, log_warn
 
 # The one shared card face rectangle (design §3.1). Applied to every card
@@ -469,6 +475,86 @@ def referenced_stored_identities() -> set[str]:
                 if identity:
                     identities.add(identity)
     return identities
+
+
+@dataclass(frozen=True)
+class GallerySubjectState:
+    """One record's read-only summary: subject, cards, default, last error."""
+
+    subject: ArtSubject
+    card_count: int
+    has_default: bool
+    error_code: str | None
+    error_at: float | None
+
+
+def _scan_gallery_states() -> list[GallerySubjectState]:
+    """One tolerant read-only pass over every gallery record.
+
+    The shared scan behind the two cross-record accessors below. Raw and
+    write-free: card entries are validated straight off the record
+    (``validate_card`` with ``api_defaults=False``) so a malformed entry is
+    skipped exactly as ``cards_for`` skips it, and no per-subject fetch —
+    which consolidates duplicate records — runs during a listing. A record
+    whose persisted kind/subject no longer parses is skipped, so one corrupt
+    row can never blind an operator surface.
+    """
+    states: list[GallerySubjectState] = []
+    for record in GalleryRecord.objects.all():
+        try:
+            subject = parse_subject(f"{record.db.kind}:{record.db.subject_key}")
+        except ArtSubjectError:  # observability: ignore R2: corrupt row skipped so one bad row cannot blind the whole operator surface; the surface's own listing is the report
+            continue
+        card_count = 0
+        for entry in record.db.cards or []:
+            try:
+                validate_card(entry, subject, api_defaults=False)
+            except GalleryRecordError:
+                log_warn(
+                    "gallery_card_invalid",
+                    context={
+                        "subject": subject.full(),
+                        "image_id": (
+                            entry.get("image_id")
+                            if isinstance(entry, Mapping)
+                            else None
+                        ),
+                    },
+                )
+                continue
+            card_count += 1
+        states.append(
+            GallerySubjectState(
+                subject=subject,
+                card_count=card_count,
+                has_default=record.db.default_image_id is not None,
+                error_code=record.db.last_error_code,
+                error_at=record.db.last_error_at,
+            )
+        )
+    return states
+
+
+def erroring_subjects() -> list[GallerySubjectState]:
+    """Read-only: every subject whose record carries a recorded generation error.
+
+    The sole cross-record ERROR read (change ``gallery-failure-visibility``):
+    operator surfaces list the subjects whose LAST generation attempt failed,
+    each with its bounded code and timestamp, without ever touching the record
+    class. Creates nothing, writes nothing, and skips unparseable rows.
+    """
+    return [state for state in _scan_gallery_states() if state.error_code is not None]
+
+
+def gallery_states() -> list[GallerySubjectState]:
+    """Read-only: one summary per gallery record, healthy records included.
+
+    The per-record state accessor behind the staff status/health surfaces:
+    subject, valid card count, whether a default is set, and the recorded
+    error code and age source. Same tolerance and write-free discipline as
+    ``erroring_subjects``.
+    """
+    return _scan_gallery_states()
 
 
 def _delete_stored_file(subject: ArtSubject, identity: object) -> None:

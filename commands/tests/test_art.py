@@ -16,7 +16,7 @@ from commands.art import (
 )
 from world.art.connectivity import ProbeResult
 from world.art.queue import claim, ensure, requeue, settle
-from world.art.queue import enqueue_gallery_job
+from world.art.queue import enqueue_gallery_job, is_gallery_job
 from world.art.sd_worker import SDError
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
@@ -224,28 +224,135 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement("art-asset-lifecycle::the-age-check-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker")
     def test_retry_skips_a_character_portrait_with_a_non_integer_age(self):
+        # Rewritten (task 6.7) against the gallery arm: the age check now
+        # rejects through the request seam, deterministically, with the
+        # recorded error kept and no job produced — the classic record the
+        # old test manufactured via ``queue.ensure`` is a state production
+        # can no longer produce for a character.
+        from world.art import gallery as gallery_api
+
+        player = self._portrait_player("non-int-age-retry", age="twenty")
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, str(player.pk))
+        gallery_api.record_error(subject, "sd_connection_error")
+        output = self.call(CmdArtRetry(), "")
+        self.assertIn("已重新排入 0 個失敗記錄，並重新請求 0 次圖庫生成", output)
+        # Deterministic rejection: no job, no classic record, error retained.
+        self.assertFalse(
+            any(
+                is_gallery_job(record)
+                for record in ArtAssetRecord.objects.all()
+            )
+        )
+        self.assertFalse(
+            ArtAssetRecord.objects.filter(
+                db_key=f"art:portrait:character:{player.pk}"
+            ).exists()
+        )
+        self.assertEqual(
+            [state.subject for state in gallery_api.erroring_subjects()], [subject]
+        )
+
+    def _portrait_player(self, key, *, age=30, apparent=30):
         from evennia.utils.create import create_object
 
         from typeclasses.characters import PlayerCharacter
-        from world.art.queue import source_hash
 
-        player = create_object(PlayerCharacter, key="non-int-age-retry")
-        player.db.age = "twenty"
-        player.db.apparent_age = 22
-        player.db.portrait_policy = {
-            "mode": "named",
-            "stable_key": str(player.pk),
-        }
+        player = create_object(PlayerCharacter, key=key)
+        player.db.age = age
+        player.db.apparent_age = apparent
+        player.db.portrait_policy = {"mode": "named", "stable_key": str(player.pk)}
+        return player
+
+    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
+    def test_retry_re_requests_an_erroring_character_exactly_once(self):
+        from world.art import gallery as gallery_api
+
+        player = self._portrait_player("retry-gallery-ok")
         subject = ArtSubject(ArtSubjectKind.CHARACTER, str(player.pk))
-        ensure(subject, "desc")
-        claim(10)
-        settle(subject, status=ArtAssetStatus.FAILED, output_identity=None, error="boom")
+        gallery_api.record_error(subject, "sd_connection_error")
         output = self.call(CmdArtRetry(), "")
-        self.assertIn("0", output)
-        record = ArtAssetRecord.objects.filter(
-            db_key=f"art:portrait:character:{player.pk}"
-        ).first()
-        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
+        self.assertIn("重新請求 1 次圖庫生成", output)
+        jobs = [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if is_gallery_job(record)
+        ]
+        self.assertEqual(len(jobs), 1)
+        self.assertTrue(
+            jobs[0].db_key.startswith(f"art:portrait:character:{player.pk}:gen:")
+        )
+        # The classic re-enqueue count is honestly zero.
+        self.assertIn("已重新排入 0 個失敗記錄", output)
+
+    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
+    def test_retry_skips_an_ineligible_erroring_subject_without_aborting(self):
+        from world.art import gallery as gallery_api
+
+        # An erroring subject whose entity no longer exists: typed rejection,
+        # error kept, no record change — and a healthy scene record in the
+        # same store still re-enqueues.
+        ghost = ArtSubject(ArtSubjectKind.CHARACTER, "999999")
+        gallery_api.record_error(ghost, "sd_connection_error")
+        scene = _scene("forest_path")
+        ensure(scene, "desc")
+        claim(10)
+        settle(scene, status=ArtAssetStatus.FAILED, output_identity=None, error="boom")
+        output = self.call(CmdArtRetry(), "")
+        self.assertIn("已重新排入 1 個失敗記錄，並重新請求 0 次圖庫生成", output)
+        # The ghost keeps its recorded error (typed rejection keeps it).
+        self.assertEqual(
+            [state.subject for state in gallery_api.erroring_subjects()], [ghost]
+        )
+        self.assertIsNone(
+            ArtAssetRecord.objects.filter(
+                db_key__startswith="art:portrait:character:999999:gen:"
+            ).first()
+        )
+
+    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
+    def test_retry_clears_a_moot_error_on_a_subject_that_now_has_art(self):
+        import uuid
+
+        from world.art import gallery as gallery_api
+
+        player = self._portrait_player("retry-gallery-moot")
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, str(player.pk))
+        gallery_api.record_error(subject, "sd_connection_error")
+        # A card arrived since the failure: the automatic guard will suppress
+        # every future request, so the error is moot.
+        image_id = str(uuid.uuid4())
+        gallery_api.append_card(
+            subject,
+            image_id=image_id,
+            stored_identity=f"gallery/character/{player.pk}/{image_id}.png",
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="seed",
+        )
+        output = self.call(CmdArtRetry(), "")
+        self.assertIn("重新請求 0 次圖庫生成", output)
+        # No job was requested, the error is cleared, and the subject is gone
+        # from the erroring surface.
+        self.assertFalse(
+            any(
+                is_gallery_job(record)
+                for record in ArtAssetRecord.objects.all()
+            )
+        )
+        self.assertEqual(gallery_api.erroring_subjects(), [])
+        status_output = self.call(CmdArtStatus(), "")
+        self.assertNotIn("sd_connection_error", status_output)
+
+    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
+    def test_retry_requests_nothing_when_no_gallery_record_errors(self):
+        output = self.call(CmdArtRetry(), "")
+        self.assertIn("已重新排入 0 個失敗記錄，並重新請求 0 次圖庫生成", output)
+        self.assertFalse(
+            any(is_gallery_job(record) for record in ArtAssetRecord.objects.all())
+        )
 
 
 class ArtOptionsCommandTests(EvenniaCommandTestMixin, EvenniaTest):
@@ -353,6 +460,90 @@ class ArtStatusSeedColumnTests(EvenniaCommandTestMixin, EvenniaTest):
         portrait_output = self.call(CmdArtStatus(), "portrait")
         self.assertNotIn(":gen:", portrait_output)
 
+    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
+    def test_a_failed_gallery_generation_is_visible_with_its_bounded_code(self):
+        from world.art import gallery as gallery_api
+
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
+        gallery_api.record_error(subject, "sd_connection_error")
+        output = self.call(CmdArtStatus(), "")
+        self.assertIn("圖庫狀態:", output)
+        self.assertIn("portrait:character:42", output)
+        self.assertIn("sd_connection_error", output)
+        # The section obeys the non-leakage rule.
+        self.assertNotIn("persona", output)
+        self.assertNotIn("prompt", output)
+        self.assertNotIn("stored_identity", output)
+        self.assertNotIn("/app", output)
+        # A scene filter yields no gallery rows (gallery kinds are portraits).
+        scene_output = self.call(CmdArtStatus(), "scene")
+        self.assertNotIn("portrait:character:42", scene_output)
+        self.assertNotIn("圖庫狀態:", scene_output)
+
+    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
+    def test_a_healthy_gallery_line_shows_cards_and_default_with_no_error(self):
+        import uuid
+
+        from world.art import gallery as gallery_api
+
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
+        image_id = str(uuid.uuid4())
+        gallery_api.append_card(
+            subject,
+            image_id=image_id,
+            stored_identity=f"gallery/character/42/{image_id}.png",
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="seed",
+        )
+        output = self.call(CmdArtStatus(), "")
+        self.assertIn("圖庫狀態:", output)
+        self.assertIn("portrait:character:42 卡片:1 預設:是", output)
+        self.assertNotIn("錯誤:", output.split("圖庫狀態:")[1])
+
+    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
+    def test_a_gallery_only_store_still_shows_the_gallery_section(self):
+        # The classic listing is empty; the healthy gallery must still appear
+        # (the gallery-only case, not the both-empty message).
+        import uuid
+
+        from world.art import gallery as gallery_api
+
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
+        image_id = str(uuid.uuid4())
+        gallery_api.append_card(
+            subject,
+            image_id=image_id,
+            stored_identity=f"gallery/character/42/{image_id}.png",
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="seed",
+        )
+        output = self.call(CmdArtStatus(), "")
+        self.assertIn("圖庫狀態:", output)
+        self.assertNotIn("沒有符合的美術資產記錄。", output)
+
+    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
+    def test_both_surfaces_empty_keeps_the_empty_message(self):
+        output = self.call(CmdArtStatus(), "")
+        self.assertIn("沒有符合的美術資產記錄。", output)
+
+    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
+    def test_the_broad_portrait_filter_keeps_the_pre_existing_classic_behaviour(self):
+        # A bare ``portrait``-prefixed classic record matches the startswith
+        # filter — the pre-existing classic behaviour this change must not
+        # alter.
+        subject = ArtSubject(ArtSubjectKind.MONSTER, "low")
+        ensure(subject, "desc")
+        output = self.call(CmdArtStatus(), "portrait")
+        self.assertIn("portrait:monster:low", output)
+
 
 class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     """``@art health`` with the thread dispatch replaced by a sync seam."""
@@ -382,7 +573,7 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement(
         "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
     )
-    def test_reachable_dashboard_shows_all_four_sections(self):
+    def test_reachable_dashboard_shows_all_five_sections(self):
         ensure(_scene("forest_path"), "desc")
         claim(10)
         settle(
@@ -405,7 +596,35 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(lines[0], "server: reachable (checked just now)")
         self.assertEqual(lines[1], "scheduler: enabled interval=30s limit=4")
         self.assertEqual(lines[2], "queue: pending=0 in_progress=0 failed=1 done=1")
-        self.assertEqual(lines[3], "output: png q=80 metadata=on")
+        self.assertEqual(lines[3], "gallery: records=0 cards=0 erroring=0")
+        self.assertEqual(lines[4], "output: png q=80 metadata=on")
+
+    @covers_requirement(
+        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
+    )
+    def test_the_gallery_line_counts_records_cards_and_erroring_subjects(self):
+        import uuid
+
+        from world.art import gallery as gallery_api
+
+        one = ArtSubject(ArtSubjectKind.CHARACTER, "42")
+        image_id = str(uuid.uuid4())
+        gallery_api.append_card(
+            one,
+            image_id=image_id,
+            stored_identity=f"gallery/character/42/{image_id}.png",
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="seed",
+        )
+        gallery_api.record_error(one, "sd_connection_error")
+        two = ArtSubject(ArtSubjectKind.CHARACTER, "43")
+        gallery_api.record_error(two, "sd_timeout")
+        output, _, _ = self._health(self._verdict())
+        self.assertIn("gallery: records=2 cards=1 erroring=2", output)
 
     @covers_requirement(
         "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
@@ -443,8 +662,28 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
     )
     def test_health_mutates_nothing(self):
+        import uuid
+
+        from world.art import gallery as gallery_api
+
         ensure(_scene("forest_path"), "desc")
         claim(1)
+        # Gallery state must survive untouched too: one card, one error.
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
+        image_id = str(uuid.uuid4())
+        gallery_api.append_card(
+            subject,
+            image_id=image_id,
+            stored_identity=f"gallery/character/42/{image_id}.png",
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="seed",
+        )
+        gallery_api.record_error(subject, "sd_timeout")
+        gallery_before = [(s.subject.full(), s.card_count, s.has_default, s.error_code) for s in gallery_api.gallery_states()]
         before = [
             (r.db_key, r.db.status, r.db.attempt_count, r.db.output_identity)
             for r in ArtAssetRecord.objects.all()
@@ -455,6 +694,8 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             for r in ArtAssetRecord.objects.all()
         ]
         self.assertEqual(before, after)
+        gallery_after = [(s.subject.full(), s.card_count, s.has_default, s.error_code) for s in gallery_api.gallery_states()]
+        self.assertEqual(gallery_before, gallery_after)
 
     @covers_requirement(
         "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
