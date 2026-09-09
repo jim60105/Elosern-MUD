@@ -173,6 +173,11 @@ def build_starting_companion(player: Any, declaration: StartingCompanion) -> LLM
         )
         npc.db.age = preset.age
         npc.db.apparent_age = preset.apparent_age
+        # Registry provenance (gallery-builtin-fallbacks): the companion's
+        # portrait subject is keyed by its own pk, so the builder carries the
+        # partner card's preset key — the companion's registry entry — for the
+        # built-in fallback resolver's declaration rung.
+        npc.db.creation_preset_key = declaration.preset_key
         # The disguise layer and sexual baseline mirror the preset-only writes
         # of player activation and the import loader: an empty declaration
         # normalizes to None, an undeclared baseline writes nothing so

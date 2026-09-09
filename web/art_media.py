@@ -25,6 +25,7 @@ from django.http import FileResponse, Http404
 
 from world.art.gallery import cards_for
 from world.art.paths import resolved_under_root, resolved_under_store_root
+from world.art.fallback_keys import FALLBACK_EXTENSION, FALLBACK_KEYS
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectError, ArtSubjectKind
 
@@ -45,7 +46,10 @@ _GALLERY_IDENTITY = re.compile(
 )
 
 # The exact built-in fallback identity shape: one flat segment under
-# `defaults/` (an unexpected sub-path never matches).
+# `defaults/` (an unexpected sub-path never matches). The stem is then
+# checked against the closed key vocabulary in ``_serve_defaults`` — a
+# filename outside the six committed keys can never be served whatever the
+# directory holds (gallery-builtin-fallbacks).
 _DEFAULTS_IDENTITY = re.compile(r"^defaults/[^/]+\.(png|webp|jpg|avif)$")
 
 _MIME_BY_EXTENSION = {
@@ -128,6 +132,25 @@ def _serve_gallery(identity: str, match: re.Match) -> FileResponse:
 
 
 def _serve_defaults(identity: str) -> FileResponse:
+    """Serve one committed fallback from the fixed in-repo defaults directory.
+
+    The defaults directory is a separate, FIXED root — never the store root —
+    resolved from the STATICFILES app dirs (overridable in tests). The shape
+    gate is the closed key vocabulary: the flat ``<stem>.<ext>`` stem must be
+    exactly one of the six committed fallback keys before the file is even
+    looked up. Then the closed extension map (via the regex) and the same
+    containment check as the other branches (resolves inside the defaults
+    root, exists as a real file, no symlink). Anything else returns 404.
+    Serving fallbacks through this one route keeps ``/art/`` the single media
+    URL surface.
+    """
+    filename = identity[len("defaults/"):]
+    if not filename.endswith(FALLBACK_EXTENSION):
+        # The committed set is exactly ``<key>.webp`` — an alternate
+        # extension for a valid stem is not a committed identity.
+        raise Http404
+    if filename[: -len(FALLBACK_EXTENSION)] not in FALLBACK_KEYS:
+        raise Http404
     resolved = resolved_under_root(_defaults_root(), identity[len("defaults/"):])
     if resolved is None or not resolved.is_file():
         raise Http404

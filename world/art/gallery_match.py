@@ -22,8 +22,9 @@ resolve to ``None`` here.
 Steps 5-7 (the classic ``done`` asset record, the terminal fallback seam, and
 the truthful placeholder) live in the presenter, which owns payload
 construction; this module exposes the seam ``fallback_for(subject)`` and
-returns ``None`` from it, so the chain's terminal behaviour is byte-for-byte
-today's placeholder until a later capability supplies a fallback image.
+fills it from ``gallery-builtin-fallbacks``: the deterministic built-in
+resolver over the six committed defaults, or ``None`` (scenes) when no
+fallback applies.
 
 Every candidate is identity-validated through
 ``validated_card_identity`` — subject prefix, closed store-extension set, and
@@ -162,20 +163,38 @@ def _default_card(subject: ArtSubject, cards: list[dict]) -> dict | None:
     return None
 
 
-def fallback_for(subject: ArtSubject) -> dict | None:
+def fallback_for(subject: ArtSubject, entity=None) -> dict | None:
     """The terminal fallback seam: consulted after the classic asset record.
 
-    In this capability the seam always returns ``None``, so the chain's
-    terminal behaviour is byte-for-byte today's truthful placeholder. A later
-    capability MAY supply a fallback here without modifying the chain; the
-    presenter is the seam's only consumer and gives whatever it returns the
-    shared default face rectangle unless the seam carries one. The filling
-    capability owns the identity contract: the presenter builds the URL from
-    the returned ``identity`` verbatim, so it MUST already be a validated
-    ``defaults/``-branch identity the media route serves (the route still
-    refuses to serve anything else; the presenter would emit a dead URL).
+    Filled by ``gallery-builtin-fallbacks`` with the deterministic built-in
+    resolver: declared registry key -> sex/age band -> deterministic
+    subject-key hash over the six committed defaults. The presenter passes
+    the entity it already resolved; a bare ``fallback_for(subject)`` call
+    recovers only a deterministic identification (primary-key path for
+    digit-only keys, unique pk-ordered attribute scan otherwise — an
+    ambiguous shared stable key recovers no entity, failing closed), and
+    scene subjects resolve ``None`` which falls through to the truthful
+    placeholder. Every resolution emits the
+    ``gallery_fallback_used`` event naming subject and resolved key and
+    writes nothing. The presenter is the seam's only consumer and gives
+    whatever it returns the shared default face rectangle unless the seam
+    carries one; the returned ``identity`` is a validated ``defaults/``-branch
+    identity the media route serves (the route refuses to serve anything
+    else).
     """
-    return None
+    from world.art.gallery_fallback import resolve_fallback
+
+    resolution = resolve_fallback(subject, entity=entity)
+    if resolution is None:
+        return None
+    key = resolution.pop("key")
+    from world.observability import log_info
+
+    log_info(
+        "gallery_fallback_used",
+        context={"subject": subject.full(), "kind": subject.kind.value, "key": key},
+    )
+    return resolution
 
 
 __all__ = [

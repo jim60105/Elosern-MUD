@@ -324,6 +324,11 @@ def _spawn_npc(
             f"spawned object {npc!r} is not an NPC; rejecting it"
         )
     npc.race = tier.race_key
+    # Registry provenance (gallery-builtin-fallbacks): the spawned NPC carries
+    # its role-tier key so the built-in gallery fallback can find the tier's
+    # declared fallback key even when the portrait subject key is the entity
+    # pk (a characterization without a stable portrait key).
+    npc.db.npc_tier_key = tier_key
     npc._apply_trait_config(config)
     npc.db.disposition = disposition
     _apply_characterization(npc, requirement, position)

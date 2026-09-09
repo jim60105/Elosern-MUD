@@ -497,6 +497,10 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
             npc.db.portrait_policy,
             {"mode": "named", "stable_key": "forest_bandit_chief"},
         )
+        # Registry provenance (gallery-builtin-fallbacks): the tier key rides
+        # the spawned NPC so a tier-level fallback declaration resolves even
+        # though the portrait subject is the stable key, not the tier.
+        self.assertEqual(npc.db.npc_tier_key, "bandit")
 
     @covers_requirement("scene-builder::anti-hallucination-the-proposal-never-chooses-numbers-stats-or-class-lineage")
     def test_unknown_tier_in_a_requirement_is_rejected_before_any_spawn(self):

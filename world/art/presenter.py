@@ -133,7 +133,9 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
     # Steps 1-5 resolved nothing: consult the terminal seam (step 6) on
     # EVERY fall-through path — no record, an unfinished record, and an
     # unusable done identity alike — before the placeholder closes the chain.
-    fallback = fallback_for(subject)
+    # The already-resolved entity rides along so the resolver reads its sex,
+    # apparent age, and registry provenance directly (gallery-builtin-fallbacks).
+    fallback = fallback_for(subject, entity=entity)
     if fallback is not None:
         return _fallback_payload(subject, fallback)
     if record is None or record.db.status != ArtAssetStatus.DONE:
@@ -182,10 +184,13 @@ def _card_payload(subject: ArtSubject, card: dict) -> dict:
 def _fallback_payload(subject: ArtSubject, fallback: dict) -> dict:
     """The asset payload for a fallback image supplied by the terminal seam.
 
-    The seam returns ``None`` in this capability, so this branch is inert
-    until a later capability fills it: an unusable seam result stays the
-    truthful placeholder, and a missing or malformed seam rectangle defaults
-    to the shared face rectangle without failing the payload.
+    Filled by ``gallery-builtin-fallbacks``: the seam hands back the resolved
+    built-in default's ``defaults/<key>.webp`` identity plus its per-key face
+    rectangle, and the URL is built from the identity exactly like every
+    other branch (the media route serves it from the in-repo defaults
+    directory). An unusable seam result stays the truthful placeholder, and a
+    missing or malformed seam rectangle defaults to the shared face rectangle
+    without failing the payload.
     """
     identity = fallback.get("identity") if isinstance(fallback, dict) else None
     if not isinstance(identity, str) or not identity:

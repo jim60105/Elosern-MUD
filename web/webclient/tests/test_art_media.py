@@ -288,10 +288,22 @@ class DefaultsServingTests(EvenniaTestCase):
         "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
     )
     def test_a_defaults_identity_is_served_from_the_defaults_directory(self):
-        (self.defaults / "unknown.png").write_bytes(b"fallback")
-        response = self._get("defaults/unknown.png")
+        # Closed vocabulary (gallery-builtin-fallbacks): only a committed key
+        # is served; an out-of-vocabulary stem 404s even when the file exists.
+        (self.defaults / "man.webp").write_bytes(b"fallback")
+        (self.defaults / "stray.png").write_bytes(b"fallback")
+        response = self._get("defaults/man.webp")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertEqual(response["Content-Type"], "image/webp")
+        self.assertEqual(self._get("defaults/stray.png").status_code, 404)
+        # The committed set is exactly ``<key>.webp``: an alternate extension
+        # for a valid stem is not a committed identity (duck MAJOR).
+        for extension in ("png", "jpg", "avif"):
+            (self.defaults / f"man.{extension}").write_bytes(b"fallback")
+            with self.subTest(extension=extension):
+                self.assertEqual(
+                    self._get(f"defaults/man.{extension}").status_code, 404
+                )
 
     @covers_requirement(
         "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
@@ -300,7 +312,7 @@ class DefaultsServingTests(EvenniaTestCase):
         outside = Path(self.tempdir.name) / "outside.png"
         outside.write_bytes(b"x")
         # Missing file
-        self.assertEqual(self._get("defaults/absent.png").status_code, 404)
+        self.assertEqual(self._get("defaults/man.webp").status_code, 404)
         # Unexpected sub-path
         nested = self.defaults / "nested"
         nested.mkdir()
@@ -310,10 +322,11 @@ class DefaultsServingTests(EvenniaTestCase):
         escaping = self.defaults.parent.parent / "escape.png"
         escaping.write_bytes(b"x")
         self.assertEqual(self._get("defaults/../escape.png").status_code, 404)
-        # Symlink escaping the defaults directory
-        link = self.defaults / "linked.png"
+        # Symlink escaping the defaults directory (vocabulary stem so only the
+        # containment check can be what rejects it)
+        link = self.defaults / "man.webp"
         link.symlink_to(outside)
-        self.assertEqual(self._get("defaults/linked.png").status_code, 404)
+        self.assertEqual(self._get("defaults/man.webp").status_code, 404)
         # The store root is never consulted for a defaults identity
         store_defaults = Path(self.store_temp.name) / "defaults"
         store_defaults.mkdir()

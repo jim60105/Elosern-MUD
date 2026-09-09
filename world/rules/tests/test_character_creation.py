@@ -813,6 +813,20 @@ class CharacterActivationTests(EvenniaTest):
         self.assertIsNone(character.attributes.get("disguised_stats"))
         self.assertFalse(character.attributes.has("sexual"))
         self.assertFalse(character.attributes.has("sexual_traits"))
+        # The preset provenance attribute is part of the covered snapshot: a
+        # rolled-back preset activation leaves no fallback-declaration hint.
+        self.assertFalse(character.attributes.has("creation_preset_key"))
+
+    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
+    def test_preset_activation_persists_the_registry_provenance_attribute(self):
+        # The built-in fallback resolver's declaration rung keys off this
+        # write: an activated player must carry its preset key so a preset
+        # declaration resolves even though the portrait subject is pk-keyed.
+        preset = self._synthetic_preset("provenance_scout")
+        character = self._activate_synthetic_preset(preset, "shell-provenance")
+        self.assertEqual(character.attributes.get("creation_preset_key"), preset.key)
+        # Custom-mode activation carries nothing.
+        self.assertFalse(self.character.attributes.has("creation_preset_key"))
 
 
 def _portrait_ensure_callbacks(callbacks):
@@ -983,12 +997,13 @@ class PortraitFinalizationTests(EvenniaTest):
         subject = ArtSubject(ArtSubjectKind.CHARACTER, str(self.character.pk))
         self.assertEqual(gallery_api.cards_for(subject), [])
         # Empty-gallery resolution reaches the chain's terminal fallback seam
-        # (world.art.gallery_match.fallback_for): today the seam provides no
-        # image, so the honest outcome is the placeholder; the moment the
-        # gallery-builtin-fallbacks capability fills the seam this resolves to
-        # an asset payload. Both halves are asserted against the same chain.
-        payload = resolve_entity(self.character)
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        # (world.art.gallery_match.fallback_for): filled by
+        # gallery-builtin-fallbacks, the seam now resolves a committed
+        # built-in default for the artless character.
+        with patch("world.observability.log_info"):
+            payload = resolve_entity(self.character)
+        self.assertEqual(payload["kind"], "asset")
+        self.assertTrue(payload["url"].startswith("/art/defaults/"))
         with patch(
             "world.art.presenter.fallback_for",
             return_value={"identity": "fallback/character/default.png"},

@@ -73,12 +73,14 @@ be computed for a monster subject and no monster card SHALL be selected by a bin
 
 ### Requirement: The chain ends at one fallback seam
 `world/art/gallery_match.py` SHALL expose exactly one terminal seam `fallback_for(subject)` consulted
-after the classic asset record and before the placeholder. In this capability the seam SHALL return
-`None`, so the chain's terminal behaviour is byte-for-byte today's placeholder. A later capability
-MAY supply a fallback without modifying the chain.
+after the classic asset record and before the placeholder. The seam was introduced inert (returning
+`None`, byte-for-byte today's placeholder) and is now filled by `art-gallery-fallback`: it resolves
+the built-in default identity and face rectangle for person subjects and returns `None` for scene
+subjects, without the chain itself being modified. The presenter threads the entity it already
+resolved to the seam as an optional parameter; a bare subject-only call stays legal.
 
 #### Scenario: The seam returning nothing preserves today's placeholder
-- **WHEN** nothing resolves for a subject and the seam returns `None`
+- **WHEN** nothing resolves for a subject and the seam returns `None` (e.g. a scene subject)
 - **THEN** the payload is exactly the truthful placeholder this project produces today
 
 ### Requirement: Every resolution payload carries a face rectangle or null

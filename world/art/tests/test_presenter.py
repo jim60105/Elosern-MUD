@@ -228,9 +228,12 @@ class ArtPresenterTests(EvenniaTestCase):
         )
         # A monster identity living outside portrait/monster/ fails the
         # subject-shape validation no matter which format is configured.
-        payload = resolve_subject(subject)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["url"])
+        # Filled seam (gallery-builtin-fallbacks): the unusable identity now
+        # falls through to the built-in fallback instead of the placeholder.
+        with patch("world.observability.log_info"):
+            payload = resolve_subject(subject)
+        self.assertEqual(payload["kind"], "asset")
+        self.assertTrue(payload["url"].startswith("/art/defaults/"))
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_all_four_store_extensions_present_as_assets(self):
@@ -299,9 +302,12 @@ class ResolveEntityTests(EvenniaTestCase):
         self.assertNotIn(subject_key, self._generation_keys())
 
     def test_named_character_resolves_through_the_canonical_age_check(self):
-        payload = resolve_entity(self.player)
+        with patch("world.observability.log_info"):
+            payload = resolve_entity(self.player)
         self.assertEqual(payload["subject_key"], f"portrait:character:{self.player.pk}")
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        # Filled seam: an artless character now resolves a built-in fallback.
+        self.assertEqual(payload["kind"], "asset")
+        self.assertTrue(payload["url"].startswith("/art/defaults/"))
         self.assertIn("subject_key", payload)
 
     def test_valid_canonical_ages_reach_the_generation_client(self):
@@ -316,9 +322,12 @@ class ResolveEntityTests(EvenniaTestCase):
         self.assertIn(subject.full(), generated)
 
     def test_generic_monster_resolves_its_archetype_subject(self):
-        payload = resolve_entity(self.monster)
+        with patch("world.observability.log_info"):
+            payload = resolve_entity(self.monster)
         self.assertEqual(payload["subject_key"], "portrait:monster:low")
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        # Filled seam: an artless monster resolves the monster_anon default.
+        self.assertEqual(payload["kind"], "asset")
+        self.assertTrue(payload["url"].startswith("/art/defaults/"))
 
     def test_non_integer_age_never_reaches_a_worker(self):
         self.player.age = "22"
@@ -512,8 +521,10 @@ class FaceRectPayloadTests(EvenniaTestCase):
         self.assertEqual(payload["kind"], "asset")
         self.assertEqual(payload["url"], "/art/defaults/monster_default.png")
         self.assertEqual(payload["face_rect"], dict(DEFAULT_FACE_RECT))
-        # The unpatched seam returns None: byte-identical placeholder.
-        payload = resolve_subject(no_record)
+        # The unpatched seam fills persons but still returns None for scenes:
+        # a scene subject keeps the byte-identical truthful placeholder.
+        scene = ArtSubject(ArtSubjectKind.SCENE, "seam-no-record-scene")
+        payload = resolve_subject(scene)
         self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
 
 

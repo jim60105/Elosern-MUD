@@ -10,6 +10,8 @@ deterministic consumers could not legally import.
 from dataclasses import dataclass
 from types import MappingProxyType
 
+from world.art.fallback_keys import validate_fallback_key
+
 
 @dataclass(frozen=True)
 class NPCTier:
@@ -27,6 +29,12 @@ class NPCTier:
     description: str
     race_key: str
     static_tier_key: str
+    # The OPTIONAL built-in gallery fallback key (gallery-builtin-fallbacks).
+    # A role tier MAY claim one key of the closed vocabulary, which wins over
+    # the sex/age band rule for every scene NPC spawned from it (the spawned
+    # NPC carries its tier key as provenance). The unset default keeps every
+    # shipped tier valid without one. Validated at registry construction.
+    fallback_key: str | None = None
 
 
 _NPC_TIERS = (
@@ -52,3 +60,18 @@ _NPC_TIERS = (
 NPC_TIER_REGISTRY: MappingProxyType[str, NPCTier] = MappingProxyType(
     {tier.key: tier for tier in _NPC_TIERS}
 )
+
+
+def _validate_npc_tier_fallback_keys(
+    registry: MappingProxyType[str, NPCTier],
+) -> None:
+    """Reject a declared fallback key outside the closed vocabulary.
+
+    Runs at registry construction (import) time so an authored typo fails
+    loudly at import rather than silently resolving to a nonexistent image.
+    """
+    for tier in registry.values():
+        validate_fallback_key(tier.fallback_key, f"NPC tier {tier.key!r}")
+
+
+_validate_npc_tier_fallback_keys(NPC_TIER_REGISTRY)
