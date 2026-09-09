@@ -3,6 +3,7 @@
 ## Purpose
 TBD - created by archiving change art-assets. Update Purpose after archive.
 ## Requirements
+
 ### Requirement: Asset records carry the full contract and never a live object reference
 `world/art/store.py` SHALL persist one record per subject key containing the subject kind and
 un-prefixed key, a deterministic source-description hash, a status (`missing` / `pending` /
@@ -11,6 +12,22 @@ public URL and never an absolute path), an attempt count, a last error code, enq
 completed timestamps, the expected aspect ratio (`16:9` for scenes, `3:4` for portraits), and a prior
 output identity retained across a failed forced regeneration. A record SHALL NOT hold a live object
 reference.
+
+A record that carries a non-empty gallery image id is a GALLERY JOB record: it additionally carries
+that image id, the pending card's binding, face rectangle, and requested field ids, and its expected
+output identity is the per-image gallery path rather than the subject's fixed identity. A gallery job
+record SHALL carry no `output_identity` and no `prior_output_identity`: its published artifact is a
+gallery card, not a record field. Gallery job records SHALL be deleted when they reach a terminal
+settle, so the scanned record set is bounded by the jobs actually in flight.
+
+#### Scenario: A gallery job record carries the pending card metadata
+- **WHEN** a gallery image is requested for a subject
+- **THEN** one record is created carrying the subject kind and key, a fresh gallery image id, the
+  pending binding, face rectangle, and requested field ids, and no output identity
+
+#### Scenario: A settled gallery job record is removed
+- **WHEN** a gallery job settles `done` or `failed`
+- **THEN** the job record no longer exists and the queue scan sees only jobs still in flight
 
 #### Scenario: A completed record contains only the contract fields
 - **WHEN** a worker successfully completes a scene job
@@ -33,6 +50,30 @@ existing `pending`, `in_progress`, or `done` record. A `missing` record SHALL be
 `failed` record SHALL re-enqueue to `pending` on the next ensure or staff retry. Forced staff
 regeneration SHALL reset the record to `pending` under the queue lock and SHALL preserve the prior
 valid output.
+
+Gallery generation SHALL NOT go through `ensure`. `world/art/queue.py` SHALL expose a separate
+gallery enqueue that creates one record per REQUESTED IMAGE under the key
+`art:<full-subject-key>:gen:<image-id>` with a freshly minted image id, so two requests for the same
+subject produce two independent jobs and a gallery request is never collapsed into an existing
+record. The gallery key shape SHALL NOT collide with the subject key `art:<full-subject-key>`, so
+subject consolidation, `ensure`, and forced requeue never see a gallery job. `failed_keys()` and the
+staff retry path SHALL exclude gallery job records, because a gallery retry is a new request, not a
+re-enqueue. Both queues SHALL share the one process-wide queue lock, the one pending ordering, and
+the one worker concurrency slot.
+
+#### Scenario: Two gallery requests for one subject produce two jobs
+- **WHEN** a gallery image is requested twice for the same subject
+- **THEN** two records exist under two distinct `art:<full-subject-key>:gen:<image-id>` keys, both
+  pending, and neither replaced the other
+
+#### Scenario: A gallery job never disturbs the subject record
+- **WHEN** a subject has both a classic asset record and an in-flight gallery job
+- **THEN** `ensure`, forced requeue, and duplicate consolidation act on the classic record only, and
+  the gallery job is untouched
+
+#### Scenario: Gallery jobs are excluded from the staff retry set
+- **WHEN** the failed-key listing is taken while gallery job records exist
+- **THEN** no gallery job key appears in it and the staff retry path re-enqueues only subject records
 
 #### Scenario: Re-ensuring a pending, in-progress, or done subject is a no-op
 - **WHEN** `ensure` is called again for a subject whose record is already `pending`, `in_progress`, or
@@ -96,6 +137,20 @@ unreferenced orphan (logged, cleaned by the next regeneration), while any failur
 the record transition leaves the prior file on disk AND referenced. So one subject never has
 two stored files referenced by a record, and no settle order can strand a record pointing at a
 deleted file; a same-extension regeneration replaces in place and deletes nothing.
+
+For a GALLERY JOB record the pre-computed expected identity SHALL be the per-image gallery path
+`gallery/<kind-directory>/<subject-key>/<image-id><extension>` derived from the record — never
+`expected_output_identity(subject)` — and the publication SHALL be a card append rather than a record
+field transition: under the queue lock, while the claim's generation token is still current, the
+engine atomically replaces the temporary file onto that identity and appends exactly one card to the
+subject's `GalleryRecord` through the gallery write API, carrying the verbatim prompt pair and the
+server-reported seed from the returned `GeneratedImage`, the configured checkpoint when one is set,
+and the job record's pending binding, face rectangle, and requested field ids. The file write SHALL
+precede the card append, so an interruption leaves an orphan FILE (reclaimed by the startup prune)
+and never a card pointing at a missing file. A gallery job SHALL NOT delete any prior file and SHALL
+NOT touch any classic record's committed output. A gallery job that fails for any bounded reason
+SHALL append NO card, SHALL record the bounded error code on the subject's `GalleryRecord`, and SHALL
+leave every existing card intact.
 
 A named client error
 (`sd_connection_error`, `sd_timeout`, `sd_http_error`, `sd_malformed_response`, `sd_no_image`,
@@ -182,6 +237,22 @@ encode reclaims a legitimately slow batch mid-work.
   its post-response conversion
 - **THEN** the stored metadata carries the prompt pair from the original request, and the worker
   performs no second prompt-library render for encoding
+
+#### Scenario: A gallery job publishes exactly one card at its per-image identity
+- **WHEN** a claimed gallery job's generation succeeds
+- **THEN** the encoded bytes are written to `gallery/<kind-directory>/<subject-key>/<image-id><extension>`
+  under the store root and exactly one card carrying that identity, the returned prompt pair, and the
+  returned seed is appended to the subject's gallery
+
+#### Scenario: A failed gallery job appends no card
+- **WHEN** a claimed gallery job settles `failed` with any bounded error code
+- **THEN** the subject's gallery holds the same cards it held before, the bounded error code is
+  recorded on the gallery record, and no file is left referenced by any card
+
+#### Scenario: A crash between the file write and the card append leaves an orphan file
+- **WHEN** the process is interrupted after the gallery file is written and before the card is appended
+- **THEN** no card references the file, the gallery is unchanged, and the startup prune reclaims the
+  orphan file
 
 ### Requirement: A changed source-description hash is reported, never silently applied
 `world/art/queue.py` SHALL compare the enqueued `source_hash` and the enqueued rendered-prompt

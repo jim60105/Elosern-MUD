@@ -442,6 +442,25 @@ def _raw_image_ids(record: GalleryRecord) -> frozenset[str]:
     return frozenset(ids)
 
 
+def referenced_stored_identities() -> set[str]:
+    """Read-only: every stored identity referenced by any gallery card.
+
+    Exposed for the startup orphan prune (change ``gallery-generation-jobs``):
+    the single-writer rule keeps the record class itself inside this module,
+    so cross-record reads go through this accessor. Malformed entries count:
+    a referenced file is NEVER deleted, and an unparseable card's file is
+    retained until a human resolves it.
+    """
+    identities: set[str] = set()
+    for record in GalleryRecord.objects.all():
+        for entry in record.db.cards or []:
+            if isinstance(entry, Mapping) and isinstance(entry.get("stored_identity"), str):
+                identity = entry["stored_identity"]
+                if identity:
+                    identities.add(identity)
+    return identities
+
+
 def _delete_stored_file(subject: ArtSubject, identity: object) -> None:
     """Unlink one card file under confinement; never raise out of deletion.
 

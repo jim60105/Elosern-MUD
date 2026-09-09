@@ -8,8 +8,10 @@ subject exactly as the classic portrait ensure does, SHALL validate the supplied
 rectangle through the `world/art/gallery.py` validators BEFORE any queue write, SHALL mint a fresh
 uuid `image_id`, and SHALL enqueue exactly one job. A rejection SHALL raise a typed error at the
 service boundary and SHALL leave no record, no file, and no card behind. The seam SHALL be
-failure-isolated on every gameplay path exactly like the existing ensure seams: an art failure logs a
-bounded diagnostic and never rolls back creation, import, spawn, or movement.
+failure-isolated on every gameplay path exactly like the existing ensure seams: every rejection
+raises BEFORE any record, file, or card is written, so a gameplay call site wrapped in the existing
+post-commit failure-isolation pattern (wired by `gallery-autogen-retrofit`) never rolls back
+creation, import, spawn, or movement, and an art failure only logs a bounded diagnostic.
 
 #### Scenario: A valid request queues exactly one job
 - **WHEN** a gallery image is requested for an eligible character subject with a valid binding and rect
@@ -46,8 +48,10 @@ generation having succeeded, so a fully offline deployment stays playable.
 ### Requirement: Interrupted gallery generations are reclaimed at startup
 The engine SHALL run one idempotent startup prune that deletes every file under the store root's
 `gallery/` tree that no card of any `GalleryRecord` references, and deletes every gallery job record
-that is not claimable (a record whose subject no longer resolves, or whose lease and generation
-token can never publish). Every deletion SHALL resolve through the single store-root confinement
+that can never be claimed or published again (a record whose subject no longer resolves, or whose
+status is neither `pending` nor `in_progress`); a lease-expired `in_progress` job is RETAINED —
+reclaiming it to `pending` is the shared queue's lease-reclaim job, not the prune's, so a gallery
+job whose worker died is retried rather than silently dropped. Every deletion SHALL resolve through the single store-root confinement
 helper, so no path outside `ART_STORE_ROOT` is ever unlinked. A prune failure SHALL be a bounded
 diagnostic that never aborts startup, and a prune SHALL NEVER delete a file a card references.
 
@@ -69,6 +73,9 @@ when a gallery job is enqueued, and one `gallery_settle` info event when a galle
 terminal settle, carrying the business ids `subject`, `image_id`, and `kind` in `context`, plus the
 settled `status` and bounded `reason` code on settle. Logging SHALL go exclusively through the
 facade so `tools.observability_lint` passes with no waiver.
+Gallery jobs flow through the existing claim machinery unchanged, so a gallery job additionally
+produces the queue-level `sd_job_claim`/`sd_job_settled` events keyed by the job record; the
+`gallery_*` pair is the per-image business stream operators SHALL count.
 
 #### Scenario: A successful gallery generation leaves a generate/settle pair
 - **WHEN** one gallery image is requested and its job settles `done`
