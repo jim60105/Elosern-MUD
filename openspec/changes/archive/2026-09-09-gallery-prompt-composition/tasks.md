@@ -42,6 +42,6 @@
 ## 6. Verification
 
 - [x] 6.1 `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.art world.prompts`
-- [ ] 6.2 `uv run --locked python -m tools.observability_lint check`
-- [ ] 6.3 `uv run --locked python -m tools.spec_traceability check`
-- [ ] 6.4 `openspec validate gallery-prompt-composition --strict`
+- [x] 6.2 `uv run --locked python -m tools.observability_lint check`
+- [x] 6.3 `uv run --locked python -m tools.spec_traceability check`
+- [x] 6.4 `openspec validate gallery-prompt-composition --strict`
