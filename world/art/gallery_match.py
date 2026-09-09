@@ -37,7 +37,7 @@ Import discipline: read-only gallery APIs only (``cards_for``, ``record_for``
 without ``create``, ``snapshot_for``) — this module names no record class and
 performs no write of its own (a subject-record consolidation inside the
 read path may still retire duplicate rows under the single-writer model). It
-never imports ``world.ai``, ``ollama``, ``llm_client``, or
+never imports the generative-transport packages or
 ``world.art.connectivity``, keeping the connectivity import boundary intact.
 """
 

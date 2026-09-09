@@ -24,7 +24,7 @@ whitespace-normalized to a single line. The caller appends it through the
 the prompt library, never in Python constants.
 
 The module is import-disciplined like the rest of the deterministic art
-path: no ``world.ai``, ``ollama``, ``llm_client``, or
+path: it stays clear of the generative-transport packages and the
 ``world.art.connectivity`` import, and no write to any entity state. The
 ``world.art.gallery`` snapshot reader is imported lazily inside
 ``equipment_fragment`` because ``gallery.py`` imports ``world.art.subjects``

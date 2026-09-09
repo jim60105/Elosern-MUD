@@ -24,7 +24,7 @@ values fail closed to the adult band rather than raising. Scene subjects are
 not persons — they get no fallback (``None``).
 
 The module writes nothing: no record, no card, no store copy. Import
-discipline: it names no ``world.ai``, ``ollama``, ``llm_client``, or
+discipline: it stays clear of the generative-transport packages and the
 ``world.art.connectivity`` import; the entity rediscovery seam imports
 ``ObjectDB``/``LivingEntity`` function-locally exactly as ``service.py``'s
 ``_living_entity_for_stable_key`` does.
