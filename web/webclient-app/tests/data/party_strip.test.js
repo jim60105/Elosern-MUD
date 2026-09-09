@@ -113,7 +113,7 @@ describe("PartyStrip (left-HUD companion quickbar)", () => {
   it("renders an img when portrait_ref resolves in artPanel", () => {
     const artPanel = {
       portrait_catalog: {
-        p_reina: { url: "/media/portraits/reina.png" },
+        p_reina: { url: "/media/portraits/reina.png", face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 } },
       },
     };
     const w = mountStrip({

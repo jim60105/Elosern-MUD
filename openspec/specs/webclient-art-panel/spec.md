@@ -7,7 +7,7 @@ contextual portrait focus, targeted worker-completion pushes, deterministic
 offline degradation, and keyboard-first desktop-bounded browser acceptance.
 ## Requirements
 ### Requirement: The art panel is an exact read-only panel available in exploration and combat modes
-The production presentation registry SHALL register `art` schema version 1. Its available payload
+The production presentation registry SHALL register `art` schema version 2. Its available payload
 SHALL contain exactly `schema_version`, `available`, `kind`, `scene`, and `portrait_catalog`;
 `available` SHALL be true and `kind` SHALL be `scene`. The panel SHALL be available in `exploration`
 and `combat` modes and SHALL use the registered common unavailable form in `creation` mode. The
@@ -71,7 +71,7 @@ present focusable entities: the combat-session participant identities in combat 
 dialogue hosts and explicit named-portrait-policy characters present in the current room in
 exploration mode, in deterministic order. Each catalog value SHALL contain the server-resolved
 subject key, asset status, same-origin media URL or placeholder, aspect ratio, alternative text, and
-bounded display context (name plus role/target label). Portrait subject resolution SHALL dispatch by
+bounded display context (name plus role/target label), and the resolved normalized face rectangle. The face rectangle SHALL be a mapping of exactly `x`, `y`, `w`, `h` in `[0, 1]` whenever the entry carries a media URL, and SHALL be `null` whenever the entry is a placeholder, so a client never offsets a frame it has no image for. The catalog SHALL carry no face-detection result, no crop, and no second image reference. Portrait subject resolution SHALL dispatch by
 entity kind: a named character SHALL resolve `portrait:character:<stable-key>` only from an explicit
 named `portrait_policy` through the canonical-age check; a generic monster SHALL resolve
 `portrait:monster:<archetype>` from its bestiary `MONSTER_TIER_REGISTRY` archetype without any
@@ -110,6 +110,14 @@ is not currently present.
 - **WHEN** a room contains entities that are not present (e.g. in another room) or carry no explicit
   named policy and are not dialogue hosts
 - **THEN** none of them appears in the portrait catalog
+
+#### Scenario: A resolved catalog entry carries its face rectangle
+- **WHEN** a present entity resolves to a gallery image
+- **THEN** its catalog entry carries a media URL and a face rectangle of exactly `x`, `y`, `w`, `h` in `[0, 1]`
+
+#### Scenario: A placeholder entry carries a null face rectangle
+- **WHEN** a present entity resolves to any truthful placeholder
+- **THEN** its catalog entry carries a null URL and a null face rectangle
 
 ### Requirement: Contextual portrait focus is client-local and verified
 The browser SHALL maintain contextual portrait focus entirely client-side: the KeyboardRouter SHALL
