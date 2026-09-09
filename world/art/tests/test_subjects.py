@@ -255,7 +255,7 @@ class DescriptionTests(EvenniaTestCase):
         character.db.persona = "secret tragic past"
         character.db.disguised_stats = {"atk_phys": 99}
         character.key = "艾琳"
-        text = character_description(character, 24)
+        text = character_description(character, 24, fields=("appearance",))
         self.assertIn("艾琳", text)
         self.assertIn("貓人族", text)
         self.assertIn("24", text)
@@ -299,7 +299,14 @@ _APPEARANCE = {
 
 class AppearanceDescriptionTests(PromptFixture):
     """The admitted persona ``appearance`` block in character descriptions
-    (portrait-prompt-appearance): ordering, exclusion, determinism, emptiness."""
+    (portrait-prompt-appearance): ordering, exclusion, determinism, emptiness.
+
+    Every description here selects ``appearance`` explicitly — the seam the
+    gallery auto-generation paths use — so these pins are the description the
+    automatic paths keep producing after ``gallery-prompt-composition`` made
+    the selection explicit."""
+
+    _APPEARANCE_ONLY = ("appearance",)
 
     def _full_persona(self):
         # Insertion order deliberately shuffled away from _SUBKEY_ORDER so the
@@ -328,7 +335,7 @@ class AppearanceDescriptionTests(PromptFixture):
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_full_persona_contributes_every_appearance_subkey_and_nothing_else(self):
         self.load()
-        text = character_description(_persona_entity(self._full_persona()), 31)
+        text = character_description(_persona_entity(self._full_persona()), 31, fields=self._APPEARANCE_ONLY)
         self.assertIn("艾琳", text)
         self.assertIn("貓人族", text)
         self.assertIn("31", text)
@@ -351,7 +358,7 @@ class AppearanceDescriptionTests(PromptFixture):
         self.load()
         persona = self._full_persona()
         persona["identity"] = {"public": "村落的偵察員", "hidden": "流放的王室信使"}
-        text = character_description(_persona_entity(persona), 31)
+        text = character_description(_persona_entity(persona), 31, fields=self._APPEARANCE_ONLY)
         self.assertNotIn("流放的王室信使", text)
         self.assertNotIn("村落的偵察員", text)
         self.assertIn("a silver ear piercing", text)
@@ -360,8 +367,8 @@ class AppearanceDescriptionTests(PromptFixture):
     def test_description_is_byte_identical_with_declared_subkey_order(self):
         self.load()
         entity = _persona_entity(self._full_persona())
-        first = character_description(entity, 31)
-        second = character_description(entity, 31)
+        first = character_description(entity, 31, fields=self._APPEARANCE_ONLY)
+        second = character_description(entity, 31, fields=self._APPEARANCE_ONLY)
         self.assertEqual(first, second)
         # The contracted shape: base sentence, then the labeled appearance
         # block in _SUBKEY_ORDER order (unknown sub-keys would follow in
@@ -396,7 +403,10 @@ class AppearanceDescriptionTests(PromptFixture):
             "secret tragic past",
         ):
             with self.subTest(persona=persona):
-                self.assertEqual(character_description(_persona_entity(persona), 24), expected)
+                self.assertEqual(
+                    character_description(_persona_entity(persona), 24, fields=self._APPEARANCE_ONLY),
+                    expected,
+                )
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_disguised_stats_never_appear_as_physical_truth(self):
@@ -409,7 +419,7 @@ class AppearanceDescriptionTests(PromptFixture):
             "vigour": 106,
         }
         entity.db.age = 61
-        text = character_description(entity, 31)
+        text = character_description(entity, 31, fields=self._APPEARANCE_ONLY)
         for value in (87, 154, 43, 106):
             self.assertNotIn(str(value), text)
         self.assertIn("a silver ear piercing", text)
@@ -420,7 +430,7 @@ class AppearanceDescriptionTests(PromptFixture):
         # authored block can never smuggle an unbounded prompt to the pipeline.
         self.load()
         persona = {"appearance": {"overview": "長" * 900}}
-        text = character_description(_persona_entity(persona), 31)
+        text = character_description(_persona_entity(persona), 31, fields=self._APPEARANCE_ONLY)
         section = text.removeprefix(
             "A 貓人族 character named 艾琳 (31) in the approved visual style.\n"
         )
@@ -454,7 +464,10 @@ class AppearanceDescriptionTests(PromptFixture):
         entity = Mock()
         entity.db = _DbTrap()
         entity.key = "艾琳"
-        self.assertEqual(character_description(entity, 24), "艾琳（貓人族，24 歲）")
+        self.assertEqual(
+            character_description(entity, 24, fields=self._APPEARANCE_ONLY),
+            "艾琳（貓人族，24 歲）",
+        )
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_library_turning_unavailable_mid_render_keeps_the_base(self):
@@ -474,7 +487,7 @@ class AppearanceDescriptionTests(PromptFixture):
             return real(key, **values)
 
         with patch.object(subjects, "render_prompt", stub):
-            text = character_description(entity, 31)
+            text = character_description(entity, 31, fields=self._APPEARANCE_ONLY)
         self.assertEqual(calls, ["", "\n外觀：\nfeature：a silver ear piercing"])
         self.assertEqual(
             text, "A 貓人族 character named 艾琳 (31) in the approved visual style."

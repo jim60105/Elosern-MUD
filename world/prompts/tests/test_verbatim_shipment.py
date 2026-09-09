@@ -397,7 +397,7 @@ class LibrarySourceTests(unittest.TestCase):
         character.db.subrace = "catkin"
         character.key = "艾琳"
         self.assertEqual(
-            character_description(character, 24),
+            character_description(character, 24, fields=("appearance",)),
             "A 貓人族 character named 艾琳 (24) in the approved visual style.",
         )
 

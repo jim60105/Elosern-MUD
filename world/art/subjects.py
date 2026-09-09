@@ -21,6 +21,7 @@ from world.lore.races import SUBRACE_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.prompts.loader import PromptUnavailableError, render_prompt
 from world.rules.persona import PersonaStore
+from world.art.gallery_prompt import equipment_fragment
 
 # The single shared stable-key contract (fix-art-pipeline-contracts D1): every
 # producer of a portrait/scene stable key validates against these same rules.
@@ -229,19 +230,27 @@ def _appearance_fragment(entity) -> str:
     return "\n" + block
 
 
-def character_description(entity, age: int) -> str:
+def character_description(entity, age: int, *, fields, custom_prompt: str = "") -> str:
     """One deterministic description for a character portrait.
 
     The template (rendered from the prompt library) covers only stable,
     validated identity: the display name, race/subrace label, the age, and the
     approved-visual-style fragment, and — as the one admitted persona
     exception — the authored physical ``appearance`` block rendered in the
-    declared ``_SUBKEY_ORDER`` order (portrait-prompt-appearance). Every other
-    persona key, secret state, mutable combat resources, and disguised stats
-    are never included (design D6 as narrowed by that change). A broken
-    library key degrades to a deterministic registry-driven fallback (design
-    D3) so the art pipeline never stalls; the fallback reads no persona at
-    all, which is why both library renders complete before any persona read.
+    declared ``_SUBKEY_ORDER`` order (portrait-prompt-appearance), admitted
+    when and only when the caller selects the ``appearance`` field. The
+    description is composable by the explicit ``fields`` selection (change
+    ``gallery-prompt-composition``): selected equipment fields add the
+    registry ``ItemPresentation`` visual text of the occupying items, and
+    ``custom_prompt`` — already validated at the service boundary — is
+    appended verbatim through its own template slot. Selecting nothing
+    reproduces exactly the pre-appearance description. Every other persona
+    key, secret state, mutable combat resources, and disguised stats are
+    never included (design D6 as narrowed by that change). A broken library
+    key degrades to a deterministic registry-driven fallback (design D3) so
+    the art pipeline never stalls; the fallback reads no persona, no
+    equipment, and no free text, which is why both library renders complete
+    before any data read.
     """
     race = _race_label(entity)
     name = entity.db.display_name or entity.key or "<unknown>"
@@ -254,11 +263,15 @@ def character_description(entity, age: int) -> str:
             age=str(age),
             style=style,
             appearance="",
+            equipment="",
+            custom="",
         )
     except PromptUnavailableError:
         return f"{name}（{race}，{age} 歲）"
-    appearance = _appearance_fragment(entity)
-    if not appearance:
+    appearance = _appearance_fragment(entity) if "appearance" in fields else ""
+    equipment = equipment_fragment(entity, fields)
+    custom = "\n" + custom_prompt if custom_prompt else ""
+    if not (appearance or equipment or custom):
         return base
     try:
         return render_prompt(
@@ -268,6 +281,8 @@ def character_description(entity, age: int) -> str:
             age=str(age),
             style=style,
             appearance=appearance,
+            equipment=equipment,
+            custom=custom,
         )
     except PromptUnavailableError:
         # observability: ignore R2: the library is frozen after the startup
@@ -298,8 +313,15 @@ def monster_description(subject: ArtSubject) -> str:
         return tier.description
 
 
-def description_for(subject: ArtSubject, *, entity=None, age=None) -> str:
-    """Return the canonical deterministic description for a subject."""
+def description_for(subject: ArtSubject, *, entity=None, age=None, fields=None, custom_prompt="") -> str:
+    """Return the canonical deterministic description for a subject.
+
+    A character description requires an EXPLICIT field selection (change
+    ``gallery-prompt-composition``): ``fields`` is mandatory for a character
+    subject so no seam can keep an implicit appearance default. Scene and
+    monster descriptions are registry text and ignore ``fields`` and
+    ``custom_prompt`` entirely.
+    """
     if subject.kind is ArtSubjectKind.SCENE:
         return scene_description(subject)
     if subject.kind is ArtSubjectKind.MONSTER:
@@ -308,4 +330,8 @@ def description_for(subject: ArtSubject, *, entity=None, age=None) -> str:
         raise ArtSubjectError(
             "a character description requires the entity and age"
         )
-    return character_description(entity, age)
+    if fields is None:
+        raise ArtSubjectError(
+            "a character description requires an explicit field selection"
+        )
+    return character_description(entity, age, fields=fields, custom_prompt=custom_prompt)
