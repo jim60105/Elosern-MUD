@@ -291,29 +291,41 @@ def _record_by_db_key(db_key: str) -> ArtAssetRecord | None:
 
 
 def settle(subject: ArtSubject, *, status: str, output_identity: str | None,
-           error: str | None) -> ArtAssetRecord | None:
+           error: str | None, generation_token: str) -> ArtAssetRecord | None:
     """Apply one validated terminal result for a claimed record under the lock.
 
     A failure retains the record's prior valid output. ``status`` must be
     ``done`` or ``failed``; anything else is recorded as a bounded failure.
-    Only a record that is still ``in_progress`` is settled: a stale settle from
-    a worker whose job was later requeued (reset to ``pending``) or reclaimed
-    is a no-op, so an older worker result can never overwrite a newer forced
-    regeneration (design D4).
+    Only a record that is still ``in_progress`` under the SAME claim is
+    settled: a stale settle from a worker whose job was later requeued (reset
+    to ``pending``), reclaimed, or re-claimed is a no-op returning ``None``
+    (design D4, and D6a for the claim-token half). The ``generation_token``
+    must be the CLAIM-TIME snapshot the worker captured before any blocking
+    work — the classic failure settle is now guarded exactly like the
+    publish-side settles, so a stale worker's late terminal result (success
+    or failure) can never steal a record another claim now owns. Callers pass
+    the token from their claim-time snapshot, never a re-read of the live
+    record attribute.
     """
     return _settle_by_key(
-        record_key(subject), status=status, output_identity=output_identity, error=error
+        record_key(subject),
+        status=status,
+        output_identity=output_identity,
+        error=error,
+        generation_token=generation_token,
     )
 
 
 def _settle_by_key(db_key: str, *, status: str, output_identity: str | None,
-                   error: str | None) -> ArtAssetRecord | None:
+                   error: str | None, generation_token: str) -> ArtAssetRecord | None:
     """``settle`` resolved by the record's own db_key (shared by both kinds)."""
     with queue_lock:
         record = _record_by_db_key(db_key)
         if record is None:
             return None
         if record.db.status != ArtAssetStatus.IN_PROGRESS:
+            return None
+        if record.db.generation_token != generation_token:
             return None
         if status == ArtAssetStatus.DONE and output_identity:
             record.db.status = ArtAssetStatus.DONE

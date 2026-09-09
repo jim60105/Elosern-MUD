@@ -144,6 +144,13 @@ ART_SD_MAX_RESPONSE_BYTES = 52428800
 ART_SD_MAX_IMAGE_DIMENSIONS = 4096
 ART_SD_MAX_IMAGE_PIXELS = 16777216
 ART_SD_PREPIN_SAMPLES_FORMAT = False
+# Portrait background-removal knobs (art-portrait-cutout): the harness is
+# fully offline and deterministic, so the stage stays off and its seam points
+# at the fake double — no test ever loads an ONNX model or reaches the
+# network. Declared like every other art knob because this module
+# deliberately does not import the developer settings.
+ART_REMBG_ENABLED = False
+ART_REMBG_BACKEND = "world.art.fake_cutout.FakeCutoutBackend"
 ART_SCHEDULER_ENABLED = False
 ART_SCHEDULER_INTERVAL_SECONDS = 30
 ART_SCHEDULER_LIMIT = 4

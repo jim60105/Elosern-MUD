@@ -231,6 +231,13 @@ name does not promise enforcement that does not exist.
   8-byte check the bad value would flow into `encode`, whose `_decode_transport_png`
   would reject it as `sd_format_error`: a bounded code, but one that blames the wrong
   stage and would send an operator to the format settings for a backend fault.
+  The validation is NOT only the 8-byte magic check: the seam also requires the value
+  to decode as a PNG whose mode carries an alpha channel (`RGBA`/`LA`/`PA`). That is
+  the postcondition of the stage's own contract ("returns PNG bytes carrying an alpha
+  channel"): a backend that returns the original opaque portrait — the exact
+  silent-degradation outcome D5 forbids — or corrupt magic-prefixed bytes must fail
+  the job as `art_cutout_error` before `encode` is ever reached. The check is
+  decode-only: the validated bytes are forwarded to `encode` untouched (no re-encode).
 - `resolve_cutout_backend()` — imports the `ART_REMBG_BACKEND` dotted path, exactly like
   `resolve_sd_client()`. Resolution failure is `art_cutout_unavailable`.
 - `RembgCutoutBackend` — the real implementation. `rembg` and `onnxruntime` are imported
@@ -377,7 +384,13 @@ the NEW claim `failed` — stealing a live job's state from an obsolete attempt.
 
 Fix: `queue.settle` and `queue._settle_by_key` gain a required `generation_token`
 argument, and the worker passes the claim-time token it already snapshots before any
-blocking work. A mismatch is a no-op returning `None`, exactly like the publish-side
+blocking work. The snapshot is captured ONCE per claim and threaded through the whole
+worker path: `_settle_one` receives it as an explicit argument and NEVER re-reads
+`record.db.generation_token` (that attribute is live storage — a record reclaimed and
+re-claimed between the batch snapshot and a later record's settle would hand the old
+worker the NEW claim's token). The same snapshot feeds `settle_generated`,
+`settle_gallery_generated`, `settle_gallery_failed`, and the classic terminal `settle`.
+A mismatch is a no-op returning `None`, exactly like the publish-side
 rule: the stale failure publishes nothing and settles nothing, and the current claim
 finishes on its own terms. `_fail_batch` (the batch-level `sd_client_config_error`
 path) is likewise re-checked under the same token discipline — its failure occurs

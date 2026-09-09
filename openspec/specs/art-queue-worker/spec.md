@@ -105,12 +105,18 @@ wait. The external worker SHALL run at most one job at a time.
 
 `world/art/worker.py` SHALL generate one image per claimed record by calling the configured
 internal sd-webui client (`world.art.sd_worker.SDWebUIClient` via the settings `ART_SD_CLIENT`
-dotted path) on a background thread with a bounded timeout, SHALL convert the returned
-`GeneratedImage` PNG bytes to the configured output format through
+dotted path) on a background thread with a bounded timeout, SHALL apply the portrait
+background-removal stage to the returned PNG bytes when and only when that stage's own
+enablement and subject-kind conditions hold (see the `art-portrait-cutout` capability),
+SHALL convert the resulting PNG bytes to the configured output format through
 `world/art/formats.py::encode(...)`, and SHALL write the encoded bytes to the engine
 pre-computed exact expected relative identity for that subject (`expected_output_identity(subject)`)
 whose extension is the store extension of the configured output format (`.png`, `.webp`, `.jpg`,
-`.avif`).
+`.avif`). The stage order SHALL be generate, then background removal, then encode, then write,
+then publish: the removal operates on the transport PNG bytes so the encoder's PNG-container
+contract, sanitization, metadata policy, and format selection are unchanged, and exactly one
+artifact is published per job. When the stage does not apply, the bytes reach `encode` exactly as
+they do today.
 The client result carries the validated PNG bytes, the server-reported generation seed (a
 non-negative integer parsed from the response `info` JSON, or `None` when `info` is absent,
 unparseable, or carries no non-negative integer `seed`), and the exact prompt pair and
@@ -118,7 +124,10 @@ generation parameters (steps, CFG scale, width/height, and the sampler/scheduler
 values when set) that built the request — the worker encodes provenance from those returned
 values and SHALL NOT re-render the prompt library after the response, so embedded metadata can
 never describe a different generation than the bytes it ships with; a missing or invalid seed
-SHALL never fail an otherwise valid generation. A job SHALL settle `done` only when the encoded
+SHALL never fail an otherwise valid generation. The background-removal stage SHALL NOT alter that
+provenance: it is a local post-process, not a generation parameter, and the embedded
+parameters block continues to describe the request sd-webui served. A job SHALL settle `done`
+only when the encoded
 bytes are written to exactly the pre-computed expected identity, resolving to an existing
 regular file
 under the configured `ART_STORE_ROOT` (symlink-resolved), and a successful settle SHALL persist
@@ -150,19 +159,33 @@ precede the card append, so an interruption leaves an orphan FILE (reclaimed by 
 and never a card pointing at a missing file. A gallery job SHALL NOT delete any prior file and SHALL
 NOT touch any classic record's committed output. A gallery job that fails for any bounded reason
 SHALL append NO card, SHALL record the bounded error code on the subject's `GalleryRecord`, and SHALL
-leave every existing card intact.
+leave every existing card intact. The background-removal stage applies to a gallery job on exactly
+the same subject-kind terms as to a classic record, and its failures settle through this gallery
+path.
 
 A named client error
 (`sd_connection_error`, `sd_timeout`, `sd_http_error`, `sd_malformed_response`, `sd_no_image`,
 `sd_decode_error`, `sd_not_png`, `sd_response_too_large`, `sd_image_dimensions_too_large`,
-`sd_format_error`), a prompt-render or client-config error (`sd_prompt_error`,
+`sd_format_error`), a background-removal error (`art_cutout_unavailable`,
+`art_cutout_error`), a prompt-render or client-config error (`sd_prompt_error`,
 `sd_client_config_error`), an internal error (`sd_internal_error`), or any rejected or
 timed-out item SHALL settle the record `failed` with a bounded error code and SHALL retain the
 record's prior valid output; no file outside the store root is ever written, deleted, or
 honored. Lease reclaim SHALL bound `in_progress` records by the worst-case duration of a
-claimed batch (`batch size × (generation timeout + per-item local-conversion allowance) +
-margin`), never by a flat per-item timeout, so neither a slow generation nor a slow local
-encode reclaims a legitimately slow batch mid-work.
+claimed batch (`batch size × (generation timeout + per-item local-conversion allowance +
+per-item background-removal allowance) + margin`), never by a flat per-item timeout, so
+neither a slow generation, a slow local encode, nor a slow background-removal pass reclaims a
+legitimately slow batch mid-work. The background-removal allowance SHALL be
+`ART_REMBG_ALLOWANCE_SECONDS` when that stage is enabled and zero when it is disabled, so a
+deployment that does not run the stage keeps today's bound exactly. A lease that nevertheless
+expires mid-flight — the one-time model download is deliberately outside the bound — SHALL
+remain safe by the claim-token rule APPLIED SYMMETRICALLY: every worker-owned terminal settle —
+the successful publication AND the terminal failure — SHALL carry the claim-time `generation_token`
+snapshot and SHALL reject a mismatch as a no-op, so a stale worker's late result, whether success
+or failure, publishes nothing, settles nothing, and never touches a record another claim now owns.
+The worst outcome is one wasted generation, never a double publish, a corrupted output, or a
+stale failure stealing a live claim. (This change adds the guard to the classic terminal-failure
+path, which is status-only today; the gallery-failure path already carries the token.)
 
 #### Scenario: A valid generation completes a scene job
 - **WHEN** the internal client returns valid PNG bytes for a scene subject, the configured
@@ -203,6 +226,18 @@ encode reclaims a legitimately slow batch mid-work.
 - **THEN** the item settles `failed` with the bounded error code and the record's prior valid
   output is retained
 
+#### Scenario: A background-removal failure is a bounded failure
+- **WHEN** the background-removal stage raises for a claimed portrait job whose record already
+  has a valid prior output
+- **THEN** the record settles `failed` with `art_cutout_unavailable` or `art_cutout_error`, the
+  prior file remains intact at the prior identity, and nothing new is written
+
+#### Scenario: The removal runs between generation and encoding
+- **WHEN** an enabled portrait job generates successfully with an injected removal backend and
+  an observed `encode`
+- **THEN** `encode` received the backend's returned bytes rather than the client's, the client
+  was called exactly once, and exactly one artifact was published
+
 #### Scenario: An out-of-root output path is rejected
 - **WHEN** the expected output identity would resolve outside `ART_STORE_ROOT`
 - **THEN** the item is rejected with a bounded failure, nothing is written outside the store root,
@@ -220,15 +255,28 @@ encode reclaims a legitimately slow batch mid-work.
   partial file replaces it, and the record's prior output is retained
 
 #### Scenario: A slow batch is not reclaimed while its worker thread is running
-- **WHEN** a batch of `N` claimed records is generating or locally converting and the elapsed
-  time exceeds a single per-item (timeout + conversion allowance) but not
-  `N × (timeout + conversion allowance) + margin`
+- **WHEN** a batch of `N` claimed records is generating, removing backgrounds, or locally
+  converting and the elapsed time exceeds a single per-item (timeout + conversion allowance +
+  removal allowance) but not `N × (timeout + conversion allowance + removal allowance) + margin`
 - **THEN** the batch is not reclaimed to `pending`, and after it finishes every claimed job
   reaches a terminal `done` or `failed` state
 
+#### Scenario: A disabled removal stage keeps today's lease bound
+- **WHEN** the lease bound is computed with `ART_REMBG_ENABLED` false
+- **THEN** it equals `ART_SCHEDULER_LIMIT × (ART_SD_TIMEOUT_SECONDS + conversion allowance) +
+  margin` exactly, and with the stage enabled it is larger by
+  `ART_SCHEDULER_LIMIT × ART_REMBG_ALLOWANCE_SECONDS`
+
+#### Scenario: A stale classic failure cannot steal a reclaimed claim
+- **WHEN** a classic portrait job's cutout overruns the lease, the record is reclaimed to
+  `pending` and re-claimed under a new generation token, and the obsolete worker then settles
+  its bounded `art_cutout_*` failure with its stale claim-time token
+- **THEN** that settle is a no-op: the record's status, error code, and outputs are exactly what
+  the current claim leaves them, and the obsolete worker's temporary artifacts are removed
+
 #### Scenario: No claimed job is left stuck
 - **WHEN** a claimed batch completes with any combination of success, named client errors,
-  prompt-render errors, client-config errors, and internal errors
+  background-removal errors, prompt-render errors, client-config errors, and internal errors
 - **THEN** every claimed job reaches a terminal `done` or `failed` state with a bounded error
   code, and none stays `in_progress`
 
@@ -253,7 +301,6 @@ encode reclaims a legitimately slow batch mid-work.
 - **WHEN** the process is interrupted after the gallery file is written and before the card is appended
 - **THEN** no card references the file, the gallery is unchanged, and the startup prune reclaims the
   orphan file
-
 ### Requirement: A changed source-description hash is reported, never silently applied
 `world/art/queue.py` SHALL compare the enqueued `source_hash` and the enqueued rendered-prompt
 digest (sha256 of the rendered positive/negative prompt pair) against the record's stored values.

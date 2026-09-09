@@ -118,8 +118,15 @@ prompts:
 | `ART_SD_PRESERVE_GENERATION_METADATA` | 同名 | `True` | 是否在輸出內嵌 A1111 形式的生成資訊（提示詞、負向提示詞、步驟、CFG、取樣器、排程器、seed、尺寸、模型）；`png` 走文字區塊、有損格式走 EXIF，來源一律是引擎-known 的請求值；`False`＝完全不寫入（此時 seed 仍存於記錄供程式使用） |
 | `ART_SD_PROBE_TIMEOUT_MS` | 同名 | `5000` | `@art health` 連線探測（`GET /sdapi/v1/samplers`）的總預算毫秒數，1000–60000 包含兩端；僅診斷用途 |
 | `ART_SD_PROBE_CACHE_SECONDS` | 同名 | `300` | 探測判定可重複使用的最長秒數，5–3600 包含兩端；URL／憑證存在性／探測預算任一變更即失效；`@art health` 一律強制重新探測 |
+| `ART_REMBG_ENABLED` | 同名 | `False` | 肖像背景移除（rembg）總開關。`true` 一行即啟用：`#ART_REMBG_ENABLED=true`（寫入 `.env` 後重啟）。場景藝術**永不**去背；種子同步的藝術保留原背景（引擎不重寫操作者供應的檔案） |
+| `ART_REMBG_MODEL` | 同名 | `bria-rmbg` | 去背模型，封閉集合 `bria-rmbg/isnet-anime/isnet-general-use/u2net/u2netp`（不分大小寫）。⚠️ 授權：`bria-rmbg` 封裝 BRIA 授權的 RMBG-2.0 權重，非商業免費、商業使用需向 BRIA 取得授權；`isnet-anime`（約 176 MB）是寬鬆授權的替換品，改一個變數加 `@art requeue` 即可 |
+| `ART_REMBG_DOWNLOAD_ENABLED` | 同名 | `True` | 允許首次使用時由 rembg 下載模型到持久 volume。`false` 加上預置的 `server/.rembg` volume＝無執行期網路配置；模型缺席時每個肖像 job 立即以有界的 `art_cutout_unavailable` 失敗 |
+| `ART_REMBG_ALLOWANCE_SECONDS` | 同名 | `120` | 啟用時每項租約寬限秒數，10–1800 包含兩端；是租約預算而非強制逾時 |
+| `ART_REMBG_THREADS` | 同名 | `0` | ONNX session 執行緒上限，0–256；`0`＝ONNX Runtime 自行決定；非零經 `OMP_NUM_THREADS` 送達（行程全域） |
 
 標註「同名」的設定由同名環境變數設定（變數不存在或空白時用預設值；存在但無效的值會在啟動時直接報錯並點名變數，絕不靜默失效）。完整的三層設定模型、優先順序與驗證規則見[設定與環境變數](/development/settings-and-environment)。
+
+**肖像去背的誠實成本**：啟用後，首次生成肖像前 rembg 會下載約 1 GB 的模型檔（快取在持久的 `server/.rembg` volume，跨容器重建保留）；每張肖像在單一 worker 執行緒上多花約 10 秒 CPU；ONNX session 建立後 Evennia 伺服器行程的常駐記憶體**永久**增加約 1–1.5 GB（`isnet-anime` 少一個數量級）——小機器請以此估算，避免 OOM。去背只影響啟用後新生成的肖像；既有資產與種子同步檔案不會被回溯改寫，需要時用 `@art retry`／`@art requeue` 逐張重生成。去背失敗是有界失敗（`art_cutout_unavailable`／`art_cutout_error`）：保留前一份有效輸出、不阻斷批次、`@art retry` 在修復後即可恢復。`ART_REMBG_ENABLED=true` 時 `ART_SD_OUTPUT_FORMAT` 不得為 `jpeg`（JPEG 無法攜帶 alpha，啟動即拒絕）；`png`／`webp`／`avif` 皆可。
 
 ### 提示詞編輯流程（美術生成）
 

@@ -65,6 +65,7 @@ class ArtQueueTests(EvenniaTestCase):
 
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/forest_path.png",
             error=None,
@@ -80,8 +81,14 @@ class ArtQueueTests(EvenniaTestCase):
         created = ensure(subject, "desc")
         self.assertEqual(created.db.status, ArtAssetStatus.PENDING)
 
-        claim(10)
-        settle(subject, status=ArtAssetStatus.FAILED, output_identity=None, error="boom")
+        claimed = claim(10)
+        settle(
+            subject,
+            generation_token=str(claimed[0].db.generation_token),
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="boom",
+        )
         failed = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
         self.assertEqual(failed.db.status, ArtAssetStatus.FAILED)
         retried = ensure(subject, "desc")
@@ -94,9 +101,10 @@ class ArtQueueTests(EvenniaTestCase):
     def test_forced_regeneration_resets_and_preserves_the_prior_output(self):
         subject = _scene("dungeon_interior")
         ensure(subject, "desc")
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/dungeon_interior.png",
             error=None,
@@ -105,8 +113,14 @@ class ArtQueueTests(EvenniaTestCase):
         record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
         self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
         self.assertEqual(record.db.prior_output_identity, "scene/dungeon_interior.png")
-        claim(10)
-        settle(subject, status=ArtAssetStatus.FAILED, output_identity=None, error="boom")
+        claimed = claim(10)
+        settle(
+            subject,
+            generation_token=str(claimed[0].db.generation_token),
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="boom",
+        )
         self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
         self.assertEqual(record.db.prior_output_identity, "scene/dungeon_interior.png")
 
@@ -114,10 +128,12 @@ class ArtQueueTests(EvenniaTestCase):
     def test_stale_settle_for_a_requeued_record_is_a_noop(self):
         subject = _scene("dungeon_interior")
         ensure(subject, "desc")
-        claim(10)
+        held = claim(10)
         requeue(subject)
         stale = settle(
-            subject, status=ArtAssetStatus.DONE,
+            subject,
+            generation_token=str(held[0].db.generation_token),
+            status=ArtAssetStatus.DONE,
             output_identity="scene/dungeon_interior.png", error=None,
         )
         self.assertIsNone(stale)
@@ -128,9 +144,10 @@ class ArtQueueTests(EvenniaTestCase):
     def test_changed_hash_is_staff_noted_without_replacing_the_image(self):
         subject = _scene("city_street")
         ensure(subject, "original description")
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/city_street.png",
             error=None,
@@ -145,9 +162,10 @@ class ArtQueueTests(EvenniaTestCase):
     def test_changed_prompt_digest_is_staff_noted_without_replacing_the_image(self):
         subject = _scene("city_street")
         ensure(subject, "same description")
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/city_street.png",
             error=None,
@@ -177,9 +195,10 @@ class ArtQueueTests(EvenniaTestCase):
     def test_requeue_recomputes_the_rendered_prompt_digest(self):
         subject = _scene("dungeon_interior")
         ensure(subject, "desc")
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/dungeon_interior.png",
             error=None,
@@ -221,10 +240,22 @@ class ArtQueueTests(EvenniaTestCase):
         bad = _scene("cave_interior")
         ensure(good, "g")
         ensure(bad, "b")
-        claim(10)
-        settle(good, status=ArtAssetStatus.DONE,
-               output_identity="scene/forest_path.png", error=None)
-        settle(bad, status=ArtAssetStatus.FAILED, output_identity=None, error="boom")
+        claimed = claim(10)
+        tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
+        settle(
+            good,
+            generation_token=tokens[record_key(good)],
+            status=ArtAssetStatus.DONE,
+            output_identity="scene/forest_path.png",
+            error=None,
+        )
+        settle(
+            bad,
+            generation_token=tokens[record_key(bad)],
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="boom",
+        )
         self.assertEqual(failed_keys(), ["scene:cave_interior"])
 
     def test_duplicate_records_are_consolidated_keeping_the_most_advanced(self):
@@ -255,6 +286,7 @@ class ArtQueueTests(EvenniaTestCase):
         for record in first_batch:
             settle(
                 _scene(record.db.subject_key),
+                generation_token=str(record.db.generation_token),
                 status=ArtAssetStatus.FAILED,
                 output_identity=None,
                 error="fixture",
@@ -272,6 +304,52 @@ class ArtQueueTests(EvenniaTestCase):
             if record.db.status == ArtAssetStatus.PENDING
         ]
         self.assertEqual(len(pending), 0)
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_a_stale_token_failure_settle_is_a_noop(self):
+        # D6a: the classic terminal-failure settle is claim-token guarded.
+        # A record claimed under token A, then re-claimed under a fresh token
+        # B (lease expiry or forced requeue), can never be failed by the
+        # obsolete worker's late terminal settle.
+        subject = _scene("dungeon_interior")
+        ensure(subject, "desc")
+        held = claim(10)[0]
+        token_a = str(held.db.generation_token)
+        requeue(subject)
+        fresh = claim(10)[0]
+        token_b = str(fresh.db.generation_token)
+        self.assertNotEqual(token_a, token_b)
+        self.assertEqual(
+            settle(
+                subject,
+                generation_token=token_a,
+                status=ArtAssetStatus.FAILED,
+                output_identity=None,
+                error="art_cutout_error",
+            ),
+            None,
+        )
+        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+        self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
+        self.assertEqual(record.db.generation_token, token_b)
+        self.assertIsNone(record.db.last_error_code)
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_the_current_token_failure_settle_still_applies(self):
+        subject = _scene("coastal_path")
+        ensure(subject, "desc")
+        claimed = claim(10)
+        settled = settle(
+            subject,
+            generation_token=str(claimed[0].db.generation_token),
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="art_cutout_error",
+        )
+        self.assertIsNotNone(settled)
+        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
+        self.assertEqual(record.db.last_error_code, "art_cutout_error")
 
 
 class GalleryJobQueueTests(EvenniaTestCase):
@@ -350,9 +428,11 @@ class GalleryJobQueueTests(EvenniaTestCase):
         subject = _character("42")
         job = _enqueue_gallery(subject, "55555555-5555-4555-8555-555555555555")
         ensure(_scene("cave_interior"), "b")
-        claim(10)
+        claimed = claim(10)
+        tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
         settle(
             _scene("cave_interior"),
+            generation_token=tokens[record_key(_scene("cave_interior"))],
             status=ArtAssetStatus.FAILED,
             output_identity=None,
             error="boom",

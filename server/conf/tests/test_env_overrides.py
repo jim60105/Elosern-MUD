@@ -65,6 +65,11 @@ ENV_BACKED: dict[str, str] = {
     "ART_SD_PRESERVE_GENERATION_METADATA": "ART_SD_PRESERVE_GENERATION_METADATA",
     "ART_SD_PROBE_TIMEOUT_MS": "ART_SD_PROBE_TIMEOUT_MS",
     "ART_SD_PROBE_CACHE_SECONDS": "ART_SD_PROBE_CACHE_SECONDS",
+    "ART_REMBG_ENABLED": "ART_REMBG_ENABLED",
+    "ART_REMBG_MODEL": "ART_REMBG_MODEL",
+    "ART_REMBG_DOWNLOAD_ENABLED": "ART_REMBG_DOWNLOAD_ENABLED",
+    "ART_REMBG_ALLOWANCE_SECONDS": "ART_REMBG_ALLOWANCE_SECONDS",
+    "ART_REMBG_THREADS": "ART_REMBG_THREADS",
     "ART_SCHEDULER_ENABLED": "ART_SCHEDULER_ENABLED",
     "ART_SCHEDULER_INTERVAL_SECONDS": "ART_SCHEDULER_INTERVAL_SECONDS",
     "ART_SCHEDULER_LIMIT": "ART_SCHEDULER_LIMIT",
@@ -97,6 +102,11 @@ DEFAULT_REPR: dict[str, str] = {
     "ART_SD_PRESERVE_GENERATION_METADATA": "True",
     "ART_SD_PROBE_TIMEOUT_MS": "5000",
     "ART_SD_PROBE_CACHE_SECONDS": "300",
+    "ART_REMBG_ENABLED": "False",
+    "ART_REMBG_MODEL": "'bria-rmbg'",
+    "ART_REMBG_DOWNLOAD_ENABLED": "True",
+    "ART_REMBG_ALLOWANCE_SECONDS": "120",
+    "ART_REMBG_THREADS": "0",
     "ART_SCHEDULER_ENABLED": "True",
     "ART_SCHEDULER_INTERVAL_SECONDS": "30",
     "ART_SCHEDULER_LIMIT": "4",
@@ -153,6 +163,11 @@ VALID_OVERRIDES: list[tuple[str, str, str, str]] = [
     ("ART_SD_PROBE_CACHE_SECONDS", "ART_SD_PROBE_CACHE_SECONDS", "60", "60"),
     ("ART_SD_PROBE_CACHE_SECONDS", "ART_SD_PROBE_CACHE_SECONDS", "5", "5"),
     ("ART_SD_PROBE_CACHE_SECONDS", "ART_SD_PROBE_CACHE_SECONDS", "3600", "3600"),
+    ("ART_REMBG_ENABLED", "ART_REMBG_ENABLED", "on", "True"),
+    ("ART_REMBG_MODEL", "ART_REMBG_MODEL", "ISNET-ANIME", "'isnet-anime'"),
+    ("ART_REMBG_DOWNLOAD_ENABLED", "ART_REMBG_DOWNLOAD_ENABLED", "off", "False"),
+    ("ART_REMBG_ALLOWANCE_SECONDS", "ART_REMBG_ALLOWANCE_SECONDS", "300", "300"),
+    ("ART_REMBG_THREADS", "ART_REMBG_THREADS", "8", "8"),
     ("ART_SCHEDULER_ENABLED", "ART_SCHEDULER_ENABLED", "0", "False"),
     ("ART_SCHEDULER_INTERVAL_SECONDS", "ART_SCHEDULER_INTERVAL_SECONDS", "15", "15"),
     ("ART_SCHEDULER_LIMIT", "ART_SCHEDULER_LIMIT", "8", "8"),
@@ -199,6 +214,14 @@ INVALID_VALUES: list[tuple[str, str, str]] = [
     ("ELOSERN_MAX_CHARACTERS", "11", "expected an integer between 1 and 10"),
     ("ELOSERN_MAX_CHARACTERS", "-1", "expected an integer between 1 and 10"),
     ("ELOSERN_MAX_CHARACTERS", "twelve", "expected an integer between 1 and 10"),
+    ("ART_REMBG_ALLOWANCE_SECONDS", "5", "expected an integer between 10 and 1800"),
+    ("ART_REMBG_ALLOWANCE_SECONDS", "2000", "expected an integer between 10 and 1800"),
+    ("ART_REMBG_ALLOWANCE_SECONDS", "twelve", "expected an integer between 10 and 1800"),
+    ("ART_REMBG_THREADS", "-1", "expected an integer between 0 and 256"),
+    ("ART_REMBG_THREADS", "257", "expected an integer between 0 and 256"),
+    ("ART_REMBG_THREADS", "twelve", "expected an integer between 0 and 256"),
+    ("ART_REMBG_MODEL", "segment-anything", "expected one of bria-rmbg/isnet-anime/isnet-general-use/u2net/u2netp (case-insensitive)"),
+    ("ART_REMBG_ENABLED", "maybe", "1/true/yes/on/0/false/no/off"),
 ]
 
 _IMPORT = "import server.conf.settings as s"
@@ -206,6 +229,8 @@ _IMPORT = "import server.conf.settings as s"
 BOOL_SETTINGS = [
     "ART_SD_PREPIN_SAMPLES_FORMAT",
     "ART_SD_PRESERVE_GENERATION_METADATA",
+    "ART_REMBG_ENABLED",
+    "ART_REMBG_DOWNLOAD_ENABLED",
     "ART_SCHEDULER_ENABLED",
     "ELOSERN_VUE_CLIENT",
 ]
@@ -333,6 +358,8 @@ class ValidCoercionTests(_SubprocessSettingsTests):
         env = {
             "ART_SD_PREPIN_SAMPLES_FORMAT": "True",
             "ART_SD_PRESERVE_GENERATION_METADATA": "TRUE",
+            "ART_REMBG_ENABLED": "TRUE",
+            "ART_REMBG_DOWNLOAD_ENABLED": "Yes",
             "ART_SCHEDULER_ENABLED": "OFF",
             "ELOSERN_VUE_CLIENT": "Yes",
         }
@@ -342,6 +369,8 @@ class ValidCoercionTests(_SubprocessSettingsTests):
             {
                 "ART_SD_PREPIN_SAMPLES_FORMAT": "True",
                 "ART_SD_PRESERVE_GENERATION_METADATA": "True",
+                "ART_REMBG_ENABLED": "True",
+                "ART_REMBG_DOWNLOAD_ENABLED": "True",
                 "ART_SCHEDULER_ENABLED": "False",
                 "ELOSERN_VUE_CLIENT": "True",
             },
@@ -417,15 +446,23 @@ class CodeOnlySeamTests(_SubprocessSettingsTests):
         "settings-environment-overrides::the-client-seam-and-art-store-root-are-never-environment-configurable"
     )
     def test_hostile_client_seam_and_store_root_variables_are_ignored(self):
-        names = ["ART_SD_CLIENT", "ART_STORE_ROOT"]
+        names = [
+            "ART_SD_CLIENT",
+            "ART_STORE_ROOT",
+            "ART_REMBG_BACKEND",
+            "ART_REMBG_MODEL_DIR",
+        ]
         env = {
             "ART_SD_CLIENT": "os.system",
             "ART_STORE_ROOT": "/tmp/env-override-art-root",
+            "ART_REMBG_BACKEND": "os.system",
+            "ART_REMBG_MODEL_DIR": "/tmp/env-override-rembg",
         }
         result = self._run(_settings_repr(names), **env)
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         printed = _printed_map(
-            result.stdout, {"ART_SD_CLIENT", "ART_STORE_ROOT"}
+            result.stdout,
+            {"ART_SD_CLIENT", "ART_STORE_ROOT", "ART_REMBG_BACKEND", "ART_REMBG_MODEL_DIR"},
         )
         self.assertEqual(
             printed["ART_SD_CLIENT"], repr("world.art.sd_worker.SDWebUIClient")
@@ -436,6 +473,16 @@ class CodeOnlySeamTests(_SubprocessSettingsTests):
             msg=printed["ART_STORE_ROOT"],
         )
         self.assertNotIn("env-override-art-root", printed["ART_STORE_ROOT"])
+        self.assertEqual(
+            printed["ART_REMBG_BACKEND"],
+            repr("world.art.cutout.RembgCutoutBackend"),
+        )
+        self.assertEqual(
+            printed["ART_REMBG_MODEL_DIR"],
+            repr(os.path.join(REPO_ROOT, "server", ".rembg")),
+            msg=printed["ART_REMBG_MODEL_DIR"],
+        )
+        self.assertNotIn("env-override-rembg", printed["ART_REMBG_MODEL_DIR"])
 
     @covers_requirement(
         "settings-environment-overrides::the-client-seam-and-art-store-root-are-never-environment-configurable"
@@ -447,6 +494,70 @@ class CodeOnlySeamTests(_SubprocessSettingsTests):
         printed = _printed_map(result.stdout, set(names))
         self.assertEqual(printed["ART_SD_USERNAME"], "''")
         self.assertEqual(printed["ART_SD_PASSWORD"], "''")
+
+
+class CutoutBootGuardTests(_SubprocessSettingsTests):  # archive-sync annotations
+
+    """The alpha-hostile combination is refused at boot, never silently
+    degraded: an enabled background-removal stage with an effective
+    ART_SD_OUTPUT_FORMAT of jpeg would store the original background-ful
+    portrait while the record claimed to be a cutout. The check runs AFTER the
+    secret_settings import, so every override path is covered by the one
+    guard (art-portrait-cutout D4; annotations follow the archive sync, task
+    6.11)."""
+
+    @covers_requirement("art-portrait-cutout::an-output-format-that-cannot-carry-alpha-is-refused-at-boot")
+    def test_enabled_with_jpeg_fails_settings_import(self):
+        result = self._run(
+            _IMPORT, ART_REMBG_ENABLED="true", ART_SD_OUTPUT_FORMAT="jpeg"
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ImproperlyConfigured", result.stderr)
+        self.assertIn("ART_REMBG_ENABLED", result.stderr)
+        self.assertIn("ART_SD_OUTPUT_FORMAT", result.stderr)
+
+    @covers_requirement("art-portrait-cutout::an-output-format-that-cannot-carry-alpha-is-refused-at-boot")
+    def test_a_secret_format_override_is_caught_by_the_same_guard(self):
+        code = (
+            "import sys\n"
+            "import types\n"
+            "secret = types.ModuleType('server.conf.secret_settings')\n"
+            "secret.ART_SD_OUTPUT_FORMAT = 'jpeg'\n"
+            "sys.modules['server.conf.secret_settings'] = secret\n"
+            + _IMPORT
+        )
+        result = self._run(code, ART_REMBG_ENABLED="true")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ImproperlyConfigured", result.stderr)
+        self.assertIn("ART_REMBG_ENABLED", result.stderr)
+        self.assertIn("ART_SD_OUTPUT_FORMAT", result.stderr)
+
+    @covers_requirement("art-portrait-cutout::an-output-format-that-cannot-carry-alpha-is-refused-at-boot")
+    def test_alpha_capable_formats_boot_normally_when_enabled(self):
+        for raw in ("png", "webp", "avif"):
+            with self.subTest(format=raw):
+                result = self._run(
+                    _settings_repr(["ART_REMBG_ENABLED", "ART_SD_OUTPUT_FORMAT"]),
+                    ART_REMBG_ENABLED="true",
+                    ART_SD_OUTPUT_FORMAT=raw,
+                )
+                self.assertEqual(result.returncode, 0, msg=result.stderr)
+                self.assertEqual(
+                    _printed_map(result.stdout, {"ART_REMBG_ENABLED", "ART_SD_OUTPUT_FORMAT"}),
+                    {"ART_REMBG_ENABLED": "True", "ART_SD_OUTPUT_FORMAT": repr(raw)},
+                )
+
+    @covers_requirement("art-portrait-cutout::an-output-format-that-cannot-carry-alpha-is-refused-at-boot")
+    def test_jpeg_alone_is_still_a_supported_configuration(self):
+        result = self._run(
+            _settings_repr(["ART_REMBG_ENABLED", "ART_SD_OUTPUT_FORMAT"]),
+            ART_SD_OUTPUT_FORMAT="jpeg",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(
+            _printed_map(result.stdout, {"ART_REMBG_ENABLED", "ART_SD_OUTPUT_FORMAT"}),
+            {"ART_REMBG_ENABLED": "False", "ART_SD_OUTPUT_FORMAT": "'jpeg'"},
+        )
 
 
 class PrecedenceTests(_SubprocessSettingsTests):
@@ -785,6 +896,8 @@ class InventoryTests(unittest.TestCase):
         self.assertNotIn("ART_STORE_ROOT", call_string_args)
         self.assertNotIn("ART_SD_USERNAME", call_string_args)
         self.assertNotIn("ART_SD_PASSWORD", call_string_args)
+        self.assertNotIn("ART_REMBG_BACKEND", call_string_args)
+        self.assertNotIn("ART_REMBG_MODEL_DIR", call_string_args)
 
     @covers_requirement(
         "settings-environment-overrides::environment-inventory-and-configuration-guide-are-version-controlled-and-exact"

@@ -62,6 +62,25 @@ class ArtSettingsTests(unittest.TestCase):
         # Derived, never configured: the default format yields .png.
         self.assertEqual(settings.ART_SD_OUTPUT_EXTENSION, ".png")
 
+    def test_background_removal_defaults(self):
+        # The stage ships fully implemented and OFF (art-portrait-cutout D2):
+        # the test defaults are exactly the documented code defaults, so no
+        # test ever loads the optional rembg stack by accident.
+        self.assertIs(settings.ART_REMBG_ENABLED, False)
+        self.assertEqual(settings.ART_REMBG_MODEL, "bria-rmbg")
+        self.assertIs(settings.ART_REMBG_DOWNLOAD_ENABLED, True)
+        self.assertEqual(settings.ART_REMBG_ALLOWANCE_SECONDS, 120)
+        self.assertEqual(settings.ART_REMBG_THREADS, 0)
+
+    def test_background_removal_seam_and_model_dir_are_code_only(self):
+        self.assertEqual(
+            settings.ART_REMBG_BACKEND, "world.art.cutout.RembgCutoutBackend"
+        )
+        self.assertEqual(
+            settings.ART_REMBG_MODEL_DIR,
+            __import__("os").path.join(settings.GAME_DIR, "server", ".rembg"),
+        )
+
     def test_external_worker_settings_are_removed(self):
         self.assertFalse(hasattr(settings, "ART_WORKER_CMD"))
         self.assertFalse(hasattr(settings, "ART_WORKER_TIMEOUT_SECONDS"))

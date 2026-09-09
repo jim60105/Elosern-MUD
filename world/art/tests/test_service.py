@@ -1196,8 +1196,14 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(b"classic")
         ensure(subject, "desc")
-        claim(10)
-        settle(subject, status=ArtAssetStatus.DONE, output_identity=identity, error=None)
+        claimed = claim(10)
+        settle(
+            subject,
+            generation_token=str(claimed[0].db.generation_token),
+            status=ArtAssetStatus.DONE,
+            output_identity=identity,
+            error=None,
+        )
         before = ArtAssetRecord.objects.filter(db_key=f"art:portrait:monster:{tier}").first()
         self.assertEqual(before.db.status, ArtAssetStatus.DONE)
         art_sync_all()

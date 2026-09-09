@@ -83,6 +83,7 @@ class ContainerContractTests(unittest.TestCase):
             "/app/server/.static",
             "/app/server/.media",
             "/app/server/.art",
+            "/app/server/.rembg",
         }
 
         self.assertRegex(
@@ -121,6 +122,7 @@ class ContainerContractTests(unittest.TestCase):
             {
                 "evennia-db:/app/server/db",
                 "evennia-art:/app/server/.art",
+                "evennia-rembg:/app/server/.rembg",
                 "evennia-logs:/app/server/logs",
                 "evennia-static:/app/server/.static",
                 "evennia-media:/app/server/.media",
@@ -130,7 +132,14 @@ class ContainerContractTests(unittest.TestCase):
         )
         self.assertEqual(
             set(compose["volumes"]),
-            {"evennia-db", "evennia-art", "evennia-logs", "evennia-static", "evennia-media"},
+            {
+                "evennia-db",
+                "evennia-art",
+                "evennia-rembg",
+                "evennia-logs",
+                "evennia-static",
+                "evennia-media",
+            },
         )
         self.assertIn("host.containers.internal", evennia["environment"]["LLM_BASE_URL"])
         self.assertNotIn("OLLAMA_BASE_URL", evennia["environment"])
@@ -140,6 +149,27 @@ class ContainerContractTests(unittest.TestCase):
         self.assertTrue(bootstrap["tty"])
         self.assertEqual(bootstrap["volumes"], ["evennia-db:/app/server/db"])
         self.assertIn("evennia createsuperuser", " ".join(bootstrap["command"]))
+
+    @covers_requirement("container-image::compose-yaml-for-local-and-networked-gpu-services")
+    def test_the_rembg_model_cache_is_a_named_volume_never_an_image_layer(self):
+        # art-portrait-cutout: the ~1 GB model artifact is fetched at runtime
+        # into a persistent named volume (code-only ART_REMBG_MODEL_DIR), never
+        # baked into the image and never the tmpfs HOME under /tmp. The knobs
+        # arrive through env_file: .env like the rest of the ART_* family, so
+        # compose.yaml carries no ART_REMBG_* interpolation line.
+        compose = yaml.safe_load(_read("compose.yaml"))
+        evennia = compose["services"]["evennia"]
+        self.assertIn("evennia-rembg:/app/server/.rembg", evennia["volumes"])
+        self.assertIn("evennia-rembg", compose["volumes"])
+        self.assertNotIn(
+            "ART_REMBG_ENABLED", evennia.get("environment", {})
+        )
+        containerfile = _read("Containerfile")
+        layout = _stage(containerfile, "app-layout")
+        final = _stage(containerfile, "final")
+        self.assertIn("install -d -m 775 -o root -g 0 /app/server/.rembg", layout)
+        self.assertIn('"/app/server/.rembg"', final)
+        self.assertNotIn("ART_REMBG_", final)
 
     @covers_requirement("container-image::compose-yaml-for-local-and-networked-gpu-services")
     def test_prompt_files_are_baked_and_mounted_read_only(self):

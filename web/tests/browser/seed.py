@@ -235,8 +235,15 @@ def _art_fixture(character, room) -> None:
         for subject in (actor_subject, host_subject):
             if subject is not None:
                 ensure(subject, "desc")
-        claim(50)
-        settle(scene, status=ArtAssetStatus.DONE, output_identity=identity, error=None)
+        claimed = claim(50)
+        tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
+        settle(
+            scene,
+            generation_token=tokens[record_key(scene)],
+            status=ArtAssetStatus.DONE,
+            output_identity=identity,
+            error=None,
+        )
         (root / "portrait" / "character").mkdir(parents=True, exist_ok=True)
         for subject, stable_key in (
             (actor_subject, f"browser-{character.pk}"),
@@ -257,12 +264,24 @@ def _art_fixture(character, room) -> None:
                 )
             portrait_identity = f"portrait/character/{stable_key}.png"
             (root / portrait_identity).write_bytes(FIXTURE_VALID_PNG)
-            settle(subject, status=ArtAssetStatus.DONE, output_identity=portrait_identity, error=None)
+            settle(
+                subject,
+                generation_token=tokens[record_key(subject)],
+                status=ArtAssetStatus.DONE,
+                output_identity=portrait_identity,
+                error=None,
+            )
     elif mode == "failed":
         from world.art.queue import claim
 
-        claim(10)
-        settle(scene, status=ArtAssetStatus.FAILED, output_identity=None, error="fixture")
+        claimed = claim(10)
+        settle(
+            scene,
+            generation_token=str(claimed[0].db.generation_token),
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="fixture",
+        )
     elif mode == "pending":
         from world.art.queue import claim
 

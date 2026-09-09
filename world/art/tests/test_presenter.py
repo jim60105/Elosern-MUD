@@ -62,9 +62,10 @@ class ArtPresenterTests(EvenniaTestCase):
         subject = _scene()
         ensure(subject, "desc")
         self._write_asset("scene/forest_path.png")
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/forest_path.png",
             error=None,
@@ -80,9 +81,10 @@ class ArtPresenterTests(EvenniaTestCase):
     def test_done_record_with_a_missing_file_resolves_to_unavailable(self):
         subject = _scene()
         ensure(subject, "desc")
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/forest_path.png",
             error=None,
@@ -105,8 +107,15 @@ class ArtPresenterTests(EvenniaTestCase):
 
         failed = ArtSubject(ArtSubjectKind.SCENE, "dungeon_interior")
         ensure(failed, "desc")
-        claim(10)
-        settle(failed, status=ArtAssetStatus.FAILED, output_identity=None, error="boom")
+        claimed = claim(10)
+        tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
+        settle(
+            failed,
+            generation_token=tokens[record_key(failed)],
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="boom",
+        )
         payload = resolve_subject(failed)
         self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
         self.assertEqual(payload["status"], ArtAssetStatus.FAILED)
@@ -132,9 +141,10 @@ class ArtPresenterTests(EvenniaTestCase):
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
         ensure(subject, "desc")
         self._write_asset("portrait/character/42.png")
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="portrait/character/42.png",
             error=None,
@@ -169,9 +179,14 @@ class ArtPresenterTests(EvenniaTestCase):
         ):
             if expected == ArtAssetStatus.FAILED:
                 ensure(subject, "desc")
-                claim(10)
-                settle(subject, status=ArtAssetStatus.FAILED,
-                       output_identity=None, error="boom")
+                claimed = claim(10)
+                settle(
+                    subject,
+                    generation_token=str(claimed[0].db.generation_token),
+                    status=ArtAssetStatus.FAILED,
+                    output_identity=None,
+                    error="boom",
+                )
             payload = resolve_subject(subject)
             self.assertEqual(payload["status"], expected)
 
@@ -197,9 +212,10 @@ class ArtPresenterTests(EvenniaTestCase):
         subject = _scene()
         ensure(subject, "desc")
         self._write_asset("scene/forest_path.png")
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/forest_path.png",
             error=None,
@@ -219,9 +235,10 @@ class ArtPresenterTests(EvenniaTestCase):
         subject = ArtSubject(ArtSubjectKind.MONSTER, "goblin")
         ensure(subject, "desc")
         self._write_asset("scene/goblin.png")
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/goblin.png",
             error=None,
@@ -242,9 +259,10 @@ class ArtPresenterTests(EvenniaTestCase):
             identity = f"scene/mixed_store_{extension[1:]}{extension}"
             ensure(subject, "desc")
             self._write_asset(identity)
-            claim(10)
+            claimed = claim(10)
             settle(
                 subject,
+                generation_token=str(claimed[0].db.generation_token),
                 status=ArtAssetStatus.DONE,
                 output_identity=identity,
                 error=None,
@@ -461,9 +479,10 @@ class FaceRectPayloadTests(EvenniaTestCase):
         target = self.root / f"portrait/character/{subject.key}.png"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(b"asset")
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity=f"portrait/character/{subject.key}.png",
             error=None,
@@ -495,9 +514,10 @@ class FaceRectPayloadTests(EvenniaTestCase):
         from world.art.queue import claim as claim2, ensure as ensure2, settle as settle2
 
         ensure2(done, "desc")
-        claim2(10)
+        claimed = claim2(10)
         settle2(
             done,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/tavern_interior.png",
             error=None,

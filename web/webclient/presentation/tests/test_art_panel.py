@@ -306,9 +306,10 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self._write_asset(identity)
         from world.art.queue import claim
 
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity=identity,
             error=None,
@@ -356,9 +357,10 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
         failed = ArtSubject(ArtSubjectKind.SCENE, "tavern_interior")
         ensure(failed, "desc")
-        claim(10)
+        claimed = claim(10)
         settle(
             failed,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.FAILED,
             output_identity=None,
             error="boom",
@@ -397,9 +399,10 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         ensure(ArtSubject(ArtSubjectKind.SCENE, "tavern_interior"), "desc")
         from world.art.queue import claim
 
-        claim(10)
+        claimed = claim(10)
         settle(
             ArtSubject(ArtSubjectKind.SCENE, "tavern_interior"),
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/tavern_interior.png",
             error=None,

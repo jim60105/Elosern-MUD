@@ -193,11 +193,12 @@ class ArtPushPresenterTests(EvenniaTestCase):
         ensure(self.subject, "desc")
         from world.art.queue import claim
 
-        claim(10)
+        claimed = claim(10)
         target = self.root / "scene" / "forest_path.png"
         target.write_bytes(b"asset")
         settle(
             self.subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/forest_path.png",
             error=None,
