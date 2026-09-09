@@ -496,7 +496,8 @@ class CodeOnlySeamTests(_SubprocessSettingsTests):
         self.assertEqual(printed["ART_SD_PASSWORD"], "''")
 
 
-class CutoutBootGuardTests(_SubprocessSettingsTests):
+class CutoutBootGuardTests(_SubprocessSettingsTests):  # archive-sync annotations
+
     """The alpha-hostile combination is refused at boot, never silently
     degraded: an enabled background-removal stage with an effective
     ART_SD_OUTPUT_FORMAT of jpeg would store the original background-ful
@@ -505,6 +506,7 @@ class CutoutBootGuardTests(_SubprocessSettingsTests):
     guard (art-portrait-cutout D4; annotations follow the archive sync, task
     6.11)."""
 
+    @covers_requirement("art-portrait-cutout::an-output-format-that-cannot-carry-alpha-is-refused-at-boot")
     def test_enabled_with_jpeg_fails_settings_import(self):
         result = self._run(
             _IMPORT, ART_REMBG_ENABLED="true", ART_SD_OUTPUT_FORMAT="jpeg"
@@ -514,6 +516,7 @@ class CutoutBootGuardTests(_SubprocessSettingsTests):
         self.assertIn("ART_REMBG_ENABLED", result.stderr)
         self.assertIn("ART_SD_OUTPUT_FORMAT", result.stderr)
 
+    @covers_requirement("art-portrait-cutout::an-output-format-that-cannot-carry-alpha-is-refused-at-boot")
     def test_a_secret_format_override_is_caught_by_the_same_guard(self):
         code = (
             "import sys\n"
@@ -529,6 +532,7 @@ class CutoutBootGuardTests(_SubprocessSettingsTests):
         self.assertIn("ART_REMBG_ENABLED", result.stderr)
         self.assertIn("ART_SD_OUTPUT_FORMAT", result.stderr)
 
+    @covers_requirement("art-portrait-cutout::an-output-format-that-cannot-carry-alpha-is-refused-at-boot")
     def test_alpha_capable_formats_boot_normally_when_enabled(self):
         for raw in ("png", "webp", "avif"):
             with self.subTest(format=raw):
@@ -543,6 +547,7 @@ class CutoutBootGuardTests(_SubprocessSettingsTests):
                     {"ART_REMBG_ENABLED": "True", "ART_SD_OUTPUT_FORMAT": repr(raw)},
                 )
 
+    @covers_requirement("art-portrait-cutout::an-output-format-that-cannot-carry-alpha-is-refused-at-boot")
     def test_jpeg_alone_is_still_a_supported_configuration(self):
         result = self._run(
             _settings_repr(["ART_REMBG_ENABLED", "ART_SD_OUTPUT_FORMAT"]),

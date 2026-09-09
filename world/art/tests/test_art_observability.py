@@ -299,6 +299,7 @@ class CutoutEventTests(EvenniaTest):
         return _OpaqueClient()
 
     @covers_requirement("art-queue-worker::worker-claim-and-settle-emit-boundary-events")
+    @covers_requirement("art-portrait-cutout::the-background-removal-stage-emits-boundary-events")
     def test_a_successful_cutout_emits_exactly_one_stage_event(self):
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
         ensure(subject, "desc")
@@ -317,6 +318,7 @@ class CutoutEventTests(EvenniaTest):
         self.assertEqual(_events(info, "art_cutout_failed"), [])
 
     @covers_requirement("art-queue-worker::worker-claim-and-settle-emit-boundary-events")
+    @covers_requirement("art-portrait-cutout::the-background-removal-stage-emits-boundary-events")
     def test_a_failed_cutout_emits_one_stage_event_and_the_job_pair(self):
         from world.art.cutout import CutoutError
 
@@ -350,6 +352,7 @@ class CutoutEventTests(EvenniaTest):
         self.assertEqual(_events(info, "art_cutout_done"), [])
 
     @covers_requirement("art-queue-worker::worker-claim-and-settle-emit-boundary-events")
+    @covers_requirement("art-portrait-cutout::the-background-removal-stage-emits-boundary-events")
     def test_a_failing_gallery_cutout_emits_the_gallery_terminal_event(self):
         from world.art.cutout import CutoutError
         from world.art.queue import enqueue_gallery_job
@@ -389,6 +392,7 @@ class CutoutEventTests(EvenniaTest):
         self.assertEqual(len(job_settles), 1)
         self.assertEqual(job_settles[0].kwargs["context"]["reason"], "art_cutout_error")
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-stage-emits-boundary-events")
     def test_no_cutout_event_for_a_skipped_or_disabled_run(self):
         scene = ArtSubject(ArtSubjectKind.SCENE, "forest_path")
         ensure(scene, "desc")

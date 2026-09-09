@@ -439,9 +439,8 @@ class MetadataPolicyTests(unittest.TestCase):
 
 class AlphaRoundTripTests(unittest.TestCase):
     """An RGBA transport PNG's transparency survives png/webp/avif end to end
-    (art-output-format-pipeline, art-portrait-cutout D4). The alpha
-    requirement is new in this change and has no canonical main-spec ID until
-    archive-sync, so these tests carry no @covers_requirement (tasks 6.11)."""
+    (art-output-format-pipeline, art-portrait-cutout D4), annotated with the
+    canonical requirement ID the archive sync published."""
 
     ALPHA_CAPABLE = ("png", "webp", "avif")
     ALPHA_MODES = ("RGBA", "LA", "RGBa", "La")
@@ -460,6 +459,7 @@ class AlphaRoundTripTests(unittest.TestCase):
         image.save(buffer, format="PNG")
         return buffer.getvalue()
 
+    @covers_requirement("art-output-format-pipeline::an-alpha-channel-survives-every-alpha-capable-output-format")
     def test_alpha_round_trips_through_each_alpha_capable_format(self):
         fixture = self._alpha_fixture()
         for output_format in self.ALPHA_CAPABLE:
@@ -479,6 +479,7 @@ class AlphaRoundTripTests(unittest.TestCase):
                     for got, want in zip(pixels[63, 47][:3], (17 + 63, 29 + 47, 60)):
                         self.assertLessEqual(abs(got - want), tolerance)
 
+    @covers_requirement("art-output-format-pipeline::an-alpha-channel-survives-every-alpha-capable-output-format")
     def test_alpha_survives_with_metadata_stripping_on(self):
         fixture = self._alpha_fixture()
         for output_format in self.ALPHA_CAPABLE:
@@ -493,6 +494,7 @@ class AlphaRoundTripTests(unittest.TestCase):
                     # The stripping contract: zero ancillary chunks survive.
                     self.assertEqual(_png_chunk_types(encoded), ["IHDR", "IDAT", "IEND"])
 
+    @covers_requirement("art-output-format-pipeline::an-alpha-channel-survives-every-alpha-capable-output-format")
     def test_an_opaque_source_is_unaffected_for_all_four_formats(self):
         # Regression: the alpha work must not change the opaque pipeline.
         opaque = _noise_png()

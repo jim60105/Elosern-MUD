@@ -1061,7 +1061,8 @@ class _ExplodingBackend:
         raise RuntimeError("removal exploded arbitrarily")
 
 
-class CutoutStageTests(WorkerStoreIsolation):
+class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
+
     """The enabled stage stores cutouts; the skipped paths are byte-identical."""
 
     def setUp(self):
@@ -1081,6 +1082,7 @@ class CutoutStageTests(WorkerStoreIsolation):
                 yield
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_a_character_portrait_is_stored_transparent(self):
         subject = self._subject("42", ArtSubjectKind.CHARACTER)
         self._record(subject)
@@ -1100,6 +1102,7 @@ class CutoutStageTests(WorkerStoreIsolation):
         self.assertNotEqual(target.read_bytes(), disabled_bytes)
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_a_monster_portrait_is_stored_transparent(self):
         subject = self._subject("low", ArtSubjectKind.MONSTER)
         self._record(subject)
@@ -1118,6 +1121,7 @@ class CutoutStageTests(WorkerStoreIsolation):
         self.assertNotEqual(target.read_bytes(), disabled_bytes)
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_gallery_portrait_jobs_are_cut_out_on_the_same_terms(self):
         monster = self._subject("low", ArtSubjectKind.MONSTER)
         character_image_id = "aaaaaaaa-1111-4111-8111-111111111111"
@@ -1158,6 +1162,7 @@ class CutoutStageTests(WorkerStoreIsolation):
         return ArtAssetRecord.objects.filter(db_key=job.db_key).first()
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_scene_art_never_reaches_the_backend(self):
         subject = self._subject()
         self._record(subject)
@@ -1176,6 +1181,7 @@ class CutoutStageTests(WorkerStoreIsolation):
         self.assertEqual(target.read_bytes(), disabled_bytes)
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_the_disabled_stage_records_zero_calls_for_every_kind(self):
         fake = FakeCutoutBackend()
         self._record(self._subject())
@@ -1187,6 +1193,7 @@ class CutoutStageTests(WorkerStoreIsolation):
         self.assertEqual(fake.calls, [])
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_the_stage_runs_between_generation_and_encoding(self):
         subject = self._subject("42", ArtSubjectKind.CHARACTER)
         self._record(subject)
@@ -1216,6 +1223,7 @@ class CutoutStageTests(WorkerStoreIsolation):
         self.assertEqual(listing, ["42.png"], "exactly one artifact is published")
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_the_disabled_stage_keeps_todays_lease_bound(self):
         from world.art.worker import _CONVERSION_ALLOWANCE_SECONDS, _LEASE_MARGIN_SECONDS
 
@@ -1228,6 +1236,7 @@ class CutoutStageTests(WorkerStoreIsolation):
             self.assertEqual(_lease_timeout(), expected)
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_the_enabled_stage_widens_the_bound_by_the_cutout_allowance(self):
         from django.conf import settings as django_settings
 
@@ -1267,6 +1276,7 @@ class CutoutFailureTests(WorkerStoreIsolation):
         return override_settings(ART_REMBG_ENABLED=True, **overrides)
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_an_unresolvable_backend_settles_art_cutout_unavailable(self):
         subject = self._subject("42", ArtSubjectKind.CHARACTER)
         self._record(subject)
@@ -1281,6 +1291,7 @@ class CutoutFailureTests(WorkerStoreIsolation):
         self.assertEqual(len(self.client.calls), 2, "one failing generation, never re-issued twice")
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_a_scripted_failure_settles_art_cutout_error(self):
         subject = self._subject("42", ArtSubjectKind.CHARACTER)
         self._record(subject)
@@ -1298,6 +1309,7 @@ class CutoutFailureTests(WorkerStoreIsolation):
         self.assertFalse((self.root / "portrait" / "character" / "42.tmp").exists())
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_an_arbitrary_exception_is_still_bounded(self):
         subject = self._subject("low", ArtSubjectKind.MONSTER)
         self._record(subject)
@@ -1313,6 +1325,7 @@ class CutoutFailureTests(WorkerStoreIsolation):
         self.assertIsNone(record.db.output_identity)
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_a_failing_gallery_cutout_appends_no_card(self):
         from world.art.queue import enqueue_gallery_job
 
@@ -1343,6 +1356,7 @@ class CutoutFailureTests(WorkerStoreIsolation):
         )
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_one_failing_portrait_does_not_fail_its_batch(self):
         scene = self._subject()
         failing = self._subject("42", ArtSubjectKind.CHARACTER)
@@ -1388,6 +1402,7 @@ class CutoutFailureTests(WorkerStoreIsolation):
             )
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_a_stale_cutout_failure_never_steals_a_reclaimed_claim(self):
         subject = self._subject("42", ArtSubjectKind.CHARACTER)
         self._record(subject)

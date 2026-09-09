@@ -8,9 +8,8 @@ network, or leaves the module session cache or the process environment
 mutated. The laziness pair proves the optional stack is never imported at
 module import and that a broken first use fails bounded.
 
-Cutout-capability requirements belong to the NEW ``art-portrait-cutout``
-capability, which enters the main-spec index only at archive-sync; per tasks
-6.11 these tests carry NO ``@covers_requirement`` annotations yet.
+Annotated with the canonical ``art-portrait-cutout`` requirement IDs the
+archive sync published — the follow-up that tasks 6.11 deferred.
 """
 
 from __future__ import annotations
@@ -32,6 +31,8 @@ from world.art import cutout
 from world.art.cutout import CUTOUT_SUBJECT_KINDS, CutoutError, applies_to
 from world.art.fake_cutout import FakeCutoutBackend
 from world.art.subjects import ArtSubjectKind
+
+from tools.spec_traceability import covers_requirement
 
 
 def _opaque_png(size=(16, 12)) -> bytes:
@@ -78,18 +79,21 @@ class _FixedBackend:
 
 
 class SeamResolutionTests(unittest.TestCase):
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_a_non_dotted_backend_path_is_unavailable(self):
         with override_settings(ART_REMBG_BACKEND="notadottedpath"):
             with self.assertRaises(CutoutError) as caught:
                 cutout.resolve_cutout_backend()
         self.assertEqual(caught.exception.code, "art_cutout_unavailable")
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_an_unimportable_module_is_unavailable(self):
         with override_settings(ART_REMBG_BACKEND="no.such.module.Backend"):
             with self.assertRaises(CutoutError) as caught:
                 cutout.resolve_cutout_backend()
         self.assertEqual(caught.exception.code, "art_cutout_unavailable")
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_a_missing_attribute_is_unavailable(self):
         with override_settings(
             ART_REMBG_BACKEND="world.art.cutout.NoSuchBackend"
@@ -98,6 +102,7 @@ class SeamResolutionTests(unittest.TestCase):
                 cutout.resolve_cutout_backend()
         self.assertEqual(caught.exception.code, "art_cutout_unavailable")
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_a_failing_constructor_is_unavailable(self):
         class _Exploding:
             def __init__(self):
@@ -110,6 +115,7 @@ class SeamResolutionTests(unittest.TestCase):
                 cutout.resolve_cutout_backend()
         self.assertEqual(caught.exception.code, "art_cutout_unavailable")
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_the_resolved_backend_is_instantiated_and_used(self):
         _FixedBackend_calls.clear()
         with override_settings(
@@ -123,6 +129,7 @@ class SeamResolutionTests(unittest.TestCase):
 class BoundedEntryTests(unittest.TestCase):
     """remove_background bounds every escaping failure to one of two codes."""
 
+    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_an_arbitrary_backend_exception_becomes_art_cutout_error(self):
         stub = _StubBackend(error=RuntimeError("inference exploded"))
         with mock.patch.object(cutout, "resolve_cutout_backend", return_value=stub):
@@ -131,6 +138,7 @@ class BoundedEntryTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "art_cutout_error")
         self.assertIsNotNone(caught.exception.__cause__)
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_non_bytes_return_is_art_cutout_error(self):
         stub = _StubBackend(result="not bytes")
         with mock.patch.object(cutout, "resolve_cutout_backend", return_value=stub):
@@ -138,6 +146,7 @@ class BoundedEntryTests(unittest.TestCase):
                 cutout.remove_background(_opaque_png())
         self.assertEqual(caught.exception.code, "art_cutout_error")
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_empty_return_is_art_cutout_error(self):
         stub = _StubBackend(result=b"")
         with mock.patch.object(cutout, "resolve_cutout_backend", return_value=stub):
@@ -145,6 +154,7 @@ class BoundedEntryTests(unittest.TestCase):
                 cutout.remove_background(_opaque_png())
         self.assertEqual(caught.exception.code, "art_cutout_error")
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_missing_png_magic_is_art_cutout_error(self):
         stub = _StubBackend(result=b"garbage-not-a-png")
         with mock.patch.object(cutout, "resolve_cutout_backend", return_value=stub):
@@ -152,6 +162,7 @@ class BoundedEntryTests(unittest.TestCase):
                 cutout.remove_background(_opaque_png())
         self.assertEqual(caught.exception.code, "art_cutout_error")
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_magic_prefixed_corrupt_bytes_are_art_cutout_error(self):
         stub = _StubBackend(result=b"\x89PNG\r\n\x1a\nnot-really-a-png")
         with mock.patch.object(cutout, "resolve_cutout_backend", return_value=stub):
@@ -159,6 +170,7 @@ class BoundedEntryTests(unittest.TestCase):
                 cutout.remove_background(_opaque_png())
         self.assertEqual(caught.exception.code, "art_cutout_error")
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_an_opaque_passthrough_is_art_cutout_error(self):
         # The stage's own postcondition is an alpha-carrying PNG: a backend
         # that returns the original opaque portrait unchanged must fail the
@@ -170,6 +182,7 @@ class BoundedEntryTests(unittest.TestCase):
                 cutout.remove_background(opaque)
         self.assertEqual(caught.exception.code, "art_cutout_error")
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_an_opaque_jpeg_decoration_is_art_cutout_error(self):
         stub = _StubBackend(result=_png_with_mode("RGB"))
         with mock.patch.object(cutout, "resolve_cutout_backend", return_value=stub):
@@ -177,12 +190,14 @@ class BoundedEntryTests(unittest.TestCase):
                 cutout.remove_background(_opaque_png())
         self.assertEqual(caught.exception.code, "art_cutout_error")
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_an_alpha_carrying_return_passes_through_untouched(self):
         payload = _png_with_mode("RGBA")
         stub = _StubBackend(result=payload)
         with mock.patch.object(cutout, "resolve_cutout_backend", return_value=stub):
             self.assertEqual(cutout.remove_background(_opaque_png()), payload)
 
+    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_a_scripted_cutout_error_propagates_unchanged(self):
         stub = _StubBackend(error=CutoutError("art_cutout_unavailable", "scripted"))
         with mock.patch.object(cutout, "resolve_cutout_backend", return_value=stub):
@@ -192,15 +207,18 @@ class BoundedEntryTests(unittest.TestCase):
 
 
 class SubjectKindScopeTests(unittest.TestCase):
+    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_the_allowlist_holds_exactly_the_portrait_kinds(self):
         self.assertEqual(
             CUTOUT_SUBJECT_KINDS,
             frozenset({ArtSubjectKind.CHARACTER, ArtSubjectKind.MONSTER}),
         )
 
+    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_scenes_are_outside_the_allowlist(self):
         self.assertFalse(applies_to(ArtSubjectKind.SCENE))
 
+    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_every_subject_kind_is_classified_by_the_allowlist(self):
         # Exhaustiveness contract (design D3): a NEW ArtSubjectKind member must
         # fail this suite until it is deliberately classified.
@@ -213,6 +231,7 @@ class SubjectKindScopeTests(unittest.TestCase):
 
 
 class FakeCutoutTests(unittest.TestCase):
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_the_fake_returns_a_real_png_with_a_zeroed_region(self):
         fake = FakeCutoutBackend()
         opaque = _opaque_png()
@@ -228,6 +247,7 @@ class FakeCutoutTests(unittest.TestCase):
             self.assertEqual(pixels[10, 10][3], 255)
             self.assertEqual(pixels[15, 11][3], 255)
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_the_fake_records_every_call(self):
         fake = FakeCutoutBackend()
         fake.remove_background(_opaque_png((4, 4)))
@@ -235,6 +255,7 @@ class FakeCutoutTests(unittest.TestCase):
         self.assertEqual(len(fake.calls), 2)
         self.assertEqual(fake.calls[0][:8], b"\x89PNG\r\n\x1a\n")
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_the_fake_replays_scripted_failures(self):
         fake = FakeCutoutBackend()
         fake.fail_every_call(CutoutError("art_cutout_error", "scripted"))
@@ -250,6 +271,7 @@ class FakeCutoutTests(unittest.TestCase):
         good = _opaque_png((6, 6))
         self.assertEqual(matcher.remove_background(good)[:8], b"\x89PNG\r\n\x1a\n")
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_the_fake_never_imports_the_optional_stack(self):
         self.assertNotIn("rembg", sys.modules)
 
@@ -309,6 +331,7 @@ class RembgSessionTests(_RembgBackendCase):
 
         return _factory, recorded
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_only_the_cpu_provider_is_requested_and_the_session_is_built_once(self):
         sessions: list = []
         factory, recorded = self._patched_new_session(sessions)
@@ -328,6 +351,7 @@ class RembgSessionTests(_RembgBackendCase):
         )
         self.assertIs(sessions[0], cutout._sessions["bria-rmbg"])
 
+    @covers_requirement("art-portrait-cutout::the-model-artifact-is-cached-in-a-code-only-persistent-directory-under-an-explicit-download-policy")
     def test_a_non_zero_thread_cap_reaches_omp_num_threads(self):
         sessions: list = []
         factory, recorded = self._patched_new_session(sessions)
@@ -339,6 +363,7 @@ class RembgSessionTests(_RembgBackendCase):
         self.assertEqual(os.environ.get("REMBG_HOME"), str(self.model_dir))
         self.assertTrue(self.model_dir.is_dir())
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_a_zero_thread_cap_leaves_omp_num_threads_untouched(self):
         sessions: list = []
         factory, recorded = self._patched_new_session(sessions)
@@ -347,6 +372,7 @@ class RembgSessionTests(_RembgBackendCase):
             backend._session()
         self.assertIsNone(os.environ.get("OMP_NUM_THREADS"))
 
+    @covers_requirement("art-portrait-cutout::the-model-artifact-is-cached-in-a-code-only-persistent-directory-under-an-explicit-download-policy")
     def test_downloads_disabled_without_an_artifact_fails_before_importing_rembg(self):
         backend = self._backend(ART_REMBG_DOWNLOAD_ENABLED=False)
         with mock.patch.dict(sys.modules, {"rembg": None}):
@@ -354,6 +380,7 @@ class RembgSessionTests(_RembgBackendCase):
                 backend._session()
         self.assertEqual(caught.exception.code, "art_cutout_unavailable")
 
+    @covers_requirement("art-portrait-cutout::the-model-artifact-is-cached-in-a-code-only-persistent-directory-under-an-explicit-download-policy")
     def test_downloads_disabled_with_a_preseeded_artifact_builds_the_session(self):
         (self.model_dir / "models" / "isnet-anime").mkdir(parents=True)
         (self.model_dir / "models" / "isnet-anime" / "isnet-anime.onnx").write_bytes(b"model")
@@ -364,6 +391,7 @@ class RembgSessionTests(_RembgBackendCase):
             backend._session()
         self.assertEqual(recorded["calls"][0][0], "isnet-anime")
 
+    @covers_requirement("art-portrait-cutout::the-model-artifact-is-cached-in-a-code-only-persistent-directory-under-an-explicit-download-policy")
     def test_downloads_disabled_accepts_the_flat_legacy_layout(self):
         self.model_dir.mkdir(parents=True, exist_ok=True)
         (self.model_dir / "u2net.onnx").write_bytes(b"model")
@@ -374,6 +402,7 @@ class RembgSessionTests(_RembgBackendCase):
             backend._session()
         self.assertEqual(recorded["calls"][0][0], "u2net")
 
+    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_a_failing_session_factory_is_art_cutout_unavailable(self):
         with mock.patch(
             "rembg.new_session", side_effect=ValueError("no session class")
@@ -387,6 +416,7 @@ class RembgSessionTests(_RembgBackendCase):
 class LazinessTests(_RembgBackendCase):
     """The optional stack is lazy: import-time absence and broken first use."""
 
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_importing_world_art_cutout_does_not_import_rembg(self):
         # Order-independent proof (a bare "not in sys.modules" would false-fail
         # after another test imported rembg, and a reload of the live module
@@ -411,6 +441,7 @@ class LazinessTests(_RembgBackendCase):
         finally:
             sys.modules.update(saved)
 
+    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_a_broken_first_use_raises_art_cutout_unavailable(self):
         real_import = builtins.__import__
 

@@ -1,8 +1,8 @@
 ## 1. Dependencies
 
-- [ ] 1.1 `uv add rembg onnxruntime` (CPU wheels — never `onnxruntime-gpu`). Confirm the resolution succeeds against Python 3.13 and the existing `pillow>=12.3.0` pin; if `rembg` pins an incompatible Pillow, stop and report before writing any code (design: risks).
-- [ ] 1.2 `uv sync --locked` and confirm `python -c "import rembg"` works in the project environment. Record the resolved `rembg` version — tasks 3.4 and 3.5 depend on it.
-- [ ] 1.3 Confirm no `onnxruntime-gpu`, `nvidia-*`, or CUDA-linked package entered `uv.lock` as a transitive dependency.
+- [x] 1.1 `uv add "rembg[cpu]"` (equivalent to the planned `rembg onnxruntime`; onnxruntime enters through rembg's own `cpu` extra floor). CPU wheels only — never `onnxruntime-gpu` — and the resolution succeeded against Python 3.13 and the existing `pillow>=12.3.0` pin — never `onnxruntime-gpu`). Confirm the resolution succeeds against Python 3.13 and the existing `pillow>=12.3.0` pin; if `rembg` pins an incompatible Pillow, stop and report before writing any code (design: risks).
+- [x] 1.2 `uv sync --locked` and `import rembg` confirmed in the project environment. Resolved: **rembg==2.0.69** + onnxruntime==1.29.0 (CPU-only providers) — 2.0.69 rather than 2.0.84 because the project pins scipy==1.16.0 while 2.0.84 needs >=1.16.3; tasks 3.4/3.5/3.6 are pinned against 2.0.69.
+- [x] 1.3 Confirmed no `onnxruntime-gpu`, `nvidia-*`, or CUDA-linked package entered `uv.lock` as a transitive dependency.
 
 ## 2. Settings
 
