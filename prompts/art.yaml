@@ -1,8 +1,13 @@
 schema_version: 1
 prompts:
   art.style: approved visual style
+  # The {appearance}, {equipment}, and {custom} slots carry whole
+  # newline-prefixed fragment sections (the value brings its own leading
+  # newline, mirroring the appearance-slot convention), so an empty slot
+  # contributes nothing and the sentence stays byte-identical. The template
+  # owns which sections exist and in which order they are composed.
   art.character_description: |-
-    A {race} character named {name} ({age}) in the {style}.{appearance}
+    A {race} character named {name} ({age}) in the {style}.{appearance}{equipment}{custom}
   art.monster_description: "{description} ({display_name}；例如：{examples})"
   # Positive prompt template for scene subjects. {description} is the
   # deterministic scene sentence from the scene-archetype registry; the

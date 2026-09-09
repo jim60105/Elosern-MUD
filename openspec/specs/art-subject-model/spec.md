@@ -78,6 +78,18 @@ same entity always yields the same prompt regardless of storage iteration order.
 appearance data SHALL render an empty appearance section and produce the description it produced
 before this contribution existed.
 
+A character description SHALL be composable by an explicit FIELD SELECTION. The appearance
+contribution SHALL be included when, and only when, the caller selects the `appearance` field; the
+existing deterministic seams SHALL select it, and a caller that selects nothing SHALL produce exactly
+the description this capability produced before appearance was admitted. A caller MAY additionally
+select one or more EQUIPMENT fields (`weapon_main`, `weapon_off`, `armor`, `accessories`), each of
+which contributes the registry-owned `ItemPresentation` visual text of the items currently occupying
+that slot, read read-only from `world/lore/items.py`; an empty slot and an item key absent from the
+registry contribute nothing. A caller MAY additionally supply bounded free-form text, which SHALL be
+appended verbatim after every selected field's contribution. Field selection SHALL NOT change the
+description produced for any unselected field, and the same entity, the same selection, and the same
+free text SHALL always produce byte-identical output.
+
 A character description SHALL NOT include any other persona key — `personality`, `life_story`,
 `habit`, `background`, `identity` (public or hidden), or `social_connection` — and SHALL NOT include
 secret state, mutable combat resources, or `disguised_stats` presented as physical truth. The
@@ -117,6 +129,26 @@ secret state, mutable combat resources, or `disguised_stats` presented as physic
 #### Scenario: The degraded fallback reads no persona
 - **WHEN** the prompt library cannot resolve `art.character_description`
 - **THEN** the fallback description is built from the display name, race label, and age only, with no persona read
+
+#### Scenario: An unselected appearance field reproduces the pre-appearance description
+- **WHEN** a character description is generated with no field selected
+- **THEN** the appearance section is empty and the result equals the description produced before appearance was admitted
+
+#### Scenario: Selected equipment fields contribute registry visual text only
+- **WHEN** a character description is generated with `armor` and `accessories` selected for a character wearing registered items
+- **THEN** it contains those items' registry `ItemPresentation` visual text, contains nothing from the unselected weapon slots, and contains no item mechanics, stat, or price data
+
+#### Scenario: Empty and unregistered slots contribute nothing
+- **WHEN** a character description is generated with an equipment field selected for an empty slot, or for a slot holding an item key absent from the item registry
+- **THEN** that field contributes no text and the description is otherwise unchanged
+
+#### Scenario: Free-form text is appended verbatim and bounded
+- **WHEN** a character description is generated with bounded free-form text supplied
+- **THEN** the text appears verbatim after the selected field contributions, and text exceeding the bound or carrying control characters is rejected before any render
+
+#### Scenario: The same selection is byte-identical across generations
+- **WHEN** the same character's description is generated twice with the same field selection and free text
+- **THEN** the two results are byte-identical, with fields in the declared order
 
 ### Requirement: Subject producer validation rejects unrepresentable keys
 `_validate_subject_key` SHALL reject keys containing `|`, `/`, `:`, `{`, `}`, or control

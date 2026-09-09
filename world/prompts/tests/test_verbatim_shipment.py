@@ -66,7 +66,13 @@ _NPC_DIALOGUE_TEMPLATE = (
     "你沒有把握能確實執行的行為，不要寫進 intent。"
 )
 _NPC_THINKING = "（{name} 沉思片刻……）"
-_ART_CHARACTER_TEMPLATE = "A {race} character named {name} ({age}) in the {style}.{appearance}"
+# The shipped template after gallery-prompt-composition admitted the
+# {equipment} and {custom} section slots (the pre-composition sentence is
+# byte-identical whenever every section slot is empty).
+_ART_CHARACTER_TEMPLATE = (
+    "A {race} character named {name} ({age}) in the {style}."
+    "{appearance}{equipment}{custom}"
+)
 _SCENE_BUILDER_SYSTEM = (
     "你是《伊洛瑟恩大陸》的場景氛圍描述者。場景句子：{scene_sentence}。"
     "任務脈絡：{quest_context}。房間名稱：{room_name}。地區：{region}。"
@@ -163,9 +169,17 @@ class VerbatimShipmentTests(unittest.TestCase):
                 age="24",
                 style=style,
                 appearance="",
+                equipment="",
+                custom="",
             ),
             _ART_CHARACTER_TEMPLATE.format(
-                race="貓人族", name="艾琳", age="24", style=style, appearance=""
+                race="貓人族",
+                name="艾琳",
+                age="24",
+                style=style,
+                appearance="",
+                equipment="",
+                custom="",
             ),
         )
         self.assertEqual(
@@ -176,6 +190,8 @@ class VerbatimShipmentTests(unittest.TestCase):
                 age="24",
                 style=style,
                 appearance="",
+                equipment="",
+                custom="",
             ),
             "A 貓人族 character named 艾琳 (24) in the approved visual style.",
         )
@@ -381,7 +397,7 @@ class LibrarySourceTests(unittest.TestCase):
         character.db.subrace = "catkin"
         character.key = "艾琳"
         self.assertEqual(
-            character_description(character, 24),
+            character_description(character, 24, fields=("appearance",)),
             "A 貓人族 character named 艾琳 (24) in the approved visual style.",
         )
 

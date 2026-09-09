@@ -17,7 +17,12 @@ from typeclasses.npcs import NPC
 from world.art.queue import ensure, record_key, source_hash
 from world.art import gallery as gallery_api
 from world.art.fake_sd_client import FakeSDWebUIClient
+from world.art.gallery_prompt import (
+    CUSTOM_PROMPT_MAX,
+    GalleryPromptError,
+)
 from world.art.sd_worker import SDError
+from world.art.service import requeue_character_portrait
 from world.art.service import prune_gallery_orphans
 from world.art.subjects import ArtSubjectError
 from world.art.service import (
@@ -30,6 +35,7 @@ from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
+from world.lore.items import ITEM_REGISTRY
 
 from tools.spec_traceability import covers_requirement
 
@@ -550,6 +556,162 @@ class GalleryRequestSeamTests(EvenniaTestCase):
         self.assertIsNotNone(record)
         self.assertEqual(record.db.last_error_code, "sd_connection_error")
         self.assertIsNotNone(record.db.last_error_at)
+
+
+class GalleryPromptCompositionTests(EvenniaTestCase):
+    """The seam's field selection: provenance on the card, validation first."""
+
+    def setUp(self):
+        super().setUp()
+        self.player = create_object(PlayerCharacter, key="composition-player")
+        self.player.age = 30
+        self.player.apparent_age = 25
+        self.player.db.portrait_policy = {
+            "mode": "named",
+            "stable_key": str(self.player.pk),
+        }
+        self.player.db.equipment = {
+            "weapon_main": "plain_sword",
+            "weapon_off": None,
+            "armor": "leather_armor",
+            "accessories": ["silver_hairpin"],
+        }
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.root = Path(self.tempdir.name)
+        self.art_settings = override_settings(
+            ART_STORE_ROOT=str(self.root),
+            ART_SD_CLIENT="world.art.fake_sd_client.FakeSDWebUIClient",
+        )
+        self.art_settings.enable()
+        self.addCleanup(self.art_settings.disable)
+        self.subject = ArtSubject(ArtSubjectKind.CHARACTER, str(self.player.pk))
+
+    def _gallery_jobs(self):
+        return [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if str(record.db.gallery_image_id or "")
+        ]
+
+    def _drain(self):
+        from world.art.worker import drain_synchronous
+
+        with patch(
+            "world.art.worker.resolve_sd_client", return_value=FakeSDWebUIClient()
+        ):
+            drain_synchronous(10)
+
+    @covers_requirement(
+        "art-gallery-prompt-fields::the-gallery-prompt-field-catalog-is-a-closed-ordered-vocabulary"
+    )
+    def test_a_selection_settles_onto_the_card_normalized_and_composed(self):
+        request_gallery_image(
+            self.player,
+            fields=("armor", "appearance", "accessories"),
+            custom_prompt="月下持杖，藍袍拖地",
+        )
+        jobs = self._gallery_jobs()
+        self.assertEqual(len(jobs), 1)
+        job = jobs[0]
+        # Stored in declared-catalog order, never the caller's listing order.
+        self.assertEqual(
+            list(job.db.gallery_requested_fields),
+            ["appearance", "armor", "accessories"],
+        )
+        summary = ITEM_REGISTRY["leather_armor"].presentation.summary_zh
+        self.assertIn(summary, job.db.source_description)
+        self.assertIn("月下持杖，藍袍拖地", job.db.source_description)
+        self.assertNotIn(ITEM_REGISTRY["plain_sword"].presentation.summary_zh,
+                         job.db.source_description)
+        self._drain()
+        cards = gallery_api.cards_for(self.subject)
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["requested_fields"], ["appearance", "armor", "accessories"])
+
+    @covers_requirement(
+        "art-gallery-prompt-fields::the-gallery-prompt-field-catalog-is-a-closed-ordered-vocabulary"
+    )
+    def test_a_request_without_a_selection_records_the_empty_provenance(self):
+        request_gallery_image(self.player)
+        jobs = self._gallery_jobs()
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(list(jobs[0].db.gallery_requested_fields), [])
+        # Nothing selected means neither persona appearance nor equipment.
+        for summary in (
+            ITEM_REGISTRY["leather_armor"].presentation.summary_zh,
+            ITEM_REGISTRY["plain_sword"].presentation.summary_zh,
+        ):
+            self.assertNotIn(summary, jobs[0].db.source_description)
+
+    @covers_requirement(
+        "art-gallery-prompt-fields::the-gallery-prompt-field-catalog-is-a-closed-ordered-vocabulary"
+    )
+    def test_an_invalid_selection_never_reaches_the_queue_or_the_prompt(self):
+        with patch("world.art.queue._prompt_digest_or_empty") as digest:
+            with patch("world.art.service.description_for") as compose:
+                with self.assertRaises(GalleryPromptError):
+                    request_gallery_image(self.player, fields=("armor", "nope"))
+                with self.assertRaises(GalleryPromptError):
+                    request_gallery_image(self.player, fields=("armor", "armor"))
+                with self.assertRaises(GalleryPromptError):
+                    request_gallery_image(self.player, fields="armor")
+                with self.assertRaises(GalleryPromptError):
+                    request_gallery_image(self.player, fields=["armor", 7])
+        self.assertEqual(self._gallery_jobs(), [])
+        compose.assert_not_called()
+        digest.assert_not_called()
+
+    @covers_requirement(
+        "art-gallery-prompt-fields::free-form-prompt-text-is-bounded-sanitized-and-appended-verbatim"
+    )
+    def test_invalid_free_text_never_reaches_the_queue_or_the_prompt(self):
+        with patch("world.art.queue._prompt_digest_or_empty") as digest:
+            with patch("world.art.service.description_for") as compose:
+                with self.assertRaises(GalleryPromptError):
+                    request_gallery_image(self.player, custom_prompt="x" * (CUSTOM_PROMPT_MAX + 1))
+                with self.assertRaises(GalleryPromptError):
+                    request_gallery_image(self.player, custom_prompt="a\nb")
+                with self.assertRaises(GalleryPromptError):
+                    request_gallery_image(self.player, custom_prompt="a\u2028b")
+        self.assertEqual(self._gallery_jobs(), [])
+        compose.assert_not_called()
+        digest.assert_not_called()
+
+    @covers_requirement(
+        "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth"
+    )
+    def test_the_auto_paths_keep_the_explicit_appearance_only_selection(self):
+        # The startup-recovery / spawn ensure path.
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_portrait_ensure(self.player)
+        jobs = self._gallery_jobs()
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(list(jobs[0].db.gallery_requested_fields), ["appearance"])
+        # The forced staff requeue path.
+        jobs[0].delete()
+        requeue_character_portrait(str(self.player.pk))
+        jobs = self._gallery_jobs()
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(list(jobs[0].db.gallery_requested_fields), ["appearance"])
+        # Appearance-only reads no equipment even with items worn.
+        for summary in (
+            ITEM_REGISTRY["leather_armor"].presentation.summary_zh,
+            ITEM_REGISTRY["plain_sword"].presentation.summary_zh,
+        ):
+            self.assertNotIn(summary, jobs[0].db.source_description)
+
+    @covers_requirement(
+        "art-gallery-prompt-fields::the-prompt-library-remains-the-sole-source-of-the-composed-template"
+    )
+    def test_the_selection_changes_the_rendered_prompt_digest(self):
+        # Distinct field selections of the same character compose distinct
+        # prompts: the digest (rendered prompt pair hash) differs per job.
+        request_gallery_image(self.player, fields=("appearance",))
+        first = self._gallery_jobs()[0]
+        request_gallery_image(self.player, fields=("appearance", "armor"))
+        second = [job for job in self._gallery_jobs() if job.pk != first.pk][0]
+        self.assertNotEqual(first.db.prompt_digest, second.db.prompt_digest)
 
 
 class GalleryPruneTests(EvenniaTestCase):

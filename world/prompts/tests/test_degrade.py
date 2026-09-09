@@ -231,7 +231,7 @@ class BoundedFailureDegradeTests(PromptFixture):
         character.db.race = "beastfolk"
         character.db.subrace = "catkin"
         character.key = "艾琳"
-        text = character_description(character, 24)
+        text = character_description(character, 24, fields=("appearance",))
         self.assertIn("艾琳", text)
         self.assertIn("貓人族", text)
         self.assertIn("24", text)

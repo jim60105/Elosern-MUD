@@ -43,6 +43,7 @@ from django.db import transaction
 from world.observability import log_error, log_info, log_warn
 
 from world.art import gallery as gallery_api
+from world.art.gallery_prompt import validate_custom_prompt, validate_fields
 from world.art.paths import resolved_under_store_root
 from world.art.queue import (
     ensure as queue_ensure,
@@ -86,9 +87,11 @@ def _ensure_character_portrait(entity) -> bool:
     immediately before the request for every portrait subject (design D3):
     a rejection is deterministic and produces no record, no prompt, and no
     worker call. The request itself is the gallery seam — one unbound card
-    built from the subject's standard deterministic description with the
-    shared default face rectangle; a character subject never writes a classic
-    fixed-identity record on an automatic path.
+    from the explicit ``appearance``-only field selection with the shared
+    default face rectangle (the selection ``gallery-autogen-retrofit``
+    described as the standard deterministic description, made explicit by
+    ``gallery-prompt-composition``); a character subject never writes a
+    classic fixed-identity record on an automatic path.
     """
     subject = character_subject_for(entity)
     if subject is None:
@@ -96,7 +99,9 @@ def _ensure_character_portrait(entity) -> bool:
     character_ages(entity)
     if _gallery_auto_generation_pending(subject):
         return False
-    request_gallery_image(entity, face_rect=dict(gallery_api.DEFAULT_FACE_RECT))
+    request_gallery_image(
+        entity, fields=("appearance",), face_rect=dict(gallery_api.DEFAULT_FACE_RECT)
+    )
     return True
 
 
@@ -207,7 +212,9 @@ def requeue_character_portrait(stable_key: str) -> None:
             f"no living character carries portrait stable_key {stable_key!r}"
         )
     character_ages(entity)
-    request_gallery_image(entity, face_rect=dict(gallery_api.DEFAULT_FACE_RECT))
+    request_gallery_image(
+        entity, fields=("appearance",), face_rect=dict(gallery_api.DEFAULT_FACE_RECT)
+    )
 
 
 def ensure_scene_asset(archetype) -> None:
@@ -294,7 +301,7 @@ def art_sync_all() -> None:
         log_error("art_startup_recovery_failed", context={"scope": "portrait-recovery"}, exc=error)
 
 
-def request_gallery_image(entity, *, binding=None, face_rect=None) -> str:
+def request_gallery_image(entity, *, fields=(), custom_prompt="", binding=None, face_rect=None) -> str:
     """Validate, mint, and enqueue exactly one gallery image request.
 
     The ONLY gameplay-reachable entry point for gallery generation
@@ -307,6 +314,14 @@ def request_gallery_image(entity, *, binding=None, face_rect=None) -> str:
     freshly minted lowercase-uuid ``image_id`` keys one independent job
     (two requests, two jobs).
 
+    Change ``gallery-prompt-composition`` adds the field selection and the
+    free text: ``fields`` is validated against the closed catalog and
+    normalized to the declared order, and ``custom_prompt`` against the
+    free-text bound, FIRST — before subject derivation, any data read, any
+    prompt render, and any queue write. The normalized selection is stored
+    verbatim on the pending job, so the settled card's ``requested_fields``
+    reports exactly which data blocks produced the image.
+
     Deliberately never imports or consults ``world.art.connectivity``: an
     unreachable sd-webui server is a reported ``failed`` settle carrying its
     bounded named error code on the subject's gallery record (design §12.3.1),
@@ -315,6 +330,8 @@ def request_gallery_image(entity, *, binding=None, face_rect=None) -> str:
     raises before any write, a wrapped call can never roll back committed
     gameplay. Returns the minted ``image_id``.
     """
+    selected = validate_fields(fields)
+    custom = validate_custom_prompt(custom_prompt)
     subject = character_subject_for(entity)
     if subject is None:
         raise ArtSubjectError(
@@ -325,16 +342,16 @@ def request_gallery_image(entity, *, binding=None, face_rect=None) -> str:
     if face_rect is not None:
         face_rect = gallery_api.validate_face_rect(face_rect)
     image_id = str(uuid.uuid4())
-    description = description_for(subject, entity=entity, age=age)
-    # No field selection in this change: the requested-field provenance is
-    # the empty list until gallery-prompt-composition introduces selection.
+    description = description_for(
+        subject, entity=entity, age=age, fields=selected, custom_prompt=custom
+    )
     enqueue_gallery_job(
         subject,
         description,
         image_id=image_id,
         binding=binding,
         face_rect=face_rect,
-        requested_fields=[],
+        requested_fields=list(selected),
     )
     log_info(
         "gallery_generate",
