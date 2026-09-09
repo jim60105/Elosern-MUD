@@ -3,10 +3,17 @@
 ## D1 — The band is one property; the delta pins the coupling, not the pixels
 
 The whole geometry repair reduces to one fact: the stage carries a single
-`--dock-h` custom property that both the dock's height and the narrative
-feed's bottom anchor read, and CSS `:has()` selectors on the stage retarget
-that property per rendered frame (interaction workspace, waiting frame,
-combat, empty combat pane). Pinning the exact clamp constants in the spec
+`--dock-h` custom property that the dock's height and the narrative feed's
+positioning both read outside combat (each adding its own fixed/viewport
+offsets; combat coordinates its feed and dock through its own shorter band
+plus explicit offsets), and stage selectors retarget that property per
+rendered frame — `:has()` for the interaction workspace and the waiting
+frame, mode-scoping for combat's normal clamp, and a mode-scoped `:has()`
+override for the two-tier empty-host collapse: any mode's empty pane host —
+including the ordinary non-degraded exploration root, whose row region the
+tab bar alone fills — collapses to 144px, and combat's empty host overrides
+that to 100px. Pinning the exact
+clamp constants in the spec
 would freeze design tuning forever; pinning only "surfaces are visible" let
 the overlap class of bugs ship silently. The delta therefore pins the
 observable coupling — one band, per-frame adaptation in a named size order,

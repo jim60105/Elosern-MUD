@@ -44,8 +44,12 @@ target's affordance rows under its name, suggestion cards, or the combat forms â
 that names the focused item, its availability, and the next key action wherever the frame carries one.
 The stage SHALL size the action dock's band and the narrative caption's lower edge from one shared
 dock-band measure that adapts to the frame the dock currently carries - the interaction workspace and
-the three-card waiting frame grow it, the combat band stays shorter, and an empty combat pane
-collapses it - so the narrative caption and the action dock never overlap and neither clips the
+the three-card waiting frame grow it, the combat band stays shorter, and an empty pane host collapses
+it in two tiers (any mode's empty host - including the ordinary non-degraded exploration root, whose
+row region the tab bar alone fills - collapses to 144px, and an empty combat host overrides that to
+100px) - outside combat both surfaces position from that one measure with their own fixed/viewport
+offsets, while combat coordinates its feed and dock through its own shorter band plus explicit
+offsets, so the narrative caption and the action dock never overlap and neither clips the
 other at a supported viewport. A frame whose rows exceed the band SHALL scroll inside the pane host
 while the tab bar and breadcrumb stay fixed above it. In dialogue mode the narrative caption SHALL
 likewise bound its own growth so the host, the latest line, the choice rows, the free-form input and

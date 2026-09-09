@@ -6,14 +6,19 @@ The `feat/webclient-obsidian-gold` branch shipped a dock workspace geometry
 repair (the `dock-layout` verification round) that no main spec records:
 
 1. **Content-adaptive dock height.** The stage derives one `--dock-h` custom
-   property and adapts it to the frame the dock carries: the root frame keeps
-   the base clamp (`clamp(260px, 34vh, 340px)`), the interaction workspace
-   raises it (`clamp(300px, 40vh, 390px)`), the three-card waiting frame raises
-   it further (`clamp(360px, 46vh, 430px)`), and combat keeps its own shorter
-   clamp (`clamp(230px, 29vh, 290px)`, collapsing to a 100px band while the
-   pane host is empty). The narrative feed's bottom edge and the dock's top
-   edge are both anchored to that one property, so feed and dock cannot
-   overlap at any supported viewport. No spec states this coupling;
+   property and adapts it to the frame the dock carries: non-empty ordinary
+   frames keep the base clamp (`clamp(260px, 34vh, 340px)`), the interaction
+   workspace raises it (`clamp(300px, 40vh, 390px)`), the three-card waiting
+   frame raises it further (`clamp(360px, 46vh, 430px)`), and combat keeps its
+   own shorter clamp (`clamp(230px, 29vh, 290px)`). An empty pane host
+   collapses the band in two tiers: any mode's empty host — which includes the
+   ordinary non-degraded exploration root, whose row region the tab bar alone
+   fills — collapses to 144px, and combat's empty host overrides that to
+   100px. The narrative feed's position and the dock's height both derive from
+   that one property outside combat (each with its own fixed/viewport offsets;
+   combat coordinates its feed and dock through its own shorter band plus
+   explicit offsets), so feed and dock cannot overlap at any supported
+   viewport. No spec states this coupling;
    `webclient-desktop-shell` only says the surfaces are "visible" and the
    earlier wrap/overlap failures were found live, not by spec.
 2. **Two-column interaction workspace.** The Interact frame renders as a
