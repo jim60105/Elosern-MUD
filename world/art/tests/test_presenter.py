@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import tempfile
+import uuid
 from unittest.mock import patch
 
 from django.test import override_settings
@@ -11,6 +12,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from world.art.fake_sd_client import FakeSDWebUIClient
+from world.art.gallery import DEFAULT_FACE_RECT, append_card, cards_for
 from world.art.presenter import (
     PLACEHOLDER_MISSING,
     PLACEHOLDER_UNAVAILABLE,
@@ -361,6 +363,140 @@ class ResolveEntityTests(EvenniaTestCase):
         payload = resolve_entity(plain)
         self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
         self.assertIsNone(payload["subject_key"])
+
+
+class FaceRectPayloadTests(EvenniaTestCase):
+    """``face_rect`` on every payload (art-gallery-resolution)."""
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.root = Path(self.tempdir.name)
+        self.art_settings = override_settings(ART_STORE_ROOT=str(self.root))
+        self.art_settings.enable()
+        self.player = create_object(PlayerCharacter, key="rect-player")
+        self.player.age = 22
+        self.player.apparent_age = 22
+        self.player.db.portrait_policy = {
+            "mode": "named",
+            "stable_key": str(self.player.pk),
+        }
+
+    def tearDown(self):
+        self.art_settings.disable()
+        self.tempdir.cleanup()
+        super().tearDown()
+
+    def _subject(self):
+        from world.art.subjects import character_subject_for
+
+        return character_subject_for(self.player)
+
+    def _append_card_with_file(self, **overrides):
+        subject = self._subject()
+        image_id = str(uuid.uuid4())
+        identity = f"gallery/character/{subject.key}/{image_id}.png"
+        target = self.root / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"image")
+        fields = {
+            "image_id": image_id,
+            "stored_identity": identity,
+            "prompt": {"positive": "a hero", "negative": "blur"},
+            "seed": 7,
+            "checkpoint": "realVision.safetensors",
+            "requested_fields": ["appearance"],
+            "binding": None,
+            "source": "generated",
+        }
+        fields.update(overrides)
+        append_card(subject, **fields)
+        return subject, image_id, identity
+
+    @covers_requirement(
+        "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
+    )
+    def test_a_resolved_card_payload_carries_its_own_rectangle(self):
+        explicit = {"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4}
+        subject, image_id, identity = self._append_card_with_file(face_rect=explicit)
+        payload = resolve_character(self.player)
+        self.assertEqual(payload["kind"], "asset")
+        self.assertEqual(payload["url"], f"/art/{identity}")
+        self.assertEqual(payload["face_rect"], explicit)
+
+    @covers_requirement(
+        "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
+    )
+    def test_a_malformed_stored_rectangle_degrades_to_the_default_with_one_warning(self):
+        subject, image_id, identity = self._append_card_with_file()
+        card = dict(cards_for(subject)[0])
+        card["face_rect"] = {"x": 0.5, "y": 0.0, "w": 0.9, "h": 0.9}
+        with patch("world.art.presenter.resolve_card", return_value=card), patch(
+            "world.art.presenter.log_warn"
+        ) as warn:
+            payload = resolve_character(self.player)
+        self.assertEqual(payload["kind"], "asset")
+        self.assertEqual(payload["face_rect"], dict(DEFAULT_FACE_RECT))
+        events = [c for c in warn.call_args_list if c.args and c.args[0] == "art_face_rect_invalid"]
+        self.assertEqual(len(events), 1, events)
+
+    @covers_requirement(
+        "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
+    )
+    def test_a_classic_asset_payload_carries_the_shared_default_rectangle(self):
+        subject = self._subject()
+        from world.art.queue import claim, ensure, settle
+        from world.art.store import ArtAssetStatus
+
+        ensure(subject, "desc")
+        target = self.root / f"portrait/character/{subject.key}.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"asset")
+        claim(10)
+        settle(
+            subject,
+            status=ArtAssetStatus.DONE,
+            output_identity=f"portrait/character/{subject.key}.png",
+            error=None,
+        )
+        payload = resolve_character(self.player)
+        self.assertEqual(payload["kind"], "asset")
+        self.assertEqual(payload["face_rect"], dict(DEFAULT_FACE_RECT))
+
+    @covers_requirement(
+        "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
+    )
+    def test_every_placeholder_payload_carries_a_null_rectangle(self):
+        # missing record -> PLACEHOLDER_MISSING
+        subject = ArtSubject(ArtSubjectKind.SCENE, "rect_not_ensured")
+        payload = resolve_subject(subject)
+        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        self.assertIsNone(payload["url"])
+        self.assertIsNone(payload["face_rect"])
+        # no policy -> unavailable
+        plain = create_object(PlayerCharacter, key="rect-plain")
+        plain.age = 30
+        plain.apparent_age = 30
+        payload = resolve_character(plain)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["url"])
+        self.assertIsNone(payload["face_rect"])
+        # done record with a missing file -> unavailable
+        done = ArtSubject(ArtSubjectKind.SCENE, "tavern_interior")
+        from world.art.queue import claim as claim2, ensure as ensure2, settle as settle2
+
+        ensure2(done, "desc")
+        claim2(10)
+        settle2(
+            done,
+            status=ArtAssetStatus.DONE,
+            output_identity="scene/tavern_interior.png",
+            error=None,
+        )
+        payload = resolve_subject(done)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["url"])
+        self.assertIsNone(payload["face_rect"])
 
 
 if __name__ == "__main__":

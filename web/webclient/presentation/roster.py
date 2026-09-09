@@ -21,6 +21,7 @@ from web.webclient.presentation.art import (
     MAX_STATUS,
     MAX_SUBJECT_KEY,
     PLACEHOLDER_KINDS,
+    _validate_face_rect,
     _placeholder_for,
 )
 from web.webclient.presentation.context import PresentationContext
@@ -43,7 +44,7 @@ from world.rules.account_roster import (
     build_account_roster,
 )
 
-ROSTER_SCHEMA_VERSION = 1
+ROSTER_SCHEMA_VERSION = 2
 
 # Shared display-name code-point bound.
 MAX_ROSTER_NAME = MAX_DISPLAY_NAME_CODE_POINTS
@@ -79,6 +80,7 @@ def _validate_roster_portrait(value: Any) -> dict[str, Any]:
             "aspect_ratio",
             "alt",
             "placeholder",
+            "face_rect",
         },
         {},
     )
@@ -117,6 +119,13 @@ def _validate_roster_portrait(value: Any) -> dict[str, Any]:
         raise RosterPanelError("portrait cannot have both url and placeholder")
     if url is None and placeholder is None:
         raise RosterPanelError("portrait must have either url or placeholder")
+    face_rect = _validate_face_rect(value["face_rect"])
+    # Same rule as the art catalog: the rectangle exists exactly when the
+    # row carries a media URL, never for a placeholder.
+    if url is not None and face_rect is None:
+        raise RosterPanelError("a portrait with a url carries a face_rect")
+    if url is None and face_rect is not None:
+        raise RosterPanelError("a placeholder portrait carries no face_rect")
 
     return {
         "subject_key": subject_key,
@@ -125,6 +134,7 @@ def _validate_roster_portrait(value: Any) -> dict[str, Any]:
         "aspect_ratio": aspect_ratio,
         "alt": alt,
         "placeholder": placeholder,
+        "face_rect": face_rect,
     }
 
 
@@ -278,6 +288,7 @@ def roster_presenter(context: PresentationContext) -> dict[str, Any]:
                 "aspect_ratio": None,
                 "alt": "無法提供",
                 "subject_key": None,
+                "face_rect": None,
             }
         else:
             resolved = resolve_character(entity)
@@ -289,6 +300,7 @@ def roster_presenter(context: PresentationContext) -> dict[str, Any]:
             "aspect_ratio": resolved.get("aspect_ratio"),
             "alt": resolved.get("alt") or "無法提供",
             "placeholder": _placeholder_for(resolved),
+            "face_rect": resolved.get("face_rect"),
         }
 
         character_rows.append(

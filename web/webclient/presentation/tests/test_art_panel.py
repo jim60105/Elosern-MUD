@@ -65,6 +65,7 @@ def _valid_catalog_entry(**overrides):
         "aspect_ratio": "3:4",
         "alt": "低階魔物",
         "placeholder": None,
+        "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
         "context": {"name": "哥布林", "role": "敵方"},
     }
     value.update(overrides)
@@ -101,7 +102,9 @@ class ArtSchemaTests(unittest.TestCase):
 
     def test_wrong_version_kind_availability_reject(self):
         with self.assertRaises(ArtPanelError):
-            validate_art(_valid_payload(schema_version=2))
+            validate_art(_valid_payload(schema_version=1))
+        with self.assertRaises(ArtPanelError):
+            validate_art(_valid_payload(schema_version=3))
         with self.assertRaises(ArtPanelError):
             validate_art(_valid_payload(available=False))
         with self.assertRaises(ArtPanelError):
@@ -144,6 +147,46 @@ class ArtSchemaTests(unittest.TestCase):
         )
         with self.assertRaises(Exception):
             validate_art(payload)
+
+    def test_catalog_face_rect_is_exact_and_tied_to_the_url(self):
+        """face_rect is required with a url, null-only for placeholders, and exact."""
+        for bad in (
+            {"face_rect": None},  # url present, rect missing
+            {"face_rect": {"x": 0.25, "y": 0.06, "w": 0.5}},  # missing h
+            {"face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5, "z": 0}},  # extra key
+            {"face_rect": {"x": -0.1, "y": 0.06, "w": 0.5, "h": 0.5}},  # below 0
+            {"face_rect": {"x": 1.5, "y": 0.06, "w": 0.5, "h": 0.5}},  # above 1
+            {"face_rect": {"x": "0.25", "y": 0.06, "w": 0.5, "h": 0.5}},  # not a number
+            {"face_rect": {"x": True, "y": 0.06, "w": 0.5, "h": 0.5}},  # bool is not a number
+        ):
+            with self.subTest(bad=bad):
+                payload = _valid_payload(
+                    portrait_catalog={"42": _valid_catalog_entry(**bad)}
+                )
+                with self.assertRaises(Exception):
+                    validate_art(payload)
+        # A url-less placeholder entry carries face_rect: null.
+        placeholder_entry = _valid_catalog_entry(
+            url=None,
+            placeholder={"kind": "unavailable", "label": "無法提供"},
+            face_rect=None,
+        )
+        normalized = validate_art(
+            _valid_payload(portrait_catalog={"42": placeholder_entry})
+        )
+        self.assertIsNone(normalized["portrait_catalog"]["42"]["face_rect"])
+        # A placeholder must not carry a rectangle.
+        with self.assertRaises(Exception):
+            validate_art(
+                _valid_payload(
+                    portrait_catalog={
+                        "42": _valid_catalog_entry(
+                            url=None,
+                            placeholder={"kind": "unavailable", "label": "無法提供"},
+                        )
+                    }
+                )
+            )
 
     def test_catalog_ceiling_and_byte_gate(self):
         entries = {
@@ -388,6 +431,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(entry["placeholder"]["kind"], "unavailable")
         self.assertIsNone(entry["subject_key"])
         self.assertIsNone(entry["url"])
+        self.assertIsNone(entry["face_rect"])
         self.assertNotIn("portrait rejected", repr(payload))
 
     def test_creation_mode_renders_unavailable_form(self):
@@ -396,6 +440,26 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertFalse(payload["available"])
         self.assertNotIn("scene", payload)
         self.assertNotIn("portrait_catalog", payload)
+
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
+    def test_resolved_catalog_entry_carries_url_and_face_rect(self):
+        # A resolved image entry carries both the media URL and the
+        # normalized face rectangle (art-gallery-resolution wire rule).
+        from world.art.gallery import DEFAULT_FACE_RECT
+
+        guest = _player(key="rect guest")
+        guest.location = self.room
+        guest.db.portrait_policy = {"mode": "named", "stable_key": "rect-guest"}
+        self._settle_done(
+            ArtSubject(ArtSubjectKind.CHARACTER, "rect-guest"),
+            "portrait/character/rect-guest.png",
+        )
+        payload = self._render()
+        entry = payload["portrait_catalog"][str(guest.pk)]
+        self.assertEqual(entry["url"], "/art/portrait/character/rect-guest.png")
+        self.assertEqual(entry["face_rect"], dict(DEFAULT_FACE_RECT))
+        # The scene wire block stays byte-identical: no face_rect key.
+        self.assertNotIn("face_rect", payload["scene"])
 
     @covers_requirement("webclient-art-panel::the-art-panel-is-an-exact-read-only-panel-available-in-exploration-and-combat-modes")
     def test_presenter_is_read_only(self):

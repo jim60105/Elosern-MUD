@@ -1563,7 +1563,7 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.party, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.objectives, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.services, 4);
-  assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.art, 2);
   assert.equal(Protocol.PANEL_ALLOWLIST.creation, 5);
   assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 2);
   assert.equal(Protocol.PANEL_ALLOWLIST.character, 7);
@@ -1571,7 +1571,7 @@ test("mirrors every registered panel schema version in the allowlist", () => {
   assert.equal(Protocol.PANEL_ALLOWLIST.dialogue, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.title_ballot, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.title_codex, 1);
-  assert.equal(Protocol.PANEL_ALLOWLIST.roster, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.roster, 2);
   assert.equal(Protocol.PANEL_ALLOWLIST.possession_banner, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.lore_codex, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.quest_log, 1);
@@ -2869,6 +2869,7 @@ function validArtCatalogEntry(overrides) {
       aspect_ratio: "3:4",
       alt: "低階魔物",
       placeholder: null,
+      face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
       context: { name: "哥布林", role: "敵方" },
     },
     overrides
@@ -2878,7 +2879,7 @@ function validArtCatalogEntry(overrides) {
 function validArtPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "scene",
       scene: validArtScene(),
@@ -2889,7 +2890,7 @@ function validArtPanel(overrides) {
 }
 
 test("art is in the production panel allowlist and validates the available payload", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.art, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.art, 2);
   assert.doesNotThrow(() => Protocol.validateArtPanel(validArtPanel()));
   assert.doesNotThrow(() =>
     Protocol.validateArtPanel(
@@ -2906,6 +2907,7 @@ test("art is in the production panel allowlist and validates the available paylo
             status: null,
             url: null,
             aspect_ratio: null,
+            face_rect: null,
             placeholder: { kind: "unavailable", label: "無法提供" },
             context: { name: "旅店主人", role: "對話對象" },
           }),
@@ -2918,12 +2920,49 @@ test("art is in the production panel allowlist and validates the available paylo
 test("rejects malformed art panels atomically", () => {
   assert.throws(() =>
     Protocol.validatePanel("art", Protocol.PANEL_ALLOWLIST.art, {
-      schema_version: 1,
+      schema_version: 2,
       available: false,
     })
   );
   assert.throws(() => Protocol.validateArtPanel(validArtPanel({ kind: "combat" })));
-  assert.throws(() => Protocol.validateArtPanel(validArtPanel({ schema_version: 2 })));
+  assert.throws(() => Protocol.validateArtPanel(validArtPanel({ schema_version: 1 })));
+  assert.throws(() => Protocol.validateArtPanel(validArtPanel({ schema_version: 3 })));
+  // v2: the face rectangle exists exactly when the entry carries a media URL.
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validArtPanel({ portrait_catalog: { "42": validArtCatalogEntry({ face_rect: null }) } })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validArtPanel({
+        portrait_catalog: {
+          "42": validArtCatalogEntry({
+            url: null,
+            placeholder: { kind: "unavailable", label: "無法提供" },
+          }),
+        },
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validArtPanel({
+        portrait_catalog: {
+          "42": validArtCatalogEntry({ face_rect: { x: 0.25, y: 0.06, w: 0.5, h: null } }),
+        },
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validArtPanel({
+        portrait_catalog: {
+          "42": validArtCatalogEntry({ face_rect: { x: -0.1, y: 0.06, w: 0.5, h: 0.5 } }),
+        },
+      })
+    )
+  );
   // A pending scene without a placeholder is untruthful.
   assert.throws(() =>
     Protocol.validateArtPanel(
@@ -5953,6 +5992,7 @@ function validRosterPortrait(overrides) {
       aspect_ratio: "3:4",
       alt: "英雄肖像",
       placeholder: null,
+      face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
     },
     overrides || {}
   );
@@ -5974,7 +6014,7 @@ function validRosterCharacter(overrides) {
 function validRosterPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       characters: [validRosterCharacter()],
       max_characters: 5,
@@ -6066,7 +6106,7 @@ test("roster validator enforces reciprocal lock/reason invariant", () => {
 
 test("roster validator mirrors server drift and bound rejections", () => {
   for (const bad of [
-    validRosterPanel({ schema_version: 2 }),
+    validRosterPanel({ schema_version: 1 }),
     validRosterPanel({ available: false }),
     validRosterPanel({ characters: "not-a-list" }),
     // Duplicate identities
@@ -6119,6 +6159,30 @@ test("roster validator mirrors server drift and bound rejections", () => {
         }),
       ],
     }),
+    // A url-bearing portrait without a face rectangle
+    validRosterPanel({
+      characters: [
+        validRosterCharacter({
+          portrait: validRosterPortrait({ face_rect: null }),
+        }),
+      ],
+    }),
+    // A face rectangle with a non-numeric coordinate
+    validRosterPanel({
+      characters: [
+        validRosterCharacter({
+          portrait: validRosterPortrait({ face_rect: { x: 0.3, y: 0.1, w: 0.4, h: "0.4" } }),
+        }),
+      ],
+    }),
+    // A coordinate outside [0, 1]
+    validRosterPanel({
+      characters: [
+        validRosterCharacter({
+          portrait: validRosterPortrait({ face_rect: { x: 0.3, y: 0.1, w: 1.4, h: 0.4 } }),
+        }),
+      ],
+    }),
     // Invalid aspect_ratio
     validRosterPanel({
       characters: [
@@ -6146,14 +6210,14 @@ test("roster validator mirrors server drift and bound rejections", () => {
 });
 
 test("roster is in the production panel allowlist and rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.roster, 1);
+  assert.equal(Protocol.PANEL_ALLOWLIST.roster, 2);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
     revision: 5,
     mode: "exploration",
     panels: {
-      roster: { schema_version: 1, available: true, characters: "not-a-list" },
+      roster: { schema_version: 2, available: true, characters: "not-a-list" },
     },
     layout_version: 1,
     server_time: serverTime(),
@@ -6164,7 +6228,7 @@ test("roster is in the production panel allowlist and rejects atomically", () =>
   assert.doesNotThrow(() => Protocol.validateSnapshot(envelope));
   envelope.panels = {
     roster: {
-      schema_version: 1,
+      schema_version: 2,
       available: false,
       reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
     },

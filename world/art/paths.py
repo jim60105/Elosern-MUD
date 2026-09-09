@@ -1,12 +1,13 @@
 """Single store-root confinement helper for every gallery file operation.
 
 One function decides whether a stored identity may be touched on disk: the
-path must be a relative, component-clean ``ART_STORE_ROOT`` descendant whose
-every existing component is a real (non-symlink) directory, and whose
-fully-resolved target is strictly under the root. Card deletion in
-``world/art/gallery.py`` resolves through here, and later gallery changes
-adopt it for every other filesystem touch, so no code path can ever unlink
-outside the store root.
+path must be a relative, component-clean root descendant whose every existing
+component is a real (non-symlink) directory, and whose fully-resolved target
+is strictly under the root. ``resolved_under_root`` is the generic discipline;
+``resolved_under_store_root`` pins it to ``ART_STORE_ROOT``. Card deletion in
+``world/art/gallery.py``, the resolution chain's identity checks, and the
+media route's gallery/defaults branches all resolve through here, so no code
+path can ever touch a file outside its own root.
 
 Reads ``settings.ART_STORE_ROOT`` per call (never at import) so
 ``override_settings`` redirects the store exactly like the queue and worker
@@ -20,8 +21,8 @@ from pathlib import Path
 from django.conf import settings
 
 
-def resolved_under_store_root(identity: str) -> Path | None:
-    """Return ``identity`` resolved strictly under ``ART_STORE_ROOT``, or None.
+def resolved_under_root(root: Path, identity: str) -> Path | None:
+    """Return ``identity`` resolved strictly under ``root``, or None.
 
     Rejected (returning ``None``, never raising): an empty or absolute
     identity, any ``..`` component, an identity equal to the root itself, a
@@ -37,7 +38,7 @@ def resolved_under_store_root(identity: str) -> Path | None:
     candidate = Path(identity)
     if candidate.is_absolute() or ".." in candidate.parts:
         return None
-    root = Path(settings.ART_STORE_ROOT)
+    root = Path(root)
     try:
         root_resolved = root.resolve()
         target = (root / candidate).resolve()
@@ -56,3 +57,13 @@ def resolved_under_store_root(identity: str) -> Path | None:
         if path.is_symlink():
             return None
     return target
+
+
+def resolved_under_store_root(identity: str) -> Path | None:
+    """Return ``identity`` resolved strictly under ``ART_STORE_ROOT``, or None.
+
+    The store-root pin of :func:`resolved_under_root`, read per call so
+    ``override_settings`` redirects the store exactly like the queue and
+    worker do.
+    """
+    return resolved_under_root(Path(settings.ART_STORE_ROOT), identity)

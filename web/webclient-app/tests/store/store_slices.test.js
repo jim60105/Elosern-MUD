@@ -728,7 +728,7 @@ describe("store view slices", () => {
   it("exposes roster slice when roster panel is available in snapshot", () => {
     openActiveSession(store);
     const rosterPanel = {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       characters: [
         {
@@ -743,6 +743,7 @@ describe("store view slices", () => {
             aspect_ratio: "3:4",
             alt: "英雄肖像",
             placeholder: null,
+            face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
           },
         },
         {
@@ -757,6 +758,7 @@ describe("store view slices", () => {
             aspect_ratio: null,
             alt: "無肖像",
             placeholder: { kind: "unavailable", label: "無肖像" },
+            face_rect: null,
           },
         },
       ],
@@ -790,7 +792,7 @@ describe("store view slices", () => {
   it("degrades roster slice to empty/unavailable when roster panel is unavailable or absent", () => {
     openActiveSession(store);
     const unavailableRoster = {
-      schema_version: 1,
+      schema_version: 2,
       available: false,
       reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
     };

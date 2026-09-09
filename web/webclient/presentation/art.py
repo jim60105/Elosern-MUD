@@ -1,4 +1,4 @@
-"""Exact schema-version-1 ``art`` panel and presenter (webclient-art-panel).
+"""Exact schema-version-2 ``art`` panel and presenter (webclient-art-panel).
 
 The presenter composes the frozen art view owned by
 ``world.rules.art_view`` with the read-only resolution primitives in
@@ -12,8 +12,10 @@ The payload contains exactly ``schema_version``, ``available``, ``kind``, the
 current scene (validated archetype, label, subject key, status, same-origin
 URL, aspect, alternative text, and a nullable placeholder) and a bounded
 ``portrait_catalog`` keyed by the opaque IDs of currently present focusable
-entities. It never exposes ``out_path``, the store root, or rejected prompt
-content.
+entities, each entry additionally carrying the resolved normalized face
+rectangle (exactly ``x``, ``y``, ``w``, ``h`` in ``[0, 1]`` whenever the entry
+has a media URL, ``null`` for every placeholder). It never exposes
+``out_path``, the store root, or rejected prompt content.
 """
 
 from typing import Any
@@ -43,7 +45,7 @@ from world.rules.art_view import (
     build_art_view,
 )
 
-ART_SCHEMA_VERSION = 1
+ART_SCHEMA_VERSION = 2
 
 # Stable panel-level bounds equal to or below the global protocol table.
 MAX_ARCHETYPE = 64
@@ -62,6 +64,31 @@ ROLES = frozenset({ROLE_ALLY, ROLE_DIALOGUE, ROLE_FOE, ROLE_PERSON})
 
 class ArtPanelError(ProtocolValidationError):
     """The available art payload violates its exact bounded schema."""
+
+
+def _validate_face_rect(value: Any) -> dict[str, float] | None:
+    """Validate the wire face rectangle: ``None`` or exactly x, y, w, h reals.
+
+    Shared by the art catalog entry and the roster row portrait (the same
+    portrait field vocabulary on both wires). Every coordinate is a real
+    number in ``[0, 1]``; booleans are not numbers here. The server ships
+    placement metadata only — no crop, no second image.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict) or set(value) != {"x", "y", "w", "h"}:
+        raise ProtocolValidationError(
+            "face_rect must be a mapping of exactly x, y, w, h"
+        )
+    rect: dict[str, float] = {}
+    for name in ("x", "y", "w", "h"):
+        coordinate = value[name]
+        if not isinstance(coordinate, (int, float)) or isinstance(coordinate, bool):
+            raise ProtocolValidationError(f"face_rect.{name} must be a real number")
+        if not 0.0 <= coordinate <= 1.0:
+            raise ProtocolValidationError(f"face_rect.{name} must lie in [0, 1]")
+        rect[name] = coordinate
+    return rect
 
 
 def _validate_placeholder(value: Any) -> dict[str, Any] | None:
@@ -164,6 +191,7 @@ def _validate_catalog_entry(value: Any) -> dict[str, Any]:
             "aspect_ratio",
             "alt",
             "placeholder",
+            "face_rect",
             "context",
         },
         {},
@@ -193,6 +221,13 @@ def _validate_catalog_entry(value: Any) -> dict[str, Any]:
         raise ProtocolValidationError("catalog alt must be non-empty")
     placeholder = _validate_placeholder(value["placeholder"])
     context = _validate_context(value["context"])
+    face_rect = _validate_face_rect(value["face_rect"])
+    # A client never offsets a frame it has no image for: the rectangle is
+    # present exactly when the entry carries a media URL.
+    if url is not None and face_rect is None:
+        raise ProtocolValidationError("a catalog entry with a url carries a face_rect")
+    if url is None and face_rect is not None:
+        raise ProtocolValidationError("a catalog placeholder carries no face_rect")
     return {
         "subject_key": subject_key,
         "status": status,
@@ -200,6 +235,7 @@ def _validate_catalog_entry(value: Any) -> dict[str, Any]:
         "aspect_ratio": aspect_ratio,
         "alt": alt,
         "placeholder": placeholder,
+        "face_rect": face_rect,
         "context": context,
     }
 
@@ -307,6 +343,7 @@ def _serialize_catalog_entry(entity_view: Any) -> dict[str, Any]:
             "aspect_ratio": None,
             "alt": "無法提供",
             "subject_key": None,
+            "face_rect": None,
         }
     else:
         resolved = resolve_entity(entity)
@@ -317,6 +354,7 @@ def _serialize_catalog_entry(entity_view: Any) -> dict[str, Any]:
         "aspect_ratio": resolved.get("aspect_ratio"),
         "alt": resolved.get("alt") or "無法提供",
         "placeholder": _placeholder_for(resolved),
+        "face_rect": resolved.get("face_rect"),
         "context": {
             "name": entity_view.display_name,
             "role": entity_view.role,
@@ -370,6 +408,7 @@ __all__ = [
     "MAX_SUBJECT_KEY",
     "PLACEHOLDER_KINDS",
     "ROLES",
+    "_validate_face_rect",
     "_placeholder_for",
     "art_presenter",
     "validate_art",

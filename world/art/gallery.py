@@ -93,6 +93,16 @@ def _empty_snapshot() -> dict:
     return {"weapon_main": None, "weapon_off": None, "armor": None, "accessories": []}
 
 
+def empty_snapshot() -> dict:
+    """Public fresh fully empty four-slot snapshot for read-only consumers.
+
+    The resolution chain needs the same empty state ``snapshot_for`` falls
+    back to when an entity carries no readable equipment; exporting it here
+    keeps the four-slot vocabulary in exactly one module.
+    """
+    return _empty_snapshot()
+
+
 # Serializes every gallery-record mutation. The generation-settle path may
 # nest this inside queue_lock; never the reverse (module docstring).
 gallery_lock = threading.RLock()

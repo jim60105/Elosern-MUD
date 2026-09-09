@@ -42,6 +42,7 @@ function validEntry(overrides) {
       aspect_ratio: "3:4",
       alt: "低階魔物",
       placeholder: null,
+      face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
       context: { name: "哥布林", role: "敵方" },
     },
     overrides
@@ -51,7 +52,7 @@ function validEntry(overrides) {
 function validPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "scene",
       scene: validScene(),
@@ -72,6 +73,7 @@ test("the validated art payload is accepted by the protocol reducer", () => {
 
 test("malformed art payloads are rejected by the protocol validator", () => {
   assert.throws(() => Protocol.validateArtPanel(validPanel({ kind: "combat" })));
+  assert.throws(() => Protocol.validateArtPanel(validPanel({ schema_version: 1 })));
   assert.throws(() =>
     Protocol.validateArtPanel(validPanel({ scene: validScene({ url: "https://x.test/a.png" }) }))
   );
@@ -81,6 +83,43 @@ test("malformed art payloads are rejected by the protocol validator", () => {
   assert.throws(() =>
     Protocol.validateArtPanel(
       validPanel({ scene: validScene({ status: "pending", url: null, placeholder: null }) })
+    )
+  );
+  // v2: a URL-bearing entry carries a face rectangle; a placeholder never does.
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validPanel({ portrait_catalog: { "1": validEntry({ face_rect: null }) } })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validPanel({
+        portrait_catalog: {
+          "1": validEntry({
+            url: null,
+            placeholder: { kind: "unavailable", label: "無法提供" },
+            face_rect: { x: 0.1, y: 0.1, w: 0.5, h: 0.5 },
+          }),
+        },
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validPanel({
+        portrait_catalog: {
+          "1": validEntry({ face_rect: { x: 0.25, y: 0.06, w: 0.5 } }),
+        },
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validPanel({
+        portrait_catalog: {
+          "1": validEntry({ face_rect: { x: 1.5, y: 0.06, w: 0.5, h: 0.5 } }),
+        },
+      })
     )
   );
 });
@@ -208,6 +247,7 @@ test("a placeholder catalog entry has no URL", () => {
         status: null,
         url: null,
         aspect_ratio: null,
+        face_rect: null,
         placeholder: { kind: "unavailable", label: "無法提供" },
       }),
     },

@@ -617,7 +617,7 @@ def valid_art_panel() -> dict:
     with a same-origin URL, 16:9 aspect ratio, and no placeholder.
     """
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
         "kind": "scene",
         "scene": {
