@@ -65,6 +65,7 @@ services:
       - evennia-static:/app/server/.static
       - evennia-media:/app/server/.media
       - ${PROMPTS_DIR:-./prompts}:/app/prompts:ro,z
+      - ${ART_SEED_DIR:-./art-seed}:/app/art-seed:ro,z
 
   # First run only: podman compose --profile bootstrap run --rm bootstrap
   bootstrap:

@@ -125,6 +125,7 @@ class ContainerContractTests(unittest.TestCase):
                 "evennia-static:/app/server/.static",
                 "evennia-media:/app/server/.media",
                 "${PROMPTS_DIR:-./prompts}:/app/prompts:ro,z",
+                "${ART_SEED_DIR:-./art-seed}:/app/art-seed:ro,z",
             },
         )
         self.assertEqual(
@@ -157,6 +158,27 @@ class ContainerContractTests(unittest.TestCase):
             [line for line in ignored if "prompts" in line],
             "the build context must include the prompt data folder",
         )
+
+    @covers_requirement("art-gallery-seed-sync::bulk-seed-art-lives-outside-git-behind-one-directory-root-setting")
+    def test_seed_art_is_mounted_read_only_and_never_baked_or_committed(self):
+        compose = yaml.safe_load(_read("compose.yaml"))
+        volumes = compose["services"]["evennia"]["volumes"]
+        self.assertIn("${ART_SEED_DIR:-./art-seed}:/app/art-seed:ro,z", volumes)
+        self.assertFalse(
+            [line for line in volumes if "/app/art-seed" in line and ":ro" not in line],
+            "the seed mount must be read-only",
+        )
+
+        # The folder is never baked into the image or committed to git.
+        containerfile = _read("Containerfile")
+        self.assertNotIn("art-seed", containerfile)
+        ignored = {
+            line.strip()
+            for line in _read(".containerignore").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+        self.assertIn("art-seed/", ignored)
+        self.assertIn("art-seed/", set(_read(".gitignore").splitlines()))
 
     @covers_requirement("container-image::container-ignore-file-excludes-non-build-context-files")
     def test_containerignore_excludes_repository_secrets_caches_and_development_paths(self):

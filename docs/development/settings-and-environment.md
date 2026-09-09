@@ -96,6 +96,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | --- | --- | --- | --- | --- |
 | `LLM_BASE_URL` | `server/conf/settings.py` | URL 字串 | `http://127.0.0.1:11434`（compose：`http://host.containers.internal:11434`） | 所有 LLM 層的 OpenAI 相容端點；見下方 LLM endpoint knob 表 |
 | `PROMPT_ROOT` | `server/conf/settings.py` | 路徑字串 | `<GAME_DIR>/prompts` | 根內提示詞資料夾；僅 bare-metal／非標準佈局使用 |
+| `ART_SEED_ROOT` | `server/conf/settings.py` | 路徑字串 | `<GAME_DIR>/art-seed` | 根內批次種子圖資料夾（gallery-seed-sync）；目錄不存在＝「不同步任何東西」，永遠不是錯誤 |
 | `WEBSOCKET_CLIENT_PROXY_PORT` | Evennia `general_context` | 整數 | `4002` | 前端可見的 websocket 埠覆寫（反代／埠重映射） |
 
 ## LLM endpoint knobs（23 個）
@@ -192,6 +193,7 @@ host-gateway 預設外，其餘 22 個全域 `LLM_*` knob（含 `LLM_API_KEY`）
 | --- | --- | --- |
 | `EVENNIA_SUPERUSER_USERNAME` / `EVENNIA_SUPERUSER_EMAIL` / `EVENNIA_SUPERUSER_PASSWORD` | Evennia launcher | 僅在資料庫全新時非互動建立 Account #1；缺 password 會在容器內崩潰迴圈 |
 | `PROMPTS_DIR` | compose.yaml | 宿側唯讀掛載點 → `/app/prompts` |
+| `ART_SEED_DIR` | compose.yaml | 宿側唯讀掛載點 → `/app/art-seed`（批次種子圖；鏡像內絕不燒入） |
 | `CONTAINER_UID`、`IMAGE_TAG`、`VERSION`、`RELEASE` | compose.yaml／Containerfile | 建置 ARG 與 OCI 標籤 |
 | `TEST_DB_PATH` | Evennia `settings_default` | 測試資料庫名預設；本專案的 test_settings 無條件覆寫，實際上無效 |
 

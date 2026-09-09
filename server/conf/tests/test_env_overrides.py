@@ -725,6 +725,7 @@ def _active_env_example_keys() -> set[str]:
 # are read OUTSIDE server/conf/settings.py (launcher, compose, harness, CI).
 EXTERNAL_READERS: dict[str, str] = {
     "PROMPTS_DIR": "compose.yaml bind mount interpolation",
+    "ART_SEED_DIR": "compose.yaml bind mount interpolation",
     "CONTAINER_UID": "Containerfile build ARG",
     "IMAGE_TAG": "compose.yaml image tag interpolation",
     "VERSION": "Containerfile/OCI label build ARG",
@@ -760,7 +761,9 @@ class InventoryTests(unittest.TestCase):
     )
     def test_settings_ast_reads_exactly_the_env_backed_inventory(self):
         read = _env_read_names(SETTINGS_PATH)
-        self.assertEqual(read, set(ENV_BACKED.values()) | {"PROMPT_ROOT"})
+        self.assertEqual(
+            read, set(ENV_BACKED.values()) | {"PROMPT_ROOT", "ART_SEED_ROOT"}
+        )
         # The LLM knob reads are loop-generated (invisible to this extractor)
         # and the retired OLLAMA_BASE_URL name must not reappear anywhere in
         # the settings module.
@@ -787,7 +790,7 @@ class InventoryTests(unittest.TestCase):
         "settings-environment-overrides::environment-inventory-and-configuration-guide-are-version-controlled-and-exact"
     )
     def test_env_example_advertises_no_dead_variables(self):
-        live = set(ENV_BACKED.values()) | {"PROMPT_ROOT"}
+        live = set(ENV_BACKED.values()) | {"PROMPT_ROOT", "ART_SEED_ROOT"}
         generated = llm_env_names()
         for key in _active_env_example_keys():
             with self.subTest(key=key):
