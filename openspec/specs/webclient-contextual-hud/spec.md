@@ -7,9 +7,7 @@ backdrop, the bounded narrative caption, drawer/overlay stage recessing, and the
 re-chrome contract: the centred floating dock panel, the root tab bar with truthful count badges,
 the router-derived breadcrumb, the per-kind row vocabulary, the display-only combat participant
 frame, the bounded skill master-detail, and the two-step destructive confirmation.
-
 ## Requirements
-
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
 The WebClient SHALL render as a full-bleed stage that fills the viewport, with the scene backdrop as
 the lowest layer, the narrative caption card above it, the HUD islands above that, the action dock
@@ -946,9 +944,12 @@ The skill-book drawer specifically SHALL carry, whenever the `character` panel i
 subtitle stating its owner's active and passive skill counts (`主動 {n} · 被動 {m}`, computed from that
 same payload `SkillBook` renders) in the drawer head; when the panel is unavailable the subtitle is
 empty, matching the drawer's existing degrade-without-inventing-data contract. The skill-book drawer
-SHALL always carry a footer stating the client's own cast-command syntax
+SHALL carry a footer stating the client's own cast-command syntax
 (`施放入口：cast <技法>[@威力]=<代號>`) as static client-local presentation copy — not a value the OOB
-protocol carries, so its presence does not depend on any panel's availability.
+protocol carries, so its presence does not depend on any panel's availability — whenever the drawer
+presents the skill book itself; while the declared-practice sub-screen replaces the book body, that
+footer is absent and the head title reads 修煉, because the cast syntax belongs to the book view the
+sub-screen replaced.
 
 #### Scenario: A drawer opens over the stage with a scrim
 - **WHEN** the player opens a reference drawer
@@ -981,29 +982,6 @@ protocol carries, so its presence does not depend on any panel's availability.
 #### Scenario: The skill-book drawer states its skill counts and cast syntax
 - **WHEN** the skill-book drawer opens with the `character` panel available
 - **THEN** its head carries a leading skill glyph and a `主動 {n} · 被動 {m}` subtitle matching the panel's active/passive row counts, its title renders exactly once (not duplicated inside the body), and its footer states the client's `/cast` syntax as static copy
-
-### Requirement: The reference surfaces have no permanently visible home and are reached from the dock
-The skill book, the bag and equipment, the shop, the quest board, the lore reference and the character
-status SHALL each render in exactly one place — its drawer — and SHALL NOT be present in the DOM while
-that drawer is closed. The stage SHALL carry no permanently visible column of reference panels.
-
-Each drawer SHALL be opened either by the dock frame that owns its surface, or by a single labelled
-control inside a drawer that already presents the same read model, or by a surface this capability
-names elsewhere as an opener for it. No reference surface SHALL require more than two actions from the
-dock's root frame to reach. Opening a drawer SHALL NOT change any dock root item, any menu frame, any
-menu key, or the meaning of Escape.
-
-#### Scenario: No reference surface is mounted while the drawers are closed
-- **WHEN** the stage renders in exploration mode with every drawer closed
-- **THEN** no skill book, bag, shop, quest board, lore reference or character-status element exists in the DOM or in the tab order, and no reference column is rendered
-
-#### Scenario: Every reference surface is reachable from the dock
-- **WHEN** the player starts at the dock's root frame
-- **THEN** each of the six reference surfaces is reached in at most two actions, and the narrative caption remains the visual centre of the stage
-
-#### Scenario: An emptied right-hand stack costs nothing
-- **WHEN** the stage renders at 1440x900 and 1280x720 with every drawer closed
-- **THEN** the right-hand HUD anchor renders no reference panel, contributes no visible box and no tab stop, and no stage anchor's rendered box intersects another's
 
 ### Requirement: A drawer hosting a dock frame renders that frame rather than a second navigation model
 When the keyboard router's current frame belongs to a surface that a drawer presents, that drawer
@@ -1749,3 +1727,57 @@ decision point.
   submenus are open
 - **THEN** the stack holds exactly the ordinary exploration root descriptor and no stale submenu
   row remains activatable
+
+### Requirement: The skill book offers a bounded declared-practice sub-screen
+The skill-book drawer SHALL offer a 修煉 affordance on each active skill row the committed
+`character` panel supports, and activating it SHALL replace the book body with a practice
+sub-screen inside the same drawer: the drawer title becomes 修煉, the body lists the panel's
+active skills for selection, and one bounded-duration control starts the practice. The browser
+SHALL compute nothing about eligibility, duration outcome, or progression: every row state comes
+from the committed panel, the duration control reuses the waiting surface's bounded hours form, and
+confirmation SHALL submit exactly one `explore.practice` with the selected `skill` and the
+converted whole `seconds` through the shared dispatch/confirmation lock. While a submission is in
+flight or its declared presentation revision is pending, the control SHALL be disabled. The
+server-authored result line (success summary or rejection message) SHALL render as escaped text
+inside the sub-screen and nowhere else, and closing the sub-screen SHALL restore the book body,
+the original drawer title, and the book's cast-syntax footer.
+
+#### Scenario: Practice dispatches one server-trusted intent
+- **WHEN** the player opens 修煉 from an active skill row, selects the skill, enters `2` hours, and confirms
+- **THEN** exactly one `ui_action` is submitted — `explore.practice` with that `skill` and `seconds: 7200` — and the drawer controls stay locked until the result revision is adopted
+
+#### Scenario: The result line is the server's
+- **WHEN** a practice result arrives
+- **THEN** its Traditional Chinese summary or rejection message renders verbatim as escaped text in the sub-screen, with no client-computed progression, elapsed-time, or eligibility claim
+
+#### Scenario: The practice screen is gated by committed data only
+- **WHEN** the `character` panel is unavailable or a row carries no practice support
+- **THEN** no 修煉 affordance renders for that row and no practice state is invented
+
+#### Scenario: Closing the practice screen restores the book
+- **WHEN** the player closes the practice sub-screen
+- **THEN** the drawer shows the skill book again with its original title and its cast-syntax footer, and no second drawer was opened
+
+### Requirement: The reference surfaces have no permanently visible home and are reached from the top navigation or the dock
+The skill book, the bag and equipment, the shop, the quest board, the lore reference and the character
+status SHALL each render in exactly one place — its drawer — and SHALL NOT be present in the DOM while
+that drawer is closed. The stage SHALL carry no permanently visible column of reference panels.
+
+Each drawer SHALL be opened either by the dock frame that owns its surface, or by a single labelled
+control inside a drawer that already presents the same read model, or by a surface this capability
+names elsewhere as an opener for it. No reference surface SHALL require more than two actions from
+the top navigation bar or the dock's root frame to reach. Opening a drawer SHALL NOT change any dock root item, any menu frame, any
+menu key, or the meaning of Escape.
+
+#### Scenario: No reference surface is mounted while the drawers are closed
+- **WHEN** the stage renders in exploration mode with every drawer closed
+- **THEN** no skill book, bag, shop, quest board, lore reference or character-status element exists in the DOM or in the tab order, and no reference column is rendered
+
+#### Scenario: Every reference surface is reachable from the dock
+- **WHEN** the player starts at the dock's root frame or the top navigation bar
+- **THEN** each of the six reference surfaces is reached in at most two actions, and the narrative caption remains the visual centre of the stage
+
+#### Scenario: An emptied right-hand stack costs nothing
+- **WHEN** the stage renders at 1440x900 and 1280x720 with every drawer closed
+- **THEN** the right-hand HUD anchor renders no reference panel, contributes no visible box and no tab stop, and no stage anchor's rendered box intersects another's
+

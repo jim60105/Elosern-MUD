@@ -562,5 +562,59 @@ class DialogueSurfaceEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class WaitingPracticeSurfaceEvidenceTest(unittest.TestCase):
+    """align-webclient-waiting-practice-specs: the three-operation waiting
+    surface and the skill book's declared-practice sub-screen are Vue-layer
+    contracts; the Vitest files are their executed evidence."""
+
+    @covers_requirement(
+        "webclient-exploration-menu::the-waiting-surface-offers-exactly-three-operations",
+    )
+    def test_waiting_surface_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/waiting_surface.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "waiting-surface Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-skill-book-offers-a-bounded-declared-practice-sub-screen",
+    )
+    def test_practice_subscreen_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/data/skill_book.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "practice-sub-screen Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,10 +1,7 @@
 ## Purpose
 
 Exact bounded UI action validation, allowlisted adapters, session identity, stale and duplicate handling, in-flight serialization, and deterministic-core mutation boundaries.
-
 ## Requirements
-
-
 ### Requirement: UI actions use an exact bounded request envelope
 `ui_action` SHALL accept exactly `protocol_version`, `presentation_epoch`, `request_id`, `base_revision`, `action_id`, and `payload`. Protocol version SHALL be integer 1; epoch SHALL satisfy the protocol's exact 22-character form; request ID SHALL be 1..64 characters from ASCII letters, digits, colon, underscore, and hyphen; action ID SHALL be 1..64 lowercase dotted identifier characters; base revision SHALL be a non-negative JavaScript-safe integer excluding booleans; and payload SHALL be an object within global bounds plus its registered action-specific smaller schema. Unknown fields or invalid global values SHALL be rejected before action lookup.
 
@@ -28,7 +25,7 @@ The dispatcher SHALL accept actions only from authenticated WebSocket sessions w
 - **THEN** no adapter runs and no character state is returned
 
 ### Requirement: Action registries are allowlisted and duplicate-safe
-The action registry SHALL bind each stable action ID to one exact payload validator and one adapter, SHALL reject duplicate registration, and SHALL reject unknown action IDs. The production registry SHALL contain exactly the three combat adapters `combat.cast`, `combat.flee`, and `combat.forfeit`, the seven service adapters `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.exam_start`, `shop.buy`, and `shop.sell`, the two inventory adapters `inventory.use` and `inventory.toggle_equip`, the five creation adapters `creation.preset`, `creation.custom`, `creation.concept`, `creation.activate`, and `creation.reset`, the eleven exploration adapters `explore.move`, `explore.look`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.possess`, and `explore.possess_release`, the `options.dismiss` action, the four title adapters `title.accept`, `title.decline`, `title.equip`, and `title.remove`, and the persona-editing adapter `character.persona.update`, each with its own exact validator and deterministic adapter, until another owning change adds an explicitly specified action. Tests MAY use an isolated proof adapter that cannot be reached in production configuration. No action SHALL route an action ID or payload string through the text command parser.
+The action registry SHALL bind each stable action ID to one exact payload validator and one adapter, SHALL reject duplicate registration, and SHALL reject unknown action IDs. The production registry SHALL contain the two account adapters `account.character.create` and `account.character.switch`, the three combat adapters `combat.cast`, `combat.flee`, and `combat.forfeit`, the eight service adapters `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_start`, `shop.buy`, and `shop.sell`, the two inventory adapters `inventory.use` and `inventory.toggle_equip`, the six creation adapters `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, and `creation.reset`, the thirteen exploration adapters `explore.move`, `explore.look`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, and `explore.deliver`, the `options.dismiss` action, the four title adapters `title.accept`, `title.decline`, `title.equip`, and `title.remove`, and the persona-editing adapter `character.persona.update`, each with its own exact validator and deterministic adapter, until another owning change adds an explicitly specified action. Tests MAY use an isolated proof adapter that cannot be reached in production configuration. No action SHALL route an action ID or payload string through the text command parser.
 
 #### Scenario: Unknown action cannot become a command
 - **WHEN** a client submits an unregistered action ID or a string resembling an Evennia command
@@ -43,13 +40,12 @@ The action registry SHALL bind each stable action ID to one exact payload valida
 - **THEN** registry construction fails rather than selecting one by registration order
 
 #### Scenario: Production registry exposes only specified combat, service, inventory, creation, exploration, dismiss, title, and persona mutations
-- **WHEN** the production registry is loaded after the possession-webclient change
-- **THEN** its action IDs are exactly `combat.cast`, `combat.flee`, `combat.forfeit`, `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.exam_start`, `shop.buy`, `shop.sell`, `inventory.use`, `inventory.toggle_equip`, `creation.preset`, `creation.custom`, `creation.concept`, `creation.activate`, `creation.reset`, `explore.move`, `explore.look`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.possess`, `explore.possess_release`, `options.dismiss`, `title.accept`, `title.decline`, `title.equip`, `title.remove`, and `character.persona.update`, each with its own exact validator and deterministic adapter
+- **WHEN** the production registry is loaded after the practice-webclient change
+- **THEN** its action IDs are exactly `account.character.create`, `account.character.switch`, `combat.cast`, `combat.flee`, `combat.forfeit`, `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`, `guild.quest_track`, `guild.exam_start`, `shop.buy`, `shop.sell`, `inventory.use`, `inventory.toggle_equip`, `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, `creation.reset`, `explore.move`, `explore.look`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, `explore.party_invite`, `explore.party_leave`, `explore.engage`, `explore.wait`, `explore.practice`, `explore.possess`, `explore.possess_release`, `explore.deliver`, `options.dismiss`, `title.accept`, `title.decline`, `title.equip`, `title.remove`, and `character.persona.update`, each with its own exact validator and deterministic adapter
 
 #### Scenario: Test proof action remains isolated
 - **WHEN** a dispatcher test installs a synthetic proof adapter
 - **THEN** that adapter exists only in the test-owned registry and does not appear in the production registry
-
 
 ### Requirement: Adapters may receive the authenticated session through a fixed optional third parameter
 
@@ -243,3 +239,4 @@ When the client recognizes a matching non-success `ui_action_result` — outcome
 
 - **WHEN** a recognized non-success result carries no usable message
 - **THEN** the narrative shows the single stable fallback line rather than failing silently
+

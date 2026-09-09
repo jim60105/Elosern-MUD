@@ -39,9 +39,13 @@ usable without an opening action; every other surface MAY be opened on demand an
 surfaces — the skill book, the bag and equipment, the shop, the quest board, the lore reference, and
 the character status — SHALL NOT be permanently visible: each SHALL render in a drawer anchored to the
 right edge of the stage, SHALL be absent from the layout and from the tab order while that drawer is
-closed, SHALL be reachable in at most two actions from the action dock's root frame, and SHALL be
-closable in one action that returns focus to the control that opened it. The map, settings and help
-surfaces SHALL each be reachable from the running client by a labelled control and SHALL be closable in
+closed, SHALL be reachable in at most two actions from the top navigation bar or from the action dock's
+root frame, and SHALL be closable in one action that returns focus to the control that opened it. The shell SHALL render a top navigation bar carrying
+a labelled control for each navigation-presented entry of the current mode's home surface - the character
+status, quest, and inventory entries - and a labelled control for the map, settings, and help surfaces;
+activating a bar control SHALL open its surface in one action and SHALL NOT push a keyboard menu frame.
+The map and settings controls on the bar are additional entry points; the
+map, settings and help surfaces SHALL each remain reachable from the running client by a labelled control and SHALL be closable in
 one action that returns focus to that control. The foundation
 SHALL target desktop only and SHALL NOT claim mobile acceptance. The shell SHALL show the game name as
 its brand and SHALL show the current location, the world date/time, and the connection state in a
@@ -57,10 +61,10 @@ wilderness room key is one string for the whole continent, while the map panel n
 player is standing in. Neither payload contract changes: the shell chooses between two labels the
 server already committed at the same revision. The action dock SHALL render as the approved command surface: a
 floating panel bounded to a maximum width and centred in the stage's dock anchor, whose root menu
-frame renders as a tab bar of icon-and-label tabs with the open entry marked by a seal-red fill, and
+frame renders as a tab bar of icon-and-label tabs with the open entry marked by a muted-gold fill, and
 whose remaining region renders the current frame's rows. The tab bar SHALL carry a guidance hint
 naming the shortcuts (direction keys to choose, Enter to confirm, Escape to return, `/` to focus the
-command input). The focused row SHALL be marked by a seal-red fill plus a leading glyph, unfocused
+command input). The focused row SHALL be marked by a muted-gold fill plus a leading glyph, unfocused
 rows bordered, and disabled rows dimmed but focusable for their explanation. Below the root frame the
 dock SHALL render a breadcrumb naming the parent and current frames with a back control, and SHALL
 render each frame's rows in the form that frame calls for — an exit outlet, navigation rows, a
@@ -69,7 +73,7 @@ that names the focused item, its availability, and the next key action wherever 
 
 #### Scenario: Standard desktop viewport contains every required surface
 - **WHEN** the shell renders at 1440x900
-- **THEN** the narrative caption, the brand, the top-meta surface, the HUD island stack, the action dock, and the command line with its visible input field are present without overlapping the narrative input path
+- **THEN** the narrative caption, the brand, the top-meta surface, the top navigation bar, the HUD island stack, the action dock, and the command line with its visible input field are present without overlapping the narrative input path
 
 #### Scenario: Minimum desktop viewport remains usable
 - **WHEN** the shell renders at 1280x720
@@ -86,6 +90,10 @@ that names the focused item, its availability, and the next key action wherever 
 #### Scenario: The map, settings and help surfaces are reachable and closable
 - **WHEN** the shell renders in exploration mode at either supported viewport
 - **THEN** a labelled control opens each of the map, settings and help surfaces, and Escape or its close control closes the open one in one action with focus returned to the control that opened it
+
+#### Scenario: The top navigation bar carries the persistent surface entry points
+- **WHEN** the shell renders in exploration mode at either supported viewport
+- **THEN** the top navigation bar shows one labelled control for each navigation-presented entry of the home surface plus a map control, each opening its surface in one action without pushing a keyboard menu frame, while the character, quest, and inventory entries are absent from the dock's root tab bar
 
 #### Scenario: The complete narrative stays reachable from the bounded caption
 - **WHEN** the narrative holds more lines than the bounded caption can display
@@ -109,7 +117,7 @@ that names the focused item, its availability, and the next key action wherever 
 
 #### Scenario: The action dock renders as a floating panel with a tab bar and a guidance hint
 - **WHEN** the action dock is mounted in any mode
-- **THEN** it renders as one centred floating panel in the dock anchor, its root frame renders as a tab bar carrying the shortcut-key hint with the open tab in a seal-red fill, its current frame's rows render with a shape-marked focused row and dimmed but focusable disabled rows, and a breadcrumb with a back control appears below the root frame
+- **THEN** it renders as one centred floating panel in the dock anchor, its root frame renders as a tab bar carrying the shortcut-key hint with the open tab in a muted-gold fill, its current frame's rows render with a shape-marked focused row and dimmed but focusable disabled rows, and a breadcrumb with a back control appears below the root frame
 
 ### Requirement: Narrative output remains the authoritative text surface
 The shell SHALL route Evennia's existing narrative and command output to a scrollable narrative log without parsing it to infer panel state. Because the portal converts server output to HTML before the `text` message is sent, the narrative log SHALL render that stream through the `webclient-narrative-markup` allowlist pipeline rather than inserting it as a single text node; it SHALL NOT display markup source to the player, and it SHALL NOT interpret anything outside that pipeline's allowlist. When the player has scrolled away from the bottom, new output SHALL increment an unread indicator without forcing the viewport to the bottom; the indicator SHALL be a labeled control that states its count and its jump action — a button reading "↓ N 則新訊息（點擊返回最新）" or equivalent — SHALL be announced through a polite live region, SHALL be hidden entirely while the count is zero, and SHALL, when activated, scroll the log to the latest output and clear the count, exactly as scrolling to the bottom does. Narrative output SHALL remain usable if every structured renderer is unavailable, and SHALL remain usable if a message cannot be fully tokenized — such a message degrades to readable literal text rather than suppressing the log.
@@ -171,7 +179,10 @@ activation. The exploration keyboard root SHALL be the G2 hierarchical root (Mov
 Interact / Character / Quests / Inventory / Wait, plus Suggestions whenever the committed
 `suggestions` envelope is not `unavailable`), whose items carry the bare keys
 `move`, `look`, `interact`, `character`, `quests`, `inventory`, `wait`, `suggestions`, rendered as a
-single-row grid whose column count equals its item count. The combat root SHALL likewise declare a
+single-row grid whose column count equals its item count; the root projection presented to both the
+tab bar and the keyboard router SHALL omit the `character`, `quests`, and `inventory` entries - the
+top navigation bar carries them as the sole keyboard-visible stop - and SHALL NOT reorder the
+remaining entries. The combat root SHALL likewise declare a
 column count equal to its item count, so both roots' horizontal arrow geometry matches their rendered
 tab order. This root replaces the legacy B2 flat `context_actions` affordance list,
 whose items were keyed `action-<action_id>` / `action-<surface>` (e.g. `action-guild`). The
@@ -217,13 +228,21 @@ B2 key-derivation contract is preserved only as the isolated Node gate
 
 #### Scenario: Exploration root exposes the G2 hierarchical keys
 - **WHEN** the client is in exploration mode and the player presses ArrowDown on the single-row
-  exploration root (Move / Look / Interact / Character / Quests / Inventory / Wait)
+  exploration root (the navigation-projected projection of Move / Look / Interact / Wait - plus
+  Suggestions when available)
 - **THEN** the keyboard router's focus key is the bare G2 key (`move` at the first cell, a no-op
   on the single-row grid), not the legacy B2 `action-guild`-style `action-<id>`/`action-<surface>`
   key, and Enter on the focused root item pushes its client-local submenu (the dock depth becomes
   2) without dispatching a `ui_action`; focus then lands on the pushed submenu's first item (for an
   empty exploration panel, the disabled `move-empty` row), so `store.view.focus.key` is `move-empty`
   and `store.view.focus.enabled` is false
+
+#### Scenario: The dock root omits the navigation-carried entries
+- **WHEN** the committed exploration panel makes the character, quest, and inventory surfaces
+  available and the dock renders its root
+- **THEN** neither the tab bar nor the keyboard root carries a 角色狀態, 任務, or 背包 entry - those
+  surfaces are opened from the top navigation bar - and the remaining root entries keep their
+  authored order
 
 ### Requirement: The command drawer preserves ordinary text control
 
@@ -329,7 +348,7 @@ Local browser storage SHALL contain only a bounded wrapper with project layout v
 - **THEN** version 1 does not treat those values as canonical project layout state
 
 ### Requirement: Theme and controls remain accessible
-The shell SHALL use the approved desktop palette — near-black charcoal surfaces, warm paper-gray text, a deep seal-red accent, and an ok-green connection indicator — while pairing color with labels, borders, icons, or shapes, and SHALL use a serif face for narrative and headings with a legible UI face for controls. Focus SHALL be visibly indicated, resource values SHALL include numeric text, disabled reasons SHALL be programmatically associated with controls, action results SHALL use a non-interrupting live region, and reduced-motion preference SHALL disable nonessential transitions. Every server-authored value carried in a structured presentation panel — labels, descriptions, reasons, names, and legend entries — SHALL be inserted as text and SHALL NEVER be treated as markup. The single bounded exception is the narrative transport stream, which the portal already converts to HTML and escapes player content within; it SHALL be rendered only through the `webclient-narrative-markup` allowlist pipeline, which constructs nodes exclusively through element and text-node constructors and degrades everything outside its allowlist to literal text. No other surface SHALL render server bytes as markup.
+The shell SHALL use the approved desktop palette — near-black charcoal surfaces, warm paper-gray text, a deep seal-red accent retained for its semantic roles (decisive primary action, danger affordances, selection, status markers) alongside a muted-gold navigation, focus, and emphasis accent, and an ok-green connection indicator — while pairing color with labels, borders, icons, or shapes, and SHALL use a serif face for narrative and headings with a legible UI face for controls. Focus SHALL be visibly indicated, resource values SHALL include numeric text, disabled reasons SHALL be programmatically associated with controls, action results SHALL use a non-interrupting live region, and reduced-motion preference SHALL disable nonessential transitions. Every server-authored value carried in a structured presentation panel — labels, descriptions, reasons, names, and legend entries — SHALL be inserted as text and SHALL NEVER be treated as markup. The single bounded exception is the narrative transport stream, which the portal already converts to HTML and escapes player content within; it SHALL be rendered only through the `webclient-narrative-markup` allowlist pipeline, which constructs nodes exclusively through element and text-node constructors and degrades everything outside its allowlist to literal text. No other surface SHALL render server bytes as markup.
 
 #### Scenario: Keyboard focus does not depend on color alone
 - **WHEN** keyboard focus moves between action controls

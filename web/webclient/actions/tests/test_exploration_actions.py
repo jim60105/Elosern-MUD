@@ -1132,6 +1132,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     # explore.wait
     # ------------------------------------------------------------------
 
+    @covers_requirement("webclient-exploration-menu::explore-practice-advances-the-clock-for-one-declared-skill")
     def test_practice_grows_only_the_declared_skill_and_plain_rest_grows_nothing(self):
         from web.webclient.actions.exploration_actions import _practice_adapter
         from world.rules.progression import practice_xp_amount
@@ -1149,6 +1150,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         _wait_adapter(self.player, {"seconds": 3600})
         self.assertAlmostEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0 + gain)
 
+    @covers_requirement("webclient-exploration-menu::explore-practice-advances-the-clock-for-one-declared-skill")
     def test_practice_rejects_unknown_capped_and_unsafe_without_advancing(self):
         from web.webclient.actions.exploration_actions import _practice_adapter
         from world.rules.progression import proficiency_cap
@@ -1169,6 +1171,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["code"], "unsafe_skip")
         self.assertEqual(get_world_clock().tick, before)
 
+    @covers_requirement("webclient-exploration-menu::explore-practice-advances-the-clock-for-one-declared-skill")
     def test_practice_payload_rejects_ambiguous_or_unbounded_requests(self):
         from web.webclient.actions.exploration_actions import validate_practice_payload
 
@@ -1182,6 +1185,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             with self.subTest(payload=payload), self.assertRaises(ValueError):
                 validate_practice_payload(payload)
 
+    @covers_requirement("webclient-exploration-menu::explore-practice-advances-the-clock-for-one-declared-skill")
     def test_failed_practice_rolls_back_clock_growth_and_new_booking(self):
         from web.webclient.actions.exploration_actions import _practice_adapter
 

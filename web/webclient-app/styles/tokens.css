@@ -2,8 +2,10 @@
  * Elosern design-system tokens, extracted from the 設計稿
  * (docs/design/elosern-redesign/index.html, landed by A1).
  *
- * Single source for the ink-night palette, the single seal-red accent,
- * typography ramps, spacing, and motion. Components consume these variables
+ * Single source for the ink-night palette, the seal-red semantic accent
+ * (decisive primary action, danger affordances, selection, status markers)
+ * alongside the muted-gold navigation/focus/emphasis accent, typography
+ * ramps, spacing, and motion. Components consume these variables
  * only; reduced-motion and not-color-only status rules are enforced at the
  * token/utility level so they stay testable (design D5).
  */
@@ -14,6 +16,7 @@
   --ink-900: #101216;
   --ink-860: #15171b;
   --ink-820: #1b1d21;
+  --ink-800: #1f2125;
   --ink-780: #232529;
   --ink-700: #363638;
   --ink-600: #55524b;
@@ -24,20 +27,27 @@
   /* ---- warm paper text ---- */
   --paper-50: #f2ecdf;
   --paper-100: #e7e0d1;
+  --paper-200: #d8d2c5;
   --paper-300: #c9c4b9;
+  --paper-400: #bab5ae;
   --paper-500: #aaa69e;
   --paper-700: #615a4c;
+  --paper-800: #4e483d;
 
-  /* ---- single seal-red accent ---- */
+  /* ---- seal-red semantic accent ---- */
   --seal-400: #e06b6b;
   --seal-500: #cf4444;
   --seal-600: #a9322a;
   --seal-700: #7c2026;
   --seal-glow: rgba(207, 68, 68, 0.32);
 
-  /* ---- gold (focus ring / location) ---- */
+  /* ---- gold (navigation, focus, and emphasis accent) ---- */
+  --gold-300: #eeddb4;
   --gold-400: #e4c88e;
   --gold-500: #b99a60;
+  /* One perceptual step below gold-500 on the same hue; dark enough for
+     white button labels to keep a >= 4.5:1 contrast ratio. */
+  --gold-600: #8f713c;
   --gold-glow: rgba(222, 189, 129, 0.24);
 
   /* Shared minimap and full-map palette. Current position keeps its red
@@ -68,6 +78,7 @@
   --f-sans: "Noto Sans TC", "Noto Serif TC", sans-serif;
   --f-mono: ui-monospace, "DejaVu Sans Mono", "JetBrains Mono", "Noto Sans TC", monospace;
   --text-sm: 13px;
+  --text-xs: 11px;
   --text-body: 15px;
    --text-narrative: 15.5px;
    --text-dialog: 16px;
@@ -123,6 +134,7 @@
   --radius-sm: 5px;
   --line: 1px solid var(--ink-700);
   --shadow: 0 18px 44px -26px rgba(0, 0, 0, 0.9);
+  --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.95);
    --focus: 0 0 0 2px var(--ink-950), 0 0 0 4px var(--gold-400);
     --header-h: 80px;
     --left-column: clamp(220px, 20vw, 330px);

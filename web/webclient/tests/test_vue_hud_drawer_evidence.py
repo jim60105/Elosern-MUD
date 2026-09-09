@@ -63,7 +63,7 @@ class VueHudDrawerEvidenceTest(unittest.TestCase):
         )
 
     @covers_requirement(
-        "webclient-contextual-hud::the-reference-surfaces-have-no-permanently-visible-home-and-are-reached-from-the-dock"
+        "webclient-contextual-hud::the-reference-surfaces-have-no-permanently-visible-home-and-are-reached-from-the-top-navigation-or-the-dock"
     )
     def test_reference_surfaces_demand_opened_from_dock(self):
         # No reference surface is mounted while closed; each is reached from the

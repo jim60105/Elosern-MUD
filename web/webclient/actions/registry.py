@@ -84,11 +84,12 @@ def build_production_action_registry() -> ActionRegistry:
     the six creation adapters (``creation.preset``, ``creation.custom``,
     ``creation.concept``, ``creation.roll_name``, ``creation.activate``,
     ``creation.reset``), and the
-    twelve exploration adapters (``explore.move``, ``explore.look``,
+    thirteen exploration adapters (``explore.move``, ``explore.look``,
     ``explore.talk_scripted``, ``explore.talk_freeform``,
     ``explore.dialogue_leave``, ``explore.party_invite``,
     ``explore.party_leave``, ``explore.engage``, ``explore.wait``,
-    ``explore.possess``, ``explore.possess_release``, ``explore.deliver``), the two
+    ``explore.practice``, ``explore.possess``, ``explore.possess_release``,
+    ``explore.deliver``), the two
     title ballot adapters (``title.accept``, ``title.decline``), the two
     account adapters (``account.character.switch``, ``account.character.create``), and the
     ``options.dismiss`` action. Each action
