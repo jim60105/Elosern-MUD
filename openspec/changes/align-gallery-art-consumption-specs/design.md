@@ -41,6 +41,10 @@ re-arms the image element.
 and the crop assertions folded into `tests/combat/participant_frame.test.js`,
 `tests/data/party_strip.test.js`, `tests/data/party_drawer.test.js`, and
 `tests/action/dock_menu.test.js` already execute in the full Vitest suite.
-At archive time the mapping requirement gains its `covers_requirement`
-annotation on the face-rect suite, following the node-suite evidence-harness
-pattern the waiting/practice requirements use.
+At archive time the mapping and frame requirements gain their
+`covers_requirement` annotations on registered rows in the Python node-suite
+evidence harness (`web/webclient/tests/test_node_suite_evidence.py`) that
+execute the face-rect and reference-artwork Vitest files — the same pattern the
+waiting/practice requirements use. The annotations cannot live on the Vitest
+files themselves: `tools.spec_traceability` discovers associations only from
+Python `test_*.py` files.

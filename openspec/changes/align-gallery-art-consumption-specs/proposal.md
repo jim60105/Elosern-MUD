@@ -23,7 +23,10 @@ spec records is the browser's consumption of that field, shipped in
    drawer, the dialogue host avatar in the narrative feed, the interaction
    target avatars in the dock, the dock's target rows, and the top-bar
    character switcher — the browser renders the server's composition choice
-   rather than a fixed center crop everywhere an image is cover-cropped.
+   rather than a fixed center crop on every framed-portrait surface. The
+   美術展示 catalog browser's own grid tiles and full view keep the centered
+   default crop, and scene backdrops consume scene media rather than portrait
+   entries; both are explicitly outside the contract.
 3. **The shared `ReferenceArtwork` frame.** New required-manifest component
    `World/ReferenceArtwork` renders a portrait entry with cover fit and the
    rect-aligned crop, renders no `img` at all for a null-URL/placeholder entry
