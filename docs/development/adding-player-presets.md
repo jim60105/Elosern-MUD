@@ -13,7 +13,7 @@
 
 ## 1. 背景：一張卡的資料住在一個 registry 裡
 
-模板是 `PLAYER_PRESET_REGISTRY` 字典中的 frozen dataclass `PlayerPreset`，共十九個欄位，分屬八個資料域。卡寫進 registry 之後，Telnet 建立精靈、WebClient 建立面板與 NPC 夥伴建構器都讀同一張卡，沒有第二份作者副本。
+模板是 `PLAYER_PRESET_REGISTRY` 字典中的 frozen dataclass `PlayerPreset`，共二十個欄位，分屬九個資料域。卡寫進 registry 之後，Telnet 建立精靈、WebClient 建立面板與 NPC 夥伴建構器都讀同一張卡，沒有第二份作者副本。
 
 | 資料域 | 欄位 | 內容 |
 |---|---|---|
@@ -25,6 +25,7 @@
 | 性傾向基線 | `sexual_baseline` | 寫入 `entity.db.sexual` 的開局狀態，`None` 則沿用泛用預設 |
 | 偽裝 | `disguised_stats` | 純顯示層的偽裝軸值，永不進入戰鬥與判定 |
 | 夥伴 | `starting_companions` | 指向夥伴自己模板卡的同行宣告清單 |
+| 頭像回退 | `fallback_key` | 無生成頭像時改用的內建回退圖鍵；選填，未宣告時走性別／年齡帶規則 |
 
 `PlayerPreset` 在 `starting_items` 之後宣告了 `_: KW_ONLY` 標記（field-parity 設計 3.2）。`sex` 因此是**必填的關鍵字引數**，新卡漏寫它會在構造時直接 `TypeError`，不會靜默繼承 `DEFAULT_SEX`；`sex` 之後的所有欄位也只能用關鍵字傳入。registry 現行卡把 `key` 到 `emphasis` 八個欄位寫成位置引數，其餘一律關鍵字，沿用既有的寫法即可。
 
@@ -105,6 +106,10 @@ print(profile.bounds)   # 七軸各 (下界, 上界)
 
 `disguised_stats` 是 `(軸名, 值)` 成對的純顯示層，值必須是恰好的 `int`（`bool` 拒絕）。軸名刻意不設白名單（`CHARACTER_SCHEMA_V1` 對該欄也只約束整數值），同鍵重複會被拒，因為 `dict()` 會靜默丟掉先寫的那筆。
 
+### Step 5.5 — 頭像回退鍵（選填）
+
+`fallback_key` 宣告這張模板的角色在**尚無生成頭像**時改顯示哪張內建回退圖。值是閉合詞彙表的成員——`man`、`woman`、`boy`、`girl`、`elder`、`monster_anon` 六鍵之一（常數住在 `world/art/fallback_keys.py`）——其餘一律留 `None`：玩家模板未設定時，解析器依存放的性別與外表年齡落到 child／adult／elder 年齡帶，`female`／`male` 直取該帶的性別鍵，其他性別以 subject 鍵雜湊到該帶的有序圖池（怪物不受模板影響，未宣告時一律 `monster_anon`）。這層純粹是顯示層回退，一旦該角色有了生成頭像卡片，頭像解析永遠優先於回退圖。詞彙表由 `_validate_preset_fallback_keys` 在 lore 匯入時逐卡檢查（見 §4），typo 直接在載入期爆。
+
 ### Step 6 — 宣告同行夥伴
 
 `starting_companions` 每筆是 `StartingCompanion(preset_key, affinity, relationship)`：`preset_key` 點名夥伴自己的卡（夥伴的數值、技能、物品、人格全部來自那張卡），`affinity` 是啟動綁定播進關係記錄的值，`relationship` 是寫進夥伴人格 `social_connection` 的關係標籤。同一張卡不得宣告自己、不得重複點名同一夥伴；數量與數值邊界（見 §4）在 rules 層掃。
@@ -140,6 +145,7 @@ uv run --locked python -m tools.spec_traceability check
 | `_validate_preset_disguised_stats` | lore 匯入 | 條目形狀壞、軸名非文字、同鍵重複、值非恰好 `int` | `malformed disguised_stats entry`／`duplicate disguised_stats key`／`non-integer disguise value` |
 | `_validate_preset_sexual_baselines` | lore 匯入 | 非 `PresetSexualBaseline`、`virgin` 非真 bool、等級越出詞彙表（僅四個選填欄可空）、部位未知或重複 | `outside its vocabulary`／`unknown body part` |
 | `_validate_preset_starting_companions` | lore 匯入 | 非 `StartingCompanion`、夥伴卡未登錄、宣告自己、同夥伴重複 | `that is not registered`／`declares itself as its own companion`／`more than once` |
+| `_validate_preset_fallback_keys` | lore 匯入 | `fallback_key` 不在閉合詞彙表（六鍵之外且非 `None`） | `declares fallback key ... outside the closed fallback vocabulary` |
 | `_validate_preset_persona_lengths` | `character_creation` 匯入 | persona record 任何字串超過 600 碼點 | `exceeds the 600-character length cap` |
 | `_validate_preset_companion_bounds` | `starting_companions` 匯入 | 夥伴數超過 `PARTY_MAX_COMPANIONS`（4）、`affinity` 不在 1～`NATURAL_CAP`（99）或為 bool、`relationship` 超過 600 | `more than the party cap 4`／`outside 1..99`／`persona length cap` |
 
