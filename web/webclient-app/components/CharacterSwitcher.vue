@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { faceObjectPosition } from "./face-rect.js";
 
 // CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui):
 // Mounted in TopBar.vue's top-right cluster beside the meta pill.
@@ -148,6 +149,7 @@ onUnmounted(() => {
           class="character-switcher__thumb"
           :src="currentCharacter.portrait.url"
           :alt="currentCharacter.portrait.alt || currentCharacter.name"
+          :style="{ objectPosition: faceObjectPosition(currentCharacter.portrait.face_rect) }"
         />
         <span
           v-else
@@ -212,6 +214,7 @@ onUnmounted(() => {
                 class="character-switcher__row-thumb"
                 :src="char.portrait.url"
                 :alt="char.portrait.alt || char.name"
+                :style="{ objectPosition: faceObjectPosition(char.portrait.face_rect) }"
               />
               <span
                 v-else

@@ -44,6 +44,7 @@ import ObjectiveTracker from "./components/ObjectiveTracker.vue";
 import DesktopNavigation from "./components/DesktopNavigation.vue";
 import ReferenceArtwork from "./components/ReferenceArtwork.vue";
 import { portraitFor, portraitGlyph } from "./components/party-helpers.js";
+import { faceObjectPosition } from "./components/face-rect.js";
 
 const store = useElosernStore();
 const currentPortrait = computed(
@@ -942,7 +943,6 @@ onMounted(() => {
         <template #backdrop>
           <SceneBackdrop ref="sceneBackdropRef" :art="panel('art') || {}" :mode="store.view.mode || 'exploration'" />
           <ReferenceArtwork v-if="store.view.mode !== 'creation'" :portrait="currentPortrait" class="stage-portrait" />
-          <ReferenceArtwork v-if="store.view.mode === 'combat' && !panel('art')?.scene?.url" subject="wolf" class="stage-opponent" />
           <div v-if="store.view.mode !== 'creation'" class="scene-heading">
             <span class="scene-heading__eyebrow">{{ store.view.mode === "combat" ? "戰鬥" : "探索伊洛瑟恩" }}</span>
             <h1>{{ store.view.statusSlice.locationLabel }}</h1>
@@ -1059,7 +1059,7 @@ onMounted(() => {
                   @click="onInteractionTarget(target.identity)"
                 >
                   <span class="interaction-avatar" aria-hidden="true">
-                    <img v-if="target.portrait" :src="target.portrait.url" alt="" />
+                    <img v-if="target.portrait" :src="target.portrait.url" :style="{ objectPosition: faceObjectPosition(target.portrait.face_rect) }" alt="" />
                     <span v-else>{{ portraitGlyph(target.display_name) }}</span>
                   </span>
                   <span>{{ target.display_name }}</span>
@@ -1127,7 +1127,6 @@ onMounted(() => {
     >
       <template #art>
         <ReferenceArtwork
-          :subject="store.view.hudDrawer === 'quest' ? 'clerk' : 'adventurer'"
           :portrait="store.view.hudDrawer === 'quest' ? null : currentPortrait"
         />
       </template>

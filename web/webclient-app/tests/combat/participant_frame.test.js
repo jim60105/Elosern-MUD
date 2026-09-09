@@ -69,6 +69,13 @@ describe("ParticipantFrame (task 6.9)", () => {
     const placeholders = w.findAll('[data-testid="participant-portrait-placeholder"]');
     expect(imgs.length + placeholders.length).toBeGreaterThan(0);
   });
+
+  it("offsets the resolved portrait crop by the catalog face rect", () => {
+    const w = mountFrame(participants, artPanel);
+    // 小美 resolves portrait_mei, whose rect centers at (50%, 31%).
+    const mei = w.findAll("img.participant-frame__portrait")[0];
+    expect(mei.element.style.objectPosition).toBe("50% 31%");
+  });
 });
 
 describe("skill frame server order + single-sub-group skip (task 6.9)", () => {

@@ -11,6 +11,7 @@
 // ref renders no card. No subject key or URL is constructed (the truthful
 // data scope: no surface without a backing model).
 import { computed } from "vue";
+import { faceObjectPosition } from "./face-rect.js";
 
 const props = defineProps({
   // The committed `context_actions` combat participants slice.
@@ -90,6 +91,7 @@ function portraitSrc(portrait) {
             class="participant-frame__portrait"
             :src="portraitSrc(portraitFor(p))"
             :alt="p.display_name"
+            :style="{ objectPosition: faceObjectPosition(portraitFor(p).face_rect) }"
           />
           <div
             v-else

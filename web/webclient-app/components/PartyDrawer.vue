@@ -12,6 +12,7 @@ import {
   portraitFor,
   portraitGlyph,
 } from "./party-helpers.js";
+import { faceObjectPosition } from "./face-rect.js";
 
 const props = defineProps({
   // The committed `party.slots` array.
@@ -252,6 +253,7 @@ function onInviteCurrentNpc() {
           class="av-img"
           :src="portraitEntry(slot).url"
           :alt="slot.display_name"
+          :style="{ objectPosition: faceObjectPosition(portraitEntry(slot).face_rect) }"
         />
         <span v-else class="mono av-glyph">{{ portraitGlyph(slot.display_name) }}</span>
       </div>

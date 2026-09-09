@@ -57,6 +57,21 @@ describe("NarrativeFeed dialogue variant", () => {
     expect(w.get('[data-testid="dialogue-say"]').text()).toBe(PANEL.line);
   });
 
+  it("renders the host's catalog portrait with its face-rect crop offset", () => {
+    const hostedPanel = { ...PANEL, host: { identity: 41, display_name: "灰婆婆", portrait_ref: "p41" } };
+    const w = mountFeed({
+      dialogue: dialogueViewModel(hostedPanel),
+      artPanel: {
+        portrait_catalog: {
+          p41: { url: "/art/portraits/granny.png", face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 } },
+        },
+      },
+    });
+    const img = w.get('[data-testid="dialogue-box"] img.av');
+    expect(img.attributes("src")).toBe("/art/portraits/granny.png");
+    expect(img.element.style.objectPosition).toBe("50% 31%");
+  });
+
   it("drops the bond segment when bond_stage is null", () => {
     const w = mountFeed({ dialogue: dialogueViewModel({ ...PANEL, bond_stage: null }) });
     expect(w.find('[data-testid="dialogue-bond"]').exists()).toBe(false);

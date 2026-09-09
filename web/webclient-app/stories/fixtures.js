@@ -64,6 +64,7 @@ export const ROSTER_CHARACTERS_SAMPLE = [
       aspect_ratio: "3/4",
       alt: "艾莉亞的肖像",
       placeholder: null,
+      face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
     },
   },
   {

@@ -4,6 +4,7 @@ import NarrativeMarkup from "../lib/narrative_markup.js";
 import UnreadIndicator from "./UnreadIndicator.vue";
 import { renderNarrativeTokens } from "./narrative-renderer.js";
 import { portraitFor, portraitGlyph } from "./party-helpers.js";
+import { faceObjectPosition } from "./face-rect.js";
 
 // Bounded narrative caption card (H1, design D4): the narrative is a
 // bounded caption at the visual centre of the stage — `width:min(880px,90vw)`,
@@ -344,7 +345,12 @@ export default {
       nodes.push(
         h("div", { key: "dlg-box", class: "dlg", "data-testid": "dialogue-box" }, [
           portrait
-            ? h("img", { class: "av", src: portrait.url, alt: vm.host.displayName })
+            ? h("img", {
+                class: "av",
+                src: portrait.url,
+                alt: vm.host.displayName,
+                style: { objectPosition: faceObjectPosition(portrait.face_rect) },
+              })
             : h("div", { class: "av" }, [portraitGlyph(vm.host.displayName)]),
           h("div", { class: "body" }, [
             h("div", { class: "who", "data-testid": "dialogue-who" }, [

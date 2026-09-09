@@ -16,6 +16,7 @@ import { glyphPath } from "./dock-icons.js";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "./dock-items.js";
 import OptionCard from "./OptionCard.vue";
 import { portraitFor, portraitGlyph } from "./party-helpers.js";
+import { faceObjectPosition } from "./face-rect.js";
 
 const props = defineProps({
   items: { type: Array, required: true },
@@ -319,7 +320,7 @@ watch(
           @click="onCellClick(row)"
         >
           <span v-if="row.target" class="dock-menu__nav-avatar" aria-hidden="true">
-            <img v-if="row.portrait" :src="row.portrait.url" alt="" />
+            <img v-if="row.portrait" :src="row.portrait.url" :style="{ objectPosition: faceObjectPosition(row.portrait.face_rect) }" alt="" />
             <span v-else>{{ portraitGlyph(row.target.display_name) }}</span>
           </span>
           <span v-else-if="glyphPath(row.item.kind)" class="dock-menu__nav-icon" aria-hidden="true"></span>

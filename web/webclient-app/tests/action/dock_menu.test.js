@@ -135,6 +135,32 @@ describe("DockMenu (B2 action-dock family)", () => {
     expect(w.emitted("activate")[0][0].intent).toBeNull();
   });
 
+  it("offsets the nav-row avatar crop by the catalog face rect", () => {
+    const items = [
+      {
+        key: "target-7",
+        label: "店長",
+        navigation: true,
+        surface: "target-7",
+        enabled: true,
+      },
+    ];
+    const view = {
+      explorationInteract: [
+        { identity: 7, display_name: "店長", portrait_ref: "p7" },
+      ],
+    };
+    const artPanel = {
+      portrait_catalog: {
+        p7: { url: "/art/portraits/shopkeeper.png", face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 } },
+      },
+    };
+    const w = mountMenu({ items, view, artPanel });
+    const img = w.get(".dock-menu__nav-avatar img");
+    expect(img.attributes("src")).toBe("/art/portraits/shopkeeper.png");
+    expect(img.element.style.objectPosition).toBe("50% 31%");
+  });
+
   it("applies the fixed framed-grid geometry when gridCols is set", () => {
     const w = mountMenu({ gridCols: 3 });
     const grid = w.get('[data-testid="dock-menu"]');

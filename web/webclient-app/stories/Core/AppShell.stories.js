@@ -124,6 +124,31 @@ const renderPlayer = (args) => ({
           local_map: protocolFixtures.localMapPanel(),
           services: SERVICES_PANEL_SAMPLE,
           character: CHARACTER_PANEL_SAMPLE,
+          roster: {
+            schema_version: 2,
+            available: true,
+            characters: [
+              {
+                identity: 1,
+                name: "艾莉亞",
+                current: true,
+                pending: false,
+                portrait: {
+                  subject_key: "char_1",
+                  status: "done",
+                  url: "/art/defaults/man.webp",
+                  aspect_ratio: "3:4",
+                  alt: "艾莉亞的肖像",
+                  placeholder: null,
+                  face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+                },
+              },
+            ],
+            max_characters: 5,
+            can_create: true,
+            switch_locked: false,
+            lock_reason: null,
+          },
           ...(args.dialogue ? { dialogue: {
             schema_version: 1, available: true, kind: "dialogue",
             host: { identity: 7, display_name: "店長", portrait_ref: null },

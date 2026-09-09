@@ -10,8 +10,8 @@ const ART_PANEL = {
   schema_version: 1,
   available: true,
   portrait_catalog: {
-    p1: { subject_key: "port_hero", status: "done", url: "/art/portraits/port_hero.png", alt: "主角的肖像", placeholder: null },
-    e1: { subject_key: "port_goblin", status: "done", url: "/art/portraits/port_goblin.png", alt: "哥布林的肖像", placeholder: null },
+    p1: { subject_key: "port_hero", status: "done", url: "/art/defaults/man.webp", alt: "主角的肖像", placeholder: null, face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 } },
+    e1: { subject_key: "port_goblin", status: "done", url: "/art/defaults/monster_anon.webp", alt: "哥布林的肖像", placeholder: null, face_rect: { x: 0.35, y: 0.12, w: 0.4, h: 0.4 } },
     e2: { subject_key: "port_ogre", status: "pending", url: null, alt: "巨魔的肖像", placeholder: { kind: "missing", label: "肖像圖像尚未生成" } },
   },
 };
