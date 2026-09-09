@@ -616,5 +616,59 @@ class WaitingPracticeSurfaceEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class GalleryArtConsumptionEvidenceTest(unittest.TestCase):
+    """align-gallery-art-consumption-specs: the shared face-rect crop mapping
+    and the reference-artwork frame's truthful degradation are Vue-layer
+    contracts; the Vitest files are their executed evidence."""
+
+    @covers_requirement(
+        "webclient-art-panel::the-browser-maps-each-framed-portrait-s-carried-face-rectangle-to-a-centered-cover-crop-through-one-shared-pure-function",
+    )
+    def test_face_rect_mapping_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/data/face_rect.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "face-rect-mapping Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-art-panel::the-reference-artwork-frame-presents-a-portrait-entry-truthfully-through-cover-fit-and-rect-crop",
+    )
+    def test_reference_artwork_frame_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/core/reference_artwork.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "reference-artwork-frame Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

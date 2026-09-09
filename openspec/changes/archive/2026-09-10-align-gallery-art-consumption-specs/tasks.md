@@ -27,7 +27,7 @@
 
 ## 2. Traceability obligations at archive time
 
-- [ ] 2.1 After syncing the two ADDED requirements, annotate the executed
+- [x] 2.1 After syncing the two ADDED requirements, annotate the executed
   evidence, following the node-suite evidence-harness pattern in
   `web/webclient/tests/test_node_suite_evidence.py`: add harness rows that
   execute the mapping suite (`web/webclient-app/tests/data/face_rect.test.js`)
@@ -38,8 +38,14 @@
   cover the synced main requirements on their own and `check` would fail them.
   Register the harness rows in the existing module (no new test module, so no
   `.github/evennia-shards.json` change).
-- [ ] 2.2 Confirm `pnpm run showcase-coverage` still passes against the frozen
+  Done at archive 2026-09-10: both ADDED requirements appended verbatim to
+  `openspec/specs/webclient-art-panel/spec.md`; `GalleryArtConsumptionEvidenceTest`
+  rows added to `test_node_suite_evidence.py` running the face-rect and
+  reference-artwork Vitest files, annotated with the two canonical IDs.
+- [x] 2.2 Confirm `pnpm run showcase-coverage` still passes against the frozen
   51-entry manifest including `World/ReferenceArtwork`.
+  Passes at archive 2026-09-10: "all 51 required component(s) have stories and
+  every one of the 51 registered story title(s) is listed".
 
 ## 3. Verification
 
@@ -68,6 +74,9 @@
   DockMenu's nav-row suite exercises the identical portraitFor → mapping
   path for the same data shape. The ArtPanel grid tiles/full view are
   excluded by the requirement.
-- [ ] 3.3 `uv run --locked python -m tools.spec_traceability check` after the
+- [x] 3.3 `uv run --locked python -m tools.spec_traceability check` after the
   archive-time annotations.
-- [ ] 3.4 At archive time: `openspec validate --all --strict`.
+  Passes: 1426 requirements, 5278 associations, 1426 covered, 0 uncovered,
+  0 errors (2026-09-10).
+- [x] 3.4 At archive time: `openspec validate --all --strict`.
+  Passes (exit 0) after the sync, immediately before archiving 2026-09-10.
