@@ -35,41 +35,6 @@
     "postprocessing": "WebP encoding."
   },
   {
-    "file": "sample-adventurer.webp",
-    "request": {
-      "prompt": "An intricately painted dark fantasy character portrait in a refined semi-realistic anime style. An adult woman adventurer in her late twenties stands in a three-quarter view, shown from her head to her boots with natural mature proportions, small amber almond-shaped eyes and a calm serious expression. Her long flowing black hair catches a fine warm rim light. She wears an elaborate obsidian-black armored traveling coat, a fitted dark steel breastplate with tiny antique gold engravings, layered black leather belts and gauntlets, and a heavy black cape with richly detailed brocade and weathered gold embroidery. A narrow ivory collar is the only pale fabric. Her gloved hand rests beside a worn sword hilt. Dense painterly texture, nuanced fabric folds, subtle realistic shading and finely etched metalwork, charcoal and brown-black dominate the image with restrained warm gold accents. The full figure fits within the image with room around her silhouette, against a uniform dark charcoal background. No lettering, interface or border.",
-      "negative_prompt": "text, watermark, logo, user interface, border, cropped head, cropped feet",
-      "steps": 12,
-      "cfg_scale": 1.5,
-      "width": 920,
-      "height": 1536,
-      "sampler_name": "ER SDE",
-      "scheduler": "beta",
-      "styles": [
-        "anima-best-quality",
-        "anima-style",
-        "turbo-anima"
-      ],
-      "seed": 26090731,
-      "override_settings": {
-        "sd_model_checkpoint": "anima/animaika_v43.safetensors [bc0a5703b6]",
-        "forge_additional_modules": [
-          "qwen_3_06b_base.safetensors",
-          "qwen_image_vae.safetensors"
-        ]
-      }
-    },
-    "info": {
-      "seed": 26090731,
-      "width": 920,
-      "height": 1536,
-      "sampler_name": "ER SDE",
-      "sd_model_name": "animaika_v43",
-      "sd_model_hash": "bc0a5703b6"
-    },
-    "postprocessing": "WebP encoding; conservative edge-connected background removal for portrait samples."
-  },
-  {
     "file": "sample-forest.webp",
     "request": {
       "prompt": "A richly detailed painterly dark fantasy environment in a refined semi-realistic anime illustration style. A wide eye-level view across an open forest clearing with an unobstructed flat earthen path covering the lower half of the frame, scattered with tiny fallen leaves, roots and mossy stones. In the middle distance, partially obscured by old oak trees, are small weathered remains of an ancient stone doorway and broken low walls. All ruins stay in the background behind the open clearing. Warm shafts of sunlight fall diagonally through a dense layered canopy, illuminating patches of ferns and leaves while most of the forest remains in deep charcoal and muted olive shadows. Natural weathered textures, intricate foliage, delicate branches, soft atmospheric mist and cinematic depth. An intimate moody battle environment with a broad empty foreground for figures, without lettering, interface, prominent characters or animals.",
@@ -105,41 +70,6 @@
     "postprocessing": "WebP encoding."
   },
   {
-    "file": "sample-wolf.webp",
-    "request": {
-      "prompt": "A Japanese dark fantasy RPG monster illustration of a huge charcoal-gray dire wolf, its entire body and all four paws visible in a low three-quarter frontal stance at eye level. The wolf leans forward alertly with raised hackles, thick layered dark fur, ember-red eyes, pointed ears, a long sweeping tail and bared ivory fangs. Its weight is planted on powerful front paws. Subtle warm rim light separates its shaggy silhouette from a plain very dark charcoal background, with soft neutral illumination showing the anatomy. Detailed painted fur with crisp illustrative edges and restrained amber highlights. Leave generous empty space around the complete silhouette. A solitary creature illustration without scenery, lettering or interface.",
-      "negative_prompt": "text, watermark, logo, user interface, border, cropped head, cropped feet",
-      "steps": 12,
-      "cfg_scale": 1.5,
-      "width": 920,
-      "height": 1536,
-      "sampler_name": "ER SDE",
-      "scheduler": "beta",
-      "styles": [
-        "anima-best-quality",
-        "anima-style",
-        "turbo-anima"
-      ],
-      "seed": 26090713,
-      "override_settings": {
-        "sd_model_checkpoint": "anima/animaika_v43.safetensors [bc0a5703b6]",
-        "forge_additional_modules": [
-          "qwen_3_06b_base.safetensors",
-          "qwen_image_vae.safetensors"
-        ]
-      }
-    },
-    "info": {
-      "seed": 26090713,
-      "width": 920,
-      "height": 1536,
-      "sampler_name": "ER SDE",
-      "sd_model_name": "animaika_v43",
-      "sd_model_hash": "bc0a5703b6"
-    },
-    "postprocessing": "WebP encoding; conservative edge-connected background removal for portrait samples."
-  },
-  {
     "file": "sample-guild.webp",
     "request": {
       "prompt": "A richly painted Japanese fantasy RPG environment showing a medieval adventurers guild hall in a wide eye-level view. Tall timber beams, a carved wooden reception counter, stone pillars, muted gold and black heraldic banners with abstract emblems and no readable text, and warm hanging lanterns. Afternoon sun enters through high windows and illuminates floating dust over an open polished wooden floor. Shelves and rolled maps behind the counter suggest many past journeys. Charcoal shadows, deep walnut wood, warm brass highlights and quiet amber light. An inviting spacious interior, painterly texture with delicate anime background linework, no prominent people, no readable lettering and no interface.",
@@ -173,40 +103,5 @@
       "sd_model_hash": "bc0a5703b6"
     },
     "postprocessing": "WebP encoding."
-  },
-  {
-    "file": "sample-clerk.webp",
-    "request": {
-      "prompt": "A Japanese fantasy RPG character illustration of an adult guild receptionist, a woman age thirty with shoulder-length ash-brown hair, green eyes and a calm welcoming expression. Full standing figure at eye level, dressed in a charcoal tailored vest with muted gold edging over an ivory long-sleeved blouse, a dark pleated skirt and practical leather boots. She holds a closed leather ledger against her chest with both hands, its cover bearing a simple embossed geometric emblem without readable text. Warm soft side light catches loose hair and brass buttons. The complete silhouette is visible with space around her head and feet against a plain very dark charcoal background. Fine anime linework, detailed cloth shading, restrained warm colors, no lettering, no frame and no user interface.",
-      "negative_prompt": "text, watermark, logo, user interface, border, cropped head, cropped feet",
-      "steps": 12,
-      "cfg_scale": 1.5,
-      "width": 920,
-      "height": 1536,
-      "sampler_name": "ER SDE",
-      "scheduler": "beta",
-      "styles": [
-        "anima-best-quality",
-        "anima-style",
-        "turbo-anima"
-      ],
-      "seed": 26090715,
-      "override_settings": {
-        "sd_model_checkpoint": "anima/animaika_v43.safetensors [bc0a5703b6]",
-        "forge_additional_modules": [
-          "qwen_3_06b_base.safetensors",
-          "qwen_image_vae.safetensors"
-        ]
-      }
-    },
-    "info": {
-      "seed": 26090715,
-      "width": 920,
-      "height": 1536,
-      "sampler_name": "ER SDE",
-      "sd_model_name": "animaika_v43",
-      "sd_model_hash": "bc0a5703b6"
-    },
-    "postprocessing": "WebP encoding; conservative edge-connected background removal for portrait samples."
   }
 ]
