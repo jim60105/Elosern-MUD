@@ -9,6 +9,12 @@ bindings. A kind without a gallery — the scene kind — is declared explicitly
 as such rather than represented by an absent entry, so "this kind has no
 gallery" is an assertion in the table, not an accident of a missing key.
 
+``gallery-monster-generation`` adds the three request-precondition fields the
+generation seam reads: whether a generation request for the kind requires the
+canonical-age precondition, whether the kind supports a prompt field
+selection, and whether it supports free-form prompt text. The character kind
+declares all three; the monster kind declares none.
+
 This module lives HERE — with zero imports — exactly like
 ``world/art/fallback_keys.py`` and for the same reason: ``world/art/subjects.py``
 imports ``world/art/gallery_prompt.py`` at module level, so a capability table
@@ -38,7 +44,16 @@ _MONSTER_KIND_VALUE = "portrait:monster"
 class GalleryKindCapabilities:
     """One immutable capability record for one subject kind value."""
 
-    __slots__ = ("kind_value", "has_gallery", "store_directory", "max_cards", "supports_bindings")
+    __slots__ = (
+        "kind_value",
+        "has_gallery",
+        "store_directory",
+        "max_cards",
+        "supports_bindings",
+        "requires_age_precondition",
+        "supports_field_selection",
+        "supports_free_text",
+    )
 
     def __init__(
         self,
@@ -47,12 +62,18 @@ class GalleryKindCapabilities:
         store_directory: "str | None",
         max_cards: "int | None",
         supports_bindings: bool,
+        requires_age_precondition: bool,
+        supports_field_selection: bool,
+        supports_free_text: bool,
     ) -> None:
         object.__setattr__(self, "kind_value", kind_value)
         object.__setattr__(self, "has_gallery", has_gallery)
         object.__setattr__(self, "store_directory", store_directory)
         object.__setattr__(self, "max_cards", max_cards)
         object.__setattr__(self, "supports_bindings", supports_bindings)
+        object.__setattr__(self, "requires_age_precondition", requires_age_precondition)
+        object.__setattr__(self, "supports_field_selection", supports_field_selection)
+        object.__setattr__(self, "supports_free_text", supports_free_text)
 
     def __setattr__(self, name: str, value: object) -> "None":
         raise TypeError(
@@ -70,7 +91,10 @@ class GalleryKindCapabilities:
             f"has_gallery={self.has_gallery!r}, "
             f"store_directory={self.store_directory!r}, "
             f"max_cards={self.max_cards!r}, "
-            f"supports_bindings={self.supports_bindings!r})"
+            f"supports_bindings={self.supports_bindings!r}, "
+            f"requires_age_precondition={self.requires_age_precondition!r}, "
+            f"supports_field_selection={self.supports_field_selection!r}, "
+            f"supports_free_text={self.supports_free_text!r})"
         )
 
     def with_values(self, **changes) -> "GalleryKindCapabilities":
@@ -85,6 +109,9 @@ class GalleryKindCapabilities:
             "store_directory": self.store_directory,
             "max_cards": self.max_cards,
             "supports_bindings": self.supports_bindings,
+            "requires_age_precondition": self.requires_age_precondition,
+            "supports_field_selection": self.supports_field_selection,
+            "supports_free_text": self.supports_free_text,
         }
         unknown = set(changes) - set(fields)
         if unknown:
@@ -152,8 +179,9 @@ class _ReadOnlyLookup:
 # THE ONE DECLARATION: exactly one immutable record per ArtSubjectKind member,
 # keyed by the kind's declared string value. `character` declares a null
 # maximum — it is uncapped today and stays uncapped; `monster` declares the
-# one-card cap without binding support; `scene` is declared explicitly as
-# having no gallery. Only None and 1 are admitted as maxima (enforced by
+# one-card cap without binding, age-precondition, field-selection, or
+# free-text support; `scene` is declared explicitly as having no gallery.
+# Only None and 1 are admitted as maxima (enforced by
 # validate_declaration_contract below); the contract test rejects anything
 # else, so no real declaration needs an N-card eviction algorithm.
 _CAPABILITIES_BY_KIND_VALUE: dict = {
@@ -163,6 +191,9 @@ _CAPABILITIES_BY_KIND_VALUE: dict = {
         store_directory="character",
         max_cards=None,
         supports_bindings=True,
+        requires_age_precondition=True,
+        supports_field_selection=True,
+        supports_free_text=True,
     ),
     _MONSTER_KIND_VALUE: GalleryKindCapabilities(
         kind_value=_MONSTER_KIND_VALUE,
@@ -170,6 +201,9 @@ _CAPABILITIES_BY_KIND_VALUE: dict = {
         store_directory="monster",
         max_cards=1,
         supports_bindings=False,
+        requires_age_precondition=False,
+        supports_field_selection=False,
+        supports_free_text=False,
     ),
     _SCENE_KIND_VALUE: GalleryKindCapabilities(
         kind_value=_SCENE_KIND_VALUE,
@@ -177,6 +211,9 @@ _CAPABILITIES_BY_KIND_VALUE: dict = {
         store_directory=None,
         max_cards=None,
         supports_bindings=False,
+        requires_age_precondition=False,
+        supports_field_selection=False,
+        supports_free_text=False,
     ),
 }
 
@@ -271,8 +308,9 @@ def validate_declaration_contract(kind_values: "tuple[str, ...]") -> list:
     an undeclared kind, a stale entry naming no member, a declared maximum
     outside the admitted values, or a cross-field impossibility (a gallery
     without a directory, a no-gallery kind claiming a directory, a maximum, or
-    binding support, a record whose own kind_value disagrees with its key, or
-    a flag that is not exactly a bool).
+    binding, age-precondition, field-selection, or free-text support, a record
+    whose own kind_value disagrees with its key, or a flag that is not exactly
+    a bool).
     """
     violations = []
     declared = set(_CAPABILITIES_BY_KIND_VALUE)
@@ -298,6 +336,16 @@ def validate_declaration_contract(kind_values: "tuple[str, ...]") -> list:
                 f"kind {value!r} declares supports_bindings "
                 f"{record.supports_bindings!r}, not a bool"
             )
+        for flag in (
+            "requires_age_precondition",
+            "supports_field_selection",
+            "supports_free_text",
+        ):
+            if not isinstance(getattr(record, flag), bool):
+                violations.append(
+                    f"kind {value!r} declares {flag} "
+                    f"{getattr(record, flag)!r}, not a bool"
+                )
         if not _is_admitted_maximum(record.max_cards):
             violations.append(
                 f"kind {value!r} declares card maximum {record.max_cards!r} "
@@ -323,6 +371,15 @@ def validate_declaration_contract(kind_values: "tuple[str, ...]") -> list:
                 violations.append(
                     f"no-gallery kind {value!r} declares binding support"
                 )
+            for flag in (
+                "requires_age_precondition",
+                "supports_field_selection",
+                "supports_free_text",
+            ):
+                if getattr(record, flag):
+                    violations.append(
+                        f"no-gallery kind {value!r} declares {flag}"
+                    )
     return violations
 
 

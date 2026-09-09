@@ -22,9 +22,14 @@ from world.art.gallery_prompt import (
     GalleryPromptError,
 )
 from world.art.sd_worker import SDError
-from world.art.service import requeue_character_portrait
+from world.art.service import requeue_gallery_subject
 from world.art.service import prune_gallery_orphans
-from world.art.subjects import ArtSubjectError
+from world.art.subjects import (
+    ArtSubjectError,
+    monster_description,
+    monster_subject_for,
+    scene_subject_for,
+)
 from world.art.service import (
     art_sync_all,
     ensure_scene_asset,
@@ -371,21 +376,21 @@ class AutogenRetrofitTests(EvenniaTestCase):
     def test_retry_reports_truthfully_through_the_guard(self):
         from world.art.service import retry_gallery_subject
 
-        self.assertTrue(retry_gallery_subject(str(self.player.pk)))
+        self.assertTrue(retry_gallery_subject(self.subject))
         self.assertEqual(len(self._gallery_jobs()), 1)
         self.assertNotIn(
             self.classic_key,
             {record.db_key for record in ArtAssetRecord.objects.all()},
         )
         # The in-flight guard suppresses the second attempt honestly.
-        self.assertFalse(retry_gallery_subject(str(self.player.pk)))
+        self.assertFalse(retry_gallery_subject(self.subject))
         self.assertEqual(len(self._gallery_jobs()), 1)
         # A carded subject is left alone too.
         for job in self._gallery_jobs():
             job.db.status = ArtAssetStatus.FAILED
             job.save()
         self._seed_card("a1b2c3d4-0000-4000-8000-000000000002")
-        self.assertFalse(retry_gallery_subject(str(self.player.pk)))
+        self.assertFalse(retry_gallery_subject(self.subject))
         # The spent FAILED job survives; no NEW job was enqueued.
         self.assertEqual(len(self._gallery_jobs()), 1)
 
@@ -393,7 +398,7 @@ class AutogenRetrofitTests(EvenniaTestCase):
         "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
     )
     def test_requeue_forces_one_card_beyond_the_idempotency_guard(self):
-        from world.art.service import requeue_character_portrait
+        from world.art.service import requeue_gallery_subject
 
         self._schedule()
         self._drain()
@@ -401,7 +406,7 @@ class AutogenRetrofitTests(EvenniaTestCase):
         self.assertEqual(len(cards), 1)
         # Staff force path: an occupied gallery does not suppress the request.
         with patch("world.art.service.log_info"):
-            requeue_character_portrait(str(self.player.pk))
+            requeue_gallery_subject(self.subject)
         jobs = self._gallery_jobs()
         self.assertEqual(len(jobs), 1)
         # The existing card is untouched until the new card is appended.
@@ -427,10 +432,10 @@ class AutogenRetrofitTests(EvenniaTestCase):
             with self.captureOnCommitCallbacks(execute=True) as callbacks:
                 schedule_portrait_ensure(self.player)
             self.assertEqual(len(callbacks), 0)
-            from world.art.service import requeue_character_portrait
+            from world.art.service import requeue_gallery_subject
 
             with self.assertRaises(ArtSubjectError):
-                requeue_character_portrait(str(self.player.pk))
+                requeue_gallery_subject(self.subject)
         render.assert_not_called()
         self.assertEqual(self._gallery_jobs(), [])
         self.assertEqual(gallery_api.cards_for(self.subject), [])
@@ -690,7 +695,7 @@ class GalleryPromptCompositionTests(EvenniaTestCase):
         self.assertEqual(list(jobs[0].db.gallery_requested_fields), ["appearance"])
         # The forced staff requeue path.
         jobs[0].delete()
-        requeue_character_portrait(str(self.player.pk))
+        requeue_gallery_subject(self.subject)
         jobs = self._gallery_jobs()
         self.assertEqual(len(jobs), 1)
         self.assertEqual(list(jobs[0].db.gallery_requested_fields), ["appearance"])
@@ -712,6 +717,223 @@ class GalleryPromptCompositionTests(EvenniaTestCase):
         request_gallery_image(self.player, fields=("appearance", "armor"))
         second = [job for job in self._gallery_jobs() if job.pk != first.pk][0]
         self.assertNotEqual(first.db.prompt_digest, second.db.prompt_digest)
+
+
+class MonsterGalleryGenerationTests(EvenniaTestCase):
+    """The request seam serves the monster kind from its declaration alone.
+
+    Change ``gallery-monster-generation``: the seam is kind-driven, so the
+    monster path proves the DECLARATIONS work — no age attribute is ever
+    read, the description is the registry text, an argument naming an
+    undeclared capability is a typed rejection, and the settled card obeys
+    the declared one-card cap with empty provenance.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.root = Path(self.tempdir.name)
+        self.art_settings = override_settings(
+            ART_STORE_ROOT=str(self.root),
+            ART_SD_CLIENT="world.art.fake_sd_client.FakeSDWebUIClient",
+        )
+        self.art_settings.enable()
+        self.addCleanup(self.art_settings.disable)
+        self.tier = next(iter(MONSTER_TIER_REGISTRY))
+        self.subject = monster_subject_for(self.tier)
+
+    def _gallery_jobs(self):
+        return [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if str(record.db.gallery_image_id or "")
+        ]
+
+    def _drain(self):
+        from world.art.worker import drain_synchronous
+
+        with patch(
+            "world.art.worker.resolve_sd_client", return_value=FakeSDWebUIClient()
+        ):
+            drain_synchronous(10)
+
+    @covers_requirement(
+        "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
+    )
+    def test_a_monster_subject_queues_one_job_with_no_age_read_and_registry_text(self):
+        with patch("world.art.service.character_ages") as ages:
+            image_id = request_gallery_image(self.subject)
+        # The age precondition is NOT declared for this kind: never read.
+        ages.assert_not_called()
+        jobs = self._gallery_jobs()
+        self.assertEqual(len(jobs), 1)
+        job = jobs[0]
+        self.assertEqual(
+            job.db_key, f"art:portrait:monster:{self.tier}:gen:{image_id}"
+        )
+        self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
+        self.assertIsNone(job.db.gallery_binding or None)
+        # The description is the registry-driven monster description.
+        self.assertEqual(job.db.source_description, monster_description(self.subject))
+        self.assertEqual(list(job.db.gallery_requested_fields), [])
+
+    @covers_requirement(
+        "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
+    )
+    def test_a_scene_subject_is_refused_at_the_seam(self):
+        scene = scene_subject_for("forest_path")
+        with self.assertRaises(ArtSubjectError):
+            request_gallery_image(scene)
+        self.assertEqual(self._gallery_jobs(), [])
+
+    @covers_requirement(
+        "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
+    )
+    def test_an_undeclared_capability_is_rejected_never_ignored(self):
+        # Each argument naming a capability the monster declaration lacks is
+        # a typed error naming that capability — before any render or write.
+        cases = (
+            ({"fields": ("appearance",)}, "field selection"),
+            ({"custom_prompt": "月光下的低階怪物"}, "free-text"),
+            ({"binding": {"mask": ["armor"], "snapshot": {"armor": "leather_armor"}}}, "binding"),
+        )
+        for kwargs, capability_name in cases:
+            with self.subTest(**kwargs):
+                with patch("world.art.sd_worker.render_prompt_pair") as render:
+                    with self.assertRaises(ValueError) as caught:
+                        request_gallery_image(self.subject, **kwargs)
+                self.assertIn(capability_name, str(caught.exception))
+                render.assert_not_called()
+        # Total rejection: nothing was written for any refused argument.
+        self.assertEqual(self._gallery_jobs(), [])
+        self.assertIsNone(gallery_api.record_for(self.subject))
+
+    @covers_requirement(
+        "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
+    )
+    def test_an_unregistered_monster_key_is_rejected_before_any_write(self):
+        raw = ArtSubject(ArtSubjectKind.MONSTER, "not_a_tier")
+        with self.assertRaises(ArtSubjectError):
+            request_gallery_image(raw)
+        self.assertEqual(self._gallery_jobs(), [])
+
+    @covers_requirement(
+        "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
+    )
+    def test_whitespace_only_text_is_the_legal_no_op_for_a_kind_without_free_text(self):
+        # Established prompt semantics: text normalizing to nothing carries
+        # nothing the kind could lose, so it is accepted as the no-op the
+        # validator already defines — not a capability violation.
+        image_id = request_gallery_image(self.subject, custom_prompt="   ")
+        jobs = self._gallery_jobs()
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0].db.gallery_image_id, image_id)
+        self.assertEqual(list(jobs[0].db.gallery_requested_fields), [])
+        self.assertNotIn("月光", jobs[0].db.source_description)
+
+    @covers_requirement(
+        "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
+    )
+    def test_retry_keeps_the_error_while_a_monster_job_is_in_flight(self):
+        # The moot clear is ONLY for the card-present decline: an in-flight
+        # monster job keeps the recorded error, exactly as for a character.
+        from world.art.service import retry_gallery_subject
+
+        request_gallery_image(self.subject)  # pending job, in flight
+        gallery_api.record_error(self.subject, "sd_connection_error")
+        self.assertFalse(retry_gallery_subject(self.subject))
+        self.assertEqual(len(self._gallery_jobs()), 1)  # nothing new enqueued
+        state = gallery_api.record_for(self.subject)
+        self.assertEqual(state.db.last_error_code, "sd_connection_error")
+
+    @covers_requirement(
+        "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
+    )
+    def test_a_character_key_colliding_with_a_monster_tier_never_crosses_kinds(self):
+        # A named character may LEGALLY carry stable_key "low", the same text
+        # as a registered monster tier. Resolution is through the subject's
+        # own kind producer, so re-driving either subject can only ever touch
+        # its own kind's job — never the identically-named other subject.
+        from evennia.utils.create import create_object
+
+        from typeclasses.characters import PlayerCharacter
+
+        from world.art.service import retry_gallery_subject
+
+        collision = self.tier  # e.g. "low"
+        character = create_object(PlayerCharacter, key="collision-host")
+        character.db.age = 30
+        character.db.apparent_age = 30
+        character.db.portrait_policy = {"mode": "named", "stable_key": collision}
+        monster_subject = monster_subject_for(collision)
+        character_subject = ArtSubject(ArtSubjectKind.CHARACTER, collision)
+
+        with patch("world.art.service.log_info"):
+            self.assertTrue(retry_gallery_subject(monster_subject))
+        jobs = self._gallery_jobs()
+        self.assertEqual(len(jobs), 1)
+        self.assertTrue(
+            jobs[0].db_key.startswith(f"art:{monster_subject.full()}:gen:")
+        )
+        # Re-driving the colliding CHARACTER subject resolves to the living
+        # character, producing a character-kind job, never a second monster job.
+        with patch("world.art.service.log_info"):
+            self.assertTrue(retry_gallery_subject(character_subject))
+        jobs = self._gallery_jobs()
+        self.assertEqual(len(jobs), 2)
+        self.assertTrue(
+            any(
+                job.db_key.startswith(f"art:{character_subject.full()}:gen:")
+                for job in jobs
+            )
+        )
+        self.assertEqual(
+            sum(
+                1
+                for job in jobs
+                if job.db_key.startswith(f"art:{monster_subject.full()}:gen:")
+            ),
+            1,
+        )
+
+
+    @covers_requirement(
+        "art-gallery-prompt-fields::the-gallery-prompt-field-catalog-is-a-closed-ordered-vocabulary"
+    )
+    def test_a_monster_card_settles_unbound_default_with_empty_provenance(self):
+        image_id = request_gallery_image(self.subject)
+        self._drain()
+        cards = gallery_api.cards_for(self.subject)
+        # Exactly one card, the shared default rectangle, unbound, and default.
+        self.assertEqual(len(cards), 1)
+        card = cards[0]
+        self.assertEqual(card["image_id"], image_id)
+        self.assertIsNone(card["binding"])
+        self.assertEqual(card["face_rect"], dict(gallery_api.DEFAULT_FACE_RECT))
+        self.assertEqual(card["requested_fields"], [])
+        self.assertEqual(
+            gallery_api.record_for(self.subject).db.default_image_id, image_id
+        )
+        # The file lives under the monster kind directory.
+        self.assertTrue(card["stored_identity"].startswith(f"gallery/monster/{self.tier}/"))
+        self.assertTrue((self.root / card["stored_identity"]).exists())
+
+    @covers_requirement(
+        "art-gallery-prompt-fields::the-gallery-prompt-field-catalog-is-a-closed-ordered-vocabulary"
+    )
+    def test_a_second_monster_card_replaces_the_first_under_the_cap(self):
+        first = request_gallery_image(self.subject)
+        self._drain()
+        second = request_gallery_image(self.subject)
+        self._drain()
+        cards = gallery_api.cards_for(self.subject)
+        # The declared maximum of one card is honored: replaced, not appended.
+        self.assertEqual([card["image_id"] for card in cards], [second])
+        self.assertNotEqual(first, second)
+        self.assertEqual(
+            gallery_api.record_for(self.subject).db.default_image_id, second
+        )
 
 
 class GalleryPruneTests(EvenniaTestCase):

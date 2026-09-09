@@ -595,6 +595,20 @@ def append_card(subject: ArtSubject, **card_fields) -> dict:
             and card_fields.get("binding") is not None
         ):
             raise GalleryRecordError("monster cards must be unbound")
+        # Provenance honesty (``gallery-monster-generation``): card
+        # ``requested_fields`` claims which data blocks produced the image, so
+        # the write boundary refuses a non-empty provenance for a kind whose
+        # declaration supports no field selection — a stored claim the kind
+        # could never have requested would make the card lie.
+        if (
+            capability.has_gallery
+            and not capability.supports_field_selection
+            and list(card_fields.get("requested_fields") or [])
+        ):
+            raise GalleryRecordError(
+                f"kind {capability.kind_value!r} supports no field selection; "
+                "a card's requested_fields must be empty"
+            )
         stored = validate_card(
             card_fields, subject, existing_ids=existing_ids
         )

@@ -77,7 +77,14 @@ def _card_fields(subject, image_id=None, **overrides):
         "prompt": {"positive": "a hero", "negative": "blur"},
         "seed": 1234,
         "checkpoint": "realVision.safetensors",
-        "requested_fields": ["appearance"],
+        # Declaration-aware: a kind whose capability supports no field
+        # selection may only ever store an empty provenance (the write
+        # boundary enforces it, ``gallery-monster-generation``).
+        "requested_fields": (
+            ["appearance"]
+            if gallery_kinds.capabilities_for(subject.kind.value).supports_field_selection
+            else []
+        ),
         "binding": None,
         "source": "generated",
     }
@@ -732,6 +739,27 @@ class GalleryRecordWriteTests(EvenniaTestCase):
                 ),
             )
         self.assertIsNone(record_for(_monster("freshgoblin")))
+
+    @covers_requirement(
+        "art-gallery-prompt-fields::the-gallery-prompt-field-catalog-is-a-closed-ordered-vocabulary"
+    )
+    def test_a_monster_card_claiming_field_provenance_is_refused(self):
+        # Card requested_fields is a provenance claim; the write boundary
+        # refuses a claim the kind's declaration could never support
+        # (``gallery-monster-generation``) — with the record unchanged.
+        subject = _monster("provenancegoblin")
+        first = _new_id()
+        append_card(subject, **_card_fields(subject, image_id=first))
+        with self.assertRaises(GalleryRecordError):
+            append_card(
+                subject,
+                **_card_fields(subject, requested_fields=["appearance"]),
+            )
+        self.assertEqual([card["image_id"] for card in cards_for(subject)], [first])
+        # Empty provenance stays legal — the settled monster shape.
+        second = _new_id()
+        stored = append_card(subject, **_card_fields(subject, image_id=second))
+        self.assertEqual(stored["requested_fields"], [])
 
     @covers_requirement("art-gallery-model::monster-subjects-hold-at-most-one-card")
     def test_the_cap_follows_the_declaration_not_the_kind(self):

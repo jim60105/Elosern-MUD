@@ -2,7 +2,9 @@
 
 Restricted to staff: ``@art status`` (list/filter records), ``@art run``
 (drain now, non-blocking), ``@art retry`` (re-enqueue failed records),
-``@art requeue <full-subject-key>`` (forced regeneration), ``@art
+``@art requeue <full-subject-key>`` (forced regeneration — gallery-bearing
+kinds through the validated gallery seam, scene keys through the classic
+record reset), ``@art
 options <kind>`` (list the live server's selectable option names), and
 ``@art health`` (forced connectivity verdict + scheduler/queue/gallery/
 output-policy dashboard). ``@art status`` additionally reports per-subject
@@ -20,12 +22,12 @@ from django.conf import settings
 from commands.command import Command
 
 from world.art import gallery as gallery_api
+from world.art import gallery_kinds
 from world.art.queue import failed_keys, is_gallery_job, record_key, requeue
 from world.art.store import ArtAssetRecord
 from world.art.subjects import (
     ArtSubjectError,
     ArtSubjectKind,
-    monster_subject_for,
     parse_subject,
     scene_subject_for,
 )
@@ -186,13 +188,13 @@ class CmdArtRetry(_ArtCommand):
         # Gallery arm: every subject whose LAST generation attempt failed is
         # re-driven through the same validated request seam the automatic
         # paths use, so every precondition still applies. A typed rejection
-        # (no living entity, ineligible ages, a kind the seam cannot resolve)
+        # (no living entity, ineligible ages, an unresolvable subject)
         # skips that subject with no record change; the moot-error clear
         # lives in the seam itself (declined because cards arrived).
         gallery_requested = 0
         for state in gallery_api.erroring_subjects():
             try:
-                requested = retry_gallery_subject(state.subject.key)
+                requested = retry_gallery_subject(state.subject)
             except ArtSubjectError:
                 continue
             if requested:
@@ -221,21 +223,23 @@ class CmdArtRequeue(_ArtCommand):
         except ArtSubjectError as error:
             self.caller.msg(f"無效的 subject key：{error}")
             return
-        if subject.kind is ArtSubjectKind.CHARACTER:
-            from world.art.service import requeue_character_portrait
+        # Gallery-bearing kinds (change ``gallery-monster-generation``) are
+        # force-regenerated through the kind-neutral gallery seam, which
+        # re-checks the kind's declared preconditions and respects the
+        # declared card cap. Only no-gallery kinds (scene) keep the classic
+        # fixed-identity record reset.
+        if gallery_kinds.has_gallery(subject.kind):
+            from world.art.service import requeue_gallery_subject
 
             try:
-                requeue_character_portrait(subject.key)
+                requeue_gallery_subject(subject)
             except ArtSubjectError as error:
                 self.caller.msg(f"無法重新排入：{error}")
                 return
             self.caller.msg(f"已將 {subject.full()} 重新排入佇列。")
             return
         try:
-            if subject.kind is ArtSubjectKind.SCENE:
-                scene_subject_for(subject.key)
-            else:
-                monster_subject_for(subject.key)
+            scene_subject_for(subject.key)
         except ArtSubjectError as error:
             self.caller.msg(f"無效的 subject key：{error}")
             return
