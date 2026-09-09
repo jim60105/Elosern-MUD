@@ -332,6 +332,11 @@ Known coordination points:
    not-yet-migrated portrait therefore keep resolving exactly as they do today,
    and the retrofit needs no migration at all. The cost is one strictly
    lower-priority step in the chain.
+   Monsters stopped PRODUCING classic records with `gallery-monster-autogen`
+   (§12.5): their generation reached the gallery like the character's.
+   Already-existing classic monster records keep resolving through this step
+   and are never migrated, reset, or newly produced — the deviation stands for
+   them.
 3. **§7.2 static serving → the `/art/defaults/` route.** The built-in fallback
    images are served through the existing `/art/` route from a fixed in-repo
    defaults directory rather than as raw static assets, so `/art/...` stays the
@@ -359,3 +364,22 @@ changes wires the rectangle into a CSS offset. D12's deferral stands, so the
 consequence is recorded rather than resolved: **§6's avatar behaviour is NOT
 delivered by this decomposition** and needs a separate frontend change once the
 rewrite settles.
+
+### 12.5 Closed: monster generation reached the gallery
+
+The decomposition (§12.1–§12.3) shipped monsters as D8 says: still generated
+classic — every `MONSTER_TIER_REGISTRY` tier got one generic prompt, one card,
+no player trigger, and startup synchronization wrote each tier a classic
+subject-keyed record. `gallery-monster-autogen` lands the routing D8 deferred
+behind the card model: startup synchronization now requests a guarded gallery
+generation for every tier through the ONE shared automatic-ensure helper
+(`_ensure_gallery_subject`, formerly `_ensure_character_portrait`), the classic
+generic-monster record is retired from production — the scene kind is the only
+classic-record producer on any path (`@art retry`'s classic arm likewise skips
+gallery-bearing kinds) — and pre-existing monster records are left in place,
+resolving through the display chain's classic step (the §12.3.2 qualification
+stands for them). Startup order moved to prune → seed → sync so a seed card
+always occupies a tier's gallery before the automatic guard reads it. D8's
+cardinality outcome is unchanged: the monster kind's declaration caps the
+gallery at one card, so each tier still holds one generated image — through
+the gallery now, not the classic table.

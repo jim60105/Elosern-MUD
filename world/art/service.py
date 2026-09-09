@@ -5,7 +5,8 @@ Presenters, workers, browsers, and ``world/ai`` never write them. The seams
 reachable from gameplay are all deterministic:
 
 - ``art_sync_all()`` -- idempotent startup sync of scene + generic-monster
-  subjects and recovery of explicit named portrait policies.
+  subjects (scene records classic, monster subjects gallery-guarded) and
+  recovery of explicit named portrait policies.
 - ``schedule_portrait_ensure(entity)`` -- post-commit portrait ensure for a
   player-created or validated-import character.
 - ``ensure_scene_asset(archetype)`` -- room-entry scene ensure.
@@ -30,8 +31,8 @@ startup recovery, staff retry — and the staff character requeue through
 default face rectangle: a character subject never writes a classic
 fixed-identity record. Automatic paths request only when the subject's gallery
 holds no card and no gallery job is in flight; ``@art requeue`` is the one
-force path that bypasses that guard. Scenes and monster tiers stay on the
-classic subject-keyed pipeline.
+force path that bypasses that guard. Scenes stay on the classic subject-keyed
+pipeline; monster routing arrived with ``gallery-monster-autogen`` below.
 
 Change ``gallery-monster-generation`` opens the seam to every gallery-bearing
 kind: ``request_gallery_image`` accepts an entity OR an already-derived
@@ -41,9 +42,20 @@ of hard-coding the character shape, and refuses an argument naming a
 capability the kind does not declare — never silently dropping it. The staff
 requeue seam becomes kind-neutral (``requeue_gallery_subject``); the retry
 seam keeps its ``gallery-failure-visibility`` name and resolves any
-gallery-bearing subject by its typed full key. Automatic monster routing
-stays with ``gallery-monster-autogen``: every automatic path still serves
-characters only.
+gallery-bearing subject by its typed full key.
+
+Change ``gallery-monster-autogen`` lands that routing: ``_ensure_gallery_subject``
+(formerly ``_ensure_character_portrait``) is the ONE automatic-ensure helper
+for EVERY gallery-bearing kind, and startup synchronization routes every
+monster tier through it instead of the classic subject-keyed ``ensure``. The
+classic generic-monster record is retired from production: the scene kind
+becomes the only classic-record producer on any path — ``@art retry``'s
+classic arm likewise skips every gallery-bearing kind, so a legacy monster
+record is never reactivated or reset. Pre-existing classic monster records
+are left in place — not deleted, not reset — and keep resolving through the
+display chain's classic step. Startup order guarantees a seed card occupies
+the gallery before the automatic pass: ``art_sync_all`` runs AFTER the
+gallery prune and seed synchronization.
 """
 
 import uuid
@@ -144,19 +156,26 @@ def _guarded_gallery_request(subject, entity) -> bool:
     return True
 
 
-def _ensure_character_portrait(entity) -> bool:
-    """Validate ages, then request one automatic gallery card when the gallery warrants it.
+def _ensure_gallery_subject(entity_or_subject) -> bool:
+    """Request one automatic gallery card for ANY gallery-bearing subject when its gallery warrants it.
 
+    The ONE automatic-ensure helper for every gallery-bearing kind (change
+    ``gallery-monster-autogen``), serving either a gameplay entity (a
+    character, derived through its typed producer) or an already-derived
+    ``ArtSubject`` (a registry-backed subject such as a monster tier).
     Returns True when a gallery generation was requested, False when the
-    gallery guard suppressed the automatic path. The character kind's
-    declaration (age precondition, ``appearance``-only selection, default
-    rect) drives the request through the shared guarded helper; a character
-    subject never writes a classic fixed-identity record on an automatic path.
+    gallery guard suppressed the automatic path. The subject kind's
+    declaration — age precondition, field selection, default rect — drives
+    everything through the shared guarded helper, so a kind that declares no
+    age precondition never reads an age attribute, and NO gallery-bearing
+    subject ever writes a classic fixed-identity record on an automatic path.
     """
-    subject = character_subject_for(entity)
+    if isinstance(entity_or_subject, ArtSubject):
+        return _guarded_gallery_request(entity_or_subject, None)
+    subject = character_subject_for(entity_or_subject)
     if subject is None:
         return False
-    return _guarded_gallery_request(subject, entity)
+    return _guarded_gallery_request(subject, entity_or_subject)
 
 
 def _ages_eligible_at_schedule(entity) -> bool:
@@ -192,7 +211,7 @@ def schedule_portrait_ensure(entity) -> None:
 
     def _safe():
         try:
-            _ensure_character_portrait(entity)
+            _ensure_gallery_subject(entity)
         except ArtSubjectError as error:
             log_info("art_portrait_skipped", context={"stage": "ensure"}, exc=error)
         except Exception as error:  # noqa: BLE001 - bounded, never propagates
@@ -336,7 +355,17 @@ def ensure_scene_asset(archetype) -> None:
 
 
 def _sync_registry_subjects() -> None:
-    """Idempotently ensure a record for every scene and generic-monster subject."""
+    """Idempotently ensure every registered subject, routed by its kind's gallery declaration.
+
+    The scene kind declares no gallery and stays on the classic
+    subject-keyed ``ensure`` — the only classic-record producer left (change
+    ``gallery-monster-autogen``). Every monster tier routes through the
+    shared automatic-ensure helper under the same gallery guard every
+    character path uses, and startup never writes a classic record for it;
+    a pre-existing classic monster record is left in place and keeps
+    resolving through the display chain's classic step. Every failure is
+    bounded per subject so one bad entry never aborts the remaining sync.
+    """
     for archetype in SCENE_ARCHETYPE_REGISTRY:
         try:
             subject = scene_subject_for(archetype)
@@ -346,8 +375,8 @@ def _sync_registry_subjects() -> None:
     for tier in MONSTER_TIER_REGISTRY:
         try:
             subject = monster_subject_for(tier)
-            queue_ensure(subject, description_for(subject))
-        except ArtSubjectError as error:
+            _ensure_gallery_subject(subject)
+        except Exception as error:  # noqa: BLE001 - bounded per tier, never aborts startup
             log_warn("art_startup_sync_skipped", context={"kind": "monster", "key": tier}, exc=error)
 
 
@@ -357,7 +386,7 @@ def _recover_named_portraits() -> None:
     Recovers an enqueue that failed after an earlier gameplay commit. The
     canonical-age check re-runs; a permanently ineligible subject is skipped
     with a diagnostic and never retried by a later recovery pass (design D7).
-    The shared automatic-generation guard inside ``_ensure_character_portrait``
+    The shared automatic-generation guard inside ``_ensure_gallery_subject``
     restricts the recovery to subjects with an empty gallery and no in-flight
     job: a subject whose gallery already holds a card, or whose generation is
     already pending/in-progress, is left alone (change
@@ -382,16 +411,20 @@ def _recover_named_portraits() -> None:
         except ArtSubjectError as error:
             log_info("art_recovery_skipped", context={"kind": "portrait", "key": entity.key}, exc=error)
             continue
-        _ensure_character_portrait(entity)
+        _ensure_gallery_subject(entity)
 
 
 def art_sync_all() -> None:
     """Idempotent startup synchronization plus named-policy recovery.
 
-    Ensures a record for every ``SCENE_ARCHETYPE_REGISTRY`` and every
-    ``MONSTER_TIER_REGISTRY`` entry, then rescans living characters carrying an
-    explicit named portrait policy. Every record write flows through the queue
-    under the shared lock; a failure is bounded and never aborts startup.
+    Routes every ``SCENE_ARCHETYPE_REGISTRY`` entry through the classic
+    ensure and every ``MONSTER_TIER_REGISTRY`` entry through the shared
+    gallery automatic-ensure helper, then rescans living characters carrying
+    an explicit named portrait policy. Every record write flows through the
+    queue under the shared lock; a failure is bounded and never aborts
+    startup. Runs as a startup step AFTER ``art_gallery_prune`` and
+    ``art_seed_sync`` so a seed card always occupies a subject's gallery
+    before the automatic guard reads it.
     """
     try:
         _sync_registry_subjects()

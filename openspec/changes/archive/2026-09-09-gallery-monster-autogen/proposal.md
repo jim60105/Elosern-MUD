@@ -25,6 +25,13 @@ for the same subject, and the display chain would resolve whichever happened las
 - Pre-existing classic monster records are left in place: not deleted, not reset.
   They keep resolving through the display chain's classic step and stay visible in
   `@art status`, so nothing needs migrating (there are no released users).
+- The startup step order moves `art_sync_all` AFTER the gallery prune and seed
+  synchronization, so an operator seed card already occupies a tier's gallery
+  before the automatic guard reads it and is never displaced by a startup-time
+  generation.
+- `@art retry`'s classic arm skips every gallery-bearing kind: a gallery kind's
+  failures are retried exclusively through the gallery seam, so a legacy failed
+  monster record is never reset, re-enqueued, or newly produced by a retry.
 - The automatic-ensure helper in `service.py` is generalized so one function
   serves every gallery-bearing kind. The character's canonical-age check becomes
   one declared precondition inside it rather than a hardcoded step, so the
@@ -44,11 +51,17 @@ None.
   requirement is stated per declared capability rather than per character path.
 - `art-asset-lifecycle`: startup synchronization stops writing classic
   generic-monster asset records and routes those subjects to the gallery.
+- `art-staff-commands`: the `@art retry` classic arm skips every
+  gallery-bearing kind, so gallery kinds retry only through the gallery seam.
 
 ## Impact
 
 - `world/art/service.py` — the shared automatic-ensure helper and
   `_sync_registry_subjects`.
+- `server/conf/at_server_startstop.py` — the startup step order (prune → seed
+  → sync) and its catalog.
+- `commands/art.py` + `docs/game/command-reference.md` — the classic retry arm
+  skips gallery-bearing kinds.
 - Tests under `world/art/tests/`, including startup-sync fixtures and
   idempotency-across-restarts coverage.
 - `docs/superpowers/specs/2026-09-08-character-gallery-art-design.md` §12 — record

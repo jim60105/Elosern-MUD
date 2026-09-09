@@ -179,6 +179,13 @@ class CmdArtRetry(_ArtCommand):
                 subject = parse_subject(full_key)
             except ArtSubjectError:
                 continue
+            # ``gallery-monster-autogen``: a gallery-bearing kind never
+            # re-enters the classic pipeline. Its gallery failures are driven
+            # exclusively by the gallery arm below, so a legacy classic
+            # monster record is left exactly as found — never reset, never
+            # re-ensqueued, never newly produced.
+            if gallery_kinds.has_gallery(subject.kind):
+                continue
             record = ArtAssetRecord.objects.filter(
                 db_key=record_key(subject)
             ).first()

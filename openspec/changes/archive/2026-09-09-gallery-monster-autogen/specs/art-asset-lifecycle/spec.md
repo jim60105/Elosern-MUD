@@ -18,13 +18,21 @@ classic asset record for it. Pre-existing classic monster records SHALL be left 
 deleted, not reset, and keep resolving through the display chain's classic step, so no migration is
 required. Every failure SHALL stay bounded and SHALL never abort startup.
 
-#### Scenario: Every registered scene has a classic record after startup sync
-- **WHEN** `art_sync_all()` runs against a fresh database
-- **THEN** every `SCENE_ARCHETYPE_REGISTRY` key has exactly one asset record in `missing` or `pending` state
+The startup step order SHALL run the gallery orphan prune and the bulk seed synchronization BEFORE
+this synchronization, so a seed card already occupies a subject's gallery — and the prune has already
+swept — before any automatic gallery request is enqueued; an operator seed card is therefore never
+displaced by a startup-time generation.
 
-#### Scenario: Every registered monster tier gets a gallery request, not a classic record
+#### Scenario: Every registered subject has a record after startup sync
 - **WHEN** `art_sync_all()` runs against a fresh database
-- **THEN** every `MONSTER_TIER_REGISTRY` key has one gallery generation requested and no classic asset record is created for it
+- **THEN** every `SCENE_ARCHETYPE_REGISTRY` key has exactly one classic asset record in `missing` or
+  `pending` state, every `MONSTER_TIER_REGISTRY` key has one gallery generation requested, and no
+  classic asset record is created for any monster tier
+
+#### Scenario: A seed-carded tier survives the ordered startup unchanged
+- **WHEN** the startup steps run in catalog order (prune, then seed synchronization, then this
+  synchronization) with a seed image present for a monster tier, and the queue is later drained
+- **THEN** no gallery generation is requested for that tier and its seed card and stored file are never replaced
 
 #### Scenario: Sync leaves existing pending, in-progress, and done records untouched
 - **WHEN** `art_sync_all()` runs after records were already created, claimed, or completed
