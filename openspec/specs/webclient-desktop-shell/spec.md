@@ -70,6 +70,18 @@ dock SHALL render a breadcrumb naming the parent and current frames with a back 
 render each frame's rows in the form that frame calls for — an exit outlet, navigation rows, a
 target's affordance rows under its name, suggestion cards, or the combat forms — beside a detail pane
 that names the focused item, its availability, and the next key action wherever the frame carries one.
+The stage SHALL size the action dock's band and the narrative caption's lower edge from one shared
+dock-band measure that adapts to the frame the dock currently carries - the interaction workspace and
+the three-card waiting frame grow it, the combat band stays shorter, and an empty pane host collapses
+it in two tiers (any mode's empty host - including the ordinary non-degraded exploration root, whose
+row region the tab bar alone fills - collapses to 144px, and an empty combat host overrides that to
+100px) - outside combat both surfaces position from that one measure with their own fixed/viewport
+offsets, while combat coordinates its feed and dock through its own shorter band plus explicit
+offsets, so the narrative caption and the action dock never overlap and neither clips the
+other at a supported viewport. A frame whose rows exceed the band SHALL scroll inside the pane host
+while the tab bar and breadcrumb stay fixed above it. In dialogue mode the narrative caption SHALL
+likewise bound its own growth so the host, the latest line, the choice rows, the free-form input and
+the exit control all stay reachable at 1280x720.
 
 #### Scenario: Standard desktop viewport contains every required surface
 - **WHEN** the shell renders at 1440x900
@@ -118,6 +130,18 @@ that names the focused item, its availability, and the next key action wherever 
 #### Scenario: The action dock renders as a floating panel with a tab bar and a guidance hint
 - **WHEN** the action dock is mounted in any mode
 - **THEN** it renders as one centred floating panel in the dock anchor, its root frame renders as a tab bar carrying the shortcut-key hint with the open tab in a muted-gold fill, its current frame's rows render with a shape-marked focused row and dimmed but focusable disabled rows, and a breadcrumb with a back control appears below the root frame
+
+#### Scenario: A tall frame grows the band without touching the narrative
+- **WHEN** the dock carries a taller frame (the interaction workspace or the three-card waiting frame) at 1440x900 or 1280x720
+- **THEN** the shared dock band grows for that frame, the narrative caption's lower edge stays above the dock's upper edge, and neither surface clips the other
+
+#### Scenario: Pane content scrolls inside the band
+- **WHEN** the active frame's rows exceed the dock band's height
+- **THEN** the rows scroll within the pane host, the tab bar and breadcrumb remain visible and fixed above the scrolling region, and the last row becomes reachable by scrolling
+
+#### Scenario: The dialogue caption stays bounded at the minimum viewport
+- **WHEN** the committed mode is dialogue at 1280x720
+- **THEN** the host identity, the latest line, every choice row, the free-form input and the exit control are all reachable without document-level scrolling
 
 ### Requirement: Narrative output remains the authoritative text surface
 The shell SHALL route Evennia's existing narrative and command output to a scrollable narrative log without parsing it to infer panel state. Because the portal converts server output to HTML before the `text` message is sent, the narrative log SHALL render that stream through the `webclient-narrative-markup` allowlist pipeline rather than inserting it as a single text node; it SHALL NOT display markup source to the player, and it SHALL NOT interpret anything outside that pipeline's allowlist. When the player has scrolled away from the bottom, new output SHALL increment an unread indicator without forcing the viewport to the bottom; the indicator SHALL be a labeled control that states its count and its jump action — a button reading "↓ N 則新訊息（點擊返回最新）" or equivalent — SHALL be announced through a polite live region, SHALL be hidden entirely while the count is zero, and SHALL, when activated, scroll the log to the latest output and clear the count, exactly as scrolling to the bottom does. Narrative output SHALL remain usable if every structured renderer is unavailable, and SHALL remain usable if a message cannot be fully tokenized — such a message degrades to readable literal text rather than suppressing the log.

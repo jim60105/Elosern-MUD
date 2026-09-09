@@ -69,3 +69,16 @@ no code.
 - Exact clamp pixel values are named as the shipped implementation's choice;
   the requirements pin the observable properties (ordering of band sizes,
   non-overlap, internal scroll), not the constants.
+
+## Managed-browser evidence status (recorded at archive 2026-09-10)
+
+The standing managed row for this requirement's geometry family is
+`test_no_stage_anchor_overlaps_at_supported_viewports`
+(`web/tests/browser/test_browser_layout.py`), which asserts stage-anchor
+non-overlap at 1440x900 and 1280x720. No dedicated managed row yet (a) grows
+the band with a tall frame (interaction workspace / waiting cards) and asserts
+feed clearance, (b) scrolls the pane host to a last row while the tab bar and
+breadcrumb stay fixed, or (c) bounds the dialogue caption at 1280x720. These
+three new scenarios were verified live in the dock-layout repair round; their
+managed-row coverage is the requirement's open evidence gap and should be
+closed by a future browser-suite change rather than retrofitted here.

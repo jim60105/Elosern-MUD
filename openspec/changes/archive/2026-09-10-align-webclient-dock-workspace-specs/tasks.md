@@ -34,14 +34,22 @@
 
 ## 2. Sync obligations at archive time
 
-- [ ] 2.1 Sync both delta specs into `openspec/specs/` and re-run
+- [x] 2.1 Sync both delta specs into `openspec/specs/` and re-run
   `uv run --locked python -m tools.spec_traceability list` — the modified
   requirements keep their existing slugs, so no annotation churn is expected;
   confirm with `uv run --locked python -m tools.spec_traceability check`.
-- [ ] 2.2 Confirm the managed browser geometry rows (feed/dock non-overlap,
+  Synced 2026-09-10: both MODIFIED requirements spliced verbatim into
+  `openspec/specs/`; `list` and `check` both exit 0 with no annotation churn.
+- [x] 2.2 Confirm the managed browser geometry rows (feed/dock non-overlap,
   scroll-reachable last option) exist for the new shell scenarios; if a row is
   genuinely missing, note it in the archive proposal as the requirement's
   evidence gap rather than shipping a fake test.
+  Assessed at archive 2026-09-10 — partial coverage, recorded as an evidence
+  gap in proposal.md ("Managed-browser evidence status"). The standing row is
+  `test_no_stage_anchor_overlaps_at_supported_viewports`
+  (web/tests/browser/test_browser_layout.py), which asserts stage-anchor
+  non-overlap at both viewports; no managed row yet grows the band with a
+  tall frame, scrolls the pane to a last row, or bounds the dialogue caption.
 
 ## 3. Verification
 
@@ -55,4 +63,5 @@
   across the two layout files). Per the archive-time row-mapping obligation in
   2.2, these are presentation/contract regressions, not the geometry proof for
   the new scenarios — the live-browser rows remain the evidence owner.
-- [ ] 3.3 At archive time: `openspec validate --all --strict`.
+- [x] 3.3 At archive time: `openspec validate --all --strict`.
+  Passes (exit 0) after the 2.1 sync, immediately before archiving 2026-09-10.
