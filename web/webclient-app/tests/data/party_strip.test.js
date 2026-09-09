@@ -132,6 +132,8 @@ describe("PartyStrip (left-HUD companion quickbar)", () => {
 
     const img = w.get('[data-testid="party-strip__slot-101"] img');
     expect(img.attributes("src")).toBe("/media/portraits/reina.png");
+    // The catalog rect {x: 0.25, y: 0.06, w: 0.5, h: 0.5} centers at (50%, 31%).
+    expect(img.element.style.objectPosition).toBe("50% 31%");
   });
 
   it("renders four dashed invite cells and 0 / 4 for an empty party", () => {

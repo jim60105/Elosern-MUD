@@ -18,9 +18,9 @@ export default {
     docs: {
       description: {
         component:
-          "The bounded rest-duration form: a div-based keyboard input (not a " +
-          "real <input>) collecting a 1..max seconds value. The browser only " +
-          "collects the value; the server parses and validates it. Slash while " +
+          "The bounded duration form collects hours using a native numeric " +
+          "input and converts them to bounded integer seconds. The server " +
+          "validates and advances the clock. Slash while " +
           "open never toggles the command drawer.",
       },
     },
@@ -34,5 +34,5 @@ export const DefaultCap = {
 
 export const SmallCap = {
   render: renderForm,
-  args: { max: 60 },
+  args: { max: 3600 },
 };

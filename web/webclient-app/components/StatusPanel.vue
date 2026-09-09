@@ -47,7 +47,11 @@ const props = defineProps({
 .island-stack {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  color: var(--paper-100);
+  overflow-wrap: anywhere;
   /* The stack root is a transparent container; each child island carries
      the shared island chrome (design D2.1). The anchor's own 9px gap
      separates the islands. `min-height: 0` lets the whole stack compress

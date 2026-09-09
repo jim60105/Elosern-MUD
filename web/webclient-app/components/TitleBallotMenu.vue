@@ -92,7 +92,8 @@ function declineBallot() {
   flex-direction: column;
   gap: var(--sp-3);
   box-sizing: border-box;
-  padding: var(--sp-3) var(--sp-4);
+  min-width: 0;
+  padding: 18px;
   background: var(--panel);
   border: var(--line);
   border-radius: var(--radius);
@@ -101,9 +102,9 @@ function declineBallot() {
 
 .title-ballot__title {
   margin: 0;
-  color: var(--seal-400);
-  font-family: var(--f-display);
-  font-size: 0.95em;
+  color: var(--gold-400);
+  font-family: var(--f-serif);
+  font-size: 18px;
 }
 
 .title-ballot__list {
@@ -119,7 +120,8 @@ function declineBallot() {
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
-  padding: var(--sp-2);
+  padding: 14px;
+  overflow-wrap: anywhere;
   border: var(--line);
   border-radius: var(--radius-sm);
   background: var(--panel-hi);
@@ -129,6 +131,7 @@ function declineBallot() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--sp-2);
 }
 
@@ -140,15 +143,17 @@ function declineBallot() {
 .title-ballot__basis {
   margin: 0;
   color: var(--paper-300);
-  font-size: 0.85em;
+  font-size: 13px;
+  line-height: 1.8;
 }
 
 .title-ballot__accept {
   align-self: auto;
-  padding: 2px var(--sp-2);
+  min-height: 36px;
+  padding: 6px 14px;
   color: var(--paper-50);
   background: transparent;
-  border: 1px solid var(--seal-600);
+  border: 1px solid var(--gold-500);
   border-radius: var(--radius-sm);
   font-family: inherit;
   font-size: 0.85em;
@@ -156,12 +161,13 @@ function declineBallot() {
 }
 
 .title-ballot__accept:hover {
-  background: var(--seal-600);
+  background: var(--gold-glow);
 }
 
 .title-ballot__decline {
   align-self: flex-start;
-  padding: 2px var(--sp-2);
+  min-height: 36px;
+  padding: 6px 14px;
   color: var(--paper-500);
   background: transparent;
   border: 1px dashed var(--ink-700);
@@ -169,5 +175,10 @@ function declineBallot() {
   font-family: inherit;
   font-size: 0.85em;
   cursor: pointer;
+}
+
+.title-ballot button:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: 3px;
 }
 </style>

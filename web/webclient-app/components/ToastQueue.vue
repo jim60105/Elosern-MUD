@@ -40,11 +40,12 @@ defineEmits(["dismiss"]);
           stroke-width="1.8"
           aria-hidden="true"
         >
-          <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" />
+          <path :d="toast.tone === 'crit' ? 'M6 6l12 12M6 18L18 6' : 'M5 13l4 4L19 7'" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
         {{ toast.title }}
       </div>
       <div v-if="toast.sub" class="ts">{{ toast.sub }}</div>
+      <button class="toast__dismiss" type="button" aria-label="關閉通知" @click.stop="$emit('dismiss', toast.id)">×</button>
     </div>
   </div>
 </template>
@@ -57,9 +58,11 @@ defineEmits(["dismiss"]);
    `elosern-toast-in`. */
 .toasts {
   position: fixed;
-  top: 76px;
+  top: calc(var(--header-h) + 12px);
   right: 16px;
-  width: 250px;
+  width: min(320px, calc(100vw - 32px));
+  max-height: calc(100dvh - var(--header-h) - var(--command-line-h) - 24px);
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -67,16 +70,18 @@ defineEmits(["dismiss"]);
   z-index: calc(var(--z-surface-modal) + 100);
 }
 .toast {
+  position: relative;
   background: var(--panel);
   backdrop-filter: blur(8px);
   border: var(--line);
   border-left: 3px solid var(--gold-500);
   border-radius: 9px;
-  padding: 9px 12px;
+  padding: 14px 42px 14px 16px;
   box-shadow: var(--shadow);
   font-size: 12px;
   pointer-events: auto;
   cursor: pointer;
+  overflow-wrap: anywhere;
   animation: elosern-toast-in var(--motion-base) ease;
 }
 .toast .tt {
@@ -88,19 +93,39 @@ defineEmits(["dismiss"]);
   margin-bottom: 2px;
 }
 .toast .tt .ic {
+  flex: none;
+  width: 16px;
+  height: 16px;
   color: var(--gold-400);
 }
 .toast .ts {
-  color: var(--paper-500);
-  font-size: 11px;
+  color: var(--paper-300);
+  font-size: 12px;
+  line-height: 1.6;
 }
 .toast.crit {
   border-left-color: var(--seal-500);
 }
 .toast.crit .tt {
-  color: #f0c8c8;
+  color: var(--crit);
 }
 .toast.crit .tt .ic {
   color: var(--seal-400);
 }
+
+.toast__dismiss {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--paper-300);
+  font-size: 20px;
+  cursor: pointer;
+}
+.toast__dismiss:hover { color: var(--gold-400); background: var(--gold-glow); }
+.toast__dismiss:focus-visible { outline: 2px solid var(--gold-400); }
 </style>

@@ -68,6 +68,9 @@ function onBack() {
 .dock-crumb {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
   gap: 8px;
   flex: none;
   font-size: 12px;
@@ -84,18 +87,23 @@ function onBack() {
   color: var(--paper-300);
   font-size: 18px;
   line-height: 1;
-  padding: 0 6px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
 .dock-crumb__back:hover {
-  color: var(--paper-50);
+  color: var(--gold-400);
+  background: var(--gold-glow);
 }
 
 /* The focused back control: a fill + ring (box-shadow, no layout shift)
    — the same non-color-alone treatment the dock rows use, so the
    non-rendered `back` row keeps a visible focus carrier. */
-.dock-crumb__back--focused {
+.dock-crumb__back--focused,
+.dock-crumb__back:focus-visible {
   background: var(--panel-hi);
   box-shadow: 0 0 0 1px var(--gold-500);
   color: var(--paper-50);

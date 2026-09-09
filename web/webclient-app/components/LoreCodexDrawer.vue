@@ -194,67 +194,95 @@ const selectedEntry = computed(
 </template>
 
 <style scoped>
+/* Drawer-body surface (the drawer chrome pads): the list is one bounded
+   scroll region and the entry card is a gold-headed charcoal group; long
+   titles/values wrap in place, never sideways. */
 .lore-codex-drawer {
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
+  min-width: 0;
   box-sizing: border-box;
-  padding: var(--sp-3) var(--sp-4);
-  background: var(--panel);
-  border: var(--line);
-  border-radius: var(--radius);
   font-family: var(--f-sans);
+  color: var(--paper-100);
 }
 
 .lore-codex-drawer__head {
   display: flex;
   align-items: baseline;
   gap: var(--sp-2);
+  min-width: 0;
 }
 
 .lore-codex-drawer__title {
   margin: 0;
-  font-family: var(--f-display);
-  font-size: 1.05em;
-  letter-spacing: 0.08em;
-  color: var(--paper-100);
+  font-family: var(--f-serif);
+  font-size: 18px;
+  letter-spacing: 0.06em;
+  color: var(--gold-400);
 }
 
 .lore-codex-drawer__sub {
+  min-width: 0;
   font-size: 0.78em;
   color: var(--paper-500);
 }
 
+/* Category pills: the shell's pill chrome, selection in gold. */
 .lore-codex-drawer__strip {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-1);
+  min-width: 0;
 }
 
 .lore-codex-drawer__pill {
-  padding: 3px var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
   color: var(--paper-500);
-  background: none;
-  border: var(--line);
+  background: transparent;
+  border: 1px solid var(--ink-600);
   border-radius: 999px;
-  font-size: 0.82em;
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
   cursor: pointer;
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
+}
+
+.lore-codex-drawer__pill:hover {
+  color: var(--paper-100);
+  border-color: var(--paper-700);
 }
 
 .lore-codex-drawer__pill.on {
-  color: var(--paper-50);
-  border-color: var(--paper-500);
+  color: var(--gold-400);
+  background: var(--gold-glow);
+  border-color: var(--gold-500);
 }
 
 .lore-codex-drawer__pill-count {
-  color: var(--paper-300);
+  color: var(--paper-500);
   font-family: var(--f-mono);
   font-size: 0.9em;
 }
 
+/* The entry list is the scroll region: bounded so a long codex never pushes
+   the card/note out of the drawer. */
 .lore-codex-drawer__entries {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  max-height: min(42vh, 360px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--ink-600) transparent;
+  scrollbar-width: thin;
+  border: var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(130deg, rgba(34, 36, 38, 0.44), rgba(16, 18, 21, 0.75));
+  padding: var(--sp-1) 0;
 }
 
 .lore-codex-drawer__entry {
@@ -262,23 +290,39 @@ const selectedEntry = computed(
   align-items: baseline;
   justify-content: space-between;
   gap: var(--sp-2);
-  padding: var(--sp-1) var(--sp-2);
-  color: var(--paper-200);
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--paper-300);
   background: none;
   border: none;
-  border-bottom: 1px solid var(--ink-800);
-  font-size: 0.9em;
+  border-bottom: 1px solid var(--ink-820);
+  border-left: 2px solid transparent;
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
 }
 
+.lore-codex-drawer__entry:last-child {
+  border-bottom: none;
+}
+
+.lore-codex-drawer__entry:hover {
+  color: var(--paper-50);
+  background: var(--ink-820);
+}
+
+/* Selection carries a gold rail, not just a tint (not color alone). */
 .lore-codex-drawer__entry.on {
   color: var(--paper-50);
-  background: var(--ink-800);
+  background: var(--ink-820);
+  border-left-color: var(--gold-400);
 }
 
 .lore-codex-drawer__entry-title {
   color: inherit;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .lore-codex-drawer__entry-category {
@@ -287,54 +331,68 @@ const selectedEntry = computed(
   font-size: 0.85em;
 }
 
+/* The selected entry's card: gold serif title over mono-styled field rows. */
 .lore-codex-drawer__card {
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
   margin: 0;
-  padding: var(--sp-2) var(--sp-3);
+  min-width: 0;
+  padding: var(--sp-3) var(--sp-4);
   border: var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--ink-900);
+  border-radius: var(--radius);
+  background: linear-gradient(130deg, rgba(34, 36, 38, 0.5), rgba(16, 18, 21, 0.8));
 }
 
 .lore-codex-drawer__card-title {
-  margin-bottom: var(--sp-1);
-  color: var(--paper-100);
-  font-family: var(--f-display);
-  font-size: 0.95em;
-  letter-spacing: 0.06em;
+  margin-bottom: var(--sp-2);
+  padding-bottom: var(--sp-2);
+  border-bottom: var(--line);
+  color: var(--gold-400);
+  font-family: var(--f-serif);
+  font-size: 16px;
+  letter-spacing: 0.05em;
+  overflow-wrap: anywhere;
 }
 
 .lore-codex-drawer__card-field {
   display: flex;
   gap: var(--sp-2);
-  font-size: 0.85em;
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: 1.6;
 }
 
 .lore-codex-drawer__card-field-name {
   flex: none;
-  min-width: 4em;
+  min-width: 4.5em;
   color: var(--paper-500);
 }
 
 .lore-codex-drawer__card-field-value {
   margin: 0;
-  color: var(--paper-200);
+  flex: 1;
+  min-width: 0;
+  color: var(--paper-100);
   white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
 .lore-codex-drawer__empty,
 .lore-codex-drawer__unavailable,
 .lore-codex-drawer__absent {
   margin: 0;
+  padding: var(--sp-2) var(--sp-3);
   color: var(--paper-500);
-  font-size: 0.88em;
+  font-size: var(--text-sm);
+  border: 1px dashed var(--ink-600);
+  border-radius: var(--radius-sm);
 }
 
 .lore-codex-drawer__note {
   margin: 0;
   color: var(--paper-700);
   font-size: 0.75em;
+  line-height: 1.6;
 }
 </style>

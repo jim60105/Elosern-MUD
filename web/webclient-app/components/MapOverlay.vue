@@ -8,7 +8,7 @@
 // The host's focus trap, Escape, and the labelled close control own the
 // surface's behaviour. Actionable adjacent nodes forward a `move` event so
 // the C-wire store can consume the OOB `explore.move` intent.
-import { computed } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import MapLattice from "./MapLattice.vue";
 
 const props = defineProps({
@@ -26,6 +26,26 @@ const emit = defineEmits(["move", "open-map"]);
 // state.
 const available = computed(() => props.localMap.available === true);
 const reasonMessage = computed(() => props.localMap.reason?.message ?? "");
+const body = ref(null);
+const currentNodeId = computed(() =>
+  props.localMap.nodes?.find((node) => node.visibility === "current")?.id,
+);
+
+function revealCurrentNode() {
+  const node = body.value?.querySelector('[data-visibility="current"]');
+  const viewport = node?.closest(".local-map__viewport");
+  if (!node || !viewport || typeof node.scrollIntoView !== "function") return;
+  const bounds = node.getBoundingClientRect();
+  const visible = viewport.getBoundingClientRect();
+  if (bounds.top < visible.top + 20 || bounds.bottom > visible.bottom - 20) {
+    node.scrollIntoView({ block: "center", inline: "nearest" });
+  }
+}
+
+// Recenter only on opening or actual travel; ordinary updates must not
+// interrupt a player scrolling through remembered locations.
+onMounted(revealCurrentNode);
+watch(currentNodeId, revealCurrentNode, { flush: "post" });
 
 // Re-emit LocalMap's move intent ({ exit_ref, destination }) so the C-wire
 // store can consume the OOB explore.move action.
@@ -39,7 +59,7 @@ function handleMove(payload) {
 </script>
 
 <template>
-  <div class="map-overlay-body" data-testid="map-overlay">
+  <div ref="body" class="map-overlay-body" data-testid="map-overlay">
     <p
       v-if="!available"
       class="map-overlay__unavailable"
@@ -48,24 +68,21 @@ function handleMove(payload) {
       {{ reasonMessage }}
     </p>
     <div v-else class="map-overlay__content" data-testid="map-overlay-content">
-      <!-- The shared lattice renderer at the overlay's larger scale: the
-           pitch fills the body's 848px content width for the seed's 3-column
-           lattice (900px host cap − 52px padding), labels truncate later
-           than the island's 4 characters, and markers scale by the same
-           factor so the crowding fix's non-collision geometry carries over.
-           No height cap is passed — the host body's `overflow-y: auto` is
-           the documented fallback for tall, dense payloads (design.md).
-           `overlay-chrome` turns on the draft mapcanvas framing (the dark
-           radial-gradient canvas + rounded ink border, pure CSS) and the
-           teardrop pin anchored inside the lattice SVG above the current
-           marker (webclient-map-01-draft-chrome design D4). -->
+      <div class="map-overlay__guide">
+        <p>點選可通行的相鄰節點，繼續探索。</p>
+        <span>Tab 切換路徑 · Enter 確認移動</span>
+      </div>
+      <!-- Both model-selected layouts use the same renderer. Tall city
+           streets and dense interior graphs stay scrollable at a readable
+           scale instead of shrinking the whole diagram to viewport height. -->
       <MapLattice
         :local-map="localMap"
         :variant="localMap.layoutVariant || 'lattice'"
         :col-pitch="280"
         :row-pitch="212"
         :label-max="10"
-        :marker-scale="4.83"
+        :label-font="14"
+        :marker-scale="2.2"
         :max-width="848"
         :max-height="null"
         :fill-width="true"
@@ -79,6 +96,11 @@ function handleMove(payload) {
 </template>
 
 <style scoped>
+.map-overlay-body {
+  height: 100%;
+  min-height: 360px;
+}
+
 .map-overlay__unavailable {
   margin: 0;
   padding: var(--sp-2) var(--sp-3);
@@ -94,8 +116,53 @@ function handleMove(payload) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* The shared lattice renders its canvas at the body's available width and
-     its state legend below it; a row-direction flex would place the legend
-     beside the full-width canvas. */
+  gap: 20px;
+  height: 100%;
+}
+
+.map-overlay__content :deep(.local-map__viewport--canvas) {
+  flex: 1;
+  min-height: 160px;
+}
+
+.map-overlay__guide {
+  flex: none;
+  order: -2;
+  width: 100%;
+  max-width: 848px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.map-overlay__guide p {
+  margin: 0;
+  color: var(--paper-100);
+  font-family: var(--f-serif);
+}
+
+.map-overlay__guide span {
+  color: var(--paper-300);
+  font-size: 12px;
+}
+
+.map-overlay__content :deep(.local-map__legend) {
+  flex: none;
+  order: -1;
+  width: 100%;
+  max-width: 848px;
+  box-sizing: border-box;
+  padding: 16px;
+  border: var(--line);
+  border-radius: var(--radius);
+  background: var(--ink-900);
+  box-shadow: 0 4px 16px #0006;
+}
+
+.map-overlay__content :deep(.local-map__lattice--canvas) {
+  border-color: var(--gold-500);
+  box-shadow: inset 0 0 60px #0005;
 }
 </style>

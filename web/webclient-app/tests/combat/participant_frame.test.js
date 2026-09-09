@@ -69,6 +69,27 @@ describe("ParticipantFrame (task 6.9)", () => {
     const placeholders = w.findAll('[data-testid="participant-portrait-placeholder"]');
     expect(imgs.length + placeholders.length).toBeGreaterThan(0);
   });
+
+  it("offsets the resolved portrait crop by the catalog face rect", () => {
+    const w = mountFrame(participants, artPanel);
+    // 小美 resolves portrait_mei, whose rect centers at (50%, 31%).
+    const mei = w.findAll("img.participant-frame__portrait")[0];
+    expect(mei.element.style.objectPosition).toBe("50% 31%");
+  });
+
+  it("offsets foe portraits by the catalog face rect too", () => {
+    const foeFramed = [
+      { identity: "f1", team: "foes", token: "オーク", display_name: "オーク", hp_current: 120, hp_maximum: 120, state: "active", portrait_ref: "portrait_ork" },
+    ];
+    const foePanel = {
+      portrait_catalog: {
+        portrait_ork: { url: "/art/defaults/monster_anon.webp", placeholder: null, face_rect: { x: 0.35, y: 0.12, w: 0.4, h: 0.4 } },
+      },
+    };
+    const w = mountFrame(foeFramed, foePanel);
+    const img = w.get("img.participant-frame__portrait");
+    expect(img.element.style.objectPosition).toBe("55% 32%");
+  });
 });
 
 describe("skill frame server order + single-sub-group skip (task 6.9)", () => {

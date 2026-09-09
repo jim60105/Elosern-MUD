@@ -332,6 +332,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreDockFocus });
 
     <!-- The header split (design D5): the top-left brand element and the
          top-right meta pill, both anchored in the stage's top band. -->
+    <slot name="navigation" />
     <TopBar
       :connected="connected"
       :location-label="locationLabel"

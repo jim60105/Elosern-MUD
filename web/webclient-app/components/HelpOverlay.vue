@@ -43,31 +43,36 @@ const controlSection = controlsReferenceSection();
 }
 
 .help-controls {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .help-controls__title {
+  grid-column: 1 / -1;
   margin: 0;
-  font-family: var(--f-display);
-  font-size: var(--text-dialog);
+  padding-bottom: 16px;
+  border-bottom: var(--line);
+  font-family: var(--f-serif);
+  font-size: 24px;
   color: var(--gold-400);
 }
 
 .help-controls__row {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  grid-template-columns: minmax(60px, max-content) minmax(0, 1fr);
   gap: var(--sp-2) var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
+  padding: 20px;
   border: var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
+  background: var(--panel);
+  overflow-wrap: anywhere;
 }
 
 .help-controls__key {
   grid-row: span 2;
   padding: 2px var(--sp-2);
-  color: var(--paper-50);
+  color: var(--gold-400);
   background: var(--panel-hi);
   border: var(--line);
   border-radius: var(--radius-sm);
@@ -87,16 +92,23 @@ const controlSection = controlsReferenceSection();
   grid-column: 2;
   font-family: var(--f-sans);
   font-size: var(--text-sm);
-  color: var(--paper-500);
+  color: var(--paper-300);
+  line-height: 1.8;
 }
 
 .help-controls__gamehelp {
+  grid-column: 1 / -1;
   margin: 0;
-  padding: var(--sp-2) var(--sp-3);
+  padding: 16px 20px;
   color: var(--paper-300);
   background: var(--panel-hi);
   border: var(--line);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
+  line-height: 1.8;
+}
+
+@media (max-width: 850px) {
+  .help-controls { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

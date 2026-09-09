@@ -41,8 +41,15 @@ import PartyStrip from "./components/PartyStrip.vue";
 import PartyDrawer from "./components/PartyDrawer.vue";
 import { dialogueViewModel } from "./stores/dialogue-view.js";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
+import DesktopNavigation from "./components/DesktopNavigation.vue";
+import ReferenceArtwork from "./components/ReferenceArtwork.vue";
+import { portraitFor, portraitGlyph } from "./components/party-helpers.js";
+import { faceObjectPosition } from "./components/face-rect.js";
 
 const store = useElosernStore();
+const currentPortrait = computed(
+  () => store.view.rosterCharacters?.find((character) => character.current)?.portrait ?? null,
+);
 
 // The shell instance handle (H5, design D1/D6): the store-driven freeform
 // dialogue entry point (a freeform affordance) requests command-line field
@@ -394,13 +401,25 @@ const dockItems = computed(() => {
 // dock's tab bar + pane render from one commit; the pane host (DockMenu)
 // re-derives the same kind internally for its row variants.
 const dockPaneKind = computed(() => classifyPane({ items: dockItems.value }));
+const interactionOpen = computed(() =>
+  ["exploration.interact", "exploration.target", "exploration.keywords"].includes(store.view.dockSource),
+);
+const interactionTarget = computed(() => interactionOpen.value ? store.view.combatMenu?.target : null);
+const interactionChoices = computed(() => store.explorationInteract.map((target) => ({
+  ...target,
+  portrait: portraitFor(panel("art"), target.portrait_ref),
+})));
 
-// H3 (task 3.2): the root frame's items (the stable hierarchical root or the
-// combat root) normalized for the dock's tab bar — the tab bar renders these
-// while the pane follows the current frame, both from one commit.
-const rootItems = computed(() => {
-  const menu = store.view.rootMenu;
-  const items = (menu && menu.items) || [];
+function onInteractionTarget(identity) {
+  if (identity === interactionTarget.value?.identity) return;
+  store.tabToRootAndConfirm("interact", "pointer");
+  if (store.focusItemByKey(`target-${identity}`)) {
+    store.focusConfirm("pointer");
+  }
+}
+
+// Normalize the committed top navigation and action-root entries identically.
+function normalizeRootItems(items) {
   return items.map((item) => {
     const normalized = {
       key: item.key,
@@ -422,13 +441,21 @@ const rootItems = computed(() => {
     }
     return normalized;
   });
-});
+}
+const rootItems = computed(() => normalizeRootItems(store.view.rootMenu?.items || []));
+const navigationItems = computed(() => normalizeRootItems(store.view.navigationItems));
 
 // H3 (task 4.5): a non-current tab click pops to the root frame, focuses the
 // tab's item, and confirms it ("pointer") — one deliberate activation, no
 // stray `ui_action`. Bounded by `router.depth()`.
 function onTabClick(key) {
   store.tabToRootAndConfirm(key, "pointer");
+}
+
+function onNavigateHome() {
+  if (store.view.hudDrawer) store.closeHudDrawer({ popFrame: true });
+  store.resetFramesToRoot();
+  shellRef.value?.restoreDockFocus();
 }
 
 // H3 (task 4.6): the crumb's back chevron pops exactly one router level —
@@ -507,6 +534,28 @@ const servicesConfirm = computed(() => {
 // `explore.wait` rest item (the legacy `openRestForm` behavior).
 const restFormOpen = ref(false);
 const restFormError = ref(null);
+const practiceRequest = ref(null);
+const practiceOpen = ref(false);
+watch([() => store.view.epoch, () => store.view.generation], () => {
+  practiceRequest.value = null;
+});
+const practiceFeedback = computed(() => {
+  const result = store.view.lastActionResult;
+  return result?.requestId === practiceRequest.value ? result?.message : "";
+});
+function onPractice(payload) {
+  practiceRequest.value = dispatchIntent("explore.practice", payload);
+}
+const waitOpen = computed(() => store.view.dockSource === "exploration.wait");
+watch(waitOpen, (open) => {
+  if (!open) restFormOpen.value = false;
+});
+const skipDisabled = computed(() => !store.view.connected || store.view.phase !== "active"
+  || store.view.mode !== "exploration" || store.view.mutationsLocked || !!store.view.dispatch?.inFlight);
+function activateWait(key) {
+  store.focusItemByKey(key);
+  store.focusConfirm("pointer");
+}
 // webclient-action-feedback (busy-drop feedback): dispatchAction returns null
 // when the single-writer gate refuses the dispatch (an in-flight action, a
 // locked mutation phase, or a disconnected session). Surfaces that fire and
@@ -515,9 +564,11 @@ const restFormError = ref(null);
 // visible busy toast at the client boundary instead of dropping it silently.
 // Return-bearing seams (the concept apply) keep calling the store directly.
 function dispatchIntent(actionId, payload, display) {
-  if (store.dispatchAction(actionId, payload, display) === null) {
+  const request = store.dispatchAction(actionId, payload, display);
+  if (request === null) {
     store.pushToast({ title: "目前無法執行此操作，請稍後再試。", tone: "info" });
   }
+  return request;
 }
 
 function onRestFormSubmit(seconds) {
@@ -530,6 +581,7 @@ function onRestFormSubmit(seconds) {
 
 function onRestFormClose() {
   restFormOpen.value = false;
+  document.querySelector(".action-dock")?.focus();
 }
 
 function onRestFormError(message) {
@@ -874,12 +926,28 @@ onMounted(() => {
         @switch-character="onSwitchCharacter"
         @create-character="onCreateCharacter"
       >
+        <template #navigation>
+          <DesktopNavigation
+            :mode="store.view.mode"
+            :items="navigationItems"
+            :drawer="store.view.hudDrawer"
+            @navigate="onTabClick"
+            @overlay="onOpenOverlay"
+            @home="onNavigateHome"
+          />
+        </template>
         <!-- The scene backdrop is the lowest stage layer (design D3/D8):
              it renders the committed `art` panel's scene truthfully — the
              done image, the dimmed prior image, or the mode gradient with a
              truthful placeholder. -->
         <template #backdrop>
           <SceneBackdrop ref="sceneBackdropRef" :art="panel('art') || {}" :mode="store.view.mode || 'exploration'" />
+          <ReferenceArtwork v-if="store.view.mode !== 'creation'" :portrait="currentPortrait" class="stage-portrait" />
+          <div v-if="store.view.mode !== 'creation'" class="scene-heading">
+            <span class="scene-heading__eyebrow">{{ store.view.mode === "combat" ? "戰鬥" : "探索伊洛瑟恩" }}</span>
+            <h1>{{ store.view.statusSlice.locationLabel }}</h1>
+            <p>{{ store.view.statusSlice.timeLabel }}</p>
+          </div>
         </template>
         <template #panel-left>
         <StatusPanel
@@ -955,18 +1023,69 @@ onMounted(() => {
           @tab-click="onTabClick"
           @back="onDockBack"
         >
-          <div class="dock-pane-host">
+          <div
+            class="dock-pane-host"
+            :class="{ 'interaction-workspace': interactionOpen, 'interaction-workspace--selected': !!interactionTarget }"
+          >
+            <section v-if="waitOpen" class="waiting-screen" aria-label="等待與休息">
+              <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-dawn' }">
+                <h3>等待直到黎明</h3>
+                <p>等待下一次天亮，再展開旅程。</p>
+                <button type="button" :disabled="skipDisabled" @keydown.enter.stop @keydown.space.stop @click="activateWait('wait-dawn')">等待直到黎明</button>
+              </article>
+              <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-sleep' }">
+                <h3>睡眠至完全恢復</h3>
+                <p>依目前恢復速度睡眠，實際時長由伺服器決定，受睡眠上限限制。</p>
+                <button type="button" :disabled="skipDisabled" @keydown.enter.stop @keydown.space.stop @click="activateWait('wait-sleep')">開始睡眠</button>
+              </article>
+              <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-rest' }">
+                <h3>休息 N 小時</h3>
+                <RestForm :autofocus="restFormOpen" :disabled="skipDisabled" @submit="onRestFormSubmit" @close="onRestFormClose" @error="onRestFormError" />
+              </article>
+              <button type="button" class="waiting-back" @keydown.enter.stop @keydown.space.stop @click="onDockBack">返回上一層</button>
+            </section>
+            <section v-if="interactionTarget" class="interaction-targets" aria-label="互動對象">
+              <h3 class="interaction-heading"><span>1</span>選擇互動對象</h3>
+              <div class="interaction-target-grid">
+                <button
+                  v-for="target in interactionChoices"
+                  :key="target.identity"
+                  type="button"
+                  class="interaction-target"
+                  :aria-pressed="target.identity === interactionTarget.identity"
+                  :disabled="!target.affordances.length"
+                  @keydown.enter.stop
+                  @keydown.space.stop
+                  @click="onInteractionTarget(target.identity)"
+                >
+                  <span class="interaction-avatar" aria-hidden="true">
+                    <img v-if="target.portrait" :src="target.portrait.url" :style="{ objectPosition: faceObjectPosition(target.portrait.face_rect) }" alt="" />
+                    <span v-else>{{ portraitGlyph(target.display_name) }}</span>
+                  </span>
+                  <span>{{ target.display_name }}</span>
+                </button>
+              </div>
+            </section>
+            <h3 v-if="interactionOpen" class="interaction-heading interaction-heading--active">
+              <span>{{ interactionTarget ? "2" : "1" }}</span>
+              {{ interactionTarget ? "選擇對話或行動" : "選擇互動對象" }}
+            </h3>
+            <section v-if="interactionOpen && !interactionTarget" class="interaction-prompt">
+              <h3 class="interaction-heading"><span>2</span>選擇對話或行動</h3>
+              <p>先選擇左側的對象，即可查看可用的互動。</p>
+            </section>
              <DockMenu
-               v-if="dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain' && !store.view.degradedRoot) && !drawerHostsServiceFrame"
+               v-if="!waitOpen && dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain' && !store.view.degradedRoot) && !drawerHostsServiceFrame"
                :items="dockItems"
               :focused-key="store.view.focus.key"
               :id-prefix="rowPrefix"
               :detail-test-id="detailTestId"
-              :show-detail="showDetail"
+              :show-detail="showDetail && !interactionOpen"
               :detail-message="restFormError"
               :grid-cols="store.view.combatMenu ? store.view.combatMenu.gridCols : null"
               :depth="store.view.dockDepth"
               :view="store.view"
+              :art-panel="panel('art')"
               :target-name="store.view.combatMenu ? store.view.combatMenu.title : null"
               :hide-generic-detail="!!store.view.focusedSkill"
               @focus-change="onDockFocusChange"
@@ -982,7 +1101,7 @@ onMounted(() => {
               @choose-shorthand="(p) => store.chooseShorthand(p.shorthand)"
             />
           </div>
-          <RestForm v-if="restFormOpen" @submit="onRestFormSubmit" @close="onRestFormClose" @error="onRestFormError" />
+          <RestForm v-if="restFormOpen && !waitOpen" :disabled="skipDisabled" @submit="onRestFormSubmit" @close="onRestFormClose" @error="onRestFormError" />
           <div v-if="servicesConfirm" class="services-confirm">
             <div class="services-confirm-title" data-testid="services-confirm-title">
               {{ servicesConfirm.label }}
@@ -999,14 +1118,19 @@ onMounted(() => {
     <HudDrawer
       v-if="store.view.hudDrawer"
       :open="true"
-      :title="drawerTitle"
+      :title="practiceOpen && store.view.hudDrawer === 'skill' ? '修煉' : drawerTitle"
       :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : (store.view.hudDrawer === 'party' ? `${(store.partySlots || []).length} / 4` : ''))"
       :icon="store.view.hudDrawer === 'inventory' ? 'inventory' : (store.view.hudDrawer === 'skill' ? 'skills' : (store.view.hudDrawer === 'party' ? 'party' : null))"
       :drawer-key="store.view.hudDrawer"
       :body-class="drawerHostsServiceFrame ? 'hud-drawer__body--dock' : ''"
       @close="onHudDrawerClose"
     >
-      <SkillBook v-if="store.view.hudDrawer === 'skill'" :skills="panel('character') || {}" />
+      <template #art>
+        <ReferenceArtwork
+          :portrait="store.view.hudDrawer === 'quest' ? null : currentPortrait"
+        />
+      </template>
+      <SkillBook v-if="store.view.hudDrawer === 'skill'" :skills="panel('character') || {}" :practice-disabled="skipDisabled" :practice-feedback="practiceFeedback" @practice="onPractice" @practice-view="(open) => practiceOpen = open" />
       <InventoryPanel
         v-else-if="store.view.hudDrawer === 'inventory'"
         :services="panel('services') || {}"
@@ -1101,7 +1225,7 @@ onMounted(() => {
       <!-- The cast-syntax footer hint is skill-drawer-only: a conditional
            named slot means the other five drawers provide no `foot` slot, so
            `HudDrawer` renders no footer for them. -->
-      <template v-if="store.view.hudDrawer === 'skill'" #foot>
+      <template v-if="store.view.hudDrawer === 'skill' && !practiceOpen" #foot>
         <p class="hud-drawer__cast-hint" data-testid="skill-book-cast-hint">{{ SKILL_CAST_HINT }}</p>
       </template>
     </HudDrawer>

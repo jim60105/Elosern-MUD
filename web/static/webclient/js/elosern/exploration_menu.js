@@ -198,47 +198,26 @@
   function waitItems() {
     var items = [
       {
-        key: "wait-midnight",
-        label: "等待至午夜",
-        enabled: true,
-        actionId: "explore.wait",
-        payload: { daypart: "midnight" },
-      },
-      {
         key: "wait-dawn",
-        label: "等待至黎明",
+        label: "等待直到黎明",
         enabled: true,
         actionId: "explore.wait",
         payload: { daypart: "dawn" },
       },
       {
-        key: "wait-noon",
-        label: "等待至正午",
+        key: "wait-sleep",
+        label: "睡眠至完全恢復",
         enabled: true,
         actionId: "explore.wait",
-        payload: { daypart: "noon" },
-      },
-      {
-        key: "wait-dusk",
-        label: "等待至黃昏",
-        enabled: true,
-        actionId: "explore.wait",
-        payload: { daypart: "dusk" },
+        payload: { sleep: true },
       },
       {
         key: "wait-rest",
-        label: "休息一段時間（自訂秒數）",
+        label: "休息 N 小時",
         enabled: true,
         actionId: null,
         payload: null,
         openRestForm: true,
-      },
-      {
-        key: "wait-sleep",
-        label: "睡眠至恢復",
-        enabled: true,
-        actionId: "explore.wait",
-        payload: { sleep: true },
       },
     ];
     items.push(backItem());

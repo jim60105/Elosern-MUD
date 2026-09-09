@@ -47,6 +47,7 @@ defineEmits(["jump"]);
   z-index: 5;
   float: right;
   width: fit-content;
+  max-width: calc(100% - 32px);
   margin: var(--sp-2) var(--sp-4) 0;
   pointer-events: none;
 }
@@ -64,15 +65,21 @@ defineEmits(["jump"]);
   font-family: var(--f-sans);
   font-size: var(--text-sm);
   color: var(--paper-50);
-  background: var(--seal-600);
-  border: 1px solid var(--seal-400);
+  background: var(--ink-820);
+  border: 1px solid var(--gold-500);
   border-radius: 999px;
-  padding: 4px var(--sp-3);
+  min-height: 36px;
+  padding: 6px 16px;
   cursor: pointer;
   box-shadow: var(--shadow);
 }
 
 .narrative-unread-button:hover {
-  background: var(--seal-500);
+  background: var(--gold-glow);
+}
+
+.narrative-unread-button:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: 2px;
 }
 </style>

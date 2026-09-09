@@ -103,8 +103,10 @@ function activate() {
   align-items: flex-start;
   gap: 11px;
   box-sizing: border-box;
-  max-width: 16rem;
-  padding: 11px 13px;
+  min-width: 0;
+  width: 100%;
+  padding: 14px;
+  overflow-wrap: anywhere;
   color: var(--paper-100);
   background: linear-gradient(180deg, var(--panel-hi), var(--panel));
   border: 1px solid var(--ink-600);
@@ -114,13 +116,12 @@ function activate() {
   line-height: 1.5;
   text-align: left;
   cursor: pointer;
-  transition: all 0.12s;
+  transition: border-color var(--motion-fast), background var(--motion-fast);
 }
 
 .option-card:hover,
 .option-card:focus-visible {
   border-color: var(--gold-500);
-  transform: translateY(-2px);
   box-shadow: var(--shadow);
 }
 
@@ -131,13 +132,14 @@ function activate() {
   display: grid;
   place-items: center;
   border-radius: 8px;
-  background: rgba(207, 68, 68, 0.13);
-  border: 1px solid rgba(207, 68, 68, 0.4);
+  background: var(--gold-glow);
+  border: 1px solid var(--gold-500);
+  color: var(--gold-400);
 }
 
 .option-card-freeform .option-card-glyph {
-  background: rgba(203, 161, 53, 0.13);
-  border-color: rgba(203, 161, 53, 0.4);
+  background: var(--panel-hi);
+  border-style: dashed;
 }
 
 .option-card--focused {
@@ -150,14 +152,19 @@ function activate() {
   font-size: 14px;
   color: var(--paper-50);
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.5;
 }
 
 .option-card-hint {
   display: block;
-  font-size: 11px;
-  color: var(--paper-500);
+  font-size: 12px;
+  color: var(--paper-300);
   margin-top: 4px;
-  line-height: 1.35;
+  line-height: 1.6;
+}
+
+.option-card:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: -3px;
 }
 </style>

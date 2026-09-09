@@ -73,6 +73,7 @@ div {
 /* No javascript warning */
 #connecting {
     position: absolute;
+    box-sizing: border-box;
     width: 100%;
-    padding: .5em .9em
+    padding: .5em .9em;
 }

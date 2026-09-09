@@ -84,11 +84,12 @@ def build_production_action_registry() -> ActionRegistry:
     the six creation adapters (``creation.preset``, ``creation.custom``,
     ``creation.concept``, ``creation.roll_name``, ``creation.activate``,
     ``creation.reset``), and the
-    twelve exploration adapters (``explore.move``, ``explore.look``,
+    thirteen exploration adapters (``explore.move``, ``explore.look``,
     ``explore.talk_scripted``, ``explore.talk_freeform``,
     ``explore.dialogue_leave``, ``explore.party_invite``,
     ``explore.party_leave``, ``explore.engage``, ``explore.wait``,
-    ``explore.possess``, ``explore.possess_release``, ``explore.deliver``), the two
+    ``explore.practice``, ``explore.possess``, ``explore.possess_release``,
+    ``explore.deliver``), the two
     title ballot adapters (``title.accept``, ``title.decline``), the two
     account adapters (``account.character.switch``, ``account.character.create``), and the
     ``options.dismiss`` action. Each action
@@ -140,6 +141,7 @@ def build_production_action_registry() -> ActionRegistry:
         _talk_freeform_adapter,
         _talk_scripted_adapter,
         _wait_adapter,
+        _practice_adapter,
         validate_engage_payload,
         validate_deliver_payload,
         validate_dialogue_leave_payload,
@@ -152,6 +154,7 @@ def build_production_action_registry() -> ActionRegistry:
         validate_talk_freeform_payload,
         validate_talk_scripted_payload,
         validate_wait_payload,
+        validate_practice_payload,
     )
     from web.webclient.actions.options import (
         _dismiss_adapter,
@@ -437,6 +440,14 @@ def build_production_action_registry() -> ActionRegistry:
             adapter=_wait_adapter,
             # No affected panels: a clock skip changes header, status, shop
             # hours, and quest deadlines together (design D7).
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.practice",
+            validate_payload=validate_practice_payload,
+            adapter=_practice_adapter,
             affected_panels=(),
         )
     )

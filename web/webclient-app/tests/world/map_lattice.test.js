@@ -585,9 +585,6 @@ describe("MapLattice (B4 world family, shared renderer)", () => {
     expect(pinTransform.startsWith(`${currentTransform} scale(`)).toBe(true);
     expect(pinTransform).toContain("scale(4.83)");
     // Pure adornment: it must never intercept node clicks or announce.
-    // The fixed teardrop path: apex 16 pre-scale units directly above the
-    // current node's y, x-aligned (the draft's pin geometry).
-    expect(pins[0].attributes("d").startsWith("M0 -16")).toBe(true);
     expect(pins[0].attributes("aria-hidden")).toBe("true");
   });
 

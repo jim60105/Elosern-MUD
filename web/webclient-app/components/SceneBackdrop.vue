@@ -217,6 +217,8 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
     :data-scene-status="scene?.status ?? 'none'"
     :style="{ background: stageGradient }"
   >
+    <div v-if="showPlaceholder && mode !== 'creation'" class="scene-backdrop__sample" aria-hidden="true"></div>
+    <p v-if="showPlaceholder && mode !== 'creation'" class="scene-backdrop__sample-label">範例場景 · 非目前地點實際圖片</p>
     <img
       v-if="activeImage"
       class="scene-backdrop__image"

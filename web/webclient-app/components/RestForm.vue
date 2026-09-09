@@ -1,117 +1,62 @@
 <script setup>
-// RestForm (C4, webclient-vue-10-wire-views-browser): the keyboard-operable
-// bounded rest-duration form. It mirrors the legacy `exploration-rest-form`
-// surface: a div-based keyboard input (not a real <input>) collecting a
-// 1..max seconds value. The browser collects the value; the server parses
-// and validates it — the browser never advances its own clock.
-//
-// Keyboard isolation (Phase-0 audit §2.3): the form binds a capture-phase
-// keydown listener so the global KeyboardRouter (the C2 bridge's document
-// listener) does not claim the form's digits / Backspace / Escape / Enter /
-// slash keys; a slash while the form is open must never toggle the command
-// drawer (the legacy isEditingRestForm gate).
-import { onBeforeUnmount, onMounted, ref } from "vue";
+// Hours are presentation-only; the action contract remains bounded seconds.
+import { computed, onMounted, ref, watch } from "vue";
 
 const props = defineProps({
-  // The bounded maximum rest seconds (the legacy 43200s = 12h cap).
   max: { type: Number, default: 43200 },
+  autofocus: { type: Boolean, default: true },
+  disabled: { type: Boolean, default: false },
+  label: { type: String, default: "開始休息" },
 });
-
 const emit = defineEmits(["submit", "close", "error"]);
-
-const MAX_DIGITS = 8;
-const raw = ref("");
-
+const raw = ref("1");
+const input = ref(null);
+const error = ref("");
+const maxHours = computed(() => props.max / 3600);
+function focusForm() { input.value?.focus(); }
+onMounted(() => { if (props.autofocus) focusForm(); });
+watch(() => props.autofocus, (value) => { if (value) focusForm(); });
+function submit() {
+  if (props.disabled) return;
+  const hours = Number(raw.value);
+  const seconds = Math.round(hours * 3600);
+  if (!String(raw.value).trim() || !Number.isFinite(hours) || hours < 1 / 3600 || hours > maxHours.value || seconds < 1 || seconds > props.max) {
+    error.value = `請輸入有效時長，最短 1 秒、最長 ${maxHours.value} 小時。`;
+    emit("error", error.value);
+    return;
+  }
+  error.value = "";
+  emit("submit", seconds);
+}
 function onKeyDown(event) {
-  const key = event.key;
-  if (key.length === 1 && key >= "0" && key <= "9") {
+  // Keep native editing and Tab behavior; claim keys before the dock router.
+  event.stopPropagation();
+  if (event.key === "Escape") {
     event.preventDefault();
-    event.stopPropagation();
-    if (raw.value.length < MAX_DIGITS) {
-      raw.value += key;
-    }
-    return;
-  }
-  if (key === "Backspace") {
-    event.preventDefault();
-    event.stopPropagation();
-    raw.value = raw.value.slice(0, -1);
-    return;
-  }
-  if (key === "Escape") {
-    event.preventDefault();
-    event.stopPropagation();
     emit("close");
-    return;
-  }
-  if (key === "Enter") {
-    event.preventDefault();
-    event.stopPropagation();
-    const seconds = parseInt(raw.value, 10);
-    if (!raw.value || !Number.isInteger(seconds) || seconds < 1 || seconds > props.max) {
-      emit("error", `請輸入 1～${props.max} 的有效秒數。`);
-      return;
-    }
-    emit("submit", seconds);
-    raw.value = "";
-    return;
-  }
-  if (key === "/") {
-    // The slash gate: while the rest form is open, a slash is ordinary text
-    // input in an editable control and must never toggle the command drawer.
-    event.preventDefault();
-    event.stopPropagation();
-    return;
   }
 }
-
-function focusForm() {
-  const el = document.querySelector('[data-testid="exploration-rest-form"]');
-  if (el) el.focus();
-}
-
-onMounted(focusForm);
 </script>
 
 <template>
-  <div
-    class="exploration-rest-form"
-    data-testid="exploration-rest-form"
-    tabindex="0"
-    @keydown="onKeyDown"
-  >
-    <div class="exploration-rest-label">
-      休息秒數（1～{{ max }}）：
-    </div>
-    <div class="exploration-rest-value">{{ raw === "" ? "＿" : raw }}</div>
-  </div>
+  <form class="exploration-rest-form" data-testid="exploration-rest-form" novalidate @submit.prevent="submit" @keydown="onKeyDown">
+    <label class="exploration-rest-label">
+      時長（小時）
+      <input ref="input" v-model="raw" type="number" inputmode="decimal" :min="1 / 3600" :max="maxHours" step="any" :disabled="disabled" aria-label="時長（小時）" />
+    </label>
+    <small>最長 {{ maxHours }} 小時，可輸入小數。</small>
+    <p v-if="error" role="alert">{{ error }}</p>
+    <button type="submit" :disabled="disabled">{{ label }}</button>
+  </form>
 </template>
 
 <style scoped>
-.exploration-rest-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  padding: var(--sp-2) var(--sp-3);
-  background: var(--panel-hi);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  font-family: var(--f-sans);
-  font-size: var(--text-sm);
-  color: var(--paper-100);
-}
-
-.exploration-rest-form:focus {
-  outline: 2px solid var(--seal-500);
-  outline-offset: 1px;
-}
-
-.exploration-rest-label {
-  color: var(--paper-500);
-}
-
-.exploration-rest-value {
-  font-family: var(--f-mono, var(--f-sans));
-  color: var(--paper-100);
-}
+.exploration-rest-form { display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--panel-hi); border: var(--line); border-radius: var(--radius-sm); color: var(--paper-100); }
+.exploration-rest-label { display: grid; gap: 8px; color: var(--paper-300); }
+input { width: 100%; box-sizing: border-box; min-width: 0; padding: 8px; color: var(--gold-400); background: #101214; border: 1px solid var(--gold-600); font-size: 20px; }
+button { padding: 10px; color: var(--gold-400); background: var(--gold-glow); border: 1px solid var(--gold-500); border-radius: 4px; cursor: pointer; }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--gold-400); outline-offset: 2px; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+small { color: var(--paper-400); }
+p { margin: 0; color: var(--warn); }
 </style>

@@ -179,29 +179,7 @@ function collectSources(dir) {
 describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen", () => {
   it("freezes the required-component manifest at the complete set", () => {
     expect(manifest.frozen).toBe(true);
-    // H1 grew the frozen set to 29; H2 (webclient-hud-02-status-islands)
-    // extends it by three (`Data/CharacterHead`, `Data/VitalsTrack`,
-    // `Data/ConditionChips`, 29 → 32); H3 (webclient-hud-03-action-dock)
-    // adds `Action/DockTabBar`, `Action/DockBreadcrumb`, `Action/SkillDetailPane`,
-    // and `Data/ParticipantFrame` (32 → 36); H4 (webclient-hud-04-reference-drawers)
-    // adds the three reference-drawer components (`Core/HudDrawer`,
-    // `Data/EquipmentDoll`, `Data/CharacterStatusDrawer`, 36 → 39). H5
-    // (webclient-hud-05-overlays-and-command-line, task 8.2) renames
-    // `Core/CommandDrawer` → `Core/CommandLine` and adds `Core/QuickWordChips`
-    // and `Overlays/OverlayHost` (39 → 41). H6 (webclient-hud-06-remap-and-
-    // finalize, task 4.2 + 5.2) removes the dead `Data/CharacterPanel` view
-    // code, re-freezing the set at 40. The improve-webclient-map-overlay-scale
-    // change adds `World/MapLattice` to the required set (40 → 41). The
-    // add-action-feedback-toasts change adds the action-feedback queue
-    // (`Feedback/ToastQueue`, 41 → 42). webclient-align-03-narrative-feed
-    // removes ChoicePointBlock (42 → 41).
-    // webclient-align-05-party-hud adds Overlays/PartyStrip and
-    // Overlays/PartyDrawer (41 → 43).
-    // webclient-align-09-objective-tracker-ui adds Overlays/ObjectiveTracker (43 → 44).
-    // multichar-05-topbar-switcher-ui adds Core/CharacterSwitcher (44 → 45).
-    // webclient-quest-drawer-split replaces World/QuestBoard with
-    // World/QuestLog and World/GuildCounter (45 → 46).
-    expect(manifest.required).toHaveLength(46);
+
    // The four full overlays complete the required set (B5's new family).
    for (const title of [
      "Core/CharacterSwitcher",

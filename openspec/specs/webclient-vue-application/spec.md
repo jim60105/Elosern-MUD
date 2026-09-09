@@ -29,7 +29,8 @@ The Vue application SHALL render with the approved design system derived from th
 (`docs/design/elosern-redesign/`), and that draft SHALL be the binding reference for **both** the visual
 system and the application's layout and information architecture — its palette, typefaces, and tokens,
 and equally its stage composition, surface anchoring, and mode-gated visibility model. The application
-SHALL render with the ink-night palette and its single seal-red accent, the self-hosted display, serif,
+SHALL render with the ink-night palette, its seal-red accent retained for its semantic roles beside a
+muted-gold navigation, focus, and emphasis accent, the self-hosted display, serif,
 and sans typefaces, and the focus, selection, and motion tokens. Status and health information SHALL
 never be conveyed by color alone (an icon or symbol plus a numeric value or an explicit text label is
 required), SHALL honor `prefers-reduced-motion`, and SHALL remain legible for common color-vision

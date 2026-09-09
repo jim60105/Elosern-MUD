@@ -170,7 +170,8 @@ function nodeMeter(node) {
 .lineage-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 20px;
+  min-width: 0;
 }
 
 .lineage-panel__unavailable,
@@ -182,14 +183,16 @@ function nodeMeter(node) {
 
 .lineage-panel__header {
   margin: 0;
-  font-family: var(--f-display);
-  font-size: var(--text-lg);
+  padding: 0 0 18px;
+  border-bottom: var(--line);
+  font-family: var(--f-serif);
+  font-size: 24px;
   color: var(--gold-400);
 }
 
 .lineage-chain {
   border: var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--panel);
   overflow: hidden;
 }
@@ -197,9 +200,10 @@ function nodeMeter(node) {
 .lineage-chain__head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 12px;
   width: 100%;
-  padding: 10px 14px;
+  padding: 20px;
   color: var(--paper-100);
   background: transparent;
   border: 0;
@@ -209,7 +213,7 @@ function nodeMeter(node) {
 }
 
 .lineage-chain__head:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--gold-glow);
 }
 
 .lineage-chain__head:focus-visible {
@@ -230,8 +234,9 @@ function nodeMeter(node) {
 }
 
 .lineage-chain__label {
-  font-family: var(--f-display);
-  font-size: var(--text-md);
+  overflow-wrap: anywhere;
+  font-family: var(--f-serif);
+  font-size: 18px;
   color: var(--paper-50);
 }
 
@@ -248,8 +253,10 @@ function nodeMeter(node) {
 
 .lineage-chain__meter {
   flex: 1;
-  min-width: 60px;
-  height: 6px;
+  min-width: 100px;
+  max-width: 360px;
+  margin-left: auto;
+  height: 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
@@ -263,16 +270,21 @@ function nodeMeter(node) {
 
 .lineage-chain__nodes {
   margin: 0;
-  padding: 4px 14px 12px 38px;
+  padding: 0 20px 20px 46px;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
 }
 
 .lineage-node {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
+  padding: 14px;
+  border-left: 2px solid var(--gold-500);
+  background: var(--ink-900);
+  overflow-wrap: anywhere;
   gap: 10px;
   font-size: var(--text-sm);
 }
@@ -295,6 +307,8 @@ function nodeMeter(node) {
 }
 
 .lineage-node__prereq {
-  color: var(--seal-400);
+  flex-basis: 100%;
+  color: var(--paper-300);
+  line-height: 1.7;
 }
 </style>

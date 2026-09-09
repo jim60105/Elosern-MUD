@@ -104,15 +104,18 @@ function isDone(row) {
   border: var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 10px 12px;
+  padding: 14px;
   box-sizing: border-box;
 }
 
 .obj .oh {
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  color: var(--paper-500);
-  margin-bottom: 8px;
+  font-family: var(--f-serif);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--gold-400);
+  padding-bottom: 10px;
+  border-bottom: var(--line);
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -122,14 +125,15 @@ function isDone(row) {
   margin-left: auto;
   font-family: var(--f-mono);
   color: var(--gold-400);
+  font-size: 10px;
 }
 
 .obj .row {
   display: flex;
   gap: 9px;
   font-size: 12px;
-  line-height: 1.35;
-  margin-bottom: 7px;
+  line-height: 1.65;
+  margin-bottom: 12px;
   color: var(--paper-100);
 }
 
@@ -168,6 +172,7 @@ function isDone(row) {
 .obj .row-head {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -186,8 +191,8 @@ function isDone(row) {
 }
 
 .obj .dl {
-  font-size: 10px;
-  color: var(--paper-500);
+  font-size: 11px;
+  color: var(--paper-300);
   margin-top: 2px;
   line-height: 1.3;
 }

@@ -34,7 +34,8 @@ const renderOverlayScale = (args) => ({
         colPitch: 280,
         rowPitch: 212,
         labelMax: 10,
-        markerScale: 4.83,
+        labelFont: 14,
+        markerScale: 2.2,
         maxWidth: 848,
         maxHeight: null,
         fillWidth: true,
@@ -97,7 +98,7 @@ export const IslandScaleRadial = {
 };
 
 // Overlay scale: the full-map overlay's larger pitches (280px column /
-// 212px row), 10-char labels, 4.83x markers, fill-width layout at the
+// 212px row), 10-char labels, 2.2x markers, fill-width layout at the
 // 848px body content width. The overlay chrome mirrors MapOverlay.vue: it
 // turns on the mapcanvas framing, the pin, and the marker NAME boxes.
 const overlayOf = (fixture) => {

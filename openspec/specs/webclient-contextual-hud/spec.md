@@ -8,13 +8,12 @@ re-chrome contract: the centred floating dock panel, the root tab bar with truth
 the router-derived breadcrumb, the per-kind row vocabulary, the display-only combat participant
 frame, the bounded skill master-detail, and the two-step destructive confirmation.
 ## Requirements
-
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
 The WebClient SHALL render as a full-bleed stage that fills the viewport, with the scene backdrop as
 the lowest layer, the narrative caption card above it, the HUD islands above that, the action dock
 above those, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed
-by named stage anchors (`hud-left`, `hud-right`, `feed`, `dock`, `command-line`) rather than by fixed
-layout columns, and SHALL NOT be placed inside a scrolling container that can push a required surface
+by named stage anchors (`hud-left`, `hud-right`, `feed`, `dock`, `command-line`) that form the
+reference's left/status, centre/scene, and right/context composition, and SHALL NOT be placed inside a page-scrolling container that can push a required surface
 out of view. The dock's reserved height SHALL come from the shared `--dock-h` token, and the narrative
 caption and the right-hand HUD stack SHALL be positioned relative to it so they never overlap it. At
 both 1440x900 and 1280x720 no stage anchor SHALL overlap another anchor's content, and the top band's
@@ -101,7 +100,14 @@ The stage backdrop SHALL render the committed `art` panel's scene: the same-orig
 cover-style cropping when the scene status is `done`; the previously rendered image visibly dimmed and
 labelled `目前場景圖片生成中` when the scene is pending and a prior image exists; and the mode's
 gradient stage otherwise — for a missing, failed, or invalid asset, for a pending scene with no prior
-image, and when the `art` panel is unavailable. The backdrop SHALL NOT present an invented image and
+image, and when the `art` panel is unavailable. A bundled decorative sample MAY accompany this
+fallback only with a visible caption distinguishing it from an actual scene image, while retaining
+the authoritative missing/pending/unavailable label. Samples SHALL NOT enter the art catalog or
+change its status, and SHALL disappear when an actual or labelled prior scene renders.
+Decorative portrait samples SHALL likewise be labelled separately from the current subject;
+an available committed player-roster portrait takes precedence, and a load failure returns to
+an explicitly labelled sample instead of attributing that sample to the player.
+The backdrop SHALL NOT present an invented image as authoritative and
 SHALL NOT present a stale image as current. The scene label, its alternative text, and any truthful
 placeholder label SHALL be rendered as text outside the bitmap, so no required information exists only
 inside an image. The gradient stage SHALL differ per mode (exploration, dialogue, combat) and SHALL
@@ -149,8 +155,7 @@ absolutely positioned within the same full-bleed stage.
 ### Requirement: The narrative is a bounded caption whose complete log is reachable in one action
 The narrative SHALL render as a bounded caption card at the visual centre of the stage, constrained in
 both measure and height so it never grows to fill the stage, drawn with the reference's caption panel
-treatment: panel fill with backdrop blur, hairline border, shared radius and shadow, and the
-reference's vertical hairline rule offset outside the card's left edge. The card SHALL carry a head
+treatment: charcoal panel fill, a hairline border, shared radius and restrained shadow. The card SHALL carry a head
 row styled as the reference's caption head (small uppercase letter-spaced label): on the left, a mode
 label — `敘述` while the committed mode is exploration, `戰鬥日誌` while it is combat, and `對話`
 while it is dialogue — and on the right, a single labelled capsule control that opens a full-log surface presenting the complete
@@ -544,13 +549,10 @@ existing per-node movement submission SHALL be unchanged.
   the island offer a second tab stop beyond its full-map affordance
 
 ### Requirement: The action dock renders as a floating panel in the stage's dock anchor
-The action dock's band SHALL fill the stage's `dock` anchor at full stage width, drawn with the
-stage's panel gradient, a hairline top border, and an upward shadow exactly as
-`docs/design/elosern-redesign/index.html` (the binding visual reference) draws its full-width
-`.dockwrap` band, so no stage background ever shows beside the band at any viewport width. Inside
-the band, the dock content SHALL render as one horizontally centred column bounded to the
-reference's maximum content width, and the combined band-plus-content surface SHALL read as the
-dock surface floating above the scene. Its height SHALL come from the shared `--dock-h` token and
+The action dock SHALL occupy the stage's bounded central `dock` anchor, drawn with a charcoal
+panel gradient, fine border, and restrained shadow. Exploration places it below the narrative;
+combat places it directly above the battle log, beneath the battle scene. Its height SHALL
+come from the shared `--dock-h` token, with a compact root and a larger open-frame state, and
 SHALL NOT grow with its content. The content column SHALL be laid out as a fixed-height tab bar,
 an optional breadcrumb line, and one remaining region that holds the current frame's rows; that
 region SHALL be the surface's only scrolling area, so no dock content is ever pushed outside the
@@ -558,15 +560,13 @@ anchor. The panel SHALL be the same single `#action-dock` element in every mode,
 existing tab index, its `data-mode` attribute and its role as the surface's documented focus
 target, and SHALL NOT be remounted when the mode changes.
 
-The band's background gradient, top border, and shadow SHALL match the values
-`docs/design/elosern-redesign/index.html` draws for its dock surface — the band reads as receding
-into shadow toward its lower edge, not as a lit, tinted card.
+The band SHALL use the current charcoal-and-gold presentation. Selected actions remain
+distinguishable by text and shape as well as their gold or warm-red emphasis.
 
-#### Scenario: The band is full-width with a centred content column
+#### Scenario: The band is bounded to the central content area
 - **WHEN** the shell renders at any viewport width from 1280x720 to 1920x1080 in exploration mode
-- **THEN** the painted band spans the full stage width inside the dock anchor, the content column
-  is centred within the reference's maximum width, and no unpainted stage background appears
-  beside the band
+- **THEN** the painted band fills its dock anchor without covering either side's status/context
+  content or the command line
 
 #### Scenario: An overflowing frame scrolls inside the panel
 - **WHEN** the current frame holds more rows than the dock's row region can display
@@ -921,15 +921,12 @@ without ending the session.
 - **THEN** exactly one forfeit action is emitted carrying the current session identifier
 
 ### Requirement: Reference surfaces render in a right-anchored drawer with one modal contract
-The client's reference surfaces SHALL render inside a drawer anchored to the right edge of the stage,
-its top edge inset from the stage top by one persistent command-line strip height (the
-`--command-line-h` token, the reference's 46px clearance) and its bottom edge at the stage bottom,
-bounded to a width that never exceeds the viewport, drawn on the solid panel background with a left
-border so it reads as a surface laid over the stage rather than a region of it. The drawer SHALL
-enter and leave by a horizontal slide expressed through the shared motion tokens, over a blurred
-scrim that covers the whole stage. Its header, its scrolling body and its optional footer SHALL be
-one column, and the body SHALL be the drawer's only scrolling region. The head SHALL render the
-reference's display type scale: the title in the display face at the reference's 20px scale with
+The client's reference surfaces SHALL render in a wide workspace bounded inside both stage edges,
+below the top navigation and above the persistent command line. A fine border and charcoal
+background SHALL distinguish the workspace from the stage. The existing modal drawer lifecycle
+and shared motion tokens SHALL be retained over a dimmed scrim. Between its header and optional
+footer, a decorative art column MAY accompany the scrolling content body; only the content body
+scrolls. The head SHALL render the title in the display face at the shared workspace scale with
 slight tracking, and the subtitle as the small muted line beside it. A drawer
 MAY declare one leading head icon (a decorative, `aria-hidden` glyph rendered before its title); a
 drawer that declares none renders its title with no icon, unchanged. The drawer's close control SHALL
@@ -947,17 +944,20 @@ The skill-book drawer specifically SHALL carry, whenever the `character` panel i
 subtitle stating its owner's active and passive skill counts (`主動 {n} · 被動 {m}`, computed from that
 same payload `SkillBook` renders) in the drawer head; when the panel is unavailable the subtitle is
 empty, matching the drawer's existing degrade-without-inventing-data contract. The skill-book drawer
-SHALL always carry a footer stating the client's own cast-command syntax
+SHALL carry a footer stating the client's own cast-command syntax
 (`施放入口：cast <技法>[@威力]=<代號>`) as static client-local presentation copy — not a value the OOB
-protocol carries, so its presence does not depend on any panel's availability.
+protocol carries, so its presence does not depend on any panel's availability — whenever the drawer
+presents the skill book itself; while the declared-practice sub-screen replaces the book body, that
+footer is absent and the head title reads 修煉, because the cast syntax belongs to the book view the
+sub-screen replaced.
 
 #### Scenario: A drawer opens over the stage with a scrim
 - **WHEN** the player opens a reference drawer
-- **THEN** the drawer slides in against the right edge, its top edge sits one `--command-line-h` below the stage top and its bottom edge at the stage bottom, over a blurred scrim that covers the whole stage, its body is the only scrolling region, and the stage behind it carries the recession mark
+- **THEN** the workspace is bounded below the navigation and above the command line over a dimmed scrim, its content body is the only scrolling region, and the stage behind it carries the recession mark
 
 #### Scenario: The head carries the reference display type scale
 - **WHEN** a reference drawer renders its head
-- **THEN** the title renders in the display face at the reference's 20px scale with slight tracking and the subtitle renders as the small muted line beside it
+- **THEN** the title renders in the display face with slight tracking and the subtitle renders as the small muted line beside it
 
 #### Scenario: Only one drawer is open at a time
 - **WHEN** a drawer is open and the player opens a different one
@@ -982,29 +982,6 @@ protocol carries, so its presence does not depend on any panel's availability.
 #### Scenario: The skill-book drawer states its skill counts and cast syntax
 - **WHEN** the skill-book drawer opens with the `character` panel available
 - **THEN** its head carries a leading skill glyph and a `主動 {n} · 被動 {m}` subtitle matching the panel's active/passive row counts, its title renders exactly once (not duplicated inside the body), and its footer states the client's `/cast` syntax as static copy
-
-### Requirement: The reference surfaces have no permanently visible home and are reached from the dock
-The skill book, the bag and equipment, the shop, the quest board, the lore reference and the character
-status SHALL each render in exactly one place — its drawer — and SHALL NOT be present in the DOM while
-that drawer is closed. The stage SHALL carry no permanently visible column of reference panels.
-
-Each drawer SHALL be opened either by the dock frame that owns its surface, or by a single labelled
-control inside a drawer that already presents the same read model, or by a surface this capability
-names elsewhere as an opener for it. No reference surface SHALL require more than two actions from the
-dock's root frame to reach. Opening a drawer SHALL NOT change any dock root item, any menu frame, any
-menu key, or the meaning of Escape.
-
-#### Scenario: No reference surface is mounted while the drawers are closed
-- **WHEN** the stage renders in exploration mode with every drawer closed
-- **THEN** no skill book, bag, shop, quest board, lore reference or character-status element exists in the DOM or in the tab order, and no reference column is rendered
-
-#### Scenario: Every reference surface is reachable from the dock
-- **WHEN** the player starts at the dock's root frame
-- **THEN** each of the six reference surfaces is reached in at most two actions, and the narrative caption remains the visual centre of the stage
-
-#### Scenario: An emptied right-hand stack costs nothing
-- **WHEN** the stage renders at 1440x900 and 1280x720 with every drawer closed
-- **THEN** the right-hand HUD anchor renders no reference panel, contributes no visible box and no tab stop, and no stage anchor's rendered box intersects another's
 
 ### Requirement: A drawer hosting a dock frame renders that frame rather than a second navigation model
 When the keyboard router's current frame belongs to a surface that a drawer presents, that drawer
@@ -1038,7 +1015,7 @@ state inside it SHALL be discarded.
 - **THEN** that drawer closes, its local selection, quantity and confirmation state is discarded, and no stale service surface remains reachable
 
 ### Requirement: The bag renders the bounded inventory rows without inventing a total or a rarity
-The bag drawer SHALL use the shared drawer chrome for the `背包 · 裝備` title, local inventory SVG icon, close control, and wallet subtitle formatted as integer copper from the committed available character panel. The wallet SHALL additionally render exactly once in the drawer body as the single row of a `金錢` section. The available body SHALL remain the redesign's unwrapped three-section stack: an `裝備` section carrying the read-only equipment doll, an `物品` section whose heading carries the shipped listing size above the bounded responsive grid, and a `金錢` section carrying the same committed wallet. The listing SHALL remain bounded by the server row ceiling and state that ceiling in words when reached; no shipped count SHALL claim to be the player's untruncated holdings.
+The bag workspace SHALL use shared chrome for the `背包 · 裝備` title, local inventory SVG icon, close control, and wallet subtitle formatted as integer copper from the committed available character panel. The wallet SHALL additionally render exactly once in the body as the single row of a `金錢` section. The available body SHALL present an `裝備` section carrying the read-only equipment doll, an `物品` section whose heading carries the shipped listing size above the bounded responsive grid, a `金錢` section carrying the same committed wallet, and a reserved non-interactive detail column driven by the existing hover/focus selection. The listing SHALL remain bounded by the server row ceiling and state that ceiling in words when reached; no shipped count SHALL claim to be the player's untruncated holdings.
 
 Each registered row's non-null `presentation` SHALL select one local inline SVG by `icon_key`, an item-kind label, rarity label, bounded summary, and non-colour-only rarity treatment. Its tile SHALL show committed held count and a non-colour equipped marker. A null presentation SHALL render only the neutral unknown-item SVG and visible unknown marker; the browser SHALL NOT derive type, icon, rarity, summary, or mechanics from item key or display name. The grid SHALL use native keyboard-focusable buttons and one non-focusable inspector shared by pointer hover and keyboard focus; both inspection paths SHALL expose identical committed name, kind, rarity, count, equipped state, and summary, and the focused tile SHALL reference the stable inspector through `aria-describedby`.
 
@@ -1074,9 +1051,10 @@ The drawer SHALL remain available from its combat affordance when services v3 in
 - **WHEN** mode changes to active combat and services v3 commits canonical inventory
 - **THEN** the combat root's client-local `背包` row opens the frameless bag without dispatch or a router frame, and personal item tiles remain reachable while guild and shop surfaces are absent
 
-#### Scenario: The bag body retains the three-section stack
+#### Scenario: The bag body retains its authoritative sections in a wide workspace
 - **WHEN** the bag is available with inventory, character equipment, and wallet
-- **THEN** it renders equipment, items, and money in order without a bordered panel-card wrapper or invented total
+- **THEN** it renders equipment, items, and money from their existing sources, with a reserved
+  non-interactive item-detail column, and invents no inventory total or additional holdings
 
 #### Scenario: Wallet renders only in the bag head and money row
 - **WHEN** the bag renders with available character and inventory panels
@@ -1749,3 +1727,57 @@ decision point.
   submenus are open
 - **THEN** the stack holds exactly the ordinary exploration root descriptor and no stale submenu
   row remains activatable
+
+### Requirement: The skill book offers a bounded declared-practice sub-screen
+The skill-book drawer SHALL offer a 修煉 affordance on each active skill row the committed
+`character` panel supports, and activating it SHALL replace the book body with a practice
+sub-screen inside the same drawer: the drawer title becomes 修煉, the body lists the panel's
+active skills for selection, and one bounded-duration control starts the practice. The browser
+SHALL compute nothing about eligibility, duration outcome, or progression: every row state comes
+from the committed panel, the duration control reuses the waiting surface's bounded hours form, and
+confirmation SHALL submit exactly one `explore.practice` with the selected `skill` and the
+converted whole `seconds` through the shared dispatch/confirmation lock. While a submission is in
+flight or its declared presentation revision is pending, the control SHALL be disabled. The
+server-authored result line (success summary or rejection message) SHALL render as escaped text
+inside the sub-screen and nowhere else, and closing the sub-screen SHALL restore the book body,
+the original drawer title, and the book's cast-syntax footer.
+
+#### Scenario: Practice dispatches one server-trusted intent
+- **WHEN** the player opens 修煉 from an active skill row, selects the skill, enters `2` hours, and confirms
+- **THEN** exactly one `ui_action` is submitted — `explore.practice` with that `skill` and `seconds: 7200` — and the drawer controls stay locked until the result revision is adopted
+
+#### Scenario: The result line is the server's
+- **WHEN** a practice result arrives
+- **THEN** its Traditional Chinese summary or rejection message renders verbatim as escaped text in the sub-screen, with no client-computed progression, elapsed-time, or eligibility claim
+
+#### Scenario: The practice screen is gated by committed data only
+- **WHEN** the `character` panel is unavailable or a row carries no practice support
+- **THEN** no 修煉 affordance renders for that row and no practice state is invented
+
+#### Scenario: Closing the practice screen restores the book
+- **WHEN** the player closes the practice sub-screen
+- **THEN** the drawer shows the skill book again with its original title and its cast-syntax footer, and no second drawer was opened
+
+### Requirement: The reference surfaces have no permanently visible home and are reached from the top navigation or the dock
+The skill book, the bag and equipment, the shop, the quest board, the lore reference and the character
+status SHALL each render in exactly one place — its drawer — and SHALL NOT be present in the DOM while
+that drawer is closed. The stage SHALL carry no permanently visible column of reference panels.
+
+Each drawer SHALL be opened either by the dock frame that owns its surface, or by a single labelled
+control inside a drawer that already presents the same read model, or by a surface this capability
+names elsewhere as an opener for it. No reference surface SHALL require more than two actions from
+the top navigation bar or the dock's root frame to reach. Opening a drawer SHALL NOT change any dock root item, any menu frame, any
+menu key, or the meaning of Escape.
+
+#### Scenario: No reference surface is mounted while the drawers are closed
+- **WHEN** the stage renders in exploration mode with every drawer closed
+- **THEN** no skill book, bag, shop, quest board, lore reference or character-status element exists in the DOM or in the tab order, and no reference column is rendered
+
+#### Scenario: Every reference surface is reachable from the dock
+- **WHEN** the player starts at the dock's root frame or the top navigation bar
+- **THEN** each of the six reference surfaces is reached in at most two actions, and the narrative caption remains the visual centre of the stage
+
+#### Scenario: An emptied right-hand stack costs nothing
+- **WHEN** the stage renders at 1440x900 and 1280x720 with every drawer closed
+- **THEN** the right-hand HUD anchor renders no reference panel, contributes no visible box and no tab stop, and no stage anchor's rendered box intersects another's
+

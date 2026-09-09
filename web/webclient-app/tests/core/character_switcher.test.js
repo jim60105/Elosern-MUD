@@ -23,6 +23,7 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
         aspect_ratio: "3/4",
         alt: "艾莉亞的肖像",
         placeholder: null,
+        face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
       },
     },
     {
@@ -86,6 +87,18 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
     const img = wrapper.get(".character-switcher__thumb");
     expect(img.attributes("src")).toBe("/art/portraits/char_1.webp");
     expect(img.attributes("alt")).toBe("艾莉亞的肖像");
+  });
+
+  it("offsets portrait crops by the payload face rect in both thumbnails", async () => {
+    wrapper = mount(CharacterSwitcher, {
+      props: { available: true, characters: SAMPLE_CHARACTERS },
+    });
+    // Rect {x: 0.3, y: 0.1, w: 0.4, h: 0.4} centers at (50%, 30%).
+    const thumb = wrapper.get("img.character-switcher__thumb");
+    expect(thumb.element.style.objectPosition).toBe("50% 30%");
+    await wrapper.get('[data-testid="character-switcher-trigger"]').trigger("click");
+    const rowThumb = wrapper.get("img.character-switcher__row-thumb");
+    expect(rowThumb.element.style.objectPosition).toBe("50% 30%");
   });
 
   it("collapsed pill uses placeholder when current character has no url", () => {

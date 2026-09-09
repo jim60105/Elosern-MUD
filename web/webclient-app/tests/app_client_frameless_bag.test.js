@@ -1,9 +1,8 @@
 // make-inventory-drawer-frameless (task 3.4): the composition contract. With
 // the bag drawer open — including after hosted-style navigation — no hosted
 // row container or detail pane renders inside the drawer body while the
-// 商店 drawer still hosts its frame's rows (regression). The 背包 dock row
-// carries no `›` nav chevron (the chevronless 角色 precedent), and each of
-// the three close routes — Escape, the close control, the scrim — restores
+// 商店 drawer still hosts its frame's rows (regression). Each of the
+// three close routes — Escape, the close control, the scrim — restores
 // focus to the 背包 entry that opened it with the router untouched.
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -49,10 +48,15 @@ describe("frameless 背包 drawer (composition contract)", () => {
     expect(result.accepted).toBe(true);
   }
 
-  function openBagFromRow(rowEl) {
-    rowEl.focus();
-    expect(store.focusItemByKey("inventory")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+  function bagButton() {
+    return wrapper.get(".desktop-navigation").findAll("button")
+      .find((button) => button.text() === "背包");
+  }
+
+  async function openBagFromNavigation() {
+    const button = bagButton();
+    button.element.focus();
+    await button.trigger("click");
   }
 
   beforeEach(() => {
@@ -61,16 +65,36 @@ describe("frameless 背包 drawer (composition contract)", () => {
     store.setSender(fx.createFakeSender());
   });
 
+  it("keeps keyboard traversal on visible action tabs after moving reference entries", async () => {
+    mountAppClient();
+    commitPanels();
+    await wrapper.vm.$nextTick();
+    const dock = wrapper.get("#action-dock");
+    expect(dock.findAll('[role="option"]').map((item) => item.text())).toEqual([
+      "移動", "查看", "互動1", "等待/休息", "建議",
+    ]);
+    for (const key of ["move", "look", "interact", "wait", "suggestions"]) {
+      expect(store.view.focus.key).toBe(key);
+      expect(dock.find(`[data-item-key="${key}"][aria-selected="true"]`).exists()).toBe(true);
+      store.focusPress("ArrowRight");
+      await wrapper.vm.$nextTick();
+    }
+    expect(store.view.focus.key).toBe("suggestions");
+    store.focusPress("ArrowLeft");
+    expect(store.view.focus.key).toBe("wait");
+    expect(wrapper.get(".desktop-navigation").text()).toContain("角色狀態");
+    expect(wrapper.get(".desktop-navigation").text()).toContain("任務");
+    expect(wrapper.get(".desktop-navigation").text()).toContain("背包");
+  });
+
   it("opens the bag frameless with no hosted row region and returns focus on every close route", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     commitPanels();
     await wrapper.vm.$nextTick();
 
-    const row = wrapper.get('[data-item-key="inventory"]');
-    // The frameless drawer-open row follows the chevronless 角色 precedent:
-    // the `›` chevron means "opens a deeper frame" and must not render.
-    expect(row.find(".dock-menu__nav-chevron").exists()).toBe(false);
+    const row = bagButton();
+    expect(wrapper.find('#action-dock [data-item-key="inventory"]').exists()).toBe(false);
 
     const routes = {
       "close control": async () => {
@@ -84,7 +108,7 @@ describe("frameless 背包 drawer (composition contract)", () => {
       },
     };
     for (const [name, closeRoute] of Object.entries(routes)) {
-      openBagFromRow(row.element);
+      await openBagFromNavigation();
       await wrapper.vm.$nextTick();
       const drawer = wrapper.get('[data-testid="hud-drawer"]');
       // The bag body is only its own committed-panel stack.
@@ -133,7 +157,7 @@ describe("frameless 背包 drawer (composition contract)", () => {
     expect(store.view.activeSubDock).toBe("services");
     expect(store.router.currentDescriptor().source).toBe("services.shop");
     // The player then escapes the remaining shop levels back to the root
-    // (the bag entry row lives in the root dock).
+    // before opening the bag from the top navigation.
     store.router.popMenu();
     store.router.popMenu();
     await wrapper.vm.$nextTick();
@@ -144,7 +168,7 @@ describe("frameless 背包 drawer (composition contract)", () => {
     // frame may still sit above the popped stack from the store-constructed
     // services root: the contract is that open+close change nothing).
     const depthBeforeBag = store.router.depth();
-    openBagFromRow(wrapper.get('[data-item-key="inventory"]').element);
+    await openBagFromNavigation();
     await wrapper.vm.$nextTick();
     drawer = wrapper.get('[data-testid="hud-drawer"]');
     expect(drawer.find('[data-testid="inventory-panel"]').exists()).toBe(true);

@@ -2,62 +2,65 @@
  * Elosern design-system tokens, extracted from the 設計稿
  * (docs/design/elosern-redesign/index.html, landed by A1).
  *
- * Single source for the ink-night palette, the single seal-red accent,
- * typography ramps, spacing, and motion. Components consume these variables
+ * Single source for the ink-night palette, the seal-red semantic accent
+ * (decisive primary action, danger affordances, selection, status markers)
+ * alongside the muted-gold navigation/focus/emphasis accent, typography
+ * ramps, spacing, and motion. Components consume these variables
  * only; reduced-motion and not-color-only status rules are enforced at the
  * token/utility level so they stay testable (design D5).
  */
 
 :root {
   /* ---- ink night palette ---- */
-  --ink-950: #08070a;
-  --ink-900: #100e12;
-  --ink-860: #151219;
-  --ink-820: #1b1720;
-  --ink-780: #221d29;
-  --ink-700: #2c2634;
-  --ink-600: #3a3344;
-  --panel: rgba(21, 17, 25, 0.78);
-  --panel-solid: #151219;
-  --panel-hi: rgba(43, 36, 52, 0.72);
+  --ink-950: #0b0d10;
+  --ink-900: #101216;
+  --ink-860: #15171b;
+  --ink-820: #1b1d21;
+  --ink-800: #1f2125;
+  --ink-780: #232529;
+  --ink-700: #363638;
+  --ink-600: #55524b;
+  --panel: rgba(15, 17, 21, 0.9);
+  --panel-solid: #121519;
+  --panel-hi: rgba(43, 42, 39, 0.8);
 
   /* ---- warm paper text ---- */
   --paper-50: #f2ecdf;
   --paper-100: #e7e0d1;
-  --paper-300: #c3b9a3;
-  --paper-500: #8d8370;
+  --paper-200: #d8d2c5;
+  --paper-300: #c9c4b9;
+  --paper-400: #bab5ae;
+  --paper-500: #aaa69e;
   --paper-700: #615a4c;
+  --paper-800: #4e483d;
 
-  /* ---- single seal-red accent ---- */
+  /* ---- seal-red semantic accent ---- */
   --seal-400: #e06b6b;
   --seal-500: #cf4444;
   --seal-600: #a9322a;
   --seal-700: #7c2026;
   --seal-glow: rgba(207, 68, 68, 0.32);
 
-  /* ---- gold (focus ring / location) ---- */
-  --gold-400: #e2c06a;
-  --gold-500: #cba135;
-  --gold-glow: rgba(203, 161, 53, 0.3);
+  /* ---- gold (navigation, focus, and emphasis accent) ---- */
+  --gold-300: #eeddb4;
+  --gold-400: #e4c88e;
+  --gold-500: #b99a60;
+  /* One perceptual step below gold-500 on the same hue; dark enough for
+     white button labels to keep a >= 4.5:1 contrast ratio. */
+  --gold-600: #8f713c;
+  --gold-glow: rgba(222, 189, 129, 0.24);
 
-  /* ---- draft map chrome (webclient-map-01-draft-chrome, design D3) ----
-     Draft-specific values the map surfaces need and the tokens above lack.
-     `--seal-deep` is the draft's current-node fill, deliberately distinct
-     from --seal-600 (#a9322a): redefining the global seal ramp would repaint
-     every other surface, so the draft-map pair gets its own tokens.
-     Sources: docs/design/elosern-redesign/index.html `.mini` / `.mapcanvas`
-     island + overlay SVGs and the `maplegend` chips. */
-  --seal-deep: #a52c31; /* draft .mini current-node circle fill */
-  --seal-light: #e06b6b; /* draft current-node stroke + pin stroke */
-  --ink-edge: #3a3344; /* draft node-dot stroke and connector-edge ink */
-  --map-canvas-hi: #1a1420; /* draft .mapcanvas gradient near stop */
-  --map-canvas-lo: #0c0a10; /* draft .mapcanvas gradient far stop / pin fill */
-  /* Node label tiers (draft island labels): current / landmark / visited /
-     unvisited, lightest to faintest. */
-  --map-label-here: #f2ecdf;
-  --map-label-gold: #e2c06a;
-  --map-label-seen: #8d8370;
-  --map-label-far: #615a4c;
+  /* Shared minimap and full-map palette. Current position keeps its red
+     state marker; paths and labels use the shell's charcoal and gold. */
+  --seal-deep: #a52c31;
+  --seal-light: #e06b6b;
+  --ink-edge: #5c5850;
+  --map-canvas-hi: #1e2024;
+  --map-canvas-lo: #0d0f12;
+  --map-label-here: var(--paper-50);
+  --map-label-gold: var(--gold-400);
+  --map-label-seen: #c1b8a6;
+  --map-label-far: #a6a095;
 
   /* ---- vitals & status colors ---- */
   --vit-hp: #e0574f;
@@ -75,6 +78,7 @@
   --f-sans: "Noto Sans TC", "Noto Serif TC", sans-serif;
   --f-mono: ui-monospace, "DejaVu Sans Mono", "JetBrains Mono", "Noto Sans TC", monospace;
   --text-sm: 13px;
+  --text-xs: 11px;
   --text-body: 15px;
    --text-narrative: 15.5px;
    --text-dialog: 16px;
@@ -126,15 +130,19 @@
   --menu-open-filter: brightness(0.5) blur(1.5px);
 
   /* ---- shape & chrome ---- */
-  --radius: 12px;
-  --radius-sm: 8px;
+  --radius: 7px;
+  --radius-sm: 5px;
   --line: 1px solid var(--ink-700);
   --shadow: 0 18px 44px -26px rgba(0, 0, 0, 0.9);
+  --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.95);
    --focus: 0 0 0 2px var(--ink-950), 0 0 0 4px var(--gold-400);
-    --dock-h: clamp(150px, 22vh, 184px);
+    --header-h: 80px;
+    --left-column: clamp(220px, 20vw, 330px);
+    --right-column: clamp(230px, 22vw, 360px);
+    --dock-h: clamp(126px, 17vh, 160px);
     /* The persistent command line's own height (HudFrame's
        [data-anchor="command-line"] rule consumes it). */
-    --command-line-h: 46px;
+    --command-line-h: 64px;
     /* How far above the stage bottom the dock's top edge sits: the dock's own
        height plus the command line beneath it. Every surface positioned above
        the dock derives its offset from this single token, never re-deriving
@@ -314,16 +322,16 @@
 }
 
 .ui-btn--primary {
-  color: #fff;
-  background: linear-gradient(180deg, var(--seal-500), var(--seal-700));
-  border-color: var(--seal-400);
+  color: var(--ink-950);
+  background: linear-gradient(180deg, var(--gold-400), var(--gold-500));
+  border-color: var(--gold-400);
   font-weight: 600;
 }
 
 .ui-btn--primary:hover:enabled {
-  color: #fff;
-  background: linear-gradient(180deg, var(--seal-500), var(--seal-700));
-  border-color: var(--seal-400);
+  color: var(--ink-950);
+  background: linear-gradient(180deg, var(--gold-400), var(--gold-500));
+  border-color: var(--gold-400);
   filter: brightness(1.08);
 }
 
@@ -348,7 +356,7 @@
 .ui-btn--ghost:hover:enabled {
   color: var(--paper-50);
   background: var(--ink-780);
-  border-color: var(--seal-500);
+  border-color: var(--gold-500);
 }
 
 .ui-btn--sm {
@@ -391,7 +399,7 @@
 
 .ui-icon-btn:hover:enabled {
   color: var(--paper-50);
-  border-color: var(--seal-500);
+  border-color: var(--gold-500);
 }
 
 .ui-icon-btn:disabled,
@@ -407,6 +415,7 @@
  */
 .ui-tabs {
   display: inline-flex;
+  flex-wrap: wrap;
   align-self: flex-start;
   gap: var(--sp-1);
   box-sizing: border-box;
@@ -445,12 +454,12 @@
 }
 
 .ui-tabs__tab.is-active {
-  color: var(--paper-50);
-  background: var(--ink-700);
+  color: var(--gold-400);
+  background: var(--gold-glow);
   font-weight: 600;
 }
 
-/* Not color alone (design D5): the selected tab also carries a seal underline,
+/* Not color alone (design D5): the selected tab also carries a gold underline,
    so the selection survives a monochrome or colorblind rendering. */
 .ui-tabs__tab.is-active::after {
   content: "";
@@ -460,7 +469,7 @@
   left: var(--sp-3);
   height: 2px;
   border-radius: 2px;
-  background: var(--seal-500);
+  background: var(--gold-500);
 }
 
 .ui-tabs__tab:disabled {

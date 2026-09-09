@@ -38,7 +38,8 @@ defineEmits({
     data-testid="topbar-title"
     :class="connected ? 'connected' : 'disconnected'"
   >
-    伊洛瑟恩
+    <span class="topbar-wordmark">ELOSERN</span>
+    <span class="topbar-tagline">伊洛瑟恩 · 文字構築的另一個世界</span>
   </div>
   <div class="topbar-right">
     <div

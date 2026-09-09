@@ -198,8 +198,10 @@ describe("H1 preserved DOM contract (design D6)", () => {
     // The listbox composite role on the dock's menu (the preserved focus
     // target the keyboard router keeps using).
     expect(wrapper.find('[role="listbox"]').exists()).toBe(true);
-    // A representative preserved item key on the exploration root frame.
-    expect(wrapper.find('[data-item-key="character"]').exists()).toBe(true);
+    // Keyboard focus remains attached to a visible action, not a moved entry.
+    expect(wrapper.find('[data-item-key="move"]').exists()).toBe(true);
+    expect(wrapper.find('#action-dock [data-item-key="character"]').exists()).toBe(false);
+    expect(wrapper.get(".desktop-navigation").text()).toContain("角色狀態");
     wrapper.unmount();
   });
 

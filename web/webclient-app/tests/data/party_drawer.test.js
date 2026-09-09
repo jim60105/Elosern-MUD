@@ -63,6 +63,17 @@ describe("PartyDrawer (同伴 · 隊伍 drawer)", () => {
     expect(r2.text()).not.toContain("70");
   });
 
+  it("offsets the companion avatar crop by the catalog face rect", () => {
+    const artPanel = {
+      portrait_catalog: {
+        p_reina: { url: "/media/portraits/reina.png", face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 } },
+      },
+    };
+    const w = mountDrawer({ artPanel });
+    const img = w.get('[data-testid="party-drawer__row-101"] img');
+    expect(img.element.style.objectPosition).toBe("50% 30%");
+  });
+
   it("leaving dispatches explore.party_leave through the two-step confirmation contract", async () => {
     const w = mountDrawer();
 

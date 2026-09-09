@@ -79,6 +79,7 @@ function onActivate() {
   gap: var(--sp-1);
   box-sizing: border-box;
   min-width: 0;
+  min-height: 38px;
   padding: var(--sp-2) var(--sp-3);
   color: var(--paper-100);
   background: var(--ink-860);
@@ -88,14 +89,15 @@ function onActivate() {
   font-size: var(--text-sm);
   line-height: 1.4;
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
-/* Focus is a seal-red fill plus a leading glyph, never color alone. */
+/* Focus uses a gold frame plus a leading glyph, never color alone. */
 .dock-menu-item--focused {
-  background: var(--seal-600);
-  border-color: var(--seal-500);
+  background: var(--gold-glow);
+  border-color: var(--gold-500);
   color: var(--paper-50);
   box-shadow: var(--focus);
 }
@@ -128,7 +130,7 @@ function onActivate() {
 }
 
 .dock-menu-item__unavailable {
-  color: var(--paper-700);
+  color: var(--paper-300);
   font-size: 0.85em;
 }
 

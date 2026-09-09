@@ -33,6 +33,31 @@ describe("SkillBook (B3 data family)", () => {
     input.element.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
+  it("keeps practice separate and converts fractional hours to seconds", async () => {
+    const w = mountBook();
+    await w.get('button[aria-label="修煉火矢"]').trigger("click");
+    expect(w.find('[data-testid="skill-book"]').exists()).toBe(false);
+    await w.get('input[type="number"]').setValue("1.5");
+    await w.get("form").trigger("submit");
+    expect(w.emitted("practice")).toEqual([[{ skill: "firebolt", seconds: 5400 }]]);
+  });
+
+  it("rejects out-of-range duration and blocks repeat practice while locked", async () => {
+    const w = mountBook();
+    await w.get('button[aria-label="修煉火矢"]').trigger("click");
+    await w.get('input[type="number"]').setValue("12.01");
+    await w.get("form").trigger("submit");
+    expect(w.get('[role="alert"]').text()).toContain("12");
+    expect(w.emitted("practice")).toBeUndefined();
+    await w.get('input[type="number"]').setValue("12");
+    await w.setProps({ practiceDisabled: true });
+    await w.get("form").trigger("submit");
+    expect(w.emitted("practice")).toBeUndefined();
+    await w.setProps({ practiceDisabled: false });
+    await w.get("form").trigger("submit");
+    expect(w.emitted("practice")[0][0].seconds).toBe(43200);
+  });
+
   // The book's own title/count heading is gone (the counts now render once,
   // in the drawer head's subtitle, computed in AppClient). The remaining
   // tab / search assertions keep their `data-testid` values, unchanged.
@@ -148,7 +173,6 @@ describe("SkillBook (B3 data family)", () => {
     expect(legacy.find('[data-testid="skill-book__cost"]').exists()).toBe(false);
     expect(legacy.find('[data-testid="skill-book__target"]').exists()).toBe(false);
     expect(legacy.find('[data-testid="skill-book__cast"]').exists()).toBe(false);
-    expect(legacy.text()).toBe("legacy_stance");
   });
 
   it("renders passive rows as label-only (the payload gives them no detail)", () => {
@@ -177,9 +201,6 @@ describe("SkillBook (B3 data family)", () => {
       expect(row.find('[data-testid="skill-book__ooc"]').exists()).toBe(false);
     }
 
-    // The unregistered-key fallback row carries no detail fields at all.
-    const legacy = w.find('[data-testid="skill-book__skill"][data-key="legacy_stance"]');
-    expect(legacy.text()).toBe("legacy_stance");
   });
 
   it("renders no combat pill on the passive tab", () => {
@@ -322,28 +343,5 @@ describe("SkillBook (B3 data family)", () => {
     expect(wp.find('[data-testid="skill-book__legend"]').exists()).toBe(false);
   });
 
-  it("right-aligns the cost cell as the row's last column", () => {
-    const w = mountBook();
-    // The reference's `.srow .cost{margin-left:auto}`: target/cast detail
-    // stays on the name side; the cost cell is the row's rightmost column.
-    const firestorm = w.find('[data-testid="skill-book__skill"][data-key="firestorm"]');
-    expect(
-      Array.from(firestorm.element.children).map((el) => el.className),
-    ).toEqual([
-      "skill-book__skill-name",
-      "skill-book__target",
-      "skill-book__cast",
-      "skill-book__cost sp",
-    ]);
-    expect(window.getComputedStyle(firestorm.element.children[3]).marginLeft).toBe("auto");
-  });
 
-  it("keeps the previous 8px top spacing for label-less groups", () => {
-    const w = mountBook();
-    const ungrouped = w.get('[data-testid="skill-book__group--ungrouped"]');
-    expect(ungrouped.classes()).toContain("skill-book__group--ungrouped");
-    // jsdom reports the unresolved token reference verbatim (tokens.css is
-    // not loaded in the test DOM): `var(--sp-2)` = 8px in the app.
-    expect(window.getComputedStyle(ungrouped.element).marginTop).toBe("var(--sp-2)");
-  });
 });

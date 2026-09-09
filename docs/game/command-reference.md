@@ -165,6 +165,14 @@
 | 情境 | 一般 |
 | 說明 | 休息指定的時間（例如 `rest 2h`），推進世界時間並回復生命與體力。可加 `practice <技能>` 宣告修煉（例如 `rest 8h practice fire_arrow`）：已學會、可主動使用且熟練度未見頂的技能，會在時鐘的修煉結算中依每整小時獲得熟練度；若技能不存在、非主動技能、未學會或已見頂，命令會被拒絕且時間完全不推進。未附 practice 子句的一般休息只推進時間，不帶來任何成長。 |
 
+The graphical rest form accepts hours, including fractions, and submits bounded
+integer seconds. The separate practice screen is available from an active skill
+in **角色狀態 → 技能書**. Practice submits `explore.practice` with the selected
+server-provided skill key and duration; the server rechecks ownership, the
+proficiency cap, and skip safety before advancing. Only completed hours award
+practice proficiency. Ordinary rest and sleep never award practice proficiency.
+The text-command syntax above is unchanged.
+
 ### sleep
 
 | 項目 | 內容 |

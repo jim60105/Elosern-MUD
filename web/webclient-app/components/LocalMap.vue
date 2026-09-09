@@ -269,6 +269,9 @@ function onIslandClick(event) {
         <span v-if="showsOrientation" class="local-map__orientation" data-testid="local-map__orientation">
           北↑ 東→
         </span>
+        <svg class="local-map__expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M14 3h7v7M21 3l-7 7M10 21H3v-7M3 21l7-7" />
+        </svg>
       </div>
 
       <!-- Shared lattice renderer (improve-webclient-map-overlay-scale): the
@@ -463,8 +466,9 @@ function onIslandClick(event) {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  font-family: var(--f-serif);
+  font-size: 12px;
+  letter-spacing: 0.04em;
   color: var(--paper-500);
   margin-bottom: 4px;
 }
@@ -482,7 +486,14 @@ function onIslandClick(event) {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: var(--paper-300);
+  color: var(--gold-400);
+}
+
+.local-map__expand-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--gold-400);
 }
 
 /* The renderer-axis orientation legend (北↑): a statement about the
@@ -492,6 +503,7 @@ function onIslandClick(event) {
   flex: none;
   white-space: nowrap;
   font-family: var(--f-mono);
+  font-size: 10px;
   letter-spacing: 0;
   color: var(--gold-400);
 }
@@ -519,10 +531,7 @@ function onIslandClick(event) {
   padding-top: var(--sp-1);
   color: var(--paper-500);
   font-family: var(--f-mono);
-  /* The island's smallest type step — the same 10px the meta row above
-     already uses. The readout is one secondary figure beside a canvas that is
-     the primary content; at 11px it was the LARGEST text in the island, above
-     the card's own title. */
+  /* Coordinates remain secondary to the map and its larger title. */
   font-size: 10px;
   line-height: 1.45;
   text-align: center;
@@ -585,6 +594,10 @@ function onIslandClick(event) {
 }
 
 .local-map :deep(.local-map__lattice) {
+  /* The display:contents viewport adds no stacking box of its own. Keep
+     node hit targets above the island's full-bleed expansion button. */
+  position: relative;
+  z-index: 1;
   pointer-events: none;
 }
 

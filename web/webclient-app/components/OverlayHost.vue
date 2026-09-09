@@ -1,8 +1,7 @@
 <script setup>
 // OverlayHost (H5, webclient-hud-05-overlays-and-command-line, design D7):
-// the shared full-screen overlay surface. The draft's exact `.full` geometry
-// (position:fixed; top:46px; left:0; right:0; bottom:0; z-index:92) keeps
-// the command line visible under the overlay; the header row carries the
+// the shared overlay workspace. The shell leaves the navigation and
+// command line visible around it; the header row carries the
 // icon slot, the overlay title, the subtitle, and a labelled close control.
 // Focus is trapped through H4's shared `focus-trap.js` (one trap, not a
 // second one). The opener element is captured at open time by the caller;
@@ -45,8 +44,8 @@ function titleFor(name) {
 }
 
 function subtitleFor(name) {
-  if (name === "map") return "分層 · 霧戰 · 路徑";
-  if (name === "settings") return "音訊 · 顯示 · 可達 · 輸入";
+  if (name === "map") return "所在位置與相鄰路徑";
+  if (name === "settings") return "閱讀偏好與輔助顯示";
   if (name === "lineage") return "熟練度 · 見頂 · 前置";
   if (name === "codex") return "稱號 · 異名 · 提名中";
   return "分類 → 條目 → 子主題";
@@ -183,14 +182,15 @@ onBeforeUnmount(() => {
 <style scoped>
 .overlay-host {
   position: fixed;
-  top: 46px;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: calc(var(--header-h) + 12px) 16px calc(var(--command-line-h) + 12px);
   z-index: 92;
   display: flex;
   flex-direction: column;
-  background: var(--ink-950);
+  overflow: hidden;
+  border: 1px solid #bca57966;
+  border-radius: 8px;
+  background: linear-gradient(120deg, #17191df5, #0b0d10fa 70%);
+  box-shadow: 0 12px 60px #0009, inset 0 1px 0 #e8d8aa12;
 }
 
 .overlay-host__header {
@@ -198,9 +198,10 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 26px;
+  flex-wrap: wrap;
+  padding: 18px 26px;
   border-bottom: var(--line);
-  background: linear-gradient(180deg, #14101a, #0e0b12);
+  background: linear-gradient(110deg, #27251e70, #111419);
 }
 
 .overlay-host__icon {
@@ -215,12 +216,13 @@ onBeforeUnmount(() => {
   font-family: var(--f-display);
   font-size: 22px;
   letter-spacing: 0.04em;
-  color: var(--paper-50);
+  color: var(--gold-400);
+  overflow-wrap: anywhere;
 }
 
 .overlay-host__subtitle {
   font-size: 12px;
-  color: var(--paper-500);
+  color: var(--paper-300);
 }
 
 .overlay-host__close {
@@ -229,11 +231,11 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   color: var(--paper-300);
-  background: transparent;
+  background: var(--ink-820);
   border: var(--line);
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -245,8 +247,8 @@ onBeforeUnmount(() => {
 }
 
 .overlay-host__close:hover {
-  color: var(--seal-400);
-  border-color: var(--seal-400);
+  color: var(--gold-400);
+  border-color: var(--gold-500);
 }
 
 .overlay-host__close:focus-visible {
@@ -256,11 +258,22 @@ onBeforeUnmount(() => {
 
 .overlay-host__body {
   flex: 1;
-  padding: 22px 26px;
-  max-width: 900px;
+  box-sizing: border-box;
+  padding: 28px;
+  max-width: 1180px;
   width: 100%;
   margin: 0 auto;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--gold-500) transparent;
+  scrollbar-width: thin;
+}
+
+@media (max-width: 700px) {
+  .overlay-host__header { gap: 8px; padding: 12px 16px; }
+  .overlay-host__title { font-size: 18px; max-width: calc(100% - 80px); }
+  .overlay-host__subtitle { order: 1; width: 100%; }
+  .overlay-host__body { padding: 16px; }
 }
 </style>

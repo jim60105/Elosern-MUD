@@ -1,5 +1,5 @@
 // make-inventory-drawer-frameless: the store-level frameless 背包 contract.
-// Both 背包 rows (the exploration root's and the services sub-dock root's)
+// Both 背包 entries (the top navigation's and the services sub-dock root's)
 // open the bag drawer as a client-local drawer open: the router's frame
 // stack, current frame, breadcrumb, and sub-dock are unchanged by the open,
 // no hosted service surface is recorded, and closing the bag (the single
@@ -54,13 +54,30 @@ describe("frameless 背包 drawer (store contract)", () => {
     store.setSender(fx.createFakeSender());
   });
 
-  it("the exploration-root 背包 row opens the bag drawer with the router unchanged", () => {
+  it("keeps top navigation subject to both submission and revision locks", () => {
+    openSession();
+    store.tabToRootAndConfirm("look", "pointer");
+    expect(store.router.depth()).toBe(2);
+    store.router.setMutationInFlight(true);
+    store.tabToRootAndConfirm("character", "pointer");
+    expect(store.view.hudDrawer).toBe(null);
+    expect(store.router.depth()).toBe(2);
+    store.router.setMutationInFlight(false);
+    store.router.setAwaitingRevision(2);
+    store.tabToRootAndConfirm("character", "pointer");
+    expect(store.view.hudDrawer).toBe(null);
+    expect(store.router.depth()).toBe(2);
+    store.router.setAwaitingRevision(null);
+    store.tabToRootAndConfirm("character", "pointer");
+    expect(store.view.hudDrawer).toBe("status");
+  });
+
+  it("the top-navigation 背包 entry opens the bag drawer with the router unchanged", () => {
     openSession();
     const depthBefore = store.router.depth();
     const trailBefore = trailTitles(store.router);
     const currentBefore = store.router.currentMenu();
-    expect(store.focusItemByKey("inventory")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    store.tabToRootAndConfirm("inventory", "pointer");
     expect(store.view.hudDrawer).toBe("inventory");
     // The open touched nothing: no push, no sub-dock switch, no surface.
     expect(store.router.depth()).toBe(depthBefore);
@@ -118,11 +135,10 @@ describe("frameless 背包 drawer (store contract)", () => {
 
   it("公會 and 商店 activations still push and host their drawers (regression)", () => {
     openSession();
-    // 公會: the exploration root's 任務 row pushes the guild quest-log
+    // 公會: the top navigation's 任務 entry pushes the guild quest-log
     // frame and the frame-hosting watcher opens the 任務 drawer.
     const depthBefore = store.router.depth();
-    expect(store.focusItemByKey("quests")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    store.tabToRootAndConfirm("quests", "pointer");
     expect(store.router.depth()).toBe(depthBefore + 1);
     expect(store.view.hudDrawer).toBe("quest");
     // 商店: the services root's 商店 row pushes the shop frame and hosts
@@ -148,8 +164,7 @@ describe("frameless 背包 drawer (store contract)", () => {
     openSession();
     const depthBefore = store.router.depth();
     const trailBefore = trailTitles(store.router);
-    expect(store.focusItemByKey("inventory")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    store.tabToRootAndConfirm("inventory", "pointer");
     expect(store.view.hudDrawer).toBe("inventory");
     // The single close entry (every HudDrawer route funnels here with
     // popFrame: true) pops nothing and restores nothing to change.
@@ -185,8 +200,7 @@ describe("frameless 背包 drawer (store contract)", () => {
     openSession();
     // 任務 (hosted): closing with popFrame pops one level AND clears the
     // services sub-dock + re-homes the exploration root, as today.
-    expect(store.focusItemByKey("quests")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    store.tabToRootAndConfirm("quests", "pointer");
     expect(store.view.hudDrawer).toBe("quest");
     const depthAtServiceFrame = store.router.depth();
     expect(store.closeHudDrawer({ popFrame: true })).toBe(true);
@@ -199,8 +213,7 @@ describe("frameless 背包 drawer (store contract)", () => {
     openSession();
     const depthBefore = store.router.depth();
     const trailBefore = trailTitles(store.router);
-    expect(store.focusItemByKey("inventory")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    store.tabToRootAndConfirm("inventory", "pointer");
     expect(store.view.hudDrawer).toBe("inventory");
     // The overlay's mutual-exclusion close (closeHudDrawer({}) from
     // openOverlay) funnels through the same frameless early return.
@@ -214,10 +227,9 @@ describe("frameless 背包 drawer (store contract)", () => {
 
   it("the frameless 狀態 drawer close keeps clearing its character sub-dock (regression)", () => {
     openSession();
-    // The 角色狀態 row opens the frameless status drawer with the character
+    // The 角色狀態 navigation entry opens the status drawer with the character
     // sub-dock active; its close still clears the sub-dock and re-homes.
-    expect(store.focusItemByKey("character")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    store.tabToRootAndConfirm("character", "pointer");
     expect(store.view.hudDrawer).toBe("status");
     expect(store.view.activeSubDock).toBe("character");
     expect(store.closeHudDrawer({ popFrame: true })).toBe(true);

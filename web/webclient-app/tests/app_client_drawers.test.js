@@ -421,8 +421,8 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
   });
 
   // quest-drawer-split: the quest drawer away from any clerk. The real
-  // player route — the 任務 sub-dock tab pops to root, focuses the quests
-  // item, and confirms, pushing the services.quests frame and opening the
+  // player route — the 任務 top-navigation entry opens the
+  // services.quests frame and the
   // drawer — must show the quest book (host-free) and the explicit
   // clerk-needed marker in place of the counter, and tracking must dispatch
   // with no guild host present.
@@ -451,9 +451,9 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     );
     expect(received.accepted).toBe(true);
     await wrapper.vm.$nextTick();
-    // The player route: 任務 tab → confirm. No clerk exists in this session.
-    expect(store.focusItemByKey("quests")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    // The player route uses the top navigation, with no clerk in this session.
+    await wrapper.get(".desktop-navigation").findAll("button")
+      .find((button) => button.text() === "任務").trigger("click");
     expect(store.view.hudDrawer).toBe("quest");
     await wrapper.vm.$nextTick();
     const body = wrapper.get('[data-testid="quest-drawer"]');

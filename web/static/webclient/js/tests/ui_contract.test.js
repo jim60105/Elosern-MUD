@@ -89,18 +89,6 @@ test("the narrative markup pipeline never parses HTML strings", () => {
   );
 });
 
-test("the rest-duration form claims its keydowns without breaking native input", () => {
-  const source = read("web/webclient-app/components/RestForm.vue");
-  // The capture-phase form handler claims the form's keys so the global
-  // keyboard router does not swallow them (the legacy isEditingRestForm gate).
-  assert.match(source, /@keydown="onKeyDown"/);
-  assert.match(source, /event\.stopPropagation\(\)/);
-  // Digits, Backspace, Escape, Enter and the slash gate are all claimed and
-  // prevented, so the value is collected in the browser and validated server-side.
-  assert.match(source, /key >= "0" && key <= "9"/);
-  assert.match(source, /key === "Escape"/);
-  assert.match(source, /key === "\/"/);
-});
 
 test("suggestion cards and the dismiss control keep native activation", () => {
   // The routing gate defers to the browser default for Enter/Space pressed on
@@ -196,4 +184,45 @@ test("the scene backdrop reuses an in-flight scene image instead of refetching",
   // A new scene resets the load-failure flag (the generating prior image).
   assert.match(source, /imageLoadFailed\.value = false/);
   assert.match(source, /目前場景圖片生成中/);
+});
+
+test("every custom property consumed without a fallback is defined in the shipped sources", () => {
+  // A `var(--x)` with no fallback silently drops its declaration when the
+  // token is never defined (the --gold-600 incident: four consumers, zero
+  // definitions). Custom properties inherit globally at runtime, so the
+  // correct semantic is the union of definitions across every shipped
+  // source; a reference that resolves nowhere in that union is a dead
+  // declaration.
+  function walk(dir, out) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (["node_modules", "dist", "storybook-static"].includes(entry.name)) continue;
+        walk(path.join(dir, entry.name), out);
+      } else if (/\.(css|vue|js)$/.test(entry.name)) {
+        out.push(path.join(dir, entry.name));
+      }
+    }
+    return out;
+  }
+  const files = [
+    ...walk(path.join(ROOT, "web", "webclient-app"), []),
+    ...walk(path.join(ROOT, "web", "static", "webclient", "js", "elosern"), []),
+  ].filter((f) => !/[\\/]tests[\\/]/.test(f) && !/\.stories\.js$/.test(f));
+  assert.ok(files.length > 50, "the token scan must cover the shipped sources");
+  const defined = new Set();
+  const referenced = new Map();
+  for (const file of files) {
+    const text = fs.readFileSync(file, "utf8");
+    for (const m of text.matchAll(/(--[a-zA-Z0-9_-]+)\s*:/g)) defined.add(m[1]);
+    // Fallback-bearing references (`var(--x, ...)`) degrade visibly and are
+    // not dead declarations; only the fallback-less form is checked.
+    for (const m of text.matchAll(/var\(\s*(--[a-zA-Z0-9_-]+)\s*\)/g)) {
+      if (!referenced.has(m[1])) referenced.set(m[1], new Set());
+      referenced.get(m[1]).add(path.relative(ROOT, file));
+    }
+  }
+  const missing = [...referenced.keys()]
+    .filter((token) => !defined.has(token))
+    .map((token) => `${token} (referenced by ${[...referenced.get(token)].join(", ")})`);
+  assert.deepStrictEqual(missing, [], `undefined custom properties: ${missing.join("; ")}`);
 });

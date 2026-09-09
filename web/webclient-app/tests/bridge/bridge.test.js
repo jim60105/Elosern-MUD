@@ -226,19 +226,18 @@ describe("window.Elosern bridge", () => {
     const unclaimed2 = press("m");
     expect(unclaimed2.defaultPrevented).toBe(false);
 
-    // The "character" root entry re-homes the character sub-dock (a local
-    // surface intent, no `ui_action` dispatched).
+    // Reference entries live in the top navigation, so the next action is wait.
     press("ArrowRight");
-    expect(store.view.focus.key).toBe("character");
-    const enterChar = press("Enter");
-    expect(enterChar.defaultPrevented).toBe(true);
-    expect(store.view.activeSubDock).toBe("character");
+    expect(store.view.focus.key).toBe("wait");
+    const enterWait = press("Enter");
+    expect(enterWait.defaultPrevented).toBe(true);
+    expect(store.view.dockDepth).toBe(2);
 
-    // Escape leaves the character sub-dock and re-homes the exploration root.
+    // Escape returns to the visible opener, never a removed reference entry.
     const escape = press("Escape");
     expect(escape.defaultPrevented).toBe(true);
     expect(store.view.activeSubDock).toBe(null);
-    expect(store.view.focus.key).toBe("move");
+    expect(store.view.focus.key).toBe("wait");
   });
 
   it("lets editable controls keep their keys", () => {

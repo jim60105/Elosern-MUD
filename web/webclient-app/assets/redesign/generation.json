@@ -1,0 +1,107 @@
+[
+  {
+    "file": "sample-town.webp",
+    "request": {
+      "prompt": "A richly painted Japanese fantasy RPG environment, a wide eye-level view down a medieval market street into a sunlit central square. Pale limestone towers and a distant cathedral rise behind red canvas market awnings, an old fountain and hanging heraldic banners bearing no readable text. Warm afternoon light catches the stone and worn wood, balanced by deep charcoal shadows and muted green trees. The lower foreground is an open cobbled avenue, framed by architecture at both edges, with tiny indistinct townspeople far in the distance. Painterly background detail, delicate linework, restrained brass gold highlights and atmospheric blue distance. An immersive environment illustration with no interface, lettering or frame.",
+      "negative_prompt": "text, watermark, logo, user interface, border, cropped head, cropped feet",
+      "steps": 12,
+      "cfg_scale": 1.5,
+      "width": 1536,
+      "height": 920,
+      "sampler_name": "ER SDE",
+      "scheduler": "beta",
+      "styles": [
+        "anima-best-quality",
+        "anima-style",
+        "turbo-anima"
+      ],
+      "seed": 26090710,
+      "override_settings": {
+        "sd_model_checkpoint": "anima/animaika_v43.safetensors [bc0a5703b6]",
+        "forge_additional_modules": [
+          "qwen_3_06b_base.safetensors",
+          "qwen_image_vae.safetensors"
+        ]
+      }
+    },
+    "info": {
+      "seed": 26090710,
+      "width": 1536,
+      "height": 920,
+      "sampler_name": "ER SDE",
+      "sd_model_name": "animaika_v43",
+      "sd_model_hash": "bc0a5703b6"
+    },
+    "postprocessing": "WebP encoding."
+  },
+  {
+    "file": "sample-forest.webp",
+    "request": {
+      "prompt": "A richly detailed painterly dark fantasy environment in a refined semi-realistic anime illustration style. A wide eye-level view across an open forest clearing with an unobstructed flat earthen path covering the lower half of the frame, scattered with tiny fallen leaves, roots and mossy stones. In the middle distance, partially obscured by old oak trees, are small weathered remains of an ancient stone doorway and broken low walls. All ruins stay in the background behind the open clearing. Warm shafts of sunlight fall diagonally through a dense layered canopy, illuminating patches of ferns and leaves while most of the forest remains in deep charcoal and muted olive shadows. Natural weathered textures, intricate foliage, delicate branches, soft atmospheric mist and cinematic depth. An intimate moody battle environment with a broad empty foreground for figures, without lettering, interface, prominent characters or animals.",
+      "negative_prompt": "text, watermark, logo, user interface, border, cropped head, cropped feet",
+      "steps": 12,
+      "cfg_scale": 1.5,
+      "width": 1536,
+      "height": 920,
+      "sampler_name": "ER SDE",
+      "scheduler": "beta",
+      "styles": [
+        "anima-best-quality",
+        "anima-style",
+        "turbo-anima"
+      ],
+      "seed": 26090732,
+      "override_settings": {
+        "sd_model_checkpoint": "anima/animaika_v43.safetensors [bc0a5703b6]",
+        "forge_additional_modules": [
+          "qwen_3_06b_base.safetensors",
+          "qwen_image_vae.safetensors"
+        ]
+      }
+    },
+    "info": {
+      "seed": 26090732,
+      "width": 1536,
+      "height": 920,
+      "sampler_name": "ER SDE",
+      "sd_model_name": "animaika_v43",
+      "sd_model_hash": "bc0a5703b6"
+    },
+    "postprocessing": "WebP encoding."
+  },
+  {
+    "file": "sample-guild.webp",
+    "request": {
+      "prompt": "A richly painted Japanese fantasy RPG environment showing a medieval adventurers guild hall in a wide eye-level view. Tall timber beams, a carved wooden reception counter, stone pillars, muted gold and black heraldic banners with abstract emblems and no readable text, and warm hanging lanterns. Afternoon sun enters through high windows and illuminates floating dust over an open polished wooden floor. Shelves and rolled maps behind the counter suggest many past journeys. Charcoal shadows, deep walnut wood, warm brass highlights and quiet amber light. An inviting spacious interior, painterly texture with delicate anime background linework, no prominent people, no readable lettering and no interface.",
+      "negative_prompt": "text, watermark, logo, user interface, border, cropped head, cropped feet",
+      "steps": 12,
+      "cfg_scale": 1.5,
+      "width": 1536,
+      "height": 920,
+      "sampler_name": "ER SDE",
+      "scheduler": "beta",
+      "styles": [
+        "anima-best-quality",
+        "anima-style",
+        "turbo-anima"
+      ],
+      "seed": 26090714,
+      "override_settings": {
+        "sd_model_checkpoint": "anima/animaika_v43.safetensors [bc0a5703b6]",
+        "forge_additional_modules": [
+          "qwen_3_06b_base.safetensors",
+          "qwen_image_vae.safetensors"
+        ]
+      }
+    },
+    "info": {
+      "seed": 26090714,
+      "width": 1536,
+      "height": 920,
+      "sampler_name": "ER SDE",
+      "sd_model_name": "animaika_v43",
+      "sd_model_hash": "bc0a5703b6"
+    },
+    "postprocessing": "WebP encoding."
+  }
+]

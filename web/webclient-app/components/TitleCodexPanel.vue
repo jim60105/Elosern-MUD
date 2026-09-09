@@ -323,67 +323,101 @@ function declineBallot() {
 </template>
 
 <style scoped>
+/* Rendered inside OverlayHost's gold-framed charcoal body: the panel drops
+   its old cream-on-transparent assumptions and speaks the shell's tokens.
+   Gold marks equipped/selected state; the destructive removal flow keeps a
+   danger treatment. */
 .codex-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  color: var(--ink, #e8e0cf);
+  gap: var(--sp-3);
+  min-width: 0;
+  font-family: var(--f-sans);
+  color: var(--paper-100);
 }
 .codex-panel__unavailable {
-  opacity: 0.75;
-  font-style: italic;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--paper-500);
+  font-size: var(--text-sm);
+  border: 1px dashed var(--ink-600);
+  border-radius: var(--radius-sm);
 }
 .codex-panel__header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
-  padding: 8px 10px;
-  border: 1px solid rgba(232, 224, 207, 0.25);
-  border-radius: 8px;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: linear-gradient(130deg, rgba(34, 36, 38, 0.5), rgba(16, 18, 21, 0.8));
+  border: var(--line);
+  border-radius: var(--radius);
 }
 .codex-panel__full-title {
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  min-width: 0;
+  font-family: var(--f-serif);
+  font-size: 18px;
+  letter-spacing: 0.05em;
+  color: var(--gold-400);
+  overflow-wrap: anywhere;
 }
 .codex-panel__counter {
-  opacity: 0.8;
+  margin-left: auto;
+  color: var(--paper-500);
+  font-family: var(--f-mono);
+  font-size: var(--text-sm);
   white-space: nowrap;
 }
+/* Block tabs reuse the shell's pill chrome at gold selection. */
 .codex-panel__tabs {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
 }
 .codex-panel__tab {
-  padding: 4px 14px;
+  padding: var(--sp-1) var(--sp-4);
   background: transparent;
-  color: inherit;
-  border: 1px solid rgba(232, 224, 207, 0.35);
+  color: var(--paper-500);
+  border: 1px solid var(--ink-600);
   border-radius: 999px;
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
   cursor: pointer;
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
+}
+.codex-panel__tab:hover {
+  color: var(--paper-100);
+  border-color: var(--paper-700);
 }
 .codex-panel__tab--active {
-  background: rgba(232, 224, 207, 0.16);
-  border-color: rgba(232, 224, 207, 0.7);
+  color: var(--gold-400);
+  background: var(--gold-glow);
+  border-color: var(--gold-500);
 }
 .codex-fixed__categories {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-2);
 }
 .codex-fixed__category {
-  padding: 2px 10px;
+  padding: 2px var(--sp-3);
   background: transparent;
-  color: inherit;
-  border: 1px dashed rgba(232, 224, 207, 0.3);
-  border-radius: 6px;
+  color: var(--paper-500);
+  border: 1px dashed var(--ink-600);
+  border-radius: var(--radius-sm);
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
   cursor: pointer;
-  font-size: 0.9em;
 }
 .codex-fixed__category--active {
   border-style: solid;
-  border-color: rgba(232, 224, 207, 0.75);
+  border-color: var(--gold-500);
+  color: var(--gold-400);
 }
 .codex-fixed__rows,
 .codex-epithets__rows,
@@ -393,119 +427,198 @@ function declineBallot() {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-2);
 }
 .codex-card,
 .codex-epithet {
-  border: 1px solid rgba(232, 224, 207, 0.2);
-  border-radius: 8px;
-  padding: 6px 10px;
+  min-width: 0;
+  background: var(--ink-860);
+  border: var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-2) var(--sp-3);
 }
 .codex-card--locked {
+  background: transparent;
   opacity: 0.65;
 }
 .codex-card__button,
 .codex-epithet__button {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--sp-2);
   align-items: baseline;
   width: 100%;
+  min-width: 0;
   background: transparent;
   color: inherit;
   border: none;
   padding: 0;
   text-align: left;
   cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.codex-card__button:hover .codex-card__name,
+.codex-epithet__button:hover .codex-epithet__name {
+  color: var(--gold-400);
 }
 .codex-card__name,
 .codex-epithet__name {
-  font-weight: 700;
+  min-width: 0;
+  font-family: var(--f-serif);
+  font-size: 15px;
+  color: var(--paper-50);
+  overflow-wrap: anywhere;
+}
+/* The equipped star and the lock glyph both carry text, never color alone. */
+.codex-card__locked {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .codex-card__star,
 .codex-epithet__star {
-  color: #e6b84c;
+  color: var(--gold-400);
 }
 .codex-card__flavor,
 .codex-card__hint,
 .codex-epithet__basis {
   display: block;
   width: 100%;
-  opacity: 0.75;
-  font-size: 0.9em;
+  min-width: 0;
+  color: var(--paper-500);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .codex-epithet {
   position: relative;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--sp-2);
   align-items: baseline;
 }
 .codex-epithet__basis {
   width: 100%;
 }
+/* 移除 is destructive: the seal danger treatment, at the row's trailing edge. */
 .codex-epithet__remove {
   margin-left: auto;
-  padding: 2px 10px;
+  min-height: 26px;
+  padding: 2px var(--sp-3);
   background: transparent;
-  color: #d98c6a;
-  border: 1px solid rgba(217, 140, 106, 0.6);
-  border-radius: 6px;
+  color: var(--seal-400);
+  border: 1px solid var(--seal-700);
+  border-radius: var(--radius-sm);
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
   cursor: pointer;
+}
+.codex-epithet__remove:hover {
+  color: var(--paper-50);
+  background: var(--seal-700);
+  border-color: var(--seal-500);
 }
 .codex-removal-card {
   width: 100%;
-  border: 1px solid rgba(217, 140, 106, 0.7);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: rgba(217, 140, 106, 0.08);
+  box-sizing: border-box;
+  min-width: 0;
+  border: 1px solid var(--seal-700);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+  background: rgba(124, 32, 38, 0.14);
+}
+.codex-removal-card__target {
+  margin: 0 0 var(--sp-1);
+  color: var(--paper-50);
+  font-family: var(--f-serif);
+  overflow-wrap: anywhere;
+}
+.codex-removal-card__basis {
+  margin: 0 0 var(--sp-1);
+  color: var(--paper-500);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
 }
 .codex-removal-card__warning {
-  color: #d98c6a;
-  font-weight: 700;
+  margin: 0 0 var(--sp-2);
+  color: var(--seal-400);
+  font-weight: 600;
+  font-size: var(--text-sm);
 }
 .codex-removal-card__buttons {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
 }
 .codex-removal-card__buttons button {
-  padding: 3px 12px;
-  background: transparent;
-  color: inherit;
-  border: 1px solid rgba(232, 224, 207, 0.5);
-  border-radius: 6px;
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-4);
+  background: var(--ink-780);
+  color: var(--paper-100);
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
   cursor: pointer;
 }
+.codex-removal-card__buttons button:hover {
+  color: var(--paper-50);
+  border-color: var(--gold-500);
+}
 .codex-panel__empty {
-  opacity: 0.7;
-  font-style: italic;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--paper-500);
+  font-size: var(--text-sm);
+  border: 1px dashed var(--ink-600);
+  border-radius: var(--radius-sm);
 }
 .codex-ballot__row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--sp-2);
   align-items: baseline;
-  border: 1px solid rgba(232, 224, 207, 0.2);
-  border-radius: 8px;
-  padding: 6px 10px;
+  min-width: 0;
+  background: var(--ink-860);
+  border: var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-2) var(--sp-3);
 }
 .codex-ballot__name {
-  font-weight: 700;
+  min-width: 0;
+  font-family: var(--f-serif);
+  font-size: 15px;
+  color: var(--paper-50);
+  overflow-wrap: anywhere;
 }
 .codex-ballot__basis {
-  opacity: 0.75;
-  font-size: 0.9em;
+  min-width: 0;
+  color: var(--paper-500);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
 }
 .codex-ballot__row button,
 .codex-ballot__decline {
-  padding: 2px 12px;
-  background: transparent;
-  color: inherit;
-  border: 1px solid rgba(232, 224, 207, 0.5);
-  border-radius: 6px;
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-4);
+  background: var(--ink-780);
+  color: var(--paper-100);
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
   cursor: pointer;
+}
+.codex-ballot__row button:hover,
+.codex-ballot__decline:hover {
+  color: var(--paper-50);
+  border-color: var(--gold-500);
 }
 .codex-ballot__row button {
   margin-left: auto;
+}
+.codex-ballot__decline {
+  align-self: flex-start;
+  color: var(--paper-300);
 }
 </style>
