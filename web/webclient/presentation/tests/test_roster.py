@@ -88,8 +88,12 @@ class RosterPresenterTests(EvenniaTest):
                 "aspect_ratio",
                 "alt",
                 "placeholder",
+                "face_rect",
             },
         )
+        # A placeholder row carries a null URL and a null rectangle.
+        self.assertIsNone(portrait["url"])
+        self.assertIsNone(portrait["face_rect"])
 
     @covers_requirement(
         "webclient-character-roster::the-account-roster-is-a-committed-presentation-panel-available-in-every-mode"
@@ -174,6 +178,7 @@ class RosterPresenterTests(EvenniaTest):
                     "aspect_ratio": "3:4",
                     "alt": "完成的肖像",
                     "subject_key": f"character:{self.char1.pk}",
+                    "face_rect": {"x": 0.3, "y": 0.1, "w": 0.4, "h": 0.4},
                 }
             elif entity.pk == char_active2.pk:
                 return {
@@ -184,6 +189,7 @@ class RosterPresenterTests(EvenniaTest):
                     "aspect_ratio": None,
                     "alt": "未生成",
                     "subject_key": f"character:{char_active2.pk}",
+                    "face_rect": None,
                 }
             else:
                 return {
@@ -194,6 +200,7 @@ class RosterPresenterTests(EvenniaTest):
                     "aspect_ratio": None,
                     "alt": "無肖像",
                     "subject_key": None,
+                    "face_rect": None,
                 }
 
         with patch("web.webclient.presentation.roster.resolve_character", side_effect=mock_resolve):
@@ -206,11 +213,15 @@ class RosterPresenterTests(EvenniaTest):
             self.assertEqual(char1_portrait["url"], f"/art/portraits/character_{self.char1.pk}.png")
             self.assertEqual(char1_portrait["aspect_ratio"], "3:4")
             self.assertIsNone(char1_portrait["placeholder"])
+            self.assertEqual(
+                char1_portrait["face_rect"], {"x": 0.3, "y": 0.1, "w": 0.4, "h": 0.4}
+            )
 
             # 2. Activated with asset pending generation
             active2_portrait = rows_by_id[int(char_active2.pk)]["portrait"]
             self.assertEqual(active2_portrait["status"], "pending")
             self.assertIsNone(active2_portrait["url"])
+            self.assertIsNone(active2_portrait["face_rect"])
             self.assertEqual(
                 active2_portrait["placeholder"],
                 {"kind": "missing", "label": "未生成"},
@@ -221,6 +232,7 @@ class RosterPresenterTests(EvenniaTest):
             self.assertIsNone(pending_portrait["status"])
             self.assertIsNone(pending_portrait["url"])
             self.assertIsNone(pending_portrait["subject_key"])
+            self.assertIsNone(pending_portrait["face_rect"])
             self.assertEqual(
                 pending_portrait["placeholder"],
                 {"kind": "unavailable", "label": "無肖像"},
@@ -299,6 +311,7 @@ class RosterValidatorTests(unittest.TestCase):
             "aspect_ratio": "3:4",
             "alt": "英雄肖像",
             "placeholder": None,
+            "face_rect": {"x": 0.3, "y": 0.1, "w": 0.4, "h": 0.4},
         }
         portrait.update(overrides)
         return portrait
@@ -383,6 +396,75 @@ class RosterValidatorTests(unittest.TestCase):
         row = self._valid_row(portrait=bad_portrait)
         with self.assertRaises(ProtocolValidationError):
             validate_roster(self._valid_payload(characters=[row]))
+
+    @covers_requirement(
+        "webclient-character-roster::roster-portraits-resolve-through-the-named-portrait-subject-mechanism"
+    )
+    def test_portrait_face_rect_is_exact_and_tied_to_the_url(self):
+        for bad in (
+            {"face_rect": None},  # url present, rect missing
+            {"face_rect": {"x": 0.3, "y": 0.1, "w": 0.4}},  # missing h
+            {"face_rect": {"x": 0.3, "y": 0.1, "w": 0.4, "h": 0.4, "z": 0}},  # extra key
+            {"face_rect": {"x": -0.1, "y": 0.1, "w": 0.4, "h": 0.4}},  # below 0
+            {"face_rect": {"x": 0.3, "y": 1.5, "w": 0.4, "h": 0.4}},  # above 1
+            {"face_rect": {"x": "0.3", "y": 0.1, "w": 0.4, "h": 0.4}},  # not a number
+        ):
+            with self.subTest(bad=bad):
+                row = self._valid_row(portrait=self._valid_portrait(**bad))
+                with self.assertRaises(ProtocolValidationError):
+                    validate_roster(self._valid_payload(characters=[row]))
+        # A placeholder portrait carries face_rect: null and no url.
+        placeholder_row = self._valid_row(
+            current=True,
+            portrait=self._valid_portrait(
+                url=None,
+                aspect_ratio=None,
+                status=None,
+                subject_key=None,
+                alt="無肖像",
+                placeholder={"kind": "unavailable", "label": "無肖像"},
+                face_rect=None,
+            ),
+        )
+        normalized = validate_roster(self._valid_payload(characters=[placeholder_row]))
+        self.assertIsNone(normalized["characters"][0]["portrait"]["face_rect"])
+        # The media URL bound admits the worst-case gallery identity.
+        worst = "/art/gallery/character/" + "k" * 64 + "/" + "0" * 36 + ".avif"
+        longest_row = self._valid_row(
+            portrait=self._valid_portrait(url=worst)
+        )
+        normalized = validate_roster(self._valid_payload(characters=[longest_row]))
+        self.assertEqual(normalized["characters"][0]["portrait"]["url"], worst)
+        with self.assertRaises(ProtocolValidationError):
+            validate_roster(
+                self._valid_payload(
+                    characters=[
+                        self._valid_row(
+                            portrait=self._valid_portrait(
+                                url="/art/" + "p" * (256 - len("/art/") + 1)
+                            )
+                        )
+                    ]
+                )
+            )
+        # A placeholder must not carry a rectangle.
+        with self.assertRaises(ProtocolValidationError):
+            validate_roster(
+                self._valid_payload(
+                    characters=[
+                        self._valid_row(
+                            portrait=self._valid_portrait(
+                                url=None,
+                                aspect_ratio=None,
+                                status=None,
+                                subject_key=None,
+                                alt="無肖像",
+                                placeholder={"kind": "unavailable", "label": "無肖像"},
+                            )
+                        )
+                    ]
+                )
+            )
 
     def test_exceeding_max_roster_rows_rejected(self):
         rows = [

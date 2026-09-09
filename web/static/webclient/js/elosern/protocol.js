@@ -412,17 +412,18 @@
   // webclient-character-roster): at most ten character rows in ascending
   // identity order; exactly one current character; locked exactly when in
   // active combat.
-  var ROSTER_SCHEMA_VERSION = 1;
+  var ROSTER_SCHEMA_VERSION = 2;
   var ROSTER_MAX_ROWS = 10;
   var ROSTER_MAX_NAME = 128;
   var ROSTER_MAX_SUBJECT_KEY = 128;
+  var MAX_MEDIA_URL = 256;
   var ROSTER_MAX_ALT = 512;
   var ROSTER_MAX_STATUS = 16;
   var ROSTER_MAX_PLACEHOLDER_LABEL = 128;
   var ROSTER_LOCK_REASON = "戰鬥中無法切換角色";
 
   var PANEL_ALLOWLIST = {
-    art: 1,
+    art: 2,
     status: 2,
     context_actions: 5,
     local_map: 1,
@@ -436,7 +437,7 @@
     dialogue: 1,
     title_ballot: 1,
     title_codex: 1,
-    roster: 1,
+    roster: 2,
     possession_banner: 1,
     lore_codex: 1,
     quest_log: 1,
@@ -4058,7 +4059,7 @@
     }
     var url = value.url;
     if (url !== null) {
-      requireString(url, "scene url", 128);
+      requireString(url, "scene url", MAX_MEDIA_URL);
       if (url.indexOf("/art/") !== 0) {
         throw new Error("scene url must be a same-origin media URL");
       }
@@ -4102,11 +4103,33 @@
     return { name: name, role: role };
   }
 
+  // Face-rectangle validator (art catalog entries and roster portraits share
+  // the portrait field vocabulary): null, or exactly x, y, w, h as finite
+  // real numbers in [0, 1]. Placement metadata only — no crop, no second
+  // image (mirror of web.webclient.presentation.art._validate_face_rect).
+  function validateArtFaceRect(value) {
+    if (value === null) {
+      return null;
+    }
+    requireExactFields(value, "face_rect", ["x", "y", "w", "h"], []);
+    var names = ["x", "y", "w", "h"];
+    for (var i = 0; i < names.length; i++) {
+      var coordinate = value[names[i]];
+      if (typeof coordinate !== "number" || !Number.isFinite(coordinate)) {
+        throw new Error("face_rect." + names[i] + " must be a real number");
+      }
+      if (!(coordinate >= 0 && coordinate <= 1)) {
+        throw new Error("face_rect." + names[i] + " must lie in [0, 1]");
+      }
+    }
+    return { x: value.x, y: value.y, w: value.w, h: value.h };
+  }
+
   function validateArtCatalogEntry(value) {
     requireExactFields(
       value,
       "art catalog entry",
-      ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "context"],
+      ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "face_rect", "context"],
       []
     );
     if (value.subject_key !== null) {
@@ -4121,7 +4144,7 @@
     }
     var url = value.url;
     if (url !== null) {
-      requireString(url, "catalog url", 128);
+      requireString(url, "catalog url", MAX_MEDIA_URL);
       if (url.indexOf("/art/") !== 0) {
         throw new Error("catalog url must be a same-origin media URL");
       }
@@ -4135,6 +4158,13 @@
     }
     validateArtPlaceholder(value.placeholder);
     validateArtContext(value.context);
+    var faceRect = validateArtFaceRect(value.face_rect);
+    if (url !== null && faceRect === null) {
+      throw new Error("a catalog entry with a url carries a face_rect");
+    }
+    if (url === null && faceRect !== null) {
+      throw new Error("a catalog placeholder carries no face_rect");
+    }
     return value;
   }
 
@@ -4146,7 +4176,7 @@
       []
     );
     requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-    if (payload.schema_version !== 1) {
+    if (payload.schema_version !== 2) {
       throw new Error("unsupported art schema_version");
     }
     if (payload.available !== true || payload.kind !== "scene") {
@@ -4169,7 +4199,7 @@
     }
 
     var result = {
-      schema_version: 1,
+      schema_version: 2,
       available: true,
       kind: "scene",
       scene: scene,
@@ -5017,13 +5047,13 @@
     return result;
   }
 
-  // Exact available roster panel v1 schema (mirror of
+  // Exact available roster panel v2 schema (mirror of
   // web.webclient.presentation.roster, webclient-character-roster).
   function validateRosterPortrait(value) {
     requireExactFields(
       value,
       "roster portrait",
-      ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder"],
+      ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "face_rect"],
       []
     );
     if (value.subject_key !== null) {
@@ -5038,7 +5068,7 @@
     }
     var url = value.url;
     if (url !== null) {
-      requireString(url, "portrait url", ROSTER_MAX_SUBJECT_KEY);
+      requireString(url, "portrait url", MAX_MEDIA_URL);
       if (url.indexOf("/art/") !== 0) {
         throw new Error("portrait url must be a same-origin media URL");
       }
@@ -5057,6 +5087,13 @@
     if (url === null && placeholder === null) {
       throw new Error("portrait must carry either url or placeholder");
     }
+    var faceRect = validateArtFaceRect(value.face_rect);
+    if (url !== null && faceRect === null) {
+      throw new Error("a portrait with a url carries a face_rect");
+    }
+    if (url === null && faceRect !== null) {
+      throw new Error("a placeholder portrait carries no face_rect");
+    }
     return {
       subject_key: value.subject_key,
       status: status,
@@ -5064,6 +5101,7 @@
       aspect_ratio: value.aspect_ratio,
       alt: alt,
       placeholder: placeholder,
+      face_rect: faceRect,
     };
   }
 

@@ -35,8 +35,8 @@ describe("ParticipantFrame (task 6.9)", () => {
   ];
   const artPanel = {
     portrait_catalog: {
-      portrait_mei: { url: "/static/art/mei.png", placeholder: null },
-      portrait_gob: { url: "", placeholder: { label: "肖像圖像尚未生成" } },
+      portrait_mei: { url: "/static/art/mei.png", placeholder: null, face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 } },
+      portrait_gob: { url: "", placeholder: { label: "肖像圖像尚未生成" }, face_rect: null },
     },
   };
 

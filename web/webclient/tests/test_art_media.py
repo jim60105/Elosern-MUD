@@ -4,12 +4,14 @@ from pathlib import Path
 import shutil
 import tempfile
 import unittest
+import uuid
 from unittest.mock import patch
 
 from django.test import override_settings
 
 from evennia.utils.test_resources import EvenniaTestCase
 
+from world.art.gallery import append_card
 from world.art.queue import ensure, settle
 from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
@@ -127,6 +129,196 @@ class ArtMediaViewTests(EvenniaTestCase):
         target.write_text("orphan", encoding="utf-8")
         response = self._get("scene/orphan.png")
         self.assertEqual(response.status_code, 404)
+        self.assertNotIn(str(self.root), repr(response))
+
+
+class GalleryIdentityServingTests(EvenniaTestCase):
+    """The gallery branch: served only via the addressed record (task 5.6)."""
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.root = Path(self.tempdir.name).resolve()
+        self.art_settings = override_settings(ART_STORE_ROOT=str(self.root))
+        self.art_settings.enable()
+
+    def tearDown(self):
+        self.art_settings.disable()
+        self.tempdir.cleanup()
+        super().tearDown()
+
+    def _subject(self, kind=ArtSubjectKind.CHARACTER, key="gallery-owner"):
+        return ArtSubject(kind, key)
+
+    def _card(self, subject, extension=".png", image_id=None, identity=None):
+        image_id = image_id or str(uuid.uuid4())
+        kind_dir = "character" if subject.kind is ArtSubjectKind.CHARACTER else "monster"
+        identity = identity or f"gallery/{kind_dir}/{subject.key}/{image_id}{extension}"
+        append_card(
+            subject,
+            **{
+                "image_id": image_id,
+                "stored_identity": identity,
+                "prompt": {"positive": "a hero", "negative": "blur"},
+                "seed": 1,
+                "checkpoint": "realVision.safetensors",
+                "requested_fields": ["appearance"],
+                "binding": None,
+                "source": "generated",
+            },
+        )
+        return identity
+
+    def _write(self, identity):
+        target = self.root / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"image")
+        return target
+
+    def _get(self, identity):
+        from django.test import Client
+
+        return Client().get(f"/art/{identity}")
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_a_card_referenced_gallery_identity_is_served_with_its_type(self):
+        media_types = {
+            ".png": "image/png",
+            ".webp": "image/webp",
+            ".jpg": "image/jpeg",
+            ".avif": "image/avif",
+        }
+        for index, (extension, media_type) in enumerate(media_types.items()):
+            subject = self._subject(key=f"gallery-owner-{index}")
+            identity = self._card(subject, extension=extension)
+            self._write(identity)
+            response = self._get(identity)
+            with self.subTest(extension=extension):
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response["Content-Type"], media_type)
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_unreferenced_gallery_identity_returns_404(self):
+        subject = self._subject(key="gallery-unref")
+        stray = f"gallery/character/{subject.key}/{uuid.uuid4()}.png"
+        self._write(stray)
+        self.assertEqual(self._get(stray).status_code, 404)
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_mis_addressed_gallery_identity_returns_404(self):
+        # A card of one subject whose stored identity addresses ANOTHER
+        # subject's path: the addressed record holds no such card -> 404.
+        from world.art.gallery import record_for
+
+        thief = self._subject(key="gallery-thief")
+        identity = self._card(thief)
+        self._write(identity)
+        self.assertEqual(self._get(identity).status_code, 200)
+        # Corrupt the card's stored identity to address a different subject
+        # (the write API itself refuses this).
+        victim_identity = f"gallery/character/gallery-victim/{uuid.uuid4()}.png"
+        self._write(victim_identity)
+        record = record_for(thief)
+        poisoned = dict(record.db.cards[0])
+        poisoned["stored_identity"] = victim_identity
+        record.db.cards = [poisoned]
+        self.assertEqual(self._get(victim_identity).status_code, 404)
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_traversal_unexpected_directory_and_extension_404(self):
+        subject = self._subject(key="gallery-rules")
+        for bad in (
+            f"gallery/character/{subject.key}/../../etc/passwd.png",
+            "gallery/npc/gallery-rules/x.png",
+            f"gallery/character/{subject.key}/{uuid.uuid4()}.jxl",
+        ):
+            with self.subTest(bad=bad):
+                self.assertEqual(self._get(bad).status_code, 404)
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_symlinked_gallery_file_returns_404_and_leaves_the_target_alive(self):
+        subject = self._subject(key="gallery-symlink")
+        identity = self._card(subject)
+        target = self._write(identity)
+        external = Path(self.tempdir.name).parent / "media-precious.png"
+        external.write_bytes(b"do not serve")
+        target.unlink()
+        target.symlink_to(external)
+        self.assertEqual(self._get(identity).status_code, 404)
+        self.assertTrue(external.exists())
+
+
+class DefaultsServingTests(EvenniaTestCase):
+    """The built-in fallback branch serves from one fixed in-repo directory."""
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.defaults = Path(self.tempdir.name) / "art" / "defaults"
+        self.defaults.mkdir(parents=True)
+        self.store_temp = tempfile.TemporaryDirectory()
+        self.art_settings = override_settings(
+            ART_STORE_ROOT=str(Path(self.store_temp.name).resolve()),
+            STATICFILES_DIRS=[str(Path(self.tempdir.name))],
+        )
+        self.art_settings.enable()
+
+    def tearDown(self):
+        self.art_settings.disable()
+        self.tempdir.cleanup()
+        self.store_temp.cleanup()
+        super().tearDown()
+
+    def _get(self, identity):
+        from django.test import Client
+
+        return Client().get(f"/art/{identity}")
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_a_defaults_identity_is_served_from_the_defaults_directory(self):
+        (self.defaults / "unknown.png").write_bytes(b"fallback")
+        response = self._get("defaults/unknown.png")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_missing_escaping_or_symlinked_defaults_identities_404(self):
+        outside = Path(self.tempdir.name) / "outside.png"
+        outside.write_bytes(b"x")
+        # Missing file
+        self.assertEqual(self._get("defaults/absent.png").status_code, 404)
+        # Unexpected sub-path
+        nested = self.defaults / "nested"
+        nested.mkdir()
+        (nested / "hidden.png").write_bytes(b"x")
+        self.assertEqual(self._get("defaults/nested/hidden.png").status_code, 404)
+        # An identity whose segments escape the defaults directory
+        escaping = self.defaults.parent.parent / "escape.png"
+        escaping.write_bytes(b"x")
+        self.assertEqual(self._get("defaults/../escape.png").status_code, 404)
+        # Symlink escaping the defaults directory
+        link = self.defaults / "linked.png"
+        link.symlink_to(outside)
+        self.assertEqual(self._get("defaults/linked.png").status_code, 404)
+        # The store root is never consulted for a defaults identity
+        store_defaults = Path(self.store_temp.name) / "defaults"
+        store_defaults.mkdir()
+        (store_defaults / "sneaky.png").write_bytes(b"x")
+        self.assertEqual(self._get("defaults/sneaky.png").status_code, 404)
 
 
 if __name__ == "__main__":

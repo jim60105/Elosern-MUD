@@ -86,16 +86,16 @@ degrade to the shared default rectangle with one bounded diagnostic, never to a 
 - **THEN** the payload carries a null URL and a null `face_rect`
 
 #### Scenario: A malformed stored rectangle degrades to the default
-- **WHEN** a resolved card's stored rectangle fails validation
+- **WHEN** the resolution seam hands the presenter a card whose stored rectangle fails validation
 - **THEN** the payload carries the shared default rectangle and one bounded diagnostic is logged
 
 ### Requirement: Gallery URLs are built only from validated card identities
 The presenter SHALL build a gallery media URL only from a card's stored identity that it has
 validated against the subject's own `gallery/<kind>/<subject-key>/` prefix, the closed set of store
 extensions, and the store-root confinement check (rejecting symlinks and out-of-root resolutions). A
-card whose file no longer exists or fails validation SHALL be skipped by the chain, which SHALL
-continue to the next step rather than emit a broken URL. The presenter SHALL never expose an absolute
-path or the store root.
+card whose file no longer exists or fails validation SHALL be skipped, with resolution continuing at
+the next remaining candidate of the current step or the next step, rather than the chain emitting a
+broken URL. The presenter SHALL never expose an absolute path or the store root.
 
 #### Scenario: A card whose file vanished is skipped, not emitted
 - **WHEN** the resolved card's file has been deleted from the store

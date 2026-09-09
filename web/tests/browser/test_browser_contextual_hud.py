@@ -252,10 +252,11 @@ def _art_panel(portrait_refs: list) -> dict:
             "aspect_ratio": "3:4",
             "alt": "角色肖像",
             "placeholder": None,
+            "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
             "context": {"name": "角色", "role": "人物"},
         }
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
         "kind": "scene",
         "scene": {

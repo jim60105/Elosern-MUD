@@ -2,17 +2,25 @@
 
 The presenter resolves a validated subject to its status, same-origin media
 URL, aspect, and alternative text, or to a truthful placeholder kind/label.
+Gallery-bearing subjects (characters, monsters) first attempt the
+deterministic gallery display chain in ``world.art.gallery_match``; every
+payload it produces carries ``face_rect`` — the resolved card's rectangle,
+the shared default for a classic asset or a fallback image, or ``null`` for
+every placeholder.
 It never exposes ``out_path``, the store root, or any absolute filesystem path.
 Change 23f's browser panel consumes these primitives; this change owns them.
 """
 
-from pathlib import Path
-
-from django.conf import settings
-
 from world.observability import log_warn
 
 from world.art.formats import STORE_EXTENSIONS
+from world.art.gallery import (
+    DEFAULT_FACE_RECT,
+    GalleryRecordError,
+    validate_face_rect,
+)
+from world.art.gallery_match import fallback_for, resolve_card
+from world.art.paths import resolved_under_store_root
 from world.art.queue import record_key
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import (
@@ -32,6 +40,11 @@ PLACEHOLDER_LABELS = {
     PLACEHOLDER_MISSING: "未生成",
     PLACEHOLDER_UNAVAILABLE: "無法提供",
 }
+
+# The fixed aspect ratio of every gallery card / fallback image payload:
+# portrait geometry is a presenter-side constant (cards store no ratio),
+# matching the wire validator's portrait aspect.
+GALLERY_ASPECT_RATIO = "3:4"
 
 
 def _record_for(subject: ArtSubject) -> ArtAssetRecord | None:
@@ -61,15 +74,8 @@ def _validated_output_identity(subject: ArtSubject, identity: str | None) -> str
     extension = identity[len(expected_prefix) + len(stem) - 1:]
     if extension.lower() not in STORE_EXTENSIONS:
         return None
-    target = Path(settings.ART_STORE_ROOT) / identity
-    if target.is_symlink():
-        return None
-    try:
-        resolved = target.resolve()
-        root = Path(settings.ART_STORE_ROOT).resolve()
-    except OSError:  # observability: ignore R2: identity validation probe; None is the caller's placeholder signal
-        return None
-    if resolved == root or root not in resolved.parents or not resolved.is_file():
+    resolved = resolved_under_store_root(identity)
+    if resolved is None or not resolved.is_file():
         return None
     return identity
 
@@ -83,8 +89,18 @@ def _subject_directory(subject: ArtSubject) -> str:
     return "portrait/character"
 
 
-def resolve_subject(subject: ArtSubject) -> dict:
+def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
     """Resolve a validated subject to its presentation payload.
+
+    Characters and monsters first attempt the deterministic gallery display
+    chain (``resolve_card``); a resolved card yields an ``asset`` payload
+    whose URL is built only from its validated stored identity. When nothing
+    in the gallery resolves, the classic ``done`` asset record is resolved
+    exactly as before, the terminal fallback seam is consulted when that
+    record's identity is unusable, and the truthful placeholder closes the
+    chain. Every payload carries ``face_rect``: the card's rectangle, the
+    shared default for a classic asset or fallback image, or ``None`` for a
+    placeholder.
 
     Returns status, same-origin URL, aspect ratio, and alternative text for a
     ``done`` record; a truthful placeholder kind/label otherwise. Never leaks
@@ -94,7 +110,32 @@ def resolve_subject(subject: ArtSubject) -> dict:
     schema (fix-art-pipeline-contracts D3); the persistent record status is
     never touched.
     """
+    card = resolve_card(subject, entity)
+    if card is not None:
+        return _card_payload(subject, card)
     record = _record_for(subject)
+    identity = None
+    if record is not None and record.db.status == ArtAssetStatus.DONE:
+        identity = _validated_output_identity(subject, record.db.output_identity)
+        if identity is None:
+            log_warn("art_asset_output_missing", context={"subject": subject.full()})
+    if identity is not None:
+        return {
+            "kind": "asset",
+            "label": "已生成",
+            "status": ArtAssetStatus.DONE,
+            "url": media_url_for(identity),
+            "aspect_ratio": record.db.aspect_ratio,
+            "alt": subject.full(),
+            "subject_key": subject.full(),
+            "face_rect": dict(DEFAULT_FACE_RECT),
+        }
+    # Steps 1-5 resolved nothing: consult the terminal seam (step 6) on
+    # EVERY fall-through path — no record, an unfinished record, and an
+    # unusable done identity alike — before the placeholder closes the chain.
+    fallback = fallback_for(subject)
+    if fallback is not None:
+        return _fallback_payload(subject, fallback)
     if record is None or record.db.status != ArtAssetStatus.DONE:
         kind = PLACEHOLDER_MISSING
         status = record.db.status if record else ArtAssetStatus.MISSING
@@ -108,19 +149,60 @@ def resolve_subject(subject: ArtSubject) -> dict:
             "aspect_ratio": record.db.aspect_ratio if record else None,
             "alt": PLACEHOLDER_LABELS[kind],
             "subject_key": subject.full(),
+            "face_rect": None,
         }
-    identity = _validated_output_identity(subject, record.db.output_identity)
-    if identity is None:
-        log_warn("art_asset_output_missing", context={"subject": subject.full()})
+    return _placeholder_unavailable("無法提供")
+
+
+def _card_payload(subject: ArtSubject, card: dict) -> dict:
+    """The asset payload for one validated gallery card.
+
+    The URL is built only from the card's validated stored identity (the
+    chain checked prefix, extension, confinement, and existence). A stored
+    rectangle that fails validation degrades to the shared default with one
+    bounded diagnostic — never a failed payload.
+    """
+    try:
+        face_rect = validate_face_rect(card["face_rect"])
+    except GalleryRecordError:  # observability: ignore R2: malformed rect degrades per contract; payload must never fail
+        log_warn("art_face_rect_invalid", context={"subject": subject.full()})
+        face_rect = dict(DEFAULT_FACE_RECT)
+    return {
+        "kind": "asset",
+        "label": "已生成",
+        "status": ArtAssetStatus.DONE,
+        "url": media_url_for(card["stored_identity"]),
+        "aspect_ratio": GALLERY_ASPECT_RATIO,
+        "alt": subject.full(),
+        "subject_key": subject.full(),
+        "face_rect": face_rect,
+    }
+
+
+def _fallback_payload(subject: ArtSubject, fallback: dict) -> dict:
+    """The asset payload for a fallback image supplied by the terminal seam.
+
+    The seam returns ``None`` in this capability, so this branch is inert
+    until a later capability fills it: an unusable seam result stays the
+    truthful placeholder, and a missing or malformed seam rectangle defaults
+    to the shared face rectangle without failing the payload.
+    """
+    identity = fallback.get("identity") if isinstance(fallback, dict) else None
+    if not isinstance(identity, str) or not identity:
         return _placeholder_unavailable("無法提供")
+    try:
+        face_rect = validate_face_rect(fallback.get("face_rect"))
+    except GalleryRecordError:  # observability: ignore R2: seam rectangle defaults per contract
+        face_rect = dict(DEFAULT_FACE_RECT)
     return {
         "kind": "asset",
         "label": "已生成",
         "status": ArtAssetStatus.DONE,
         "url": media_url_for(identity),
-        "aspect_ratio": record.db.aspect_ratio,
+        "aspect_ratio": GALLERY_ASPECT_RATIO,
         "alt": subject.full(),
         "subject_key": subject.full(),
+        "face_rect": face_rect,
     }
 
 
@@ -141,7 +223,7 @@ def resolve_character(entity) -> dict:
         character_ages(entity)
     except Exception:  # observability: ignore R2: age-eligibility failure -> specified unavailable placeholder; diagnostics must never leak
         return _placeholder_unavailable("無法提供")
-    return resolve_subject(subject)
+    return resolve_subject(subject, entity=entity)
 
 
 def resolve_entity(entity) -> dict:
@@ -161,7 +243,7 @@ def resolve_entity(entity) -> dict:
             subject = monster_subject_for(threat_tier)
         except ArtSubjectError:  # observability: ignore R2: unregistered tier -> specified unavailable placeholder
             return _placeholder_unavailable("無法提供")
-        payload = resolve_subject(subject)
+        payload = resolve_subject(subject, entity=entity)
         payload["subject_key"] = subject.full()
         return payload
     return resolve_character(entity)
@@ -187,4 +269,5 @@ def _placeholder_unavailable(label: str) -> dict:
         "aspect_ratio": None,
         "alt": label,
         "subject_key": None,
+        "face_rect": None,
     }
