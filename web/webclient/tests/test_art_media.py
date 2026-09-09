@@ -42,9 +42,10 @@ class ArtMediaViewTests(EvenniaTestCase):
         target.write_text("asset", encoding="utf-8")
         from world.art.queue import claim
 
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity=identity,
             error=None,

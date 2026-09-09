@@ -19,6 +19,8 @@ from PIL import Image
 from evennia.utils.test_resources import EvenniaTest
 
 from world.art.fake_sd_client import DEFAULT_PNG, FakeSDWebUIClient
+from world.art.fake_cutout import FakeCutoutBackend
+from world.art.cutout import CutoutError
 from world.art import gallery as gallery_api
 from world.art.gallery import DEFAULT_FACE_RECT
 from world.art.queue import (
@@ -69,6 +71,26 @@ class _MixedOutcomeClient:
         return GeneratedImage(data=DEFAULT_PNG, seed=self.seed)
 
 
+def _opaque_portrait_png(size=(16, 12)) -> bytes:
+    """An OPAQUE multi-pixel PNG, LARGER than the fake's zeroed 8x8 region.
+
+    ``fake_sd_client.DEFAULT_PNG`` is a 1x1 already-transparent image, so an
+    alpha assertion driven by it passes with the stage disabled and proves
+    nothing; a fixture no bigger than the zeroed region would make every pixel
+    transparent. This fixture has a known opaque pixel at (10, 10) and a known
+    RGB pattern per pixel, so a cutout run's stored bytes can never equal a
+    disabled run's.
+    """
+    image = Image.new("RGB", size)
+    pixels = image.load()
+    for y in range(size[1]):
+        for x in range(size[0]):
+            pixels[x, y] = (17 + x * 13, 29 + y * 7, (x * y * 5 + 3) % 256)
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 class WorkerStoreIsolation(EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -99,6 +121,16 @@ class WorkerStoreIsolation(EvenniaTest):
 
     def _record_for(self, subject):
         return ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+
+    def _assert_region_transparent(self, path: Path) -> None:
+        """The fake zeroes the top-left 8x8; the standard fixture is 16x12."""
+        with Image.open(path.open("rb")) as image:
+            self.assertEqual(image.mode, "RGBA")
+            pixels = image.load()
+            self.assertEqual(pixels[0, 0][3], 0)
+            self.assertEqual(pixels[7, 7][3], 0)
+            self.assertEqual(pixels[10, 10][3], 255)
+            self.assertEqual(pixels[15, 11][3], 255)
 
 
 class WorkerStoreIsolationTests(WorkerStoreIsolation):
@@ -361,7 +393,9 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         claimed = claim(10)
         requeue(subject)
         with self._client(FakeSDWebUIClient()):
-            settled = _run_and_settle_batch([claimed[0]])
+            settled = _run_and_settle_batch(
+                [(claimed[0], subject, str(claimed[0].db.generation_token))]
+            )
         self.assertEqual(settled, [])
         record = self._record_for(subject)
         self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
@@ -371,9 +405,10 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
     def test_failed_regeneration_never_corrupts_the_prior_output(self):
         subject = self._subject("dungeon_interior")
         self._record(subject)
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/dungeon_interior.png",
             error=None,
@@ -627,7 +662,7 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
         racing = _ReclaimMidFlightClient()
         from world.art.worker import _settle_one
 
-        outcome = _settle_one(racing, held)
+        outcome = _settle_one(racing, held, subject, token_a)
         self.assertIsNone(outcome)
         record = self._record_for(subject)
         # The stale worker (token A) must not publish under the newer claim
@@ -654,10 +689,16 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
             claimed = claim(10)
             self.assertEqual(len(claimed), 1)
             held = claimed[0]
+            token_held = str(held.db.generation_token)
             requeue(subject)
             from world.art.worker import _settle_one
 
-            outcome = _settle_one(FakeSDWebUIClient(), held)
+            outcome = _settle_one(
+                FakeSDWebUIClient(),
+                held,
+                subject,
+                token_held,
+            )
             self.assertIsNone(outcome)
         record = self._record_for(subject)
         self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
@@ -993,6 +1034,383 @@ class GalleryWorkerTests(WorkerStoreIsolation):
         # Only the claimed classic record exists besides the deleted job.
         keys = {r.db_key for r in ArtAssetRecord.objects.all()}
         self.assertEqual(keys, {record_key(scene)})
+
+
+class _OpaqueClient:
+    """Deterministic client replaying the OPAQUE multi-pixel portrait fixture.
+
+    ``FakeSDWebUIClient``'s default PNG is a 1x1 ALREADY-TRANSPARENT image, so
+    every cutout assertion in this module drives this client instead: an alpha
+    assertion against the transparent default would pass with the stage
+    disabled and prove nothing (design D7).
+    """
+
+    def __init__(self):
+        self.calls: list[tuple[ArtSubject, str]] = []
+        self.seed = 77
+
+    def generate(self, subject: ArtSubject, description: str) -> GeneratedImage:
+        self.calls.append((subject, description))
+        return GeneratedImage(data=_opaque_portrait_png(), seed=self.seed)
+
+
+class _ExplodingBackend:
+    """A backend whose removal raises an arbitrary, unbounded exception."""
+
+    def remove_background(self, png_bytes):
+        raise RuntimeError("removal exploded arbitrarily")
+
+
+class CutoutStageTests(WorkerStoreIsolation):
+    """The enabled stage stores cutouts; the skipped paths are byte-identical."""
+
+    def setUp(self):
+        super().setUp()
+        self.client = _OpaqueClient()
+
+    @contextmanager
+    def _cutout(self, fake):
+        """Enable the stage with ``fake`` as the injected backend instance."""
+        with override_settings(
+            ART_REMBG_ENABLED=True,
+            ART_REMBG_BACKEND="world.art.fake_cutout.FakeCutoutBackend",
+        ):
+            with patch(
+                "world.art.fake_cutout.FakeCutoutBackend", return_value=fake
+            ):
+                yield
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_a_character_portrait_is_stored_transparent(self):
+        subject = self._subject("42", ArtSubjectKind.CHARACTER)
+        self._record(subject)
+        with self._client(self.client):
+            drain_synchronous(10)
+        target = self.root / "portrait" / "character" / "42.png"
+        disabled_bytes = target.read_bytes()
+        requeue(subject)
+        fake = FakeCutoutBackend()
+        with self._cutout(fake):
+            with self._client(self.client):
+                drain_synchronous(10)
+        record = self._record_for(subject)
+        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        self.assertEqual(len(fake.calls), 1)
+        self._assert_region_transparent(target)
+        self.assertNotEqual(target.read_bytes(), disabled_bytes)
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_a_monster_portrait_is_stored_transparent(self):
+        subject = self._subject("low", ArtSubjectKind.MONSTER)
+        self._record(subject)
+        with self._client(self.client):
+            drain_synchronous(10)
+        target = self.root / "portrait" / "monster" / "low.png"
+        disabled_bytes = target.read_bytes()
+        requeue(subject)
+        fake = FakeCutoutBackend()
+        with self._cutout(fake):
+            with self._client(self.client):
+                drain_synchronous(10)
+        record = self._record_for(subject)
+        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        self._assert_region_transparent(target)
+        self.assertNotEqual(target.read_bytes(), disabled_bytes)
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_gallery_portrait_jobs_are_cut_out_on_the_same_terms(self):
+        monster = self._subject("low", ArtSubjectKind.MONSTER)
+        character_image_id = "aaaaaaaa-1111-4111-8111-111111111111"
+        monster_image_id = "bbbbbbbb-2222-4222-8222-222222222222"
+        character_job = enqueue_gallery_job(
+            self._subject("42", ArtSubjectKind.CHARACTER),
+            "desc",
+            image_id=character_image_id,
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
+        monster_job = enqueue_gallery_job(
+            monster,
+            "desc",
+            image_id=monster_image_id,
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
+        fake = FakeCutoutBackend()
+        with self._cutout(fake):
+            with self._client(self.client):
+                drain_synchronous(10)
+        self.assertEqual(len(fake.calls), 2)
+        self._assert_region_transparent(
+            self.root / "gallery" / "character" / "42" / f"{character_image_id}.png"
+        )
+        self._assert_region_transparent(
+            self.root / "gallery" / "monster" / "low" / f"{monster_image_id}.png"
+        )
+        self.assertEqual(len(gallery_api.cards_for(self._subject("42", ArtSubjectKind.CHARACTER))), 1)
+        self.assertEqual(len(gallery_api.cards_for(monster)), 1)
+        self.assertIsNone(self._gallery_job_key(character_job))
+        self.assertIsNone(self._gallery_job_key(monster_job))
+
+    def _gallery_job_key(self, job):
+        return ArtAssetRecord.objects.filter(db_key=job.db_key).first()
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_scene_art_never_reaches_the_backend(self):
+        subject = self._subject()
+        self._record(subject)
+        with self._client(self.client):
+            drain_synchronous(10)
+        target = self.root / "scene" / "forest_path.png"
+        disabled_bytes = target.read_bytes()
+        requeue(subject)
+        fake = FakeCutoutBackend()
+        with self._cutout(fake):
+            with self._client(self.client):
+                drain_synchronous(10)
+        record = self._record_for(subject)
+        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        self.assertEqual(fake.calls, [])
+        self.assertEqual(target.read_bytes(), disabled_bytes)
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_the_disabled_stage_records_zero_calls_for_every_kind(self):
+        fake = FakeCutoutBackend()
+        self._record(self._subject())
+        self._record(self._subject("42", ArtSubjectKind.CHARACTER))
+        self._record(self._subject("low", ArtSubjectKind.MONSTER))
+        with patch("world.art.fake_cutout.FakeCutoutBackend", return_value=fake):
+            with self._client(self.client):
+                drain_synchronous(10)
+        self.assertEqual(fake.calls, [])
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_the_stage_runs_between_generation_and_encoding(self):
+        subject = self._subject("42", ArtSubjectKind.CHARACTER)
+        self._record(subject)
+        real_encode = __import__("world.art.formats", fromlist=["encode"]).encode
+        captured: dict = {}
+
+        def _spy_encode(png_bytes, **kwargs):
+            captured["bytes"] = png_bytes
+            return real_encode(png_bytes, **kwargs)
+
+        fake = FakeCutoutBackend()
+        with self._cutout(fake):
+            with patch("world.art.worker.encode", side_effect=_spy_encode):
+                with self._client(self.client):
+                    drain_synchronous(10)
+        record = self._record_for(subject)
+        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        self.assertEqual(len(self.client.calls), 1, "the generation is never re-issued")
+        self.assertEqual(len(fake.calls), 1)
+        # encode received the BACKEND's bytes, not the client's: the received
+        # bytes decode RGBA with the fake's zeroed region.
+        self.assertNotEqual(captured["bytes"], _opaque_portrait_png())
+        with Image.open(io.BytesIO(captured["bytes"])) as image:
+            self.assertEqual(image.mode, "RGBA")
+            self.assertEqual(image.load()[0, 0][3], 0)
+        listing = sorted(p.name for p in (self.root / "portrait" / "character").iterdir())
+        self.assertEqual(listing, ["42.png"], "exactly one artifact is published")
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_the_disabled_stage_keeps_todays_lease_bound(self):
+        from world.art.worker import _CONVERSION_ALLOWANCE_SECONDS, _LEASE_MARGIN_SECONDS
+
+        with override_settings(
+            ART_SD_TIMEOUT_SECONDS=1,
+            ART_SCHEDULER_LIMIT=2,
+            ART_REMBG_ENABLED=False,
+        ):
+            expected = 2 * (1 + _CONVERSION_ALLOWANCE_SECONDS) + _LEASE_MARGIN_SECONDS
+            self.assertEqual(_lease_timeout(), expected)
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_the_enabled_stage_widens_the_bound_by_the_cutout_allowance(self):
+        from django.conf import settings as django_settings
+
+        from world.art.worker import _CONVERSION_ALLOWANCE_SECONDS, _LEASE_MARGIN_SECONDS
+
+        with override_settings(
+            ART_SD_TIMEOUT_SECONDS=1,
+            ART_SCHEDULER_LIMIT=2,
+            ART_REMBG_ENABLED=True,
+        ):
+            expected = 2 * (
+                1
+                + _CONVERSION_ALLOWANCE_SECONDS
+                + int(django_settings.ART_REMBG_ALLOWANCE_SECONDS)
+            ) + _LEASE_MARGIN_SECONDS
+            self.assertEqual(_lease_timeout(), expected)
+
+
+class CutoutFailureTests(WorkerStoreIsolation):
+    """A cutout failure is a bounded, terminal, non-degrading job failure."""
+
+    def setUp(self):
+        super().setUp()
+        self.client = _OpaqueClient()
+
+    def _prior_output(self, subject: ArtSubject) -> tuple[Path, bytes]:
+        """Generate a valid prior output once, then requeue for the failure."""
+        with self._client(self.client):
+            drain_synchronous(10)
+        target = self.root / expected_output_identity(subject)
+        self.assertTrue(target.is_file())
+        prior = target.read_bytes()
+        requeue(subject)
+        return target, prior
+
+    def _cutout(self, **overrides):
+        return override_settings(ART_REMBG_ENABLED=True, **overrides)
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_an_unresolvable_backend_settles_art_cutout_unavailable(self):
+        subject = self._subject("42", ArtSubjectKind.CHARACTER)
+        self._record(subject)
+        target, prior = self._prior_output(subject)
+        with self._cutout(ART_REMBG_BACKEND="no.such.module.Backend"):
+            with self._client(self.client):
+                drain_synchronous(10)
+        record = self._record_for(subject)
+        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
+        self.assertEqual(record.db.last_error_code, "art_cutout_unavailable")
+        self.assertEqual(target.read_bytes(), prior)
+        self.assertEqual(len(self.client.calls), 2, "one failing generation, never re-issued twice")
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_a_scripted_failure_settles_art_cutout_error(self):
+        subject = self._subject("42", ArtSubjectKind.CHARACTER)
+        self._record(subject)
+        target, prior = self._prior_output(subject)
+        fake = FakeCutoutBackend()
+        fake.fail_every_call(CutoutError("art_cutout_error", "scripted"))
+        with self._cutout(ART_REMBG_BACKEND="world.art.fake_cutout.FakeCutoutBackend"):
+            with patch("world.art.fake_cutout.FakeCutoutBackend", return_value=fake):
+                with self._client(self.client):
+                    drain_synchronous(10)
+        record = self._record_for(subject)
+        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
+        self.assertEqual(record.db.last_error_code, "art_cutout_error")
+        self.assertEqual(target.read_bytes(), prior)
+        self.assertFalse((self.root / "portrait" / "character" / "42.tmp").exists())
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_an_arbitrary_exception_is_still_bounded(self):
+        subject = self._subject("low", ArtSubjectKind.MONSTER)
+        self._record(subject)
+        with override_settings(
+            ART_REMBG_ENABLED=True,
+            ART_REMBG_BACKEND="world.art.tests.test_worker._ExplodingBackend",
+        ):
+            with self._client(self.client):
+                drain_synchronous(10)
+        record = self._record_for(subject)
+        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
+        self.assertEqual(record.db.last_error_code, "art_cutout_error")
+        self.assertIsNone(record.db.output_identity)
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_a_failing_gallery_cutout_appends_no_card(self):
+        from world.art.queue import enqueue_gallery_job
+
+        character = self._subject("42", ArtSubjectKind.CHARACTER)
+        image_id = "cccccccc-3333-4333-8333-333333333333"
+        job = enqueue_gallery_job(
+            character,
+            "desc",
+            image_id=image_id,
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
+        fake = FakeCutoutBackend()
+        fake.fail_every_call(CutoutError("art_cutout_unavailable", "model missing"))
+        with self._cutout(ART_REMBG_BACKEND="world.art.fake_cutout.FakeCutoutBackend"):
+            with patch("world.art.fake_cutout.FakeCutoutBackend", return_value=fake):
+                with self._client(self.client):
+                    drain_synchronous(10)
+        record = gallery_api.record_for(character)
+        self.assertEqual(record.db.last_error_code, "art_cutout_unavailable")
+        self.assertEqual(gallery_api.cards_for(character), [])
+        self.assertFalse(
+            (self.root / "gallery" / "character" / "42" / f"{image_id}.png").exists()
+        )
+        self.assertIsNone(
+            ArtAssetRecord.objects.filter(db_key=job.db_key).first()
+        )
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_one_failing_portrait_does_not_fail_its_batch(self):
+        scene = self._subject()
+        failing = self._subject("42", ArtSubjectKind.CHARACTER)
+        succeeding = self._subject("low", ArtSubjectKind.MONSTER)
+        for subject in (scene, failing, succeeding):
+            self._record(subject)
+        fake = FakeCutoutBackend()
+        seen: list[bytes] = []
+
+        def _fail_first_portrait(payload: bytes) -> bool:
+            seen.append(payload)
+            return len(seen) == 1
+
+        fake.add_failure(
+            _fail_first_portrait,
+            CutoutError("art_cutout_error", "first portrait only"),
+        )
+        with self._cutout(ART_REMBG_BACKEND="world.art.fake_cutout.FakeCutoutBackend"):
+            with patch("world.art.fake_cutout.FakeCutoutBackend", return_value=fake):
+                with self._client(self.client):
+                    drain_synchronous(10)
+        scene_record = self._record_for(scene)
+        failing_record = self._record_for(failing)
+        succeeding_record = self._record_for(succeeding)
+        self.assertEqual(scene_record.db.status, ArtAssetStatus.DONE)
+        self.assertEqual(failing_record.db.status, ArtAssetStatus.FAILED)
+        self.assertEqual(failing_record.db.last_error_code, "art_cutout_error")
+        self.assertEqual(succeeding_record.db.status, ArtAssetStatus.DONE)
+        self._assert_not_in_progress({scene_record, failing_record, succeeding_record})
+        self._assert_region_transparent(
+            self.root / "portrait" / "monster" / "low.png"
+        )
+        self.assertFalse((self.root / "portrait" / "character" / "42.png").exists())
+
+    def _assert_not_in_progress(self, records) -> None:
+        from world.art.store import ArtAssetStatus as Status
+
+        for record in records:
+            self.assertIn(
+                record.db.status,
+                {Status.DONE, Status.FAILED},
+                "no claimed job is left in_progress",
+            )
+
+    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
+    def test_a_stale_cutout_failure_never_steals_a_reclaimed_claim(self):
+        subject = self._subject("42", ArtSubjectKind.CHARACTER)
+        self._record(subject)
+        held = claim(10)[0]
+        token_a = str(held.db.generation_token)
+        # The record is reclaimed to pending and re-claimed under a NEW token
+        # while the obsolete worker (token A) is still holding its batch.
+        requeue(subject)
+        fresh = claim(10)[0]
+        token_b = str(fresh.db.generation_token)
+        self.assertNotEqual(token_a, token_b)
+        fake = FakeCutoutBackend()
+        fake.fail_every_call(CutoutError("art_cutout_error", "obsolete worker"))
+        with self._cutout(ART_REMBG_BACKEND="world.art.fake_cutout.FakeCutoutBackend"):
+            with patch("world.art.fake_cutout.FakeCutoutBackend", return_value=fake):
+                settled = _run_and_settle_batch([(held, subject, token_a)])
+        self.assertEqual(settled, [])
+        record = self._record_for(subject)
+        self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
+        self.assertEqual(record.db.generation_token, token_b)
+        self.assertIsNone(record.db.last_error_code)
+        self.assertIsNone(record.db.output_identity)
+        self.assertFalse((self.root / "portrait" / "character" / "42.png").exists())
 
 
 if __name__ == "__main__":

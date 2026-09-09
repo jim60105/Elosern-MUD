@@ -80,10 +80,12 @@ dotted path (default `world.art.cutout.RembgCutoutBackend`), resolved exactly li
 `ART_SD_CLIENT` is resolved by `resolve_sd_client()`, and SHALL expose a module-level
 `remove_background(png_bytes) -> bytes` entry point that returns PNG bytes carrying an
 alpha channel. `remove_background` SHALL validate the backend's return value before
-returning it — a non-`bytes` value, empty bytes, or bytes not beginning with the PNG
-magic SHALL raise `art_cutout_error` — so a misbehaving backend can never push a bad
-value into `encode`, where it would surface as `sd_format_error` and blame the format
-stage for a backend fault. `world/art/fake_cutout.py` SHALL provide a deterministic
+returning it — a non-`bytes` value, empty bytes, bytes not beginning with the PNG
+magic, or bytes that do not decode as an alpha-carrying PNG (`RGBA`/`LA`/`PA` mode)
+SHALL raise `art_cutout_error` — so a misbehaving backend can never push a bad value
+into `encode`, where it would surface as `sd_format_error` and blame the format
+stage for a backend fault, and an opaque passthrough can never be stored as a
+successful cutout. `world/art/fake_cutout.py` SHALL provide a deterministic
 `FakeCutoutBackend` with the same interface that records every call, replays scripted
 failures, and returns a real PNG whose alpha channel is zeroed over a fixed region —
 never a passthrough of its input — without importing `rembg`, reading a model file, or
@@ -122,6 +124,12 @@ default in place.
 - **THEN** `remove_background` raises `CutoutError` with code `art_cutout_error`, and the
   value never reaches `encode` (the settled code is the cutout code, never
   `sd_format_error`)
+
+#### Scenario: A backend passthrough of an opaque PNG is caught at the seam
+- **WHEN** an injected backend returns the original opaque RGB PNG unchanged, or any
+  decodable PNG whose mode carries no alpha
+- **THEN** `remove_background` raises `CutoutError` with code `art_cutout_error` and the
+  bytes never reach `encode`, so a non-cutout can never be stored as a successful cutout
 
 #### Scenario: The module imports without the optional stack
 - **WHEN** `world.art.cutout` is imported in an environment where importing `rembg` raises

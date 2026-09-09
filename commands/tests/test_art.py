@@ -51,9 +51,10 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_staff_can_list_scene_records_without_persona_or_paths(self):
         ensure(_scene("forest_path"), "desc")
-        claim(10)
+        claimed = claim(10)
         settle(
             _scene("forest_path"),
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/forest_path.png",
             error=None,
@@ -102,8 +103,14 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_retry_reenqueues_failed_records(self):
         subject = _scene("forest_path")
         ensure(subject, "desc")
-        claim(10)
-        settle(subject, status=ArtAssetStatus.FAILED, output_identity=None, error="boom")
+        claimed = claim(10)
+        settle(
+            subject,
+            generation_token=str(claimed[0].db.generation_token),
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="boom",
+        )
         with patch("world.art.worker.drain"):
             output = self.call(CmdArtRetry(), "")
         record = ArtAssetRecord.objects.filter(db_key="art:scene:forest_path").first()
@@ -114,9 +121,10 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_requeue_valid_key_forces_regeneration_preserving_prior_output(self):
         subject = _scene("forest_path")
         ensure(subject, "desc")
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/forest_path.png",
             error=None,
@@ -277,9 +285,10 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         tier = next(iter(MONSTER_TIER_REGISTRY))
         subject = monster_subject_for(tier)
         ensure(subject, "desc")
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity=f"portrait/monster/{tier}.png",
             error=None,
@@ -448,8 +457,14 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         gallery_api.record_error(ghost, "sd_connection_error")
         scene = _scene("forest_path")
         ensure(scene, "desc")
-        claim(10)
-        settle(scene, status=ArtAssetStatus.FAILED, output_identity=None, error="boom")
+        claimed = claim(10)
+        settle(
+            scene,
+            generation_token=str(claimed[0].db.generation_token),
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="boom",
+        )
         output = self.call(CmdArtRetry(), "")
         self.assertIn("已重新排入 1 個失敗記錄，並重新請求 0 次圖庫生成", output)
         # The ghost keeps its recorded error (typed rejection keeps it).
@@ -516,17 +531,24 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         tier = next(iter(MONSTER_TIER_REGISTRY))
         subject = monster_subject_for(tier)
         ensure(subject, "desc")
-        claim(10)
+        claimed = claim(10)
         settle(
             subject,
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.FAILED,
             output_identity=None,
             error="legacy boom",
         )
         scene = _scene("forest_path")
         ensure(scene, "desc")
-        claim(10)
-        settle(scene, status=ArtAssetStatus.FAILED, output_identity=None, error="boom")
+        claimed = claim(10)
+        settle(
+            scene,
+            generation_token=str(claimed[0].db.generation_token),
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="boom",
+        )
         output = self.call(CmdArtRetry(), "")
         # Only the scene was re-enqueued.
         self.assertIn("已重新排入 1 個失敗記錄", output)
@@ -612,9 +634,10 @@ class ArtStatusSeedColumnTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_done_record_shows_its_persisted_seed(self):
         ensure(_scene("forest_path"), "desc")
-        claim(10)
+        claimed = claim(10)
         settle(
             _scene("forest_path"),
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/forest_path.png",
             error=None,
@@ -763,17 +786,19 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     )
     def test_reachable_dashboard_shows_all_five_sections(self):
         ensure(_scene("forest_path"), "desc")
-        claim(10)
+        claimed = claim(10)
         settle(
             _scene("forest_path"),
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
             output_identity="scene/forest_path.png",
             error=None,
         )
         ensure(_scene("old_ruins"), "desc")
-        claim(10)
+        claimed = claim(10)
         settle(
             _scene("old_ruins"),
+            generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.FAILED,
             output_identity=None,
             error="sd_connection_error",

@@ -462,6 +462,69 @@ ART_SD_PROBE_CACHE_SECONDS = _env_int_bounded(
     "ART_SD_PROBE_CACHE_SECONDS", 300, low=5, high=3_600
 )
 
+###############################################################################
+# Portrait background removal (art-portrait-cutout)
+###############################################################################
+
+# Master switch for the local CPU background-removal stage (rembg). Deliberately
+# defaults to False (design D2): the code defaults — and therefore the effective
+# settings under server/conf/test_settings.py — stay free of the ~1 GB first-use
+# model download and the multi-second CPU pass per portrait. An operator turns
+# the stage on with one line in .env and restarts.
+ART_REMBG_ENABLED = _env_bool("ART_REMBG_ENABLED", False)
+
+# Closed, case-insensitive choice set for the removal model (design D9).
+# LICENSING: the default `bria-rmbg` wraps BRIA's RMBG-2.0 weights, which are
+# BRIA-licensed — free for non-commercial use, commercial use requires a
+# licence from BRIA. `isnet-anime` (~176 MB) is the permissively licensed
+# drop-in alternative: one variable change plus `@art requeue`, no code change.
+# An unknown name fails settings import here rather than failing every portrait
+# job at runtime inside rembg's session factory.
+ART_REMBG_MODEL = _env_choice(
+    "ART_REMBG_MODEL",
+    ("bria-rmbg", "isnet-anime", "isnet-general-use", "u2net", "u2netp"),
+    "bria-rmbg",
+)
+
+# When False, the backend verifies the model artifact already exists under
+# ART_REMBG_MODEL_DIR before importing rembg and raises the bounded
+# `art_cutout_unavailable` immediately when absent: the supported air-gapped
+# configuration (pre-seed the volume from a trusted machine, disable runtime
+# downloads — the fetch then becomes structurally impossible).
+ART_REMBG_DOWNLOAD_ENABLED = _env_bool("ART_REMBG_DOWNLOAD_ENABLED", True)
+
+# Per-item lease allowance charged when the stage is enabled (design D6): a
+# lease BUDGET, never an enforced timeout (ONNX inference is not interruptible
+# from another thread, so the name deliberately avoids promising enforcement).
+# The one-time model download sits outside this bound by design; the
+# claim-token guard (design D6a) makes such an overrun safe.
+ART_REMBG_ALLOWANCE_SECONDS = _env_int_bounded(
+    "ART_REMBG_ALLOWANCE_SECONDS", 120, low=10, high=1800
+)
+
+# Cap on the ONNX session's intra/inter-op thread count. 0 leaves ONNX
+# Runtime's own default in place. Non-zero reaches the session through
+# OMP_NUM_THREADS (the only mechanism the locked rembg 2.0.69 offers — its
+# new_session() builds its own SessionOptions); this is a deliberate
+# PROCESS-GLOBAL environment setting (see world/art/cutout.py).
+ART_REMBG_THREADS = _env_int_bounded("ART_REMBG_THREADS", 0, low=0, high=256)
+
+# Dotted path of the background-removal backend class (the swappable seam,
+# mirroring ART_SD_CLIENT). Tests and the browser harness point this at
+# world.art.fake_cutout.FakeCutoutBackend so no test ever loads an ONNX model.
+# Deliberately NOT environment-overridable: an environment-controlled
+# import-executing seam would let any inherited process environment import
+# arbitrary code at engine startup (settings-environment-overrides).
+ART_REMBG_BACKEND = "world.art.cutout.RembgCutoutBackend"
+
+# Model cache directory. Deliberately NOT environment-overridable (same
+# rationale as ART_STORE_ROOT): a mistyped value would silently relocate the
+# ~1 GB model artifact off its persistent volume (compose mounts
+# evennia-rembg:/app/server/.rembg; the image's HOME=/tmp tmpfs makes rembg's
+# library default re-download on every container start). secret_settings.py
+# remains the escape hatch for a nonstandard layout.
+ART_REMBG_MODEL_DIR = os.path.join(GAME_DIR, "server", ".rembg")
+
 ######################################################################
 # Prompt library (prompt-library)
 ######################################################################
@@ -585,3 +648,19 @@ ART_SD_OUTPUT_EXTENSION = {
     "jpeg": ".jpg",
     "avif": ".avif",
 }[ART_SD_OUTPUT_FORMAT]
+
+# Fail-closed alpha guard (art-portrait-cutout D4): the background-removal
+# stage produces RGBA cutouts, and the JPEG path encodes from an RGB view
+# (image.convert("RGB")), which would silently discard the alpha and store the
+# original background-ful portrait while the record claimed to be a cutout.
+# Placed AFTER the secret_settings import — beside the extension derivation —
+# so every override path (code default, environment, secret_settings.py) is
+# covered by this one check; a secret_settings format override is caught here
+# exactly like the extension derivation already guarantees.
+if bool(ART_REMBG_ENABLED) and ART_SD_OUTPUT_FORMAT == "jpeg":
+    raise ImproperlyConfigured(
+        "setting ART_REMBG_ENABLED=true requires an alpha-capable "
+        f"ART_SD_OUTPUT_FORMAT: the effective ART_SD_OUTPUT_FORMAT is "
+        f"'{ART_SD_OUTPUT_FORMAT}', which cannot carry the transparency the "
+        "background-removal stage produces"
+    )

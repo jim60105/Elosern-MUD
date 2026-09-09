@@ -435,3 +435,72 @@ class MetadataPolicyTests(unittest.TestCase):
         self.assertIn("Seed: 12345", lines[2])
         self.assertIn("Size: 64x48", lines[2])
         self.assertIn("Model: anima/animaika_v43.safetensors", lines[2])
+
+
+class AlphaRoundTripTests(unittest.TestCase):
+    """An RGBA transport PNG's transparency survives png/webp/avif end to end
+    (art-output-format-pipeline, art-portrait-cutout D4). The alpha
+    requirement is new in this change and has no canonical main-spec ID until
+    archive-sync, so these tests carry no @covers_requirement (tasks 6.11)."""
+
+    ALPHA_CAPABLE = ("png", "webp", "avif")
+    ALPHA_MODES = ("RGBA", "LA", "RGBa", "La")
+
+    def _alpha_fixture(self) -> bytes:
+        """An RGBA PNG with a fully transparent region and an opaque region."""
+        image = Image.new("RGBA", (64, 48))
+        pixels = image.load()
+        for y in range(48):
+            for x in range(64):
+                if x < 8 and y < 8:
+                    pixels[x, y] = (200, 10, 10, 0)
+                else:
+                    pixels[x, y] = (17 + x, 29 + y, 60, 255)
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        return buffer.getvalue()
+
+    def test_alpha_round_trips_through_each_alpha_capable_format(self):
+        fixture = self._alpha_fixture()
+        for output_format in self.ALPHA_CAPABLE:
+            with self.subTest(format=output_format):
+                encoded, _extension = _encode(fixture, output_format)
+                with Image.open(io.BytesIO(encoded)) as image:
+                    self.assertIn(image.mode, self.ALPHA_MODES)
+                    pixels = image.load()
+                    self.assertEqual(
+                        pixels[0, 0][3], 0, "source transparent stays transparent"
+                    )
+                    self.assertEqual(pixels[7, 7][3], 0)
+                    self.assertEqual(pixels[63, 47][3], 255, "source opaque stays opaque")
+                    # webp/avif are lossy: the opaque colour survives within
+                    # the encoder's tolerance, the alpha survives exactly.
+                    tolerance = 0 if output_format == "png" else 3
+                    for got, want in zip(pixels[63, 47][:3], (17 + 63, 29 + 47, 60)):
+                        self.assertLessEqual(abs(got - want), tolerance)
+
+    def test_alpha_survives_with_metadata_stripping_on(self):
+        fixture = self._alpha_fixture()
+        for output_format in self.ALPHA_CAPABLE:
+            with self.subTest(format=output_format):
+                encoded, _extension = _encode(
+                    fixture, output_format, preserve_metadata=False
+                )
+                with Image.open(io.BytesIO(encoded)) as image:
+                    self.assertIn(image.mode, self.ALPHA_MODES)
+                    self.assertEqual(image.load()[0, 0][3], 0)
+                if output_format == "png":
+                    # The stripping contract: zero ancillary chunks survive.
+                    self.assertEqual(_png_chunk_types(encoded), ["IHDR", "IDAT", "IEND"])
+
+    def test_an_opaque_source_is_unaffected_for_all_four_formats(self):
+        # Regression: the alpha work must not change the opaque pipeline.
+        opaque = _noise_png()
+        for output_format in ("png", "webp", "jpeg", "avif"):
+            with self.subTest(format=output_format):
+                encoded, _extension = _encode(opaque, output_format)
+                baseline, _baseline_extension = _encode(opaque, output_format)
+                self.assertEqual(
+                    list(Image.open(io.BytesIO(encoded)).getdata()),
+                    list(Image.open(io.BytesIO(baseline)).getdata()),
+                )

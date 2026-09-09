@@ -22,6 +22,7 @@ Twisted thread with the lock released and a bounded timeout.
 
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,7 @@ from django.conf import settings
 from twisted.internet import threads
 
 from world.art import gallery_kinds
+from world.art.cutout import CutoutError, applies_to, remove_background
 from world.art.formats import encode
 from world.art.queue import (
     claim,
@@ -162,14 +164,23 @@ def subject_for(record: ArtAssetRecord) -> ArtSubject:
 def _settle_one(
     client: Any,
     record: ArtAssetRecord,
+    subject: ArtSubject,
+    generation_token: str,
 ) -> tuple[str, str | None, str | None, bool] | None:
     """Generate, convert, and publish one claimed record; return the settle outcome.
 
+    ``subject`` and ``generation_token`` are the CLAIM-TIME values captured by
+    the batch runner before any blocking work: settle authority is the token
+    this worker actually claimed, never whatever the record field happens to
+    hold after a reclaim (design D6a) — the record attribute is live storage
+    and is deliberately never re-read here.
+
     Every failure mode maps to a bounded settle: named ``SDError`` codes,
-    local-conversion failures (``sd_format_error``), prompt-library failures
-    (``sd_prompt_error``), and any unexpected internal error
-    (``sd_internal_error``); the record's prior valid output is retained on
-    every failure path. The embedded-metadata provenance comes from the
+    background-removal failures (``art_cutout_unavailable`` /
+    ``art_cutout_error``), local-conversion failures (``sd_format_error``),
+    prompt-library failures (``sd_prompt_error``), and any unexpected internal
+    error (``sd_internal_error``); the record's prior valid output is retained
+    on every failure path. The embedded-metadata provenance comes from the
     ``GeneratedImage`` the client returned — never from a second render of
     the mutable prompt library. A success publishes the encoded bytes
     atomically through ``settle_generated`` (carrying the returned seed),
@@ -184,12 +195,7 @@ def _settle_one(
     Returns ``None`` when the claim was requeued or reclaimed mid-flight and
     must not be settled by this worker.
     """
-    subject = subject_for(record)
     description = str(record.db.source_description or "")
-    # The claim-time token snapshot is captured BEFORE any blocking work:
-    # settle authority is the token this worker actually claimed, never
-    # whatever the record field happens to hold after the generation.
-    generation_token = str(record.db.generation_token or "")
     # The job key and image id are likewise captured BEFORE the settle: a
     # gallery settle deletes the job record, and the post-settle boundary
     # event must still name the finished job.
@@ -207,10 +213,52 @@ def _settle_one(
         _log_gallery_settle(subject, image_id, ArtAssetStatus.FAILED, code)
         return ArtAssetStatus.FAILED, None, code, True
 
+    def _cutout_transport(png_bytes: bytes) -> bytes:
+        """Apply the background-removal stage and emit its boundary event.
+
+        Exactly one stage event per outcome (design D12): ``art_cutout_done``
+        on success, ``art_cutout_failed`` (with ``exc=``) on failure. Neither
+        is emitted for a subject the stage skipped.
+        """
+        started = time.monotonic()
+        try:
+            result = remove_background(png_bytes)
+        except CutoutError as error:
+            log_warn(
+                "art_cutout_failed",
+                context={
+                    "job": job_key,
+                    "subject": subject.full(),
+                    "image_id": image_id,
+                    "model": str(settings.ART_REMBG_MODEL),
+                    "code": error.code,
+                },
+                exc=error,
+            )
+            raise
+        log_info(
+            "art_cutout_done",
+            context={
+                "job": job_key,
+                "subject": subject.full(),
+                "image_id": image_id,
+                "model": str(settings.ART_REMBG_MODEL),
+                "duration_ms": int((time.monotonic() - started) * 1000),
+            },
+        )
+        return result
+
     try:
         image = client.generate(subject, description)
+        # The stage runs on the transport PNG bytes, before encode (design
+        # D1). The GeneratedImage provenance is untouched: the metadata still
+        # describes the request sd-webui actually served (design D11).
+        if bool(settings.ART_REMBG_ENABLED) and applies_to(subject.kind):
+            image_bytes = _cutout_transport(image.data)
+        else:
+            image_bytes = image.data
         encoded, _extension = encode(
-            image.data,
+            image_bytes,
             prompt=image.prompt,
             negative_prompt=image.negative_prompt,
             steps=image.steps,
@@ -228,6 +276,11 @@ def _settle_one(
         identity = output_identity_for(record)
         tmp_path = _write_temp(identity, encoded)
     except SDError as error:
+        log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": error.code}, exc=error)
+        if is_gallery:
+            return _gallery_failure(error.code)
+        return ArtAssetStatus.FAILED, None, error.code, False
+    except CutoutError as error:
         log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": error.code}, exc=error)
         if is_gallery:
             return _gallery_failure(error.code)
@@ -371,7 +424,25 @@ def _log_gallery_settle(
     )
 
 
-def _run_and_settle_batch(records: list[ArtAssetRecord]) -> list[ArtSubject]:
+def _claim_pairs(records: list[ArtAssetRecord]) -> list[tuple[ArtAssetRecord, ArtSubject, str]]:
+    """Capture the CLAIM-TIME (record, subject, generation token) triples.
+
+    Runs synchronously on the calling thread immediately after ``claim()``
+    returned, before any blocking work (design D6a): settle authority is the
+    token this worker actually claimed. The record attribute is live storage —
+    a record reclaimed and re-claimed later would hand a stale worker the NEW
+    claim's token — so the token is snapshotted exactly once here and threaded
+    through every settle call; the attribute is never re-read afterwards.
+    """
+    return [
+        (record, subject_for(record), str(record.db.generation_token or ""))
+        for record in records
+    ]
+
+
+def _run_and_settle_batch(
+    pairs: list[tuple[ArtAssetRecord, ArtSubject, str]],
+) -> list[ArtSubject]:
     """Generate and settle one claimed batch on the background thread.
 
     The client is resolved once per batch: a bad ``ART_SD_CLIENT`` dotted path
@@ -385,7 +456,6 @@ def _run_and_settle_batch(records: list[ArtAssetRecord]) -> list[ArtSubject]:
     result whose claim was requeued or reclaimed is excluded, so the completion
     notification is emitted only for a result that is truly the current record.
     """
-    pairs = [(record, subject_for(record)) for record in records]
     try:
         client = resolve_sd_client()
     except Exception as error:
@@ -397,8 +467,8 @@ def _run_and_settle_batch(records: list[ArtAssetRecord]) -> list[ArtSubject]:
         _fail_batch(pairs, "sd_client_config_error")
         return []
     settled: list[ArtSubject] = []
-    for record, subject in pairs:
-        outcome = _settle_one(client, record)
+    for record, subject, token in pairs:
+        outcome = _settle_one(client, record, subject, token)
         if outcome is None:
             continue
         status, identity, error, already_settled = outcome
@@ -415,6 +485,7 @@ def _run_and_settle_batch(records: list[ArtAssetRecord]) -> list[ArtSubject]:
         if (
             settle(
                 subject,
+                generation_token=token,
                 status=status,
                 output_identity=identity,
                 error=error,
@@ -426,7 +497,9 @@ def _run_and_settle_batch(records: list[ArtAssetRecord]) -> list[ArtSubject]:
     return settled
 
 
-def _fail_batch(pairs: list[tuple[ArtAssetRecord, ArtSubject]], error: str) -> None:
+def _fail_batch(
+    pairs: list[tuple[ArtAssetRecord, ArtSubject, str]], error: str
+) -> None:
     """Settle every claimed record ``failed``; event only when applied.
 
     A stale record (requeued or reclaimed mid-flight) settles to a no-op
@@ -436,14 +509,14 @@ def _fail_batch(pairs: list[tuple[ArtAssetRecord, ArtSubject]], error: str) -> N
     and the spent job record is deleted — so no gallery job is ever settled
     through (or onto) its subject's classic record.
     """
-    for record, subject in pairs:
+    for record, subject, token in pairs:
         if is_gallery_job(record):
             # The event fields are captured BEFORE the settle: the terminal
             # gallery-failed settle deletes the job record (task 3.4).
             image_id = str(record.db.gallery_image_id or "")
             applied = settle_gallery_failed(
                 str(record.db_key),
-                generation_token=str(record.db.generation_token or ""),
+                generation_token=token,
                 error=error,
             )
             if applied is not None:
@@ -456,6 +529,7 @@ def _fail_batch(pairs: list[tuple[ArtAssetRecord, ArtSubject]], error: str) -> N
         if (
             settle(
                 subject,
+                generation_token=token,
                 status=ArtAssetStatus.FAILED,
                 output_identity=None,
                 error=error,
@@ -469,15 +543,25 @@ def _lease_timeout() -> float:
     """Lease-reclaim bound sized by the worst-case claimed batch.
 
     A batch of up to ``ART_SCHEDULER_LIMIT`` claimed records can run for
-    ``N x (ART_SD_TIMEOUT_SECONDS + per-item local-conversion allowance)`` on
-    the single slot, so the lease bound is
+    ``N x (ART_SD_TIMEOUT_SECONDS + per-item local-conversion allowance +
+    per-item background-removal allowance)`` on the single slot, so the lease
+    bound is
     ``N x (timeout + conversion allowance) + margin`` -- never a flat per-item
-    timeout -- so neither a slow generation nor a slow local encode reclaims a
-    legitimately slow batch while its worker thread is still running. The
-    hard per-request deadline plus the per-subject terminal-settle guarantee
-    mean a batch always finishes within a bounded wall-clock budget.
+    timeout -- so neither a slow generation, a slow local encode, nor a slow
+    background-removal pass reclaims a legitimately slow batch while its
+    worker thread is still running. The background-removal term
+    (``ART_REMBG_ALLOWANCE_SECONDS``) is charged ONLY when
+    ``ART_REMBG_ENABLED`` is true, so a deployment that does not run the stage
+    keeps today's bound exactly. The one-time model download sits deliberately
+    OUTSIDE this bound (a 1 GB fetch can exceed any sane lease and cannot be
+    preempted from another thread); the claim-token rule makes such an overrun
+    safe instead of corrupting (design D6a). The hard per-request deadline
+    plus the per-subject terminal-settle guarantee mean a batch always
+    finishes within a bounded wall-clock budget.
     """
     per_item = float(settings.ART_SD_TIMEOUT_SECONDS) + _CONVERSION_ALLOWANCE_SECONDS
+    if bool(settings.ART_REMBG_ENABLED):
+        per_item += int(settings.ART_REMBG_ALLOWANCE_SECONDS)
     return int(settings.ART_SCHEDULER_LIMIT) * per_item + _LEASE_MARGIN_SECONDS
 
 
@@ -523,9 +607,13 @@ def drain(limit: int) -> int:
     if not records:
         _release_worker_slot()
         return 0
-    for record in records:
+    # Snapshot the claim-time tokens BEFORE any other step: a reactor-thread
+    # requeue could interleave even between the claim logs, so the snapshot
+    # must be the very next statement after claim() (design D6a).
+    pairs = _claim_pairs(records)
+    for record, _subject, _token in pairs:
         _log_claim(record)
-    deferred = threads.deferToThread(_run_and_release_slot, records)
+    deferred = threads.deferToThread(_run_and_release_slot, pairs)
     # The success callback runs on the reactor thread, so the completion
     # notification is never emitted from the worker generation thread.
     deferred.addCallback(_notify_completed_batch)
@@ -533,14 +621,16 @@ def drain(limit: int) -> int:
     return len(records)
 
 
-def _run_and_release_slot(records: list[ArtAssetRecord]) -> list[ArtSubject]:
+def _run_and_release_slot(
+    pairs: list[tuple[ArtAssetRecord, ArtSubject, str]],
+) -> list[ArtSubject]:
     """Run a claimed batch on the worker thread and always release the slot.
 
     Returns the subjects whose terminal status was actually applied so the
     reactor-thread callback can emit the completion notification.
     """
     try:
-        return _run_and_settle_batch(records)
+        return _run_and_settle_batch(pairs)
     finally:
         _release_worker_slot()
 
@@ -564,9 +654,10 @@ def drain_synchronous(limit: int) -> int:
         _release_worker_slot()
         return 0
     try:
-        for record in records:
+        pairs = _claim_pairs(records)
+        for record, _subject, _token in pairs:
             _log_claim(record)
-        settled = _run_and_settle_batch(records)
+        settled = _run_and_settle_batch(pairs)
         _notify_completed_batch(settled)
         return len(records)
     finally:

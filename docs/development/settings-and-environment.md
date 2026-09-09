@@ -27,7 +27,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 
 絕對不會靜默退回預設值、clamp 或延後到第一次使用時才報錯。
 
-## 本變更提供的 26 個環境變數（加上 SD_WEBUI_BASE_URL）
+## 本變更提供的 31 個環境變數（加上 SD_WEBUI_BASE_URL）
 
 `ART_SD_BASE_URL` 的變數名稱由 `internal-art-worker` 規格固定為 `SD_WEBUI_BASE_URL`；其餘變數與設定同名。
 
@@ -57,6 +57,22 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `ART_SD_PRESERVE_GENERATION_METADATA` | `ART_SD_PRESERVE_GENERATION_METADATA` | 布林 | `True` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；True＝產出物嵌入 A1111 形狀的 parameters 文字（PNG 文字區塊 `parameters`——latin-1 內容走 `tEXt`、其餘走 `iTXt`，A1111 讀取時兩種都認；JPEG／WebP／AVIF EXIF UserComment），False＝可證明的零中繼資料（無 text chunk、EXIF、ICC）；兩種模式下伺服器端嵌入的文字／EXIF／ICC 一律不會留存 |
 | `ART_SD_PROBE_TIMEOUT_MS` | `ART_SD_PROBE_TIMEOUT_MS` | 整數 | `5000` | 1000 到 60000 包含兩端（拒絕低於 1000 或高於 60000）；單次 samplers 探測的總預算；僅診斷用途 |
 | `ART_SD_PROBE_CACHE_SECONDS` | `ART_SD_PROBE_CACHE_SECONDS` | 整數 | `300` | 5 到 3600 包含兩端（拒絕低於 5 或高於 3600）；探測判定可重複使用的最長秒數；`@art health` 一律強制重新探測 |
+
+### 美術肖像去背（rembg）
+
+本機 CPU 去背階段（`rembg`），在生成與本機轉碼之間對傳輸 PNG bytes 作用，僅套用於角色與怪物肖像（classic 記錄與 gallery 卡片同一處理；scene 完全不進入 backend）。以一行 `ART_REMBG_ENABLED=true` 開啟。誠實成本：首次使用下載約 1 GB 模型（快取於持久的 `server/.rembg` volume）、每張肖像約 10 秒 CPU、且 ONNX session 建立後 Evennia 伺服器行程的常駐記憶體永久增加約 1–1.5 GB（`isnet-anime` 少一個數量級）。
+
+| 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
+| --- | --- | --- | --- | --- |
+| `ART_REMBG_ENABLED` | `ART_REMBG_ENABLED` | 布林 | `False` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；False 時整條管線與變更前逐位元組相同（設計 D2：程式碼與測試預設不得隱含 1 GB 下載） |
+| `ART_REMBG_MODEL` | `ART_REMBG_MODEL` | 選擇 | `bria-rmbg` | 不分大小寫限於封閉集合 `bria-rmbg/isnet-anime/isnet-general-use/u2net/u2netp`；集合外值啟動即失敗。⚠️ 授權：`bria-rmbg` 封裝 BRIA 授權的 RMBG-2.0 權重——非商業免費，商業使用需向 BRIA 取得授權；`isnet-anime`（約 176 MB）是寬鬆授權的替換品，改一個變數加 `@art requeue` 即可 |
+| `ART_REMBG_DOWNLOAD_ENABLED` | `ART_REMBG_DOWNLOAD_ENABLED` | 布林 | `True` | 布林字；False＝支援的離線配置——backend 先檢查模型檔是否存在於 `ART_REMBG_MODEL_DIR`，缺席時立即以 `art_cutout_unavailable` 有界失敗（不 import rembg、不觸網、不等待） |
+| `ART_REMBG_ALLOWANCE_SECONDS` | `ART_REMBG_ALLOWANCE_SECONDS` | 整數 | `120` | 10 到 1800 包含兩端；啟用時每項租約寬限，是租約預算而非強制逾時（ONNX 推論無法從其他執行緒中斷）；首次模型下載刻意在此界限之外，由 claim-token 規則（設計 D6a）保證超時安全 |
+| `ART_REMBG_THREADS` | `ART_REMBG_THREADS` | 整數 | `0` | 0 到 256 包含兩端；0＝ONNX Runtime 自行決定；非零值經 `OMP_NUM_THREADS` 送達 session（鎖定 rembg 2.0.69 的唯一機制），屬刻意的行程全域設定 |
+
+**模型快取目錄（code-only）**：`ART_REMBG_MODEL_DIR = <GAME_DIR>/server/.rembg`，不讀任何環境變數（理由同 `ART_STORE_ROOT`：打錯字會把約 1 GB 產物悄悄搬離持久 volume；容器 `HOME=/tmp` 是 tmpfs，rembg 預設位置會在每次容器重啟時重新下載）。`secret_settings.py` 是唯一的逃生氣閘。compose 以具名 volume `evennia-rembg` 掛載於 `/app/server/.rembg`。
+
+**Alpha 敵對組合啟動即拒絕**：`ART_REMBG_ENABLED=true` 搭配有效 `ART_SD_OUTPUT_FORMAT=jpeg` 在 settings 匯入時直接 `ImproperlyConfigured`（JPEG 的 RGB 正規化會丟掉 alpha，存下帶背景的肖像卻宣稱是去背成品）。檢查位於 `secret_settings` 匯入之後，因此環境與 `secret_settings.py` 兩條覆蓋路徑由同一個檢查把關；`png`／`webp`／`avif` 攜帶 alpha，三者啟用階段皆正常啟動。
 
 ### 美術佇列排空控制
 
