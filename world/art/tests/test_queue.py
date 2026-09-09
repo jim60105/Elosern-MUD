@@ -5,6 +5,7 @@ import unittest
 
 from evennia.utils.test_resources import EvenniaTestCase
 
+from world.art import gallery_kinds
 from world.art.queue import (
     claim,
     ensure,
@@ -362,6 +363,24 @@ class GalleryJobQueueTests(EvenniaTestCase):
     def test_a_scene_subject_has_no_gallery(self):
         with self.assertRaises(GalleryRecordError):
             _enqueue_gallery(_scene("forest_path"))
+        self.assertEqual(ArtAssetRecord.objects.all().count(), 0)
+
+    @covers_requirement(
+        "art-gallery-kind-capabilities::gallery-enforcement-reads-the-declaration-instead-of-comparing-kinds"
+    )
+    def test_the_enqueue_guard_follows_the_declaration_not_the_kind(self):
+        # A MONSTER whose declaration is patched to has_gallery=False must be
+        # refused before any write — the guard reads the table, not a kind.
+        subject = ArtSubject(ArtSubjectKind.MONSTER, "nogoblin")
+        no_gallery = gallery_kinds.GALLERY_KIND_CAPABILITIES[
+            ArtSubjectKind.MONSTER.value
+        ].with_values(has_gallery=False, store_directory=None)
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {ArtSubjectKind.MONSTER.value: no_gallery},
+        ):
+            with self.assertRaises(GalleryRecordError):
+                _enqueue_gallery(subject)
         self.assertEqual(ArtAssetRecord.objects.all().count(), 0)
 
     @covers_requirement(

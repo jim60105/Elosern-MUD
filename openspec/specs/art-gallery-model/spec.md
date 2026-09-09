@@ -131,10 +131,19 @@ or wrongly typed storage SHALL fail closed to the fully empty snapshot rather th
 - **THEN** the snapshot is the fully empty snapshot and no exception propagates
 
 ### Requirement: Monster subjects hold at most one card
-A `GalleryRecord` whose subject kind is the monster portrait kind SHALL hold at most one card:
-appending a card to a monster record that already has one SHALL replace the existing card — deleting
-its stored file under the confinement rules — and SHALL leave the new card as the record's default.
-Monster cards SHALL be rejected when they carry a non-`None` binding.
+A `GalleryRecord` SHALL hold at most the number of cards its subject kind's capability declaration
+names as that kind's maximum. The monster portrait kind SHALL declare a maximum of one; the character
+portrait kind SHALL declare NO maximum and SHALL therefore stay uncapped exactly as it is today —
+appending to it always accumulates and never replaces, however many cards it already holds. Appending
+a card to a record whose kind declares a maximum SHALL install the new card as its sole card — deleting
+any replaced card's stored file under the confinement rules — and SHALL leave the new card as the
+record's default; because the only admitted maximum is one, a capped record is never partially full and
+appending to an empty capped record installs the card exactly as the monster append does today. A card
+SHALL be rejected when it carries a non-`None` binding for a kind whose
+declaration does not support bindings, which the monster portrait kind does not. Both rules SHALL be
+enforced by reading the declaration, never by comparing the subject kind inline, so the monster cap and
+the monster unbound rule are consequences of that kind's declared capabilities rather than
+monster-specific enforcement code.
 
 #### Scenario: A second monster card replaces the first
 - **WHEN** a card is appended to a monster subject that already has one card
@@ -143,6 +152,14 @@ Monster cards SHALL be rejected when they carry a non-`None` binding.
 #### Scenario: A bound monster card is rejected
 - **WHEN** a card carrying a binding is appended to a monster subject
 - **THEN** a typed validation error is raised and the record is unchanged
+
+#### Scenario: A character record stays uncapped
+- **WHEN** many cards are appended to a character subject
+- **THEN** every card is retained in append order, none is replaced, no stored file is deleted, and the first card is still the default
+
+#### Scenario: The cap follows the declaration
+- **WHEN** the enforced cap is exercised against a kind whose declared maximum is changed
+- **THEN** the append honours the declared maximum with no edit to the enforcing module
 
 ### Requirement: world/art/gallery.py is the sole writer of gallery records and deletion never dangles
 `world/art/gallery.py` SHALL be the only module that creates, mutates, or deletes a `GalleryRecord`

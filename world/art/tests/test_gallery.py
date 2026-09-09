@@ -17,6 +17,7 @@ import unittest
 from django.test import override_settings
 from evennia.utils.test_resources import EvenniaTestCase
 
+from world.art import gallery_kinds
 from world.art.gallery import (
     DEFAULT_FACE_RECT,
     GalleryRecord,
@@ -731,6 +732,131 @@ class GalleryRecordWriteTests(EvenniaTestCase):
                 ),
             )
         self.assertIsNone(record_for(_monster("freshgoblin")))
+
+    @covers_requirement("art-gallery-model::monster-subjects-hold-at-most-one-card")
+    def test_the_cap_follows_the_declaration_not_the_kind(self):
+        # A CHARACTER declaration patched to declare a one-card maximum must
+        # make appends replace — with no edit to gallery.py. Enforcement
+        # follows the declared value, not an inline kind comparison.
+        subject = _character("declaredcap")
+        first = _new_id()
+        second = _new_id()
+        first_file = self._make_file(_identity(subject, first))
+        append_card(subject, **_card_fields(subject, image_id=first))
+        self._make_file(_identity(subject, second))
+        capped = gallery_kinds.GALLERY_KIND_CAPABILITIES[
+            ArtSubjectKind.CHARACTER.value
+        ].with_values(max_cards=1)
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {ArtSubjectKind.CHARACTER.value: capped},
+        ):
+            append_card(subject, **_card_fields(subject, image_id=second))
+        self.assertEqual(
+            [card["image_id"] for card in cards_for(subject)], [second]
+        )
+        self.assertEqual(record_for(subject).db.default_image_id, second)
+        self.assertFalse(first_file.exists())
+
+    @covers_requirement("art-gallery-model::monster-subjects-hold-at-most-one-card")
+    def test_a_failed_replacement_unlink_leaves_the_committed_replacement_intact(self):
+        # Declaration-driven cap path: the replacement commits FIRST; an
+        # unlink failure afterwards is a bounded warn, never a raise, and
+        # never rolls the record back.
+        subject = _character("unlinkfail")
+        first = _new_id()
+        second = _new_id()
+        self._make_file(_identity(subject, first))
+        append_card(subject, **_card_fields(subject, image_id=first))
+        self._make_file(_identity(subject, second))
+        capped = gallery_kinds.GALLERY_KIND_CAPABILITIES[
+            ArtSubjectKind.CHARACTER.value
+        ].with_values(max_cards=1)
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {ArtSubjectKind.CHARACTER.value: capped},
+        ), patch("world.art.gallery.log_warn") as warn, patch(
+            "pathlib.Path.unlink", side_effect=OSError("locked")
+        ):
+            append_card(subject, **_card_fields(subject, image_id=second))
+        self.assertEqual(
+            [card["image_id"] for card in cards_for(subject)], [second]
+        )
+        self.assertEqual(record_for(subject).db.default_image_id, second)
+        self.assertIn(
+            "gallery_card_file_delete_failed",
+            [call.args[0] for call in warn.call_args_list],
+        )
+
+    @covers_requirement("art-gallery-model::monster-subjects-hold-at-most-one-card")
+    def test_the_declared_null_maximum_keeps_a_character_record_uncapped(self):
+        # The sentinel-integer regression: a character must retain EVERY card
+        # in append order, delete no stored file, and never move the default.
+        subject = _character("manyuncapped")
+        ids = []
+        files = []
+        for _ in range(6):
+            image_id = _new_id()
+            files.append(self._make_file(_identity(subject, image_id)))
+            append_card(subject, **_card_fields(subject, image_id=image_id))
+            ids.append(image_id)
+        self.assertEqual([card["image_id"] for card in cards_for(subject)], ids)
+        self.assertEqual(record_for(subject).db.default_image_id, ids[0])
+        self.assertTrue(all(path.exists() for path in files))
+
+    @covers_requirement("art-gallery-model::monster-subjects-hold-at-most-one-card")
+    def test_a_bound_card_is_rejected_for_any_kind_declaring_no_binding_support(self):
+        # Not monster-specific: a CHARACTER whose declaration is patched to
+        # drop binding support must reject a bound card, record unchanged.
+        subject = _character("nobindings")
+        first = _new_id()
+        append_card(subject, **_card_fields(subject, image_id=first))
+        unbound = gallery_kinds.GALLERY_KIND_CAPABILITIES[
+            ArtSubjectKind.CHARACTER.value
+        ].with_values(supports_bindings=False)
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {ArtSubjectKind.CHARACTER.value: unbound},
+        ):
+            with self.assertRaises(GalleryRecordError):
+                append_card(
+                    subject,
+                    **_card_fields(
+                        subject,
+                        image_id=_new_id(),
+                        binding={"mask": ["armor"], "snapshot": {"armor": "cloth"}},
+                    ),
+                )
+        self.assertEqual([card["image_id"] for card in cards_for(subject)], [first])
+
+    @covers_requirement(
+        "art-gallery-kind-capabilities::gallery-enforcement-reads-the-declaration-instead-of-comparing-kinds"
+    )
+    def test_a_kind_declared_without_a_gallery_is_refused_at_every_write_seam(self):
+        # The scene refusal is a declaration consequence, not a kind test: a
+        # MONSTER whose declaration is patched to has_gallery=False must be
+        # refused by record creation and card validation alike, nothing stored.
+        no_gallery = gallery_kinds.GALLERY_KIND_CAPABILITIES[
+            ArtSubjectKind.MONSTER.value
+        ].with_values(has_gallery=False, store_directory=None)
+        subject = _monster("nogallery")
+        fields = _card_fields(subject)
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {ArtSubjectKind.MONSTER.value: no_gallery},
+        ):
+            with self.assertRaises(GalleryRecordError):
+                record_for(subject, create=True)
+            with self.assertRaises(GalleryRecordError):
+                validate_card(fields, subject)
+            with self.assertRaises(GalleryRecordError):
+                append_card(subject, **fields)
+        self.assertIsNone(record_for(subject))
+        # The scene kind itself is refused through the same declared path.
+        with self.assertRaises(GalleryRecordError):
+            record_for(_scene(), create=True)
+        with self.assertRaises(GalleryRecordError):
+            validate_card(_card_fields(_scene()), _scene())
 
     @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
     def test_deleting_a_card_unlinks_exactly_its_confined_file(self):

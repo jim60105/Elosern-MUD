@@ -437,6 +437,32 @@ class ImportBoundaryTests(unittest.TestCase):
             with self.subTest(clean=source.strip()):
                 self.assertFalse(_imports_connectivity(source))
 
+    @covers_requirement(
+        "art-gallery-kind-capabilities::the-declaration-module-imports-nothing-and-is-keyed-by-the-kind-s-declared-value"
+    )
+    def test_the_capability_declaration_imports_nothing(self):
+        source = (_WORLD_ART_ROOT / "gallery_kinds.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        offenders = [
+            f"line {node.lineno}: {type(node).__name__}"
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+        ]
+        self.assertEqual(offenders, [])
+
+    @covers_requirement(
+        "art-gallery-kind-capabilities::the-declaration-module-imports-nothing-and-is-keyed-by-the-kind-s-declared-value"
+    )
+    def test_importing_the_declaration_after_the_prompt_layer_closes_no_cycle(self):
+        # The prompt layer is the module whose cycle the zero-import rule
+        # exists to prevent: subjects.py imports gallery_prompt, so the
+        # declaration may never import subjects (or anything pulling it in).
+        import importlib
+
+        importlib.import_module("world.art.gallery_prompt")
+        module = importlib.import_module("world.art.gallery_kinds")
+        self.assertTrue(callable(module.capabilities_for))
+
 
 class ProbeSeamTests(unittest.TestCase):
     """Focused behaviour of SDWebUIClient.probe_samplers (design D5)."""

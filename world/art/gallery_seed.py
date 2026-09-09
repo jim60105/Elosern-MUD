@@ -80,9 +80,9 @@ import uuid
 
 from django.conf import settings
 
+from world.art import gallery_kinds
 from world.art.formats import STORE_EXTENSIONS
 from world.art.gallery import (
-    GALLERY_KIND_DIRECTORIES,
     GalleryRecordError,
     append_card,
     record_for,
@@ -116,11 +116,6 @@ _MAX_DIAGNOSTICS = 32
 # kilobyte-to-megabyte media; anything past the cap is refused without being
 # buffered into memory.
 _MAX_FILE_BYTES = 32 * 1024 * 1024
-
-# kind-dir -> typed kind (traversal order comes from the sorted listing).
-_KIND_DIRECTORIES: dict[str, ArtSubjectKind] = {
-    directory: kind for kind, directory in GALLERY_KIND_DIRECTORIES.items()
-}
 
 
 class _SeedFileRejected(Exception):
@@ -395,6 +390,7 @@ def _sync_subject_open(
     """Synchronize one already-opened subject folder; never raises."""
     subject_key = subject.full()
     kind = subject.kind
+    capability = gallery_kinds.capabilities_for(kind.value)
     try:
         names = sorted(os.listdir(subject_fd))
     except OSError:  # observability: ignore R2: reported through the bounded diagnostic emitter below
@@ -429,8 +425,8 @@ def _sync_subject_open(
     raw_count, existing_ids, referenced_identities = _raw_occupancy(subject)
     had_default = _has_raw_default(subject)
 
-    if kind is ArtSubjectKind.MONSTER and raw_count > 0:
-        # append_card REPLACES a full monster record: the never-replace
+    if capability.max_cards is not None and raw_count > 0:
+        # append_card REPLACES a record already at its declared maximum: the never-replace
         # guarantee forbids touching a subject whose raw list holds any entry,
         # malformed included. Files whose card is already present are the
         # ordinary no-op; the rest count as blocked and earn ONE diagnostic
@@ -452,8 +448,8 @@ def _sync_subject_open(
         if image_id in existing_ids:
             counters["already_present"] += 1
             continue
-        if kind is ArtSubjectKind.MONSTER and name != candidate_name:
-            # The monster one-card cap: only the candidate file may ever be
+        if capability.max_cards is not None and name != candidate_name:
+            # A declared one-card cap: only the candidate file may ever be
             # appended for this subject.
             counters["monster_cap_skipped"] += 1
             diagnostics.emit("monster_cap_skipped", subject=subject_key, entry=name)
@@ -515,7 +511,7 @@ def _sync_subject_open(
     # (where the first append already auto-defaulted the first-appended card,
     # possibly not the candidate) and a record whose default was deleted while
     # other cards remained. A non-null prior default is never touched.
-    if had_default or kind is not ArtSubjectKind.CHARACTER:
+    if had_default or capability.max_cards is not None:
         return
     candidate_id = derive_image_id(f"{kind_directory}/{subject.key}/{candidate_name}")
     if candidate_id not in existing_ids:
@@ -591,7 +587,8 @@ def sync_all() -> dict:
                 )
                 return {"skipped": True, **counters}
             for kind_name in kind_names:
-                kind = _KIND_DIRECTORIES.get(kind_name)
+                kind_value = gallery_kinds.kind_value_for_store_directory(kind_name)
+                kind = ArtSubjectKind(kind_value) if kind_value is not None else None
                 try:
                     kind_stat = os.lstat(kind_name, dir_fd=root_fd)
                 except OSError:  # observability: ignore R2: a vanished listing entry is a silent no-op
