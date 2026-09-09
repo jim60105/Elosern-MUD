@@ -391,6 +391,78 @@ class CompositionTests(PromptFixture):
             "艾琳（貓人族，24 歲）",
         )
 
+    @covers_requirement(
+        "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth"
+    )
+    def test_a_generator_selection_composes_identically_to_the_same_tuple(self):
+        # A one-shot iterable must not silently lose fields to exhaustion:
+        # the public boundary normalizes once, before any membership test.
+        self.load()
+        entity = _entity(
+            {"appearance": _APPEARANCE_TEXT},
+            equipment={
+                "weapon_main": "plain_sword",
+                "weapon_off": None,
+                "armor": None,
+                "accessories": [],
+            },
+        )
+        as_tuple = character_description(
+            entity, 24, fields=("weapon_main", "appearance"), custom_prompt=""
+        )
+        as_generator = character_description(
+            entity, 24, fields=(field for field in ("weapon_main", "appearance"))
+        )
+        self.assertEqual(as_generator, as_tuple)
+        self.assertIn(
+            ITEM_REGISTRY["plain_sword"].presentation.summary_zh, as_generator
+        )
+
+    @covers_requirement(
+        "art-gallery-prompt-fields::the-gallery-prompt-field-catalog-is-a-closed-ordered-vocabulary"
+    )
+    def test_the_direct_api_rejects_invalid_inputs_before_any_data_read(self):
+        # The composition boundary validates too: no render, no persona or
+        # equipment read, for a raw selection or free text the seam rejects.
+        self.load()
+
+        class _Trap:
+            display_name = "艾琳"
+            race = "beastfolk"
+            subrace = "catkin"
+
+            @property
+            def persona(self):
+                raise AssertionError("validation must precede every persona read")
+
+            @property
+            def equipment(self):
+                raise AssertionError("validation must precede every equipment read")
+
+        entity = Mock()
+        entity.db = _Trap()
+        entity.key = "艾琳"
+        for bad_fields, bad_custom in (
+            (("armor", "nope"), ""),
+            (("armor", "armor"), ""),
+            (("armor", 7), ""),
+            (("armor",), "a\nb"),
+            (("armor",), "x" * (CUSTOM_PROMPT_MAX + 1)),
+        ):
+            with self.subTest(fields=bad_fields, custom=bad_custom[:8]):
+                with self.assertRaises(GalleryPromptError):
+                    character_description(
+                        entity, 24, fields=bad_fields, custom_prompt=bad_custom
+                    )
+                with self.assertRaises(GalleryPromptError):
+                    description_for(
+                        subjects.ArtSubject(subjects.ArtSubjectKind.CHARACTER, "42"),
+                        entity=entity,
+                        age=24,
+                        fields=bad_fields,
+                        custom_prompt=bad_custom,
+                    )
+
 
 class DescriptionDispatcherTests(PromptFixture):
     """The description_for boundary: explicit selection only for characters."""

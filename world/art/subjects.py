@@ -21,7 +21,11 @@ from world.lore.races import SUBRACE_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.prompts.loader import PromptUnavailableError, render_prompt
 from world.rules.persona import PersonaStore
-from world.art.gallery_prompt import equipment_fragment
+from world.art.gallery_prompt import (
+    equipment_fragment,
+    validate_custom_prompt,
+    validate_fields,
+)
 
 # The single shared stable-key contract (fix-art-pipeline-contracts D1): every
 # producer of a portrait/scene stable key validates against these same rules.
@@ -251,7 +255,17 @@ def character_description(entity, age: int, *, fields, custom_prompt: str = "") 
     the art pipeline never stalls; the fallback reads no persona, no
     equipment, and no free text, which is why both library renders complete
     before any data read.
+
+    Both inputs are validated here at the public composition boundary — the
+    selection is normalized to the declared catalog order (a one-shot
+    iterable such as a generator therefore behaves identically to the same
+    selection as a tuple) and the free text is revalidated against the
+    bound/control rules — so no caller can reach ``render_prompt`` with an
+    unvalidated selection or unsanitized text. Both validations are
+    idempotent on already-normalized input and run before any prompt render.
     """
+    fields = validate_fields(fields)
+    custom_prompt = validate_custom_prompt(custom_prompt)
     race = _race_label(entity)
     name = entity.db.display_name or entity.key or "<unknown>"
     try:
@@ -320,7 +334,10 @@ def description_for(subject: ArtSubject, *, entity=None, age=None, fields=None, 
     ``gallery-prompt-composition``): ``fields`` is mandatory for a character
     subject so no seam can keep an implicit appearance default. Scene and
     monster descriptions are registry text and ignore ``fields`` and
-    ``custom_prompt`` entirely.
+    ``custom_prompt`` entirely. For a character subject, both the selection
+    and the free text are validated and normalized by
+    ``character_description`` itself at the public composition boundary,
+    before any persona, equipment, or render access.
     """
     if subject.kind is ArtSubjectKind.SCENE:
         return scene_description(subject)
