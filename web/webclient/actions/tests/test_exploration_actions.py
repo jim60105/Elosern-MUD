@@ -1132,6 +1132,69 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     # explore.wait
     # ------------------------------------------------------------------
 
+    def test_practice_grows_only_the_declared_skill_and_plain_rest_grows_nothing(self):
+        from web.webclient.actions.exploration_actions import _practice_adapter
+        from world.rules.progression import practice_xp_amount
+        from world.skills.registry import SKILL_REGISTRY
+
+        self.player.db.skills = {"active": ["fire_arrow"], "passive": []}
+        self.player.db.skill_proficiency = {"fire_arrow": 20.0}
+        before = get_world_clock().tick
+        gain = 10 * practice_xp_amount(self.player, SKILL_REGISTRY["fire_arrow"])
+        result = _practice_adapter(self.player, {"skill": "fire_arrow", "seconds": 3600})
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(get_world_clock().tick, before + 3600)
+        self.assertAlmostEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0 + gain)
+        self.assertIsNone(self.player.db.practice_booking)
+        _wait_adapter(self.player, {"seconds": 3600})
+        self.assertAlmostEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0 + gain)
+
+    def test_practice_rejects_unknown_capped_and_unsafe_without_advancing(self):
+        from web.webclient.actions.exploration_actions import _practice_adapter
+        from world.rules.progression import proficiency_cap
+
+        self.player.db.skills = {"active": ["fire_arrow"], "passive": []}
+        before = get_world_clock().tick
+        result = _practice_adapter(self.player, {"skill": "unknown", "seconds": 3600})
+        self.assertEqual(result["code"], "PRACTICE_SKILL_UNKNOWN")
+        self.assertEqual(get_world_clock().tick, before)
+        self.player.db.skill_proficiency = {"fire_arrow": proficiency_cap("fire_arrow") * 50.0}
+        result = _practice_adapter(self.player, {"skill": "fire_arrow", "seconds": 3600})
+        self.assertEqual(result["code"], "PRACTICE_SKILL_CAPPED")
+        self.assertEqual(get_world_clock().tick, before)
+        monster = create_object(Monster, key="修煉阻擋者", location=self.room1)
+        monster.threat_tier = "low"
+        monster.apply_monster_tier("floor")
+        result = _practice_adapter(self.player, {"skill": "fire_arrow", "seconds": 3600})
+        self.assertEqual(result["code"], "unsafe_skip")
+        self.assertEqual(get_world_clock().tick, before)
+
+    def test_practice_payload_rejects_ambiguous_or_unbounded_requests(self):
+        from web.webclient.actions.exploration_actions import validate_practice_payload
+
+        for payload in (
+            {"skill": "fire_arrow", "seconds": True},
+            {"skill": "fire_arrow", "seconds": 43201},
+            {"skill": "fire_arrow", "seconds": 0},
+            {"skill": "fire_arrow", "seconds": 1, "sleep": True},
+            {"skill": "fire arrow", "seconds": 1},
+        ):
+            with self.subTest(payload=payload), self.assertRaises(ValueError):
+                validate_practice_payload(payload)
+
+    def test_failed_practice_rolls_back_clock_growth_and_new_booking(self):
+        from web.webclient.actions.exploration_actions import _practice_adapter
+
+        self.player.db.skills = {"active": ["fire_arrow"], "passive": []}
+        self.player.db.skill_proficiency = {"fire_arrow": 20.0}
+        before = get_world_clock().tick
+        with patch("world.rules.clock._settle_boundary_stages", side_effect=RuntimeError("settlement failed")):
+            result = _practice_adapter(self.player, {"skill": "fire_arrow", "seconds": 28800})
+        self.assertEqual(result["code"], "skip_failed")
+        self.assertEqual(get_world_clock().tick, before)
+        self.assertEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0)
+        self.assertIsNone(self.player.db.practice_booking)
+
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
     def test_wait_until_dawn_advances_to_the_next_occurrence(self):
         from world.rules.clock import seconds_until_daypart

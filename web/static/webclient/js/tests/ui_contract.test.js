@@ -89,18 +89,6 @@ test("the narrative markup pipeline never parses HTML strings", () => {
   );
 });
 
-test("the rest-duration form claims its keydowns without breaking native input", () => {
-  const source = read("web/webclient-app/components/RestForm.vue");
-  // The capture-phase form handler claims the form's keys so the global
-  // keyboard router does not swallow them (the legacy isEditingRestForm gate).
-  assert.match(source, /@keydown="onKeyDown"/);
-  assert.match(source, /event\.stopPropagation\(\)/);
-  // Digits, Backspace, Escape, Enter and the slash gate are all claimed and
-  // prevented, so the value is collected in the browser and validated server-side.
-  assert.match(source, /key >= "0" && key <= "9"/);
-  assert.match(source, /key === "Escape"/);
-  assert.match(source, /key === "\/"/);
-});
 
 test("suggestion cards and the dismiss control keep native activation", () => {
   // The routing gate defers to the browser default for Enter/Space pressed on

@@ -245,6 +245,20 @@ body {
 .elosern-root .dock-tab-bar__tab { border: 1px solid #53504a; border-radius: 5px; padding: 8px 10px; background: linear-gradient(#ffffff05, #0002); font-family: var(--f-serif); }
 .elosern-root .dock-tab-bar__tab--on { background: var(--gold-glow); border-color: var(--gold-400); color: var(--gold-400); box-shadow: inset 0 -2px var(--gold-500); }
 .elosern-root .dock-tab-bar__hint { font-size: 10px; opacity: .8; }
+.waiting-screen { width: 100%; min-width: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-content: start; }
+.waiting-card { min-width: 0; padding: 14px; background: #141719; border: 1px solid #746342; border-radius: 5px; display: flex; flex-direction: column; gap: 12px; }
+.waiting-card--focused { border-color: var(--gold-400); }
+.waiting-card h3, .practice-screen h2 { margin: 0; color: var(--gold-400); font-family: var(--f-serif); }
+.waiting-card p, .practice-screen p { margin: 0; color: var(--paper-300); font-size: 13px; line-height: 1.6; }
+.waiting-card > button { margin-top: auto; }
+.waiting-screen button, .practice-screen select { padding: 9px; border: 1px solid var(--gold-600); border-radius: 4px; background: var(--gold-glow); color: var(--gold-400); }
+.waiting-screen button:focus-visible, .practice-screen select:focus-visible { outline: 2px solid var(--gold-400); outline-offset: 2px; }
+.waiting-screen button:disabled { opacity: .5; }
+.waiting-back { grid-column: 1 / -1; }
+.elosern-root .waiting-card .exploration-rest-form { padding: 0; border: 0; background: transparent; }
+.practice-screen { display: grid; gap: 12px; max-width: 640px; margin: auto; }
+.practice-screen label { display: grid; gap: 10px; color: var(--gold-400); }
+@media (max-width: 1000px) { .waiting-screen { grid-template-columns: 1fr; } }
 .elosern-root .action-dock__pane {
   overflow-x: hidden;
   scrollbar-width: thin;
@@ -255,6 +269,12 @@ body {
 }
 .elosern-root .elosern-stage:has(.interaction-workspace) {
   --dock-h: clamp(300px, 40vh, 390px);
+}
+.elosern-root .elosern-stage:has(.waiting-screen) {
+  --dock-h: clamp(360px, 46vh, 430px);
+}
+.elosern-root .elosern-stage:has(.waiting-screen) [data-anchor="dock"] {
+  left: calc(var(--left-column) + 12px);
 }
 .elosern-root .elosern-stage:has(.interaction-workspace) [data-anchor="dock"] {
   left: calc(var(--left-column) + 12px);

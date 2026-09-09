@@ -1,4 +1,4 @@
-import { createApp, h, onBeforeUnmount, onMounted, ref } from "vue";
+import { createApp, h, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { createPinia, disposePinia } from "pinia";
 import AppShell from "../../components/AppShell.vue";
 import AppClient from "../../AppClient.vue";
@@ -91,7 +91,7 @@ const renderPlayer = (args) => ({
     const store = useElosernStore(pinia);
     let app;
     let bridge;
-    onMounted(() => {
+    onMounted(async () => {
       app = createApp(AppClient);
       app.use(pinia);
       bridge = createWindowBridge(store);
@@ -141,6 +141,11 @@ const renderPlayer = (args) => ({
       const result = store.receive(1, "ui_snapshot", [snapshot], {});
       if (!result.accepted || store.lastPanelRejection) throw new Error("Player layout fixture was rejected");
       if (args.pane) store.tabToRootAndConfirm(args.pane, "pointer");
+      if (args.practice) {
+        store.openHudDrawer("skill");
+        await nextTick();
+        host.value?.querySelector('button[aria-label^="修煉"]')?.click();
+      }
     });
     onBeforeUnmount(() => {
       bridge?.uninstall();
@@ -154,3 +159,5 @@ const renderPlayer = (args) => ({
 export const ActionNavigation = { render: renderPlayer, args: {} };
 export const InteractionSelector = { render: renderPlayer, args: { pane: "interact" } };
 export const DialogueSelector = { render: renderPlayer, args: { dialogue: true } };
+export const WaitingSelector = { render: renderPlayer, args: { pane: "wait" } };
+export const PracticeScreen = { render: renderPlayer, args: { practice: true } };

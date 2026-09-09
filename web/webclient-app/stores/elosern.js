@@ -258,6 +258,9 @@ export const useElosernStore = defineStore("elosern", () => {
         // Readable cards and action choices share a vertical keyboard list.
         menu.gridCols = 1;
       }
+      if (descriptor.source === "exploration.wait" && Array.isArray(menu.items)) {
+        menu.gridCols = 3;
+      }
       return menu;
     },
   });

@@ -140,6 +140,7 @@ def build_production_action_registry() -> ActionRegistry:
         _talk_freeform_adapter,
         _talk_scripted_adapter,
         _wait_adapter,
+        _practice_adapter,
         validate_engage_payload,
         validate_deliver_payload,
         validate_dialogue_leave_payload,
@@ -152,6 +153,7 @@ def build_production_action_registry() -> ActionRegistry:
         validate_talk_freeform_payload,
         validate_talk_scripted_payload,
         validate_wait_payload,
+        validate_practice_payload,
     )
     from web.webclient.actions.options import (
         _dismiss_adapter,
@@ -437,6 +439,14 @@ def build_production_action_registry() -> ActionRegistry:
             adapter=_wait_adapter,
             # No affected panels: a clock skip changes header, status, shop
             # hours, and quest deadlines together (design D7).
+            affected_panels=(),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="explore.practice",
+            validate_payload=validate_practice_payload,
+            adapter=_practice_adapter,
             affected_panels=(),
         )
     )

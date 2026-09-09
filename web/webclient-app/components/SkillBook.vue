@@ -8,7 +8,8 @@
 // gives without detail (e.g. an unregistered-key fallback row) renders
 // without detail cells, so nothing is invented. Tab and search are view-local
 // UI state.
-import { ref, computed } from "vue";
+import { ref, computed, watch, onBeforeUnmount } from "vue";
+import RestForm from "./RestForm.vue";
 
 const props = defineProps({
   // The character's skill data: { actives, passives } in the character
@@ -19,7 +20,17 @@ const props = defineProps({
   initialTab: { type: String, default: "active" },
   // Showcase/mount convenience: the search string on first render.
   initialQuery: { type: String, default: "" },
+  practiceDisabled: { type: Boolean, default: false },
+  practiceFeedback: { type: String, default: "" },
 });
+const emit = defineEmits(["practice", "practice-view"]);
+const practice = ref(null);
+watch(practice, (value) => emit("practice-view", value !== null));
+onBeforeUnmount(() => emit("practice-view", false));
+const practiceSkills = computed(() => (props.skills.actives ?? []).flatMap(
+  (category) => (category.groups ?? []).flatMap((group) => group.skills ?? []),
+));
+const practiceSkill = computed(() => practiceSkills.value.find((row) => row.key === practice.value));
 
 const TARGET_LABELS = {
   none: "無目標",
@@ -162,7 +173,21 @@ function castText(row) {
 </script>
 
 <template>
-  <section class="skill-book" data-testid="skill-book">
+  <section v-if="practice !== null" class="practice-screen" data-testid="practice-screen" @keydown.stop @keydown.esc.prevent="practice = null">
+    <button type="button" class="skill-book__tab" @click="practice = null">返回技能書</button>
+    <h2>專注修煉</h2>
+    <p>選擇一項已學會的主動技能，投入時間磨練熟練度。</p>
+    <label>修煉技能
+      <select v-model="practice" :disabled="practiceDisabled" aria-label="修煉技能">
+        <option v-for="row in practiceSkills" :key="row.key" :value="row.key">{{ row.label }}</option>
+      </select>
+    </label>
+    <p>技能達上限、戰鬥中或附近有敵人時，伺服器會拒絕修煉，不推進時間。</p>
+    <p>修煉依完整小時結算；不足一小時不增加熟練度。普通休息與睡眠不增加熟練度。</p>
+    <RestForm :disabled="practiceDisabled || !practiceSkill" label="開始修煉" @close="practice = null" @submit="(seconds) => emit('practice', { skill: practice, seconds })" />
+    <p v-if="practiceFeedback" role="status">{{ practiceFeedback }}</p>
+  </section>
+  <section v-else class="skill-book" data-testid="skill-book">
     <!-- The book's title and active/passive counts now render once, in the
          drawer head (`HudDrawer`'s `title` + `subtitle`), not here. -->
     <div class="skill-book__tabs" role="tablist" data-testid="skill-book__tabs">
@@ -262,6 +287,7 @@ function castText(row) {
           :data-key="row.key"
         >
           <span class="skill-book__skill-name">{{ row.label }}</span>
+          <button v-if="tab === 'active'" type="button" class="skill-book__tab" :disabled="practiceDisabled" :aria-label="`修煉${row.label}`" @click="practice = row.key" @keydown.enter.stop @keydown.space.stop>修煉</button>
           <span
             v-if="row.usable_out_of_combat === true"
             class="skill-book__ooc"

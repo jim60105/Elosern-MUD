@@ -41,6 +41,10 @@
 | [`sleep`](/game/command-reference?id=sleep) | 睡到完全恢復。 |
 | [`wait`](/game/command-reference?id=wait) | 等待直到指定時段。 |
 
+In the web client, **等待／休息** offers dawn, full-recovery sleep, and
+custom rest in hours (up to 12 hours). Declared practice has a separate screen:
+open **角色狀態 → 技能書**, then choose **修煉** beside an active skill.
+
 ## 戰鬥
 
 | 指令 | 說明 |

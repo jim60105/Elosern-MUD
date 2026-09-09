@@ -334,11 +334,9 @@ describe("store dispatch + focus", () => {
       expect(store.view.focus.key).toBe("wait");
       // Confirming "wait" opens the wait submenu (openSubmenu).
       expect(store.focusConfirm("keyboard")).toBe(true);
-      // Within the wait submenu (2-column grid), reach "wait-dusk":
-      // ArrowDown → wait-noon (row 1 col 0), ArrowRight → wait-dusk (row 1 col 1).
-      expect(store.focusPress("ArrowDown")).toBe(true);
+      // The simplified selector exposes dawn, sleep, then custom rest.
       expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("wait-dusk");
+      expect(store.view.focus.key).toBe("wait-sleep");
       // Confirming the leaf dispatches the exact `explore.wait` action.
       expect(store.focusConfirm("keyboard")).toBe(true);
       expect(sender.sent.actions.length).toBe(1);
@@ -350,7 +348,7 @@ describe("store dispatch + focus", () => {
         request_id: "session:1",
         base_revision: 2,
         action_id: "explore.wait",
-        payload: { daypart: "dusk" },
+        payload: { sleep: true },
       });
     });
 

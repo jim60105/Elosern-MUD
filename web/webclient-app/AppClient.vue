@@ -533,6 +533,28 @@ const servicesConfirm = computed(() => {
 // `explore.wait` rest item (the legacy `openRestForm` behavior).
 const restFormOpen = ref(false);
 const restFormError = ref(null);
+const practiceRequest = ref(null);
+const practiceOpen = ref(false);
+watch([() => store.view.epoch, () => store.view.generation], () => {
+  practiceRequest.value = null;
+});
+const practiceFeedback = computed(() => {
+  const result = store.view.lastActionResult;
+  return result?.requestId === practiceRequest.value ? result?.message : "";
+});
+function onPractice(payload) {
+  practiceRequest.value = dispatchIntent("explore.practice", payload);
+}
+const waitOpen = computed(() => store.view.dockSource === "exploration.wait");
+watch(waitOpen, (open) => {
+  if (!open) restFormOpen.value = false;
+});
+const skipDisabled = computed(() => !store.view.connected || store.view.phase !== "active"
+  || store.view.mode !== "exploration" || store.view.mutationsLocked || !!store.view.dispatch?.inFlight);
+function activateWait(key) {
+  store.focusItemByKey(key);
+  store.focusConfirm("pointer");
+}
 // webclient-action-feedback (busy-drop feedback): dispatchAction returns null
 // when the single-writer gate refuses the dispatch (an in-flight action, a
 // locked mutation phase, or a disconnected session). Surfaces that fire and
@@ -541,9 +563,11 @@ const restFormError = ref(null);
 // visible busy toast at the client boundary instead of dropping it silently.
 // Return-bearing seams (the concept apply) keep calling the store directly.
 function dispatchIntent(actionId, payload, display) {
-  if (store.dispatchAction(actionId, payload, display) === null) {
+  const request = store.dispatchAction(actionId, payload, display);
+  if (request === null) {
     store.pushToast({ title: "目前無法執行此操作，請稍後再試。", tone: "info" });
   }
+  return request;
 }
 
 function onRestFormSubmit(seconds) {
@@ -556,6 +580,7 @@ function onRestFormSubmit(seconds) {
 
 function onRestFormClose() {
   restFormOpen.value = false;
+  document.querySelector(".action-dock")?.focus();
 }
 
 function onRestFormError(message) {
@@ -1002,6 +1027,23 @@ onMounted(() => {
             class="dock-pane-host"
             :class="{ 'interaction-workspace': interactionOpen, 'interaction-workspace--selected': !!interactionTarget }"
           >
+            <section v-if="waitOpen" class="waiting-screen" aria-label="等待與休息">
+              <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-dawn' }">
+                <h3>等待直到黎明</h3>
+                <p>等待下一次天亮，再展開旅程。</p>
+                <button type="button" :disabled="skipDisabled" @keydown.enter.stop @keydown.space.stop @click="activateWait('wait-dawn')">等待直到黎明</button>
+              </article>
+              <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-sleep' }">
+                <h3>睡眠至完全恢復</h3>
+                <p>依目前恢復速度睡眠，實際時長由伺服器決定，受睡眠上限限制。</p>
+                <button type="button" :disabled="skipDisabled" @keydown.enter.stop @keydown.space.stop @click="activateWait('wait-sleep')">開始睡眠</button>
+              </article>
+              <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-rest' }">
+                <h3>休息 N 小時</h3>
+                <RestForm :autofocus="restFormOpen" :disabled="skipDisabled" @submit="onRestFormSubmit" @close="onRestFormClose" @error="onRestFormError" />
+              </article>
+              <button type="button" class="waiting-back" @keydown.enter.stop @keydown.space.stop @click="onDockBack">返回上一層</button>
+            </section>
             <section v-if="interactionTarget" class="interaction-targets" aria-label="互動對象">
               <h3 class="interaction-heading"><span>1</span>選擇互動對象</h3>
               <div class="interaction-target-grid">
@@ -1033,7 +1075,7 @@ onMounted(() => {
               <p>先選擇左側的對象，即可查看可用的互動。</p>
             </section>
              <DockMenu
-               v-if="dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain' && !store.view.degradedRoot) && !drawerHostsServiceFrame"
+               v-if="!waitOpen && dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain' && !store.view.degradedRoot) && !drawerHostsServiceFrame"
                :items="dockItems"
               :focused-key="store.view.focus.key"
               :id-prefix="rowPrefix"
@@ -1059,7 +1101,7 @@ onMounted(() => {
               @choose-shorthand="(p) => store.chooseShorthand(p.shorthand)"
             />
           </div>
-          <RestForm v-if="restFormOpen" @submit="onRestFormSubmit" @close="onRestFormClose" @error="onRestFormError" />
+          <RestForm v-if="restFormOpen && !waitOpen" :disabled="skipDisabled" @submit="onRestFormSubmit" @close="onRestFormClose" @error="onRestFormError" />
           <div v-if="servicesConfirm" class="services-confirm">
             <div class="services-confirm-title" data-testid="services-confirm-title">
               {{ servicesConfirm.label }}
@@ -1076,7 +1118,7 @@ onMounted(() => {
     <HudDrawer
       v-if="store.view.hudDrawer"
       :open="true"
-      :title="drawerTitle"
+      :title="practiceOpen && store.view.hudDrawer === 'skill' ? '修煉' : drawerTitle"
       :subtitle="store.view.hudDrawer === 'inventory' ? inventoryWalletSubtitle : (store.view.hudDrawer === 'skill' ? skillBookSubtitle : (store.view.hudDrawer === 'party' ? `${(store.partySlots || []).length} / 4` : ''))"
       :icon="store.view.hudDrawer === 'inventory' ? 'inventory' : (store.view.hudDrawer === 'skill' ? 'skills' : (store.view.hudDrawer === 'party' ? 'party' : null))"
       :drawer-key="store.view.hudDrawer"
@@ -1089,7 +1131,7 @@ onMounted(() => {
           :portrait="store.view.hudDrawer === 'quest' ? null : currentPortrait"
         />
       </template>
-      <SkillBook v-if="store.view.hudDrawer === 'skill'" :skills="panel('character') || {}" />
+      <SkillBook v-if="store.view.hudDrawer === 'skill'" :skills="panel('character') || {}" :practice-disabled="skipDisabled" :practice-feedback="practiceFeedback" @practice="onPractice" @practice-view="(open) => practiceOpen = open" />
       <InventoryPanel
         v-else-if="store.view.hudDrawer === 'inventory'"
         :services="panel('services') || {}"
@@ -1184,7 +1226,7 @@ onMounted(() => {
       <!-- The cast-syntax footer hint is skill-drawer-only: a conditional
            named slot means the other five drawers provide no `foot` slot, so
            `HudDrawer` renders no footer for them. -->
-      <template v-if="store.view.hudDrawer === 'skill'" #foot>
+      <template v-if="store.view.hudDrawer === 'skill' && !practiceOpen" #foot>
         <p class="hud-drawer__cast-hint" data-testid="skill-book-cast-hint">{{ SKILL_CAST_HINT }}</p>
       </template>
     </HudDrawer>

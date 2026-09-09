@@ -3,7 +3,7 @@
 The production exploration actions are ``explore.move``, ``explore.look``,
 ``explore.talk_scripted``, ``explore.talk_freeform``, ``explore.dialogue_leave``,
 ``explore.party_invite``, ``explore.party_leave``, ``explore.engage``,
-``explore.wait``, ``explore.possess``, ``explore.possess_release``, and
+``explore.wait``, ``explore.practice``, ``explore.possess``, ``explore.possess_release``, and
 ``explore.deliver``. Each
 validator enforces an exact bounded payload shape; each adapter re-resolves
 every referenced identity from the actor's **current** location's present
@@ -20,6 +20,7 @@ from twisted.internet.defer import Deferred
 
 from web.webclient.actions.node_ids import node_id_for_location
 from web.webclient.presentation.protocol import MAX_SAFE_INTEGER
+from world.observability import log_error, log_warn
 from world.rules.affinity import AFFINITY_DAILY_CAP_HINT
 from world.rules.clock import DaypartError, get_world_clock, seconds_until_daypart
 from world.rules.combat_session import CombatSessionError, SessionReason, engage
@@ -51,6 +52,7 @@ from world.rules.time_skip import (
     DAYPARTS,
     MAX_WEB_SKIP_SECONDS,
     advance_skip,
+    preflight_practice_booking,
     render_skip_summary,
     seconds_to_full_regen,
     unsafe_rejection,
@@ -247,6 +249,18 @@ def validate_wait_payload(payload: Any) -> dict[str, Any]:
     raise ExplorationActionError("explore.wait requires exactly one of daypart, seconds, or sleep")
 
 
+def validate_practice_payload(payload: Any) -> dict[str, Any]:
+    """Validate a declared skill and the existing bounded seconds contract."""
+    if not isinstance(payload, dict) or set(payload) != {"skill", "seconds"}:
+        raise ExplorationActionError("explore.practice requires exactly skill and seconds")
+    skill = payload["skill"]
+    if not isinstance(skill, str) or not skill or len(skill) > MAX_ITEM_KEY_CHARS or any(
+        character.isspace() for character in skill
+    ):
+        raise ExplorationActionError("explore.practice skill must be a bounded key")
+    return {"skill": skill, **validate_wait_payload({"seconds": payload["seconds"]})}
+
+
 def validate_possess_payload(payload: Any) -> dict[str, Any]:
     """Validate the exact ``explore.possess`` payload."""
     if not isinstance(payload, dict):
@@ -380,12 +394,14 @@ def _move_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
     try:
         if not bool(exit_obj.access(actor, "traverse")):
             return _rejected("locked", "此出口目前無法通行。")
-    except Exception:
+    except Exception as exc:
+        log_warn("exit_access_failed", context={"char": actor.pk, "exit": exit_obj.pk}, exc=exc)
         return _rejected("locked", "此出口目前無法通行。")
     source_location = actor.location
     try:
         exit_obj.at_traverse(actor, destination)
-    except Exception:
+    except Exception as exc:
+        log_error("exit_traverse_failed", context={"char": actor.pk, "exit": exit_obj.pk}, exc=exc)
         return _rejected("move_failed", "移動失敗。")
     if actor.location is source_location:
         # ``at_traverse`` returns None on both branches (the movement cost and
@@ -414,7 +430,8 @@ def _look_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
             return _rejected("no_target", "這裡沒有這個對象。")
     try:
         appearance = actor.at_look(target)
-    except Exception:
+    except Exception as exc:
+        log_warn("look_failed", context={"char": actor.pk, "target": target.pk}, exc=exc)
         return _rejected("look_failed", "無法查看。")
     actor.msg(appearance)
     return _success("looked", "你仔細打量了一番。", AFFECTED_FULL)
@@ -451,7 +468,8 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
         return _rejected("unregistered_keyword", "對方不明白這個話題。")
     try:
         result = run_scripted_talk(npc, actor, payload["keyword_id"])
-    except Exception:
+    except Exception as exc:
+        log_error("scripted_dialogue_failed", context={"char": actor.pk, "npc": npc.pk, "keyword": payload["keyword_id"]}, exc=exc)
         return _rejected("dialogue_failed", "交談失敗。")
     if result is None:
         return _rejected("no_response", "對方沒有理會你。")
@@ -621,6 +639,7 @@ def _render_invite_outcome(npc: Any, actor: Any, result: Any) -> str:
         try:
             join_party(npc, actor)
         except PartyJoinError as error:
+            log_warn("party_join_rejected", context={"char": actor.pk, "npc": npc.pk}, exc=error)
             line = JOIN_REJECTION_MESSAGES.get(error.reason, REFUSED_MESSAGE)
             actor.msg(line)
             return line
@@ -687,6 +706,7 @@ def _engage_adapter(actor: Any, payload: dict[str, Any], session: Any = None) ->
     try:
         engage(actor, monster)
     except CombatSessionError as error:
+        log_warn("engage_rejected", context={"char": actor.pk, "monster": monster.pk}, exc=error)
         reason = error.args[0] if error.args else None
         if reason is SessionReason.ALREADY_IN_COMBAT:
             return _rejected("already_in_combat", "你已在戰鬥中。")
@@ -700,28 +720,45 @@ def _engage_adapter(actor: Any, payload: dict[str, Any], session: Any = None) ->
     return _success("engaged", message, AFFECTED_ENGAGE)
 
 
-def _wait_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
+def _practice_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
+    """Use the guarded skip workflow with an explicit practice declaration."""
+    return _wait_adapter(actor, payload, session, practice_skill=payload["skill"])
+
+
+def _wait_adapter(
+    actor: Any, payload: dict[str, Any], session: Any = None,
+    *, practice_skill: str | None = None,
+) -> dict[str, Any]:
     """Recheck safety and advance the clock through the shared skip helper."""
     del session
     rejection = unsafe_rejection(actor)
     if rejection is not None:
         return _rejected("unsafe_skip", rejection)
+    if practice_skill is not None:
+        reject = preflight_practice_booking(actor, practice_skill)
+        if reject is not None:
+            return _rejected(reject.reason, reject.message)
     if "daypart" in payload:
         daypart = payload["daypart"]
         try:
             clock = get_world_clock()
             seconds = seconds_until_daypart(clock.calendar, daypart)
-        except DaypartError:
+        except DaypartError as exc:
+            log_warn("daypart_rejected", context={"char": actor.pk, "daypart": daypart}, exc=exc)
             return _rejected("unknown_daypart", "未知的時段。")
     elif "seconds" in payload:
         seconds = payload["seconds"]
     else:
         seconds = seconds_to_full_regen(actor)
     try:
-        events = advance_skip(actor, seconds)
-    except Exception:
+        events = (
+            advance_skip(actor, seconds, practice_skill=practice_skill)
+            if practice_skill is not None else advance_skip(actor, seconds)
+        )
+    except Exception as exc:
+        log_error("skip_failed", context={"char": actor.pk, "skill": practice_skill, "seconds": seconds}, exc=exc)
         return _rejected("skip_failed", "無法跳過時間。")
-    message = render_skip_summary(seconds, events)
+    message = ("修煉結束。" if practice_skill is not None else "") + render_skip_summary(seconds, events)
     actor.msg(message)
     # Rest-point nomination trigger (title-system D4 §7.1, change G): the
     # service helper gates on a day-boundary event and never raises. The

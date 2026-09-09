@@ -153,18 +153,27 @@ def unsafe_rejection(actor: Any) -> str | None:
     return _REJECTION_MESSAGES[reason]
 
 
-def advance_skip(actor: Any, seconds: int) -> list[ScheduledEvent]:
+def advance_skip(
+    actor: Any, seconds: int, *, practice_skill: str | None = None
+) -> list[ScheduledEvent]:
     """Advance the world clock exactly like ``rest``/``sleep``/``wait``.
 
     ``seconds`` must already be safe and validated; this call performs the
     single ``AdvanceSource.SKIP`` advance and returns the settled events.
-    The skip is unlabeled by definition, so it carries zero growth: any
-    stale booking a rolled-back advance restored is cleared BEFORE the
-    advance, keeping the accepted ``rest`` practice clause the only way a
-    booking can settle.
+    A declared skill must pass ``preflight_practice_booking`` before entry.
+    Unlabeled skips clear stale bookings and carry zero growth. The clock's
+    practice settlement remains the sole progression writer.
     """
-    actor.db.practice_booking = None
-    return get_world_clock().advance(seconds, AdvanceSource.SKIP, [actor])
+    previous_booking = actor.db.practice_booking if practice_skill is not None else None
+    actor.db.practice_booking = practice_skill
+    try:
+        return get_world_clock().advance(seconds, AdvanceSource.SKIP, [actor])
+    except Exception:
+        # Clock rollback restores its entry snapshot, which already contains
+        # this declaration. A failed graphical action must not leave a new
+        # booking that a later, unrelated skip could consume.
+        actor.db.practice_booking = previous_booking
+        raise
 
 
 __all__ = [
