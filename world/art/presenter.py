@@ -114,6 +114,28 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
     if card is not None:
         return _card_payload(subject, card)
     record = _record_for(subject)
+    identity = None
+    if record is not None and record.db.status == ArtAssetStatus.DONE:
+        identity = _validated_output_identity(subject, record.db.output_identity)
+        if identity is None:
+            log_warn("art_asset_output_missing", context={"subject": subject.full()})
+    if identity is not None:
+        return {
+            "kind": "asset",
+            "label": "已生成",
+            "status": ArtAssetStatus.DONE,
+            "url": media_url_for(identity),
+            "aspect_ratio": record.db.aspect_ratio,
+            "alt": subject.full(),
+            "subject_key": subject.full(),
+            "face_rect": dict(DEFAULT_FACE_RECT),
+        }
+    # Steps 1-5 resolved nothing: consult the terminal seam (step 6) on
+    # EVERY fall-through path — no record, an unfinished record, and an
+    # unusable done identity alike — before the placeholder closes the chain.
+    fallback = fallback_for(subject)
+    if fallback is not None:
+        return _fallback_payload(subject, fallback)
     if record is None or record.db.status != ArtAssetStatus.DONE:
         kind = PLACEHOLDER_MISSING
         status = record.db.status if record else ArtAssetStatus.MISSING
@@ -129,23 +151,7 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
             "subject_key": subject.full(),
             "face_rect": None,
         }
-    identity = _validated_output_identity(subject, record.db.output_identity)
-    if identity is None:
-        log_warn("art_asset_output_missing", context={"subject": subject.full()})
-        fallback = fallback_for(subject)
-        if fallback is not None:
-            return _fallback_payload(subject, fallback)
-        return _placeholder_unavailable("無法提供")
-    return {
-        "kind": "asset",
-        "label": "已生成",
-        "status": ArtAssetStatus.DONE,
-        "url": media_url_for(identity),
-        "aspect_ratio": record.db.aspect_ratio,
-        "alt": subject.full(),
-        "subject_key": subject.full(),
-        "face_rect": dict(DEFAULT_FACE_RECT),
-    }
+    return _placeholder_unavailable("無法提供")
 
 
 def _card_payload(subject: ArtSubject, card: dict) -> dict:

@@ -2995,6 +2995,40 @@ test("rejects malformed art panels atomically", () => {
   );
 });
 
+test("media url bound admits the worst-case gallery identity in both mirrors", () => {
+  // /art/gallery/character/<64-char key>/<uuid36>.avif = 129 chars.
+  const worst = "/art/gallery/character/" + "k".repeat(64) + "/" + "0".repeat(36) + ".avif";
+  assert.equal(worst.length, 129);
+  const panel = validArtPanel({
+    portrait_catalog: { "42": validArtCatalogEntry({ url: worst }) },
+  });
+  assert.doesNotThrow(() => Protocol.validateArtPanel(panel));
+  const tooLong = "/art/" + "p".repeat(256 - "/art/".length + 1);
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validArtPanel({
+        portrait_catalog: { "42": validArtCatalogEntry({ url: tooLong }) },
+      })
+    )
+  );
+  assert.doesNotThrow(() =>
+    Protocol.validateRosterPanel(
+      validRosterPanel({
+        characters: [validRosterCharacter({ portrait: validRosterPortrait({ url: worst }) })],
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateRosterPanel(
+      validRosterPanel({
+        characters: [
+          validRosterCharacter({ portrait: validRosterPortrait({ url: tooLong }) }),
+        ],
+      })
+    )
+  );
+});
+
 // ---------------------------------------------------------------------------
 // creation panel v3 (mirror of web.webclient.presentation.creation).
 // ---------------------------------------------------------------------------

@@ -148,6 +148,7 @@ class ArtSchemaTests(unittest.TestCase):
         with self.assertRaises(Exception):
             validate_art(payload)
 
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     def test_catalog_face_rect_is_exact_and_tied_to_the_url(self):
         """face_rect is required with a url, null-only for placeholders, and exact."""
         for bad in (
@@ -184,6 +185,43 @@ class ArtSchemaTests(unittest.TestCase):
                             url=None,
                             placeholder={"kind": "unavailable", "label": "無法提供"},
                         )
+                    }
+                )
+            )
+
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
+    def test_catalog_url_bound_admits_the_worst_case_gallery_identity(self):
+        # /art/ + gallery/<kind>/ + 64-code-point key + / + uuid36 + .avif
+        # is the longest legal media URL (129 chars); classic identities
+        # never exceeded ~97. The bound must admit it.
+        worst = (
+            "/art/gallery/character/"
+            + "k" * 64
+            + "/"
+            + "0" * 36
+            + ".avif"
+        )
+        self.assertEqual(len(worst), 129)
+        normalized = validate_art(
+            _valid_payload(
+                portrait_catalog={"42": _valid_catalog_entry(url=worst)}
+            )
+        )
+        self.assertEqual(normalized["portrait_catalog"]["42"]["url"], worst)
+        # The shared media-url bound is 256: admitted exactly at it...
+        boundary = "/art/" + "p" * (256 - len("/art/"))
+        normalized = validate_art(
+            _valid_payload(
+                portrait_catalog={"42": _valid_catalog_entry(url=boundary)}
+            )
+        )
+        self.assertEqual(normalized["portrait_catalog"]["42"]["url"], boundary)
+        # ...and rejected one character past it.
+        with self.assertRaises(Exception):
+            validate_art(
+                _valid_payload(
+                    portrait_catalog={
+                        "42": _valid_catalog_entry(url=boundary + "p")
                     }
                 )
             )

@@ -51,6 +51,7 @@ ART_SCHEMA_VERSION = 2
 MAX_ARCHETYPE = 64
 MAX_LABEL = 128
 MAX_SUBJECT_KEY = 128
+MAX_MEDIA_URL = 256
 MAX_ALT = 512
 MAX_STATUS = 16
 MAX_PLACEHOLDER_KIND = 16
@@ -140,7 +141,7 @@ def _validate_scene(value: Any) -> dict[str, Any]:
             raise ProtocolValidationError("scene status is not a stable value")
     url = value["url"]
     if url is not None:
-        url = _require_str(value, "url", maximum=MAX_SUBJECT_KEY)
+        url = _require_str(value, "url", maximum=MAX_MEDIA_URL)
         if not url.startswith("/art/"):
             raise ProtocolValidationError("scene url must be a same-origin media URL")
     aspect_ratio = value["aspect_ratio"]
@@ -208,7 +209,7 @@ def _validate_catalog_entry(value: Any) -> dict[str, Any]:
             raise ProtocolValidationError("catalog status is not a stable value")
     url = value["url"]
     if url is not None:
-        url = _require_str(value, "url", maximum=MAX_SUBJECT_KEY)
+        url = _require_str(value, "url", maximum=MAX_MEDIA_URL)
         if not url.startswith("/art/"):
             raise ProtocolValidationError("catalog url must be a same-origin media URL")
     aspect_ratio = value["aspect_ratio"]
@@ -406,6 +407,7 @@ __all__ = [
     "MAX_PLACEHOLDER_LABEL",
     "MAX_STATUS",
     "MAX_SUBJECT_KEY",
+    "MAX_MEDIA_URL",
     "PLACEHOLDER_KINDS",
     "ROLES",
     "_validate_face_rect",

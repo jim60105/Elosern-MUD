@@ -416,6 +416,7 @@
   var ROSTER_MAX_ROWS = 10;
   var ROSTER_MAX_NAME = 128;
   var ROSTER_MAX_SUBJECT_KEY = 128;
+  var MAX_MEDIA_URL = 256;
   var ROSTER_MAX_ALT = 512;
   var ROSTER_MAX_STATUS = 16;
   var ROSTER_MAX_PLACEHOLDER_LABEL = 128;
@@ -4058,7 +4059,7 @@
     }
     var url = value.url;
     if (url !== null) {
-      requireString(url, "scene url", 128);
+      requireString(url, "scene url", MAX_MEDIA_URL);
       if (url.indexOf("/art/") !== 0) {
         throw new Error("scene url must be a same-origin media URL");
       }
@@ -4143,7 +4144,7 @@
     }
     var url = value.url;
     if (url !== null) {
-      requireString(url, "catalog url", 128);
+      requireString(url, "catalog url", MAX_MEDIA_URL);
       if (url.indexOf("/art/") !== 0) {
         throw new Error("catalog url must be a same-origin media URL");
       }
@@ -5067,7 +5068,7 @@
     }
     var url = value.url;
     if (url !== null) {
-      requireString(url, "portrait url", ROSTER_MAX_SUBJECT_KEY);
+      requireString(url, "portrait url", MAX_MEDIA_URL);
       if (url.indexOf("/art/") !== 0) {
         throw new Error("portrait url must be a same-origin media URL");
       }

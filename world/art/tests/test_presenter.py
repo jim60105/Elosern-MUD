@@ -498,6 +498,24 @@ class FaceRectPayloadTests(EvenniaTestCase):
         self.assertIsNone(payload["url"])
         self.assertIsNone(payload["face_rect"])
 
+    @covers_requirement(
+        "art-gallery-resolution::the-chain-ends-at-one-fallback-seam"
+    )
+    def test_the_seam_is_consulted_on_every_fall_through_path(self):
+        # A filled seam must win over the placeholder for every subject that
+        # resolved no card and no classic done asset: no record at all, and
+        # an unusable done identity.
+        seam = {"identity": "defaults/monster_default.png", "face_rect": None}
+        no_record = ArtSubject(ArtSubjectKind.MONSTER, "seam-no-record")
+        with patch("world.art.presenter.fallback_for", return_value=seam):
+            payload = resolve_subject(no_record)
+        self.assertEqual(payload["kind"], "asset")
+        self.assertEqual(payload["url"], "/art/defaults/monster_default.png")
+        self.assertEqual(payload["face_rect"], dict(DEFAULT_FACE_RECT))
+        # The unpatched seam returns None: byte-identical placeholder.
+        payload = resolve_subject(no_record)
+        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+
 
 if __name__ == "__main__":
     import unittest

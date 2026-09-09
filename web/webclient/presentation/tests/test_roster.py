@@ -428,6 +428,25 @@ class RosterValidatorTests(unittest.TestCase):
         )
         normalized = validate_roster(self._valid_payload(characters=[placeholder_row]))
         self.assertIsNone(normalized["characters"][0]["portrait"]["face_rect"])
+        # The media URL bound admits the worst-case gallery identity.
+        worst = "/art/gallery/character/" + "k" * 64 + "/" + "0" * 36 + ".avif"
+        longest_row = self._valid_row(
+            portrait=self._valid_portrait(url=worst)
+        )
+        normalized = validate_roster(self._valid_payload(characters=[longest_row]))
+        self.assertEqual(normalized["characters"][0]["portrait"]["url"], worst)
+        with self.assertRaises(ProtocolValidationError):
+            validate_roster(
+                self._valid_payload(
+                    characters=[
+                        self._valid_row(
+                            portrait=self._valid_portrait(
+                                url="/art/" + "p" * (256 - len("/art/") + 1)
+                            )
+                        )
+                    ]
+                )
+            )
         # A placeholder must not carry a rectangle.
         with self.assertRaises(ProtocolValidationError):
             validate_roster(

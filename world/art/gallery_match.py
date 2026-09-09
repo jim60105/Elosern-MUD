@@ -169,7 +169,11 @@ def fallback_for(subject: ArtSubject) -> dict | None:
     terminal behaviour is byte-for-byte today's truthful placeholder. A later
     capability MAY supply a fallback here without modifying the chain; the
     presenter is the seam's only consumer and gives whatever it returns the
-    shared default face rectangle unless the seam carries one.
+    shared default face rectangle unless the seam carries one. The filling
+    capability owns the identity contract: the presenter builds the URL from
+    the returned ``identity`` verbatim, so it MUST already be a validated
+    ``defaults/``-branch identity the media route serves (the route still
+    refuses to serve anything else; the presenter would emit a dead URL).
     """
     return None
 

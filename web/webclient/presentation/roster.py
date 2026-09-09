@@ -17,6 +17,7 @@ from typing import Any
 from web.webclient.presentation.affordances import MAX_DISPLAY_NAME_CODE_POINTS
 from web.webclient.presentation.art import (
     MAX_ALT,
+    MAX_MEDIA_URL,
     MAX_PLACEHOLDER_LABEL,
     MAX_STATUS,
     MAX_SUBJECT_KEY,
@@ -98,7 +99,7 @@ def _validate_roster_portrait(value: Any) -> dict[str, Any]:
 
     url = value["url"]
     if url is not None:
-        url = _require_str(value, "url", maximum=MAX_SUBJECT_KEY)
+        url = _require_str(value, "url", maximum=MAX_MEDIA_URL)
         if not url.startswith("/art/"):
             raise RosterPanelError("portrait url must be a same-origin media URL")
 
