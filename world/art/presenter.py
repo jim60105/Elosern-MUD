@@ -182,10 +182,13 @@ def _card_payload(subject: ArtSubject, card: dict) -> dict:
 def _fallback_payload(subject: ArtSubject, fallback: dict) -> dict:
     """The asset payload for a fallback image supplied by the terminal seam.
 
-    The seam returns ``None`` in this capability, so this branch is inert
-    until a later capability fills it: an unusable seam result stays the
-    truthful placeholder, and a missing or malformed seam rectangle defaults
-    to the shared face rectangle without failing the payload.
+    Filled by ``gallery-builtin-fallbacks``: the seam hands back the resolved
+    built-in default's ``defaults/<key>.webp`` identity plus its per-key face
+    rectangle, and the URL is built from the identity exactly like every
+    other branch (the media route serves it from the in-repo defaults
+    directory). An unusable seam result stays the truthful placeholder, and a
+    missing or malformed seam rectangle defaults to the shared face rectangle
+    without failing the payload.
     """
     identity = fallback.get("identity") if isinstance(fallback, dict) else None
     if not isinstance(identity, str) or not identity:

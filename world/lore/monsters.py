@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from world.art.fallback_keys import validate_fallback_key
+
 from .races import StaticBand
 
 
@@ -14,6 +16,11 @@ class MonsterTier:
     hp_band: tuple[int, int]
     example_monsters_zh: tuple[str, ...]
     description: str
+    # The OPTIONAL built-in gallery fallback key (gallery-builtin-fallbacks).
+    # A threat tier MAY claim one key of the closed vocabulary for its
+    # generic-monster subject; the unset default means the subject resolves
+    # ``monster_anon`` by rule. Validated at registry construction below.
+    fallback_key: str | None = None
 
 
 def _static_band(lower: int, upper: int) -> StaticBand:
@@ -51,3 +58,16 @@ MONSTER_TIER_REGISTRY: dict[str, MonsterTier] = {
         "Legendary threats beyond the human scale and above a typical elf.",
     ),
 }
+
+
+def _validate_monster_fallback_keys(registry: dict[str, MonsterTier]) -> None:
+    """Reject a declared fallback key outside the closed vocabulary.
+
+    Runs at registry construction (import) time so an authored typo fails
+    loudly at import rather than silently resolving to a nonexistent image.
+    """
+    for tier in registry.values():
+        validate_fallback_key(tier.fallback_key, f"monster tier {tier.key!r}")
+
+
+_validate_monster_fallback_keys(MONSTER_TIER_REGISTRY)

@@ -394,10 +394,16 @@ class FallbackSeamTests(_ChainBase):
     @covers_requirement(
         "art-gallery-resolution::the-chain-ends-at-one-fallback-seam"
     )
-    def test_the_seam_returns_nothing_for_every_subject_kind(self):
-        self.assertIsNone(fallback_for(_character("seam")))
-        self.assertIsNone(fallback_for(_monster("seam")))
+    def test_the_seam_resolves_persons_and_returns_nothing_for_scenes(self):
+        # Filled by gallery-builtin-fallbacks: person subjects now resolve a
+        # committed built-in default; a scene subject still falls through.
+        with patch("world.observability.log_info"):
+            person = fallback_for(_monster("seam"))
+            character = fallback_for(_character("seam"))
         self.assertIsNone(fallback_for(_scene()))
+        self.assertIsNotNone(person)
+        self.assertTrue(person["identity"].startswith("defaults/"))
+        self.assertTrue(character["identity"].startswith("defaults/"))
 
     @covers_requirement(
         "art-gallery-resolution::the-chain-ends-at-one-fallback-seam"

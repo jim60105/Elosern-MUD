@@ -1,4 +1,16 @@
-## ADDED Requirements
+# art-gallery-fallback Specification
+
+## Purpose
+
+Define the built-in gallery fallback layer: the closed six-key image
+vocabulary committed to the repository and served through the existing
+`/art/defaults/` route, the deterministic declaration → sex/age band →
+subject-key hash resolution rule that fills the resolution chain's terminal
+fallback seam, the per-key face-rectangle map, and the `gallery_fallback_used`
+observability event — so a fresh database with every external service offline
+still shows a dignified portrait instead of a placeholder.
+
+## Requirements
 
 ### Requirement: The built-in fallback set is a closed vocabulary committed to the repository
 The project SHALL commit exactly one image per key of the closed fallback vocabulary `man`, `woman`,

@@ -4,6 +4,7 @@ from dataclasses import KW_ONLY, asdict, dataclass, fields
 from math import isfinite
 from typing import Any
 
+from world.art.fallback_keys import validate_fallback_key
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
@@ -231,6 +232,14 @@ class PlayerPreset:
     # ``PARTY_MAX_COMPANIONS``, affinity against ``NATURAL_CAP``) are swept at
     # ``world/rules/starting_companions.py`` import time.
     starting_companions: tuple[StartingCompanion, ...] = ()
+    # The OPTIONAL built-in gallery fallback key (gallery-builtin-fallbacks).
+    # A preset MAY claim one key of the closed vocabulary outright, which
+    # wins over the sex/age band rule for every character activated from it.
+    # The unset default keeps every shipped card valid without one. The key
+    # vocabulary lives in the dependency-neutral ``world.art.fallback_keys``
+    # -- the only ``world.art`` surface lore may import -- and is checked at
+    # registry construction below so a typo fails loudly at import.
+    fallback_key: str | None = None
 
     def allocation_dict(self) -> dict[str, int]:
         """Return a mutable copy suitable for rules validation."""
@@ -247,6 +256,17 @@ class PlayerPreset:
             for item_key, quantity in self.starting_items
             for _ in range(quantity)
         ]
+
+
+def _validate_preset_fallback_keys(registry: dict[str, PlayerPreset]) -> None:
+    """Reject a declared fallback key outside the closed vocabulary.
+
+    Runs at registry construction (import) time like every other preset
+    sweep, so an authored typo fails loudly at import rather than silently
+    resolving to a nonexistent image.
+    """
+    for preset in registry.values():
+        validate_fallback_key(preset.fallback_key, f"preset {preset.key!r}")
 
 
 PLAYER_PRESET_REGISTRY: dict[str, PlayerPreset] = {
@@ -1375,3 +1395,4 @@ _validate_preset_skill_proficiency(PLAYER_PRESET_REGISTRY)
 _validate_preset_disguised_stats(PLAYER_PRESET_REGISTRY)
 _validate_preset_sexual_baselines(PLAYER_PRESET_REGISTRY)
 _validate_preset_starting_companions(PLAYER_PRESET_REGISTRY)
+_validate_preset_fallback_keys(PLAYER_PRESET_REGISTRY)

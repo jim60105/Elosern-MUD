@@ -41,6 +41,10 @@ _CREATION_ATTRIBUTE_KEYS = (
     # must restore the player-side membership cache alongside every other
     # in-process surface this snapshot covers.
     "party",
+    # Preset activation records its provenance preset key so the built-in
+    # gallery fallback can find the preset's declared fallback key through
+    # a subject keyed by the entity pk (gallery-builtin-fallbacks).
+    "creation_preset_key",
 )
 
 # The single deterministic race-bound mapping every identity channel and the
@@ -682,6 +686,11 @@ def activate_player_character(
         attribute_values["disguised_stats"] = dict(preset.disguised_stats) or None
         if preset.sexual_baseline is not None:
             attribute_values["sexual"] = preset.sexual_baseline.to_record()
+        # Registry provenance (gallery-builtin-fallbacks): the portrait
+        # subject of a preset-born character is keyed by pk, not preset key,
+        # so the activation itself carries the preset key for the fallback
+        # resolver's declaration rung.
+        attribute_values["creation_preset_key"] = preset.key
     persona_record = _persona_record_for(validated, request, persona)
     old_key = character.key
     attribute_snapshots = snapshot_attributes(character, _CREATION_ATTRIBUTE_KEYS)

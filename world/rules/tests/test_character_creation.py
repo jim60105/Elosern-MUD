@@ -983,12 +983,13 @@ class PortraitFinalizationTests(EvenniaTest):
         subject = ArtSubject(ArtSubjectKind.CHARACTER, str(self.character.pk))
         self.assertEqual(gallery_api.cards_for(subject), [])
         # Empty-gallery resolution reaches the chain's terminal fallback seam
-        # (world.art.gallery_match.fallback_for): today the seam provides no
-        # image, so the honest outcome is the placeholder; the moment the
-        # gallery-builtin-fallbacks capability fills the seam this resolves to
-        # an asset payload. Both halves are asserted against the same chain.
-        payload = resolve_entity(self.character)
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        # (world.art.gallery_match.fallback_for): filled by
+        # gallery-builtin-fallbacks, the seam now resolves a committed
+        # built-in default for the artless character.
+        with patch("world.observability.log_info"):
+            payload = resolve_entity(self.character)
+        self.assertEqual(payload["kind"], "asset")
+        self.assertTrue(payload["url"].startswith("/art/defaults/"))
         with patch(
             "world.art.presenter.fallback_for",
             return_value={"identity": "fallback/character/default.png"},
