@@ -914,7 +914,26 @@ class GalleryWorkerTests(WorkerStoreIsolation):
             "world.art.worker.resolve_sd_client",
             side_effect=ImportError("no module named nope"),
         ):
-            drain_synchronous(10)
+            with patch("world.art.worker.log_info") as info:
+                drain_synchronous(10)
+        settles = [
+            call
+            for call in info.call_args_list
+            if call.args and call.args[0] == "gallery_settle"
+        ]
+        self.assertEqual(len(settles), 1, settles)
+        # The event fields are captured BEFORE the spent record's deletion:
+        # a non-empty image id survives the settle (task 3.4).
+        self.assertEqual(
+            settles[0].kwargs["context"],
+            {
+                "subject": self.character.full(),
+                "image_id": self._IMAGE_ID,
+                "kind": self.character.kind.value,
+                "status": ArtAssetStatus.FAILED,
+                "reason": "sd_client_config_error",
+            },
+        )
         scene_record = self._record_for(scene)
         self.assertEqual(scene_record.db.status, ArtAssetStatus.FAILED)
         self.assertEqual(scene_record.db.last_error_code, "sd_client_config_error")

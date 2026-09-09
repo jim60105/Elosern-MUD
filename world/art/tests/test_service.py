@@ -258,6 +258,18 @@ class GalleryRequestSeamTests(EvenniaTestCase):
         self.assertEqual(self._gallery_jobs(), [])
         render.assert_not_called()
 
+        self.player.age = 30
+        self.player.attributes.remove("apparent_age")
+        with self.assertRaises(ArtSubjectError):
+            request_gallery_image(self.player)
+        self.assertEqual(self._gallery_jobs(), [])
+
+        self.player.apparent_age = 25
+        self.player.age = "not-an-integer"
+        with self.assertRaises(ArtSubjectError):
+            request_gallery_image(self.player)
+        self.assertEqual(self._gallery_jobs(), [])
+
         plain = create_object(NPC, key="gallery-no-policy")
         with self.assertRaises(ArtSubjectError):
             request_gallery_image(plain)
@@ -343,6 +355,26 @@ class GalleryPruneTests(EvenniaTestCase):
         with patch("pathlib.Path.rglob", side_effect=OSError("unreadable tree")):
             prune_gallery_orphans()
         self.assertTrue(tree.is_dir())
+
+    @covers_requirement(
+        "art-gallery-generation::interrupted-gallery-generations-are-reclaimed-at-startup"
+    )
+    def test_a_failing_deletion_is_bounded_and_a_failed_reference_read_deletes_nothing(self):
+        orphan = self._write("gallery/character/9001/deadbeef-1111-4111-8111-111111111111.png")
+        # One deletion raising never aborts the sweep and never raises out.
+        with patch("pathlib.Path.unlink", side_effect=OSError("busy")):
+            result = prune_gallery_orphans()
+        self.assertEqual(result["files"], 0)
+        self.assertTrue(orphan.exists())
+        # Without a readable reference set NOTHING may be deleted — not even
+        # orphans: a prune must never delete a file a card references.
+        with patch(
+            "world.art.gallery.referenced_stored_identities",
+            side_effect=RuntimeError("db down"),
+        ):
+            result = prune_gallery_orphans()
+        self.assertEqual(result["files"], 0)
+        self.assertTrue(orphan.exists())
 
     @covers_requirement(
         "art-gallery-generation::interrupted-gallery-generations-are-reclaimed-at-startup"

@@ -439,6 +439,9 @@ def _fail_batch(pairs: list[tuple[ArtAssetRecord, ArtSubject]], error: str) -> N
     """
     for record, subject in pairs:
         if is_gallery_job(record):
+            # The event fields are captured BEFORE the settle: the terminal
+            # gallery-failed settle deletes the job record (task 3.4).
+            image_id = str(record.db.gallery_image_id or "")
             applied = settle_gallery_failed(
                 str(record.db_key),
                 generation_token=str(record.db.generation_token or ""),
@@ -446,7 +449,7 @@ def _fail_batch(pairs: list[tuple[ArtAssetRecord, ArtSubject]], error: str) -> N
             )
             if applied is not None:
                 _log_gallery_settle(
-                    subject, str(record.db.gallery_image_id or ""),
+                    subject, image_id,
                     ArtAssetStatus.FAILED, error,
                 )
                 _log_settled(record, subject, ArtAssetStatus.FAILED, error)

@@ -85,6 +85,9 @@ when a gallery job is enqueued, and one `gallery_settle` info event when a galle
 terminal settle, carrying the business ids `subject`, `image_id`, and `kind` in `context`, plus the
 settled `status` and bounded `reason` code on settle. Logging SHALL go exclusively through the
 facade so `tools.observability_lint` passes with no waiver.
+Gallery jobs flow through the existing claim machinery unchanged, so a gallery job additionally
+produces the queue-level `sd_job_claim`/`sd_job_settled` events keyed by the job record; the
+`gallery_*` pair is the per-image business stream operators SHALL count.
 
 #### Scenario: A successful gallery generation leaves a generate/settle pair
 - **WHEN** one gallery image is requested and its job settles `done`

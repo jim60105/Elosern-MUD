@@ -16,6 +16,7 @@ from commands.art import (
 )
 from world.art.connectivity import ProbeResult
 from world.art.queue import claim, ensure, requeue, settle
+from world.art.queue import enqueue_gallery_job
 from world.art.sd_worker import SDError
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
@@ -280,6 +281,23 @@ class ArtStatusSeedColumnTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("scene:forest_path", output)
         self.assertNotIn("seed=", output)
 
+    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
+    def test_gallery_job_records_are_invisible_to_the_status_listing(self):
+        ensure(_scene("forest_path"), "desc")
+        enqueue_gallery_job(
+            ArtSubject(ArtSubjectKind.CHARACTER, "42"),
+            "desc",
+            image_id="99999999-9999-4999-8999-999999999999",
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
+        output = self.call(CmdArtStatus(), "")
+        self.assertIn("scene:forest_path", output)
+        self.assertNotIn(":gen:", output)
+        portrait_output = self.call(CmdArtStatus(), "portrait")
+        self.assertNotIn(":gen:", portrait_output)
+
 
 class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     """``@art health`` with the thread dispatch replaced by a sync seam."""
@@ -348,6 +366,23 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("queue: pending=0 in_progress=0 failed=0 done=0", output)
         self.assertIn("output: ", output)
         probe.assert_called_once_with(force=True)
+
+    @covers_requirement(
+        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
+    )
+    def test_queue_counts_exclude_gallery_job_records(self):
+        ensure(_scene("forest_path"), "desc")
+        enqueue_gallery_job(
+            ArtSubject(ArtSubjectKind.CHARACTER, "42"),
+            "desc",
+            image_id="88888888-8888-4888-8888-888888888888",
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
+        output, _, _ = self._health(self._verdict())
+        # The lone pending scene record counts; the pending gallery job does not.
+        self.assertIn("queue: pending=1 in_progress=0 failed=0 done=0", output)
 
     @covers_requirement(
         "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"

@@ -344,37 +344,45 @@ def prune_gallery_orphans() -> dict:
     deleted. Every failure phase is bounded: an unreadable tree or a failing
     deletion is a named diagnostic and the prune continues; the function
     itself never raises, so startup never aborts because of it.
+
+    Reads happen on the reactor thread during ``at_server_start``, before the
+    scheduler can claim or publish anything — the gallery and queue locks are
+    deliberately not taken here. A future mid-game re-use must take them.
     """
     files_deleted = 0
     records_deleted = 0
+    referenced = None
     try:
         referenced = gallery_api.referenced_stored_identities()
     except Exception as error:  # noqa: BLE001 - bounded: skip the file phase, still prune records
-        referenced = set()
         log_error("gallery_prune_failed", context={"phase": "references"}, exc=error)
-    try:
-        gallery_root = Path(settings.ART_STORE_ROOT) / "gallery"
-        if gallery_root.is_dir():
-            store_root = Path(settings.ART_STORE_ROOT)
-            for path in gallery_root.rglob("*"):
-                try:
-                    if not path.is_file():
-                        continue
-                    identity = path.relative_to(store_root).as_posix()
-                    if identity in referenced:
-                        continue
-                    if resolved_under_store_root(identity) is None:
-                        continue
-                    path.unlink()
-                    files_deleted += 1
-                except OSError as error:
-                    log_warn(
-                        "gallery_prune_failed",
-                        context={"phase": "file", "path": str(path)},
-                        exc=error,
-                    )
-    except Exception as error:  # noqa: BLE001 - an unreadable tree never aborts the prune
-        log_error("gallery_prune_failed", context={"phase": "tree"}, exc=error)
+    if referenced is not None:
+        # Without the reference set NOTHING may be deleted: a prune must
+        # never remove a file a card references, and an unreadable set cannot
+        # prove non-reference for any file.
+        try:
+            gallery_root = Path(settings.ART_STORE_ROOT) / "gallery"
+            if gallery_root.is_dir():
+                store_root = Path(settings.ART_STORE_ROOT)
+                for path in gallery_root.rglob("*"):
+                    try:
+                        if not path.is_file():
+                            continue
+                        identity = path.relative_to(store_root).as_posix()
+                        if identity in referenced:
+                            continue
+                        if resolved_under_store_root(identity) is None:
+                            continue
+                        path.unlink()
+                        files_deleted += 1
+                    except OSError as error:
+                        log_warn(
+                            "gallery_prune_failed",
+                            context={"phase": "file", "path": str(path)},
+                            exc=error,
+                        )
+        except Exception as error:  # noqa: BLE001 - an unreadable tree never aborts the prune
+            log_error("gallery_prune_failed", context={"phase": "tree"}, exc=error)
     try:
         for record in list(ArtAssetRecord.objects.all()):
             try:

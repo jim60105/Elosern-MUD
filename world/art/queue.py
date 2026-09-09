@@ -464,6 +464,12 @@ def settle_gallery_generated(
     Returns the stored card dict, or ``None`` for a stale claim (the
     temporary file is removed first). An identity that escapes the store
     root removes the temporary file and raises.
+    A record whose persisted kind/subject no longer parses is spent work
+    that can never append: its (un-rewound) published file stays an orphan
+    for the startup prune, the record is deleted, and the settle reports
+    ``None`` rather than raising inside the queue lock. queue.py is log-free
+    by design (the worker owns every boundary event); the deleted or DONE
+    record is the durable diagnostic.
     """
     with queue_lock:
         record = _record_by_db_key(job_key)
@@ -487,7 +493,11 @@ def settle_gallery_generated(
         except BaseException:
             _remove_tmp(tmp_path)
             raise
-        subject = _gallery_subject(record)
+        try:
+            subject = _gallery_subject(record)
+        except ArtSubjectError:  # corrupt record: it can never resolve a gallery
+            _finish_gallery_job(record, ArtAssetStatus.FAILED)
+            return None
         card_fields: dict = {
             "image_id": str(record.db.gallery_image_id),
             "stored_identity": output_identity,
@@ -502,7 +512,10 @@ def settle_gallery_generated(
         if face_rect:
             card_fields["face_rect"] = face_rect
         stored = gallery_api.append_card(subject, **card_fields)
-        record.delete()
+        # The card append is the authoritative publish: a failure deleting
+        # the spent record afterwards must never rewrite this settle's
+        # outcome; the terminal marking below keeps it unclaimable.
+        _finish_gallery_job(record, ArtAssetStatus.DONE)
         return stored
 
 
@@ -528,10 +541,36 @@ def settle_gallery_failed(
             or record.db.generation_token != generation_token
         ):
             return None
-        subject = _gallery_subject(record)
+        try:
+            subject = _gallery_subject(record)
+        except ArtSubjectError:  # corrupt record: nowhere to record the error
+            _finish_gallery_job(record, ArtAssetStatus.FAILED)
+            return None
         gallery_api.record_error(subject, error or "settle_error")
-        record.delete()
+        _finish_gallery_job(record, ArtAssetStatus.FAILED)
         return subject
+
+
+def _finish_gallery_job(record: ArtAssetRecord, status: str) -> None:
+    """Mark a spent gallery job terminal, then delete it (both best-effort).
+
+    The card append (or failed settle) already decided this job's outcome.
+    Marking the terminal status first keeps the record unclaimable even when the delete
+    fails: claim and lease reclaim only touch pending/in-progress work, and
+    the startup prune sweeps terminal gallery jobs, so a lost delete delays
+    cleanup and can never re-publish. A save that also fails leaves an
+    in-progress record with a live token, which the shared reclaim re-runs
+    once and self-settles as a rejected duplicate — bounded, never corrupt.
+    """
+    try:
+        record.db.status = status
+        record.save()
+    except Exception:  # noqa: BLE001 - the reclaim self-heals this DB-failure corner
+        pass
+    try:
+        record.delete()
+    except Exception:  # noqa: BLE001 - the retained terminal record is pruned at startup
+        pass
 
 
 def failed_keys() -> list[str]:
