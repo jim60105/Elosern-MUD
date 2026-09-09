@@ -17,4 +17,10 @@ describe("faceObjectPosition (gallery face_rect → object-position)", () => {
     expect(faceObjectPosition({ x: 0, y: 0, w: 0, h: 0.5 })).toBe("50% 50%");
     expect(faceObjectPosition({ x: 0, y: 0.6, w: 0.5, h: 0.5 })).toBe("50% 50%");
   });
+
+  it("pins the boundary rounding tolerance at the rect edge", () => {
+    // A center of 0.999995 serializes as 100%: the maximum rounding
+    // displacement is 0.005 percentage points for a well-formed rect.
+    expect(faceObjectPosition({ x: 0, y: 0.99999, w: 0.00002, h: 0.00001 })).toBe("0% 100%");
+  });
 });

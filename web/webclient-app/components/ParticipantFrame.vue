@@ -125,6 +125,7 @@ function portraitSrc(portrait) {
             class="participant-frame__portrait"
             :src="portraitSrc(portraitFor(p))"
             :alt="p.display_name"
+            :style="{ objectPosition: faceObjectPosition(portraitFor(p).face_rect) }"
           />
           <div
             v-else

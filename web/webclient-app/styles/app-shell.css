@@ -439,6 +439,10 @@ body {
 }
 .elosern-root .hud-drawer__head { min-height: 54px; box-sizing: border-box; padding: 10px 20px; }
 .elosern-root .hud-drawer__title { color: var(--gold-400); font-family: var(--f-serif); font-size: 25px; }
+/* Scene-decoration exception: sample-town/forest/guild remain deliberate
+   backdrop washes (scene-domain, truthfully labeled by SceneBackdrop), not
+   portrait surfaces — the gallery face-rect consumption retired only the
+   character/monster sample art. */
 .hud-drawer__workspace { display: flex; flex: 1; min-height: 0; }
 .hud-drawer__art { flex: 0 0 32%; min-width: 0; min-height: 0; overflow: hidden; position: relative; background: linear-gradient(0deg, #111419, transparent), url("../assets/redesign/sample-town.webp") center / cover; }
 .hud-drawer__art .reference-artwork { height: 100%; }
