@@ -1,4 +1,17 @@
-## ADDED Requirements
+# art-gallery-resolution Specification
+
+## Purpose
+
+Define how the gallery resolves which image a subject displays: the
+deterministic chain in `world/art/gallery_match.py` from the entity's
+four-slot equipment snapshot through masked-binding matching to the default
+card, the monster chain variant that skips the binding steps, the single
+terminal fallback seam, the presenter payload `face_rect` carriage contract,
+the rule that gallery media URLs are built only from validated card
+identities, and the media route's admission of gallery and built-in-default
+identities under the same store-root confinement discipline.
+
+## Requirements
 
 ### Requirement: Display resolution is one deterministic chain from equipment to fallback
 `world/art/gallery_match.py` SHALL resolve the image shown for a subject by exactly this ordered
