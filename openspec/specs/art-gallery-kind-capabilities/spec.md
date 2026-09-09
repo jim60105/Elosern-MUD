@@ -7,42 +7,35 @@ TBD - created by archiving change gallery-kind-capabilities. Update Purpose afte
 `world/art/gallery_kinds.py` SHALL declare exactly one immutable capability record per art subject
 kind, and that declaration SHALL be the single origin of every per-kind gallery rule. Each record
 SHALL carry at least: whether the kind has a gallery at all, the directory segment its stored
-identities use, the maximum number of cards one record may hold, and whether the kind supports
-equipment bindings. A kind without a gallery SHALL be declared explicitly as such rather than being
-represented by an absent entry, so "this kind has no gallery" is an assertion in the table and not an
-accident of a missing key.
+identities use, the maximum number of cards one record may hold, whether the kind supports equipment
+bindings, whether a generation request for the kind requires the canonical-age precondition, whether
+the kind supports a prompt field selection, and whether the kind supports free-form prompt text. A
+kind without a gallery SHALL be declared explicitly as such rather than being represented by an absent
+entry, so "this kind has no gallery" is an assertion in the table and not an accident of a missing key.
 
-The card maximum SHALL be nullable, and a null maximum SHALL mean genuinely unbounded — the character
-portrait kind is uncapped today and SHALL stay uncapped, so "no maximum" MUST be representable rather
-than approximated by a large sentinel. The declared maximum SHALL be either null or exactly `1`; the
-contract test SHALL reject any other value. The gallery holds no kind needing an intermediate cap, and
-admitting arbitrary values would require an eviction algorithm no real declaration exercises. A future
-kind that genuinely needs one widens this rule in the change that introduces it.
+The character portrait kind SHALL declare the age precondition, field-selection support, binding
+support, free-text support, and no card maximum. The monster portrait kind SHALL declare none of those
+four capabilities and a maximum of one card: a monster's fewer capabilities are a declaration, not a
+special case in the code that serves it.
 
-The declaration SHALL be data only: it SHALL perform no I/O and read no settings, and it SHALL expose
-no mutable state to consumers — records and the table view are frozen, and the writable origin is a
-module-private mapping that no consumer API hands out and only the test patch seam rewrites — so the
-same kind resolves the same capabilities in every process.
+The declaration SHALL be data only: it SHALL perform no I/O, read no settings, and hold no mutable
+state, so the same kind resolves the same capabilities in every process.
 
 #### Scenario: Every declared capability is readable from one place
 - **WHEN** the capability record for the character kind and for the monster kind are read
-- **THEN** each reports its gallery-bearing flag, store directory segment, maximum card count, and binding support without consulting any other module
+- **THEN** each reports its gallery-bearing flag, store directory segment, maximum card count, binding support, age precondition, field-selection support, and free-text support without consulting any other module
 
 #### Scenario: A kind with no gallery is declared, not omitted
 - **WHEN** the capability record for the scene kind is read
 - **THEN** an entry exists that declares the kind as having no gallery, and reading it raises no error
 
-#### Scenario: The character kind declares no maximum and stays uncapped
-- **WHEN** the character capability record is read and cards are appended to a character record well past any single-card limit
-- **THEN** the declared maximum is null and every card is retained in append order with no replacement
-
-#### Scenario: A maximum outside the admitted values fails the contract
-- **WHEN** the contract test runs against a declaration naming a card maximum that is neither null nor `1`
-- **THEN** the test fails naming the offending kind and value
-
 #### Scenario: The declaration is immutable
 - **WHEN** a caller attempts to mutate a capability record or the table that holds them
 - **THEN** the attempt fails and no other caller observes a changed capability
+
+#### Scenario: The monster kind declares strictly fewer capabilities than the character kind
+- **WHEN** the character and monster capability records are compared
+- **THEN** the monster declares no binding support, no field selection, no free text, no age precondition, and a maximum of one card, while the character declares all four capabilities and no maximum
 
 ### Requirement: The declaration covers every subject kind exhaustively
 A contract test SHALL assert that the declaration holds exactly one entry for every member of

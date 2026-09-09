@@ -101,6 +101,38 @@ class FieldCatalogTests(unittest.TestCase):
                 with self.assertRaises(GalleryPromptError):
                     validate_fields(bad)
 
+    @covers_requirement(
+        "art-gallery-prompt-fields::the-gallery-prompt-field-catalog-is-a-closed-ordered-vocabulary"
+    )
+    def test_a_kind_without_field_support_rejects_any_selection(self):
+        # The catalog applies ONLY to kinds declaring field support (change
+        # gallery-monster-generation): a monster-kind selection is a typed
+        # rejection naming the undeclared capability, never a silent drop —
+        # while the empty selection stays legal for every gallery kind.
+        monster_value = subjects.ArtSubjectKind.MONSTER.value
+        character_value = subjects.ArtSubjectKind.CHARACTER.value
+        with self.assertRaises(GalleryPromptError) as caught:
+            validate_fields(["appearance"], kind=monster_value)
+        self.assertIn(monster_value, str(caught.exception))
+        self.assertIn("field selection", str(caught.exception))
+        # Any catalog field is rejected for the kind, not just one.
+        for field in GALLERY_PROMPT_FIELDS:
+            with self.subTest(field=field):
+                with self.assertRaises(GalleryPromptError):
+                    validate_fields([field], kind=monster_value)
+        # Empty stays legal for BOTH vocabularies; a declaring kind is
+        # unaffected by the scope.
+        self.assertEqual(validate_fields((), kind=monster_value), ())
+        self.assertEqual(validate_fields([], kind=monster_value), ())
+        self.assertEqual(
+            validate_fields(("armor", "appearance"), kind=character_value),
+            ("appearance", "armor"),
+        )
+        # A syntactically bad selection for the no-support kind still fails
+        # with the catalog-level typed error (never silently accepted).
+        with self.assertRaises(GalleryPromptError):
+            validate_fields(["nope"], kind=monster_value)
+
 
 class CustomPromptBoundTests(unittest.TestCase):
     """The bounded, sanitized, single-line free text."""

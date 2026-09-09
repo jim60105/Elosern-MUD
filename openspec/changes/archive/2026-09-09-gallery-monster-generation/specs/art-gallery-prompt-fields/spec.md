@@ -14,6 +14,12 @@ at the service boundary. The selection SHALL be normalized to the declared order
 on the resulting card's `requested_fields`, so a card always reports which data blocks produced it.
 Selecting no field SHALL be legal for every gallery-bearing kind.
 
+A card's `requested_fields` is a provenance claim about which data blocks produced the image, so the
+gallery card-write boundary SHALL enforce the same declaration: a card whose kind does not support a
+field selection SHALL store an empty `requested_fields`, and a write claiming a non-empty provenance
+for such a kind SHALL raise a typed error and leave the record unchanged — a stored claim the kind
+could never have requested would make the card lie.
+
 #### Scenario: A selection is normalized and recorded on the card
 - **WHEN** a gallery image is requested selecting `armor` and `appearance` in that order
 - **THEN** the prompt contributions are composed in the declared catalog order and the settled card's `requested_fields` is `["appearance", "armor"]`
@@ -33,3 +39,7 @@ Selecting no field SHALL be legal for every gallery-bearing kind.
 #### Scenario: A monster card records an empty provenance
 - **WHEN** a monster gallery generation settles successfully
 - **THEN** the settled card's `requested_fields` is empty and its description came from the monster registry
+
+#### Scenario: A write claiming field provenance for a kind without selection is refused
+- **WHEN** a card carrying a non-empty `requested_fields` is appended for a subject whose kind declaration supports no field selection
+- **THEN** a typed error is raised and the record is unchanged

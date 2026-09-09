@@ -111,6 +111,18 @@ class DeclarationContractTests(unittest.TestCase):
             self.assertTrue(
                 any("supports_bindings" in v for v in violations), violations
             )
+        # The request-precondition fields (gallery-monster-generation) face the
+        # same exactly-a-bool rule as the older flags.
+        for flag in (
+            "requires_age_precondition",
+            "supports_field_selection",
+            "supports_free_text",
+        ):
+            with self.subTest(field=flag):
+                violations = _violations_with(monster_value, **{flag: 0})
+                self.assertTrue(
+                    any(flag in v for v in violations), violations
+                )
 
     @covers_requirement(
         "art-gallery-kind-capabilities::one-closed-declaration-states-what-every-subject-kind-s-gallery-may-do"
@@ -136,6 +148,18 @@ class DeclarationContractTests(unittest.TestCase):
                 any(scene_value in v and "binding" in v for v in violations),
                 violations,
             )
+        # A no-gallery kind may not claim any request precondition either.
+        for flag in (
+            "requires_age_precondition",
+            "supports_field_selection",
+            "supports_free_text",
+        ):
+            with self.subTest(case=f"no-gallery kind claiming {flag}"):
+                violations = _violations_with(scene_value, **{flag: True})
+                self.assertTrue(
+                    any(scene_value in v and flag in v for v in violations),
+                    violations,
+                )
 
     @covers_requirement(
         "art-gallery-kind-capabilities::one-closed-declaration-states-what-every-subject-kind-s-gallery-may-do"
@@ -150,12 +174,46 @@ class DeclarationContractTests(unittest.TestCase):
             self.assertIsInstance(record.store_directory, str)
             self.assertTrue(record.store_directory)
             self.assertIsInstance(record.supports_bindings, bool)
+            for flag in (
+                "requires_age_precondition",
+                "supports_field_selection",
+                "supports_free_text",
+            ):
+                self.assertIsInstance(getattr(record, flag), bool)
         self.assertEqual(character.store_directory, "character")
         self.assertIsNone(character.max_cards)
         self.assertTrue(character.supports_bindings)
+        self.assertTrue(character.requires_age_precondition)
+        self.assertTrue(character.supports_field_selection)
+        self.assertTrue(character.supports_free_text)
         self.assertEqual(monster.store_directory, "monster")
         self.assertEqual(monster.max_cards, 1)
         self.assertFalse(monster.supports_bindings)
+        self.assertFalse(monster.requires_age_precondition)
+        self.assertFalse(monster.supports_field_selection)
+        self.assertFalse(monster.supports_free_text)
+
+    @covers_requirement(
+        "art-gallery-kind-capabilities::one-closed-declaration-states-what-every-subject-kind-s-gallery-may-do"
+    )
+    def test_the_monster_kind_declares_strictly_fewer_capabilities(self):
+        # The monster's fewer capabilities are a declaration, not a special
+        # case in the code that serves it: one read of the two records shows
+        # the monster lacking ALL FOUR discretionary capabilities while the
+        # character declares every one of them.
+        character = gallery_kinds.capabilities_for(ArtSubjectKind.CHARACTER.value)
+        monster = gallery_kinds.capabilities_for(ArtSubjectKind.MONSTER.value)
+        declared = (
+            "supports_bindings",
+            "requires_age_precondition",
+            "supports_field_selection",
+            "supports_free_text",
+        )
+        for flag in declared:
+            self.assertTrue(getattr(character, flag), flag)
+            self.assertFalse(getattr(monster, flag), flag)
+        self.assertIsNone(character.max_cards)
+        self.assertEqual(monster.max_cards, 1)
 
     @covers_requirement(
         "art-gallery-kind-capabilities::one-closed-declaration-states-what-every-subject-kind-s-gallery-may-do"

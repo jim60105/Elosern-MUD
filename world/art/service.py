@@ -32,6 +32,18 @@ fixed-identity record. Automatic paths request only when the subject's gallery
 holds no card and no gallery job is in flight; ``@art requeue`` is the one
 force path that bypasses that guard. Scenes and monster tiers stay on the
 classic subject-keyed pipeline.
+
+Change ``gallery-monster-generation`` opens the seam to every gallery-bearing
+kind: ``request_gallery_image`` accepts an entity OR an already-derived
+``ArtSubject``, reads EVERY precondition from the kind's capability
+declaration (age precondition, field selection, free text, bindings) instead
+of hard-coding the character shape, and refuses an argument naming a
+capability the kind does not declare — never silently dropping it. The staff
+requeue seam becomes kind-neutral (``requeue_gallery_subject``); the retry
+seam keeps its ``gallery-failure-visibility`` name and resolves any
+gallery-bearing subject by its typed full key. Automatic monster routing
+stays with ``gallery-monster-autogen``: every automatic path still serves
+characters only.
 """
 
 import uuid
@@ -43,7 +55,12 @@ from django.db import transaction
 from world.observability import log_error, log_info, log_warn
 
 from world.art import gallery as gallery_api
-from world.art.gallery_prompt import validate_custom_prompt, validate_fields
+from world.art import gallery_kinds
+from world.art.gallery_prompt import (
+    GalleryPromptError,
+    validate_custom_prompt,
+    validate_fields,
+)
 from world.art.paths import resolved_under_store_root
 from world.art.queue import (
     ensure as queue_ensure,
@@ -54,6 +71,8 @@ from world.art.queue import (
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import (
     ArtSubjectError,
+    ArtSubject,
+    ArtSubjectKind,
     character_ages,
     character_subject_for,
     description_for,
@@ -79,30 +98,65 @@ def _gallery_auto_generation_pending(subject) -> bool:
     return gallery_job_in_flight(subject)
 
 
+#: The typed producers that re-validate a supplied/referenced subject for a
+#: registry-backed gallery kind (``gallery-monster-generation``). A kind with
+#: no entry here is either entity-derived (character, resolved through
+#: ``_living_entity_for_stable_key``) or declares no gallery at all; presence
+#: in this mapping always agrees with the kind's gallery declaration.
+_GALLERY_REGISTRY_PRODUCERS = {ArtSubjectKind.MONSTER.value: monster_subject_for}
+
+
+def _standard_gallery_request_kwargs(capability) -> dict:
+    """The standard deterministic staff/automatic request shape for a kind.
+
+    The ``appearance``-only selection belongs to the character vocabulary and
+    is passed only where the declaration supports field selection; a kind
+    without it requests with no selection. Every such request carries the
+    shared default face rectangle and no binding or free text.
+    """
+    fields = ("appearance",) if capability.supports_field_selection else ()
+    return {"fields": fields, "face_rect": dict(gallery_api.DEFAULT_FACE_RECT)}
+
+
+def _guarded_gallery_request(subject, entity) -> bool:
+    """One guarded automatic-path-style request for a resolved gallery subject.
+
+    Returns True when a gallery generation was requested, False when the
+    automatic-generation guard suppressed it. For a kind that declares the
+    canonical-age precondition the age pair is read immediately before the
+    request (design D3): a rejection is deterministic and produces no record,
+    no prompt, and no worker call. The kind's declaration decides the request
+    shape — never a comparison against a particular kind.
+    """
+    capability = gallery_kinds.capabilities_for(subject.kind.value)
+    if capability.requires_age_precondition:
+        if entity is None:
+            raise ArtSubjectError(
+                f"a gallery request for {subject.full()!r} requires the entity carrying the portrait subject"
+            )
+        character_ages(entity)
+    if _gallery_auto_generation_pending(subject):
+        return False
+    request_gallery_image(
+        entity if entity is not None else subject,
+        **_standard_gallery_request_kwargs(capability),
+    )
+    return True
+
+
 def _ensure_character_portrait(entity) -> bool:
     """Validate ages, then request one automatic gallery card when the gallery warrants it.
 
     Returns True when a gallery generation was requested, False when the
-    gallery guard suppressed the automatic path. Reads the canonical age pair
-    immediately before the request for every portrait subject (design D3):
-    a rejection is deterministic and produces no record, no prompt, and no
-    worker call. The request itself is the gallery seam — one unbound card
-    from the explicit ``appearance``-only field selection with the shared
-    default face rectangle (the selection ``gallery-autogen-retrofit``
-    described as the standard deterministic description, made explicit by
-    ``gallery-prompt-composition``); a character subject never writes a
-    classic fixed-identity record on an automatic path.
+    gallery guard suppressed the automatic path. The character kind's
+    declaration (age precondition, ``appearance``-only selection, default
+    rect) drives the request through the shared guarded helper; a character
+    subject never writes a classic fixed-identity record on an automatic path.
     """
     subject = character_subject_for(entity)
     if subject is None:
         return False
-    character_ages(entity)
-    if _gallery_auto_generation_pending(subject):
-        return False
-    request_gallery_image(
-        entity, fields=("appearance",), face_rect=dict(gallery_api.DEFAULT_FACE_RECT)
-    )
-    return True
+    return _guarded_gallery_request(subject, entity)
 
 
 def _ages_eligible_at_schedule(entity) -> bool:
@@ -176,57 +230,92 @@ def _living_entity_for_stable_key(stable_key: str):
     return None
 
 
-def retry_gallery_subject(stable_key: str) -> bool:
-    """Re-attempt one gallery subject through the age check and the gallery guard.
+def _resolve_gallery_subject(subject: ArtSubject) -> tuple[ArtSubject, object]:
+    """Resolve one erroring gallery subject to its canonical subject and entity.
 
-    The subject is re-derived from the living entity that owns the explicit
-    named policy for ``stable_key`` and the ages are re-checked; an unknown key,
-    a missing entity, or an ineligible character is a named rejection with no
-    record change (staff retry path, design D3). Returns True only when a
-    gallery generation was actually requested, so ``@art retry`` counts
-    truthfully when the guard leaves an already-carded subject alone.
-
-    Kind-neutral by name (change ``gallery-failure-visibility``):
-    ``gallery-monster-generation`` generalizes the resolution internals later
-    without call-site churn. When the guard declines only because the gallery
-    already holds cards, the subject's recorded error is moot — the automatic
-    path will suppress every future request and nothing else would ever clear
-    it — so the seam clears it here. A decline for any other reason (an
-    in-flight job) keeps the recorded error.
+    Resolution is ALWAYS through the subject's OWN kind producer — never a
+    scan across kinds, because a character stable key may legally equal a
+    monster tier key and a kind-order scan could then re-drive the wrong
+    subject (``gallery-monster-generation``, design: collision safety). The
+    entity is returned for kinds that declare the age precondition and is
+    ``None`` for registry-backed kinds. An unresolvable subject — no living
+    character, an unregistered registry entry, a kind with no gallery — is a
+    typed ``ArtSubjectError`` with no record change.
     """
-    entity = _living_entity_for_stable_key(stable_key)
-    if entity is None:
+    capability = gallery_kinds.capabilities_for(subject.kind.value)
+    if not capability.has_gallery:
+        raise ArtSubjectError(f"subject {subject.full()!r} declares no gallery")
+    if capability.requires_age_precondition:
+        entity = _living_entity_for_stable_key(subject.key)
+        if entity is None:
+            raise ArtSubjectError(
+                f"no living character carries portrait stable_key {subject.key!r}"
+            )
+        resolved = character_subject_for(entity)
+        if resolved is None:
+            raise ArtSubjectError(
+                f"character carrying stable_key {subject.key!r} no longer yields a portrait subject"
+            )
+        return resolved, entity
+    producer = _GALLERY_REGISTRY_PRODUCERS.get(subject.kind.value)
+    if producer is None:  # pragma: no cover - every gallery kind has a producer
         raise ArtSubjectError(
-            f"no living character carries portrait stable_key {stable_key!r}"
+            f"no typed producer resolves subject kind {subject.kind.value!r}"
         )
-    requested = _ensure_character_portrait(entity)
-    if not requested:
-        subject = character_subject_for(entity)
-        if subject is not None and gallery_api.cards_for(subject):
-            gallery_api.clear_error(subject)
+    return producer(subject.key), None
+
+
+def retry_gallery_subject(subject: ArtSubject) -> bool:
+    """Re-attempt one gallery subject through its kind preconditions and the gallery guard.
+
+    Takes the erroring subject's TYPED subject (the record identity ``@art
+    retry`` already holds — ``gallery-monster-generation``), so resolution
+    cannot confuse a character key with an identically-spelled monster key.
+    The subject is re-validated through its own kind's producer — the living
+    entity that owns the explicit named policy and the ages for an
+    age-declaring kind, the registry entry for a registry kind; an unknown
+    key, a missing entity, or an ineligible character is a named rejection
+    with no record change (staff retry path, design D3). Returns True only
+    when a gallery generation was actually requested, so ``@art retry``
+    counts truthfully when the guard leaves an already-carded subject alone.
+
+    When the guard declines only because the gallery already holds cards, the
+    subject's recorded error is moot — the guard will suppress every future
+    automatic or retry request for a carded subject of ANY gallery kind and
+    nothing else would ever clear it — so the seam clears it here. A decline
+    for any other reason (an in-flight job) keeps the recorded error.
+    """
+    subject, entity = _resolve_gallery_subject(subject)
+    requested = _guarded_gallery_request(subject, entity)
+    if not requested and gallery_api.cards_for(subject):
+        gallery_api.clear_error(subject)
     return requested
 
 
-def requeue_character_portrait(stable_key: str) -> None:
-    """Force-regenerate one character portrait through the age check and the gallery.
+def requeue_gallery_subject(subject: ArtSubject) -> None:
+    """Force-regenerate one gallery subject through its kind preconditions and the gallery.
 
-    Resolves the owning entity and re-checks the canonical ages before issuing
-    exactly one gallery generation request — appending a new card on success
-    and never replacing an existing one. Requeue is the staff force path: it
-    deliberately bypasses the automatic-generation idempotency guard, so a
-    subject that already holds cards still gets one new generation. An unknown
-    key or an ineligible character is a named rejection with no record change
-    (staff requeue path, design D3). A character subject never writes a
-    classic fixed-identity record here.
+    The kind-neutral staff force path (``gallery-monster-generation``,
+    formerly ``requeue_character_portrait``): re-validates the subject
+    through its own kind's producer, and for an age-declaring kind resolves
+    the owning entity and re-checks the canonical ages before issuing exactly
+    one gallery generation request. Requeue deliberately bypasses the
+    automatic-generation idempotency guard, so a subject that already holds
+    cards still gets one new generation — appended for a kind with no declared
+    maximum, and replacing under the cap for a capped kind such as monster. An
+    unresolvable subject or an ineligible character is a named rejection with
+    no record change (staff requeue path, design D3). A gallery-bearing
+    subject never writes or resets a classic fixed-identity record here.
     """
-    entity = _living_entity_for_stable_key(stable_key)
-    if entity is None:
+    subject, entity = _resolve_gallery_subject(subject)
+    capability = gallery_kinds.capabilities_for(subject.kind.value)
+    if capability.requires_age_precondition and entity is None:  # pragma: no cover - resolver guarantees the entity
         raise ArtSubjectError(
-            f"no living character carries portrait stable_key {stable_key!r}"
+            f"no living character carries portrait stable_key {subject.key!r}"
         )
-    character_ages(entity)
     request_gallery_image(
-        entity, fields=("appearance",), face_rect=dict(gallery_api.DEFAULT_FACE_RECT)
+        entity if entity is not None else subject,
+        **_standard_gallery_request_kwargs(capability),
     )
 
 
@@ -314,26 +403,29 @@ def art_sync_all() -> None:
         log_error("art_startup_recovery_failed", context={"scope": "portrait-recovery"}, exc=error)
 
 
-def request_gallery_image(entity, *, fields=(), custom_prompt="", binding=None, face_rect=None) -> str:
+def request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", binding=None, face_rect=None) -> str:
     """Validate, mint, and enqueue exactly one gallery image request.
 
     The ONLY gameplay-reachable entry point for gallery generation
-    (change ``gallery-generation-jobs``). Derives the subject through the
-    existing typed producer, re-checks the canonical age pair exactly as the
-    classic portrait ensure does, and validates the binding and face
-    rectangle through the ``world/art/gallery.py`` validators BEFORE any
-    queue write — every rejection raises a typed error at this boundary and
-    leaves no record, no file, no card, and no rendered prompt behind. The
-    freshly minted lowercase-uuid ``image_id`` keys one independent job
-    (two requests, two jobs).
-
-    Change ``gallery-prompt-composition`` adds the field selection and the
-    free text: ``fields`` is validated against the closed catalog and
-    normalized to the declared order, and ``custom_prompt`` against the
-    free-text bound, FIRST — before subject derivation, any data read, any
-    prompt render, and any queue write. The normalized selection is stored
-    verbatim on the pending job, so the settled card's ``requested_fields``
-    reports exactly which data blocks produced the image.
+    (change ``gallery-generation-jobs``), now serving EVERY gallery-bearing
+    subject kind (change ``gallery-monster-generation``). Accepts either a
+    gameplay entity — derived through the existing typed producer for its
+    kind — or an already-derived :class:`ArtSubject` (a registry-backed
+    subject such as a monster tier is re-validated through its kind's typed
+    producer, never trusted from the caller's key alone). EVERY precondition
+    is read from the subject kind's capability declaration instead of being
+    hard-coded to the character shape: the canonical-age check applies only
+    where the kind declares it; a field selection, free text, or binding is
+    accepted only where the kind declares the capability, and an argument
+    naming an undeclared capability is a typed rejection at this boundary
+    that NAMES the capability — never silently dropped, because a card whose
+    ``requested_fields`` provenance would lie is worse than a refusal.
+    Validated arguments are checked through the ``world/art/gallery_prompt``
+    and ``world/art/gallery.py`` validators BEFORE any queue write — every
+    rejection raises a typed error at this boundary and leaves no record, no
+    file, no card, and no rendered prompt behind. The freshly minted
+    lowercase-uuid ``image_id`` keys one independent job (two requests, two
+    jobs).
 
     Deliberately never imports or consults ``world.art.connectivity``: an
     unreachable sd-webui server is a reported ``failed`` settle carrying its
@@ -343,21 +435,83 @@ def request_gallery_image(entity, *, fields=(), custom_prompt="", binding=None, 
     raises before any write, a wrapped call can never roll back committed
     gameplay. Returns the minted ``image_id``.
     """
-    selected = validate_fields(fields)
-    custom = validate_custom_prompt(custom_prompt)
-    subject = character_subject_for(entity)
+    # 1. Derive the subject through the kind's typed producer. A raw subject
+    # for a registry-backed kind is re-validated through its kind's producer
+    # right here — the caller's key alone is never trusted, and no later
+    # precondition reads the raw subject. A raw subject for an
+    # entity-derived kind carries no entity with it, and its declared
+    # preconditions need the entity — the typed rejection below.
+    if isinstance(entity_or_subject, ArtSubject):
+        subject = entity_or_subject
+        entity = None
+        registry_producer = _GALLERY_REGISTRY_PRODUCERS.get(subject.kind.value)
+        if registry_producer is not None:
+            subject = registry_producer(subject.key)
+    else:
+        entity = entity_or_subject
+        subject = character_subject_for(entity)
     if subject is None:
         raise ArtSubjectError(
-            f"character {getattr(entity, 'key', entity)!r} carries no portrait subject"
+            f"subject source {getattr(entity, 'key', entity_or_subject)!r} yields no portrait subject"
         )
-    age, _apparent_age = character_ages(entity)
-    binding = gallery_api.validate_binding(binding)
+    capability = gallery_kinds.capabilities_for(subject.kind.value)
+    if not capability.has_gallery:
+        raise ArtSubjectError(
+            f"subject kind {subject.kind.value!r} declares no gallery"
+        )
+    # 2. Capability-gated argument validation, each error naming the
+    # undeclared capability when the declaration rejects the argument.
+    # The catalog validator is itself kind-aware: an empty selection stays
+    # legal for every gallery kind, a non-empty one is rejected where the
+    # declaration admits no field selection, naming the capability.
+    selected = validate_fields(fields, kind=subject.kind.value)
+    if capability.supports_free_text:
+        custom = validate_custom_prompt(custom_prompt)
+    elif custom_prompt:
+        # Normalize through the SAME validator first: whitespace-only text is
+        # the established legal no-op and carries nothing the kind could lose;
+        # only text that survives normalization NAMES the undeclared
+        # capability and is rejected. A non-text argument fails the validator.
+        if validate_custom_prompt(custom_prompt):
+            raise GalleryPromptError(
+                f"subject kind {subject.kind.value!r} declares no free-text support; "
+                "non-empty custom prompt text is rejected"
+            )
+        custom = ""
+    else:
+        custom = ""
+    if capability.supports_bindings:
+        binding = gallery_api.validate_binding(binding)
+    elif binding is not None:
+        raise gallery_api.GalleryRecordError(
+            f"subject kind {subject.kind.value!r} declares no binding support; "
+            "a binding argument is rejected"
+        )
+    # The face rectangle is shared gallery-card metadata, not a kind
+    # capability: a supplied rect is validated for every gallery kind, and
+    # ``None`` keeps the shared default downstream.
     if face_rect is not None:
         face_rect = gallery_api.validate_face_rect(face_rect)
-    image_id = str(uuid.uuid4())
+    # 3. The declared age precondition, read immediately before the request.
+    # A kind without the declaration never reads the age attribute at all.
+    age = None
+    if capability.requires_age_precondition:
+        if entity is None:
+            raise ArtSubjectError(
+                f"a gallery request for {subject.full()!r} requires the entity carrying the portrait subject"
+            )
+        age, _apparent_age = character_ages(entity)
+    # 4. Description: the selection and free text exist only where declared;
+    # a kind without them gets its registry-driven description (monster kind)
+    # or base identity text — never an empty character description.
     description = description_for(
-        subject, entity=entity, age=age, fields=selected, custom_prompt=custom
+        subject,
+        entity=entity,
+        age=age,
+        fields=selected if capability.supports_field_selection else None,
+        custom_prompt=custom if capability.supports_free_text else "",
     )
+    image_id = str(uuid.uuid4())
     enqueue_gallery_job(
         subject,
         description,

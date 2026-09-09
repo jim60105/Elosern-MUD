@@ -77,13 +77,20 @@ def _is_selection_container(value: object) -> bool:
     return isinstance(value, Iterable)
 
 
-def validate_fields(fields: object) -> tuple[str, ...]:
+def validate_fields(fields: object, kind: "str | None" = None) -> tuple[str, ...]:
     """Return the selection normalized to the declared catalog order.
 
     Rejects a non-selection container, a non-string id, an id absent from the
     closed catalog, and a duplicated id — each with the typed
     ``GalleryPromptError`` — before any caller renders or writes anything. An
     empty selection is legal (a description of the base identity alone).
+
+    ``kind`` (an ``ArtSubjectKind`` string value) scopes the capability check:
+    a non-empty selection for a kind whose declaration admits no prompt field
+    selection is REJECTED with an error naming the undeclared capability —
+    never silently dropped. For such a kind an empty selection stays legal and
+    returns ``()``. ``kind=None`` keeps the kind-neutral behavior for callers
+    that validate before any kind is known (the character-description producer).
     """
     if not _is_selection_container(fields):
         raise GalleryPromptError(
@@ -98,7 +105,24 @@ def validate_fields(fields: object) -> tuple[str, ...]:
         if field in selected:
             raise GalleryPromptError(f"duplicate gallery prompt field {field!r}")
         selected.add(field)
+    if selected and kind is not None and not _supports_field_selection(kind):
+        raise GalleryPromptError(
+            f"subject kind {kind!r} declares no prompt field selection; "
+            f"a non-empty selection ({', '.join(sorted(selected))}) is rejected"
+        )
     return tuple(field for field in GALLERY_PROMPT_FIELDS if field in selected)
+
+
+def _supports_field_selection(kind: str) -> bool:
+    """Read the declared field-selection capability for a kind string value.
+
+    ``world.art.gallery_kinds`` is a zero-import module — consulting it adds no
+    import cycle. An undeclared kind value raises loudly through
+    ``capabilities_for``.
+    """
+    from world.art import gallery_kinds
+
+    return gallery_kinds.capabilities_for(kind).supports_field_selection
 
 
 def _has_control_character(text: str) -> bool:

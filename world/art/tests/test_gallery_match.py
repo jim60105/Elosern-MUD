@@ -65,7 +65,13 @@ def _card_fields(subject, image_id=None, **overrides):
         "prompt": {"positive": "a hero", "negative": "blur"},
         "seed": 1234,
         "checkpoint": "realVision.safetensors",
-        "requested_fields": ["appearance"],
+        # Declaration-aware: a kind without field-selection support stores an
+        # empty provenance only (write-boundary rule, ``gallery-monster-generation``).
+        "requested_fields": (
+            ["appearance"]
+            if gallery_kinds.capabilities_for(subject.kind.value).supports_field_selection
+            else []
+        ),
         "binding": None,
         "source": "generated",
     }

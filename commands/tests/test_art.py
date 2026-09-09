@@ -1,7 +1,9 @@
 """Tests for the staff-only ``@art`` command family."""
 
+import tempfile
 from unittest.mock import patch
 
+from django.test import override_settings
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
@@ -15,11 +17,13 @@ from commands.art import (
     CmdArtStatus,
 )
 from world.art.connectivity import ProbeResult
+from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.queue import claim, ensure, requeue, settle
 from world.art.queue import enqueue_gallery_job, is_gallery_job
 from world.art.sd_worker import SDError
 from world.art.store import ArtAssetRecord, ArtAssetStatus
-from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.art.subjects import ArtSubject, ArtSubjectKind, monster_subject_for
+from world.lore.monsters import MONSTER_TIER_REGISTRY
 
 from tools.spec_traceability import covers_requirement
 
@@ -262,6 +266,155 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         player.db.apparent_age = apparent
         player.db.portrait_policy = {"mode": "named", "stable_key": str(player.pk)}
         return player
+
+    @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
+    def test_requeue_monster_requests_a_gallery_job_never_touching_the_classic_record(self):
+        # The spec/code divergence this change closes: a monster key requeue
+        # issues a GALLERY request, and the pre-existing classic monster
+        # record's status and prior output stay untouched (no classic reset).
+        from world.art import gallery as gallery_api
+
+        tier = next(iter(MONSTER_TIER_REGISTRY))
+        subject = monster_subject_for(tier)
+        ensure(subject, "desc")
+        claim(10)
+        settle(
+            subject,
+            status=ArtAssetStatus.DONE,
+            output_identity=f"portrait/monster/{tier}.png",
+            error=None,
+        )
+        with patch("world.art.service.log_info"):
+            output = self.call(CmdArtRequeue(), f"portrait:monster:{tier}")
+        self.assertIn("已將", output)
+        jobs = [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if is_gallery_job(record)
+        ]
+        self.assertEqual(len(jobs), 1)
+        self.assertTrue(
+            jobs[0].db_key.startswith(f"art:portrait:monster:{tier}:gen:")
+        )
+        classic = ArtAssetRecord.objects.filter(
+            db_key=f"art:portrait:monster:{tier}"
+        ).first()
+        self.assertEqual(classic.db.status, ArtAssetStatus.DONE)
+        self.assertEqual(classic.db.output_identity, f"portrait/monster/{tier}.png")
+        self.assertEqual(gallery_api.cards_for(subject), [])
+
+    @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
+    def test_requeue_monster_settles_one_card_under_the_declared_cap(self):
+        # Requeue into an occupied monster gallery: the settled card REPLACES
+        # the existing one under the declared maximum of one.
+        import uuid
+
+        from world.art import gallery as gallery_api
+
+        tier = next(iter(MONSTER_TIER_REGISTRY))
+        subject = monster_subject_for(tier)
+        kept = str(uuid.uuid4())
+        tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tempdir.cleanup)
+        with override_settings(
+            ART_STORE_ROOT=tempdir.name,
+            ART_SD_CLIENT="world.art.fake_sd_client.FakeSDWebUIClient",
+        ):
+            gallery_api.append_card(
+                subject,
+                image_id=kept,
+                stored_identity=f"gallery/monster/{tier}/{kept}.png",
+                prompt=None,
+                seed=None,
+                checkpoint=None,
+                requested_fields=[],
+                binding=None,
+                source="seed",
+            )
+            with patch("world.art.service.log_info"):
+                output = self.call(CmdArtRequeue(), f"portrait:monster:{tier}")
+            self.assertIn("已將", output)
+            from world.art.worker import drain_synchronous
+
+            with patch(
+                "world.art.worker.resolve_sd_client",
+                return_value=FakeSDWebUIClient(),
+            ):
+                drain_synchronous(10)
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(len(cards), 1)
+        self.assertNotEqual(cards[0]["image_id"], kept)
+        self.assertEqual(
+            gallery_api.record_for(subject).db.default_image_id,
+            cards[0]["image_id"],
+        )
+
+    @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
+    def test_requeue_unregistered_monster_key_is_rejected_with_no_record_change(self):
+        # An unregistered tier is a named error through the seam, and no
+        # gallery job or record appears.
+        output = self.call(CmdArtRequeue(), "portrait:monster:not_a_tier")
+        self.assertIn("無法重新排入", output)
+        self.assertFalse(
+            any(is_gallery_job(record) for record in ArtAssetRecord.objects.all())
+        )
+        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+
+    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
+    @covers_requirement("art-gallery-generation::one-validated-service-seam-requests-every-gallery-image")
+    def test_retry_re_requests_an_erroring_monster_subject(self):
+        # The gallery arm iterates gallery records, not kinds: a monster
+        # subject carrying a recorded error is re-driven with no command
+        # change (``gallery-monster-generation``, task 4.5).
+        import uuid
+
+        from world.art import gallery as gallery_api
+
+        tier = next(iter(MONSTER_TIER_REGISTRY))
+        subject = monster_subject_for(tier)
+        gallery_api.record_error(subject, "sd_connection_error")
+        output = self.call(CmdArtRetry(), "")
+        self.assertIn("重新請求 1 次圖庫生成", output)
+        jobs = [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if is_gallery_job(record)
+        ]
+        self.assertEqual(len(jobs), 1)
+        self.assertTrue(
+            jobs[0].db_key.startswith(f"art:portrait:monster:{tier}:gen:")
+        )
+
+    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
+    def test_retry_clears_a_moot_error_on_a_carded_monster_subject(self):
+        # The guard suppresses EVERY future request for a carded subject of
+        # any gallery kind, so a monster error left by a failed requeue is
+        # equally moot once the gallery holds its card.
+        import uuid
+
+        from world.art import gallery as gallery_api
+
+        tier = next(iter(MONSTER_TIER_REGISTRY))
+        subject = monster_subject_for(tier)
+        gallery_api.record_error(subject, "sd_connection_error")
+        image_id = str(uuid.uuid4())
+        gallery_api.append_card(
+            subject,
+            image_id=image_id,
+            stored_identity=f"gallery/monster/{tier}/{image_id}.png",
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="seed",
+        )
+        output = self.call(CmdArtRetry(), "")
+        self.assertIn("重新請求 0 次圖庫生成", output)
+        self.assertFalse(
+            any(is_gallery_job(record) for record in ArtAssetRecord.objects.all())
+        )
+        self.assertEqual(gallery_api.erroring_subjects(), [])
 
     @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
     def test_retry_re_requests_an_erroring_character_exactly_once(self):
