@@ -133,7 +133,9 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
     # Steps 1-5 resolved nothing: consult the terminal seam (step 6) on
     # EVERY fall-through path — no record, an unfinished record, and an
     # unusable done identity alike — before the placeholder closes the chain.
-    fallback = fallback_for(subject)
+    # The already-resolved entity rides along so the resolver reads its sex,
+    # apparent age, and registry provenance directly (gallery-builtin-fallbacks).
+    fallback = fallback_for(subject, entity=entity)
     if fallback is not None:
         return _fallback_payload(subject, fallback)
     if record is None or record.db.status != ArtAssetStatus.DONE:

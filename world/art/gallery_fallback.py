@@ -153,12 +153,16 @@ def _declared_key_for_subject_key(subject: ArtSubject) -> str | None:
 def _entity_for_character_subject(subject: ArtSubject) -> Any:
     """The living entity carrying a character's named portrait subject.
 
-    Digit-only keys (player pks) take the direct ``ObjectDB`` primary-key
-    path, re-deriving the subject through ``character_subject_for`` to prove
-    the row really carries it; every other key follows the
-    ``service._living_entity_for_stable_key`` scan precedent, skipping rows
-    whose policy is malformed. No entity is a legal answer: the caller then
-    fails closed to the adult band.
+    Only used when the caller (normally the presenter) has no entity to
+    thread through. Digit-only keys (player pks) take the direct ``ObjectDB``
+    primary-key path, re-deriving the subject through ``character_subject_for``
+    to prove the row really carries it. Every other key is a stable portrait
+    key: the scan is pk-ordered and returns an entity ONLY when exactly one
+    living entity carries the key — a shared stable key with different
+    provenance would be nondeterministic, so an ambiguous key recovers no
+    entity and resolution fails closed to the band rule (sex and apparent age
+    are then absent too, closing on the adult pool). No entity is a legal
+    answer.
     """
     from evennia.objects.models import ObjectDB
 
@@ -172,7 +176,10 @@ def _entity_for_character_subject(subject: ArtSubject) -> Any:
                     return row
             except ArtSubjectError:  # observability: ignore R2: malformed policy on the pk row -> scan below fails closed
                 pass
-    for entity in ObjectDB.objects.all():
+        return None
+    matches = 0
+    found = None
+    for entity in ObjectDB.objects.order_by("id"):
         if not isinstance(entity, LivingEntity):
             continue
         try:
@@ -180,8 +187,11 @@ def _entity_for_character_subject(subject: ArtSubject) -> Any:
         except ArtSubjectError:  # observability: ignore R2: scan skip; the unpaired entity yields no portrait subject
             continue
         if derived is not None and derived == subject:
-            return entity
-    return None
+            matches += 1
+            found = entity
+            if matches > 1:
+                break
+    return found if matches == 1 else None
 
 
 def _band_name_for_apparent_age(apparent_age: object) -> str:
@@ -230,20 +240,19 @@ def fallback_key_for(subject: ArtSubject, entity: Any = None) -> str:
     return _hash_into_pool(subject.full(), band["pool"])
 
 
-def resolve_fallback(subject: ArtSubject) -> dict | None:
+def resolve_fallback(subject: ArtSubject, entity: Any = None) -> dict | None:
     """The seam's resolution: ``{identity, face_rect, key}`` or ``None``.
 
     Scenes resolve ``None`` (no fallback image exists for a place). A
-    character subject recovers its entity through the bounded read-only
-    lookup above; monsters need no entity. Writes nothing.
+    character subject uses the entity the caller threads through; without
+    one it recovers a deterministic identification through the lookup above
+    (and fails closed when a shared stable key makes that ambiguous);
+    monsters need no entity. Writes nothing.
     """
     if subject.kind is ArtSubjectKind.SCENE:
         return None
-    entity = (
-        _entity_for_character_subject(subject)
-        if subject.kind is ArtSubjectKind.CHARACTER
-        else None
-    )
+    if entity is None and subject.kind is ArtSubjectKind.CHARACTER:
+        entity = _entity_for_character_subject(subject)
     key = fallback_key_for(subject, entity)
     identity, face_rect = fallback_identity_and_rect(key)
     return {"identity": identity, "face_rect": face_rect, "key": key}

@@ -25,7 +25,7 @@ from django.http import FileResponse, Http404
 
 from world.art.gallery import cards_for
 from world.art.paths import resolved_under_root, resolved_under_store_root
-from world.art.fallback_keys import FALLBACK_KEYS
+from world.art.fallback_keys import FALLBACK_EXTENSION, FALLBACK_KEYS
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectError, ArtSubjectKind
 
@@ -145,7 +145,11 @@ def _serve_defaults(identity: str) -> FileResponse:
     URL surface.
     """
     filename = identity[len("defaults/"):]
-    if filename[: filename.rindex(".")] not in FALLBACK_KEYS:
+    if not filename.endswith(FALLBACK_EXTENSION):
+        # The committed set is exactly ``<key>.webp`` — an alternate
+        # extension for a valid stem is not a committed identity.
+        raise Http404
+    if filename[: -len(FALLBACK_EXTENSION)] not in FALLBACK_KEYS:
         raise Http404
     resolved = resolved_under_root(_defaults_root(), identity[len("defaults/"):])
     if resolved is None or not resolved.is_file():

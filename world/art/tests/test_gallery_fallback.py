@@ -220,6 +220,32 @@ class SeamPayloadTests(EvenniaTestCase):
         with patch("world.observability.log_info"):
             self.assertIsNone(resolve_fallback(_scene()))
 
+    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
+    def test_an_ambiguous_shared_stable_key_fails_closed_without_an_entity(self):
+        # Two living entities legally sharing one stable portrait key make a
+        # subject-only recovery ambiguous: no entity may be guessed, so the
+        # band rule closes deterministically on the adult pool. Provenance is
+        # never selected from an arbitrary DB row.
+        from evennia.utils.create import create_object
+        from typeclasses.npcs import NPC
+
+        policy = {"mode": "named", "stable_key": "shared_twin"}
+        first = create_object(NPC, key="twin-a")
+        second = create_object(NPC, key="twin-b")
+        for entity in (first, second):
+            entity.db.portrait_policy = policy
+            entity.db.apparent_age = 30
+        subject = _character("shared_twin")
+        with patch("world.observability.log_info"):
+            resolution = resolve_fallback(subject)
+        self.assertIn(resolution["key"], ("man", "woman"))
+        # A unique carrier is recovered deterministically (elder band here).
+        first.db.portrait_policy = None
+        second.db.apparent_age = 75
+        from world.art.gallery_fallback import _entity_for_character_subject
+
+        self.assertIs(_entity_for_character_subject(subject), second)
+
 
 class DefaultsRouteVocabularyTests(EvenniaTestCase):
     @covers_requirement("art-gallery-fallback::the-built-in-fallback-set-is-a-closed-vocabulary-committed-to-the-repository")

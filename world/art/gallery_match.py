@@ -163,16 +163,18 @@ def _default_card(subject: ArtSubject, cards: list[dict]) -> dict | None:
     return None
 
 
-def fallback_for(subject: ArtSubject) -> dict | None:
+def fallback_for(subject: ArtSubject, entity=None) -> dict | None:
     """The terminal fallback seam: consulted after the classic asset record.
 
     Filled by ``gallery-builtin-fallbacks`` with the deterministic built-in
     resolver: declared registry key -> sex/age band -> deterministic
-    subject-key hash over the six committed defaults. A character subject's
-    entity (and through it its sex, apparent age, and registry provenance) is
-    recovered internally through the bounded read-only lookup, so the seam
-    signature stays ``fallback_for(subject)``; scene subjects resolve ``None``
-    and fall through to the truthful placeholder. Every resolution emits the
+    subject-key hash over the six committed defaults. The presenter passes
+    the entity it already resolved; a bare ``fallback_for(subject)`` call
+    recovers only a deterministic identification (primary-key path for
+    digit-only keys, unique pk-ordered attribute scan otherwise — an
+    ambiguous shared stable key recovers no entity, failing closed), and
+    scene subjects resolve ``None`` which falls through to the truthful
+    placeholder. Every resolution emits the
     ``gallery_fallback_used`` event naming subject and resolved key and
     writes nothing. The presenter is the seam's only consumer and gives
     whatever it returns the shared default face rectangle unless the seam
@@ -182,7 +184,7 @@ def fallback_for(subject: ArtSubject) -> dict | None:
     """
     from world.art.gallery_fallback import resolve_fallback
 
-    resolution = resolve_fallback(subject)
+    resolution = resolve_fallback(subject, entity=entity)
     if resolution is None:
         return None
     key = resolution.pop("key")

@@ -228,6 +228,10 @@ class CompanionBuildTests(_BuilderCase):
         self.assertIsInstance(companion, LLMNPC)
         self.assertEqual(companion.location, self.hall)
         self.assertEqual(companion.key, "悠花")
+        # Registry provenance (gallery-builtin-fallbacks): the builder carries
+        # the partner card's preset key so a preset-level fallback declaration
+        # resolves even though the companion's subject is pk-keyed.
+        self.assertEqual(companion.db.creation_preset_key, _YUKA)
 
     @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")
     def test_an_elf_companion_seeds_affinity_elements_from_its_subrace(self):

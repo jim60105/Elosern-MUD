@@ -55,11 +55,14 @@ band rather than raising.
 - **THEN** the adult band is used, no exception propagates, and a key is still resolved
 
 ### Requirement: The fallback seam supplies a URL and a face rectangle and reports its use
-`world/art/gallery_match.py::fallback_for(subject)` SHALL return the resolved key's
+`world/art/gallery_match.py::fallback_for(subject, entity=None)` SHALL return the resolved key's
 committed `defaults/<key>.<ext>` identity together with that key's declared face rectangle, taken
 from a fixed per-key rectangle map that falls back to the shared default rectangle for any key
 without its own entry (the presenter builds the `/art/defaults/<key>.<ext>` URL from the identity
-exactly like every other payload branch). Each use SHALL emit one `gallery_fallback_used` info event
+exactly like every other payload branch). The presenter threads the entity it already resolved as
+the optional argument; a subject-only call SHALL stay legal and recover only a deterministic
+identification — an ambiguous shared stable key recovers no entity and fails closed to the band
+rule. Each use SHALL emit one `gallery_fallback_used` info event
 through the `world.observability`
 facade carrying the `subject`, `kind`, and resolved fallback `key` in `context`. The seam SHALL NOT
 create a record, append a card, copy a file into the store, or write any state.

@@ -296,6 +296,14 @@ class DefaultsServingTests(EvenniaTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "image/webp")
         self.assertEqual(self._get("defaults/stray.png").status_code, 404)
+        # The committed set is exactly ``<key>.webp``: an alternate extension
+        # for a valid stem is not a committed identity (duck MAJOR).
+        for extension in ("png", "jpg", "avif"):
+            (self.defaults / f"man.{extension}").write_bytes(b"fallback")
+            with self.subTest(extension=extension):
+                self.assertEqual(
+                    self._get(f"defaults/man.{extension}").status_code, 404
+                )
 
     @covers_requirement(
         "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
