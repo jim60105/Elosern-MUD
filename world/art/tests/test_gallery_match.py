@@ -18,6 +18,7 @@ import unittest
 from django.test import override_settings
 from evennia.utils.test_resources import EvenniaTestCase
 
+from world.art import gallery_kinds
 from world.art.gallery import (
     DEFAULT_FACE_RECT,
     GalleryRecord,
@@ -279,6 +280,32 @@ class MonsterChainTests(_ChainBase):
     )
     def test_a_monster_with_no_card_resolves_to_nothing(self):
         self.assertIsNone(resolve_card(_monster("bare"), _FakeEntity()))
+
+    @covers_requirement(
+        "art-gallery-resolution::monster-subjects-resolve-through-the-chain-without-the-binding-steps"
+    )
+    def test_the_binding_skip_follows_the_declaration_not_the_kind(self):
+        # A CHARACTER whose declaration is patched to drop binding support
+        # must resolve through the chain with the binding steps skipped — no
+        # snapshot computation — landing on the explicit default.
+        subject = _character("declaredskip")
+        unbound_default = self._append_present(subject)
+        self._append_present(
+            subject, binding=_binding(["armor"], {"armor": "leather_vest"})
+        )
+        unbound = gallery_kinds.GALLERY_KIND_CAPABILITIES[
+            ArtSubjectKind.CHARACTER.value
+        ].with_values(supports_bindings=False)
+
+        def explode(*args, **kwargs):
+            raise AssertionError("snapshot computation must not run")
+
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {ArtSubjectKind.CHARACTER.value: unbound},
+        ), patch("world.art.gallery_match.snapshot_for", side_effect=explode):
+            resolved = resolve_card(subject, _FakeEntity({"armor": "leather_vest"}))
+        self.assertEqual(resolved["image_id"], unbound_default)
 
     @covers_requirement(
         "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"

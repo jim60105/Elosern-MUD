@@ -10,9 +10,7 @@ terminal fallback seam, the presenter payload `face_rect` carriage contract,
 the rule that gallery media URLs are built only from validated card
 identities, and the media route's admission of gallery and built-in-default
 identities under the same store-root confinement discipline.
-
 ## Requirements
-
 ### Requirement: Display resolution is one deterministic chain from equipment to fallback
 `world/art/gallery_match.py` SHALL resolve the image shown for a subject by exactly this ordered
 chain, with no other input: (1) compute the entity's four-slot equipment snapshot from stored state,
@@ -59,9 +57,13 @@ exist — so no image the player has not chosen is ever displayed as a surprise.
 - **THEN** that card is resolved
 
 ### Requirement: Monster subjects resolve through the chain without the binding steps
-A monster subject SHALL resolve by skipping steps 1 through 3 of the chain: the default card, then
-the classic asset record, then the fallback seam, then the placeholder. No equipment snapshot SHALL
-be computed for a monster subject and no monster card SHALL be selected by a binding.
+The chain SHALL run steps 1 through 3 — the equipment snapshot, the binding candidates, and the
+most-specific-mask selection — only for a subject kind whose capability declaration supports
+bindings. A kind that does not support them, which the monster portrait kind does not, SHALL resolve
+by skipping those steps: the default card, then the classic asset record, then the fallback seam, then
+the placeholder. No equipment snapshot SHALL be computed for such a subject and no card of such a
+subject SHALL be selected by a binding. The skip SHALL be decided by reading the declaration, never by
+comparing the subject kind inline.
 
 #### Scenario: A monster resolves its single card
 - **WHEN** a monster subject holds its one card
@@ -70,6 +72,10 @@ be computed for a monster subject and no monster card SHALL be selected by a bin
 #### Scenario: A monster with no card falls through unchanged
 - **WHEN** a monster subject holds no card and its classic asset record is `done`
 - **THEN** the classic asset is resolved exactly as it is today
+
+#### Scenario: The binding steps follow the declaration
+- **WHEN** display resolution runs for a kind whose declaration does not support bindings
+- **THEN** the binding steps are skipped and no equipment snapshot is computed, with no edit to the resolution module
 
 ### Requirement: The chain ends at one fallback seam
 `world/art/gallery_match.py` SHALL expose exactly one terminal seam `fallback_for(subject)` consulted
@@ -119,3 +125,4 @@ broken URL. The presenter SHALL never expose an absolute path or the store root.
 #### Scenario: A cross-subject or out-of-root identity is never served
 - **WHEN** a card carries an identity whose path segments address a different subject, or that resolves outside the store root or through a symlink
 - **THEN** the card is skipped and no URL is produced from it
+

@@ -45,12 +45,12 @@ from evennia import DefaultScript
 from evennia.typeclasses.attributes import AttributeProperty
 from evennia.utils.create import create_script
 
+from world.art import gallery_kinds
 from world.art.formats import STORE_EXTENSIONS
 from world.art.paths import resolved_under_store_root
 from world.art.subjects import (
     ArtSubject,
     ArtSubjectError,
-    ArtSubjectKind,
     parse_subject,
 )
 from world.observability import log_debug, log_info, log_warn
@@ -65,13 +65,6 @@ DEFAULT_FACE_RECT: dict[str, float] = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
 # the same selection always serializes identically, and an equipment snapshot
 # always carries exactly these four keys.
 SLOT_ORDER = ("weapon_main", "weapon_off", "armor", "accessories")
-
-# The CLOSED kind-directory vocabulary of the gallery store path
-# ``gallery/<kind-dir>/<subject-key>/<image-id><ext>``. Scenes have no gallery.
-GALLERY_KIND_DIRECTORIES = {
-    ArtSubjectKind.CHARACTER: "character",
-    ArtSubjectKind.MONSTER: "monster",
-}
 
 # The closed provenance vocabulary (design §12.1: a seeded base image is a
 # legitimate card provenance, not a fake generation).
@@ -169,13 +162,13 @@ def record_for(
 
     The read path (``create=False``) never creates: a subject with no record
     is the legal empty-gallery state. Creation is guarded against scene
-    subjects — scenes have no gallery.
+    subjects — scenes have no gallery (declared, not compared).
     """
     with gallery_lock:
         record = _consolidate(subject)
         if record is not None or not create:
             return record
-        if subject.kind not in GALLERY_KIND_DIRECTORIES:
+        if not gallery_kinds.has_gallery(subject.kind.value):
             raise GalleryRecordError("scene subjects have no gallery")
         return _create_record(subject)
 
@@ -377,9 +370,10 @@ def validate_card(
             "gallery card keys must be exactly the contract set"
             f" (missing {sorted(missing)}, unexpected {sorted(extra)})"
         )
-    kind_directory = GALLERY_KIND_DIRECTORIES.get(subject.kind)
-    if kind_directory is None:
+    capability = gallery_kinds.capabilities_for(subject.kind.value)
+    if not capability.has_gallery:
         raise GalleryRecordError("scene subjects have no gallery cards")
+    kind_directory = capability.store_directory
 
     image_id = _canonical_uuid_text(card["image_id"])
     if image_id is None:
@@ -584,15 +578,22 @@ def append_card(subject: ArtSubject, **card_fields) -> dict:
     """Validate and append one card, returning the stored form.
 
     The first card of a character record becomes its default; a later append
-    never touches the default. A monster record holds at most one card: the
-    append replaces the existing card (commit first, then delete the old
-    file) and the new card becomes the default. Every violation raises a
+    never touches the default. A kind whose declaration caps its cards at a
+    maximum (only ``1`` is admitted today) installs the new card as its sole
+    card — committing first, then deleting any replaced files — and makes it
+    the default, exactly as today's monster branch did unconditionally; a kind
+    declaring a null maximum never replaces anything. Every violation raises a
     typed ``GalleryRecordError`` before any record or file is touched.
     """
     with gallery_lock:
         record = record_for(subject)
         existing_ids = _raw_image_ids(record) if record is not None else frozenset()
-        if subject.kind is ArtSubjectKind.MONSTER and card_fields.get("binding") is not None:
+        capability = gallery_kinds.capabilities_for(subject.kind.value)
+        if (
+            capability.has_gallery
+            and not capability.supports_bindings
+            and card_fields.get("binding") is not None
+        ):
             raise GalleryRecordError("monster cards must be unbound")
         stored = validate_card(
             card_fields, subject, existing_ids=existing_ids
@@ -600,7 +601,7 @@ def append_card(subject: ArtSubject, **card_fields) -> dict:
         if record is None:
             record = record_for(subject, create=True)
         previous: list = list(record.db.cards or [])
-        if subject.kind is ArtSubjectKind.MONSTER:
+        if capability.max_cards is not None:
             record.db.cards = [stored]
             record.db.default_image_id = stored["image_id"]
             log_info(

@@ -27,6 +27,7 @@ from django.conf import settings
 from evennia.utils.create import create_script
 
 from world.art import gallery as gallery_api
+from world.art import gallery_kinds
 from world.art.paths import resolved_under_store_root
 from world.art.sd_worker import prompt_digest
 from world.art.store import ArtAssetRecord, ArtAssetStatus, status_rank
@@ -155,7 +156,7 @@ def enqueue_gallery_job(
     an ``output_identity`` — its published artifact is a gallery card. Scene
     subjects have no gallery and are refused before any write.
     """
-    if subject.kind not in gallery_api.GALLERY_KIND_DIRECTORIES:
+    if not gallery_kinds.has_gallery(subject.kind.value):
         raise gallery_api.GalleryRecordError("scene subjects have no gallery")
     digest = source_hash(description)
     with queue_lock:

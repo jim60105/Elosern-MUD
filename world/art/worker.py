@@ -28,6 +28,7 @@ from typing import Any
 from django.conf import settings
 from twisted.internet import threads
 
+from world.art import gallery_kinds
 from world.art.formats import encode
 from world.art.queue import (
     claim,
@@ -99,9 +100,7 @@ def output_identity_for(record: ArtAssetRecord) -> str:
     """
     image_id = str(record.db.gallery_image_id or "")
     if image_id:
-        from world.art.gallery import GALLERY_KIND_DIRECTORIES
-
-        kind_directory = GALLERY_KIND_DIRECTORIES[ArtSubjectKind(str(record.db.kind))]
+        kind_directory = gallery_kinds.store_directory_for(str(record.db.kind))
         extension = str(settings.ART_SD_OUTPUT_EXTENSION)
         return f"gallery/{kind_directory}/{record.db.subject_key}/{image_id}{extension}"
     return expected_output_identity(subject_for(record))

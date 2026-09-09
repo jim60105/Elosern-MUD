@@ -1,5 +1,8 @@
-## ADDED Requirements
+# art-gallery-kind-capabilities Specification
 
+## Purpose
+TBD - created by archiving change gallery-kind-capabilities. Update Purpose after archive.
+## Requirements
 ### Requirement: One closed declaration states what every subject kind's gallery may do
 `world/art/gallery_kinds.py` SHALL declare exactly one immutable capability record per art subject
 kind, and that declaration SHALL be the single origin of every per-kind gallery rule. Each record
@@ -16,8 +19,10 @@ contract test SHALL reject any other value. The gallery holds no kind needing an
 admitting arbitrary values would require an eviction algorithm no real declaration exercises. A future
 kind that genuinely needs one widens this rule in the change that introduces it.
 
-The declaration SHALL be data only: it SHALL perform no I/O, read no settings, and hold no mutable
-state, so the same kind resolves the same capabilities in every process.
+The declaration SHALL be data only: it SHALL perform no I/O and read no settings, and it SHALL expose
+no mutable state to consumers — records and the table view are frozen, and the writable origin is a
+module-private mapping that no consumer API hands out and only the test patch seam rewrites — so the
+same kind resolves the same capabilities in every process.
 
 #### Scenario: Every declared capability is readable from one place
 - **WHEN** the capability record for the character kind and for the monster kind are read
@@ -95,3 +100,4 @@ kind's declaration changes the enforced rule with no edit to the enforcing modul
 #### Scenario: A kind declared as having no gallery is refused at every write
 - **WHEN** a record creation, a card validation, or a gallery job enqueue is attempted for a kind declared as having no gallery
 - **THEN** each is refused with a typed error and nothing is written
+

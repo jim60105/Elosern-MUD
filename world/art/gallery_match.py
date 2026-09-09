@@ -43,16 +43,16 @@ never imports the generative-transport packages or
 
 from typing import Any
 
+from world.art import gallery_kinds
 from world.art.formats import STORE_EXTENSIONS
 from world.art.gallery import (
-    GALLERY_KIND_DIRECTORIES,
     empty_snapshot,
     cards_for,
     record_for,
     snapshot_for,
 )
 from world.art.paths import resolved_under_store_root
-from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.art.subjects import ArtSubject
 from world.observability import log_debug
 
 
@@ -67,7 +67,8 @@ def validated_card_identity(subject: ArtSubject, card: dict) -> str | None:
     ``gallery_card_skipped`` debug event, never a raise.
     """
     identity = card.get("stored_identity")
-    kind_directory = GALLERY_KIND_DIRECTORIES.get(subject.kind)
+    capability = gallery_kinds.capabilities_for(subject.kind.value)
+    kind_directory = capability.store_directory if capability.has_gallery else None
     reason = None
     resolved = None
     if kind_directory is None:
@@ -111,10 +112,11 @@ def resolve_card(subject: ArtSubject, entity: Any = None) -> dict | None:
     the chain at the classic asset record. The same record and the same
     equipment always resolve to the same card; nothing here writes.
     """
-    if subject.kind not in GALLERY_KIND_DIRECTORIES:
+    capability = gallery_kinds.capabilities_for(subject.kind.value)
+    if not capability.has_gallery:
         return None
     cards = cards_for(subject)
-    if subject.kind is ArtSubjectKind.CHARACTER:
+    if capability.supports_bindings:
         snapshot = snapshot_for(entity) if entity is not None else empty_snapshot()
         matched = _binding_candidates(cards, snapshot)
         for card in matched:

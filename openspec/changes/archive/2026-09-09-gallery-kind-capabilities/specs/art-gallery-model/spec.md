@@ -5,9 +5,11 @@ A `GalleryRecord` SHALL hold at most the number of cards its subject kind's capa
 names as that kind's maximum. The monster portrait kind SHALL declare a maximum of one; the character
 portrait kind SHALL declare NO maximum and SHALL therefore stay uncapped exactly as it is today —
 appending to it always accumulates and never replaces, however many cards it already holds. Appending
-a card to a record whose kind declares a maximum and already holds it SHALL replace the existing card —
-deleting the replaced card's stored file under the confinement rules — and SHALL leave the new card as
-the record's default. A card SHALL be rejected when it carries a non-`None` binding for a kind whose
+a card to a record whose kind declares a maximum SHALL install the new card as its sole card — deleting
+any replaced card's stored file under the confinement rules — and SHALL leave the new card as the
+record's default; because the only admitted maximum is one, a capped record is never partially full and
+appending to an empty capped record installs the card exactly as the monster append does today. A card
+SHALL be rejected when it carries a non-`None` binding for a kind whose
 declaration does not support bindings, which the monster portrait kind does not. Both rules SHALL be
 enforced by reading the declaration, never by comparing the subject kind inline, so the monster cap and
 the monster unbound rule are consequences of that kind's declared capabilities rather than

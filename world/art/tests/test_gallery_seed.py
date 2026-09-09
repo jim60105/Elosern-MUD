@@ -21,6 +21,7 @@ from django.test import override_settings
 from evennia.utils.test_resources import EvenniaTestCase
 
 from world.art import gallery_seed
+from world.art import gallery_kinds
 from world.art.gallery import (
     DEFAULT_FACE_RECT,
     append_card,
@@ -601,6 +602,28 @@ class MonsterCapTests(_TempRoots):
         summary = sync_all()
         self.assertEqual(summary["appended"], 0)
         self.assertEqual(self._reasons(), [])
+
+    @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
+    def test_the_seed_cap_follows_the_declaration_not_the_kind(self):
+        # A CHARACTER whose declaration is patched to a one-card maximum must
+        # seed exactly the candidate card, skipping the surplus with the
+        # existing capped-skip diagnostic — with no edit to gallery_seed.py.
+        hero = _unique("character")
+        self.tree.image("character", hero, "a.png")
+        self.tree.image("character", hero, "b.png")
+        capped = gallery_kinds.GALLERY_KIND_CAPABILITIES[
+            ArtSubjectKind.CHARACTER.value
+        ].with_values(max_cards=1)
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {ArtSubjectKind.CHARACTER.value: capped},
+        ):
+            summary = sync_all()
+        cards = cards_for(_character(hero))
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(summary["appended"], 1)
+        self.assertEqual(summary["monster_cap_skipped"], 1)
+        self.assertIn("monster_cap_skipped", self._reasons())
 
 
 class GeneratedCardIsolationTests(_TempRoots):
