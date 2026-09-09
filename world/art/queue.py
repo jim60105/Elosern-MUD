@@ -531,6 +531,17 @@ def settle_gallery_generated(
         if face_rect:
             card_fields["face_rect"] = face_rect
         stored = gallery_api.append_card(subject, **card_fields)
+        # The recorded error describes the LAST generation attempt, so a
+        # successful append clears it (change gallery-failure-visibility).
+        # Non-authoritative like the terminal marking below: the appended
+        # card is the publish, and a failed clear must never rewrite this
+        # settle's outcome. queue.py stays log-free — the worker owns the
+        # boundary events; the retained error is re-clearable on the next
+        # success or via @art retry's moot clear.
+        try:
+            gallery_api.clear_error(subject)
+        except Exception:  # noqa: BLE001 - the appended card is authoritative
+            pass
         # The card append is the authoritative publish: a failure deleting
         # the spent record afterwards must never rewrite this settle's
         # outcome; the terminal marking below keeps it unclaimable.

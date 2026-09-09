@@ -62,8 +62,8 @@ The subject has art and its automatic guard will suppress every future request, 
 ever clear that code and it would otherwise remain permanently on the status surface. A subject
 declined for any other reason SHALL keep its recorded error.
 
-#### Scenario: Failed classic records are re-enqueued
-- **WHEN** staff runs `@art retry` with failed scene records present
+#### Scenario: Failed records are re-enqueued
+- **WHEN** staff runs `@art retry` with failed classic (scene) records present
 - **THEN** each failed record becomes `pending` and the command reports the re-enqueued count
 
 #### Scenario: A failed gallery generation is retried without a restart

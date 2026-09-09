@@ -176,8 +176,8 @@ def _living_entity_for_stable_key(stable_key: str):
     return None
 
 
-def retry_character_portrait(stable_key: str) -> bool:
-    """Re-attempt one character portrait through the age check and the gallery guard.
+def retry_gallery_subject(stable_key: str) -> bool:
+    """Re-attempt one gallery subject through the age check and the gallery guard.
 
     The subject is re-derived from the living entity that owns the explicit
     named policy for ``stable_key`` and the ages are re-checked; an unknown key,
@@ -185,13 +185,26 @@ def retry_character_portrait(stable_key: str) -> bool:
     record change (staff retry path, design D3). Returns True only when a
     gallery generation was actually requested, so ``@art retry`` counts
     truthfully when the guard leaves an already-carded subject alone.
+
+    Kind-neutral by name (change ``gallery-failure-visibility``):
+    ``gallery-monster-generation`` generalizes the resolution internals later
+    without call-site churn. When the guard declines only because the gallery
+    already holds cards, the subject's recorded error is moot — the automatic
+    path will suppress every future request and nothing else would ever clear
+    it — so the seam clears it here. A decline for any other reason (an
+    in-flight job) keeps the recorded error.
     """
     entity = _living_entity_for_stable_key(stable_key)
     if entity is None:
         raise ArtSubjectError(
             f"no living character carries portrait stable_key {stable_key!r}"
         )
-    return _ensure_character_portrait(entity)
+    requested = _ensure_character_portrait(entity)
+    if not requested:
+        subject = character_subject_for(entity)
+        if subject is not None and gallery_api.cards_for(subject):
+            gallery_api.clear_error(subject)
+    return requested
 
 
 def requeue_character_portrait(stable_key: str) -> None:

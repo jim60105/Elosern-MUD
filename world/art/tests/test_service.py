@@ -369,23 +369,23 @@ class AutogenRetrofitTests(EvenniaTestCase):
         "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
     )
     def test_retry_reports_truthfully_through_the_guard(self):
-        from world.art.service import retry_character_portrait
+        from world.art.service import retry_gallery_subject
 
-        self.assertTrue(retry_character_portrait(str(self.player.pk)))
+        self.assertTrue(retry_gallery_subject(str(self.player.pk)))
         self.assertEqual(len(self._gallery_jobs()), 1)
         self.assertNotIn(
             self.classic_key,
             {record.db_key for record in ArtAssetRecord.objects.all()},
         )
         # The in-flight guard suppresses the second attempt honestly.
-        self.assertFalse(retry_character_portrait(str(self.player.pk)))
+        self.assertFalse(retry_gallery_subject(str(self.player.pk)))
         self.assertEqual(len(self._gallery_jobs()), 1)
         # A carded subject is left alone too.
         for job in self._gallery_jobs():
             job.db.status = ArtAssetStatus.FAILED
             job.save()
         self._seed_card("a1b2c3d4-0000-4000-8000-000000000002")
-        self.assertFalse(retry_character_portrait(str(self.player.pk)))
+        self.assertFalse(retry_gallery_subject(str(self.player.pk)))
         # The spent FAILED job survives; no NEW job was enqueued.
         self.assertEqual(len(self._gallery_jobs()), 1)
 

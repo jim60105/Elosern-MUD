@@ -4,16 +4,22 @@ Restricted to staff: ``@art status`` (list/filter records), ``@art run``
 (drain now, non-blocking), ``@art retry`` (re-enqueue failed records),
 ``@art requeue <full-subject-key>`` (forced regeneration), ``@art
 options <kind>`` (list the live server's selectable option names), and
-``@art health`` (forced connectivity verdict + scheduler/queue/output-policy
-dashboard). Status and health output never include persona text, prompt
+``@art health`` (forced connectivity verdict + scheduler/queue/gallery/
+output-policy dashboard). ``@art status`` additionally reports per-subject
+gallery STATE through the gallery module's read-only accessors, and
+``@art retry`` re-drives every subject whose last gallery generation
+failed. Status and health output never include persona text, prompt
 content, credentials, URL userinfo, absolute filesystem paths, or the store
 root (design D8).
 """
 
-from django.conf import settings
-from commands.command import Command
+import time
 import urllib.parse
 
+from django.conf import settings
+from commands.command import Command
+
+from world.art import gallery as gallery_api
 from world.art.queue import failed_keys, is_gallery_job, record_key, requeue
 from world.art.store import ArtAssetRecord
 from world.art.subjects import (
@@ -48,7 +54,7 @@ def _kind_filter(subject_kind: str | None) -> str | None:
 
 
 class CmdArtStatus(_ArtCommand):
-    """列出美術資產記錄。用法：art status [scene|portrait|monster]"""
+    """列出美術資產記錄與圖庫狀態。用法：art status [scene|portrait|monster]"""
 
     key = "art status"
 
@@ -70,7 +76,18 @@ class CmdArtStatus(_ArtCommand):
             and (kind is None or record.db.kind.startswith(kind))
         ]
         records.sort(key=lambda record: record.db_key)
-        if not records:
+        # Gallery STATE (change gallery-failure-visibility): one line per
+        # gallery record from the gallery module's read-only state accessor —
+        # never a query of the record class, never a gallery JOB row. The
+        # same kind filter applies: gallery kinds serialize under the
+        # ``portrait`` prefix, so a ``scene`` filter yields no gallery rows.
+        gallery_rows = [
+            state
+            for state in gallery_api.gallery_states()
+            if kind is None or state.subject.kind.value.startswith(kind)
+        ]
+        gallery_rows.sort(key=lambda state: state.subject.full())
+        if not records and not gallery_rows:
             self.caller.msg("沒有符合的美術資產記錄。")
             return
         lines = []
@@ -84,6 +101,24 @@ class CmdArtStatus(_ArtCommand):
                 f"{' 提示詞變更' if record.db.hash_changed else ''}"
                 f"{f' seed={seed}' if seed is not None else ''}"
             )
+        if records:
+            lines.insert(0, "經典資產記錄:")
+        if gallery_rows:
+            now = time.time()
+            lines.append("圖庫狀態:")
+            for state in gallery_rows:
+                error = ""
+                if state.error_code is not None:
+                    error_at = (
+                        state.error_at if state.error_at is not None else now
+                    )
+                    age = max(0, int(now - error_at))
+                    error = f" 錯誤:{state.error_code}({age}s)"
+                lines.append(
+                    f"  {state.subject.full()} "
+                    f"卡片:{state.card_count} "
+                    f"預設:{'是' if state.has_default else '否'}{error}"
+                )
         self.caller.msg("\n".join(lines))
 
 
@@ -123,7 +158,7 @@ class CmdArtRun(_ArtCommand):
 
 
 class CmdArtRetry(_ArtCommand):
-    """重新排入所有失敗的美術記錄。用法：art retry"""
+    """重新排入失敗記錄並重試圖庫生成失敗的主體。用法：art retry"""
 
     key = "art retry"
 
@@ -134,8 +169,7 @@ class CmdArtRetry(_ArtCommand):
         keys = failed_keys()
         from world.art.queue import ensure
 
-        from world.art.service import retry_character_portrait
-        from world.art.subjects import ArtSubjectKind, description_for
+        from world.art.service import retry_gallery_subject
 
         reenqueued = 0
         for full_key in keys:
@@ -143,21 +177,30 @@ class CmdArtRetry(_ArtCommand):
                 subject = parse_subject(full_key)
             except ArtSubjectError:
                 continue
-            if subject.kind is ArtSubjectKind.CHARACTER:
-                try:
-                    requested = retry_character_portrait(subject.key)
-                except ArtSubjectError:
-                    continue
-                if requested:
-                    reenqueued += 1
-                continue
             record = ArtAssetRecord.objects.filter(
                 db_key=record_key(subject)
             ).first()
             description = record.db.source_description if record else ""
             ensure(subject, description)
             reenqueued += 1
-        self.caller.msg(f"已重新排入 {reenqueued} 個失敗記錄。")
+        # Gallery arm: every subject whose LAST generation attempt failed is
+        # re-driven through the same validated request seam the automatic
+        # paths use, so every precondition still applies. A typed rejection
+        # (no living entity, ineligible ages, a kind the seam cannot resolve)
+        # skips that subject with no record change; the moot-error clear
+        # lives in the seam itself (declined because cards arrived).
+        gallery_requested = 0
+        for state in gallery_api.erroring_subjects():
+            try:
+                requested = retry_gallery_subject(state.subject.key)
+            except ArtSubjectError:
+                continue
+            if requested:
+                gallery_requested += 1
+        self.caller.msg(
+            f"已重新排入 {reenqueued} 個失敗記錄，"
+            f"並重新請求 {gallery_requested} 次圖庫生成。"
+        )
 
 
 class CmdArtRequeue(_ArtCommand):
@@ -280,6 +323,17 @@ class CmdArtHealth(_ArtCommand):
                     f"{status}={counts.get(status, 0)}"
                     for status in ("pending", "in_progress", "failed", "done")
                 )
+            )
+            # Section 4 of five (change gallery-failure-visibility): exact
+            # gallery counts from the module's read-only state accessor —
+            # records, total valid cards, subjects carrying an error. Pure
+            # read: nothing is created, cleared, or touched.
+            states = gallery_api.gallery_states()
+            lines.append(
+                "gallery: "
+                f"records={len(states)} "
+                f"cards={sum(state.card_count for state in states)} "
+                f"erroring={sum(1 for state in states if state.error_code is not None)}"
             )
             metadata = "on" if settings.ART_SD_PRESERVE_GENERATION_METADATA else "off"
             lines.append(

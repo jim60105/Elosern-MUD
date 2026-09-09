@@ -25,6 +25,8 @@ from world.art.gallery import (
     append_card,
     cards_for,
     clear_error,
+    erroring_subjects,
+    gallery_states,
     record_error,
     record_for,
     record_key,
@@ -898,6 +900,81 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         append_card(subject, **_card_fields(subject, image_id=second))
         refetched = GalleryRecord.objects.get(pk=record_for(subject).pk)
         self.assertEqual(len(refetched.db.cards), 2)
+
+    @covers_requirement("art-gallery-model::the-recorded-generation-error-is-last-attempt-state-not-a-permanent-mark")
+    def test_a_second_failure_replaces_the_first_code(self):
+        subject = _character("replaced")
+        record_error(subject, "sd_connection_error")
+        first_at = record_for(subject).db.last_error_at
+        record_error(subject, "sd_timeout")
+        record = record_for(subject)
+        self.assertEqual(record.db.last_error_code, "sd_timeout")
+        self.assertGreaterEqual(record.db.last_error_at, first_at)
+        # Fresh read: the replacement survived the round trip; the error
+        # fields hold exactly the new code (no append-style history).
+        refetched = GalleryRecord.objects.get(pk=record.pk)
+        self.assertEqual(refetched.db.last_error_code, "sd_timeout")
+
+    @covers_requirement("art-gallery-model::the-recorded-generation-error-is-last-attempt-state-not-a-permanent-mark")
+    def test_clearing_leaves_every_card_and_the_default_untouched(self):
+        subject = _character("cleartouched")
+        image_id = _new_id()
+        append_card(subject, **_card_fields(subject, image_id=image_id))
+        record_error(subject, "sd_connection_error")
+        cards_before = cards_for(subject)
+        default_before = record_for(subject).db.default_image_id
+        clear_error(subject)
+        record = record_for(subject)
+        self.assertIsNone(record.db.last_error_code)
+        self.assertIsNone(record.db.last_error_at)
+        self.assertEqual(cards_for(subject), cards_before)
+        self.assertEqual(record.db.default_image_id, default_before)
+
+    @covers_requirement("art-gallery-model::one-read-only-accessor-reports-every-subject-whose-gallery-carries-an-error")
+    def test_the_accessor_reports_only_erroring_subjects(self):
+        erroring = _character("badgen")
+        clean = _character("well")
+        empty = _character("alsofine")
+        append_card(clean, **_card_fields(clean))
+        append_card(empty, **_card_fields(empty))
+        record_error(erroring, "sd_connection_error")
+        rows = erroring_subjects()
+        self.assertEqual([row.subject for row in rows], [erroring])
+        self.assertEqual(rows[0].error_code, "sd_connection_error")
+        self.assertIsInstance(rows[0].error_at, float)
+
+    @covers_requirement("art-gallery-model::one-read-only-accessor-reports-every-subject-whose-gallery-carries-an-error")
+    def test_the_accessor_on_an_empty_store_creates_nothing(self):
+        self.assertEqual(erroring_subjects(), [])
+        self.assertEqual(gallery_states(), [])
+        self.assertEqual(GalleryRecord.objects.count(), 0)
+
+    @covers_requirement("art-gallery-model::one-read-only-accessor-reports-every-subject-whose-gallery-carries-an-error")
+    def test_an_unparseable_record_is_skipped_not_fatal(self):
+        good = _character("stillseen")
+        record_error(good, "sd_timeout")
+        broken = _character("corrupt")
+        record_error(broken, "sd_connection_error")
+        # Corrupt the persisted identity the way a bad deploy could: a kind
+        # that no longer parses.
+        record_for(broken).db.kind = "monster"
+        rows = erroring_subjects()
+        self.assertEqual([row.subject for row in rows], [good])
+
+    @covers_requirement("art-gallery-model::one-read-only-accessor-reports-every-subject-whose-gallery-carries-an-error")
+    def test_the_state_accessor_lists_healthy_records_and_valid_card_counts(self):
+        subject = _character("stateview")
+        append_card(subject, **_card_fields(subject))
+        record_for(subject).db.cards.append({"not": "a card"})
+        record_error(subject, "sd_timeout")
+        states = gallery_states()
+        self.assertEqual([state.subject for state in states], [subject])
+        state = states[0]
+        # The malformed entry is skipped; only the valid card counts.
+        self.assertEqual(state.card_count, 1)
+        self.assertTrue(state.has_default)
+        self.assertEqual(state.error_code, "sd_timeout")
+        self.assertIsInstance(state.error_at, float)
 
 
 if __name__ == "__main__":
