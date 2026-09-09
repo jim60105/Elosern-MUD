@@ -625,11 +625,18 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             {"mode": "named", "stable_key": str(self.char1.pk)},
         )
         self.assertEqual(len(_portrait_ensure_callbacks(callbacks)), 1)
-        records = ArtAssetRecord.objects.filter(
-            db_key=f"art:portrait:character:{self.char1.pk}"
+        # The retrofit: the committed creation owns one gallery job, never a
+        # classic fixed-identity record.
+        jobs = [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if str(record.db.gallery_image_id or "")
+        ]
+        self.assertEqual(len(jobs), 1)
+        self.assertTrue(
+            jobs[0].db_key.startswith(f"art:portrait:character:{self.char1.pk}:gen:")
         )
-        self.assertEqual(records.count(), 1)
-        self.assertEqual(records.first().db.status, ArtAssetStatus.PENDING)
+        self.assertEqual(jobs[0].db.status, ArtAssetStatus.PENDING)
 
     @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     def test_rolled_back_creation_emits_no_job(self):

@@ -40,6 +40,9 @@ class ImportPortraitSeamTests(EvenniaTestCase):
         return records
 
     @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
+    @covers_requirement(
+        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+    )
     def test_committed_batch_schedules_one_post_commit_ensure_per_record(self):
         first = example_record()
         second = example_record()
@@ -56,11 +59,21 @@ class ImportPortraitSeamTests(EvenniaTestCase):
             )
             self.assertEqual(entity.db.age, 22)
             self.assertEqual(entity.db.apparent_age, 22)
-            record = ArtAssetRecord.objects.filter(
-                db_key=f"art:portrait:character:{entity.key}"
-            ).first()
-            self.assertIsNotNone(record)
-            self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
+            # The retrofit: each committed import owns exactly one gallery
+            # job, never a classic fixed-identity record.
+            jobs = [
+                record
+                for record in ArtAssetRecord.objects.all()
+                if str(record.db.gallery_image_id or "")
+            ]
+            self.assertEqual(len(jobs), 2)
+            for job in jobs:
+                self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
+            self.assertFalse(
+                ArtAssetRecord.objects.filter(
+                    db_key=f"art:portrait:character:{entity.key}"
+                ).exists()
+            )
 
     @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     def test_rejected_import_batch_emits_no_job(self):

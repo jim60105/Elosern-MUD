@@ -552,10 +552,19 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         self.assertEqual(len(_portrait_callbacks(callbacks)), 1)
         from world.art.store import ArtAssetRecord
 
-        records = ArtAssetRecord.objects.filter(
-            db_key="art:portrait:character:forest_bandit_chief"
+        # The retrofit: the committed spawn owns one gallery job, never a
+        # classic fixed-identity record.
+        self.assertEqual(
+            ArtAssetRecord.objects.filter(
+                db_key__startswith="art:portrait:character:forest_bandit_chief:gen:"
+            ).count(),
+            1,
         )
-        self.assertEqual(records.count(), 1)
+        self.assertFalse(
+            ArtAssetRecord.objects.filter(
+                db_key="art:portrait:character:forest_bandit_chief"
+            ).exists()
+        )
 
     @covers_requirement("scene-builder::the-occupant-spawn-path-exposes-a-post-commit-portrait-eligibility-seam-with-unchanged-atomicity")
     @covers_requirement("art-asset-lifecycle::validated-named-npc-spawn-schedules-its-portrait-ensure-after-the-spawn-transaction-commits")
@@ -882,6 +891,9 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
         return record, client, dispatched
 
     @covers_requirement("spawn-named-portraits::a-spawned-named-occupant-completes-the-full-portrait-pipeline")
+    @covers_requirement(
+        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+    )
     def test_fake_worker_receives_the_story_driven_description(self):
         record, client, dispatched = self._materialize_and_drain(
             self._characterized_payload()
@@ -894,24 +906,43 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
         self.assertIn("黑鬍", description)
         self.assertIn("35", description)
 
-        from world.art.store import ArtAssetRecord, ArtAssetStatus
+        # The retrofit settles to a gallery card, not a classic record.
+        from world.art import gallery as gallery_api
+        from world.art.subjects import ArtSubject
+        from world.art.store import ArtAssetRecord
 
-        record = ArtAssetRecord.objects.filter(
-            db_key="art:portrait:character:forest_bandit_chief"
-        ).first()
-        self.assertIsNotNone(record)
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        cards = gallery_api.cards_for(ArtSubject(ArtSubjectKind.CHARACTER, "forest_bandit_chief"))
+        self.assertEqual(len(cards), 1)
+        self.assertIsNone(cards[0]["binding"])
         self.assertTrue(
-            (Path(self.tempdir.name) / "portrait" / "character" / "forest_bandit_chief.png").is_file()
+            (Path(self.tempdir.name) / cards[0]["stored_identity"]).is_file()
+        )
+        self.assertFalse(
+            ArtAssetRecord.objects.filter(
+                db_key="art:portrait:character:forest_bandit_chief"
+            ).exists()
         )
 
     @covers_requirement("spawn-named-portraits::a-spawned-named-occupant-completes-the-full-portrait-pipeline")
-    def test_shared_stable_key_resolves_to_one_asset_with_first_writer_wins(self):
-        self._materialize_and_drain(
+    @covers_requirement(
+        "art-gallery-autogen::automatic-generation-is-idempotent-against-the-subject-s-gallery"
+    )
+    def test_shared_stable_key_resolves_to_one_card_from_the_first_materialization(self):
+        from world.art import gallery as gallery_api
+        from world.art.subjects import ArtSubject
+
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, "forest_bandit_chief")
+        first_client = FakeSDWebUIClient()
+        _, _, first_dispatched = self._materialize_and_drain(
             self._characterized_payload(),
-            client=FakeSDWebUIClient(),
+            client=first_client,
         )
-        self._materialize_and_drain(
+        self.assertEqual(first_dispatched, 1)
+        # The first materialization's description is the one that generated
+        # the card.
+        self.assertIn("黑鬍", first_client.calls[0][1])
+        self.assertNotIn("獨眼", first_client.calls[0][1])
+        _, second_client, second_dispatched = self._materialize_and_drain(
             self._characterized_payload(
                 display_name="獨眼",
                 age=40,
@@ -920,18 +951,15 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
             client=FakeSDWebUIClient(),
         )
 
-        from world.art.store import ArtAssetRecord, ArtAssetStatus
-
-        records = ArtAssetRecord.objects.filter(
-            db_key="art:portrait:character:forest_bandit_chief"
-        )
-        self.assertEqual(records.count(), 1)
-        record = records.first()
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertIn("黑鬍", record.db.source_description)
-        self.assertNotIn("獨眼", record.db.source_description)
+        # The second materialization sees the occupied gallery and is
+        # suppressed by the automatic-generation guard without requesting a
+        # second generation: nothing dispatched, still exactly one card.
+        self.assertEqual(second_dispatched, 0)
+        self.assertEqual(second_client.calls, [])
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(len(cards), 1)
         self.assertTrue(
-            (Path(self.tempdir.name) / "portrait" / "character" / "forest_bandit_chief.png").is_file()
+            (Path(self.tempdir.name) / cards[0]["stored_identity"]).is_file()
         )
 
 if __name__ == "__main__":

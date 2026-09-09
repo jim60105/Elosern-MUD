@@ -191,6 +191,7 @@ class CharacterCreationRequest:
     affinity_elements: tuple[str, ...] | None = None
     sex: str | None = None
     nation: str | None = None
+    skip_portrait: bool = False
 
 
 @dataclass(frozen=True)
@@ -482,7 +483,7 @@ def preflight_character_creation(
     )
 
 
-def finalize_player_portrait(character: Any) -> None:
+def finalize_player_portrait(character: Any, *, skip_portrait: bool = False) -> None:
     """Establish the named portrait policy and schedule the post-commit ensure.
 
     The explicit named policy (``{"mode": "named", "stable_key": str(pk)}``)
@@ -491,11 +492,21 @@ def finalize_player_portrait(character: Any) -> None:
     activation transaction (fix-creation-finalization-safety D3): a rollback
     removes the policy attribute and the registered on-commit job never fires,
     so no rolled-back creation can leave portrait state behind.
+
+    ``skip_portrait`` (default False: generate) is the explicit player-created
+    skip flag (change ``gallery-autogen-retrofit``): the named policy is still
+    established on the skipped path — the character stays eligible for a later
+    request — but nothing is scheduled, leaving an empty gallery that resolves
+    through the standard chain's fallback seam. Like every other finalization
+    write, it is read inside the activation transaction, so a rollback leaves
+    no portrait state either way.
     """
     character.db.portrait_policy = {
         "mode": "named",
         "stable_key": str(character.pk),
     }
+    if skip_portrait:
+        return
     from world.art.service import schedule_portrait_ensure
 
     schedule_portrait_ensure(character)
@@ -758,7 +769,10 @@ def activate_player_character(
             # schedules the post-commit portrait ensure INSIDE this activation
             # transaction (fix-creation-finalization-safety D3): a rollback
             # removes the policy attribute and the on-commit job never fires.
-            finalize_player_portrait(character)
+            # The request's explicit ``skip_portrait`` flag (default False)
+            # still establishes the policy but schedules nothing
+            # (gallery-autogen-retrofit).
+            finalize_player_portrait(character, skip_portrait=request.skip_portrait)
             if write_observer:
                 write_observer("portrait_policy")
     except Exception:

@@ -22,6 +22,16 @@ queue write and never consulting the connectivity probe (the connectivity
 import boundary holds package-wide) — and ``prune_gallery_orphans``, the
 idempotent startup reclaim of orphan gallery files and unclaimable gallery
 job records.
+
+The automatic character-portrait retrofit (change ``gallery-autogen-retrofit``)
+routes every automatic path — creation, validated import, named-NPC spawn,
+startup recovery, staff retry — and the staff character requeue through
+``request_gallery_image`` as one unbound appearance-only card with the shared
+default face rectangle: a character subject never writes a classic
+fixed-identity record. Automatic paths request only when the subject's gallery
+holds no card and no gallery job is in flight; ``@art requeue`` is the one
+force path that bypasses that guard. Scenes and monster tiers stay on the
+classic subject-keyed pipeline.
 """
 
 import uuid
@@ -37,6 +47,7 @@ from world.art.paths import resolved_under_store_root
 from world.art.queue import (
     ensure as queue_ensure,
     enqueue_gallery_job,
+    gallery_job_in_flight,
     is_gallery_job,
 )
 from world.art.store import ArtAssetRecord, ArtAssetStatus
@@ -53,21 +64,40 @@ from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 
 
-def _ensure_character_portrait(entity) -> None:
-    """Validate ages, derive, describe, and enqueue one character portrait subject.
+def _gallery_auto_generation_pending(subject) -> bool:
+    """True when the subject's gallery already occupies it: any card or an in-flight job.
 
-    Reads the canonical age pair immediately before the queue write for every
-    portrait subject (design D3). The eligibility check is a pure function of
-    the canonical age attributes, so a rejection is deterministic and produces
-    no record, no prompt, and no worker call.
+    The automatic-generation idempotency guard (change ``gallery-autogen-retrofit``):
+    a subject whose gallery holds any card — generated, seed-synced, or
+    player-kept — or whose generation is already pending/in-progress is left
+    alone. ``cards_for`` is the tolerant valid-card read, so a malformed entry
+    (ignored by every read, never resolvable) never blocks a real generation.
+    """
+    if gallery_api.cards_for(subject):
+        return True
+    return gallery_job_in_flight(subject)
+
+
+def _ensure_character_portrait(entity) -> bool:
+    """Validate ages, then request one automatic gallery card when the gallery warrants it.
+
+    Returns True when a gallery generation was requested, False when the
+    gallery guard suppressed the automatic path. Reads the canonical age pair
+    immediately before the request for every portrait subject (design D3):
+    a rejection is deterministic and produces no record, no prompt, and no
+    worker call. The request itself is the gallery seam — one unbound card
+    built from the subject's standard deterministic description with the
+    shared default face rectangle; a character subject never writes a classic
+    fixed-identity record on an automatic path.
     """
     subject = character_subject_for(entity)
     if subject is None:
-        return
+        return False
     character_ages(entity)
-    age = int(entity.db.age)
-    description = description_for(subject, entity=entity, age=age)
-    queue_ensure(subject, description)
+    if _gallery_auto_generation_pending(subject):
+        return False
+    request_gallery_image(entity, face_rect=dict(gallery_api.DEFAULT_FACE_RECT))
+    return True
 
 
 def _ages_eligible_at_schedule(entity) -> bool:
@@ -141,28 +171,35 @@ def _living_entity_for_stable_key(stable_key: str):
     return None
 
 
-def retry_character_portrait(stable_key: str) -> None:
-    """Re-enqueue one failed character portrait through the age check.
+def retry_character_portrait(stable_key: str) -> bool:
+    """Re-attempt one character portrait through the age check and the gallery guard.
 
     The subject is re-derived from the living entity that owns the explicit
     named policy for ``stable_key`` and the ages are re-checked; an unknown key,
     a missing entity, or an ineligible character is a named rejection with no
-    record change (staff retry path, design D3).
+    record change (staff retry path, design D3). Returns True only when a
+    gallery generation was actually requested, so ``@art retry`` counts
+    truthfully when the guard leaves an already-carded subject alone.
     """
     entity = _living_entity_for_stable_key(stable_key)
     if entity is None:
         raise ArtSubjectError(
             f"no living character carries portrait stable_key {stable_key!r}"
         )
-    _ensure_character_portrait(entity)
+    return _ensure_character_portrait(entity)
 
 
 def requeue_character_portrait(stable_key: str) -> None:
-    """Force-regenerate one character portrait through the age check.
+    """Force-regenerate one character portrait through the age check and the gallery.
 
-    Resolves the owning entity and re-checks the canonical ages before resetting the
-    record; an unknown key or an ineligible character is a named rejection
-    with no record change (staff requeue path, design D3).
+    Resolves the owning entity and re-checks the canonical ages before issuing
+    exactly one gallery generation request — appending a new card on success
+    and never replacing an existing one. Requeue is the staff force path: it
+    deliberately bypasses the automatic-generation idempotency guard, so a
+    subject that already holds cards still gets one new generation. An unknown
+    key or an ineligible character is a named rejection with no record change
+    (staff requeue path, design D3). A character subject never writes a
+    classic fixed-identity record here.
     """
     entity = _living_entity_for_stable_key(stable_key)
     if entity is None:
@@ -170,14 +207,7 @@ def requeue_character_portrait(stable_key: str) -> None:
             f"no living character carries portrait stable_key {stable_key!r}"
         )
     character_ages(entity)
-    from world.art.queue import requeue as queue_requeue
-
-    subject = character_subject_for(entity)
-    if subject is None:
-        raise ArtSubjectError(
-            f"character {entity.key!r} carries no named portrait policy"
-        )
-    queue_requeue(subject)
+    request_gallery_image(entity, face_rect=dict(gallery_api.DEFAULT_FACE_RECT))
 
 
 def ensure_scene_asset(archetype) -> None:
@@ -218,6 +248,11 @@ def _recover_named_portraits() -> None:
     Recovers an enqueue that failed after an earlier gameplay commit. The
     canonical-age check re-runs; a permanently ineligible subject is skipped
     with a diagnostic and never retried by a later recovery pass (design D7).
+    The shared automatic-generation guard inside ``_ensure_character_portrait``
+    restricts the recovery to subjects with an empty gallery and no in-flight
+    job: a subject whose gallery already holds a card, or whose generation is
+    already pending/in-progress, is left alone (change
+    ``gallery-autogen-retrofit``).
     """
     from evennia.objects.models import ObjectDB
 

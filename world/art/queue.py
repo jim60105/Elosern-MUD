@@ -57,6 +57,25 @@ def is_gallery_job(record: ArtAssetRecord) -> bool:
     return bool(str(record.db.gallery_image_id or ""))
 
 
+def gallery_job_in_flight(subject: ArtSubject) -> bool:
+    """True when a pending or in-progress gallery job exists for the subject.
+
+    The automatic-generation guard's in-flight half: a spent job is marked
+    terminal before it is deleted and a failed settle deletes its record, so
+    ``pending``/``in_progress`` are exactly the live requests. A leftover
+    terminal record is spent work the startup prune reclaims — it never
+    blocks a later automatic request.
+    """
+    with queue_lock:
+        return any(
+            record.db.kind == subject.kind.value
+            and record.db.subject_key == subject.key
+            and record.db.status in (ArtAssetStatus.PENDING, ArtAssetStatus.IN_PROGRESS)
+            for record in _all_records()
+            if is_gallery_job(record)
+        )
+
+
 def source_hash(description: str) -> str:
     """Deterministic sha256 of the canonical subject description."""
     return hashlib.sha256(description.encode("utf-8")).hexdigest()
