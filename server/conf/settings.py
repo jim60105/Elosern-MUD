@@ -472,6 +472,13 @@ ART_SD_PROBE_CACHE_SECONDS = _env_int_bounded(
 # runtime bind-mounts the host folder here read-only at /app/prompts.
 PROMPT_ROOT = os.environ.get("PROMPT_ROOT", os.path.join(GAME_DIR, "prompts"))
 
+# Root directory of the operator-supplied bulk seed-art folder (gallery-seed-sync
+# D10): <seed root>/<kind>/<subject-key>/<filename>.png, bind-mounted read-only
+# by compose at /app/art-seed. A directory root like PROMPT_ROOT — a plain
+# environment read, never a typed ART_SD_* knob. An absent directory means
+# "synchronize nothing", never an error.
+ART_SEED_ROOT = os.environ.get("ART_SEED_ROOT", os.path.join(GAME_DIR, "art-seed"))
+
 # Periodic queue drain control. When ART_SCHEDULER_ENABLED is False the
 # ArtDrainScript never drains; records stay missing/pending and placeholders
 # remain.

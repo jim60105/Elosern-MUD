@@ -5,10 +5,10 @@
 `GAME_DIR` and overridable through an environment variable of the same name, following the
 `PROMPT_ROOT` precedent for directory roots rather than the typed `ART_SD_*` knob table. The
 repository SHALL gitignore the default directory, so bulk seed art can never be committed. An absent,
-empty, or unreadable seed root SHALL be a supported configuration meaning "synchronize nothing" — it
-SHALL log exactly one `gallery_seed_sync` event and SHALL NEVER fail startup. Seed images SHALL be
-copied into the art store rather than served from the seed root, so the read-only mount is never on a
-serving path.
+empty, symlinked, or unreadable seed root SHALL be a supported configuration meaning "synchronize
+nothing" — it SHALL log exactly one `gallery_seed_sync` event and SHALL NEVER fail startup. Seed
+images SHALL be copied into the art store rather than served from the seed root, so the read-only
+mount is never on a serving path.
 
 #### Scenario: A missing seed root is a supported no-op
 - **WHEN** the server starts with no directory at the configured seed root
@@ -33,6 +33,13 @@ be skipped without copying, so repeated runs never duplicate a card and never re
 with an unsupported extension, an unresolvable subject key, or an unknown kind directory SHALL be
 skipped with a bounded diagnostic. Synchronization SHALL NEVER delete, replace, or reorder a card
 that already exists, including cards the player generated.
+
+Reading files out of the (potentially hostile) seed tree SHALL verify each opened file AFTER the
+open — regular, hard-link count one, within a size cap, never reached through a symlink — so a
+planted link or aliased inode is refused rather than copied. Writing into the store SHALL likewise
+open each destination no-follow and refuse anything that is not a single-link regular file, and a
+raw record entry (valid or malformed) SHALL reserve its `stored_identity`: the file it points at is
+never overwritten even when the card itself no longer validates.
 
 #### Scenario: A second run copies and appends nothing
 - **WHEN** `sync_all()` runs twice against an unchanged seed root

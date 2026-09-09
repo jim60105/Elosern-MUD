@@ -36,6 +36,10 @@ server/.media/
 server/.cache/
 server/conf/secret_settings.py
 
+# The seed-art folder is bind-mounted read-only at runtime (gallery-seed-sync);
+# bulk seed images are never baked into the image.
+art-seed/
+
 # ==========================================
 # Environment & Secrets
 # ==========================================

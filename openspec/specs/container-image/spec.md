@@ -64,7 +64,12 @@ via `${PROMPTS_DIR:-./prompts}:/app/prompts:ro,z`, so an admin can edit prompt f
 apply them by restarting or reloading the server without rebuilding the image. The `,z` option
 relabels the bind mount with the SELinux container context so the read-only mount stays readable
 under enforcing SELinux (for example on Fedora or RHEL hosts) without weakening its read-only
-semantics. It SHALL also
+semantics. It SHALL additionally mount the host bulk seed-art folder read-only into the container at
+`/app/art-seed` via `${ART_SEED_DIR:-./art-seed}:/app/art-seed:ro,z`, following the same
+read-only, SELinux-relabelled pattern as the prompt mount, so an operator supplies large prebuilt
+character art without adding it to the image or to version control. Unlike `prompts/`, the seed
+folder SHALL NOT be baked into the image: an absent mount is a supported configuration in which the
+engine simply synchronizes nothing. It SHALL also
 provide a profile-gated, interactive one-shot bootstrap service for initializing a fresh database
 without storing the initial administrator's password in the long-lived service configuration.
 
@@ -102,6 +107,14 @@ without storing the initial administrator's password in the long-lived service c
 - **THEN** it defines no Ollama or sd-webui service, and the `evennia` service instead reads their
   base URLs from environment variables that default to Podman's `host.containers.internal`
   hostname for host-local GPU services
+
+#### Scenario: Seed art is mounted read-only and never baked into the image
+- **WHEN** `compose.yaml` and the built image are inspected
+- **THEN** the `evennia` service mounts `${ART_SEED_DIR:-./art-seed}:/app/art-seed:ro,z`, and the image itself contains no seed-art directory
+
+#### Scenario: A deployment with no seed folder still starts
+- **WHEN** the service is started with no host seed folder present
+- **THEN** the server starts normally, synchronizes no seed art, and reports the skip once
 
 ### Requirement: Container ignore file excludes non-build-context files
 The project SHALL provide a `.containerignore` that excludes version control metadata, local virtual
