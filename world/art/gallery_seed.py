@@ -58,6 +58,7 @@ paths confinement, subject model, observability facade, stdlib) — never the
 worker, the sd-webui client, or any connectivity surface.
 """
 
+from collections.abc import Mapping
 from pathlib import Path
 import json
 import shutil
@@ -183,7 +184,7 @@ def _parse_manifest(
     if "face_rect" in raw:
         try:
             face_rect = validate_face_rect(raw["face_rect"])
-        except GalleryRecordError:
+        except GalleryRecordError:  # observability: ignore R2: an invalid rect degrades whole via the diagnostic below
             diagnostics.emit("manifest_invalid_face_rect", subject=subject)
             return None, None
     default_name = raw.get("default")
@@ -211,7 +212,8 @@ def _raw_occupancy(subject: ArtSubject) -> tuple[int, set[str]]:
     ids = {
         entry["image_id"]
         for entry in cards
-        if isinstance(entry, dict) and isinstance(entry.get("image_id"), str)
+        # Stored entries round-trip as Evennia's _SaverDict, never plain dict.
+        if isinstance(entry, Mapping) and isinstance(entry.get("image_id"), str)
     }
     return len(cards), ids
 
@@ -273,11 +275,13 @@ def _sync_subject(
         # malformed included. Files whose card is already present are the
         # ordinary no-op; the rest count as blocked and earn ONE diagnostic
         # only when something genuinely could not be honored.
-        blocked = sum(
+        present = sum(
             1
             for image in images
-            if derive_image_id(f"{kind_directory}/{subject.key}/{image.name}") not in existing_ids
+            if derive_image_id(f"{kind_directory}/{subject.key}/{image.name}") in existing_ids
         )
+        counters["already_present"] += present
+        blocked = len(images) - present
         counters["monster_cap_skipped"] += blocked
         if blocked:
             diagnostics.emit("monster_card_present_skipped", subject=subject_key, blocked=blocked)
