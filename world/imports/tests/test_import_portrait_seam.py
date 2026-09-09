@@ -95,7 +95,7 @@ class ImportPortraitSeamTests(EvenniaTestCase):
         with (
             self.captureOnCommitCallbacks(execute=True) as callbacks,
             patch(
-                "world.art.service._ensure_character_portrait",
+                "world.art.service._ensure_gallery_subject",
                 side_effect=RuntimeError("art boom"),
             ),
         ):

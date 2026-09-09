@@ -507,6 +507,41 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             any(is_gallery_job(record) for record in ArtAssetRecord.objects.all())
         )
 
+    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
+    def test_retry_never_reactivates_a_legacy_failed_monster_classic_record(self):
+        # ``gallery-monster-autogen``: the classic arm skips every
+        # gallery-bearing kind, so a legacy failed monster record is left
+        # exactly as found (failed, output untouched, never re-ensqueued)
+        # while a healthy scene failed record still re-enqueues normally.
+        tier = next(iter(MONSTER_TIER_REGISTRY))
+        subject = monster_subject_for(tier)
+        ensure(subject, "desc")
+        claim(10)
+        settle(
+            subject,
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="legacy boom",
+        )
+        scene = _scene("forest_path")
+        ensure(scene, "desc")
+        claim(10)
+        settle(scene, status=ArtAssetStatus.FAILED, output_identity=None, error="boom")
+        output = self.call(CmdArtRetry(), "")
+        # Only the scene was re-enqueued.
+        self.assertIn("已重新排入 1 個失敗記錄", output)
+        monster_record = ArtAssetRecord.objects.filter(
+            db_key=f"art:portrait:monster:{tier}"
+        ).first()
+        self.assertEqual(monster_record.db.status, ArtAssetStatus.FAILED)
+        self.assertEqual(
+            ArtAssetRecord.objects.filter(db_key="art:scene:forest_path").first().db.status,
+            ArtAssetStatus.PENDING,
+        )
+        self.assertFalse(
+            any(is_gallery_job(record) for record in ArtAssetRecord.objects.all())
+        )
+
 
 class ArtOptionsCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     """``@art options`` with the thread dispatch replaced by a sync seam."""

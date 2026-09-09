@@ -66,9 +66,9 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "register_action_options_layer",
     "register_title_nomination_layer",
     "register_nomination_triggers",
-    "art_sync_all",
     "art_gallery_prune",
     "art_seed_sync",
+    "art_sync_all",
     "connect_art_push",
 )
 
@@ -463,12 +463,6 @@ def at_server_start():
         tolerant_on=_ALL_ERRORS,
     )
 
-    # Deterministic art-assets startup sync: ensure a record for every scene
-    # and generic-monster subject, then recover explicit named portrait
-    # policies (idempotent; failures are bounded internally, so the wrapper
-    # keeps the pre-refactor fail-loud posture for unforeseen leaks).
-    _startup_step("art_sync_all", lambda: _late("world.art.service", "art_sync_all"))
-
     # Gallery orphan reclaim (gallery-generation-jobs): deletes unreferenced
     # files under gallery/ and unclaimable gallery job records. The seam is
     # internally bounded; the tolerant wrapper is the last-resort guard — an
@@ -495,6 +489,16 @@ def at_server_start():
         tolerant_on=_ALL_ERRORS,
         degrade_level="error",
     )
+
+    # Deterministic art-assets startup sync: ensure a record for every scene
+    # subject, request a guarded gallery generation for every generic-monster
+    # tier, then recover explicit named portrait policies (idempotent;
+    # failures are bounded internally, so the wrapper keeps the pre-refactor
+    # fail-loud posture for unforeseen leaks). Runs AFTER the prune and seed
+    # steps (change ``gallery-monster-autogen``) so an operator seed card
+    # always occupies a subject's gallery — and the orphan prune has already
+    # swept — before any automatic gallery request is enqueued.
+    _startup_step("art_sync_all", lambda: _late("world.art.service", "art_sync_all"))
 
     # WebClient art completion push: re-entrant-safe via a stable dispatch UID.
     _startup_step(

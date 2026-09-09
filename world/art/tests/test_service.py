@@ -73,16 +73,40 @@ class ArtServiceTests(EvenniaTestCase):
                 records[f"art:scene:{archetype}"].db.status,
                 (ArtAssetStatus.MISSING, ArtAssetStatus.PENDING),
             )
+        # ``gallery-monster-autogen``: a monster tier gets a gallery request,
+        # never a classic fixed-identity record.
         for tier in MONSTER_TIER_REGISTRY:
-            self.assertIn(f"art:portrait:monster:{tier}", records)
-        self.assertEqual(len(records), len(SCENE_ARCHETYPE_REGISTRY) + len(MONSTER_TIER_REGISTRY))
+            self.assertNotIn(f"art:portrait:monster:{tier}", records)
+        classic = {
+            key: record
+            for key, record in records.items()
+            if not str(record.db.gallery_image_id or "")
+        }
+        self.assertEqual(
+            sorted(classic),
+            sorted(f"art:scene:{archetype}" for archetype in SCENE_ARCHETYPE_REGISTRY),
+        )
+        monster_jobs = [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if str(record.db.gallery_image_id or "")
+            and record.db_key.startswith("art:portrait:monster:")
+        ]
+        self.assertEqual(len(monster_jobs), len(MONSTER_TIER_REGISTRY))
 
     @covers_requirement("art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records")
     def test_startup_sync_leaves_pending_in_progress_and_done_records_untouched(self):
         subject = _scene("forest_path")
         ensure(subject, "desc")
         art_sync_all()
-        self.assertEqual(len(self._records()), len(SCENE_ARCHETYPE_REGISTRY) + len(MONSTER_TIER_REGISTRY))
+        # Only classic records remain counted: monster tiers hold gallery jobs
+        # (per-image records that drain away), never fixed-identity records.
+        classic = [
+            key
+            for key, record in self._records().items()
+            if not str(record.db.gallery_image_id or "")
+        ]
+        self.assertEqual(len(classic), len(SCENE_ARCHETYPE_REGISTRY))
 
     @covers_requirement("art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records")
     def test_startup_sync_consolidates_duplicate_records(self):
@@ -109,6 +133,7 @@ class ArtServiceTests(EvenniaTestCase):
             record
             for record in ArtAssetRecord.objects.all()
             if str(record.db.gallery_image_id or "")
+            and record.db_key.startswith(f"art:portrait:character:{self.player.pk}:gen:")
         ]
         self.assertEqual(len(jobs), 1)
         self.assertTrue(
@@ -172,7 +197,7 @@ class ArtServiceTests(EvenniaTestCase):
         with (
             self.captureOnCommitCallbacks(execute=True) as callbacks,
             patch(
-                "world.art.service._ensure_character_portrait",
+                "world.art.service._ensure_gallery_subject",
                 side_effect=RuntimeError("art boom"),
             ),
         ):
@@ -234,6 +259,9 @@ class AutogenRetrofitTests(EvenniaTestCase):
             record
             for record in ArtAssetRecord.objects.all()
             if str(record.db.gallery_image_id or "")
+            # Scoped to THIS subject: startup sync now enqueues monster-tier
+            # gallery jobs too (``gallery-monster-autogen``).
+            and record.db_key.startswith(f"art:{self.subject.full()}:gen:")
         ]
 
     def _seed_card(self, image_id):
@@ -934,6 +962,257 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
         self.assertEqual(
             gallery_api.record_for(self.subject).db.default_image_id, second
         )
+
+
+class MonsterStartupSyncTests(EvenniaTestCase):
+    """Startup synchronization routes every monster tier through the gallery.
+
+    Change ``gallery-monster-autogen``: the tier loop shares ONE guarded
+    helper with every character path, the classic generic-monster record is
+    retired from production, every failure is bounded per tier, and the
+    startup step order (prune → seed → sync) guarantees a seed card occupies
+    the gallery before the automatic pass reads it.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.root = Path(self.tempdir.name).resolve()
+        self.seed_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.seed_dir.cleanup)
+        self.seed_root = Path(self.seed_dir.name).resolve()
+        self.art_settings = override_settings(
+            ART_STORE_ROOT=str(self.root),
+            ART_SEED_ROOT=str(self.seed_root),
+            ART_SD_CLIENT="world.art.fake_sd_client.FakeSDWebUIClient",
+        )
+        self.art_settings.enable()
+        self.addCleanup(self.art_settings.disable)
+        self.tiers = sorted(MONSTER_TIER_REGISTRY)
+
+    def _job_keys(self):
+        return sorted(
+            record.db_key
+            for record in ArtAssetRecord.objects.all()
+            if str(record.db.gallery_image_id or "")
+        )
+
+    def _monster_job_keys(self, tier):
+        return [
+            key
+            for key in self._job_keys()
+            if key.startswith(f"art:portrait:monster:{tier}:gen:")
+        ]
+
+    def _classic_keys(self):
+        return sorted(
+            record.db_key
+            for record in ArtAssetRecord.objects.all()
+            if not str(record.db.gallery_image_id or "")
+        )
+
+    def _drain(self):
+        from world.art.worker import drain_synchronous
+
+        with patch(
+            "world.art.worker.resolve_sd_client", return_value=FakeSDWebUIClient()
+        ):
+            # Drain past the scene classic jobs too so every gallery job is claimed.
+            drain_synchronous(200)
+
+    @covers_requirement(
+        "art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records"
+    )
+    @covers_requirement(
+        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+    )
+    def test_a_fresh_startup_gives_each_tier_one_gallery_request_and_drains_to_one_card(self):
+        # The monster kind declares NO age precondition: no age attribute is
+        # ever read on this path.
+        with patch("world.art.service.character_ages") as ages:
+            art_sync_all()
+        ages.assert_not_called()
+        for tier in self.tiers:
+            self.assertEqual(len(self._monster_job_keys(tier)), 1)
+        # No classic monster record was ever written; scenes keep theirs.
+        classic = self._classic_keys()
+        self.assertEqual(
+            classic, sorted(f"art:scene:{archetype}" for archetype in SCENE_ARCHETYPE_REGISTRY)
+        )
+        self._drain()
+        for tier in self.tiers:
+            subject = monster_subject_for(tier)
+            cards = gallery_api.cards_for(subject)
+            self.assertEqual(len(cards), 1)
+            self.assertIsNone(cards[0]["binding"])
+            self.assertEqual(cards[0]["face_rect"], dict(gallery_api.DEFAULT_FACE_RECT))
+            self.assertEqual(
+                gallery_api.record_for(subject).db.default_image_id, cards[0]["image_id"]
+            )
+            self.assertTrue((self.root / cards[0]["stored_identity"]).exists())
+        # The drained per-image jobs are spent and gone; still zero classic monster keys.
+        self.assertEqual(self._classic_keys(), sorted(f"art:scene:{a}" for a in SCENE_ARCHETYPE_REGISTRY))
+
+    @covers_requirement(
+        "art-gallery-autogen::automatic-generation-is-idempotent-against-the-subject-s-gallery"
+    )
+    def test_consecutive_startups_never_replace_a_tiers_card_or_its_stored_file(self):
+        art_sync_all()
+        self._drain()
+        subject = monster_subject_for(self.tiers[0])
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(len(cards), 1)
+        stored = cards[0]["stored_identity"]
+        self.assertTrue((self.root / stored).exists())
+        # Consecutive restarts: the card occupies the gallery, so nothing is
+        # requested and nothing is replaced.
+        art_sync_all()
+        art_sync_all()
+        self.assertEqual(self._monster_job_keys(self.tiers[0]), [])
+        self.assertEqual(gallery_api.cards_for(subject), cards)
+        self.assertTrue((self.root / stored).exists())
+
+    @covers_requirement(
+        "art-gallery-autogen::automatic-generation-is-idempotent-against-the-subject-s-gallery"
+    )
+    def test_an_in_flight_tier_job_suppresses_a_second_request(self):
+        art_sync_all()
+        tier = self.tiers[0]
+        self.assertEqual(len(self._monster_job_keys(tier)), 1)
+        # A second startup sees the pending job and enqueues nothing more.
+        art_sync_all()
+        self.assertEqual(len(self._monster_job_keys(tier)), 1)
+        # The job claimed and still in progress likewise suppresses a second.
+        from world.art.queue import claim
+
+        claimed = [
+            record
+            for record in claim(500)
+            if record.db_key.startswith(f"art:portrait:monster:{tier}:gen:")
+        ]
+        self.assertEqual(len(claimed), 1)
+        art_sync_all()
+        self.assertEqual(len(self._monster_job_keys(tier)), 1)
+
+    @covers_requirement(
+        "art-gallery-autogen::automatic-generation-is-idempotent-against-the-subject-s-gallery"
+    )
+    @covers_requirement(
+        "art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive"
+    )
+    def test_the_real_startup_dispatch_leaves_a_seed_carded_tier_alone(self):
+        # Dispatches the REAL ``at_server_start()`` launch site: unrelated
+        # steps are stubbed out, the three art steps run for real, and the
+        # wrapper records the launch order itself. A monster seed image
+        # occupies the tier's gallery before the automatic pass runs, so no
+        # generation is ever requested for it and the seed card/file survive
+        # a later drain untouched. A launch site wired in any other order
+        # fails this test.
+        import server.conf.at_server_startstop as at
+        from world.art.gallery_seed import derive_image_id
+
+        tier = self.tiers[0]
+        folder = self.seed_root / "monster" / tier
+        folder.mkdir(parents=True)
+        (folder / "sentinel.png").write_bytes(b"\x89PNG seed bytes")
+        expected_id = derive_image_id(f"monster/{tier}/sentinel.png")
+        launched: list[str] = []
+        art_steps = ("art_gallery_prune", "art_seed_sync", "art_sync_all")
+        real_startup_step = at._startup_step
+
+        def _recording_step(name, run, **kwargs):
+            if name in art_steps:
+                launched.append(name)
+                return real_startup_step(name, run, **kwargs)
+            return None
+
+        with (
+            patch.object(at, "_startup_step", side_effect=_recording_step),
+            patch("world.art.gallery_seed.log_warn"),
+            patch("world.art.gallery_seed.log_info"),
+        ):
+            at.at_server_start()
+        self.assertEqual(launched, list(art_steps))
+        self.assertEqual(
+            [name for name in at.STARTUP_STEP_ORDER if name in art_steps],
+            list(art_steps),
+        )
+        subject = monster_subject_for(tier)
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual([card["image_id"] for card in cards], [expected_id])
+        seed_file = self.root / cards[0]["stored_identity"]
+        seed_bytes = seed_file.read_bytes()
+        self.assertEqual(self._monster_job_keys(tier), [])
+        self._drain()
+        self.assertEqual(gallery_api.cards_for(subject), cards)
+        self.assertEqual(seed_file.read_bytes(), seed_bytes)
+
+    @covers_requirement(
+        "art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records"
+    )
+    def test_a_failing_tier_is_bounded_and_the_remaining_tiers_still_synchronize(self):
+        failing = self.tiers[0]
+        real_request = request_gallery_image
+
+        def _boom(entity_or_subject, **kwargs):
+            if isinstance(entity_or_subject, ArtSubject) and entity_or_subject.key == failing:
+                raise RuntimeError("gallery boom")
+            return real_request(entity_or_subject, **kwargs)
+
+        with (
+            patch("world.art.service.request_gallery_image", side_effect=_boom),
+            patch("world.art.service.log_warn") as warn,
+        ):
+            art_sync_all()  # must not raise
+        self.assertEqual(self._monster_job_keys(failing), [])
+        for tier in self.tiers[1:]:
+            self.assertEqual(len(self._monster_job_keys(tier)), 1)
+        self.assertTrue(
+            any(
+                call.args
+                and call.args[0] == "art_startup_sync_skipped"
+                and call.kwargs["context"] == {"kind": "monster", "key": failing}
+                for call in warn.call_args_list
+            )
+        )
+        # Scenes were unaffected by the failing tier.
+        self.assertEqual(
+            self._classic_keys(),
+            sorted(f"art:scene:{a}" for a in SCENE_ARCHETYPE_REGISTRY),
+        )
+
+    @covers_requirement(
+        "art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records"
+    )
+    def test_a_pre_existing_classic_record_is_left_alone_and_still_resolves_classic(self):
+        from world.art.presenter import resolve_subject
+        from world.art.queue import claim, settle
+
+        tier = self.tiers[0]
+        subject = monster_subject_for(tier)
+        identity = f"portrait/monster/{tier}.png"
+        target = self.root / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"classic")
+        ensure(subject, "desc")
+        claim(10)
+        settle(subject, status=ArtAssetStatus.DONE, output_identity=identity, error=None)
+        before = ArtAssetRecord.objects.filter(db_key=f"art:portrait:monster:{tier}").first()
+        self.assertEqual(before.db.status, ArtAssetStatus.DONE)
+        art_sync_all()
+        # The classic record's presence never suppresses the tier's gallery
+        # request: an empty gallery still gets exactly one job.
+        self.assertEqual(len(self._monster_job_keys(tier)), 1)
+        after = ArtAssetRecord.objects.filter(db_key=f"art:portrait:monster:{tier}").first()
+        self.assertIsNotNone(after)
+        self.assertEqual(after.db.status, ArtAssetStatus.DONE)
+        self.assertEqual(after.db.output_identity, identity)
+        # An empty gallery still resolves through the chain's classic step.
+        payload = resolve_subject(subject)
+        self.assertEqual(payload["kind"], "asset")
+        self.assertEqual(payload["status"], ArtAssetStatus.DONE)
+        self.assertIn(identity, payload["url"])
 
 
 class GalleryPruneTests(EvenniaTestCase):
