@@ -10,6 +10,7 @@ player-generated cards are never disturbed.
 """
 
 import json
+import os
 import tempfile
 import unittest
 import uuid
@@ -145,7 +146,7 @@ class IdDerivationTests(unittest.TestCase):
 
 
 class ManifestParsingTests(unittest.TestCase):
-    """The parser is pure over a subject folder — no DB, no events needed."""
+    """The parser reads one subject folder fd — no DB, no events needed."""
 
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
@@ -164,9 +165,13 @@ class ManifestParsingTests(unittest.TestCase):
                 payload if isinstance(payload, str) else json.dumps(payload),
                 encoding="utf-8",
             )
-        return gallery_seed._parse_manifest(
-            manifest, set(eligible), self.diagnostics, "portrait:character/x"
-        )
+        subject_fd = os.open(folder, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            return gallery_seed._parse_manifest(
+                subject_fd, set(eligible), self.diagnostics, "portrait:character/x"
+            )
+        finally:
+            os.close(subject_fd)
 
     @covers_requirement("art-gallery-seed-sync::an-optional-per-subject-manifest-declares-the-default-and-the-face-rectangle")
     def test_absent_manifest_falls_back_silently(self):
@@ -243,6 +248,29 @@ class SeedRootSkipTests(_TempRoots):
         self.assertEqual(
             self.warn.call_args.kwargs["context"]["reason"], "seed_root_unreadable"
         )
+
+    @covers_requirement("art-gallery-seed-sync::bulk-seed-art-lives-outside-git-behind-one-directory-root-setting")
+    def test_a_symlinked_root_is_refused_with_one_skip_event(self):
+        real = self.seed_root / "real"
+        self.seed_root = real  # keep the tree builder pointed at the real folder
+        self.tree = _SeedTree(real)
+        self.tree.image("character", "heron", "a.png")
+        link = self.store_root / "seedlink"
+        if link.exists() or link.is_symlink():
+            link.unlink()
+        link.symlink_to(real)
+        try:
+            with override_settings(ART_SEED_ROOT=str(link)):
+                summary = sync_all()
+        finally:
+            link.unlink()
+        self.assertTrue(summary["skipped"])
+        self.assertEqual(self.warn.call_count, 1)
+        self.assertEqual(
+            self.warn.call_args.kwargs["context"]["reason"], "seed_root_symlink"
+        )
+        # Nothing synchronized: the heron subject has no record.
+        self.assertEqual(cards_for(_character("heron")), [])
 
 
 class SyncIdempotencyTests(_TempRoots):
@@ -338,6 +366,64 @@ class SyncIdempotencyTests(_TempRoots):
         self.assertIn("nested_directory_skipped", reasons)
         self.assertIn("unsupported_extension_skipped", reasons)
         self.assertEqual(summary["appended"], 1)
+
+    @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
+    def test_a_hardlinked_source_is_refused_without_leaking_bytes(self):
+        hero = _unique("character")
+        self.tree.image("character", hero, "a.png")
+        # A second name for the same inode: classification cannot tell which
+        # name the tree operator declared, so both are refused.
+        os.link(
+            self.seed_root / "character" / hero / "a.png",
+            self.seed_root / "character" / hero / "b.png",
+        )
+        summary = sync_all()
+        reasons = self._reasons()
+        self.assertEqual(summary["appended"], 0)
+        self.assertIn("source_rejected", reasons)
+        self.assertNotIn("source_unreadable", reasons)
+
+    @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
+    def test_a_hardlinked_destination_is_never_clobbered(self):
+        hero = _unique("character")
+        self.tree.image("character", hero, "a.png")
+        subject = _character(hero)
+        image_id, identity = self._identity_for(subject, "a.png")
+        # Pre-plant the derived destination as a 2-link inode OUTSIDE the store.
+        twin = self.store_root / "twin.bin"
+        twin.write_bytes(b"priceless")
+        destination = self.store_root / identity
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        os.link(twin, destination)
+        sync_all()
+        self.assertEqual(twin.read_bytes(), b"priceless")
+        self.assertIn("destination_refused", self._reasons())
+        self.assertEqual(cards_for(subject), [])
+
+    @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
+    def test_a_malformed_entry_referencing_the_identity_never_has_its_file_swapped(self):
+        hero = _unique("character")
+        self.tree.image("character", hero, "a.png")
+        subject = _character(hero)
+        image_id, identity = self._identity_for(subject, "a.png")
+        # Plant a raw entry that fails validation but references the file the
+        # seed file WOULD sync to — the closest possible corruption of the
+        # store. The never-overwrite guarantee must still hold byte-for-byte.
+        # Its id is deliberately NOT the derived one: an id match would skip
+        # at the occupancy check; this probes the IDENTITY reservation.
+        record = record_for(subject, create=True)
+        served = self.store_root / identity
+        served.parent.mkdir(parents=True, exist_ok=True)
+        served.write_bytes(b"referenced bytes")
+        record.db.cards = [
+            {"image_id": "not-the-derived-id", "stored_identity": identity}
+        ]
+        record.save()
+        summary = sync_all()
+        self.assertEqual(summary["appended"], 0)
+        self.assertEqual(served.read_bytes(), b"referenced bytes")
+        self.assertIn("destination_referenced_skipped", self._reasons())
+        self.assertEqual(cards_for(subject), [])
 
     @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
     def test_diagnostic_output_stops_at_the_budget_and_reports_the_suppressed_count(self):
