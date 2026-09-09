@@ -6,6 +6,14 @@ lock: enqueue (ensure), forced requeue, claim, lease reclaim, and settle. The
 external worker subprocess never runs under the lock -- it executes on a
 background Twisted thread -- so concurrent drains, ``@art`` commands, and
 ``on_commit`` enqueues serialize on fast DB transactions only.
+
+Gallery generation (change ``gallery-generation-jobs``) shares this queue,
+lock, and worker slot but never ``ensure``: one record per REQUESTED IMAGE is
+keyed ``art:<full-subject-key>:gen:<image-id>``, so a gallery job can never
+collide with or be collapsed into its subject's classic record. Gallery
+settles resolve the record by its own job key (never re-derived from the
+subject), and both gallery settles delete the spent job record after their
+terminal outcome (card append / error code on the subject's gallery record).
 """
 
 import hashlib
@@ -18,9 +26,11 @@ from pathlib import Path
 from django.conf import settings
 from evennia.utils.create import create_script
 
+from world.art import gallery as gallery_api
+from world.art.paths import resolved_under_store_root
 from world.art.sd_worker import prompt_digest
 from world.art.store import ArtAssetRecord, ArtAssetStatus, status_rank
-from world.art.subjects import ArtSubject
+from world.art.subjects import ArtSubject, parse_subject
 from world.prompts.loader import PromptLibraryError
 
 # The single shared serialization lock for every scene and portrait operation.
@@ -30,6 +40,21 @@ queue_lock = threading.Lock()
 def record_key(subject: ArtSubject) -> str:
     """The script key for a subject's asset record."""
     return f"art:{subject.full()}"
+
+
+def gallery_record_key(subject: ArtSubject, image_id: str) -> str:
+    """The script key for one requested gallery image (per-request unique).
+
+    The ``:gen:`` suffix keeps this shape disjoint from ``record_key``'s
+    ``art:<full-subject-key>``, so ``ensure``, consolidation, and forced
+    requeue never see a gallery job.
+    """
+    return f"{record_key(subject)}:gen:{image_id}"
+
+
+def is_gallery_job(record: ArtAssetRecord) -> bool:
+    """True when a record is a per-image gallery job, not a subject record."""
+    return bool(str(record.db.gallery_image_id or ""))
 
 
 def source_hash(description: str) -> str:
@@ -90,6 +115,50 @@ def _find_or_create(subject: ArtSubject) -> ArtAssetRecord:
     if record is None:
         record = _create_record(subject)
     return record
+
+
+def enqueue_gallery_job(
+    subject: ArtSubject,
+    description: str,
+    *,
+    image_id: str,
+    binding: dict | None,
+    face_rect: dict | None,
+    requested_fields: list,
+) -> ArtAssetRecord:
+    """Create exactly one per-image gallery job record under the queue lock.
+
+    There is deliberately NO find-or-create and NO consolidation here: every
+    call is one requested image with its own freshly minted ``image_id``, and
+    two requests for one subject MUST produce two independent jobs. The
+    record carries the pending card's binding, face rectangle, and requested
+    field ids verbatim (validated upstream at the service boundary) and never
+    an ``output_identity`` — its published artifact is a gallery card. Scene
+    subjects have no gallery and are refused before any write.
+    """
+    if subject.kind not in gallery_api.GALLERY_KIND_DIRECTORIES:
+        raise gallery_api.GalleryRecordError("scene subjects have no gallery")
+    digest = source_hash(description)
+    with queue_lock:
+        record = create_script(
+            ArtAssetRecord,
+            key=gallery_record_key(subject, image_id),
+            persistent=True,
+            interval=0,
+        )
+        record.db.kind = subject.kind.value
+        record.db.subject_key = subject.key
+        record.db.gallery_image_id = image_id
+        record.db.gallery_binding = binding
+        record.db.gallery_face_rect = face_rect
+        record.db.gallery_requested_fields = list(requested_fields)
+        record.db.source_description = description
+        record.db.source_hash = digest
+        record.db.prompt_digest = _prompt_digest_or_empty(subject, description)
+        record.db.aspect_ratio = _aspect_ratio_for(subject)
+        record.db.status = ArtAssetStatus.PENDING
+        record.db.enqueued_at = time.time()
+        return record
 
 
 def ensure(subject: ArtSubject, description: str) -> ArtAssetRecord:
@@ -192,6 +261,15 @@ def reclaim_expired_leases(timeout: float) -> int:
     return reclaimed
 
 
+def _record_by_db_key(db_key: str) -> ArtAssetRecord | None:
+    """Resolve one record by its OWN stored key (never re-derived).
+
+    Settle authority is the key the claim itself carried, so a gallery job
+    and its subject's classic record can never settle onto each other.
+    """
+    return ArtAssetRecord.objects.filter(db_key=db_key).first()
+
+
 def settle(subject: ArtSubject, *, status: str, output_identity: str | None,
            error: str | None) -> ArtAssetRecord | None:
     """Apply one validated terminal result for a claimed record under the lock.
@@ -203,11 +281,18 @@ def settle(subject: ArtSubject, *, status: str, output_identity: str | None,
     is a no-op, so an older worker result can never overwrite a newer forced
     regeneration (design D4).
     """
+    return _settle_by_key(
+        record_key(subject), status=status, output_identity=output_identity, error=error
+    )
+
+
+def _settle_by_key(db_key: str, *, status: str, output_identity: str | None,
+                   error: str | None) -> ArtAssetRecord | None:
+    """``settle`` resolved by the record's own db_key (shared by both kinds)."""
     with queue_lock:
-        records = _records_for(subject)
-        if not records:
+        record = _record_by_db_key(db_key)
+        if record is None:
             return None
-        record = records[0]
         if record.db.status != ArtAssetStatus.IN_PROGRESS:
             return None
         if status == ArtAssetStatus.DONE and output_identity:
@@ -256,12 +341,29 @@ def settle_generated(
     the existing output is never touched, and the error propagates. Returns
     ``None`` (stale claim) after removing the temporary file.
     """
+    return _settle_generated_by_key(
+        record_key(subject),
+        generation_token=generation_token,
+        output_identity=output_identity,
+        tmp_path=tmp_path,
+        seed=seed,
+    )
+
+
+def _settle_generated_by_key(
+    db_key: str,
+    *,
+    generation_token: str,
+    output_identity: str,
+    tmp_path: str,
+    seed: int | None = None,
+) -> tuple[ArtAssetRecord, str | None] | None:
+    """``settle_generated`` resolved by the record's own db_key."""
     with queue_lock:
-        records = _records_for(subject)
-        if not records:
+        record = _record_by_db_key(db_key)
+        if record is None:
             _remove_tmp(tmp_path)
             return None
-        record = records[0]
         if (
             record.db.status != ArtAssetStatus.IN_PROGRESS
             or record.db.generation_token != generation_token
@@ -329,13 +431,121 @@ def _remove_tmp(tmp_path: str) -> None:
         pass
 
 
+def _gallery_subject(record: ArtAssetRecord) -> ArtSubject:
+    """Rebuild a gallery job record's typed subject from its persisted fields."""
+    return parse_subject(f"{record.db.kind}:{record.db.subject_key}")
+
+
+def settle_gallery_generated(
+    job_key: str,
+    *,
+    generation_token: str,
+    output_identity: str,
+    tmp_path: str,
+    prompt: dict,
+    seed: int | None,
+    checkpoint: str | None,
+) -> dict | None:
+    """Publish one generated gallery image as exactly one card append.
+
+    Under the queue lock, while the claim's generation token is still
+    current: validate the per-image identity through the single store-root
+    confinement helper, atomically replace the temporary file onto it, THEN
+    append the card through ``world/art/gallery.py`` (file write before card
+    append, so an interruption leaves an orphan FILE reclaimed by the startup
+    prune, never a card pointing at a missing file), and delete the spent job
+    record. The card carries the verbatim prompt pair and server-reported
+    seed from the returned generation, the configured checkpoint when one is
+    set, and the job record's pending binding, face rectangle, and requested
+    field ids. A gallery job deletes NO prior file and never touches a
+    classic record. Lock order is ``queue_lock -> gallery_lock`` (the only
+    allowed order; ``gallery.py`` never acquires ``queue_lock``).
+
+    Returns the stored card dict, or ``None`` for a stale claim (the
+    temporary file is removed first). An identity that escapes the store
+    root removes the temporary file and raises.
+    """
+    with queue_lock:
+        record = _record_by_db_key(job_key)
+        if record is None or not is_gallery_job(record):
+            _remove_tmp(tmp_path)
+            return None
+        if (
+            record.db.status != ArtAssetStatus.IN_PROGRESS
+            or record.db.generation_token != generation_token
+        ):
+            _remove_tmp(tmp_path)
+            return None
+        target = resolved_under_store_root(output_identity)
+        if target is None:
+            _remove_tmp(tmp_path)
+            raise ValueError(
+                f"gallery identity {output_identity!r} escapes the store root"
+            )
+        try:
+            os.replace(tmp_path, target)
+        except BaseException:
+            _remove_tmp(tmp_path)
+            raise
+        subject = _gallery_subject(record)
+        card_fields: dict = {
+            "image_id": str(record.db.gallery_image_id),
+            "stored_identity": output_identity,
+            "prompt": prompt,
+            "seed": seed,
+            "checkpoint": checkpoint or None,
+            "requested_fields": list(record.db.gallery_requested_fields or []),
+            "binding": record.db.gallery_binding,
+            "source": "generated",
+        }
+        face_rect = record.db.gallery_face_rect
+        if face_rect:
+            card_fields["face_rect"] = face_rect
+        stored = gallery_api.append_card(subject, **card_fields)
+        record.delete()
+        return stored
+
+
+def settle_gallery_failed(
+    job_key: str, *, generation_token: str, error: str | None
+) -> ArtSubject | None:
+    """Terminal failure for a gallery job: no card, bounded code, spent record gone.
+
+    While the claim is still current, records the bounded error code (and its
+    timestamp) on the subject's gallery record through the gallery write
+    API — every existing card stays intact, NO card is appended — then
+    deletes the spent job record. A stale claim (missing record, requeued,
+    reclaimed, or token mismatch) is a side-effect-free no-op returning
+    ``None``, so an outdated worker can never stamp an error onto a gallery
+    that moved on.
+    """
+    with queue_lock:
+        record = _record_by_db_key(job_key)
+        if record is None or not is_gallery_job(record):
+            return None
+        if (
+            record.db.status != ArtAssetStatus.IN_PROGRESS
+            or record.db.generation_token != generation_token
+        ):
+            return None
+        subject = _gallery_subject(record)
+        gallery_api.record_error(subject, error or "settle_error")
+        record.delete()
+        return subject
+
+
 def failed_keys() -> list[str]:
-    """Full subject keys of every ``failed`` record (for ``@art retry``)."""
+    """Full subject keys of every ``failed`` SUBJECT record (for ``@art retry``).
+
+    Gallery job records are excluded: a gallery retry is a new request, not a
+    re-enqueue, and their keys are not subject keys.
+    """
     with queue_lock:
         return [
             record.db_key.removeprefix("art:")
             for record in _all_records()
             if record.db.status == ArtAssetStatus.FAILED
+            and not is_gallery_job(record)
         ]
 
 

@@ -9,6 +9,9 @@ from world.art.queue import (
     claim,
     ensure,
     failed_keys,
+    enqueue_gallery_job,
+    gallery_record_key,
+    is_gallery_job,
     queue_lock,
     reclaim_expired_leases,
     record_key,
@@ -16,6 +19,7 @@ from world.art.queue import (
     settle,
     source_hash,
 )
+from world.art.gallery import GalleryRecordError
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 
@@ -24,6 +28,21 @@ from tools.spec_traceability import covers_requirement
 
 def _scene(key="forest_path"):
     return ArtSubject(ArtSubjectKind.SCENE, key)
+
+
+def _character(key="42"):
+    return ArtSubject(ArtSubjectKind.CHARACTER, key)
+
+
+def _enqueue_gallery(subject, image_id="11111111-1111-4111-8111-111111111111", **fields):
+    return enqueue_gallery_job(
+        subject,
+        "desc",
+        image_id=image_id,
+        binding=fields.get("binding"),
+        face_rect=fields.get("face_rect"),
+        requested_fields=fields.get("requested_fields", []),
+    )
 
 
 class ArtQueueTests(EvenniaTestCase):
@@ -252,6 +271,111 @@ class ArtQueueTests(EvenniaTestCase):
             if record.db.status == ArtAssetStatus.PENDING
         ]
         self.assertEqual(len(pending), 0)
+
+
+class GalleryJobQueueTests(EvenniaTestCase):
+    """Per-image gallery jobs share the queue machinery but never ``ensure``."""
+
+    @covers_requirement(
+        "art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent"
+    )
+    def test_two_requests_for_one_subject_produce_two_independent_jobs(self):
+        subject = _character("42")
+        first = _enqueue_gallery(subject, "11111111-1111-4111-8111-111111111111")
+        second = _enqueue_gallery(subject, "22222222-2222-4222-8222-222222222222")
+        self.assertNotEqual(first.db_key, second.db_key)
+        self.assertEqual(
+            first.db_key,
+            gallery_record_key(subject, "11111111-1111-4111-8111-111111111111"),
+        )
+        self.assertTrue(first.db_key.startswith(f"art:{subject.full()}:gen:"))
+        self.assertEqual(first.db.status, ArtAssetStatus.PENDING)
+        self.assertEqual(second.db.status, ArtAssetStatus.PENDING)
+        self.assertTrue(is_gallery_job(first) and is_gallery_job(second))
+        self.assertFalse(is_gallery_job(ensure(subject, "classic")))
+
+    @covers_requirement(
+        "art-queue-worker::asset-records-carry-the-full-contract-and-never-a-live-object-reference"
+    )
+    def test_a_gallery_job_carries_the_card_metadata_and_no_output_identity(self):
+        subject = _character("42")
+        binding = {
+            "mask": ["weapon_main"],
+            "snapshot": {"weapon_main": "longsword"},
+        }
+        rect = {"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.4}
+        job = _enqueue_gallery(
+            subject,
+            "33333333-3333-4333-8333-333333333333",
+            binding=binding,
+            face_rect=rect,
+            requested_fields=["eyes"],
+        )
+        self.assertEqual(dict(job.db.gallery_binding), binding)
+        self.assertEqual(dict(job.db.gallery_face_rect), rect)
+        self.assertEqual(list(job.db.gallery_requested_fields), ["eyes"])
+        self.assertEqual(job.db.source_hash, source_hash("desc"))
+        self.assertTrue(job.db.prompt_digest)
+        self.assertEqual(job.db.aspect_ratio, "3:4")
+        self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
+        self.assertFalse(job.db.output_identity)
+        self.assertFalse(job.db.prior_output_identity)
+        # No lease was taken: a reclaim pass never disturbs a pending job.
+        self.assertEqual(reclaim_expired_leases(0.001), 0)
+
+    @covers_requirement(
+        "art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent"
+    )
+    def test_ensure_requeue_and_consolidation_never_see_a_gallery_job(self):
+        subject = _character("42")
+        job = _enqueue_gallery(subject, "44444444-4444-4444-8444-444444444444")
+        classic = ensure(subject, "classic desc")
+        self.assertEqual(classic.db_key, record_key(subject))
+        self.assertNotEqual(classic.db_key, job.db_key)
+        requeue(subject)
+        self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
+        self.assertEqual(classic.db.status, ArtAssetStatus.PENDING)
+        again = ensure(subject, "classic desc")
+        self.assertEqual(again.db_key, classic.db_key)
+        self.assertEqual(
+            ArtAssetRecord.objects.filter(db_key=record_key(subject)).count(), 1
+        )
+        self.assertTrue(ArtAssetRecord.objects.filter(db_key=job.db_key).exists())
+
+    @covers_requirement(
+        "art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent"
+    )
+    def test_failed_keys_excludes_gallery_job_records(self):
+        subject = _character("42")
+        job = _enqueue_gallery(subject, "55555555-5555-4555-8555-555555555555")
+        ensure(_scene("cave_interior"), "b")
+        claim(10)
+        settle(
+            _scene("cave_interior"),
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="boom",
+        )
+        self.assertEqual(failed_keys(), ["scene:cave_interior"])
+        self.assertNotIn(job.db_key.removeprefix("art:"), failed_keys())
+
+    def test_a_scene_subject_has_no_gallery(self):
+        with self.assertRaises(GalleryRecordError):
+            _enqueue_gallery(_scene("forest_path"))
+        self.assertEqual(ArtAssetRecord.objects.all().count(), 0)
+
+    @covers_requirement(
+        "art-queue-worker::asset-records-carry-the-full-contract-and-never-a-live-object-reference"
+    )
+    def test_claim_and_lease_reclaim_apply_to_gallery_jobs_unchanged(self):
+        subject = _character("42")
+        _enqueue_gallery(subject, "66666666-6666-4666-8666-666666666666")
+        claimed = claim(10)
+        self.assertEqual(len(claimed), 1)
+        self.assertEqual(claimed[0].db.status, ArtAssetStatus.IN_PROGRESS)
+        self.assertIsNotNone(claimed[0].db.generation_token)
+        self.assertEqual(reclaim_expired_leases(0.001), 1)
+        self.assertEqual(claimed[0].db.status, ArtAssetStatus.PENDING)
 
 
 if __name__ == "__main__":

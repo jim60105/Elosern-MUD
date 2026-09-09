@@ -39,6 +39,7 @@ _BODY_TARGETS = (
     "world.rules.titles.register_title_planner",
     "world.prompts.loader.load_prompt_library",
     "world.art.service.art_sync_all",
+    "world.art.service.prune_gallery_orphans",
     "web.webclient.presentation.art_push.connect_art_push",
     "world.ai.narrator.register_narrator",
     "world.ai.npc_dialogue.register_npc_dialogue",

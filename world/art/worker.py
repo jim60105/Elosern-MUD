@@ -31,8 +31,11 @@ from twisted.internet import threads
 from world.art.formats import encode
 from world.art.queue import (
     claim,
+    is_gallery_job,
     queue_lock,
     reclaim_expired_leases,
+    settle_gallery_failed,
+    settle_gallery_generated,
     settle,
     settle_generated,
 )
@@ -84,6 +87,24 @@ def expected_output_identity(subject: ArtSubject) -> str:
     if subject.kind is ArtSubjectKind.MONSTER:
         return f"portrait/monster/{subject.key}{extension}"
     return f"portrait/character/{subject.key}{extension}"
+
+
+def output_identity_for(record: ArtAssetRecord) -> str:
+    """The engine's expected relative identity derived from the RECORD itself.
+
+    A gallery job publishes to the per-image gallery path
+    ``gallery/<kind-directory>/<subject-key>/<image-id><extension>`` — never
+    the subject's fixed identity. A classic subject job keeps
+    ``expected_output_identity(subject)`` byte-for-byte.
+    """
+    image_id = str(record.db.gallery_image_id or "")
+    if image_id:
+        from world.art.gallery import GALLERY_KIND_DIRECTORIES
+
+        kind_directory = GALLERY_KIND_DIRECTORIES[ArtSubjectKind(str(record.db.kind))]
+        extension = str(settings.ART_SD_OUTPUT_EXTENSION)
+        return f"gallery/{kind_directory}/{record.db.subject_key}/{image_id}{extension}"
+    return expected_output_identity(subject_for(record))
 
 
 def _store_root() -> Path:
@@ -156,6 +177,11 @@ def _settle_one(
     which settles the record ``done`` under the queue lock (the returned flag
     marks that); only after that commit does an extension change delete the
     validated prior file (a deletion error is a bounded log, never a revert).
+    A GALLERY JOB record instead publishes through ``settle_gallery_generated``
+    (file write, then exactly one card append, then spent-record deletion) and
+    fails through ``settle_gallery_failed`` (no card, bounded code on the
+    subject's gallery record, spent-record deletion) — it never deletes a prior file
+    and never touches a classic record's committed output.
     Returns ``None`` when the claim was requeued or reclaimed mid-flight and
     must not be settled by this worker.
     """
@@ -165,6 +191,23 @@ def _settle_one(
     # settle authority is the token this worker actually claimed, never
     # whatever the record field happens to hold after the generation.
     generation_token = str(record.db.generation_token or "")
+    # The job key and image id are likewise captured BEFORE the settle: a
+    # gallery settle deletes the job record, and the post-settle boundary
+    # event must still name the finished job.
+    job_key = str(record.db_key)
+    image_id = str(record.db.gallery_image_id or "")
+    is_gallery = bool(image_id)
+
+    def _gallery_failure(code: str):
+        """Terminal gallery failure settle; ``None`` when the claim is stale."""
+        applied = settle_gallery_failed(
+            job_key, generation_token=generation_token, error=code
+        )
+        if applied is None:
+            return None
+        _log_gallery_settle(subject, image_id, ArtAssetStatus.FAILED, code)
+        return ArtAssetStatus.FAILED, None, code, True
+
     try:
         image = client.generate(subject, description)
         encoded, _extension = encode(
@@ -183,20 +226,56 @@ def _settle_one(
             quality=int(settings.ART_SD_OUTPUT_QUALITY),
             preserve_metadata=bool(settings.ART_SD_PRESERVE_GENERATION_METADATA),
         )
-        identity = expected_output_identity(subject)
+        identity = output_identity_for(record)
         tmp_path = _write_temp(identity, encoded)
     except SDError as error:
         log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": error.code}, exc=error)
+        if is_gallery:
+            return _gallery_failure(error.code)
         return ArtAssetStatus.FAILED, None, error.code, False
     except PromptLibraryError as error:
         log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": "sd_prompt_error"}, exc=error)
+        if is_gallery:
+            return _gallery_failure("sd_prompt_error")
         return ArtAssetStatus.FAILED, None, "sd_prompt_error", False
     except WorkerStoreError as error:
         log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": "worker_output_out_of_root"}, exc=error)
+        if is_gallery:
+            return _gallery_failure("worker_output_out_of_root")
         return ArtAssetStatus.FAILED, None, "worker_output_out_of_root", False
     except Exception as error:
         log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": "sd_internal_error"}, exc=error)
+        if is_gallery:
+            return _gallery_failure("sd_internal_error")
         return ArtAssetStatus.FAILED, None, "sd_internal_error", False
+    if is_gallery:
+        try:
+            stored = settle_gallery_generated(
+                job_key,
+                generation_token=generation_token,
+                output_identity=identity,
+                tmp_path=tmp_path,
+                prompt={"positive": image.prompt, "negative": image.negative_prompt},
+                seed=image.seed,
+                checkpoint=image.checkpoint,
+            )
+        except Exception as error:  # noqa: BLE001 - a publication failure is a terminal per-record failure, never a batch abort
+            log_warn(
+                "sd_generation_error",
+                context={
+                    "endpoint": _sd_endpoint(),
+                    "code": "sd_internal_error",
+                    "stage": "publication",
+                },
+                exc=error,
+            )
+            # A card-append failure leaves at worst an orphan FILE (written
+            # before the append) for the startup prune; the job settles failed.
+            return _gallery_failure("sd_internal_error")
+        if stored is None:
+            return None
+        _log_gallery_settle(subject, image_id, ArtAssetStatus.DONE, "generated")
+        return ArtAssetStatus.DONE, identity, None, True
     try:
         committed = settle_generated(
             subject,
@@ -277,6 +356,22 @@ def _log_settled(
     )
 
 
+def _log_gallery_settle(
+    subject: ArtSubject, image_id: str, status: str, reason: str
+) -> None:
+    """One boundary event per gallery job that reached an applied terminal settle."""
+    log_info(
+        "gallery_settle",
+        context={
+            "subject": subject.full(),
+            "image_id": image_id,
+            "kind": subject.kind.value,
+            "status": status,
+            "reason": reason,
+        },
+    )
+
+
 def _run_and_settle_batch(records: list[ArtAssetRecord]) -> list[ArtSubject]:
     """Generate and settle one claimed batch on the background thread.
 
@@ -309,8 +404,14 @@ def _run_and_settle_batch(records: list[ArtAssetRecord]) -> list[ArtSubject]:
             continue
         status, identity, error, already_settled = outcome
         if already_settled:
-            settled.append(subject)
-            _log_settled(record, subject, status, "generated")
+            if subject.full() not in {s.full() for s in settled}:
+                settled.append(subject)
+            _log_settled(
+                record,
+                subject,
+                status,
+                str(error) if status == ArtAssetStatus.FAILED else "generated",
+            )
             continue
         if (
             settle(
@@ -331,8 +432,25 @@ def _fail_batch(pairs: list[tuple[ArtAssetRecord, ArtSubject]], error: str) -> N
 
     A stale record (requeued or reclaimed mid-flight) settles to a no-op
     (``settle`` returns ``None``) and must not fabricate a settle event.
+    Gallery job records settle through the gallery-failed path — their card
+    is never appended, the bounded code lands on the subject's gallery record,
+    and the spent job record is deleted — so no gallery job is ever settled
+    through (or onto) its subject's classic record.
     """
     for record, subject in pairs:
+        if is_gallery_job(record):
+            applied = settle_gallery_failed(
+                str(record.db_key),
+                generation_token=str(record.db.generation_token or ""),
+                error=error,
+            )
+            if applied is not None:
+                _log_gallery_settle(
+                    subject, str(record.db.gallery_image_id or ""),
+                    ArtAssetStatus.FAILED, error,
+                )
+                _log_settled(record, subject, ArtAssetStatus.FAILED, error)
+            continue
         if (
             settle(
                 subject,

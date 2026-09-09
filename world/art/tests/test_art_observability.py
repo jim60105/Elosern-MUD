@@ -17,6 +17,9 @@ from evennia.utils.test_resources import EvenniaTest
 
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.queue import ensure, record_key
+from evennia.utils.create import create_object
+from typeclasses.characters import PlayerCharacter
+from world.art.service import request_gallery_image
 
 from tools.spec_traceability import covers_requirement
 from world.art.sd_worker import SDError
@@ -179,6 +182,78 @@ class ArtWorkerObservabilityTests(EvenniaTest):
         # The slot was released: a following drain proceeds normally.
         with self._client(FakeSDWebUIClient()):
             self.assertEqual(drain_synchronous(10), 0)
+
+
+class GalleryBoundaryEventTests(EvenniaTest):
+    """One generate/settle pair per requested image, carrying the business ids."""
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.art_settings = override_settings(
+            ART_STORE_ROOT=str(Path(self.tempdir.name)),
+            ART_SD_CLIENT="world.art.fake_sd_client.FakeSDWebUIClient",
+        )
+        self.art_settings.enable()
+        self.addCleanup(self.art_settings.disable)
+        self.player = create_object(PlayerCharacter, key="gallery-obs-player")
+        self.player.age = 30
+        self.player.apparent_age = 30
+        self.player.db.portrait_policy = {
+            "mode": "named",
+            "stable_key": str(self.player.pk),
+        }
+        self.subject_full = f"portrait:character:{self.player.pk}"
+
+    @contextmanager
+    def _client(self, client):
+        with patch("world.art.worker.resolve_sd_client", return_value=client):
+            yield
+
+    @covers_requirement("art-gallery-generation::gallery-generation-emits-its-boundary-events")
+    def test_a_successful_request_logs_one_generate_and_one_done_settle(self):
+        with patch("world.art.service.log_info") as service_info:
+            image_id = request_gallery_image(self.player)
+        generates = _events(service_info, "gallery_generate")
+        self.assertEqual(len(generates), 1, generates)
+        self.assertEqual(
+            generates[0].kwargs["context"],
+            {"subject": self.subject_full, "image_id": image_id, "kind": "portrait:character"},
+        )
+        with self._client(FakeSDWebUIClient()):
+            with patch("world.art.worker.log_info") as info:
+                drain_synchronous(10)
+        settles = _events(info, "gallery_settle")
+        self.assertEqual(len(settles), 1, settles)
+        self.assertEqual(
+            settles[0].kwargs["context"],
+            {
+                "subject": self.subject_full,
+                "image_id": image_id,
+                "kind": "portrait:character",
+                "status": ArtAssetStatus.DONE,
+                "reason": "generated",
+            },
+        )
+
+    @covers_requirement("art-gallery-generation::gallery-generation-emits-its-boundary-events")
+    def test_a_failed_settle_reports_the_bounded_reason(self):
+        with patch("world.art.service.log_info"):
+            image_id = request_gallery_image(self.player)
+        failing = FakeSDWebUIClient()
+        failing.fail_every_call(SDError("sd_timeout", "scripted"))
+        with self._client(failing):
+            with patch("world.art.worker.log_info") as info:
+                drain_synchronous(10)
+        settles = _events(info, "gallery_settle")
+        self.assertEqual(len(settles), 1, settles)
+        context = settles[0].kwargs["context"]
+        self.assertEqual(context["status"], ArtAssetStatus.FAILED)
+        self.assertEqual(context["reason"], "sd_timeout")
+        self.assertEqual(context["image_id"], image_id)
+        self.assertEqual(context["subject"], self.subject_full)
+        self.assertEqual(context["kind"], "portrait:character")
 
 
 if __name__ == "__main__":

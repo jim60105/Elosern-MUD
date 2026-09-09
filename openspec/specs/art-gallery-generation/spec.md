@@ -1,4 +1,15 @@
-## ADDED Requirements
+# art-gallery-generation Specification
+
+## Purpose
+
+Define per-image gallery generation jobs: one validated service seam that
+validates and enqueues exactly one request keyed by a freshly minted image id,
+generation failures reported (never gated) while the image server is down, an
+idempotent startup prune that reclaims orphan gallery files and spent gallery
+job records, and the `gallery_generate`/`gallery_settle` boundary events that
+make every request and terminal settle observable.
+
+## Requirements
 
 ### Requirement: One validated service seam requests every gallery image
 `world/art/service.py::request_gallery_image(entity, *, binding=None, face_rect=None)` SHALL be the
@@ -51,9 +62,10 @@ The engine SHALL run one idempotent startup prune that deletes every file under 
 that can never be claimed or published again (a record whose subject no longer resolves, or whose
 status is neither `pending` nor `in_progress`); a lease-expired `in_progress` job is RETAINED —
 reclaiming it to `pending` is the shared queue's lease-reclaim job, not the prune's, so a gallery
-job whose worker died is retried rather than silently dropped. Every deletion SHALL resolve through the single store-root confinement
-helper, so no path outside `ART_STORE_ROOT` is ever unlinked. A prune failure SHALL be a bounded
-diagnostic that never aborts startup, and a prune SHALL NEVER delete a file a card references.
+job whose worker died is retried rather than silently dropped. Every deletion SHALL resolve through
+the single store-root confinement helper, so no path outside `ART_STORE_ROOT` is ever unlinked. A
+prune failure SHALL be a bounded diagnostic that never aborts startup, and a prune SHALL NEVER
+delete a file a card references.
 
 #### Scenario: An orphan gallery file is reclaimed
 - **WHEN** the server starts with a file under `gallery/` that no card references

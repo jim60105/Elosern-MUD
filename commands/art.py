@@ -14,7 +14,7 @@ from django.conf import settings
 from commands.command import Command
 import urllib.parse
 
-from world.art.queue import failed_keys, record_key, requeue
+from world.art.queue import failed_keys, is_gallery_job, record_key, requeue
 from world.art.store import ArtAssetRecord
 from world.art.subjects import (
     ArtSubjectError,
@@ -64,7 +64,10 @@ class CmdArtStatus(_ArtCommand):
         records = [
             record
             for record in ArtAssetRecord.objects.all()
-            if kind is None or record.db.kind.startswith(kind)
+            # Gallery job records are invisible here: the staff surface keeps
+            # reporting the classic subject queue only.
+            if not is_gallery_job(record)
+            and (kind is None or record.db.kind.startswith(kind))
         ]
         records.sort(key=lambda record: record.db_key)
         if not records:
@@ -266,6 +269,8 @@ class CmdArtHealth(_ArtCommand):
             )
             counts: dict[str, int] = {}
             for record in ArtAssetRecord.objects.all():
+                if is_gallery_job(record):
+                    continue
                 status = str(record.db.status)
                 counts[status] = counts.get(status, 0) + 1
             lines.append(

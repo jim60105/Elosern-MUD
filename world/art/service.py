@@ -14,18 +14,38 @@ reachable from gameplay are all deterministic:
 
 Every seam is failure-isolated: an art failure logs a bounded diagnostic and
 never rolls back creation, import, spawn, or movement (design D7).
+
+Gallery generation (change ``gallery-generation-jobs``) adds two seams:
+``request_gallery_image`` — the only gameplay-reachable entry point that
+queues a gallery generation, validating subject/binding/rect BEFORE any
+queue write and never consulting the connectivity probe (the connectivity
+import boundary holds package-wide) — and ``prune_gallery_orphans``, the
+idempotent startup reclaim of orphan gallery files and unclaimable gallery
+job records.
 """
 
+import uuid
+from pathlib import Path
+
+from django.conf import settings
 from django.db import transaction
 
 from world.observability import log_error, log_info, log_warn
 
-from world.art.queue import ensure as queue_ensure
+from world.art import gallery as gallery_api
+from world.art.paths import resolved_under_store_root
+from world.art.queue import (
+    ensure as queue_ensure,
+    enqueue_gallery_job,
+    is_gallery_job,
+)
+from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import (
     ArtSubjectError,
     character_ages,
     character_subject_for,
     description_for,
+    parse_subject,
     monster_subject_for,
     scene_subject_for,
 )
@@ -237,3 +257,142 @@ def art_sync_all() -> None:
         _recover_named_portraits()
     except Exception as error:  # pragma: no cover - defensive startup isolation
         log_error("art_startup_recovery_failed", context={"scope": "portrait-recovery"}, exc=error)
+
+
+def request_gallery_image(entity, *, binding=None, face_rect=None) -> str:
+    """Validate, mint, and enqueue exactly one gallery image request.
+
+    The ONLY gameplay-reachable entry point for gallery generation
+    (change ``gallery-generation-jobs``). Derives the subject through the
+    existing typed producer, re-checks the canonical age pair exactly as the
+    classic portrait ensure does, and validates the binding and face
+    rectangle through the ``world/art/gallery.py`` validators BEFORE any
+    queue write — every rejection raises a typed error at this boundary and
+    leaves no record, no file, no card, and no rendered prompt behind. The
+    freshly minted lowercase-uuid ``image_id`` keys one independent job
+    (two requests, two jobs).
+
+    Deliberately never imports or consults ``world.art.connectivity``: an
+    unreachable sd-webui server is a reported ``failed`` settle carrying its
+    bounded named error code on the subject's gallery record (design §12.3.1),
+    not a gate. The caller-side failure isolation is the existing post-commit
+    pattern the auto-generation retrofit wires: because every rejection
+    raises before any write, a wrapped call can never roll back committed
+    gameplay. Returns the minted ``image_id``.
+    """
+    subject = character_subject_for(entity)
+    if subject is None:
+        raise ArtSubjectError(
+            f"character {getattr(entity, 'key', entity)!r} carries no portrait subject"
+        )
+    age, _apparent_age = character_ages(entity)
+    binding = gallery_api.validate_binding(binding)
+    if face_rect is not None:
+        face_rect = gallery_api.validate_face_rect(face_rect)
+    image_id = str(uuid.uuid4())
+    description = description_for(subject, entity=entity, age=age)
+    # No field selection in this change: the requested-field provenance is
+    # the empty list until gallery-prompt-composition introduces selection.
+    enqueue_gallery_job(
+        subject,
+        description,
+        image_id=image_id,
+        binding=binding,
+        face_rect=face_rect,
+        requested_fields=[],
+    )
+    log_info(
+        "gallery_generate",
+        context={"subject": subject.full(), "image_id": image_id, "kind": subject.kind.value},
+    )
+    return image_id
+
+
+def _gallery_job_is_unclaimable(record) -> bool:
+    """True when a gallery job record can never be claimed or published again.
+
+    A whose-subject-no-longer-resolves row and a row whose status is neither
+    ``pending`` nor ``in_progress`` can never publish. A lease-expired
+    ``in_progress`` job is RETAINED — reclaiming it to ``pending`` is the
+    shared queue's lease-reclaim job, so a job whose worker died is retried,
+    not silently dropped.
+    """
+    try:
+        parse_subject(f"{record.db.kind}:{record.db.subject_key}")
+    except ArtSubjectError as error:
+        # The deletion decision is itself a bounded diagnostic.
+        log_warn(
+            "gallery_prune_unresolvable_subject",
+            context={"job": record.db_key},
+            exc=error,
+        )
+        return True
+    status = str(record.db.status or "")
+    return status not in (ArtAssetStatus.PENDING, ArtAssetStatus.IN_PROGRESS)
+
+
+def prune_gallery_orphans() -> dict:
+    """Idempotent startup reclaim of orphan gallery files and spent job records.
+
+    Deletes every file under the store root's ``gallery/`` tree that no card
+    of any gallery record references (read-only through the gallery API), and
+    every gallery job record that can
+    never be claimed or published again (unresolvable subject, or a status
+    outside ``pending``/``in_progress``). Every path is resolved through the
+    single store-root confinement helper, so nothing outside
+    ``ART_STORE_ROOT`` is ever unlinked, and a referenced file is NEVER
+    deleted. Every failure phase is bounded: an unreadable tree or a failing
+    deletion is a named diagnostic and the prune continues; the function
+    itself never raises, so startup never aborts because of it.
+    """
+    files_deleted = 0
+    records_deleted = 0
+    try:
+        referenced = gallery_api.referenced_stored_identities()
+    except Exception as error:  # noqa: BLE001 - bounded: skip the file phase, still prune records
+        referenced = set()
+        log_error("gallery_prune_failed", context={"phase": "references"}, exc=error)
+    try:
+        gallery_root = Path(settings.ART_STORE_ROOT) / "gallery"
+        if gallery_root.is_dir():
+            store_root = Path(settings.ART_STORE_ROOT)
+            for path in gallery_root.rglob("*"):
+                try:
+                    if not path.is_file():
+                        continue
+                    identity = path.relative_to(store_root).as_posix()
+                    if identity in referenced:
+                        continue
+                    if resolved_under_store_root(identity) is None:
+                        continue
+                    path.unlink()
+                    files_deleted += 1
+                except OSError as error:
+                    log_warn(
+                        "gallery_prune_failed",
+                        context={"phase": "file", "path": str(path)},
+                        exc=error,
+                    )
+    except Exception as error:  # noqa: BLE001 - an unreadable tree never aborts the prune
+        log_error("gallery_prune_failed", context={"phase": "tree"}, exc=error)
+    try:
+        for record in list(ArtAssetRecord.objects.all()):
+            try:
+                if not is_gallery_job(record):
+                    continue
+                if _gallery_job_is_unclaimable(record):
+                    record.delete()
+                    records_deleted += 1
+            except Exception as error:  # noqa: BLE001 - one bad record never stops the sweep
+                log_warn(
+                    "gallery_prune_failed",
+                    context={"phase": "record", "job": record.db_key},
+                    exc=error,
+                )
+    except Exception as error:  # noqa: BLE001 - bounded scan failure
+        log_error("gallery_prune_failed", context={"phase": "record-scan"}, exc=error)
+    log_info(
+        "gallery_orphans_pruned",
+        context={"files": files_deleted, "records": records_deleted},
+    )
+    return {"files": files_deleted, "records": records_deleted}

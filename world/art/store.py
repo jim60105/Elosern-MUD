@@ -62,3 +62,13 @@ class ArtAssetRecord(DefaultScript):
     # servers may not report one). settle_generated assigns it unconditionally
     # on publish, so a seedless regeneration never keeps a stale seed.
     seed: int | None = AttributeProperty(default=None)
+    # --- Gallery job fields (change gallery-generation-jobs) ---------------
+    # A record with a non-empty ``gallery_image_id`` is a GALLERY JOB record:
+    # it is keyed ``art:<full-subject-key>:gen:<image-id>`` (never the plain
+    # subject key), carries no ``output_identity`` / ``prior_output_identity``
+    # (its published artifact is a gallery card, not a record field), and is
+    # deleted the moment it reaches a terminal settle.
+    gallery_image_id: str = AttributeProperty(default="")
+    gallery_binding: dict | None = AttributeProperty(default=None)
+    gallery_face_rect: dict | None = AttributeProperty(default=None)
+    gallery_requested_fields: list = AttributeProperty(default=list)

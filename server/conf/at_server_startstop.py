@@ -67,6 +67,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "register_title_nomination_layer",
     "register_nomination_triggers",
     "art_sync_all",
+    "art_gallery_prune",
     "connect_art_push",
 )
 
@@ -466,6 +467,19 @@ def at_server_start():
     # policies (idempotent; failures are bounded internally, so the wrapper
     # keeps the pre-refactor fail-loud posture for unforeseen leaks).
     _startup_step("art_sync_all", lambda: _late("world.art.service", "art_sync_all"))
+
+    # Gallery orphan reclaim (gallery-generation-jobs): deletes unreferenced
+    # files under gallery/ and unclaimable gallery job records. The seam is
+    # internally bounded; the tolerant wrapper is the last-resort guard — an
+    # unforeseen prune failure must degrade at error level and NEVER abort
+    # the deterministic game's startup.
+    _startup_step(
+        "art_gallery_prune",
+        lambda: _late("world.art.service", "prune_gallery_orphans"),
+        fail_loud=False,
+        tolerant_on=_ALL_ERRORS,
+        degrade_level="error",
+    )
 
     # WebClient art completion push: re-entrant-safe via a stable dispatch UID.
     _startup_step(
