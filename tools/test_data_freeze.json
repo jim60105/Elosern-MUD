@@ -393,8 +393,6 @@
     "world/rules/tests/test_defeat_aftermath_violation.py",
     "world/rules/tests/test_dialogue.py",
     "world/rules/tests/test_dialogue_session.py",
-    "world/rules/tests/test_disengage.py",
-    "world/rules/tests/test_disengage_integration.py",
     "world/rules/tests/test_divine_mystery_gate.py",
     "world/rules/tests/test_effect_handlers.py",
     "world/rules/tests/test_effective_power.py",

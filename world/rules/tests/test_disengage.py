@@ -25,6 +25,7 @@ from world.rules.disengage import (
     _fastest_pursuer_agility,
     _handle_disengage,
 )
+from world.rules.combat_session import BASIC_ATTACK_KEY
 from world.rules.monster_behaviour import monster_behaviour_policy
 
 from .combat_fixtures import FakeEntity
@@ -226,7 +227,7 @@ class DisengageStagingTests(unittest.TestCase):
         self.assertNotIn("isinstance(context, Battlefield", source)
 
     def test_monster_policy_ignores_fled_enemies_without_modification(self):
-        monster = FakeMonster("monster", owned=["fire_ball"])
+        monster = FakeMonster("monster", owned=[BASIC_ATTACK_KEY])
         active = FakeEntity("active")
         fled = FakeEntity("fled")
         field = _field(monster, active, fled)
