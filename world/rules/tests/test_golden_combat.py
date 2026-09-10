@@ -15,7 +15,9 @@ from world.rules.combat import (
     _handle_damage,
     run_battle,
 )
+from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
 
+from ._combat_session_helpers import _race_key, synth_innate_overlay
 from .combat_fixtures import FakeEntity
 
 
@@ -78,14 +80,21 @@ class GoldenCombatTests(unittest.TestCase):
         self.assertEqual(result.total_seconds, 18)
 
 
+@synthetic_registries(
+    "skills",
+    "races",
+    "subraces",
+    "static_tiers",
+    extra=synth_innate_overlay(),
+)
 class GoldenResolverBattleTests(EvenniaTestCase):
     def _battlefield(self, suffix: str) -> Battlefield:
         first = create_object(PlayerCharacter, key=f"first-{suffix}")
         second = create_object(PlayerCharacter, key=f"second-{suffix}")
         for entity in (first, second):
-            entity.race = "human"
+            entity.race = _race_key()
             entity.apply_race_baseline()
-            entity.db.skills = {"active": ["shadow_slash"], "passive": []}
+            entity.db.skills = {"active": [SYNTH_SKILLS["t_ember_burst"].key], "passive": []}
         return Battlefield(
             {
                 "first": frozenset({first.key}),

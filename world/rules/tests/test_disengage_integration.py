@@ -24,20 +24,35 @@ from world.rules.overwhelm import (
     resolve_overwhelm,
     team_effective_power,
 )
+from world.tests.synthetic_data import SYNTH_SKILLS
 from world.rules.tests.combat_fixtures import grant_lineage
-from world.skills.registry import SKILL_REGISTRY
 
+from ._combat_session_helpers import (
+    _race_key,
+    _live_registry,
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
 
 class DisengageResolverIntegrationTests(EvenniaTestCase):
     def setUp(self):
+        open_synthetic_scope(
+            self,
+            "skills",
+            "elements",
+            "races",
+            "subraces",
+            "static_tiers",
+            extra=synth_innate_overlay(),
+        )
         super().setUp()
         self.actor = create_object(PlayerCharacter, key="actor")
         self.pursuer = create_object(PlayerCharacter, key="pursuer")
         for entity in (self.actor, self.pursuer):
-            entity.race = "human"
+            entity.race = _race_key()
             entity.apply_race_baseline()
-            # Human static magic_power at 術師 tier so the pursuer's
-            # element-gated fire_ball casts pass.
+            # Static magic_power raised to the spell-casting fixture level so
+            # the pursuer's element-gated synthetic cast passes.
             entity.traits.magic_power.base = 30
             entity.db.skills = {"active": [], "passive": []}
         self.field = Battlefield(
@@ -62,7 +77,7 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
         )
 
     def test_flee_definition_and_innate_ownership(self):
-        skill = SKILL_REGISTRY[FLEE_SKILL_KEY]
+        skill = synth_innate_overlay()["skills"][FLEE_SKILL_KEY]
         self.assertEqual(skill.cost, {})
         self.assertFalse(skill.usable_out_of_combat)
         self.assertIn(FLEE_SKILL_KEY, self.actor.skills.owned_keys())
@@ -176,14 +191,14 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
         self.assertEqual(self.actor.traits.atk_phys.value, before)
 
     def test_failed_flee_spends_turn_while_opponent_still_attacks(self):
-        grant_lineage(self.pursuer, ["fire_ball"])
+        grant_lineage(self.pursuer, [SYNTH_SKILLS["t_ember_burst"].key])
 
         def provider(entity, field):
             if entity is self.actor:
                 return self.request()
             return ActionRequest(
                 self.pursuer,
-                "fire_ball",
+                SYNTH_SKILLS["t_ember_burst"].key,
                 [self.actor],
                 BattlefieldActionContext(field),
             )
@@ -204,8 +219,11 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
         self.assertLess(self.actor.traits.hp.value, before)
 
     def test_overwhelm_recomputes_after_successful_flee(self):
-        self.pursuer.race = "elf"
-        self.pursuer.apply_race_baseline()
+        # A stat-dominant pursuer makes the opening verdict well-formed (the
+        # pursuing side overwhelms), so it is the successful flee — not a
+        # None verdict — that ends the encounter.
+        for key in ("atk_phys", "agility", "defense"):
+            getattr(self.pursuer.traits, key).base = 300
         self.actor.traits.agility.value = self.pursuer.traits.agility.value
 
         def provider(entity, field):

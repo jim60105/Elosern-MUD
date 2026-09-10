@@ -1,4 +1,6 @@
-"""Tests named one-to-one with combat modifier rule IDs."""
+"""Data-contract test: combat modifier rulebook content contract
+One-to-one binding tests for the shipped combat_modifiers.yaml rows:
+each rule names its shipped skill/gear trigger and its exact adjustment."""
 
 from tools.spec_traceability import covers_requirement
 

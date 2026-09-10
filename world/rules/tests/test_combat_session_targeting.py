@@ -18,20 +18,51 @@ from world.rules.combat_session import (
     read_session,
     submit_player_action,
 )
+from world.rules.disengage import FLEE_SKILL_KEY
+from world.tests.synthetic_data import SYNTH_SKILLS
 
-from ._combat_session_helpers import BattlefieldIsolation, _monster, _player
+from ._combat_session_helpers import (
+    SYNTH_SEAM_AREA_SKILL,
+    BattlefieldIsolation,
+    _monster,
+    _player,
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
 from .combat_fixtures import grant_lineage
+
+# Synthetic vehicles for the facade (test-data-independence): ANY-faction
+# single-target and AREA damage skills carry the same resolver semantics the
+# submitted skill keys used to.
+_T_ANY_SINGLE = SYNTH_SKILLS["t_ember_burst"].key
+_T_ANY_AREA = SYNTH_SEAM_AREA_SKILL.key
+
+
+def _scope_extra():
+    skills = dict(synth_innate_overlay()["skills"])
+    skills[SYNTH_SEAM_AREA_SKILL.key] = SYNTH_SEAM_AREA_SKILL
+    return {"skills": skills}
 
 
 class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
     """Regression tests for the explicit-list facade contract (tasks 2.2-2.3)."""
 
     def setUp(self):
+        open_synthetic_scope(
+            self,
+            "skills",
+            "elements",
+            "races",
+            "subraces",
+            "static_tiers",
+            "monster_tiers",
+            extra=_scope_extra(),
+        )
         super().setUp()
         self.room = create_object(Room, key="explicit arena")
         self.player = _player()
         self.player.location = self.room
-        grant_lineage(self.player, ["wind_blade", "fire_ball"])
+        grant_lineage(self.player, [_T_ANY_AREA, _T_ANY_SINGLE])
         self.monster_a = _monster("alpha", hp=100)
         self.monster_b = _monster("beta", hp=100)
         self.monster_a.location = self.room
@@ -56,7 +87,7 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
         _persist(self.player, record)
         with patch("world.rules.combat.roll_d100", return_value=100):
             result = submit_player_action(
-                self.player, "wind_blade", [self.monster_a, self.monster_b]
+                self.player, _T_ANY_AREA, [self.monster_a, self.monster_b]
             )
         self.assertIn(result["outcome"], ("round", "victory", "defeat"))
         self.assertGreaterEqual(read_session(self.player).rounds_elapsed, 1)
@@ -64,7 +95,7 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
     def test_approved_shorthand_reaches_ordinary_targeting(self):
         engage(self.player, self.monster_a)
         with patch("world.rules.combat.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "wind_blade", "all-enemies")
+            result = submit_player_action(self.player, _T_ANY_AREA, "all-enemies")
         self.assertIn(result["outcome"], ("round", "victory", "defeat"))
         self.assertLessEqual(self.monster_a.traits.hp.current, 99)
         self.assertGreaterEqual(read_session(self.player).rounds_elapsed, 1)
@@ -77,7 +108,7 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.roll_d100") as roll,
         ):
             result = submit_player_action(
-                self.player, "wind_blade", [self.monster_a, self.monster_a]
+                self.player, _T_ANY_AREA, [self.monster_a, self.monster_a]
             )
         roll.assert_not_called()
         self.assertEqual(result["outcome"], "rejected")
@@ -94,7 +125,7 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
         with patch("world.rules.clock.get_world_clock", return_value=clock):
             with self.assertRaises(CombatSessionError) as ctx:
                 submit_player_action(
-                    self.player, "fire_ball", [self.monster_a, remote]
+                    self.player, _T_ANY_SINGLE, [self.monster_a, remote]
                 )
         self.assertEqual(ctx.exception.args[0], SessionReason.NOT_PRESENT)
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)
@@ -118,18 +149,18 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
         # Freely-targetable (ANY) skills accept an ally as an explicit target;
         # the round resolves and the ally takes the damage instead of the
         # faction check rejecting it (friendly-fire reachability).
-        result = submit_player_action(self.player, "fire_ball", [ally])
+        result = submit_player_action(self.player, _T_ANY_SINGLE, [ally])
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
 
     def test_old_single_object_input_is_rejected(self):
         engage(self.player, self.monster_a)
         with self.assertRaises(TypeError):
-            submit_player_action(self.player, "fire_ball", self.monster_a)
+            submit_player_action(self.player, _T_ANY_SINGLE, self.monster_a)
 
     def test_self_facade_requires_empty_list(self):
         engage(self.player, self.monster_a)
         with patch("world.rules.disengage.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "flee", [])
+            result = submit_player_action(self.player, FLEE_SKILL_KEY, [])
         self.assertEqual(result["outcome"], "fled")
         self.assertIsNone(self.player.db.active_combat)

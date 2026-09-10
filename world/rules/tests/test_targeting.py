@@ -16,8 +16,34 @@ from world.rules.targeting import (
 )
 from world.skills.registry import (
     FactionConstraint,
-    SKILL_REGISTRY,
     TargetSpec,
+)
+from world.tests.synthetic_data import SYNTH_SKILLS, make_skill
+
+# File-local synthetic skill shapes (test-data-independence): the targeting
+# resolver takes the SkillDef as an argument and never consults the registry,
+# so invented rows exercise every target-spec/faction branch identically.
+_T_ANY_SINGLE = SYNTH_SKILLS["t_ember_burst"]  # SINGLE + ANY + damage
+_T_ANY_AREA = replace(
+    _T_ANY_SINGLE,
+    key="t_glitter_cascade",
+    label="瀉光瀑",
+    description="將熾燼化為覆蓋戰場的光瀑。",
+    target_spec=TargetSpec.AREA,
+)
+_T_ZERO_COST_SINGLE = replace(
+    SYNTH_SKILLS["t_cinder_cleave"],
+    key="t_plain_thrust",
+    label="樸刺",
+    description="毫無花樣地刺向單一目標。",
+    effects=["damage:physical:physical"],
+)
+_T_SELF_SHAPE = make_skill(
+    "t_bark_skin",
+    label="樹皮膚",
+    description="讓皮膚硬化如樹皮。",
+    target_spec=TargetSpec.SELF,
+    effects=["stat_multiply:defense:1.1"],
 )
 
 
@@ -75,7 +101,7 @@ class TargetingTests(unittest.TestCase):
         target = _Entity("target", room)
         context = RoomActionContext(room)
         self.assertIs(context.relation_to(actor, target), Relation.ALLY)
-        self.assertTrue(context.is_in_range(actor, target, SKILL_REGISTRY["fire_ball"]))
+        self.assertTrue(context.is_in_range(actor, target, _T_ANY_SINGLE))
 
     def test_area_filters_invalid_candidates(self):
         room = object()
@@ -83,7 +109,7 @@ class TargetingTests(unittest.TestCase):
         present = _Entity("present", room)
         absent = _Entity("absent", object())
         skill = replace(
-            SKILL_REGISTRY["wind_blade"],
+            _T_ANY_AREA,
             faction_constraint=FactionConstraint.ANY,
         )
         request = ActionRequest(actor, skill.key, [present, absent], RoomActionContext(room))
@@ -96,7 +122,7 @@ class TargetingTests(unittest.TestCase):
         absent = _Entity("absent", object())
         absent.traits.hp.value = 0
         skill = replace(
-            SKILL_REGISTRY["fire_ball"],
+            _T_ANY_SINGLE,
             target_spec=TargetSpec.SINGLE,
             faction_constraint=FactionConstraint.ANY,
         )
@@ -111,7 +137,7 @@ class TargetingTests(unittest.TestCase):
         item = _Entity("item", room)
         del item.traits.hp
         skill = replace(
-            SKILL_REGISTRY["fire_ball"],
+            _T_ANY_SINGLE,
             faction_constraint=FactionConstraint.ANY,
         )
         request = ActionRequest(actor, skill.key, [item], RoomActionContext(room))
@@ -125,7 +151,7 @@ class TargetingTests(unittest.TestCase):
         actor = _Entity("actor", room)
         target = _Entity("target", room)
         skill = replace(
-            SKILL_REGISTRY["fire_ball"],
+            _T_ANY_SINGLE,
             faction_constraint=FactionConstraint.SELF_ONLY,
         )
         room_request = ActionRequest(
@@ -165,7 +191,7 @@ class TargetingTests(unittest.TestCase):
         self_entity = _Entity("self", room)
         ally = _Entity("ally", room)
         enemy = _Entity("enemy", room)
-        skill = SKILL_REGISTRY["fire_ball"]
+        skill = _T_ANY_SINGLE
 
         class _Context(RoomActionContext):
             battlefield = object()
@@ -193,7 +219,7 @@ class TargetingTests(unittest.TestCase):
         actor = _Entity("actor", room)
         ally = _Entity("ally", room)
         skill = replace(
-            SKILL_REGISTRY["fire_ball"],
+            _T_ANY_SINGLE,
             faction_constraint=FactionConstraint.SELF_ONLY,
         )
         request = ActionRequest(actor, skill.key, [ally], RoomActionContext(room))
@@ -228,7 +254,7 @@ class TightenedShapeTests(unittest.TestCase):
     def test_none_rejects_supplied_targets(self):
         actor = self._actor()
         skill = replace(
-            SKILL_REGISTRY["basic_attack"], target_spec=TargetSpec.NONE
+            _T_ZERO_COST_SINGLE, target_spec=TargetSpec.NONE
         )
         target = self._target()
         request = self._request(actor, skill.key, [target])
@@ -241,7 +267,7 @@ class TightenedShapeTests(unittest.TestCase):
 
     def test_self_accepts_empty_or_actor_only(self):
         actor = self._actor()
-        skill = SKILL_REGISTRY["body_enhancement"]
+        skill = _T_SELF_SHAPE
         request = self._request(actor, skill.key, [])
         self.assertEqual(resolve_targets(request, skill, []), [actor])
 
@@ -256,7 +282,7 @@ class TightenedShapeTests(unittest.TestCase):
 
     def test_single_rejects_non_unit_cardinality(self):
         actor = self._actor()
-        skill = SKILL_REGISTRY["basic_attack"]
+        skill = _T_ZERO_COST_SINGLE
         request = self._request(actor, skill.key, [])
         with self.assertRaises(RejectedAction) as caught:
             resolve_targets(request, skill, [])
@@ -264,7 +290,7 @@ class TightenedShapeTests(unittest.TestCase):
 
     def test_single_rejects_shorthand_even_when_one_target(self):
         actor = self._actor()
-        skill = replace(SKILL_REGISTRY["basic_attack"], target_spec=TargetSpec.SINGLE)
+        skill = replace(_T_ZERO_COST_SINGLE, target_spec=TargetSpec.SINGLE)
         roster = {actor.key: actor}
         context = _BattlefieldContext(object(), roster)
         request = self._request(actor, skill.key, "all-enemies", context)
@@ -277,7 +303,7 @@ class TightenedShapeTests(unittest.TestCase):
     def test_area_rejects_duplicate_explicit_targets(self):
         actor = self._actor()
         target = self._target()
-        skill = replace(SKILL_REGISTRY["wind_blade"], faction_constraint=FactionConstraint.ANY)
+        skill = replace(_T_ANY_AREA, faction_constraint=FactionConstraint.ANY)
         request = self._request(actor, skill.key, [target, target])
         with self.assertRaises(RejectedAction) as caught:
             resolve_targets(request, skill, [target, target])
@@ -285,7 +311,7 @@ class TightenedShapeTests(unittest.TestCase):
 
     def test_area_rejects_empty_explicit_input(self):
         actor = self._actor()
-        skill = SKILL_REGISTRY["wind_blade"]
+        skill = _T_ANY_AREA
         request = self._request(actor, skill.key, [])
         with self.assertRaises(RejectedAction) as caught:
             resolve_targets(request, skill, [])
@@ -297,7 +323,7 @@ class TightenedShapeTests(unittest.TestCase):
         present = _Entity("present", room)
         absent = _Entity("absent", object())
         skill = replace(
-            SKILL_REGISTRY["wind_blade"],
+            _T_ANY_AREA,
             faction_constraint=FactionConstraint.ANY,
         )
         request = ActionRequest(actor, skill.key, [present, absent], RoomActionContext(room))
@@ -309,7 +335,7 @@ class TightenedShapeTests(unittest.TestCase):
         dead = _Entity("dead", room)
         dead.traits.hp.value = 0
         skill = replace(
-            SKILL_REGISTRY["wind_blade"],
+            _T_ANY_AREA,
             faction_constraint=FactionConstraint.ANY,
         )
         request = ActionRequest(actor, skill.key, [dead], RoomActionContext(room))
@@ -323,7 +349,7 @@ class TightenedShapeTests(unittest.TestCase):
         actor = _Entity("actor", room)
         ally = _Entity("ally", room)
         skill = replace(
-            SKILL_REGISTRY["wind_blade"],
+            _T_ANY_AREA,
             faction_constraint=FactionConstraint.ANY,
         )
         # RoomActionContext reports Relation.ALLY for co-located non-self
