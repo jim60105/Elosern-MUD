@@ -137,6 +137,10 @@
       "reason": "affinity config validation contract"
     },
     {
+      "path": "world/rules/tests/test_buffs.py",
+      "reason": "buff rulebook content contract"
+    },
+    {
       "path": "world/rules/tests/test_clock.py",
       "reason": "clock rulebook contract"
     },

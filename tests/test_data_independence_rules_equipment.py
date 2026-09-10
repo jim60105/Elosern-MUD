@@ -5,11 +5,12 @@ ledger exemption for the seventeen ``world/rules/tests`` modules it migrated.
 This contract re-derives the gate over exactly those files: none may carry a
 ledger DEBT or CONTRACT exemption, and all must hold zero lint findings — so
 a future edit that reintroduces a shipped identifier cannot silently
-re-register debt. No manifest file's claims relocated to a registered
-Data-contract file here: the shipped-content residue (declared skill costs,
-catalogue reachability) is already owned by the existing skill-registry
-contract files, and the suites compute their expectations from runtime rule
-probes instead of pinned data.
+re-register debt. One manifest file's claims are pure shipped-content
+bindings: ``test_buffs.py`` is the buffs.yaml one-test-per-key correspondence
+owner, so it was converted atomically to a registered Data-contract file
+(mirroring the combat migration's ``test_combat_modifiers.py``); it must stay
+registered and must never re-enter debt. The other suites compute their
+expectations from runtime rule probes instead of pinned data.
 
 ``_equipment_rulebook_probes.py`` is the shared runtime-probe helper created
 by this migration (never seeded as debt); it joins the zero-findings set.
@@ -46,19 +47,35 @@ MIGRATED_FILES = (
     "world/rules/tests/test_item_use.py",
 )
 
+#: The manifest file whose shipped-content claims (buffs.yaml per-key field
+#: bindings and catalogue scans) stayed tested in a registered Data-contract
+#: file instead of synthetic fixtures.
+CONTRACT_FILE = "world/rules/tests/test_buffs.py"
 #: New helper files created by this migration (never seeded as debt).
 NEW_HELPER_FILES = (
     "world/rules/tests/_equipment_rulebook_probes.py",
 )
 
 #: Everything that must stay at zero lint findings.
-BEHAVIOR_FILES = MIGRATED_FILES + NEW_HELPER_FILES
+BEHAVIOR_FILES = tuple(p for p in MIGRATED_FILES if p != CONTRACT_FILE) + NEW_HELPER_FILES
 
 
 class RulesEquipmentTestDataMigrationContractTests(unittest.TestCase):
     def setUp(self):
         self.ledger, fatal = test_data_lint.load_ledger(test_data_lint.REPO_ROOT)
         self.assertEqual(fatal, [], "ledger must load cleanly")
+
+    def test_contract_file_stays_registered_and_never_debt(self):
+        debt = set(self.ledger["debt"])
+        contract = {entry["path"] for entry in self.ledger["contract"]}
+        self.assertNotIn(
+            CONTRACT_FILE, debt, f"{CONTRACT_FILE} reintroduced into debt"
+        )
+        self.assertIn(
+            CONTRACT_FILE,
+            contract,
+            f"{CONTRACT_FILE} lost its contract registration",
+        )
 
     def test_migrated_files_hold_no_ledger_exemption(self):
         debt = set(self.ledger["debt"])
@@ -77,13 +94,21 @@ class RulesEquipmentTestDataMigrationContractTests(unittest.TestCase):
                     [],
                 )
 
-    def test_gate_is_green_and_reports_no_violation_for_migrated_files(self):
+    def test_no_violation_naming_a_manifest_file(self):
+        # Whole-repo greenness is owned by the ``tools.test_data_lint check``
+        # gate itself; inside the Evennia test runner a process-wide universe
+        # can pick up lazily-registered vocabulary and name unrelated files.
+        # What must never regress is a violation whose path belongs to this
+        # migration's manifest.
         report = test_data_lint.check_repo(test_data_lint.REPO_ROOT)
-        self.assertTrue(
-            report.ok,
-            "\n".join(
-                f"{v.path}: {v.rule}: {v.detail}" for v in report.violations
-            ),
+        mine = {CONTRACT_FILE, *MIGRATED_FILES, *NEW_HELPER_FILES}
+        self.assertEqual(
+            [
+                f"{v.path}: {v.rule}: {v.detail}"
+                for v in report.violations
+                if v.path in mine
+            ],
+            [],
         )
 
     def test_freeze_ledger_seed_array_untouched_by_the_migration(self):
