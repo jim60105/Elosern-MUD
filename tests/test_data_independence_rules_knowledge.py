@@ -15,14 +15,15 @@ finding-free.
 ``_knowledge_probes.py`` is the shared synthetic-catalog probe helper created
 by this migration (never seeded as debt); it joins the zero-findings set.
 
-The canonical requirement-id annotation is added in the archive/sync commit
-once this change's delta lands in ``openspec/specs``.
+Annotated with the canonical requirement id added when this change's delta
+was archived/synced into ``openspec/specs``.
 """
 
 from pathlib import Path
 import unittest
 
 from tools import test_data_lint
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -56,6 +57,10 @@ class RulesKnowledgeTestDataMigrationContractTests(unittest.TestCase):
         self.ledger, fatal = test_data_lint.load_ledger(test_data_lint.REPO_ROOT)
         self.assertEqual(fatal, [], "ledger must load cleanly")
 
+    @covers_requirement(
+        "test-data-independence::"
+        "knowledge-title-and-view-behavior-tests-resolve-game-data-through-synthetic-fixtures"
+    )
     def test_migrated_files_hold_no_ledger_exemption(self):
         debt = set(self.ledger["debt"])
         contract = {entry["path"] for entry in self.ledger["contract"]}
@@ -63,6 +68,10 @@ class RulesKnowledgeTestDataMigrationContractTests(unittest.TestCase):
             self.assertNotIn(path, debt, f"{path} reintroduced into debt")
             self.assertNotIn(path, contract, f"{path} registered as contract")
 
+    @covers_requirement(
+        "test-data-independence::"
+        "knowledge-title-and-view-behavior-tests-resolve-game-data-through-synthetic-fixtures"
+    )
     def test_migrated_files_carry_zero_findings(self):
         universe = test_data_lint.derive_universe(test_data_lint.REPO_ROOT)
         for path in BEHAVIOR_FILES:
