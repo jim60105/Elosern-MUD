@@ -8,7 +8,8 @@ import unittest
 from unittest.mock import patch
 
 from world.rules.combat import Battlefield, effective_power
-from world.rules import overwhelm
+from world.rules import combat_modifiers, overwhelm
+from world.rules.rulebook.schema import Rule
 from world.rules.overwhelm import (
     _agility_saturation,
     _decided_direction,
@@ -21,13 +22,13 @@ from world.rules.overwhelm import (
     team_effective_power,
 )
 from world.skills.registry import (
-    SKILL_REGISTRY,
     SkillCategory,
     SkillDef,
     SkillKind,
     TargetSpec,
 )
 
+from ._combat_session_helpers import live_skill_registry
 from .combat_fixtures import FakeEntity
 
 
@@ -179,13 +180,33 @@ class HitRateTests(unittest.TestCase):
         "combat-modifier-table::damage-estimation-surfaces-mirror-the-live-adjusted-damage-math"
     )
     def test_estimate_terms_include_the_flat_bundle_bonuses(self):
+        # Synthetic ownership doctrines: file-local rule-table rows (the same
+        # shape every shipped flat ownership bonus uses — see
+        # test_damage_effect_handler's guardian stand-in) keyed to invented
+        # skill keys the fixtures own directly. The expected estimate names
+        # the +5 bonuses these local rows declare.
+        rules = [
+            Rule(
+                "t_drill_mastery_bonus",
+                {"skill_owned": "t_drill_mastery"},
+                {"atk_phys": 5},
+            ),
+            Rule(
+                "t_shell_doctrine_bonus",
+                {"skill_owned": "t_shell_doctrine"},
+                {"defense": 5},
+            ),
+        ]
         attacker = FakeEntity(
             "attacker", atk_phys=20, agility=10
         )
-        attacker.skills._owned = ["retainer_martial_training"]
+        attacker.skills._owned = ["t_drill_mastery"]
         defender = FakeEntity("defender", defense=5, agility=10)
-        defender.skills._owned = ["guardian_instinct"]
-        estimate = _expected_damage_per_attack(attacker, defender)
+        defender.skills._owned = ["t_shell_doctrine"]
+        with patch.object(
+            combat_modifiers, "_RULES", list(combat_modifiers._RULES) + rules
+        ):
+            estimate = _expected_damage_per_attack(attacker, defender)
         self.assertAlmostEqual(estimate, 0.5 * (round((20 + 5) * 1.0) - (5 + 5)))
 
 
@@ -218,7 +239,7 @@ class RoundEstimateTests(unittest.TestCase):
             )
             for index in range(3)
         ]
-        calamity = FakeEntity("calamity", hp=10000, atk_phys=100, agility=92)
+        apex = FakeEntity("t_apex_raider", hp=10000, atk_phys=100, agility=92)
         humans = [
             FakeEntity(
                 f"human-{index}",
@@ -250,7 +271,7 @@ class RoundEstimateTests(unittest.TestCase):
             )
             self.assertAlmostEqual(
                 estimated_rounds_to_conclude(
-                    battlefield([calamity], humans),
+                    battlefield([apex], humans),
                     "first",
                     "second",
                 ),
@@ -435,7 +456,7 @@ class CommandedDamageQueryTests(unittest.TestCase):
         )
 
     def query(self, field, skill_key, target_keys):
-        with patch.dict(SKILL_REGISTRY, QUERY_SKILLS):
+        with patch.dict(live_skill_registry(), QUERY_SKILLS):
             return commanded_damage_reaches_enemy(
                 field, "actor", skill_key, target_keys
             )
@@ -484,7 +505,7 @@ class CommandedDamageQueryTests(unittest.TestCase):
         del stale.roster["enemy"]
         self.assertFalse(self.query(stale, "q_damage", ["enemy"]))
         # An actor key on no team defines no opposing team at all.
-        with patch.dict(SKILL_REGISTRY, QUERY_SKILLS):
+        with patch.dict(live_skill_registry(), QUERY_SKILLS):
             self.assertFalse(
                 commanded_damage_reaches_enemy(
                     field, "not-in-teams", "q_damage", ["enemy"]
@@ -548,7 +569,7 @@ class CommandedDamageQueryTests(unittest.TestCase):
         self.assertFalse(self.query(moved, "q_damage", ["enemy"]))
         weakened = dict(QUERY_SKILLS)
         weakened["q_damage"] = _skill_def("q_damage", ["buff_apply:fixture_focus"])
-        with patch.dict(SKILL_REGISTRY, weakened):
+        with patch.dict(live_skill_registry(), weakened):
             self.assertFalse(
                 commanded_damage_reaches_enemy(
                     self.field(), "actor", "q_damage", ["enemy"]

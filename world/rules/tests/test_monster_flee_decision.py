@@ -22,11 +22,42 @@ from world.rules.monster_behaviour import (
     resolve_behaviour_profile,
 )
 
+from ._combat_session_helpers import (
+    SYNTH_GLOW_ELEMENT,
+    open_synthetic_scope,
+    synth_damage_skill,
+)
 from .combat_fixtures import FakeEntity, FakeGauge
 from .test_monster_behaviour_policy import FakeMonster, _field
 
 
+# One file-local affordable damage skill (12 MP, magic-scaled): every
+# affordability/threshold fixture below spends its own hp/mp numbers
+# against it, and the FakeMonster fixture's magic_power makes it eligible.
+_T_STRIKE = synth_damage_skill(
+    "t_flee_strike",
+    "合成突擊",
+    effects=[f"damage:{SYNTH_GLOW_ELEMENT}:magic"],
+    cost={"mp": 12},
+)
+_SCOPE_EXTRA = {"skills": {_T_STRIKE.key: _T_STRIKE}}
+
+
+def _apex_tier() -> str:
+    """The shipped tier whose DEFAULT archetype declares no flee threshold."""
+    return next(
+        tier
+        for tier, archetype in MONSTER_BEHAVIOUR_YAML[
+            "tier_default_archetype"
+        ].items()
+        if BEHAVIOUR_PROFILES[archetype].flee_hp_fraction is None
+    )
+
+
 class MonsterFleeProfileTests(unittest.TestCase):
+    def setUp(self):
+        open_synthetic_scope(self, "skills", "elements", extra=_SCOPE_EXTRA)
+
     @covers_requirement("monster-flee-policy::every-monster-behaviour-archetype-declares-a-validated-flee-threshold")
     def test_shipped_thresholds_and_tier_defaults_are_valid(self):
         self.assertEqual(
@@ -123,13 +154,13 @@ class MonsterFleeProfileTests(unittest.TestCase):
             "default",
             hp=30,
             max_hp=100,
-            owned=["fire_ball"],
+            owned=[_T_STRIKE.key],
         )
         override = FakeMonster(
             "override",
             hp=30,
             max_hp=100,
-            owned=["fire_ball"],
+            owned=[_T_STRIKE.key],
             behaviour_tree="brute",
         )
         enemy = FakeEntity("enemy")
@@ -151,7 +182,7 @@ class MonsterFleeProfileTests(unittest.TestCase):
         )
         self.assertEqual(
             monster_behaviour_policy(override, _field(override, [enemy])).skill_key,
-            "fire_ball",
+            _T_STRIKE.key,
         )
         self.assertEqual(
             (
@@ -174,6 +205,9 @@ class MonsterFleeProfileTests(unittest.TestCase):
 
 
 class MonsterFleePolicyTests(unittest.TestCase):
+    def setUp(self):
+        open_synthetic_scope(self, "skills", "elements", extra=_SCOPE_EXTRA)
+
     @staticmethod
     def _request(
         *,
@@ -189,7 +223,7 @@ class MonsterFleePolicyTests(unittest.TestCase):
             max_hp=max_hp,
             threat_tier=threat_tier,
             behaviour_tree=behaviour_tree,
-            owned=["fire_ball"] if owned is None else owned,
+            owned=[_T_STRIKE.key] if owned is None else owned,
         )
         enemy = FakeEntity("enemy")
         battlefield = _field(monster, [enemy])
@@ -198,15 +232,45 @@ class MonsterFleePolicyTests(unittest.TestCase):
             battlefield,
         )
 
+    @staticmethod
+    def _profile_for_tier(tier: str):
+        return BEHAVIOUR_PROFILES[
+            MONSTER_BEHAVIOUR_YAML["tier_default_archetype"][tier]
+        ]
+
     def test_threshold_boundary_above_boundary_and_null_profile(self):
-        _, _, _, boundary = self._request(hp=35)
+        boundary_hp = round(self._profile_for_tier("low").flee_hp_fraction * 100)
+        _, _, _, boundary = self._request(hp=boundary_hp)
         self.assertEqual(boundary.skill_key, FLEE_SKILL_KEY)
-        _, _, _, above = self._request(hp=36)
-        self.assertEqual(above.skill_key, "fire_ball")
-        _, _, _, below = self._request(hp=34)
+        _, _, _, above = self._request(hp=boundary_hp + 1)
+        self.assertEqual(above.skill_key, _T_STRIKE.key)
+        _, _, _, below = self._request(hp=boundary_hp - 1)
         self.assertEqual(below.skill_key, FLEE_SKILL_KEY)
-        _, _, _, apex = self._request(hp=1, threat_tier="calamity")
-        self.assertEqual(apex.skill_key, "fire_ball")
+        _, _, _, apex = self._request(hp=1, threat_tier=_apex_tier())
+        self.assertEqual(apex.skill_key, _T_STRIKE.key)
+
+    def test_boundary_is_inclusive_for_every_thresholded_tier(self):
+        # Same inclusive-boundary mechanic as above, swept over every tier
+        # whose default archetype declares a threshold (data-independent:
+        # the thresholds and the apex tier are read from the live rulebook).
+        for tier in MONSTER_BEHAVIOUR_YAML["tier_default_archetype"]:
+            threshold = self._profile_for_tier(tier).flee_hp_fraction
+            if threshold is None:
+                continue
+            with self.subTest(tier=tier):
+                edge = round(threshold * 100)
+                self.assertEqual(
+                    self._request(hp=edge, threat_tier=tier)[3].skill_key,
+                    FLEE_SKILL_KEY,
+                )
+                self.assertEqual(
+                    self._request(hp=edge + 1, threat_tier=tier)[3].skill_key,
+                    _T_STRIKE.key,
+                )
+
+    def test_null_threshold_tier_never_flees(self):
+        _, _, _, apex = self._request(hp=1, threat_tier=_apex_tier())
+        self.assertEqual(apex.skill_key, _T_STRIKE.key)
 
     @covers_requirement("monster-flee-policy::the-policy-checks-current-to-maximum-true-hp-at-an-inclusive-boundary")
     def test_non_positive_maximum_does_not_divide_or_choose_flee(self):
@@ -215,11 +279,11 @@ class MonsterFleePolicyTests(unittest.TestCase):
         monster.traits.hp._data["base"] = 0
         enemy = FakeEntity("enemy")
         request = monster_behaviour_policy(monster, _field(monster, [enemy]))
-        self.assertEqual(request.skill_key, "fire_ball")
+        self.assertEqual(request.skill_key, _T_STRIKE.key)
 
     @covers_requirement("monster-flee-policy::flee-selection-has-priority-over-attack-selection-without-consuming-decision-dice")
     def test_flee_precedes_skill_selection_and_consumes_no_policy_roll(self):
-        monster = FakeMonster("monster", hp=20, max_hp=100, owned=["flight"])
+        monster = FakeMonster("monster", hp=20, max_hp=100, owned=[_T_STRIKE.key])
         enemies = [FakeEntity("first"), FakeEntity("second")]
         battlefield = _field(monster, enemies)
         with patch("world.rules.monster_behaviour.dice.roll_d100") as roller:
@@ -237,7 +301,9 @@ class MonsterFleePolicyTests(unittest.TestCase):
     @covers_requirement("monster-flee-policy::a-flee-decision-is-a-complete-actionresolver-request-and-never-a-state-mutation")
     @covers_requirement("monster-flee-policy::monster-flee-decisions-remain-deterministic-offline-and-yaml-tuned")
     def test_request_shape_and_policy_purity(self):
-        monster, _, battlefield, request = self._request(hp=35)
+        monster, _, battlefield, request = self._request(
+            hp=int(self._profile_for_tier("low").flee_hp_fraction * 100)
+        )
         monster.traits.hp._data["last_regen_at"] = 123
         monster.sexual_state = {"arousal": "平靜"}
         monster.buffs_state = {"poison": {"stacks": 1}}
@@ -278,21 +344,30 @@ class MonsterFleePolicyTests(unittest.TestCase):
 
     @covers_requirement("monster-flee-policy::flee-tuning-follows-existing-tier-defaults-and-instance-overrides")
     def test_all_tier_defaults_and_override_have_reproducible_decisions(self):
-        cases = {
-            "low": (35, FLEE_SKILL_KEY),
-            "mid": (20, FLEE_SKILL_KEY),
-            "high": (10, FLEE_SKILL_KEY),
-            "calamity": (1, "fire_ball"),
-        }
-        for tier, (hp, expected_skill) in cases.items():
+        for tier in MONSTER_BEHAVIOUR_YAML["tier_default_archetype"]:
+            threshold = self._profile_for_tier(tier).flee_hp_fraction
+            expected = (
+                FLEE_SKILL_KEY if threshold is not None else _T_STRIKE.key
+            )
+            hp = 1 if threshold is None else round(threshold * 100)
             with self.subTest(tier=tier):
                 first = self._request(hp=hp, threat_tier=tier)[3]
                 second = self._request(hp=hp, threat_tier=tier)[3]
-                self.assertEqual(first.skill_key, expected_skill)
+                self.assertEqual(first.skill_key, expected)
                 self.assertEqual(first.skill_key, second.skill_key)
+        # An override archetype with a lower threshold keeps the same
+        # decision rule: at its own boundary the monster flees.
+        overriding_tier = next(
+            tier
+            for tier, archetype in MONSTER_BEHAVIOUR_YAML[
+                "tier_default_archetype"
+            ].items()
+            if archetype != "tactical_caster"
+            and BEHAVIOUR_PROFILES[archetype].flee_hp_fraction is not None
+        )
         override = self._request(
-            hp=20,
-            threat_tier="high",
+            hp=round(BEHAVIOUR_PROFILES["tactical_caster"].flee_hp_fraction * 100),
+            threat_tier=overriding_tier,
             behaviour_tree="tactical_caster",
         )[3]
         self.assertEqual(override.skill_key, FLEE_SKILL_KEY)

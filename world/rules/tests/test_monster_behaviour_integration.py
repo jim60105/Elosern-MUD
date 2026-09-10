@@ -11,11 +11,16 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
+from world.rules.combat_session import BASIC_ATTACK_KEY
 from world.rules.action import ActionResolver
 from world.rules.combat import Battlefield, _max_hp, _stored_hp, run_round
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.event_log import EventLog
-from world.rules.monster_behaviour import monster_behaviour_policy
+from world.rules.monster_behaviour import (
+    BEHAVIOUR_PROFILES,
+    MONSTER_BEHAVIOUR_YAML,
+    monster_behaviour_policy,
+)
 from world.rules.overwhelm import (
     OverwhelmResult,
     classify_overwhelm,
@@ -23,17 +28,47 @@ from world.rules.overwhelm import (
     team_effective_power,
 )
 
+from ._combat_session_helpers import open_synthetic_scope, synth_innate_overlay
 from .combat_fixtures import FakeEntity
-from .test_monster_behaviour_policy import FakeMonster
+from .test_monster_behaviour_policy import (
+    FakeMonster,
+    _SCOPE_EXTRA,
+    _T_CLAW,
+    _T_SPELL,
+)
+
+
+def _scope_extra():
+    """Kit rows plus the runtime-keyed innate attack/flee rows.
+
+    The resolver reaches for ``BASIC_ATTACK_KEY``/``FLEE_SKILL_KEY`` on
+    every monster turn, so any scope whose requests may RESOLVE must carry
+    synthetic rows under those runtime keys.
+    """
+    extra = {logical: dict(rows) for logical, rows in _SCOPE_EXTRA.items()}
+    extra["skills"].update(synth_innate_overlay()["skills"])
+    return extra
+
+
+def _expected_default_skill(tier: str) -> str:
+    """The skill the tier's DEFAULT archetype must produce at near-zero hp.
+
+    A profile with a flee threshold flees; the null-threshold apex tier is
+    built with zero magic_power and zero sp, so the only damage skill it can
+    afford is the innate attack row — the highest-expected-damage choice.
+    """
+    profile = BEHAVIOUR_PROFILES[MONSTER_BEHAVIOUR_YAML["tier_default_archetype"][tier]]
+    return FLEE_SKILL_KEY if profile.flee_hp_fraction is not None else BASIC_ATTACK_KEY
 
 
 class MonsterBehaviourIntegrationTests(unittest.TestCase):
     def setUp(self):
+        open_synthetic_scope(self, "skills", "elements", extra=_SCOPE_EXTRA)
         self.monster = FakeMonster(
             "monster",
             hp=10000,
             max_hp=10000,
-            owned=["shadow_slash"],
+            owned=[_T_CLAW.key],
             atk_phys=1000,
             agility=1000,
             defense=1000,
@@ -50,7 +85,7 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
 
     @covers_requirement("monster-action-policy::monster-behaviour-policy-is-a-complete-drop-in-action-provider")
     def test_run_round_resolves_policy_request(self):
-        log = EventLog("monster", "shadow_slash", ("enemy",), (), 6)
+        log = EventLog("monster", _T_CLAW.key, ("enemy",), (), 6)
         result = type(
             "Result",
             (),
@@ -101,7 +136,7 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
                 max_rounds=1,
             )
         self.assertIsInstance(result, OverwhelmResult)
-        self.assertEqual(observed[0].skill_key, "shadow_slash")
+        self.assertEqual(observed[0].skill_key, _T_CLAW.key)
         self.assertEqual(observed[0].targets, [self.enemy])
 
     @covers_requirement("monster-action-policy::a-monster-with-zero-actions-per-turn-is-skipped-by-the-existing-gate-with-no")
@@ -128,12 +163,16 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
 
 
 class MonsterBehaviourResolverIntegrationTests(EvenniaTestCase):
+    def setUp(self):
+        open_synthetic_scope(self, "skills", "elements", extra=_scope_extra())
+        super().setUp()
+
     def test_depleted_resource_falls_back_and_resolves(self):
         monster = create_object(Monster, key="resource-monster")
         monster.threat_tier = "mid"
         monster.apply_monster_tier()
         monster.db.skills = {
-            "active": ["wind_blade", "shadow_slash"],
+            "active": [_T_CLAW.key, _T_SPELL.key],
             "passive": [],
         }
         monster.traits.mp.current = 0
@@ -151,15 +190,16 @@ class MonsterBehaviourResolverIntegrationTests(EvenniaTestCase):
             {monster.key: monster, target.key: target},
         )
 
-        # The mid-tier pack-hunter profile picks by highest expected damage, and
-        # both affordable single-target physical skills tie at the same attack
-        # value, so the dice tie-break must be pinned for a deterministic test.
+        # The mid-tier pack-hunter profile picks by highest expected damage.
+        # The mp-costing spell is unaffordable; the zero-cost physical strike
+        # and the innate attack row tie on expected damage, so the dice
+        # tie-break must be pinned to the first owned candidate.
         with patch(
             "world.rules.monster_behaviour.dice.roll_d100",
             return_value=0,
         ):
             request = monster_behaviour_policy(monster, battlefield)
-        self.assertEqual(request.skill_key, "shadow_slash")
+        self.assertEqual(request.skill_key, _T_CLAW.key)
         with patch(
             "world.rules.combat.evaluate_combat_modifiers",
             return_value={},
@@ -170,6 +210,7 @@ class MonsterBehaviourResolverIntegrationTests(EvenniaTestCase):
 
 class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
     def setUp(self):
+        open_synthetic_scope(self, "skills", "elements", extra=_scope_extra())
         super().setUp()
         self.monster = create_object(Monster, key="flee-monster")
         self.monster.threat_tier = "low"
@@ -193,7 +234,9 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
         self.assertEqual(self.monster.threat_tier, "low")
         self.assertLessEqual(
             _stored_hp(self.monster) / _max_hp(self.monster),
-            0.35,
+            BEHAVIOUR_PROFILES[
+                MONSTER_BEHAVIOUR_YAML["tier_default_archetype"]["low"]
+            ].flee_hp_fraction,
         )
 
     def test_generated_flee_request_is_registered_and_resolves(self):
@@ -283,23 +326,39 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
         self.assertEqual(result.verdict_after, "party")
 
     def test_tier_default_and_override_decisions_have_fixed_outcomes(self):
-        # The calamity apex predator has no magic level, so the innate
-        # physical `basic_attack` is its highest-expected-damage choice over a
-        # zero-magic `fire_ball` (deliberate second-innate update, task 7.13).
-        cases = (
-            ("low", None, FLEE_SKILL_KEY),
-            ("mid", None, FLEE_SKILL_KEY),
-            ("high", None, FLEE_SKILL_KEY),
-            ("calamity", None, "basic_attack"),
-            ("high", "tactical_caster", FLEE_SKILL_KEY),
+        # Every near-zero-hp monster follows its tier DEFAULT archetype — the
+        # flee-threshold profiles flee, the null-threshold apex profile
+        # strikes with the zero-cost physical row — and the instance override
+        # re-routes the decision without touching the tier assignment.
+        apex_tier = next(
+            tier
+            for tier, archetype in MONSTER_BEHAVIOUR_YAML[
+                "tier_default_archetype"
+            ].items()
+            if BEHAVIOUR_PROFILES[archetype].flee_hp_fraction is None
         )
-        for index, (tier, override, expected_skill) in enumerate(cases):
+        other_tiers = [
+            tier
+            for tier in MONSTER_BEHAVIOUR_YAML["tier_default_archetype"]
+            if tier != apex_tier
+        ]
+        cases = (
+            [(tier, None) for tier in other_tiers]
+            + [(apex_tier, None)]
+            + [(other_tiers[0], "tactical_caster")]
+        )
+        for index, (tier, override) in enumerate(cases):
             with self.subTest(tier=tier, override=override):
+                expected_skill = (
+                    FLEE_SKILL_KEY
+                    if override is not None
+                    else _expected_default_skill(tier)
+                )
                 monster = create_object(Monster, key=f"golden-monster-{index}")
                 monster.threat_tier = tier
                 monster.behaviour_tree = override
                 monster.apply_monster_tier()
-                monster.db.skills = {"active": ["fire_ball"], "passive": []}
+                monster.db.skills = {"active": [_T_CLAW.key], "passive": []}
                 monster.traits.mp.base = 100
                 monster.traits.mp.current = 100
                 monster.traits.hp.current = 1

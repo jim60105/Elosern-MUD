@@ -23,7 +23,14 @@ from world.rules.overwhelm import (
     resolve_overwhelm,
 )
 
+from ._combat_session_helpers import open_synthetic_scope, synth_damage_skill
 from .combat_fixtures import FakeEntity
+
+
+# File-local registered row (data independence): the real-combat
+# equivalence fixtures own exactly this damage skill, and the
+# commanded-action key below is the same row.
+_T_STRIKE = synth_damage_skill("t_equiv_strike", "合成打擊")
 
 
 def battlefield() -> Battlefield:
@@ -334,6 +341,12 @@ class FirstActorForwardingTests(unittest.TestCase):
 
 
 class RealCombatEquivalenceTests(EvenniaTestCase):
+    def setUp(self):
+        open_synthetic_scope(
+            self, "skills", "elements", extra={"skills": {_T_STRIKE.key: _T_STRIKE}}
+        )
+        super().setUp()
+
     def _entity(self, key: str, *, strong: bool) -> PlayerCharacter:
         entity = create_object(PlayerCharacter, key=key)
         entity.race = "human"
@@ -362,7 +375,7 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
             trait.base = value
             if hasattr(trait, "current"):
                 trait.current = value
-        entity.db.skills = {"active": ["shadow_slash"], "passive": []}
+        entity.db.skills = {"active": [_T_STRIKE.key], "passive": []}
         return entity
 
     def _field(self, suffix: str, *, strong_first: bool) -> Battlefield:
@@ -555,7 +568,7 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
             marked,
             default_attack_policy,
             commanded_actor="first-marked",
-            commanded_action_kind="skill", commanded_action_key="shadow_slash",
+            commanded_action_kind="skill", commanded_action_key=_T_STRIKE.key,
         )
         self.assertEqual(result.rounds_elapsed, baseline.rounds_elapsed)
         self.assertEqual(result.total_seconds, baseline.total_seconds)

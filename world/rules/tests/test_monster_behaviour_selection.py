@@ -5,6 +5,7 @@ from tools.spec_traceability import covers_requirement
 import unittest
 from unittest.mock import patch
 
+from world.rules import combat_modifiers
 from world.rules.combat import Battlefield
 from world.rules.monster_behaviour import (
     _choose_skill,
@@ -12,29 +13,70 @@ from world.rules.monster_behaviour import (
     _living_enemies,
     _owned_damage_skills,
 )
-from world.skills.registry import SKILL_REGISTRY
+from world.rules.rulebook.schema import Rule
+from world.skills.registry import SkillKind
 
+from ._combat_session_helpers import (
+    SYNTH_GLOW_ELEMENT,
+    open_synthetic_scope,
+    synth_damage_skill,
+)
 from .combat_fixtures import FakeEntity, FakeGauge
+
+# File-local synthetic rows (data independence): a passive, a non-damage
+# active, a zero-cost physical strike, and an MP-costing magic spell. Their
+# relative costs/stats are authored here, so every expectation below names
+# its own numbers.
+_T_PASSIVE = synth_damage_skill(
+    "t_guard_shell", "合成護殼", effects=["passive_buff:t_guard_shell"], kind=SkillKind.PASSIVE
+)
+_T_FLIGHT = synth_damage_skill("t_synth_flight", "合成飛行", effects=["movement:flight"])
+_T_CLAW = synth_damage_skill("t_split_claw", "裂爪擊")
+_T_SPELL = synth_damage_skill(
+    "t_rain_spray",
+    "瀧灑法術",
+    effects=[f"damage:{SYNTH_GLOW_ELEMENT}:magic"],
+    cost={"mp": 12},
+)
+# One flat atk_phys bonus rule keyed to the synthetic passive, mirroring the
+# rule-table shape any shipped ownership bonus uses (see test_stat_breakdown).
+_T_BONUS_PASSIVE = synth_damage_skill(
+    "t_training_drill", "合成鍛鍊", effects=["passive_buff:t_training_drill"], kind=SkillKind.PASSIVE
+)
+_T_BONUS_RULE = Rule(
+    "t_training_drill_atk_phys_bonus",
+    {"skill_owned": _T_BONUS_PASSIVE.key},
+    {"atk_phys": 5},
+)
+_SCOPE_EXTRA = {
+    "skills": {
+        row.key: row
+        for row in (_T_PASSIVE, _T_FLIGHT, _T_CLAW, _T_SPELL, _T_BONUS_PASSIVE)
+    }
+}
 
 
 class MonsterBehaviourSelectionTests(unittest.TestCase):
+    def setUp(self):
+        open_synthetic_scope(self, "skills", "elements", extra=_SCOPE_EXTRA)
+
     def test_owned_damage_skills_preserve_owned_order(self):
         entity = FakeEntity(
             "actor",
-            owned=["fire_mastery", "flight", "shadow_slash", "fire_ball"],
+            owned=[_T_PASSIVE.key, _T_FLIGHT.key, _T_CLAW.key, _T_SPELL.key],
         )
         entity.traits.sp = FakeGauge(18, 18)
         entity.traits.mp = FakeGauge(20, 20)
         self.assertEqual(
             [skill.key for skill in _owned_damage_skills(entity)],
-            ["shadow_slash", "fire_ball"],
+            [_T_CLAW.key, _T_SPELL.key],
         )
         entity.traits.mp.value = 0
         self.assertEqual(
             [skill.key for skill in _owned_damage_skills(entity)],
-            ["shadow_slash"],
+            [_T_CLAW.key],
         )
-        entity.skills._owned = ["flight"]
+        entity.skills._owned = [_T_FLIGHT.key]
         self.assertEqual(_owned_damage_skills(entity), [])
 
     def test_living_enemies_excludes_dead_and_fled(self):
@@ -84,8 +126,8 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
             magic_power=50,
         )
         target = FakeEntity("target", defense=12)
-        physical = SKILL_REGISTRY["shadow_slash"]
-        magic = SKILL_REGISTRY["fire_ball"]
+        physical = _T_CLAW
+        magic = _T_SPELL
         self.assertIs(
             _choose_skill(
                 entity,
@@ -125,14 +167,19 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
     )
     def test_physical_candidate_ranks_with_its_atk_phys_bonus(self):
         entity = FakeEntity("actor", atk_phys=30, magic_power=30)
-        entity.skills._owned = ["retainer_martial_training"]
+        entity.skills._owned = [_T_BONUS_PASSIVE.key]
         target = FakeEntity("target", defense=12)
-        physical = SKILL_REGISTRY["shadow_slash"]
-        magic = SKILL_REGISTRY["fire_ball"]
-        with patch(
-            "world.rules.monster_behaviour.dice.roll_d100",
-            return_value=0,
-        ) as roller:
+        physical = _T_CLAW
+        magic = _T_SPELL
+        with (
+            patch.object(
+                combat_modifiers, "_RULES", list(combat_modifiers._RULES) + [_T_BONUS_RULE]
+            ),
+            patch(
+                "world.rules.monster_behaviour.dice.roll_d100",
+                return_value=0,
+            ) as roller,
+        ):
             self.assertIs(
                 _choose_skill(
                     entity,

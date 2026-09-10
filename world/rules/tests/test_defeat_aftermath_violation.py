@@ -23,6 +23,7 @@ from world.quests.catalog import register_catalog
 from world.rules import clock as clock_module
 from world.rules import combat_session as combat_session_module
 from world.rules.combat_session import (
+    BASIC_ATTACK_KEY,
     engage,
     forfeit,
     read_session,
@@ -136,7 +137,7 @@ class ViolationBase(BattlefieldIsolation, EvenniaTestCase):
     def _settle(self):
         """Lose and forfeit the already-engaged session."""
         with patch("world.rules.combat.roll_d100", return_value=1):
-            submit_player_action(self.player, "basic_attack", [self.monster])
+            submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
         return forfeit(self.player)
 
     def _knock_out(self, companion):
@@ -640,7 +641,7 @@ class PoolAndDigestTests(ViolationBase):
 
         def spy(actor, record, battlefield):
             outcome = real_writer(actor, record, battlefield)
-            captured["violation"] = outcome.violation
+            captured["outcomes"] = outcome.violation
             return outcome
 
         self.player.sexual.pleasure.base = 84
@@ -654,8 +655,8 @@ class PoolAndDigestTests(ViolationBase):
         entries = _aftermath_entries(result)
         # The handoff is the per-participant mapping (companion-victims
         # D-P3); a solo pool carries exactly the player's outcome.
-        self.assertEqual(set(captured["violation"]), {str(self.player.key)})
-        outcome = captured["violation"][str(self.player.key)]
+        self.assertEqual(set(captured["outcomes"]), {str(self.player.key)})
+        outcome = captured["outcomes"][str(self.player.key)]
         self.assertIsInstance(outcome, defeat_aftermath_module.ViolationOutcome)
         self.assertEqual(
             outcome.selected,
@@ -674,8 +675,12 @@ class PoolAndDigestTests(ViolationBase):
             ),
         )
         self.assertFalse(outcome.zero_landed)
-        # In-memory only: the settlement result exposes no violation record.
-        self.assertNotIn("violation", result)
+        # In-memory only: the settlement result carries no ViolationOutcome
+        # object anywhere in its handoff.
+        self.assertNotIn(
+            defeat_aftermath_module.ViolationOutcome,
+            [type(value) for value in result.values()],
+        )
 
 
 class CompanionPoolTests(ViolationBase):
@@ -832,7 +837,7 @@ class CompanionPoolTests(ViolationBase):
 
         def spy(actor, record, battlefield):
             outcome = real_writer(actor, record, battlefield)
-            captured["violation"] = outcome.violation
+            captured["outcomes"] = outcome.violation
             return outcome
 
         with (
@@ -844,7 +849,7 @@ class CompanionPoolTests(ViolationBase):
             result = forfeit(self.player)
         # Both attempts drew slot 0 (the player): the companion is absent
         # from the outcome mapping (D-P3) and gets no wake observation.
-        self.assertEqual(set(captured["violation"]), {str(self.player.key)})
+        self.assertEqual(set(captured["outcomes"]), {str(self.player.key)})
         self.assertNotIn("companion_wake", _kinds(_aftermath_entries(result)))
         self.assertEqual(companion.sexual.pleasure.value, 0)
         self.assertEqual(companion.sexual.hostile_act_count, 0)
@@ -1006,7 +1011,7 @@ class EventLogOrderTests(ViolationBase):
         )
         with self._patch_rolls([1, 1]):
             with patch("world.rules.combat.roll_d100", return_value=1):
-                submit_player_action(self.player, "basic_attack", [self.monster])
+                submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
             result = forfeit(self.player)
         kinds = _kinds(_aftermath_entries(result))
         self.assertEqual(
