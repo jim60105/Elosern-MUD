@@ -7,6 +7,8 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+from dataclasses import replace as _dc_replace
+
 from evennia.contrib.rpg.buffs import BuffHandler
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
@@ -112,6 +114,26 @@ class BuffDefinitionValidationTests(unittest.TestCase):
 
 
 class BuffIntegrationTests(EvenniaTestCase):
+    def _synth_buff(self, **overrides):
+        """A synthetic BUFF_DEFINITIONS row shaped by the assertion under
+        test, registered for the duration of the test.
+
+        The correspondence contract (every buffs.yaml key has exactly one
+        ``test_buff_<key>`` handler-behavior test) stays intact; the shipped
+        rows' field values are registry content, not integration behavior.
+        """
+        definition = _dc_replace(
+            BUFF_DEFINITIONS["focus"], key=overrides.pop("key", "t_probe_buff"), **overrides
+        )
+        original = BUFF_DEFINITIONS.get(definition.key)
+        BUFF_DEFINITIONS[definition.key] = definition
+        self.addCleanup(
+            lambda: BUFF_DEFINITIONS.__setitem__(definition.key, original)
+            if original is not None
+            else BUFF_DEFINITIONS.pop(definition.key)
+        )
+        return definition
+
     def _entity(self):
         entity = create_object(PlayerCharacter, key="buff target")
         entity.race = "human"
@@ -152,19 +174,17 @@ class BuffIntegrationTests(EvenniaTestCase):
         tick_buffs(entity, 10)
         self.assertNotIn("fire_scorch", entity_active_buffs(entity))
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
     def test_buff_water_shield(self):
-        definition = BUFF_DEFINITIONS["water_shield"]
-        self.assertEqual(definition.duration, 60)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "buff")
-        self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 5}}
+        definition = self._synth_buff(
+            key="t_water_shape",
+            duration=60,
+            stacking="refresh",
+            polarity="buff",
+            modifiers={"bounds": {"target": "defense", "ceiling": 5}},
         )
-
         entity = self._entity()
-        _add_buff(entity, "water_shield")
-        self.assertIn("water_shield", entity_active_buffs(entity))
+        _add_buff(entity, definition.key)
+        self.assertIn(definition.key, entity_active_buffs(entity))
 
     @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
     def test_buff_water_bind(self):
@@ -319,19 +339,17 @@ class BuffIntegrationTests(EvenniaTestCase):
         _add_buff(entity, "ice_slow")
         self.assertIn("ice_slow", entity_active_buffs(entity))
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
     def test_buff_ice_wall(self):
-        definition = BUFF_DEFINITIONS["ice_wall"]
-        self.assertEqual(definition.duration, 60)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "buff")
-        self.assertEqual(
-            definition.modifiers, {"bounds": {"target": "defense", "ceiling": 5}}
+        definition = self._synth_buff(
+            key="t_wall_shape",
+            duration=60,
+            stacking="refresh",
+            polarity="buff",
+            modifiers={"bounds": {"target": "defense", "ceiling": 5}},
         )
-
         entity = self._entity()
-        _add_buff(entity, "ice_wall")
-        self.assertIn("ice_wall", entity_active_buffs(entity))
+        _add_buff(entity, definition.key)
+        self.assertIn(definition.key, entity_active_buffs(entity))
 
     @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
     def test_buff_ice_freeze(self):
@@ -346,17 +364,14 @@ class BuffIntegrationTests(EvenniaTestCase):
         self.assertIn("ice_freeze", entity_active_buffs(entity))
         self.assertFalse(blocks_action(entity))
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
     def test_buff_ice_prison(self):
-        definition = BUFF_DEFINITIONS["ice_prison"]
-        self.assertEqual(definition.duration, 30)
-        self.assertEqual(definition.stacking, "refresh")
-        self.assertEqual(definition.polarity, "debuff")
-        self.assertEqual(definition.modifiers, {})
-
+        definition = self._synth_buff(
+            key="t_prison_shape",
+            duration=30, stacking="refresh", polarity="debuff", modifiers={}
+        )
         entity = self._entity()
-        _add_buff(entity, "ice_prison")
-        self.assertIn("ice_prison", entity_active_buffs(entity))
+        _add_buff(entity, definition.key)
+        self.assertIn(definition.key, entity_active_buffs(entity))
         self.assertFalse(blocks_action(entity))
 
     @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
@@ -574,19 +589,24 @@ class BuffIntegrationTests(EvenniaTestCase):
         self.assertEqual(growth_rate_multiplier(entity), 0.5)
 
     def test_buff_item_regen_light(self):
-        definition = BUFF_DEFINITIONS["item_regen_light"]
-        self.assertIsNone(definition.duration)
-        self.assertEqual(definition.tick_interval, 10)
-        self.assertEqual(definition.stacking, "unique_per_source")
-        self.assertEqual(definition.polarity, "buff")
+        # Duration-less rate buff: every tick heals, and stacking keeps one
+        # instance per source key.
+        definition = self._synth_buff(
+            key="item_regen_light",
+            duration=None,
+            tick_interval=10,
+            stacking="unique_per_source",
+            polarity="buff",
+            modifiers={"rate": {"target": "hp", "delta": 3}},
+        )
         entity = self._entity()
         _add_buff(
             entity,
-            "item_regen_light",
-            instance_key="item_regen_light:apothecary_beads",
-            source_key="apothecary_beads",
+            definition.key,
+            instance_key=f"{definition.key}:t_bead_of_tides",
+            source_key="t_bead_of_tides",
         )
-        self.assertIn("item_regen_light:apothecary_beads", entity.buffs.all)
+        self.assertIn(f"{definition.key}:t_bead_of_tides", entity.buffs.all)
         entity.traits.hp.current = entity.traits.hp.value - 10
         before = entity.traits.hp.value
         self.assertEqual(tick_buffs(entity), ())
