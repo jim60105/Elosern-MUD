@@ -13,26 +13,88 @@ from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.clock import AdvanceSource, _STAGE_ORDER, register_event_source
-from world.rules.guild_config import CATALOG, load_catalog_into_cache
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.shop_hours import _boundary_ticks, settle_shop_hours
 from world.rules.caravan_arrivals import settle_caravan_arrivals
 from world.rules.guild_economy import sync_guild_economy
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.rules.tests._guild_service_probes import (
+    install_synthetic_catalog,
+    synth_catalog,
+    synth_offer_rule,
+    synth_shop_config,
+)
+from world.tests.synthetic_data import SYNTH_SHOPS
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
+
+# Caravan settlement runs entirely on kit rows: one synthetic shop config over
+# kit items (scoped registries) replaces the shipped store catalog. The caps
+# and restock quantities below are authored here, so every assertion names
+# its own numbers.
+T_SHOP = next(iter(SYNTH_SHOPS))
+_T_SPRAY = "t_ember_spray"
+_T_FANG = "t_iron_fang"
+_T_APPLE = "t_huskapple"
+def _shop_config():
+    """Built inside the scope: the offer rules read live price bands."""
+    return synth_shop_config(
+        T_SHOP,
+        (_T_SPRAY, _T_FANG, _T_APPLE),
+        offer_rules=(
+            synth_offer_rule(_T_SPRAY, max_stock=5, restock_quantity=2),
+            synth_offer_rule(_T_FANG, max_stock=20, restock_quantity=5),
+            synth_offer_rule(_T_APPLE, max_stock=3, restock_quantity=1),
+        ),
+    )
 
 
 class ClockRegistryIsolation(BattlefieldIsolation, QuestRegistryIsolation):
     def setUp(self):
+        # Scope before construction so every registry lookup inside the
+        # synthetic catalog builder resolves against kit rows.
+        open_synthetic_scope(self, "items", "prices", "shops")
         super().setUp()
         register_catalog()
-        self._previous_catalog = CATALOG
+        install_synthetic_catalog(
+            self, synth_catalog(shop_configs={T_SHOP: _shop_config()})
+        )
         self._previous_offers = list(GUILD_OFFER_REGISTRY.items())
 
     def tearDown(self):
-        global CATALOG
-        CATALOG = self._previous_catalog
         GUILD_OFFER_REGISTRY.clear()
         GUILD_OFFER_REGISTRY.update(self._previous_offers)
+        super().tearDown()
+
+
+class ClockStageOrderIsolation(BattlefieldIsolation, QuestRegistryIsolation):
+    """Isolation for the pure stage-order/wiring checks.
+
+    These tests name no shipped identifier and only exercise clock-source
+    registration wiring, so the shipped catalog sync runs unchanged here:
+    ``sync_guild_economy`` reloads the catalog from the shipped rulebook,
+    which a scoped (synthetic) shop registry would reject.
+    """
+
+    def setUp(self):
+        super().setUp()
+        register_catalog()
+        from world.rules import guild_config as guild_config_module
+
+        self._guild_config_module = guild_config_module
+        self._previous_catalog = guild_config_module.CATALOG
+        self._previous_offers = list(GUILD_OFFER_REGISTRY.items())
+        from world.rules.clock import _EVENT_SOURCES
+
+        self._previous_sources = dict(_EVENT_SOURCES)
+
+    def tearDown(self):
+        from world.rules.clock import _EVENT_SOURCES
+
+        self._guild_config_module.CATALOG = self._previous_catalog
+        GUILD_OFFER_REGISTRY.clear()
+        GUILD_OFFER_REGISTRY.update(self._previous_offers)
+        _EVENT_SOURCES.clear()
+        _EVENT_SOURCES.update(self._previous_sources)
         super().tearDown()
 
 
@@ -102,34 +164,33 @@ class ShopHoursSettlementTests(ClockRegistryIsolation, EvenniaTestCase):
 class CaravanArrivalTests(ClockRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
-        load_catalog_into_cache()
         self.store = create_object(Room, key="store")
-        self.merchant_npc = create_object(NPC, key="merchant", location=self.store)
+        self.merchant_npc = create_object(NPC, key="kit vendor", location=self.store)
         self.merchant = Merchant.create(
             self.merchant_npc,
-            service_id="merchant",
-            shop_key="altoria_general_store",
+            service_id="vendor",
+            shop_key=T_SHOP,
         )
         self.merchant_npc.components.add(self.merchant)
 
     def test_daily_restock_fills_only_to_cap(self):
-        # healing_potion: max_stock 5, restock_quantity 2. Stock 4 crosses the
-        # day boundary and gains exactly 1 (capped at max 5).
-        self.merchant.merchant_stock = {"meal": 20, "healing_potion": 4, "plain_sword": 1}
+        # The spray offer: max_stock 5, restock_quantity 2. Stock 4 crosses
+        # the day boundary and gains exactly 1 (capped at max 5).
+        self.merchant.merchant_stock = {_T_FANG: 20, _T_SPRAY: 4, _T_APPLE: 1}
         self.merchant.last_restock_day = 0
         with patch("world.rules.clock.get_world_clock") as clock:
             # Day 1 boundary crossed: restock_hour 6, end_tick = 1 day + 7h.
             clock.return_value.tick = 86400 + 7 * 3600
             events = settle_caravan_arrivals(0, 86400 + 7 * 3600)
         self.assertEqual(len(events), 1)
-        meal_payload = next(e for e in events if e.payload["shop_key"] == "altoria_general_store")
-        self.assertIn("healing_potion", meal_payload.payload["items_added"])
-        self.assertEqual(self.merchant.merchant_stock["healing_potion"], 5)
+        payload = next(e for e in events if e.payload["shop_key"] == T_SHOP)
+        self.assertIn(_T_SPRAY, payload.payload["items_added"])
+        self.assertEqual(self.merchant.merchant_stock[_T_SPRAY], 5)
         self.assertEqual(self.merchant.last_restock_day, 1)
 
     @covers_requirement("shop-economy::caravan-arrivals-restock-once-per-crossed-merchant-day-up-to-cap")
     def test_multi_day_skip_catches_up_deterministically(self):
-        self.merchant.merchant_stock = {"meal": 0, "healing_potion": 0, "plain_sword": 0}
+        self.merchant.merchant_stock = {_T_FANG: 0, _T_SPRAY: 0, _T_APPLE: 0}
         self.merchant.last_restock_day = 0
         end_tick = 3 * 86400 + 7 * 3600
         with patch("world.rules.clock.get_world_clock") as clock:
@@ -141,11 +202,11 @@ class CaravanArrivalTests(ClockRegistryIsolation, EvenniaTestCase):
             3,
         )
         # At most three restocks; stock never exceeds max.
-        self.assertLessEqual(self.merchant.merchant_stock["meal"], 20)
-        self.assertLessEqual(self.merchant.merchant_stock["healing_potion"], 5)
+        self.assertLessEqual(self.merchant.merchant_stock[_T_FANG], 20)
+        self.assertLessEqual(self.merchant.merchant_stock[_T_SPRAY], 5)
 
     def test_one_restock_per_day(self):
-        self.merchant.merchant_stock = {"meal": 0, "healing_potion": 0, "plain_sword": 0}
+        self.merchant.merchant_stock = {_T_FANG: 0, _T_SPRAY: 0, _T_APPLE: 0}
         self.merchant.last_restock_day = 0
         end_tick = 86400 + 7 * 3600
         with patch("world.rules.clock.get_world_clock") as clock:
@@ -155,21 +216,21 @@ class CaravanArrivalTests(ClockRegistryIsolation, EvenniaTestCase):
         self.assertEqual(self.merchant.last_restock_day, 1)
 
     def test_malformed_merchant_is_isolated(self):
-        bad_npc = create_object(NPC, key="bad merchant", location=self.store)
-        bad_merchant = Merchant.create(bad_npc, service_id="bad", shop_key="altoria_general_store")
+        bad_npc = create_object(NPC, key="bad vendor", location=self.store)
+        bad_merchant = Merchant.create(bad_npc, service_id="bad", shop_key=T_SHOP)
         bad_npc.components.add(bad_merchant)
-        bad_merchant.merchant_stock = {"meal": "oops"}
+        bad_merchant.merchant_stock = {_T_FANG: "oops"}
         bad_merchant.last_restock_day = 0
         # The good merchant still settles; the malformed one is skipped.
-        self.merchant.merchant_stock = {"meal": 0, "healing_potion": 0, "plain_sword": 0}
+        self.merchant.merchant_stock = {_T_FANG: 0, _T_SPRAY: 0, _T_APPLE: 0}
         self.merchant.last_restock_day = 0
         end_tick = 86400 + 7 * 3600
         with patch("world.rules.clock.get_world_clock") as clock:
             clock.return_value.tick = end_tick
             events = settle_caravan_arrivals(0, end_tick)
         self.assertEqual(len(events), 1)
-        self.assertEqual(bad_merchant.merchant_stock, {"meal": "oops"})
-        self.assertGreaterEqual(self.merchant.merchant_stock["meal"], 5)
+        self.assertEqual(bad_merchant.merchant_stock, {_T_FANG: "oops"})
+        self.assertGreaterEqual(self.merchant.merchant_stock[_T_FANG], 5)
 
 
 class CaravanRollbackCacheTests(ClockRegistryIsolation, EvenniaTestCase):
@@ -179,16 +240,15 @@ class CaravanRollbackCacheTests(ClockRegistryIsolation, EvenniaTestCase):
         super().setUp()
         import world.rules.clock as clock_module
 
-        load_catalog_into_cache()
         self.store = create_object(Room, key="store")
-        self.merchant_npc = create_object(NPC, key="merchant", location=self.store)
+        self.merchant_npc = create_object(NPC, key="kit vendor", location=self.store)
         self.merchant = Merchant.create(
             self.merchant_npc,
-            service_id="merchant",
-            shop_key="altoria_general_store",
+            service_id="vendor",
+            shop_key=T_SHOP,
         )
         self.merchant_npc.components.add(self.merchant)
-        self.merchant.merchant_stock = {"meal": 0, "healing_potion": 0, "plain_sword": 0}
+        self.merchant.merchant_stock = {_T_FANG: 0, _T_SPRAY: 0, _T_APPLE: 0}
         self.merchant.last_restock_day = 0
         self._sources = dict(clock_module._EVENT_SOURCES)
 
@@ -244,7 +304,7 @@ class CaravanRollbackCacheTests(ClockRegistryIsolation, EvenniaTestCase):
         self.assertEqual(self._raw_attribute(self.merchant_npc, day_key), before_day)
 
 
-class StageOrderAndRegistrationTests(ClockRegistryIsolation, EvenniaTestCase):
+class StageOrderAndRegistrationTests(ClockStageOrderIsolation, EvenniaTestCase):
     @covers_requirement("settlement-stage-order::caravan-arrivals-shop-hours-quest-deadlines-and-npc-schedules-are-declared")
     def test_caravan_precedes_shop_hours_in_stage_order(self):
         self.assertLess(
