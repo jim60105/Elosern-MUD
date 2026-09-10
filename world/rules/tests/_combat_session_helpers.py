@@ -154,11 +154,18 @@ def synth_innate_overlay() -> dict[str, dict[str, object]]:
     return {"skills": rows}
 
 
+# The kit's invented element row: the default damage effect of a synthetic
+# skill MUST name an element the scoped element registry actually carries
+# (the old ``t_synthetic`` default named a never-registered key; effect
+# resolution failed on it the moment a row was actually cast).
+SYNTH_GLOW_ELEMENT = "t_glowmire"
+
+
 def synth_damage_skill(
     key: str,
     label: str,
     *,
-    effects: tuple[str, ...] = ("damage:t_synthetic:physical",),
+    effects: tuple[str, ...] = (f"damage:{SYNTH_GLOW_ELEMENT}:physical",),
     cost: dict[str, int] | None = None,
     target_spec=None,
     kind=None,
