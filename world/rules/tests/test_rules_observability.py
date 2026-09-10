@@ -30,8 +30,14 @@ from world.rules.clock import AdvanceSource, get_world_clock
 from world.rules.combat_session import engage, forfeit, submit_player_action
 from world.rules.surfaces import restore_attribute_best_effort
 
-from ._combat_session_helpers import _monster, _player
+from ._combat_session_helpers import _monster, _player, open_synthetic_scope, synth_innate_overlay
 from .combat_fixtures import BattlefieldIsolation
+from ._knowledge_probes import basic_attack_key, race_key
+
+# The action label an ``action_commit`` boundary event carries is an opaque
+# caller-supplied identifier — these tests pin the event SHAPE, so the label is
+# a file-local invented id, never a shipped skill key.
+PROBE_ACTION = "probe_commit_action"
 
 
 class ClockBoundaryEventTests(EvenniaTest):
@@ -40,7 +46,7 @@ class ClockBoundaryEventTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         self.player = self.char1
-        self.player.race = "human"
+        self.player.race = race_key()
         self.player.apply_race_baseline()
 
     @covers_requirement('world-clock::clock-advance-and-restore-failures-emit-observability-events')
@@ -115,7 +121,7 @@ class ActionCommitEventTests(EvenniaTest):
     def setUp(self):
         super().setUp()
         self.entity = create_object(PlayerCharacter, key="commit-event")
-        self.entity.race = "human"
+        self.entity.race = race_key()
         self.entity.apply_race_baseline()
 
     @covers_requirement('action-resolution-pipeline::successful-commits-emit-an-action-commit-boundary-event')
@@ -133,12 +139,12 @@ class ActionCommitEventTests(EvenniaTest):
             patch("world.rules.action.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
-            _commit(effects, char="commit-event", action="fire_ball")
+            _commit(effects, char="commit-event", action=PROBE_ACTION)
         info.assert_called_once()
         (event,), kwargs = info.call_args
         self.assertEqual(event, "action_commit")
         self.assertEqual(kwargs["context"]["char"], "commit-event")
-        self.assertEqual(kwargs["context"]["action"], "fire_ball")
+        self.assertEqual(kwargs["context"]["action"], PROBE_ACTION)
         self.assertIsInstance(kwargs["context"]["ms"], int)
 
     def test_rolled_back_commit_emits_no_action_commit(self):
@@ -155,7 +161,7 @@ class ActionCommitEventTests(EvenniaTest):
             self.captureOnCommitCallbacks(execute=True),
         ):
             with self.assertRaises(Exception):
-                _commit(effects, char="commit-event", action="fire_ball")
+                _commit(effects, char="commit-event", action=PROBE_ACTION)
         events = [call.args[0] for call in info.call_args_list if call.args]
         self.assertNotIn("action_commit", events)
 
@@ -164,6 +170,11 @@ class CombatBoundaryEventTests(BattlefieldIsolation, EvenniaTest):
     """``combat_round_settled`` / ``settlement_done`` at committed boundaries."""
 
     def setUp(self):
+        # Skill rows resolve against synthetic innate overlays (the production
+        # attack/flee keys ride runtime-derived rows). Monster tiers stay
+        # shipped: monster rounds validate against shipped-tier-keyed
+        # rulebooks, so the tier vocabulary is probed, never patched.
+        open_synthetic_scope(self, "skills", "elements", extra=synth_innate_overlay())
         super().setUp()
         self.room = create_object(Room, key="event arena")
         self.player = _player("event player")
@@ -181,7 +192,7 @@ class CombatBoundaryEventTests(BattlefieldIsolation, EvenniaTest):
             patch("world.rules.combat.roll_d100", return_value=100),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            submit_player_action(self.player, "basic_attack", [self.monster])
+            submit_player_action(self.player, basic_attack_key(), [self.monster])
         settle_calls = [
             call for call in info.call_args_list if call.args
             and call.args[0] == "combat_round_settled"
@@ -207,7 +218,7 @@ class CombatBoundaryEventTests(BattlefieldIsolation, EvenniaTest):
             self.captureOnCommitCallbacks(execute=True),
             self.assertRaises(RuntimeError),
         ):
-            submit_player_action(self.player, "basic_attack", [self.monster])
+            submit_player_action(self.player, basic_attack_key(), [self.monster])
         events = [call.args[0] for call in info.call_args_list if call.args]
         self.assertNotIn("combat_round_settled", events)
 

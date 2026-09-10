@@ -16,16 +16,64 @@ from unittest.mock import MagicMock, patch
 
 from tools.spec_traceability import covers_requirement
 
-from world.lore.anchors import ANCHOR_REGISTRY
-from world.lore.guild import GUILD_RANK_REGISTRY
-from world.lore.monsters import MONSTER_TIER_REGISTRY
-from world.lore.nations import NATION_REGISTRY
-from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
 from world.rules.lore_knowledge import (
     record_lore_reveal,
     reveal_lore_best_effort,
     schedule_lore_reveal_best_effort,
 )
+from world.tests.synthetic_data import synthetic_registries
+
+from ._knowledge_probes import (
+    live_anchor_registry,
+    live_guild_rank_registry,
+    live_monster_tier_registry,
+    live_nation_registry,
+    live_race_registry,
+    live_region_registry,
+    live_subrace_registry,
+)
+
+# The deterministic reveal sources resolve keys against the lore-catalog
+# family; every class below runs against the scoped synthetic family.
+_LORE_LOGICALS = (
+    "races",
+    "subraces",
+    "nations",
+    "regions",
+    "monster_tiers",
+    "elements",
+    "magic_tiers",
+    "anchors",
+    "guild_ranks",
+)
+
+
+def _race_key() -> str:
+    return next(iter(live_race_registry()))
+
+
+def _nation_key() -> str:
+    return next(iter(live_nation_registry()))
+
+
+def _region_key() -> str:
+    return next(iter(live_region_registry()))
+
+
+def _anchor_key() -> str:
+    return next(iter(live_anchor_registry()))
+
+
+def _guild_key() -> str:
+    return next(iter(live_guild_rank_registry()))
+
+
+def _subrace_key() -> str:
+    return next(iter(live_subrace_registry()))
+
+
+def _monster_tier_key() -> str:
+    return next(iter(live_monster_tier_registry()))
 
 # ---------------------------------------------------------------------------
 # Stubs
@@ -63,23 +111,26 @@ def _player(**attrs):
 # ---------------------------------------------------------------------------
 
 
+@synthetic_registries(*_LORE_LOGICALS)
 class RevealBestEffortHelperTests(unittest.TestCase):
     """reveal_lore_best_effort: wraps record_lore_reveal, swallows exceptions."""
 
     @covers_requirement("lore-knowledge::a-reveal-never-blocks-or-fails-the-play-that-triggered-it")
     def test_success_returns_true_and_writes_record(self):
         player = _player()
-        result = reveal_lore_best_effort(player, "race", "elf")
+        race = _race_key()
+        result = reveal_lore_best_effort(player, "race", race)
         self.assertTrue(result)
-        self.assertIn("race:elf", player.db.lore_discovered)
+        self.assertIn(f"race:{race}", player.db.lore_discovered)
 
     @covers_requirement("lore-knowledge::a-reveal-never-blocks-or-fails-the-play-that-triggered-it")
     def test_repeat_reveal_returns_true_idempotently(self):
         player = _player()
-        reveal_lore_best_effort(player, "anchor", "capital_grandia")
-        result = reveal_lore_best_effort(player, "anchor", "capital_grandia")
+        anchor = _anchor_key()
+        reveal_lore_best_effort(player, "anchor", anchor)
+        result = reveal_lore_best_effort(player, "anchor", anchor)
         self.assertTrue(result)
-        self.assertEqual(player.db.lore_discovered, {"anchor:capital_grandia"})
+        self.assertEqual(player.db.lore_discovered, {f"anchor:{anchor}"})
 
     @covers_requirement("lore-knowledge::a-reveal-never-blocks-or-fails-the-play-that-triggered-it")
     def test_unresolvable_key_returns_false_without_raising(self):
@@ -113,17 +164,18 @@ class RevealBestEffortHelperTests(unittest.TestCase):
     def test_sole_writer_not_bypassed(self):
         """reveal_lore_best_effort must delegate to record_lore_reveal only."""
         player = _player()
+        anchor = _anchor_key()
         with patch("world.rules.lore_knowledge.record_lore_reveal") as mock_writer:
             mock_writer.return_value = None
-            reveal_lore_best_effort(player, "anchor", "capital_grandia")
-        mock_writer.assert_called_once_with(player, "anchor", "capital_grandia")
+            reveal_lore_best_effort(player, "anchor", anchor)
+        mock_writer.assert_called_once_with(player, "anchor", anchor)
 
     @covers_requirement("lore-knowledge::a-reveal-never-blocks-or-fails-the-play-that-triggered-it")
     def test_reveal_is_silent_no_msg_sent(self):
         """A successful reveal must not call player.msg()."""
         player = _Stub()
         # _Stub.msg raises on any call; this test must not raise
-        reveal_lore_best_effort(player, "race", "elf")
+        reveal_lore_best_effort(player, "race", _race_key())
 
     @covers_requirement("lore-knowledge::a-reveal-never-blocks-or-fails-the-play-that-triggered-it")
     def test_schedule_ignores_none_key(self):
@@ -139,6 +191,7 @@ class RevealBestEffortHelperTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@synthetic_registries(*_LORE_LOGICALS)
 class RoomResolutionTests(unittest.TestCase):
     """resolve_room_anchor and resolve_room_region return correct keys."""
 
@@ -149,11 +202,12 @@ class RoomResolutionTests(unittest.TestCase):
 
     @covers_requirement("lore-knowledge::arrival-reveals-the-anchor-and-region-a-room-resolves-to")
     def test_anchor_room_resolves_to_registered_key(self):
+        anchor = _anchor_key()
         room = MagicMock(spec=["anchor_key", "db"])
-        room.anchor_key = "capital_grandia"
+        room.anchor_key = anchor
         result = self.resolve_anchor(room)
-        self.assertEqual(result, "capital_grandia")
-        self.assertIn("capital_grandia", ANCHOR_REGISTRY)
+        self.assertEqual(result, anchor)
+        self.assertIn(anchor, live_anchor_registry())
 
     @covers_requirement("lore-knowledge::arrival-reveals-the-anchor-and-region-a-room-resolves-to")
     def test_room_with_unregistered_anchor_key_returns_none(self):
@@ -172,17 +226,24 @@ class RoomResolutionTests(unittest.TestCase):
 
     @covers_requirement("lore-knowledge::arrival-reveals-the-anchor-and-region-a-room-resolves-to")
     def test_region_resolves_from_explicit_region_key(self):
+        region = _region_key()
         room = MagicMock(spec=["region_key", "db"])
-        room.region_key = "central_mountains"
+        room.region_key = region
         result = self.resolve_region(room)
-        self.assertEqual(result, "central_mountains")
+        self.assertEqual(result, region)
 
     @covers_requirement("lore-knowledge::arrival-reveals-the-anchor-and-region-a-room-resolves-to")
     def test_region_resolves_from_valid_coordinates(self):
-        # (110, 50): central_mountains — x in [100,123], y=50 < _NORTH_FOREST_Y_MIN=190
+        # In-bounds coordinates resolve through the wilderness provider's
+        # coordinate mapping, patched here to return the scoped region key.
+        region = _region_key()
         room = MagicMock(spec=[])
-        result = self.resolve_region(room, coordinates=(110, 50))
-        self.assertEqual(result, "central_mountains")
+        with patch(
+            "world.maps.wilderness_provider.region_for_coordinates",
+            return_value=region,
+        ):
+            result = self.resolve_region(room, coordinates=(110, 50))
+        self.assertEqual(result, region)
 
     @covers_requirement("lore-knowledge::arrival-reveals-the-anchor-and-region-a-room-resolves-to")
     def test_room_with_no_region_info_returns_none(self):
@@ -209,6 +270,7 @@ class RoomResolutionTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@synthetic_registries(*_LORE_LOGICALS)
 class ArrivalLoreTests(unittest.TestCase):
     """observe_arrival_lore schedules anchor and region reveals on character arrival."""
 
@@ -230,19 +292,24 @@ class ArrivalLoreTests(unittest.TestCase):
     def test_anchor_room_schedules_anchor_reveal(self):
         char = self._make_player_char()
         room = MagicMock(spec=["anchor_key", "db"])
-        room.anchor_key = "capital_grandia"
+        room.anchor_key = _anchor_key()
         with patch("world.rules.lore_knowledge.schedule_lore_reveal_best_effort") as mock_sched:
             self.observe(char, room)
         calls = [c.args for c in mock_sched.call_args_list]
-        self.assertIn((char, "anchor", "capital_grandia"), calls)
+        self.assertIn((char, "anchor", _anchor_key()), calls)
 
     @covers_requirement("lore-knowledge::arrival-reveals-the-anchor-and-region-a-room-resolves-to")
     def test_region_room_schedules_region_reveal(self):
         char = self._make_player_char()
-        with patch("world.rules.lore_knowledge.schedule_lore_reveal_best_effort") as mock_sched:
-            self.observe(char, None, wilderness_coordinates=(110, 50))
+        region = _region_key()
+        with patch(
+            "world.maps.wilderness_provider.region_for_coordinates",
+            return_value=region,
+        ):
+            with patch("world.rules.lore_knowledge.schedule_lore_reveal_best_effort") as mock_sched:
+                self.observe(char, None, wilderness_coordinates=(110, 50))
         calls = [c.args for c in mock_sched.call_args_list]
-        self.assertIn((char, "region", "central_mountains"), calls)
+        self.assertIn((char, "region", region), calls)
 
     @covers_requirement("lore-knowledge::arrival-reveals-the-anchor-and-region-a-room-resolves-to")
     def test_unremarkable_room_schedules_nothing(self):
@@ -256,7 +323,7 @@ class ArrivalLoreTests(unittest.TestCase):
     def test_non_player_character_is_ignored(self):
         non_player = MagicMock()
         room = MagicMock(spec=["anchor_key", "db"])
-        room.anchor_key = "capital_grandia"
+        room.anchor_key = _anchor_key()
         with patch("world.rules.lore_knowledge.schedule_lore_reveal_best_effort") as mock_sched:
             self.observe(non_player, room)
         mock_sched.assert_not_called()
@@ -265,7 +332,7 @@ class ArrivalLoreTests(unittest.TestCase):
     def test_idempotent_writer_prevents_duplicate_codex_entries(self):
         char = self._make_player_char()
         room = MagicMock(spec=["anchor_key", "db"])
-        room.anchor_key = "capital_grandia"
+        room.anchor_key = _anchor_key()
         with patch("world.rules.lore_knowledge.schedule_lore_reveal_best_effort") as mock_sched:
             self.observe(char, room)
             self.observe(char, room)  # same room, same char — should deduplicate
@@ -280,7 +347,7 @@ class ArrivalLoreTests(unittest.TestCase):
         """A broken schedule call must be caught by observe_arrival_lore's outer guard."""
         char = self._make_player_char()
         room = MagicMock(spec=["anchor_key", "db"])
-        room.anchor_key = "capital_grandia"
+        room.anchor_key = _anchor_key()
         with patch("world.rules.lore_knowledge.schedule_lore_reveal_best_effort",
                    side_effect=RuntimeError("db corruption")):
             with patch("world.observability.log_warn") as mock_log:
@@ -296,7 +363,7 @@ class ArrivalLoreTests(unittest.TestCase):
         char = self._make_player_char()
         char.msg = MagicMock(side_effect=AssertionError("msg() must not be called"))
         room = MagicMock(spec=["anchor_key", "db"])
-        room.anchor_key = "capital_grandia"
+        room.anchor_key = _anchor_key()
         with patch("world.rules.lore_knowledge.schedule_lore_reveal_best_effort"):
             self.observe(char, room)
 
@@ -306,6 +373,7 @@ class ArrivalLoreTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@synthetic_registries(*_LORE_LOGICALS)
 class DefeatLoreTests(unittest.TestCase):
     """_make_defeat_lore_apply and _defeated_targets honour the spec."""
 
@@ -324,7 +392,7 @@ class DefeatLoreTests(unittest.TestCase):
     def test_simulated_defeat_excluded_from_defeated_targets(self):
         from world.quests.planner import _defeated_targets
         log = self._make_event_log([
-            self._make_entry("target_defeated", target_id=1, monster_tier="low", simulated=True)
+            self._make_entry("target_defeated", target_id=1, monster_tier=_monster_tier_key(), simulated=True)
         ])
         self.assertEqual(_defeated_targets(log), ())
 
@@ -332,10 +400,10 @@ class DefeatLoreTests(unittest.TestCase):
     def test_real_defeat_included_in_defeated_targets(self):
         from world.quests.planner import _defeated_targets
         log = self._make_event_log([
-            self._make_entry("target_defeated", target_id=1, monster_tier="low")
+            self._make_entry("target_defeated", target_id=1, monster_tier=_monster_tier_key())
         ])
         result = _defeated_targets(log)
-        self.assertEqual(result, ((1, "low"),))
+        self.assertEqual(result, ((1, _monster_tier_key()),))
 
     @covers_requirement("lore-knowledge::defeating-a-monster-reveals-its-tier")
     def test_untiered_defeat_yields_none_tier(self):
@@ -356,10 +424,10 @@ class DefeatLoreTests(unittest.TestCase):
         with patch("world.rules.lore_knowledge.schedule_lore_reveal_best_effort") as mock_sched:
             # Build the factory INSIDE the patch so the import in the factory body
             # resolves to the mocked version and the lambda's closure captures it.
-            fn = _make_defeat_lore_apply(player, "low")
+            fn = _make_defeat_lore_apply(player, _monster_tier_key())
             self.assertTrue(callable(fn))
             fn()
-        mock_sched.assert_called_once_with(player, "monster", "low")
+        mock_sched.assert_called_once_with(player, "monster", _monster_tier_key())
 
     @covers_requirement("lore-knowledge::defeating-a-monster-reveals-its-tier")
     def test_unregistered_tier_not_in_monster_registry(self):
@@ -370,7 +438,7 @@ class DefeatLoreTests(unittest.TestCase):
         ])
         result = _defeated_targets(log)
         tier = result[0][1]
-        self.assertNotIn(tier, MONSTER_TIER_REGISTRY)
+        self.assertNotIn(tier, live_monster_tier_registry())
 
     @covers_requirement("lore-knowledge::a-reveal-never-blocks-or-fails-the-play-that-triggered-it")
     def test_defeat_lore_reveal_failure_does_not_raise(self):
@@ -380,7 +448,7 @@ class DefeatLoreTests(unittest.TestCase):
         player = _player()
         with patch("world.rules.lore_knowledge.schedule_lore_reveal_best_effort",
                    side_effect=RuntimeError("boom")):
-            fn = _make_defeat_lore_apply(player, "low")
+            fn = _make_defeat_lore_apply(player, _monster_tier_key())
         # schedule_lore_reveal_best_effort wraps its own internals in try-except; any
         # error it encounters (import failure, on_commit failure) is logged, not raised.
         # Verify that schedule_lore_reveal_best_effort guards unexpected failures:
@@ -389,7 +457,7 @@ class DefeatLoreTests(unittest.TestCase):
                        side_effect=RuntimeError("boom")):
                 # on_commit is called immediately in AUTOCOMMIT mode; the lambda raises;
                 # schedule_lore_reveal_best_effort's guard catches it.
-                schedule_lore_reveal_best_effort(player, "monster", "low")
+                schedule_lore_reveal_best_effort(player, "monster", _monster_tier_key())
 
 
 # ---------------------------------------------------------------------------
@@ -397,6 +465,7 @@ class DefeatLoreTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@synthetic_registries(*_LORE_LOGICALS)
 class OriginRevealCreationDataclassTests(unittest.TestCase):
     """CharacterCreationRequest and _ValidatedCreation carry the nation field."""
 
@@ -413,37 +482,41 @@ class OriginRevealCreationDataclassTests(unittest.TestCase):
     def test_nation_defaults_to_none_on_request(self):
         from world.rules.character_creation import CharacterCreationRequest
         req = CharacterCreationRequest(mode="custom", display_name="T", age=20,
-                                       apparent_age=20, race="human", subrace="human_commoner",
+                                       apparent_age=20, race=_race_key(), subrace=_subrace_key(),
                                        allocations={})
         self.assertIsNone(req.nation)
 
 
+@synthetic_registries(*_LORE_LOGICALS)
 class OriginRevealHelperTests(unittest.TestCase):
     """reveal_lore_best_effort covers race, nation, guild entries."""
 
     @covers_requirement("lore-knowledge::origin-reveals-seed-the-codex-at-creation-and-registration")
     def test_valid_race_reveal_succeeds(self):
         player = _player()
-        self.assertTrue(reveal_lore_best_effort(player, "race", "human"))
-        self.assertIn("race:human", player.db.lore_discovered)
+        race = _race_key()
+        self.assertTrue(reveal_lore_best_effort(player, "race", race))
+        self.assertIn(f"race:{race}", player.db.lore_discovered)
 
     @covers_requirement("lore-knowledge::origin-reveals-seed-the-codex-at-creation-and-registration")
     def test_valid_nation_reveal_succeeds(self):
         player = _player()
-        self.assertTrue(reveal_lore_best_effort(player, "nation", "grandia"))
-        self.assertIn("nation:grandia", player.db.lore_discovered)
+        nation = _nation_key()
+        self.assertTrue(reveal_lore_best_effort(player, "nation", nation))
+        self.assertIn(f"nation:{nation}", player.db.lore_discovered)
 
     @covers_requirement("lore-knowledge::origin-reveals-seed-the-codex-at-creation-and-registration")
     def test_f_rank_guild_reveal_succeeds(self):
         player = _player()
-        self.assertTrue(reveal_lore_best_effort(player, "guild", "F"))
-        self.assertIn("guild:F", player.db.lore_discovered)
+        rank = _guild_key()
+        self.assertTrue(reveal_lore_best_effort(player, "guild", rank))
+        self.assertIn(f"guild:{rank}", player.db.lore_discovered)
 
     @covers_requirement("lore-knowledge::origin-reveals-seed-the-codex-at-creation-and-registration")
     def test_unresolvable_race_does_not_raise_and_reveals_nothing(self):
         """A subrace key (not a race) must not raise and must leave codex unchanged."""
         player = _player()
-        result = reveal_lore_best_effort(player, "race", "ciaran")
+        result = reveal_lore_best_effort(player, "race", _subrace_key())
         self.assertFalse(result)
         self.assertIsNone(player.db.lore_discovered)
 
@@ -457,7 +530,7 @@ class OriginRevealHelperTests(unittest.TestCase):
     @covers_requirement("lore-knowledge::origin-reveals-seed-the-codex-at-creation-and-registration")
     def test_unresolvable_guild_rank_does_not_raise(self):
         player = _player()
-        result = reveal_lore_best_effort(player, "guild", "Z")
+        result = reveal_lore_best_effort(player, "guild", "t_absent_rank")
         self.assertFalse(result)
         self.assertIsNone(player.db.lore_discovered)
 
@@ -467,6 +540,7 @@ class OriginRevealHelperTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@synthetic_registries(*_LORE_LOGICALS)
 class SoleWriterBoundaryTests(unittest.TestCase):
     """Deterministic sources must write through record_lore_reveal only."""
 
@@ -483,25 +557,33 @@ class SoleWriterBoundaryTests(unittest.TestCase):
             calls.append((cat, key))
             return original_record(p, cat, key)
 
+        anchor = _anchor_key()
         with patch.object(mod, "record_lore_reveal", side_effect=recording_record):
-            reveal_lore_best_effort(player, "anchor", "capital_grandia")
+            reveal_lore_best_effort(player, "anchor", anchor)
 
-        self.assertEqual(calls, [("anchor", "capital_grandia")])
-        self.assertIn("anchor:capital_grandia", player.db.lore_discovered)
+        self.assertEqual(calls, [("anchor", anchor)])
+        self.assertIn(f"anchor:{anchor}", player.db.lore_discovered)
 
     @covers_requirement("lore-knowledge::the-codex-is-discoverable-with-every-generative-service-offline")
     def test_offline_play_fills_codex_without_external_calls(self):
         """Purely deterministic reveals fill the codex without any LLM or network call."""
         player = _player()
-
-        reveal_lore_best_effort(player, "race", "elf")
-        reveal_lore_best_effort(player, "nation", "grandia")
-        reveal_lore_best_effort(player, "anchor", "capital_grandia")
-        reveal_lore_best_effort(player, "monster", "low")
+        race, nation, anchor, tier = (
+            _race_key(), _nation_key(), _anchor_key(), _monster_tier_key()
+        )
+        reveal_lore_best_effort(player, "race", race)
+        reveal_lore_best_effort(player, "nation", nation)
+        reveal_lore_best_effort(player, "anchor", anchor)
+        reveal_lore_best_effort(player, "monster", tier)
 
         self.assertEqual(
             player.db.lore_discovered,
-            {"race:elf", "nation:grandia", "anchor:capital_grandia", "monster:low"},
+            {
+                f"race:{race}",
+                f"nation:{nation}",
+                f"anchor:{anchor}",
+                f"monster:{tier}",
+            },
         )
 
 
@@ -510,6 +592,7 @@ class SoleWriterBoundaryTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@synthetic_registries(*_LORE_LOGICALS)
 class RevealSilenceTests(unittest.TestCase):
     """Reveals must emit no player-facing messages."""
 
@@ -518,7 +601,7 @@ class RevealSilenceTests(unittest.TestCase):
         """reveal_lore_best_effort must never call player.msg()."""
         player = _Stub()
         # _Stub.msg raises on any call; this test must not raise
-        reveal_lore_best_effort(player, "race", "elf")
+        reveal_lore_best_effort(player, "race", _race_key())
 
     @covers_requirement("lore-knowledge::a-reveal-never-blocks-or-fails-the-play-that-triggered-it")
     def test_failed_reveal_sends_no_message(self):
@@ -532,5 +615,5 @@ class RevealSilenceTests(unittest.TestCase):
         player = _Stub()
         msg_mock = MagicMock()
         player.msg = msg_mock
-        reveal_lore_best_effort(player, "anchor", "capital_grandia")
+        reveal_lore_best_effort(player, "anchor", _anchor_key())
         msg_mock.assert_not_called()

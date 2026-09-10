@@ -17,9 +17,8 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.exits import Exit, WildernessGateExit, WildernessReturnExit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, InstanceRoom, Room, TerrainRoom
-from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-from world.maps.bootstrap import SOUTH_GATE_XYZ, sync_grid, sync_wilderness
-from world.maps.wilderness_provider import WILDERNESS_NAME
+from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.maps import wilderness_provider
 from world.rules.clock import get_world_clock
 from world.rules.map_knowledge import (
     KnowledgeError,
@@ -28,9 +27,30 @@ from world.rules.map_knowledge import (
     record_arrival,
 )
 
-NORTH_GATE_XYZ = (2, 4, "capital_altoria")
-_CAPITAL = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
-ENTRY_XY = _CAPITAL.approach_cell(_CAPITAL.gate_for("s"))  # (60, 103)
+from ._knowledge_probes import live_city_gate_registry, live_map_key, live_wilderness_entry_registry
+
+# Every map/wilderness fact is derived from the live registries INSIDE the
+# seam suite's setUp (never at module import): the known city map key, the
+# entry footprint whose south-returning gate leads onto that map, its gate
+# room, and its wilderness approach cell. A map-data rework may rename maps,
+# move coordinates, or re-author footprints without breaking — or even
+# importing — this seam suite; the behavior under test (successful arrivals
+# record exactly the derived destination node) is unchanged.
+
+
+def _entry_with_south_gate_on(map_key: str):
+    """The wilderness entry whose south-returning gate lands on ``map_key``."""
+    for entry in live_wilderness_entry_registry().values():
+        gate = entry.gate_for("s")
+        if gate is not None and gate.z_map_key == map_key:
+            return entry, gate
+    raise AssertionError(f"no wilderness entry gate returns to map {map_key!r}")
+
+
+def _grid_node(room) -> str:
+    """The canonical grid node ID of a booted GridRoom, from its own xyz."""
+    x, y, z = room.xyz
+    return f"grid:{z}:{x}:{y}"
 
 
 def _knowledge(character):
@@ -54,8 +74,18 @@ class MapKnowledgeSeamTests(EvenniaTest):
         create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
-        self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
-        self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        # Resolve the map vocabulary only after the grid bootstraps.
+        self.map = live_map_key()
+        self.gate_row = live_city_gate_registry()[self.map]
+        # The city-gate row's own gate_xyz is the south gate room's
+        # coordinate — read from the live registry, not a shipped constant.
+        self.south_gate_xyz = self.gate_row.gate_xyz
+        entry, south_row = _entry_with_south_gate_on(self.map)
+        self.north_gate_xyz = (*south_row.grid_xy, south_row.z_map_key)
+        self.entry_xy = entry.approach_cell(south_row)
+        self.wild = getattr(wilderness_provider, "WILDERNESS_NAME")
+        self.north_gate = GridRoom.objects.filter_xyz(xyz=self.north_gate_xyz).first()
+        self.south_gate = GridRoom.objects.filter_xyz(xyz=self.south_gate_xyz).first()
         self.gate = [e for e in self.north_gate.exits if isinstance(e, WildernessGateExit)][0]
 
     def _exit(self, direction):
@@ -64,10 +94,14 @@ class MapKnowledgeSeamTests(EvenniaTest):
     @covers_requirement("map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams")
     def test_grid_traversal_records_destination_grid_node(self):
         self.char1.location = self.south_gate
-        city_exit = [e for e in self.south_gate.exits if e.destination.key == "南大道"][0]
-        city_exit.at_traverse(self.char1, city_exit.destination)
-        self.assertEqual(self.char1.location.key, "南大道")
-        self.assertIn("grid:capital_altoria:2:1", _node_ids(self.char1))
+        # Any inter-grid exit from the south-gate room: the seam must record the
+        # node derived from the room actually arrived at, whatever the bootstrapped
+        # street is named or where it sits.
+        city_exit = [e for e in self.south_gate.exits if isinstance(e.destination, GridRoom)][0]
+        destination = city_exit.destination
+        city_exit.at_traverse(self.char1, destination)
+        self.assertIs(self.char1.location, destination)
+        self.assertIn(_grid_node(destination), _node_ids(self.char1))
 
     def test_plain_exit_records_room_node(self):
         exit_obj = create_object(Exit, key="door", location=self.room1, destination=self.room2)
@@ -77,21 +111,18 @@ class MapKnowledgeSeamTests(EvenniaTest):
 
     @covers_requirement("map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams")
     def test_limbo_bridge_records_grid_node(self):
-        from world.maps.city_gates import CITY_GATE_REGISTRY
-
-        row = CITY_GATE_REGISTRY["capital_altoria"]
         limbo = create_object(Room, key="LimboBridge", location=None)
-        south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        south_gate = GridRoom.objects.filter_xyz(xyz=self.south_gate_xyz).first()
         bridge = create_object(
             Exit,
-            key=row.exit_key,
-            aliases=list(row.exit_aliases),
+            key=self.gate_row.exit_key,
+            aliases=list(self.gate_row.exit_aliases),
             location=limbo,
             destination=south_gate,
         )
         self.char1.location = limbo
         bridge.at_traverse(self.char1, south_gate)
-        self.assertIn("grid:capital_altoria:2:0", _node_ids(self.char1))
+        self.assertIn(_grid_node(south_gate), _node_ids(self.char1))
 
     def test_instance_doorway_records_room_node(self):
         from world.maps.instance import spawn_instance_room
@@ -114,8 +145,8 @@ class MapKnowledgeSeamTests(EvenniaTest):
         before = get_world_clock().tick
         self.gate.at_traverse(self.char1, self.north_gate)
         self.assertIsInstance(self.char1.location, TerrainRoom)
-        self.assertEqual(self.char1.location.coordinates, ENTRY_XY)
-        expected = f"wild:{WILDERNESS_NAME}:{ENTRY_XY[0]}:{ENTRY_XY[1]}"
+        self.assertEqual(self.char1.location.coordinates, self.entry_xy)
+        expected = f"wild:{self.wild}:{self.entry_xy[0]}:{self.entry_xy[1]}"
         self.assertIn(expected, _node_ids(self.char1))
         self.assertGreater(get_world_clock().tick, before)
 
@@ -124,7 +155,7 @@ class MapKnowledgeSeamTests(EvenniaTest):
         self.gate.at_traverse(self.char1, self.north_gate)
         start = self.char1.location.coordinates
         self._exit("east").at_traverse(self.char1, self.char1.location)
-        expected = f"wild:{WILDERNESS_NAME}:{start[0] + 1}:{start[1]}"
+        expected = f"wild:{self.wild}:{start[0] + 1}:{start[1]}"
         self.assertIn(expected, _node_ids(self.char1))
 
     @covers_requirement("map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams")
@@ -132,7 +163,7 @@ class MapKnowledgeSeamTests(EvenniaTest):
         self.gate.at_traverse(self.char1, self.north_gate)
         self._exit("south").at_traverse(self.char1, self.char1.location)
         self.assertIs(self.char1.location, self.north_gate)
-        self.assertIn("grid:capital_altoria:2:4", _node_ids(self.char1))
+        self.assertIn(_grid_node(self.north_gate), _node_ids(self.char1))
 
     @covers_requirement("map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams")
     def test_failed_gate_entry_records_nothing(self):

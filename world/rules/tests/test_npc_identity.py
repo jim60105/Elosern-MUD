@@ -129,8 +129,8 @@ class ValidateNPCNameTests(unittest.TestCase):
     def test_legal_name_round_trips_stripped(self):
         self.assertEqual(validate_npc_name(" 黑鬍 "), "黑鬍")
         self.assertEqual(
-            validate_npc_name(f"{_FULL_WIDTH_SPACE}雷加·鐵拳{_FULL_WIDTH_SPACE}"),
-            "雷加·鐵拳",
+            validate_npc_name(f"{_FULL_WIDTH_SPACE}岑影·鐵硨{_FULL_WIDTH_SPACE}"),
+            "岑影·鐵硨",
         )
 
     def test_interior_ordinary_whitespace_is_allowed(self):
@@ -221,7 +221,7 @@ class NPCTitleComposerTests(EvenniaTest):
 
     @covers_requirement('npc-identity-titles::a-single-deterministic-composer-renders-the-npc-full-identity')
     def test_player_and_monster_never_compose(self):
-        player = create_object(PlayerCharacter, key="冒險者")
+        player = create_object(PlayerCharacter, key="行旅客")
         for entity in (player, create_object(Monster, key="哥布林")):
             with self.subTest(entity=type(entity).__name__):
                 self.assertEqual(npc_title_value(entity), "")

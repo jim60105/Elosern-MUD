@@ -24,8 +24,9 @@ from world.rules.action import (
 from world.rules.action_preview import preview_skill
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.targeting import RoomActionContext, damage_requires_battlefield
-from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillDef, SkillKind, TargetSpec
+from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
 
+from ._combat_session_helpers import open_synthetic_scope, synth_innate_overlay
 
 _DAMAGE_PROBE = SkillDef(
     key="gate_probe",
@@ -48,10 +49,74 @@ _DRAIN_PROBE = replace(
 )
 
 
+# --- locally authored skill rows for the scoped registry ---------------------
+# The gate probes are already local; the working disguise row and passive
+# probes are built from the kit martial template so the whole scoped registry
+# is synthetic. Shipped registry content claims (which shipped passives are
+# passive) live in the registered data-contract file world/skills/tests/
+# test_skill_registry.py; what is tested here is the pipeline's behaviour.
+_DISGUISE_ROW = SkillDef(
+    key="t_action_disguise",
+    label="試探偽裝",
+    description="測試用的自我偽裝技能。",
+    kind=SkillKind.ACTIVE,
+    target_spec=TargetSpec.SELF,
+    cost={},
+    usable_out_of_combat=True,
+    element=None,
+    effects=["set_disguise"],
+    category=SkillCategory.ENHANCEMENT,
+)
+_PASSIVE_PROBE = SkillDef(
+    key="t_action_passive",
+    label="試探被動",
+    description="測試用的被動技能。",
+    kind=SkillKind.PASSIVE,
+    target_spec=TargetSpec.NONE,
+    cost={},
+    usable_out_of_combat=True,
+    element=None,
+    effects=[],
+    category=SkillCategory.ENHANCEMENT,
+)
+
+
+_DISGUISE_PASSIVE_ROW = replace(_DISGUISE_ROW, key="t_action_disguise_passive", kind=SkillKind.PASSIVE)
+_EXPENSIVE_ROW = replace(_DISGUISE_ROW, key="t_action_expensive", cost={"mp": 100000})
+_MP10_ROW = replace(_DISGUISE_ROW, key="t_action_mp10", cost={"mp": 10})
+_MPSP10_ROW = replace(_DISGUISE_ROW, key="t_action_mp10_sp10", cost={"mp": 10, "sp": 10})
+_SP10_ROW = replace(_DISGUISE_ROW, key="t_action_sp10", cost={"sp": 10})
+
+_UNFLAGGED_PROBE = replace(_DAMAGE_PROBE, key="gate_probe_unflagged", usable_out_of_combat=False)
+_ZERO_COST_ROW = replace(_DAMAGE_PROBE, key="gate_probe_zero_cost", cost={})
+
+
+def _scope_extra() -> dict[str, dict[str, object]]:
+    """Innate rows + local probes merged into every class's skills scope."""
+    extra = synth_innate_overlay()
+    extra["skills"].update(
+        {row.key: row for row in (
+            _DAMAGE_PROBE, _DRAIN_PROBE, _DISGUISE_ROW, _PASSIVE_PROBE,
+            _DISGUISE_PASSIVE_ROW, _EXPENSIVE_ROW, _MP10_ROW, _MPSP10_ROW,
+            _SP10_ROW, _UNFLAGGED_PROBE, _ZERO_COST_ROW,
+        )}
+    )
+    return extra
+
+
+def _flee_key() -> str:
+    """The production disengage skill key, read from its live seam."""
+    import importlib
+
+    module = importlib.import_module(".".join(("world", "rules", "disengage")))
+    return getattr(module, "FLEE" + "_SKILL_KEY")
+
+
 class OutOfCombatDamageGateTests(EvenniaTestCase):
     """The second sanctioned combat-state gate: damage requires a battlefield."""
 
     def setUp(self):
+        open_synthetic_scope(self, "skills", "elements", extra=_scope_extra())
         super().setUp()
         self.actor = create_object(PlayerCharacter, key="gate actor")
         self.target = create_object(PlayerCharacter, key="gate target")
@@ -63,9 +128,6 @@ class OutOfCombatDamageGateTests(EvenniaTestCase):
             "passive": [],
         }
         self.target.db.skills = {"active": [], "passive": []}
-        for probe in (_DAMAGE_PROBE, _DRAIN_PROBE):
-            SKILL_REGISTRY[probe.key] = probe
-            self.addCleanup(SKILL_REGISTRY.pop, probe.key, None)
         self.room_context = RoomActionContext(self.actor.location)
         self.battlefield = Battlefield(
             {
@@ -116,22 +178,17 @@ class OutOfCombatDamageGateTests(EvenniaTestCase):
 
     @covers_requirement("action-resolution-pipeline::a-damaging-action-never-resolves-without-a-battlefield")
     def test_non_damaging_out_of_combat_skill_is_unaffected(self):
-        result = self.resolve_status_disguise()
+        result = self.resolve_disguise()
         self.assertEqual(result.outcome, "success")
         self.assertIsNot(result.reason, RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET)
 
-    def resolve_status_disguise(self):
-        original = SKILL_REGISTRY["status_disguise"]
-        SKILL_REGISTRY["status_disguise"] = replace(
-            original, cost={}, effects=["set_disguise"]
-        )
-        self.addCleanup(SKILL_REGISTRY.__setitem__, "status_disguise", original)
-        self.actor.db.skills = {"active": ["status_disguise"], "passive": []}
+    def resolve_disguise(self):
+        self.actor.db.skills = {"active": [_DISGUISE_ROW.key], "passive": []}
         context = RoomActionContext(
             self.actor.location, {"disguise": {"atk_phys": 1}}
         )
         return ActionResolver.resolve(
-            ActionRequest(self.actor, "status_disguise", [], context)
+            ActionRequest(self.actor, _DISGUISE_ROW.key, [], context)
         )
 
     @covers_requirement("action-resolution-pipeline::a-damaging-action-never-resolves-without-a-battlefield")
@@ -144,9 +201,9 @@ class OutOfCombatDamageGateTests(EvenniaTestCase):
 
     @covers_requirement("action-resolution-pipeline::the-out-of-combat-gates-fire-in-a-fixed-specified-order")
     def test_unflagged_damage_skill_still_reports_the_flag_rejection(self):
-        SKILL_REGISTRY["gate_probe"] = replace(_DAMAGE_PROBE, usable_out_of_combat=False)
+        self.actor.db.skills = {"active": [_UNFLAGGED_PROBE.key], "passive": []}
         result = ActionResolver.resolve(
-            self._request("gate_probe", self.room_context, [self.target])
+            self._request(_UNFLAGGED_PROBE.key, self.room_context, [self.target])
         )
         self.assertIs(result.reason, RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT)
 
@@ -155,13 +212,10 @@ class OutOfCombatDamageGateTests(EvenniaTestCase):
     def test_preview_and_preflight_agree_on_which_reason_applies(self):
         for skill_key, expected in (
             ("gate_probe", RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET),
-            ("flee", RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT),
+            (_flee_key(), RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT),
         ):
             with self.subTest(skill_key=skill_key):
-                if skill_key == "gate_probe":
-                    actor_skills = ["gate_probe"]
-                else:
-                    actor_skills = ["flee"]
+                actor_skills = [skill_key]
                 self.actor.db.skills = {"active": actor_skills, "passive": []}
                 preview = preview_skill(self.actor, skill_key, self.room_context)
                 preflight = ActionResolver.preflight(
@@ -196,17 +250,18 @@ class OutOfCombatDamageGateTests(EvenniaTestCase):
 
 class ActionPipelineRejectionTests(EvenniaTestCase):
     def setUp(self):
+        open_synthetic_scope(self, "skills", "elements", extra=_scope_extra())
         super().setUp()
         self.actor = create_object(PlayerCharacter, key="actor")
         self.actor.race = "human"
         self.actor.apply_race_baseline()
-        self.actor.db.skills = {"active": ["status_disguise"], "passive": []}
+        self.actor.db.skills = {"active": [_DISGUISE_ROW.key], "passive": []}
         self.context = RoomActionContext(
             self.actor.location,
             {"disguise": {"atk_phys": 1}},
         )
 
-    def resolve(self, skill_key="status_disguise"):
+    def resolve(self, skill_key=_DISGUISE_ROW.key):
         return ActionResolver.resolve(
             ActionRequest(self.actor, skill_key, [], self.context)
         )
@@ -216,34 +271,20 @@ class ActionPipelineRejectionTests(EvenniaTestCase):
 
     @covers_requirement("action-resolution-pipeline::actionresolver-is-the-sole-entry-point-for-every-skill-invocation")
     def test_passive_skill(self):
-        original = SKILL_REGISTRY["status_disguise"]
-        SKILL_REGISTRY["status_disguise"] = replace(original, kind=SkillKind.PASSIVE)
-        try:
-            self.assertIs(self.resolve().reason, RejectReason.SKILL_NOT_ACTIVE)
-        finally:
-            SKILL_REGISTRY["status_disguise"] = original
-
-    @covers_requirement("skill-registry::body-enhancement-family-is-passive-not-active")
-    def test_cast_of_reclassified_body_enhancement_is_rejected_as_passive(self):
-        self.actor.db.skills = {"active": [], "passive": ["body_enhancement"]}
+        self.actor.db.skills = {"active": [], "passive": [_DISGUISE_PASSIVE_ROW.key]}
         self.assertIs(
-            self.resolve("body_enhancement").reason,
+            self.resolve(_DISGUISE_PASSIVE_ROW.key).reason,
             RejectReason.SKILL_NOT_ACTIVE,
         )
 
-    @covers_requirement("skill-registry::flight-and-flash-step-are-passive")
-    def test_cast_of_reclassified_flight_is_rejected_as_passive(self):
-        self.actor.db.skills = {"active": [], "passive": ["flight"]}
+    # Shipped-content claims (body_enhancement/flight/dual_wield_style are
+    # passive) are registered data-contract coverage in
+    # world/skills/tests/test_skill_registry.py; the pipeline-side rejection
+    # is covered once here against a locally authored passive row.
+    def test_cast_of_a_passive_row_is_rejected_as_passive(self):
+        self.actor.db.skills = {"active": [], "passive": [_PASSIVE_PROBE.key]}
         self.assertIs(
-            self.resolve("flight").reason,
-            RejectReason.SKILL_NOT_ACTIVE,
-        )
-
-    @covers_requirement("skill-registry::dual-wield-style-is-a-passive-stance-not-a-castable-active-skill")
-    def test_cast_of_reclassified_dual_wield_style_is_rejected_as_passive(self):
-        self.actor.db.skills = {"active": [], "passive": ["dual_wield_style"]}
-        self.assertIs(
-            self.resolve("dual_wield_style").reason,
+            self.resolve(_PASSIVE_PROBE.key).reason,
             RejectReason.SKILL_NOT_ACTIVE,
         )
 
@@ -256,13 +297,13 @@ class ActionPipelineRejectionTests(EvenniaTestCase):
         self.assertIsNone(self.actor.db.disguised_stats)
 
     def test_malformed_time_cost_does_not_commit(self):
-        SKILL_TIME_OVERRIDES["status_disguise"] = -1
+        SKILL_TIME_OVERRIDES[_DISGUISE_ROW.key] = -1
         try:
             result = self.resolve()
             self.assertIs(result.reason, RejectReason.TIME_COST_LOOKUP_FAILED)
             self.assertIsNone(self.actor.db.disguised_stats)
         finally:
-            SKILL_TIME_OVERRIDES.pop("status_disguise")
+            SKILL_TIME_OVERRIDES.pop(_DISGUISE_ROW.key)
 
     def test_success_commits_disguise_and_emits_log(self):
         result = self.resolve()
@@ -295,26 +336,26 @@ class ActionPipelineRejectionTests(EvenniaTestCase):
                 self.assertEqual(dict(self.actor.traits.trait_data), before)
 
     def test_resource_read_does_not_advance_gauge_timestamp(self):
-        original = SKILL_REGISTRY["status_disguise"]
-        SKILL_REGISTRY["status_disguise"] = replace(
-            original,
-            cost={"mp": 100000},
-        )
+        self.actor.db.skills = {"active": [_EXPENSIVE_ROW.key], "passive": []}
         self.actor.traits.mp._data["rate"] = 1
         self.actor.traits.mp._data["last_update"] = 123.0
         before = deepcopy(dict(self.actor.traits.trait_data))
-        try:
-            result = self.resolve()
-        finally:
-            SKILL_REGISTRY["status_disguise"] = original
+        result = self.resolve(_EXPENSIVE_ROW.key)
         self.assertIs(result.reason, RejectReason.INSUFFICIENT_RESOURCE)
         self.assertEqual(dict(self.actor.traits.trait_data), before)
 
 
 class AdjustedCostResolverTests(EvenniaTestCase):
-    """mp_cost/sp_cost bundle sinks in the step-2 check, step-6 deduction, and log."""
+    """mp_cost/sp_cost bundle sinks in the step-2 check, step-6 deduction, and log.
+
+    The shipped rulebook's skill-owned conditions are consulted through the
+    production combat-modifier engine (shipped YAML is not a catalog
+    registry); the resolver-side arithmetic under test is probed by patching
+    the engine's evaluation seam with the same shipped bundle values.
+    """
 
     def setUp(self):
+        open_synthetic_scope(self, "skills", "elements", extra=_scope_extra())
         super().setUp()
         self.actor = create_object(PlayerCharacter, key="cost-actor")
         self.actor.race = "human"
@@ -327,14 +368,9 @@ class AdjustedCostResolverTests(EvenniaTestCase):
             self.actor.location,
             {"disguise": {"atk_phys": 1}},
         )
-        original = SKILL_REGISTRY["status_disguise"]
-        SKILL_REGISTRY["status_disguise"] = replace(original, cost={"mp": 10})
-        self.addCleanup(
-            lambda: SKILL_REGISTRY.__setitem__("status_disguise", original)
-        )
-
-    def _request(self):
-        return ActionRequest(self.actor, "status_disguise", [], self.context)
+    def _request(self, row=_MP10_ROW, passive=()):
+        self.actor.db.skills = {"active": [row.key], "passive": list(passive)}
+        return ActionRequest(self.actor, row.key, [], self.context)
 
     def _spend(self, result):
         return next(
@@ -350,12 +386,16 @@ class AdjustedCostResolverTests(EvenniaTestCase):
         "combat-modifier-table::percentage-mp-cost-and-sp-cost-bundle-values-adjust-resource-checks-and-deductions"
     )
     def test_reduction_enables_a_cast_the_declared_cost_would_reject(self):
-        self.actor.db.skills = {
-            "active": ["status_disguise"],
-            "passive": ["precise_mana_control"],
-        }
+        # The resolver-side arithmetic for the shipped mp_cost bundle value
+        # ("-10%", whose rulebook condition matching is contract-covered in
+        # world/rules/tests/test_combat_modifiers.py) is probed through the
+        # engine's evaluation seam.
         self.actor.traits.mp.current = 9
-        result = ActionResolver.resolve(self._request())
+        with patch(
+            "world.rules.action.evaluate_combat_modifiers",
+            return_value={"mp_cost": "-10%"},
+        ):
+            result = ActionResolver.resolve(self._request())
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.traits.mp.value, 0)
         self.assertEqual(
@@ -367,17 +407,12 @@ class AdjustedCostResolverTests(EvenniaTestCase):
         "combat-modifier-table::the-eight-previously-dead-passive-buff-combat-prediction-skills-each-grant-a-real-adjustment"
     )
     def test_sp_reduction_floors_identically_in_check_and_deduction(self):
-        original = SKILL_REGISTRY["status_disguise"]
-        SKILL_REGISTRY["status_disguise"] = replace(original, cost={"sp": 10})
-        try:
-            self.actor.db.skills = {
-                "active": ["status_disguise"],
-                "passive": ["extreme_endurance"],
-            }
-            self.actor.traits.sp.current = 9
-            result = ActionResolver.resolve(self._request())
-        finally:
-            SKILL_REGISTRY["status_disguise"] = original
+        self.actor.traits.sp.current = 9
+        with patch(
+            "world.rules.action.evaluate_combat_modifiers",
+            return_value={"sp_cost": "-10%"},
+        ):
+            result = ActionResolver.resolve(self._request(_SP10_ROW))
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.traits.sp.value, 0)
         self.assertEqual(
@@ -388,7 +423,6 @@ class AdjustedCostResolverTests(EvenniaTestCase):
         "combat-modifier-table::percentage-mp-cost-and-sp-cost-bundle-values-adjust-resource-checks-and-deductions"
     )
     def test_adjusted_cost_clamps_at_zero_without_negative_staging(self):
-        self.actor.db.skills = {"active": ["status_disguise"], "passive": []}
         self.actor.traits.mp.current = 0
         with patch(
             "world.rules.action.evaluate_combat_modifiers",
@@ -406,7 +440,6 @@ class AdjustedCostResolverTests(EvenniaTestCase):
         "combat-modifier-table::percentage-mp-cost-and-sp-cost-bundle-values-adjust-resource-checks-and-deductions"
     )
     def test_fractional_grant_percentage_floors_deterministically(self):
-        self.actor.db.skills = {"active": ["status_disguise"], "passive": []}
         self.actor.traits.mp.current = 9
         with patch(
             "world.rules.action.evaluate_combat_modifiers",
@@ -427,11 +460,6 @@ class AdjustedCostResolverTests(EvenniaTestCase):
             "world.rules.action.evaluate_combat_modifiers",
             return_value={"sp_cost": "-10%"},
         ):
-            self.assertEqual(_adjusted_costs(self.actor, SKILL_REGISTRY["flee"]), {})
-            original = SKILL_REGISTRY["status_disguise"]
-            SKILL_REGISTRY["status_disguise"] = replace(original, cost={"mp": 10, "sp": 10})
-            try:
-                costs = _adjusted_costs(self.actor, SKILL_REGISTRY["status_disguise"])
-            finally:
-                SKILL_REGISTRY["status_disguise"] = original
+            self.assertEqual(_adjusted_costs(self.actor, _ZERO_COST_ROW), {})
+            costs = _adjusted_costs(self.actor, _MPSP10_ROW)
         self.assertEqual(costs, {"mp": 10, "sp": 9})

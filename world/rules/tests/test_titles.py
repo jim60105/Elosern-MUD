@@ -26,11 +26,9 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.titles import (
-    FIXED_TITLE_REGISTRY,
-    STARTER_EPITHET,
     FixedTitleDef,
+    StarterEpithet,
     TitleCategory,
     TitlePredicate,
     TitlePredicateFamily,
@@ -98,12 +96,89 @@ from world.rules.tests.test_cast_settlement import (
     _CastSettlementTestCase,
     _raising_stage,
 )
+from world.lore.guild import GuildRank
+from world.tests.synthetic_data import make_title
 
-_FIXED = {"kind": "fixed", "key": "g_f_rank", "granted_tick": 3}
+from ._combat_session_helpers import open_synthetic_scope
+from ._knowledge_probes import basic_attack_key, live_fixed_title_registry, live_guild_rank_registry, live_registry
+
+# --- synthetic title-cluster data (locally authored ladder + pair rows) ------
+# The title scope carries four locally authored fixed-title rows whose
+# predicates are the guild-rank pairing family, and the guild-rank scope
+# carries the matching F/E ladder (plus two extra rows so no shipped-shape
+# kit row dangles). Every pairing fact the suite asserts is authored here —
+# a rework of the shipped seven-pair ladder cannot break this suite.
+_LADDER = (
+    ("F", "t_pair_first_hunt", "霧鱗・初獵", "合成公會考官"),
+    ("E", "t_pair_woodland", "苔徑・巡林", "合成公會考官乙"),
+    ("t_bronze", "t_pair_bronze_badge", "灰鱗・銅徽", "合成公會銅階考官"),
+    ("t_silver", "t_pair_silver_badge", "霜鬃・銀環", "合成公會銀階考官"),
+)
+
+_PAIR_TITLES = {
+    title_key: make_title(
+        title_key,
+        display_name_zh=f"合成稱號{rank}",
+        predicate=TitlePredicate(
+            family=TitlePredicateFamily.GUILD_RANK_REACHED, guild_rank=rank
+        ),
+    )
+    for rank, title_key, _examiner, _examiner_title in _LADDER
+}
+# One counter-driven extra bankable row for multi-key bank/equip sequences.
+_T_PROBE_KEY = "t_synth_probe"
+_PROBE_TITLE = make_title(
+    _T_PROBE_KEY,
+    display_name_zh="探徑合成者",
+    predicate=TitlePredicate(
+        family=TitlePredicateFamily.COUNTER_THRESHOLD,
+        counter="t_synthetic_probe_counter",
+        threshold=1,
+    ),
+)
+_PAIR_TITLES[_T_PROBE_KEY] = _PROBE_TITLE
+
+# Rank letters are production ladder identifiers (never catalog tokens); the
+# rows themselves are authored here, so the ladder content is fully local.
+_PAIR_RANKS = {
+    "F": GuildRank("F", 1, 50, 400, "合成 F 階委託。", "t_pair_first_hunt", "霧鱗・初獵", "合成公會考官"),
+    "E": GuildRank("E", 2, 400, 4_000, "合成 E 階委託。", "t_pair_woodland", "苔徑・巡林", "合成公會考官乙"),
+    "t_bronze": GuildRank("t_bronze", 3, 4_000, 40_000, "合成銅階委託。", "t_pair_bronze_badge", "灰鱗・銅徽", "合成公會銅階考官"),
+    "t_silver": GuildRank("t_silver", 4, 40_000, 400_000, "合成銀階委託。", "t_pair_silver_badge", "霜鬃・銀環", "合成公會銀階考官"),
+}
+
+T_F_KEY = "t_pair_first_hunt"
+T_E_KEY = "t_pair_woodland"
+T_F_DISPLAY = _PAIR_TITLES[T_F_KEY].display_name_zh
+T_E_DISPLAY = _PAIR_TITLES[T_E_KEY].display_name_zh
+
+# The (patched) starter-epithet seam constant the guild claim path banks.
+T_STARTER = StarterEpithet("苔徑新旅", "你在合成公會完成第一次任務回報。")
+
+
+def _open_title_scope(test):
+    """Pairing titles + the F/E ladder + the patched starter-epithet seam."""
+    open_synthetic_scope(
+        test,
+        "titles",
+        "guild_ranks",
+        extra={"guild_ranks": _PAIR_RANKS, "titles": _PAIR_TITLES},
+    )
+    seam = patch("world.lore.titles.STARTER_EPITHET", T_STARTER)
+    seam.start()
+    test.addCleanup(seam.stop)
+
+
+def _starter():
+    """The CURRENT starter-epithet constant (synthetic inside the scope)."""
+    return live_registry("world.lore.titles", "STARTER_EPITHET")
+
+
+_FIXED = {"kind": "fixed", "key": T_F_KEY, "granted_tick": 3}
 _EPITHET = {
     "kind": "epithet",
-    "display": "南門新客",
-    "origin_quote": "你在南門守衛的目送下踏入阿爾托利亞。",
+    "display": T_STARTER.display,
+    "origin_quote": "你在苔徑分部的目送下踏入合成驛鎮。",
     "granted_tick": 4,
 }
 
@@ -132,11 +207,11 @@ def _with_counter_row(func):
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
         # The published registry is an immutable proxy, so the seam replaces
-        # the module attribute wholesale (merged with the shipped rows) for
+        # the module attribute wholesale (merged with the scoped rows) for
         # the duration of the test.
         with patch(
             "world.rules.titles.FIXED_TITLE_REGISTRY",
-            {**FIXED_TITLE_REGISTRY, _COUNTER_ROW_KEY: _COUNTER_ROW},
+            {**live_fixed_title_registry(), _COUNTER_ROW_KEY: _COUNTER_ROW},
         ):
             return func(self, *args, **kwargs)
 
@@ -148,7 +223,7 @@ def _with_counter_row(func):
 def _event_log(*entries: EventEntry) -> EventLog:
     return EventLog(
         actor="tester",
-        skill_key="basic_attack",
+        skill_key=basic_attack_key(),
         targets=("monster",),
         entries=entries,
         time_cost_seconds=1,
@@ -176,6 +251,7 @@ class TitleStateTests(EvenniaTest):
     """The two attributes, the strict reader, and the swap-only surface."""
 
     def setUp(self):
+        _open_title_scope(self)
         super().setUp()
         self.entity = create_object(PlayerCharacter, key="title-state-holder")
 
@@ -196,76 +272,76 @@ class TitleStateTests(EvenniaTest):
     @covers_requirement("title-system::compose-title-is-the-single-pure-composition-of-the-full-title")
     def test_compose_matrix_joins_non_empty_parts_fixed_first(self):
         self.assertEqual(compose_title(None, None), "")
-        self.assertEqual(compose_title("F級冒險者", None), "F級冒險者")
-        self.assertEqual(compose_title(None, "南門新客"), "南門新客")
-        self.assertEqual(compose_title("F級冒險者", "南門新客"), "F級冒險者　南門新客")
+        self.assertEqual(compose_title(T_F_DISPLAY, None), T_F_DISPLAY)
+        self.assertEqual(compose_title(None, _starter().display), _starter().display)
+        self.assertEqual(compose_title(T_F_DISPLAY, _starter().display), f"{T_F_DISPLAY}　{_starter().display}")
 
     def test_fixed_key_resolves_to_the_registry_display(self):
-        self.assertEqual(fixed_display_name("g_s_rank"), "S級傳說")
+        self.assertEqual(fixed_display_name(T_E_KEY), T_E_DISPLAY)
         # An unregistered key degrades to the key itself, never to a guess.
-        self.assertEqual(fixed_display_name("g_unknown"), "g_unknown")
+        self.assertEqual(fixed_display_name("t_unknown"), "t_unknown")
 
     @covers_requirement("title-system::compose-title-is-the-single-pure-composition-of-the-full-title")
     def test_compose_reads_only_the_equipped_slots(self):
         self._prime(
             [
                 _FIXED,
-                {**_FIXED, "key": "g_e_rank"},
+                {**_FIXED, "key": T_E_KEY},
                 _EPITHET,
                 {**_EPITHET, "display": "夜行者"},
             ],
-            {"fixed": "g_e_rank", "epithet": "夜行者"},
+            {"fixed": T_E_KEY, "epithet": "夜行者"},
         )
-        self.assertEqual(compose_full_title(self.entity), "E級斥候　夜行者")
+        self.assertEqual(compose_full_title(self.entity), f"{T_E_DISPLAY}　夜行者")
 
     @covers_requirement("title-system::slot-non-empty-is-an-invariant-with-auto-equip-and-no-unequip", "title-system::title-state-is-a-two-kind-collection-and-a-two-slot-equip-record")
     def test_bank_fixed_auto_equips_once_and_dedupes(self):
-        self.assertTrue(bank_fixed(self.entity, "g_f_rank", 1))
+        self.assertTrue(bank_fixed(self.entity, T_F_KEY, 1))
         collection, equipped = read_title_state(self.entity)
-        self.assertEqual(equipped["fixed"], "g_f_rank")
+        self.assertEqual(equipped["fixed"], T_F_KEY)
         self.assertEqual(collection[0]["granted_tick"], 1)
         # A duplicate key is a silent no-op: order and tick both stay put.
-        self.assertFalse(bank_fixed(self.entity, "g_f_rank", 99))
+        self.assertFalse(bank_fixed(self.entity, T_F_KEY, 99))
         self.assertEqual(read_title_state(self.entity)[0], collection)
 
     @covers_requirement("title-system::slot-non-empty-is-an-invariant-with-auto-equip-and-no-unequip", "title-system::title-state-is-a-two-kind-collection-and-a-two-slot-equip-record")
     def test_bank_epithet_auto_equips_once_and_dedupes(self):
-        self.assertTrue(bank_epithet(self.entity, "南門新客", "守衛的目送", 2))
+        self.assertTrue(bank_epithet(self.entity, _starter().display, "守衛的目送", 2))
         _, equipped = read_title_state(self.entity)
-        self.assertEqual(equipped["epithet"], "南門新客")
+        self.assertEqual(equipped["epithet"], _starter().display)
         before = read_title_state(self.entity)[0]
-        self.assertFalse(bank_epithet(self.entity, "南門新客", "另一段引文", 55))
+        self.assertFalse(bank_epithet(self.entity, _starter().display, "另一段引文", 55))
         self.assertEqual(read_title_state(self.entity)[0], before)
 
     @covers_requirement("title-system::narrative-consumers-compose-predicates-read-the-collection")
     def test_mechanical_reads_cover_the_whole_collection_not_the_slots(self):
-        bank_fixed(self.entity, "g_f_rank", 1)
-        bank_fixed(self.entity, "g_e_rank", 2)
-        bank_epithet(self.entity, "南門新客", "守衛的目送", 3)
+        bank_fixed(self.entity, T_F_KEY, 1)
+        bank_fixed(self.entity, T_E_KEY, 2)
+        bank_epithet(self.entity, _starter().display, "守衛的目送", 3)
         bank_epithet(self.entity, "夜行者", "夜裡的眼", 4)
         # Only the first entry of each kind auto-equipped; the later ones
         # never touched a slot.
         _, equipped = read_title_state(self.entity)
-        self.assertEqual(equipped, {"fixed": "g_f_rank", "epithet": "南門新客"})
+        self.assertEqual(equipped, {"fixed": T_F_KEY, "epithet": _starter().display})
         # The mechanical reads still see every banked entry in the collection.
-        self.assertEqual(banked_fixed_keys(self.entity), ("g_f_rank", "g_e_rank"))
+        self.assertEqual(banked_fixed_keys(self.entity), (T_F_KEY, T_E_KEY))
         self.assertEqual(
             tuple(entry["display"] for entry in banked_epithets(self.entity)),
-            ("南門新客", "夜行者"),
+            (_starter().display, "夜行者"),
         )
 
     def test_bank_fixed_rejects_malformed_input_without_touching_state(self):
-        bank_fixed(self.entity, "g_f_rank", 1)
-        bank_epithet(self.entity, "南門新客", "守衛的目送", 1)
+        bank_fixed(self.entity, T_F_KEY, 1)
+        bank_epithet(self.entity, _starter().display, "守衛的目送", 1)
         before = deepcopy(read_title_state(self.entity))
         cases = (
             ("", 1),
-            ("g_unknown_rank", 1),
-            ("S級傳說", 1),
-            ("g_e_rank", -1),
-            ("g_e_rank", 1.0),
-            ("g_e_rank", True),
-            ("g_e_rank", "1"),
+            ("t_unknown_rank", 1),
+            ("未存在的稱號", 1),
+            (T_E_KEY, -1),
+            (T_E_KEY, 1.0),
+            (T_E_KEY, True),
+            (T_E_KEY, "1"),
             (None, 1),
             (7, 1),
         )
@@ -278,8 +354,8 @@ class TitleStateTests(EvenniaTest):
     def test_bank_epithet_rejects_malformed_input_without_touching_state(self):
         from world.rules.titles import MAX_EPITHET_DISPLAY_CODE_POINTS
 
-        bank_fixed(self.entity, "g_f_rank", 1)
-        bank_epithet(self.entity, "南門新客", "守衛的目送", 1)
+        bank_fixed(self.entity, T_F_KEY, 1)
+        bank_epithet(self.entity, _starter().display, "守衛的目送", 1)
         before = deepcopy(read_title_state(self.entity))
         oversized = "長" * (MAX_EPITHET_DISPLAY_CODE_POINTS + 1)
         cases = (
@@ -308,16 +384,16 @@ class TitleStateTests(EvenniaTest):
 
     @covers_requirement("title-system::slot-non-empty-is-an-invariant-with-auto-equip-and-no-unequip", "title-system::the-title-equip-surface-swaps-identifiers-and-never-un-equips")
     def test_no_mutator_sequence_empties_an_occupied_slot(self):
-        bank_fixed(self.entity, "g_f_rank", 1)
-        bank_epithet(self.entity, "南門新客", "守衛的目送", 1)
+        bank_fixed(self.entity, T_F_KEY, 1)
+        bank_epithet(self.entity, _starter().display, "守衛的目送", 1)
         sequence = [
-            lambda: bank_fixed(self.entity, "g_e_rank", 2),
+            lambda: bank_fixed(self.entity, T_E_KEY, 2),
             lambda: bank_epithet(self.entity, "夜行者", "夜裡的眼", 2),
-            lambda: equip_fixed(self.entity, "g_e_rank"),
+            lambda: equip_fixed(self.entity, T_E_KEY),
             lambda: equip_epithet(self.entity, "夜行者"),
-            lambda: equip_fixed(self.entity, "g_f_rank"),
-            lambda: equip_epithet(self.entity, "南門新客"),
-            lambda: bank_fixed(self.entity, "g_d_rank", 3),
+            lambda: equip_fixed(self.entity, T_F_KEY),
+            lambda: equip_epithet(self.entity, _starter().display),
+            lambda: bank_fixed(self.entity, "t_synth_probe", 3),
         ]
         for step in sequence:
             step()
@@ -326,7 +402,7 @@ class TitleStateTests(EvenniaTest):
             self.assertIsNotNone(equipped["epithet"])
         # Rejected mutators cannot empty a slot either.
         for attempt in (
-            lambda: equip_fixed(self.entity, "S級傳說"),
+            lambda: equip_fixed(self.entity, "未存在的稱號"),
             lambda: equip_epithet(self.entity, "未存在"),
         ):
             with self.assertRaises(TitleEquipError):
@@ -337,36 +413,36 @@ class TitleStateTests(EvenniaTest):
 
     @covers_requirement("title-system::the-title-equip-surface-swaps-identifiers-and-never-un-equips")
     def test_equip_accepts_key_or_display_and_returns_the_display(self):
-        bank_fixed(self.entity, "g_f_rank", 1)
-        bank_fixed(self.entity, "g_e_rank", 2)
-        self.assertEqual(equip_fixed(self.entity, "g_e_rank"), "E級斥候")
-        self.assertEqual(compose_full_title(self.entity), "E級斥候")
-        self.assertEqual(equip_fixed(self.entity, "F級冒險者"), "F級冒險者")
-        self.assertEqual(read_title_state(self.entity)[1]["fixed"], "g_f_rank")
-        self.assertEqual(equip_fixed(self.entity, "F級冒險者"), "F級冒險者")
-        bank_epithet(self.entity, "南門新客", "守衛的目送", 1)
+        bank_fixed(self.entity, T_F_KEY, 1)
+        bank_fixed(self.entity, T_E_KEY, 2)
+        self.assertEqual(equip_fixed(self.entity, T_E_KEY), T_E_DISPLAY)
+        self.assertEqual(compose_full_title(self.entity), T_E_DISPLAY)
+        self.assertEqual(equip_fixed(self.entity, T_F_DISPLAY), T_F_DISPLAY)
+        self.assertEqual(read_title_state(self.entity)[1]["fixed"], T_F_KEY)
+        self.assertEqual(equip_fixed(self.entity, T_F_DISPLAY), T_F_DISPLAY)
+        bank_epithet(self.entity, _starter().display, "守衛的目送", 1)
         bank_epithet(self.entity, "夜行者", "夜裡的眼", 2)
         self.assertEqual(equip_epithet(self.entity, "夜行者"), "夜行者")
-        self.assertEqual(compose_full_title(self.entity), "F級冒險者　夜行者")
+        self.assertEqual(compose_full_title(self.entity), f"{T_F_DISPLAY}　夜行者")
 
     @covers_requirement("title-system::the-title-equip-surface-swaps-identifiers-and-never-un-equips")
     def test_equip_rejections_name_only_the_request_and_leak_no_candidates(self):
-        bank_fixed(self.entity, "g_f_rank", 1)
-        bank_epithet(self.entity, "南門新客", "守衛的目送", 1)
+        bank_fixed(self.entity, T_F_KEY, 1)
+        bank_epithet(self.entity, _starter().display, "守衛的目送", 1)
         with self.assertRaises(TitleEquipError) as caught:
-            equip_fixed(self.entity, "S級傳說")
+            equip_fixed(self.entity, "未存在的稱號")
         message = str(caught.exception)
-        self.assertIn("S級傳說", message)
+        self.assertIn("未存在的稱號", message)
         # No oracle: the rejection never lists what the player does hold.
-        for hidden in ("F級冒險者", "南門新客", "g_f_rank"):
+        for hidden in (T_F_DISPLAY, _starter().display, T_F_KEY):
             self.assertNotIn(hidden, message)
         # Wrong-kind and unknown identifiers share the same rejection type.
         with self.assertRaises(TitleEquipError):
-            equip_fixed(self.entity, "南門新客")
+            equip_fixed(self.entity, _starter().display)
         with self.assertRaises(TitleEquipError):
-            equip_epithet(self.entity, "F級冒險者")
+            equip_epithet(self.entity, T_F_DISPLAY)
         with self.assertRaises(TitleEquipError):
-            equip_epithet(self.entity, "g_f_rank")
+            equip_epithet(self.entity, T_F_KEY)
 
     def _malformed_states(self):
         return {
@@ -377,7 +453,7 @@ class TitleStateTests(EvenniaTest):
                 {"fixed": None, "epithet": None},
             ),
             "entry has unknown kind": (
-                [{"kind": "rank", "key": "g_f_rank", "granted_tick": 1}],
+                [{"kind": "rank", "key": T_F_KEY, "granted_tick": 1}],
                 {"fixed": None, "epithet": None},
             ),
             "fixed entry misses its key": (
@@ -385,7 +461,7 @@ class TitleStateTests(EvenniaTest):
                 {"fixed": None, "epithet": None},
             ),
             "epithet entry misses its quote": (
-                [{"kind": "epithet", "display": "南門新客", "granted_tick": 1}],
+                [{"kind": "epithet", "display": _starter().display, "granted_tick": 1}],
                 {"fixed": None, "epithet": None},
             ),
             "granted_tick is boolean": (
@@ -402,11 +478,11 @@ class TitleStateTests(EvenniaTest):
             ),
             "duplicate fixed key": (
                 [_FIXED, dict(_FIXED)],
-                {"fixed": "g_f_rank", "epithet": None},
+                {"fixed": T_F_KEY, "epithet": None},
             ),
             "duplicate epithet display": (
                 [_EPITHET, dict(_EPITHET)],
-                {"fixed": None, "epithet": "南門新客"},
+                {"fixed": None, "epithet": _starter().display},
             ),
             "equipped is not a mapping": ([], "fixed"),
             "equipped has unknown fields": (
@@ -425,11 +501,11 @@ class TitleStateTests(EvenniaTest):
             ),
             "fixed slot names an unbanked key": (
                 [_FIXED],
-                {"fixed": "g_e_rank", "epithet": None},
+                {"fixed": T_E_KEY, "epithet": None},
             ),
             "fixed slot names a banked epithet": (
                 [_FIXED, _EPITHET],
-                {"fixed": "南門新客", "epithet": "南門新客"},
+                {"fixed": _starter().display, "epithet": _starter().display},
             ),
             "epithet slot names an unbanked display": (
                 [_EPITHET],
@@ -442,10 +518,10 @@ class TitleStateTests(EvenniaTest):
         mutators = {
             "read": lambda entity: read_title_state(entity),
             "compose": lambda entity: compose_full_title(entity),
-            "bank_fixed": lambda entity: bank_fixed(entity, "g_d_rank", 9),
+            "bank_fixed": lambda entity: bank_fixed(entity, "t_synth_probe", 9),
             "bank_epithet": lambda entity: bank_epithet(entity, "新異名", "引文", 9),
-            "equip_fixed": lambda entity: equip_fixed(entity, "g_f_rank"),
-            "equip_epithet": lambda entity: equip_epithet(entity, "南門新客"),
+            "equip_fixed": lambda entity: equip_fixed(entity, T_F_KEY),
+            "equip_epithet": lambda entity: equip_epithet(entity, _starter().display),
             "banked_fixed_keys": lambda entity: banked_fixed_keys(entity),
             "banked_epithets": lambda entity: banked_epithets(entity),
             "context_entries": lambda entity: title_context_entries(entity),
@@ -671,11 +747,11 @@ class TitlePredicateTests(EvenniaTest):
 
     def test_mastery_owned_reads_skill_ownership(self):
         predicate = TitlePredicate(
-            family=TitlePredicateFamily.MASTERY_OWNED, element="fire"
+            family=TitlePredicateFamily.MASTERY_OWNED, element="ember"
         )
         self.entity.db.skills = {"active": [], "passive": []}
         self.assertFalse(predicate_satisfied(self.entity, _event_log(), predicate))
-        self.entity.db.skills = {"active": ["fire_mastery"], "passive": []}
+        self.entity.db.skills = {"active": ["ember_mastery"], "passive": []}
         self.assertTrue(predicate_satisfied(self.entity, _event_log(), predicate))
 
     def test_lineage_complete_needs_ownership_and_the_crown_cap(self):
@@ -766,6 +842,7 @@ class TitlePlannerTests(EvenniaTest):
     """The planner stages grants; only the commit applies them (D4/D5)."""
 
     def setUp(self):
+        _open_title_scope(self)
         super().setUp()
         self.planners = dict(_EVENT_EFFECT_PLANNERS)
         self.actor = create_object(PlayerCharacter, key="title-planner-actor")
@@ -780,7 +857,7 @@ class TitlePlannerTests(EvenniaTest):
 
         return ActionRequest(
             actor=self.actor,
-            skill_key="basic_attack",
+            skill_key="probe_action",
             targets=[],
             context=RoomActionContext(None, {}),
         )
@@ -825,9 +902,9 @@ class TitlePlannerTests(EvenniaTest):
         # propagate out of the planner: the row grants nothing, the action
         # stands. ``db.skills`` as a non-mapping makes both the handler fold
         # and the no-create fallback fail.
-        self.actor.db.skills = [{"active": "basic_attack"}]
+        self.actor.db.skills = [{"active": "probe_skill"}]
         for family, parameter, value in (
-            (TitlePredicateFamily.MASTERY_OWNED, "element", "fire"),
+            (TitlePredicateFamily.MASTERY_OWNED, "element", "ember"),
             (TitlePredicateFamily.LINEAGE_COMPLETE, "root_skill_key", "firebolt"),
         ):
             with self.subTest(family=family.value):
@@ -853,10 +930,11 @@ class TitlePlannerTests(EvenniaTest):
             "提示文字。",
             TitlePredicate(
                 family=TitlePredicateFamily.LINEAGE_COMPLETE,
-                root_skill_key="basic_attack",
+                root_skill_key="probe_skill",
             ),
         )
-        self.actor.db.skill_proficiency = {"basic_attack": "not-a-number"}
+        self.actor.db.skills = {"active": ["probe_skill"], "passive": []}
+        self.actor.db.skill_proficiency = {"probe_skill": "not-a-number"}
         with patch("world.rules.titles.FIXED_TITLE_REGISTRY", {"t_lineage": row}):
             with self.assertRaises(TitleDataError):
                 predicate_satisfied(self.actor, _event_log(), row.predicate)
@@ -865,20 +943,22 @@ class TitlePlannerTests(EvenniaTest):
     def test_an_uneventful_action_stages_nothing(self):
         self.assertEqual(title_event_effect_planner(self._request(), _event_log()), [])
 
-    def test_shipped_guild_rows_are_satisfied_by_the_current_rank(self):
-        self.actor.db.guild_rank = "C"
+    def test_the_paired_rank_row_is_satisfied_by_the_current_rank(self):
+        # The scoped ladder's E row fires for exactly its rank; the pairing
+        # shape (rank letter -> its own fixed-title row) is what the planner
+        # reads, whichever rows the shipped ladder happens to carry.
+        self.actor.db.guild_rank = "E"
         effects = title_event_effect_planner(self._request(), _event_log())
-        self.assertEqual([effect.notify for effect in effects], ["獲得稱號：C級騎士"])
+        self.assertEqual([effect.notify for effect in effects], [f"獲得稱號：{T_E_DISPLAY}"])
         for effect in effects:
             effect.apply()
-        self.assertEqual(banked_fixed_keys(self.actor), ("g_c_rank",))
-        self.assertEqual(compose_full_title(self.actor), "C級騎士")
+        self.assertEqual(banked_fixed_keys(self.actor), (T_E_KEY,))
+        self.assertEqual(compose_full_title(self.actor), T_E_DISPLAY)
         self.assertEqual(title_event_effect_planner(self._request(), _event_log()), [])
 
-    def test_every_shipped_row_is_reachable_through_its_own_predicate(self):
-        # The registry's seven rows are all guild pairings: each one fires for
-        # exactly its rank and for no other rank.
-        for rank, definition in sorted(GUILD_RANK_REGISTRY.items()):
+    def test_every_paired_row_is_reachable_through_its_own_predicate(self):
+        # Every scoped ladder row fires for exactly its rank and no other.
+        for rank, definition in sorted(live_guild_rank_registry().items()):
             with self.subTest(rank=rank):
                 holder = create_object(PlayerCharacter, key=f"t-plan-{rank}")
                 holder.db.guild_rank = rank
@@ -906,10 +986,10 @@ class TitlePlannerTests(EvenniaTest):
         # The counter row's predicate fails closed and is skipped; the action
         # is never rejected, and a row reading healthy state still fires.
         self.assertEqual(self._plan(), [])
-        self.actor.db.guild_rank = "D"
+        self.actor.db.guild_rank = "E"
         self.assertEqual(
             [effect.description for effect in self._plan()],
-            ["title_granted|g_d_rank"],
+            [f"title_granted|{T_E_KEY}"],
         )
 
     def test_registration_is_idempotent_in_the_planner_registry(self):
@@ -938,10 +1018,11 @@ class TitleCommitRollbackTests(EvenniaTest):
     """A failed commit restores title state exactly (no lost or double grant)."""
 
     def setUp(self):
+        _open_title_scope(self)
         super().setUp()
         self.actor = create_object(PlayerCharacter, key="title-commit-actor")
 
-    def _bank_effect(self, key="g_f_rank"):
+    def _bank_effect(self, key=T_F_KEY):
         return PendingEffect(
             self.actor,
             f"title_granted|{key}",
@@ -967,21 +1048,21 @@ class TitleCommitRollbackTests(EvenniaTest):
         self.assertFalse(self.actor.attributes.has(TITLE_COLLECTION_KEY))
 
     def test_failed_commit_restores_a_pre_existing_collection(self):
-        bank_fixed(self.actor, "g_f_rank", 1)
+        bank_fixed(self.actor, T_F_KEY, 1)
         before = deepcopy(read_title_state(self.actor))
         with self.assertRaises(CommitFailed):
-            _commit([self._bank_effect("g_e_rank"), self._raising_effect()], char="tester", action="test_skill")
+            _commit([self._bank_effect(T_E_KEY), self._raising_effect()], char="tester", action="test_skill")
         self.assertEqual(read_title_state(self.actor), before)
 
     def test_a_successful_commit_grants_once(self):
-        _commit([self._bank_effect("g_f_rank")], char="tester", action="test_skill")
-        self.assertEqual(banked_fixed_keys(self.actor), ("g_f_rank",))
+        _commit([self._bank_effect(T_F_KEY)], char="tester", action="test_skill")
+        self.assertEqual(banked_fixed_keys(self.actor), (T_F_KEY,))
 
     def test_failed_commit_restores_the_removal_log_surface(self):
         # The durable removal log is registered in the commit-window entity
         # snapshot: a failed commit restores it byte-identically alongside
         # the title attributes (no orphaned removal record).
-        bank_epithet(self.actor, "南門新客", "初入南門。", 1)
+        bank_epithet(self.actor, _starter().display, "初入南門。", 1)
         bank_epithet(self.actor, "待放之名", "舊事蹟。", 2)
         remove_epithet(self.actor, "待放之名")
         before_log = deepcopy(self.actor.attributes.get(REMOVALS_LOG_KEY))
@@ -1082,6 +1163,7 @@ class TitleGuildPairingTests(EvenniaTest):
     """Registration banks the rank title only; the epithet rides first claim."""
 
     def setUp(self):
+        _open_title_scope(self)
         super().setUp()
         from world.quests.catalog import register_catalog
 
@@ -1094,7 +1176,7 @@ class TitleGuildPairingTests(EvenniaTest):
         self.staff = create_object(NPC, key="title guild staff", location=self.room)
         self.staff.components.add(
             GuildStaff.create(
-                self.staff, service_id="staff", branch_key="guild_branch_altoria"
+                self.staff, service_id="staff", branch_key="t_mossgate_branch"
             )
         )
 
@@ -1102,25 +1184,25 @@ class TitleGuildPairingTests(EvenniaTest):
     def test_first_quest_epithet_grant_banks_and_auto_equips_the_epithet_slot(self):
         with patch("world.rules.titles.get_world_clock", return_value=WorldClock(42)):
             lines = grant_first_quest_epithet(self.player)
-        self.assertEqual(lines, ("獲得異名：南門新客",))
-        self.assertEqual(compose_full_title(self.player), "南門新客")
+        self.assertEqual(lines, (f"獲得異名：{_starter().display}",))
+        self.assertEqual(compose_full_title(self.player), _starter().display)
         collection, equipped = read_title_state(self.player)
-        self.assertEqual(equipped, {"fixed": None, "epithet": STARTER_EPITHET.display})
+        self.assertEqual(equipped, {"fixed": None, "epithet": _starter().display})
         self.assertEqual([entry["granted_tick"] for entry in collection], [42])
-        self.assertEqual(collection[0]["origin_quote"], STARTER_EPITHET.origin_basis)
+        self.assertEqual(collection[0]["origin_quote"], _starter().origin_basis)
 
     def test_a_second_first_quest_epithet_grant_is_silent_and_inert(self):
         first = grant_first_quest_epithet(self.player)
         before = deepcopy(read_title_state(self.player))
         self.assertEqual(grant_first_quest_epithet(self.player), ())
         self.assertEqual(read_title_state(self.player), before)
-        self.assertEqual(first, ("獲得異名：南門新客",))
+        self.assertEqual(first, (f"獲得異名：{_starter().display}",))
 
     @covers_requirement("title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
     def test_rank_titles_pair_one_to_one_with_the_guild_ranks(self):
-        for rank, definition in GUILD_RANK_REGISTRY.items():
+        for rank, definition in live_guild_rank_registry().items():
             with self.subTest(rank=rank):
-                title_row = FIXED_TITLE_REGISTRY[definition.title_key]
+                title_row = live_fixed_title_registry()[definition.title_key]
                 holder = create_object(PlayerCharacter, key=f"title-rank-{rank}")
                 self.assertEqual(
                     grant_rank_title(holder, rank),
@@ -1139,10 +1221,10 @@ class TitleGuildPairingTests(EvenniaTest):
         record = register_adventurer(self.player, staff=self.staff)
         self.assertEqual(
             record["title_notifications"],
-            ["獲得稱號：F級冒險者"],
+            [f"獲得稱號：{T_F_DISPLAY}"],
         )
-        self.assertEqual(compose_full_title(self.player), "F級冒險者")
-        self.assertEqual(banked_fixed_keys(self.player), ("g_f_rank",))
+        self.assertEqual(compose_full_title(self.player), T_F_DISPLAY)
+        self.assertEqual(banked_fixed_keys(self.player), (T_F_KEY,))
         self.assertEqual(banked_epithets(self.player), ())
 
     @covers_requirement("guild-registration::guild-registration-grants-the-paired-starter-titles-atomically", "title-system::guild-registration-and-rank-promotion-grant-paired-titles-atomically")
@@ -1163,7 +1245,7 @@ class TitleGuildPairingTests(EvenniaTest):
         self.assertFalse(self.player.attributes.has(TITLE_COLLECTION_KEY))
         # The retry grants each entry exactly once.
         record = register_adventurer(self.player, staff=self.staff)
-        self.assertEqual(record["title_notifications"], ["獲得稱號：F級冒險者"])
+        self.assertEqual(record["title_notifications"], [f"獲得稱號：{T_F_DISPLAY}"])
         self.assertEqual(len(banked_fixed_keys(self.player)), 1)
         self.assertEqual(banked_epithets(self.player), ())
 
@@ -1206,14 +1288,14 @@ class TitleGuildPairingTests(EvenniaTest):
         exam_id = self._arm_exam("E")
         result = self._settle(exam_id, "exam_passed")
         self.assertEqual(result["passed"], True)
-        self.assertEqual(result["title_notifications"], ["獲得稱號：E級斥候"])
+        self.assertEqual(result["title_notifications"], [f"獲得稱號：{T_E_DISPLAY}"])
         self.assertEqual(self.player.guild_rank, "E")
         self.assertEqual(
-            banked_fixed_keys(self.player), ("g_f_rank", "g_e_rank")
+            banked_fixed_keys(self.player), (T_F_KEY, T_E_KEY)
         )
         # D8: the fixed slot was occupied, so promotion never re-equips.
         _, equipped = read_title_state(self.player)
-        self.assertEqual(equipped["fixed"], "g_f_rank")
+        self.assertEqual(equipped["fixed"], T_F_KEY)
 
     def test_a_failed_exam_grants_nothing(self):
         register_adventurer(self.player, staff=self.staff)
@@ -1243,7 +1325,7 @@ class TitleGuildPairingTests(EvenniaTest):
         self.assertEqual(read_title_state(self.player), (before_collection, before_equipped))
         # Exactly one retry settles and grants once.
         result = self._settle(exam_id, "exam_passed")
-        self.assertEqual(result["title_notifications"], ["獲得稱號：E級斥候"])
+        self.assertEqual(result["title_notifications"], [f"獲得稱號：{T_E_DISPLAY}"])
         self.assertEqual(len(banked_fixed_keys(self.player)), 2)
 
     def test_exam_pass_fires_observers_once_and_fail_does_not(self):
@@ -1296,6 +1378,7 @@ class EpithetNominationRulesTests(EvenniaTest):
     """Ballot face, suppression/cooldown, and the three rules-layer writers."""
 
     def setUp(self):
+        _open_title_scope(self)
         super().setUp()
         self.entity = create_object(PlayerCharacter, key="ballot-holder")
 
@@ -1366,7 +1449,7 @@ class EpithetNominationRulesTests(EvenniaTest):
 
     @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_accept_banks_auto_equips_and_clears(self):
-        bank_fixed(self.entity, "g_f_rank", 1)
+        bank_fixed(self.entity, T_F_KEY, 1)
         self._persist(("火焰之心", "焚盡匪寨"))
         display, banked = accept_epithet(self.entity, 1)
         self.assertEqual((display, banked), ("火焰之心", True))
@@ -1385,16 +1468,16 @@ class EpithetNominationRulesTests(EvenniaTest):
         grant_first_quest_epithet(self.entity)
         self._persist(("新月", "月下救人"))
         _, equipped_before = read_title_state(self.entity)
-        self.assertEqual(equipped_before["epithet"], STARTER_EPITHET.display)
+        self.assertEqual(equipped_before["epithet"], _starter().display)
         accept_epithet(self.entity, 1)
         _, equipped_after = read_title_state(self.entity)
-        self.assertEqual(equipped_after["epithet"], STARTER_EPITHET.display)
+        self.assertEqual(equipped_after["epithet"], _starter().display)
 
     def test_duplicate_display_accept_consumes_ballot_without_new_entry(self):
         grant_first_quest_epithet(self.entity)
-        self._persist((STARTER_EPITHET.display, "再次入票的事蹟"))
+        self._persist((_starter().display, "再次入票的事蹟"))
         display, banked = accept_epithet(self.entity, 1)
-        self.assertEqual((display, banked), (STARTER_EPITHET.display, False))
+        self.assertEqual((display, banked), (_starter().display, False))
         self.assertFalse(self.entity.attributes.has(PENDING_BALLOT_KEY))
         self.assertEqual(len(banked_epithets(self.entity)), 1)
 
@@ -1407,7 +1490,7 @@ class EpithetNominationRulesTests(EvenniaTest):
 
     @covers_requirement("title-system::ballot-persistence-acceptance-and-decline-are-rules-layer-writers-only")
     def test_accept_failure_restores_every_attribute(self):
-        bank_fixed(self.entity, "g_f_rank", 1)
+        bank_fixed(self.entity, T_F_KEY, 1)
         self._persist(("甲名", "一"))
         before = read_title_state(self.entity)
         with patch.object(
@@ -1508,7 +1591,7 @@ class EpithetNominationRulesTests(EvenniaTest):
         grant_first_quest_epithet(self.entity)
         self.assertEqual(
                 owned_epithet_displays(self.entity),
-                frozenset({STARTER_EPITHET.display}),
+                frozenset({_starter().display}),
         )
         self.assertEqual(declined_digest(self.entity), ())
         for bad_limit in (True, -1, "5", None):
@@ -1539,6 +1622,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
     the bounded durable removal log (title-codex-removal task 4.2)."""
 
     def setUp(self):
+        _open_title_scope(self)
         super().setUp()
         self.entity = create_object(PlayerCharacter, key="removal-holder")
 
@@ -1555,7 +1639,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
         # Unknown before anything: no epithets at all, fixed keys, blanks,
         # and non-strings all read TARGET_UNKNOWN.
         grant_first_quest_epithet(self.entity)
-        for target in (" nonexistent", "g_f_rank", "", None, 7, True, ["破城先鋒"]):
+        for target in (" nonexistent", T_F_KEY, "", None, 7, True, ["破城先鋒"]):
             with self.subTest(target=target):
                 self.assertIs(
                     epithet_removal_gate(self.entity, target),
@@ -1567,19 +1651,19 @@ class EpithetRemovalRulesTests(EvenniaTest):
         )
         # Sole epithet (necessarily equipped by D8) reads LAST, not EQUIPPED.
         self.assertIs(
-            epithet_removal_gate(self.entity, "南門新客"),
+            epithet_removal_gate(self.entity, _starter().display),
             TitleRemovalReason.LAST_EPITHET,
         )
         # With two epithets the equipped one reads EQUIPPED, the other passes.
         bank_epithet(self.entity, "破城先鋒", "率先破門。", 500)
         self.assertIs(
-            epithet_removal_gate(self.entity, "南門新客"),
+            epithet_removal_gate(self.entity, _starter().display),
             TitleRemovalReason.EQUIPPED_UNREMOVABLE,
         )
         self.assertIsNone(epithet_removal_gate(self.entity, "破城先鋒"))
         # Swapping moves the verdict, never the precedence.
         equip_epithet(self.entity, "破城先鋒")
-        self.assertIsNone(epithet_removal_gate(self.entity, "南門新客"))
+        self.assertIsNone(epithet_removal_gate(self.entity, _starter().display))
         self.assertIs(
             epithet_removal_gate(self.entity, "破城先鋒"),
             TitleRemovalReason.EQUIPPED_UNREMOVABLE,
@@ -1594,8 +1678,8 @@ class EpithetRemovalRulesTests(EvenniaTest):
         before = read_title_state(self.entity)
         for target, reason in (
             ("不存在", TitleRemovalReason.TARGET_UNKNOWN),
-            ("g_f_rank", TitleRemovalReason.TARGET_UNKNOWN),
-            ("南門新客", TitleRemovalReason.EQUIPPED_UNREMOVABLE),
+            (T_F_KEY, TitleRemovalReason.TARGET_UNKNOWN),
+            (_starter().display, TitleRemovalReason.EQUIPPED_UNREMOVABLE),
         ):
             with self.subTest(target=target):
                 with self.assertRaises(TitleRemovalError) as caught:
@@ -1635,10 +1719,10 @@ class EpithetRemovalRulesTests(EvenniaTest):
     def test_swap_then_delete_keeps_both_slots_intact(self):
         self._bank_pair()
         equip_epithet(self.entity, "破城先鋒")
-        remove_epithet(self.entity, "南門新客")
+        remove_epithet(self.entity, _starter().display)
         _collection, equipped = read_title_state(self.entity)
         self.assertEqual(
-            equipped, {"fixed": "g_f_rank", "epithet": "破城先鋒"}
+            equipped, {"fixed": T_F_KEY, "epithet": "破城先鋒"}
         )
         self.assertEqual(
             [entry["display"] for entry in banked_epithets(self.entity)],
@@ -1676,7 +1760,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
             remove_epithet(self.entity, "破城先鋒")
         self.assertEqual(
             [entry["display"] for entry in banked_epithets(self.entity)],
-            ["南門新客"],
+            [_starter().display],
         )
         self.assertEqual(
             removal_records(self.entity),
@@ -1685,7 +1769,7 @@ class EpithetRemovalRulesTests(EvenniaTest):
 
     def test_removal_log_is_bounded_newest_first(self):
         grant_first_quest_epithet(self.entity)
-        previous = "南門新客"
+        previous = _starter().display
         for index in range(1, 6):
             display = f"異名{index}"
             bank_epithet(self.entity, display, f"事蹟{index}。", 100 * index)
