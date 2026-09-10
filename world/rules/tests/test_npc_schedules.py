@@ -1,4 +1,5 @@
-"""NPC schedule model tests: rulebook, validation, assignment, sync, guards.
+"""Data-contract test: npc schedule rulebook contract
+NPC schedule model tests: rulebook, validation, assignment, sync, guards.
 
 The shipped rulebook, every named validation error, the two storage shapes,
 the assignment API, the consumer-side parser, the startup sync, and the

@@ -20,13 +20,17 @@ behavior coverage silently rots into data echo.
   the exact tag `Data-contract test:`) and `debt` (temporary migration ledger; a lint
   flag makes any NEW debt entry a violation, so the ledger is shrink-only). A
   `check --seed` subcommand is the only way debt entries may ever be created, and only
-  for files that currently violate — the pre-existing 291-file debt corpus.
-- Seed the ledger from the completed scan of the 341 flagged files: all 54 classified
-  data-contract test files (including 4 that currently scan clean) become `contract`
-  entries and receive the `Data-contract test:` tag; the remaining 291 flagged files
-  become `debt` entries. Day-one gate is green; the per-area migration
+  for files that currently violate — the pre-existing debt corpus (the reviewed
+  291-file scan corpus, plus the 14 files the derived scanner additionally flags:
+  10 JS/py tests naming shipped display values the historical curated-token scan
+  missed, and 4 registry-symbol-reference-only tests). 27 historical debt files
+  scan clean under the derived universe and stay recorded; seed debt is 305.
+- Seed the ledger from the completed scan: all 54 classified data-contract test
+  files (including 5 that currently scan clean) become `contract` entries and
+  receive the `Data-contract test:` tag; the 305 debt files become `debt` entries
+  (278 currently flagged; the derived scan flags 327 files in total). Day-one gate is green; the per-area migration
   changes remove entries as they migrate, and `check` fails on any stale, duplicate,
-  non-flagging contract, or newly added debt entry.
+  duplicate, seed-mismatch, or newly added debt entry.
 - Wire `uv run --locked python -m tools.test_data_lint check` into the CI quality gate
   beside the observability lint and traceability check.
 - Write the rule into `AGENTS.md` and `docs/development/evennia-testing-guide.md`:
@@ -49,8 +53,10 @@ behavior coverage silently rots into data echo.
 
 ## Impact
 
-- New: `tools/test_data_lint.py`, `tools/test_data_freeze.json` (345 seed entries:
-  54 `contract` + 291 `debt`),
+- New: `tools/test_data_lint.py`, `tools/test_data_freeze.json` (359 seed entries:
+  54 `contract` + 305 `debt`), `tools/test_data_lint_seed.json` (the reviewed
+  classification the seed is regenerated from), `tools/test_data_lint_deny.json`
+  (52 rule-bound token exclusions with reasons + evidence),
   `tests/test_test_data_lint.py` (top-level repository check, not an Evennia shard).
 - Touched: `.github/workflows/quality-gate.yml`, `AGENTS.md`,
   `docs/development/evennia-testing-guide.md`, plus a tag docstring line in the 54

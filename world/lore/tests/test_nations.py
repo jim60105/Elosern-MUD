@@ -1,4 +1,5 @@
-"""Self-consistency checks for nations and capital anchors."""
+"""Data-contract test: nation data contract
+Self-consistency checks for nations and capital anchors."""
 
 from tools.spec_traceability import covers_requirement
 

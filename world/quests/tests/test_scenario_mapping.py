@@ -1,4 +1,5 @@
-"""Every delta-spec scenario maps to at least one deterministic test (10.1).
+"""Data-contract test: scenario mapping data-contract surface
+Every delta-spec scenario maps to at least one deterministic test (10.1).
 
 The mapping table is a living guard: this test parses every spec file under
 this change, extracts every ``#### Scenario:`` title, and asserts (a) the title

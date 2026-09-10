@@ -1,4 +1,5 @@
-"""Quest publication and registry tests (RegisterGeneratedQuestTests family).
+"""Data-contract test: quest compile data-contract surface
+Quest publication and registry tests (RegisterGeneratedQuestTests family).
 
 Covers ``register_generated_quest`` all-or-nothing publication with preflight
 and rollback, the scene-requirement registry entries, and the shared payload

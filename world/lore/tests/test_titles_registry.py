@@ -1,4 +1,5 @@
-"""Load-contract tests for the fixed-title registry (title-system D2/D3).
+"""Data-contract test: fixed-title registry content contract
+Load-contract tests for the fixed-title registry (title-system D2/D3).
 
 The registry is immutable module-level data validated at import; these tests
 exercise the pure validator with injected faces so every failure mode — a

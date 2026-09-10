@@ -1,4 +1,5 @@
-"""Self-consistency checks for guild reward bands."""
+"""Data-contract test: guild registry content contract
+Self-consistency checks for guild reward bands."""
 
 from tools.spec_traceability import covers_requirement
 

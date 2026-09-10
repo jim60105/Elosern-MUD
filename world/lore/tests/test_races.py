@@ -1,4 +1,5 @@
-"""Self-consistency checks for race, tier, and subrace registries."""
+"""Data-contract test: race/subrace data contract
+Self-consistency checks for race, tier, and subrace registries."""
 
 from tools.spec_traceability import covers_requirement
 

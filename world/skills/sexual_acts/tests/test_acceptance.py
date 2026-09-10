@@ -1,4 +1,5 @@
-"""End-to-end acceptance proof for the act ownership/unlock/ActionResolver seam.
+"""Data-contract test: sexual act acceptance catalog contract
+End-to-end acceptance proof for the act ownership/unlock/ActionResolver seam.
 
 The synthetic act is built inside this test module via ``_act_family()`` and
 installed into both registries for the duration of the test only; the shipped

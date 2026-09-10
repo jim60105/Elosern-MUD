@@ -1,4 +1,5 @@
-"""Affinity rulebook ladder tests (affinity-system 2.x).
+"""Data-contract test: affinity config validation contract
+Affinity rulebook ladder tests (affinity-system 2.x).
 
 One test per stage rule ID plus the constants and resolution contracts. Rule
 IDs are loaded from ``rulebook/affinity.yaml``; a mechanical check pins the

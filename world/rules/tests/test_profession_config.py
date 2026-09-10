@@ -1,4 +1,5 @@
-"""Tests for the professions rulebook loader and its component-type contract."""
+"""Data-contract test: profession config contract
+Tests for the professions rulebook loader and its component-type contract."""
 
 import ast
 import tempfile

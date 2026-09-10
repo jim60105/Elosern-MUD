@@ -1,4 +1,5 @@
-"""Self-consistency checks for monster threat bands."""
+"""Data-contract test: monster tier data contract
+Self-consistency checks for monster threat bands."""
 
 from tools.spec_traceability import covers_requirement
 

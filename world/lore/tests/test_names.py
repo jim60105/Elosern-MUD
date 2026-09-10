@@ -1,4 +1,5 @@
-"""Name-corpus registry checks (npc-namegen-lore-registry).
+"""Data-contract test: name-pack corpus contract
+Name-corpus registry checks (npc-namegen-lore-registry).
 
 Pure ``unittest.TestCase`` covers the frozen registry shape, array-by-array
 coverage against the vendored JSON, the import-time invariant fail-fast paths

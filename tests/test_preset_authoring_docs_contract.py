@@ -1,4 +1,5 @@
-"""Regression checks that the player-preset authoring guide cannot drift.
+"""Data-contract test: authoring docs contract
+Regression checks that the player-preset authoring guide cannot drift.
 
 ``docs/development/adding-player-presets.md`` is the authoring contract for
 every field of ``world/lore.player_presets.PlayerPreset``. This module

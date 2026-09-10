@@ -1,4 +1,5 @@
-"""Behaviour tests for the seven counter-gated 異種線 acts.
+"""Data-contract test: sexual act catalog contract
+Behaviour tests for the seven counter-gated 異種線 acts.
 
 Covers the full line this change registers: the tiered counter-threshold
 unlock gates (Tiers 1-4), the symmetric ``interspecies_act_count`` credit

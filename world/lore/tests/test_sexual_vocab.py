@@ -1,3 +1,5 @@
+"""Data-contract test: sexual vocabulary contract"""
+
 from tools.spec_traceability import covers_requirement
 
 from unittest import TestCase

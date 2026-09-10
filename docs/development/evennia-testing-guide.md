@@ -1086,3 +1086,27 @@ Evennia 測試的主要優化空間通常存在於 fixture 粒度。
 當優化造成原本通過的測試失敗時，失敗本身也是有價值的訊號。Django 提供 `--shuffle`、`--reverse` 與獨立 parallel databases，就是為了讓測試隔離問題更容易暴露與定位。
 
 最終理想狀態是讓大部分測試停留在 pure Python 或 lightweight DB 層，保留較少量的完整 Evennia integration tests。這樣可以縮短本機 feedback cycle，也不必用降低測試隔離程度來換取速度。
+
+## 測試資料獨立性規則（test-data independence）
+
+行為測試（behavior test）驗證機制，不引用正式遊戲資料（shipped content）。需要物品、技能、區域等資料時：
+
+1. 優先使用 synthetic test-data kit（`world/tests/synthetic_data.py`，由
+   `add-test-synthetic-data-kit` 變更提供）；kit 尚未覆蓋的形狀，使用**檔內合成 fixture**
+   （例如 `t_ember_spray` 這類明顯非正式的 id 與自製 display prose）。
+2. 只有「資料契約測試」可以引用正式資料：在 module docstring 的第一行加上
+   `Data-contract test: <一句理由>`（JS/TS 檔用首行 `// Data-contract test: <理由>`），
+   並在 `tools/test_data_freeze.json` 的 `contract` 登記同一路徑與理由。
+3. 斷言必須建立機制，不是回貼 fixture 或 registry 的內容；純回貼資料的測試要被替換而不是倍增
+   （aggregate 覆蓋率門維持 ≥80% 地板，不是目標）。
+
+執行門：
+
+```sh
+uv run --locked python -m tools.test_data_lint check
+```
+
+該門在 lint 時從 locked catalogs 推導 shipped-token universe（永不維護手抄清單），
+掃描所有版本控制的測試來源（Python AST 可靜態解析的字串運算式與 catalog 符號引用、
+JS/TS 字串／模板字面量），並比照 `tools/test_data_freeze.json` 的 `contract`／`debt`
+帳本放行既有例外。`debt` 帳本只減不增：遷移時在讓檔案變乾淨的同一個 commit 移除條目。

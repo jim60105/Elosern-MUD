@@ -1,4 +1,5 @@
-"""Whole-registry structural invariants for the sexual act catalogue.
+"""Data-contract test: sexual act registry structure contract
+Whole-registry structural invariants for the sexual act catalogue.
 
 The per-row checks run inside ``_act_family()`` at import time; the
 whole-registry checks below are test-time, mirroring ``sexual.yaml``'s own

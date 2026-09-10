@@ -1,4 +1,5 @@
-"""Behaviour tests for the four C7b 神之秘法 acts.
+"""Data-contract test: sexual act catalog contract
+Behaviour tests for the four C7b 神之秘法 acts.
 
 Covers the delta spec's scenarios for the four hand-built acts — 感度創世
 (sensitivity saturation), 恥辱剝奪 (permanent shame pinning, eager Monster

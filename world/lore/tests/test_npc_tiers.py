@@ -1,4 +1,5 @@
-"""Registry self-consistency and boundary-consumer checks for NPC tiers."""
+"""Data-contract test: npc tier data contract
+Registry self-consistency and boundary-consumer checks for NPC tiers."""
 
 from dataclasses import FrozenInstanceError
 

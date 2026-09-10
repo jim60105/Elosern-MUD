@@ -1,4 +1,5 @@
-"""Behaviour tests for the nine counter-gated 羞恥線 acts.
+"""Data-contract test: sexual act catalog contract
+Behaviour tests for the nine counter-gated 羞恥線 acts.
 
 The seed 撩起衣襬 ships unconditionally (covered by ``test_seed_acts.py``);
 this module covers the nine rows this change adds: their counter-threshold

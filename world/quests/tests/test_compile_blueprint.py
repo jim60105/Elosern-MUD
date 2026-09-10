@@ -1,4 +1,5 @@
-"""Deterministic quest-compile tests (CompileQuestBlueprintTests family).
+"""Data-contract test: quest compile data-contract surface
+Deterministic quest-compile tests (CompileQuestBlueprintTests family).
 
 Covers ``compile_quest_blueprint`` re-validation, the pinned per-stage mapping
 contract, content-digest keys, raw-dict rejection, scene-bound proposal stage

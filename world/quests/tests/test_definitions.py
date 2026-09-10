@@ -1,4 +1,5 @@
-"""Unit tests for deterministic quest definitions (tasks 2.1-2.6)."""
+"""Data-contract test: quest definition catalog contract
+Unit tests for deterministic quest definitions (tasks 2.1-2.6)."""
 
 from tools.spec_traceability import covers_requirement
 

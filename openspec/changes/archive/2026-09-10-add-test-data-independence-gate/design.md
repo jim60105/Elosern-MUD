@@ -59,9 +59,9 @@ automatically; contract tests breaking on rename is their purpose.
 
 ```json
 {
-  "seedDebtPaths": ["<291 paths, frozen>"],
+  "seedDebtPaths": ["<305 paths, frozen>"],
   "contract": [{ "path": "...", "reason": "..." }],
-  "debt": ["<291 paths at seed, shrinking to []>"]
+  "debt": ["<305 paths at seed, shrinking to []>"]
 }
 ```
 
@@ -74,15 +74,23 @@ Violation rules (exit 1, JSON output available for migration tooling):
 | `untagged-contract` | `contract` entry whose file lacks the tag line | classification must be human-visible |
 | `stale-path` | ledger path missing on disk | ledger cannot rot |
 | `duplicate` | path in both kinds or twice | single classification per file |
+| `seed-mismatch` | ledger `seedDebtPaths`/contract reasons diverge from `tools/test_data_lint_seed.json` | the frozen seed cannot be quietly rewritten |
 
-`seedDebtPaths` is written once (P1 task) and frozen thereafter. Permitted future
+`contract` registrations outside the seed classification ∪ `seedDebtPaths` are
+rejected as `new-debt` (the contract route is not a back door for new exemptions).
+
+`seedDebtPaths` is written once (P1 task) and frozen thereafter. The seed is
+scan-derived at seed time: the reviewed 291-file corpus unioned with the 14 files
+the D1-derived scanner additionally flags on the seed tree (D6); 27 historical
+entries that scan clean under the derived universe are retained (no rule requires
+a debt entry to currently flag). Permitted future
 mutations are exactly: (a) removing a `debt` entry whose file the gate no longer
 flags (the migration shrink), and (b) the atomic debt→contract reclassification for a
 seeded debt file legitimately reclassified as a data-contract test: the path must be
 in `seedDebtPaths`, is removed from `debt` and added once to `contract` with the tag +
 reason in the same commit, and still satisfies every stale/duplicate rule (a
 `new-debt`-style recheck rejects any conversion attempt for a path outside the seed).
-All 54 classified contract files — including the 4 that currently scan clean (e.g.
+All 54 classified contract files — including the 5 that currently scan clean (e.g.
 `world/lore/tests/test_magic.py`) — receive a `contract` ledger entry plus the tag;
 the gate never requires a contract entry to be currently-flagged, so classification is
 complete in the ledger.
@@ -142,7 +150,7 @@ but `check` never re-seeds.
 
 ## Migration Plan
 
-Day one: seed lands green (341 exemptions). Each `migrate-*` change removes its files'
+Day one: seed lands green (359 exemptions; the derived scanner flags 327). Each `migrate-*` change removes its files'
 debt entries in the same commit that makes them clean; mid-flight PRs are internally
 consistent, so `check` is never red for an unrelated branch. End state: `debt: []`,
 54 tagged contract files, seed list retained as history.

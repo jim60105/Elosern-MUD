@@ -1,4 +1,5 @@
-"""Unit tests for the shared declarative condition grammar."""
+"""Data-contract test: rulebook schema contract
+Unit tests for the shared declarative condition grammar."""
 
 from tools.spec_traceability import covers_requirement
 

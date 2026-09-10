@@ -1,4 +1,5 @@
-"""Self-consistency checks for the wilderness terrain registry (map-wilderness)."""
+"""Data-contract test: wilderness region data contract
+Self-consistency checks for the wilderness terrain registry (map-wilderness)."""
 
 from tools.spec_traceability import covers_requirement
 

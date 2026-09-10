@@ -1,4 +1,5 @@
-"""Self-consistency checks for currency and purchasing power."""
+"""Data-contract test: price-table data contract
+Self-consistency checks for currency and purchasing power."""
 
 from tools.spec_traceability import covers_requirement
 

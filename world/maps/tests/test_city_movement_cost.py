@@ -1,4 +1,5 @@
-"""Integration tests for wiring CostedXYZExit into the sample city (map-movement-clock)."""
+"""Data-contract test: city movement cost data contract
+Integration tests for wiring CostedXYZExit into the sample city (map-movement-clock)."""
 
 from tools.spec_traceability import covers_requirement
 

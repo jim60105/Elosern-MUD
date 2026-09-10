@@ -1,4 +1,5 @@
-"""Self-consistency checks for geographic anchors."""
+"""Data-contract test: anchor data contract
+Self-consistency checks for geographic anchors."""
 
 from tools.spec_traceability import covers_requirement
 

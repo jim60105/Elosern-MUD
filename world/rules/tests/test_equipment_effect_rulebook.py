@@ -1,4 +1,5 @@
-"""Validation tests for the equipment-effect rulebook loader.
+"""Data-contract test: equipment effect rulebook contract
+Validation tests for the equipment-effect rulebook loader.
 
 Pure unittest. Deviant rulebook copies are built by mutating a fresh parse
 of the canonical YAML and loading it through the path override, so every

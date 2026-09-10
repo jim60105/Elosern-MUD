@@ -1,4 +1,5 @@
-"""Tests for immutable economy identities and the guild-economy catalog loader (tasks 2.1-2.5)."""
+"""Data-contract test: guild/shop config validation contract
+Tests for immutable economy identities and the guild-economy catalog loader (tasks 2.1-2.5)."""
 
 from tools.spec_traceability import covers_requirement
 

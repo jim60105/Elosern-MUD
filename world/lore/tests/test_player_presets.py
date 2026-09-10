@@ -1,4 +1,5 @@
-"""Tests for immutable registration presets."""
+"""Data-contract test: lore registry content contract
+Tests for immutable registration presets."""
 
 import unittest
 
