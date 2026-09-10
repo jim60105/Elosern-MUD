@@ -57,7 +57,7 @@ class ReclaimRoutingTests(EvenniaTest):
 
     def test_npc_only_room_is_not_deferred_for_npc_presence_alone(self):
         room = _due_room("npc_alone")
-        npc = create_object(NPC, key="civilian")
+        npc = create_object(NPC, key="t_instance_passerby")
         npc.move_to(room, quiet=True)
         events = reclaim_due_instances(0, 100)
         # Not deferred: routed to promotion (not named) either way, so it must

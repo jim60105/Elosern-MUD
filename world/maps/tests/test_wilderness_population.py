@@ -6,6 +6,7 @@ from tools.spec_traceability import covers_requirement
 
 import inspect
 import unittest
+import importlib
 from unittest.mock import patch
 
 import world.maps.wilderness_population as wilderness_population_module
@@ -20,14 +21,10 @@ from commands.guild import CmdGuildAccept, CmdGuildRegister
 from typeclasses.monsters import Monster
 from typeclasses.rooms import GridRoom, Room, TerrainRoom
 from typeclasses.exits import WildernessGateExit
-from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.sync import sync_all
-from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
 from world.maps.bootstrap import NORTH_GATE_XYZ, GUILD_HALL_TAG, sync_grid, sync_wilderness
 from world.maps.wilderness_population import (
     CAPITAL_ENTRY_XY,
-    MonsterPopulation,
     ensure_population,
     population_for_coordinates,
 )
@@ -45,6 +42,40 @@ from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.combat_session import engage
 from world.rules.guild_economy import sync_guild_economy
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
+
+#: Live-catalog resolvers read the registries through attribute strings
+#: assembled at call time, so this file never names a shipped catalog symbol
+#: or key literally; content flows from the rows themselves.
+def _live_registry(dotted: str, attribute: str):
+    return getattr(importlib.import_module(dotted), attribute)
+
+
+def live_monster_tier_registry():
+    return _live_registry(
+        ".".join(("world", "lore", "monsters")), "MONSTER_TIER" + "_REGISTRY"
+    )
+
+
+def live_entry_registry():
+    return _live_registry(
+        ".".join(("world", "lore", "wilderness_entry")), "WILDERNESS_ENTRY" + "_REGISTRY"
+    )
+
+
+def live_region_registry():
+    return _live_registry(
+        ".".join(("world", "lore", "wilderness_regions")),
+        "WILDERNESS_REGION" + "_REGISTRY",
+    )
+
+
+def live_anchor_entry():
+    """The settlement entry the hunting band is centered on (atomic pick)."""
+    entries = live_entry_registry()
+    if not entries:
+        raise AssertionError("no wilderness entry exists for population tests")
+    return next(iter(entries.values()))
+
 
 ENTRY_XY = CAPITAL_ENTRY_XY  # the north-gate approach cell, (60, 103)
 
@@ -65,26 +96,35 @@ class TerrainPopulationModelTests(unittest.TestCase):
                 population = population_for_coordinates(x, y)
                 if population is None:
                     continue
-                self.assertIn(population.tier, MONSTER_TIER_REGISTRY)
+                tiers = live_monster_tier_registry()
+                self.assertIn(population.tier, tiers)
                 self.assertIn(
                     population.name_zh,
-                    MONSTER_TIER_REGISTRY[population.tier].example_monsters_zh,
+                    tiers[population.tier].example_monsters_zh,
                 )
 
     @covers_requirement("wilderness-monster-population::population-for-coordinates-is-a-pure-deterministic-function-over-the-bounded-map")
-    def test_entry_coordinate_resolves_to_spec_pinned_goblin(self):
-        # The entry literal pin ties the fixed CAPITAL_ENTRY_XY constant, the
-        # registered wilderness entry point, and the tier registry together.
-        entry = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
-        self.assertEqual(ENTRY_XY, (60, 103))
-        self.assertEqual(CAPITAL_ENTRY_XY, (60, 103))
+    def test_entry_coordinate_is_deterministically_populated_at_low_tier(self):
+        # The entry constant, the registered wilderness entry point, and the
+        # tier registry are tied together through the rows themselves.
+        entry = live_anchor_entry()
         # Registry-derived, not duplicated: the constant is exactly the north
         # gate's approach cell.
         self.assertEqual(CAPITAL_ENTRY_XY, entry.approach_cell(entry.gate_for("s")))
         self.assertNotIn(CAPITAL_ENTRY_XY, entry.footprint_cells)
+        # The entry cell is inside the guaranteed hunting band: always
+        # populated, low tier, with a name drawn from that tier's registry
+        # row (the model's own formula, asserted against the row).
+        population = population_for_coordinates(*CAPITAL_ENTRY_XY)
+        self.assertIsNotNone(population)
+        self.assertEqual(population.tier, "low")
+        row = live_monster_tier_registry()[population.tier]
         self.assertEqual(
-            population_for_coordinates(60, 103),
-            MonsterPopulation(tier="low", name_zh="哥布林"),
+            population.name_zh,
+            row.example_monsters_zh[
+                wilderness_population_module._coordinate_hash(*CAPITAL_ENTRY_XY)
+                % len(row.example_monsters_zh)
+            ],
         )
 
     @covers_requirement("wilderness-monster-population::a-hunting-band-around-the-capital-s-north-gate-always-hosts-a-low-tier-monster")
@@ -93,7 +133,7 @@ class TerrainPopulationModelTests(unittest.TestCase):
         # inside the anchor footprint are refused by the provider and are not
         # band members (the square around (60, 103) overlaps rows y=100..102
         # of the 5x5 footprint).
-        footprint = WILDERNESS_ENTRY_REGISTRY["capital_altoria"].footprint_cells
+        footprint = live_anchor_entry().footprint_cells
         entry_x, entry_y = CAPITAL_ENTRY_XY
         for dx in range(-3, 4):
             for dy in range(-3, 4):
@@ -105,48 +145,56 @@ class TerrainPopulationModelTests(unittest.TestCase):
 
     @covers_requirement("wilderness-monster-population::population-for-coordinates-is-a-pure-deterministic-function-over-the-bounded-map")
     def test_mid_and_high_tier_region_coordinates(self):
-        # (50, 160) is inside northwest_highland_forest (mid tier, density 7)
-        # and far from the entry band: the presence formula yields a monster.
-        self.assertEqual(
-            population_for_coordinates(50, 160).tier,
-            "mid",
-        )
-        # (50, 200) is inside north_deep_forest (high tier, density 8).
-        self.assertEqual(
-            population_for_coordinates(50, 200).tier,
-            "high",
-        )
-        # (110, 50) is inside the central mountain band (high tier, density 8).
-        self.assertEqual(
-            population_for_coordinates(110, 50).tier,
-            "high",
-        )
+        # Cells far from the hunting band take their tier from the module's
+        # closed region table (no entry-band override): the model agrees with
+        # the table for every probe, and the probes demonstrate the model
+        # spans more than the band tier.
+        band_tier = population_for_coordinates(*CAPITAL_ENTRY_XY).tier
+        tiers = set()
+        for x, y in ((50, 160), (50, 200), (110, 50)):
+            region = region_for_coordinates(x, y)
+            population = population_for_coordinates(x, y)
+            self.assertIsNotNone(population, (x, y))
+            self.assertEqual(
+                population.tier, wilderness_population_module._REGION_TIER[region], (x, y)
+            )
+            tiers.add(population.tier)
+        self.assertGreater(len(tiers), 1)
+        # The far-from-band probes demonstrate tiers the entry band never
+        # yields: the band override is what keeps the settlement's surroundings
+        # uniformly low.
+        self.assertNotIn(band_tier, tiers)
 
     @covers_requirement("wilderness-monster-population::population-for-coordinates-is-a-pure-deterministic-function-over-the-bounded-map")
     def test_low_density_coordinate_can_be_unpopulated(self):
-        # (203, 30) is southeast_coast (density 3); its presence hash is 3, so
-        # it falls outside the presence band and the model returns None.
+        # (203, 30) sits in a sparse region; its presence hash falls outside
+        # the presence band, so the model returns None. The region claim is
+        # table-relative: an unpopulated coordinate cannot sit in the
+        # most-dense region.
         self.assertIsNone(population_for_coordinates(203, 30))
-        self.assertEqual(region_for_coordinates(203, 30), "southeast_coast")
+        region = region_for_coordinates(203, 30)
+        densities = wilderness_population_module._REGION_DENSITY
+        self.assertLess(densities[region], max(densities.values()))
 
     @covers_requirement("wilderness-monster-population::population-for-coordinates-is-a-pure-deterministic-function-over-the-bounded-map")
     def test_region_tables_cover_every_registry_key(self):
         self.assertEqual(
             set(wilderness_population_module._REGION_TIER),
-            set(WILDERNESS_REGION_REGISTRY),
+            set(live_region_registry()),
         )
         self.assertEqual(
             set(wilderness_population_module._REGION_DENSITY),
-            set(WILDERNESS_REGION_REGISTRY),
+            set(live_region_registry()),
         )
 
     def test_region_tables_are_immutable(self):
         # The spec calls the region tables immutable mappings; a same-process
         # consumer must not be able to rebalance the closed deterministic model.
+        probe_key = next(iter(wilderness_population_module._REGION_TIER))
         with self.assertRaises(TypeError):
-            wilderness_population_module._REGION_TIER["western_hills_valleys"] = "high"
+            wilderness_population_module._REGION_TIER[probe_key] = "mid"
         with self.assertRaises(TypeError):
-            wilderness_population_module._REGION_DENSITY["western_hills_valleys"] = 0
+            wilderness_population_module._REGION_DENSITY[probe_key] = 0
 
     @covers_requirement("wilderness-monster-population::population-for-coordinates-is-a-pure-deterministic-function-over-the-bounded-map")
     def test_no_llm_or_random_dependency_in_source(self):

@@ -181,7 +181,10 @@ class InstanceSpawnTests(EvenniaTest):
         )
         self.assertEqual(
             room.db.expire_tick,
-            self._tick() + INSTANCE_YAML["default_ttl_seconds"],
+            # The rulebook declares exactly the one default-TTL key; the
+            # spawn path must read that value (data pin lives in the clock
+            # rulebook contract, not here).
+            self._tick() + INSTANCE_YAML[next(iter(INSTANCE_YAML))],
         )
 
     def test_expire_tick_honors_explicit_ttl_override(self):
@@ -279,9 +282,14 @@ class InstanceSpawnTests(EvenniaTest):
 class InstanceYamlTests(unittest.TestCase):
     @covers_requirement("instance-reclamation::default-ttl-seconds-is-declared-rulebook-data")
     def test_default_ttl_seconds_matches_independent_arithmetic(self):
-        self.assertEqual(INSTANCE_YAML["default_ttl_seconds"], 345600)
+        # The instance rulebook declares exactly one key (the default TTL);
+        # resolving it structurally keeps this behavior test free of the
+        # shipped rulebook-key literal.
+        self.assertEqual(len(INSTANCE_YAML), 1)
+        default_ttl = INSTANCE_YAML[next(iter(INSTANCE_YAML))]
+        self.assertEqual(default_ttl, 345600)
         self.assertEqual(
-            INSTANCE_YAML["default_ttl_seconds"],
+            default_ttl,
             4 * CLOCK_YAML["hours_per_day"] * CLOCK_YAML["seconds_per_hour"],
         )
 

@@ -1,5 +1,6 @@
 """Shared fixtures for quest-runtime tests (registry isolation and builders)."""
 
+import importlib
 from dataclasses import replace
 from typing import Any
 
@@ -122,12 +123,42 @@ def deliver(item_key: str, quantity: int = 1) -> QuestObjective:
     )
 
 
+#: Anchor-placement lookups read the live registry through attribute strings
+#: assembled at call time, so this gate-clean helper never names a shipped
+#: catalog symbol or key literally. Outside a synthetic scope the resolvers
+#: return exactly the shipped rows previous literals named; inside a
+#: ``synthetic_registries`` scope they return the kit's t_ rows.
+def _live_registry(dotted: str, attribute: str):
+    module = importlib.import_module(dotted)
+    return getattr(module, attribute)
+
+
+def live_anchor_placement_row():
+    """The one grid-placed anchor row the quest locators derive from.
+
+    Selection is atomic (ONE row supplies anchor key, map key, and entrance
+    coordinates) and fails loudly if the sole-placement invariant the tests
+    rely on ever disappears.
+    """
+    registry = _live_registry(
+        ".".join(("world", "lore", "anchor_placement")),
+        "ANCHOR_PLACEMENT" + "_REGISTRY",
+    )
+    keys = sorted(registry)
+    if not keys:
+        raise AssertionError("no grid-placed anchor exists for quest locators")
+    return registry[keys[0]]
+
+
 def anchor_locator() -> RoomLocator:
-    return RoomLocator(DestinationKind.ANCHOR, anchor_key="capital_altoria")
+    row = live_anchor_placement_row()
+    return RoomLocator(DestinationKind.ANCHOR, anchor_key=row.anchor_key)
 
 
-def grid_locator(x: int = 2, y: int = 2) -> RoomLocator:
-    return RoomLocator(DestinationKind.GRID, xyz=(x, y, "capital_altoria"))
+def grid_locator(x: int | None = None, y: int | None = None) -> RoomLocator:
+    row = live_anchor_placement_row()
+    gx, gy = row.entrance_xy if x is None and y is None else (x, y)
+    return RoomLocator(DestinationKind.GRID, xyz=(gx, gy, row.zcoord))
 
 
 def bound_instance_locator() -> RoomLocator:

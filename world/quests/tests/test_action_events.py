@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import unittest
+from contextlib import ExitStack
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -19,17 +20,31 @@ from world.rules.action import (
     register_event_effect_planner,
 )
 from world.rules.combat import Battlefield, BattlefieldActionContext
-from world.skills.registry import (
-    SKILL_REGISTRY,
-    SkillCategory,
-    SkillDef,
-    SkillKind,
-    TargetSpec,
-)
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.quests.planner import quest_event_effect_planner
+from world.tests.synthetic_data import SYNTH_SKILLS, make_skill, synthetic_registries
 
 from ._fixtures import QuestRegistryIsolation, accept, defeat, quest, register
+
+#: Combat runs on the kit's spell row; the double-damage probe is a kit-shaped
+#: extra so the skill registry never holds a shipped row inside these tests.
+_T_SKILL = SYNTH_SKILLS["t_ember_burst"].key
+_T_DOUBLE = make_skill(
+    "t_double_burst",
+    effects=[
+        f"damage:{SYNTH_SKILLS['t_ember_burst'].element.key}:magic",
+        f"damage:{SYNTH_SKILLS['t_ember_burst'].element.key}:magic",
+    ],
+    cost={},
+    usable_out_of_combat=False,
+)
+_SCOPE = synthetic_registries("skills", extra={"skills": {_T_DOUBLE.key: _T_DOUBLE}})
+
+
+def _enter_scope(test) -> None:
+    stack = ExitStack()
+    stack.enter_context(_SCOPE)
+    test.addCleanup(stack.close)
 
 
 def fire_field(actor, target) -> Battlefield:
@@ -42,15 +57,17 @@ def fire_field(actor, target) -> Battlefield:
     )
 
 
+@_SCOPE
 class TargetDefeatedEventTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
+        _enter_scope(self)
         self.actor = create_object(PlayerCharacter, key="actor")
         self.actor.race = "human"
         self.actor.apply_race_baseline()
         # Direct mastery keeps the cast gate open at magic level 0, preserving
         # this class's small-damage profile for the defeat-event scenarios.
-        grant_lineage(self.actor, ["fire_ball"], ["fire_mastery"])
+        grant_lineage(self.actor, [_T_SKILL], [])
 
     def _monster(self, key: str, hp: int) -> Monster:
         monster = create_object(Monster, key=key)
@@ -59,7 +76,7 @@ class TargetDefeatedEventTests(EvenniaTestCase):
         monster.traits.hp._data["current"] = hp
         return monster
 
-    def _resolve(self, targets, skill_key: str = "fire_ball"):
+    def _resolve(self, targets, skill_key: str = _T_SKILL):
         field = fire_field(self.actor, targets[0])
         request = ActionRequest(
             self.actor,
@@ -84,7 +101,7 @@ class TargetDefeatedEventTests(EvenniaTestCase):
         field = fire_field(self.actor, monster)
         request = ActionRequest(
             self.actor,
-            "fire_ball",
+            _T_SKILL,
             [monster],
             BattlefieldActionContext(field),
         )
@@ -107,25 +124,12 @@ class TargetDefeatedEventTests(EvenniaTestCase):
         self.assertLess(monster.traits.hp.current, 50)
 
     def test_two_damage_effects_emit_one_defeat(self):
-        skill_key = "test_double_fire"
-        SKILL_REGISTRY[skill_key] = SkillDef(
-            key=skill_key,
-            label="雙重火焰",
-            description="測試用：對單一敵人造成兩次火焰傷害。",
-            kind=SkillKind.ACTIVE,
-            target_spec=TargetSpec.SINGLE,
-            cost={},
-            usable_out_of_combat=False,
-            element=None,
-            effects=["damage:fire:magic", "damage:fire:magic"],
-            category=SkillCategory.UTILITY,
-        )
-        self.actor.db.skills = {"active": [skill_key], "passive": []}
+        # The kit-scope extra carries the double-damage row; it exists only
+        # while the scope is open, so no registry cleanup is needed.
+        self.actor.db.skills = {"active": [_T_DOUBLE.key], "passive": []}
+        grant_lineage(self.actor, [_T_DOUBLE.key], [])
         monster = self._monster("goblin-double", hp=1)
-        try:
-            result = self._resolve([monster], skill_key)
-        finally:
-            SKILL_REGISTRY.pop(skill_key, None)
+        result = self._resolve([monster], _T_DOUBLE.key)
         defeated = [entry for entry in result.event_log.entries if entry.kind == "target_defeated"]
         self.assertEqual(result.outcome, "success")
         self.assertEqual(len(defeated), 1)
@@ -141,15 +145,17 @@ class TargetDefeatedEventTests(EvenniaTestCase):
         self.assertEqual(defeated[0].data["target_id"], monster_b.pk)
 
 
+@_SCOPE
 class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
+        _enter_scope(self)
         self.player = create_object(PlayerCharacter, key="planner-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
-        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        # Human static magic_power at 術師 tier so the synthetic spell casts pass.
         self.player.traits.magic_power.base = 30
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_SKILL])
         register_event_effect_planner("quest", quest_event_effect_planner)
         self.low_hunt = register(quest("planner_hunt"))
 
@@ -171,7 +177,7 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTestCase):
         field = fire_field(self.player, monster)
         request = ActionRequest(
             self.player,
-            "fire_ball",
+            _T_SKILL,
             [monster],
             BattlefieldActionContext(field),
         )
@@ -196,18 +202,18 @@ class EventEffectPlannerSeamTests(QuestRegistryIsolation, EvenniaTestCase):
         field = fire_field(self.player, monster)
         request = ActionRequest(
             self.player,
-            "fire_ball",
+            _T_SKILL,
             [monster],
             BattlefieldActionContext(field),
         )
         from world.rules.action import SKILL_TIME_OVERRIDES
 
-        SKILL_TIME_OVERRIDES["fire_ball"] = -1
+        SKILL_TIME_OVERRIDES[_T_SKILL] = -1
         try:
             with patch("world.rules.combat.roll_d100", return_value=100):
                 result = ActionResolver.resolve(request)
         finally:
-            SKILL_TIME_OVERRIDES.pop("fire_ball", None)
+            SKILL_TIME_OVERRIDES.pop(_T_SKILL, None)
         self.assertEqual(result.reason, RejectReason.TIME_COST_LOOKUP_FAILED)
         self.assertEqual(self.player.db.quest_log[0]["stage_progress"], 0)
         self.assertEqual(monster.traits.hp.current, 1)

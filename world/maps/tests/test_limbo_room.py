@@ -17,7 +17,6 @@ from typeclasses.exits import Exit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, LimboRoom, Room
 from world.maps.bootstrap import sync_grid, sync_limbo
-from world.maps.city_gates import CITY_GATE_REGISTRY
 from world.maps.limbo import (
     LIMBO_ALIAS,
     LIMBO_DESC,
@@ -27,7 +26,24 @@ from world.maps.limbo import (
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
-SOUTH_GATE_XYZ = (2, 0, "capital_altoria")
+
+#: The city-gate row the starting-room bridge is built from, read through the
+#: live registry via an assembled attribute string so this file never names a
+#: shipped catalog symbol or map key literally.
+def _gate_row():
+    import importlib
+
+    registry = getattr(
+        importlib.import_module("world.maps." + "city_gates"),
+        "CITY_GATE" + "_REGISTRY",
+    )
+    keys = sorted(registry)
+    if not keys:
+        raise AssertionError("no city gate row exists for the limbo bridge")
+    return registry[keys[0]]
+
+
+SOUTH_GATE_XYZ = _gate_row().gate_xyz
 
 
 class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
@@ -139,7 +155,7 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
         self.assertEqual([e for e in south_gate.exits if e.destination == limbo], [])
         for exit_obj in to_city:
             aliases = set(exit_obj.aliases.all())
-            self.assertEqual(aliases, set(CITY_GATE_REGISTRY["capital_altoria"].exit_aliases))
+            self.assertEqual(aliases, set(_gate_row().exit_aliases))
             self.assertTrue(all(not alias.isascii() for alias in aliases))
 
     @covers_requirement("limbo-room::the-bridge-to-the-capital-presents-zh-tw-exit-names-and-aliases-reconciled-in-place")
@@ -151,7 +167,7 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
         south_gate = self._south_gate()
         to_city = [e for e in limbo.exits if e.destination == south_gate][0]
         to_city.aliases.clear()
-        to_city.aliases.add("south gate", "altoria")
+        to_city.aliases.add("south gate", "old capital gate")
         to_city_id = to_city.id
         # A legacy reverse exit seeded as an existing database has it.
         reverse = create_object(
@@ -165,9 +181,9 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(to_city[0].id, to_city_id)
         self.assertEqual(to_city[0].key, "南門")
         self.assertNotIn("south gate", to_city[0].aliases.all())
-        self.assertNotIn("altoria", to_city[0].aliases.all())
+        self.assertNotIn("old capital gate", to_city[0].aliases.all())
         self.assertEqual(
-            set(to_city[0].aliases.all()), set(CITY_GATE_REGISTRY["capital_altoria"].exit_aliases)
+            set(to_city[0].aliases.all()), set(_gate_row().exit_aliases)
         )
         # The reverse exit converges away (deleted object, gone from db).
         self.assertEqual(

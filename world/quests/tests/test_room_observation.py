@@ -38,6 +38,7 @@ from ._fixtures import (
     bound_instance_locator,
     escort,
     grid_locator,
+    live_anchor_placement_row,
     quest,
     reach,
     register,
@@ -77,7 +78,8 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
         return room
 
     def _grid_room(self, x: int = 1, y: int = 1) -> GridRoom:
-        room = GridRoom.objects.filter_xyz(xyz=(x, y, "capital_altoria")).first()
+        # The city map key comes from the same placement row the locators use.
+        room = GridRoom.objects.filter_xyz(xyz=(x, y, live_anchor_placement_row().zcoord)).first()
         self.assertIsNotNone(room)
         return room
 

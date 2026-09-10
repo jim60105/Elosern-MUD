@@ -11,9 +11,9 @@ area.
 
 ## What Changes
 
-- Migrate the 27 flagged test files under world/quests/ and world/maps/ to the synthetic test-data kit
+- Migrate the 28 flagged test files under world/quests/ and world/maps/ to the synthetic test-data kit
   (`world/tests/synthetic_data.py`) or file-local synthetic fixtures
-  (14 assertion-literal files, 13 setup-literal files).
+  (14 assertion-literal files, 14 setup-literal files).
 - Replace every shipped-identifier literal and shipped display-prose literal in the
   migrated files with kit constants or locally built synthetic definitions; replace
   pinned data quantities with values derived from the patched synthetic catalogs.
@@ -49,6 +49,7 @@ area.
 | `world/quests/tests/_fixtures.py` | B |
 | `world/quests/tests/test_acquire.py` | A |
 | `world/quests/tests/test_action_events.py` | B |
+| `world/quests/tests/test_binding.py` | B |
 | `world/quests/tests/test_characterization.py` | B |
 | `world/quests/tests/test_deliver.py` | B |
 | `world/quests/tests/test_describe.py` | A |
@@ -78,7 +79,7 @@ area.
 
 ## Impact
 
-- The 27 listed test files plus the new closure test file `tests/test_data_independence_quests.py`.
+- The 28 listed test files plus the new closure test file `tests/test_data_independence_quests.py`.
 - `tools/test_data_freeze.json` shrinks by exactly the listed entries (shrink-only
   ratchet; this change removes entries only).
 - No production code, no shipped data, no player-command surface changes (docs untouched
