@@ -2,6 +2,7 @@
 
 from tools.spec_traceability import covers_requirement
 
+import inspect
 from dataclasses import replace
 from copy import deepcopy
 from unittest.mock import patch
@@ -20,8 +21,177 @@ from world.rules.action import (
     RejectReason,
     SKILL_TIME_OVERRIDES,
 )
-from world.rules.targeting import RoomActionContext
-from world.skills.registry import SKILL_REGISTRY, SkillKind
+from world.rules.action_preview import preview_skill
+from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.targeting import RoomActionContext, damage_requires_battlefield
+from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillDef, SkillKind, TargetSpec
+
+
+_DAMAGE_PROBE = SkillDef(
+    key="gate_probe",
+    label="試探突刺",
+    description="測試用的單體物理傷害技能。",
+    kind=SkillKind.ACTIVE,
+    target_spec=TargetSpec.SINGLE,
+    cost={"mp": 1},
+    usable_out_of_combat=True,
+    element="fire",
+    effects=["damage:fire:physical"],
+    category=SkillCategory.MARTIAL_ARTS,
+)
+_DRAIN_PROBE = replace(
+    _DAMAGE_PROBE,
+    key="gate_drain_probe",
+    label="試探汲取",
+    description="測試用的純粹愉悅汲取技能。",
+    effects=["divine_drain:試探"],
+)
+
+
+class OutOfCombatDamageGateTests(EvenniaTestCase):
+    """The second sanctioned combat-state gate: damage requires a battlefield."""
+
+    def setUp(self):
+        super().setUp()
+        self.actor = create_object(PlayerCharacter, key="gate actor")
+        self.target = create_object(PlayerCharacter, key="gate target")
+        for entity in (self.actor, self.target):
+            entity.race = "human"
+            entity.apply_race_baseline()
+        self.actor.db.skills = {
+            "active": ["gate_probe", "gate_drain_probe"],
+            "passive": [],
+        }
+        self.target.db.skills = {"active": [], "passive": []}
+        for probe in (_DAMAGE_PROBE, _DRAIN_PROBE):
+            SKILL_REGISTRY[probe.key] = probe
+            self.addCleanup(SKILL_REGISTRY.pop, probe.key, None)
+        self.room_context = RoomActionContext(self.actor.location)
+        self.battlefield = Battlefield(
+            {
+                "party": frozenset({self.actor.key}),
+                "foes": frozenset({self.target.key}),
+            },
+            {self.actor.key: self.actor, self.target.key: self.target},
+        )
+
+    def _request(self, skill_key, context, targets=()):
+        return ActionRequest(self.actor, skill_key, list(targets), context)
+
+    def _field_context(self):
+        return BattlefieldActionContext(self.battlefield)
+
+    @covers_requirement("action-resolution-pipeline::a-damaging-action-never-resolves-without-a-battlefield")
+    def test_damaging_usable_out_of_combat_skill_is_refused_without_battlefield(self):
+        before_actor = deepcopy(dict(self.actor.traits.trait_data))
+        before_target = deepcopy(dict(self.target.traits.trait_data))
+        with (
+            patch("world.rules.combat.roll_d100") as roller,
+            patch("world.rules.action._commit", side_effect=AssertionError("committed")) as commit,
+        ):
+            result = ActionResolver.resolve(
+                self._request("gate_probe", self.room_context, [self.target])
+            )
+        self.assertIs(result.reason, RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET)
+        self.assertIsNone(result.event_log)
+        roller.assert_not_called()
+        commit.assert_not_called()
+        self.assertEqual(dict(self.actor.traits.trait_data), before_actor)
+        self.assertEqual(dict(self.target.traits.trait_data), before_target)
+
+    @covers_requirement("action-resolution-pipeline::a-damaging-action-never-resolves-without-a-battlefield")
+    def test_the_same_skill_resolves_normally_with_a_battlefield(self):
+        before = self.target.traits.hp.value
+        with patch("world.rules.combat.roll_d100", return_value=100) as roller:
+            result = ActionResolver.resolve(
+                self._request("gate_probe", self._field_context(), [self.target])
+            )
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(roller.call_count, 1)
+        self.assertLess(self.target.traits.hp.value, before)
+        self.assertEqual(
+            [entry.kind for entry in result.event_log.entries[:2]],
+            ["roll", "damage"],
+        )
+
+    @covers_requirement("action-resolution-pipeline::a-damaging-action-never-resolves-without-a-battlefield")
+    def test_non_damaging_out_of_combat_skill_is_unaffected(self):
+        result = self.resolve_status_disguise()
+        self.assertEqual(result.outcome, "success")
+        self.assertIsNot(result.reason, RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET)
+
+    def resolve_status_disguise(self):
+        original = SKILL_REGISTRY["status_disguise"]
+        SKILL_REGISTRY["status_disguise"] = replace(
+            original, cost={}, effects=["set_disguise"]
+        )
+        self.addCleanup(SKILL_REGISTRY.__setitem__, "status_disguise", original)
+        self.actor.db.skills = {"active": ["status_disguise"], "passive": []}
+        context = RoomActionContext(
+            self.actor.location, {"disguise": {"atk_phys": 1}}
+        )
+        return ActionResolver.resolve(
+            ActionRequest(self.actor, "status_disguise", [], context)
+        )
+
+    @covers_requirement("action-resolution-pipeline::a-damaging-action-never-resolves-without-a-battlefield")
+    def test_indirect_hp_movement_is_not_damage_for_the_gate(self):
+        result = ActionResolver.resolve(
+            self._request("gate_drain_probe", self.room_context, [self.target])
+        )
+        self.assertIsNot(result.reason, RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET)
+        self.assertIsNot(result.reason, RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT)
+
+    @covers_requirement("action-resolution-pipeline::the-out-of-combat-gates-fire-in-a-fixed-specified-order")
+    def test_unflagged_damage_skill_still_reports_the_flag_rejection(self):
+        SKILL_REGISTRY["gate_probe"] = replace(_DAMAGE_PROBE, usable_out_of_combat=False)
+        result = ActionResolver.resolve(
+            self._request("gate_probe", self.room_context, [self.target])
+        )
+        self.assertIs(result.reason, RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT)
+
+    @covers_requirement("action-resolution-pipeline::the-out-of-combat-gates-fire-in-a-fixed-specified-order")
+    @covers_requirement("action-resolution-pipeline::a-damaging-action-never-resolves-without-a-battlefield")
+    def test_preview_and_preflight_agree_on_which_reason_applies(self):
+        for skill_key, expected in (
+            ("gate_probe", RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET),
+            ("flee", RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT),
+        ):
+            with self.subTest(skill_key=skill_key):
+                if skill_key == "gate_probe":
+                    actor_skills = ["gate_probe"]
+                else:
+                    actor_skills = ["flee"]
+                self.actor.db.skills = {"active": actor_skills, "passive": []}
+                preview = preview_skill(self.actor, skill_key, self.room_context)
+                preflight = ActionResolver.preflight(
+                    self._request(skill_key, self.room_context)
+                )
+                self.assertFalse(preview.enabled)
+                self.assertIs(preview.reason, expected)
+                self.assertIs(preflight.reason, expected)
+
+    @covers_requirement("action-resolution-pipeline::a-damaging-action-never-resolves-without-a-battlefield")
+    def test_gate_is_per_request_not_a_catalog_snapshot(self):
+        source = inspect.getsource(damage_requires_battlefield)
+        self.assertNotIn("SKILL_REGISTRY", source)
+
+        class _Ctx:
+            def __init__(self, battlefield):
+                self.battlefield = battlefield
+
+        room, field = _Ctx(None), _Ctx(object())
+        self.assertTrue(damage_requires_battlefield(_DAMAGE_PROBE, room))
+        self.assertFalse(damage_requires_battlefield(_DAMAGE_PROBE, field))
+        self.assertFalse(damage_requires_battlefield(_DRAIN_PROBE, room))
+        self.assertFalse(
+            damage_requires_battlefield(
+                replace(_DRAIN_PROBE, effects=["set_disguise"]), room
+            )
+        )
+        # A definition mutated per-request proves no registry-key dependence.
+        per_call = replace(_DAMAGE_PROBE, effects=["set_disguise"])
+        self.assertFalse(damage_requires_battlefield(per_call, room))
 
 
 class ActionPipelineRejectionTests(EvenniaTestCase):
@@ -78,17 +248,12 @@ class ActionPipelineRejectionTests(EvenniaTestCase):
         )
 
     def test_unknown_effect(self):
-        original = SKILL_REGISTRY["status_disguise"]
-        SKILL_REGISTRY["status_disguise"] = replace(
-            original,
-            effects=["damage:fire:magic"],
-        )
-        try:
-            with patch.dict(_EFFECT_HANDLERS, {"damage": None}):
-                self.assertIs(self.resolve().reason, RejectReason.UNKNOWN_EFFECT_ID)
-            self.assertIsNone(self.actor.db.disguised_stats)
-        finally:
-            SKILL_REGISTRY["status_disguise"] = original
+        # An unregistered handler for the skill's own (non-damaging) effect:
+        # the gate is irrelevant here — effect registration is checked later
+        # in the pipeline, and the rejection must not commit anything.
+        with patch.dict(_EFFECT_HANDLERS, {"set_disguise": None}):
+            self.assertIs(self.resolve().reason, RejectReason.UNKNOWN_EFFECT_ID)
+        self.assertIsNone(self.actor.db.disguised_stats)
 
     def test_malformed_time_cost_does_not_commit(self):
         SKILL_TIME_OVERRIDES["status_disguise"] = -1

@@ -53,6 +53,7 @@ from world.rules.skill_effects import (
 )
 from world.rules.targeting import (
     ActionContext,
+    damage_requires_battlefield,
     expand_target_shorthand,
     resolve_targets,
 )
@@ -69,6 +70,7 @@ class RejectReason(StrEnum):
     UNKNOWN_SKILL = "unknown_skill"
     SKILL_NOT_ACTIVE = "skill_not_active"
     SKILL_NOT_USABLE_OUT_OF_COMBAT = "skill_not_usable_out_of_combat"
+    DAMAGE_REQUIRES_MONSTER_TARGET = "damage_requires_monster_target"
     INSUFFICIENT_RESOURCE = "insufficient_resource"
     TARGET_SPEC_MISMATCH = "target_spec_mismatch"
     TARGET_NOT_PRESENT = "target_not_present"
@@ -306,10 +308,23 @@ def _step1_ownership(request: ActionRequest) -> SkillDef:
         )
     if skill.kind is not SkillKind.ACTIVE:
         raise RejectedAction(RejectReason.SKILL_NOT_ACTIVE, request.skill_key)
-    # The ONE sanctioned combat-context read in this entire module — see design.md D-3.
+    # Sanctioned combat-state gate 1 of 2 (usable_out_of_combat): the flagged
+    # out-of-combat gate — see design.md D-3. Both sanctioned gates read the
+    # context's battlefield, never a combat-state token.
     if not skill.usable_out_of_combat and request.context.battlefield is None:
         raise RejectedAction(
             RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT,
+            request.skill_key,
+        )
+    # Sanctioned combat-state gate site 2 of 2 (damaging-action gate): the
+    # reason names the player-facing rule (a damaging skill must be aimed at a
+    # co-located monster), while the shared condition in
+    # targeting.damage_requires_battlefield tests for the battlefield's
+    # absence — the only way to obtain one is to open combat on a monster.
+    # Fires before step 2, so nothing is deducted, rolled, staged, or timed.
+    if damage_requires_battlefield(skill, request.context):
+        raise RejectedAction(
+            RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET,
             request.skill_key,
         )
     _step1_divine_arts_gate(request.actor, skill)

@@ -13,6 +13,7 @@ _REJECTION_MESSAGES: dict[RejectReason, str] = {
     RejectReason.UNKNOWN_SKILL: "你不會使用這項技能。",
     RejectReason.SKILL_NOT_ACTIVE: "被動技能不能主動施展。",
     RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT: "這項技能無法在目前場合施展。",
+    RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET: "該技能會造成傷害，必須鎖定同場的怪物（需先處於戰鬥中）。",
     RejectReason.INSUFFICIENT_RESOURCE: "你的資源不足。",
     RejectReason.TARGET_SPEC_MISMATCH: "這項技能的目標形式不符合。",
     RejectReason.TARGET_NOT_PRESENT: "目標不在這裡。",

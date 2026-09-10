@@ -849,9 +849,13 @@ class FreeformTextCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         # No catalog spell usable out of combat is magnitude-scalable today;
         # the fixture supplies the flag deterministically (freeform-casting
         # spec scenario) without changing the shipped registry.
+        # The scalable shape is swapped to heal:area because a damage cast in
+        # a room context is refused outright by the sanctioned damaging-action
+        # gate (out-of-combat-damage-gate); the scale-token mechanics under
+        # test (cost scaling, clock advance) are shape-independent.
         original = SKILL_REGISTRY["wind_blade"]
         SKILL_REGISTRY["wind_blade"] = replace(
-            original, usable_out_of_combat=True
+            original, usable_out_of_combat=True, effects=["heal:area"]
         )
         try:
             self._setup_caster(mastery=True)
@@ -861,7 +865,7 @@ class FreeformTextCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 self.call(
                     CmdCast(),
                     "wind_blade@1/2=wind target",
-                    f"{self.char1.key} 對 wind target 的攻擊擲出了",
+                    f"{self.char1.key} 對 wind target 恢復了",
                 )
             half_end = self.char1.traits.mp.value
             # The ordinary command-time charge applies per cast.
@@ -875,7 +879,7 @@ class FreeformTextCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 self.call(
                     CmdCast(),
                     "wind_blade@1=wind target",
-                    f"{self.char1.key} 對 wind target 的攻擊擲出了",
+                    f"{self.char1.key} 對 wind target 恢復了",
                 )
             one_end = self.char1.traits.mp.value
             self.assertEqual(clock.tick, 12)
@@ -911,9 +915,12 @@ class FreeformTextCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_unauthorized_scale_rejects_without_effect(self):
         from commands.action import CmdCast
 
+        # Same non-damage scalable shape as the success-path tests: the
+        # unauthorized-scale rejection comes from the freeform gate, and the
+        # fixture must not be gated earlier by the damaging-action gate.
         original = SKILL_REGISTRY["wind_blade"]
         SKILL_REGISTRY["wind_blade"] = replace(
-            original, usable_out_of_combat=True
+            original, usable_out_of_combat=True, effects=["heal:area"]
         )
         try:
             self._setup_caster(mastery=False)
@@ -955,9 +962,11 @@ class FreeformTextCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_scale_one_stays_the_ordinary_command_path(self):
         from commands.action import CmdCast
 
+        # Non-damage scalable shape (see the scaled-cast test above): the
+        # ordinary room command path must not trip the damaging-action gate.
         original = SKILL_REGISTRY["wind_blade"]
         SKILL_REGISTRY["wind_blade"] = replace(
-            original, usable_out_of_combat=True
+            original, usable_out_of_combat=True, effects=["heal:area"]
         )
         try:
             self._setup_caster(mastery=True)
@@ -967,7 +976,7 @@ class FreeformTextCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 self.call(
                     CmdCast(),
                     "wind_blade@1=wind target",
-                    f"{self.char1.key} 對 wind target 的攻擊擲出了",
+                    f"{self.char1.key} 對 wind target 恢復了",
                 )
             one_end = self.char1.traits.mp.value
             # Reset the gauge (and its regen remainder) so the second cast
@@ -978,7 +987,7 @@ class FreeformTextCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 self.call(
                     CmdCast(),
                     "wind_blade@2=wind target",
-                    f"{self.char1.key} 對 wind target 的攻擊擲出了",
+                    f"{self.char1.key} 對 wind target 恢復了",
                 )
             two_end = self.char1.traits.mp.value
             self.assertEqual(clock.tick, 12)
