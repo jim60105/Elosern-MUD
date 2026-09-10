@@ -57,6 +57,11 @@ def live_skill_registry():
     return _live_registry("world.skills.registry", "SKILL" + "_REGISTRY")
 
 
+def live_item_registry():
+    """The CURRENT item-registry mapping (kit rows inside a scope)."""
+    return _live_registry("world.lore.items", "ITEM" + "_REGISTRY")
+
+
 def _race_key() -> str:
     registry = _live_registry("world.lore.races", "RACE_REGISTRY")
     return "t_duskmari" if "t_duskmari" in registry else next(iter(registry))

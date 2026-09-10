@@ -29,13 +29,13 @@ from world.rules.combat import (
     _parse_heal_effect,
 )
 from world.skills.registry import (
-    SKILL_REGISTRY,
     SkillCategory,
     SkillDef,
     SkillKind,
     TargetSpec,
 )
 
+from ._combat_session_helpers import live_skill_registry
 from .combat_fixtures import FakeEntity
 
 
@@ -200,16 +200,17 @@ class HealResolverIntegrationTests(EvenniaTestCase):
             effects=effects,
             category=SkillCategory.UTILITY,
         )
-        previous = SKILL_REGISTRY.get(self._TEST_SKILL_KEY)
+        registry = live_skill_registry()
+        previous = registry.get(self._TEST_SKILL_KEY)
 
         def _restore():
             if previous is None:
-                SKILL_REGISTRY.pop(self._TEST_SKILL_KEY, None)
+                registry.pop(self._TEST_SKILL_KEY, None)
             else:
-                SKILL_REGISTRY[self._TEST_SKILL_KEY] = previous
+                registry[self._TEST_SKILL_KEY] = previous
 
         self.addCleanup(_restore)
-        SKILL_REGISTRY[self._TEST_SKILL_KEY] = skill
+        registry[self._TEST_SKILL_KEY] = skill
         self.actor.db.skills = {
             "active": [self._TEST_SKILL_KEY],
             "passive": [],

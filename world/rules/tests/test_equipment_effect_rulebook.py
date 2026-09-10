@@ -32,6 +32,7 @@ from world.rules.equipment_effects import (
     EQUIPMENT_EFFECT_RULES,
     EquipmentEffectRule,
     EquipmentEffectsRulebookError,
+    equipment_adjustment_text,
     load_equipment_effect_rules,
     reload_equipment_effect_rules,
     validate_equipment_effect_rules,
@@ -715,6 +716,44 @@ class ChurchDoctrineTests(unittest.TestCase):
                 )
             },
         )
+
+
+class ShippedAdjustmentProseContractTests(unittest.TestCase):
+    """The shipped roster's authored prose renders exactly as composed.
+
+    Relocated from the migrated behavior file
+    (migrate-rules-equipment-item-tests-off-real-data): the D4 formatter
+    itself is behavior-tested against synthetic rows in
+    ``test_equipment_prose.py``; the shipped rows' exact prose is a
+    data-contract claim owned by this registered file.
+    """
+
+    @covers_requirement(
+        "equipment-effects::equipment-adjustments-render-as-deterministic-prose"
+    )
+    def test_shipped_roster_rows_render_their_exact_authored_prose(self):
+        # The tradeoff heavy armor: flat atk penalty + flat defense +
+        # percent agility + hp ceiling, in the fixed vocabulary order.
+        self.assertEqual(
+            equipment_adjustment_text("knight_platemail"),
+            "攻擊 −2｜防禦 +8｜敏捷 −10%｜生命上限 +15",
+        )
+        # Immunity-only accessory.
+        self.assertEqual(equipment_adjustment_text("fearless_brooch"), "免疫恐懼")
+        # Flat defense with poison immunity.
+        self.assertEqual(
+            equipment_adjustment_text("purified_pendant"), "防禦 +2｜免疫中毒"
+        )
+        # Flat weapon.
+        self.assertEqual(equipment_adjustment_text("plain_sword"), "攻擊 +2")
+        # Flat defense with a percent agility tradeoff.
+        self.assertEqual(
+            equipment_adjustment_text("chainmail"), "防禦 +5｜敏捷 −5%"
+        )
+        # Explicit empty entry renders nothing.
+        self.assertEqual(equipment_adjustment_text("storage_pouch"), "")
+        # P4-only vocabulary (pleasure_gain/exposure_bias) stays absent.
+        self.assertEqual(equipment_adjustment_text("sister_vestments"), "治療 +10%")
 
 
 if __name__ == "__main__":
