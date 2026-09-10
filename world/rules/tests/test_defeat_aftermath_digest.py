@@ -270,7 +270,7 @@ class DigestPhaseTests(ViolationBase, EvenniaTestCase):
 
         def spy(actor, record, battlefield):
             outcome = real_writer(actor, record, battlefield)
-            captured["violation"] = outcome.violation
+            captured["outcomes"] = outcome.violation
             captured["digests"] = outcome.digests
             captured["observations"] = outcome.wake_observations
             return outcome
@@ -340,7 +340,7 @@ class DigestPhaseTests(ViolationBase, EvenniaTestCase):
         self._knock_out(companion)
         result, captured = self._defeat_capturing([1, 1], [100, 100])
         self.assertTrue(
-            all(outcome.zero_landed for outcome in captured["violation"].values())
+            all(outcome.zero_landed for outcome in captured["outcomes"].values())
         )
         self.assertEqual(
             self._digest_rows(captured),
@@ -426,7 +426,7 @@ class DigestPhaseTests(ViolationBase, EvenniaTestCase):
         engage(self.player, self.monster)
         self._knock_out(victim)
         result, captured = self._defeat_capturing([1, 1], [1, 1])
-        self.assertEqual(set(captured["violation"]), {str(victim.key)})
+        self.assertEqual(set(captured["outcomes"]), {str(victim.key)})
         self.assertEqual(
             [row.participant for row in captured["observations"]],
             [str(witness.key)],
@@ -544,7 +544,7 @@ class DigestPhaseTests(ViolationBase, EvenniaTestCase):
         self._arouse(13)
         engage(self.player, self.monster)
         result, captured = self._defeat_capturing([1], [1])
-        self.assertEqual(captured["violation"], {})
+        self.assertEqual(captured["outcomes"], {})
         self.assertEqual(captured["digests"], ())
         self.assertEqual(captured["observations"], ())
         self.assertNotIn("digest_outcome", _kinds(_aftermath_entries(result)))
