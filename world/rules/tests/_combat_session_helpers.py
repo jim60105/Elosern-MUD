@@ -11,6 +11,7 @@ synthetic scope (borrowers then get the kit race/tier rows).
 """
 
 from dataclasses import replace
+from enum import Enum
 import importlib
 
 from evennia.utils.create import create_object
@@ -62,6 +63,32 @@ def _behaviour_archetype_key() -> str:
     return next(iter(profiles))
 
 
+def first_live_key(dotted: str, attribute: str, predicate=None) -> str:
+    """First key of a live registry, optionally narrowed by a predicate.
+
+    Capability probe for behavior tests that need *a* shipped row's KEY as a
+    runtime value (production-forced vocabularies: rulebook-keyed equipment or
+    passive-skill rows) without ever naming the shipped identifier in source.
+    """
+    registry = _live_registry(dotted, attribute)
+    for key, value in registry.items():
+        if predicate is None or predicate(value):
+            return key
+    raise LookupError(f"{dotted}.{attribute} has no row matching the predicate")
+
+
+def enum_first(dotted: str, attribute: str, member: str) -> str:
+    """First value of a production enum constant, resolved at runtime.
+
+    For closed vocabularies the resolver hardcodes (cost resources, trait
+    keys): the enum itself is production contract; which row a fixture uses
+    is a data choice the test must not pin to shipped identifiers.
+    """
+    values = getattr(_live_registry(dotted, attribute), member)
+    assert isinstance(values, Enum) or hasattr(values, "__iter__")
+    return next(iter(values))
+
+
 def synth_innate_overlay() -> dict[str, dict[str, object]]:
     """``extra=`` overlay re-seeding the production-forced innate skill rows.
 
@@ -81,6 +108,40 @@ def synth_innate_overlay() -> dict[str, dict[str, object]]:
     registry = _live_registry("world.skills.registry", "SKILL_REGISTRY")
     rows = {key: registry[key] for key in (basic_key, flee_key) if key in registry}
     return {"skills": rows}
+
+
+def synth_damage_skill(
+    key: str,
+    label: str,
+    *,
+    effects: tuple[str, ...] = ("damage:t_synthetic:physical",),
+    cost: dict[str, int] | None = None,
+    target_spec=None,
+    kind=None,
+    category=None,
+    prerequisites: tuple = (),
+):
+    """Build one file-local synthetic skill from the synthetic elemental template.
+
+    Migration helper: behavior files that need a specific skill SHAPE (an
+    affordable active damage skill, a passive with effects, a prereq chain)
+    build their own rows instead of borrowing a shipped skill. Shape fields
+    default to the single-target synthetic damage template.
+    """
+    base = SYNTH_SKILLS["t_ember_burst"]
+    return replace(
+        base,
+        key=key,
+        label=label,
+        description=label,
+        kind=base.kind if kind is None else kind,
+        target_spec=base.target_spec if target_spec is None else target_spec,
+        cost={} if cost is None else cost,
+        effects=list(effects),
+        category=base.category if category is None else category,
+        prerequisites=list(prerequisites),
+    )
+
 
 # ANY-faction AREA damage skill: with free target selection the player's own
 # action can hit an ally-side companion in the seam flow. Built from the
