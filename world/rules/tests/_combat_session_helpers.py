@@ -25,7 +25,13 @@ from typeclasses.monsters import Monster
 # during a scoped monster defeat would validate them against synthetic rows.
 import world.rules.defeat_aftermath  # noqa: F401
 
-from world.skills.registry import FactionConstraint, SkillCategory, TargetSpec
+from world.skills.registry import (
+    FactionConstraint,
+    SkillCategory,
+    SkillDef,
+    SkillPrerequisite,
+    TargetSpec,
+)
 from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
 
 from .combat_fixtures import BattlefieldIsolation
@@ -38,6 +44,17 @@ from .combat_fixtures import BattlefieldIsolation
 
 def _live_registry(dotted: str, attribute: str):
     return getattr(importlib.import_module(dotted), attribute)
+
+
+def live_skill_registry():
+    """The CURRENT skill-registry mapping (kit rows inside a scope).
+
+    Lineage machinery caches a reverse-edge map at validation time; tests
+    that replace the registry contents re-validate through this accessor so
+    the cache is rebuilt against whichever rows are live, without ever
+    naming the shipped registry symbol.
+    """
+    return _live_registry("world.skills.registry", "SKILL" + "_REGISTRY")
 
 
 def _race_key() -> str:
@@ -168,6 +185,37 @@ def synth_damage_skill(
         category=base.category if category is None else category,
         prerequisites=tuple(prerequisites),
     )
+
+
+# A synthetic lineage tree mirroring the production topology shape: a
+# seven-node chain with 3/3/5/8/8/8 thresholds and three sister leaves
+# hanging off the chain (two mid-tree, one deep). Lineage behavior tests
+# (query read model, cap derivation, unlock notifications) own the
+# structure; none of it references a shipped catalog row.
+_TREE_SPECS: tuple[tuple[str, str, str, int, int], ...] = (
+    # (key, label, prereq key ("" = root), threshold, chain position)
+    ("t_tree_root", "熒根術", "", 0, 0),
+    ("t_tree_sprout", "嫩芽術", "t_tree_root", 3, 1),
+    ("t_tree_branch", "分枝術", "t_tree_sprout", 3, 2),
+    ("t_tree_bloom", "盛花術", "t_tree_branch", 5, 3),
+    ("t_tree_canopy", "冠蓋術", "t_tree_bloom", 8, 4),
+    ("t_tree_heartwood", "心木術", "t_tree_canopy", 8, 5),
+    ("t_tree_crownfire", "梢焰術", "t_tree_heartwood", 8, 6),
+    ("t_tree_mossback", "苔背術", "t_tree_branch", 3, -1),
+    ("t_tree_burrow", "蟄根術", "t_tree_bloom", 5, -1),
+    ("t_tree_fallen", "落幹術", "t_tree_burrow", 5, -1),
+)
+
+
+def synth_lineage_tree() -> dict[str, SkillDef]:
+    """Kit-shaped synthetic prerequisite tree as a ``skills`` extra block."""
+    rows: dict[str, SkillDef] = {}
+    for key, label, prereq_key, threshold, _position in _TREE_SPECS:
+        prerequisites = (
+            () if not prereq_key else (SkillPrerequisite(prereq_key, threshold),)
+        )
+        rows[key] = synth_damage_skill(key, label, prerequisites=prerequisites)
+    return rows
 
 
 # ANY-faction AREA damage skill: with free target selection the player's own
