@@ -58,14 +58,31 @@ from world.rules.quest_issuance import (
     resolve_issuance,
 )
 from world.rules.surfaces import write_counter_trait
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.rules.tests._guild_service_probes import (
+    install_synthetic_catalog,
+    synth_catalog,
+)
+from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY, SYNTH_ITEMS
 
 from tools.spec_traceability import covers_requirement
+
+# Intent application runs on kit rows: the exam/offer branch is the kit guild
+# branch and transferred items are the kit potion row (scoped registries
+# validate them), so no shipped content key is named below.
+BRANCH = SYNTH_GUILD_BRANCH_KEY
+T_ITEM = SYNTH_ITEMS["t_ember_spray"].key
 
 
 class ExamRegistryIsolation(QuestRegistryIsolation):
     def setUp(self):
+        # Examiner/staff branches resolve against the kit branch row, and the
+        # exam path reads the synthetic catalog (invented E-through-S
+        # thresholds) instead of the shipped rulebook.
+        open_synthetic_scope(self, "guild_branches")
         super().setUp()
         register_catalog()
+        install_synthetic_catalog(self, synth_catalog())
         self._previous_catalog = CATALOG
         from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 
@@ -96,7 +113,7 @@ class ExamIntentTests(ExamRegistryIsolation, EvenniaTestCase):
         self.staff = create_object(NPC, key="guild staff", location=self.hall)
         self.staff.components.add(
             GuildStaff.create(
-                self.staff, service_id="staff", branch_key="guild_branch_altoria"
+                self.staff, service_id="staff", branch_key=BRANCH
             )
         )
         self.examiner = create_object(NPC, key="examiner", location=self.hall)
@@ -104,7 +121,7 @@ class ExamIntentTests(ExamRegistryIsolation, EvenniaTestCase):
             GuildExaminer.create(
                 self.examiner,
                 service_id="examiner",
-                branch_key="guild_branch_altoria",
+                branch_key=BRANCH,
             )
         )
         register_adventurer(self.player, self.staff)
@@ -128,7 +145,7 @@ class ExamIntentTests(ExamRegistryIsolation, EvenniaTestCase):
         other = create_object(Room, key="elsewhere")
         far = create_object(NPC, key="far examiner", location=other)
         far.components.add(
-            GuildExaminer.create(far, service_id="far", branch_key="guild_branch_altoria")
+            GuildExaminer.create(far, service_id="far", branch_key=BRANCH)
         )
         self._give_merit(50)
         # The completion gate is bypassed so this test exercises the exam
@@ -148,7 +165,7 @@ class ExamIntentTests(ExamRegistryIsolation, EvenniaTestCase):
         examiner = create_object(NPC, key="other branch examiner", location=self.hall)
         examiner.components.add(
             GuildExaminer.create(
-                examiner, service_id="other", branch_key="guild_branch_elsewhere"
+                examiner, service_id="other", branch_key="t_other_branch"
             )
         )
         self._give_merit(50)
@@ -224,6 +241,8 @@ class ExamIntentTests(ExamRegistryIsolation, EvenniaTestCase):
 
 class ItemIntentTests(EvenniaTestCase):
     def setUp(self):
+        # Transferred item identities validate against the kit potion row.
+        open_synthetic_scope(self, "items")
         super().setUp()
         self.room = create_object(Room, key="transfer room")
         self.player = create_object(PlayerCharacter, key="transfer player")
@@ -232,20 +251,20 @@ class ItemIntentTests(EvenniaTestCase):
         self.player.location = self.room
         self.npc = create_object(NPC, key="giver npc", location=self.room)
 
-    def _give_intent(self, item_key="healing_potion", qty=1):
+    def _give_intent(self, item_key=T_ITEM, qty=1):
         return {"kind": "give_item", "item_key": item_key, "qty": qty}
 
-    def _take_intent(self, item_key="healing_potion", qty=1):
+    def _take_intent(self, item_key=T_ITEM, qty=1):
         return {"kind": "take_item", "item_key": item_key, "qty": qty}
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_give_item_transfers_verified_holdings_to_the_player(self):
-        self.npc.db.inventory = ["healing_potion", "healing_potion"]
+        self.npc.db.inventory = [T_ITEM, T_ITEM]
         self.player.db.inventory = []
         outcome = apply_npc_intent(self.npc, self.player, self._give_intent(qty=2))
         self.assertTrue(outcome.applied)
         self.assertEqual(list(self.npc.db.inventory), [])
-        self.assertEqual(list(self.player.db.inventory), ["healing_potion", "healing_potion"])
+        self.assertEqual(list(self.player.db.inventory), [T_ITEM, T_ITEM])
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_take_item_transfers_verified_holdings_to_the_npc(self):
@@ -258,42 +277,42 @@ class ItemIntentTests(EvenniaTestCase):
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_unverifiable_item_intent_changes_no_inventory(self):
-        self.npc.db.inventory = ["healing_potion"]
+        self.npc.db.inventory = [T_ITEM]
         self.player.db.inventory = []
         outcome = apply_npc_intent(self.npc, self.player, self._give_intent(qty=2))
         self.assertFalse(outcome.applied)
-        self.assertEqual(list(self.npc.db.inventory), ["healing_potion"])
+        self.assertEqual(list(self.npc.db.inventory), [T_ITEM])
         self.assertEqual(list(self.player.db.inventory), [])
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_pathological_qty_is_rejected_before_any_transfer_work(self):
-        self.npc.db.inventory = ["healing_potion"]
+        self.npc.db.inventory = [T_ITEM]
         self.player.db.inventory = []
         outcome = apply_npc_intent(self.npc, self.player, self._give_intent(qty=10**9))
         self.assertFalse(outcome.applied)
         self.assertIn("does not hold", outcome.reason)
-        self.assertEqual(list(self.npc.db.inventory), ["healing_potion"])
+        self.assertEqual(list(self.npc.db.inventory), [T_ITEM])
         self.assertEqual(list(self.player.db.inventory), [])
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_invalid_item_payload_is_rejected_without_state_change(self):
-        self.npc.db.inventory = ["healing_potion"]
+        self.npc.db.inventory = [T_ITEM]
         self.player.db.inventory = []
         for intent in (
-            {"kind": "give_item", "item_key": "healing_potion"},
+            {"kind": "give_item", "item_key": T_ITEM},
             {"kind": "give_item", "item_key": "", "qty": 1},
-            {"kind": "give_item", "item_key": "healing_potion", "qty": 0},
-            {"kind": "give_item", "item_key": "healing_potion", "qty": "1"},
+            {"kind": "give_item", "item_key": T_ITEM, "qty": 0},
+            {"kind": "give_item", "item_key": T_ITEM, "qty": "1"},
         ):
             with self.subTest(intent=intent):
                 outcome = apply_npc_intent(self.npc, self.player, intent)
                 self.assertFalse(outcome.applied)
-                self.assertEqual(list(self.npc.db.inventory), ["healing_potion"])
+                self.assertEqual(list(self.npc.db.inventory), [T_ITEM])
                 self.assertEqual(list(self.player.db.inventory), [])
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_second_side_transfer_failure_rolls_back_both_entities(self):
-        self.npc.db.inventory = ["healing_potion"]
+        self.npc.db.inventory = [T_ITEM]
         self.player.db.inventory = []
         npc_before = list(self.npc.db.inventory)
         player_before = list(self.player.db.inventory)
@@ -533,7 +552,7 @@ class PartyInviteIntentTests(EvenniaTestCase):
 class OfferQuestIntentTests(ExamRegistryIsolation, EvenniaTestCase):
     """The offer_quest intent routes through the issuer-aware offer surface."""
 
-    ALTORIA_BRANCH = "guild_branch_altoria"
+    ALTORIA_BRANCH = BRANCH
 
     def setUp(self):
         super().setUp()
@@ -1067,8 +1086,9 @@ class CompletionGateTests(EvenniaTestCase):
     """
 
     def setUp(self):
+        # Gate checks transfer kit-row item identities.
+        open_synthetic_scope(self, "items")
         super().setUp()
-        register_catalog()
         self.room = create_object(Room, key="gate room")
         self.other = create_object(Room, key="gate other room")
         self.player = create_object(PlayerCharacter, key="gate player")
@@ -1078,10 +1098,10 @@ class CompletionGateTests(EvenniaTestCase):
         self.npc = create_object(NPC, key="gate npc", location=self.room)
 
     def _give_intent(self):
-        return {"kind": "give_item", "item_key": "healing_potion", "qty": 1}
+        return {"kind": "give_item", "item_key": T_ITEM, "qty": 1}
 
     def _take_intent(self):
-        return {"kind": "take_item", "item_key": "healing_potion", "qty": 1}
+        return {"kind": "take_item", "item_key": T_ITEM, "qty": 1}
 
     def _relation_intent(self, delta=3):
         return {"kind": "adjust_relation", "delta": delta}
@@ -1091,23 +1111,23 @@ class CompletionGateTests(EvenniaTestCase):
 
     @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
     def test_give_intent_is_dropped_after_separation(self):
-        self.npc.db.inventory = ["healing_potion"]
+        self.npc.db.inventory = [T_ITEM]
         self.npc.location = self.other
         outcome = apply_npc_intent(self.npc, self.player, self._give_intent())
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.reason, STALE_CONTEXT_REASON)
         self.assertTrue(is_stale_context(outcome))
-        self.assertEqual(list(self.npc.db.inventory), ["healing_potion"])
+        self.assertEqual(list(self.npc.db.inventory), [T_ITEM])
         self.assertEqual(list(self.player.db.inventory or []), [])
 
     @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
     def test_take_intent_is_dropped_when_the_player_left(self):
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [T_ITEM]
         self.player.location = self.other
         outcome = apply_npc_intent(self.npc, self.player, self._take_intent())
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.reason, STALE_CONTEXT_REASON)
-        self.assertEqual(list(self.player.db.inventory), ["healing_potion"])
+        self.assertEqual(list(self.player.db.inventory), [T_ITEM])
         self.assertEqual(list(self.npc.db.inventory or []), [])
 
     @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
@@ -1128,25 +1148,25 @@ class CompletionGateTests(EvenniaTestCase):
 
     @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
     def test_co_located_interactive_completion_applies_the_intent(self):
-        self.npc.db.inventory = ["healing_potion"]
+        self.npc.db.inventory = [T_ITEM]
         outcome = apply_npc_intent(self.npc, self.player, self._give_intent())
         self.assertTrue(outcome.applied)
         self.assertFalse(is_stale_context(outcome))
         self.assertEqual(list(self.npc.db.inventory), [])
-        self.assertEqual(list(self.player.db.inventory), ["healing_potion"])
+        self.assertEqual(list(self.player.db.inventory), [T_ITEM])
 
     @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
     def test_the_gate_reads_canonical_state_at_application_time(self):
         # The predicate is evaluated inside ``apply_npc_intent``, so a
         # schedule-driven move landing mid-exchange (between the pre-call
         # fast path and the intent application) still fails the gate.
-        self.npc.db.inventory = ["healing_potion"]
+        self.npc.db.inventory = [T_ITEM]
         self.assertTrue(intent_context_ok(self.npc, self.player))
         self.npc.location = self.other
         outcome = apply_npc_intent(self.npc, self.player, self._give_intent())
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.reason, STALE_CONTEXT_REASON)
-        self.assertEqual(list(self.npc.db.inventory), ["healing_potion"])
+        self.assertEqual(list(self.npc.db.inventory), [T_ITEM])
 
     @covers_requirement("npc-dialogue::async-dialogue-intents-revalidate-context-at-completion")
     def test_stale_context_party_invite_returns_the_marker_before_join_gates(self):
@@ -1166,6 +1186,8 @@ class AcquireRollbackTests(QuestRegistryIsolation, EvenniaTestCase):
     """A second-side ACQUIRE failure restores both entities' quest surfaces too."""
 
     def setUp(self):
+        # The acquire objective and transfers name the kit potion row.
+        open_synthetic_scope(self, "items")
         super().setUp()
         self.room = create_object(Room, key="acquire rollback room")
         self.player = create_object(PlayerCharacter, key="acquire player")
@@ -1176,7 +1198,7 @@ class AcquireRollbackTests(QuestRegistryIsolation, EvenniaTestCase):
         definition = _register_quest(
             _quest(
                 "potions_please",
-                stages=(QuestStage(0, _acquire("healing_potion", quantity=2)),),
+                stages=(QuestStage(0, _acquire(T_ITEM, quantity=2)),),
             )
         )
         accept(self.player, definition.key)
@@ -1196,7 +1218,7 @@ class AcquireRollbackTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("npc-dialogue::intent-application-is-deterministic-verified-and-non-escalating")
     def test_second_side_acquire_failure_rolls_back_quest_log_and_inventories(self):
-        self.npc.db.inventory = ["healing_potion", "healing_potion"]
+        self.npc.db.inventory = [T_ITEM, T_ITEM]
         self.player.db.inventory = []
         before = self._snapshot()
         records_before = read_records(self.player)
@@ -1219,7 +1241,7 @@ class AcquireRollbackTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(records_after[0].stage_progress, 0)
         self.assertEqual(list(self.player.db.quest_log or []), before["player_quest_log"])
 
-    def _give_intent(self, item_key="healing_potion", qty=1):
+    def _give_intent(self, item_key=T_ITEM, qty=1):
         return {"kind": "give_item", "item_key": item_key, "qty": qty}
 
 
