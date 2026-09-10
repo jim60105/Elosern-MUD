@@ -90,7 +90,7 @@ class ServicesViewSideEffectTests(EvenniaTestCase):
         self.merchant_npc = create_object(NPC, key="shop keeper", location=self.store)
         self.merchant = Merchant.create(
             self.merchant_npc,
-            service_id="merchant",
+            service_id="store",
             shop_key=T_SHOP,
         )
         self.merchant_npc.components.add(self.merchant)
