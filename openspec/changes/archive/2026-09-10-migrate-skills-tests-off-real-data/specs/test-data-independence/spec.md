@@ -10,6 +10,10 @@ naming a manifest file is removed. Exemptions owned by other changes under the s
 directories are outside this requirement. Converted assertions SHALL establish the
 mechanics named by the OpenSpec requirements they annotate; an assertion that merely
 echoes synthetic-fixture content is not a passing conversion.
+A parser branch whose accepted payload is a closed production vocabulary with no
+synthetic substitute MAY keep its positive shipped-value assertion in a
+gate-tagged data-contract file instead; the migrated behavior file itself still
+carries no shipped-content reference.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration

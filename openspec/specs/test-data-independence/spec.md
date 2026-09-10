@@ -184,3 +184,34 @@ Node-gate self-test SHALL fail if either mirror drifts from the shared literals.
 - **THEN** the JavaScript mirror payloads and the Python kit entries agree on every `t_`
   id and display label, and a deliberate drift in either side turns one of the two red
 
+### Requirement: Skills package behavior tests resolve game data through synthetic fixtures
+Behavior tests in the 7 test files enumerated in this change's migration
+manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
+synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
+SHALL NOT pin quantities derived from shipped content. After the migration, none of the
+manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
+naming a manifest file is removed. Exemptions owned by other changes under the same
+directories are outside this requirement. Converted assertions SHALL establish the
+mechanics named by the OpenSpec requirements they annotate; an assertion that merely
+echoes synthetic-fixture content is not a passing conversion.
+A parser branch whose accepted payload is a closed production vocabulary with no
+synthetic substitute MAY keep its positive shipped-value assertion in a
+gate-tagged data-contract file instead; the migrated behavior file itself still
+carries no shipped-content reference.
+
+#### Scenario: Area passes the gate with zero debt exemptions
+- **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
+- **THEN** no flagged test file remains among this change's migrated files, and no
+  freeze-list entry names a migrated file
+
+#### Scenario: Suite is green on synthetic data
+- **WHEN** the focused suites for the migrated files run on the retained-database Evennia
+  profile (or the Node/Vitest/managed-browser profile for JS-owned files)
+- **THEN** every test passes while skills, items, quests, regions, presets, titles, and
+  prose resolve exclusively from synthetic catalogs
+
+#### Scenario: Data rework cannot break the area again
+- **WHEN** shipped identifiers, display prose, or catalog sizes change in the game-data
+  rework
+- **THEN** the migrated skills tests keep passing unchanged
+

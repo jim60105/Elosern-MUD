@@ -1,4 +1,13 @@
-"""Cast-resolution tests for registry skills with combat handlers."""
+"""Cast-resolution tests built on the synthetic skill kit.
+
+The shipped-registry content claims these tests used to carry (dual-blade
+sibling, light-sword damage declaration, full-earth spell round-trip) live
+in the registered data-contract files (test_skill_registry.py,
+test_spell_catalogs.py). What remains here is cast-resolution *behavior*
+exercised through synthetic rows: damage dispatch and cost deduction, self
+buffs committing to the caster only, target-spec rejection, and the
+usable-out-of-combat flag gate against the damaging-action gate.
+"""
 
 from tools.spec_traceability import covers_requirement
 
@@ -8,106 +17,87 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
-from world.lore.elements import ELEMENT_REGISTRY
-from world.rules.tests.combat_fixtures import grant_lineage
 from world.rules.action import ActionRequest, ActionResolver, RejectReason
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.targeting import RoomActionContext
-from world.skills.effects import (
-    BuffApplyEffect,
-    DamageEffect,
-    SelfBuffApplyEffect,
-    parse_effect,
+from world.skills.registry import SkillKind, TargetSpec
+from world.tests.synthetic_data import (
+    SYNTH_SKILLS,
+    make_skill,
+    synthetic_registries,
 )
-from world.skills.registry import SKILL_REGISTRY
 
-from .test_spell_catalogs import EARTH_SPELL_CATALOG
+# Synthetic cast fixtures. The damage element is borrowed from the kit's
+# own spell row, so the closed element enum never needs a synthetic name.
+_ELEMENT = SYNTH_SKILLS["t_ember_burst"].element
+_T_CLEAVE = make_skill(
+    "t_iron_cleave",
+    effects=[f"damage:{_ELEMENT}:physical"],
+    cost={"sp": 30},
+    usable_out_of_combat=False,
+)
+_T_HOLLOW_STANCE = make_skill(
+    "t_hollow_stance",
+    effects=["stat_multiply:agility:1.1"],
+    kind=SkillKind.PASSIVE,
+    target_spec=TargetSpec.SELF,
+)
+_T_BLAZE_JAB = make_skill(
+    "t_blaze_jab",
+    effects=[f"damage:{_ELEMENT}:magic"],
+    cost={"mp": 12},
+    usable_out_of_combat=True,
+)
+_T_MOSS_VEIL = SYNTH_SKILLS["t_moss_veil"]
 
-
-class DualBladeMasteryCastTests(EvenniaTestCase):
-    def setUp(self):
-        super().setUp()
-        self.actor = create_object(PlayerCharacter, key="dual blade actor")
-        self.target = create_object(PlayerCharacter, key="dual blade target")
-        for entity in (self.actor, self.target):
-            entity.race = "human"
-            entity.apply_race_baseline()
-        self.actor.db.skills = {"active": ["dual_blade_mastery"], "passive": []}
-        self.target.db.skills = {"active": [], "passive": []}
-        battlefield = Battlefield(
-            {
-                "party": frozenset({"dual blade actor"}),
-                "foes": frozenset({"dual blade target"}),
-            },
-            {"dual blade actor": self.actor, "dual blade target": self.target},
-        )
-        self.request = ActionRequest(
-            self.actor,
-            "dual_blade_mastery",
-            [self.target],
-            BattlefieldActionContext(battlefield),
-        )
-
-    @covers_requirement("skill-registry::dual-blade-mastery-exists-as-a-higher-tier-sibling-to-dual-wield-style")
-    def test_cast_resolves_via_damage_handler_without_dual_wield_style(self):
-        self.assertNotIn("dual_wield_style", self.actor.skills.owned_keys())
-        before = self.target.traits.hp.value
-        sp_before = self.actor.traits.sp.value
-        with patch("world.rules.combat.roll_d100", return_value=100):
-            result = ActionResolver.resolve(self.request)
-        self.assertEqual(result.outcome, "success")
-        self.assertLess(self.target.traits.hp.value, before)
-        self.assertEqual(
-            [entry.kind for entry in result.event_log.entries[:2]],
-            ["roll", "damage"],
-        )
-        self.assertEqual(self.actor.traits.sp.value, sp_before - 30)
-
-    @covers_requirement("skill-registry::dual-blade-mastery-exists-as-a-higher-tier-sibling-to-dual-wield-style")
-    def test_dual_wield_style_ownership_has_no_bearing_on_cost(self):
-        self.actor.db.skills = {
-            "active": ["dual_blade_mastery"],
-            "passive": ["dual_wield_style"],
+_SCOPE = synthetic_registries(
+    "skills",
+    "buffs",
+    "races",
+    "subraces",
+    "static_tiers",
+    "elements",
+    "items",
+    "sexual_acts",
+    extra={
+        "skills": {
+            skill.key: skill for skill in (_T_CLEAVE, _T_HOLLOW_STANCE, _T_BLAZE_JAB)
         }
-        self.assertIn("dual_wield_style", self.actor.skills.owned_keys())
-        sp_before = self.actor.traits.sp.value
-        with patch("world.rules.combat.roll_d100", return_value=100):
-            result = ActionResolver.resolve(self.request)
-        self.assertEqual(result.outcome, "success")
-        self.assertEqual(self.actor.traits.sp.value, sp_before - 30)
+    },
+)
 
-class LightSwordStyleCastTests(EvenniaTestCase):
-    def setUp(self):
-        super().setUp()
-        self.actor = create_object(PlayerCharacter, key="light sword actor")
-        self.target = create_object(PlayerCharacter, key="light sword target")
+
+# Lifecycle note: the kit's class decorator wraps collected ``test*`` methods,
+# not ``setUp`` — so every synthetic-scoped entity construction happens in a
+# helper invoked from the test body, guaranteeing the patched registries are
+# installed when ``apply_race_baseline`` reads the race catalog.
+@_SCOPE
+class SyntheticDamageCastTests(EvenniaTestCase):
+    def _build(self):
+        self.actor = create_object(PlayerCharacter, key="synth cleave actor")
+        self.target = create_object(PlayerCharacter, key="synth cleave target")
         for entity in (self.actor, self.target):
-            entity.race = "human"
+            entity.race = "t_duskmari"
+            entity.subrace = "t_duskmari_evensong"
             entity.apply_race_baseline()
-        self.actor.db.skills = {"active": ["light_sword_style"], "passive": []}
+        self.actor.db.skills = {"active": [_T_CLEAVE.key], "passive": []}
         self.target.db.skills = {"active": [], "passive": []}
         battlefield = Battlefield(
             {
-                "party": frozenset({"light sword actor"}),
-                "foes": frozenset({"light sword target"}),
+                "party": frozenset({"synth cleave actor"}),
+                "foes": frozenset({"synth cleave target"}),
             },
-            {"light sword actor": self.actor, "light sword target": self.target},
+            {"synth cleave actor": self.actor, "synth cleave target": self.target},
         )
         self.request = ActionRequest(
             self.actor,
-            "light_sword_style",
+            _T_CLEAVE.key,
             [self.target],
             BattlefieldActionContext(battlefield),
         )
 
-    @covers_requirement("skill-registry::light-sword-style-deals-damage-via-the-standard-damage-convention")
-    def test_light_sword_style_declares_the_damage_convention(self):
-        skill = SKILL_REGISTRY["light_sword_style"]
-        self.assertEqual(skill.effects, ["damage:light:physical"])
-        self.assertIs(skill.element, ELEMENT_REGISTRY["light"])
-
-    @covers_requirement("skill-registry::light-sword-style-deals-damage-via-the-standard-damage-convention")
-    def test_cast_resolves_and_deals_light_elemental_physical_damage(self):
+    def test_cast_resolves_via_damage_handler_and_deducts_the_declared_cost(self):
+        self._build()
         before = self.target.traits.hp.value
         sp_before = self.actor.traits.sp.value
         with patch("world.rules.combat.roll_d100", return_value=100):
@@ -118,106 +108,91 @@ class LightSwordStyleCastTests(EvenniaTestCase):
             [entry.kind for entry in result.event_log.entries[:2]],
             ["roll", "damage"],
         )
-        self.assertEqual(self.actor.traits.sp.value, sp_before - 6)
+        self.assertEqual(
+            self.actor.traits.sp.value, sp_before - _T_CLEAVE.cost["sp"]
+        )
 
-class EarthHardenedSkinCastTests(EvenniaTestCase):
-    def setUp(self):
-        super().setUp()
-        self.actor = create_object(PlayerCharacter, key="hardened skin actor")
-        self.other = create_object(PlayerCharacter, key="hardened skin other")
+    def test_unrelated_passive_ownership_has_no_bearing_on_cost(self):
+        self._build()
+        self.actor.db.skills = {
+            "active": [_T_CLEAVE.key],
+            "passive": [_T_HOLLOW_STANCE.key],
+        }
+        self.assertIn(_T_HOLLOW_STANCE.key, self.actor.skills.owned_keys())
+        sp_before = self.actor.traits.sp.value
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            result = ActionResolver.resolve(self.request)
+        self.assertEqual(result.outcome, "success")
+        self.assertEqual(
+            self.actor.traits.sp.value, sp_before - _T_CLEAVE.cost["sp"]
+        )
+
+
+@_SCOPE
+class SelfBuffCastTests(EvenniaTestCase):
+    def _build(self):
+        self.actor = create_object(PlayerCharacter, key="synth veil actor")
+        self.other = create_object(PlayerCharacter, key="synth veil other")
         for entity in (self.actor, self.other):
-            entity.race = "human"
+            entity.race = "t_duskmari"
+            entity.subrace = "t_duskmari_evensong"
             entity.apply_race_baseline()
-        self.actor.db.skills = {"active": ["hardened_skin"], "passive": []}
+        self.actor.db.skills = {"active": [_T_MOSS_VEIL.key], "passive": []}
         self.other.db.skills = {"active": [], "passive": []}
         battlefield = Battlefield(
             {
-                "party": frozenset({"hardened skin actor"}),
-                "foes": frozenset({"hardened skin other"}),
+                "party": frozenset({"synth veil actor"}),
+                "foes": frozenset({"synth veil other"}),
             },
-            {"hardened skin actor": self.actor, "hardened skin other": self.other},
+            {"synth veil actor": self.actor, "synth veil other": self.other},
         )
         self.context = BattlefieldActionContext(battlefield)
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
     def test_self_cast_applies_the_buff_to_the_caster(self):
-        request = ActionRequest(
-            self.actor,
-            "hardened_skin",
-            [],
-            self.context,
-        )
+        self._build()
+        request = ActionRequest(self.actor, _T_MOSS_VEIL.key, [], self.context)
         result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
-        self.assertIn("earth_hardened_skin", self.actor.buffs.all)
-        self.assertNotIn("earth_hardened_skin", self.other.buffs.all)
+        buff_key = _T_MOSS_VEIL.parsed_effects[0].buff_key
+        self.assertIn(buff_key, self.actor.buffs.all)
+        self.assertNotIn(buff_key, self.other.buffs.all)
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
     def test_cast_at_an_explicit_other_target_is_rejected(self):
+        self._build()
         request = ActionRequest(
-            self.actor,
-            "hardened_skin",
-            [self.other],
-            self.context,
+            self.actor, _T_MOSS_VEIL.key, [self.other], self.context
         )
         result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "rejected")
         self.assertEqual(result.reason, RejectReason.TARGET_SPEC_MISMATCH)
 
-    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
-    def test_every_earth_spell_effect_round_trips_through_typed_dispatch(self):
-        for key, _label, _target_spec, _mp, effects in EARTH_SPELL_CATALOG:
-            skill = SKILL_REGISTRY[key]
-            for effect_id in effects:
-                with self.subTest(spell=key, effect=effect_id):
-                    parsed = parse_effect(effect_id)
-                    if effect_id.startswith("damage:"):
-                        self.assertEqual(
-                            parsed,
-                            DamageEffect(element="earth", school="magic"),
-                        )
-                    elif effect_id.startswith("self_buff_apply:"):
-                        self.assertEqual(
-                            parsed,
-                            SelfBuffApplyEffect(
-                                buff_key=effect_id.partition(":")[2]
-                            ),
-                        )
-                    else:
-                        self.assertEqual(
-                            parsed,
-                            BuffApplyEffect(buff_key=effect_id.partition(":")[2]),
-                        )
-                    self.assertIn(parsed, skill.parsed_effects)
 
-
+@_SCOPE
 class FieldDamageSelectionTests(EvenniaTestCase):
     """``usable_out_of_combat`` governs selection; the damaging-action gate
     governs resolution (skill-field-availability, design D-7)."""
 
-    def setUp(self):
-        super().setUp()
+    def _build(self):
         from typeclasses.rooms import Room
 
         self.room = create_object(Room, key="field room")
         self.actor = create_object(PlayerCharacter, key="field selector")
-        self.actor.race = "human"
+        self.actor.race = "t_duskmari"
+        self.actor.subrace = "t_duskmari_evensong"
         self.actor.apply_race_baseline()
         self.actor.location = self.room
-        # fire_ball sits behind fire_arrow Lv.3 in the lineage; grant the
-        # whole chain so the ownership step reaches the gates under test.
-        grant_lineage(self.actor, ["fire_arrow", "fire_ball", "basic_attack"])
+        self.actor.db.skills = {"active": [_T_BLAZE_JAB.key], "passive": []}
 
     @covers_requirement(
-        "skill-registry::every-skill-declares-usable-out-of-combat-deliberately-under-one-written-policy"
+        "action-resolution-pipeline::the-out-of-combat-gates-fire-in-a-fixed-specified-order"
     )
     def test_newly_permitted_damage_spell_is_selectable_but_never_resolves(self):
-        skill = SKILL_REGISTRY["fire_ball"]
-        self.assertTrue(skill.usable_out_of_combat)
+        self._build()
+        self.assertTrue(_T_BLAZE_JAB.usable_out_of_combat)
         mp_before = self.actor.traits.mp.value
         result = ActionResolver.resolve(
             ActionRequest(
-                self.actor, "fire_ball", [self.actor], RoomActionContext(self.room)
+                self.actor, _T_BLAZE_JAB.key, [self.actor], RoomActionContext(self.room)
             )
         )
         # The flag gate lets the cast through to the damaging-action gate,
@@ -227,12 +202,21 @@ class FieldDamageSelectionTests(EvenniaTestCase):
         self.assertEqual(self.actor.traits.mp.value, mp_before)
 
     @covers_requirement(
-        "skill-registry::every-skill-declares-usable-out-of-combat-deliberately-under-one-written-policy"
+        "action-resolution-pipeline::the-out-of-combat-gates-fire-in-a-fixed-specified-order"
     )
-    def test_flee_still_reports_the_flag_rejection_outside_combat(self):
+    def test_skill_declaring_false_is_rejected_at_the_flag_gate(self):
+        self._build()
+        # The out-of-combat-permitted fixture is a second synthetic row; the
+        # damage fixture deliberately declares False, so the flag gate — not
+        # the damaging-action gate — rejects its field selection.
+        self.assertFalse(_T_CLEAVE.usable_out_of_combat)
+        self.actor.db.skills = {
+            "active": [_T_CLEAVE.key],
+            "passive": [],
+        }
         result = ActionResolver.resolve(
             ActionRequest(
-                self.actor, "flee", [self.actor], RoomActionContext(self.room)
+                self.actor, _T_CLEAVE.key, [self.actor], RoomActionContext(self.room)
             )
         )
         self.assertEqual(result.outcome, "rejected")

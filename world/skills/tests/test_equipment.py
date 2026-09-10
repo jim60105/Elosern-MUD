@@ -10,7 +10,6 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.items import (
-    ITEM_REGISTRY,
     EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
@@ -24,6 +23,7 @@ from world.skills.equipment import (
     EquipmentSlot,
     dual_wielding_from_storage,
 )
+from world.tests.synthetic_data import synthetic_registries
 
 _PRESENTATION = ItemPresentation(
     kind=ItemKind.ACCESSORY,
@@ -45,52 +45,50 @@ def _fixture_definition(key: str, slot: EquipmentSlot) -> ItemDefinition:
     )
 
 
+def _items(*definitions: ItemDefinition):
+    """Scope the item catalog to the synthetic kit plus these fixtures.
+
+    The fixture rows are invented t_* keys; the shipped catalog never enters
+    the scope, so no fixture shadows a shipped item.
+    """
+    return synthetic_registries(
+        "items", extra={"items": {d.key: d for d in definitions}}
+    )
+
+
+_RING_KEYS = tuple(f"t_ring_{index}" for index in range(ACCESSORY_MAX_SLOTS + 1))
+
+
 class EquipmentHandlerTests(EvenniaTestCase):
-    def setUp(self):
-        super().setUp()
-        # Snapshot before any test body: some tests register fixture items
-        # before creating an entity, so the restore must anchor at setUp.
-        snapshot = dict(ITEM_REGISTRY)
-
-        def restore():
-            ITEM_REGISTRY.clear()
-            ITEM_REGISTRY.update(snapshot)
-
-        self.addCleanup(restore)
-
     def _entity(self):
         entity = create_object(PlayerCharacter, key="equipment tester")
         entity.db.inventory = []
         return entity
 
-    def _register(self, *definitions: ItemDefinition) -> None:
-        for definition in definitions:
-            ITEM_REGISTRY[definition.key] = definition
-
     def _hold(self, entity, *keys: str) -> None:
         entity.db.inventory = list(keys)
 
     @covers_requirement("equipment-inventory::equipmentslot-defines-four-slots-sized-to-the-sample-cards-own-equipment-shapes")
+    @_items(
+        _fixture_definition("t_left_blade", EquipmentSlot.WEAPON_MAIN),
+        _fixture_definition("t_right_blade", EquipmentSlot.WEAPON_OFF),
+    )
     def test_enum_and_dual_wield_slots_are_independent(self):
         self.assertEqual(
             set(EquipmentSlot.__members__),
             {"WEAPON_MAIN", "WEAPON_OFF", "ARMOR", "ACCESSORY"},
         )
-        self._register(
-            _fixture_definition("left_blade", EquipmentSlot.WEAPON_MAIN),
-            _fixture_definition("right_blade", EquipmentSlot.WEAPON_OFF),
-        )
         entity = self._entity()
-        self._hold(entity, "left_blade", "right_blade")
-        toggle_equipment(entity, "left_blade")
-        toggle_equipment(entity, "right_blade")
+        self._hold(entity, "t_left_blade", "t_right_blade")
+        toggle_equipment(entity, "t_left_blade")
+        toggle_equipment(entity, "t_right_blade")
         self.assertEqual(
             entity.equipment.slot_contents(EquipmentSlot.WEAPON_MAIN),
-            "left_blade",
+            "t_left_blade",
         )
         self.assertEqual(
             entity.equipment.slot_contents(EquipmentSlot.WEAPON_OFF),
-            "right_blade",
+            "t_right_blade",
         )
 
     @covers_requirement("equipment-inventory::equipmenthandler-is-mounted-directly-as-entity-equipment")
@@ -111,88 +109,85 @@ class EquipmentHandlerTests(EvenniaTestCase):
     def test_direct_private_storage_is_reflected(self):
         entity = self._entity()
         entity.db.equipment = {
-            "weapon_main": "light_sword",
+            "weapon_main": "t_iron_fang",
             "weapon_off": None,
-            "armor": "elf_traditional_garb",
-            "accessories": ["crescent_earring"],
+            "armor": "t_bark_cloak",
+            "accessories": ["t_moon_ring"],
         }
         self.assertEqual(
             entity.equipment.slot_contents(EquipmentSlot.WEAPON_MAIN),
-            "light_sword",
+            "t_iron_fang",
         )
         self.assertEqual(
             entity.equipment.slot_contents(EquipmentSlot.ACCESSORY),
-            ["crescent_earring"],
+            ["t_moon_ring"],
         )
 
     @covers_requirement("equipment-inventory::accessory-is-a-bounded-multi-item-slot")
+    @_items(
+        *(
+            _fixture_definition(key, EquipmentSlot.ACCESSORY)
+            for key in _RING_KEYS
+        )
+    )
     def test_five_distinct_accessories_equip_in_deterministic_order(self):
-        self._register(
-            *(
-                _fixture_definition(f"ring_{index}", EquipmentSlot.ACCESSORY)
-                for index in range(ACCESSORY_MAX_SLOTS + 1)
-            )
-        )
         entity = self._entity()
-        self._hold(
-            entity,
-            *(f"ring_{index}" for index in range(ACCESSORY_MAX_SLOTS + 1)),
-        )
+        self._hold(entity, *_RING_KEYS)
         self.assertEqual(ACCESSORY_MAX_SLOTS, 5)
-        for index in range(ACCESSORY_MAX_SLOTS):
-            result = toggle_equipment(entity, f"ring_{index}")
+        for key in _RING_KEYS[:ACCESSORY_MAX_SLOTS]:
+            result = toggle_equipment(entity, key)
             self.assertEqual(result.outcome, "success")
         self.assertEqual(
             entity.equipment.slot_contents(EquipmentSlot.ACCESSORY),
-            [f"ring_{index}" for index in range(ACCESSORY_MAX_SLOTS)],
+            list(_RING_KEYS[:ACCESSORY_MAX_SLOTS]),
         )
-        overflow = toggle_equipment(entity, f"ring_{ACCESSORY_MAX_SLOTS}")
+        overflow = toggle_equipment(entity, _RING_KEYS[ACCESSORY_MAX_SLOTS])
         self.assertEqual(overflow.outcome, "rejected")
         self.assertEqual(overflow.reason.value, "accessory_slots_full")
         self.assertEqual(
             entity.equipment.slot_contents(EquipmentSlot.ACCESSORY),
-            [f"ring_{index}" for index in range(ACCESSORY_MAX_SLOTS)],
+            list(_RING_KEYS[:ACCESSORY_MAX_SLOTS]),
         )
 
+    @_items(
+        _fixture_definition("t_iron_fang", EquipmentSlot.WEAPON_MAIN),
+        _fixture_definition("t_moon_ring", EquipmentSlot.ACCESSORY),
+    )
     def test_equipment_survives_database_serialization_round_trip(self):
-        self._register(
-            _fixture_definition("light_sword", EquipmentSlot.WEAPON_MAIN),
-            _fixture_definition("crescent_earring", EquipmentSlot.ACCESSORY),
-        )
         entity = self._entity()
-        self._hold(entity, "light_sword", "crescent_earring")
-        toggle_equipment(entity, "light_sword")
-        toggle_equipment(entity, "crescent_earring")
+        self._hold(entity, "t_iron_fang", "t_moon_ring")
+        toggle_equipment(entity, "t_iron_fang")
+        toggle_equipment(entity, "t_moon_ring")
 
         reloaded = ObjectDB.objects.get(pk=entity.pk)
 
         self.assertEqual(
             reloaded.equipment.slot_contents(EquipmentSlot.WEAPON_MAIN),
-            "light_sword",
+            "t_iron_fang",
         )
         self.assertEqual(
             reloaded.equipment.slot_contents(EquipmentSlot.ACCESSORY),
-            ["crescent_earring"],
+            ["t_moon_ring"],
         )
 
+    @_items(
+        _fixture_definition("t_left_blade", EquipmentSlot.WEAPON_MAIN),
+        _fixture_definition("t_right_blade", EquipmentSlot.WEAPON_OFF),
+    )
     def test_is_dual_wielding_requires_both_weapon_slots(self):
-        self._register(
-            _fixture_definition("left_blade", EquipmentSlot.WEAPON_MAIN),
-            _fixture_definition("right_blade", EquipmentSlot.WEAPON_OFF),
-        )
         entity = self._entity()
-        self._hold(entity, "left_blade", "right_blade")
+        self._hold(entity, "t_left_blade", "t_right_blade")
         self.assertFalse(entity.equipment.is_dual_wielding)
-        toggle_equipment(entity, "left_blade")
+        toggle_equipment(entity, "t_left_blade")
         self.assertFalse(entity.equipment.is_dual_wielding)
-        toggle_equipment(entity, "right_blade")
+        toggle_equipment(entity, "t_right_blade")
         self.assertTrue(entity.equipment.is_dual_wielding)
-        toggle_equipment(entity, "right_blade")
+        toggle_equipment(entity, "t_right_blade")
         self.assertFalse(entity.equipment.is_dual_wielding)
 
     def test_storage_fact_fails_closed_on_malformed_equipment(self):
         entity = self._entity()
-        for malformed in (None, "corrupt", ["left_blade", "right_blade"]):
+        for malformed in (None, "corrupt", ["t_left_blade", "t_right_blade"]):
             with self.subTest(malformed=malformed):
                 entity.db.equipment = malformed
                 self.assertFalse(dual_wielding_from_storage(entity))

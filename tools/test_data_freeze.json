@@ -515,14 +515,7 @@
     "world/rules/tests/test_time_skip.py",
     "world/rules/tests/test_title_view.py",
     "world/rules/tests/test_titles.py",
-    "world/rules/tests/test_traits.py",
-    "world/skills/tests/test_conferral.py",
-    "world/skills/tests/test_disguise_effect.py",
-    "world/skills/tests/test_effects.py",
-    "world/skills/tests/test_equipment.py",
-    "world/skills/tests/test_handler.py",
-    "world/skills/tests/test_inventory.py",
-    "world/skills/tests/test_skill_casts.py"
+    "world/rules/tests/test_traits.py"
   ],
   "seedDebtPaths": [
     "commands/tests/test_art.py",
