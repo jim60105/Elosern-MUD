@@ -19,7 +19,8 @@ class CombatResultRenderingTests(unittest.TestCase):
             data={"amount": 5},
             text_template="{actor} 對 {target} 造成了 {data[amount]} 點傷害。",
         )
-        return EventLog("hero", "fire_ball", ("goblin",), (entry,), 6)
+        # The settlement renderer treats the skill field as an opaque label.
+        return EventLog("hero", "t_ember_burst", ("goblin",), (entry,), 6)
 
     def test_round_settlement_renders_logs_and_continue_message(self):
         lines, message = settle_to_messages(
