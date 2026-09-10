@@ -57,7 +57,7 @@ open **角色狀態 → 技能書**, then choose **修煉** beside an active ski
 
 | 指令 | 說明 |
 | --- | --- |
-| [`cast`](/game/command-reference?id=cast) | 施放技能；持有屬性主宰者可搭配 `@<scale>` 比例調整威力與 MP 消耗。性愛技能亦屬可施放之列，隨遊玩解鎖後可經 `combat actions` 的分類檢視。 |
+| [`cast`](/game/command-reference?id=cast) | 施放技能；持有屬性主宰者可搭配 `@<scale>` 比例調整威力與 MP 消耗。探索中瞄準同場怪物會直接開戰並以該技能為首個行動；傷害技能只能瞄準怪物。性愛技能亦屬可施放之列，隨遊玩解鎖後可經 `combat actions` 的分類檢視。 |
 | [`lineage`](/game/command-reference?id=lineage) | 檢視技能系譜：各系的熟練度、見頂節點與解鎖門檻。 |
 
 ## 公會
