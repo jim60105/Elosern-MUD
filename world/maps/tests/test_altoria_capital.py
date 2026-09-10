@@ -1,4 +1,5 @@
-"""Parsing and topology checks for the capital_altoria sample city."""
+"""Data-contract test: capital xymap data contract
+Parsing and topology checks for the capital_altoria sample city."""
 
 from tools.spec_traceability import covers_requirement
 

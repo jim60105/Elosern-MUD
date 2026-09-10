@@ -1,4 +1,5 @@
-"""Integration tests for idempotent grid and wilderness bootstrap (map-anchor-grid, map-wilderness)."""
+"""Data-contract test: map bootstrap/gate data contract
+Integration tests for idempotent grid and wilderness bootstrap (map-anchor-grid, map-wilderness)."""
 
 from tools.spec_traceability import covers_requirement
 

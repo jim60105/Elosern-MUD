@@ -1,4 +1,5 @@
-"""Focused deterministic tests for player-driven world time."""
+"""Data-contract test: clock rulebook contract
+Focused deterministic tests for player-driven world time."""
 
 from tools.spec_traceability import covers_requirement
 

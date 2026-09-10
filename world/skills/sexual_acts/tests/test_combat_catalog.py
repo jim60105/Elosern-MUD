@@ -1,4 +1,5 @@
-"""Behaviour tests for the eight counter-gated 戰鬥線 acts.
+"""Data-contract test: sexual act catalog contract
+Behaviour tests for the eight counter-gated 戰鬥線 acts.
 
 The seed 挑逗 ships unconditionally (covered by ``test_seed_acts.py``); this
 module covers the eight rows this change adds: their counter-threshold unlock

@@ -1,4 +1,5 @@
-"""Contract tests for the MP cost-tier lookup."""
+"""Data-contract test: MP cost-tier assignment contract
+Contract tests for the MP cost-tier lookup."""
 
 from dataclasses import replace
 import unittest

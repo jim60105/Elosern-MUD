@@ -1,4 +1,5 @@
-"""Skill-registry, category-classification, and content tests."""
+"""Data-contract test: skill registry content contract
+Skill-registry, category-classification, and content tests."""
 
 from tools.spec_traceability import covers_requirement
 

@@ -1,4 +1,5 @@
-"""Behaviour tests for the sixteen counter-gated 關係線 acts.
+"""Data-contract test: sexual act catalog contract
+Behaviour tests for the sixteen counter-gated 關係線 acts.
 
 The two seed acts ship unconditionally in ``partner.py`` (covered by
 ``test_seed_acts.py``); this module covers the sixteen rows this change

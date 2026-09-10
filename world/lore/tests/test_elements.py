@@ -1,4 +1,5 @@
-"""Self-consistency checks for the element registry."""
+"""Data-contract test: element data contract
+Self-consistency checks for the element registry."""
 
 from tools.spec_traceability import covers_requirement
 

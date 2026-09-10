@@ -1,4 +1,5 @@
-"""Elemental spell-catalog tests and their pinned catalog constants."""
+"""Data-contract test: spell catalog content contract
+Elemental spell-catalog tests and their pinned catalog constants."""
 
 from tools.spec_traceability import covers_requirement
 

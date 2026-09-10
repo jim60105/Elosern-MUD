@@ -1,4 +1,5 @@
-"""Registry v2 self-consistency and validation checks (wilderness-anchor-footprint)."""
+"""Data-contract test: wilderness entry data contract
+Registry v2 self-consistency and validation checks (wilderness-anchor-footprint)."""
 
 import unittest
 from unittest.mock import patch

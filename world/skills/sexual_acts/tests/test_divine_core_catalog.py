@@ -1,4 +1,5 @@
-"""Behaviour tests for the three C7a 神之秘法 acts.
+"""Data-contract test: sexual act catalog contract
+Behaviour tests for the three C7a 神之秘法 acts.
 
 Covers the delta spec's scenarios for the three hand-built acts — 絕頂律令
 (AREA pleasure-ceiling), 時姦 (staged climax extensions), 神域搾取 (pleasure

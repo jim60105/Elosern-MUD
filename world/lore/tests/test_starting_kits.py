@@ -1,4 +1,5 @@
-"""Registry contract tests for the subrace starting-kit catalog."""
+"""Data-contract test: starting-kit data contract
+Registry contract tests for the subrace starting-kit catalog."""
 
 from tools.spec_traceability import covers_requirement
 

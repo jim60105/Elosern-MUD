@@ -1,5 +1,13 @@
-## ADDED Requirements
+## Purpose
 
+The test-data independence capability: a deterministic lint gate
+(`tools.test_data_lint`) that blocks unregistered references to shipped game
+content in test sources, a provably shrink-only exemption ledger seeded with
+the pre-existing debt corpus, the `Data-contract test:` classification tag,
+and the CI + documentation wiring that keeps behavior tests resolvable without
+a database or shipped-content coupling.
+
+## Requirements
 ### Requirement: Data-contract tests are explicitly classified
 Every test file that intentionally asserts against shipped game content SHALL declare
 its class in the source: the first non-blank line of its module docstring (or a leading
@@ -12,7 +20,9 @@ document.
 #### Scenario: Tag and ledger agree
 - **WHEN** the lint gate evaluates a test file registered as a data-contract exemption
 - **THEN** the gate requires the `Data-contract test:` tag in the file and passes when
-  present, and fails the run with an `untagged-contract` violation when absent
+  present with a rationale equal to the registered ledger reason, and fails the run with
+  an `untagged-contract` violation when the tag is absent, carries no rationale, or the
+  rationale diverges from the ledger reason
 
 #### Scenario: Classification is discoverable by humans
 - **WHEN** a developer greps the repository for `Data-contract test:`
@@ -23,7 +33,8 @@ document.
 `tools.test_data_lint check` SHALL scan every versioned test source (Python test files
 by AST over statically resolvable string expressions — constants, literal-only
 concatenation, and all-literal f-strings — plus catalog-symbol references, and
-JavaScript/TypeScript test files by string/template-literal scan) and exit non-zero listing, with stable violation codes,
+JavaScript/TypeScript test files by string/template-literal scan including literal-only
+`+` concatenation) and exit non-zero listing, with stable violation codes,
 any flagged test file that is not registered as `contract` or `debt` in the exemption
 ledger. The shipped-content token universe SHALL be derived at lint time by importing the
 locked content catalogs (`world/lore`, `world/skills`, `world/quests`, `world/maps`

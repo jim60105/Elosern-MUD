@@ -1,4 +1,5 @@
-"""End-to-end walkthrough of the capital_altoria sample city (map-anchor-grid)."""
+"""Data-contract test: capital map walkability contract
+End-to-end walkthrough of the capital_altoria sample city (map-anchor-grid)."""
 
 from tools.spec_traceability import covers_requirement
 

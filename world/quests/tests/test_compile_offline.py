@@ -1,4 +1,5 @@
-"""Offline director end-to-end compile tests (OfflineDirectorEndToEndTests).
+"""Data-contract test: quest compile data-contract surface
+Offline director end-to-end compile tests (OfflineDirectorEndToEndTests).
 
 Covers the full deterministic quest lifecycle with no LLM and no generative
 state mutation: template draw, compile, register, accept, bind, fight, and

@@ -1,4 +1,5 @@
-"""Registry self-consistency and boundary-consumer checks for scene archetypes."""
+"""Data-contract test: scene archetype data contract
+Registry self-consistency and boundary-consumer checks for scene archetypes."""
 
 from dataclasses import FrozenInstanceError
 

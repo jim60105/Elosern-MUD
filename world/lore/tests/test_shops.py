@@ -1,4 +1,5 @@
-"""Self-consistency checks for the shop registry (authored host identity)."""
+"""Data-contract test: shop registry content contract
+Self-consistency checks for the shop registry (authored host identity)."""
 
 import unittest
 

@@ -1,0 +1,316 @@
+{
+  "entries": [
+    {
+      "evidence": "world/art/fake_cutout.py:37",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/art/fake_cutout.py:37); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "A"
+    },
+    {
+      "evidence": "web/webclient-app/stories/fixtures.js:1237",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/fixtures.js:1237); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "B"
+    },
+    {
+      "evidence": "web/webclient-app/stories/fixtures.js:1235",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/fixtures.js:1235); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "C"
+    },
+    {
+      "evidence": "world/rules/guild_config.py:39",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/guild_config.py:39); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "D"
+    },
+    {
+      "evidence": "commands/combat.py:162",
+      "reason": "proven present in non-test production corpus outside catalog modules (commands/combat.py:162); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "E"
+    },
+    {
+      "evidence": "world/ai/director_templates.py:35",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/ai/director_templates.py:35); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "F"
+    },
+    {
+      "evidence": "world/rules/guild_config.py:39",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/guild_config.py:39); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "S"
+    },
+    {
+      "evidence": "web/webclient-app/stories/Data/EquipmentDoll.stories.js:22",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/Data/EquipmentDoll.stories.js:22); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "armor"
+    },
+    {
+      "evidence": "world/ai/director_templates.py:55",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/ai/director_templates.py:55); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "bandit"
+    },
+    {
+      "evidence": "world/rules/rulebook/clock.yaml top-level schema fields (catalog payload field names)",
+      "reason": "clock.yaml schema field name (also named in design D1)",
+      "rule": "schema-structural",
+      "token": "command_defaults"
+    },
+    {
+      "evidence": "world/rules/action.py:1596",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/action.py:1596); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "damage"
+    },
+    {
+      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "dark"
+    },
+    {
+      "evidence": "world/rules/rulebook/clock.yaml top-level schema fields (catalog payload field names)",
+      "reason": "clock.yaml schema field name",
+      "rule": "schema-structural",
+      "token": "dayparts"
+    },
+    {
+      "evidence": "world/rules/rulebook/clock.yaml top-level schema fields (catalog payload field names)",
+      "reason": "clock.yaml schema field name",
+      "rule": "schema-structural",
+      "token": "days_per_season"
+    },
+    {
+      "evidence": "world/rules/defeat_aftermath.py:664",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/defeat_aftermath.py:664); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "digest"
+    },
+    {
+      "evidence": "web/webclient/presentation/local_map.py:64",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map.py:64); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "e"
+    },
+    {
+      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "earth"
+    },
+    {
+      "evidence": "web/static/webclient/js/elosern/protocol.js:349",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:349); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "elf"
+    },
+    {
+      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "fire"
+    },
+    {
+      "evidence": "typeclasses/exits.py:161",
+      "reason": "proven present in non-test production corpus outside catalog modules (typeclasses/exits.py:161); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "flight"
+    },
+    {
+      "evidence": "world/rules/action.py:1597",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/action.py:1597); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "heal"
+    },
+    {
+      "evidence": "server/conf/llm_knobs.py:150",
+      "reason": "proven present in non-test production corpus outside catalog modules (server/conf/llm_knobs.py:150); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "high"
+    },
+    {
+      "evidence": "world/rules/rulebook/clock.yaml top-level schema fields (catalog payload field names)",
+      "reason": "clock.yaml schema field name",
+      "rule": "schema-structural",
+      "token": "hours_per_day"
+    },
+    {
+      "evidence": "web/static/webclient/js/elosern/protocol.js:349",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:349); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "human"
+    },
+    {
+      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "ice"
+    },
+    {
+      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "light"
+    },
+    {
+      "evidence": "server/conf/llm_knobs.py:150",
+      "reason": "proven present in non-test production corpus outside catalog modules (server/conf/llm_knobs.py:150); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "low"
+    },
+    {
+      "evidence": "commands/localized/xyzgrid.py:260",
+      "reason": "proven present in non-test production corpus outside catalog modules (commands/localized/xyzgrid.py:260); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "map"
+    },
+    {
+      "evidence": "world/rules/rulebook/clock.yaml top-level schema fields (catalog payload field names)",
+      "reason": "clock.yaml schema field name",
+      "rule": "schema-structural",
+      "token": "max_settlement_quanta"
+    },
+    {
+      "evidence": "world/rules/rulebook/clock.yaml top-level schema fields (catalog payload field names)",
+      "reason": "clock.yaml schema field name",
+      "rule": "schema-structural",
+      "token": "max_sleep_seconds"
+    },
+    {
+      "evidence": "web/webclient-app/stories/fixtures.js:1367",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/fixtures.js:1367); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "meal"
+    },
+    {
+      "evidence": "world/maps/wilderness_population.py:49",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/maps/wilderness_population.py:49); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "mid"
+    },
+    {
+      "evidence": "web/webclient/presentation/local_map.py:64",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map.py:64); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "n"
+    },
+    {
+      "evidence": "web/webclient/presentation/local_map.py:64",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map.py:64); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "ne"
+    },
+    {
+      "evidence": "web/webclient/presentation/local_map.py:64",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map.py:64); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "nw"
+    },
+    {
+      "evidence": "commands/localized/account.py:298",
+      "reason": "proven present in non-test production corpus outside catalog modules (commands/localized/account.py:298); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "options"
+    },
+    {
+      "evidence": "web/webclient-app/stories/World/InventoryPanel.stories.js:193",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient-app/stories/World/InventoryPanel.stories.js:193); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "potion"
+    },
+    {
+      "evidence": "catalog payload / import-schema field names present in the derived universe",
+      "reason": "import-schema field name colliding with a map catalog key",
+      "rule": "schema-structural",
+      "token": "prototypes"
+    },
+    {
+      "evidence": "web/static/webclient/js/elosern/protocol.js:918",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:918); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "round"
+    },
+    {
+      "evidence": "commands/localized/general.py:204",
+      "reason": "proven present in non-test production corpus outside catalog modules (commands/localized/general.py:204); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "s"
+    },
+    {
+      "evidence": "web/webclient/presentation/local_map.py:64",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map.py:64); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "se"
+    },
+    {
+      "evidence": "world/rules/rulebook/clock.yaml top-level schema fields (catalog payload field names)",
+      "reason": "clock.yaml schema field name",
+      "rule": "schema-structural",
+      "token": "season_names"
+    },
+    {
+      "evidence": "world/rules/rulebook/clock.yaml top-level schema fields (catalog payload field names)",
+      "reason": "clock.yaml schema field name",
+      "rule": "schema-structural",
+      "token": "seasons_per_year"
+    },
+    {
+      "evidence": "world/rules/rulebook/clock.yaml top-level schema fields (catalog payload field names)",
+      "reason": "clock.yaml schema field name",
+      "rule": "schema-structural",
+      "token": "seconds_per_hour"
+    },
+    {
+      "evidence": "world/rules/guild_config.py:526",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/guild_config.py:526); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "shops"
+    },
+    {
+      "evidence": "world/ai/scenario_director.py:504",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/ai/scenario_director.py:504); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "stages"
+    },
+    {
+      "evidence": "web/webclient/presentation/local_map.py:64",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/webclient/presentation/local_map.py:64); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "sw"
+    },
+    {
+      "evidence": "tools/verify_coverage_roots.py:16",
+      "reason": "proven present in non-test production corpus outside catalog modules (tools/verify_coverage_roots.py:16); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "tool"
+    },
+    {
+      "evidence": "commands/skip.py:124",
+      "reason": "proven present in non-test production corpus outside catalog modules (commands/skip.py:124); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "w"
+    },
+    {
+      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "water"
+    },
+    {
+      "evidence": "web/static/webclient/js/elosern/protocol.js:347",
+      "reason": "proven present in non-test production corpus outside catalog modules (web/static/webclient/js/elosern/protocol.js:347); collides with generic test vocabulary, not shipped-content coupling",
+      "rule": "production-independent",
+      "token": "wind"
+    },
+    {
+      "evidence": "catalog payload / import-schema field names present in the derived universe",
+      "reason": "map payload field name (generic client coordinate vocabulary)",
+      "rule": "schema-structural",
+      "token": "zcoord"
+    }
+  ]
+}

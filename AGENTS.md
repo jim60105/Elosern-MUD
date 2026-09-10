@@ -210,6 +210,15 @@ Use `uv add <package>` and `uv remove <package>` for dependency changes so
 manually, invoke project Python tools outside `uv run --locked`, or use `pip`
 against the project environment.
 
+Behavior tests resolve game data through the synthetic test-data kit or
+file-local synthetic fixtures; only tagged data-contract tests (first docstring
+line `Data-contract test: <rationale>`, registered in
+`tools/test_data_freeze.json`) may name shipped content. The gate is
+`uv run --locked python -m tools.test_data_lint check`. Assertions establish
+mechanics rather than echo fixture or registry content; data-echo tests are
+replaced, not multiplied (the aggregate coverage gate stays a floor, not a
+target).
+
 ## OpenSpec workflow
 
 Feature work is specification-driven. Use the matching repository skill under

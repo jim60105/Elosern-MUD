@@ -1,4 +1,5 @@
-"""Evennia integration checks for idempotent lore synchronization."""
+"""Data-contract test: lore cross-registry sync contract
+Evennia integration checks for idempotent lore synchronization."""
 
 from tools.spec_traceability import covers_requirement
 

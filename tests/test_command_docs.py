@@ -1,4 +1,5 @@
-"""Regression checks that the player command documentation cannot drift.
+"""Data-contract test: player command docs parity contract
+Regression checks that the player command documentation cannot drift.
 
 The docs pages under ``docs/game/`` are the player-facing contract for every
 typed in-game command. This module cross-checks the mounted command registry

@@ -1,4 +1,5 @@
-"""Behaviour tests for the seven unconditionally-owned seed acts.
+"""Data-contract test: sexual act seed catalog contract
+Behaviour tests for the seven unconditionally-owned seed acts.
 
 The seeds are real catalogue rows registered in ``solo.py``/``shame.py``/
 ``partner.py``/``combat.py``; this module casts them through the ordinary

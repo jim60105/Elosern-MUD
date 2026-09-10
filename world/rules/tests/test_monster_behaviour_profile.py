@@ -1,4 +1,5 @@
-"""Rulebook coverage and monster profile resolution."""
+"""Data-contract test: monster behaviour rulebook contract
+Rulebook coverage and monster profile resolution."""
 
 from tools.spec_traceability import covers_requirement
 

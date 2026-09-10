@@ -1,4 +1,5 @@
-"""Self-consistency checks for the magic-tier cost bands."""
+"""Data-contract test: magic tier data contract
+Self-consistency checks for the magic-tier cost bands."""
 
 from tools.spec_traceability import covers_requirement
 

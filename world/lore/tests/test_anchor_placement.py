@@ -1,4 +1,5 @@
-"""Self-consistency checks for anchor grid placements (map-anchor-grid)."""
+"""Data-contract test: anchor placement data contract
+Self-consistency checks for anchor grid placements (map-anchor-grid)."""
 
 from tools.spec_traceability import covers_requirement
 

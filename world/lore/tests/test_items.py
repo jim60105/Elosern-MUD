@@ -1,4 +1,5 @@
-"""Registry contract tests for the immutable item presentation metadata."""
+"""Data-contract test: item registry content contract
+Registry contract tests for the immutable item presentation metadata."""
 
 from tools.spec_traceability import covers_requirement
 
