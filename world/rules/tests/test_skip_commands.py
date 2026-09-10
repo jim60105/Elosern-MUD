@@ -18,6 +18,12 @@ from world.rules.clock import AdvanceSource, ScheduledEvent
 from world.rules.progression import proficiency_cap
 from world.rules.skip_safety import SkipRejectReason
 from world.rules.time_skip import MAX_SKIP_SECONDS, advance_skip
+from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
+
+# Kit rows: an ACTIVE martial skill is practicable; a PASSIVE row must be
+# refused as "unknown" by the booking preflight.
+_PRACTICE_SKILL = SYNTH_SKILLS["t_cinder_cleave"].key
+_PASSIVE_SKILL = SYNTH_SKILLS["t_steady_stride"].key
 
 
 class SkipCommandHelperTests(unittest.TestCase):
@@ -103,6 +109,7 @@ def _booking_caller(
     )
 
 
+@synthetic_registries("skills")
 class RestPracticeBookingTests(unittest.TestCase):
     """Declared-practice clause: preflight order, zero-advance, booking state."""
 
@@ -126,15 +133,15 @@ class RestPracticeBookingTests(unittest.TestCase):
 
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
     def test_valid_booking_is_recorded_before_the_advance(self):
-        caller = _booking_caller(owned=("fire_arrow",))
-        clock, observed = self._run("8h practice fire_arrow", caller)
+        caller = _booking_caller(owned=(_PRACTICE_SKILL,))
+        clock, observed = self._run(f"8h practice {_PRACTICE_SKILL}", caller)
         clock.advance.assert_called_once_with(28800, AdvanceSource.SKIP, [caller])
         # Recorded on the caller BEFORE advance; the clock stage is the writer.
-        self.assertEqual(observed, ["fire_arrow"])
+        self.assertEqual(observed, [_PRACTICE_SKILL])
 
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
     def test_unknown_skill_rejects_with_zero_advance(self):
-        caller = _booking_caller(owned=("fire_arrow",))
+        caller = _booking_caller(owned=(_PRACTICE_SKILL,))
         clock, _ = self._run("1h practice not_a_skill", caller)
         clock.advance.assert_not_called()
         self.assertIn(
@@ -145,13 +152,13 @@ class RestPracticeBookingTests(unittest.TestCase):
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
     def test_unowned_and_passive_skills_reject_as_unknown(self):
         unowned = _booking_caller(owned=())
-        clock, _ = self._run("1h practice fire_arrow", unowned)
+        clock, _ = self._run(f"1h practice {_PRACTICE_SKILL}", unowned)
         clock.advance.assert_not_called()
         self.assertIn(
             "PRACTICE_SKILL_UNKNOWN", unowned.msg.call_args_list[0].args[0]
         )
-        passive = _booking_caller(owned=("fire_mastery",))
-        clock, _ = self._run("1h practice fire_mastery", passive)
+        passive = _booking_caller(owned=(_PASSIVE_SKILL,))
+        clock, _ = self._run(f"1h practice {_PASSIVE_SKILL}", passive)
         clock.advance.assert_not_called()
         self.assertIn(
             "PRACTICE_SKILL_UNKNOWN", passive.msg.call_args_list[0].args[0]
@@ -159,13 +166,15 @@ class RestPracticeBookingTests(unittest.TestCase):
 
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
     def test_capped_skill_rejects_and_clears_stale_booking(self):
-        cap = proficiency_cap("fire_arrow")
+        # Nobody consumes the kit row, so its derived cap is the configured
+        # tip ceiling; read it through the same authority the command uses.
+        cap = proficiency_cap(_PRACTICE_SKILL)
         caller = _booking_caller(
-            owned=("fire_arrow",),
-            proficiency={"fire_arrow": cap * 50.0},
-            booking="fire_arrow",
+            owned=(_PRACTICE_SKILL,),
+            proficiency={_PRACTICE_SKILL: cap * 50.0},
+            booking=_PRACTICE_SKILL,
         )
-        clock, _ = self._run("8h practice fire_arrow", caller)
+        clock, _ = self._run(f"8h practice {_PRACTICE_SKILL}", caller)
         clock.advance.assert_not_called()
         self.assertIn("PRACTICE_SKILL_CAPPED", caller.msg.call_args_list[0].args[0])
         # A rejected clause leaves no booking — new or stale — to settle later.
@@ -173,7 +182,7 @@ class RestPracticeBookingTests(unittest.TestCase):
 
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")
     def test_plain_rest_clears_a_stale_rolled_back_booking(self):
-        caller = _booking_caller(owned=("fire_arrow",), booking="fire_arrow")
+        caller = _booking_caller(owned=(_PRACTICE_SKILL,), booking=_PRACTICE_SKILL)
         clock, observed = self._run("8h", caller)
         clock.advance.assert_called_once_with(28800, AdvanceSource.SKIP, [caller])
         self.assertEqual(observed, [None])
@@ -181,7 +190,7 @@ class RestPracticeBookingTests(unittest.TestCase):
 
     @covers_requirement("skip-safety-gate::the-safety-gate-rejects-outright-it-does-not-compute-a-partial-safety-shortened")
     def test_safety_gate_rejection_precedes_booking_preflight(self):
-        caller = _booking_caller(booking="fire_arrow")
+        caller = _booking_caller(booking=_PRACTICE_SKILL)
         clock = Mock()
         command = CmdRest()
         command.caller = caller
@@ -200,7 +209,7 @@ class RestPracticeBookingTests(unittest.TestCase):
         caller.msg.assert_called_once_with("附近有活著的怪物，這裡不安全。")
         # The whole command was blocked before booking handling: nothing
         # booking-related was written on any rejection path before the gate.
-        self.assertEqual(caller.db.practice_booking, "fire_arrow")
+        self.assertEqual(caller.db.practice_booking, _PRACTICE_SKILL)
 
     def test_malformed_clause_rejects_before_any_safety_check(self):
         caller = _booking_caller()
@@ -215,6 +224,7 @@ class RestPracticeBookingTests(unittest.TestCase):
         )
 
 
+@synthetic_registries("skills")
 class UnlabeledSkipClearingTests(unittest.TestCase):
     """Accepted unlabeled skips clear stale bookings before advancing."""
 
@@ -222,7 +232,7 @@ class UnlabeledSkipClearingTests(unittest.TestCase):
     def _caller():
         return SimpleNamespace(
             msg=Mock(),
-            db=SimpleNamespace(practice_booking="fire_arrow"),
+            db=SimpleNamespace(practice_booking=_PRACTICE_SKILL),
             traits=SimpleNamespace(
                 hp=SimpleNamespace(value=100, max=100, rate=1),
                 mp=SimpleNamespace(value=100, max=100, rate=1),

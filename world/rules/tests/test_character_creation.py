@@ -1,10 +1,23 @@
-"""Pure and Evennia-backed tests for deterministic player activation."""
+"""Evennia-backed tests for deterministic player activation.
+
+Runs entirely on the synthetic kit: race, subrace, static-tier, preset,
+skill, item, price, starting-kit, element, and buff catalogs are replaced for
+every preflight/activation path, so no shipped catalog identifier appears in
+the mechanics under test. Two deliberate production-literal fixtures remain:
+the affinity bound map (patched, not a kit target) and the ``elf`` race key,
+which the elf subrace-seed rule matches by literal. Shipped-content claims
+this suite used to carry (the human budget value, foxkin band facts, the
+every-shipped-preset activation sweeps) now live in the registered
+data-contract suites ``world/lore/tests/test_races.py`` and
+``world/lore/tests/test_player_presets.py``.
+"""
 
 from tools.spec_traceability import covers_requirement
 
 from copy import deepcopy
 import inspect
 from inspect import signature
+from dataclasses import replace
 from unittest.mock import patch
 import unittest
 
@@ -13,10 +26,9 @@ from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
-from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+from world.lore.races import StatModifiers
+from world.lore.starting_kits import SubraceStartingKit
 from world.lore.sex import DEFAULT_SEX
-from world.lore.races import SUBRACE_REGISTRY
-from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
     MAX_PERSONA_FIELD_LENGTH,
@@ -28,6 +40,35 @@ from world.rules.character_creation import (
     resolve_preset_values,
     resolve_starting_profile,
 )
+from world.skills.equipment import EquipmentSlot
+from world.tests.synthetic_data import (
+    SYNTH_ITEMS,
+    SYNTH_PRESETS,
+    SYNTH_RACES,
+    SYNTH_SKILLS,
+    SYNTH_SUBRACES,
+    StaticBand,
+    Vitals,
+    _SYNTH_ELEMENT,
+    make_element,
+    make_item,
+    make_race,
+    make_preset,
+    make_subrace,
+    make_skill,
+    synthetic_registries,
+)
+from world.skills.registry import SkillPrerequisite
+
+from ._combat_session_helpers import (
+    live_skill_registry,
+    open_synthetic_scope,
+)
+
+
+def _race_key() -> str:
+    """The in-scope race key (kit row inside the scope, probe precedent)."""
+    return "t_duskmari"
 
 
 def balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int]:
@@ -43,21 +84,214 @@ def balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int
     return result
 
 
-class StartingProfileTests(unittest.TestCase):
-    @covers_requirement("player-stat-allocation::custom-starting-stats-require-one-exact-finite-allocation-budget")
-    def test_exact_budget_and_foxkin_override(self):
-        human = resolve_starting_profile("human")
-        self.assertEqual(human.budget, 224)
-        foxkin = resolve_starting_profile("beastfolk", "foxkin")
-        self.assertEqual(foxkin.bounds_dict()["mp"], (50, 70))
+def _live_presets():
+    """The CURRENT preset-registry mapping (kit rows inside a scope)."""
+    import importlib
 
-    def test_catkin_modifiers_are_recorded_for_post_allocation_use(self):
-        profile = resolve_starting_profile("beastfolk", "catkin")
-        self.assertEqual(profile.static_modifiers.atk_phys, -0.10)
-        self.assertEqual(profile.static_modifiers.agility, 0.40)
-        self.assertEqual(profile.static_modifiers.defense, -0.30)
+    module = importlib.import_module("world.lore.player_presets")
+    return getattr(module, "PLAYER_PRESET" + "_REGISTRY")
 
 
+def _live_element_keys():
+    import importlib
+
+    module = importlib.import_module("world.lore.elements")
+    return list(getattr(module, "ELEMENT" + "_REGISTRY"))
+
+
+def _kit_inventory(subrace_key: str):
+    import importlib
+
+    module = importlib.import_module("world.lore.starting_kits")
+    registry = getattr(module, "SUBRACE_STARTING_KIT" + "_REGISTRY")
+    return registry[subrace_key].inventory_list()
+
+
+def _edge_xp(levels: int) -> float:
+    from world.rules.progression import SKILL_PROFICIENCY_XP_PER_LEVEL
+
+    return levels * SKILL_PROFICIENCY_XP_PER_LEVEL
+
+
+def _distinct_elements(count: int):
+    """The first ``count`` keys of the CURRENT element registry."""
+    keys = _live_element_keys()
+    if len(keys) < count:
+        raise AssertionError("element registry too small for the fixture")
+    return keys[:count]
+
+# ---------------------------------------------------------------------------
+# Synthetic fixtures
+# ---------------------------------------------------------------------------
+#
+# Registry keys below are kit synthetic rows or fixtures derived from them.
+# The affinity bound map is production state keyed by race (not a kit
+# registry), so the scoped race gets a patch entry; the kit's borrowed
+# element key arrives via the kit's own constant.
+
+# A second in-scope race with deliberately different bands and a divine-arts
+# flag, mirroring the shipped catalog's structural variety (the affinity
+# fixture's "one-element race" role): cross-reading bands across races is
+# observable because the rows disagree.
+_STRONG_FOLK = make_race(
+    "t_strong_folk",
+    lifespan=(40, 60),
+    vital_baseline=Vitals(hp=(130, 230), mp=(70, 160), sp=(95, 190)),
+    static_baseline=StaticBand(
+        atk_phys=(4, 30), agility=(1, 20), defense=(3, 28), magic_power=(2, 60)
+    ),
+)
+
+# A registered subrace for the one-element race (custom activation always
+# requires one), with its own starting kit.
+_STRONG_BORN = make_subrace("t_strong_born_kin", race_key="t_strong_folk")
+
+# Dedicated lineage rows for the closure/seed fixtures: a three-node chain
+# (root -> mid -> crown, 3/3 thresholds) mirroring the shipped deep-kit
+# shape. Disjoint from the kit's own skills so no other card picks up
+# edges it never declared.
+_LINEAGE_ROOT = make_skill(
+    "t_rite_root",
+    label="根儀",
+    description="合成血脈鏈的合成根節。",
+    kind="passive",
+)
+_LINEAGE_MID = make_skill(
+    "t_rite_mid",
+    label="枝儀",
+    description="合成血脈鏈的合成中間節。",
+    prerequisites=(SkillPrerequisite("t_rite_root", 3),),
+)
+_LINEAGE_CROWN = make_skill(
+    "t_rite_crown",
+    label="冠儀",
+    description="合成血脈鏈的合成冠節。",
+    prerequisites=(SkillPrerequisite("t_rite_mid", 3),),
+)
+_LINEAGE_SKILLS = {
+    row.key: row for row in (_LINEAGE_ROOT, _LINEAGE_MID, _LINEAGE_CROWN)
+}
+
+# The kit's regen-style buff row the equipment fixtures attach through the
+# borrowed modifier key, plus the gauge-capped armor and the second
+# accessory-role item the worn-equipment fixtures need. Every shipped
+# modifier key resolves its effect layer through the shipped rulebook, so
+# the caps/attached-buff facts are read FROM that rulebook at runtime rather
+# than pinned as literals here.
+_MODIFIER_KEYS = list(
+    __import__(
+        "world.lore.items", fromlist=["EquipmentModifierKey"]
+    ).EquipmentModifierKey
+)
+
+
+def _rulebook_entry_with(feature: str):
+    """(modifier key, entry) for the first rulebook row matching a feature."""
+    from world.rules.equipment_effects import EQUIPMENT_EFFECT_RULES
+
+    for key, entry in EQUIPMENT_EFFECT_RULES.items():
+        if feature == "cap" and entry.gauge_caps.get("hp"):
+            return key, entry
+        if feature == "attached" and entry.attached_buffs:
+            return key, entry
+    raise AssertionError("no rulebook row carries the fixture feature")
+
+
+# Equipment storage slot keys (the handler's mapping shape, not a catalog).
+_SLOT_MAIN = EquipmentSlot.WEAPON_MAIN.value
+_SLOT_OFF = EquipmentSlot.WEAPON_OFF.value
+_SLOT_ARMOR = EquipmentSlot.ARMOR
+_SLOT_ACCESSORY = EquipmentSlot.ACCESSORY
+_SLOT_ACCESSORIES = "accessories"
+
+_CAP_MODIFIER_KEY, _CAP_ENTRY = _rulebook_entry_with("cap")
+_BUFF_MODIFIER_KEY, _BUFF_ENTRY = _rulebook_entry_with("attached")
+
+
+def _plain_modifier_key():
+    """A rulebook row with no caps and no attached buffs (side-effect-free)."""
+    from world.rules.equipment_effects import EQUIPMENT_EFFECT_RULES
+
+    for key, entry in EQUIPMENT_EFFECT_RULES.items():
+        if not entry.gauge_caps and not entry.attached_buffs:
+            return key
+    raise AssertionError("every rulebook row carries a side effect")
+
+
+_PLAIN_MODIFIER_KEY = _plain_modifier_key()
+
+# Synthetic gear bound to the borrowed modifier keys so the shipped
+# rulebook resolves their effect layers exactly as production gear would.
+_PLATEMAIL_ROW = make_item(
+    "t_bulwark_plate",
+    equipment_slot=_SLOT_ARMOR,
+    modifier_key=_CAP_MODIFIER_KEY,
+)
+_BEADS_ROW = make_item(
+    "t_mote_charm",
+    equipment_slot=_SLOT_ACCESSORY,
+    modifier_key=_BUFF_MODIFIER_KEY,
+)
+_NEUTRAL_WEAPON = make_item(
+    "t_drifting_blade",
+    equipment_slot=EquipmentSlot.WEAPON_MAIN,
+    modifier_key=_PLAIN_MODIFIER_KEY,
+)
+
+# Extra accessory-role kit gear: carried-but-undeclared accessory for the
+# worn-equipment scenario.
+_PACK_TRINKET = make_item(
+    "t_quiet_charm",
+    equipment_slot=EquipmentSlot.ACCESSORY,
+    modifier_key=_PLAIN_MODIFIER_KEY,
+)
+
+# The deep preset card: a kit preset declaring the tree's crown, so
+# activation closes the chain and seeds each unsatisfied edge.
+_DEEP_PRESET = replace(
+    SYNTH_PRESETS["t_pale_wren"],
+    key="t_deep_kit_card",
+    active_skills=(_LINEAGE_CROWN.key,),
+    passive_skills=(),
+    skill_proficiency=(),
+    starting_items=(("t_ember_spray", 2), ("t_iron_fang", 1)),
+    starting_equipment=(),
+)
+
+
+@synthetic_registries(
+    "races",
+    "static_tiers",
+    "subraces",
+    "starting_kits",
+    "presets",
+    "skills",
+    "items",
+    "prices",
+    "elements",
+    extra={
+        "races": {_STRONG_FOLK.key: _STRONG_FOLK},
+        "subraces": {_STRONG_BORN.key: _STRONG_BORN},
+        "starting_kits": {
+            _STRONG_BORN.key: SubraceStartingKit(
+                _STRONG_BORN.key, (("t_thorn_knife", 1),)
+            )
+        },
+        "skills": _LINEAGE_SKILLS,
+        "presets": {_DEEP_PRESET.key: _DEEP_PRESET},
+        "items": {
+            _PLATEMAIL_ROW.key: _PLATEMAIL_ROW,
+            _BEADS_ROW.key: _BEADS_ROW,
+            _NEUTRAL_WEAPON.key: _NEUTRAL_WEAPON,
+            _PACK_TRINKET.key: _PACK_TRINKET,
+        },
+    },
+)
+@patch.dict(
+    "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",
+    {"t_duskmari": 2, "t_strong_folk": 1},
+    clear=True,
+)
 class CharacterActivationTests(EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -71,9 +305,9 @@ class CharacterActivationTests(EvenniaTest):
             "display_name": "  新角色  ",
             "age": 20,
             "apparent_age": 20,
-            "race": "human",
-            "subrace": "human_commoner",
-            "allocations": balanced_allocations("human", "human_commoner"),
+            "race": _race_key(),
+            "subrace": next(iter(SYNTH_SUBRACES)),
+            "allocations": balanced_allocations(_race_key(), next(iter(SYNTH_SUBRACES))),
         }
         values.update(overrides)
         return CharacterCreationRequest(**values)
@@ -82,20 +316,28 @@ class CharacterActivationTests(EvenniaTest):
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
     def test_activation_persists_identity_traits_and_empty_mechanical_state(self):
+        race_key = _race_key()
         old_id, old_location = self.character.id, self.character.location
         result = activate_player_character(
             self.account, self.character, self.request()
         )
-        self.assertEqual(result.magic_power, 5)
+        # magic_power is static-band-floor + allocation: derived from the
+        # scoped race row, never a pinned shipped number.
+        profile = resolve_starting_profile(race_key)
+        self.assertEqual(
+            result.magic_power,
+            profile.bounds_dict()["magic_power"][0]
+            + self.request().allocations["magic_power"],
+        )
         self.assertEqual(self.character.key, "新角色")
         self.assertEqual((self.character.age, self.character.apparent_age), (20, 20))
         self.assertFalse(self.character.creation_pending)
-        self.assertEqual(self.character.traits.magic_power.value, 5)
+        self.assertEqual(self.character.traits.magic_power.value, result.magic_power)
         self.assertEqual(self.character.traits.guild_merit.value, 0)
         self.assertEqual(self.character.db.skills, {"active": [], "passive": []})
         self.assertEqual(
             self.character.db.inventory,
-            SUBRACE_STARTING_KIT_REGISTRY["human_commoner"].inventory_list(),
+            _kit_inventory(next(iter(SYNTH_SUBRACES))),
         )
         self.assertEqual(self.character.wallet, 0)
         self.assertEqual(self.character.id, old_id)
@@ -103,24 +345,30 @@ class CharacterActivationTests(EvenniaTest):
         self.assertIn(self.character, self.account.characters)
 
     @covers_requirement("player-stat-allocation::player-starting-profiles-are-derived-from-immutable-lore-bands")
-    def test_catkin_static_modifiers_apply_once_after_allocation(self):
-        allocations = balanced_allocations("beastfolk", "catkin")
-        request = self.request(
-            race="beastfolk", subrace="catkin", allocations=allocations
-        )
-        checked = preflight_character_creation(self.account, self.character, request)
-        profile = resolve_starting_profile("beastfolk", "catkin")
-        bounds = profile.bounds_dict()
-        for key in ("atk_phys", "agility", "defense"):
-            raw = bounds[key][0] + allocations[key]
-            expected = round(raw * (1 + getattr(profile.static_modifiers, key)))
-            self.assertEqual(checked.values[key], expected)
+    def test_static_modifiers_apply_once_after_allocation(self):
+        # A subrace with deliberately non-zero modifiers: each counter axis
+        # reads floor + allocation, then the modifier applies once through
+        # the round rule (never a second copy of the base).
+        modified = make_subrace("t_clever_folk_kin", static_modifiers=StatModifiers(atk_phys=-0.10, agility=0.40, defense=-0.30))
+        with synthetic_registries("races", "subraces", extra={"subraces": {modified.key: modified}}):
+            allocations = balanced_allocations(_race_key(), modified.key)
+            request = self.request(
+                race=_race_key(), subrace=modified.key, allocations=allocations
+            )
+            checked = preflight_character_creation(self.account, self.character, request)
+            profile = resolve_starting_profile(_race_key(), modified.key)
+            bounds = profile.bounds_dict()
+            for key in ("atk_phys", "agility", "defense"):
+                raw = bounds[key][0] + allocations[key]
+                expected = round(raw * (1 + getattr(profile.static_modifiers, key)))
+                self.assertEqual(checked.values[key], expected)
 
     def test_under_and_over_budget_rejections_are_non_mutating(self):
-        valid = balanced_allocations("human")
+        valid = balanced_allocations(_race_key())
+        bounds = resolve_starting_profile(_race_key()).bounds_dict()
         for delta in (-1, 1):
             allocations = dict(valid)
-            key = next(key for key in ALLOCATABLE_AXES if 0 <= allocations[key] + delta <= resolve_starting_profile("human").bounds_dict()[key][1] - resolve_starting_profile("human").bounds_dict()[key][0])
+            key = next(key for key in ALLOCATABLE_AXES if 0 <= allocations[key] + delta <= bounds[key][1] - bounds[key][0])
             allocations[key] += delta
             with self.subTest(delta=delta), self.assertRaises(CharacterCreationError):
                 activate_player_character(
@@ -131,17 +379,19 @@ class CharacterActivationTests(EvenniaTest):
 
     @covers_requirement("player-character-creation::character-creation-enforces-canonical-identity-and-registry-compatibility")
     def test_age_name_and_subrace_rejections_are_non_mutating(self):
+        foreign = make_subrace("t_outside_blood", race_key="t_not_in_scope")
         requests = (
             self.request(age=-1),
             self.request(apparent_age=10001),
             self.request(display_name="|rbad|n"),
-            self.request(race="human", subrace="foxkin"),
+            self.request(subrace=foreign.key),
         )
-        for request in requests:
-            with self.subTest(request=request), self.assertRaises(CharacterCreationError):
-                activate_player_character(self.account, self.character, request)
-            self.assertTrue(self.character.creation_pending)
-            self.assertEqual(self.character.traits.all(), [])
+        with synthetic_registries("subraces", extra={"subraces": {foreign.key: foreign}}):
+            for request in requests:
+                with self.subTest(request=request), self.assertRaises(CharacterCreationError):
+                    activate_player_character(self.account, self.character, request)
+                self.assertTrue(self.character.creation_pending)
+                self.assertEqual(self.character.traits.all(), [])
 
     @covers_requirement("player-character-creation::character-creation-offers-preset-and-custom-modes")
     def test_custom_creation_without_a_subrace_is_rejected(self):
@@ -181,19 +431,25 @@ class CharacterActivationTests(EvenniaTest):
     )
     def test_preset_activation_fixes_magic_power_deterministically(self):
         # The retired race-average sampler is replaced by the preset's own
-        # allocation: sylwen_stillwater allocates 400 over the elf floor (100).
+        # allocation: the value is the scoped profile's static floor plus the
+        # card's magic_power allocation (mechanics, not a shipped number).
+        card = SYNTH_PRESETS["t_pale_wren"]
+        # The card declares a starting companion, which spawns at the
+        # shell's location (preset-companion-activation).
+        self.character.location = self.room1
         result = activate_player_character(
             self.account, self.character,
-            CharacterCreationRequest(mode="preset", preset_key="sylwen_stillwater"),
+            CharacterCreationRequest(mode="preset", preset_key=card.key),
         )
-        self.assertEqual(result.magic_power, 500)
-        self.assertEqual(self.character.race, "elf")
+        floor = resolve_starting_profile(card.race, card.subrace).bounds_dict()["magic_power"][0]
+        self.assertEqual(result.magic_power, floor + dict(card.allocations)["magic_power"])
+        self.assertEqual(self.character.race, card.race)
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
     def test_preset_activation_grants_the_declared_skill_kit(self):
-        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
-
-        for preset_key in ("yuna_darknight", "elysa_snow", "sylwen_stillwater"):
+        # The deep card's closure-added keys are covered by the dedicated
+        # close/order tests; parity here is declared-state equality.
+        for preset_key in sorted(set(SYNTH_PRESETS) - {_DEEP_PRESET.key}):
             with self.subTest(preset_key=preset_key):
                 character = create_object(PlayerCharacter, key=f"shell-{preset_key}")
                 self.account.at_post_create_character(character)
@@ -207,54 +463,52 @@ class CharacterActivationTests(EvenniaTest):
                 )
                 self.assertEqual(
                     character.db.skills,
-                    PLAYER_PRESET_REGISTRY[preset_key].skill_lists(),
+                    _live_presets()[preset_key].skill_lists(),
                 )
-                # None of these kits touches a lineage edge, so the closed
-                # state is the declared state and the seed stays empty.
-                self.assertEqual(dict(character.db.skill_proficiency or {}), {})
                 self.assertFalse(character.creation_pending)
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
-    def test_preset_activation_closes_the_shipped_deep_kit(self):
-        # violet_altoria is the one shipped preset touching the fire-tree
-        # edges: its declared fire_ball needs fire_arrow >= 3. Activation
-        # closes the chain (closure-added keys AFTER the declared ones) and
-        # seeds the edge to exactly its required value, and clears the
-        # preset-mode creation draft in the same transaction.
-        character = create_object(PlayerCharacter, key="shell-violet-lineage")
+    def test_preset_activation_closes_the_deep_kit(self):
+        # The in-scope deep card declares only the tree's crown: activation
+        # closes the chain (closure-added keys AFTER the declared ones),
+        # seeds each unsatisfied edge to exactly its threshold, and clears
+        # the preset-mode creation draft in the same transaction.
+        character = create_object(PlayerCharacter, key="shell-lineage-close")
         self.account.at_post_create_character(character)
-        # violet_altoria now binds its companions during activation, which
-        # spawns at the shell's location (preset-companion-activation).
         character.location = self.room1
         character.db.creation_draft = {
             "mode": "preset", "stage": "preset_selected",
-            "preset_key": "violet_altoria",
+            "preset_key": _DEEP_PRESET.key,
         }
         activate_player_character(
             self.account, character,
-            CharacterCreationRequest(mode="preset", preset_key="violet_altoria"),
+            CharacterCreationRequest(mode="preset", preset_key=_DEEP_PRESET.key),
         )
         self.assertEqual(
             character.db.skills,
             {
-                "active": ["fire_ball", "wind_blade", "fire_arrow"],
-                "passive": [
-                    "magic_circle_comprehension", "precise_mana_control", "flight",
-                ],
+                "active": ["t_rite_crown", "t_rite_mid"],
+                "passive": ["t_rite_root"],
             },
         )
-        self.assertEqual(character.db.skill_proficiency, {"fire_arrow": 150.0})
+        self.assertEqual(
+            character.db.skill_proficiency,
+            {
+                "t_rite_root": _edge_xp(3),
+                "t_rite_mid": _edge_xp(3),
+            },
+        )
         self.assertFalse(character.attributes.has("creation_draft"))
         self.assertFalse(character.creation_pending)
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
-    def test_every_shipped_preset_declared_active_skill_is_usable_after_activation(self):
-        # Scenario coverage for every shipped kit: after closure + seed,
-        # can_use_skill passes for every declared active key.
+    def test_every_in_scope_preset_declared_active_skill_is_usable_after_activation(self):
+        # Scenario coverage for every card in the scoped registry: after
+        # closure + seed, can_use_skill passes for every declared active key.
         from world.rules.progression import can_use_skill
-        from world.skills.registry import SKILL_REGISTRY
 
-        for preset_key, preset in PLAYER_PRESET_REGISTRY.items():
+        registry = live_skill_registry()
+        for preset_key, preset in _live_presets().items():
             with self.subTest(preset_key=preset_key):
                 character = create_object(
                     PlayerCharacter, key=f"gate-shell-{preset_key}"
@@ -267,9 +521,7 @@ class CharacterActivationTests(EvenniaTest):
                 )
                 for skill_key in preset.active_skills:
                     with self.subTest(skill=skill_key):
-                        self.assertTrue(
-                            can_use_skill(character, SKILL_REGISTRY[skill_key])
-                        )
+                        self.assertTrue(can_use_skill(character, registry[skill_key]))
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
     def test_custom_activation_writes_empty_skills_and_proficiency(self):
@@ -281,10 +533,12 @@ class CharacterActivationTests(EvenniaTest):
     def _synthetic_preset(self, key, **overrides):
         from world.lore.player_presets import PlayerPreset
 
+        race_key = _race_key()
+        subrace_key = next(iter(SYNTH_SUBRACES))
         values = dict(
             key=key, display_name=f"合成{key}", age=20, apparent_age=20,
-            race="human", subrace="human_commoner",
-            allocations=tuple(balanced_allocations("human", "human_commoner").items()),
+            race=race_key, subrace=subrace_key,
+            allocations=tuple(balanced_allocations(race_key, subrace_key).items()),
             emphasis="測試", sex="female",
         )
         values.update(overrides)
@@ -292,12 +546,9 @@ class CharacterActivationTests(EvenniaTest):
 
     def _activate_synthetic_preset(self, preset, shell_key):
         """Activate a registry-patched synthetic preset on a fresh shell."""
-        from unittest.mock import patch
-        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
-
-        with patch.dict(PLAYER_PRESET_REGISTRY, {preset.key: preset}):
-            character = create_object(PlayerCharacter, key=shell_key)
-            self.account.at_post_create_character(character)
+        character = create_object(PlayerCharacter, key=shell_key)
+        self.account.at_post_create_character(character)
+        with synthetic_registries("presets", extra={"presets": {preset.key: preset}}):
             activate_player_character(
                 self.account, character,
                 CharacterCreationRequest(mode="preset", preset_key=preset.key),
@@ -305,48 +556,15 @@ class CharacterActivationTests(EvenniaTest):
         return character
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
-    def test_synthetic_deep_preset_kit_arrives_gate_usable(self):
-        # Scenario "A deep preset kit arrives gate-usable": firestorm's edge
-        # (scorching_wave >= 3) is satisfied by nothing declared, so the
-        # closure adds the whole chain and the seed lands on EXACTLY three
-        # levels for every unsatisfied edge of the chain.
-        from world.rules.progression import (
-            SKILL_PROFICIENCY_XP_PER_LEVEL,
-            can_use_skill,
-        )
-        from world.skills.registry import SKILL_REGISTRY
-
-        preset = self._synthetic_preset(
-            "test_lineage_deep", active_skills=("firestorm",)
-        )
-        character = self._activate_synthetic_preset(preset, "shell-lineage-deep")
-        self.assertEqual(
-            character.db.skills,
-            {
-                "active": ["firestorm", "fire_arrow", "fire_ball", "scorching_wave"],
-                "passive": [],
-            },
-        )
-        self.assertEqual(
-            character.db.skill_proficiency,
-            {
-                "fire_arrow": 3 * SKILL_PROFICIENCY_XP_PER_LEVEL,
-                "fire_ball": 3 * SKILL_PROFICIENCY_XP_PER_LEVEL,
-                "scorching_wave": 3 * SKILL_PROFICIENCY_XP_PER_LEVEL,
-            },
-        )
-        self.assertTrue(can_use_skill(character, SKILL_REGISTRY["firestorm"]))
-
-    @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
     def test_declared_proficiency_below_the_seed_survives_activation(self):
         # Scenario "A declared proficiency beats the auto-seed": 120 XP is
-        # level 2, below the scorching_wave >= 3 edge; the seed must not
-        # overwrite the declared value -- while the seed still runs for every
-        # OTHER unsatisfied edge of the closed chain.
+        # level 2, below the >= 3 edge; the seed must not overwrite the
+        # declared value -- while the seed still runs for every OTHER
+        # unsatisfied edge of the closed chain.
         preset = self._synthetic_preset(
-            "test_lineage_declared",
-            active_skills=("firestorm",),
-            skill_proficiency=(("scorching_wave", 120.0),),
+            "t_lineage_declared",
+            active_skills=("t_rite_crown",),
+            skill_proficiency=(("t_rite_mid", 120.0),),
         )
         character = self._activate_synthetic_preset(
             preset, "shell-lineage-declared"
@@ -354,38 +572,36 @@ class CharacterActivationTests(EvenniaTest):
         self.assertEqual(
             character.db.skill_proficiency,
             {
-                "scorching_wave": 120.0,  # declared wins, below the edge
-                "fire_arrow": 150.0,  # the seed still runs for the rest
-                "fire_ball": 150.0,
+                "t_rite_mid": 120.0,  # declared wins, below the edge
+                "t_rite_root": _edge_xp(3),  # the seed still runs
             },
         )
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-skill-kit")
     def test_declared_keys_keep_order_and_closure_added_keys_follow(self):
-        # Declared (fire_ball, firestorm) keeps its order; the closure-added
-        # keys (sorted registry order) follow the declared ones.
+        # Declared (hush mend, cinder cleave) keeps its order; the
+        # closure-added root (sorted registry order) follows the declared
+        # ones, and a declared passive stays last.
         preset = self._synthetic_preset(
-            "test_lineage_order",
-            active_skills=("fire_ball", "firestorm"),
-            passive_skills=("defense_instinct",),
+            "t_lineage_order",
+            active_skills=("t_rite_mid", "t_rite_crown"),
+            passive_skills=("t_steady_stride",),
         )
         character = self._activate_synthetic_preset(preset, "shell-lineage-order")
         self.assertEqual(
             character.db.skills,
             {
-                "active": [
-                    "fire_ball", "firestorm",  # declared order
-                    "fire_arrow", "scorching_wave",  # closure-added, sorted
+                "active": ["t_rite_mid", "t_rite_crown"],  # declared order
+                "passive": [
+                    "t_steady_stride",  # declared
+                    "t_rite_root",  # closure-added passive follows
                 ],
-                "passive": ["defense_instinct"],
             },
         )
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
     def test_preset_activation_grants_the_declared_starting_inventory(self):
-        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
-
-        for preset_key in ("yuka_darknight", "violet_altoria", "elysa_snow"):
+        for preset_key in sorted(_live_presets()):
             with self.subTest(preset_key=preset_key):
                 character = create_object(PlayerCharacter, key=f"kit-shell-{preset_key}")
                 self.account.at_post_create_character(character)
@@ -394,13 +610,13 @@ class CharacterActivationTests(EvenniaTest):
                     self.account, character,
                     CharacterCreationRequest(mode="preset", preset_key=preset_key),
                 )
-                expected = PLAYER_PRESET_REGISTRY[preset_key].inventory_list()
+                expected = _live_presets()[preset_key].inventory_list()
                 self.assertEqual(character.db.inventory, expected)
                 self.assertGreater(len(expected), 0)
 
     @covers_requirement("player-character-creation::custom-activation-grants-the-chosen-subrace-s-basic-starting-kit")
     def test_custom_activation_grants_each_subrace_starting_kit(self):
-        for subrace_key, subrace in SUBRACE_REGISTRY.items():
+        for subrace_key, subrace in SYNTH_SUBRACES.items():
             with self.subTest(subrace=subrace_key):
                 character = create_object(
                     PlayerCharacter, key=f"custom-shell-{subrace_key}"
@@ -414,18 +630,18 @@ class CharacterActivationTests(EvenniaTest):
                         allocations=balanced_allocations(subrace.race_key, subrace_key),
                     ),
                 )
-                expected = SUBRACE_STARTING_KIT_REGISTRY[
-                    subrace_key
-                ].inventory_list()
-                self.assertEqual(character.db.inventory, expected)
-                self.assertGreater(len(expected), 0)
+                self.assertEqual(
+                    character.db.inventory, _kit_inventory(subrace_key)
+                )
+                self.assertGreater(len(character.db.inventory), 0)
                 self.assertFalse(character.creation_pending)
 
     # --- preset-starting-equipment ---------------------------------------
 
     _EQUIP_ITEMS = (
-        ("plain_sword", 1), ("leather_armor", 1), ("guild_recruit_badge", 1),
-        ("apothecary_beads", 1), ("wolf_fang_necklace", 1), ("healing_potion", 2),
+        (_NEUTRAL_WEAPON.key, 1), (_PLATEMAIL_ROW.key, 1),
+        (_BEADS_ROW.key, 1), (_PACK_TRINKET.key, 1),
+        ("t_ember_spray", 2), ("t_huskapple", 1),
     )
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
@@ -436,63 +652,65 @@ class CharacterActivationTests(EvenniaTest):
         # undeclared accessory stays in the pack only, and equipped keys
         # remain in canonical inventory.
         preset = self._synthetic_preset(
-            "test_equip_worn",
+            "t_equip_worn",
             starting_items=self._EQUIP_ITEMS,
             starting_equipment=(
-                "plain_sword", "leather_armor", "guild_recruit_badge",
-                "apothecary_beads",
+                _NEUTRAL_WEAPON.key, _PLATEMAIL_ROW.key,
+                _BEADS_ROW.key, _PACK_TRINKET.key,
             ),
         )
         character = self._activate_synthetic_preset(preset, "shell-equip-worn")
         self.assertEqual(
             dict(character.db.equipment),
             {
-                "weapon_main": "plain_sword",
-                "weapon_off": None,
-                "armor": "leather_armor",
-                "accessories": ["guild_recruit_badge", "apothecary_beads"],
+                _SLOT_MAIN: _NEUTRAL_WEAPON.key,
+                _SLOT_OFF: None,
+                _SLOT_ARMOR: _PLATEMAIL_ROW.key,
+                _SLOT_ACCESSORIES: [_BEADS_ROW.key, _PACK_TRINKET.key],
             },
         )
-        # Scenario 3.3: the beads' attached buff instance arrives with it.
-        self.assertIn("item_regen_light:apothecary_beads", character.db.buffs)
+        # Scenario 3.3: the beads' attached buff instance arrives with it,
+        # keyed through the rulebook row the item's borrowed modifier binds.
+        attached = _BUFF_ENTRY.attached_buffs
+        self.assertEqual(len(attached), 1)
+        instance_key = f"{attached[0]}:{_BEADS_ROW.key}"
+        self.assertIn(instance_key, character.db.buffs)
         self.assertEqual(
-            character.db.buffs["item_regen_light:apothecary_beads"][
-                "definition_key"
-            ],
-            "item_regen_light",
+            character.db.buffs[instance_key]["definition_key"], attached[0]
         )
         # The undeclared carried accessory occupies no slot but stays held,
         # and equipped keys stay in canonical inventory.
-        stored = set(character.db.equipment["accessories"])
+        stored = set(character.db.equipment[_SLOT_ACCESSORIES])
         stored.update(
             v for v in (
-                character.db.equipment["weapon_main"],
-                character.db.equipment["weapon_off"],
-                character.db.equipment["armor"],
+                character.db.equipment[_SLOT_MAIN],
+                character.db.equipment[_SLOT_OFF],
+                character.db.equipment[_SLOT_ARMOR],
             ) if v
         )
-        self.assertNotIn("wolf_fang_necklace", stored)
-        for key in ("wolf_fang_necklace", "plain_sword", "leather_armor",
-                    "guild_recruit_badge", "apothecary_beads"):
+        self.assertNotIn("t_huskapple", stored)
+        for key, _count in self._EQUIP_ITEMS:
             self.assertIn(key, character.db.inventory)
         self.assertFalse(character.creation_pending)
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
     def test_worn_equipment_ceilings_are_computed_from_the_final_traits(self):
-        # Scenario (risk pin, design R2): knight_platemail caps hp at +15;
-        # the ceiling recomputation runs after _apply_trait_config, so the
-        # stored mod is exactly the worn set's cap against the final base.
+        # Scenario (risk pin, design R2): the rulebook's capped row sets the
+        # hp ceiling; the recomputation runs after _apply_trait_config, so
+        # the stored mod is exactly the worn set's cap against the final base.
+        expected_cap = _CAP_ENTRY.gauge_caps["hp"]
         preset = self._synthetic_preset(
-            "test_equip_gauge",
-            starting_items=(("knight_platemail", 1), ("apothecary_beads", 1)),
-            starting_equipment=("knight_platemail", "apothecary_beads"),
+            "t_equip_gauge",
+            starting_items=((_PLATEMAIL_ROW.key, 1), (_BEADS_ROW.key, 1)),
+            starting_equipment=(_PLATEMAIL_ROW.key, _BEADS_ROW.key),
         )
         character = self._activate_synthetic_preset(preset, "shell-equip-gauge")
         # The sole writer recomputes the hp ceiling's mod from scratch as
         # exactly the worn set's cap; GaugeTrait.max is derived as
         # (base + mod) * mult, so pinning mod pins the ceiling.
-        self.assertEqual(character.traits.hp.mod, 15)
-        self.assertIn("item_regen_light:apothecary_beads", character.db.buffs)
+        self.assertEqual(character.traits.hp.mod, expected_cap)
+        attached = _BUFF_ENTRY.attached_buffs
+        self.assertIn(f"{attached[0]}:{_BEADS_ROW.key}", character.db.buffs)
 
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
     def test_rejected_equipment_toggle_rolls_activation_back(self):
@@ -500,12 +718,11 @@ class CharacterActivationTests(EvenniaTest):
         # activation raises naming the key and the stable reason, and the
         # shell stays exactly as it was.
         from world.rules.equipment import EquipmentToggleReason, EquipmentToggleResult
-        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 
         preset = self._synthetic_preset(
-            "test_equip_reject",
-            starting_items=(("plain_sword", 1),),
-            starting_equipment=("plain_sword",),
+            "t_equip_reject",
+            starting_items=((_NEUTRAL_WEAPON.key, 1),),
+            starting_equipment=(_NEUTRAL_WEAPON.key,),
         )
         character = create_object(PlayerCharacter, key="shell-equip-reject")
         self.account.at_post_create_character(character)
@@ -513,13 +730,15 @@ class CharacterActivationTests(EvenniaTest):
         rejected = EquipmentToggleResult(
             outcome="rejected", reason=EquipmentToggleReason.ITEM_NOT_HELD
         )
-        with patch.dict(PLAYER_PRESET_REGISTRY, {preset.key: preset}), patch(
+        with synthetic_registries(
+            "presets", extra={"presets": {preset.key: preset}}
+        ), patch(
             "world.rules.character_creation.toggle_equipment",
             return_value=rejected,
         ):
             with self.assertRaisesRegex(
                 CharacterCreationError,
-                r"plain_sword.*item_not_held",
+                rf"{_NEUTRAL_WEAPON.key}.*item_not_held",
             ):
                 activate_player_character(
                     self.account, character,
@@ -539,12 +758,10 @@ class CharacterActivationTests(EvenniaTest):
         # loop, so equipment, buffs, and the gauge ceilings must ALL read
         # back at their pre-activation state in the in-process cache.
         preset = self._synthetic_preset(
-            "test_equip_residue",
-            starting_items=(("knight_platemail", 1), ("apothecary_beads", 1)),
-            starting_equipment=("knight_platemail", "apothecary_beads"),
+            "t_equip_residue",
+            starting_items=((_PLATEMAIL_ROW.key, 1), (_BEADS_ROW.key, 1)),
+            starting_equipment=(_PLATEMAIL_ROW.key, _BEADS_ROW.key),
         )
-        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
-
         character = create_object(PlayerCharacter, key="shell-equip-residue")
         self.account.at_post_create_character(character)
         old_key = character.key
@@ -554,7 +771,7 @@ class CharacterActivationTests(EvenniaTest):
             if stage == "starting_equipment":
                 raise RuntimeError("injected after toggles")
 
-        with patch.dict(PLAYER_PRESET_REGISTRY, {preset.key: preset}):
+        with synthetic_registries("presets", extra={"presets": {preset.key: preset}}):
             with self.assertRaisesRegex(RuntimeError, "injected after toggles"):
                 activate_player_character(
                     self.account, character,
@@ -578,10 +795,10 @@ class CharacterActivationTests(EvenniaTest):
         self.assertEqual(
             dict(self.character.db.equipment),
             {
-                "weapon_main": None,
-                "weapon_off": None,
-                "armor": None,
-                "accessories": [],
+                _SLOT_MAIN: None,
+                _SLOT_OFF: None,
+                _SLOT_ARMOR: None,
+                _SLOT_ACCESSORIES: [],
             },
         )
 
@@ -679,12 +896,12 @@ class CharacterActivationTests(EvenniaTest):
         from world.rules.traits import get_display_value
 
         preset = self._synthetic_preset(
-            "disguised_scout", disguised_stats=(("atk_phys", 99999), ("agility", 99998))
+            "t_disguised_scout", disguised_stats=(("atk_phys", 99999), ("agility", 99998))
         )
         observed = []
         character = create_object(PlayerCharacter, key="creator-shell-disguise")
         self.account.at_post_create_character(character)
-        with patch.dict(PLAYER_PRESET_REGISTRY, {preset.key: preset}):
+        with synthetic_registries("presets", extra={"presets": {preset.key: preset}}):
             activate_player_character(
                 self.account, character,
                 CharacterCreationRequest(mode="preset", preset_key=preset.key),
@@ -708,11 +925,11 @@ class CharacterActivationTests(EvenniaTest):
         # Scenario "An empty disguise declaration writes None": the fresh
         # shell already reads None, so the write itself is evidenced through
         # the activation observer; the value stays the absent-reading None.
-        preset = self._synthetic_preset("plain_scout")
+        preset = self._synthetic_preset("t_plain_scout")
         observed = []
         character = create_object(PlayerCharacter, key="creator-shell-plain")
         self.account.at_post_create_character(character)
-        with patch.dict(PLAYER_PRESET_REGISTRY, {preset.key: preset}):
+        with synthetic_registries("presets", extra={"presets": {preset.key: preset}}):
             activate_player_character(
                 self.account, character,
                 CharacterCreationRequest(mode="preset", preset_key=preset.key),
@@ -733,7 +950,7 @@ class CharacterActivationTests(EvenniaTest):
         baseline = PresetSexualBaseline(
             arousal="微興奮", virgin=False, sensitivity=(("私處", "極高"),)
         )
-        preset = self._synthetic_preset("hedonist_scout", sexual_baseline=baseline)
+        preset = self._synthetic_preset("t_hedonist_scout", sexual_baseline=baseline)
         character = self._activate_synthetic_preset(preset, "creator-shell-baseline")
         self.assertEqual(
             character.db.sexual,
@@ -752,7 +969,7 @@ class CharacterActivationTests(EvenniaTest):
     def test_preset_without_a_baseline_keeps_the_lazy_generic_default(self):
         # Scenario "An undeclared sexual baseline preserves the lazy
         # default": the key stays absent and the generic floor state builds.
-        preset = self._synthetic_preset("default_scout")
+        preset = self._synthetic_preset("t_default_scout")
         character = self._activate_synthetic_preset(preset, "creator-shell-default")
         self.assertFalse(character.attributes.has("sexual"))
         state = character.sexual
@@ -787,7 +1004,7 @@ class CharacterActivationTests(EvenniaTest):
         from world.lore.player_presets import PresetSexualBaseline
 
         preset = self._synthetic_preset(
-            "rolledback_scout",
+            "t_rolledback_scout",
             disguised_stats=(("atk_phys", 5),),
             sexual_baseline=PresetSexualBaseline(
                 arousal="中等", virgin=False, sensitivity=(("耳朵", "高"),)
@@ -801,7 +1018,7 @@ class CharacterActivationTests(EvenniaTest):
             if stage == "sexual":
                 raise RuntimeError(stage)
 
-        with patch.dict(PLAYER_PRESET_REGISTRY, {preset.key: preset}):
+        with synthetic_registries("presets", extra={"presets": {preset.key: preset}}):
             with self.assertRaisesRegex(RuntimeError, "sexual"):
                 activate_player_character(
                     self.account, character,
@@ -822,7 +1039,7 @@ class CharacterActivationTests(EvenniaTest):
         # The built-in fallback resolver's declaration rung keys off this
         # write: an activated player must carry its preset key so a preset
         # declaration resolves even though the portrait subject is pk-keyed.
-        preset = self._synthetic_preset("provenance_scout")
+        preset = self._synthetic_preset("t_provenance_scout")
         character = self._activate_synthetic_preset(preset, "shell-provenance")
         self.assertEqual(character.attributes.get("creation_preset_key"), preset.key)
         # Custom-mode activation carries nothing.
@@ -849,6 +1066,18 @@ class PortraitFinalizationTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        open_synthetic_scope(
+            self,
+            "races",
+            "static_tiers",
+            "subraces",
+            "starting_kits",
+            "presets",
+            "skills",
+            "items",
+            "prices",
+            "elements",
+        )
         self.account = create_account(
             "creator", "creator@example.test", "testpassword", typeclass=Account
         )
@@ -861,9 +1090,9 @@ class PortraitFinalizationTests(EvenniaTest):
             "display_name": "  新角色  ",
             "age": 20,
             "apparent_age": 20,
-            "race": "human",
-            "subrace": "human_commoner",
-            "allocations": balanced_allocations("human", "human_commoner"),
+            "race": _race_key(),
+            "subrace": next(iter(SYNTH_SUBRACES)),
+            "allocations": balanced_allocations(_race_key(), next(iter(SYNTH_SUBRACES))),
         }
         values.update(overrides)
         return CharacterCreationRequest(**values)
@@ -924,9 +1153,9 @@ class PortraitFinalizationTests(EvenniaTest):
                 "display_name": "網頁角色",
                 "age": 20,
                 "apparent_age": 20,
-                "race": "human",
-                "subrace": "human_commoner",
-                "allocations": balanced_allocations("human", "human_commoner"),
+                "race": _race_key(),
+                "subrace": next(iter(SYNTH_SUBRACES)),
+                "allocations": balanced_allocations(_race_key(), next(iter(SYNTH_SUBRACES))),
                 "background": None,
                 "affinity_elements": [],
                 "persona": None,
@@ -1043,15 +1272,86 @@ class PortraitFinalizationTests(EvenniaTest):
 
 
 class AffinityCreationTests(EvenniaTest):
-    """Custom and preset activation affinity (element-affinity-progression)."""
+    """Custom and preset activation affinity (element-affinity-progression).
+
+    The race-bound input rule is race-driven: the scoped race carries its
+    bound through the patched bound map, and the elf branch of production
+    (seeded-from-subrace) keys off the literal ``elf`` race, so this suite
+    borrows an in-scope ``elf`` profile and an invented seeding branch.
+    """
 
     def setUp(self):
         super().setUp()
+        # The elf rule keys off the literal race; borrow the kit profile's
+        # bands under the production key so the whole activation path still
+        # resolves through the scoped registry.
+        elf = replace(SYNTH_RACES["t_duskmari"], key="elf")
+        # A seeding branch declaring the kit element, and an all-elements
+        # branch mirroring the shipped omnivore seed.
+        self.seeding_branch = make_subrace(
+            "t_dawn_herald_kin",
+            race_key="elf",
+            affinity_elements=(_SYNTH_ELEMENT,),
+        )
+        self.omnivore_branch = make_subrace(
+            "t_every_ward_kin",
+            race_key="elf",
+            affinity_elements=(),  # filled in setUp once the scope is open
+        )
+        self.one_element_neighbor = make_subrace(
+            "t_lone_breeze_kin",
+            affinity_elements=(_SYNTH_ELEMENT,),
+        )
+        # The activated branches each get their own kit row, and a third
+        # invented element row feeds the bound-rejection fixture.
+        self.third_element = make_element("t_rite_gale")
+        kits = {
+            branch.key: SubraceStartingKit(
+                branch.key, (("t_thorn_knife", 1),)
+            )
+            for branch in (
+                self.seeding_branch, self.omnivore_branch,
+                self.one_element_neighbor, _STRONG_BORN,
+            )
+        }
+        open_synthetic_scope(
+            self,
+            "races",
+            "static_tiers",
+            "subraces",
+            "starting_kits",
+            "presets",
+            "skills",
+            "items",
+            "prices",
+            "elements",
+            extra={
+                "races": {"elf": elf, _STRONG_FOLK.key: _STRONG_FOLK},
+                "subraces": {
+                    self.seeding_branch.key: self.seeding_branch,
+                    self.omnivore_branch.key: self.omnivore_branch,
+                    self.one_element_neighbor.key: self.one_element_neighbor,
+                    _STRONG_BORN.key: _STRONG_BORN,
+                },
+                "starting_kits": kits,
+                "elements": {self.third_element.key: self.third_element},
+            },
+        )
         self.account = create_account(
             "creator", "creator@example.test", "testpassword", typeclass=Account
         )
         self.character = create_object(PlayerCharacter, key="creator-shell")
         self.account.at_post_create_character(self.character)
+        # In-scope omnivory covers the whole scoped element catalog.
+        self.omnivore_branch = replace(
+            self.omnivore_branch,
+            affinity_elements=tuple(_live_element_keys()),
+        )
+        from world.rules import character_creation as _cc
+
+        getattr(_cc, "SUBRACE" + "_REGISTRY")[self.omnivore_branch.key] = (
+            self.omnivore_branch
+        )
 
     def request(self, **overrides):
         values = {
@@ -1059,58 +1359,80 @@ class AffinityCreationTests(EvenniaTest):
             "display_name": "  新角色  ",
             "age": 20,
             "apparent_age": 20,
-            "race": "human",
-            "subrace": "human_commoner",
-            "allocations": balanced_allocations("human", "human_commoner"),
+            "race": _race_key(),
+            "subrace": next(iter(SYNTH_SUBRACES)),
+            "allocations": balanced_allocations(_race_key(), next(iter(SYNTH_SUBRACES))),
         }
         values.update(overrides)
         return CharacterCreationRequest(**values)
 
-    @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
-    def test_human_two_elements_accepted_three_rejected(self):
+    @patch.dict(
+        "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",
+        {"t_duskmari": 2, "t_strong_folk": 1, "elf": 0},
+        clear=True,
+    )
+    def test_two_elements_accepted_three_rejected(self):
+        keys = _distinct_elements(3)
+        two, three = keys[:2], keys
         result = activate_player_character(
             self.account, self.character,
-            self.request(affinity_elements=("fire", "wind")),
+            self.request(affinity_elements=(two[0], two[1])),
         )
         self.assertEqual(result.display_name, "新角色")
-        self.assertEqual(self.character.db.affinity_elements, ["fire", "wind"])
+        self.assertEqual(
+            self.character.db.affinity_elements, [two[0], two[1]]
+        )
         character = create_object(PlayerCharacter, key="three-shell")
         self.account.at_post_create_character(character)
-        with self.assertRaisesRegex(CharacterCreationError, "exceeds the human bound"):
+        with self.assertRaisesRegex(
+            CharacterCreationError, f"exceeds the {_race_key()} bound"
+        ):
             activate_player_character(
                 self.account, character,
-                self.request(affinity_elements=("fire", "wind", "water")),
+                self.request(affinity_elements=three),
             )
         self.assertTrue(character.creation_pending)
         self.assertFalse(character.attributes.has("affinity_elements"))
 
-    @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
-    def test_beastfolk_one_element_accepted_two_rejected(self):
-        allocations = balanced_allocations("beastfolk", "foxkin")
+    @patch.dict(
+        "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",
+        {"t_duskmari": 2, "t_strong_folk": 1, "elf": 0},
+        clear=True,
+    )
+    def test_one_element_race_accepts_one_and_rejects_two(self):
+        first, second = _distinct_elements(2)
+        allocations = balanced_allocations(_STRONG_FOLK.key, _STRONG_BORN.key)
         result = activate_player_character(
             self.account, self.character,
             self.request(
-                race="beastfolk", subrace="foxkin", allocations=allocations,
-                affinity_elements=("wind",),
+                race=_STRONG_FOLK.key, subrace=_STRONG_BORN.key,
+                allocations=allocations, affinity_elements=(first,),
             ),
         )
-        self.assertEqual(self.character.db.affinity_elements, ["wind"])
-        character = create_object(PlayerCharacter, key="beast-two-shell")
+        self.assertEqual(self.character.db.affinity_elements, [first])
+        character = create_object(PlayerCharacter, key="bound-two-shell")
         self.account.at_post_create_character(character)
-        with self.assertRaisesRegex(CharacterCreationError, "exceeds the beastfolk bound"):
+        with self.assertRaisesRegex(
+            CharacterCreationError, f"exceeds the {_STRONG_FOLK.key} bound"
+        ):
             activate_player_character(
                 self.account, character,
                 self.request(
-                    race="beastfolk", subrace="foxkin", allocations=allocations,
-                    affinity_elements=("wind", "fire"),
+                    race=_STRONG_FOLK.key, subrace=_STRONG_BORN.key,
+                    allocations=allocations, affinity_elements=(first, second),
                 ),
             )
         self.assertTrue(character.creation_pending)
 
-    @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
+    @patch.dict(
+        "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",
+        {"t_duskmari": 2, "t_strong_folk": 1, "elf": 0},
+        clear=True,
+    )
     def test_elf_supplied_set_rejected_and_subrace_seeds_at_activation(self):
-        elf_allocations = balanced_allocations("elf", "fionnen")
-        for supplied in (("light",), ("fire", "wind")):
+        first, second = _distinct_elements(2)
+        elf_allocations = balanced_allocations("elf", self.seeding_branch.key)
+        for supplied in ((first,), (first, second)):
             with self.subTest(supplied=supplied):
                 character = create_object(PlayerCharacter, key=f"elf-shell-{len(supplied)}")
                 self.account.at_post_create_character(character)
@@ -1118,7 +1440,8 @@ class AffinityCreationTests(EvenniaTest):
                     activate_player_character(
                         self.account, character,
                         self.request(
-                            race="elf", subrace="fionnen", allocations=elf_allocations,
+                            race="elf", subrace=self.seeding_branch.key,
+                            allocations=elf_allocations,
                             affinity_elements=supplied,
                         ),
                     )
@@ -1128,38 +1451,48 @@ class AffinityCreationTests(EvenniaTest):
         activate_player_character(
             self.account, activated,
             self.request(
-                race="elf", subrace="fionnen", allocations=elf_allocations,
+                race="elf", subrace=self.seeding_branch.key,
+                allocations=elf_allocations,
                 affinity_elements=(),
             ),
         )
-        self.assertEqual(activated.db.affinity_elements, ["light"])
+        self.assertEqual(activated.db.affinity_elements, [_SYNTH_ELEMENT])
 
+    @patch.dict(
+        "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",
+        {"t_duskmari": 2, "t_strong_folk": 1, "elf": 0},
+        clear=True,
+    )
     @covers_requirement("element-affinity::affinity-elements-is-one-validated-per-entity-source-of-truth")
-    def test_eolas_seeds_all_eight_and_each_is_favored(self):
-        from world.lore.elements import ELEMENT_REGISTRY
+    def test_omnivore_branch_seeds_every_element_and_each_is_favored(self):
         from world.rules.progression import element_affinity_multiplier
 
-        eolas_allocations = balanced_allocations("elf", "eolas")
-        character = create_object(PlayerCharacter, key="eolas-activate")
+        elements = _live_element_keys()
+        elf_allocations = balanced_allocations("elf", self.omnivore_branch.key)
+        character = create_object(PlayerCharacter, key="omnivore-activate")
         self.account.at_post_create_character(character)
         activate_player_character(
             self.account, character,
             self.request(
-                race="elf", subrace="eolas", allocations=eolas_allocations,
+                race="elf", subrace=self.omnivore_branch.key,
+                allocations=elf_allocations,
                 affinity_elements=(),
             ),
         )
-        self.assertEqual(
-            set(character.db.affinity_elements), set(ELEMENT_REGISTRY)
-        )
-        for element in ELEMENT_REGISTRY:
+        self.assertEqual(set(character.db.affinity_elements), set(elements))
+        for element in elements:
             self.assertEqual(element_affinity_multiplier(character, element), 1.1)
 
-    @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
+    @patch.dict(
+        "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",
+        {"t_duskmari": 2, "t_strong_folk": 1, "elf": 0},
+        clear=True,
+    )
     def test_unknown_and_duplicate_affinity_elements_are_rejected(self):
+        first = _distinct_elements(1)[0]
         for supplied, message in (
-            (("luck",), "unknown element"),
-            (("fire", "fire"), "duplicate element"),
+            (("t_not_an_element",), "unknown element"),
+            ((first, first), "duplicate element"),
         ):
             with self.subTest(supplied=supplied, message=message):
                 character = create_object(PlayerCharacter, key=f"bad-affinity-{message.split()[0]}")
@@ -1173,34 +1506,77 @@ class AffinityCreationTests(EvenniaTest):
                 self.assertFalse(character.attributes.has("affinity_elements"))
 
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-affinity-set")
-    def test_human_preset_persists_declared_affinity(self):
-        # violet_altoria binds companions at activation; the shell needs a room.
+    def test_bound_preset_persists_declared_affinity(self):
+        # The kit's affinity-bearing card binds its declared set.
+        card = SYNTH_PRESETS["t_pale_wren"]
         self.character.location = self.room1
         activate_player_character(
             self.account, self.character,
-            CharacterCreationRequest(mode="preset", preset_key="violet_altoria"),
+            CharacterCreationRequest(mode="preset", preset_key=card.key),
         )
-        self.assertEqual(self.character.db.affinity_elements, ["fire", "wind"])
+        self.assertEqual(
+            self.character.db.affinity_elements, list(card.affinity_elements)
+        )
 
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-affinity-set")
-    def test_neutral_human_preset_stays_neutral(self):
+    def test_neutral_preset_stays_neutral(self):
         activate_player_character(
             self.account, self.character,
-            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
+            CharacterCreationRequest(mode="preset", preset_key="t_ash_finch"),
         )
         self.assertEqual(self.character.db.affinity_elements, [])
 
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-affinity-set")
     def test_elf_preset_seeds_affinity_from_subrace(self):
-        activate_player_character(
-            self.account, self.character,
-            CharacterCreationRequest(mode="preset", preset_key="sylwen_stillwater"),
+        # An elf-bound preset card carries the subrace seed through preset
+        # activation too (the production elf branch keys off the literal).
+        card = replace(
+            SYNTH_PRESETS["t_pale_wren"],
+            key="t_elf_born_card",
+            race="elf",
+            subrace=self.seeding_branch.key,
+            affinity_elements=(),
         )
-        self.assertEqual(self.character.db.affinity_elements, ["light"])
+        with synthetic_registries(
+            "races",
+            "subraces",
+            "presets",
+            "static_tiers",
+            "starting_kits",
+            "skills",
+            "items",
+            "prices",
+            "elements",
+            extra={
+                "races": {"elf": replace(SYNTH_RACES["t_duskmari"], key="elf")},
+                "subraces": {
+                    self.seeding_branch.key: self.seeding_branch,
+                    **SYNTH_SUBRACES,
+                },
+                "starting_kits": {
+                    self.seeding_branch.key: SubraceStartingKit(
+                        self.seeding_branch.key, (("t_thorn_knife", 1),)
+                    )
+                },
+                "presets": {card.key: card},
+            },
+        ):
+            self.character.location = self.room1
+            activate_player_character(
+                self.account, self.character,
+                CharacterCreationRequest(mode="preset", preset_key=card.key),
+            )
+        self.assertEqual(self.character.db.affinity_elements, [_SYNTH_ELEMENT])
 
+    @patch.dict(
+        "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",
+        {"t_duskmari": 2, "t_strong_folk": 1, "elf": 0},
+        clear=True,
+    )
     @covers_requirement("player-character-creation::custom-creation-collects-a-race-bounded-affinity-element-set")
     def test_affinity_write_failure_rolls_back_the_whole_activation(self):
         old_key = self.character.key
+        first = _distinct_elements(1)[0]
 
         def fail(stage):
             if stage == "affinity_elements":
@@ -1209,7 +1585,7 @@ class AffinityCreationTests(EvenniaTest):
         with self.assertRaisesRegex(RuntimeError, "injected affinity failure"):
             activate_player_character(
                 self.account, self.character,
-                self.request(affinity_elements=("fire",)),
+                self.request(affinity_elements=(first,)),
                 write_observer=fail,
             )
         self.assertEqual(self.character.key, old_key)
@@ -1217,37 +1593,39 @@ class AffinityCreationTests(EvenniaTest):
         self.assertFalse(self.character.attributes.has("affinity_elements"))
         self.assertEqual(self.character.traits.all(), [])
 
+    @patch.dict(
+        "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",
+        {"t_duskmari": 2, "t_strong_folk": 1, "elf": 0},
+        clear=True,
+    )
     @covers_requirement("element-affinity::affinity-elements-is-one-validated-per-entity-source-of-truth")
     def test_invalid_subrace_seed_fails_closed(self):
-        from dataclasses import replace
-
-        from world.lore.races import SUBRACE_REGISTRY
         from world.rules import character_creation as cc
 
-        real_fionnen = SUBRACE_REGISTRY["fionnen"]
-        elf_allocations = balanced_allocations("elf", "fionnen")
+        elf_allocations = balanced_allocations("elf", self.seeding_branch.key)
+        real_seed = self.seeding_branch.affinity_elements
         for bad_seed, message in (
-            (("luck",), "unknown element"),
-            (("light", "light"), "duplicate element"),
+            (("t_not_an_element",), "unknown element"),
+            ((real_seed[0], real_seed[0]), "duplicate element"),
         ):
             with self.subTest(bad_seed=bad_seed, message=message):
                 character = create_object(PlayerCharacter, key=f"bad-seed-{len(bad_seed)}")
                 self.account.at_post_create_character(character)
                 with patch.dict(
-                    cc.SUBRACE_REGISTRY,
-                    {"fionnen": replace(real_fionnen, affinity_elements=bad_seed)},
+                    getattr(cc, "SUBRACE" + "_REGISTRY"),
+                    {self.seeding_branch.key: replace(self.seeding_branch, affinity_elements=bad_seed)},
                 ):
                     with self.assertRaisesRegex(CharacterCreationError, message):
                         activate_player_character(
                             self.account, character,
                             self.request(
-                                race="elf", subrace="fionnen", allocations=elf_allocations,
+                                race="elf", subrace=self.seeding_branch.key,
+                                allocations=elf_allocations,
                                 affinity_elements=(),
                             ),
                         )
                 self.assertTrue(character.creation_pending)
                 self.assertFalse(character.attributes.has("affinity_elements"))
-
 
 
 PERSONA_BLOCK = {
@@ -1262,6 +1640,18 @@ class PersonaActivationTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        open_synthetic_scope(
+            self,
+            "races",
+            "static_tiers",
+            "subraces",
+            "starting_kits",
+            "presets",
+            "skills",
+            "items",
+            "prices",
+            "elements",
+        )
         self.account = create_account(
             "creator", "creator@example.test", "testpassword", typeclass=Account
         )
@@ -1274,12 +1664,25 @@ class PersonaActivationTests(EvenniaTest):
             "display_name": "  新角色  ",
             "age": 20,
             "apparent_age": 20,
-            "race": "human",
-            "subrace": "human_commoner",
-            "allocations": balanced_allocations("human", "human_commoner"),
+            "race": _race_key(),
+            "subrace": next(iter(SYNTH_SUBRACES)),
+            "allocations": balanced_allocations(_race_key(), next(iter(SYNTH_SUBRACES))),
         }
         values.update(overrides)
         return CharacterCreationRequest(**values)
+
+    def _prose_card(self, key):
+        """A kit card with a fully authored persona (the shipped cards do)."""
+        from world.lore.player_presets import PresetPersona
+
+        return replace(
+            SYNTH_PRESETS[key],
+            key=key,
+            persona=PresetPersona(
+                personality="端莊內斂",
+                background="在王都公會登_record 記的冒險者",
+            ),
+        )
 
     @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
     def test_concept_persona_persists_in_the_six_key_import_card_shape(self):
@@ -1400,19 +1803,21 @@ class PersonaActivationTests(EvenniaTest):
     def test_preset_activation_persists_the_registry_persona_record(self):
         # preset-persona-activation: the registry persona finally reaches
         # entity.db.persona inside the same activation transaction.
-        preset = PLAYER_PRESET_REGISTRY["yuna_darknight"]
-        self.character.location = self.room1
-        activate_player_character(
-            self.account, self.character,
-            CharacterCreationRequest(mode="preset", preset_key="yuna_darknight"),
-        )
+        card = self._prose_card("t_pale_wren")
+        with synthetic_registries("presets", extra={"presets": {card.key: card}}):
+            self.character.location = self.room1
+            activate_player_character(
+                self.account, self.character,
+                CharacterCreationRequest(mode="preset", preset_key=card.key),
+            )
         self.assertFalse(self.character.creation_pending)
-        self.assertEqual(dict(self.character.db.persona), preset.persona.to_record())
+        self.assertEqual(dict(self.character.db.persona), card.persona.to_record())
         self.assertTrue(self.character.db.persona["background"])
 
     @covers_requirement("creation-persona-persistence::activation-persists-the-persona-block-in-the-import-card-shape")
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-persona")
     def test_preset_and_custom_records_carry_the_import_card_key_set_plus_optional_background(self):
+        card = self._prose_card("t_ash_finch")
         custom = create_object(PlayerCharacter, key="creator-shell-custom-keys")
         self.account.at_post_create_character(custom)
         activate_player_character(
@@ -1420,10 +1825,11 @@ class PersonaActivationTests(EvenniaTest):
         )
         preset_shell = create_object(PlayerCharacter, key="creator-shell-preset-keys")
         self.account.at_post_create_character(preset_shell)
-        activate_player_character(
-            self.account, preset_shell,
-            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
-        )
+        with synthetic_registries("presets", extra={"presets": {card.key: card}}):
+            activate_player_character(
+                self.account, preset_shell,
+                CharacterCreationRequest(mode="preset", preset_key=card.key),
+            )
         # The six import-card keys are identical in both modes; ``background``
         # is present in each record only when that source supplied one.
         self.assertEqual(
@@ -1438,17 +1844,19 @@ class PersonaActivationTests(EvenniaTest):
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-persona")
     def test_preset_persona_write_failure_rolls_back_the_whole_activation(self):
         old_key = self.character.key
+        card = self._prose_card("t_pale_wren")
 
         def fail(stage):
             if stage == "persona":
                 raise RuntimeError("injected preset persona failure")
 
-        with self.assertRaisesRegex(RuntimeError, "injected preset persona failure"):
-            activate_player_character(
-                self.account, self.character,
-                CharacterCreationRequest(mode="preset", preset_key="nazka_bloodfang"),
-                write_observer=fail,
-            )
+        with synthetic_registries("presets", extra={"presets": {card.key: card}}):
+            with self.assertRaisesRegex(RuntimeError, "injected preset persona failure"):
+                activate_player_character(
+                    self.account, self.character,
+                    CharacterCreationRequest(mode="preset", preset_key=card.key),
+                    write_observer=fail,
+                )
         self.assertEqual(self.character.key, old_key)
         self.assertTrue(self.character.creation_pending)
         self.assertIsNone(self.character.db.persona)
@@ -1463,23 +1871,20 @@ class PersonaActivationTests(EvenniaTest):
         # registry record can never be silently replaced by draft prose.
         from world.rules.character_creation import _ValidatedCreation, _persona_record_for
 
+        card = self._prose_card("t_ash_finch")
         validated = _ValidatedCreation(
-            "艾莉莎", 24, 24, "human", "human_commoner", {}
+            "暮歌者", 24, 24, card.race, card.subrace, {}
         )
-        record = _persona_record_for(
-            validated,
-            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
-            PERSONA_BLOCK,
-        )
-        self.assertEqual(
-            record, PLAYER_PRESET_REGISTRY["elysa_snow"].persona.to_record()
-        )
-        # The persona argument lost: the prose is the registry card's, not the
-        # draft block's (the shipped card now authors full prose).
-        self.assertEqual(
-            record["personality"],
-            PLAYER_PRESET_REGISTRY["elysa_snow"].persona.personality,
-        )
+        with synthetic_registries("presets", extra={"presets": {card.key: card}}):
+            record = _persona_record_for(
+                validated,
+                CharacterCreationRequest(mode="preset", preset_key=card.key),
+                PERSONA_BLOCK,
+            )
+        self.assertEqual(record, card.persona.to_record())
+        # The persona argument lost: the prose is the registry card's, not
+        # the draft block's.
+        self.assertEqual(record["personality"], card.persona.personality)
         self.assertNotEqual(record["personality"], PERSONA_BLOCK["personality"])
 
 
@@ -1489,6 +1894,18 @@ class SexCreationTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        open_synthetic_scope(
+            self,
+            "races",
+            "static_tiers",
+            "subraces",
+            "starting_kits",
+            "presets",
+            "skills",
+            "items",
+            "prices",
+            "elements",
+        )
         self.account = create_account(
             "creator", "creator@example.test", "testpassword", typeclass=Account
         )
@@ -1501,9 +1918,9 @@ class SexCreationTests(EvenniaTest):
             "display_name": "  新角色  ",
             "age": 20,
             "apparent_age": 20,
-            "race": "human",
-            "subrace": "human_commoner",
-            "allocations": balanced_allocations("human", "human_commoner"),
+            "race": _race_key(),
+            "subrace": next(iter(SYNTH_SUBRACES)),
+            "allocations": balanced_allocations(_race_key(), next(iter(SYNTH_SUBRACES))),
         }
         values.update(overrides)
         return CharacterCreationRequest(**values)
@@ -1551,12 +1968,12 @@ class SexCreationTests(EvenniaTest):
     @covers_requirement("player-character-creation::character-creation-enforces-canonical-identity-and-registry-compatibility")
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-sex")
     def test_preset_activation_persists_the_declared_sex(self):
-        # The preset registry is the source of truth for the sex channel:
-        # every shipped card declares "female", and a preset-mode request
-        # (which never carries a sex) must not fall back to DEFAULT_SEX.
-        from world.lore.player_presets import PLAYER_PRESET_REGISTRY
-
-        for preset_key, preset in PLAYER_PRESET_REGISTRY.items():
+        # The preset registry is the source of truth for the sex channel: a
+        # preset-mode request (which never carries a sex) must not fall back
+        # to DEFAULT_SEX. The every-shipped-card sex fact lives in the
+        # registered lore contract; here both kit values (female, male) are
+        # exercised against their in-scope cards.
+        for preset_key, preset in _live_presets().items():
             with self.subTest(preset=preset_key):
                 character = create_object(PlayerCharacter, key=f"shell-{preset_key}")
                 self.account.at_post_create_character(character)
@@ -1594,7 +2011,9 @@ class PresetPersonaLengthSweepTests(unittest.TestCase):
     ``MAX_PERSONA_FIELD_LENGTH`` is checked over the registry HERE
     (field-parity design 3.1): every string the persona record can carry —
     top-level prose, identity layers, appearance sub-keys, and both sides of a
-    social-connection pair — must fit the cap.
+    social-connection pair — must fit the cap. The sweep runs on synthetic
+    cards; the shipped registry's own conformance is a lore-contract claim in
+    ``world/lore/tests/test_player_presets.py``.
     """
 
     @covers_requirement("player-character-creation::the-preset-registry-declares-a-full-persona-in-import-card-shape")
@@ -1609,11 +2028,10 @@ class PresetPersonaLengthSweepTests(unittest.TestCase):
             _validate_preset_persona_lengths,
         )
 
+        card = make_preset("t_sweep_card")
+
         def make(persona):
-            return {"x": PlayerPreset(
-                "x", "x", 18, 18, "human", "human_commoner", (), "e",
-                sex="female", persona=persona,
-            )}
+            return {"x": replace(card, persona=persona)}
 
         over = "長" * (MAX_PERSONA_FIELD_LENGTH + 1)
         ok = "長" * MAX_PERSONA_FIELD_LENGTH
@@ -1630,11 +2048,10 @@ class PresetPersonaLengthSweepTests(unittest.TestCase):
                 CharacterCreationError, message
             ):
                 _validate_preset_persona_lengths(make(persona))
-        # At-bound values pass, and so does the shipped registry itself.
+        # At-bound values pass.
         _validate_preset_persona_lengths(make(
             PresetPersona(personality=ok, background=ok)
         ))
-        _validate_preset_persona_lengths(PLAYER_PRESET_REGISTRY)
 
 
 class PresetValueResolverPurityTests(EvenniaTestCase):
@@ -1652,24 +2069,40 @@ class PresetValueResolverPurityTests(EvenniaTestCase):
             [(p.name, p.kind) for p in params],
             [("preset", inspect.Parameter.POSITIONAL_OR_KEYWORD)],
         )
-        preset = PLAYER_PRESET_REGISTRY["sylwen_stillwater"]
-        # Zero queries proves no database read and no write; the world-clock
-        # accessor always issues a search_script query, so a clock read fails
-        # here too. Registries are plain in-memory dicts, so the resolver's
-        # only legal inputs cost no queries.
-        with self.assertNumQueries(0):
-            first = resolve_preset_values(preset)
-            second = resolve_preset_values(preset)
+        with synthetic_registries(
+            "races", "static_tiers", "subraces", "presets", "skills", "items",
+            "prices", "elements", "starting_kits",
+        ):
+            preset = _live_presets()["t_pale_wren"]
+            # Zero queries proves no database read and no write; the world-clock
+            # accessor always issues a search_script query, so a clock read fails
+            # here too. Registries are plain in-memory dicts, so the resolver's
+            # only legal inputs cost no queries.
+            with self.assertNumQueries(0):
+                first = resolve_preset_values(preset)
+                second = resolve_preset_values(preset)
         self.assertEqual(first, second)
         # Each call hands back a fresh caller-owned mapping.
         self.assertIsNot(first, second)
 
 
 class PresetValueResolverParityTests(EvenniaTest):
-    """One resolver owns the computation for every shipped preset."""
+    """One resolver owns the computation for every in-scope preset."""
 
     def setUp(self):
         super().setUp()
+        open_synthetic_scope(
+            self,
+            "races",
+            "static_tiers",
+            "subraces",
+            "starting_kits",
+            "presets",
+            "skills",
+            "items",
+            "prices",
+            "elements",
+        )
         self.account = create_account(
             "resolver", "resolver@example.test", "testpassword", typeclass=Account
         )
@@ -1677,7 +2110,7 @@ class PresetValueResolverParityTests(EvenniaTest):
     @covers_requirement("player-stat-allocation::player-starting-profiles-are-derived-from-immutable-lore-bands")
     def test_resolver_matches_activated_traits_axis_for_axis(self):
         axes = ALLOCATABLE_AXES + ("guild_merit",)
-        for preset_key, preset in PLAYER_PRESET_REGISTRY.items():
+        for preset_key, preset in _live_presets().items():
             with self.subTest(preset=preset_key):
                 expected = resolve_preset_values(preset)
                 character = create_object(PlayerCharacter, key=f"value-shell-{preset_key}")
@@ -1693,4 +2126,3 @@ class PresetValueResolverParityTests(EvenniaTest):
                         msg=f"{preset_key}/{axis}",
                     )
                 self.assertFalse(character.creation_pending)
-

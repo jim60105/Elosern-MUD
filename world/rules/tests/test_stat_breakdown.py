@@ -7,41 +7,261 @@ flat sums, ``combat_modifiers.adjusted_agility`` (percent-then-flat, floored
 at zero), and the gauge-ceiling reader. Fail-closed fixtures force each
 unattributable-source branch, including the per-stat layer bound via a
 synthetic 17-item accessory stack.
+
+All fixtures run inside the synthetic-data scope (test-data-independence):
+kit race/skill/buff/item rows, an invented combat-modifier rule table, an
+invented equipment-effect table, and display metadata registered in-test —
+the shipped catalogs never appear as literals or symbol references.
 """
 
-from tools.spec_traceability import covers_requirement
-
+from contextlib import ExitStack, contextmanager
+from dataclasses import replace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
-from world.lore.items import ITEM_REGISTRY
+from world.skills.equipment import EquipmentSlot
+from world.lore.items import EquipmentModifierKey
 from world.rules import combat
 from world.rules.buffs import _add_buff
 from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
 from world.rules.equipment import toggle_equipment
+from world.rules.equipment_effects import (
+    EquipmentEffectRule,
+    equipment_modifier_layers,
+)
+from world.rules.rulebook.schema import Rule
+from world.rules.status_display import (
+    ConditionDisplay,
+    MissingDisplayMetadataError,
+    display_for,
+)
 from world.rules.status_query import (
     MAX_LAYERS_PER_STAT,
+    CharacterEquipmentView,
     GaugeValue,
     StatBreakdownRow,
     StatLayer,
     StatusQueryError,
     _Assembly,
+    _validated_row,
     build_character_read_model,
     build_stat_breakdown,
     build_status_read_model,
-    display_for,
 )
-from world.rules.status_display import MissingDisplayMetadataError
 from world.skills.effects import StatMultiplyEffect
 from world.skills.handler import ConferredSkillGrant
+from world.skills.registry import SkillCategory, SkillKind, TargetSpec
+from world.tests.synthetic_data import (
+    SYNTH_BUFFS,
+    make_item,
+    make_skill,
+    synthetic_registries,
+)
+
+# ---------------------------------------------------------------------------
+# Synthetic fixtures. Registry rows are kit templates; the rule tables and
+# display metadata have no registry target, so they are invented here and
+# swapped in through the patch context below. Display labels are invented
+# prose disjoint from the shipped token universe.
+# ---------------------------------------------------------------------------
+
+# Skill rows: an owned x1.2 enhancement, a 100x partner for display-sort,
+# two rule-table passives (owned and conferred), and a same-trait duplicate
+# for the fail-closed fold.
+_BODY_PULSE = make_skill(
+    "t_body_pulse",
+    label="體魄躍動",
+    kind=SkillKind.PASSIVE,
+    effects=[f"stat_multiply:{trait}:1.2" for trait in ("atk_phys", "agility", "defense")],
+    category=SkillCategory.ENHANCEMENT,
+)
+_HIGH_PULSE = make_skill(
+    "t_high_pulse",
+    label="巨力澎湃",
+    kind=SkillKind.PASSIVE,
+    effects=["stat_multiply:atk_phys:100"],
+    category=SkillCategory.ENHANCEMENT,
+)
+_WARD_TRAINING = make_skill(
+    "t_ward_training",
+    label="守御鍛練",
+    kind=SkillKind.PASSIVE,
+    effects=["passive_buff:t_ward_stance"],
+    category=SkillCategory.ENHANCEMENT,
+)
+_RAMPART_INSTINCT = make_skill(
+    "t_rampart_instinct",
+    label="垣壁本能",
+    kind=SkillKind.PASSIVE,
+    effects=["passive_buff:t_rampart_guard"],
+    category=SkillCategory.ENHANCEMENT,
+)
+_DUP_PULSE = make_skill(
+    "t_dup_pulse",
+    label="重影",
+    kind=SkillKind.PASSIVE,
+    effects=["stat_multiply:atk_phys:1.5", "stat_multiply:atk_phys:2.0"],
+    category=SkillCategory.ENHANCEMENT,
+)
+_TIE_PULSE = make_skill(
+    "t_tie_pulse",
+    label="測試強化",
+    kind=SkillKind.PASSIVE,
+    effects=["stat_multiply:atk_phys:2.5"],
+    category=SkillCategory.ENHANCEMENT,
+)
+
+# Buff + combat-modifier rule table (replaces the shipped rulebook wholesale
+# while the context is open; the rule shape mirrors combat_modifiers.yaml).
+# Refresh-stacking template: an in-test grant needs no source key.
+_THORN_FEVER = replace(SYNTH_BUFFS["t_moss_veil"], key="t_thorn_fever")
+_FEVER_RULE_ID = "t_thorn_fever_agility_penalty"
+_WARD_RULE_ID = "t_ward_training_atk_phys_bonus"
+_RAMPART_RULE_ID = "t_rampart_instinct_defense_bonus"
+_COMBAT_RULES = [
+    Rule(_FEVER_RULE_ID, {"buff_active": _THORN_FEVER.key}, {"agility": "-10%"}),
+    Rule(_WARD_RULE_ID, {"skill_owned": _WARD_TRAINING.key}, {"atk_phys": 5}),
+    Rule(_RAMPART_RULE_ID, {"skill_owned": _RAMPART_INSTINCT.key}, {"defense": 5}),
+]
+_DISPLAY_ROWS = {
+    row.code: row
+    for row in (
+        ConditionDisplay(_THORN_FEVER.key, "荊棘熱", "harmful"),
+        ConditionDisplay(_FEVER_RULE_ID, "荊棘熱靈巧 penalty", "harmful"),
+        ConditionDisplay(_WARD_RULE_ID, "守御鍛練攻擊提升", "beneficial"),
+        ConditionDisplay(_RAMPART_RULE_ID, "垣壁本能防禦提升", "beneficial"),
+    )
+}
+
+# Gear rows. The closed shipped modifier enum cannot gain members, so the
+# kit items borrow members positionally at runtime (never named as literals
+# or attributes); the invented effect table below is the only source their
+# rows resolve through while the context is open. Index 0 is the kit item's
+# own borrowed member, so gear rows take the next five.
+_BORROWED_KEYS = tuple(EquipmentModifierKey)[1:6]
+_BULWARK_KEY, _HUSK_KEY, _GLINT_KEY, _BEADS_KEY, _FANG_KEY = _BORROWED_KEYS
+_BULWARK_SHIELD = make_item(
+    "t_bulwark_shell",
+    display_name_zh="合成城殼鎧",
+    equipment_slot=EquipmentSlot.ARMOR,
+    modifier_key=_BULWARK_KEY,
+)
+_HUSK_VEST = make_item(
+    "t_husk_vest",
+    display_name_zh="合成殼甲衣",
+    equipment_slot=EquipmentSlot.ARMOR,
+    modifier_key=_HUSK_KEY,
+)
+_GLINT_FOCUS = make_item(
+    "t_glint_focus",
+    display_name_zh="合成微光飾符",
+    equipment_slot=EquipmentSlot.ACCESSORY,
+    modifier_key=_GLINT_KEY,
+)
+_BEAD_WARD = make_item(
+    "t_warbeads_ward",
+    display_name_zh="合成戰珠護符",
+    equipment_slot=EquipmentSlot.ACCESSORY,
+    modifier_key=_BEADS_KEY,
+)
+_FANG_BLADE = make_item(
+    "t_fang_blade",
+    display_name_zh="合成毒牙短刃",
+    equipment_slot=EquipmentSlot.WEAPON_MAIN,
+    modifier_key=_FANG_KEY,
+)
+_BULWARK_RULE = EquipmentEffectRule(
+    adjustments={"atk_phys": -2, "agility": "-10%", "magic_power": 3},
+    gauge_caps={"hp": 15},
+    immune=(),
+    attached_buffs=(),
+    exposure_bias=0,
+)
+_HUSK_RULE = EquipmentEffectRule(
+    adjustments={"defense": 8}, gauge_caps={}, immune=(), attached_buffs=(), exposure_bias=0
+)
+_GLINT_RULE = EquipmentEffectRule(
+    # Flat agility rides the authored ``agility`` int field (the bundle
+    # accessor relays it to ``agility_flat``).
+    adjustments={"agility": 2}, gauge_caps={}, immune=(), attached_buffs=(), exposure_bias=0
+)
+_BEADS_RULE = EquipmentEffectRule(
+    adjustments={"atk_phys": 1, "defense": 1},
+    gauge_caps={},
+    immune=(),
+    attached_buffs=(),
+    exposure_bias=0,
+)
+_FANG_RULE = EquipmentEffectRule(
+    adjustments={"atk_phys": 4}, gauge_caps={}, immune=(), attached_buffs=(), exposure_bias=0
+)
+_EQUIPMENT_RULES = {
+    _BULWARK_KEY: _BULWARK_RULE,
+    _HUSK_KEY: _HUSK_RULE,
+    _GLINT_KEY: _GLINT_RULE,
+    _BEADS_KEY: _BEADS_RULE,
+    _FANG_KEY: _FANG_RULE,
+}
+
+
+@contextmanager
+def _synthetic_tables():
+    """Swap the non-registry tables (rules, gear effects, display) synthetically."""
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch("world.rules.combat_modifiers._RULES", new=list(_COMBAT_RULES))
+        )
+        stack.enter_context(
+            patch(
+                "world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES",
+                new=dict(_EQUIPMENT_RULES),
+            )
+        )
+        stack.enter_context(
+            patch.dict("world.rules.status_display.STATUS_DISPLAY", _DISPLAY_ROWS)
+        )
+        yield
+
+
+def _open_scope(case):
+    """One kit scope covering the whole test, plus the synthetic table swaps."""
+    scope = synthetic_registries(
+        "races",
+        "skills",
+        "items",
+        "buffs",
+        extra={
+            "skills": {
+                _BODY_PULSE.key: _BODY_PULSE,
+                _HIGH_PULSE.key: _HIGH_PULSE,
+                _WARD_TRAINING.key: _WARD_TRAINING,
+                _RAMPART_INSTINCT.key: _RAMPART_INSTINCT,
+                _DUP_PULSE.key: _DUP_PULSE,
+                _TIE_PULSE.key: _TIE_PULSE,
+            },
+            "items": {
+                _BULWARK_SHIELD.key: _BULWARK_SHIELD,
+                _HUSK_VEST.key: _HUSK_VEST,
+                _GLINT_FOCUS.key: _GLINT_FOCUS,
+                _BEAD_WARD.key: _BEAD_WARD,
+                _FANG_BLADE.key: _FANG_BLADE,
+            },
+            "buffs": {_THORN_FEVER.key: _THORN_FEVER},
+        },
+    )
+    stack = ExitStack()
+    stack.enter_context(scope)
+    stack.enter_context(_synthetic_tables())
+    case.addCleanup(stack.close)
 
 
 def _player(key: str):
     player = create_object(PlayerCharacter, key=key)
-    player.race = "human"
+    player.race = "t_duskmari"
     player.apply_race_baseline()
     player.traits.hp.rate = 0
     player.db.equipment = None
@@ -73,7 +293,16 @@ def _rows(entity) -> dict[str, StatBreakdownRow]:
 def _synthetic_assembly(entity, *, matches=(), equipment=()) -> _Assembly:
     """An assembly with forced storage views for fail-closed fixtures."""
     traits_data = _traits_data(entity)
-    gauges = {key: GaugeValue(current=100, maximum=100) for key in ("hp", "mp", "sp")}
+    gauges = {}
+    gauge_records = {}
+    for key in ("hp", "mp", "sp"):
+        raw = traits_data[key]
+        base = raw.get("base", 0)
+        mod = raw.get("mod", 0)
+        gauge_records[key] = (mod, raw.get("mult", 1))
+        gauges[key] = GaugeValue(
+            current=raw.get("current", base + mod), maximum=base + mod
+        )
     trait_values = {
         key: (traits_data[key].get("current", traits_data[key].get("base")))
         for key in ("atk_phys", "agility", "defense", "magic_power", "guild_merit")
@@ -82,7 +311,7 @@ def _synthetic_assembly(entity, *, matches=(), equipment=()) -> _Assembly:
         entity=entity,
         traits_data=traits_data,
         gauges=gauges,
-        gauge_records={key: (0, 1) for key in ("hp", "mp", "sp")},
+        gauge_records=gauge_records,
         trait_values=trait_values,
         buff_entries=(),
         matches=tuple(matches),
@@ -93,6 +322,9 @@ def _synthetic_assembly(entity, *, matches=(), equipment=()) -> _Assembly:
 
 class BreakdownShapeTests(EvenniaTestCase):
     """Closed vocabulary, row order, empty-source rows, current semantics."""
+
+    def setUp(self):
+        _open_scope(self)
 
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
     def test_rows_have_closed_order_and_empty_layers(self):
@@ -118,14 +350,14 @@ class BreakdownShapeTests(EvenniaTestCase):
         player.traits.hp.current = 40
         row = _rows(player)["hp"]
         self.assertEqual(row.current, 40)
-        self.assertEqual(row.effective, 100)
+        self.assertEqual(row.effective, _traits_data(player)["hp"]["base"])
         model = build_status_read_model(player)
         self.assertEqual(row.effective, model.resources["hp"].maximum)
 
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
     def test_character_read_model_projects_the_breakdown(self):
         player = _player("breakdown model")
-        _wear(player, "knight_platemail")
+        _wear(player, _BULWARK_SHIELD.key)
         first = build_character_read_model(player)
         second = build_character_read_model(player)
         self.assertEqual(
@@ -134,12 +366,13 @@ class BreakdownShapeTests(EvenniaTestCase):
         )
         self.assertEqual(first.breakdown, second.breakdown)
         hp = next(row for row in first.breakdown if row.key == "hp")
-        self.assertEqual(hp.effective, 115)  # base 100 + worn plate cap 15
+        cap = _BULWARK_RULE.gauge_caps["hp"]
+        self.assertEqual(hp.effective, _stored_trait(player, "hp") + cap)
         self.assertEqual(
             hp.layers,
             (
                 StatLayer(
-                    "equipment", ITEM_REGISTRY["knight_platemail"].display_name_zh, "flat", 15
+                    "equipment", _BULWARK_SHIELD.display_name_zh, "flat", cap
                 ),
             ),
         )
@@ -147,9 +380,9 @@ class BreakdownShapeTests(EvenniaTestCase):
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
     def test_layer_alphabets_are_closed(self):
         player = _player("breakdown alphabet")
-        _add_buff(player, "poisoned")
-        _wear(player, "knight_platemail", "ashen_scimitar")
-        player.db.skills = {"active": ["body_enhancement_basic"], "passive": []}
+        _add_buff(player, _THORN_FEVER.key)
+        _wear(player, _BULWARK_SHIELD.key, _FANG_BLADE.key)
+        player.db.skills = {"active": [_BODY_PULSE.key], "passive": []}
         for row in build_stat_breakdown(player):
             for layer in row.layers:
                 self.assertIn(layer.source, ("skill", "condition", "equipment"))
@@ -160,27 +393,18 @@ class BreakdownShapeTests(EvenniaTestCase):
 class SkillFoldParityTests(EvenniaTestCase):
     """Tasks 1.1/1.3: the shipped effective_value fold, replayed as layers."""
 
+    def setUp(self):
+        _open_scope(self)
+
     @covers_requirement("character-breakdown-view::each-displayed-stat-matches-its-named-authoritative-computation")
     def test_bankers_rounding_replays_the_shipped_round(self):
         player = _player("breakdown tie")
         # 45 x 2.5 = 112.5 is an exact banker's-rounding tie: the replay must
         # land on the shipped fold's half-even neighbour (112), never away.
         player.traits.atk_phys.base = 45
-        player.db.skills = {"active": ["tie_skill"], "passive": []}
-        skill = type(
-            "Skill",
-            (),
-            {
-                "key": "tie_skill",
-                "label": "測試強化",
-                "parsed_effects": [StatMultiplyEffect(trait="atk_phys", multiplier=2.5)],
-            },
-        )()
-        with patch("world.rules.status_query.SKILL_REGISTRY", {"tie_skill": skill}), patch(
-            "world.skills.handler.SKILL_REGISTRY", {"tie_skill": skill}
-        ):
-            row = _rows(player)["atk_phys"]
-            self.assertEqual(row.effective, player.skills.effective_value("atk_phys"))
+        player.db.skills = {"active": [_TIE_PULSE.key], "passive": []}
+        row = _rows(player)["atk_phys"]
+        self.assertEqual(row.effective, player.skills.effective_value("atk_phys"))
         self.assertEqual(row.base, 45)
         self.assertEqual(row.effective, 112)
         self.assertEqual(row.current, 112)
@@ -188,9 +412,9 @@ class SkillFoldParityTests(EvenniaTestCase):
     @covers_requirement("character-breakdown-view::each-displayed-stat-matches-its-named-authoritative-computation")
     def test_skill_grant_fold_carries_scaled_layer(self):
         player = _player("breakdown grant fold")
-        player.db.skills = {"active": ["body_enhancement_basic"], "passive": []}
+        player.db.skills = {"active": [_BODY_PULSE.key], "passive": []}
         player.db.skill_grants = [
-            ConferredSkillGrant(source_key="patron", skill_key="body_enhancement_basic", scale=0.5)
+            ConferredSkillGrant(source_key="t_patron", skill_key=_BODY_PULSE.key, scale=0.5)
         ]
         base = _stored_trait(player, "defense")
         row = _rows(player)["defense"]
@@ -209,52 +433,44 @@ class SkillFoldParityTests(EvenniaTestCase):
         player_a = _player("breakdown perm a")
         player_b = _player("breakdown perm b")
         player_a.db.skills = {
-            "active": ["body_enhancement_basic", "body_enhancement"],
+            "active": [_BODY_PULSE.key, _HIGH_PULSE.key],
             "passive": [],
         }
         player_b.db.skills = {
-            "active": ["body_enhancement", "body_enhancement_basic"],
+            "active": [_HIGH_PULSE.key, _BODY_PULSE.key],
             "passive": [],
         }
         rows_a = _rows(player_a)["atk_phys"]
         rows_b = _rows(player_b)["atk_phys"]
         self.assertEqual(rows_a.effective, rows_b.effective)
         self.assertEqual(rows_a.layers, rows_b.layers)
-        self.assertEqual([layer.amount for layer in rows_a.layers], [100, 1.2])
+        # Display order is (skill_key, source_key): the x1.2 row sorts first.
+        self.assertEqual([layer.amount for layer in rows_a.layers], [1.2, 100.0])
 
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
     def test_duplicate_multiplier_fails_closed(self):
         player = _player("breakdown dup")
-        player.db.skills = {"active": ["dup_skill"], "passive": []}
-        skill = type(
-            "Skill",
-            (),
-            {
-                "key": "dup_skill",
-                "label": "重複",
-                "parsed_effects": [
-                    StatMultiplyEffect(trait="atk_phys", multiplier=1.5),
-                    StatMultiplyEffect(trait="atk_phys", multiplier=2.0),
-                ],
-            },
-        )()
-        with patch("world.rules.status_query.SKILL_REGISTRY", {"dup_skill": skill}):
-            with self.assertRaises(StatusQueryError):
-                build_stat_breakdown(player)
+        player.db.skills = {"active": [_DUP_PULSE.key], "passive": []}
+        with self.assertRaises(StatusQueryError):
+            build_stat_breakdown(player)
 
 
 class ConditionLayerTests(EvenniaTestCase):
     """Task 1.2: per-rule condition layers, buff classification, parity."""
 
+    def setUp(self):
+        _open_scope(self)
+
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
     def test_poison_agility_layer_is_named_and_signed(self):
         player = _player("breakdown poison")
-        _add_buff(player, "poisoned")
+        player.traits.agility.base = 100
+        _add_buff(player, _THORN_FEVER.key)
         base = _stored_trait(player, "agility")
         row = _rows(player)["agility"]
         self.assertEqual(
             row.layers,
-            (StatLayer("condition", display_for("poison_agility_penalty").label, "pct", -10),),
+            (StatLayer("condition", display_for(_FEVER_RULE_ID).label, "pct", -10),),
         )
         self.assertEqual(row.effective, base * 0.9)
         self.assertEqual(row.effective, adjusted_agility(player))
@@ -267,7 +483,7 @@ class ConditionLayerTests(EvenniaTestCase):
         # it here made the whole character panel unavailable).
         player = _player("breakdown fraction")
         player.traits.agility.base = 1
-        _add_buff(player, "poisoned")
+        _add_buff(player, _THORN_FEVER.key)
         row = _rows(player)["agility"]
         self.assertEqual(row.effective, 0.9)
         self.assertEqual(row.current, 0.9)
@@ -277,7 +493,7 @@ class ConditionLayerTests(EvenniaTestCase):
     @covers_requirement("character-breakdown-view::each-displayed-stat-matches-its-named-authoritative-computation")
     def test_skill_owned_rule_flows_through_the_facade(self):
         player = _player("breakdown skill owned")
-        player.db.skills = {"active": ["retainer_martial_training"], "passive": []}
+        player.db.skills = {"active": [_WARD_TRAINING.key], "passive": []}
         base = _stored_trait(player, "atk_phys")
         row = _rows(player)["atk_phys"]
         self.assertEqual(
@@ -285,7 +501,7 @@ class ConditionLayerTests(EvenniaTestCase):
             (
                 StatLayer(
                     "condition",
-                    display_for("retainer_martial_training_atk_phys_bonus").label,
+                    display_for(_WARD_RULE_ID).label,
                     "flat",
                     5,
                 ),
@@ -299,7 +515,7 @@ class ConditionLayerTests(EvenniaTestCase):
     def test_conferred_rule_scale_produces_fractional_layer(self):
         player = _player("breakdown conferred rule")
         player.db.skill_grants = [
-            ConferredSkillGrant(source_key="patron", skill_key="defense_instinct", scale=0.5)
+            ConferredSkillGrant(source_key="t_patron", skill_key=_RAMPART_INSTINCT.key, scale=0.5)
         ]
         base = _stored_trait(player, "defense")
         row = _rows(player)["defense"]
@@ -308,7 +524,7 @@ class ConditionLayerTests(EvenniaTestCase):
             (
                 StatLayer(
                     "condition",
-                    display_for("defense_instinct_defense_bonus").label,
+                    display_for(_RAMPART_RULE_ID).label,
                     "flat",
                     2.5,
                 ),
@@ -319,27 +535,27 @@ class ConditionLayerTests(EvenniaTestCase):
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
     def test_buff_rule_sorts_before_plain_rule(self):
         player = _player("breakdown buff order")
-        _add_buff(player, "poisoned")
-        player.db.skills = {"active": ["retainer_martial_training"], "passive": []}
+        _add_buff(player, _THORN_FEVER.key)
+        player.db.skills = {"active": [_WARD_TRAINING.key], "passive": []}
         rows = _rows(player)
-        # The poison row exists and carries the buff-classified condition
-        # layer; the retainer row is the plain-rule counterpart.
-        poison = rows["agility"].layers[0]
-        self.assertEqual(poison.source, "condition")
-        retainer = rows["atk_phys"].layers[0]
-        self.assertEqual(retainer.source, "condition")
-        self.assertEqual(retainer.kind, "flat")
+        # The fever row exists and carries the buff-classified condition
+        # layer; the ward row is the plain-rule counterpart.
+        fever = rows["agility"].layers[0]
+        self.assertEqual(fever.source, "condition")
+        ward = rows["atk_phys"].layers[0]
+        self.assertEqual(ward.source, "condition")
+        self.assertEqual(ward.kind, "flat")
 
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
     def test_unresolvable_label_fails_closed(self):
         player = _player("breakdown no label")
         assembly = _synthetic_assembly(
-            player, matches=[("poison_agility_penalty", {"agility": "-10%"})]
+            player, matches=[(_FEVER_RULE_ID, {"agility": "-10%"})]
         )
         real = display_for
 
         def fake(code: str):
-            if code == "poison_agility_penalty":
+            if code == _FEVER_RULE_ID:
                 raise MissingDisplayMetadataError(code)
             return real(code)
 
@@ -350,11 +566,11 @@ class ConditionLayerTests(EvenniaTestCase):
     @covers_requirement("character-breakdown-view::each-displayed-stat-matches-its-named-authoritative-computation")
     def test_panel_agility_matches_live_consumers(self):
         player = _player("breakdown live parity")
-        _add_buff(player, "poisoned")
-        _wear(player, "knight_platemail", "ashen_scimitar")
-        player.db.skills = {"active": ["body_enhancement_basic"], "passive": []}
+        _add_buff(player, _THORN_FEVER.key)
+        _wear(player, _BULWARK_SHIELD.key, _GLINT_FOCUS.key)
+        player.db.skills = {"active": [_BODY_PULSE.key], "passive": []}
         bundle = evaluate_combat_modifiers(player)
-        self.assertEqual(bundle["agility"], "-20%")  # poison -10 merged with gear -10
+        self.assertEqual(bundle["agility"], "-20%")  # fever -10 merged with gear -10
         self.assertEqual(bundle["agility_flat"], 2)
         row = _rows(player)["agility"]
         self.assertEqual(row.effective, adjusted_agility(player))
@@ -366,8 +582,10 @@ class ConditionLayerTests(EvenniaTestCase):
             [
                 ("skill", "mult", 1.2),
                 ("condition", "pct", -10),
-                ("equipment", "flat", 2),
+                # Slot order: the armor's percent layer precedes the
+                # accessory's flat layer.
                 ("equipment", "pct", -10),
+                ("equipment", "flat", 2),
             ],
         )
 
@@ -375,11 +593,14 @@ class ConditionLayerTests(EvenniaTestCase):
 class EquipmentLayerTests(EvenniaTestCase):
     """Task 1.4: per-item gear layers, slot order, gauge decomposition."""
 
+    def setUp(self):
+        _open_scope(self)
+
     @covers_requirement("character-breakdown-view::each-displayed-stat-matches-its-named-authoritative-computation")
     def test_flat_stat_parity_with_combat_consumers(self):
         player = _player("breakdown flat parity")
-        _wear(player, "knight_platemail", "ashen_scimitar")
-        player.db.skills = {"active": ["retainer_martial_training"], "passive": []}
+        _wear(player, _BULWARK_SHIELD.key, _FANG_BLADE.key)
+        player.db.skills = {"active": [_WARD_TRAINING.key], "passive": []}
         rows = _rows(player)
         self.assertEqual(rows["atk_phys"].effective, combat._adjusted_attack(player, "atk_phys"))
         self.assertEqual(rows["defense"].effective, combat._adjusted_defense(player))
@@ -390,19 +611,20 @@ class EquipmentLayerTests(EvenniaTestCase):
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
     def test_gear_layers_follow_slot_order(self):
         player = _player("breakdown slot order")
-        _wear(player, "knight_platemail", "ashen_scimitar")
+        _wear(player, _BULWARK_SHIELD.key, _FANG_BLADE.key)
         row = _rows(player)["atk_phys"]
         plate = next(layer for layer in row.layers if layer.amount == -2)
-        scimitar = next(layer for layer in row.layers if layer.amount == 4)
-        self.assertLess(row.layers.index(scimitar), row.layers.index(plate))
+        blade = next(layer for layer in row.layers if layer.amount == 4)
+        self.assertLess(row.layers.index(blade), row.layers.index(plate))
 
     @covers_requirement("character-breakdown-view::each-displayed-stat-matches-its-named-authoritative-computation")
     def test_gauge_mod_is_explained_by_worn_caps(self):
         player = _player("breakdown gauge gear")
-        _wear(player, "knight_platemail")  # gauge_caps hp +15
+        _wear(player, _BULWARK_SHIELD.key)  # gauge_caps hp +15
         row = _rows(player)["hp"]
-        self.assertEqual(row.base, 100)
-        self.assertEqual(row.effective, 115)
+        base = _stored_trait(player, "hp")
+        self.assertEqual(row.base, base)
+        self.assertEqual(row.effective, base + _BULWARK_RULE.gauge_caps["hp"])
         self.assertEqual(row.layers[0].source, "equipment")
         # The heal-clamp ceiling agrees with the composed maximum.
         self.assertEqual(float(row.effective), combat._max_hp(player))
@@ -414,7 +636,7 @@ class EquipmentLayerTests(EvenniaTestCase):
         # must take the identical zero — never layers the bundle lacks.
         player = _player("breakdown unknown gear")
         player.db.equipment = {
-            "weapon_main": "not_a_real_item",
+            "weapon_main": "t_not_a_real_item",
             "weapon_off": None,
             "armor": None,
             "accessories": [],
@@ -423,11 +645,14 @@ class EquipmentLayerTests(EvenniaTestCase):
         self.assertEqual(rows["defense"].layers, ())
         self.assertEqual(rows["defense"].effective, _stored_trait(player, "defense"))
         self.assertEqual(rows["hp"].layers, ())
-        self.assertEqual(rows["hp"].effective, 100)
+        self.assertEqual(rows["hp"].effective, _stored_trait(player, "hp"))
 
 
 class FailClosedTests(EvenniaTestCase):
     """Unattributable storage, bounds, and malformed bundles fail the read."""
+
+    def setUp(self):
+        _open_scope(self)
 
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
     def test_static_nonzero_mod_fails_closed(self):
@@ -463,13 +688,11 @@ class FailClosedTests(EvenniaTestCase):
         # enforced by the wire validators (documented deviation). Malformed
         # gear reads as "nothing worn" — the same zero the combat bundle
         # takes — instead of failing the whole panel.
-        from world.rules.status_query import CharacterEquipmentView
-
         player = _player("breakdown bound")
         assembly = _synthetic_assembly(
             player,
             equipment=[
-                CharacterEquipmentView("accessory", "chainmail")
+                CharacterEquipmentView("accessory", _BEAD_WARD.key)
                 for _ in range(MAX_LAYERS_PER_STAT + 1)
             ],
         )
@@ -481,8 +704,6 @@ class FailClosedTests(EvenniaTestCase):
     def test_layer_bound_rejects_instead_of_truncating(self):
         # The builder-side bound itself: a 17-layer row fails the read
         # closed through _validated_row, never a silent truncation.
-        from world.rules.status_query import _validated_row
-
         row = StatBreakdownRow(
             "defense",
             4,
@@ -499,7 +720,7 @@ class FailClosedTests(EvenniaTestCase):
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
     def test_malformed_agility_bundle_fails_closed(self):
         player = _player("breakdown bad percent")
-        assembly = _synthetic_assembly(player, matches=[("bad_rule", {"agility": -10})])
+        assembly = _synthetic_assembly(player, matches=[("t_bad_rule", {"agility": -10})])
         with self.assertRaises(StatusQueryError):
             build_stat_breakdown(player, assembly)
 
@@ -507,7 +728,7 @@ class FailClosedTests(EvenniaTestCase):
     def test_agility_floors_at_zero(self):
         player = _player("breakdown floor")
         assembly = _synthetic_assembly(
-            player, matches=[("poison_agility_penalty", {"agility": "-120%"})]
+            player, matches=[(_FEVER_RULE_ID, {"agility": "-120%"})]
         )
         row = next(row for row in build_stat_breakdown(player, assembly) if row.key == "agility")
         self.assertEqual(row.effective, 0.0)
@@ -516,8 +737,42 @@ class FailClosedTests(EvenniaTestCase):
         self.assertEqual(row.layers[0].amount, -120.0)
 
 
+class EquipmentEffectTableTests(EvenniaTestCase):
+    """The synthetic gear rows decompose through the loaded table accessor."""
+
+    def test_accessor_decomposes_invented_rules(self):
+        with _synthetic_tables():
+            self.assertEqual(
+                equipment_modifier_layers(_GLINT_KEY), {"agility": ("flat", 2)}
+            )
+            layers = equipment_modifier_layers(_BULWARK_KEY)
+            self.assertEqual(
+                {key: layers[key] for key in ("atk_phys", "agility", "hp")},
+                {
+                    "atk_phys": ("flat", -2),
+                    "agility": ("pct", -10),
+                    "hp": ("flat", 15),
+                },
+            )
+
+    @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
+    def test_unbound_modifier_key_resolves_none(self):
+        # A closed-enum member with no row in the (invented) table stays the
+        # sanctioned "no rulebook entry" answer, never a KeyError.
+        unbound = next(
+            member
+            for member in EquipmentModifierKey
+            if member not in _EQUIPMENT_RULES
+        )
+        with _synthetic_tables():
+            self.assertIsNone(equipment_modifier_layers(unbound))
+
+
 class PurityTests(EvenniaTestCase):
     """Task 1.3: the reads never materialize entity.skills."""
+
+    def setUp(self):
+        _open_scope(self)
 
     @staticmethod
     def _attribute_snapshot(entity) -> dict:
@@ -540,10 +795,10 @@ class PurityTests(EvenniaTestCase):
     def test_builds_never_materialize_skills(self):
         player = _player("breakdown purity")
         player.db.skills = {
-            "active": ["retainer_martial_training", "guardian_instinct"],
+            "active": [_WARD_TRAINING.key, _RAMPART_INSTINCT.key],
             "passive": [],
         }
-        _wear(player, "knight_platemail")
+        _wear(player, _BULWARK_SHIELD.key)
         before = self._attribute_snapshot(player)
         before_vars = sorted(vars(player).keys())
         self.assertIsNone(player.attributes.get("sexual_traits", category="traits"))

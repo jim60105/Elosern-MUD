@@ -20,7 +20,10 @@ from world.skills.registry import (
     FactionConstraint,
     SKILL_REGISTRY,
     SkillKind,
+    SkillPrerequisite,
     TargetSpec,
+    declared_prerequisites,
+    prerequisite_consumers,
 )
 
 
@@ -715,3 +718,43 @@ class DarkSpellCatalogTests(unittest.TestCase):
             {row[0] for row in DARK_SPELL_CATALOG}
             | {"shadow_slash", "dual_blade_mastery"},
         )
+
+
+class FireLineageTreeCatalogTests(unittest.TestCase):
+    """The shipped first-round fire lineage tree is catalog data.
+
+    Relocated from the migrated (now synthetic) rules lineage suite: the
+    edge table itself is the shipped content the requirement names, so it
+    lives in this registered data-contract file.
+    """
+
+    @covers_requirement("skill-lineage::the-fire-lineage-ships-as-the-first-round-linear-tree")
+    def test_fire_tree_edges_are_as_designed(self):
+        expected = {
+            "fire_ball": ("fire_arrow", 3),
+            "scorching_wave": ("fire_ball", 3),
+            "firestorm": ("scorching_wave", 3),
+            "infernal_wrap": ("scorching_wave", 3),
+            "lava_burst": ("firestorm", 5),
+            "hellfire": ("firestorm", 5),
+            "world_ending_blaze": ("hellfire", 5),
+            "dragon_flame": ("lava_burst", 8),
+            "phoenix_eternal_flame": ("dragon_flame", 8),
+        }
+        for key, (prereq_key, minimum) in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(
+                    declared_prerequisites(key),
+                    (SkillPrerequisite(prereq_key, minimum),),
+                )
+        self.assertEqual(declared_prerequisites("fire_arrow"), ())
+        # Topological canopy: phoenix is the strict last node.
+        self.assertEqual(prerequisite_consumers("phoenix_eternal_flame"), ())
+
+    @covers_requirement("skill-lineage::the-fire-lineage-ships-as-the-first-round-linear-tree")
+    def test_mastery_passives_stay_out_of_the_graph(self):
+        for element_key in ELEMENT_REGISTRY:
+            mastery_key = f"{element_key}_mastery"
+            with self.subTest(mastery_key=mastery_key):
+                self.assertEqual(prerequisite_consumers(mastery_key), ())
+                self.assertEqual(declared_prerequisites(mastery_key), ())

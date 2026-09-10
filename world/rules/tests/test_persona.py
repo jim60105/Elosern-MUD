@@ -297,11 +297,11 @@ class PersonaStoreTests(unittest.TestCase):
 
     @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
     def test_social_connection_entries_key_by_counterparty_name(self):
-        record = {"social_connection": {"悠奈": {"relationship": "舊識"}, "黛莉雅": "宿敵"}}
+        record = {"social_connection": {"芮奈": {"relationship": "舊識"}, "黛莉雅": "宿敵"}}
         block = PersonaStore(_FakeEntity(record)).flatten(("social_connection",))
         self.assertEqual(
             block,
-            "人脈：\n悠奈：{'relationship': '舊識'}\n黛莉雅：宿敵",
+            "人脈：\n芮奈：{'relationship': '舊識'}\n黛莉雅：宿敵",
         )
 
     @covers_requirement("persona-store::flatten-produces-one-bounded-labeled-prompt-block")
@@ -357,7 +357,7 @@ class PersonaStoreTests(unittest.TestCase):
             "personality": "Calm.",
             "identity": {"public": "表", "hidden": "祕"},
             "appearance": {"height": "165cm"},
-            "social_connection": {"悠奈": "舊識"},
+            "social_connection": {"芮奈": "舊識"},
         }
         block = PersonaStore(_FakeEntity(record)).flatten()
         self.assertEqual(block, "性格：Calm.")
@@ -373,7 +373,7 @@ class PersonaStoreTests(unittest.TestCase):
                 "height": "高" * 50,
                 "weight": "重" * 50,
                 "measurement": "量" * 50,
-                "style": "風" * 50,
+                "style": "颶" * 50,
                 "overview": "觀" * 50,
                 "attire": {"日常": "服" * 100},
                 "feature": ["特" * 40, "徵" * 40],
@@ -450,25 +450,25 @@ class PersonaStoreTests(unittest.TestCase):
     def test_public_view_prunes_nested_hidden_entries_at_any_depth(self):
         record = {
             "identity": {
-                "public": {"hidden": "巢狀祕密", "role": "商人", "ties": [{"hidden": "深", "k": "v"}]},
+                "public": {"hidden": "巢狀祕密", "role": "行商", "ties": [{"hidden": "深", "k": "v"}]},
             }
         }
         block = PersonaStore(_FakeEntity(record)).public_view().flatten(("identity",))
         self.assertEqual(
-            block, "身分：\n公開身分：{'role': '商人', 'ties': [{'k': 'v'}]}"
+            block, "身分：\n公開身分：{'role': '行商', 'ties': [{'k': 'v'}]}"
         )
         self.assertNotIn("巢狀祕密", block)
         self.assertNotIn("深", block)
 
     @covers_requirement("persona-store::personastore-is-a-read-only-handler-over-the-verbatim-persona-record")
     def test_public_view_is_an_independent_snapshot_of_later_mutations(self):
-        record = {"identity": {"public": {"role": "商人"}}}
+        record = {"identity": {"public": {"role": "行商"}}}
         view = PersonaStore(_FakeEntity(record)).public_view()
         # A writer adding a hidden entry to the shared nested container after
         # the view was taken must not surface through the already-built view.
         record["identity"]["public"]["hidden"] = "後植入"
         block = view.flatten(("identity",))
-        self.assertEqual(block, "身分：\n公開身分：{'role': '商人'}")
+        self.assertEqual(block, "身分：\n公開身分：{'role': '行商'}")
         self.assertNotIn("後植入", block)
 
     @covers_requirement("persona-store::personastore-is-a-read-only-handler-over-the-verbatim-persona-record")
@@ -581,7 +581,7 @@ class PresetPersonaRecordRenderingTests(unittest.TestCase):
             life_story="邊境小村",
             habit="清晨練劍",
             appearance=PresetAppearance(height="160cm", attire="旅裝"),
-            social_connection=(("悠奈", "舊識"),),
+            social_connection=(("芮奈", "舊識"),),
             background="來自南境的旅人",
         ).to_record()
         # Same six import-card keys the custom writers produce (parity pin).
@@ -598,7 +598,7 @@ class PresetPersonaRecordRenderingTests(unittest.TestCase):
         self.assertEqual(
             block,
             "身分：\n公開身分：公會註冊冒險者\n隱秘身分：流亡王女\n"
-            "外觀：\nheight：160cm\nattire：旅裝\n人脈：\n悠奈：舊識",
+            "外觀：\nheight：160cm\nattire：旅裝\n人脈：\n芮奈：舊識",
         )
         prose = PersonaStore(entity).flatten(
             ("personality", "life_story", "habit", "background")

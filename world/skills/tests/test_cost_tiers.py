@@ -4,6 +4,8 @@ Contract tests for the MP cost-tier lookup."""
 from dataclasses import replace
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from world.skills.cost_tiers import MP_COST_TIERS, spell_tier_for
 from world.skills.registry import SKILL_REGISTRY
 
@@ -75,3 +77,107 @@ class SpellTierLookupTests(unittest.TestCase):
         # deliberate split documented in element-mastery-cast-gate design.md.
         self.assertEqual(MP_COST_TIERS["主宰"].min_level, 90)
         self.assertEqual(MAGIC_TIER_THRESHOLDS["主宰"], 91)
+
+
+class SpellTierLabelCatalogTests(unittest.TestCase):
+    """Every element's representative per-band spells keep their catalog label.
+
+    Relocated from the retired ``SpellTierLabelTests`` in the progression
+    suite: the magic-XP gate is gone (magic-xp-engine-retirement), so the
+    tier label a spell belongs to is purely shipped catalog data and belongs
+    in this registered data-contract file.
+    """
+
+    def _assert_labels(self, spell_tiers: dict[str, tuple[str, ...]]) -> None:
+        for tier, spell_keys in spell_tiers.items():
+            for key in spell_keys:
+                with self.subTest(tier=tier, spell=key):
+                    self.assertEqual(spell_tier_for(SKILL_REGISTRY[key]), tier)
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-火-element-spell-set")
+    def test_fire_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("firestorm", "scorching_wave"),
+                "大師": ("lava_burst", "infernal_wrap"),
+                "賢者": ("dragon_flame", "hellfire"),
+                "主宰": ("phoenix_eternal_flame", "world_ending_blaze"),
+            }
+        )
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-水-element-spell-set")
+    def test_water_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("healing_spring", "water_shield"),
+                "大師": ("abyssal_whirlpool", "wellspring_of_life"),
+                "賢者": ("tsunami", "tidal_revival"),
+                "主宰": ("sea_of_life", "abyssal_tide"),
+            }
+        )
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_earth_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("stone_armor", "dust_veil"),
+                "大師": ("earth_bind", "rockslide"),
+                "賢者": ("earthquake", "earthen_ward"),
+                "主宰": ("mountain_collapse", "earths_judgment"),
+            }
+        )
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-風-element-spell-set")
+    def test_wind_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("tornado_blade",),
+                "大師": ("storm_domain", "gale_dance_strike"),
+                "賢者": ("heavens_wrath_storm", "haste_domain"),
+                "主宰": ("vacuum_severance", "sky_tempest"),
+            }
+        )
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-雷-element-spell-set")
+    def test_lightning_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("chain_lightning", "paralyzing_bolt"),
+                "大師": ("thunder_combo", "lightning_strike"),
+                "賢者": ("heavens_thunder", "thunder_gods_haste"),
+                "主宰": ("judgement_thunder", "divine_lightning_slaughter"),
+            }
+        )
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-冰-element-spell-set")
+    def test_ice_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("ice_wall", "frost_arrow_rain"),
+                "大師": ("permafrost_domain", "ice_prison"),
+                "賢者": ("blizzard", "absolute_tundra"),
+                "主宰": ("absolute_zero", "eternal_ice_field"),
+            }
+        )
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-光-element-spell-set")
+    def test_light_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("purify", "mass_heal"),
+                "大師": ("advanced_heal", "holy_shield"),
+                "賢者": ("holy_radiance", "revival_light"),
+                "主宰": ("goddess_blessing", "heavens_judgment_light"),
+            }
+        )
+
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-暗-element-spell-set")
+    def test_dark_spell_tier_labels_match_the_catalog(self):
+        self._assert_labels(
+            {
+                "術師": ("curse", "dark_burst"),
+                "大師": ("dark_corrosion_domain", "shadow_torment"),
+                "賢者": ("abyss_devour", "dark_dominion"),
+                "主宰": ("void_annihilation", "netherworld_judgment"),
+            }
+        )

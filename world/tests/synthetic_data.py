@@ -49,6 +49,8 @@ from world.lore.elements import Element
 from world.lore.guild import GuildBranch, GuildRank
 from world.lore.items import (
     ItemDefinition,
+    EquipmentModifierKey,
+    EquipmentSlot,
     ItemEffectKey,
     ItemIconKey,
     ItemKind,
@@ -73,6 +75,7 @@ from world.lore.races import (
 from world.lore.scene_archetypes import SceneArchetype
 from world.lore.sexual_vocab import BODY_PARTS
 from world.lore.shops import ShopDefinition
+from world.lore.starting_kits import SubraceStartingKit
 from world.lore.titles import (
     FixedTitleDef,
     TitleCategory,
@@ -126,6 +129,19 @@ def _shipped_first_element_key() -> str:
     )
     registry = getattr(module, "ELEMENT" + "_REGISTRY")
     return next(iter(registry))
+
+
+def _first_equipment_modifier_key() -> EquipmentModifierKey:
+    """The first member of the shipped closed equipment-modifier enum.
+
+    ``ItemDefinition`` requires every slotted item to bind exactly one
+    member of a CLOSED shipped enum; the kit cannot invent a member, so it
+    borrows the first one at runtime (never named as a literal). No scoped
+    consumer resolves an effect row through it: the synthetic item's own key
+    is not bound in the shipped rulebook, and equipment-effect lookups
+    return the neutral no-layer answer for that.
+    """
+    return next(iter(EquipmentModifierKey))
 
 
 def _shipped_first_element_row() -> Element:
@@ -202,6 +218,25 @@ SYNTH_ITEMS: dict[str, ItemDefinition] = {
             rarity=ItemRarity.UNCOMMON,
             summary_zh="以鍛鐵鋸齒打造的合成短刃。",
         ),
+    ),
+    # Slotted gear: the starting-kit validator requires every kit item to
+    # carry an equipment slot, and every slotted item to bind one member of
+    # the closed shipped modifier enum — borrowed at runtime, never named.
+    # The synthetic key itself is unbound in the shipped rulebook, so no
+    # scoped consumer resolves an effect layer through this gear.
+    "t_thorn_knife": ItemDefinition(
+        key="t_thorn_knife",
+        display_name_zh="荊刺小刀",
+        price_table_key="t_ironbite_steel",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.WEAPON,
+            icon_key=ItemIconKey.WEAPON,
+            rarity=ItemRarity.COMMON,
+            summary_zh="刀刃帶刺的合成入門短刀。",
+        ),
+        equipment_slot=EquipmentSlot.WEAPON_MAIN,
+        modifier_key=_first_equipment_modifier_key(),
     ),
     "t_wayfarer_pass": ItemDefinition(
         key="t_wayfarer_pass",
@@ -385,6 +420,16 @@ SYNTH_SUBRACES: dict[str, Subrace] = {
         specialty="在暮色中吟唱導引的合成支系。",
         static_modifiers=StatModifiers(atk_phys=0.05, agility=0.05, defense=0.0),
     ),
+}
+
+# One basic starting-equipment kit per synthetic subrace, so a scoped custom
+# activation hands out exactly what the synthetic kit declares instead of
+# falling back to a shipped per-subrace loadout.
+SYNTH_STARTING_KITS: dict[str, SubraceStartingKit] = {
+    kit.subrace_key: kit
+    for kit in (
+        SubraceStartingKit("t_duskmari_evensong", (("t_thorn_knife", 1),)),
+    )
 }
 
 SYNTH_NPC_TIERS: MappingProxyType[str, NPCTier] = MappingProxyType(
@@ -842,6 +887,7 @@ def _content_by_logical() -> dict[str, Callable[[], Mapping[str, object]]]:
         "races": lambda: SYNTH_RACES,
         "static_tiers": lambda: SYNTH_STATIC_TIERS,
         "subraces": lambda: SYNTH_SUBRACES,
+        "starting_kits": lambda: SYNTH_STARTING_KITS,
         "presets": lambda: SYNTH_PRESETS,
         "npc_tiers": lambda: SYNTH_NPC_TIERS,
         "monster_tiers": lambda: SYNTH_MONSTER_TIERS,
@@ -904,6 +950,7 @@ REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
     "races": ("world.lore.races", "RACE" + "_REGISTRY"),
     "static_tiers": ("world.lore.races", "STATIC_TIER" + "_REGISTRY"),
     "subraces": ("world.lore.races", "SUBRACE" + "_REGISTRY"),
+    "starting_kits": ("world.lore.starting_kits", "SUBRACE_STARTING_KIT" + "_REGISTRY"),
     "presets": ("world.lore.player_presets", "PLAYER_PRESET" + "_REGISTRY"),
     "npc_tiers": ("world.lore.npc_tiers", "NPC_TIER" + "_REGISTRY"),
     "monster_tiers": ("world.lore.monsters", "MONSTER_TIER" + "_REGISTRY"),

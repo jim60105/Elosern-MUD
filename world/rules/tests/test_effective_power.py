@@ -8,7 +8,9 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
+from world.skills.registry import SkillKind
 from world.rules.combat import effective_power
+from world.tests.synthetic_data import make_skill, synthetic_registries
 
 from .combat_fixtures import FakeEntity
 
@@ -49,17 +51,32 @@ class EffectivePowerTests(unittest.TestCase):
         self.assertGreater(effective_power(entity), before)
 
 
+_MIGHTY_PULSE = make_skill(
+    "t_mighty_pulse",
+    kind=SkillKind.PASSIVE,
+    effects=[
+        f"stat_multiply:{trait}:3.0"
+        for trait in ("atk_phys", "agility", "defense")
+    ],
+)
+
+
+@synthetic_registries(
+    "races", "skills", extra={"skills": {_MIGHTY_PULSE.key: _MIGHTY_PULSE}}
+)
 class EffectivePowerIntegrationTests(EvenniaTest):
     @covers_requirement("damage-effect-handlers::damage-reads-every-stat-through-effective-value-never-raw-entity-traits")
     def test_real_skill_handler_multiplier_changes_power_not_stored_trait(self):
         entity = create_object(PlayerCharacter, key="power")
-        entity.race = "human"
+        entity.race = "t_duskmari"
         entity.apply_race_baseline()
         entity.db.skills = {"active": [], "passive": []}
         stored_attack = entity.traits.atk_phys.value
         before = effective_power(entity)
+        # The kit's passive multiplies the summed stats through the real
+        # skill handler: power must rise while the stored trait stays put.
         entity.db.skills = {
-            "active": ["body_enhancement"],
+            "active": ["t_mighty_pulse"],
             "passive": [],
         }
         self.assertGreater(effective_power(entity), before)
