@@ -11,8 +11,6 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildStaff
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.lore.guild import GUILD_RANK_REGISTRY
-from world.quests.catalog import register_catalog
 from world.quests.runtime import QuestState, accept_quest, read_records
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
@@ -48,8 +46,26 @@ from world.rules.guild_offers import (
 )
 from world.rules.party import join_party
 from world.rules.surfaces import read_counter_trait
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.rules.tests._guild_service_probes import (
+    a_live_monster_tier_key,
+    live_guild_branch_registry,
+    rank_reward_band,
+    synthetic_branch_key,
+)
+from world.tests.synthetic_data import SYNTH_ITEMS
+from world.quests.tests._fixtures import register_catalog_once
 
-ALTORIA_BRANCH = "guild_branch_altoria"
+# The shipped affinity rulebook cross-references one catalog quest by key, so
+# the affinity-config loader needs the catalog definitions present in-process.
+# Registered at import (no synthetic scope is open yet), exactly as the other
+# catalog-riding suites do.
+register_catalog_once()
+
+# Board identity is the kit synthetic guild branch, and reward items are the
+# kit potion row -- no shipped content key is named anywhere below.
+ALTORIA_BRANCH = synthetic_branch_key()
+T_ITEM = SYNTH_ITEMS["t_ember_spray"].key
 
 
 def _attach_staff(npc) -> None:
@@ -58,7 +74,7 @@ def _attach_staff(npc) -> None:
     )
 
 
-def _offer(definition_key: str, copper: int = 50, merit: int = 25, items=("healing_potion",)) -> GuildQuestOffer:
+def _offer(definition_key: str, copper: int = 50, merit: int = 25, items=(T_ITEM,)) -> GuildQuestOffer:
     return GuildQuestOffer(
         definition_key=definition_key,
         issuer_branch_key=ALTORIA_BRANCH,
@@ -72,8 +88,9 @@ def _offer(definition_key: str, copper: int = 50, merit: int = 25, items=("heali
 
 class OfferRegistryIsolation(QuestRegistryIsolation):
     def setUp(self):
+        # Branch, item, and tier identities validate against the kit rows.
+        open_synthetic_scope(self, "guild_branches", "items", "monster_tiers")
         super().setUp()
-        register_catalog()
         self._offer_items = list(GUILD_OFFER_REGISTRY.items())
 
     def tearDown(self):
@@ -88,7 +105,7 @@ class OfferValidationTests(OfferRegistryIsolation, EvenniaTestCase):
         self.test_definition = register(
             quest(
                 "offer_test_quest",
-                stages=(QuestStage(0, defeat(tier="low")),),
+                stages=(QuestStage(0, defeat(tier=a_live_monster_tier_key())),),
             )
         )
 
@@ -143,7 +160,7 @@ class OfferValidationTests(OfferRegistryIsolation, EvenniaTestCase):
                 GuildQuestOffer(
                     self.test_definition.key,
                     ALTORIA_BRANCH,
-                    QuestReward(50, (ItemQuantity("healing_potion", 0),), 0),
+                    QuestReward(50, (ItemQuantity(T_ITEM, 0),), 0),
                 )
             )
 
@@ -155,30 +172,30 @@ class OfferValidationTests(OfferRegistryIsolation, EvenniaTestCase):
                     ALTORIA_BRANCH,
                     QuestReward(
                         50,
-                        (ItemQuantity("healing_potion", 1), ItemQuantity("healing_potion", 1)),
+                        (ItemQuantity(T_ITEM, 1), ItemQuantity(T_ITEM, 1)),
                         0,
                     ),
                 )
             )
 
     def test_out_of_band_copper_is_rejected(self):
-        f_rank = GUILD_RANK_REGISTRY["F"]
-        for out in (f_rank.reward_min_copper - 1, f_rank.reward_max_copper + 1):
+        floor, ceiling = rank_reward_band("F")
+        for out in (floor - 1, ceiling + 1):
             with self.subTest(copper=out):
                 with self.assertRaises(GuildOfferError):
                     register_guild_offer(_offer(self.test_definition.key, copper=out, items=()))
 
     @covers_requirement("guild-quest-board::guildquestoffer-is-immutable-and-validated-against-quest-guild-item-and-branch-registries")
     def test_s_rank_open_upper_bound_is_honored(self):
-        s_rank = GUILD_RANK_REGISTRY["S"]
+        s_floor, _ = rank_reward_band("S")
         s_definition = register(
             quest(
                 "s_rank_quest",
                 rank="S",
-                stages=(QuestStage(0, defeat(tier="calamity")),),
+                stages=(QuestStage(0, defeat(tier=a_live_monster_tier_key())),),
             )
         )
-        large = _offer(s_definition.key, copper=s_rank.reward_min_copper + 1, items=())
+        large = _offer(s_definition.key, copper=s_floor + 1, items=())
         register_guild_offer(large)  # No upper cap invented for S.
         self.assertIn((s_definition.key, ALTORIA_BRANCH), GUILD_OFFER_REGISTRY)
 
@@ -186,9 +203,6 @@ class OfferValidationTests(OfferRegistryIsolation, EvenniaTestCase):
 class BoardAccessTests(OfferRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
-        from world.rules.guild_config import load_guild_catalog, register_catalog_offers
-
-        register_catalog_offers(load_guild_catalog(QUEST_DEFINITION_REGISTRY))
         self.hall = create_object(Room, key="hall")
         self.staff = create_object(NPC, key="staff", location=self.hall)
         _attach_staff(self.staff)
@@ -197,22 +211,30 @@ class BoardAccessTests(OfferRegistryIsolation, EvenniaTestCase):
         self.player.apply_race_baseline()
         self.player.location = self.hall
         register_adventurer(self.player, self.staff)
+        # A locally-issued F-rank offer stands in for any catalog row.
+        self.board_quest = register(
+            quest(
+                "board_f_quest",
+                stages=(QuestStage(0, defeat(tier=a_live_monster_tier_key())),),
+            )
+        )
+        register_guild_offer(_offer(self.board_quest.key, copper=50, items=()))
 
     def test_f_member_sees_only_local_f_offers(self):
-        # The catalog registers the introductory hunt at the Altoria branch.
+        # Only the branch-local F-rank offer is listed for a fresh F member.
         self.assertEqual(
             [o.definition_key for o in list_guild_offers(self.player, self.staff)],
-            ["introductory_hunt"],
+            [self.board_quest.key],
         )
 
     @covers_requirement("guild-quest-board::guild-boards-expose-only-local-rank-eligible-offers")
     def test_true_exceptional_power_does_not_bypass_rank(self):
-        e_definition = register(quest("e_rank_quest", rank="E", stages=(QuestStage(0, defeat(tier="low")),)))
+        e_definition = register(quest("e_rank_quest", rank="E", stages=(QuestStage(0, defeat(tier=a_live_monster_tier_key())),)))
         register_guild_offer(_offer(e_definition.key, copper=100))
         self.player.traits.atk_phys.base = 88
         self.assertEqual(
             [o.definition_key for o in list_guild_offers(self.player, self.staff)],
-            ["introductory_hunt"],
+            [self.board_quest.key],
         )
 
     def test_unregistered_actor_is_rejected(self):
@@ -225,15 +247,15 @@ class BoardAccessTests(OfferRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("affinity-system::deterministic-gains-apply-at-talk-trade-and-guild-success-paths")
     def test_eligible_offer_creates_normal_quest_record(self):
-        record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        record = accept_guild_offer(self.player, self.staff, self.board_quest.key)
         self.assertEqual(record.state, QuestState.IN_PROGRESS)
-        self.assertEqual(record.definition_key, "introductory_hunt")
+        self.assertEqual(record.definition_key, self.board_quest.key)
         # Registration granted +1; acceptance grants another +1.
         self.assertEqual(self.staff.relations.affinity_for(self.player), 2)
 
     @covers_requirement("guild-quest-board::board-acceptance-and-abandonment-delegate-to-quest-lifecycle")
     def test_over_rank_direct_acceptance_is_rejected_before_quest_mutation(self):
-        e_definition = register(quest("e_rank_quest", rank="E", stages=(QuestStage(0, defeat(tier="low")),)))
+        e_definition = register(quest("e_rank_quest", rank="E", stages=(QuestStage(0, defeat(tier=a_live_monster_tier_key())),)))
         register_guild_offer(_offer(e_definition.key, copper=100))
         before = [dict(e) for e in (self.player.db.quest_log or [])]
         before_affinity = self.staff.relations.affinity_for(self.player)
@@ -245,7 +267,7 @@ class BoardAccessTests(OfferRegistryIsolation, EvenniaTestCase):
         )
 
     def test_abandonment_delegates_to_quest_runtime(self):
-        record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        record = accept_guild_offer(self.player, self.staff, self.board_quest.key)
         failed = abandon_guild_quest(self.player, self.staff, record.quest_id)
         self.assertEqual(failed.state, QuestState.FAILED)
         self.assertEqual(failed.failure_reason, "abandoned")
@@ -266,7 +288,7 @@ class BoardAccessTests(OfferRegistryIsolation, EvenniaTestCase):
 
         with patch("django.db.transaction.atomic", return_value=FakeAtomic()):
             with self.assertRaises(RuntimeError):
-                accept_guild_offer(self.player, self.staff, "introductory_hunt")
+                accept_guild_offer(self.player, self.staff, self.board_quest.key)
         self.assertEqual([dict(e) for e in (self.player.db.quest_log or [])], quest_log_before)
         self.assertEqual(self.staff.db.relations_data, relations_before)
 
@@ -278,7 +300,7 @@ class BoardAccessTests(OfferRegistryIsolation, EvenniaTestCase):
             side_effect=RuntimeError("affinity write failed"),
         ):
             with self.assertRaises(RuntimeError):
-                accept_guild_offer(self.player, self.staff, "introductory_hunt")
+                accept_guild_offer(self.player, self.staff, self.board_quest.key)
         self.assertEqual([dict(e) for e in (self.player.db.quest_log or [])], quest_log_before)
         self.assertEqual(self.staff.db.relations_data, relations_before)
 
@@ -286,7 +308,7 @@ class BoardAccessTests(OfferRegistryIsolation, EvenniaTestCase):
 class BoardAcceptanceIssuerKeyTests(OfferRegistryIsolation, EvenniaTestCase):
     """Board acceptance names the issuing branch as the record's issuer key."""
 
-    SECOND_BRANCH = "guild_branch_second"
+    SECOND_BRANCH = "t_second_branch"
 
     def setUp(self):
         super().setUp()
@@ -299,26 +321,28 @@ class BoardAcceptanceIssuerKeyTests(OfferRegistryIsolation, EvenniaTestCase):
         self.player.location = self.hall
         register_adventurer(self.player, self.staff_a)
         self.definition = register(
-            quest("branch_issuer_quest", stages=(QuestStage(0, defeat(tier="low")),))
+            quest("branch_issuer_quest", stages=(QuestStage(0, defeat(tier=a_live_monster_tier_key())),))
         )
 
     def _inject_second_branch(self) -> None:
-        """A second branch, host, and offer for the same definition."""
-        from world.lore.guild import GUILD_BRANCH_REGISTRY, GuildBranch
+        """A second invented branch, host, and offer for the same definition."""
+        from world.lore.guild import GuildBranch
 
-        branch_items = list(GUILD_BRANCH_REGISTRY.items())
+        registry = live_guild_branch_registry()
+        branch_items = list(registry.items())
         self.addCleanup(
             lambda: (
-                GUILD_BRANCH_REGISTRY.clear(),
-                GUILD_BRANCH_REGISTRY.update(branch_items),
+                registry.clear(),
+                registry.update(branch_items),
             )
         )
-        GUILD_BRANCH_REGISTRY[self.SECOND_BRANCH] = GuildBranch(
+        registry[self.SECOND_BRANCH] = GuildBranch(
             self.SECOND_BRANCH,
             "埃洛西恩冒險者公會 第二分會",
             "測試會長",
             "測試分會會長",
-            "capital_altoria",
+            # Branch anchors are free-form identities on this invented row.
+            "t_hollow_tarn",
         )
         self.staff_b = create_object(NPC, key="staff b", location=self.hall)
         self.staff_b.components.add(
@@ -370,7 +394,6 @@ class BoardAcceptanceIssuerKeyTests(OfferRegistryIsolation, EvenniaTestCase):
 class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
-        self._definition_key = "introductory_hunt"
         self.hall = create_object(Room, key="hall")
         self.staff = create_object(NPC, key="turnin staff", location=self.hall)
         _attach_staff(self.staff)
@@ -379,12 +402,25 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
         self.player.apply_race_baseline()
         self.player.location = self.hall
         register_adventurer(self.player, self.staff)
-        from world.rules.guild_config import load_guild_catalog
-
-        catalog_offer = load_guild_catalog(
-            QUEST_DEFINITION_REGISTRY
-        ).offer_by_definition["introductory_hunt"]
-        register_guild_offer(catalog_offer)
+        # An invented settlement quest with an invented reward: 50 copper,
+        # 25 merit, and two of the kit potion (the atomic-acquire test relies
+        # on the quantity; every number here is the fixture's own).
+        self._definition = register(
+            quest(
+                "settlement_quest",
+                stages=(QuestStage(0, defeat(tier=a_live_monster_tier_key())),),
+            )
+        )
+        self._definition_key = self._definition.key
+        register_guild_offer(
+            GuildQuestOffer(
+                definition_key=self._definition.key,
+                issuer_branch_key=ALTORIA_BRANCH,
+                reward=QuestReward(
+                    copper=50, items=(ItemQuantity(T_ITEM, 2),), merit=25
+                ),
+            )
+        )
 
     def _complete(self, acceptance: int = 1) -> str:
         from world.quests.runtime import fulfill_record
@@ -417,7 +453,7 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
         self.assertEqual(result["merit"], 25)
         self.assertEqual(self.player.db.wallet, 50)
         self.assertEqual(read_counter_trait(self.player, "guild_merit"), 25)
-        self.assertIn("healing_potion", self.player.db.inventory)
+        self.assertIn(T_ITEM, self.player.db.inventory)
         self.assertEqual(parse_reward_claims(self.player), [quest_id])
 
     def test_duplicate_turn_in_pays_nothing(self):
@@ -448,7 +484,7 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
 
     def test_no_completed_record_is_rejected(self):
         with self.assertRaises(RewardClaimError) as ctx:
-            turn_in_quest(self.player, self.staff, "introductory_hunt:99")
+            turn_in_quest(self.player, self.staff, self._definition_key + ":99")
         self.assertEqual(ctx.exception.args[0], RewardClaim.NO_COMPLETED_RECORD)
 
     def test_unregistered_actor_is_rejected(self):
@@ -468,7 +504,7 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
         acquire_def = register(
             quest(
                 "potions_please",
-                stages=(QuestStage(0, _acquire("healing_potion", quantity=2)),),
+                stages=(QuestStage(0, _acquire(T_ITEM, quantity=2)),),
             )
         )
         accept(self.player, acquire_def.key)
@@ -493,7 +529,7 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
         self.assertEqual(result["copper"], 50)
         self.assertEqual(self.player.db.wallet, 50)
         self.assertEqual(read_counter_trait(self.player, "guild_merit"), 25)
-        self.assertIn("healing_potion", self.player.db.inventory)
+        self.assertIn(T_ITEM, self.player.db.inventory)
         self.assertEqual(parse_reward_claims(self.player), [quest_id])
         self.assertEqual(first.relations.affinity_for(self.player), 2)
         self.assertEqual(second.relations.affinity_for(self.player), 2)
@@ -624,12 +660,20 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-reward-settlement::the-first-ever-reward-claim-grants-the-starter-epithet-atomically")
     def test_first_ever_claim_grants_the_starter_epithet(self):
-        from world.rules.titles import compose_full_title, read_title_state
+        from world.rules.titles import (
+            compose_full_title,
+            compose_title,
+            read_title_state,
+        )
 
+        registered_title = compose_full_title(self.player)
         quest_id = self._complete()
         result = turn_in_quest(self.player, self.staff, quest_id)
         self.assertEqual(result["title_notifications"], ["獲得異名：南門新客"])
-        self.assertEqual(compose_full_title(self.player), "F級冒險者　南門新客")
+        self.assertEqual(
+            compose_full_title(self.player),
+            compose_title(registered_title, "南門新客"),
+        )
         collection, equipped = read_title_state(self.player)
         epithets = [entry for entry in collection if entry["kind"] == "epithet"]
         self.assertEqual([entry["display"] for entry in epithets], ["南門新客"])
@@ -658,7 +702,8 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
         quest_id = self._complete()
         # Prime the in-process title read path so the post-failure assertions
         # distinguish a stale attribute cache from a real rollback.
-        self.assertEqual(compose_full_title(self.player), "F級冒險者")
+        registered_title = compose_full_title(self.player)
+        self.assertTrue(registered_title)
         parsed_before = read_title_state(self.player)
         raw_before = (
             self.player.db.title_collection,
@@ -679,25 +724,29 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
             raw_before,
         )
         self.assertEqual(read_title_state(self.player), parsed_before)
-        self.assertEqual(compose_full_title(self.player), "F級冒險者")
+        self.assertEqual(compose_full_title(self.player), registered_title)
         self.assertEqual(parse_reward_claims(self.player), [])
 
     @covers_requirement("quest-reward-settlement::the-first-ever-reward-claim-grants-the-starter-epithet-atomically")
     def test_the_grant_is_definition_independent(self):
-        from world.rules.titles import compose_full_title
+        from world.rules.titles import compose_full_title, compose_title
 
         side = register(
             quest(
                 "first_claim_side_quest",
-                stages=(QuestStage(0, defeat(tier="low")),),
+                stages=(QuestStage(0, defeat(tier=a_live_monster_tier_key())),),
             )
         )
         register_guild_offer(_offer(side.key))
         self._definition_key = side.key
+        registered_title = compose_full_title(self.player)
         quest_id = self._complete()
         result = turn_in_quest(self.player, self.staff, quest_id)
         self.assertEqual(result["title_notifications"], ["獲得異名：南門新客"])
-        self.assertEqual(compose_full_title(self.player), "F級冒險者　南門新客")
+        self.assertEqual(
+            compose_full_title(self.player),
+            compose_title(registered_title, "南門新客"),
+        )
 
 
 class RewardClaimsParsingTests(QuestRegistryIsolation, EvenniaTestCase):

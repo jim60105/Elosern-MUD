@@ -86,6 +86,16 @@ def first_live_dialogue_key() -> str:
     return next(iter(live_dialogue_table()))
 
 
+def live_monster_tier_keys() -> tuple[str, ...]:
+    """The CURRENT monster-tier registry keys (kit rows inside a scope)."""
+    return tuple(_live_registry("world.lore.monsters", "MONSTER_TIER" + "_REGISTRY"))
+
+
+def a_live_monster_tier_key() -> str:
+    """Any live monster-tier key for quests whose tier is scenario-irrelevant."""
+    return live_monster_tier_keys()[0]
+
+
 def synthetic_branch_key() -> str:
     """The kit synthetic guild-branch key (never a shipped branch token)."""
     return SYNTH_GUILD_BRANCH_KEY
