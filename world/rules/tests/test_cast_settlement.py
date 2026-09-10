@@ -34,6 +34,7 @@ from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.progression import SKILL_PRACTICE_XP_PER_USE, reset_practice_dedupe
 from world.rules.surfaces import attribute_snapshot
 from world.rules.targeting import RoomActionContext
+from world.skills.effects import DamageEffect
 from world.skills.registry import SKILL_REGISTRY, SkillKind, TargetSpec
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
@@ -422,7 +423,12 @@ class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
     """Every ACTIVE out-of-combat catalog skill stages effects only within the
     settlement's snapshot superset (task 3.7)."""
 
-    ACTIVE_OUT_OF_COMBAT_SKILLS = (
+    #: The catalog the settlement was first written for. skill-field-
+    #: availability (change #3) made every non-damage ACTIVE skill usable
+    #: outside combat, so the reachable set is derived from the registry
+    #: below (coverage must grow with the catalog); this literal stays as a
+    #: pin that the original settlement catalog is still present.
+    DECLARED_SETTLEMENT_CATALOG = (
         "status_disguise",
         "dominion_art",
         "divine_sexual_arts",
@@ -433,13 +439,30 @@ class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
         *sorted(SEXUAL_ACT_REGISTRY),
     )
 
-    def test_catalog_actives_are_exactly_the_declared_seven(self):
-        actives = {
-            key: skill
+    #: The ACTIVE skills whose out-of-combat cast actually reaches
+    #: ``settle_out_of_combat_cast``: usable outside combat AND carrying no
+    #: ``DamageEffect`` — the damaging-action gate (skill-field-availability,
+    #: change #3) rejects a damage-carrying cast in a room context before
+    #: settlement, so damage skills are selectable but never settle here.
+    ACTIVE_OUT_OF_COMBAT_SKILLS = tuple(
+        sorted(
+            key
             for key, skill in SKILL_REGISTRY.items()
-            if skill.kind is SkillKind.ACTIVE and skill.usable_out_of_combat
-        }
-        self.assertEqual(set(actives), set(self.ACTIVE_OUT_OF_COMBAT_SKILLS))
+            if skill.kind is SkillKind.ACTIVE
+            and skill.usable_out_of_combat
+            and not any(
+                isinstance(effect, DamageEffect) for effect in skill.parsed_effects
+            )
+        )
+    )
+
+    def test_registry_reachable_set_contains_the_declared_catalog(self):
+        self.assertEqual(
+            set(self.DECLARED_SETTLEMENT_CATALOG)
+            - set(self.ACTIVE_OUT_OF_COMBAT_SKILLS),
+            set(),
+            "the original settlement catalog must stay settlement-reachable",
+        )
 
     @covers_requirement("cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces")
     def test_every_skill_stages_effects_only_within_the_superset(self):

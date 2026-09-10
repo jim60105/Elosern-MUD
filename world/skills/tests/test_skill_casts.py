@@ -9,8 +9,10 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.elements import ELEMENT_REGISTRY
+from world.rules.tests.combat_fixtures import grant_lineage
 from world.rules.action import ActionRequest, ActionResolver, RejectReason
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.targeting import RoomActionContext
 from world.skills.effects import (
     BuffApplyEffect,
     DamageEffect,
@@ -187,3 +189,51 @@ class EarthHardenedSkinCastTests(EvenniaTestCase):
                             BuffApplyEffect(buff_key=effect_id.partition(":")[2]),
                         )
                     self.assertIn(parsed, skill.parsed_effects)
+
+
+class FieldDamageSelectionTests(EvenniaTestCase):
+    """``usable_out_of_combat`` governs selection; the damaging-action gate
+    governs resolution (skill-field-availability, design D-7)."""
+
+    def setUp(self):
+        super().setUp()
+        from typeclasses.rooms import Room
+
+        self.room = create_object(Room, key="field room")
+        self.actor = create_object(PlayerCharacter, key="field selector")
+        self.actor.race = "human"
+        self.actor.apply_race_baseline()
+        self.actor.location = self.room
+        # fire_ball sits behind fire_arrow Lv.3 in the lineage; grant the
+        # whole chain so the ownership step reaches the gates under test.
+        grant_lineage(self.actor, ["fire_arrow", "fire_ball", "basic_attack"])
+
+    @covers_requirement(
+        "skill-registry::every-skill-declares-usable-out-of-combat-deliberately-under-one-written-policy"
+    )
+    def test_newly_permitted_damage_spell_is_selectable_but_never_resolves(self):
+        skill = SKILL_REGISTRY["fire_ball"]
+        self.assertTrue(skill.usable_out_of_combat)
+        mp_before = self.actor.traits.mp.value
+        result = ActionResolver.resolve(
+            ActionRequest(
+                self.actor, "fire_ball", [self.actor], RoomActionContext(self.room)
+            )
+        )
+        # The flag gate lets the cast through to the damaging-action gate,
+        # which rejects before any MP is deducted or effect is staged.
+        self.assertEqual(result.outcome, "rejected")
+        self.assertIs(result.reason, RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET)
+        self.assertEqual(self.actor.traits.mp.value, mp_before)
+
+    @covers_requirement(
+        "skill-registry::every-skill-declares-usable-out-of-combat-deliberately-under-one-written-policy"
+    )
+    def test_flee_still_reports_the_flag_rejection_outside_combat(self):
+        result = ActionResolver.resolve(
+            ActionRequest(
+                self.actor, "flee", [self.actor], RoomActionContext(self.room)
+            )
+        )
+        self.assertEqual(result.outcome, "rejected")
+        self.assertIs(result.reason, RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT)

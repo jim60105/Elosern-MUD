@@ -86,11 +86,24 @@ class InnateSkillTests(EvenniaTest):
         self.assertEqual(skill.kind, SkillKind.ACTIVE)
         self.assertEqual(skill.target_spec, TargetSpec.SINGLE)
         self.assertEqual(skill.cost, {})
-        self.assertFalse(skill.usable_out_of_combat)
+        # D-7 (field-combat initiation): the flag governs SELECTION only, so
+        # basic_attack is selectable from exploration as the field-combat
+        # initiation; the damaging-action gate keeps it unable to resolve
+        # without a battlefield.
+        self.assertTrue(skill.usable_out_of_combat)
         self.assertTrue(any(e.startswith("damage:") for e in skill.effects))
 
-    def test_basic_attack_rejects_out_of_combat(self):
+    @covers_requirement(
+        "universal-action-ownership::innate-skill-keys-makes-flee-and-basic-attack-ownable-by-every-livingentity-regardless-of-import-or-spawn-data"
+    )
+    @covers_requirement(
+        "skill-registry::every-skill-declares-usable-out-of-combat-deliberately-under-one-written-policy"
+    )
+    def test_basic_attack_selectable_out_of_combat_but_damage_gated(self):
         player = _player()
+        player.location = create_object(Room, key="bare room")
+        mp_before = player.traits.mp.value
+        hp_before = player.traits.hp.value
         request = ActionRequest(
             player,
             "basic_attack",
@@ -101,7 +114,12 @@ class InnateSkillTests(EvenniaTest):
         )
         result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "rejected")
-        self.assertEqual(result.reason, RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT)
+        # The usable_out_of_combat gate no longer rejects it (it is
+        # deliberately selectable outside combat); the damaging-action gate
+        # rejects instead, before any resource or damage step.
+        self.assertEqual(result.reason, RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET)
+        self.assertEqual(player.traits.mp.value, mp_before)
+        self.assertEqual(player.traits.hp.value, hp_before)
 
 class EngageTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
