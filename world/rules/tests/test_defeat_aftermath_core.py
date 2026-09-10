@@ -26,6 +26,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 import world.rules.defeat_aftermath as defeat_aftermath_module
 from world.rules import combat_session as combat_session_module
 from world.rules import clock as clock_module
+from world.rules import guild_config as guild_config_module
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.components import Merchant
@@ -36,7 +37,13 @@ from world.maps.wilderness_provider import (
     ElosernWildernessMapProvider,
 )
 from world.rules.caravan_arrivals import register_caravan_arrivals
-from world.rules.guild_config import load_catalog_into_cache
+from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+from world.rules.tests._guild_service_probes import (
+    install_synthetic_catalog,
+    synth_catalog,
+    synth_offer_rule,
+    synth_shop_config,
+)
 from world.quests.binding import bind_stage_runtime
 from world.quests.definitions import QuestStage
 from world.quests.tests._fixtures import (
@@ -50,6 +57,7 @@ from world.rules.affinity import apply_affinity_change
 from world.rules.buffs import entity_active_buffs, tick_buffs
 from world.rules.clock import MAX_ADVANCE_SECONDS, AdvanceSource, WorldClock
 from world.rules.combat_session import (
+    BASIC_ATTACK_KEY,
     engage,
     forfeit,
     restore_active_session,
@@ -69,7 +77,71 @@ from world.rules.time_skip import advance_skip, seconds_to_full_regen
 from world.rules.surfaces import read_counter_trait, write_counter_trait
 from tools.spec_traceability import covers_requirement
 
-from ._combat_session_helpers import BattlefieldIsolation, _monster, _player
+from ._combat_session_helpers import (
+    BattlefieldIsolation,
+    _monster,
+    _player,
+    open_synthetic_scope,
+)
+from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SHOPS
+
+
+# Synthetic restock fixture (data independence): the kit shop identity over
+# two kit items. The restock hour/quantities/caps are authored here, so the
+# restock expectations below name their own numbers.
+_T_SHOP = next(iter(SYNTH_SHOPS))
+_T_POTION = "t_ember_spray"
+_T_BLADE = "t_iron_fang"
+assert _T_POTION in SYNTH_ITEMS and _T_BLADE in SYNTH_ITEMS
+_T_SHOP_RESTOCK_HOUR = 6
+_T_POTION_STOCK_BEFORE = 3
+_T_POTION_RESTOCKED = 5
+_T_POTION_REACHED = _T_POTION_STOCK_BEFORE + 2  # restock_quantity 2, cap 5
+
+
+def _synthetic_restock_catalog():
+    return synth_catalog(
+        shop_configs={
+            _T_SHOP: synth_shop_config(
+                _T_SHOP,
+                (_T_POTION, _T_BLADE),
+                restock_hour=_T_SHOP_RESTOCK_HOUR,
+                offer_rules=(
+                    synth_offer_rule(
+                        _T_POTION,
+                        max_stock=_T_POTION_REACHED,
+                        initial_stock=_T_POTION_STOCK_BEFORE,
+                        restock_quantity=2,
+                    ),
+                    synth_offer_rule(_T_BLADE, max_stock=1, initial_stock=1, restock_quantity=1),
+                ),
+            )
+        }
+    )
+
+
+def _isolate_synthetic_catalog(test):
+    """Swap the process-global guild catalog for the synthetic one.
+
+    The recovery advance's caravan-arrival settlement reads it through the
+    owner module, so production resolves only synthetic shop rows. Restores
+    both the catalog and the offer registry through cleanup.
+    """
+    previous_catalog = guild_config_module.CATALOG
+    previous_offers = list(GUILD_OFFER_REGISTRY.items())
+    test.addCleanup(
+        lambda: (
+            setattr(guild_config_module, "CATALOG", previous_catalog),
+            GUILD_OFFER_REGISTRY.clear(),
+            GUILD_OFFER_REGISTRY.update(previous_offers),
+        )
+    )
+    return install_synthetic_catalog(test, _synthetic_restock_catalog())
+
+
+def _attack(player, target):
+    """Submit the player's innate attack (runtime key, never a literal)."""
+    return submit_player_action(player, BASIC_ATTACK_KEY, [target])
 
 
 class DefeatAftermathBase(BattlefieldIsolation, EvenniaTestCase):
@@ -95,7 +167,7 @@ class DefeatAftermathBase(BattlefieldIsolation, EvenniaTestCase):
         """Drive one hostile defeat settlement through ``forfeit``."""
         engage(self.player, target or self.monster)
         with patch("world.rules.combat.roll_d100", return_value=1):
-            submit_player_action(self.player, "basic_attack", [target or self.monster])
+            _attack(self.player, target or self.monster)
         return forfeit(self.player)
 
 
@@ -591,9 +663,10 @@ class RecoveryWindowClockCausalityTests(
     # altoria_general_store restocks at day-1 06:00 = 108000. The defeat at
     # tick 107990 spends 6s of combat and 8s of recovery, so exactly that one
     # boundary falls inside the recovery window (107996, 108004].
-    RESTOCK_TICK = 86400 + 6 * 3600
+    RESTOCK_TICK = 86400 + _T_SHOP_RESTOCK_HOUR * 3600
 
     def setUp(self):
+        open_synthetic_scope(self, "items", "prices", "shops")
         super().setUp()
         self.setUp_wilderness()
         clock_patcher = patch(
@@ -602,16 +675,16 @@ class RecoveryWindowClockCausalityTests(
         clock_patcher.start()
         self.addCleanup(clock_patcher.stop)
         self.isolate_event_sources(register_caravan_arrivals, sync_quest_runtime)
-        load_catalog_into_cache()
+        _isolate_synthetic_catalog(self)
         store = create_object(Room, key="window store")
         merchant_npc = create_object(NPC, key="window merchant", location=store)
         self.merchant = Merchant.create(
             merchant_npc,
-            service_id="merchant",
-            shop_key="altoria_general_store",
+            service_id="t_synthetic_merchant",
+            shop_key=_T_SHOP,
         )
         merchant_npc.components.add(self.merchant)
-        self.merchant.merchant_stock = {"meal": 20, "healing_potion": 3, "plain_sword": 1}
+        self.merchant.merchant_stock = {_T_POTION: _T_POTION_STOCK_BEFORE, _T_BLADE: 1}
         self.merchant.last_restock_day = 0
 
     def _manifest(self):
@@ -643,9 +716,9 @@ class RecoveryWindowClockCausalityTests(
         self.assertEqual(len(stored), 1)
         self.assertEqual(stored[0]["state"], "failed")
         self.assertEqual(stored[0]["failure_reason"], "deadline_expired")
-        self.assertEqual(self.merchant.merchant_stock["healing_potion"], 5)
+        self.assertEqual(self.merchant.merchant_stock[_T_POTION], _T_POTION_RESTOCKED)
         self.assertEqual(self.merchant.last_restock_day, 1)
-        self.assertEqual(self.merchant.merchant_stock["meal"], 20)
+        self.assertEqual(self.merchant.merchant_stock[_T_BLADE], 1)
         after = {family: extract() for family, extract in self._manifest().items()}
         self.assertEqual(after, before)
 
@@ -970,6 +1043,7 @@ class RollbackTests(
     """Rollback injection after the writer's last write (tasks 6.2, D-C5)."""
 
     def setUp(self):
+        open_synthetic_scope(self, "items", "prices", "shops")
         super().setUp()
         self.setUp_wilderness()
         self._mark_population_monster(self.monster)
@@ -983,7 +1057,7 @@ class RollbackTests(
     def test_persist_failure_rolls_back_the_whole_aftermath_and_retry_settles_once(self):
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=1):
-            submit_player_action(self.player, "basic_attack", [self.monster])
+            _attack(self.player, self.monster)
         saved_pk = self.monster.pk
         hp_after_round = self.player.traits.hp.current
         quest_log_before = [dict(e) for e in (self.player.db.quest_log or [])]
@@ -1034,21 +1108,21 @@ class RollbackTests(
                 return False
 
         self.isolate_event_sources(register_caravan_arrivals, sync_quest_runtime)
-        load_catalog_into_cache()
+        _isolate_synthetic_catalog(self)
         store = create_object(Room, key="rollback store")
         merchant_npc = create_object(NPC, key="rollback merchant", location=store)
         merchant = Merchant.create(
             merchant_npc,
-            service_id="merchant",
-            shop_key="altoria_general_store",
+            service_id="t_synthetic_merchant",
+            shop_key=_T_SHOP,
         )
         merchant_npc.components.add(merchant)
-        merchant.merchant_stock = {"meal": 20, "healing_potion": 3, "plain_sword": 1}
+        merchant.merchant_stock = {_T_POTION: _T_POTION_STOCK_BEFORE, _T_BLADE: 1}
         merchant.last_restock_day = 0
 
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=1):
-            submit_player_action(self.player, "basic_attack", [self.monster])
+            _attack(self.player, self.monster)
         hp_after_round = self.player.traits.hp.current
         saved_marker = self.monster.db.population_key
         collected: list = []
@@ -1069,7 +1143,7 @@ class RollbackTests(
         # had already restocked.
         self.assertEqual(self.player.traits.hp.current, hp_after_round)
         self.assertNotIn("defeat_weak", entity_active_buffs(self.player))
-        self.assertEqual(merchant.merchant_stock["healing_potion"], 3)
+        self.assertEqual(merchant.merchant_stock[_T_POTION], _T_POTION_STOCK_BEFORE)
         self.assertEqual(merchant.last_restock_day, 0)
         self.assertEqual(self.monster.db.population_key, saved_marker)
         # Retry: the wake state and the advance are reproduced. The restock
@@ -1082,7 +1156,7 @@ class RollbackTests(
         self.assertEqual(self.player.traits.hp.current, 5)
         self.assertEqual(self.clock.tick, 108010)
         self.assertEqual(merchant.last_restock_day, 1)
-        self.assertEqual(merchant.merchant_stock["healing_potion"], 5)
+        self.assertEqual(merchant.merchant_stock[_T_POTION], _T_POTION_RESTOCKED)
 
     @covers_requirement(
         "defeat-aftermath-core::the-defeat-aftermath-joins-the-round-s-atomic-persistence-unit"
@@ -1100,7 +1174,7 @@ class RollbackTests(
         collected: list = []
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=1):
-            submit_player_action(self.player, "basic_attack", [self.monster])
+            _attack(self.player, self.monster)
         saved_pk = self.monster.pk
         saved_marker = self.monster.db.population_key
         hp_after_round = self.player.traits.hp.current
@@ -1148,7 +1222,7 @@ class RollbackTests(
             patch("world.rules.combat.roll_d100", return_value=1),
             self.assertRaises(RuntimeError),
         ):
-            submit_player_action(self.player, "basic_attack", [self.monster])
+            _attack(self.player, self.monster)
         # The armed undo ran inside _submit_request's except: the winner and
         # its marker/bookkeeping survived the outer rollback.
         self.assertEqual(self.monster.pk, saved_pk)
