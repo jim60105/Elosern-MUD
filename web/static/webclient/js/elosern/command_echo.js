@@ -193,6 +193,27 @@
       var fallback = label(display && display.waitLabel);
       return fallback;
     },
+    // Declared practice books the typed `rest <seconds>s practice <skill>`
+    // line (commands/skip.py CmdRest: `rest <duration> [practice <skill>]`).
+    // The skill key is a whitespace-free bounded key (the registry's
+    // validate_practice_payload) and the rest form converts whole hours to
+    // whole seconds, so the echoed line is byte-replayable. A malformed
+    // local payload stays silent rather than echoing a non-replayable line.
+    "explore.practice": function (payload) {
+      var skill = payload && payload.skill;
+      var seconds = payload && payload.seconds;
+      if (!isNonEmpty(skill) || /\s/.test(skill)) {
+        return null;
+      }
+      if (
+        typeof seconds !== "number" ||
+        !Number.isInteger(seconds) ||
+        seconds < 0
+      ) {
+        return null;
+      }
+      return join(["rest", String(seconds) + "s", "practice", skill]);
+    },
     // Exit traversal has no `move` command; the exit's server label is the
     // documented action description, never a guessed command.
     "explore.move": function (payload, display) {

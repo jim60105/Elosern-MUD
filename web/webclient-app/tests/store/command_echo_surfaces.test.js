@@ -533,6 +533,17 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "wait until dusk",
     },
     {
+      id: "skill book: practice screen dispatch (payload-only)",
+      ids: ["explore.practice"],
+      prepare() {
+        openExploration();
+        // The practice screen intent (AppClient.onPractice forwards the
+        // RestForm's {skill, seconds}; the echo replays the typed rest line).
+        store.dispatchAction("explore.practice", { skill: "firebolt", seconds: 3600 });
+      },
+      expected: "rest 3600s practice firebolt",
+    },
+    {
       id: "guild rows: register / abandon / turnin / track / exam (payload-only)",
       ids: ["guild.register", "guild.quest_abandon", "guild.quest_turnin", "guild.quest_track", "guild.exam_start"],
       prepare() {

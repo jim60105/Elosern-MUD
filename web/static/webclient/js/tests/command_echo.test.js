@@ -133,6 +133,31 @@ test("explore.wait sleep resolves to sleep", () => {
   assert.strictEqual(Echo.commandLine("explore.wait", { sleep: true }, {}), "sleep");
 });
 
+test("explore.practice resolves to rest <n>s practice <skill>", () => {
+  assert.strictEqual(
+    Echo.commandLine("explore.practice", { skill: "firebolt", seconds: 3600 }, {}),
+    "rest 3600s practice firebolt"
+  );
+});
+
+test("explore.practice stays silent on malformed local payloads", () => {
+  // A malformed payload must never echo a non-replayable line: the skill key
+  // is whitespace-free and the duration is a whole number of seconds.
+  assert.strictEqual(Echo.commandLine("explore.practice", { seconds: 3600 }, {}), null);
+  assert.strictEqual(
+    Echo.commandLine("explore.practice", { skill: "wind lance", seconds: 3600 }, {}),
+    null
+  );
+  assert.strictEqual(
+    Echo.commandLine("explore.practice", { skill: "firebolt", seconds: 3.5 }, {}),
+    null
+  );
+  assert.strictEqual(
+    Echo.commandLine("explore.practice", { skill: "firebolt", seconds: -1 }, {}),
+    null
+  );
+});
+
 test("explore.move has no typed command and emits the exit label", () => {
   assert.strictEqual(
     Echo.commandLine(
@@ -612,6 +637,7 @@ const REGISTERED_MUTATION_ACTIONS = {
   "explore.party_leave": { payload: { npc_id: "bard" }, display: { npcLabel: "吟遊詩人" } },
   "explore.possess": { payload: { npc_id: "bard" }, display: { npcLabel: "吟遊詩人" } },
   "explore.possess_release": { payload: { npc_id: "bard" }, display: {} },
+  "explore.practice": { payload: { skill: "firebolt", seconds: 3600 }, display: {} },
   "explore.talk_freeform": { payload: { npc_id: "bard", speech: "你好" }, display: { npcLabel: "吟遊詩人" } },
   "explore.talk_scripted": { payload: { npc_id: "bard", keyword_id: "guild" }, display: { npcLabel: "吟遊詩人", keywordLabel: "公會" } },
   "explore.wait": { payload: { daypart: "dusk" }, display: {} },

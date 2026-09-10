@@ -21,6 +21,7 @@
     "explore.party_leave",
     "explore.possess",
     "explore.possess_release",
+    "explore.practice",
     "explore.talk_freeform",
     "explore.talk_scripted",
     "explore.wait",
