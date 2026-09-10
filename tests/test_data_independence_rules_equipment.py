@@ -23,6 +23,7 @@ from pathlib import Path
 import unittest
 
 from tools import test_data_lint
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -65,6 +66,10 @@ class RulesEquipmentTestDataMigrationContractTests(unittest.TestCase):
         self.ledger, fatal = test_data_lint.load_ledger(test_data_lint.REPO_ROOT)
         self.assertEqual(fatal, [], "ledger must load cleanly")
 
+    @covers_requirement(
+        "test-data-independence::"
+        "equipment-and-item-behavior-tests-resolve-game-data-through-synthetic-fixtures"
+    )
     def test_contract_file_stays_registered_and_never_debt(self):
         debt = set(self.ledger["debt"])
         contract = {entry["path"] for entry in self.ledger["contract"]}
@@ -77,6 +82,10 @@ class RulesEquipmentTestDataMigrationContractTests(unittest.TestCase):
             f"{CONTRACT_FILE} lost its contract registration",
         )
 
+    @covers_requirement(
+        "test-data-independence::"
+        "equipment-and-item-behavior-tests-resolve-game-data-through-synthetic-fixtures"
+    )
     def test_migrated_files_hold_no_ledger_exemption(self):
         debt = set(self.ledger["debt"])
         contract = {entry["path"] for entry in self.ledger["contract"]}
@@ -84,6 +93,10 @@ class RulesEquipmentTestDataMigrationContractTests(unittest.TestCase):
             self.assertNotIn(path, debt, f"{path} reintroduced into debt")
             self.assertNotIn(path, contract, f"{path} registered as contract")
 
+    @covers_requirement(
+        "test-data-independence::"
+        "equipment-and-item-behavior-tests-resolve-game-data-through-synthetic-fixtures"
+    )
     def test_migrated_files_carry_zero_findings(self):
         universe = test_data_lint.derive_universe(test_data_lint.REPO_ROOT)
         for path in BEHAVIOR_FILES:

@@ -10,11 +10,16 @@ naming a manifest file is removed. Exemptions owned by other changes under the s
 directories are outside this requirement. Converted assertions SHALL establish the
 mechanics named by the OpenSpec requirements they annotate; an assertion that merely
 echoes synthetic-fixture content is not a passing conversion.
+One manifest file whose assertions are exclusively shipped-content buffs.yaml row
+bindings (the one-test-per-key correspondence owner) is exempted by atomic
+debt-to-contract conversion under the exemption ledger's seeded-classification rule:
+it leaves the `debt` list and joins the registered `contract` list in the same commit,
+and the migrated behavior suites carry no shipped-content reference on its behalf.
 
 #### Scenario: Area passes the gate with zero debt exemptions
 - **WHEN** `uv run --locked python -m tools.test_data_lint check` runs after the migration
-- **THEN** no flagged test file remains among this change's migrated files, and no
-  freeze-list entry names a migrated file
+- **THEN** no flagged test file remains among this change's migrated behavior files, and
+  no freeze-list `debt` entry names a migrated file
 
 #### Scenario: Suite is green on synthetic data
 - **WHEN** the focused suites for the migrated files run on the retained-database Evennia
