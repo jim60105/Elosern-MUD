@@ -25,7 +25,7 @@ from typeclasses.monsters import Monster
 # during a scoped monster defeat would validate them against synthetic rows.
 import world.rules.defeat_aftermath  # noqa: F401
 
-from world.skills.registry import TargetSpec
+from world.skills.registry import FactionConstraint, SkillCategory, TargetSpec
 from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
 
 from .combat_fixtures import BattlefieldIsolation
@@ -102,16 +102,38 @@ def synth_innate_overlay() -> dict[str, dict[str, object]]:
     ``world.rules.disengage.FLEE_SKILL_KEY``): the resolver rejects anything
     else as ``UNKNOWN_SKILL`` and the player handler treats exactly those
     keys as universal. A synthetic skills scope therefore MUST carry rows
-    under those runtime keys, carrying their shipped definitions — built
-    content (targeting, cost, effect kinds) is what the surrounding flows
-    exercise, so the rows are read from the live registry BEFORE the scope
-    patches it (attribute-string resolution per the ``_live_registry``
-    precedent). The keys arrive as runtime values, never literals.
+    under those runtime keys. The rows themselves are SYNTHETIC: built from
+    the kit's martial template under the runtime-derived keys (keys arrive as
+    runtime values, never literals), with only the minimal shape the innate
+    paths exercise — a zero-cost ANY-faction physical single-target strike
+    and a zero-cost self-target disengage. No shipped definition row is
+    copied.
     """
     basic_key = _live_registry("world.rules.combat_session", "BASIC_ATTACK_KEY")
     flee_key = _live_registry("world.rules.disengage", "FLEE_SKILL_KEY")
-    registry = _live_registry("world.skills.registry", "SKILL_REGISTRY")
-    rows = {key: registry[key] for key in (basic_key, flee_key) if key in registry}
+    template = SYNTH_SKILLS["t_cinder_cleave"]
+    element_key = SYNTH_SKILLS["t_ember_burst"].element.key
+    rows = {
+        basic_key: replace(
+            template,
+            key=basic_key,
+            label="合成基本攻擊",
+            description="以合成武技對單一目標造成物理傷害。",
+            faction_constraint=FactionConstraint.ANY,
+            effects=[f"damage:{element_key}:physical"],
+        ),
+        flee_key: replace(
+            template,
+            key=flee_key,
+            label="合成逃跑",
+            description="嘗試脫離當前戰鬥的合成身法。",
+            target_spec=TargetSpec.SELF,
+            faction_constraint=FactionConstraint.SELF_ONLY,
+            usable_out_of_combat=False,
+            effects=["disengage:self"],
+            category=SkillCategory.MOVEMENT,
+        ),
+    }
     return {"skills": rows}
 
 

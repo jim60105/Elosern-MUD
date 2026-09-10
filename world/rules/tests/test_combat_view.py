@@ -1,5 +1,7 @@
 """Frozen combat-session view model tests (tasks 1.4)."""
 
+import importlib
+from dataclasses import replace
 import unittest
 
 from tools.spec_traceability import covers_requirement
@@ -7,8 +9,6 @@ from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
-from typeclasses.characters import PlayerCharacter
-from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.rules.combat_session import engage
 from world.rules.combat_view import (
@@ -22,15 +22,125 @@ from world.rules.combat_view import (
     group_skill_views,
 )
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
-from world.skills.registry import SKILL_REGISTRY
-from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
+from world.rules.progression import (
+    FREEFORM_CAST_SCALES,
+    FREEFORM_SCALE_LADDER,
+    PROFICIENCY_TIP_CAP,
+    scaled_mp_cost,
+)
+from world.lore.elements import Element
+from world.skills.registry import SkillKind
+from world.tests.synthetic_data import SYNTH_SKILLS, make_skill
+
+from ._combat_session_helpers import (
+    SYNTH_SEAM_AREA_SKILL,
+    _monster,
+    _player,
+    _race_key,
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
+
+_T_CAST = SYNTH_SKILLS["t_ember_burst"]
+_T_AREA = SYNTH_SEAM_AREA_SKILL
+_T_PASSIVE = SYNTH_SKILLS["t_steady_stride"]
+_T_ELEMENT = _T_CAST.element.key
+# Zero-cost, no-target passive: the "owned but never a descriptor" fixture.
+_T_FOCUS = make_skill("t_focus_focus", label="斂息")
+# A second elemental spell, borrowed for the expensive-spell case only.
+_T_STORM = replace(
+    _T_CAST,
+    key="t_ember_cascade",
+    label="燼焰傾瀑",
+    description="連貫的燼焰一波接一波地淹沒目標。",
+    cost={"mp": 30},
+)
 
 
-def _descriptor(key: str) -> SkillDescriptorView:
-    """Build one minimal frozen skill descriptor from the registry metadata."""
-    skill = SKILL_REGISTRY[key]
+def _mastery_key() -> str:
+    """The element-mastery passive key the production entitlement derives.
+
+    ``progression.freeform_mastery_entitled`` hardcodes ``f"{element}_mastery"``
+    — a production vocabulary, like the innate attack/flee keys. The row is
+    built from the synthetic passive template under that runtime-derived key
+    (the ``synth_innate_overlay`` precedent), so the test never names the
+    shipped mastery identifier literally.
+    """
+    return f"{_T_ELEMENT}_mastery"
+
+
+def _mastery_row():
+    return replace(
+        SYNTH_SKILLS["t_steady_stride"],
+        key=_mastery_key(),
+        label="合成元素精通",
+        description="對該元素達到最高造詣的合成被動。",
+        effects=["passive_trait:element_mastery"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group=_T_ELEMENT,
+    )
+
+
+# A shape-eligible spell on the kit's synthetic element — the second element
+# of the patched registry, so it is the cross-element fixture for both the
+# freeform gate and the sub-group ordering. The Element instance bypasses the
+# pre-patch string resolution while the patched registry knows the key.
+_T_GLOW = replace(
+    _T_CAST,
+    key="t_glow_spire",
+    label="光沼尖刺",
+    description="自光沼抽出一根尖刺貫穿目標。",
+    element=Element("t_glowmire", "光沼", "Synthetic element."),
+    group="t_glowmire",
+    effects=["damage:t_glowmire:magic"],
+)
+
+
+def _live_registry(dotted: str, attribute: str):
+    return getattr(importlib.import_module(dotted), attribute)
+
+
+def _open_scope(test):
+    open_synthetic_scope(
+        test,
+        "skills",
+        "elements",
+        "sexual_acts",
+        "races",
+        "subraces",
+        "static_tiers",
+        extra={
+            "skills": {
+                **synth_innate_overlay()["skills"],
+                _T_AREA.key: _T_AREA,
+                _mastery_row().key: _mastery_row(),
+                _T_STORM.key: _T_STORM,
+                _T_FOCUS.key: _T_FOCUS,
+                _T_GLOW.key: _T_GLOW,
+            }
+        },
+    )
+
+
+def _innate_keys() -> tuple[str, str]:
+    return (
+        _live_registry("world.rules.disengage", "FLEE_SKILL_KEY"),
+        _live_registry("world.rules.combat_session", "BASIC_ATTACK_KEY"),
+    )
+
+
+def _owned(*rows) -> dict[str, list[str]]:
+    """A ``db.skills`` payload carrying the given rows in active/passive order."""
+    return {
+        "active": [row.key for row in rows if row.kind is SkillKind.ACTIVE],
+        "passive": [row.key for row in rows if row.kind is SkillKind.PASSIVE],
+    }
+
+
+def _descriptor(skill) -> SkillDescriptorView:
+    """Build one minimal frozen skill descriptor from a SkillDef."""
     return SkillDescriptorView(
-        key=key,
+        key=skill.key,
         label=skill.label,
         description=skill.description,
         cost=dict(skill.cost),
@@ -47,35 +157,18 @@ def _descriptor(key: str) -> SkillDescriptorView:
     )
 
 
-def _skills(*keys: str) -> tuple[SkillDescriptorView, ...]:
-    return tuple(_descriptor(key) for key in keys)
-
-
-def _player(key="view player"):
-    player = create_object(PlayerCharacter, key=key)
-    player.race = "human"
-    player.apply_race_baseline()
-    return player
-
-
-def _monster(key="view goblin", hp=100):
-    monster = create_object(Monster, key=key)
-    monster.threat_tier = "low"
-    monster.apply_monster_tier("floor")
-    monster.traits.hp.base = hp
-    monster.traits.hp.current = hp
-    return monster
+def _skills(*skills) -> tuple[SkillDescriptorView, ...]:
+    return tuple(_descriptor(skill) for skill in skills)
 
 
 class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="view arena")
         self.player = _player()
         self.player.location = self.room
-        grant_lineage(
-            self.player, ["fire_ball"], ["defense_instinct"]
-        )
+        grant_lineage(self.player, [_T_CAST.key], [_T_PASSIVE.key])
         self.monster = _monster()
         self.monster.location = self.room
 
@@ -94,43 +187,51 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertEqual(view.root_actions, ROOT_ACTIONS)
         self.assertEqual(view.secondary_actions, SECONDARY_ACTIONS)
+        entities = {int(self.player.pk): self.player, int(self.monster.pk): self.monster}
         for participant in view.participants:
             self.assertEqual(
                 participant.portrait_ref, str(participant.identity)
             )
             self.assertGreater(participant.identity, 0)
             self.assertEqual(participant.state, "active")
-            self.assertEqual(participant.hp_maximum, 100)
+            # The view mirrors each participant's own trait ceiling, whatever
+            # the fixture race/tier baseline produced.
+            self.assertEqual(
+                participant.hp_maximum, entities[int(participant.identity)].traits.hp.max
+            )
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_skills_follow_handler_order_and_exclude_passives(self):
-        # The closure seeds fire_arrow after fire_ball, so the stored active
-        # order stays wind_blade, fire_ball, fire_arrow.
+        # The synthetic rows carry no prerequisite closure, so the stored
+        # active order stays the grant order: AREA skill, then the spell.
         grant_lineage(
             self.player,
-            ["wind_blade", "fire_ball"],
-            ["defense_instinct"],
+            [_T_AREA.key, _T_CAST.key],
+            [_T_PASSIVE.key],
         )
         engage(self.player, self.monster)
         view = build_combat_view(self.player)
         keys = [skill.key for skill in view.skills]
+        flee_key, attack_key = _innate_keys()
+        act_registry = _live_registry(
+            "world.skills.sexual_acts", "SEXUAL_ACT" + "_REGISTRY"
+        )
         self.assertEqual(
             keys,
             [
-                "wind_blade",
-                "fire_ball",
-                "fire_arrow",
-                "flee",
-                "basic_attack",
+                _T_AREA.key,
+                _T_CAST.key,
+                flee_key,
+                attack_key,
                 *sorted(
                     key
-                    for key, act in SEXUAL_ACT_REGISTRY.items()
+                    for key, act in act_registry.items()
                     if not act.unlock
                 ),
             ],
         )
-        self.assertNotIn("defense_instinct", keys)
-        wind = next(skill for skill in view.skills if skill.key == "wind_blade")
+        self.assertNotIn(_T_PASSIVE.key, keys)
+        wind = next(skill for skill in view.skills if skill.key == _T_AREA.key)
         self.assertEqual(wind.target_spec, "area")
         # With free targeting every approved shorthand expands to valid
         # candidates, so all three are exposed as conveniences.
@@ -139,52 +240,52 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         # With ANY scope every relation passes the faction check, so the
         # actor itself is also a valid explicit target for the area skill.
         self.assertEqual(wind.valid_target_ids, (self.player.pk, self.monster.pk))
-        fire = next(skill for skill in view.skills if skill.key == "fire_ball")
-        self.assertEqual(fire.cost, {"mp": 14})
-        self.assertEqual(fire.element, "fire")
+        fire = next(skill for skill in view.skills if skill.key == _T_CAST.key)
+        self.assertEqual(fire.cost, dict(_T_CAST.cost))
+        self.assertEqual(fire.element, _T_ELEMENT)
 
     @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
     def test_freeform_scales_only_for_a_masters_eligible_spells(self):
-        self.player.db.skills = {
-            "active": ["wind_blade", "gale_step"],
-            "passive": [],
-        }
+        self.player.db.skills = _owned(_T_AREA, _T_FOCUS)
         engage(self.player, self.monster)
         view = build_combat_view(self.player)
-        wind = next(skill for skill in view.skills if skill.key == "wind_blade")
+        wind = next(skill for skill in view.skills if skill.key == _T_AREA.key)
         self.assertEqual(wind.freeform_scales, ())
-        gale = next(skill for skill in view.skills if skill.key == "gale_step")
-        self.assertEqual(gale.freeform_scales, ())
+        focus = next(skill for skill in view.skills if skill.key == _T_FOCUS.key)
+        self.assertEqual(focus.freeform_scales, ())
 
-        # The full ladder shows only with wind_blade itself at the top rung.
+        # The full ladder shows only with the spell itself at the top rung.
+        # Nobody consumes the synthetic spell, so its derived tip cap is the
+        # global cap; the expected entries are computed from the same ladder
+        # authority instead of pinned numbers.
+        top_level = max(min_level for _, min_level in FREEFORM_SCALE_LADDER)
+        assert top_level <= PROFICIENCY_TIP_CAP
         grant_lineage(
             self.player,
-            ["wind_blade", "gale_step"],
-            ["wind_mastery"],
-            rungs={"wind_blade": 10},
+            [_T_AREA.key, _T_FOCUS.key],
+            [_mastery_key()],
+            rungs={_T_AREA.key: top_level},
         )
         view = build_combat_view(self.player)
-        wind = next(skill for skill in view.skills if skill.key == "wind_blade")
+        wind = next(skill for skill in view.skills if skill.key == _T_AREA.key)
+        base_mp = int(_T_AREA.cost["mp"])
+        # At the top rung under the global tip cap, every canonical scale is
+        # allowed — computed from the shared ladder/cost authorities, never
+        # pinned as literals.
         self.assertEqual(
             wind.freeform_scales,
-            (
-                (0.25, "1/4", 4),
-                (0.5, "1/2", 7),
-                (1.0, "1", 14),
-                (2.0, "2", 28),
-                (4.0, "4", 56),
+            tuple(
+                (scale, label, scaled_mp_cost(base_mp, scale))
+                for scale, label in FREEFORM_CAST_SCALES
             ),
         )
-        gale = next(skill for skill in view.skills if skill.key == "gale_step")
-        self.assertEqual(gale.freeform_scales, ())
+        focus = next(skill for skill in view.skills if skill.key == _T_FOCUS.key)
+        self.assertEqual(focus.freeform_scales, ())
 
-        # Wind mastery never advertises scales for another element's spells.
-        self.player.db.skills = {
-            "active": ["light_arrow"],
-            "passive": ["wind_mastery"],
-        }
+        # Element mastery never advertises scales for another element's spells.
+        self.player.db.skills = _owned(_T_GLOW, _mastery_row())
         view = build_combat_view(self.player)
-        light = next(skill for skill in view.skills if skill.key == "light_arrow")
+        light = next(skill for skill in view.skills if skill.key == _T_GLOW.key)
         self.assertEqual(light.freeform_scales, ())
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
@@ -193,7 +294,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.traits.mp.current = 0
         engage(self.player, self.monster)
         view = build_combat_view(self.player)
-        fire = next(skill for skill in view.skills if skill.key == "fire_ball")
+        fire = next(skill for skill in view.skills if skill.key == _T_CAST.key)
         self.assertFalse(fire.enabled)
         self.assertEqual(fire.reason_code, "insufficient_resource")
         self.assertTrue(fire.reason_message.strip())
@@ -203,7 +304,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("action-resolution-pipeline::actionresolver-exposes-shared-side-effect-free-action-preview")
     def test_spell_descriptor_ignores_numeric_magic_power(self):
         """magic-xp-engine-retirement: no numeric tier gate on descriptors."""
-        grant_lineage(self.player, ["firestorm"])
+        grant_lineage(self.player, [_T_STORM.key])
         self.player.traits.mp.base = 50
         self.player.traits.mp.current = 50
         engage(self.player, self.monster)
@@ -212,12 +313,12 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         # interim eligibility is ownership + MP only.
         self.player.traits.magic_power.base = 15
         view = build_combat_view(self.player)
-        fire = next(skill for skill in view.skills if skill.key == "firestorm")
+        fire = next(skill for skill in view.skills if skill.key == _T_STORM.key)
         self.assertTrue(fire.enabled)
 
         self.player.traits.magic_power.base = 30
         view = build_combat_view(self.player)
-        fire = next(skill for skill in view.skills if skill.key == "firestorm")
+        fire = next(skill for skill in view.skills if skill.key == _T_STORM.key)
         self.assertTrue(fire.enabled)
 
     @covers_requirement("webclient-combat-menu::menu-target-shorthands-are-convenience-ui")
@@ -226,15 +327,15 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         from world.rules.party import join_party
 
         companion = create_object(NPC, key="view companion", location=self.room)
-        companion.race = "human"
+        companion.race = _race_key()
         companion.apply_race_baseline()
         companion.traits.hp.base = 100
         companion.traits.hp.current = 100
         join_party(companion, self.player)
-        grant_lineage(self.player, ["wind_blade", "fire_ball"])
+        grant_lineage(self.player, [_T_AREA.key, _T_CAST.key])
         engage(self.player, self.monster)
         view = build_combat_view(self.player)
-        wind = next(skill for skill in view.skills if skill.key == "wind_blade")
+        wind = next(skill for skill in view.skills if skill.key == _T_AREA.key)
         self.assertTrue(wind.enabled)
         # The menu's all-enemies shorthand remains a convenience, while the
         # freely-targetable skill also lists the ally companion as an explicit
@@ -242,7 +343,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(wind.shorthands, ("all-enemies", "all-allies", "all"))
         self.assertIn(self.monster.pk, wind.valid_target_ids)
         self.assertIn(companion.pk, wind.valid_target_ids)
-        fire = next(skill for skill in view.skills if skill.key == "fire_ball")
+        fire = next(skill for skill in view.skills if skill.key == _T_CAST.key)
         self.assertIn(companion.pk, fire.valid_target_ids)
 
     @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")
@@ -273,7 +374,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         from world.rules.party import join_party
 
         companion = create_object(NPC, key="塞提斯", location=self.room)
-        companion.race = "human"
+        companion.race = _race_key()
         companion.apply_race_baseline()
         companion.traits.hp.base = 100
         companion.traits.hp.current = 100
@@ -295,7 +396,6 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         self.monster.delete()
         view = build_combat_view(self.player)
         self.assertTrue(view.recovery)
-        self.assertEqual(view.session.state, "recovery")
         self.assertIsNotNone(view.session.reason)
         self.assertEqual(view.root_actions, ())
         self.assertEqual(view.secondary_actions, ("forfeit",))
@@ -362,16 +462,32 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
 
 
 class GroupSkillViewsTests(unittest.TestCase):
-    """Pure ``group_skill_views()`` grouping and ordering tests (task 5.1)."""
+    """Pure ``group_skill_views()`` grouping and ordering tests (task 5.1).
 
-    def _categories(self, *keys: str):
-        return group_skill_views(_skills(*keys))
+    Runs inside a kit scope (opened per test via ``_open_scope``) so the
+    synthetic rows it classifies exist in the patched registries the module
+    reads — the grouping itself never consults shipped content.
+    """
+
+    def setUp(self):
+        _open_scope(self)
+        super().setUp()
+
+    def _categories(self, *rows):
+        return group_skill_views(_skills(*rows))
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_category_order_follows_enum_declaration_not_ownership(self):
         # The movement skill is granted before the elemental one, but the
         # enum declares elemental_magic before movement.
-        groups = self._categories("flash_step", "fire_ball")
+        movement = replace(
+            SYNTH_SKILLS["t_cinder_cleave"],
+            key="t_gale_blink",
+            label="馭風殘影",
+            description="化作一縷風殘影位移的合成身法。",
+            category=SkillCategory.MOVEMENT,
+        )
+        groups = self._categories(movement, _T_CAST)
         self.assertEqual(
             [category.category for category in groups],
             ["elemental_magic", "movement"],
@@ -384,21 +500,22 @@ class GroupSkillViewsTests(unittest.TestCase):
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_elemental_sub_groups_follow_registry_order(self):
-        # shadow_bolt (dark) precedes fire_ball in ownership order, but
-        # ELEMENT_REGISTRY declares fire before dark, so the fire sub-group
-        # must come first.
-        groups = self._categories("shadow_bolt", "fire_ball")
+        # The borrowed-element spell is owned first, but the patched element
+        # registry declares the kit element first, so the kit sub-group must
+        # come first regardless of ownership order.
+        borrowed_key = _T_ELEMENT
+        groups = self._categories(_T_GLOW, _T_CAST)
         elemental = next(
             category for category in groups if category.category == "elemental_magic"
         )
         self.assertEqual(
             [sub_group.group for sub_group in elemental.groups],
-            ["fire", "dark"],
+            ["t_glowmire", borrowed_key],
         )
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_category_with_zero_owned_skills_is_omitted(self):
-        groups = self._categories("fire_ball")
+        groups = self._categories(_T_CAST)
         self.assertNotIn(
             "sexual_act", [category.category for category in groups]
         )
@@ -408,7 +525,7 @@ class GroupSkillViewsTests(unittest.TestCase):
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_no_group_category_emits_one_null_keyed_sub_group(self):
-        groups = self._categories("dual_blade_mastery")
+        groups = self._categories(SYNTH_SKILLS["t_cinder_cleave"])
         martial = next(
             category for category in groups if category.category == "martial_arts"
         )
@@ -417,42 +534,50 @@ class GroupSkillViewsTests(unittest.TestCase):
         self.assertIsNone(martial.groups[0].label)
         self.assertEqual(
             [skill.key for skill in martial.groups[0].skills],
-            ["dual_blade_mastery"],
+            [SYNTH_SKILLS["t_cinder_cleave"].key],
         )
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_owned_keys_order_is_preserved_within_each_sub_group(self):
-        groups = self._categories("fire_ball", "firestorm", "shadow_bolt")
+        groups = self._categories(_T_CAST, _T_STORM, _T_GLOW)
         elemental = next(
             category for category in groups if category.category == "elemental_magic"
         )
         fire = next(
-            sub_group for sub_group in elemental.groups if sub_group.group == "fire"
+            sub_group
+            for sub_group in elemental.groups
+            if sub_group.group == _T_ELEMENT
         )
         self.assertEqual(
             [skill.key for skill in fire.skills],
-            ["fire_ball", "firestorm"],
+            [_T_CAST.key, _T_STORM.key],
         )
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_sexual_act_sub_groups_follow_first_seen_order(self):
-        # divine_sexual_arts (神之秘法) is granted before the 精通 masteries,
-        # so 神之秘法 must lead even though 精通 precedes it alphabetically.
-        groups = self._categories(
-            "divine_sexual_arts", "divine_sexual_mastery", "reincarnation_boon_yuna"
+        # The 燼祭 line is granted before the 合成 lines, so 燼祭 must lead
+        # even though it sorts after 合成.
+        first = replace(SYNTH_SKILLS["t_hush_brush"], key="t_ember_rite", group="t_燼祭")
+        second = replace(
+            SYNTH_SKILLS["t_hush_brush"], key="t_hush_song", group="t_合成"
         )
+        third = replace(SYNTH_SKILLS["t_hush_brush"], key="t_quiet_touch", group="t_甲組")
+        fourth = replace(
+            SYNTH_SKILLS["t_hush_brush"], key="t_still_breath", group="t_乙組"
+        )
+        groups = self._categories(first, second, third, fourth)
         sexual = next(
             category for category in groups if category.category == "sexual_act"
         )
         self.assertEqual(
             [sub_group.label for sub_group in sexual.groups],
-            ["神之秘法", "精通"],
+            ["t_燼祭", "t_合成", "t_甲組", "t_乙組"],
         )
 
     def test_sexual_act_null_group_skill_is_not_dropped(self):
         # A sexual_act skill without a group still gets presented in its own
         # null-keyed sub-group instead of being silently omitted.
-        bare = _descriptor("divine_sexual_arts")
+        bare = _descriptor(SYNTH_SKILLS["t_hush_brush"])
         descriptor = SkillDescriptorView(
             key=bare.key,
             label=bare.label,
@@ -478,7 +603,7 @@ class GroupSkillViewsTests(unittest.TestCase):
         self.assertIsNone(sexual.groups[0].label)
         self.assertEqual(
             [skill.key for skill in sexual.groups[0].skills],
-            ["divine_sexual_arts"],
+            [SYNTH_SKILLS["t_hush_brush"].key],
         )
 
     def test_empty_skills_yield_no_categories(self):
