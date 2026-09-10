@@ -37,6 +37,7 @@ from world.rules.combat_session import (
     read_session,
     reconstruct_battlefield,
     submit_player_action,
+    submit_opening_action,
 )
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.party import AUTO_LEAVE_MESSAGE, PartyWriteError, join_party, party_ids
@@ -508,10 +509,12 @@ class SnapshotFriendlyFireTests(FriendlyFireBase):
 
 
 class OverwhelmCompressionTests(FriendlyFireBase):
-    """Task 3.4 supplement: overwhelm compression resolves all raw rounds
-    before the single friendly-fire scan; the compressed logs keep the
-    player's own action damage, so the same per-hit penalty and auto-leave
-    contracts hold through the compression."""
+    """Task 3.4 supplement under the opening seam: overwhelm compression
+    resolves all raw rounds before the single friendly-fire scan; the
+    compressed logs keep the player's own action damage, so the same per-hit
+    penalty and auto-leave contracts hold through the compression.
+    (combat-session-opening-dispatch: compression is reachable only via
+    ``submit_opening_action()``, so the test opens through that seam.)"""
 
     @covers_requirement("affinity-friendly-fire::player-combat-actions-that-damage-companion-npcs-apply-a-per-hit-affinity-penalty")
     @covers_requirement("affinity-friendly-fire::the-scan-penalties-and-auto-leave-commit-atomically-with-the-round")
@@ -524,8 +527,14 @@ class OverwhelmCompressionTests(FriendlyFireBase):
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000
         engage(self.player, self.monster)
-        with patch.object(self.player, "msg") as msg:
-            result = self._run_hit("wind_blade", [companion])
+        with (
+            patch.object(self.player, "msg") as msg,
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.action.roll_d100", return_value=100),
+        ):
+            result = submit_opening_action(
+                self.player, "wind_blade", [companion, self.monster]
+            )
         self.assertEqual(result["outcome"], "victory")
         self.assertEqual(companion.relations.affinity_for(self.player), 69)
         self.assertNotIn(int(companion.pk), party_ids(self.player))

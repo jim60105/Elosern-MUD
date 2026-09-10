@@ -4,16 +4,17 @@ One JSON-safe ``CombatSessionRecord`` lives under
 ``PlayerCharacter.db.active_combat`` and stores participant dbrefs plus
 fled/knockout identity and the accumulated round count -- never live objects.
 ``engage`` creates a session and waits for player input; each preflight-valid
-player action drives exactly one ordinary round (or the resolver-backed
-overwhelm compression), and the accumulated round time settles exactly once at
-a terminal outcome through ``settle_combat_result``.
+player action drives exactly one ordinary round -- compression is reachable
+only through ``submit_opening_action``, the sole sanctioned requester -- and
+the accumulated round time settles exactly once at a terminal outcome through
+``settle_combat_result``.
 """
 
 import time
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Literal
 
 from evennia.objects.models import ObjectDB
 
@@ -40,7 +41,11 @@ from world.rules.combat import (
 from world.rules.clock import get_world_clock, read_world_clock, settle_combat_result
 from world.rules.items import ItemUseRequest, preflight_item_use
 from world.rules.monster_behaviour import monster_behaviour_policy
-from world.rules.overwhelm import classify_overwhelm, resolve_overwhelm
+from world.rules.overwhelm import (
+    classify_overwhelm,
+    commanded_damage_reaches_enemy,
+    resolve_overwhelm,
+)
 from world.rules.progression import (
     restore_practice_dedupe,
     snapshot_practice_dedupe,
@@ -600,23 +605,62 @@ def clear_session(
 def engage(actor: Any, target: Any) -> dict[str, Any]:
     """Create one persistent hostile session for a present living monster.
 
-    Validates a PlayerCharacter with no active session and a living hostile
-    ``Monster`` in the same room. Every bound companion that is co-located,
-    living, and not knocked out joins the session's allied team in
-    deterministic party order (party-combat D-1). Registers the reconstructed
-    battlefield with skip safety and records the initial overwhelm
-    classification, but runs no action before the player chooses one.
+    Thin single-target wrapper (combat-session-opening-dispatch D-4): every
+    step lives in :func:`engage_group`, so ``engage``'s signature, return
+    shape, and raised ``CombatSessionError`` reasons are unchanged for its
+    existing call sites.
+    """
+    return engage_group(actor, [target])
+
+
+def engage_group(actor: Any, targets: Any) -> dict[str, Any]:
+    """Create one persistent hostile session against several present monsters.
+
+    Carries every step single-target engagement performed before this change
+    (combat-session-opening-dispatch D-4): the PlayerCharacter check, the
+    no-active-session check, the per-target living-hostile-``Monster``-in-room
+    checks in their established order and reasons, ``combat_companions()``
+    collection, record construction with one dbref per supplied target in
+    deterministic (sorted-pk) order, battlefield reconstruction, persistence,
+    skip-safety registration, and dialogue clearing. Any single invalid
+    target rejects the whole group before anything is persisted or
+    registered, and a repeated target dbref is rejected as
+    ``DUPLICATE_PARTICIPANT``. The informational ``classify_overwhelm``
+    verdict is computed once over the complete multi-enemy roster and is
+    never consulted for dispatch here (single-shot-resolution): engagement
+    runs no action before the player chooses one.
     """
     if not isinstance(actor, PlayerCharacter):
         raise CombatSessionError(SessionReason.NOT_A_PLAYER)
     if read_session(actor) is not None:
         raise CombatSessionError(SessionReason.ALREADY_IN_COMBAT)
-    if not isinstance(target, Monster):
-        raise CombatSessionError(SessionReason.NOT_HOSTILE)
-    if actor.location is None or target.location is not actor.location:
-        raise CombatSessionError(SessionReason.NOT_PRESENT)
-    if _stored_trait_value(target.traits.hp) <= 0:
-        raise CombatSessionError(SessionReason.TARGET_DEAD)
+    if isinstance(targets, (str, bytes)) or not hasattr(targets, "__iter__"):
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "engage_group requires a sequence of targets",
+        )
+    targets = list(targets)
+    if not targets:
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "engage_group requires at least one target",
+        )
+    seen_pks: set[Any] = set()
+    for target in targets:
+        pk = getattr(target, "pk", None)
+        if pk is not None and pk in seen_pks:
+            raise CombatSessionError(
+                SessionReason.DUPLICATE_PARTICIPANT,
+                f"target dbref {pk} is supplied more than once",
+            )
+        seen_pks.add(pk)
+    for target in targets:
+        if not isinstance(target, Monster):
+            raise CombatSessionError(SessionReason.NOT_HOSTILE)
+        if actor.location is None or target.location is not actor.location:
+            raise CombatSessionError(SessionReason.NOT_PRESENT)
+        if _stored_trait_value(target.traits.hp) <= 0:
+            raise CombatSessionError(SessionReason.TARGET_DEAD)
 
     from world.rules.party import combat_companions
 
@@ -628,7 +672,7 @@ def engage(actor: Any, target: Any) -> dict[str, Any]:
         mode="hostile",
         room_id=int(actor.location.pk),
         player_ids=(int(actor.pk), *companions),
-        enemy_ids=(int(target.pk),),
+        enemy_ids=tuple(sorted(int(target.pk) for target in targets)),
         fled_ids=(),
         knocked_out_ids=(),
         rounds_elapsed=0,
@@ -995,7 +1039,7 @@ def submit_player_action(
     targets_or_shorthand: list[Any] | str,
     scale: float = 1.0,
 ) -> dict[str, Any]:
-    """Run one ordinary round (or overwhelm compression) for one player action.
+    """Run one ordinary round for one player action.
 
     ``targets_or_shorthand`` is either a concrete list of live participant
     objects or one approved AREA shorthand (``all-enemies``, ``all-allies``,
@@ -1006,10 +1050,51 @@ def submit_player_action(
     gate forbids rejects before initiative and consumes no round or world
     time. The facade revalidates the
     submitted target value through the shared side-effect-free preview, runs
-    ``ActionResolver.preflight()``, and only then starts one round (or the
-    resolver-backed overwhelm compression). A rejection returns before
-    initiative and consumes no round or world time.
+    ``ActionResolver.preflight()``, and only then starts exactly one ordinary
+    round -- whatever ``classify_overwhelm()`` decides for the session. A
+    submission made inside an already-active session never compresses;
+    compression is reachable only by opening a fight from exploration through
+    ``submit_opening_action()`` (combat-session-opening-dispatch D-1/D-2). A
+    rejection returns before initiative and consumes no round or world time.
     """
+    record, battlefield, request, rejection = _preflight_skill_submission(
+        submit_player_action, actor, skill_key, targets_or_shorthand, scale=scale
+    )
+    if rejection is not None:
+        return rejection
+    return _submit_request(
+        actor,
+        record,
+        battlefield,
+        request,
+        commanded_kind="skill",
+        commanded_key=skill_key,
+    )
+
+
+def _preflight_skill_submission(
+    entry: Any,
+    actor: Any,
+    skill_key: str,
+    targets_or_shorthand: list[Any] | str,
+    scale: float = 1.0,
+) -> tuple[CombatSessionRecord, Battlefield, "ActionRequest | None", "dict[str, Any] | None"]:
+    """Shared session read, reconstruction, preview, and resolver preflight.
+
+    ``submit_player_action()`` and ``submit_opening_action()`` run the
+    identical side-effect-free validation through this one body (combat-
+    session-opening-dispatch D-2): session presence, reconstruction
+    freshness, recovery validity, target-shape and roster-membership
+    rejection, ``revalidate_submission()``, and ``ActionResolver.preflight()``.
+    Returns ``(record, battlefield, request, rejection)``; ``rejection`` is
+    the caller-returnable rejection dict when validation stopped the
+    submission, else ``None`` (and then ``request`` is built and
+    preflight-approved). Raises ``TypeError`` for a non-list/non-shorthand
+    target value and ``CombatSessionError`` for a missing session, invalid
+    recovery, or an off-roster target, naming the public ``entry`` in the
+    shape message.
+    """
+    name = getattr(entry, "__name__", str(entry))
     record = read_session(actor)
     if record is None:
         raise CombatSessionError(SessionReason.NO_ACTIVE_SESSION)
@@ -1017,7 +1102,7 @@ def submit_player_action(
     if _stored_trait_value(actor.traits.hp) <= 0:
         raise CombatSessionError(SessionReason.INVALID_RECOVERY)
     if not isinstance(targets_or_shorthand, (list, str)):
-        raise TypeError("submit_player_action requires an explicit target list or shorthand")
+        raise TypeError(f"{name} requires an explicit target list or shorthand")
     if not isinstance(targets_or_shorthand, str) and not all(
         str(target.key) in battlefield.roster
         for target in targets_or_shorthand
@@ -1029,11 +1114,16 @@ def submit_player_action(
         actor, skill_key, context, targets_or_shorthand, scale=scale
     )
     if not preview.enabled:
-        return {
-            "outcome": "rejected",
-            "reason": preview.reason,
-            "detail": preview.detail,
-        }
+        return (
+            record,
+            battlefield,
+            None,
+            {
+                "outcome": "rejected",
+                "reason": preview.reason,
+                "detail": preview.detail,
+            },
+        )
 
     request = ActionRequest(
         actor=actor,
@@ -1044,35 +1134,95 @@ def submit_player_action(
     )
     preflight = ActionResolver.preflight(request)
     if preflight.outcome == "rejected":
-        return {
-            "outcome": "rejected",
-            "reason": preflight.reason,
-            "detail": preflight.detail,
-        }
+        return (
+            record,
+            battlefield,
+            None,
+            {
+                "outcome": "rejected",
+                "reason": preflight.reason,
+                "detail": preflight.detail,
+            },
+        )
+    return record, battlefield, request, None
 
-    overwhelming = classify_overwhelm(battlefield)
-    player_team = battlefield.team_of(str(actor.key))
+
+def submit_opening_action(
+    actor: Any,
+    skill_key: str,
+    targets: list[Any],
+    scale: float = 1.0,
+) -> dict[str, Any]:
+    """Open the fight's first action: the sole production requester of compression.
+
+    Its production consumer is ``field-combat-initiation``'s routing; the
+    seam ships callerless until then (combat-session-opening-dispatch D-7).
+    Runs the identical session read, reconstruction,
+    ``revalidate_submission()`` and ``ActionResolver.preflight()`` as
+    ``submit_player_action()``, then owns the two-part dispatch judgement
+    (D-2): select ``opening="overwhelm"`` if and only if
+    ``classify_overwhelm()`` decides for the actor's team **and**
+    ``overwhelm.commanded_damage_reaches_enemy()`` reports the submitted
+    skill damages a member of the opposing team; every other case selects
+    ``opening="round"``. Both selections pass ``first_actor`` equal to the
+    actor's roster key (D-3): the player who chose to start the fight acts
+    before any other combatant in the opening round.
+
+    Skills only -- no item request may reach this entry. Only a concrete
+    list of participant objects is accepted: an approved AREA shorthand
+    (``all-enemies``/``all-allies``/``all``) is rejected before initiative
+    even though ``submit_player_action()`` accepts one, because
+    ``commanded_damage_reaches_enemy()`` reads concrete roster keys and a
+    shorthand reaching it would silently answer ``False`` and disable
+    one-shot settlement with no diagnostic. Off-roster targets reject
+    exactly as ``submit_player_action()`` does.
+    """
+    if isinstance(targets, str):
+        # Rejected before any initiative or dispatch, but only after the
+        # session-presence check so a caller with no session still gets
+        # NO_ACTIVE_SESSION, exactly as submit_player_action reports it.
+        if read_session(actor) is None:
+            raise CombatSessionError(SessionReason.NO_ACTIVE_SESSION)
+        raise TypeError(
+            "submit_opening_action requires a concrete target list; the "
+            f"shorthand {targets!r} cannot be resolved to roster keys for the "
+            "compression predicate"
+        )
+    record, battlefield, request, rejection = _preflight_skill_submission(
+        submit_opening_action, actor, skill_key, targets, scale=scale
+    )
+    if rejection is not None:
+        return rejection
+    target_keys = [str(target.key) for target in targets]
+    compress = classify_overwhelm(battlefield) == battlefield.team_of(
+        str(actor.key)
+    ) and commanded_damage_reaches_enemy(
+        battlefield, str(actor.key), skill_key, target_keys
+    )
     return _submit_request(
         actor,
         record,
         battlefield,
         request,
-        overwhelming,
-        player_team,
+        opening="overwhelm" if compress else "round",
+        first_actor=str(actor.key),
         commanded_kind="skill",
         commanded_key=skill_key,
     )
 
 
 def submit_player_item_use(actor: Any, item_key: str) -> dict[str, Any]:
-    """Run one combat round whose player turn consumes one held item.
+    """Run one ordinary combat round whose player turn consumes one held item.
 
     The facade revalidates the request through the shared item preflight
-    with combat allowed, and only then starts one round (or the resolver-
-    backed overwhelm compression) exactly like ``submit_player_action``.
-    A rejection returns before initiative and consumes no round or world
-    time; a successful use resolves on the player's turn and the item
-    journal is merged into the session's outer rollback safety net.
+    with combat allowed, and only then starts exactly one ordinary round
+    whatever ``classify_overwhelm()`` decides, exactly like
+    ``submit_player_action`` (combat-session-opening-dispatch D-5: a
+    consumable is not an attack, so item submissions lose the compression
+    branch outright rather than gaining the opening gate). A rejection
+    returns before initiative and consumes no round or world time; a
+    successful use resolves on the player's turn and the item journal is
+    merged into the session's outer rollback safety net.
     """
     record = read_session(actor)
     if record is None:
@@ -1091,15 +1241,11 @@ def submit_player_item_use(actor: Any, item_key: str) -> dict[str, Any]:
             "reason": preflight.reason.value if preflight.reason else None,
             "detail": None,
         }
-    overwhelming = classify_overwhelm(battlefield)
-    player_team = battlefield.team_of(str(actor.key))
     return _submit_request(
         actor,
         record,
         battlefield,
         ItemUseRequest(actor=actor, item_key=item_key),
-        overwhelming,
-        player_team,
         commanded_kind="item",
         commanded_key=item_key,
     )
@@ -1110,9 +1256,9 @@ def _submit_request(
     record: CombatSessionRecord,
     battlefield: Battlefield,
     request: "combat.RoundRequest",
-    overwhelming: str | None,
-    player_team: str,
     *,
+    opening: Literal["round", "overwhelm"] = "round",
+    first_actor: str | None = None,
     commanded_kind: str,
     commanded_key: str,
 ) -> dict[str, Any]:
@@ -1125,6 +1271,13 @@ def _submit_request(
     except-path restoration covers the actually-deleted mirrors
     (fix-combat-settlement-recovery D1 extended by add-inventory-item-actions
     D2).
+
+    ``opening`` (combat-session-opening-dispatch D-1) is the caller's
+    dispatch decision, never this body's: the default ``"round"`` means one
+    ordinary ``run_round()``, and the only sanctioned way to request the
+    ``"overwhelm"`` compression is ``submit_opening_action()``. This body
+    never consults ``classify_overwhelm()`` to choose; ``first_actor`` is
+    forwarded to whichever entry the opening selects.
     """
     touched, extra = _snapshot_round_touched(actor, battlefield, record)
     party_before, members_before, relations_before = _snapshot_party_surfaces(
@@ -1148,19 +1301,16 @@ def _submit_request(
             # durable state.
             # Later combat changes that edit this seam (roster-and-overwhelm,
             # friendly-fire reachability) must keep edits inside this block.
-            # Compression is player-direction only (fix-combat-session-roster-
-            # and-overwhelm D2). ``classify_overwhelm`` can return the foe
-            # team (reverse overwhelm) or None (contested); neither verdict
-            # ever dispatches the resolver. A foe-overwhelming encounter
-            # deliberately plays out one ordinary round per player submission
-            # so the player keeps full per-round agency (skill choice and
-            # flee) and is never forced into an unavoidable compressed defeat;
-            # the informational ``overwhelming_team`` output value is
-            # unchanged. The session's simulated/nonlethal policy threads
-            # into the round and overwhelm compression so upkeep-settled
-            # ticks honor the same credit rules as direct damage
-            # (fix-dot-kill-credit D4).
-            if overwhelming == player_team:
+            # Compression is opt-in (combat-session-opening-dispatch D-1/D-2):
+            # only ``submit_opening_action()`` may pass ``opening =
+            # "overwhelm"``, and only after its own two-part player-direction
+            # plus damage-reaches-enemy judgement. Every in-session
+            # submission takes the default ``"round"`` -- one ordinary round
+            # per submission, whatever the verdict, so the player always
+            # keeps per-round agency. The session's simulated/nonlethal
+            # policy threads into both entries so upkeep-settled ticks honor
+            # the same credit rules as direct damage (fix-dot-kill-credit D4).
+            if opening == "overwhelm":
                 provider = _overwhelm_provider(actor, request, battlefield, record)
                 result = resolve_overwhelm(
                     battlefield,
@@ -1173,11 +1323,12 @@ def _submit_request(
                     nonlethal_keys=nonlethal_keys,
                     journal_sink=item_journals,
                     notifications_sink=grant_notifications,
+                    first_actor=first_actor,
                 )
                 logs = result.event_logs
                 gained = result.rounds_elapsed
             else:
-                # Foe-overwhelming and contested verdicts: one ordinary round.
+                # The default: one ordinary round.
                 provider = _round_provider(actor, request, battlefield, record)
                 logs = run_round(
                     battlefield,
@@ -1186,14 +1337,16 @@ def _submit_request(
                     nonlethal_keys=nonlethal_keys,
                     journal_sink=item_journals,
                     notifications_sink=grant_notifications,
+                    first_actor=first_actor,
                 )
                 gained = 1
                 # Boundary event for a committed ordinary round only: the
                 # on_commit callback fires once the OUTERMOST transaction
                 # commits and is discarded if this unit rolls back, so a
                 # rolled-back round never leaves a boundary line behind. The
-                # overwhelm-compression branch is deliberately excluded (it is
-                # not one ordinary round).
+                # event is bound to this ``opening == "round"`` path only
+                # (combat-session-opening-dispatch D-6): the compression
+                # opening is not one ordinary round.
                 # Every value is snapshotted NOW, at the round's durable
                 # boundary: a nested caller's later work must not shift the
                 # tick/HP this line describes, and the callback itself does

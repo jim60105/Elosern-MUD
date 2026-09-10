@@ -28,6 +28,7 @@ from world.rules.combat_session import (
     engage,
     read_session,
     submit_player_item_use,
+    submit_opening_action,
 )
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.equipment import (
@@ -268,6 +269,37 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             ),
             0,
         )
+
+    @covers_requirement(
+        "player-combat-session::one-submission-inside-an-active-session-is-one-ordinary-round-by-default-and-structurally"
+    )
+    def test_player_overwhelming_verdict_item_use_never_compresses(self):
+        # combat-session-opening-dispatch 5.2: an item submission under a
+        # PLAYER-direction verdict also resolves exactly one ordinary round;
+        # items lost the compression branch outright (D-5), so the resolver
+        # must never be reached.
+        self._hurt(20)
+        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        engage(self.player, self.monster)
+        with (
+            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.action.roll_d100", return_value=1),
+            patch(
+                "world.rules.combat_session.classify_overwhelm",
+                return_value="party",
+            ),
+            patch(
+                "world.rules.combat_session.resolve_overwhelm",
+                side_effect=AssertionError(
+                    "an item submission must never dispatch compression"
+                ),
+            ) as resolver,
+        ):
+            result = submit_player_item_use(self.player, "healing_potion")
+        resolver.assert_not_called()
+        self.assertEqual(result["outcome"], "round")
+        self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+        self.assertEqual(self.player.db.inventory.count("healing_potion"), 1)
 
     @covers_requirement(
         "item-use-resolution::combat-item-use-occupies-one-initiative-ordered-round"
