@@ -49,6 +49,23 @@ def unique_rule(label: str, predicate):
     return _unique_feature(label, predicate)
 
 
+def first_matching_rule(label: str, predicate) -> tuple:
+    """(key, rule) for the deterministically-first rulebook row matching
+    ``predicate`` (sorted key order; fail-fast when nothing matches).
+
+    Shape probes for the combat-wiring suite: the test computes every
+    expected number from the returned rule's live values, so a shipped row
+    being replaced by a same-shape row (different key or numbers) keeps the
+    test honest instead of pinning the old data.
+    """
+    matches = sorted(
+        (key, rule) for key, rule in _rules().items() if predicate(rule)
+    )
+    if not matches:
+        raise LookupError(f"no equipment-effect row matches the {label} shape probe")
+    return matches[0]
+
+
 def gauge_cap_row_keys() -> tuple:
     """The two-plus rows carrying an ``hp`` gauge cap, ascending by cap.
 
@@ -129,6 +146,7 @@ def display_label(code: str) -> str:
 
 
 __all__ = [
+    "first_matching_rule",
     "attached_buffs_rule",
     "gauge_cap_row_keys",
     "display_label",
