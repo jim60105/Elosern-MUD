@@ -1,40 +1,40 @@
 ## 1. Baseline
 
-- [ ] 1.1 Capture the gate report and this area's freeze-list entries with `uv run --locked python -m tools.test_data_lint check --json`
-- [ ] 1.2 Confirm the synthetic kit catalogs cover this area's registries; extend only the kit module when an entry shape is genuinely missing
+- [x] 1.1 Capture the gate report and this area's freeze-list entries with `uv run --locked python -m tools.test_data_lint check --json`
+- [x] 1.2 Confirm the synthetic kit catalogs cover this area's registries; extend only the kit module when an entry shape is genuinely missing
 
 ## 2. Migration
 
 ## 3. Migrate group 1
 
-- [ ] 3.1 Migrate `world/rules/tests/_combat_session_helpers.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.2 Migrate `world/rules/tests/test_affinity.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.3 Migrate `world/rules/tests/test_combat_initiation.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.4 Migrate `world/rules/tests/test_combat_modifiers.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.5 Migrate `world/rules/tests/test_combat_modifiers_matched.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.6 Migrate `world/rules/tests/test_combat_result.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.1 Migrate `world/rules/tests/_combat_session_helpers.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.2 Migrate `world/rules/tests/test_affinity.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.3 Migrate `world/rules/tests/test_combat_initiation.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.4 Migrate `world/rules/tests/test_combat_modifiers.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.5 Migrate `world/rules/tests/test_combat_modifiers_matched.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.6 Migrate `world/rules/tests/test_combat_result.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
 ## 4. Migrate group 2
 
-- [ ] 4.1 Migrate `world/rules/tests/test_combat_session_flow.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.2 Migrate `world/rules/tests/test_combat_session_recovery.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.3 Migrate `world/rules/tests/test_combat_session_targeting.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.4 Migrate `world/rules/tests/test_combat_view.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.5 Migrate `world/rules/tests/test_disengage.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.6 Migrate `world/rules/tests/test_disengage_integration.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.1 Migrate `world/rules/tests/test_combat_session_flow.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.2 Migrate `world/rules/tests/test_combat_session_recovery.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.3 Migrate `world/rules/tests/test_combat_session_targeting.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.4 Migrate `world/rules/tests/test_combat_view.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.5 Migrate `world/rules/tests/test_disengage.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.6 Migrate `world/rules/tests/test_disengage_integration.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
 ## 5. Migrate group 3
 
-- [ ] 5.1 Migrate `world/rules/tests/test_freeform_casting.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.2 Migrate `world/rules/tests/test_friendly_fire.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.3 Migrate `world/rules/tests/test_golden_combat.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.4 Migrate `world/rules/tests/test_initiative_and_turn_loop.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.5 Migrate `world/rules/tests/test_phase4_integration.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.6 Migrate `world/rules/tests/test_targeting.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.1 Migrate `world/rules/tests/test_freeform_casting.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.2 Migrate `world/rules/tests/test_friendly_fire.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.3 Migrate `world/rules/tests/test_golden_combat.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.4 Migrate `world/rules/tests/test_initiative_and_turn_loop.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.5 Migrate `world/rules/tests/test_phase4_integration.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.6 Migrate `world/rules/tests/test_targeting.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
 ## 6. Freeze-list and closure
 
-- [ ] 6.1 Remove exactly the migrated files' entries from `tools/test_data_freeze.json` and re-run the gate (must be clean)
-- [ ] 6.2 Add the area closure test file `tests/test_data_independence_rules_combat.py` (owned by `unittest discover`, not an Evennia shard): one test asserting the gate reports zero debt exemptions among this change's migrated files, and one asserting every manifest entry was removed from `tools/test_data_freeze.json`. Ship it WITHOUT a `@covers_requirement` annotation — the requirement id does not exist in the traceability index until this delta is archived/synced; adding the annotation earlier fails `spec_traceability check` with `unknown-requirement-id`
+- [x] 6.1 Remove exactly the migrated files' entries from `tools/test_data_freeze.json` and re-run the gate (must be clean)
+- [x] 6.2 Add the area closure test file `tests/test_data_independence_rules_combat.py` (owned by `unittest discover`, not an Evennia shard): one test asserting the gate reports zero debt exemptions among this change's migrated files, and one asserting every manifest entry was removed from `tools/test_data_freeze.json`. Ship it WITHOUT a `@covers_requirement` annotation — the requirement id does not exist in the traceability index until this delta is archived/synced; adding the annotation earlier fails `spec_traceability check` with `unknown-requirement-id`
 - [ ] 6.3 Annotate the closure test with the canonical id from `uv run --locked python -m tools.spec_traceability list` in the archive step that syncs this delta into `openspec/specs/test-data-independence/spec.md`, then run `uv run --locked python -m tools.spec_traceability check` (must be green)
-- [ ] 6.4 Run the affected shard(s) per `.github/evennia-shards.json`, the closure test via `unittest`, and `git diff --check`
+- [x] 6.4 Run the affected shard(s) per `.github/evennia-shards.json`, the closure test via `unittest`, and `git diff --check`
