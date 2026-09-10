@@ -2,11 +2,12 @@
 
 Covers the ``item-use-resolution`` delta requirement
 ``blessed-cleansing-consumes-holy-water-to-purge-debuffs``: the registered
-``blessed_cleansing`` effect removes every active debuff through the shipped
-cleanse path, consumes exactly one potion key atomically, emits the stable
-event, rejects a clean actor with ``no_debuffs`` (no consume, no clock, zh
-prose through the shipped reason surfaces), restores buffs on a
-post-cleanse fault, and the loader rejects an ``amount`` on cleanse entries.
+``blessed_cleansing`` effect removes every active debuff through the cleanse
+path, consumes exactly one potion key atomically, emits the stable event,
+rejects a clean actor with ``no_debuffs`` (no consume, no clock, zh prose
+through the reason surfaces), restores buffs on a post-cleanse fault, and
+the loader rejects an ``amount`` on cleanse entries. The potion is a
+synthetic consumable bound to the closed cleanse effect-key member.
 """
 
 from tools.spec_traceability import covers_requirement
@@ -20,6 +21,7 @@ import yaml
 
 from evennia.utils.test_resources import EvenniaTest
 
+from world.lore.items import ItemUseMechanics
 from world.rules.buffs import _add_buff, entity_active_buffs
 from world.rules.clock import WorldClock
 from world.rules.items import (
@@ -32,17 +34,36 @@ from world.rules.items import (
 )
 from world.rules.service_messages import rejection_message
 from world.skills.equipment import list_items
+from world.tests.synthetic_data import make_item
+
+from ._combat_session_helpers import open_synthetic_scope
+
+_VIAL_KEY = "t_blessed_vial"
+_CLEANSE_EFFECT = str(ItemEffectKey.BLESSED_CLEANSE)
+
+_VIAL = make_item(
+    _VIAL_KEY,
+    display_name_zh="合成受洗水",
+    price_table_key="t_mossmeals",
+    sellable=True,
+    use_mechanics=ItemUseMechanics(
+        effect_key=ItemEffectKey.BLESSED_CLEANSE,
+        consumable=True,
+        combat_allowed=True,
+    ),
+)
 
 
 class HolyWaterCleanseTests(EvenniaTest):
-    """Settlement and rejection for the shipped 受洗聖水 definition."""
+    """Settlement and rejection for a synthetic cleanse consumable."""
 
     def setUp(self):
         super().setUp()
+        open_synthetic_scope(self, "items", extra={"items": {_VIAL_KEY: _VIAL}})
         self.actor = self.char1
         self.actor.race = "human"
         self.actor.apply_race_baseline()
-        self.actor.db.inventory = ["baptismal_holy_water"]
+        self.actor.db.inventory = [_VIAL_KEY]
         self.actor.db.equipment = None
 
     def _afflict(self, *keys: str) -> None:
@@ -51,7 +72,7 @@ class HolyWaterCleanseTests(EvenniaTest):
 
     def test_cleanse_removes_debuffs_consumes_and_logs_stable_event(self):
         self._afflict("poisoned", "fear")
-        settlement = use_item(self.actor, "baptismal_holy_water")
+        settlement = use_item(self.actor, _VIAL_KEY)
         result = settlement.result
         self.assertEqual(result.outcome, "success")
         self.assertEqual(entity_active_buffs(self.actor), set())
@@ -65,14 +86,14 @@ class HolyWaterCleanseTests(EvenniaTest):
             set(entry.data),
             {"item_key", "effect_key", "consumable", "count"},
         )
-        self.assertEqual(entry.data["effect_key"], "blessed_cleansing")
+        self.assertEqual(entry.data["effect_key"], _CLEANSE_EFFECT)
         self.assertEqual(entry.data["count"], 2)
         self.assertNotIn("amount", entry.data)
         self.assertIn("淨化", entry.text_template)
 
     def test_cleanse_keeps_buff_polarity_buffs(self):
         self._afflict("poisoned", "focus")
-        result = use_item(self.actor, "baptismal_holy_water").result
+        result = use_item(self.actor, _VIAL_KEY).result
         self.assertEqual(result.outcome, "success")
         self.assertEqual(entity_active_buffs(self.actor), {"focus"})
 
@@ -80,18 +101,18 @@ class HolyWaterCleanseTests(EvenniaTest):
         clock = WorldClock()
         self.assertEqual(clock.tick, 0)
         self.actor.db.quest_log = None
-        settlement = use_item(self.actor, "baptismal_holy_water", clock=clock)
+        settlement = use_item(self.actor, _VIAL_KEY, clock=clock)
         result = settlement.result
         self.assertEqual(result.outcome, "rejected")
         self.assertIs(result.reason, ItemUseReason.NO_DEBUFFS)
         self.assertIsNone(result.event_log)
         self.assertEqual(clock.tick, 0)
-        self.assertEqual(list_items(self.actor), ["baptismal_holy_water"])
+        self.assertEqual(list_items(self.actor), [_VIAL_KEY])
         self.assertEqual(rejection_message(result.reason), "你身上沒有需要淨化的負面狀態。")
 
     def test_preflight_rejects_no_debuffs_without_writing(self):
         preflight = preflight_item_use(
-            ItemUseRequest(actor=self.actor, item_key="baptismal_holy_water"),
+            ItemUseRequest(actor=self.actor, item_key=_VIAL_KEY),
             in_combat=False,
         )
         self.assertFalse(preflight.allowed)
@@ -102,7 +123,7 @@ class HolyWaterCleanseTests(EvenniaTest):
         self._afflict("poisoned")
         self.actor.traits.hp.current = 0
         preflight = preflight_item_use(
-            ItemUseRequest(actor=self.actor, item_key="baptismal_holy_water"),
+            ItemUseRequest(actor=self.actor, item_key=_VIAL_KEY),
             in_combat=False,
         )
         self.assertFalse(preflight.allowed)
@@ -117,7 +138,7 @@ class HolyWaterCleanseTests(EvenniaTest):
             side_effect=RuntimeError("boom"),
         ):
             with self.assertRaises(RuntimeError):
-                use_item(self.actor, "baptismal_holy_water")
+                use_item(self.actor, _VIAL_KEY)
         self.assertEqual(list_items(self.actor), before_inventory)
         self.assertEqual(set(self.actor.buffs.all), before_buffs)
         self.assertEqual(entity_active_buffs(self.actor), {"poisoned", "fear"})
@@ -126,8 +147,8 @@ class HolyWaterCleanseTests(EvenniaTest):
         from world.rules.equipment import materialize_registry_object
 
         self._afflict("poisoned")
-        materialize_registry_object(self.actor, "baptismal_holy_water")
-        result = use_item(self.actor, "baptismal_holy_water").result
+        materialize_registry_object(self.actor, _VIAL_KEY)
+        result = use_item(self.actor, _VIAL_KEY).result
         self.assertEqual(result.outcome, "success")
         self.assertEqual(list_items(self.actor), [])
         self.assertEqual(
@@ -140,14 +161,14 @@ class HolyWaterCleanseTests(EvenniaTest):
     )
     def test_in_combat_preflight_shares_the_same_gate(self):
         clean = preflight_item_use(
-            ItemUseRequest(actor=self.actor, item_key="baptismal_holy_water"),
+            ItemUseRequest(actor=self.actor, item_key=_VIAL_KEY),
             in_combat=True,
         )
         self.assertFalse(clean.allowed)
         self.assertIs(clean.reason, ItemUseReason.NO_DEBUFFS)
         self._afflict("poisoned")
         allowed = preflight_item_use(
-            ItemUseRequest(actor=self.actor, item_key="baptismal_holy_water"),
+            ItemUseRequest(actor=self.actor, item_key=_VIAL_KEY),
             in_combat=True,
         )
         self.assertTrue(allowed.allowed)
@@ -162,7 +183,7 @@ class ItemEffectsLoaderCleanseShapeTests(unittest.TestCase):
     def _document_with(self, entry):
         source = Path(__file__).parents[1] / "rulebook" / "item_effects.yaml"
         document = yaml.safe_load(source.read_text(encoding="utf-8"))
-        document["effects"]["blessed_cleansing"] = entry
+        document["effects"][_CLEANSE_EFFECT] = entry
         handle = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
         yaml.safe_dump(document, handle, allow_unicode=True)
         handle.close()
