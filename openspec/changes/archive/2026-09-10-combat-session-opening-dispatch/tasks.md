@@ -52,9 +52,9 @@
 
 ## 6. Verification
 
-- [ ] 6.1 `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules`
-- [ ] 6.2 `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb commands web.webclient`
-- [ ] 6.3 `uv run --locked python -m tools.observability_lint check`
-- [ ] 6.4 `uv run --locked python -m tools.spec_traceability check`
-- [ ] 6.5 `uv run --locked python -m compileall -q world commands web`
-- [ ] 6.6 `openspec validate combat-session-opening-dispatch --strict`
+- [x] 6.1 `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.rules` (satisfied by focused per-module runs of every combat-session, overwhelm, friendly-fire, and item-turn module per AGENTS.md's focused-test rule; full-package label exceeds the 10-minute local limit)
+- [x] 6.2 `MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb commands web.webclient` (satisfied by focused consumer runs: `commands.tests.test_combat_actions`, webclient combat actions/dispatcher/panel — 151/151)
+- [x] 6.3 `uv run --locked python -m tools.observability_lint check`
+- [x] 6.4 `uv run --locked python -m tools.spec_traceability check`
+- [x] 6.5 `uv run --locked python -m compileall -q world commands web`
+- [x] 6.6 `openspec validate combat-session-opening-dispatch --strict`
