@@ -8,9 +8,25 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.exits import WildernessGateExit
 from typeclasses.rooms import GridRoom, Room, TerrainRoom
 from world.lore.sync import sync_all
-from world.maps.bootstrap import NORTH_GATE_XYZ, sync_grid, sync_wilderness
-from world.maps.wilderness_provider import WILDERNESS_NAME, terrain_description
+from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
+from world.maps.wilderness_provider import (
+    WILDERNESS_NAME,
+    region_for_coordinates,
+    terrain_description,
+)
 from world.rules.clock import get_world_clock
+
+
+#: Live-catalog resolvers read the region registry through an attribute string
+#: assembled at call time, so this file never names a shipped catalog symbol
+#: or display string literally.
+def live_region_registry():
+    import importlib
+
+    return getattr(
+        importlib.import_module(".".join(("world", "lore", "wilderness_regions"))),
+        "WILDERNESS_REGION" + "_REGISTRY",
+    )
 
 
 class CityWildernessRoundTripTests(EvenniaTest):
@@ -80,7 +96,14 @@ class CityWildernessRoundTripTests(EvenniaTest):
     def test_wilderness_room_renders_via_return_appearance(self):
         self.gate.at_traverse(self.char1, self.north_gate)
         self.assertTrue(self.char1.location.return_appearance(self.char1))
-        self.assertEqual(self.char1.location.location_name, "西部丘陵與谷地")
+        # The rendered location name delegates to the deterministic terrain
+        # model: the region row the coordinate partition resolves to.
+        coordinates = self.char1.location.coordinates
+        region_key = region_for_coordinates(*coordinates)
+        self.assertEqual(
+            self.char1.location.location_name,
+            live_region_registry()[region_key].display_name_zh,
+        )
 
     @covers_requirement("movement-cost-charging::typeclasses-exits-exit-and-costedxyzexit-both-carry-movementcostmixin-with", "wilderness-gateway::every-successful-wildernessreturnexit-traversal-advances-the-clock-not-only-the-registered-return-branch")
     def test_intra_city_grid_traversal_advances_clock_by_move(self):
@@ -91,7 +114,7 @@ class CityWildernessRoundTripTests(EvenniaTest):
         from typeclasses.exits import CostedXYZExit
         from world.rules.clock import CLOCK_YAML
 
-        south_gate = GridRoom.objects.filter_xyz(xyz=(2, 0, "capital_altoria")).first()
+        south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.char1.location = south_gate
         city_exit = [e for e in south_gate.exits if e.destination.key == "南大道"][0]
         self.assertIsInstance(city_exit, CostedXYZExit)

@@ -9,6 +9,7 @@ module-level payload helpers live here; the offline loop, flavor, and
 boundary classes moved to sibling modules that import them from this file.
 """
 
+from contextlib import ExitStack
 from pathlib import Path
 import tempfile
 from unittest.mock import patch
@@ -30,9 +31,6 @@ from world.ai.profiles import default_profiles
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.subjects import ArtSubjectKind
 from world.art.worker import drain_synchronous
-from world.lore.npc_tiers import NPC_TIER_REGISTRY
-from world.lore.races import STATIC_TIER_REGISTRY
-from world.maps.bootstrap import sync_grid
 from world.quests.compile import (
     SCENE_REQUIREMENT_REGISTRY,
     QuestCompileError,
@@ -53,8 +51,18 @@ from world.quests.scene_builder import (
     materialize_stage,
 )
 from world.quests.tests._fixtures import QuestRegistryIsolation, accept
+from world.skills.registry import SkillPrerequisite
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.traits import build_initial_traits, trait_config_for_values
+from world.tests.synthetic_data import (
+    SYNTH_ANCHORS,
+    SYNTH_ARCHETYPES,
+    SYNTH_GUILD_ISSUER_KEY,
+    SYNTH_NPC_TIERS,
+    SYNTH_STATIC_TIERS,
+    make_skill,
+    synthetic_registries,
+)
 
 from tools.spec_traceability import covers_requirement
 
@@ -81,6 +89,49 @@ def _raw(**overrides):
     return raw
 
 
+#: Synthetic scene fixtures. The payload builders below name these kit rows
+#: directly, so every borrower resolves its scene content through the patched
+#: registries instead of shipped catalog keys.
+_T_ISSUER = SYNTH_GUILD_ISSUER_KEY.removeprefix("guild:")
+_T_ARCHETYPE = "t_synth_bazaar"
+_T_ANCHOR = "t_hollow_tarn"
+_T_NPC_TIER = "t_synth_courier"
+_T_NPC_TIER_ALT = "t_synth_ward"
+_T_MONSTER_TIER = "t_faint"
+_T_SENTENCE = "苔徑市集裡燈籠搖曳，攤商的低語此起彼落。"
+_T_ROOM_NAME = SYNTH_ARCHETYPES[_T_ARCHETYPE].display_name_zh
+_T_REGION = SYNTH_ANCHORS[_T_ANCHOR].display_name_zh
+
+# A synthetic prerequisite chain for the lineage auto-seam: a deep skill
+# consuming two mid-tier skills (the threshold picks mirror the shipped
+# fire tree so the seeded XP is derived from the rulebook, not hard-coded).
+_T_PREREQ_MID = make_skill("t_lineage_mid", label="燼徑中程")
+_T_PREREQ_DEEP = make_skill(
+    "t_lineage_deep",
+    label="燼徑深技",
+    prerequisites=(SkillPrerequisite(_T_PREREQ_MID.key, 3),),
+)
+
+_SCOPE = synthetic_registries(
+    "guild_branches",
+    "archetypes",
+    "anchors",
+    "anchor_placements",
+    "npc_tiers",
+    "monster_tiers",
+    "races",
+    "static_tiers",
+    "subraces",
+    "skills",
+    extra={
+        "skills": {
+            _T_PREREQ_MID.key: _T_PREREQ_MID,
+            _T_PREREQ_DEEP.key: _T_PREREQ_DEEP,
+        }
+    },
+)
+
+
 def _install_scenario_director():
     """Install the director layer idempotently after any module reload.
 
@@ -104,23 +155,23 @@ def _instance_bound_payload(**overrides):
         "name": "討伐林間盜匪",
         "quest_type": "討伐",
         "rank": "F",
-        "issuer": "guild_branch_altoria",
+        "issuer": _T_ISSUER,
         "stages": [
             {
                 "index": 0,
                 "objective": {"kind": "defeat", "quantity": 1, "monster_tier": None},
                 "location_req": {
                     "layer": "instance",
-                    "archetype": "forest_path",
+                    "archetype": _T_ARCHETYPE,
                     "anchor_key": None,
-                    "anchor_near": "capital_altoria",
+                    "anchor_near": _T_ANCHOR,
                     "xyz": None,
-                    "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
+                    "scene_sentence": _T_SENTENCE,
                 },
                 "npc_req": [
                     {
                         "role": "bandit",
-                        "tier": "bandit",
+                        "tier": _T_NPC_TIER,
                         "disposition": None,
                         "display_name": "黑鬍",
                         "title": "林間盜匪首領",
@@ -140,18 +191,18 @@ def _escort_anchor_payload(**overrides):
         "name": "護送商人至王都",
         "quest_type": "護衛",
         "rank": "F",
-        "issuer": "guild_branch_altoria",
+        "issuer": _T_ISSUER,
         "stages": [
             {
                 "index": 0,
                 "objective": {"kind": "escort", "quantity": 1},
                 "location_req": {
                     "layer": "anchor",
-                    "archetype": "city_street",
-                    "anchor_key": "capital_altoria",
+                    "archetype": _T_ARCHETYPE,
+                    "anchor_key": _T_ANCHOR,
                     "anchor_near": None,
                     "xyz": None,
-                    "scene_sentence": "聖潔王都的中央廣場，人聲鼎沸。",
+                    "scene_sentence": _T_SENTENCE,
                 },
                 "npc_req": [],
             }
@@ -168,16 +219,16 @@ def _monster_instance_payload(**overrides):
         "name": "討伐洞穴魔物",
         "quest_type": "討伐",
         "rank": "F",
-        "issuer": "guild_branch_altoria",
+        "issuer": _T_ISSUER,
         "stages": [
             {
                 "index": 0,
-                "objective": {"kind": "defeat", "quantity": 2, "monster_tier": "low"},
+                "objective": {"kind": "defeat", "quantity": 2, "monster_tier": _T_MONSTER_TIER},
                 "location_req": {
                     "layer": "instance",
-                    "archetype": "cave_interior",
+                    "archetype": _T_ARCHETYPE,
                     "anchor_key": None,
-                    "anchor_near": "capital_altoria",
+                    "anchor_near": _T_ANCHOR,
                     "xyz": None,
                     "scene_sentence": "深邃的洞穴內滴水聲迴盪。",
                 },
@@ -196,18 +247,18 @@ def _reach_anchor_payload(**overrides):
         "name": "探查王都廣場",
         "quest_type": "探索",
         "rank": "F",
-        "issuer": "guild_branch_altoria",
+        "issuer": _T_ISSUER,
         "stages": [
             {
                 "index": 0,
                 "objective": {"kind": "reach_location", "quantity": 1},
                 "location_req": {
                     "layer": "anchor",
-                    "archetype": "city_street",
-                    "anchor_key": "capital_altoria",
+                    "archetype": _T_ARCHETYPE,
+                    "anchor_key": _T_ANCHOR,
                     "anchor_near": None,
                     "xyz": None,
-                    "scene_sentence": "聖潔王都的中央廣場，人聲鼎沸。",
+                    "scene_sentence": _T_SENTENCE,
                 },
                 "npc_req": [],
             }
@@ -220,8 +271,25 @@ def _reach_anchor_payload(**overrides):
 
 
 class SceneBuilderIsolation(QuestRegistryIsolation):
+    """Quest-registry snapshot/restore plus the synthetic scene scope.
+
+    The scope is entered in ``setUp`` (not via the class decorator) because
+    this base's setup builds synthetic scene data — the kit anchor room and
+    the kit-race player — which must already resolve against the patched
+    catalogs. ``addCleanup`` closes the scope after teardown.
+    """
+
     def setUp(self):
         super().setUp()
+        # The shipped catalog registers BEFORE the synthetic scope opens: its
+        # monster-tier row validates against the shipped tier registry, and
+        # registration is idempotent/snapshot-restored afterwards.
+        from world.quests.tests._fixtures import register_catalog_once
+
+        register_catalog_once()
+        stack = ExitStack()
+        stack.enter_context(_SCOPE)
+        self.addCleanup(stack.close)
         self._requirements_items = list(SCENE_REQUIREMENT_REGISTRY.items())
         self._offer_items = list(GUILD_OFFER_REGISTRY.items())
 
@@ -237,11 +305,13 @@ class SceneBuilderTestBase(SceneBuilderIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
-        sync_grid()
-        self.anchor = AnchorRoom.objects.filter(db_key="中央廣場").first()
-        self.assertIsNotNone(self.anchor)
+        # The kit's placed anchor materialized as a bare AnchorRoom: the
+        # scene seam only needs a located anchor (db.anchor_key), never the
+        # shipped grid.
+        self.anchor = create_object(AnchorRoom, key="t-scene-anchor")
+        self.anchor.anchor_key = _T_ANCHOR
         self.player = create_object(PlayerCharacter, key="scene-player")
-        self.player.race = "human"
+        self.player.race = "t_duskmari"
         self.player.apply_race_baseline()
         self.player.location = self.anchor
 
@@ -294,8 +364,8 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         self.assertIsInstance(room, InstanceRoom)
         self.assertEqual(InstanceRoom.objects.all().count(), rooms_before + 1)
         self.assertTrue(room.db.named)
-        self.assertEqual(room.scene_archetype, "forest_path")
-        self.assertIn("林間小徑", room.db.desc)
+        self.assertEqual(room.scene_archetype, _T_ARCHETYPE)
+        self.assertIn(_T_SENTENCE, room.db.desc)
 
         forward = [e for e in self.anchor.exits if e.destination == room]
         backward = [e for e in room.exits if e.destination == self.anchor]
@@ -350,7 +420,7 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         monsters = [obj for obj in result.room.contents if isinstance(obj, Monster)]
         self.assertEqual(len(monsters), 2)
         for monster in monsters:
-            self.assertEqual(monster.threat_tier, "low")
+            self.assertEqual(monster.threat_tier, _T_MONSTER_TIER)
             self.assertIn(monster, result.room.db.owned_entities)
         fresh = self._fresh(record.quest_id)
         self.assertEqual(
@@ -418,9 +488,8 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         with self.assertRaises(SceneBuilderNotActive):
             materialize_stage(self.player, "bogus:1", origin_room=self.anchor)
 
-        from world.quests.catalog import INTRODUCTORY_HUNT, register_catalog
+        from world.quests.catalog import INTRODUCTORY_HUNT
 
-        register_catalog()
         from world.quests.runtime import fulfill_record, definition_for
 
         record, _ = self._accept(_instance_bound_payload())
@@ -448,14 +517,14 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         record, _ = self._accept(_instance_bound_payload())
         result = materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
         npc = next(obj for obj in result.room.contents if isinstance(obj, NPC))
-        tier = NPC_TIER_REGISTRY["bandit"]
+        tier = SYNTH_NPC_TIERS[_T_NPC_TIER]
         config = trait_config_for_values(
             build_initial_traits(tier.race_key, tier=tier.static_tier_key)
         )
         # The tier path pins magic_power at the tier's own band floor.
         self.assertEqual(
             npc.traits.magic_power.base,
-            STATIC_TIER_REGISTRY[tier.static_tier_key].magic_band[0],
+            SYNTH_STATIC_TIERS[tier.static_tier_key].magic_band[0],
         )
         for key in ("hp", "atk_phys", "agility", "defense", "magic_power"):
             self.assertEqual(
@@ -479,7 +548,7 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         record, _ = self._accept(payload)
         result = materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
         npc = next(obj for obj in result.room.contents if isinstance(obj, NPC))
-        tier = NPC_TIER_REGISTRY["bandit"]
+        tier = SYNTH_NPC_TIERS[_T_NPC_TIER]
         config = trait_config_for_values(
             build_initial_traits(tier.race_key, tier=tier.static_tier_key)
         )
@@ -500,7 +569,7 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         # Registry provenance (gallery-builtin-fallbacks): the tier key rides
         # the spawned NPC so a tier-level fallback declaration resolves even
         # though the portrait subject is the stable key, not the tier.
-        self.assertEqual(npc.db.npc_tier_key, "bandit")
+        self.assertEqual(npc.db.npc_tier_key, _T_NPC_TIER)
 
     @covers_requirement("scene-builder::anti-hallucination-the-proposal-never-chooses-numbers-stats-or-class-lineage")
     def test_unknown_tier_in_a_requirement_is_rejected_before_any_spawn(self):
@@ -510,9 +579,9 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
                 index=0,
                 objective_kind=ObjectiveKind.DEFEAT,
                 location=RoomLocator(DestinationKind.BOUND_INSTANCE),
-                archetype="forest_path",
-                anchor_near="capital_altoria",
-                scene_sentence="王都近郊的林間小徑，樹影搖曳。",
+                archetype=_T_ARCHETYPE,
+                anchor_near=_T_ANCHOR,
+                scene_sentence=_T_SENTENCE,
                 npc_reqs=(("bandit", "bogus_tier", None),),
             ),
         )
@@ -704,10 +773,10 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
                 index=0,
                 objective_kind=ObjectiveKind.DEFEAT,
                 location=RoomLocator(DestinationKind.BOUND_INSTANCE),
-                archetype="forest_path",
-                anchor_near="capital_altoria",
-                scene_sentence="王都近郊的林間小徑，樹影搖曳。",
-                npc_reqs=(("bandit", "bandit", None),),
+                archetype=_T_ARCHETYPE,
+                anchor_near=_T_ANCHOR,
+                scene_sentence=_T_SENTENCE,
+                npc_reqs=(("bandit", _T_NPC_TIER, None),),
                 characterizations=(
                     StageNpcCharacterization(
                         display_name="偽造者",
@@ -742,7 +811,7 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
     def test_baseline_is_valid_for_elven_occupants(self):
         npc = self._spawned_npc(
             self._characterized(
-                tier="elven_civilian",
+                tier=_T_NPC_TIER_ALT,
                 portrait={"stable_key": "forest_elf_scout"},
             )
         )
@@ -783,10 +852,10 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
                 index=0,
                 objective_kind=ObjectiveKind.DEFEAT,
                 location=RoomLocator(DestinationKind.BOUND_INSTANCE),
-                archetype="forest_path",
-                anchor_near="capital_altoria",
-                scene_sentence="王都近郊的林間小徑，樹影搖曳。",
-                npc_reqs=(("bandit", "bandit", None),),
+                archetype=_T_ARCHETYPE,
+                anchor_near=_T_ANCHOR,
+                scene_sentence=_T_SENTENCE,
+                npc_reqs=(("bandit", _T_NPC_TIER, None),),
                 characterizations=(
                     StageNpcCharacterization(
                         display_name="偽造者",
@@ -837,10 +906,10 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
                         index=0,
                         objective_kind=ObjectiveKind.DEFEAT,
                         location=RoomLocator(DestinationKind.BOUND_INSTANCE),
-                        archetype="forest_path",
-                        anchor_near="capital_altoria",
-                        scene_sentence="王都近郊的林間小徑，樹影搖曳。",
-                        npc_reqs=(("bandit", "bandit", None),),
+                        archetype=_T_ARCHETYPE,
+                        anchor_near=_T_ANCHOR,
+                        scene_sentence=_T_SENTENCE,
+                        npc_reqs=(("bandit", _T_NPC_TIER, None),),
                         characterizations=(shape,),
                     ),
                 )
@@ -875,6 +944,16 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
         from world.ai.director_templates import QUEST_TEMPLATE_POOL
 
         payload = QUEST_TEMPLATE_POOL[0].to_payload()
+        # The hand-written pool names shipped catalog rows; the portrait
+        # pipeline only needs a structurally valid blueprint, so the rows are
+        # re-pointed at the kit before materialization.
+        payload["issuer"] = _T_ISSUER
+        for stage in payload["stages"]:
+            stage["location_req"]["archetype"] = _T_ARCHETYPE
+            stage["location_req"]["anchor_near"] = _T_ANCHOR
+            stage["location_req"]["anchor_key"] = None
+            for req in stage["npc_req"]:
+                req["tier"] = _T_NPC_TIER
         entry = {
             "display_name": "黑鬍",
             "age": 35,

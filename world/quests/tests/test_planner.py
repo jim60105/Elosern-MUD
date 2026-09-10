@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import unittest
+from contextlib import ExitStack
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -29,13 +30,8 @@ from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.party import join_party
 from world.rules.targeting import RoomActionContext
 from world.rules.tests.combat_fixtures import grant_lineage
-from world.skills.registry import (
-    SKILL_REGISTRY,
-    SkillCategory,
-    SkillDef,
-    SkillKind,
-    TargetSpec,
-)
+from world.skills.registry import SkillCategory, SkillDef, SkillKind, TargetSpec
+from world.tests.synthetic_data import SYNTH_SKILLS, make_skill, synthetic_registries
 
 from ._fixtures import (
     QuestRegistryIsolation,
@@ -48,44 +44,52 @@ from ._fixtures import (
 )
 
 
-CLAW_SKILL = SkillDef(
-    key="claw",
-    label="利爪",
-    description="以利爪撕扯單一敵人。",
-    kind=SkillKind.ACTIVE,
-    target_spec=TargetSpec.SINGLE,
+#: Every cast in this module runs on kit rows: the player spell is the kit's
+#: burst, the monster/NPC attacks are kit-shaped extras installed through the
+#: scope (no shipped registry row is ever named or mutated).
+_T_SKILL = SYNTH_SKILLS["t_ember_burst"].key
+#: Kit-element physical damage so low-magic monster/NPC attackers still kill.
+_T_PHYS = f"damage:{SYNTH_SKILLS['t_ember_burst'].element.key}:physical"
+CLAW_SKILL = make_skill("t_brig_claw", cost={}, effects=[_T_PHYS])
+STRIKE_SKILL = make_skill(
+    "t_brig_strike", cost={}, effects=[_T_PHYS], usable_out_of_combat=True
+)
+AREA_SKILL = make_skill(
+    "t_brig_gale",
+    target_spec=TargetSpec.AREA,
+    effects=[_T_PHYS],
     cost={},
-    usable_out_of_combat=False,
-    element=None,
-    effects=["damage:dark:physical"],
-    category=SkillCategory.UTILITY,
+)
+_SCOPE = synthetic_registries(
+    "skills",
+    extra={
+        "skills": {
+            CLAW_SKILL.key: CLAW_SKILL,
+            STRIKE_SKILL.key: STRIKE_SKILL,
+            AREA_SKILL.key: AREA_SKILL,
+        }
+    },
 )
 
-STRIKE_SKILL = SkillDef(
-    key="strike",
-    label="突襲",
-    description="測試用：對單一敵人造成物理傷害，且可在非戰鬥場合使用。",
-    kind=SkillKind.ACTIVE,
-    target_spec=TargetSpec.SINGLE,
-    cost={},
-    usable_out_of_combat=True,
-    element=None,
-    effects=["damage:dark:physical"],
-    category=SkillCategory.UTILITY,
-)
+
+def _enter_scope(test) -> None:
+    stack = ExitStack()
+    stack.enter_context(_SCOPE)
+    test.addCleanup(stack.close)
 
 
+@_SCOPE
 class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
+        _enter_scope(self)
         register_event_effect_planner("quest", quest_event_effect_planner)
-        SKILL_REGISTRY["claw"] = CLAW_SKILL
         self.player = create_object(PlayerCharacter, key="quest-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
-        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        # Human static magic_power at 術師 tier so the synthetic spell casts pass.
         self.player.traits.magic_power.base = 30
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_SKILL])
         self.tier_hunt = register(quest("tier_hunt_three", stages=(QuestStage(0, defeat(quantity=3)),)))
         self.bound_hunt = register(
             quest("bound_hunt", stages=(QuestStage(0, defeat(bound=True)),))
@@ -111,7 +115,6 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         from world.rules.action import _EVENT_EFFECT_PLANNERS
 
         _EVENT_EFFECT_PLANNERS.pop("quest", None)
-        SKILL_REGISTRY.pop("claw", None)
         super().tearDown()
 
     def _monster(self, key: str, hp: int = 1, tier: str = "low") -> Monster:
@@ -148,17 +151,17 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     def test_player_defeat_advances_matching_tier_objective(self):
         accept(self.player, self.tier_hunt.key)
         first = self._monster("a")
-        self.assertEqual(self._resolve(self.player, "fire_ball", [first]).outcome, "success")
+        self.assertEqual(self._resolve(self.player, _T_SKILL, [first]).outcome, "success")
         self.assertEqual(self._records()[0]["stage_progress"], 1)
         second = self._monster("b")
-        self.assertEqual(self._resolve(self.player, "fire_ball", [second]).outcome, "success")
+        self.assertEqual(self._resolve(self.player, _T_SKILL, [second]).outcome, "success")
         self.assertEqual(self._records()[0]["stage_progress"], 2)
         self.assertEqual(self._records()[0]["state"], "in_progress")
 
     def test_wrong_tier_kill_grants_no_progress(self):
         accept(self.player, self.tier_hunt.key)
         mid = self._monster("mid", tier="mid")
-        self.assertEqual(self._resolve(self.player, "fire_ball", [mid]).outcome, "success")
+        self.assertEqual(self._resolve(self.player, _T_SKILL, [mid]).outcome, "success")
         self.assertEqual(self._records()[0]["stage_progress"], 0)
 
     def test_bound_objective_matches_exact_dbref_not_display_key(self):
@@ -166,17 +169,17 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         unbound = self._monster("decoy")
         bound = self._monster("real")
         bind_stage_runtime(self.player, record.quest_id, objective_targets=(bound,))
-        self.assertEqual(self._resolve(self.player, "fire_ball", [unbound]).outcome, "success")
+        self.assertEqual(self._resolve(self.player, _T_SKILL, [unbound]).outcome, "success")
         self.assertEqual(self._records()[0]["stage_progress"], 0)
-        self.assertEqual(self._resolve(self.player, "fire_ball", [bound]).outcome, "success")
+        self.assertEqual(self._resolve(self.player, _T_SKILL, [bound]).outcome, "success")
         self.assertEqual(self._records()[0]["stage_progress"], 1)
 
     def test_non_player_actor_grants_no_ordinary_kill_credit(self):
         accept(self.player, self.tier_hunt.key)
         hunter = self._monster("hunter", hp=200, tier="mid")
-        hunter.db.skills = {"active": ["claw"], "passive": []}
+        hunter.db.skills = {"active": [CLAW_SKILL.key], "passive": []}
         prey = self._monster("prey")
-        result = self._resolve(hunter, "claw", [prey])
+        result = self._resolve(hunter, CLAW_SKILL.key, [prey])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(prey.traits.hp.current, 0)
         self.assertEqual(self._records()[0]["stage_progress"], 0)
@@ -184,8 +187,8 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     def test_area_defeat_aggregates_without_skipping_stages(self):
         accept(self.player, self.two_stage.key)
         monsters = [self._monster(f"m{i}") for i in range(3)]
-        self.player.db.skills = {"active": ["wind_blade"], "passive": []}
-        result = self._resolve(self.player, "wind_blade", monsters)
+        self.player.db.skills = {"active": [AREA_SKILL.key], "passive": []}
+        result = self._resolve(self.player, AREA_SKILL.key, monsters)
         self.assertEqual(result.outcome, "success")
         stored = self._records()[0]
         self.assertEqual(stored["stage_index"], 1)
@@ -196,7 +199,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         room = create_object(InstanceRoom, key="hunt-room")
         bound = self._monster("final")
         bind_stage_runtime(self.player, record.quest_id, room=room, objective_targets=(bound,))
-        result = self._resolve(self.player, "fire_ball", [bound])
+        result = self._resolve(self.player, _T_SKILL, [bound])
         self.assertEqual(result.outcome, "success")
         stored = self._records()[0]
         self.assertEqual(stored["state"], "completed")
@@ -210,18 +213,18 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         record = accept(self.player, self.bound_hunt.key)
         bound = self._monster("done")
         bind_stage_runtime(self.player, record.quest_id, objective_targets=(bound,))
-        self._resolve(self.player, "fire_ball", [bound])
+        self._resolve(self.player, _T_SKILL, [bound])
         stored = self._records()[0]
         self.assertEqual(stored["state"], "completed")
         extra = self._monster("extra")
-        self._resolve(self.player, "fire_ball", [extra])
+        self._resolve(self.player, _T_SKILL, [extra])
         after = self._records()[0]
         self.assertEqual(after, stored)
         self.assertEqual(after["state"], "completed")
 
     def test_protected_npc_death_fails_escort_quest(self):
         record = accept(self.player, self.escort_quest.key)
-        guard = self._npc("guard")
+        guard = self._npc("warden")
         room = create_object(InstanceRoom, key="escort-room")
         bind_stage_runtime(
             self.player,
@@ -230,8 +233,8 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
             protected_entities=(guard,),
         )
         killer = self._monster("killer", hp=200, tier="mid")
-        killer.db.skills = {"active": ["claw"], "passive": []}
-        result = self._resolve(killer, "claw", [guard])
+        killer.db.skills = {"active": [CLAW_SKILL.key], "passive": []}
+        result = self._resolve(killer, CLAW_SKILL.key, [guard])
         self.assertEqual(result.outcome, "success")
         stored = self._records()[0]
         self.assertEqual(stored["state"], "failed")
@@ -242,23 +245,23 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     def test_same_display_key_creates_no_false_failure(self):
         record = accept(self.player, self.escort_quest.key)
-        guard = self._npc("guard-identical")
-        impostor = self._npc("guard-identical")
-        guard.db.key = "guard"
-        impostor.db.key = "guard"
+        guard = self._npc("warden-identical")
+        impostor = self._npc("warden-identical")
+        guard.db.key = "warden"
+        impostor.db.key = "warden"
         bind_stage_runtime(self.player, record.quest_id, protected_entities=(guard,))
         killer = self._monster("killer", hp=200, tier="mid")
-        killer.db.skills = {"active": ["claw"], "passive": []}
-        self._resolve(killer, "claw", [impostor])
+        killer.db.skills = {"active": [CLAW_SKILL.key], "passive": []}
+        self._resolve(killer, CLAW_SKILL.key, [impostor])
         self.assertEqual(self._records()[0]["state"], "in_progress")
-        self._resolve(killer, "claw", [guard])
+        self._resolve(killer, CLAW_SKILL.key, [guard])
         self.assertEqual(self._records()[0]["state"], "failed")
 
     def test_objective_target_death_cannot_trigger_protected_failure(self):
         record = accept(self.player, self.bound_hunt.key)
         target = self._monster("objective-target")
         bind_stage_runtime(self.player, record.quest_id, objective_targets=(target,))
-        self._resolve(self.player, "fire_ball", [target])
+        self._resolve(self.player, _T_SKILL, [target])
         stored = self._records()[0]
         self.assertEqual(stored["state"], "completed")
         self.assertEqual(stored["failure_reason"], None)
@@ -273,8 +276,8 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
             objective_targets=(target,),
             protected_entities=(npc_guard,),
         )
-        self.player.db.skills = {"active": ["wind_blade"], "passive": []}
-        result = self._resolve(self.player, "wind_blade", [target, npc_guard])
+        self.player.db.skills = {"active": [AREA_SKILL.key], "passive": []}
+        result = self._resolve(self.player, AREA_SKILL.key, [target, npc_guard])
         self.assertEqual(result.outcome, "success")
         stored = self._records()[0]
         self.assertEqual(stored["state"], "failed")
@@ -294,14 +297,14 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
             protected_entities=(guard,),
         )
         killer = self._monster("killer-rollback", hp=200, tier="mid")
-        killer.db.skills = {"active": ["claw"], "passive": []}
+        killer.db.skills = {"active": [CLAW_SKILL.key], "passive": []}
         guard_hp_before = guard.traits.hp.current
         room_pins_before = list(room.db.pin_reasons)
         with patch(
             "world.quests.transitions._apply_pin_operations",
             side_effect=RuntimeError("injected pin failure"),
         ):
-            result = self._resolve(killer, "claw", [guard])
+            result = self._resolve(killer, CLAW_SKILL.key, [guard])
         from world.rules.action import RejectReason
 
         self.assertEqual(result.reason, RejectReason.COMMIT_FAILED)
@@ -319,7 +322,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         field = self._field(self.player, [target])
         request = ActionRequest(
             self.player,
-            "fire_ball",
+            _T_SKILL,
             [target],
             BattlefieldActionContext(
                 field,
@@ -345,11 +348,11 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
             protected_entities=(guard,),
         )
         killer = self._monster("simulated-killer", hp=200, tier="mid")
-        killer.db.skills = {"active": ["claw"], "passive": []}
+        killer.db.skills = {"active": [CLAW_SKILL.key], "passive": []}
         field = self._field(killer, [guard])
         request = ActionRequest(
             killer,
-            "claw",
+            CLAW_SKILL.key,
             [guard],
             BattlefieldActionContext(
                 field,
@@ -365,22 +368,22 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(stored["protected_entity_ids"], [int(guard.pk)])
 
 
+@_SCOPE
 class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
     """Companion DEFEAT credit for the quest owner (party-quest task 1.3)."""
 
     def setUp(self):
         super().setUp()
+        _enter_scope(self)
         register_event_effect_planner("quest", quest_event_effect_planner)
-        SKILL_REGISTRY["claw"] = CLAW_SKILL
-        SKILL_REGISTRY["strike"] = STRIKE_SKILL
         self.room = create_object(Room, key="companion-room")
         self.player = create_object(PlayerCharacter, key="companion-owner")
         self.player.race = "human"
         self.player.apply_race_baseline()
-        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        # Human static magic_power at 術師 tier so the synthetic spell casts pass.
         self.player.traits.magic_power.base = 30
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_SKILL])
         self.tier_hunt = register(quest("tier_hunt_three", stages=(QuestStage(0, defeat(quantity=3)),)))
         self.two_stage = register(
             quest(
@@ -396,8 +399,6 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         from world.rules.action import _EVENT_EFFECT_PLANNERS
 
         _EVENT_EFFECT_PLANNERS.pop("quest", None)
-        SKILL_REGISTRY.pop("claw", None)
-        SKILL_REGISTRY.pop("strike", None)
         super().tearDown()
 
     def _monster(self, key: str, hp: int = 1, tier: str = "low") -> Monster:
@@ -412,10 +413,10 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         npc.race = "human"
         npc.apply_race_baseline()
         # Human static magic_power at 術師 tier so elemental companion casts
-        # (wind_blade) pass the cast gate.
+        # (the kit area skill) pass the cast gate.
         npc.traits.magic_power.base = 30
         npc.traits.hp._data["current"] = 1
-        npc.db.skills = {"active": ["claw"], "passive": []}
+        npc.db.skills = {"active": [CLAW_SKILL.key], "passive": []}
         join_party(npc, self.player)
         return npc
 
@@ -448,7 +449,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         enter_possession(self.player, companion)
         prey = self._monster("prey_possessed")
         field = self._field(companion, [prey])
-        result = self._resolve(companion, "claw", [prey], field)
+        result = self._resolve(companion, CLAW_SKILL.key, [prey], field)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self._records()[0]["stage_progress"], 1)
 
@@ -459,7 +460,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         companion = self._companion("first")
         prey = self._monster("prey")
         field = self._field(companion, [prey])
-        result = self._resolve(companion, "claw", [prey], field)
+        result = self._resolve(companion, CLAW_SKILL.key, [prey], field)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(prey.traits.hp.current, 0)
         self.assertEqual(self._records()[0]["stage_progress"], 1)
@@ -473,7 +474,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         field = self._field(
             companion, [prey], knocked_out=frozenset({companion.key})
         )
-        result = self._resolve(companion, "claw", [prey], field)
+        result = self._resolve(companion, CLAW_SKILL.key, [prey], field)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(prey.traits.hp.current, 0)
         self.assertEqual(self._records()[0]["stage_progress"], 0)
@@ -485,10 +486,10 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         outsider = create_object(NPC, key="outsider", location=self.room)
         outsider.race = "human"
         outsider.apply_race_baseline()
-        outsider.db.skills = {"active": ["claw"], "passive": []}
+        outsider.db.skills = {"active": [CLAW_SKILL.key], "passive": []}
         prey = self._monster("prey-unbound")
         field = self._field(outsider, [prey])
-        result = self._resolve(outsider, "claw", [prey], field)
+        result = self._resolve(outsider, CLAW_SKILL.key, [prey], field)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(prey.traits.hp.current, 0)
         self.assertEqual(self._records()[0]["stage_progress"], 0)
@@ -501,11 +502,11 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         impostor = create_object(NPC, key="impostor", location=self.room)
         impostor.race = "human"
         impostor.apply_race_baseline()
-        impostor.db.skills = {"active": ["claw"], "passive": []}
+        impostor.db.skills = {"active": [CLAW_SKILL.key], "passive": []}
         impostor.db.party_member = self.player.pk
         prey = self._monster("prey-mismatch")
         field = self._field(impostor, [prey])
-        result = self._resolve(impostor, "claw", [prey], field)
+        result = self._resolve(impostor, CLAW_SKILL.key, [prey], field)
         self.assertEqual(result.outcome, "success")
         self.assertEqual(prey.traits.hp.current, 0)
         self.assertEqual(self._records()[0]["stage_progress"], 0)
@@ -526,11 +527,11 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
 
         accept(self.player, self.tier_hunt.key)
         companion = self._companion("striker")
-        companion.db.skills = {"active": ["strike"], "passive": []}
+        companion.db.skills = {"active": [STRIKE_SKILL.key], "passive": []}
         prey = self._monster("prey-ambush")
         prey.location = self.room
         request = ActionRequest(
-            companion, "strike", [prey], RoomActionContext(self.room)
+            companion, STRIKE_SKILL.key, [prey], RoomActionContext(self.room)
         )
         with patch("world.rules.combat.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
@@ -544,16 +545,17 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
     def test_companion_area_defeat_aggregates_without_skipping_stages(self):
         accept(self.player, self.two_stage.key)
         companion = self._companion("reaver")
-        companion.db.skills = {"active": ["wind_blade"], "passive": []}
+        companion.db.skills = {"active": [AREA_SKILL.key], "passive": []}
         monsters = [self._monster(f"c-m{i}") for i in range(3)]
         field = self._field(companion, monsters)
-        result = self._resolve(companion, "wind_blade", monsters, field)
+        result = self._resolve(companion, AREA_SKILL.key, monsters, field)
         self.assertEqual(result.outcome, "success")
         stored = self._records()[0]
         self.assertEqual(stored["stage_index"], 1)
         self.assertEqual(stored["stage_progress"], 0)
 
 
+@_SCOPE
 class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     """fix-dot-kill-credit: the quest planner consumes upkeep-built defeat logs.
 

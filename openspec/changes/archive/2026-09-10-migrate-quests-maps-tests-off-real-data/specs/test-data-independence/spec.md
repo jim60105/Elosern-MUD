@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Quests and maps behavior tests resolve game data through synthetic fixtures
-Behavior tests in the 27 test files enumerated in this change's migration
+Behavior tests in the 28 test files enumerated in this change's migration
 manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
 synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
 SHALL NOT pin quantities derived from shipped content. After the migration, none of the

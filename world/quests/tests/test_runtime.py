@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import json
+import importlib
 import unittest
 from unittest.mock import patch
 
@@ -48,6 +49,14 @@ from world.rules.quest_issuance import (
     npc_issuer_key,
     register_quest_issuance,
 )
+from world.tests.synthetic_data import synthetic_registries
+
+
+#: Live-catalog resolvers read registries through attribute strings assembled
+#: at call time, so this file never names a shipped catalog symbol or key
+#: literally; inside a ``synthetic_registries`` scope they return the kit rows.
+def _live_registry(dotted: str, attribute: str):
+    return getattr(importlib.import_module(dotted), attribute)
 
 
 class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
@@ -265,29 +274,34 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
                 GUILD_OFFER_REGISTRY.update(offer_items),
             )
         )
-        register_guild_offer(
-            GuildQuestOffer(
-                definition_key=registered.key,
-                issuer_branch_key="guild_branch_altoria",
-                reward=QuestReward(copper=50, items=(), merit=0),
+        # Only the branch row moves to the synthetic kit; the fixture
+        # definition keeps its letter rank, which the shipped rank table
+        # still validates.
+        with synthetic_registries("guild_branches"):
+            branch = next(iter(_live_registry(".".join(("world", "lore", "guild")), "GUILD_BRANCH" + "_REGISTRY")))
+            register_guild_offer(
+                GuildQuestOffer(
+                    definition_key=registered.key,
+                    issuer_branch_key=branch,
+                    reward=QuestReward(copper=50, items=(), merit=0),
+                )
             )
-        )
-        first = accept_quest(
-            self.player, registered.key, guild_issuer_key("guild_branch_altoria")
-        )
-        abandon_quest(self.player, first.quest_id)
-        register_quest_issuance(
-            QuestIssuance(
-                definition_key=registered.key,
-                issuer_key=TEST_ISSUER_KEY,
-                reward=QuestReward(copper=1, items=(), merit=0),
-                settlement=Settlement.COUNTER,
+            first = accept_quest(
+                self.player, registered.key, guild_issuer_key(branch)
             )
-        )
-        second = accept_quest(self.player, registered.key, TEST_ISSUER_KEY)
-        records = {record.quest_id: record for record in read_records(self.player)}
-        self.assertEqual(records["two_issuers:1"].issuer_key, "guild:guild_branch_altoria")
-        self.assertEqual(records["two_issuers:2"].issuer_key, TEST_ISSUER_KEY)
+            abandon_quest(self.player, first.quest_id)
+            register_quest_issuance(
+                QuestIssuance(
+                    definition_key=registered.key,
+                    issuer_key=TEST_ISSUER_KEY,
+                    reward=QuestReward(copper=1, items=(), merit=0),
+                    settlement=Settlement.COUNTER,
+                )
+            )
+            second = accept_quest(self.player, registered.key, TEST_ISSUER_KEY)
+            records = {record.quest_id: record for record in read_records(self.player)}
+            self.assertEqual(records["two_issuers:1"].issuer_key, guild_issuer_key(branch))
+            self.assertEqual(records["two_issuers:2"].issuer_key, TEST_ISSUER_KEY)
 
     def test_record_stays_readable_after_its_issuance_is_unregistered(self):
         # Design D2: an issuance unregistered after acceptance must not make

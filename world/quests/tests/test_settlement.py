@@ -17,6 +17,7 @@ archive-and-sync of this change.
 """
 
 from dataclasses import replace
+from contextlib import ExitStack
 from unittest.mock import patch
 
 from django.db import transaction
@@ -63,6 +64,12 @@ from world.rules.guild_offers import (
     register_guild_offer,
 )
 from world.rules.quest_issuance import guild_issuer_key, npc_issuer_key
+from world.tests.synthetic_data import (
+    SYNTH_GUILD_BRANCH_KEY,
+    SYNTH_ITEMS,
+    SYNTH_SKILLS,
+    synthetic_registries,
+)
 from world.rules.surfaces import attribute_snapshot, read_counter_trait
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.quests.planner import quest_event_effect_planner
@@ -79,7 +86,22 @@ from ._fixtures import (
     register,
 )
 
-ALTORIA_BRANCH = "guild_branch_altoria"
+# Settlement runs entirely on kit rows: the issuing branch, the reward/acquire
+# items, and the combat skill are synthetic. The branch/items scope is opened
+# per class AND inside setUp bodies (the class decorator wraps test methods
+# only), so issuance registration and reward validation resolve against the
+# synthetic registries.
+ALTORIA_BRANCH = SYNTH_GUILD_BRANCH_KEY
+_T_ITEM = SYNTH_ITEMS["t_ember_spray"].key
+_T_ORE = SYNTH_ITEMS["t_iron_fang"].key
+_T_SKILL = SYNTH_SKILLS["t_ember_burst"].key
+_SCOPE = ("guild_branches", "items")
+
+
+def _enter_scope(test) -> None:
+    stack = ExitStack()
+    stack.enter_context(synthetic_registries(*_SCOPE))
+    test.addCleanup(stack.close)
 
 
 def _attach_staff(npc) -> None:
@@ -109,11 +131,13 @@ def _wallet(actor) -> int:
     return int(actor.db.wallet or 0)
 
 
+@synthetic_registries(*_SCOPE)
 class AutoSettlementPlannerTests(QuestRegistryIsolation, EvenniaTest):
     """Task 5.1: the pure planner's contribution rules and no-write rule."""
 
     def setUp(self):
         super().setUp()
+        _enter_scope(self)
         self.actor = self.char1
         self.definition = register(quest("auto_plan"))
         self.record = accept_auto(self.actor, self.definition)
@@ -138,13 +162,13 @@ class AutoSettlementPlannerTests(QuestRegistryIsolation, EvenniaTest):
             self.actor,
             itemised,
             reward=QuestReward(
-                copper=5, items=(ItemQuantity("healing_potion", 2),), merit=0
+                copper=5, items=(ItemQuantity(_T_ITEM, 2),), merit=0
             ),
         )
         completed = fulfill_record(record, QUEST_DEFINITION_REGISTRY[itemised.key])
         plan = plan_auto_settlement(self.actor, [completed])
         (entry,) = plan.entries
-        self.assertEqual(entry.items, ("healing_potion", "healing_potion"))
+        self.assertEqual(entry.items, (_T_ITEM, _T_ITEM))
 
     @covers_requirement("quest-auto-settlement::automatic-settlement-is-planned-by-a-pure-function")
     def test_counter_commission_contributes_nothing(self):
@@ -178,17 +202,19 @@ class AutoSettlementPlannerTests(QuestRegistryIsolation, EvenniaTest):
             self.assertEqual(attribute_snapshot(self.actor, key), snapshot)
 
 
+@synthetic_registries(*_SCOPE)
 class ReplacementPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
     """Task 3.1/5.2: settlement commits inside the replacement transaction."""
 
     def setUp(self):
         super().setUp()
+        _enter_scope(self)
         self.actor = self.char1
         self.definition = register(
             quest("auto_reach", stages=(QuestStage(0, defeat(tier="low")),))
         )
         self.reward = QuestReward(
-            copper=30, items=(ItemQuantity("healing_potion", 1),), merit=0
+            copper=30, items=(ItemQuantity(_T_ITEM, 1),), merit=0
         )
         self.record = accept_auto(self.actor, self.definition, reward=self.reward)
 
@@ -210,7 +236,7 @@ class ReplacementPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
         stored = {r.quest_id: r for r in read_records(self.actor)}
         self.assertEqual(stored[completed.quest_id].state, QuestState.COMPLETED)
         self.assertEqual(_wallet(self.actor), 30)
-        self.assertIn("healing_potion", self.actor.db.inventory)
+        self.assertIn(_T_ITEM, self.actor.db.inventory)
         self.assertEqual(parse_reward_claims(self.actor), [completed.quest_id])
 
     @covers_requirement("quest-auto-settlement::automatic-settlement-commits-atomically-with-the-completing-transition")
@@ -230,7 +256,7 @@ class ReplacementPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
     @covers_requirement("quest-auto-settlement::automatic-settlement-commits-atomically-with-the-completing-transition")
     def test_chain_reward_completes_auto_acquire_quest(self):
         payer_reward = QuestReward(
-            copper=10, items=(ItemQuantity("healing_potion", 2),), merit=0
+            copper=10, items=(ItemQuantity(_T_ITEM, 2),), merit=0
         )
         payer = accept_auto(
             self.actor,
@@ -242,7 +268,7 @@ class ReplacementPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
         target_definition = register(
             quest(
                 "chain_target",
-                stages=(QuestStage(0, acquire("healing_potion", 2)),),
+                stages=(QuestStage(0, acquire(_T_ITEM, 2)),),
             )
         )
         target = accept_auto(self.actor, target_definition)
@@ -259,11 +285,11 @@ class ReplacementPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(stored[target.quest_id].state, QuestState.COMPLETED)
         self.assertEqual(parse_reward_claims(self.actor), [payer.quest_id, target.quest_id])
         self.assertEqual(_wallet(self.actor), 35)
-        self.assertEqual(self.actor.db.inventory.count("healing_potion"), 2)
+        self.assertEqual(self.actor.db.inventory.count(_T_ITEM), 2)
 
     def test_chain_pays_each_link_once(self):
         payer_reward = QuestReward(
-            copper=10, items=(ItemQuantity("healing_potion", 2),), merit=0
+            copper=10, items=(ItemQuantity(_T_ITEM, 2),), merit=0
         )
         payer = accept_auto(
             self.actor,
@@ -273,14 +299,14 @@ class ReplacementPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
             reward=payer_reward,
         )
         middle_reward = QuestReward(
-            copper=20, items=(ItemQuantity("rough_iron_ore", 1),), merit=0
+            copper=20, items=(ItemQuantity(_T_ORE, 1),), merit=0
         )
         middle = accept_auto(
             self.actor,
             register(
                 quest(
                     "link_middle",
-                    stages=(QuestStage(0, acquire("healing_potion", 2)),),
+                    stages=(QuestStage(0, acquire(_T_ITEM, 2)),),
                 )
             ),
             reward=middle_reward,
@@ -288,7 +314,7 @@ class ReplacementPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
         tail_definition = register(
             quest(
                 "link_tail",
-                stages=(QuestStage(0, acquire("rough_iron_ore", 1)),),
+                stages=(QuestStage(0, acquire(_T_ORE, 1)),),
             )
         )
         tail = accept_auto(self.actor, tail_definition)
@@ -308,8 +334,8 @@ class ReplacementPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
             [payer.quest_id, middle.quest_id, tail.quest_id],
         )
         self.assertEqual(_wallet(self.actor), 55)
-        self.assertEqual(self.actor.db.inventory.count("healing_potion"), 2)
-        self.assertEqual(self.actor.db.inventory.count("rough_iron_ore"), 1)
+        self.assertEqual(self.actor.db.inventory.count(_T_ITEM), 2)
+        self.assertEqual(self.actor.db.inventory.count(_T_ORE), 1)
 
     @covers_requirement("quest-auto-settlement::automatic-settlement-never-grants-merit-and-never-needs-a-host")
     def test_wilderness_completion_needs_no_host(self):
@@ -324,11 +350,13 @@ class ReplacementPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(_wallet(self.actor), 30)
 
 
+@synthetic_registries(*_SCOPE)
 class DeltaPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
     """Task 3.2/5.2: settlement commits inside the delta caller's transaction."""
 
     def setUp(self):
         super().setUp()
+        _enter_scope(self)
         self.actor = self.char1
         self.definition = register(
             quest("auto_delta", stages=(QuestStage(0, defeat(tier="low")),))
@@ -337,7 +365,7 @@ class DeltaPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
             self.actor,
             self.definition,
             reward=QuestReward(
-                copper=30, items=(ItemQuantity("healing_potion", 1),), merit=0
+                copper=30, items=(ItemQuantity(_T_ITEM, 1),), merit=0
             ),
         )
 
@@ -374,7 +402,7 @@ class DeltaPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
         stored = {r.quest_id: r for r in read_records(self.actor)}
         self.assertEqual(stored[self.record.quest_id].state, QuestState.COMPLETED)
         self.assertEqual(_wallet(self.actor), 30)
-        self.assertIn("healing_potion", self.actor.db.inventory)
+        self.assertIn(_T_ITEM, self.actor.db.inventory)
         self.assertEqual(parse_reward_claims(self.actor), [self.record.quest_id])
 
     def test_delta_settlement_failure_restores_settlement_surfaces(self):
@@ -414,16 +442,21 @@ class DeltaPathSettlementTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(info.call_args_list, [])
 
 
+@synthetic_registries(*_SCOPE, "skills")
 class DefeatActionSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
     """Task 5.2: a DEFEAT completion settles with the committed action."""
 
     def setUp(self):
         super().setUp()
+        _enter_scope(self)
+        stack = ExitStack()
+        stack.enter_context(synthetic_registries(*_SCOPE, "skills"))
+        self.addCleanup(stack.close)
         register_event_effect_planner("quest", quest_event_effect_planner)
         self.actor = create_object(PlayerCharacter, key="settlement actor")
         self.actor.race = "human"
         self.actor.apply_race_baseline()
-        grant_lineage(self.actor, ["fire_ball"], ["fire_mastery"])
+        grant_lineage(self.actor, [_T_SKILL], [])
         self.definition = register(
             quest("auto_hunt", stages=(QuestStage(0, defeat(tier="low")),))
         )
@@ -445,7 +478,7 @@ class DefeatActionSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
         )
         request = ActionRequest(
             self.actor,
-            "fire_ball",
+            _T_SKILL,
             targets,
             BattlefieldActionContext(field),
         )
@@ -457,7 +490,7 @@ class DefeatActionSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
             self.actor,
             self.definition,
             reward=QuestReward(
-                copper=30, items=(ItemQuantity("healing_potion", 1),), merit=0
+                copper=30, items=(ItemQuantity(_T_ITEM, 1),), merit=0
             ),
         )
         monster = self._monster("settlement goblin")
@@ -466,7 +499,7 @@ class DefeatActionSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
         stored = {r.quest_id: r for r in read_records(self.actor)}
         self.assertEqual(stored[self.record.quest_id].state, QuestState.COMPLETED)
         self.assertEqual(_wallet(self.actor), 30)
-        self.assertIn("healing_potion", self.actor.db.inventory)
+        self.assertIn(_T_ITEM, self.actor.db.inventory)
         self.assertEqual(parse_reward_claims(self.actor), [self.record.quest_id])
 
     def test_defeat_settlement_failure_rejects_the_action_and_restores(self):
@@ -502,11 +535,13 @@ class DefeatActionSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(info.call_args_list, [])
 
 
+@synthetic_registries(*_SCOPE)
 class GuildCrossModeSettlementTests(RegistryIsolationMixin, EvenniaTest):
     """Tasks 1.2/5.4: both settlement modes share one exactly-once ledger."""
 
     def setUp(self):
         super().setUp()
+        _enter_scope(self)
         from world.quests.catalog import register_catalog
 
         register_catalog()
@@ -597,7 +632,7 @@ class GuildCrossModeSettlementTests(RegistryIsolationMixin, EvenniaTest):
         acquire_definition = register(
             quest(
                 "cross_target",
-                stages=(QuestStage(0, acquire("healing_potion", 1)),),
+                stages=(QuestStage(0, acquire(_T_ITEM, 1)),),
             )
         )
         acquire_record = accept_auto(
@@ -609,7 +644,7 @@ class GuildCrossModeSettlementTests(RegistryIsolationMixin, EvenniaTest):
             quest("cross_payer", stages=(QuestStage(0, defeat(tier="low")),))
         )
         register_guild_offer(
-            _offer(payer_definition.key, copper=50, merit=0, items=("healing_potion",))
+            _offer(payer_definition.key, copper=50, merit=0, items=(_T_ITEM,))
         )
         payer_record = accept_quest(
             self.player, payer_definition.key, guild_issuer_key(ALTORIA_BRANCH)
@@ -623,9 +658,10 @@ class GuildCrossModeSettlementTests(RegistryIsolationMixin, EvenniaTest):
             [payer_completed.quest_id, acquire_record.quest_id],
         )
         self.assertEqual(_wallet(self.player), 65)
-        self.assertIn("healing_potion", self.player.db.inventory)
+        self.assertIn(_T_ITEM, self.player.db.inventory)
 
 
+@synthetic_registries(*_SCOPE)
 class SettlementEventTests(QuestRegistryIsolation, EvenniaTest):
     """Task 4.1: one boundary event per payout; an empty plan is silent."""
 
@@ -693,11 +729,13 @@ class SettlementEventTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(self._settlement_events(info), [])
 
 
+@synthetic_registries(*_SCOPE)
 class JustCompletedDiffTests(QuestRegistryIsolation, EvenniaTest):
     """The write-boundary diff reuses one notion of "just completed"."""
 
     def setUp(self):
         super().setUp()
+        _enter_scope(self)
         self.actor = self.char1
         self.definition = register(quest("diff_probe"))
         self.record = accept_auto(self.actor, self.definition)

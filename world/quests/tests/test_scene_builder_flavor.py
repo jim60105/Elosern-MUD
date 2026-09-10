@@ -15,9 +15,13 @@ from typeclasses.rooms import InstanceRoom
 from world.quests.scene_builder import apply_scene_flavor, materialize_stage
 from world.quests.tests.test_scene_builder import (
     SceneBuilderTestBase,
+    _T_ROOM_NAME,
+    _T_REGION,
+    _T_SENTENCE,
     _instance_bound_payload,
     _reach_anchor_payload,
 )
+from world.tests.synthetic_data import SYNTH_ARCHETYPES
 
 from tools.spec_traceability import covers_requirement
 
@@ -35,10 +39,10 @@ class SceneFlavorContextAndApplyTests(SceneBuilderTestBase):
         self.assertEqual(
             result.flavor_context,
             {
-                "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
+                "scene_sentence": _T_SENTENCE,
                 "quest_context": "討伐林間盜匪（討伐任務）",
-                "room_name": "林間小徑",
-                "region": "聖潔王都",
+                "room_name": _T_ROOM_NAME,
+                "region": _T_REGION,
             },
         )
 
@@ -58,11 +62,9 @@ class SceneFlavorContextAndApplyTests(SceneBuilderTestBase):
         payload = _instance_bound_payload()
         payload["stages"][0]["location_req"]["scene_sentence"] = None
         _, result = self._materialize_first(payload)
-        from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
-
         self.assertEqual(
             result.flavor_context["scene_sentence"],
-            SCENE_ARCHETYPE_REGISTRY["forest_path"].scene_sentence,
+            SYNTH_ARCHETYPES["t_synth_bazaar"].scene_sentence,
         )
 
     @covers_requirement("scene-builder::scene-materialization-exposes-deterministic-flavor-context-for-fresh-instance-scenes")

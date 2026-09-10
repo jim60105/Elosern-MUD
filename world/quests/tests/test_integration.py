@@ -4,6 +4,7 @@ from tools.spec_traceability import covers_requirement
 
 import inspect
 import unittest
+from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import patch
 
@@ -35,22 +36,48 @@ from world.rules.combat import (
 )
 from world.rules.overwhelm import resolve_overwhelm
 from world.rules.tests.combat_fixtures import grant_lineage
+from world.skills.registry import TargetSpec
+from world.tests.synthetic_data import (
+    SYNTH_SKILLS,
+    make_skill,
+    synthetic_registries,
+)
 
 from ._fixtures import QuestRegistryIsolation, accept, defeat, quest, register
+
+#: Casting paths run on the kit's spell rows: the combat spell and a
+#: self-targeted out-of-combat cast (kit-shaped extra over the heal template)
+#: are both synthetic.
+_T_SKILL = SYNTH_SKILLS["t_ember_burst"].key
+_T_SELF_CAST = make_skill(
+    "t_moss_bloom",
+    target_spec=TargetSpec.SELF,
+    usable_out_of_combat=True,
+    effects=[],
+)
+_SCOPE = synthetic_registries("skills", extra={"skills": {_T_SELF_CAST.key: _T_SELF_CAST}})
+
+
+def _enter_scope(test) -> None:
+    stack = ExitStack()
+    stack.enter_context(_SCOPE)
+    test.addCleanup(stack.close)
 
 QUESTS_ROOT = Path(__file__).resolve().parents[2]
 
 
+@_SCOPE
 class OfflineRuntimePathTests(QuestRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
+        _enter_scope(self)
         sync_quest_runtime()
         self.player = create_object(PlayerCharacter, key="offline-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
-        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        # Human static magic_power at 術師 tier so the synthetic spell casts pass.
         self.player.traits.magic_power.base = 30
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_SKILL])
 
     def _monster(self, key: str, hp: int = 1) -> Monster:
         monster = create_object(Monster, key=key)
@@ -66,7 +93,7 @@ class OfflineRuntimePathTests(QuestRegistryIsolation, EvenniaTestCase):
         )
         request = ActionRequest(
             self.player,
-            "fire_ball",
+            _T_SKILL,
             [monster],
             BattlefieldActionContext(field),
         )
@@ -93,9 +120,11 @@ class OfflineRuntimePathTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertNotIn("world.ai", quest_source)
 
 
+@_SCOPE
 class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
+        _enter_scope(self)
         self.calls: list[str] = []
         sync_quest_runtime()
         original = _EVENT_EFFECT_PLANNERS["quest"]
@@ -108,9 +137,9 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
         self.player = create_object(PlayerCharacter, key="path-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
-        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        # Human static magic_power at 術師 tier so the synthetic spell casts pass.
         self.player.traits.magic_power.base = 30
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_SKILL])
 
     def _monster(self, key: str, hp: int = 1) -> Monster:
         monster = create_object(Monster, key=key)
@@ -130,7 +159,7 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
         field = self._field(self.player, [monster])
         request = ActionRequest(
             self.player,
-            "fire_ball",
+            _T_SKILL,
             [monster],
             BattlefieldActionContext(field),
         )
@@ -142,22 +171,27 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
     def test_out_of_combat_cast_executes_the_planner(self):
         self.char1.race = "human"
         self.char1.apply_race_baseline()
-        self.char1.db.skills = {"active": ["status_disguise"], "passive": []}
+        # Any committed out-of-combat self-cast runs the planner; the
+        # kit-shaped self-cast row stands in for the shipped disguise cast.
+        self.char1.db.skills = {"active": [_T_SELF_CAST.key], "passive": []}
+        grant_lineage(self.char1, [_T_SELF_CAST.key])
+        self.char1.traits.mp.base = 50
+        self.char1.traits.mp.current = 50
         from world.rules.clock import WorldClock
 
         clock = WorldClock()
         with patch(
             "world.rules.cast_settlement.read_world_clock", return_value=clock
         ), patch("world.rules.cast_settlement.get_world_clock", return_value=clock):
-            self.call(CmdCast(), "status_disguise", f"{self.char1.key} 改變了")
+            self.call(CmdCast(), _T_SELF_CAST.key, f"{self.char1.key} 累積了技能熟練度。")
         self.assertEqual(self.calls.count("quest"), 1)
 
     def test_combat_round_executes_the_planner(self):
         self.char1.race = "human"
         self.char1.apply_race_baseline()
-        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        # Human static magic_power at 術師 tier so the synthetic spell casts pass.
         self.char1.traits.magic_power.base = 30
-        grant_lineage(self.char1, ["fire_ball"])
+        grant_lineage(self.char1, [_T_SKILL])
         monster = self._monster("round")
         field = self._field(self.char1, [monster])
         with patch("world.rules.combat.roll_d100", return_value=100):

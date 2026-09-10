@@ -11,6 +11,7 @@ unit stays DB-free by patching the store boundary.
 
 from dataclasses import replace
 import unittest
+from contextlib import ExitStack
 from unittest.mock import patch
 
 from evennia.utils.create import create_object, create_script
@@ -71,8 +72,15 @@ from world.rules.quest_issuance import (
 )
 from world.rules.service_view import build_services_view
 from world.rules.tests.combat_fixtures import grant_lineage
+from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
+
+from ._compile_helpers import _anchor_key, _archetype_key, _issuer_key
 
 from tools.spec_traceability import covers_requirement
+
+#: The restart-cast class fights on the kit's spell row.
+_T_SKILL = SYNTH_SKILLS["t_ember_burst"].key
+_SCOPE = synthetic_registries("skills")
 
 
 def _defeat_payload(**overrides):
@@ -80,15 +88,15 @@ def _defeat_payload(**overrides):
         "name": "討伐低階魔物",
         "quest_type": "討伐",
         "rank": "F",
-        "issuer": "guild_branch_altoria",
+        "issuer": _issuer_key(),
         "stages": [
             {
                 "index": 0,
                 "objective": {"kind": "defeat", "quantity": 1, "monster_tier": "low"},
                 "location_req": {
                     "layer": "anchor",
-                    "archetype": "forest_path",
-                    "anchor_key": "capital_altoria",
+                    "archetype": _archetype_key(),
+                    "anchor_key": _anchor_key(),
                     "anchor_near": None,
                     "xyz": None,
                     "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
@@ -112,9 +120,9 @@ def _characterized_payload(**overrides):
     }
     payload["stages"][0]["location_req"] = {
         "layer": "instance",
-        "archetype": "forest_path",
+        "archetype": _archetype_key(),
         "anchor_key": None,
-        "anchor_near": "capital_altoria",
+        "anchor_near": _anchor_key(),
         "xyz": None,
         "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
     }
@@ -235,7 +243,7 @@ class StoreConflictTests(RegistryIsolationMixin, EvenniaTestCase):
             register_generated_quest(variant)
         self.assertNotIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
         self.assertNotIn(
-            (compiled.definition.key, "guild_branch_altoria"),
+            (compiled.definition.key, _issuer_key()),
             GUILD_OFFER_REGISTRY,
         )
         self.assertNotIn(compiled.definition.key, SCENE_REQUIREMENT_REGISTRY)
@@ -379,12 +387,10 @@ class CrashWindowHealingTests(RegistryIsolationMixin, EvenniaTestCase):
             compiled.definition,
         )
         self.assertEqual(
-            GUILD_OFFER_REGISTRY.get(
-                (compiled.definition.key, "guild_branch_altoria")
-            ),
+            GUILD_OFFER_REGISTRY.get((compiled.definition.key, _issuer_key())),
             GuildQuestOffer(
                 definition_key=compiled.definition.key,
-                issuer_branch_key="guild_branch_altoria",
+                issuer_branch_key=_issuer_key(),
                 reward=compiled.reward,
             ),
         )
@@ -394,18 +400,24 @@ class CrashWindowHealingTests(RegistryIsolationMixin, EvenniaTestCase):
         )
 
 
+@_SCOPE
 class RestartRestoreIntegrationTests(RegistryIsolationMixin, EvenniaTestCase):
     """Task 4.2: an accepted generated quest survives a simulated restart."""
 
     def setUp(self):
         super().setUp()
+        # The class decorator wraps test methods only, so the skill scope is
+        # entered here too before the casting entity is built.
+        stack = ExitStack()
+        stack.enter_context(_SCOPE)
+        self.addCleanup(stack.close)
         sync_quest_runtime()
         self.player = create_object(PlayerCharacter, key="restore-player")
         self.player.race = "human"
         self.player.apply_race_baseline()
-        # Human static magic_power at 術師 tier so fire_ball casts pass.
+        # Human static magic_power at 術師 tier so the synthetic spell casts pass.
         self.player.traits.magic_power.base = 30
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_SKILL])
 
     def _monster(self, key: str, hp: int = 1) -> Monster:
         monster = create_object(Monster, key=key)
@@ -421,7 +433,7 @@ class RestartRestoreIntegrationTests(RegistryIsolationMixin, EvenniaTestCase):
         )
         request = ActionRequest(
             self.player,
-            "fire_ball",
+            _T_SKILL,
             [monster],
             BattlefieldActionContext(field),
         )
@@ -545,7 +557,7 @@ class GuildBoardRestoreTests(RegistryIsolationMixin, EvenniaTestCase):
         self.staff = create_object(NPC, key="restore staff", location=self.hall)
         self.staff.components.add(
             GuildStaff.create(
-                self.staff, service_id="staff", branch_key="guild_branch_altoria"
+                self.staff, service_id="staff", branch_key=_issuer_key()
             )
         )
         self.player = create_object(PlayerCharacter, key="restore-board-player")

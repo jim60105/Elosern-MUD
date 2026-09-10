@@ -8,7 +8,6 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.exits import Exit
 from typeclasses.rooms import GridRoom, Room
-from world.maps.altoria_capital import XYMAP_DATA
 from world.maps.bootstrap import (
     GENERAL_STORE_EXTERIOR_XYZ,
     GENERAL_STORE_TAG,
@@ -17,9 +16,6 @@ from world.maps.bootstrap import (
     sync_grid,
     sync_service_interiors,
 )
-
-SOUTH_GATE_XYZ = (2, 0, "capital_altoria")
-
 
 class ServiceInteriorTests(EvenniaTestCase):
     def setUp(self):

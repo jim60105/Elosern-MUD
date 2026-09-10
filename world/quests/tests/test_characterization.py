@@ -11,8 +11,6 @@ registry-driven race-lifespan bound resolution.
 from dataclasses import FrozenInstanceError
 import unittest
 
-from world.lore.npc_tiers import NPC_TIER_REGISTRY
-from world.lore.races import RACE_REGISTRY
 from world.rules.npc_identity import MAX_NPC_NAME_CODE_POINTS
 from world.quests.characterization import (
     AGE_FLOOR,
@@ -22,6 +20,12 @@ from world.quests.characterization import (
     duplicate_display_name_errors,
     duplicate_stable_key_errors,
     race_lifespan_upper_bound,
+)
+from world.tests.synthetic_data import (
+    SYNTH_RACES,
+    make_npc_tier,
+    make_race,
+    synthetic_registries,
 )
 
 from tools.spec_traceability import covers_requirement
@@ -37,15 +41,29 @@ def _entry(**overrides):
 
 class CharacterizationRaceBoundTests(unittest.TestCase):
     @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")
-    def test_human_race_bound_resolves_from_the_registry(self):
-        bound = race_lifespan_upper_bound("civilian")
-        self.assertEqual(bound, RACE_REGISTRY["human"].lifespan[1])
-        self.assertEqual(bound, 80)
+    @synthetic_registries("races", "npc_tiers", "subraces", "static_tiers")
+    def test_race_bound_resolves_from_the_registries(self):
+        bound = race_lifespan_upper_bound("t_synth_courier")
+        self.assertEqual(bound, SYNTH_RACES["t_duskmari"].lifespan[1])
+        self.assertEqual(bound, 90)
 
     @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")
-    def test_elven_tier_bound_resolves_to_the_elf_lifespan_band(self):
-        bound = race_lifespan_upper_bound("elven_civilian")
-        self.assertEqual(bound, RACE_REGISTRY["elf"].lifespan[1])
+    @synthetic_registries(
+        "races",
+        "npc_tiers",
+        "subraces",
+        "static_tiers",
+        extra={
+            "races": {"t_longlife": make_race("t_longlife", lifespan=(900, 1200))},
+            "npc_tiers": {
+                "t_elder": make_npc_tier("t_elder", race_key="t_longlife")
+            },
+        },
+    )
+    def test_longlived_race_bound_resolves_to_its_own_lifespan_band(self):
+        # A second (tier, race) pairing proves the bound follows the tier's
+        # own race row rather than any constant.
+        bound = race_lifespan_upper_bound("t_elder")
         self.assertEqual(bound, 1200)
 
     @covers_requirement("blueprint-portrait-policy::the-shared-bound-helper-is-the-single-validation-rule-source-for-both-layers")

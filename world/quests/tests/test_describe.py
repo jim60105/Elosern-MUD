@@ -9,9 +9,12 @@ from tools.spec_traceability import covers_requirement
 
 import unittest
 
-from world.lore.anchors import ANCHOR_REGISTRY
-from world.lore.items import ITEM_REGISTRY
-from world.lore.monsters import MONSTER_TIER_REGISTRY
+from world.tests.synthetic_data import (
+    SYNTH_ANCHORS,
+    SYNTH_ITEMS,
+    SYNTH_MONSTER_TIERS,
+    synthetic_registries,
+)
 from world.quests.definitions import (
     DestinationKind,
     ObjectiveKind,
@@ -46,9 +49,20 @@ from ._fixtures import (
 
 _HOUR = CLOCK_YAML["seconds_per_hour"]
 
+# Rendering runs entirely against the kit's synthetic rows; the scope keeps
+# the tier/anchor/item registries synthetic for the describe lookups.
+_T_TIER = SYNTH_MONSTER_TIERS["t_faint"].key
+_T_ITEM = SYNTH_ITEMS["t_ember_spray"].key
+_T_ANCHOR = SYNTH_ANCHORS["t_hollow_tarn"].key
+
+
+#: Pure rendering input: a private definition key consistent across the
+#: record and its definition.
+_DEFINITION_KEY = "t_describe_fixture"
+
 
 def _record(
-    definition_key: str = "introductory_hunt",
+    definition_key: str = _DEFINITION_KEY,
     *,
     state: QuestState = QuestState.IN_PROGRESS,
     stage_index: int = 0,
@@ -74,22 +88,23 @@ def _record(
 
 def _offer() -> GuildQuestOffer:
     return GuildQuestOffer(
-        definition_key="introductory_hunt",
-        issuer_branch_key="guild_branch_altoria",
+        definition_key=_DEFINITION_KEY,
+        issuer_branch_key="t_mossgate_branch",
         reward=QuestReward(
             copper=50,
-            items=(ItemQuantity("healing_potion", 2),),
+            items=(ItemQuantity(_T_ITEM, 2),),
             merit=25,
         ),
     )
 
 
+@synthetic_registries("monster_tiers", "anchors", "anchor_placements", "items")
 class DescribeObjectiveTests(unittest.TestCase):
     @covers_requirement("quest-detail-view::objective-descriptions-are-deterministic-and-exhaustive")
     def test_defeat_tier_renders_tier_and_quantity(self):
-        tier = MONSTER_TIER_REGISTRY["low"]
+        tier = SYNTH_MONSTER_TIERS[_T_TIER]
         self.assertEqual(
-            describe_objective(defeat(tier="low", quantity=1)),
+            describe_objective(defeat(tier=_T_TIER, quantity=1)),
             f"討伐 1 隻{tier.display_name_zh}魔物",
         )
 
@@ -102,7 +117,7 @@ class DescribeObjectiveTests(unittest.TestCase):
 
     @covers_requirement("quest-detail-view::objective-descriptions-are-deterministic-and-exhaustive")
     def test_reach_anchor_renders_anchor_display_name(self):
-        anchor = ANCHOR_REGISTRY["capital_altoria"]
+        anchor = SYNTH_ANCHORS[_T_ANCHOR]
         objective = QuestObjective(
             kind=ObjectiveKind.REACH,
             destination=anchor_locator(),
@@ -139,11 +154,11 @@ class DescribeObjectiveTests(unittest.TestCase):
 
     @covers_requirement("quest-detail-view::objective-descriptions-are-deterministic-and-exhaustive")
     def test_acquire_renders_item_and_count(self):
-        item = ITEM_REGISTRY["healing_potion"]
+        item = SYNTH_ITEMS[_T_ITEM]
         objective = QuestObjective(
             kind=ObjectiveKind.ACQUIRE,
             quantity=2,
-            item_key="healing_potion",
+            item_key=_T_ITEM,
         )
         self.assertEqual(
             describe_objective(objective),
@@ -161,11 +176,12 @@ class DescribeObjectiveTests(unittest.TestCase):
             describe_objective(objective)
 
 
+@synthetic_registries("anchors", "anchor_placements")
 class DescribeDestinationTests(unittest.TestCase):
     def test_anchor_uses_registry_display_name(self):
         self.assertEqual(
             describe_destination(anchor_locator()),
-            ANCHOR_REGISTRY["capital_altoria"].display_name_zh,
+            SYNTH_ANCHORS[_T_ANCHOR].display_name_zh,
         )
 
     def test_grid_uses_exact_coordinates(self):
@@ -181,16 +197,17 @@ class DescribeDestinationTests(unittest.TestCase):
         )
 
     def test_unknown_destination_kind_raises(self):
-        locator = RoomLocator(DestinationKind.ANCHOR, anchor_key="capital_altoria")
+        locator = RoomLocator(DestinationKind.ANCHOR, anchor_key=_T_ANCHOR)
         object.__setattr__(locator, "kind", "bogus")
         with self.assertRaises(QuestDescribeError):
             describe_destination(locator)
 
 
+@synthetic_registries("items")
 class DescribeQuestDetailTests(unittest.TestCase):
     def setUp(self):
         super().setUp()
-        self.definition = quest("introductory_hunt")
+        self.definition = quest(_DEFINITION_KEY)
 
     def test_full_detail_assembles_name_state_stage_progress(self):
         text = describe_quest_detail(
@@ -214,7 +231,7 @@ class DescribeQuestDetailTests(unittest.TestCase):
         )
         self.assertIn("獎勵：銅 50", text)
         self.assertIn("功績 25", text)
-        self.assertIn("治療藥水", text)
+        self.assertIn(SYNTH_ITEMS[_T_ITEM].display_name_zh, text)
 
     @covers_requirement("quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail")
     def test_reward_section_omitted_when_offer_absent(self):

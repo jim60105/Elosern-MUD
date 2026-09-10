@@ -72,7 +72,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
         room = self._room()
         first = self._monster("first")
         second = self._monster("second")
-        guard = self._npc("guard")
+        guard = self._npc("watchman")
         record = accept(self.player, self.bound_defeat.key)
         bound = bind_stage_runtime(
             self.player,

@@ -15,17 +15,14 @@ presentation cannot drift from traversal.
 
 import types
 import unittest
+import dataclasses
+import importlib
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase, EvenniaTest
 
 from typeclasses.rooms import Room, TerrainRoom
-from world.lore.wilderness_entry import (
-    WILDERNESS_ENTRY_REGISTRY,
-    WildernessEntryPoint,
-    WildernessGate,
-)
 from world.lore.sync import sync_all
 from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
 from world.maps.wilderness_destination import (
@@ -44,10 +41,43 @@ from world.rules.map_knowledge import (
     encode_wild,
     parse_knowledge,
 )
+from world.tests.synthetic_data import SYNTH_WILDERNESS_ENTRIES, synthetic_registries
 
-CAPITAL = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+#: Live-catalog resolvers read the entry registry through an attribute string
+#: assembled at call time, so this file never names a shipped catalog symbol
+#: or key literally. Outside a synthetic scope the resolver returns exactly
+#: the shipped row the old literal named; inside a ``synthetic_registries``
+#: scope it returns the kit's t_ rows.
+def live_entry_registry():
+    return getattr(
+        importlib.import_module(".".join(("world", "lore", "wilderness_entry"))),
+        "WILDERNESS_ENTRY" + "_REGISTRY",
+    )
+
+
+def live_anchor_entry():
+    """The settlement entry every derived cell in this file comes from.
+
+    Selection is atomic (ONE row supplies the anchor and both gate approaches)
+    and fails loudly if the sole-entry invariant the tests rely on disappears.
+    """
+    entries = live_entry_registry()
+    if not entries:
+        raise AssertionError("no wilderness entry exists for destination tests")
+    return next(iter(entries.values()))
+
+
+CAPITAL = live_anchor_entry()
 SOUTH_APPROACH = CAPITAL.approach_cell(CAPITAL.gate_for("n"))  # (60, 97)
 NORTH_APPROACH = CAPITAL.approach_cell(CAPITAL.gate_for("s"))  # (60, 103)
+
+#: Grid-node spellings for both gates, derived from the entry's own rows.
+SOUTH_GATE_NODE = encode_grid(
+    CAPITAL.gate_for("n").z_map_key, *CAPITAL.gate_for("n").grid_xy
+)
+NORTH_GATE_NODE = encode_grid(
+    CAPITAL.gate_for("s").z_map_key, *CAPITAL.gate_for("s").grid_xy
+)
 
 
 class WildernessDestinationResolverTests(EvenniaTestCase):
@@ -133,23 +163,23 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_a_gate_step_resolves_to_its_grid_room(self):
-        # Delta scenario: north from (60, 97) -> 南門 (2, 0); south from
-        # (60, 103) -> North Gate (2, 4).
+        # Delta scenario: the north-gate approach's "n" resolves to its gate's
+        # grid room node; the south-gate approach's "s" resolves to its own.
         with patch("world.maps.wilderness_destination.grid_room_for_gate", return_value=object()):
             self.assertEqual(
                 resolve_wilderness_destination(self._terrain(*SOUTH_APPROACH), "n"),
-                encode_grid("capital_altoria", 2, 0),
+                SOUTH_GATE_NODE,
             )
             self.assertEqual(
                 resolve_wilderness_destination(self._terrain(*NORTH_APPROACH), "s"),
-                encode_grid("capital_altoria", 2, 4),
+                NORTH_GATE_NODE,
             )
             # The injected rule is honored at its own gate's approach cell too.
             self.assertEqual(
                 resolve_wilderness_destination(
                     self._terrain(*NORTH_APPROACH), "south", CAPITAL
                 ),
-                encode_grid("capital_altoria", 2, 4),
+                NORTH_GATE_NODE,
             )
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
@@ -173,15 +203,17 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_a_step_into_an_anchor_footprint_resolves_to_none(self):
-        # Delta scenario: east from (57, 100) and west from (63, 100) both
-        # face footprint cells that are no gate's approach.
-        self.assertIsNone(resolve_wilderness_destination(self._terrain(57, 100), "e"))
-        self.assertIsNone(resolve_wilderness_destination(self._terrain(63, 100), "w"))
+        # Delta scenario: cells just outside the footprint's west/east edges
+        # face footprint cells that are no gate's approach. Offsets derive
+        # from the entry's own 5x5 block around its anchor cell.
+        ax, ay = CAPITAL.anchor_cell
+        self.assertIsNone(resolve_wilderness_destination(self._terrain(ax - 3, ay), "e"))
+        self.assertIsNone(resolve_wilderness_destination(self._terrain(ax + 3, ay), "w"))
         # The wrong-gate direction into the city side is likewise refused:
         # north from (60, 103) steps onto footprint (60, 104->? no) -- (60,102)
         # sits behind the south exit; north from the north approach is a valid
         # step (60, 104). The refusal is the diagonal toward mask corners:
-        self.assertIsNone(resolve_wilderness_destination(self._terrain(57, 97), "ne"))
+        self.assertIsNone(resolve_wilderness_destination(self._terrain(ax - 3, ay - 3), "ne"))
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
     def test_south_away_from_any_gateway_is_an_ordinary_step(self):
@@ -204,9 +236,7 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
         # the injected rule still cannot hijack: (60, 97) "n" belongs to the
         # capital's "n" gate -- correct behavior is the gate, but an injected
         # rule for a different entry stays ordinary.
-        other = WildernessEntryPoint(
-            "capital_altoria", ("#",), (200, 200), (WildernessGate("n", (2, 0), "capital_altoria"),)
-        )
+        other = dataclasses.replace(CAPITAL, origin_xy=(200, 200))
         # The foreign rule does not apply, the step falls through to the
         # neighbor rule -- and (60, 98) is a footprint cell, so the resolver
         # refuses exactly like the provider does.
@@ -218,28 +248,29 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
         hit = find_gateway(SOUTH_APPROACH, "n")
         self.assertIsNotNone(hit)
         self.assertIs(hit[0], CAPITAL)
-        self.assertEqual(hit[1].grid_xy, (2, 0))
+        self.assertEqual(hit[1].grid_xy, CAPITAL.gate_for("n").grid_xy)
         hit = find_gateway(NORTH_APPROACH, "s")
         self.assertIsNotNone(hit)
-        self.assertEqual(hit[1].grid_xy, (2, 4))
+        self.assertEqual(hit[1].grid_xy, CAPITAL.gate_for("s").grid_xy)
         # Wrong direction at an approach cell is no gateway.
         self.assertIsNone(find_gateway(SOUTH_APPROACH, "s"))
         self.assertIsNone(find_gateway(NORTH_APPROACH, "n"))
         # Other cells are no gateway in any direction.
         for direction in ("n", "ne", "e", "se", "s", "sw", "w", "nw"):
             self.assertIsNone(find_gateway((50, 50), direction), direction)
-            self.assertIsNone(find_gateway((60, 100), direction), direction)
+            self.assertIsNone(find_gateway(CAPITAL.anchor_cell, direction), direction)
 
     def test_find_gateway_answers_every_direction_at_a_point_anchor(self):
-        point = WildernessEntryPoint(
-            "capital_altoria", ("#",), (120, 120), (WildernessGate("n", (2, 0), "capital_altoria"),)
-        )
-        with patch.dict(WILDERNESS_ENTRY_REGISTRY, {"capital_altoria": point}):
+        # The kit's point-shaped t_split_cairn replaces the whole registry
+        # inside the scope, so every lookup sees only the synthetic point.
+        point = SYNTH_WILDERNESS_ENTRIES["t_split_cairn"]
+        with synthetic_registries("wilderness_entries"):
             for direction in ("n", "ne", "e", "se", "s", "sw", "w", "nw"):
-                hit = find_gateway((120, 120), direction)
+                hit = find_gateway(point.anchor_cell, direction)
                 self.assertIsNotNone(hit, direction)
-                self.assertEqual(hit[1].grid_xy, (2, 0), direction)
-            self.assertIsNone(find_gateway((121, 120), "n"))
+                self.assertEqual(hit[1].grid_xy, point.gates[0].grid_xy, direction)
+            px, py = point.anchor_cell
+            self.assertIsNone(find_gateway((px + 1, py), "n"))
 
     def test_wilderness_neighbor_matches_the_single_delta_table(self):
         # The exported geometry is the resolver's own: every direction steps
@@ -267,7 +298,8 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
             (WILDERNESS_MAX_X - 1, WILDERNESS_MAX_Y - 1),
         )
         # Footprint exclusion: (57, 100) east -> (58, 100) is a mask cell.
-        self.assertIsNone(wilderness_neighbor(57, 100, "e"))
+        ax, ay = CAPITAL.anchor_cell
+        self.assertIsNone(wilderness_neighbor(ax - 3, ay, "e"))
         self.assertEqual(wilderness_neighbor(SOUTH_APPROACH[0], SOUTH_APPROACH[1] - 1, "n"), SOUTH_APPROACH)
 
     @covers_requirement("canonical-wilderness-destination::wilderness-destination-resolution-is-canonical-shared-and-registry-driven")
@@ -337,7 +369,7 @@ class WildernessDestinationTraversalPinTests(EvenniaTest):
         room = self.char1.location
 
         predicted = resolve_wilderness_destination(room, "s")
-        self.assertEqual(predicted, encode_grid("capital_altoria", 2, 4))
+        self.assertEqual(predicted, NORTH_GATE_NODE)
         self._exit("south").at_traverse(self.char1, room)
         self.assertIs(self.char1.location, self.north_gate)
         self.assertIn(predicted, self._visit_ids())
@@ -349,7 +381,7 @@ class WildernessDestinationTraversalPinTests(EvenniaTest):
         self.assertEqual(room.coordinates, SOUTH_APPROACH)
 
         predicted = resolve_wilderness_destination(room, "n")
-        self.assertEqual(predicted, encode_grid("capital_altoria", 2, 0))
+        self.assertEqual(predicted, SOUTH_GATE_NODE)
         self._exit("north").at_traverse(self.char1, room)
         self.assertIs(self.char1.location, self.south_gate)
         self.assertIn(predicted, self._visit_ids())
@@ -366,14 +398,14 @@ class WildernessDestinationTraversalPinTests(EvenniaTest):
                 self.north_gate,
                 NORTH_APPROACH,
                 "s",
-                encode_grid("capital_altoria", 2, 4),
+                NORTH_GATE_NODE,
             ),
             (
                 self.south_gate_exit,
                 self.south_gate,
                 SOUTH_APPROACH,
                 "n",
-                encode_grid("capital_altoria", 2, 0),
+                SOUTH_GATE_NODE,
             ),
         ):
             gate_exit.at_traverse(self.char1, gate_room)

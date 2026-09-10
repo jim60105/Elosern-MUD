@@ -1,7 +1,15 @@
 """Tests for DELIVER quest objectives, transfer observer, and atomic progress."""
 
 import unittest
+from contextlib import ExitStack
 from unittest.mock import patch
+
+from world.tests.synthetic_data import SYNTH_ITEMS, synthetic_registries
+
+#: Deliveries run on the kit's synthetic rows: the delivery item and the
+#: wrong-item decoy are both catalog-synthetic.
+_T_ITEM = SYNTH_ITEMS["t_ember_spray"].key
+_T_OTHER = SYNTH_ITEMS["t_iron_fang"].key
 
 from django.db import transaction
 from evennia.utils.create import create_object
@@ -40,6 +48,7 @@ from world.rules.npc_intents import (
 )
 
 
+@synthetic_registries("items")
 class DeliverDefinitionTests(QuestRegistryIsolation, EvenniaTest):
     """Validation contract for DELIVER quest objectives."""
 
@@ -52,7 +61,7 @@ class DeliverDefinitionTests(QuestRegistryIsolation, EvenniaTest):
         definition = register(
             quest(
                 "deliver_valid",
-                stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
+                stages=(QuestStage(0, deliver(_T_ITEM, quantity=2)),),
             )
         )
         player = create_object(PlayerCharacter, key="deliver player")
@@ -79,7 +88,7 @@ class DeliverDefinitionTests(QuestRegistryIsolation, EvenniaTest):
             bad_objective = QuestObjective(
                 kind=ObjectiveKind.DELIVER,
                 quantity=qty,
-                item_key="healing_potion",
+                item_key=_T_ITEM,
                 requires_bound_targets=True,
             )
             bad_definition = quest(f"deliver_bad_qty_{qty}", stages=(QuestStage(0, bad_objective),))
@@ -94,7 +103,7 @@ class DeliverDefinitionTests(QuestRegistryIsolation, EvenniaTest):
             bad_objective = QuestObjective(
                 kind=ObjectiveKind.DELIVER,
                 quantity=1,
-                item_key="healing_potion",
+                item_key=_T_ITEM,
                 requires_bound_targets=val,
             )
             bad_definition = quest("deliver_unbound", stages=(QuestStage(0, bad_objective),))
@@ -108,7 +117,7 @@ class DeliverDefinitionTests(QuestRegistryIsolation, EvenniaTest):
         bad_objective = QuestObjective(
             kind=ObjectiveKind.DELIVER,
             quantity=1,
-            item_key="healing_potion",
+            item_key=_T_ITEM,
             requires_bound_targets=True,
             destination=anchor_locator(),
         )
@@ -122,7 +131,7 @@ class DeliverDefinitionTests(QuestRegistryIsolation, EvenniaTest):
         bad_objective = QuestObjective(
             kind=ObjectiveKind.DELIVER,
             quantity=1,
-            item_key="healing_potion",
+            item_key=_T_ITEM,
             requires_bound_targets=True,
             monster_tier="low",
         )
@@ -132,11 +141,18 @@ class DeliverDefinitionTests(QuestRegistryIsolation, EvenniaTest):
         self.assertIn("monster_tier", str(ctx.exception))
 
 
+@synthetic_registries("items")
 class DeliverBindingTests(QuestRegistryIsolation, EvenniaTest):
     """Binding contract for DELIVER quest objectives."""
 
     def setUp(self):
         super().setUp()
+        # The class decorator wraps test methods only, so the item scope
+        # is entered here too: the definition registered below validates
+        # its item key against the synthetic registry.
+        stack = ExitStack()
+        stack.enter_context(synthetic_registries("items"))
+        self.addCleanup(stack.close)
         register_catalog_once()
         self.room = create_object(Room, key="delivery room")
         self.player = create_object(PlayerCharacter, key="delivery player")
@@ -153,7 +169,7 @@ class DeliverBindingTests(QuestRegistryIsolation, EvenniaTest):
         self.definition = register(
             quest(
                 "deliver_binding_quest",
-                stages=(QuestStage(0, deliver("healing_potion", quantity=1)),),
+                stages=(QuestStage(0, deliver(_T_ITEM, quantity=1)),),
             )
         )
         self.record = accept(self.player, self.definition.key)
@@ -165,9 +181,9 @@ class DeliverBindingTests(QuestRegistryIsolation, EvenniaTest):
 
     @covers_requirement("quest-delivery::the-recipient-is-a-runtime-bound-identity-never-a-name")
     def test_transfer_to_bound_recipient_advances_the_objective(self):
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_ITEM]
         self.recipient.db.inventory = []
-        outcome = _transfer_items(self.player, self.recipient, "healing_potion", 1)
+        outcome = _transfer_items(self.player, self.recipient, _T_ITEM, 1)
         self.assertTrue(outcome.applied)
         record = read_records(self.player)[0]
         self.assertEqual(record.state, QuestState.COMPLETED)
@@ -175,20 +191,27 @@ class DeliverBindingTests(QuestRegistryIsolation, EvenniaTest):
 
     @covers_requirement("quest-delivery::the-recipient-is-a-runtime-bound-identity-never-a-name")
     def test_transfer_to_same_named_unbound_character_does_not_advance(self):
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_ITEM]
         self.other_npc.db.inventory = []
-        outcome = _transfer_items(self.player, self.other_npc, "healing_potion", 1)
+        outcome = _transfer_items(self.player, self.other_npc, _T_ITEM, 1)
         self.assertTrue(outcome.applied)
         record = read_records(self.player)[0]
         self.assertEqual(record.state, QuestState.IN_PROGRESS)
         self.assertEqual(record.stage_progress, 0)
 
 
+@synthetic_registries("items")
 class DeliverProgressTests(QuestRegistryIsolation, EvenniaTest):
     """Progress rules for DELIVER quest objectives."""
 
     def setUp(self):
         super().setUp()
+        # The class decorator wraps test methods only, so the item scope
+        # is entered here too: the definition registered below validates
+        # its item key against the synthetic registry.
+        stack = ExitStack()
+        stack.enter_context(synthetic_registries("items"))
+        self.addCleanup(stack.close)
         register_catalog_once()
         self.room = create_object(Room, key="progress room")
         self.player = create_object(PlayerCharacter, key="progress player")
@@ -202,7 +225,7 @@ class DeliverProgressTests(QuestRegistryIsolation, EvenniaTest):
         self.definition = register(
             quest(
                 "deliver_progress_quest",
-                stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
+                stages=(QuestStage(0, deliver(_T_ITEM, quantity=2)),),
             )
         )
         self.record = accept(self.player, self.definition.key)
@@ -214,9 +237,9 @@ class DeliverProgressTests(QuestRegistryIsolation, EvenniaTest):
 
     @covers_requirement("quest-delivery::delivery-progress-comes-only-from-a-committed-transfer-to-the-bound-recipient")
     def test_giver_side_transfer_advances_matching_objective(self):
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_ITEM, _T_ITEM]
         self.recipient.db.inventory = []
-        outcome = _transfer_items(self.player, self.recipient, "healing_potion", 1)
+        outcome = _transfer_items(self.player, self.recipient, _T_ITEM, 1)
         self.assertTrue(outcome.applied)
         record = read_records(self.player)[0]
         self.assertEqual(record.state, QuestState.IN_PROGRESS)
@@ -224,9 +247,9 @@ class DeliverProgressTests(QuestRegistryIsolation, EvenniaTest):
 
     @covers_requirement("quest-delivery::delivery-progress-comes-only-from-a-committed-transfer-to-the-bound-recipient")
     def test_transferring_wrong_item_advances_nothing(self):
-        self.player.db.inventory = ["iron_ore"]
+        self.player.db.inventory = [_T_OTHER]
         self.recipient.db.inventory = []
-        outcome = _transfer_items(self.player, self.recipient, "iron_ore", 1)
+        outcome = _transfer_items(self.player, self.recipient, _T_OTHER, 1)
         self.assertTrue(outcome.applied)
         record = read_records(self.player)[0]
         self.assertEqual(record.state, QuestState.IN_PROGRESS)
@@ -234,9 +257,9 @@ class DeliverProgressTests(QuestRegistryIsolation, EvenniaTest):
 
     @covers_requirement("quest-delivery::delivery-progress-comes-only-from-a-committed-transfer-to-the-bound-recipient")
     def test_receiving_rather_than_giving_advances_nothing(self):
-        self.recipient.db.inventory = ["healing_potion"]
+        self.recipient.db.inventory = [_T_ITEM]
         self.player.db.inventory = []
-        outcome = _transfer_items(self.recipient, self.player, "healing_potion", 1)
+        outcome = _transfer_items(self.recipient, self.player, _T_ITEM, 1)
         self.assertTrue(outcome.applied)
         record = read_records(self.player)[0]
         self.assertEqual(record.state, QuestState.IN_PROGRESS)
@@ -244,9 +267,9 @@ class DeliverProgressTests(QuestRegistryIsolation, EvenniaTest):
 
     @covers_requirement("quest-progress-tracking::stage-completion-advances-exactly-once-and-releases-obsolete-runtime-bindings")
     def test_oversized_transfer_advances_once_with_progress_capped_and_no_surplus(self):
-        self.player.db.inventory = ["healing_potion"] * 5
+        self.player.db.inventory = [_T_ITEM] * 5
         self.recipient.db.inventory = []
-        outcome = _transfer_items(self.player, self.recipient, "healing_potion", 5)
+        outcome = _transfer_items(self.player, self.recipient, _T_ITEM, 5)
         self.assertTrue(outcome.applied)
         record = read_records(self.player)[0]
         self.assertEqual(record.state, QuestState.COMPLETED)
@@ -255,25 +278,32 @@ class DeliverProgressTests(QuestRegistryIsolation, EvenniaTest):
 
     @covers_requirement("quest-progress-tracking::stage-completion-advances-exactly-once-and-releases-obsolete-runtime-bindings")
     def test_terminal_record_ignores_later_matching_transfer(self):
-        self.player.db.inventory = ["healing_potion"] * 3
+        self.player.db.inventory = [_T_ITEM] * 3
         self.recipient.db.inventory = []
         # Complete the quest
-        _transfer_items(self.player, self.recipient, "healing_potion", 2)
+        _transfer_items(self.player, self.recipient, _T_ITEM, 2)
         completed_record = read_records(self.player)[0]
         self.assertEqual(completed_record.state, QuestState.COMPLETED)
 
         # Transfer one more item to the former recipient
-        outcome = _transfer_items(self.player, self.recipient, "healing_potion", 1)
+        outcome = _transfer_items(self.player, self.recipient, _T_ITEM, 1)
         self.assertTrue(outcome.applied)
         after_record = read_records(self.player)[0]
         self.assertEqual(after_record, completed_record)
 
 
+@synthetic_registries("items")
 class DeliverPurityAndAtomicityTests(QuestRegistryIsolation, EvenniaTest):
     """Purity of observer and atomicity of transfer with rollback."""
 
     def setUp(self):
         super().setUp()
+        # The class decorator wraps test methods only, so the item scope
+        # is entered here too: the definition registered below validates
+        # its item key against the synthetic registry.
+        stack = ExitStack()
+        stack.enter_context(synthetic_registries("items"))
+        self.addCleanup(stack.close)
         register_catalog_once()
         self.room = create_object(Room, key="atomicity room")
         self.player = create_object(PlayerCharacter, key="atomicity player")
@@ -287,7 +317,7 @@ class DeliverPurityAndAtomicityTests(QuestRegistryIsolation, EvenniaTest):
         self.definition = register(
             quest(
                 "deliver_atomicity_quest",
-                stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
+                stages=(QuestStage(0, deliver(_T_ITEM, quantity=2)),),
             )
         )
         self.record = accept(self.player, self.definition.key)
@@ -302,7 +332,7 @@ class DeliverPurityAndAtomicityTests(QuestRegistryIsolation, EvenniaTest):
         before_inventory = list(self.player.db.inventory or [])
         before_log = [dict(entry) for entry in (self.player.db.quest_log or [])]
 
-        result = compute_deliver_replacement(self.player, self.recipient, "healing_potion", 1)
+        result = compute_deliver_replacement(self.player, self.recipient, _T_ITEM, 1)
         self.assertIsNotNone(result)
         new_records, pin_ops = result
         self.assertEqual(new_records[0].stage_progress, 1)
@@ -314,7 +344,7 @@ class DeliverPurityAndAtomicityTests(QuestRegistryIsolation, EvenniaTest):
 
     @covers_requirement("quest-delivery::the-delivery-observer-computes-a-replacement-and-writes-nothing")
     def test_fault_injected_transfer_restores_quest_log_and_inventories(self):
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_ITEM, _T_ITEM]
         self.recipient.db.inventory = []
         player_before = list(self.player.db.inventory)
         recipient_before = list(self.recipient.db.inventory)
@@ -327,7 +357,7 @@ class DeliverPurityAndAtomicityTests(QuestRegistryIsolation, EvenniaTest):
             return _apply_plan(plan)
 
         with patch("world.rules.npc_intents._apply_plan", side_effect=failing_apply):
-            outcome = _transfer_items(self.player, self.recipient, "healing_potion", 1)
+            outcome = _transfer_items(self.player, self.recipient, _T_ITEM, 1)
 
         self.assertFalse(outcome.applied)
         self.assertEqual(list(self.player.db.inventory), player_before)
@@ -337,14 +367,14 @@ class DeliverPurityAndAtomicityTests(QuestRegistryIsolation, EvenniaTest):
 
     @covers_requirement("quest-delivery::the-delivery-observer-computes-a-replacement-and-writes-nothing")
     def test_successful_transfer_schedules_delivery_progress_event(self):
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_ITEM]
         self.recipient.db.inventory = []
 
         with (
             patch("world.quests.deliver.log_info") as mock_log,
             self.captureOnCommitCallbacks(execute=True),
         ):
-            outcome = _transfer_items(self.player, self.recipient, "healing_potion", 1)
+            outcome = _transfer_items(self.player, self.recipient, _T_ITEM, 1)
 
         self.assertTrue(outcome.applied)
         mock_log.assert_called_once_with(
@@ -358,7 +388,7 @@ class DeliverPurityAndAtomicityTests(QuestRegistryIsolation, EvenniaTest):
 
     @covers_requirement("quest-delivery::the-delivery-observer-computes-a-replacement-and-writes-nothing")
     def test_rolled_back_transfer_does_not_emit_delivery_progress_event(self):
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_ITEM]
         self.recipient.db.inventory = []
 
         def failing_apply(plan):
@@ -369,17 +399,24 @@ class DeliverPurityAndAtomicityTests(QuestRegistryIsolation, EvenniaTest):
             patch("world.rules.npc_intents._apply_plan", side_effect=failing_apply),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            outcome = _transfer_items(self.player, self.recipient, "healing_potion", 1)
+            outcome = _transfer_items(self.player, self.recipient, _T_ITEM, 1)
 
         self.assertFalse(outcome.applied)
         mock_log.assert_not_called()
 
 
+@synthetic_registries("items")
 class DeliverSeamTests(QuestRegistryIsolation, EvenniaTest):
     """Contract of the shared advance seam both transfer callers route through."""
 
     def setUp(self):
         super().setUp()
+        # The class decorator wraps test methods only, so the item scope
+        # is entered here too: the definition registered below validates
+        # its item key against the synthetic registry.
+        stack = ExitStack()
+        stack.enter_context(synthetic_registries("items"))
+        self.addCleanup(stack.close)
         self.room = create_object(Room, key="seam room")
         self.player = create_object(PlayerCharacter, key="seam player")
         self.player.race = "human"
@@ -395,7 +432,7 @@ class DeliverSeamTests(QuestRegistryIsolation, EvenniaTest):
         self.definition = register(
             quest(
                 "deliver_seam_quest",
-                stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
+                stages=(QuestStage(0, deliver(_T_ITEM, quantity=2)),),
             )
         )
         self.record = accept(self.player, self.definition.key)
@@ -411,7 +448,7 @@ class DeliverSeamTests(QuestRegistryIsolation, EvenniaTest):
             self.captureOnCommitCallbacks(execute=True),
         ):
             advance_deliveries_for_transfer(
-                self.player, self.recipient, "healing_potion", 1, pin_snapshots={}
+                self.player, self.recipient, _T_ITEM, 1, pin_snapshots={}
             )
 
         self.assertEqual(read_records(self.player)[0].stage_progress, 1)
@@ -426,7 +463,7 @@ class DeliverSeamTests(QuestRegistryIsolation, EvenniaTest):
 
     def test_seam_advances_nothing_for_an_unbound_receiver(self):
         advance_deliveries_for_transfer(
-            self.player, self.bystander, "healing_potion", 1, pin_snapshots={}
+            self.player, self.bystander, _T_ITEM, 1, pin_snapshots={}
         )
 
         self.assertEqual(read_records(self.player)[0].stage_progress, 0)
@@ -435,7 +472,7 @@ class DeliverSeamTests(QuestRegistryIsolation, EvenniaTest):
         second_definition = register(
             quest(
                 "deliver_seam_quest_two",
-                stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
+                stages=(QuestStage(0, deliver(_T_ITEM, quantity=2)),),
             )
         )
         second_record = accept(self.player, second_definition.key)
@@ -446,7 +483,7 @@ class DeliverSeamTests(QuestRegistryIsolation, EvenniaTest):
         )
 
         advance_deliveries_for_transfer(
-            self.player, self.recipient, "healing_potion", 3, pin_snapshots={}
+            self.player, self.recipient, _T_ITEM, 3, pin_snapshots={}
         )
 
         progress = {
@@ -477,7 +514,7 @@ class DeliverSeamTests(QuestRegistryIsolation, EvenniaTest):
             self.assertRaises(RuntimeError),
         ):
             advance_deliveries_for_transfer(
-                self.player, self.recipient, "healing_potion", 1, pin_snapshots={}
+                self.player, self.recipient, _T_ITEM, 1, pin_snapshots={}
             )
 
         self.assertEqual(read_records(self.player)[0].stage_progress, 0)
@@ -486,6 +523,7 @@ class DeliverSeamTests(QuestRegistryIsolation, EvenniaTest):
         )
 
 
+@synthetic_registries("items")
 class DeliverProseTests(unittest.TestCase):
     """Prose rendering contract for DELIVER quest objectives."""
 
@@ -494,11 +532,13 @@ class DeliverProseTests(unittest.TestCase):
         objective = QuestObjective(
             kind=ObjectiveKind.DELIVER,
             quantity=3,
-            item_key="healing_potion",
+            item_key=_T_ITEM,
             requires_bound_targets=True,
         )
         prose = describe_objective(objective)
-        self.assertEqual(prose, "交付 3 個治療藥水")
+        self.assertEqual(
+            prose, f"交付 3 個{SYNTH_ITEMS[_T_ITEM].display_name_zh}"
+        )
 
     @covers_requirement("quest-delivery::a-delivery-objective-renders-player-facing-prose-from-the-registries")
     def test_deliver_objective_with_unknown_item_raises(self):
