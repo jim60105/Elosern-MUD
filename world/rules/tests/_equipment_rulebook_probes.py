@@ -107,14 +107,38 @@ def rulebook_item_binding_pairs() -> list[tuple[str, object]]:
     ]
 
 
+def rulebook_rules(module_dotted: str) -> list:
+    """The loaded rule list of one rulebook module (mutable list, live rows)."""
+    return getattr(importlib.import_module(module_dotted), "_RULES")
+
+
+def rule_with_id(module_dotted: str, rule_id: str):
+    """The loaded rule carrying ``rule_id`` in one rulebook's rule list."""
+    for rule in rulebook_rules(module_dotted):
+        if rule.id == rule_id:
+            return rule
+    raise LookupError(f"{module_dotted}: no rule {rule_id!r}")
+
+
+def display_label(code: str) -> str:
+    """The shipped display label one condition code resolves through the
+    status-display table (borrowed at runtime, never pinned as a literal)."""
+    return getattr(
+        importlib.import_module("world.rules.status_display"), "display_for"
+    )(code).label
+
+
 __all__ = [
     "attached_buffs_rule",
     "gauge_cap_row_keys",
+    "display_label",
     "immune_to_key",
     "inventory_slot_vocabulary",
     "modifier_value",
     "rule_for",
     "rulebook_item_binding_pairs",
+    "rulebook_rules",
+    "rule_with_id",
     "unique_modifier_key",
     "unique_rule",
 ]

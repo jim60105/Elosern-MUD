@@ -555,3 +555,28 @@ class ApplyCostModifierTests(unittest.TestCase):
     def test_floor_not_truncation_on_fractional_product(self):
         self.assertEqual(apply_cost_modifier(10, "-5%"), 9)
         self.assertEqual(apply_cost_modifier(9, "-10%"), 8)
+
+
+class ChurchGraceDoctrineTests(unittest.TestCase):
+    """光明教會 doctrine content claim (以坦露為聖、恩賜為正).
+
+    Relocated from the worn-grace behavior suite: the grace set being a
+    blessing, not a curse, is a claim about the SHIPPED rows.
+    """
+
+    GRACE_RULE_IDS = (
+        "sister_vestment_grace",
+        "saintess_vestment_grace",
+        "holy_emblem_grace",
+        "pilgrim_medallion_grace",
+    )
+
+    def test_grace_adjustments_carry_no_negative_church_values(self):
+        for rule in RULES.values():
+            if rule.id not in self.GRACE_RULE_IDS:
+                continue
+            for key, value in rule.then.items():
+                if isinstance(value, int):
+                    self.assertGreaterEqual(value, 0, (rule.id, key))
+                elif isinstance(value, str) and value.endswith("%"):
+                    self.assertGreaterEqual(int(value[:-1]), 0, (rule.id, key))
