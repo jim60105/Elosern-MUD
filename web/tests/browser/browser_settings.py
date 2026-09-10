@@ -15,7 +15,10 @@ module. The seeding process imports it directly through
  test-data catalogs (``world/tests/synthetic_data.py``) before any startup
  world mirroring, so both this module's processes — the one-off seed and the
  managed Evennia server — mirror synthetic content into the private database.
- Default-off leaves shipped behavior identical.
+ The seed stays runnable under the flag: its base character activates from the
+ kit's own preset card and the shipped-key fixtures (combat grants, monsters)
+ are skipped, so the flag is documented as combinable with no other
+ fixture-enabling flag. Default-off leaves shipped behavior identical.
 """
 
 from evennia.settings_default import *  # noqa: F401, F403

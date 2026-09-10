@@ -59,11 +59,12 @@ managed-browser seed process, the managed Evennia server, and their startup
 world-bootstrap mirror synthetic catalogs into their private database instead of
 shipped content.
 
-#### Scenario: Browser journeys resolve a synthetic key end to end
-- **WHEN** the managed browser harness runs with the synthetic-install flag set and a
-  journey resolves a `t_`-prefixed entity through the running server
-- **THEN** the server, seeded from the synthetic catalogs at bootstrap, serves the
-  synthetic entity and the journey passes against it
+#### Scenario: Harness processes complete under the install flag
+- **WHEN** the managed browser seed process and the managed Evennia server run with the
+  synthetic-install flag set against a private database
+- **THEN** the seed completes with a `t_`-keyed base character, the server completes
+  startup, and the mirrored lore rows carry `t_`-prefixed keys (plus only the
+  documented runtime seams) instead of shipped content
 
 ### Requirement: JavaScript test corpora share an equivalent synthetic mirror
 The Vitest and Node-gate test corpora SHALL share a synthetic payload mirror (module
