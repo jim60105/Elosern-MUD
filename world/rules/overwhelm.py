@@ -12,6 +12,7 @@ from world.rules import combat
 from world.rules.combat import Battlefield
 from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
 from world.rules.event_log import EventEntry, EventLog
+from world.skills.effects import DamageEffect
 from world.skills.registry import SKILL_REGISTRY
 from world.lore.items import ITEM_REGISTRY
 
@@ -223,6 +224,57 @@ def classify_overwhelm(battlefield: Battlefield) -> str | None:
     return decided
 
 
+def commanded_damage_reaches_enemy(
+    battlefield: Battlefield,
+    actor_key: str,
+    skill_key: str,
+    target_keys: Iterable[str],
+) -> bool:
+    """Return whether a commanded action statically damages an enemy.
+
+    A pure query (combat-opening-seams D-4), the same discipline
+    ``classify_overwhelm()`` carries: it rolls no dice, constructs no pending
+    effect, writes nothing, caches nothing, and is recomputable at any time.
+    It returns ``True`` only when the registry skill's parsed effects carry
+    at least one ``DamageEffect`` **and** at least one ``target_keys`` member
+    is a concrete roster combatant on the team opposing
+    ``battlefield.team_of(actor_key)``. Indirect HP movement such as
+    ``SexualDrainEffect`` deliberately does not count: it moves the target's
+    pleasure into the caster's own pools, not damage.
+
+    ``target_keys`` holds concrete roster keys only — resolving an approved
+    AREA shorthand into concrete keys is the dispatching caller's job, the
+    only layer that knows which shorthand was approved. A value that is not a
+    concrete enemy-team roster key (a shorthand string, an ally, the actor,
+    or a key removed from the roster) simply fails to match rather than
+    raising, so every unresolvable aim fails closed to ``False``. An unknown
+    ``skill_key`` likewise returns ``False`` without raising, keeping the
+    query safe before any registry validation has run. It is never called
+    from inside ``classify_overwhelm()``: the two answer independent
+    questions, and combining them is the dispatching caller's decision.
+    """
+    skill = SKILL_REGISTRY.get(skill_key)
+    if skill is None:
+        return False
+    if not any(isinstance(effect, DamageEffect) for effect in skill.parsed_effects):
+        return False
+    actor_team = battlefield.team_of(actor_key)
+    if actor_team is None:
+        return False
+    enemy_members = next(
+        (
+            members
+            for team, members in battlefield.teams.items()
+            if team != actor_team
+        ),
+        frozenset(),
+    )
+    return any(
+        key in battlefield.roster and key in enemy_members
+        for key in target_keys
+    )
+
+
 @dataclass(frozen=True)
 class OverwhelmResult:
     """Structured result from one bounded overwhelm-resolution call."""
@@ -369,6 +421,7 @@ def _resolve_overwhelm_raw(
     nonlethal_keys: frozenset[str] = frozenset(),
     journal_sink: "list[object] | None" = None,
     notifications_sink: "list[str] | None" = None,
+    first_actor: str | None = None,
 ) -> tuple[str | None, str | None, list[EventLog], int, tuple[EventLog, ...]]:
     """Resolve and expose raw logs, the round-1 slice, and round count."""
     if max_rounds < 0:
@@ -381,22 +434,26 @@ def _resolve_overwhelm_raw(
     verdict_after = initial
     round1_window: tuple[EventLog, ...] = ()
     while rounds < max_rounds and not combat.is_battle_over(battlefield):
+        round_kwargs: dict[str, Any] = {}
         if (
             simulated
             or nonlethal_keys
             or journal_sink is not None
             or notifications_sink is not None
         ):
-            round_logs = combat.run_round(
-                battlefield,
-                action_provider,
-                simulated=simulated,
-                nonlethal_keys=nonlethal_keys,
-                journal_sink=journal_sink,
-                notifications_sink=notifications_sink,
-            )
-        else:
-            round_logs = combat.run_round(battlefield, action_provider)
+            round_kwargs = {
+                "simulated": simulated,
+                "nonlethal_keys": nonlethal_keys,
+                "journal_sink": journal_sink,
+                "notifications_sink": notifications_sink,
+            }
+        if first_actor is not None:
+            # D-2: the opening privilege belongs to round one only — the
+            # same slice that captures the commanded-action marker window.
+            # Later rounds act on ordinary initiative, so an explicit
+            # first_actor=None is what every later round forwards.
+            round_kwargs["first_actor"] = first_actor if rounds == 0 else None
+        round_logs = combat.run_round(battlefield, action_provider, **round_kwargs)
         if rounds == 0:
             round1_window = tuple(round_logs)
         raw_logs.extend(round_logs)
@@ -419,6 +476,7 @@ def resolve_overwhelm(
     nonlethal_keys: frozenset[str] = frozenset(),
     journal_sink: "list[object] | None" = None,
     notifications_sink: "list[str] | None" = None,
+    first_actor: str | None = None,
 ) -> OverwhelmResult:
     """Resolve a currently overwhelming encounter through the normal loop.
 
@@ -435,6 +493,18 @@ def resolve_overwhelm(
     can restore the actually-deleted mirrors. ``notifications_sink`` collects
     player-facing notification lines (e.g. title grant toasts) for delivery
     by the session boundary after its commit; compression never sends.
+
+    The keyword-only ``first_actor`` (combat-opening-seams D-2) reorders
+    round one's initiative only: it is forwarded to ``combat.run_round()``
+    for the first round and ``None`` for every later round. It influences
+    turn order alone and never damage, to-hit, the recomputed
+    ``classify_overwhelm()`` verdict, ``rounds_elapsed``, ``total_seconds``
+    (which stays ``rounds_elapsed * 6``), ``overwhelming_team``, or
+    ``verdict_after`` other than through the ordinary consequences of the
+    reordered turn sequence. A stale key is a silent no-op in
+    ``run_round()``. When it is ``None`` nothing new is forwarded, so a
+    default-mode call's call into ``run_round()`` stays byte-identical to
+    the pre-parameter signature.
     """
     initial, verdict_after, raw_logs, rounds, round1_window = (
         _resolve_overwhelm_raw(
@@ -445,6 +515,7 @@ def resolve_overwhelm(
             nonlethal_keys=nonlethal_keys,
             journal_sink=journal_sink,
             notifications_sink=notifications_sink,
+            first_actor=first_actor,
         )
     )
     event_logs = (

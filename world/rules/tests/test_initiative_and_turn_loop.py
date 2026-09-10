@@ -118,3 +118,126 @@ class DefaultAttackPolicyAffordabilityTests(unittest.TestCase):
         )
         request = default_attack_policy(actor, self._field(actor))
         self.assertEqual(request.skill_key, "firestorm")
+
+
+class FirstActorOverrideTests(unittest.TestCase):
+    """run_round(first_actor=...) reorders the rolled sequence and nothing else."""
+
+    _ROLLS = (70, 10, 40)
+
+    def battlefield(self):
+        # 100-point agility gaps (weight 10) dominate every d100 jitter, so
+        # the rolled baseline order is fixed under any seeded rolls.
+        fast = FakeEntity("fast", agility=40)
+        mid = FakeEntity("mid", agility=30)
+        slow = FakeEntity("slow", agility=20)
+        return Battlefield(
+            {"a": frozenset({"fast", "mid"}), "b": frozenset({"slow"})},
+            {"fast": fast, "mid": mid, "slow": slow},
+        )
+
+    def stale_battlefield(self):
+        field = Battlefield(
+            {
+                "a": frozenset({"fast", "dead", "fled", "fainted"}),
+                "b": frozenset({"slow"}),
+            },
+            {
+                "fast": FakeEntity("fast", agility=40),
+                "dead": FakeEntity("dead", agility=40, hp=0),
+                "fled": FakeEntity("fled", agility=40),
+                "fainted": FakeEntity("fainted", agility=40),
+                "slow": FakeEntity("slow", agility=20),
+            },
+        )
+        field.fled.add("fled")
+        field.knocked_out.add("fainted")
+        return field
+
+    def acting_order(self, battlefield, first_actor=(), rolls=_ROLLS):
+        seen: list[str] = []
+
+        def provider(entity, field):
+            seen.append(str(entity.key))
+            return None
+
+        kwargs = {} if first_actor == () else {"first_actor": first_actor}
+        with (
+            patch(
+                "world.rules.combat.roll_d100", side_effect=list(rolls)
+            ) as roller,
+            patch(
+                "world.rules.combat.evaluate_combat_modifiers", return_value={}
+            ),
+            patch("world.rules.combat.tick_buffs"),
+            patch("world.rules.combat.decay_tick"),
+        ):
+            run_round(battlefield, provider, **kwargs)
+        return seen, roller
+
+    @covers_requirement("combat-resolution::run-round-accepts-an-optional-first-actor-override-that-reorders-the-rolled-sequence-and-nothing-else")
+    def test_named_key_acts_first_and_rolls_stay_one_per_combatant(self):
+        baseline, baseline_rolls = self.acting_order(self.battlefield())
+        overridden, overridden_rolls = self.acting_order(
+            self.battlefield(), first_actor="slow"
+        )
+        self.assertEqual(baseline, ["fast", "mid", "slow"])
+        # The named key moves to the head; every other key keeps its rolled
+        # relative order. The override never re-rolls: exactly one roll per
+        # eligible combatant in both runs.
+        self.assertEqual(overridden, ["slow", "fast", "mid"])
+        self.assertEqual(baseline_rolls.call_count, 3)
+        self.assertEqual(overridden_rolls.call_count, 3)
+
+    @covers_requirement("combat-resolution::run-round-accepts-an-optional-first-actor-override-that-reorders-the-rolled-sequence-and-nothing-else")
+    def test_override_changes_order_never_the_action_multiset(self):
+        baseline, _ = self.acting_order(self.battlefield())
+        overridden, _ = self.acting_order(
+            self.battlefield(), first_actor="slow"
+        )
+        # Exactly one action per capable combatant under both runs; the
+        # override grants no extra action and skips nobody.
+        self.assertEqual(baseline, ["fast", "mid", "slow"])
+        self.assertEqual(sorted(overridden), sorted(baseline))
+        self.assertEqual(len(overridden), len(set(overridden)))
+
+    @covers_requirement("combat-resolution::run-round-accepts-an-optional-first-actor-override-that-reorders-the-rolled-sequence-and-nothing-else")
+    def test_stale_first_actor_keys_are_silent_noops(self):
+        baseline, _ = self.acting_order(self.stale_battlefield())
+        self.assertEqual(baseline, ["fast", "slow"])
+        for stale_key in ("dead", "fled", "fainted", "not-in-roster"):
+            with self.subTest(first_actor=stale_key):
+                order, _ = self.acting_order(
+                    self.stale_battlefield(), first_actor=stale_key
+                )
+                self.assertEqual(order, baseline)
+
+    @covers_requirement("combat-resolution::run-round-accepts-an-optional-first-actor-override-that-reorders-the-rolled-sequence-and-nothing-else")
+    def test_roll_initiative_sequence_is_the_only_source_of_order(self):
+        # A deliberately non-score-derived order: any implementation that
+        # re-scored or re-rolled to honour the override could not reproduce
+        # this exact sequence.
+        rolled = ["mid", "slow", "fast"]
+        seen: list[str] = []
+
+        def provider(entity, field):
+            seen.append(str(entity.key))
+            return None
+
+        with (
+            patch(
+                "world.rules.combat.roll_initiative", return_value=list(rolled)
+            ) as roller,
+            patch(
+                "world.rules.combat.roll_d100",
+                side_effect=AssertionError("re-rolled"),
+            ),
+            patch(
+                "world.rules.combat.evaluate_combat_modifiers", return_value={}
+            ),
+            patch("world.rules.combat.tick_buffs"),
+            patch("world.rules.combat.decay_tick"),
+        ):
+            run_round(self.battlefield(), provider, first_actor="slow")
+        self.assertEqual(roller.call_count, 1)
+        self.assertEqual(seen, ["slow", "mid", "fast"])

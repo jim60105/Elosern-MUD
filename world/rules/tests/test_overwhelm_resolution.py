@@ -229,6 +229,110 @@ class ResolutionTests(unittest.TestCase):
             )
 
 
+class FirstActorForwardingTests(unittest.TestCase):
+    """resolve_overwhelm(first_actor=...) reaches round one and only round one."""
+
+    def recorder(self):
+        calls: list[tuple[tuple, dict]] = []
+
+        def record(*args, **kwargs):
+            calls.append((args, dict(kwargs)))
+            return []
+
+        return calls, record
+
+    @covers_requirement("single-shot-resolution::resolve-overwhelm-accepts-a-first-actor-override-that-applies-to-round-one-only")
+    def test_override_reaches_round_one_and_none_after(self):
+        field = battlefield()
+
+        def provider(entity, current):
+            return None
+
+        calls, record = self.recorder()
+        with (
+            patch(
+                "world.rules.overwhelm.classify_overwhelm",
+                return_value="elves",
+            ),
+            patch(
+                "world.rules.overwhelm.combat.is_battle_over",
+                return_value=False,
+            ),
+            patch("world.rules.overwhelm.combat.run_round", side_effect=record),
+        ):
+            result = resolve_overwhelm(
+                field,
+                provider,
+                max_rounds=3,
+                first_actor="elf",
+            )
+        self.assertEqual(result.rounds_elapsed, 3)
+        self.assertEqual(result.total_seconds, 18)
+        self.assertEqual(len(calls), 3)
+        for args, _ in calls:
+            self.assertEqual(args, (field, provider))
+        self.assertEqual(calls[0][1], {"first_actor": "elf"})
+        self.assertEqual(calls[1][1], {"first_actor": None})
+        self.assertEqual(calls[2][1], {"first_actor": None})
+
+    @covers_requirement("single-shot-resolution::resolve-overwhelm-accepts-a-first-actor-override-that-applies-to-round-one-only")
+    def test_default_mode_call_forwards_nothing_new(self):
+        field = battlefield()
+
+        def provider(entity, current):
+            return None
+
+        calls, record = self.recorder()
+        with (
+            patch(
+                "world.rules.overwhelm.classify_overwhelm",
+                return_value="elves",
+            ),
+            patch(
+                "world.rules.overwhelm.combat.is_battle_over",
+                # Initial check, round-1 loop check, loop exit, final report.
+                side_effect=[False, False, True, False],
+            ),
+            patch("world.rules.overwhelm.combat.run_round", side_effect=record),
+        ):
+            resolve_overwhelm(field, provider)
+        # fix-dot-kill-credit D4 discipline: a default-mode call's call into
+        # run_round() is exactly the pre-change (battlefield, provider) call.
+        self.assertEqual(calls, [((field, provider), {})])
+
+    @covers_requirement("single-shot-resolution::resolve-overwhelm-accepts-a-first-actor-override-that-applies-to-round-one-only")
+    def test_override_starts_no_round_when_none_can_run(self):
+        for label, rounds_cap, over in (
+            ("zero-round cap", 0, False),
+            ("battle already over", 3, True),
+        ):
+            with self.subTest(case=label):
+                field = battlefield()
+
+                def provider(entity, current):
+                    return None
+
+                calls, record = self.recorder()
+                with (
+                    patch(
+                        "world.rules.overwhelm.classify_overwhelm",
+                        return_value="elves",
+                    ),
+                    patch(
+                        "world.rules.overwhelm.combat.is_battle_over",
+                        return_value=over,
+                    ),
+                    patch(
+                        "world.rules.overwhelm.combat.run_round",
+                        side_effect=record,
+                    ),
+                ):
+                    resolve_overwhelm(
+                        field, provider, max_rounds=rounds_cap, first_actor="elf"
+                    )
+                self.assertEqual(calls, [])
+
+
 class RealCombatEquivalenceTests(EvenniaTestCase):
     def _entity(self, key: str, *, strong: bool) -> PlayerCharacter:
         entity = create_object(PlayerCharacter, key=key)
@@ -309,6 +413,103 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
             )
             for log in logs
         ]
+
+    @staticmethod
+    def _full_logs(logs):
+        """Every EventLog field, with only unstable dbref identity normalized.
+
+        Unlike ``_logs``, this keeps ``skill_key``, ``targets``, and
+        ``time_cost_seconds`` so result-equality claims cover the whole
+        emitted log sequence, including every ``"roll"``-kind entry.
+        """
+
+        def _data(item):
+            rows = []
+            for key, value in item.data.items():
+                if key == "target_id":
+                    value = None if item.target is None else item.target.split("-")[0]
+                rows.append((key, value))
+            return tuple(sorted(rows))
+
+        return [
+            (
+                log.actor.split("-")[0],
+                log.skill_key,
+                tuple(target.split("-")[0] for target in log.targets),
+                log.time_cost_seconds,
+                tuple(
+                    (
+                        item.kind,
+                        item.actor.split("-")[0],
+                        None
+                        if item.target is None
+                        else item.target.split("-")[0],
+                        _data(item),
+                    )
+                    for item in log.entries
+                ),
+            )
+            for log in logs
+        ]
+
+    def _recording_provider(self, order):
+        def provider(entity, field):
+            order.append(str(entity.key).split("-")[0])
+            return default_attack_policy(entity, field)
+
+        return provider
+
+    @covers_requirement("combat-resolution::run-round-accepts-an-optional-first-actor-override-that-reorders-the-rolled-sequence-and-nothing-else")
+    def test_first_actor_none_is_byte_identical_to_omitted(self):
+        omitted = self._field("omitted", strong_first=True)
+        explicit = self._field("explicit", strong_first=True)
+        omitted_order: list[str] = []
+        explicit_order: list[str] = []
+        random.seed(1017)
+        omitted_logs = run_round(omitted, self._recording_provider(omitted_order))
+        random.seed(1017)
+        explicit_logs = run_round(
+            explicit,
+            self._recording_provider(explicit_order),
+            first_actor=None,
+        )
+        self.assertEqual(omitted_order, explicit_order)
+        self.assertEqual(self._state(omitted), self._state(explicit))
+        self.assertEqual(
+            self._full_logs(omitted_logs), self._full_logs(explicit_logs)
+        )
+        # The compared sequence really carried the dice evidence.
+        self.assertTrue(
+            any(
+                entry.kind == "roll"
+                for log in omitted_logs
+                for entry in log.entries
+            )
+        )
+
+    @covers_requirement("single-shot-resolution::the-first-actor-override-influences-turn-order-alone-never-resolution-outputs")
+    def test_stale_override_leaves_every_result_field_unchanged(self):
+        plain = self._field("plain", strong_first=True)
+        stale = self._field("stale", strong_first=True)
+        random.seed(1017)
+        baseline = resolve_overwhelm(plain, default_attack_policy)
+        random.seed(1017)
+        result = resolve_overwhelm(
+            stale,
+            default_attack_policy,
+            first_actor="not-in-roster",
+        )
+        self.assertEqual(result.rounds_elapsed, baseline.rounds_elapsed)
+        self.assertEqual(result.total_seconds, result.rounds_elapsed * 6)
+        self.assertEqual(result.total_seconds, baseline.total_seconds)
+        self.assertEqual(result.overwhelming_team, baseline.overwhelming_team)
+        self.assertEqual(result.verdict_after, baseline.verdict_after)
+        self.assertEqual(result.battle_over, baseline.battle_over)
+        self.assertEqual(self._state(stale), self._state(plain))
+        self.assertEqual(
+            self._full_logs(result.event_logs),
+            self._full_logs(baseline.event_logs),
+        )
 
     def _assert_direction_is_exact(self, *, strong_first: bool) -> None:
         resolved = self._field("resolved", strong_first=strong_first)

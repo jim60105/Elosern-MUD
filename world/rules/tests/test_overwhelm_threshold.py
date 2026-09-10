@@ -3,19 +3,29 @@
 from tools.spec_traceability import covers_requirement
 
 import math
+import inspect
 import unittest
 from unittest.mock import patch
 
 from world.rules.combat import Battlefield, effective_power
+from world.rules import overwhelm
 from world.rules.overwhelm import (
     _agility_saturation,
     _decided_direction,
     _expected_damage_per_attack,
+    commanded_damage_reaches_enemy,
     classify_overwhelm,
     estimated_rounds_to_conclude,
     hit_rate_verdict,
     power_ratio_verdict,
     team_effective_power,
+)
+from world.skills.registry import (
+    SKILL_REGISTRY,
+    SkillCategory,
+    SkillDef,
+    SkillKind,
+    TargetSpec,
 )
 
 from .combat_fixtures import FakeEntity
@@ -33,6 +43,38 @@ def battlefield(
         },
         {entity.key: entity for entity in members},
     )
+
+
+def _skill_def(key: str, effects: list[str]) -> SkillDef:
+    return SkillDef(
+        key=key,
+        label=f"fixture {key}",
+        description="Test fixture skill for the commanded-damage query.",
+        kind=SkillKind.ACTIVE,
+        target_spec=TargetSpec.SINGLE,
+        cost={},
+        usable_out_of_combat=False,
+        element=None,
+        effects=effects,
+        category=SkillCategory.UTILITY,
+    )
+
+
+QUERY_SKILLS = {
+    definition.key: definition
+    for definition in (
+        _skill_def("q_damage", ["damage:fire:physical"]),
+        _skill_def("q_buff", ["buff_apply:fixture_focus"]),
+        _skill_def("q_heal", ["heal:single"]),
+        _skill_def("q_self_heal", ["self_heal"]),
+        _skill_def("q_cleanse", ["cleanse:status"]),
+        _skill_def("q_debuff", ["buff_apply:fixture_curse"]),
+        _skill_def("q_disguise", ["set_disguise"]),
+        _skill_def("q_movement", ["movement:flight"]),
+        _skill_def("q_composite", ["damage:water:magic", "buff_apply:fixture_focus"]),
+        _skill_def("q_drain", ["divine_drain:測試"]),
+    )
+}
 
 
 class PowerRatioTests(unittest.TestCase):
@@ -381,3 +423,150 @@ class CombinedSignalTests(unittest.TestCase):
                 magic_power=1,
             )
             self.assertIsNone(classify_overwhelm(field))
+
+
+class CommandedDamageQueryTests(unittest.TestCase):
+    """commanded_damage_reaches_enemy() static-read truth table and purity."""
+
+    def field(self) -> Battlefield:
+        return battlefield(
+            [FakeEntity("actor"), FakeEntity("ally")],
+            [FakeEntity("enemy")],
+        )
+
+    def query(self, field, skill_key, target_keys):
+        with patch.dict(SKILL_REGISTRY, QUERY_SKILLS):
+            return commanded_damage_reaches_enemy(
+                field, "actor", skill_key, target_keys
+            )
+
+    @covers_requirement("overwhelm-threshold::a-pure-query-answers-whether-a-commanded-action-damages-an-enemy-read-statically-from-the-skill-definition")
+    def test_damage_at_enemy_is_the_only_true_skill_row(self):
+        field = self.field()
+        self.assertTrue(self.query(field, "q_damage", ["enemy"]))
+        self.assertTrue(self.query(field, "q_composite", ["enemy"]))
+        for non_damage_key in (
+            "q_buff",
+            "q_heal",
+            "q_self_heal",
+            "q_cleanse",
+            "q_debuff",
+            "q_disguise",
+            "q_movement",
+            # SexualDrainEffect moves pleasure into the caster's own pools;
+            # it is deliberately not damage.
+            "q_drain",
+        ):
+            with self.subTest(skill=non_damage_key):
+                self.assertFalse(self.query(field, non_damage_key, ["enemy"]))
+
+    @covers_requirement("overwhelm-threshold::a-pure-query-answers-whether-a-commanded-action-damages-an-enemy-read-statically-from-the-skill-definition")
+    def test_damage_skill_aimed_away_from_the_enemy_team_is_false(self):
+        field = self.field()
+        for label, targets in (
+            ("self", ["actor"]),
+            ("ally", ["ally"]),
+            ("nothing", []),
+            ("mixed-allies", ["actor", "ally"]),
+        ):
+            with self.subTest(aim=label):
+                self.assertFalse(self.query(field, "q_damage", targets))
+
+    @covers_requirement("overwhelm-threshold::a-pure-query-answers-whether-a-commanded-action-damages-an-enemy-read-statically-from-the-skill-definition")
+    def test_non_concrete_values_and_unknown_keys_fail_closed(self):
+        field = self.field()
+        # An un-resolved AREA shorthand is the caller's job to expand; as a
+        # bare string it simply fails to match the enemy team.
+        self.assertFalse(self.query(field, "q_damage", ["all-enemies"]))
+        # A key removed from the roster after construction is not a concrete
+        # roster combatant either.
+        stale = self.field()
+        del stale.roster["enemy"]
+        self.assertFalse(self.query(stale, "q_damage", ["enemy"]))
+        # An actor key on no team defines no opposing team at all.
+        with patch.dict(SKILL_REGISTRY, QUERY_SKILLS):
+            self.assertFalse(
+                commanded_damage_reaches_enemy(
+                    field, "not-in-teams", "q_damage", ["enemy"]
+                )
+            )
+        self.assertFalse(self.query(field, "not-in-registry", ["enemy"]))
+
+    @covers_requirement("overwhelm-threshold::the-damage-query-is-side-effect-free-roll-free-and-recomputable")
+    def test_query_is_pure_and_never_consulted_by_classify(self):
+        field = self.field()
+
+        def snapshot():
+            return (
+                dict(field.teams),
+                list(field.roster),
+                set(field.fled),
+                set(field.knocked_out),
+                {
+                    key: (
+                        entity.traits.hp.value,
+                        entity.traits.hp.current,
+                        entity.traits.magic_power.value,
+                        dict(entity.buffs.all),
+                        dict(entity.db.__dict__)
+                        if hasattr(entity.db, "__dict__")
+                        else None,
+                    )
+                    for key, entity in field.roster.items()
+                },
+            )
+
+        with patch(
+            "world.rules.overwhelm.evaluate_combat_modifiers",
+            return_value={},
+        ):
+            verdict_before = classify_overwhelm(field)
+            before = snapshot()
+            # Any dice the query rolled would raise through this patch.
+            with patch(
+                "world.rules.combat.roll_d100",
+                side_effect=AssertionError("query rolled dice"),
+            ):
+                first = self.query(field, "q_damage", ["enemy"])
+                second = self.query(field, "q_damage", ["enemy"])
+            self.assertTrue(first)
+            self.assertEqual(first, second)
+            self.assertEqual(before, snapshot())
+            self.assertEqual(classify_overwhelm(field), verdict_before)
+
+    @covers_requirement("overwhelm-threshold::the-damage-query-is-side-effect-free-roll-free-and-recomputable")
+    def test_query_recomputes_instead_of_caching(self):
+        # The answer follows the current registry definition and current
+        # team membership: changing either between calls must change the
+        # result, which a cached answer would not.
+        field = self.field()
+        self.assertTrue(self.query(field, "q_damage", ["enemy"]))
+        moved = battlefield(
+            [FakeEntity("actor"), FakeEntity("ally"), FakeEntity("enemy")],
+            [FakeEntity("other")],
+        )
+        self.assertFalse(self.query(moved, "q_damage", ["enemy"]))
+        weakened = dict(QUERY_SKILLS)
+        weakened["q_damage"] = _skill_def("q_damage", ["buff_apply:fixture_focus"])
+        with patch.dict(SKILL_REGISTRY, weakened):
+            self.assertFalse(
+                commanded_damage_reaches_enemy(
+                    self.field(), "actor", "q_damage", ["enemy"]
+                )
+            )
+        # Implementation inspection: the query computes from a registry
+        # lookup and team membership alone, and classify_overwhelm() never
+        # consults it.
+        query_source = inspect.getsource(overwhelm.commanded_damage_reaches_enemy)
+        for forbidden in (
+            "roll_d100",
+            "PendingEffect",
+            "ActionResolver",
+            "lru_cache",
+            "functools",
+        ):
+            self.assertNotIn(forbidden, query_source)
+        self.assertNotIn(
+            "commanded_damage_reaches_enemy",
+            inspect.getsource(overwhelm.classify_overwhelm),
+        )

@@ -607,8 +607,20 @@ def run_round(
     nonlethal_keys: frozenset[str] = frozenset(),
     journal_sink: "list[object] | None" = None,
     notifications_sink: "list[str] | None" = None,
+    first_actor: str | None = None,
 ) -> list[EventLog]:
     """Resolve one action per capable combatant, then perform upkeep.
+
+    The keyword-only ``first_actor`` is a reorder-only initiative override
+    (combat-opening-seams D-1): ``roll_initiative()`` still computes the
+    sequence exactly as today, and the named key is then moved to the head of
+    that returned sequence with every other key's relative order unchanged.
+    It never re-rolls, re-scores, or bypasses ``roll_initiative()``, never
+    grants the named combatant an additional action, and never skips another
+    combatant. A key absent from the rolled sequence — dead, fled, knocked
+    out, or not in the roster — is a silent no-op. ``None`` (every existing
+    call site) leaves the iteration byte-identical to the pre-parameter
+    behaviour.
 
     The round's upkeep settlement (fix-dot-kill-credit D3) turns the damaging
     tick records into defeat crossings, kill XP, and quest effects inside the
@@ -626,7 +638,10 @@ def run_round(
     settlement boundary after its commit; ``run_round`` itself never sends.
     """
     logs: list[EventLog] = []
-    for key in roll_initiative(battlefield):
+    order = roll_initiative(battlefield)
+    if first_actor is not None and first_actor in order:
+        order = [first_actor] + [key for key in order if key != first_actor]
+    for key in order:
         entity = battlefield.roster[key]
         if (
             key in battlefield.fled
