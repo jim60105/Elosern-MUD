@@ -63,18 +63,23 @@ def _behaviour_archetype_key() -> str:
     return next(iter(profiles))
 
 
-def first_live_key(dotted: str, attribute: str, predicate=None) -> str:
-    """First key of a live registry, optionally narrowed by a predicate.
+def unique_live_key(dotted: str, attribute: str, predicate) -> str:
+    """The ONE live-registry key matching a semantic predicate.
 
     Capability probe for behavior tests that need *a* shipped row's KEY as a
     runtime value (production-forced vocabularies: rulebook-keyed equipment or
     passive-skill rows) without ever naming the shipped identifier in source.
+    Selection is predicate-driven and asserts uniqueness — never registry
+    insertion order, so a catalog reorder cannot silently swap the row.
     """
     registry = _live_registry(dotted, attribute)
-    for key, value in registry.items():
-        if predicate is None or predicate(value):
-            return key
-    raise LookupError(f"{dotted}.{attribute} has no row matching the predicate")
+    matches = [key for key, value in registry.items() if predicate(value)]
+    if len(matches) != 1:
+        raise LookupError(
+            f"{dotted}.{attribute}: expected exactly one row matching the "
+            f"predicate, found {len(matches)}"
+        )
+    return matches[0]
 
 
 def enum_first(dotted: str, attribute: str, member: str) -> str:
@@ -139,7 +144,7 @@ def synth_damage_skill(
         cost={} if cost is None else cost,
         effects=list(effects),
         category=base.category if category is None else category,
-        prerequisites=list(prerequisites),
+        prerequisites=tuple(prerequisites),
     )
 
 

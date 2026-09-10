@@ -16,9 +16,29 @@ from world.rules.progression import (
     seed_lineage_proficiency,
 )
 
+from world.rules.combat_session import BASIC_ATTACK_KEY
+from world.skills.registry import SkillPrerequisite
+from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
+
+from ._combat_session_helpers import synth_damage_skill, synth_innate_overlay
 from .combat_fixtures import FakeEntity, FakeGauge
 
+# Synthetic vehicles (test-data-independence): the kit's affordable spell is
+# made unaffordable by fixture MP, and a file-local deep skill carries a
+# prerequisite edge so the lineage gate is exercised over synthetic rows.
+_T_CAST = SYNTH_SKILLS["t_ember_burst"].key
+_T_DEEP = synth_damage_skill(
+    "t_rune_barrage",
+    "符文彈幕",
+    cost={"mp": 20},
+    prerequisites=(SkillPrerequisite(skill_key=_T_CAST, min_proficiency=1),),
+)
+_SCOPE = synthetic_registries(
+    "skills", extra={"skills": {**synth_innate_overlay()["skills"], _T_DEEP.key: _T_DEEP}}
+)
 
+
+@_SCOPE
 class InitiativeAndTurnLoopTests(unittest.TestCase):
     def battlefield(self, gap: int = 10):
         fast = FakeEntity("fast", agility=10 + gap)
@@ -63,7 +83,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
     def test_default_policy_does_not_retry_an_unaffordable_skill(self):
         battlefield = self.battlefield()
         actor = battlefield.roster["fast"]
-        actor.skills._owned = ["fire_ball"]
+        actor.skills._owned = [_T_CAST]
         actor.traits.mp = type(
             "Gauge",
             (),
@@ -75,6 +95,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         self.assertIsNone(default_attack_policy(actor, battlefield))
 
 
+@_SCOPE
 class DefaultAttackPolicyAffordabilityTests(unittest.TestCase):
     """The generic policy only proposes resolver-backed affordable skills."""
 
@@ -83,7 +104,7 @@ class DefaultAttackPolicyAffordabilityTests(unittest.TestCase):
         # affordability are the eligibility gates: a deep spell owned without
         # its prerequisite chain is not usable and the innate basic_attack
         # (no cost) takes over.
-        actor = FakeEntity(key, owned=[*owned, "basic_attack"])
+        actor = FakeEntity(key, owned=[*owned, BASIC_ATTACK_KEY])
         actor.traits.mp = FakeGauge(mp, 30)
         return actor
 
@@ -96,28 +117,40 @@ class DefaultAttackPolicyAffordabilityTests(unittest.TestCase):
 
     @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-proposes-the-first-usable-resolver-backed-damage-skill")
     def test_unaffordable_spell_falls_back_to_basic_attack(self):
-        actor = self._npc("npc", ["firestorm"], mp=10)
+        actor = self._npc("npc", [_T_CAST], mp=10)
         request = default_attack_policy(actor, self._field(actor))
         # basic_attack carries no cost, so the resolver's own gate accepts.
-        self.assertEqual(request.skill_key, "basic_attack")
+        self.assertEqual(request.skill_key, BASIC_ATTACK_KEY)
         self.assertEqual([str(target.key) for target in request.targets], ["enemy"])
 
     def test_affordable_owned_spell_is_chosen_ahead_of_the_innate(self):
-        actor = self._npc("npc-caster", ["firestorm"], mp=30)
-        # The caster closes the lineage with exactly-seeded XP so firestorm
-        # passes the shared use gate.
-        add_active, add_passive = lineage_ownership_closure(["firestorm"])
+        actor = self._npc("npc-caster", [_T_DEEP.key], mp=30)
+        # The caster closes the lineage with exactly-seeded XP so the deep
+        # spell passes the shared use gate; the policy picks it (it precedes
+        # the innate in ownership order) over basic_attack.
+        add_active, add_passive = lineage_ownership_closure([_T_DEEP.key])
         actor.skills._owned = [
-            "firestorm",
+            _T_DEEP.key,
             *add_active,
             *add_passive,
-            "basic_attack",
+            BASIC_ATTACK_KEY,
         ]
         actor.db.skill_proficiency = seed_lineage_proficiency(
             actor.skills._owned
         )
         request = default_attack_policy(actor, self._field(actor))
-        self.assertEqual(request.skill_key, "firestorm")
+        self.assertEqual(request.skill_key, _T_DEEP.key)
+
+    def test_owned_deep_spell_skipped_when_unaffordable(self):
+        # The deep synthetic spell costs 20 MP; at 12 MP the policy skips it
+        # and proposes the affordable prerequisite spell instead — MP
+        # affordability is enforced per owned skill, never by lineage order.
+        actor = self._npc("npc-cheap", [_T_DEEP.key], mp=12)
+        add_active, add_passive = lineage_ownership_closure([_T_DEEP.key])
+        actor.skills._owned = [_T_DEEP.key, *add_active, *add_passive, BASIC_ATTACK_KEY]
+        actor.db.skill_proficiency = seed_lineage_proficiency(actor.skills._owned)
+        request = default_attack_policy(actor, self._field(actor))
+        self.assertEqual(request.skill_key, _T_CAST)
 
 
 class FirstActorOverrideTests(unittest.TestCase):
