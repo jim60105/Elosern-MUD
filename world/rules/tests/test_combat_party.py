@@ -52,21 +52,40 @@ from world.rules.targeting import expand_target_shorthand
 
 from .combat_fixtures import FakeEntity
 from .combat_fixtures import BattlefieldIsolation, grant_lineage
+from ._combat_session_helpers import (
+    _behaviour_archetype_key,
+    _monster_tier_key,
+    _race_key,
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
+from world.tests.synthetic_data import SYNTH_SKILLS
+
+# Fixture mechanics resolve through the synthetic kit: the spell and martial
+# carriers are kit rows, the delivered-cast element is the kit element, and
+# race/threshold keys arrive through runtime probes (identical values outside
+# a scope, kit rows inside one). Monster rounds execute against the LIVE tier
+# vocabulary — monster_tiers is deliberately never scoped here.
+_T_CAST = SYNTH_SKILLS["t_ember_burst"].key
+_T_MARTIAL = SYNTH_SKILLS["t_cinder_cleave"].key
+_T_DAMAGE_EFFECT = "damage:" + SYNTH_SKILLS["t_ember_burst"].element.key + ":magic"
+_SCOPE_LOGICALS = ("skills", "elements", "races", "subraces", "static_tiers")
 
 
 def _player(key="combat party player"):
     player = create_object(PlayerCharacter, key=key)
-    player.race = "human"
+    player.race = _race_key()
     player.apply_race_baseline()
-    # Human static magic_power at 術師 tier so element-gated spell casts pass.
+    # Static magic_power raised so element-gated kit casts pass tuning.
     player.traits.magic_power.base = 30
-    grant_lineage(player, ["fire_ball", "wind_blade"])
+    grant_lineage(player, [_T_CAST, _T_MARTIAL])
     return player
 
 
 def _monster(key="goblin", hp=100, atk=10, agility=10):
     monster = create_object(Monster, key=key)
-    monster.threat_tier = "low"
+    monster.threat_tier = _monster_tier_key()
+    monster.behaviour_tree = _behaviour_archetype_key()
     monster.apply_monster_tier("floor")
     monster.traits.hp.base = hp
     monster.traits.hp.current = hp
@@ -77,7 +96,7 @@ def _monster(key="goblin", hp=100, atk=10, agility=10):
 
 def _companion(player, key, hp=100, agility=10):
     npc = create_object(NPC, key=key, location=player.location)
-    npc.race = "human"
+    npc.race = _race_key()
     npc.apply_race_baseline()
     npc.traits.hp.base = hp
     npc.traits.hp.current = hp
@@ -103,6 +122,9 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
     """Task 1.4: allied-team collection on engage."""
 
     def setUp(self):
+        open_synthetic_scope(
+            self, *_SCOPE_LOGICALS, extra=synth_innate_overlay()
+        )
         super().setUp()
         from world.quests.catalog import register_catalog
 
@@ -150,7 +172,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["record"].player_ids, (self.player.pk,))
         with patch("world.rules.combat.roll_d100", return_value=100):
             outcome = submit_player_action(
-                self.player, "fire_ball", [self.monster]
+                self.player, _T_CAST, [self.monster]
             )
         self.assertIn(outcome["outcome"], ("round", "victory", "defeat"))
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
@@ -179,7 +201,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         battlefield = reconstruct_battlefield(self.player, record)
         context = _context_for(battlefield, record)
         request = ActionRequest(
-            self.player, "fire_ball", [monster_a], context
+            self.player, _T_CAST, [monster_a], context
         )
         provider = _round_provider(self.player, request, battlefield, record)
         calls: dict[str, int] = {}
@@ -208,7 +230,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         )
         with patch("world.rules.combat.roll_d100", return_value=100):
             result = submit_player_action(
-                self.player, "fire_ball", [companion]
+                self.player, _T_CAST, [companion]
             )
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
@@ -225,7 +247,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         battlefield = reconstruct_battlefield(self.player, record)
         context = _context_for(battlefield, record)
         request = ActionRequest(
-            self.player, "fire_ball", [monster], context
+            self.player, _T_CAST, [monster], context
         )
         provider = _round_provider(self.player, request, battlefield, record)
         with patch("world.rules.combat.roll_d100", return_value=100):
@@ -258,7 +280,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         record = read_session(self.player)
         battlefield = reconstruct_battlefield(self.player, record)
         context = _context_for(battlefield, record)
-        request = ActionRequest(self.player, "fire_ball", [monster], context)
+        request = ActionRequest(self.player, _T_CAST, [monster], context)
         provider = _round_provider(self.player, request, battlefield, record)
         with patch("world.rules.combat.roll_d100", return_value=100):
             logs = run_round(battlefield, provider)
@@ -284,6 +306,9 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
     """Tasks 2.7 and 3.3: per-entity nonlethal knockout as battlefield state."""
 
     def setUp(self):
+        open_synthetic_scope(
+            self, *_SCOPE_LOGICALS, extra=synth_innate_overlay()
+        )
         super().setUp()
         self.room = create_object(Room, key="knockout arena")
         self.player = _player()
@@ -299,7 +324,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
         battlefield = reconstruct_battlefield(self.player, record)
         context = _context_for(battlefield, record)
         request = ActionRequest(
-            self.player, "fire_ball", [self.monster], context
+            self.player, _T_CAST, [self.monster], context
         )
         provider = _round_provider(self.player, request, battlefield, record)
         with patch("world.rules.combat.roll_d100", return_value=100):
@@ -356,7 +381,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.roll_d100", return_value=100),
         ):
             result = submit_player_action(
-                self.player, "fire_ball", [self.monster]
+                self.player, _T_CAST, [self.monster]
             )
         self.assertEqual(result["outcome"], "round")
         self.assertNotIn(str(self.companion.key), calls)
@@ -415,7 +440,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
     def test_knockout_state_survives_a_battlefield_rebuild(self):
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=100):
-            submit_player_action(self.player, "fire_ball", [self.monster])
+            submit_player_action(self.player, _T_CAST, [self.monster])
         record = read_session(self.player)
         self.assertIn(int(self.companion.pk), record.knocked_out_ids)
         rebuilt = reconstruct_battlefield(self.player, record)
@@ -445,7 +470,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=100):
             result = submit_player_action(
-                self.player, "fire_ball", [self.monster]
+                self.player, _T_CAST, [self.monster]
             )
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(self.companion.traits.hp.current, 1)
@@ -480,6 +505,9 @@ class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTestCase):
     """Task 4.3: player-centric terminal rules and participant cleanup."""
 
     def setUp(self):
+        open_synthetic_scope(
+            self, *_SCOPE_LOGICALS, extra=synth_innate_overlay()
+        )
         super().setUp()
         self.room = create_object(Room, key="terminal arena")
         self.player = _player()
@@ -495,7 +523,7 @@ class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=100):
             result = submit_player_action(
-                self.player, "fire_ball", [self.monster]
+                self.player, _T_CAST, [self.monster]
             )
         self.assertEqual(result["outcome"], "defeat")
         self.assertEqual(result["rounds_elapsed"], 1)
@@ -526,7 +554,7 @@ class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=100):
             result = submit_player_action(
-                self.player, "fire_ball", [self.monster]
+                self.player, _T_CAST, [self.monster]
             )
         self.assertEqual(result["outcome"], "victory")
         self.assertEqual(result["rounds_elapsed"], 1)
@@ -540,7 +568,7 @@ class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=100):
             result = submit_player_action(
-                self.player, "fire_ball", [self.monster]
+                self.player, _T_CAST, [self.monster]
             )
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(companion.traits.hp.current, 1)
@@ -612,7 +640,7 @@ class MultiTargetKnockoutProjectionTests(unittest.TestCase):
             pending = _handle_damage(
                 actor,
                 [first, second],
-                "damage:fire:magic",
+                _T_DAMAGE_EFFECT,
                 {
                     "battlefield": field,
                     "nonlethal_keys": frozenset({"第一", "第二"}),
@@ -658,7 +686,7 @@ class BattlefieldCommitSurfaceTests(EvenniaTestCase):
     @covers_requirement("battlefield-commit-surface::a-commit-failure-rolls-back-a-battlefield-mutation-exactly-as-it-rolls-back-an-entity")
     def test_knockout_mark_is_rolled_back_with_the_commit(self):
         entity = create_object(PlayerCharacter, key="rollback host")
-        entity.race = "human"
+        entity.race = _race_key()
         entity.apply_race_baseline()
         field = self._field(entity)
         effects = [
@@ -687,7 +715,7 @@ class BattlefieldCommitSurfaceTests(EvenniaTestCase):
     )
     def test_entity_and_battlefield_restore_in_one_commit(self):
         entity = create_object(PlayerCharacter, key="mixed host")
-        entity.race = "human"
+        entity.race = _race_key()
         entity.apply_race_baseline()
         before = entity.traits.atk_phys.value
         field = self._field(entity)
