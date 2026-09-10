@@ -23,9 +23,14 @@ from world.rules.player_messages import (
 from world.rules.combat_session import SessionReason
 from world.skills.registry import SkillCategory, SkillKind, TargetSpec
 from world.rules.targeting import RoomActionContext
-from world.tests.synthetic_data import make_skill, synthetic_registries
+from world.tests.synthetic_data import (
+    make_act,
+    make_act_skill,
+    make_skill,
+    synthetic_registries,
+)
 
-from ._combat_session_helpers import synth_innate_overlay
+from ._combat_session_helpers import open_synthetic_scope, synth_innate_overlay
 
 # A synthetic disguise caster: same registered effect prefix (set_disguise)
 # and pipeline shape as any stock self-target disguise skill.
@@ -37,6 +42,20 @@ _MIRROR_VEIL = make_skill(
     target_spec=TargetSpec.SELF,
     category=SkillCategory.UTILITY,
     effects=["set_disguise"],
+)
+
+# A synthetic resistible forced act: same paired SkillDef/SexualActDef shape
+# as any catalog act, with the resistible flag the coercion scan keys on.
+_SYNTH_FORCED_ACT = make_act("t_snare_murmur", resistible=True)
+_SYNTH_FORCED_ACT_SKILL = make_act_skill(
+    "t_snare_murmur",
+    label="纏縛低語",
+    description="以纏繞不散的低語壓制對方的抗拒，強迫其留在原地。",
+    effects=[
+        "pleasure:t_snare_murmur",
+        "sexual_counter:t_snare_murmur",
+        "sexual_event:self_exposure",
+    ],
 )
 
 
@@ -130,16 +149,34 @@ class CmdCastSexualCoercionTests(EvenniaCommandTestMixin, EvenniaTest):
     player after the rendered EventLog (sexual-resist-out-of-combat)."""
 
     def setUp(self):
+        # setUp constructs entities against the patched catalogs, so the
+        # scope opens before EvenniaTest's own setUp (class decorators would
+        # only wrap the test methods).
+        open_synthetic_scope(
+            self,
+            "races",
+            "skills",
+            "sexual_acts",
+            extra={
+                "skills": {
+                    **synth_innate_overlay()["skills"],
+                    _SYNTH_FORCED_ACT_SKILL.key: _SYNTH_FORCED_ACT_SKILL,
+                },
+                "sexual_acts": {_SYNTH_FORCED_ACT.key: _SYNTH_FORCED_ACT},
+            },
+        )
         super().setUp()
+        # Affinity-config bootstrap: the rulebook loader validates its
+        # cap-break quest keys against the quest definition registry.
         register_catalog()
-        self.char1.race = "human"
+        self.char1.race = "t_duskmari"
         self.char1.apply_race_baseline()
         self.char1.db.skills = {"active": [], "passive": []}
         self.clock = WorldClock()
 
     def _companion(self, key, affinity: int | None = None):
         npc = create_object(NPC, key=key, location=self.room1)
-        npc.race = "human"
+        npc.race = "t_duskmari"
         npc.apply_race_baseline()
         npc.traits.hp.base = 100
         npc.traits.hp.current = 100
@@ -164,7 +201,9 @@ class CmdCastSexualCoercionTests(EvenniaCommandTestMixin, EvenniaTest):
             patch("commands.action.render_plain_text", return_value="RENDERED"),
         ):
             return self.call(
-                CmdCast(), f"combat_tease={target_key}", use_assertequal=True
+                CmdCast(),
+                f"{_SYNTH_FORCED_ACT.key}={target_key}",
+                use_assertequal=True,
             )
 
     @covers_requirement("sexual-resist-out-of-combat::an-out-of-combat-forced-act-s-party-auto-leave-notification-reaches-the-player")
