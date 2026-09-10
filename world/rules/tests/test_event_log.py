@@ -15,7 +15,9 @@ class EventLogTests(unittest.TestCase):
     def test_json_round_trip_contains_only_plain_data(self):
         log = EventLog(
             actor="elosia",
-            skill_key="dominion_art",
+            # EventLog is a plain record: the skill key is carried data, not
+            # a registry read — an invented key keeps the seam data-free.
+            skill_key="t_duskward_confer",
             targets=("violet",),
             entries=(
                 EventEntry(
@@ -23,7 +25,7 @@ class EventLogTests(unittest.TestCase):
                     "elosia",
                     "violet",
                     {"scale": 0.1},
-                    "{actor} 對 {target} 施展了統御術。",
+                    "{actor} 對 {target} 施展了暮授術。",
                 ),
             ),
             time_cost_seconds=6,
@@ -31,7 +33,7 @@ class EventLogTests(unittest.TestCase):
         self.assertEqual(json.loads(json.dumps(asdict(log)))["actor"], "elosia")
         self.assertEqual(
             render_plain_text(log),
-            "elosia 對 violet 施展了統御術。",
+            "elosia 對 violet 施展了暮授術。",
         )
 
     @covers_requirement("event-log::render-plain-text-renders-an-eventlog-to-prose-with-no-llm-involvement")

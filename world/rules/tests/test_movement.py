@@ -14,8 +14,26 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.rules.clock import CLOCK_YAML, AdvanceSource, get_world_clock
 from world.rules.movement import charge_movement
+from world.skills.registry import SkillCategory
+from world.tests.synthetic_data import make_skill, synthetic_registries
+
+# A synthetic movement-category skill standing in for any non-flight mobility
+# skill: the waiver is keyed to the one flight skill, so ANY other owned row
+# must charge normally.
+_DART_STEP = make_skill(
+    "t_dart_step",
+    label="疾影步",
+    description="短促爆发的合成身法。",
+    category=SkillCategory.MOVEMENT,
+)
+
+# The waiver key is hardcoded inside ``world.rules.movement.charge_movement``
+# (production), so the runtime key is used as-is; its registry row is not
+# consulted by the waiver at all.
+_FLIGHT_KEY = "flight"
 
 
+@synthetic_registries("skills", extra={"skills": {_DART_STEP.key: _DART_STEP}})
 class ChargeMovementTests(EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -80,13 +98,13 @@ class ChargeMovementTests(EvenniaTest):
 
     @covers_requirement("movement-cost-charging::charge-movement-is-the-single-shared-movement-cost-charging-function")
     def test_flight_owner_is_waived_the_wilderness_move_cost(self):
-        self.char1.db.skills = {"active": [], "passive": ["flight"]}
+        self.char1.db.skills = {"active": [], "passive": [_FLIGHT_KEY]}
         before = get_world_clock().tick
         charge_movement(self.char1, "wilderness_move")
         self.assertEqual(get_world_clock().tick, before)
 
     def test_flight_owner_still_pays_other_cost_keys(self):
-        self.char1.db.skills = {"active": [], "passive": ["flight"]}
+        self.char1.db.skills = {"active": [], "passive": [_FLIGHT_KEY]}
         before = get_world_clock().tick
         charge_movement(self.char1, "move")
         self.assertEqual(
@@ -103,7 +121,8 @@ class ChargeMovementTests(EvenniaTest):
         )
 
     def test_flash_step_owner_does_not_get_the_wilderness_waiver(self):
-        self.char1.db.skills = {"active": [], "passive": ["flash_step"]}
+        # Any owned mobility skill that is not the waiver-keyed one charges.
+        self.char1.db.skills = {"active": [], "passive": [_DART_STEP.key]}
         before = get_world_clock().tick
         charge_movement(self.char1, "wilderness_move")
         self.assertEqual(

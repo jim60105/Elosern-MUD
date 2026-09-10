@@ -10,7 +10,7 @@ from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 from commands.action import CmdCast
 from typeclasses.npcs import NPC
 from world.quests.catalog import register_catalog
-from world.rules.action import RejectReason
+from world.rules.action import DEFAULT_CAST_SECONDS, RejectReason
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.clock import WorldClock
@@ -21,24 +21,57 @@ from world.rules.player_messages import (
     terminal_outcome_message,
 )
 from world.rules.combat_session import SessionReason
+from world.skills.registry import SkillCategory, SkillKind, TargetSpec
+from world.rules.targeting import RoomActionContext
+from world.tests.synthetic_data import make_skill, synthetic_registries
+
+from ._combat_session_helpers import synth_innate_overlay
+
+# A synthetic disguise caster: same registered effect prefix (set_disguise)
+# and pipeline shape as any stock self-target disguise skill.
+_MIRROR_VEIL = make_skill(
+    "t_mirror_veil",
+    label="鏡幕偽裝",
+    description="以鏡光扭曲自身外貌的合成偽裝法術。",
+    kind=SkillKind.ACTIVE,
+    target_spec=TargetSpec.SELF,
+    category=SkillCategory.UTILITY,
+    effects=["set_disguise"],
+)
 
 
+@synthetic_registries(
+    "races",
+    "skills",
+    extra={
+        "skills": {
+            **synth_innate_overlay()["skills"],
+            _MIRROR_VEIL.key: _MIRROR_VEIL,
+        }
+    },
+)
 class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement("action-resolution-pipeline::every-production-skill-path-receives-registered-event-effect-planning-automatically")
     def test_successful_stock_disguise_cast_renders_event(self):
-        self.char1.race = "human"
+        self.char1.race = "t_duskmari"
         self.char1.apply_race_baseline()
         self.char1.db.skills = {
-            "active": ["status_disguise"],
+            "active": [_MIRROR_VEIL.key],
             "passive": [],
         }
         self.char1.db.disguised_stats = {"atk_phys": 1}
+        # The disguise handler reads its overrides from the action context.
+        self.char1.ndb.action_context = RoomActionContext(
+            self.char1.location, {"disguise": {"atk_phys": 1}}
+        )
         clock = WorldClock()
         with patch(
             "world.rules.cast_settlement.read_world_clock", return_value=clock
         ), patch("world.rules.cast_settlement.get_world_clock", return_value=clock):
-            self.call(CmdCast(), "status_disguise", f"{self.char1.key} 改變了")
-        self.assertEqual(clock.tick, 6)
+            self.call(CmdCast(), _MIRROR_VEIL.key, f"{self.char1.key} 改變了")
+        # The pipeline's default cast cost lands on the clock for any
+        # registered skill path.
+        self.assertEqual(clock.tick, DEFAULT_CAST_SECONDS)
 
     def test_unknown_skill_renders_named_rejection(self):
         self.char1.db.skills = {"active": [], "passive": []}
@@ -74,8 +107,8 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
             self.assertNotEqual(message, "繼續戰鬥。")
 
     def test_flee_uses_active_battlefield_context(self):
-        self.char1.race = "human"
-        self.char2.race = "human"
+        self.char1.race = "t_duskmari"
+        self.char2.race = "t_duskmari"
         for entity in (self.char1, self.char2):
             entity.apply_race_baseline()
             entity.db.skills = {"active": [], "passive": []}

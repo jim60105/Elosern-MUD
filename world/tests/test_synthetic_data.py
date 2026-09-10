@@ -155,6 +155,7 @@ class SyntheticCatalogShapeTests(unittest.TestCase):
             "SYNTH_SKILLS": "world.skills.registry",
             "SYNTH_RACES": "world.lore.races",
             "SYNTH_SUBRACES": "world.lore.races",
+            "SYNTH_STARTING_KITS": "world.lore.starting_kits",
             "SYNTH_PRESETS": "world.lore.player_presets",
             "SYNTH_NPC_TIERS": "world.lore.npc_tiers",
             "SYNTH_MONSTER_TIERS": "world.lore.monsters",
@@ -198,6 +199,17 @@ class SyntheticCatalogShapeTests(unittest.TestCase):
             with self.subTest(target=logical):
                 module = importlib.import_module(module_name)
                 self.assertTrue(hasattr(module, attribute), f"{logical} unresolved")
+
+    def test_starting_kit_scope_covers_every_synthetic_subrace(self):
+        """Custom activation must find a kit for any scoped synthetic subrace."""
+        self.assertEqual(
+            set(kit.SYNTH_STARTING_KITS), set(kit.SYNTH_SUBRACES)
+        )
+        with kit.synthetic_registries("subraces", "starting_kits", "items"):
+            module_name, attribute = kit.REGISTRY_TARGETS["starting_kits"]
+            patched = getattr(importlib.import_module(module_name), attribute)
+            for subrace_key in kit.SYNTH_SUBRACES:
+                self.assertIn(subrace_key, patched)
 
 
 class PatchRestoreTests(unittest.TestCase):
