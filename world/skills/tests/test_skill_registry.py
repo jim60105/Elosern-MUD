@@ -123,6 +123,32 @@ class SkillRegistryTests(unittest.TestCase):
                 key,
             )
 
+    @covers_requirement(
+        "affinity-friendly-fire::shipped-content-provides-reachable-friendly-fire-triggers"
+    )
+    def test_shipped_set_provides_any_faction_area_and_single_target_damage(self):
+        # affinity-friendly-fire reachability contract: the penalty and
+        # auto-leave flow must stay playable through ordinary player actions,
+        # so the shipped registry must keep at least one ANY-faction active
+        # AREA damage skill AND one ANY-faction active single-target damage
+        # skill. Shape-based existence (never specific keys) so a content
+        # rename cannot silently strand the friendly-fire contract.
+        damaging = [
+            skill
+            for skill in SKILL_REGISTRY.values()
+            if skill.kind is SkillKind.ACTIVE
+            and skill.faction_constraint is FactionConstraint.ANY
+            and any(effect.startswith("damage:") for effect in skill.effects)
+        ]
+        self.assertTrue(
+            any(skill.target_spec is TargetSpec.AREA for skill in damaging),
+            "shipped set lost its ANY-faction AREA damage path",
+        )
+        self.assertTrue(
+            any(skill.target_spec is TargetSpec.SINGLE for skill in damaging),
+            "shipped set lost its ANY-faction single-target damage path",
+        )
+
     def test_self_only_constraint_is_available_for_self_effects(self):
         # The enum keeps SELF_ONLY for self-only effects; the shipped flee
         # innate skill is the only self-only consumer today.

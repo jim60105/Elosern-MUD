@@ -405,7 +405,6 @@
     "world/rules/tests/test_equipment_worn_grace_rules.py",
     "world/rules/tests/test_event_log.py",
     "world/rules/tests/test_freeform_casting.py",
-    "world/rules/tests/test_friendly_fire.py",
     "world/rules/tests/test_guild_dialogue_turnin.py",
     "world/rules/tests/test_guild_economy_sync.py",
     "world/rules/tests/test_guild_exams.py",
