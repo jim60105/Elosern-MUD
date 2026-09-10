@@ -32,6 +32,7 @@ from world.quests.tests._fixtures import (
 from world.rules.combat_session import engage
 from world.rules.quest_delivery import (
     REASON_IN_COMBAT,
+    item_display_name as quest_delivery_item_display,
     REASON_ITEM_NOT_HELD,
     REASON_NO_ACTIVE_DELIVERY,
     REASON_NOT_COLOCATED,
@@ -40,8 +41,16 @@ from world.rules.quest_delivery import (
     active_deliveries_for_recipient,
     deliver_quest_item,
 )
-from world.rules.tests._combat_session_helpers import _monster
+from world.rules.tests._combat_session_helpers import _monster, _race_key, open_synthetic_scope
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SKILLS, SYNTH_STATIC_TIERS
+
+# The delivered item and the casting fixture spell resolve through the kit;
+# the success prose is composed from the patched registry's display name so
+# no shipped display string is pinned in this file.
+_T_ITEM = "t_ember_spray"
+_T_RECIPIENT_KEY = "灰婆婆"
+
 
 
 def _all_profiles_disabled() -> dict:
@@ -59,23 +68,27 @@ class _DeliveryWorldBase(QuestRegistryIsolation, EvenniaTest):
     quantity = 2
 
     def setUp(self):
+        # Scope before construction: the entities race off the kit row and the
+        # delivered item resolves through the patched item registry.
+        open_synthetic_scope(self, "items", "races", "subraces", "static_tiers")
         super().setUp()
         self.room = create_object(Room, key="delivery rule room")
         self.player = create_object(PlayerCharacter, key="delivery holder")
-        self.player.race = "human"
+        self.player.race = _race_key()
         self.player.apply_race_baseline()
         self.player.location = self.room
-        self.recipient = create_object(NPC, key="灰婆婆", location=self.room)
-        self.recipient.race = "human"
+        self.recipient = create_object(NPC, key=_T_RECIPIENT_KEY, location=self.room)
+        self.recipient.race = _race_key()
         self.recipient.apply_race_baseline()
         self.bystander = create_object(NPC, key="旁觀者", location=self.room)
-        self.bystander.race = "human"
+        self.bystander.race = _race_key()
         self.bystander.apply_race_baseline()
+        self.item_display = quest_delivery_item_display(_T_ITEM)
 
         self.definition = register(
             quest(
                 "deliver_rule_quest",
-                stages=(QuestStage(0, deliver("healing_potion", quantity=self.quantity)),),
+                stages=(QuestStage(0, deliver(_T_ITEM, quantity=self.quantity)),),
             )
         )
         self.record = accept(self.player, self.definition)
@@ -102,41 +115,44 @@ class OfflineDeliveryTests(_DeliveryWorldBase):
         "quest-delivery::a-delivery-is-completable-with-every-generative-service-offline"
     )
     def test_delivery_completes_end_to_end_with_all_profiles_disabled(self):
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_ITEM, _T_ITEM]
         self.recipient.db.inventory = []
 
         with override_settings(LLM_PROFILES=_all_profiles_disabled()):
-            outcome = deliver_quest_item(self.player, self.recipient, "healing_potion")
+            outcome = deliver_quest_item(self.player, self.recipient, _T_ITEM)
 
         self.assertTrue(outcome.applied)
         self.assertIsNone(outcome.code)
         self.assertEqual(list(self.player.db.inventory), [])
-        self.assertEqual(list(self.recipient.db.inventory), ["healing_potion", "healing_potion"])
+        self.assertEqual(list(self.recipient.db.inventory), [_T_ITEM, _T_ITEM])
         record = read_records(self.player)[0]
         self.assertEqual(record.state, QuestState.COMPLETED)
-        self.assertEqual(outcome.message, "你把 2 個治療藥水交給了灰婆婆。")
+        self.assertEqual(
+            outcome.message,
+            f"你把 2 個{self.item_display}交給了{_T_RECIPIENT_KEY}。",
+        )
 
     @covers_requirement(
         "quest-delivery::a-delivery-is-completable-with-every-generative-service-offline"
     )
     def test_partially_advanced_stage_is_completed_by_one_hand_over(self):
-        self.player.db.inventory = ["healing_potion"] * 3
+        self.player.db.inventory = [_T_ITEM] * 3
         self.recipient.db.inventory = []
         from world.rules.npc_intents import _transfer_items
 
         # Advance the stage halfway through the LLM-driven transfer path:
         # 1 of 2 potions moved, progress 1, 2 potions left held.
-        _transfer_items(self.player, self.recipient, "healing_potion", 1)
+        _transfer_items(self.player, self.recipient, _T_ITEM, 1)
         record = read_records(self.player)[0]
         self.assertEqual(record.stage_progress, 1)
 
-        self.assertEqual(list(self.player.db.inventory), ["healing_potion", "healing_potion"])
-        outcome = deliver_quest_item(self.player, self.recipient, "healing_potion")
+        self.assertEqual(list(self.player.db.inventory), [_T_ITEM, _T_ITEM])
+        outcome = deliver_quest_item(self.player, self.recipient, _T_ITEM)
 
         self.assertTrue(outcome.applied)
-        self.assertEqual(list(self.player.db.inventory), ["healing_potion"])
+        self.assertEqual(list(self.player.db.inventory), [_T_ITEM])
         self.assertEqual(
-            list(self.recipient.db.inventory), ["healing_potion"] * 2
+            list(self.recipient.db.inventory), [_T_ITEM] * 2
         )
         record = read_records(self.player)[0]
         self.assertEqual(record.state, QuestState.COMPLETED)
@@ -146,14 +162,14 @@ class OfflineDeliveryTests(_DeliveryWorldBase):
         "quest-delivery::a-delivery-is-completable-with-every-generative-service-offline"
     )
     def test_partially_advanced_stage_refuses_without_the_exact_remainder(self):
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_ITEM]
         self.recipient.db.inventory = []
         from world.rules.npc_intents import _transfer_items
 
-        _transfer_items(self.player, self.recipient, "healing_potion", 1)
+        _transfer_items(self.player, self.recipient, _T_ITEM, 1)
 
         before = self._world_snapshot()
-        outcome = deliver_quest_item(self.player, self.recipient, "healing_potion")
+        outcome = deliver_quest_item(self.player, self.recipient, _T_ITEM)
 
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.code, REASON_ITEM_NOT_HELD)
@@ -169,16 +185,19 @@ class DeliveryParityTests(_DeliveryWorldBase):
     def test_action_adapter_and_rule_produce_identical_outcomes(self):
         from web.webclient.actions.exploration_actions import _deliver_adapter
 
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_ITEM, _T_ITEM]
         self.recipient.db.inventory = []
 
         result = _deliver_adapter(
             self.player,
-            {"npc_id": int(self.recipient.pk), "item_key": "healing_potion"},
+            {"npc_id": int(self.recipient.pk), "item_key": _T_ITEM},
         )
         self.assertEqual(result["outcome"], "success")
         # The adapter's success message is the rule's success message.
-        self.assertEqual(result["message"], "你把 2 個治療藥水交給了灰婆婆。")
+        self.assertEqual(
+            result["message"],
+            f"你把 2 個{self.item_display}交給了{_T_RECIPIENT_KEY}。",
+        )
 
         # Reset to the identical fixture and run the rule directly: identical
         # outcome, identical final state.
@@ -187,9 +206,9 @@ class DeliveryParityTests(_DeliveryWorldBase):
         bind_stage_runtime(
             self.player, record.quest_id, objective_targets=(self.recipient,)
         )
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_ITEM, _T_ITEM]
         self.recipient.db.inventory = []
-        direct = deliver_quest_item(self.player, self.recipient, "healing_potion")
+        direct = deliver_quest_item(self.player, self.recipient, _T_ITEM)
         self.assertTrue(direct.applied)
         self.assertEqual(direct.message, result["message"])
         self.assertEqual(read_records(self.player)[0].state, QuestState.COMPLETED)
@@ -203,9 +222,9 @@ class DeliveryParityTests(_DeliveryWorldBase):
         self.player.db.inventory = []
         result = _deliver_adapter(
             self.player,
-            {"npc_id": int(self.recipient.pk), "item_key": "healing_potion"},
+            {"npc_id": int(self.recipient.pk), "item_key": _T_ITEM},
         )
-        direct = deliver_quest_item(self.player, self.recipient, "healing_potion")
+        direct = deliver_quest_item(self.player, self.recipient, _T_ITEM)
 
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], direct.code)
@@ -218,7 +237,7 @@ class DeliveryRefusalTests(_DeliveryWorldBase):
 
     def setUp(self):
         super().setUp()
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_ITEM, _T_ITEM]
         self.recipient.db.inventory = []
 
     @covers_requirement(
@@ -229,7 +248,7 @@ class DeliveryRefusalTests(_DeliveryWorldBase):
         self.recipient.location = other_room
 
         before = self._world_snapshot()
-        outcome = deliver_quest_item(self.player, self.recipient, "healing_potion")
+        outcome = deliver_quest_item(self.player, self.recipient, _T_ITEM)
 
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.code, REASON_NOT_COLOCATED)
@@ -241,7 +260,7 @@ class DeliveryRefusalTests(_DeliveryWorldBase):
     )
     def test_unbound_recipient_is_refused(self):
         before = self._world_snapshot()
-        outcome = deliver_quest_item(self.player, self.bystander, "healing_potion")
+        outcome = deliver_quest_item(self.player, self.bystander, _T_ITEM)
 
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.code, REASON_NO_ACTIVE_DELIVERY)
@@ -253,7 +272,7 @@ class DeliveryRefusalTests(_DeliveryWorldBase):
     def test_unheld_item_is_refused(self):
         self.player.db.inventory = []
         before = self._world_snapshot()
-        outcome = deliver_quest_item(self.player, self.recipient, "healing_potion")
+        outcome = deliver_quest_item(self.player, self.recipient, _T_ITEM)
 
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.code, REASON_ITEM_NOT_HELD)
@@ -263,9 +282,9 @@ class DeliveryRefusalTests(_DeliveryWorldBase):
         "quest-delivery::a-delivery-is-refused-honestly-and-changes-nothing-when-refused"
     )
     def test_insufficient_holdings_are_refused(self):
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_ITEM]
         before = self._world_snapshot()
-        outcome = deliver_quest_item(self.player, self.recipient, "healing_potion")
+        outcome = deliver_quest_item(self.player, self.recipient, _T_ITEM)
 
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.code, REASON_ITEM_NOT_HELD)
@@ -284,7 +303,7 @@ class DeliveryRefusalTests(_DeliveryWorldBase):
 
         before = self._world_snapshot()
         with patch("world.rules.npc_intents._apply_plan", side_effect=failing_apply):
-            outcome = deliver_quest_item(self.player, self.recipient, "healing_potion")
+            outcome = deliver_quest_item(self.player, self.recipient, _T_ITEM)
 
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.code, REASON_TRANSFER_FAILED)
@@ -305,7 +324,7 @@ class DeliveryCombatGateTests(BattlefieldIsolation, _DeliveryWorldBase):
     def test_active_combat_refuses_a_valid_delivery(self):
         engage(self.player, self.monster)
         before = self._world_snapshot()
-        outcome = deliver_quest_item(self.player, self.recipient, "healing_potion")
+        outcome = deliver_quest_item(self.player, self.recipient, _T_ITEM)
 
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.code, REASON_IN_COMBAT)
@@ -320,7 +339,7 @@ class DeliveryCombatGateTests(BattlefieldIsolation, _DeliveryWorldBase):
         # under active combat the combat code wins.
         engage(self.player, self.monster)
         self.player.db.inventory = []
-        outcome = deliver_quest_item(self.player, self.bystander, "healing_potion")
+        outcome = deliver_quest_item(self.player, self.bystander, _T_ITEM)
 
         self.assertEqual(outcome.code, REASON_IN_COMBAT)
 
@@ -332,7 +351,7 @@ class DeliverySelectionTests(_DeliveryWorldBase):
         second = register(
             quest(
                 "deliver_rule_quest_second",
-                stages=(QuestStage(0, deliver("healing_potion", quantity=quantity)),),
+                stages=(QuestStage(0, deliver(_T_ITEM, quantity=quantity)),),
             )
         )
         record = accept(self.player, second)
@@ -347,7 +366,7 @@ class DeliverySelectionTests(_DeliveryWorldBase):
     def test_lowest_remaining_stage_is_selected_for_both_surfaces(self):
         # Bound quest: remaining 2 (quantity 2). Second quest: remaining 1.
         self._accept_second_quest(quantity=1)
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_ITEM]
         self.recipient.db.inventory = []
 
         views = active_deliveries_for_recipient(self.player, self.recipient)
@@ -357,9 +376,12 @@ class DeliverySelectionTests(_DeliveryWorldBase):
         self.assertEqual(view.remaining, 1)
         self.assertTrue(view.deliverable)
 
-        outcome = deliver_quest_item(self.player, self.recipient, "healing_potion")
+        outcome = deliver_quest_item(self.player, self.recipient, _T_ITEM)
         self.assertTrue(outcome.applied)
-        self.assertEqual(outcome.message, "你把治療藥水交給了灰婆婆。")
+        self.assertEqual(
+            outcome.message,
+            f"你把{self.item_display}交給了{_T_RECIPIENT_KEY}。",
+        )
 
         states = {r.definition_key: r for r in read_records(self.player)}
         self.assertEqual(
@@ -383,7 +405,7 @@ class DeliverySelectionTests(_DeliveryWorldBase):
         self.assertEqual(views[0].reason[0], REASON_ITEM_NOT_HELD)
 
         before = self._world_snapshot()
-        outcome = deliver_quest_item(self.player, self.recipient, "healing_potion")
+        outcome = deliver_quest_item(self.player, self.recipient, _T_ITEM)
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.code, REASON_ITEM_NOT_HELD)
         self.assertEqual(self._world_snapshot(), before)
@@ -396,13 +418,13 @@ class DeliveryObservabilityTests(_DeliveryWorldBase):
         "quest-delivery::a-delivery-is-completable-with-every-generative-service-offline"
     )
     def test_successful_hand_over_schedules_boundary_event(self):
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_ITEM, _T_ITEM]
         self.recipient.db.inventory = []
         with (
             patch("world.rules.quest_delivery.log_info") as mock_log,
             self.captureOnCommitCallbacks(execute=True),
         ):
-            outcome = deliver_quest_item(self.player, self.recipient, "healing_potion")
+            outcome = deliver_quest_item(self.player, self.recipient, _T_ITEM)
 
         self.assertTrue(outcome.applied)
         mock_log.assert_called_once_with(
@@ -411,7 +433,7 @@ class DeliveryObservabilityTests(_DeliveryWorldBase):
                 "char": str(self.player.pk),
                 "quest": self.definition.key,
                 "npc": str(self.recipient.pk),
-                "item": "healing_potion",
+                "item": _T_ITEM,
             },
         )
 
@@ -424,7 +446,7 @@ class DeliveryObservabilityTests(_DeliveryWorldBase):
             patch("world.rules.quest_delivery.log_info") as mock_log,
             self.captureOnCommitCallbacks(execute=True),
         ):
-            outcome = deliver_quest_item(self.player, self.recipient, "healing_potion")
+            outcome = deliver_quest_item(self.player, self.recipient, _T_ITEM)
 
         self.assertFalse(outcome.applied)
         mock_log.assert_not_called()

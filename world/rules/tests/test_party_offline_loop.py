@@ -31,6 +31,13 @@ from world.ai.npc_dialogue import register_npc_dialogue
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
 from world.quests.bootstrap import sync_quest_runtime
+from world.quests.definitions import (
+    ObjectiveKind,
+    QuestDefinition,
+    QuestObjective,
+    QuestStage,
+    QuestType,
+)
 from world.quests.runtime import QuestState, read_records
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.clock import CLOCK_YAML, get_world_clock
@@ -55,10 +62,66 @@ from world.rules.party import (
     is_companion,
 )
 from world.rules.surfaces import read_counter_trait
+from world.rules.tests._combat_session_helpers import (
+    _monster_tier_key,
+    _race_key,
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
+from world.tests.synthetic_data import (
+    SYNTH_GUILD_BRANCH_KEY,
+    SYNTH_ITEMS,
+    SYNTH_SKILLS,
+)
 from .combat_fixtures import BattlefieldIsolation, grant_lineage
 
-ALTORIA_BRANCH = "guild_branch_altoria"
-MOVE = CLOCK_YAML["command_defaults"]["move"]
+# The offline loop runs entirely on kit rows: the issuing branch is the kit
+# guild branch, the cast is a kit spell, and the reward item is a kit potion.
+# The hunt definition is this file's own one-kill DEFEAT card (defeat-count
+# progression is catalog-agnostic), with the monster tier arriving through the
+# runtime probe so monster rounds keep resolving against the LIVE tier
+# vocabulary (monster_tiers is deliberately never scoped).
+ALTORIA_BRANCH = SYNTH_GUILD_BRANCH_KEY
+_T_CAST = SYNTH_SKILLS["t_ember_burst"].key
+_T_ITEM = "t_ember_spray"
+_T_HUNT = "t_party_loop_hunt"
+_T_COMPANION_KEY = "艾洛希雅"
+_T_MONSTER_NAME = "合成微光蟲"
+_T_MONSTER_HP = 1
+_T_REWARD_COPPER = 50
+_T_REWARD_MERIT = 25
+_T_REWARD_QTY = 2
+_T_SEED_AFFINITY = 70
+_T_EXPECTED_AFFINITY_AFTER_TURNIN = 72
+_T_MAGIC_POWER = 30
+_MOVE = CLOCK_YAML["command_defaults"]["move"]
+_SCOPE_LOGICALS = (
+    "guild_branches",
+    "skills",
+    "elements",
+    "items",
+    "races",
+    "subraces",
+    "static_tiers",
+)
+
+def _hunt_definition() -> QuestDefinition:
+    return QuestDefinition(
+        key=_T_HUNT,
+        display_name="合成微光蟲清剿",
+        quest_type=QuestType.DEFEAT,
+        rank="F",
+        stages=(
+            QuestStage(
+                0,
+                QuestObjective(
+                    kind=ObjectiveKind.DEFEAT,
+                    quantity=1,
+                    monster_tier=_monster_tier_key(),
+                ),
+            ),
+        ),
+    )
 
 
 def _raw(**overrides):
@@ -68,7 +131,27 @@ def _raw(**overrides):
     return raw
 
 
-def _reset_all():
+def _snapshot_ai_registries(test):
+    """Freeze the process-global AI registration state for exact restoration.
+
+    These mappings are process globals owned jointly by every suite in the
+    shard; a bare clear() at teardown would silently strip registrations other
+    suites installed. Snapshot first, register the dialogue seam, and restore
+    the exact prior contents on cleanup.
+    """
+    validators = dict(guardrail._semantic_validators)
+    fallbacks = dict(guardrail._degrade_fallbacks)
+    schemas = dict(_OUTPUT_SCHEMAS)
+
+    def _restore():
+        guardrail._semantic_validators.clear()
+        guardrail._semantic_validators.update(validators)
+        guardrail._degrade_fallbacks.clear()
+        guardrail._degrade_fallbacks.update(fallbacks)
+        _OUTPUT_SCHEMAS.clear()
+        _OUTPUT_SCHEMAS.update(schemas)
+
+    test.addCleanup(_restore)
     guardrail._semantic_validators.clear()
     guardrail._degrade_fallbacks.clear()
     _OUTPUT_SCHEMAS.clear()
@@ -78,17 +161,26 @@ class OfflinePartyQuestLoopTests(BattlefieldIsolation, EvenniaCommandTestMixin, 
     """The design §7 offline full loop: invite → follow → combat → turn-in → dismiss."""
 
     def setUp(self):
+        # Scope before construction: staff branch validation, entity races,
+        # the cast, and the reward item all resolve inside the synthetic
+        # registries; the monster tier vocabulary stays live for the round.
+        open_synthetic_scope(
+            self, *_SCOPE_LOGICALS, extra=synth_innate_overlay()
+        )
         super().setUp()
-        from world.quests.catalog import register_catalog
         from world.quests.definitions import QUEST_DEFINITION_REGISTRY
         from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 
         self._quest_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._offer_items = list(GUILD_OFFER_REGISTRY.items())
-        _reset_all()
+        self.addCleanup(self._restore_registries)
+        _snapshot_ai_registries(self)
         register_npc_dialogue()
-        register_catalog()
+        # Runtime composition (planner registration + catalog vocabulary for
+        # the affinity rulebook's cap-break validation) is restored as before;
+        # the loop's visible board stays offer-driven.
         sync_quest_runtime()
+        QUEST_DEFINITION_REGISTRY.setdefault(_T_HUNT, _hunt_definition())
         self.hall = create_object(Room, key="公會大廳")
         self.hunt_ground = create_object(Room, key="南郊狩獵場")
         self.door = create_object(
@@ -98,30 +190,44 @@ class OfflinePartyQuestLoopTests(BattlefieldIsolation, EvenniaCommandTestMixin, 
         self.staff.components.add(
             GuildStaff.create(self.staff, service_id="staff", branch_key=ALTORIA_BRANCH)
         )
-        self.char1.race = "human"
+        self.char1.race = _race_key()
         self.char1.apply_race_baseline()
-        # Human static magic_power at 術師 tier so fire_ball casts pass.
-        self.char1.traits.magic_power.base = 30
-        grant_lineage(self.char1, ["fire_ball"])
+        # Static magic_power raised to the kit spell's tuning threshold.
+        self.char1.traits.magic_power.base = _T_MAGIC_POWER
+        grant_lineage(self.char1, [_T_CAST])
         self.char1.location = self.hall
         register_adventurer(self.char1, self.staff)
         register_guild_offer(
             GuildQuestOffer(
-                definition_key="introductory_hunt",
+                definition_key=_T_HUNT,
                 issuer_branch_key=ALTORIA_BRANCH,
                 reward=QuestReward(
-                    copper=50,
-                    items=(ItemQuantity("healing_potion", 2),),
-                    merit=25,
+                    copper=_T_REWARD_COPPER,
+                    items=(ItemQuantity(_T_ITEM, _T_REWARD_QTY),),
+                    merit=_T_REWARD_MERIT,
                 ),
             )
         )
-        self.companion = create_object(LLMNPC, key="艾洛希雅", location=self.hall)
-        self.companion.race = "human"
+        self.companion = create_object(
+            LLMNPC, key=_T_COMPANION_KEY, location=self.hall
+        )
+        self.companion.race = _race_key()
         self.companion.apply_race_baseline()
         apply_affinity_change(
-            self.companion, self.char1, AffinitySource.QUEST_COMPLETION, 70
+            self.companion,
+            self.char1,
+            AffinitySource.QUEST_COMPLETION,
+            _T_SEED_AFFINITY,
         )
+
+    def _restore_registries(self):
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+        from world.rules.guild_offers import GUILD_OFFER_REGISTRY
+
+        QUEST_DEFINITION_REGISTRY.clear()
+        QUEST_DEFINITION_REGISTRY.update(self._quest_items)
+        GUILD_OFFER_REGISTRY.clear()
+        GUILD_OFFER_REGISTRY.update(self._offer_items)
 
     def tearDown(self):
         from world.quests.definitions import QUEST_DEFINITION_REGISTRY
@@ -131,7 +237,6 @@ class OfflinePartyQuestLoopTests(BattlefieldIsolation, EvenniaCommandTestMixin, 
         QUEST_DEFINITION_REGISTRY.update(self._quest_items)
         GUILD_OFFER_REGISTRY.clear()
         GUILD_OFFER_REGISTRY.update(self._offer_items)
-        _reset_all()
         super().tearDown()
 
     @covers_requirement("party-system::the-invite-command-proposes-a-party-through-the-ai-judged-dialogue-seam")
@@ -151,35 +256,35 @@ class OfflinePartyQuestLoopTests(BattlefieldIsolation, EvenniaCommandTestMixin, 
                 "web.webclient.actions.dialogue_composition.build_dialogue_client",
                 return_value=client,
             ):
-                output = self.call(CmdInvite(), "艾洛希雅")
+                output = self.call(CmdInvite(), _T_COMPANION_KEY)
         self.assertIn(DEGRADED_ACCEPT_MESSAGE, output)
         self.assertIn(JOINED_MESSAGE, output)
         self.assertTrue(is_companion(self.companion, self.char1))
         self.assertEqual(len(client.calls), 0)
 
         offers = list_guild_offers(self.char1, self.staff)
-        self.assertEqual(
-            [offer.definition_key for offer in offers], ["introductory_hunt"]
-        )
-        record = accept_guild_offer(self.char1, self.staff, "introductory_hunt")
+        self.assertEqual([offer.definition_key for offer in offers], [_T_HUNT])
+        record = accept_guild_offer(self.char1, self.staff, _T_HUNT)
         quest_id = record.quest_id
 
         tick_before = get_world_clock().tick
         self.door.at_traverse(self.char1, self.hunt_ground)
         self.assertIs(self.char1.location, self.hunt_ground)
         self.assertIs(self.companion.location, self.hunt_ground)
-        self.assertEqual(get_world_clock().tick, tick_before + MOVE)
+        self.assertEqual(get_world_clock().tick, tick_before + _MOVE)
 
-        monster = create_object(Monster, key="低階哥布林", location=self.hunt_ground)
-        monster.threat_tier = "low"
+        monster = create_object(
+            Monster, key=_T_MONSTER_NAME, location=self.hunt_ground
+        )
+        monster.threat_tier = _monster_tier_key()
         monster.apply_monster_tier("floor")
-        monster.traits.hp.base = 1
-        monster.traits.hp.current = 1
+        monster.traits.hp.base = _T_MONSTER_HP
+        monster.traits.hp.current = _T_MONSTER_HP
         engage(self.char1, monster)
         session = read_session(self.char1)
         self.assertIn(int(self.companion.pk), session.player_ids)
         with patch("world.rules.combat.roll_d100", return_value=100):
-            outcome = submit_player_action(self.char1, "fire_ball", [monster])
+            outcome = submit_player_action(self.char1, _T_CAST, [monster])
         self.assertEqual(outcome["outcome"], "victory")
         self.assertIsNone(read_session(self.char1))
         completed = [r for r in read_records(self.char1) if r.quest_id == quest_id]
@@ -187,16 +292,21 @@ class OfflinePartyQuestLoopTests(BattlefieldIsolation, EvenniaCommandTestMixin, 
 
         self.door.at_traverse(self.char1, self.hall)
         result = turn_in_quest(self.char1, self.staff, quest_id)
-        self.assertEqual(result["copper"], 50)
-        self.assertEqual(result["merit"], 25)
-        self.assertEqual(self.char1.db.wallet, 50)
-        self.assertEqual(read_counter_trait(self.char1, "guild_merit"), 25)
-        self.assertIn("healing_potion", self.char1.db.inventory)
+        self.assertEqual(result["copper"], _T_REWARD_COPPER)
+        self.assertEqual(result["merit"], _T_REWARD_MERIT)
+        self.assertEqual(self.char1.db.wallet, _T_REWARD_COPPER)
+        self.assertEqual(
+            read_counter_trait(self.char1, "guild_merit"), _T_REWARD_MERIT
+        )
+        self.assertIn(_T_ITEM, self.char1.db.inventory)
         self.assertEqual(parse_reward_claims(self.char1), [quest_id])
-        self.assertEqual(self.companion.relations.affinity_for(self.char1), 72)
+        self.assertEqual(
+            self.companion.relations.affinity_for(self.char1),
+            _T_EXPECTED_AFFINITY_AFTER_TURNIN,
+        )
 
         before = self.companion.relations.affinity_for(self.char1)
-        output = self.call(CmdLeave(), "艾洛希雅")
+        output = self.call(CmdLeave(), _T_COMPANION_KEY)
         self.assertIn(LEAVE_DISMISSED_MESSAGE, output)
         self.assertFalse(is_companion(self.companion, self.char1))
         self.assertIsNone(self.companion.db.party_member)

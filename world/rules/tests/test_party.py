@@ -53,7 +53,6 @@ from world.rules.party import (
     party_size,
     purge_npc_memberships,
 )
-from world.maps.bootstrap import sync_grid
 from typeclasses.rooms import AnchorRoom
 from evennia.utils.create import create_account
 from evennia.utils.test_resources import EvenniaTest
@@ -66,6 +65,27 @@ from world.quests.tests._fixtures import (
     quest,
     reach,
     register,
+)
+from world.rules.tests._combat_session_helpers import _race_key, open_synthetic_scope
+from world.tests.synthetic_data import SYNTH_PRESETS
+
+# Activation parity rides the kit card: the synthetic preset (with its
+# declared companion chain) and the kit race/subrace/kit registries replace
+# the shipped activation data, and the quest's anchor destination resolves
+# through the patched placement registry to a locally built AnchorRoom.
+_T_PRESET = next(iter(SYNTH_PRESETS))  # t_pale_wren: declares a twin
+_SCOPE_LOGICALS = (
+    "presets",
+    "races",
+    "subraces",
+    "static_tiers",
+    "starting_kits",
+    "items",
+    "prices",
+    "skills",
+    "elements",
+    "anchors",
+    "anchor_placements",
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -107,11 +127,12 @@ class MembershipOwnershipContractTests(unittest.TestCase):
 
 class PartyMembershipTests(EvenniaTestCase):
     def setUp(self):
+        open_synthetic_scope(self, "races", "subraces", "static_tiers")
         super().setUp()
         register_catalog()
         self.room = create_object(Room, key="party room")
         self.player = create_object(PlayerCharacter, key="party player")
-        self.player.race = "human"
+        self.player.race = _race_key()
         self.player.apply_race_baseline()
         self.player.location = self.room
         self.npc = create_object(NPC, key="party npc", location=self.room)
@@ -274,7 +295,7 @@ class PartyMembershipTests(EvenniaTestCase):
     @covers_requirement("party-system::party-membership-is-bounded-persistent-and-single-writer")
     def test_leave_never_clears_a_backref_owned_by_another_player(self):
         other_player = create_object(PlayerCharacter, key="other player")
-        other_player.race = "human"
+        other_player.race = _race_key()
         other_player.apply_race_baseline()
         other_player.location = self.room
         join_party(self.npc, self.player)
@@ -289,11 +310,12 @@ class AutoLeaveIntegrationTests(EvenniaTestCase):
     """The wired auto-leave rule run from the affinity writer (party-core D-5)."""
 
     def setUp(self):
+        open_synthetic_scope(self, "races", "subraces", "static_tiers")
         super().setUp()
         register_catalog()
         self.room = create_object(Room, key="auto room")
         self.player = create_object(PlayerCharacter, key="auto player")
-        self.player.race = "human"
+        self.player.race = _race_key()
         self.player.apply_race_baseline()
         self.player.location = self.room
         self.npc = create_object(NPC, key="auto npc", location=self.room)
@@ -404,28 +426,32 @@ class ActivationBoundParityTests(QuestRegistryIsolation, EvenniaTest):
     """
 
     def setUp(self):
+        # Scope before construction: entity races, the activation card, and
+        # the quest anchor all resolve through the patched registries, so no
+        # shipped grid content is consulted (the anchor room is built locally
+        # under the kit placement key).
+        open_synthetic_scope(self, *_SCOPE_LOGICALS)
         super().setUp()
-        create_object(Room, key="虛境", location=None)
-        sync_grid()
         register_catalog()
-        self.anchor = AnchorRoom.objects.filter(db_key="中央廣場").first()
+        self.anchor = create_object(AnchorRoom, key="parity anchor room")
+        self.anchor.anchor_key = anchor_locator().anchor_key
         self.assertIsInstance(self.anchor, AnchorRoom)
         self.account = create_account(
             "parity-maker", "parity@example.test", "testpassword", typeclass=Account
         )
         self.invited = create_object(NPC, key="受邀夥伴", location=self.room1)
-        self.invited.race = "human"
+        self.invited.race = _race_key()
         self.invited.apply_race_baseline()
         self.player = None
 
     def _activate_parity_player(self, key: str) -> PlayerCharacter:
-        """A freshly activated 由奈 holder with her bound twin in ``room1``."""
+        """A freshly activated kit-card holder with her bound twin in ``room1``."""
         shell = create_object(PlayerCharacter, key=key)
         self.account.at_post_create_character(shell)
         shell.location = self.room1
         activate_player_character(
             self.account, shell,
-            CharacterCreationRequest(mode="preset", preset_key="yuna_darknight"),
+            CharacterCreationRequest(mode="preset", preset_key=_T_PRESET),
         )
         return shell
 

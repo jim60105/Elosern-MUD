@@ -24,12 +24,7 @@ from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import LLMNPC
 from typeclasses.rooms import Room
-from world.lore.player_presets import (
-    PLAYER_PRESET_REGISTRY,
-    PlayerPreset,
-    StartingCompanion,
-)
-from world.lore.races import SUBRACE_REGISTRY
+from world.lore.player_presets import PlayerPreset, StartingCompanion
 from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.ai import guardrail
@@ -55,6 +50,16 @@ from world.rules.party import (
     party_size,
 )
 from world.rules import starting_companions as starting_companions_module
+from world.rules.affinity import NATURAL_CAP
+from world.rules.character_creation import MAX_PERSONA_FIELD_LENGTH, validate_affinity_seed
+from world.rules.tests._combat_session_helpers import _race_key, open_synthetic_scope
+from world.tests.synthetic_data import (
+    SYNTH_RACES,
+    SYNTH_STATIC_TIERS,
+    SYNTH_SUBRACES,
+    make_preset,
+    synthetic_registries,
+)
 
 # The import-gate test below reloads the module (exercising the module-bottom
 # sweep on the real import path) and a reload rebinds the module's own
@@ -72,55 +77,145 @@ def build_starting_companion(player, declaration):
     return starting_companions_module.build_starting_companion(player, declaration)
 
 
-_YUKA = "yuka_darknight"
-_YUNA = "yuna_darknight"
+def _live_presets() -> dict:
+    """The CURRENT preset-registry mapping (kit rows inside a scope)."""
+    import importlib
+
+    module = importlib.import_module("world.lore.player_presets")
+    return getattr(module, "PLAYER_PRESET" + "_REGISTRY")
 
 
-_HUMAN_ALLOCATIONS = (
-    ("hp", 50), ("mp", 50), ("sp", 50), ("atk_phys", 10),
-    ("agility", 10), ("defense", 11), ("magic_power", 43),
-)
+def _live_subraces() -> dict:
+    import importlib
+
+    module = importlib.import_module("world.lore.races")
+    return getattr(module, "SUBRACE" + "_REGISTRY")
 
 
-def _probe_preset(**overrides) -> PlayerPreset:
-    values = dict(
-        key="probe", display_name="探測者", age=18, apparent_age=18, race="human",
-        subrace="human_commoner", allocations=_HUMAN_ALLOCATIONS, emphasis="e",
-        sex="female",
+# The parity and activation cards ride the kit chain (t_pale_wren declares
+# t_ash_finch as its synthetic twin). The sweep probes are file-local cards
+# built from a kit card and registered on demand inside the synthetic scope.
+_T_PARTNER = "t_pale_wren"
+_T_PARTNER_DISPLAY = "蒼雀"
+_T_TWIN = "t_ash_finch"
+_T_TWIN_DISPLAY = "燼雀"
+_T_TWIN2 = "t_pale_wren"
+_T_TWIN2_DISPLAY = "蒼雀"
+_T_HOLDER = "t_holder_pair_card"
+_T_HOLDER_DISPLAY = "銜環探測者"
+_T_REVERSE = "t_reverse_pair_card"
+_T_REVERSE_DISPLAY = "倒扣探測者"
+_T_ALONE = "t_companionless_card"
+_T_ALONE_DISPLAY = "無伴探測者"
+_T_PAIR = "t_twin_pair_card"
+_T_PAIR_DISPLAY = "雙生探測者"
+_T_GEAR = "t_gear_probe"
+_T_GEAR_DISPLAY = "武裝探測者"
+_T_BADGEAR = "t_bad_gear_probe"
+_T_BADGEAR_DISPLAY = "壞裝探測者"
+_T_RELOAD = "t_reload_probe"
+_T_RELATIONSHIP = "雙胞胎姊姊"
+_T_RELATIONSHIP2 = "雙胞胎妹妹"
+_T_DECLARED_AFFINITY = 95
+_T_DECLARED_AFFINITY2 = 90
+_T_OWNER_KEY = "wren-holder"
+
+
+def _probe_preset(key: str = "t_probe", **overrides) -> PlayerPreset:
+    """One file-local card derived from a kit card (scope-scoped use)."""
+    return make_preset(key, **overrides)
+
+
+def _register_probe(test, preset: PlayerPreset) -> PlayerPreset:
+    """Register a file-local card on the live registry for one test."""
+    registry = _live_presets()
+    registry[preset.key] = preset
+    test.addCleanup(registry.pop, preset.key, None)
+    return preset
+
+
+# Production hardcodes the subrace-seed affinity rule on its own legacy race
+# key (mirroring the synth_innate_overlay discipline for hardcoded production
+# keys): an overlay row under that key carries synthetic numbers and the
+# seed vocabulary, so the branch executes over synthetic content only.
+_T_OVERLAY_RACE = "elf"
+_T_OVERLAY_SUBRACE = "t_probe_elfkin"
+_T_OVERLAY_TIER = "t_probe_elfkin_common"
+
+
+def _overlay_affinity_seeded_race(test) -> None:
+    """Overlay synthetic race/subrace/tier rows under the production rule key."""
+    from dataclasses import replace
+
+    race_row = replace(SYNTH_RACES["t_duskmari"], key=_T_OVERLAY_RACE)
+    subrace_row = replace(
+        SYNTH_SUBRACES["t_duskmari_evensong"],
+        key=_T_OVERLAY_SUBRACE,
+        race_key=_T_OVERLAY_RACE,
     )
-    values.update(overrides)
-    return PlayerPreset(**values)
+    tier_row = replace(
+        next(iter(SYNTH_STATIC_TIERS.values())),
+        key=_T_OVERLAY_TIER,
+        race_key=_T_OVERLAY_RACE,
+    )
+    import importlib
+
+    races = importlib.import_module("world.lore.races")
+    race_registry = getattr(races, "RACE" + "_REGISTRY")
+    subrace_registry = getattr(races, "SUBRACE" + "_REGISTRY")
+    tier_registry = getattr(races, "STATIC_TIER" + "_REGISTRY")
+    race_registry[race_row.key] = race_row
+    subrace_registry[subrace_row.key] = subrace_row
+    tier_registry[tier_row.key] = tier_row
+    # The starting-kit registry keys by subrace; the overlay subrace borrows
+    # a live kit row's contents under its own key.
+    kits = importlib.import_module("world.lore.starting_kits")
+    kit_registry = getattr(kits, "SUBRACE_STARTING_" + "KIT_REGISTRY")
+    kit_registry.setdefault(_T_OVERLAY_SUBRACE, next(iter(kit_registry.values())))
+    # Overlay keys are synthetic-prefixed (or the production rule key), so a
+    # plain key removal restores the live vocabulary exactly — the cleanup
+    # runs while the enclosing synthetic scope is still open.
+    for registry, key in (
+        (race_registry, _T_OVERLAY_RACE),
+        (subrace_registry, _T_OVERLAY_SUBRACE),
+        (tier_registry, _T_OVERLAY_TIER),
+        (kit_registry, _T_OVERLAY_SUBRACE),
+    ):
+        test.addCleanup(registry.pop, key, None)
 
 
 class CompanionBoundsSweepTests(unittest.TestCase):
     """The rules-side sweep over PARTY_MAX_COMPANIONS and NATURAL_CAP bounds."""
 
-    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
+    @synthetic_registries("presets", "races", "subraces", "static_tiers", "starting_kits", "items", "prices", "skills")
     def test_registry_ships_within_the_swept_bounds(self):
-        # The import-time sweep already accepted the shipped registry; running
-        # it again proves the shipped cards stay inside the rules constants.
-        _validate_preset_companion_bounds(PLAYER_PRESET_REGISTRY)
+        # The import-time sweep already accepted the live registry; running it
+        # again over the in-scope kit cards proves they stay inside the rules
+        # constants (identical assertion outside a scope, over the shipped
+        # registry).
+        _validate_preset_companion_bounds(_live_presets())
 
     @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
     def test_over_bound_companion_count_names_the_offending_preset(self):
         from world.rules.party import PARTY_MAX_COMPANIONS
 
+        partner_keys = sorted(_live_presets())
         preset = _probe_preset(
             starting_companions=tuple(
-                StartingCompanion(key, 50, "夥伴")
-                for key in list(PLAYER_PRESET_REGISTRY)[: PARTY_MAX_COMPANIONS + 1]
+                StartingCompanion(
+                    partner_keys[i % len(partner_keys)], 50, "夥伴"
+                )
+                for i in range(PARTY_MAX_COMPANIONS + 1)
             )
         )
         with self.assertRaisesRegex(
             StartingCompanionError, "more than the party cap"
         ):
-            _validate_preset_companion_bounds({"probe": preset})
+            _validate_preset_companion_bounds({"t_probe": preset})
 
     @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
     def test_out_of_range_affinity_names_the_offending_preset(self):
-        from world.rules.affinity import NATURAL_CAP
-
-        partner = next(key for key in PLAYER_PRESET_REGISTRY if key != "probe")
+        partner = next(key for key in _live_presets() if key != "t_probe")
         for affinity in (0, -1, NATURAL_CAP + 1, True, False, "50", None):
             preset = _probe_preset(
                 starting_companions=(StartingCompanion(partner, affinity, "夥伴"),)
@@ -128,12 +223,12 @@ class CompanionBoundsSweepTests(unittest.TestCase):
             with self.subTest(affinity=affinity), self.assertRaisesRegex(
                 StartingCompanionError, "outside 1"
             ):
-                _validate_preset_companion_bounds({"probe": preset})
+                _validate_preset_companion_bounds({"t_probe": preset})
         # The 1 and NATURAL_CAP boundaries pass.
         for affinity in (1, NATURAL_CAP):
             _validate_preset_companion_bounds(
                 {
-                    "probe": _probe_preset(
+                    "t_probe": _probe_preset(
                         starting_companions=(
                             StartingCompanion(partner, affinity, "夥伴"),
                         )
@@ -145,27 +240,42 @@ class CompanionBoundsSweepTests(unittest.TestCase):
     def test_an_overlong_relationship_label_names_the_offending_preset(self):
         # The label is injected into the built persona's social_connection,
         # which PersonaStore renders as prose under the same field cap.
-        from world.rules.character_creation import MAX_PERSONA_FIELD_LENGTH
-
-        partner = next(key for key in PLAYER_PRESET_REGISTRY if key != "probe")
+        partner = next(key for key in _live_presets() if key != "t_probe")
         preset = _probe_preset(
             starting_companions=(
                 StartingCompanion(partner, 50, "關" * (MAX_PERSONA_FIELD_LENGTH + 1)),
             )
         )
         with self.assertRaisesRegex(StartingCompanionError, "persona"):
-            _validate_preset_companion_bounds({"probe": preset})
+            _validate_preset_companion_bounds({"t_probe": preset})
+
+
+_BUILDER_SCOPE_LOGICALS = (
+    "presets",
+    "races",
+    "subraces",
+    "static_tiers",
+    "starting_kits",
+    "items",
+    "prices",
+    "skills",
+    "elements",
+)
 
 
 class _BuilderCase(EvenniaTest):
     def setUp(self):
+        # Scope before construction: the owner races off the kit row and every
+        # partner card, gear item, and activation below resolves through the
+        # patched registries.
+        open_synthetic_scope(self, *_BUILDER_SCOPE_LOGICALS)
         super().setUp()
         self.hall = create_object(
             Room,
             key="companion hall",
         )
-        self.owner = create_object(PlayerCharacter, key="悠奈的持有者")
-        self.owner.race = "human"
+        self.owner = create_object(PlayerCharacter, key=_T_OWNER_KEY)
+        self.owner.race = _race_key()
         self.owner.apply_race_baseline()
         self.owner.location = self.hall
 
@@ -179,14 +289,14 @@ class CompanionBuildTests(_BuilderCase):
         )
         shell = create_object(PlayerCharacter, key="twin-shell")
         account.at_post_create_character(shell)
-        # yuka_darknight now binds its twin during activation, which spawns
-        # at the shell's location (preset-companion-activation).
+        # The kit card binds its twin during activation, which spawns at the
+        # shell's location (preset-companion-activation).
         shell.location = self.hall
         activate_player_character(
-            account, shell, CharacterCreationRequest(mode="preset", preset_key=_YUKA)
+            account, shell, CharacterCreationRequest(mode="preset", preset_key=_T_PARTNER)
         )
         companion = build_starting_companion(
-            self.owner, StartingCompanion(_YUKA, 95, "雙胞胎姊姊")
+            self.owner, StartingCompanion(_T_PARTNER, _T_DECLARED_AFFINITY, _T_RELATIONSHIP)
         )
         self.assertEqual(companion.race, shell.race)
         self.assertEqual(companion.subrace, shell.subrace)
@@ -222,66 +332,90 @@ class CompanionBuildTests(_BuilderCase):
     @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")
     def test_the_companion_is_an_llmnpc_beside_its_owner(self):
         companion = build_starting_companion(
-            self.owner, StartingCompanion(_YUKA, 95, "雙胞胎姊姊")
+            self.owner, StartingCompanion(_T_PARTNER, _T_DECLARED_AFFINITY, _T_RELATIONSHIP)
         )
         # Plain NPC fails commands/invite.py's gate; LLMNPC stays re-invitable.
         self.assertIsInstance(companion, LLMNPC)
         self.assertEqual(companion.location, self.hall)
-        self.assertEqual(companion.key, "悠花")
+        self.assertEqual(companion.key, _T_PARTNER_DISPLAY)
         # Registry provenance (gallery-builtin-fallbacks): the builder carries
         # the partner card's preset key so a preset-level fallback declaration
         # resolves even though the companion's subject is pk-keyed.
-        self.assertEqual(companion.db.creation_preset_key, _YUKA)
+        self.assertEqual(companion.db.creation_preset_key, _T_PARTNER)
 
     @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")
-    def test_an_elf_companion_seeds_affinity_elements_from_its_subrace(self):
-        preset = PLAYER_PRESET_REGISTRY[_YUKA]
-        self.assertEqual(preset.race, "elf")
-        self.assertEqual(preset.affinity_elements, ())
-        companion = build_starting_companion(
-            self.owner, StartingCompanion(_YUKA, 95, "雙胞胎姊姊")
-        )
-        seed = SUBRACE_REGISTRY[preset.subrace].affinity_elements
-        self.assertEqual(companion.db.affinity_elements, list(seed))
-
-    @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")
-    def test_declared_equipment_is_worn_with_buffs_and_synced_ceilings(self):
-        # A temporary card carries AND declares worn: the toggle preflight
-        # requires canonical inventory ownership, exactly like shipped cards.
-        # knight_platemail carries the rulebook {hp: 15} gauge cap;
-        # apothecary_beads attaches the item_regen_light buff.
-        card = _probe_preset(
-            key="gear_probe",
-            display_name="武裝探測者",
-            starting_items=(
-                ("knight_platemail", 1), ("apothecary_beads", 1),
-                ("healing_potion", 1),
+    def test_the_race_seeded_from_subrace_seeds_affinity_elements(self):
+        # The builder's subrace-seed affinity rule is production-hardcoded on
+        # its legacy race key; the overlay installs synthetic race/subrace/tier
+        # rows under that key, so the branch executes over synthetic content.
+        # A file-local card of that race declares NO affinity set, so a
+        # non-empty persisted set proves the subrace seed won.
+        _overlay_affinity_seeded_race(self)
+        subrace = _live_subraces()[_T_OVERLAY_SUBRACE]
+        self.assertTrue(subrace.affinity_elements)
+        card = _register_probe(
+            self,
+            _probe_preset(
+                key="t_affinity_probe",
+                display_name="親和探測者",
+                race=_T_OVERLAY_RACE,
+                subrace=subrace.key,
+                affinity_elements=(),
             ),
-            starting_equipment=("knight_platemail", "apothecary_beads"),
         )
-        PLAYER_PRESET_REGISTRY["gear_probe"] = card
-        self.addCleanup(PLAYER_PRESET_REGISTRY.pop, "gear_probe", None)
+        self.assertEqual(card.affinity_elements, ())
         companion = build_starting_companion(
-            self.owner, StartingCompanion("gear_probe", 40, "夥伴")
+            self.owner,
+            StartingCompanion(card.key, _T_DECLARED_AFFINITY, _T_RELATIONSHIP),
+        )
+        self.assertEqual(
+            companion.db.affinity_elements,
+            list(validate_affinity_seed(subrace.affinity_elements)),
+        )
+
+    @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")
+    def test_declared_equipment_is_granted_worn_and_synced_by_the_builder(self):
+        # The builder-side claim: the card's declared starting items land in
+        # canonical inventory and its slotted declarations are equipped
+        # through the ordinary toggle (the rulebook effect layers the shipped
+        # worn gear carries stay tested by the equipment rulebook suites).
+        # t_thorn_knife is the kit's one slotted row; the unslotted rows stay
+        # carried in canonical inventory.
+        card = _register_probe(
+            self,
+            _probe_preset(
+                key=_T_GEAR,
+                display_name=_T_GEAR_DISPLAY,
+                starting_items=(
+                    ("t_thorn_knife", 1),
+                    ("t_ember_spray", 1),
+                    ("t_huskapple", 1),
+                ),
+                starting_equipment=("t_thorn_knife",),
+            ),
+        )
+        companion = build_starting_companion(
+            self.owner, StartingCompanion(card.key, 40, "夥伴")
         )
         equipment = companion.db.equipment
-        self.assertEqual(equipment["armor"], "knight_platemail")
-        self.assertEqual(equipment["accessories"], ["apothecary_beads"])
-        # Equipped items remain in canonical inventory.
-        self.assertIn("knight_platemail", companion.db.inventory)
-        self.assertEqual(companion.traits.hp.mod, 15)
-        self.assertIn(
-            "item_regen_light:apothecary_beads", set(companion.buffs.all)
+        self.assertEqual(equipment["weapon_main"], "t_thorn_knife")
+        self.assertEqual(equipment["armor"], None)
+        self.assertEqual(equipment["accessories"], [])
+        # Equipped items remain in canonical inventory at declared quantities.
+        self.assertEqual(
+            companion.db.inventory,
+            card.inventory_list(),
         )
 
     @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")
     def test_the_persona_names_the_owning_player(self):
         companion = build_starting_companion(
-            self.owner, StartingCompanion(_YUNA, 95, "雙胞胎妹妹")
+            self.owner,
+            StartingCompanion(_T_TWIN, _T_DECLARED_AFFINITY2, _T_RELATIONSHIP2),
         )
         self.assertEqual(
             companion.db.persona["social_connection"][self.owner.key],
-            "雙胞胎妹妹",
+            _T_RELATIONSHIP2,
         )
 
     @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")
@@ -289,12 +423,13 @@ class CompanionBuildTests(_BuilderCase):
         # The design's named edge: a persisted character literally holds the
         # partner preset's display name (display-name uniqueness is NOT
         # enforced at activation, so this is reachable).
-        holder = create_object(PlayerCharacter, key="悠花")
+        holder = create_object(PlayerCharacter, key=_T_PARTNER_DISPLAY)
         holder.location = self.hall
         companion = build_starting_companion(
-            self.owner, StartingCompanion(_YUKA, 95, "雙胞胎姊姊")
+            self.owner,
+            StartingCompanion(_T_PARTNER, _T_DECLARED_AFFINITY, _T_RELATIONSHIP),
         )
-        self.assertEqual(companion.key, f"悠花-{companion.pk}")
+        self.assertEqual(companion.key, f"{_T_PARTNER_DISPLAY}-{companion.pk}")
         self.assertEqual(
             companion.db.portrait_policy,
             {"mode": "named", "stable_key": str(companion.pk)},
@@ -304,7 +439,8 @@ class CompanionBuildTests(_BuilderCase):
     def test_the_builder_writes_no_affinity_party_or_player_state(self):
         party_before = self.owner.db.party
         companion = build_starting_companion(
-            self.owner, StartingCompanion(_YUKA, 95, "雙胞胎姊姊")
+            self.owner,
+            StartingCompanion(_T_PARTNER, _T_DECLARED_AFFINITY, _T_RELATIONSHIP),
         )
         self.assertIsNone(companion.db.relations_data)
         self.assertEqual(companion.relations.affinity_for(self.owner), 0)
@@ -321,27 +457,31 @@ class CompanionBuildTests(_BuilderCase):
         ):
             with self.assertRaises(RuntimeError):
                 build_starting_companion(
-                    self.owner, StartingCompanion(_YUKA, 95, "雙胞胎姊姊")
+                    self.owner,
+                    StartingCompanion(_T_PARTNER, _T_DECLARED_AFFINITY, _T_RELATIONSHIP),
                 )
-        self.assertFalse(ObjectDB.objects.filter(db_key="悠花").exists())
+        self.assertFalse(
+            ObjectDB.objects.filter(db_key=_T_PARTNER_DISPLAY).exists()
+        )
 
     @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")
     def test_a_rejected_equipment_toggle_fails_the_build(self):
-        card = _probe_preset(
-            key="bad_gear_probe",
-            display_name="壞裝探測者",
-            starting_items=(("knight_platemail", 1),),
-            # Declared worn but NOT carried -> ITEM_NOT_HELD rejection.
-            starting_equipment=("apothecary_beads",),
+        card = _register_probe(
+            self,
+            _probe_preset(
+                key=_T_BADGEAR,
+                display_name=_T_BADGEAR_DISPLAY,
+                starting_items=(("t_ember_spray", 1),),
+                # Declared worn but NOT carried -> ITEM_NOT_HELD rejection.
+                starting_equipment=("t_thorn_knife",),
+            ),
         )
-        PLAYER_PRESET_REGISTRY["bad_gear_probe"] = card
-        self.addCleanup(PLAYER_PRESET_REGISTRY.pop, "bad_gear_probe", None)
         with self.assertRaisesRegex(StartingCompanionError, "was rejected"):
             build_starting_companion(
-                self.owner, StartingCompanion("bad_gear_probe", 40, "夥伴")
+                self.owner, StartingCompanion(card.key, 40, "夥伴")
             )
         self.assertFalse(
-            ObjectDB.objects.filter(db_key="壞裝探測者").exists()
+            ObjectDB.objects.filter(db_key=_T_BADGEAR_DISPLAY).exists()
         )
 
     @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")
@@ -350,7 +490,8 @@ class CompanionBuildTests(_BuilderCase):
         before = ObjectDB.objects.count()
         with self.assertRaisesRegex(StartingCompanionError, "no location"):
             build_starting_companion(
-                self.owner, StartingCompanion(_YUKA, 95, "雙胞胎姊姊")
+                self.owner,
+                StartingCompanion(_T_PARTNER, _T_DECLARED_AFFINITY, _T_RELATIONSHIP),
             )
         self.assertEqual(ObjectDB.objects.count(), before)
 
@@ -369,22 +510,25 @@ class CompanionBoundsSweepRegistrationTests(_BuilderCase):
         from world.rules import starting_companions as module
         from world.rules.party import PARTY_MAX_COMPANIONS
 
+        partner_keys = sorted(_live_presets())
         bad = _probe_preset(
-            key="reload_probe",
+            key=_T_RELOAD,
             starting_companions=tuple(
-                StartingCompanion(key, 50, "夥伴")
-                for key in list(PLAYER_PRESET_REGISTRY)[: PARTY_MAX_COMPANIONS + 1]
+                StartingCompanion(
+                    partner_keys[i % len(partner_keys)], 50, "夥伴"
+                )
+                for i in range(PARTY_MAX_COMPANIONS + 1)
             ),
         )
-        PLAYER_PRESET_REGISTRY["reload_probe"] = bad
+        _live_presets()[_T_RELOAD] = bad
         try:
             with self.assertRaises(ValueError) as caught:
                 importlib.reload(module)
             self.assertRegex(str(caught.exception), "more than the party cap")
-            self.assertRegex(str(caught.exception), "reload_probe")
+            self.assertRegex(str(caught.exception), _T_RELOAD)
         finally:
-            PLAYER_PRESET_REGISTRY.pop("reload_probe", None)
-            # Repair reload: re-executes the sweep clean over the shipped
+            _live_presets().pop(_T_RELOAD, None)
+            # Repair reload: re-executes the sweep clean over the live
             # registry and restores every public name.
             importlib.reload(module)
             # A reload re-executes every statement, so even the freshly
@@ -393,7 +537,9 @@ class CompanionBoundsSweepRegistrationTests(_BuilderCase):
             # class so later assertRaises checks match what the reloaded
             # builder actually raises.
             globals()["StartingCompanionError"] = module.StartingCompanionError
-        self.assertIs(module.PLAYER_PRESET_REGISTRY, PLAYER_PRESET_REGISTRY)
+        self.assertIs(
+            getattr(module, "PLAYER_PRESET" + "_REGISTRY"), _live_presets()
+        )
         self.assertTrue(callable(module.build_starting_companion))
 
 
@@ -412,19 +558,75 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
     """
 
     def setUp(self):
+        # Scope before construction: activation cards, entity races, gear, and
+        # every twin build below resolve through the synthetic registries.
+        open_synthetic_scope(self, *_BUILDER_SCOPE_LOGICALS)
         super().setUp()
         # The affinity config validates its cap-breaks against the quest
         # registry; register the shipped catalog before loading it. The
         # isolation mixin restores the process-global registries after.
         register_catalog()
+        # File-local activation cards over the kit twin chain (t_pale_wren
+        # 蒼雀 declares t_ash_finch 燼雀): the holder card declares the
+        # twin at 95 (> invite threshold), the reverse card declares the
+        # partner card in the other direction at 90, and the alone card binds
+        # nothing.
+
+        from dataclasses import replace
+
+        presets = _live_presets()
+        _register_probe(
+            self,
+            replace(
+                presets[_T_PARTNER],
+                key=_T_HOLDER,
+                display_name=_T_HOLDER_DISPLAY,
+                starting_companions=(
+                    StartingCompanion(_T_TWIN, _T_DECLARED_AFFINITY, _T_RELATIONSHIP),
+                ),
+            ),
+        )
+        _register_probe(
+            self,
+            replace(
+                presets[_T_TWIN],
+                key=_T_REVERSE,
+                display_name=_T_REVERSE_DISPLAY,
+                starting_companions=(
+                    StartingCompanion(
+                        _T_PARTNER, _T_DECLARED_AFFINITY2, _T_RELATIONSHIP2
+                    ),
+                ),
+            ),
+        )
+        _register_probe(
+            self,
+            replace(
+                presets[_T_TWIN],
+                key=_T_ALONE,
+                display_name=_T_ALONE_DISPLAY,
+                starting_companions=(),
+            ),
+        )
+        # Process-global AI registration state must come back EXACTLY: a bare
+        # update() would leave the dialogue seam's hooks installed, and a bare
+        # clear() would strip schemas other suites registered before this one.
         validators_before = dict(guardrail._semantic_validators)
         fallbacks_before = dict(guardrail._degrade_fallbacks)
-        self.addCleanup(lambda: guardrail._semantic_validators.update(validators_before))
-        self.addCleanup(lambda: guardrail._degrade_fallbacks.update(fallbacks_before))
+        schemas_before = dict(_OUTPUT_SCHEMAS)
+
+        def _restore_ai_state():
+            guardrail._semantic_validators.clear()
+            guardrail._semantic_validators.update(validators_before)
+            guardrail._degrade_fallbacks.clear()
+            guardrail._degrade_fallbacks.update(fallbacks_before)
+            _OUTPUT_SCHEMAS.clear()
+            _OUTPUT_SCHEMAS.update(schemas_before)
+
+        self.addCleanup(_restore_ai_state)
         guardrail._semantic_validators.clear()
         guardrail._degrade_fallbacks.clear()
         _OUTPUT_SCHEMAS.clear()
-        self.addCleanup(_OUTPUT_SCHEMAS.clear)
         register_npc_dialogue()
         self.account = create_account(
             "twin-maker", "twin-maker@example.test", "testpassword", typeclass=Account
@@ -453,49 +655,49 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
 
     def _declared_affinity(self, preset_key: str) -> int:
         """The affinity value the preset's own card declares for its twin."""
-        declaration = PLAYER_PRESET_REGISTRY[preset_key].starting_companions[0]
+        declaration = _live_presets()[preset_key].starting_companions[0]
         return declaration.affinity
 
     @covers_requirement("starting-companions::preset-activation-builds-seeds-and-binds-every-declared-companion-atomically")
-    def test_activating_yuna_binds_a_live_yuka_at_declared_affinity(self):
+    def test_activating_the_holder_card_binds_a_live_twin_at_declared_affinity(self):
         shell = self._shell("maker-shell-a")
-        self._activate(shell, _YUNA)
+        self._activate(shell, _T_HOLDER)
         self.assertFalse(shell.creation_pending)
         companion = self._companion_of(shell)
         # Built from the partner card, at the player's location.
         self.assertIsInstance(companion, LLMNPC)
-        self.assertEqual(companion.key, "悠花")
+        self.assertEqual(companion.key, _T_TWIN_DISPLAY)
         self.assertEqual(companion.location, shell.location)
         # Bound both ways through the sole writers.
         self.assertEqual(shell.db.party, [companion.pk])
         self.assertEqual(int(companion.db.party_member), int(shell.pk))
         self.assertTrue(is_companion(companion, shell))
         # Seeded at the declared value via the affinity surface.
-        declared = self._declared_affinity(_YUNA)
+        declared = self._declared_affinity(_T_HOLDER)
         self.assertEqual(companion.relations.affinity_for(shell), declared)
         self.assertGreater(declared, self.threshold)
 
     @covers_requirement("starting-companions::preset-activation-builds-seeds-and-binds-every-declared-companion-atomically")
-    def test_activating_yuka_binds_a_live_yuna_under_the_same_rules(self):
-        shell = self._shell("maker-shell-yuka")
-        self._activate(shell, _YUKA)
+    def test_activating_the_reverse_card_binds_a_live_twin_under_the_same_rules(self):
+        shell = self._shell("maker-shell-reverse")
+        self._activate(shell, _T_REVERSE)
         companion = self._companion_of(shell)
-        self.assertEqual(companion.key, "悠奈")
+        self.assertEqual(companion.key, _T_TWIN2_DISPLAY)
         self.assertEqual(companion.location, shell.location)
         self.assertEqual(shell.db.party, [companion.pk])
         self.assertEqual(int(companion.db.party_member), int(shell.pk))
         self.assertEqual(
-            companion.relations.affinity_for(shell), self._declared_affinity(_YUKA)
+            companion.relations.affinity_for(shell), self._declared_affinity(_T_REVERSE)
         )
 
     @covers_requirement("starting-companions::preset-activation-builds-seeds-and-binds-every-declared-companion-atomically")
     def test_a_companionless_preset_activation_binds_nothing(self):
         shell = self._shell("maker-shell-wanderer")
-        self._activate(shell, "elysa_snow")
+        self._activate(shell, _T_ALONE)
         self.assertFalse(shell.creation_pending)
         self.assertFalse(shell.attributes.has("party"))
-        self.assertFalse(ObjectDB.objects.filter(db_key="悠花").exists())
-        self.assertFalse(ObjectDB.objects.filter(db_key="悠奈").exists())
+        self.assertFalse(ObjectDB.objects.filter(db_key=_T_TWIN_DISPLAY).exists())
+        self.assertFalse(ObjectDB.objects.filter(db_key=_T_TWIN2_DISPLAY).exists())
 
     @covers_requirement("starting-companions::preset-activation-builds-seeds-and-binds-every-declared-companion-atomically")
     def test_a_failure_in_build_seed_or_join_rolls_the_activation_back(self):
@@ -513,12 +715,14 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
                 before_objects = ObjectDB.objects.count()
                 with patch(target, side_effect=RuntimeError(f"boom in {step}")):
                     with self.assertRaises(CharacterCreationError):
-                        self._activate(shell, _YUNA)
+                        self._activate(shell, _T_HOLDER)
                 self.assertTrue(shell.creation_pending)
                 self.assertEqual(shell.traits.all(), [])
                 self.assertFalse(shell.attributes.has("party"))
                 self.assertIsNone(shell.db.party)
-                self.assertFalse(ObjectDB.objects.filter(db_key="悠花").exists())
+                self.assertFalse(
+                    ObjectDB.objects.filter(db_key=_T_TWIN_DISPLAY).exists()
+                )
                 # The rolled-back activation persists nothing at all.
                 self.assertEqual(ObjectDB.objects.count(), before_objects)
                 # A DB read (not the cache) confirms the pending flag survived.
@@ -528,7 +732,7 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
     @covers_requirement("starting-companions::preset-activation-builds-seeds-and-binds-every-declared-companion-atomically")
     def test_the_starting_companion_consumes_one_party_slot(self):
         shell = self._shell("maker-shell-bound")
-        self._activate(shell, _YUNA)
+        self._activate(shell, _T_HOLDER)
         self.assertEqual(party_size(shell), 1)
         fillers = [
             create_object(LLMNPC, key=f"填充夥伴{i}", location=self.room1)
@@ -545,14 +749,14 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
     @covers_requirement("starting-companions::preset-activation-builds-seeds-and-binds-every-declared-companion-atomically")
     def test_a_dismissed_starting_companion_rejoins_via_invite(self):
         shell = self._shell("maker-shell-dismiss")
-        self._activate(shell, _YUNA)
+        self._activate(shell, _T_HOLDER)
         companion = self._companion_of(shell)
         leave_party(companion, shell, reason="dismissed")
         # Dismissed, not deleted: still in the room at the seeded affinity.
         self.assertFalse(is_companion(companion, shell))
         self.assertEqual(companion.location, self.room1)
         self.assertEqual(
-            companion.relations.affinity_for(shell), self._declared_affinity(_YUNA)
+            companion.relations.affinity_for(shell), self._declared_affinity(_T_HOLDER)
         )
         # The ordinary invite command re-binds through the degraded terminal
         # (declared seed > invite threshold), exactly like any other NPC.
@@ -564,7 +768,9 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
                 "web.webclient.actions.dialogue_composition.build_dialogue_client",
                 return_value=client,
             ):
-                output = self.call(CmdInvite(), "悠花", caller=shell, msg=None)
+                output = self.call(
+                    CmdInvite(), _T_TWIN_DISPLAY, caller=shell, msg=None
+                )
         self.assertIn(JOINED_MESSAGE, output)
         self.assertEqual(len(client.calls), 0)
         self.assertTrue(is_companion(companion, shell))
@@ -588,37 +794,37 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
             side_effect=_portrait_boom,
         ):
             with self.assertRaises(RuntimeError):
-                self._activate(shell, _YUNA)
+                self._activate(shell, _T_HOLDER)
         self.assertIsNotNone(captured["pk"], "the bind completed before the failure")
         # Gone from the database, from the room's contents, and from the
         # process-global idmapper — no phantom companion survives.
-        self.assertFalse(ObjectDB.objects.filter(db_key="悠花").exists())
+        self.assertFalse(ObjectDB.objects.filter(db_key=_T_TWIN_DISPLAY).exists())
         self.assertNotIn(
-            "悠花", [obj.key for obj in self.room1.contents]
+            _T_TWIN_DISPLAY, [obj.key for obj in self.room1.contents]
         )
         self.assertNotIn(captured["pk"], LLMNPC.__dbclass__.__instance_cache__)
         self.assertFalse(shell.attributes.has("party"))
 
     @covers_requirement("starting-companions::preset-activation-builds-seeds-and-binds-every-declared-companion-atomically")
     def test_a_later_declaration_failing_deletes_the_already_joined_twin(self):
-        # No shipped preset declares two companions, so exercise the
-        # multi-companion compensation with a synthetic card: the first twin
-        # builds, seeds, AND joins; the second twin's join fails — every NPC
-        # built during the activation must be deleted, including the one that
-        # already holds a party binding, and party left unset.
+        # No kit preset declares two companions, so exercise the
+        # multi-companion compensation with a file-local card over the twin
+        # chain: the first twin builds, seeds, AND joins; the second twin's
+        # join fails — every NPC built during the activation must be deleted,
+        # including the one that already holds a party binding, and party left
+        # unset.
         from dataclasses import replace
 
         synthetic = replace(
-            PLAYER_PRESET_REGISTRY["elysa_snow"],
-            key="twin_pair",
-            display_name="雙生者",
+            _live_presets()[_T_ALONE],
+            key=_T_PAIR,
+            display_name=_T_PAIR_DISPLAY,
             starting_companions=(
-                StartingCompanion(_YUKA, 95, "雙胞胎姊姊"),
-                StartingCompanion(_YUNA, 90, "雙胞胎妹妹"),
+                StartingCompanion(_T_TWIN, _T_DECLARED_AFFINITY, _T_RELATIONSHIP),
+                StartingCompanion(_T_TWIN2, _T_DECLARED_AFFINITY2, _T_RELATIONSHIP2),
             ),
         )
-        PLAYER_PRESET_REGISTRY["twin_pair"] = synthetic
-        self.addCleanup(PLAYER_PRESET_REGISTRY.pop, "twin_pair", None)
+        _register_probe(self, synthetic)
         shell = self._shell("maker-shell-pair")
         before_objects = ObjectDB.objects.count()
         # First join lands for real (the twin genuinely holds a binding);
@@ -637,11 +843,11 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
             side_effect=join_then_boom,
         ):
             with self.assertRaises(CharacterCreationError):
-                self._activate(shell, "twin_pair")
+                self._activate(shell, _T_PAIR)
         self.assertTrue(shell.creation_pending)
         self.assertFalse(shell.attributes.has("party"))
-        self.assertFalse(ObjectDB.objects.filter(db_key="悠花").exists())
-        self.assertFalse(ObjectDB.objects.filter(db_key="悠奈").exists())
+        self.assertFalse(ObjectDB.objects.filter(db_key=_T_TWIN_DISPLAY).exists())
+        self.assertFalse(ObjectDB.objects.filter(db_key=_T_TWIN2_DISPLAY).exists())
         self.assertEqual(ObjectDB.objects.count(), before_objects)
 
     @covers_requirement("starting-companions::preset-activation-builds-seeds-and-binds-every-declared-companion-atomically")
@@ -649,28 +855,36 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
         from world.rules.affinity import run_auto_leave_recheck
 
         shell = self._shell("maker-shell-recheck")
-        self._activate(shell, _YUNA)
+        self._activate(shell, _T_HOLDER)
         companion = self._companion_of(shell)
-        # The wired auto-leave rule on arrival: 95 is above the threshold.
+        # The wired auto-leave rule on arrival: the declared seed exceeds
+        # the threshold.
         self.assertIsNone(run_auto_leave_recheck(companion, shell))
         self.assertTrue(is_companion(companion, shell))
 
     @covers_requirement("starting-companions::preset-activation-builds-seeds-and-binds-every-declared-companion-atomically")
     def test_a_name_clash_takes_the_pk_suffix_and_binds_the_right_entity(self):
-        # The same-account design case: a player literally named 悠奈 owns
-        # the twin's display name, so the companion's key takes the -{pk}
-        # suffix while the party binding still names the real companion.
-        first = self._shell("悠奈")
-        self._activate(first, _YUNA)
+        # The same-account design case: a player literally named after the
+        # partner card's display activates that same card, so activation keeps
+        # the display name occupied; the second activation's twin therefore
+        # clashes and takes the -{pk} suffix while the party binding still
+        # names the real companion.
+        first = self._shell(_T_TWIN2_DISPLAY)
+        self._activate(first, _T_PARTNER)
         second = self._shell("maker-shell-second")
-        self._activate(second, _YUKA)
+        self._activate(second, _T_REVERSE)
         own_companion = self._companion_of(first)
         clash_companion = self._companion_of(second)
-        # Player 悠奈's own twin (悠花) keeps its key untouched.
-        self.assertEqual(own_companion.key, "悠花")
-        # The second activation's twin wants 悠奈, which the *player* holds.
-        self.assertNotEqual(clash_companion.key, "悠奈")
-        self.assertEqual(clash_companion.key, f"悠奈-{clash_companion.pk}")
+        # The first player's own twin (built from the porter card) keeps its
+        # key untouched; activation renamed the shell to the display it
+        # already held, so the partner name stays occupied by the player.
+        self.assertEqual(own_companion.key, _T_TWIN_DISPLAY)
+        self.assertEqual(first.key, _T_TWIN2_DISPLAY)
+        # The second activation's twin wants the display the *player* holds.
+        self.assertNotEqual(clash_companion.key, _T_TWIN2_DISPLAY)
+        self.assertEqual(
+            clash_companion.key, f"{_T_TWIN2_DISPLAY}-{clash_companion.pk}"
+        )
         # Both entities coexist; each player's list names its own twin.
         self.assertNotEqual(int(own_companion.pk), int(clash_companion.pk))
         self.assertEqual(second.db.party, [clash_companion.pk])

@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
 
-from world.lore.items import ITEM_REGISTRY, ItemDefinition
+from world.lore.items import ItemDefinition
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
     QuestDefinition,
@@ -20,6 +20,13 @@ from world.rules.guild_offers import (
     QuestReward,
     get_guild_offer,
     register_guild_offer,
+)
+from world.tests.synthetic_data import (
+    SYNTH_COMMISSIONER_KEY,
+    SYNTH_GUILD_BRANCH_KEY,
+    SYNTH_GUILD_ISSUER_KEY,
+    SYNTH_ITEMS,
+    synthetic_registries,
 )
 from world.rules.quest_issuance import (
     MAX_ISSUER_KEY_LENGTH,
@@ -36,10 +43,18 @@ from world.rules.quest_issuance import (
     resolve_issuance,
 )
 
-ALTORIA_BRANCH = "guild_branch_altoria"
+# Issuer identities resolve through the synthetic kit: the guild branch is
+# the kit branch (namespaced through the kit issuer key), and the private
+# commissioner is the kit NPC card. The malformed probe strings below are this
+# file's own grammar fixtures, not shipped content.
+ALTORIA_BRANCH = SYNTH_GUILD_BRANCH_KEY
+GUILD_ISSUER = SYNTH_GUILD_ISSUER_KEY
+COMMISSIONER = SYNTH_COMMISSIONER_KEY
+_COMMISSIONER_ID = SYNTH_COMMISSIONER_KEY.partition(":")[2]
+_T_ITEM = next(iter(SYNTH_ITEMS))
 
 
-def _sample_reward(copper: int = 50, merit: int = 0, item_key: str = "healing_potion") -> QuestReward:
+def _sample_reward(copper: int = 50, merit: int = 0, item_key: str = _T_ITEM) -> QuestReward:
     return QuestReward(
         copper=copper,
         items=(ItemQuantity(item_key, 1),),
@@ -68,17 +83,17 @@ class IssuerKeyGrammarTests(unittest.TestCase):
 
     @covers_requirement("quest-issuance::an-issuer-key-is-a-namespaced-validated-identity")
     def test_parse_valid_guild_key(self):
-        parsed = parse_issuer_key("guild:guild_branch_altoria")
+        parsed = parse_issuer_key(GUILD_ISSUER)
         self.assertEqual(
             parsed,
-            ParsedIssuerKey(namespace="guild", remainder="guild_branch_altoria", entity_pk=None),
+            ParsedIssuerKey(namespace="guild", remainder=ALTORIA_BRANCH, entity_pk=None),
         )
 
     def test_parse_valid_npc_authored_key(self):
-        parsed = parse_issuer_key("npc:grey_granny")
+        parsed = parse_issuer_key(COMMISSIONER)
         self.assertEqual(
             parsed,
-            ParsedIssuerKey(namespace="npc", remainder="grey_granny", entity_pk=None),
+            ParsedIssuerKey(namespace="npc", remainder=_COMMISSIONER_ID, entity_pk=None),
         )
 
     def test_parse_valid_npc_pk_key(self):
@@ -115,15 +130,15 @@ class IssuerKeyGrammarTests(unittest.TestCase):
 
     def test_parse_rejects_missing_separator(self):
         with self.assertRaises(IssuerKeyError):
-            parse_issuer_key("guild_branch_altoria")
+            parse_issuer_key(ALTORIA_BRANCH)
 
     def test_parse_rejects_multiple_separators(self):
         with self.assertRaises(IssuerKeyError):
-            parse_issuer_key("npc:grey:granny")
+            parse_issuer_key("npc:t_grey:t:lantern")
 
     def test_parse_rejects_empty_namespace(self):
         with self.assertRaises(IssuerKeyError):
-            parse_issuer_key(":grey_granny")
+            parse_issuer_key(":" + _COMMISSIONER_ID)
 
     def test_parse_rejects_empty_remainder(self):
         with self.assertRaises(IssuerKeyError):
@@ -146,21 +161,21 @@ class IssuerKeyGrammarTests(unittest.TestCase):
                     parse_issuer_key(digit_key)
 
     def test_guild_issuer_key_helper(self):
-        self.assertEqual(guild_issuer_key(ALTORIA_BRANCH), f"guild:{ALTORIA_BRANCH}")
+        self.assertEqual(guild_issuer_key(ALTORIA_BRANCH), GUILD_ISSUER)
         with self.assertRaises(IssuerKeyError):
             guild_issuer_key("")
         with self.assertRaises(IssuerKeyError):
             guild_issuer_key(None)
 
     def test_npc_issuer_key_helper(self):
-        self.assertEqual(npc_issuer_key(content_key="grey_granny"), "npc:grey_granny")
+        self.assertEqual(npc_issuer_key(content_key=_COMMISSIONER_ID), COMMISSIONER)
         self.assertEqual(npc_issuer_key(pk=42), "npc:#42")
 
         # Rejects neither or both
         with self.assertRaises(IssuerKeyError):
             npc_issuer_key()
         with self.assertRaises(IssuerKeyError):
-            npc_issuer_key(content_key="grey_granny", pk=42)
+            npc_issuer_key(content_key=_COMMISSIONER_ID, pk=42)
 
         # Rejects boolean PK or negative PK
         with self.assertRaises(IssuerKeyError):
@@ -185,6 +200,7 @@ class SettlementVocabularyTests(unittest.TestCase):
             Settlement("manual")
 
 
+@synthetic_registries("items")
 class QuestIssuanceValueTests(QuestRegistryIsolation, unittest.TestCase):
     """Tests for QuestIssuance creation, validation, immutability, and merit rule."""
 
@@ -198,12 +214,12 @@ class QuestIssuanceValueTests(QuestRegistryIsolation, unittest.TestCase):
         reward = _sample_reward(copper=100, merit=0)
         issuance = QuestIssuance(
             definition_key=self.def_key,
-            issuer_key="npc:grey_granny",
+            issuer_key=COMMISSIONER,
             reward=reward,
             settlement=Settlement.AUTO,
         )
         self.assertEqual(issuance.definition_key, self.def_key)
-        self.assertEqual(issuance.issuer_key, "npc:grey_granny")
+        self.assertEqual(issuance.issuer_key, COMMISSIONER)
         self.assertEqual(issuance.reward, reward)
         self.assertEqual(issuance.settlement, Settlement.AUTO)
 
@@ -215,7 +231,7 @@ class QuestIssuanceValueTests(QuestRegistryIsolation, unittest.TestCase):
         with self.assertRaises(QuestIssuanceError) as cm:
             QuestIssuance(
                 definition_key="nonexistent_definition",
-                issuer_key="npc:grey_granny",
+                issuer_key=COMMISSIONER,
                 reward=_sample_reward(copper=100, merit=0),
                 settlement=Settlement.AUTO,
             )
@@ -237,7 +253,7 @@ class QuestIssuanceValueTests(QuestRegistryIsolation, unittest.TestCase):
                 with self.assertRaises(QuestIssuanceError) as cm:
                     QuestIssuance(
                         definition_key=self.def_key,
-                        issuer_key="npc:grey_granny",
+                        issuer_key=COMMISSIONER,
                         reward=_sample_reward(copper=100, merit=0),
                         settlement=plain,  # type: ignore[arg-type]
                     )
@@ -248,7 +264,7 @@ class QuestIssuanceValueTests(QuestRegistryIsolation, unittest.TestCase):
         with self.assertRaises(QuestIssuanceError) as cm:
             QuestIssuance(
                 definition_key=self.def_key,
-                issuer_key="npc:grey_granny",
+                issuer_key=COMMISSIONER,
                 reward=_sample_reward(copper=100, merit=10),
                 settlement=Settlement.AUTO,
             )
@@ -257,7 +273,7 @@ class QuestIssuanceValueTests(QuestRegistryIsolation, unittest.TestCase):
     def test_guild_issuance_permits_merit(self):
         issuance = QuestIssuance(
             definition_key=self.def_key,
-            issuer_key=f"guild:{ALTORIA_BRANCH}",
+            issuer_key=GUILD_ISSUER,
             reward=_sample_reward(copper=100, merit=25),
             settlement=Settlement.COUNTER,
         )
@@ -268,7 +284,7 @@ class QuestIssuanceValueTests(QuestRegistryIsolation, unittest.TestCase):
         with self.assertRaises(QuestIssuanceError):
             QuestIssuance(
                 definition_key=self.def_key,
-                issuer_key="npc:grey_granny",
+                issuer_key=COMMISSIONER,
                 reward=_sample_reward(copper=-1),
                 settlement=Settlement.AUTO,
             )
@@ -276,7 +292,7 @@ class QuestIssuanceValueTests(QuestRegistryIsolation, unittest.TestCase):
         with self.assertRaises(QuestIssuanceError):
             QuestIssuance(
                 definition_key=self.def_key,
-                issuer_key="npc:grey_granny",
+                issuer_key=COMMISSIONER,
                 reward=_sample_reward(item_key="nonexistent_item_key_xyz"),
                 settlement=Settlement.AUTO,
             )
@@ -284,16 +300,17 @@ class QuestIssuanceValueTests(QuestRegistryIsolation, unittest.TestCase):
         with self.assertRaises(QuestIssuanceError):
             QuestIssuance(
                 definition_key=self.def_key,
-                issuer_key="npc:grey_granny",
+                issuer_key=COMMISSIONER,
                 reward=QuestReward(
                     copper=50,
-                    items=(ItemQuantity("healing_potion", 1), ItemQuantity("healing_potion", 2)),
+                    items=(ItemQuantity(_T_ITEM, 1), ItemQuantity(_T_ITEM, 2)),
                     merit=0,
                 ),
                 settlement=Settlement.AUTO,
             )
 
 
+@synthetic_registries("items")
 class QuestIssuanceRegistryTests(QuestIssuanceIsolationMixin, QuestRegistryIsolation, unittest.TestCase):
     """Tests for QUEST_ISSUANCE_REGISTRY and register_quest_issuance."""
 
@@ -306,7 +323,7 @@ class QuestIssuanceRegistryTests(QuestIssuanceIsolationMixin, QuestRegistryIsola
     def test_register_npc_issuance_success_and_logging(self):
         issuance = QuestIssuance(
             definition_key=self.def_key,
-            issuer_key="npc:grey_granny",
+            issuer_key=COMMISSIONER,
             reward=_sample_reward(copper=50, merit=0),
             settlement=Settlement.AUTO,
         )
@@ -314,17 +331,17 @@ class QuestIssuanceRegistryTests(QuestIssuanceIsolationMixin, QuestRegistryIsola
             register_quest_issuance(issuance)
             mock_log.assert_called_once_with(
                 "quest_issuance_registered",
-                context={"quest": self.def_key, "issuer": "npc:grey_granny"},
+                context={"quest": self.def_key, "issuer": COMMISSIONER},
             )
         self.assertEqual(
-            QUEST_ISSUANCE_REGISTRY[(self.def_key, "npc:grey_granny")],
+            QUEST_ISSUANCE_REGISTRY[(self.def_key, COMMISSIONER)],
             issuance,
         )
 
     def test_register_identical_issuance_is_idempotent_no_op(self):
         issuance = QuestIssuance(
             definition_key=self.def_key,
-            issuer_key="npc:grey_granny",
+            issuer_key=COMMISSIONER,
             reward=_sample_reward(copper=50, merit=0),
             settlement=Settlement.AUTO,
         )
@@ -335,14 +352,14 @@ class QuestIssuanceRegistryTests(QuestIssuanceIsolationMixin, QuestRegistryIsola
             register_quest_issuance(issuance)
             mock_log.assert_not_called()
         self.assertEqual(
-            QUEST_ISSUANCE_REGISTRY[(self.def_key, "npc:grey_granny")],
+            QUEST_ISSUANCE_REGISTRY[(self.def_key, COMMISSIONER)],
             issuance,
         )
 
     def test_register_conflicting_issuance_raises_without_overwriting(self):
         issuance1 = QuestIssuance(
             definition_key=self.def_key,
-            issuer_key="npc:grey_granny",
+            issuer_key=COMMISSIONER,
             reward=_sample_reward(copper=50, merit=0),
             settlement=Settlement.AUTO,
         )
@@ -350,7 +367,7 @@ class QuestIssuanceRegistryTests(QuestIssuanceIsolationMixin, QuestRegistryIsola
 
         conflicting = QuestIssuance(
             definition_key=self.def_key,
-            issuer_key="npc:grey_granny",
+            issuer_key=COMMISSIONER,
             reward=_sample_reward(copper=100, merit=0),
             settlement=Settlement.AUTO,
         )
@@ -359,23 +376,24 @@ class QuestIssuanceRegistryTests(QuestIssuanceIsolationMixin, QuestRegistryIsola
         self.assertIn("conflicting issuance already registered", str(cm.exception))
         # Original remains intact
         self.assertEqual(
-            QUEST_ISSUANCE_REGISTRY[(self.def_key, "npc:grey_granny")],
+            QUEST_ISSUANCE_REGISTRY[(self.def_key, COMMISSIONER)],
             issuance1,
         )
 
     def test_register_guild_key_is_refused(self):
         issuance = QuestIssuance(
             definition_key=self.def_key,
-            issuer_key=f"guild:{ALTORIA_BRANCH}",
+            issuer_key=GUILD_ISSUER,
             reward=_sample_reward(copper=50, merit=10),
             settlement=Settlement.COUNTER,
         )
         with self.assertRaises(QuestIssuanceError) as cm:
             register_quest_issuance(issuance)
         self.assertIn("only stores npc-namespaced issuances", str(cm.exception))
-        self.assertNotIn((self.def_key, f"guild:{ALTORIA_BRANCH}"), QUEST_ISSUANCE_REGISTRY)
+        self.assertNotIn((self.def_key, GUILD_ISSUER), QUEST_ISSUANCE_REGISTRY)
 
 
+@synthetic_registries("items", "guild_branches")
 class ResolveIssuanceSeamTests(QuestIssuanceIsolationMixin, QuestRegistryIsolation, unittest.TestCase):
     """Tests for resolve_issuance normalized read seam."""
 
@@ -394,10 +412,10 @@ class ResolveIssuanceSeamTests(QuestIssuanceIsolationMixin, QuestRegistryIsolati
         )
         register_guild_offer(offer)
 
-        resolved = resolve_issuance(self.def_key, f"guild:{ALTORIA_BRANCH}")
+        resolved = resolve_issuance(self.def_key, GUILD_ISSUER)
         self.assertIsNotNone(resolved)
         self.assertEqual(resolved.definition_key, self.def_key)
-        self.assertEqual(resolved.issuer_key, f"guild:{ALTORIA_BRANCH}")
+        self.assertEqual(resolved.issuer_key, GUILD_ISSUER)
         self.assertEqual(resolved.reward, guild_reward)
         self.assertEqual(resolved.settlement, Settlement.COUNTER)
 
@@ -405,18 +423,18 @@ class ResolveIssuanceSeamTests(QuestIssuanceIsolationMixin, QuestRegistryIsolati
         npc_reward = _sample_reward(copper=80, merit=0)
         issuance = QuestIssuance(
             definition_key=self.def_key,
-            issuer_key="npc:grey_granny",
+            issuer_key=COMMISSIONER,
             reward=npc_reward,
             settlement=Settlement.AUTO,
         )
         register_quest_issuance(issuance)
 
-        resolved = resolve_issuance(self.def_key, "npc:grey_granny")
+        resolved = resolve_issuance(self.def_key, COMMISSIONER)
         self.assertEqual(resolved, issuance)
 
     def test_resolve_unregistered_identity_returns_none(self):
-        self.assertIsNone(resolve_issuance(self.def_key, f"guild:{ALTORIA_BRANCH}"))
-        self.assertIsNone(resolve_issuance(self.def_key, "npc:unregistered_npc"))
+        self.assertIsNone(resolve_issuance(self.def_key, GUILD_ISSUER))
+        self.assertIsNone(resolve_issuance(self.def_key, "npc:t_unregistered_npc"))
 
     def test_resolve_malformed_key_raises_parser_error(self):
         with self.assertRaises(IssuerKeyError):
@@ -430,14 +448,14 @@ class ResolveIssuanceSeamTests(QuestIssuanceIsolationMixin, QuestRegistryIsolati
         npc_reward = _sample_reward(copper=80, merit=0)
         issuance = QuestIssuance(
             definition_key=self.def_key,
-            issuer_key="npc:grey_granny",
+            issuer_key=COMMISSIONER,
             reward=npc_reward,
             settlement=Settlement.AUTO,
         )
         register_quest_issuance(issuance)
 
-        self.assertNotIn((self.def_key, "npc:grey_granny"), GUILD_OFFER_REGISTRY)
-        self.assertNotIn((self.def_key, "grey_granny"), GUILD_OFFER_REGISTRY)
+        self.assertNotIn((self.def_key, COMMISSIONER), GUILD_OFFER_REGISTRY)
+        self.assertNotIn((self.def_key, _COMMISSIONER_ID), GUILD_OFFER_REGISTRY)
 
         # Verify that get_guild_offer and register_guild_offer
         # preserve their exact contract, types, and idempotency
