@@ -964,7 +964,7 @@ class ZeroUncausedWriteTests(WildernessDefeatMixin, RegistryIsolationMixin, Defe
         write_counter_trait(self.player, "guild_merit", 10)
         self.player.wallet = 500
         # Seeded raw inventory (shape mirrors list_items: a list of keys).
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_POTION]
         definition = register(quest("battery_defeat", stages=(QuestStage(0, defeat(bound=True)),)))
         record = accept(self.player, definition.key)
         self.bound_room = create_object(InstanceRoom, key="battery binding room")
