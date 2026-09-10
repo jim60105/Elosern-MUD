@@ -20,10 +20,21 @@ from world.rules.quest_issuance import (
 )
 
 class _NoLookupRegistry(dict):
-    """A registry stub that fails the test the moment it is consulted."""
+    """A registry stub that fails the test on ANY read of its contents.
 
-    def get(self, *args, **kwargs):
+    Covers every lookup surface a future resolver might use — get, membership,
+    indexing, iteration, length — so "resolution performs no registry lookup"
+    stays proven however the implementation is rewritten.
+    """
+
+    def _consulted(self, *args, **kwargs):
         raise AssertionError("registry consulted")
+
+    get = _consulted
+    __contains__ = _consulted
+    __getitem__ = _consulted
+    __iter__ = _consulted
+    __len__ = _consulted
 
 
 class QuestIssuerComponentShapeTests(unittest.TestCase):

@@ -161,14 +161,12 @@ def _overlay_affinity_seeded_race(test) -> None:
     import importlib
 
     races = importlib.import_module("world.lore.races")
-    for registry in (
-        getattr(races, "RACE" + "_REGISTRY"),
-        getattr(races, "SUBRACE" + "_REGISTRY"),
-        getattr(races, "STATIC_TIER" + "_REGISTRY"),
-    ):
-        registry[race_row.key] = race_row
-        registry[subrace_row.key] = subrace_row
-        registry[tier_row.key] = tier_row
+    race_registry = getattr(races, "RACE" + "_REGISTRY")
+    subrace_registry = getattr(races, "SUBRACE" + "_REGISTRY")
+    tier_registry = getattr(races, "STATIC_TIER" + "_REGISTRY")
+    race_registry[race_row.key] = race_row
+    subrace_registry[subrace_row.key] = subrace_row
+    tier_registry[tier_row.key] = tier_row
     # The starting-kit registry keys by subrace; the overlay subrace borrows
     # a live kit row's contents under its own key.
     kits = importlib.import_module("world.lore.starting_kits")
@@ -177,17 +175,13 @@ def _overlay_affinity_seeded_race(test) -> None:
     # Overlay keys are synthetic-prefixed (or the production rule key), so a
     # plain key removal restores the live vocabulary exactly — the cleanup
     # runs while the enclosing synthetic scope is still open.
-    for registry, keys in (
-        (getattr(races, "RACE" + "_REGISTRY"), [_T_OVERLAY_RACE]),
-        (getattr(races, "SUBRACE" + "_REGISTRY"), [_T_OVERLAY_SUBRACE]),
-        (
-            getattr(races, "STATIC_TIER" + "_REGISTRY"),
-            [_T_OVERLAY_TIER],
-        ),
-        (kit_registry, [_T_OVERLAY_SUBRACE]),
+    for registry, key in (
+        (race_registry, _T_OVERLAY_RACE),
+        (subrace_registry, _T_OVERLAY_SUBRACE),
+        (tier_registry, _T_OVERLAY_TIER),
+        (kit_registry, _T_OVERLAY_SUBRACE),
     ):
-        for key in keys:
-            test.addCleanup(registry.pop, key, None)
+        test.addCleanup(registry.pop, key, None)
 
 
 class CompanionBoundsSweepTests(unittest.TestCase):
@@ -614,14 +608,25 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
                 starting_companions=(),
             ),
         )
+        # Process-global AI registration state must come back EXACTLY: a bare
+        # update() would leave the dialogue seam's hooks installed, and a bare
+        # clear() would strip schemas other suites registered before this one.
         validators_before = dict(guardrail._semantic_validators)
         fallbacks_before = dict(guardrail._degrade_fallbacks)
-        self.addCleanup(lambda: guardrail._semantic_validators.update(validators_before))
-        self.addCleanup(lambda: guardrail._degrade_fallbacks.update(fallbacks_before))
+        schemas_before = dict(_OUTPUT_SCHEMAS)
+
+        def _restore_ai_state():
+            guardrail._semantic_validators.clear()
+            guardrail._semantic_validators.update(validators_before)
+            guardrail._degrade_fallbacks.clear()
+            guardrail._degrade_fallbacks.update(fallbacks_before)
+            _OUTPUT_SCHEMAS.clear()
+            _OUTPUT_SCHEMAS.update(schemas_before)
+
+        self.addCleanup(_restore_ai_state)
         guardrail._semantic_validators.clear()
         guardrail._degrade_fallbacks.clear()
         _OUTPUT_SCHEMAS.clear()
-        self.addCleanup(_OUTPUT_SCHEMAS.clear)
         register_npc_dialogue()
         self.account = create_account(
             "twin-maker", "twin-maker@example.test", "testpassword", typeclass=Account

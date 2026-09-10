@@ -131,7 +131,27 @@ def _raw(**overrides):
     return raw
 
 
-def _reset_all():
+def _snapshot_ai_registries(test):
+    """Freeze the process-global AI registration state for exact restoration.
+
+    These mappings are process globals owned jointly by every suite in the
+    shard; a bare clear() at teardown would silently strip registrations other
+    suites installed. Snapshot first, register the dialogue seam, and restore
+    the exact prior contents on cleanup.
+    """
+    validators = dict(guardrail._semantic_validators)
+    fallbacks = dict(guardrail._degrade_fallbacks)
+    schemas = dict(_OUTPUT_SCHEMAS)
+
+    def _restore():
+        guardrail._semantic_validators.clear()
+        guardrail._semantic_validators.update(validators)
+        guardrail._degrade_fallbacks.clear()
+        guardrail._degrade_fallbacks.update(fallbacks)
+        _OUTPUT_SCHEMAS.clear()
+        _OUTPUT_SCHEMAS.update(schemas)
+
+    test.addCleanup(_restore)
     guardrail._semantic_validators.clear()
     guardrail._degrade_fallbacks.clear()
     _OUTPUT_SCHEMAS.clear()
@@ -154,7 +174,7 @@ class OfflinePartyQuestLoopTests(BattlefieldIsolation, EvenniaCommandTestMixin, 
         self._quest_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._offer_items = list(GUILD_OFFER_REGISTRY.items())
         self.addCleanup(self._restore_registries)
-        _reset_all()
+        _snapshot_ai_registries(self)
         register_npc_dialogue()
         # Runtime composition (planner registration + catalog vocabulary for
         # the affinity rulebook's cap-break validation) is restored as before;
@@ -217,7 +237,6 @@ class OfflinePartyQuestLoopTests(BattlefieldIsolation, EvenniaCommandTestMixin, 
         QUEST_DEFINITION_REGISTRY.update(self._quest_items)
         GUILD_OFFER_REGISTRY.clear()
         GUILD_OFFER_REGISTRY.update(self._offer_items)
-        _reset_all()
         super().tearDown()
 
     @covers_requirement("party-system::the-invite-command-proposes-a-party-through-the-ai-judged-dialogue-seam")
