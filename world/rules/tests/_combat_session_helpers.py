@@ -214,7 +214,37 @@ def synth_lineage_tree() -> dict[str, SkillDef]:
         prerequisites = (
             () if not prereq_key else (SkillPrerequisite(prereq_key, threshold),)
         )
-        rows[key] = synth_damage_skill(key, label, prerequisites=prerequisites)
+        rows[key] = synth_damage_skill(
+            key,
+            label,
+            prerequisites=prerequisites,
+            category=SkillCategory.MARTIAL_ARTS,
+        )
+    return rows
+
+
+def synth_lineage_tree_magic() -> dict[str, SkillDef]:
+    """Same topology, ELEMENTAL_MAGIC category (spell-wording fixtures).
+
+    ``progression.unlock_line`` splits its prefix on the skill category; the
+    default martial-shaped tree covers the 技能 branch, this variant covers
+    the 法術 branch without copying a shipped catalog row. Keys and edges
+    are prefixed so the variant is a DISJOINT graph: its edges never add
+    consumers to the martial tree's nodes.
+    """
+    rows: dict[str, SkillDef] = {}
+    for key, label, prereq_key, threshold, _position in _TREE_SPECS:
+        prerequisites = (
+            ()
+            if not prereq_key
+            else (SkillPrerequisite(f"magic_{prereq_key}", threshold),)
+        )
+        rows[f"magic_{key}"] = synth_damage_skill(
+            f"magic_{key}",
+            label,
+            prerequisites=prerequisites,
+            category=SkillCategory.ELEMENTAL_MAGIC,
+        )
     return rows
 
 
