@@ -377,7 +377,6 @@
     "world/rules/tests/test_character_creation.py",
     "world/rules/tests/test_climax_settlement.py",
     "world/rules/tests/test_cmd_cast.py",
-    "world/rules/tests/test_combat_initiation.py",
     "world/rules/tests/test_combat_modifiers.py",
     "world/rules/tests/test_combat_party.py",
     "world/rules/tests/test_combat_session_flow.py",

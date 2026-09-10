@@ -11,6 +11,7 @@ command's routing.
 
 from tools.spec_traceability import covers_requirement
 
+from dataclasses import replace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -33,6 +34,7 @@ from world.rules.combat_initiation import (
     initiate_field_combat,
 )
 from world.rules.combat_session import (
+    BASIC_ATTACK_KEY,
     _context_for,
     engage_group,
     read_session,
@@ -43,10 +45,67 @@ from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.party import join_party
 from world.rules.player_messages import rejection_message
 from world.rules.skip_safety import _BATTLEFIELDS
-from world.skills.registry import SKILL_REGISTRY
+from world.tests.synthetic_data import SYNTH_ACT, SYNTH_ACT_SKILL, SYNTH_SKILLS
 
-from ._combat_session_helpers import SEAM_AREA_KEY, _monster, _player
+from ._combat_session_helpers import (
+    SYNTH_SEAM_AREA_SKILL,
+    _monster,
+    _player,
+    _race_key,
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
 from .combat_fixtures import BattlefieldIsolation, grant_lineage
+
+SEAM_AREA_KEY = SYNTH_SEAM_AREA_SKILL.key
+_T_CAST = SYNTH_SKILLS["t_ember_burst"].key
+_T_HEAL = SYNTH_SKILLS["t_hush_mend"].key
+_T_SELF = SYNTH_SKILLS["t_moss_veil"].key
+# A synthetic skill limited to in-combat use, for the availability gate.
+_T_LOCKED = replace(
+    SYNTH_SKILLS["t_ember_burst"],
+    key="t_locked_skill",
+    label="測試鎖定技能",
+    description="僅供測試的戰鬥內限定技能。",
+    usable_out_of_combat=False,
+)
+
+# The command-routing tests need a RESISTIBLE act (the coercion scan only
+# arms for resistible acts); the kit ships one non-resistible row.
+_T_ACT_RESISTIBLE = replace(SYNTH_ACT, key="t_tease_finger", resistible=True)
+_T_ACT_SKILL_RESISTIBLE = replace(
+    SYNTH_ACT_SKILL,
+    key="t_tease_finger",
+    label="拂指試探",
+    effects=[
+        "pleasure:t_tease_finger",
+        "sexual_counter:t_tease_finger",
+        "sexual_event:self_exposure",
+    ],
+)
+_T_ACT = _T_ACT_RESISTIBLE.key
+
+
+def _open_scope(case):
+    open_synthetic_scope(
+        case,
+        "skills",
+        "elements",
+        "sexual_acts",
+        "races",
+        "subraces",
+        "static_tiers",
+        extra={
+            "skills": {
+                **synth_innate_overlay()["skills"],
+                SYNTH_SEAM_AREA_SKILL.key: SYNTH_SEAM_AREA_SKILL,
+                _T_LOCKED.key: _T_LOCKED,
+                _T_ACT_SKILL_RESISTIBLE.key: _T_ACT_SKILL_RESISTIBLE,
+            },
+            "sexual_acts": {_T_ACT: _T_ACT_RESISTIBLE},
+        },
+    )
+
 
 def _dominant_player(key):
     """A player that dominates floor-tier monsters (compression fixture)."""
@@ -60,6 +119,7 @@ def _dominant_player(key):
 
 class FieldCombatTargetTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="classification field")
         self.player = _player("classifier")
@@ -78,10 +138,10 @@ class FieldCombatTargetTests(BattlefieldIsolation, EvenniaTestCase):
 )
     def test_every_negative_case_returns_none(self):
         npc = create_object(NPC, key="classified npc", location=self.room)
-        npc.race = "human"
+        npc.race = _race_key()
         npc.apply_race_baseline()
         companion = create_object(NPC, key="classified companion", location=self.room)
-        companion.race = "human"
+        companion.race = _race_key()
         companion.apply_race_baseline()
         join_party(companion, self.player)
         object_thing = create_object(DefaultObject, key="classified rock", location=self.room)
@@ -122,6 +182,7 @@ class InitiationRoutingTests(
     BattlefieldIsolation, QuestRegistryIsolation, EvenniaTestCase
 ):
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         register_catalog()
         self.room = create_object(Room, key="initiation field")
@@ -146,7 +207,7 @@ class InitiationRoutingTests(
         monster.location = self.room
         hp_before = monster.traits.hp.current
         with patch("world.rules.combat.roll_d100", return_value=50):
-            result = initiate_field_combat(self.player, "basic_attack", monster)
+            result = initiate_field_combat(self.player, BASIC_ATTACK_KEY, monster)
         self.assertEqual(result["outcome"], "round")
         self.assertIsNotNone(read_session(self.player))
         self.assertEqual(result["rounds_elapsed"], 1)
@@ -163,8 +224,11 @@ class InitiationRoutingTests(
     "field-combat-initiation::a-skill-aimed-at-a-co-located-hostile-monster-from-exploration-always-initiates-combat"
 )
     def test_non_damaging_skills_open_and_run_exactly_one_round(self):
-        grant_lineage(self.player, ["water_shield", "heal", "purify", "weaken"])
-        for skill_key in ("water_shield", "heal", "purify", "weaken", "combat_tease"):
+        _T_CLEAVE = SYNTH_SKILLS["t_cinder_cleave"].key
+        # (Self-target skills are not monster-aimable; the entry would reject
+        # them on their own target contract, not on initiation logic.)
+        grant_lineage(self.player, [_T_HEAL, _T_CLEAVE, _T_ACT])
+        for skill_key in (_T_HEAL, _T_CLEAVE, _T_ACT):
             with self.subTest(skill=skill_key):
                 monster = _monster(f"target {skill_key}", hp=2000, atk=1)
                 monster.location = self.room
@@ -186,7 +250,7 @@ class InitiationRoutingTests(
     "field-combat-initiation::a-skill-aimed-at-a-co-located-hostile-monster-from-exploration-always-initiates-combat"
 )
     def test_healing_a_monster_starts_the_fight_and_heals_it(self):
-        grant_lineage(self.player, ["heal"])
+        grant_lineage(self.player, [_T_HEAL])
         monster = _monster("wounded wolf", hp=2000, atk=1)
         monster.location = self.room
         monster.traits.hp.current = 100
@@ -197,7 +261,7 @@ class InitiationRoutingTests(
             patch("world.rules.combat.roll_d100", return_value=50),
             patch("world.rules.monster_behaviour._should_flee", return_value=False),
         ):
-            result = initiate_field_combat(self.player, "heal", monster)
+            result = initiate_field_combat(self.player, _T_HEAL, monster)
         self.assertEqual(result["outcome"], "round")
         self.assertIsNotNone(read_session(self.player))
         self.assertGreater(int(monster.traits.hp.current), 100)
@@ -212,7 +276,7 @@ class InitiationRoutingTests(
         wolf = _monster("contract wolf", hp=2000, atk=1)
         wolf.location = self.room
         npc = create_object(NPC, key="contract npc", location=self.room)
-        npc.race = "human"
+        npc.race = _race_key()
         npc.apply_race_baseline()
         far_room = create_object(Room, key="contract elsewhere")
         far_monster = _monster("contract far wolf", hp=2000, atk=1)
@@ -257,31 +321,20 @@ class InitiationRoutingTests(
     def test_unusable_skill_is_refused_before_the_candidate_is_built(self):
         monster = _monster("locked wolf", hp=2000, atk=1)
         monster.location = self.room
-        self.addCleanup(SKILL_REGISTRY.pop, "test_locked_skill", None)
-        SKILL_REGISTRY["test_locked_skill"] = SKILL_REGISTRY["basic_attack"].__class__(
-            key="test_locked_skill",
-            label="測試鎖定技能",
-            description="僅供測試的戰鬥內限定技能。",
-            kind=SKILL_REGISTRY["basic_attack"].kind,
-            target_spec=SKILL_REGISTRY["basic_attack"].target_spec,
-            cost={},
-            usable_out_of_combat=False,
-            element=None,
-            effects=["damage:physical:physical"],
-            category=SKILL_REGISTRY["basic_attack"].category,
-        )
-        self.player.db.skills = {"active": ["test_locked_skill"], "passive": []}
+        # The in-combat-only synthetic row ships inside this test's scope.
+        self.player.db.skills = {"active": [_T_LOCKED.key], "passive": []}
         with patch("world.rules.combat_initiation.reconstruct_battlefield") as rebuild:
-            result = initiate_field_combat(self.player, "test_locked_skill", monster)
+            result = initiate_field_combat(self.player, _T_LOCKED.key, monster)
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["reason"], RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT)
-        self.assertEqual(result["detail"], "test_locked_skill")
+        self.assertEqual(result["detail"], _T_LOCKED.key)
         rebuild.assert_not_called()
         self.assertIsNone(read_session(self.player))
 
 
 class CandidateValidationTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="candidate field")
         self.player = _player("candidate opener")
@@ -298,7 +351,7 @@ class CandidateValidationTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.db.skills = {"active": [], "passive": []}
         mp_before = self.player.traits.mp.value
         with patch.dict(_BATTLEFIELDS, {}, clear=True):
-            result = initiate_field_combat(self.player, "fire_ball", monster)
+            result = initiate_field_combat(self.player, _T_CAST, monster)
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["reason"], RejectReason.UNKNOWN_SKILL)
         self.assertIsNone(read_session(self.player))
@@ -315,7 +368,7 @@ class CandidateValidationTests(BattlefieldIsolation, EvenniaTestCase):
 )
     def test_candidate_roster_matches_the_persisted_session(self):
         companion = create_object(NPC, key="candidate companion", location=self.room)
-        companion.race = "human"
+        companion.race = _race_key()
         companion.apply_race_baseline()
         companion.traits.hp.base = 500
         companion.traits.hp.current = 500
@@ -349,6 +402,7 @@ class CandidateValidationTests(BattlefieldIsolation, EvenniaTestCase):
 
 class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="lineup field")
         self.player = _player("lineup opener")
@@ -389,7 +443,7 @@ class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         for monster in monsters:
             monster.location = self.room
         with patch("world.rules.combat.roll_d100", return_value=50):
-            result = initiate_field_combat(self.player, "basic_attack", monsters[1])
+            result = initiate_field_combat(self.player, BASIC_ATTACK_KEY, monsters[1])
         self.assertEqual(result["outcome"], "round")
         record = read_session(self.player)
         self.assertEqual(record.enemy_ids, (int(monsters[1].pk),))
@@ -409,6 +463,7 @@ class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
 
 class FailureBoundaryTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="failure field")
         self.player = _player("failed opener")
@@ -425,7 +480,7 @@ class FailureBoundaryTests(BattlefieldIsolation, EvenniaTestCase):
             self.assertRaises(RuntimeError),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            initiate_field_combat(self.player, "basic_attack", self.monster)
+            initiate_field_combat(self.player, BASIC_ATTACK_KEY, self.monster)
 
     @covers_requirement(
     "field-combat-initiation::session-creation-and-the-opening-action-share-one-failure-boundary"
@@ -463,7 +518,7 @@ class FailureBoundaryTests(BattlefieldIsolation, EvenniaTestCase):
 )
     def test_dialogue_session_survives_a_rolled_back_initiation(self):
         npc = create_object(NPC, key="dialogue npc", location=self.room)
-        npc.race = "human"
+        npc.race = _race_key()
         npc.apply_race_baseline()
         open_or_refresh_dialogue(self.player, npc, "保持著的那句話")
         self._force_opening_failure()
@@ -476,25 +531,26 @@ class FailureBoundaryTests(BattlefieldIsolation, EvenniaTestCase):
 )
     def test_committed_initiation_retires_the_dialogue_session(self):
         npc = create_object(NPC, key="retired dialogue npc", location=self.room)
-        npc.race = "human"
+        npc.race = _race_key()
         npc.apply_race_baseline()
         open_or_refresh_dialogue(self.player, npc, "即將隨開戰結束的一句話")
         with (
             patch("world.rules.combat.roll_d100", return_value=50),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            result = initiate_field_combat(self.player, "basic_attack", self.monster)
+            result = initiate_field_combat(self.player, BASIC_ATTACK_KEY, self.monster)
         self.assertEqual(result["outcome"], "round")
         self.assertIsNone(self.player.db.dialogue_session)
 
 
 class WorldTimeTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="time field")
         self.player = _dominant_player("timed opener")
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_CAST])
 
     @covers_requirement(
     "field-combat-initiation::the-opening-cast-charges-combat-time-never-command-time"
@@ -505,7 +561,7 @@ class WorldTimeTests(BattlefieldIsolation, EvenniaTestCase):
         for trait_key in ("atk_phys", "agility"):
             getattr(self.player.traits, trait_key).base = 10
         with patch("world.rules.combat.roll_d100", return_value=50):
-            result = initiate_field_combat(self.player, "fire_ball", monster)
+            result = initiate_field_combat(self.player, _T_CAST, monster)
         self.assertEqual(result["outcome"], "round")
         # Combat time stays unsettled in the session until the terminal
         # outcome; no AdvanceSource.COMMAND charge was taken for the cast:
@@ -524,7 +580,7 @@ class WorldTimeTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat_session.log_info") as session_info,
             self.captureOnCommitCallbacks(execute=True),
         ):
-            result = initiate_field_combat(self.player, "fire_ball", monster)
+            result = initiate_field_combat(self.player, _T_CAST, monster)
         self.assertEqual(result["outcome"], "victory")
         self.assertIsNone(read_session(self.player))
         settlements = [
@@ -539,6 +595,7 @@ class WorldTimeTests(BattlefieldIsolation, EvenniaTestCase):
 
 class BoundaryEventTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="event field")
 
@@ -552,7 +609,7 @@ class BoundaryEventTests(BattlefieldIsolation, EvenniaTestCase):
     def test_committed_initiation_logs_one_matching_event(self):
         player = _dominant_player("event opener")
         player.location = self.room
-        grant_lineage(player, ["fire_ball"])
+        grant_lineage(player, [_T_CAST])
         monster = _monster("event wolf", hp=100, atk=10)
         monster.location = self.room
         with (
@@ -560,14 +617,14 @@ class BoundaryEventTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat_initiation.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
-            result = initiate_field_combat(player, "fire_ball", monster)
+            result = initiate_field_combat(player, _T_CAST, monster)
         self.assertEqual(result["outcome"], "victory")
         (event,) = self._events(info)
         (_, kwargs) = event
         context = kwargs["context"]
         self.assertEqual(context["char"], str(player.pk))
         self.assertEqual(context["room"], str(self.room.pk))
-        self.assertEqual(context["skill"], "fire_ball")
+        self.assertEqual(context["skill"], _T_CAST)
         self.assertEqual(context["enemy_count"], 1)
         self.assertEqual(context["opening"], "overwhelm")
         self.assertIn("tick", context)
@@ -585,7 +642,7 @@ class BoundaryEventTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat_initiation.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
-            result = initiate_field_combat(player, "basic_attack", monster)
+            result = initiate_field_combat(player, BASIC_ATTACK_KEY, monster)
         self.assertEqual(result["outcome"], "round")
         (event,) = self._events(info)
         (_, kwargs) = event
@@ -616,7 +673,7 @@ class BoundaryEventTests(BattlefieldIsolation, EvenniaTestCase):
             self.assertRaises(RuntimeError),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            initiate_field_combat(player, "basic_attack", monster)
+            initiate_field_combat(player, BASIC_ATTACK_KEY, monster)
         self.assertEqual(self._events(info), [])
 
 
@@ -624,11 +681,12 @@ class FieldCombatCommandTests(
     BattlefieldIsolation, QuestRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
 ):
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         register_catalog()
         self.room = create_object(Room, key="command field")
         self.char1.location = self.room
-        self.char1.race = "human"
+        self.char1.race = _race_key()
         self.char1.apply_race_baseline()
         self.monster = _monster("command wolf", hp=2000, atk=1)
         self.monster.location = self.room
@@ -640,7 +698,7 @@ class FieldCombatCommandTests(
         with patch("world.rules.combat.roll_d100", return_value=50):
             self.call(
                 CmdCast(),
-                "basic_attack=command wolf",
+                f"{BASIC_ATTACK_KEY}=command wolf",
                 None,
             )
         self.assertIsNotNone(read_session(self.char1))
@@ -654,14 +712,14 @@ class FieldCombatCommandTests(
 )
     def test_damaging_skill_aimed_at_an_npc_is_refused_with_nothing_spent(self):
         npc = create_object(NPC, key="command npc", location=self.room)
-        npc.race = "human"
+        npc.race = _race_key()
         npc.apply_race_baseline()
         npc.traits.hp.base = 500
         npc.traits.hp.current = 500
         mp_before = self.char1.traits.mp.value
         self.call(
             CmdCast(),
-            "basic_attack=command npc",
+            f"{BASIC_ATTACK_KEY}=command npc",
             rejection_message(RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET),
         )
         self.assertIsNone(read_session(self.char1))
@@ -675,10 +733,11 @@ class FieldCombatCommandTests(
 )
     def test_resistible_sexual_act_aimed_at_an_npc_is_unchanged(self):
         npc = create_object(NPC, key="teased npc", location=self.room)
-        npc.race = "human"
+        npc.race = _race_key()
         npc.apply_race_baseline()
         npc.traits.hp.base = 500
         npc.traits.hp.current = 500
+        self.char1.db.skills = {"active": [_T_ACT], "passive": []}
         with (
             patch("world.rules.action.roll_d100", return_value=1),
             patch(
@@ -691,7 +750,7 @@ class FieldCombatCommandTests(
         ):
             self.call(
                 CmdCast(),
-                "combat_tease=teased npc",
+                f"{_T_ACT}=teased npc",
                 None,
             )
         scan.assert_called_once()
@@ -705,6 +764,7 @@ class FieldCombatCommandTests(
     "field-combat-initiation::a-committed-field-initiation-emits-one-boundary-event"
 )
     def test_sexual_act_aimed_at_a_monster_runs_the_in_combat_scan(self):
+        self.char1.db.skills = {"active": [_T_ACT], "passive": []}
         with (
             patch("world.rules.combat.roll_d100", return_value=50),
             patch("world.rules.action.roll_d100", return_value=1),
@@ -721,7 +781,7 @@ class FieldCombatCommandTests(
         ):
             self.call(
                 CmdCast(),
-                "combat_tease=command wolf",
+                f"{_T_ACT}=command wolf",
                 None,
             )
         combat_scan.assert_called_once()
@@ -734,9 +794,13 @@ class FieldCombatCommandTests(
     "field-combat-initiation::the-command-routes-an-exploration-cast-by-target-and-its-documentation-says-so"
 )
     def test_non_damaging_self_cast_keeps_the_existing_route(self):
-        self.char1.db.skills = {"active": ["status_disguise"], "passive": []}
+        self.char1.db.skills = {"active": [SYNTH_SKILLS["t_cinder_cleave"].key], "passive": []}
         self.char1.db.disguised_stats = {"atk_phys": 1}
-        self.call(CmdCast(), "status_disguise", f"{self.char1.key} 改變了")
+        self.call(
+            CmdCast(),
+            f"{SYNTH_SKILLS['t_cinder_cleave'].key}={self.char1.key}",
+            None,
+        )
         singleton = read_world_clock()
         self.assertIsNotNone(singleton)
         self.assertGreater(singleton.tick, 0)
