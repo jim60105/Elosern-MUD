@@ -479,6 +479,21 @@ const showDetail = computed(() => {
   const v = store.view;
   return v.mode === "combat" || v.dockDepth > 1;
 });
+// webclient-pointer-activation: a pointer activation on a disabled row SHALL
+// surface that row's explanation in the detail pane. The interaction
+// workspace normally suppresses the generic detail pane (its step prompt
+// owns the pane region), but when the focused row of the workspace's own
+// rendered frame is disabled, the disabled-explanation contract outranks
+// the pane-free layout and the pane stays readable.
+const focusedRowDisabled = computed(() => {
+  const menu = store.view.combatMenu;
+  const focused = store.view.focus && store.view.focus.key;
+  if (!menu || !Array.isArray(menu.items) || !focused) {
+    return false;
+  }
+  const row = menu.items.find((item) => item.key === focused);
+  return !!row && row.enabled === false;
+});
 
 // The re-homed services confirmation screen (webclient-service-menus: an explicit
 // confirm/cancel screen in front of the destructive `guild.quest_abandon`). When
@@ -1080,7 +1095,7 @@ onMounted(() => {
               :focused-key="store.view.focus.key"
               :id-prefix="rowPrefix"
               :detail-test-id="detailTestId"
-              :show-detail="showDetail && !interactionOpen"
+              :show-detail="showDetail && (!interactionOpen || focusedRowDisabled)"
               :detail-message="restFormError"
               :grid-cols="store.view.combatMenu ? store.view.combatMenu.gridCols : null"
               :depth="store.view.dockDepth"

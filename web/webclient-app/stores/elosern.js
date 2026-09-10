@@ -245,10 +245,15 @@ export const useElosernStore = defineStore("elosern", () => {
     resolve: (descriptor) => {
       const menu = frameResolver.resolve(descriptor);
       if (
-        (descriptor.source === "exploration.root" || descriptor.source === "combat.root") &&
+        descriptor.source === "exploration.root" &&
         Array.isArray(menu.items)
       ) {
         // Top navigation entries must not remain invisible keyboard stops.
+        // Scope: the EXPLORATION root only. The combat root's client-local
+        // 背包 row (inventory-item-actions: the combat dock root adds one
+        // client-local bag drawer row) is a keyboard stop by contract —
+        // filtering it here made the combat bag pointer-only and shifted
+        // the root's arrow geometry (acd3790 regression).
         menu.items = menu.items.filter((item) => !NAVIGATION_ITEM_KEYS.has(item.key));
       }
       if (

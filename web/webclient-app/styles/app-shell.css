@@ -222,6 +222,21 @@ body {
   background: linear-gradient(135deg, #1b1d21ed, #101215f5);
   box-shadow: inset 0 1px 0 #ffffff09;
 }
+/* Narrow viewports: the floating-panel inset is a wide-workspace layout —
+   below the workspace columns the anchor keeps the frame-resolution
+   contract's full-width band (the 400x720 outlet-tile scenarios pin a
+   ~384px pane), so the band spans the stage instead of collapsing. */
+@media (max-width: 1000px) {
+  .elosern-root .elosern-stage [data-anchor="dock"] {
+    left: calc(var(--left-column) + 12px);
+    right: 12px;
+  }
+}
+@media (max-width: 720px) {
+  .elosern-root .elosern-stage [data-anchor="dock"] {
+    left: 12px;
+  }
+}
 .elosern-root .elosern-stage {
   --dock-h: clamp(260px, 34vh, 340px);
   --stage-content-bottom: calc(var(--dock-h) + var(--command-line-h));
