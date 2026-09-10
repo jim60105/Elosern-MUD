@@ -620,11 +620,20 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                       };
                     }"""
                 )
-                chrome_step = ladder["header"]
-                self.assertEqual(chrome_step, 10, "the island's chrome type step is 10px")
+                # The desktop redesign re-budgeted the draft's `.mini .mt`
+                # header row for authored payload titles (LocalMap.vue
+                # `.local-map__meta` at 12px), while the readout keeps the
+                # spec's "island's smallest type step" (10px, the
+                # token-driven closing-readout rule). The ladder is now
+                # header 12 > chrome step 10 (webclient-local-map spec:
+                # readout at the island's smallest type step; node labels at
+                # most 9-unit type size, below the island's own 10px chrome
+                # step).
+                self.assertEqual(ladder["header"], 12, "the island's header type step is 12px")
+                chrome_step = ladder["readout"]
                 self.assertEqual(
-                    ladder["readout"],
                     chrome_step,
+                    10,
                     "the readout states its figure at the island's smallest type step",
                 )
                 self.assertLessEqual(

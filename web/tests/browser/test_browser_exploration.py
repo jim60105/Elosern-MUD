@@ -172,7 +172,12 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self._wait_exploration_available(page)
         self.assertIn("character", store_state(page)["panels"])
 
-        self._open_root(page, 3)  # 角色狀態
+        # The desktop redesign re-homed the character surface into the top
+        # navigation (webclient-desktop-shell, acd3790: the dock root is the
+        # capability-driven [move, look, interact, wait, suggestions];
+        # 角色狀態 opens from the DesktopNavigation entry — the nav click
+        # routes the same store confirm the dock row carried).
+        page.locator('.desktop-navigation button', has_text="角色狀態").click()
         self.assertEqual(
             page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
             "character",
@@ -397,7 +402,10 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self._open_root(page, 2)  # Interact
         _press(page, "ArrowRight")  # the bard (second grid column)
         _press(page, "Enter")
-        _press(page, "ArrowRight")  # 自由交談 (second grid column)
+        # Vertical affordance navigation (webclient-exploration-menu:
+        # "the selected target's heading and its single-column affordance
+        # rows hold the second column ... vertical affordance navigation").
+        _press(page, "ArrowDown")  # 自由交談 (second affordance row)
         _press(page, "Enter")
         wait_for_store_state(
             page,
@@ -446,7 +454,10 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self._open_root(page, 2)  # Interact
         _press(page, "ArrowRight")  # the bard (second grid column)
         _press(page, "Enter")
-        _press(page, "ArrowRight")  # 自由交談 (second grid column)
+        # Vertical affordance navigation (webclient-exploration-menu:
+        # "single-column affordance rows ... vertical affordance
+        # navigation").
+        _press(page, "ArrowDown")  # 自由交談 (second affordance row)
         _press(page, "Enter")
         wait_for_store_state(
             page,
@@ -564,8 +575,14 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # At the South Gate a living goblin makes every skip unsafe; the
         # daypart boundary rejects before any clock advance.
         time_before = store_state(page)["serverTime"]
-        self._open_root(page, 6)  # Wait/休息
-        _press(page, "ArrowRight")  # 等待至黎明 (second grid column)
+        # The desktop redesign re-homed Wait to the dock root's fourth tab
+        # (webclient-exploration-menu: the capability-driven root
+        # [move, look, interact, wait, suggestions]) and re-cut the wait
+        # frame into the three-operation row [等待直到黎明, 睡眠至完全恢復,
+        # 休息 N 小時] — the direct daypart wait dispatches from the first
+        # column, and the safety gate rejects it while the goblin stands at
+        # the gate (the daypart value is irrelevant to the rejection).
+        self._open_root(page, 3)  # Wait/休息
         _press(page, "Enter")
         wait_for_store_state(
             page,
@@ -578,22 +595,30 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
 
         # The bounded custom-duration form is parsed server-side and rejected
         # by the same safety gate.
-        self._open_root(page, 6)  # Wait/休息
-        _press(page, "ArrowDown")  # 等待至正午 (second grid row)
-        _press(page, "ArrowDown")  # 休息一段時間 (third grid row)
+        # 休息 N 小時 is the third card of the shipped row (stores/elosern.js
+        # resolves exploration.wait with gridCols: 3): two ArrowRight steps
+        # reach it.
+        self._open_root(page, 3)  # Wait/休息
+        _press(page, "ArrowRight")  # 睡眠至完全恢復
+        _press(page, "ArrowRight")  # 休息 N 小時
         _press(page, "Enter")
         wait_for_store_state(
             page,
             _connected_active,
             dom_readiness={
-                "selector": '[data-testid="exploration-rest-form"]',
+                "selector": ".exploration-rest-form input[type='number']",
                 "predicate": (
-                    "() => !!document.querySelector('[data-testid=\"exploration-rest-form\"]')"
+                    "() => { const f = document.querySelector("
+                    "'.exploration-rest-form input[type=\\'number\\']');"
+                    "return !!f && document.activeElement === f; }"
                 ),
-                "description": "exploration rest duration form rendered",
+                "description": "rest form's duration input focused",
             },
         )
-        page.keyboard.type("3600")
+        # The redesigned form's unit is HOURS (RestForm.vue: raw ref "1",
+        # submit emits bounded seconds) — the default one-hour value is the
+        # custom 3600s the old seconds-form typed; keep the form's default
+        # and confirm it.
         page.keyboard.press("Enter")
         wait_for_store_state(
             page,
@@ -620,9 +645,30 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             lambda p: p.get("available") is True and p["current_node"] != "grid:capital_altoria:2:0",
         )
         time_before = store_state(page)["serverTime"]
-        self._open_root(page, 6)  # Wait/休息
-        _press(page, "ArrowRight")  # 等待至黎明 (second grid column)
+        # The shipped three-operation frame (webclient-exploration-menu,
+        # 298bc61): 等待直到黎明 / 睡眠至完全恢復 dispatch their daypart wait
+        # directly — a no-op at the fixture's midnight clock — while 休息 N
+        # 小時 (wait-rest, the third card of the gridCols: 3 row) opens the
+        # custom-duration form. Confirm the form's default one-hour wait so
+        # the SKIP advance moves the fixture clock off midnight.
+        self._open_root(page, 3)  # Wait/休息
+        _press(page, "ArrowRight")  # 睡眠至完全恢復
+        _press(page, "ArrowRight")  # 休息 N 小時
         _press(page, "Enter")
+        wait_for_store_state(
+            page,
+            _connected_active,
+            dom_readiness={
+                "selector": ".exploration-rest-form input[type='number']",
+                "predicate": (
+                    "() => { const f = document.querySelector("
+                    "'.exploration-rest-form input[type=\\'number\\']');"
+                    "return !!f && document.activeElement === f; }"
+                ),
+                "description": "rest form's duration input focused",
+            },
+        )
+        _press(page, "Enter")  # confirm the default one-hour wait
         wait_for_store_state(
             page,
             lambda s: (s.get("lastActionResult") or {}).get("code") == "skipped",
@@ -1275,8 +1321,13 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(accepted["accepted"], accepted)
         self.assertIsNone(store_state(page)["degradedRoot"])
         root_keys = self._pane_keys(page)
+        # The desktop redesign (webclient-exploration-menu, synced
+        # projection scenario) omits the character, quests, and inventory
+        # entries the top navigation owns: the recovered root's dock
+        # projection is the capability-driven [move, look, interact, wait,
+        # suggestions].
         self.assertTrue(
-            {"move", "look", "interact", "character", "wait"} <= set(root_keys),
+            {"move", "look", "interact", "wait", "suggestions"} <= set(root_keys),
             f"the recovered root lost its entries: {root_keys}",
         )
 
@@ -1625,11 +1676,13 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
         )
         # H3 (design D5): the exploration root includes the 建議 (suggestions)
-        # tab, so the root renders 8 cells (the live fixture commits a
-        # non-`unavailable` suggestions envelope).
+        # tab; the desktop redesign (webclient-exploration-menu, synced
+        # projection scenario) omits the character, quests, and inventory
+        # entries the top navigation owns, so the root renders the
+        # capability-driven five-tab set.
         self.assertEqual(
             keys,
-            ["move", "look", "interact", "character", "quests", "inventory", "wait", "suggestions"],
+            ["move", "look", "interact", "wait", "suggestions"],
         )
         self.assertEqual(sent_action_count(page), 0)
         self.assertEqual(
@@ -1709,7 +1762,12 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         # Quests opens a re-homed services submenu; Escape must return to the
         # exploration root without corrupting or re-rendering exploration
         # cells (the shared-router regression).
-        self._open_root(page, 4)  # Quests
+        # The desktop redesign re-homed Quests into the top navigation
+        # (webclient-desktop-shell, acd3790): the nav 任務 click submits the
+        # same committed navigation row (openServiceSubmenu: "quests") the
+        # old dock row carried, opening the quest drawer with the services
+        # sub-dock flag.
+        page.locator('.desktop-navigation button', has_text="任務").click()
         self.assertEqual(
             page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
             "services",
@@ -1727,21 +1785,25 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
             "'#action-dock [data-item-key]')).map((el) => el.getAttribute('data-item-key'))"
         )
         # H3 (design D5): the exploration root now includes the 建議 (suggestions)
-        # tab, so the root has 8 cells, not 7.
+        # tab; the desktop redesign (webclient-exploration-menu, synced
+        # projection scenario) omits the character, quests, and inventory
+        # entries the top navigation owns, so the dock root is the
+        # capability-driven five-tab set.
         self.assertEqual(
             keys,
-            ["move", "look", "interact", "character", "quests", "inventory", "wait", "suggestions"],
+            ["move", "look", "interact", "wait", "suggestions"],
             "the exploration root cells must render after Escape from Quests",
         )
-        # Declarative opener-key restore (webclient-frame-resolution): the
-        # pop returns focus to the key of the row that opened the popped
-        # frame — the root's quests tab — not to `move`.
+        # The nav-opened surface has no dock opener row: the Escape re-home
+        # replaces the exploration root with its first row focused
+        # (stores/elosern.js replaceFrame(EXPLORATION_ROOT_DESCRIPTOR,
+        # {openerKey: null})).
         self.assertEqual(
             page.evaluate(
                 "window.__elosernBridge.router.currentItem() && "
                 "window.__elosernBridge.router.currentItem().key"
             ),
-            "quests",
+            "move",
         )
 
     @covers_requirement("webclient-contextual-hud::a-fixed-column-count-dock-pane-sizes-its-columns-to-content-never-stretching-to-fill-the-panel")
@@ -1961,13 +2023,21 @@ class ExplorationBrowserTest(BrowserAcceptanceTest):
         _press(page, "Escape")
         page.wait_for_timeout(80)
 
-        # Wait/rest (task 2.3 re-confirmation): the plain pane is not a grid
-        # container, so this change is inert on the 等待/休息 frame.
-        self._open_root(page, 6)  # Wait
-        self.assertEqual(
-            page.locator(".dock-menu__plain").evaluate("el => getComputedStyle(el).display"),
-            "block",
-            "the wait/rest pane stays a non-grid block container",
+        # Wait/rest (task 2.3 re-confirmation, re-cut by acd3790 /
+        # webclient-exploration-menu): the wait surface left the dock pane —
+        # opening the Wait tab renders the dedicated waiting screen (the
+        # dock pane is absent) with the three-operation card row, so the old
+        # `.dock-menu__plain` non-grid check has no dock surface left to
+        # observe. The equivalent narrow-viewport guarantee: the waiting
+        # screen's card row stays inside the stage bounds.
+        self._open_root(page, 3)  # Wait
+        waiting = page.locator(".waiting-screen")
+        self.assertGreater(waiting.count(), 0, "the waiting screen owns the wait surface")
+        # The three-operation frame: dawn / sleep / 休息 N 小時 cards.
+        self.assertGreaterEqual(
+            page.locator(".waiting-card").count(),
+            3,
+            "the waiting screen renders the three-operation card row",
         )
 
     def test_outlet_partial_last_row_fills_the_pane_at_a_narrower_viewport(self):

@@ -19,6 +19,7 @@ from .browser_helpers import (
     install_outbound_recorder,
     sent_action_count,
     store_state,
+    wait_for_store_state,
 )
 from .test_browser_services import ServicesBrowserTest
 
@@ -41,11 +42,38 @@ class InventoryGridJourneys(ServicesBrowserTest):
         frame stack stays at the root.
         """
         focus_action_dock(page)
-        # Move, Look, Interact, Character, Quests, Inventory
-        for _ in range(5):
-            _press(page, "ArrowRight")
-        _press(page, "Enter")
-        page.wait_for_timeout(120)
+        # The base class's `_wait_services_available` opened the reference
+        # quest drawer as its journey's first step (H4 task 4.3). The drawer
+        # is the design's modal surface (HudDrawer.vue: the blurred scrim
+        # covers the whole stage while open), so the nav click must follow a
+        # close — Escape is the keyboard close the drawer owns (design D4).
+        # The store's single close entry (the same entry the drawer's own
+        # close control, scrim, and Escape handler funnel through): the
+        # focus-trap makes raw key dispatch focus-dependent, so the close
+        # goes through the store entry the gate used to open the drawer.
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s) s.closeHudDrawer({ popFrame: true }); }"
+        )
+        wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
+        # The desktop redesign re-homed the 背包 entry into the top
+        # navigation (webclient-desktop-shell, acd3790): the dock root is the
+        # capability-driven [move, look, interact, wait, suggestions], so the
+        # drawer opens from the DesktopNavigation 背包 click — the same
+        # client-local openHudDrawer('inventory') the old dock row submitted
+        # (make-inventory-drawer-frameless: no keyboard frame is pushed).
+        page.locator('.desktop-navigation button', has_text="背包").click()
+        wait_for_store_state(
+            page,
+            lambda s: s.get("hudDrawer") == "inventory",
+            dom_readiness={
+                "selector": '[data-testid="inventory-panel"]',
+                "predicate": (
+                    "() => !!document.querySelector('[data-testid=\"inventory-panel\"]')"
+                ),
+                "description": "frameless inventory drawer rendered",
+            },
+        )
         return self._services_panel(page)
 
     @covers_requirement(
@@ -117,14 +145,17 @@ class InventoryGridJourneys(ServicesBrowserTest):
 
         # Focus a tile: the shared inspector spells the committed kind and
         # rarity words, the held count, and the equipped state.
-        page.evaluate(
-            """() => {
-                const tile = document.querySelector('[data-testid="inventory-panel__tile--healing_potion"]');
-                tile.focus();
-                return true;
-            }"""
+        # Playwright's locator focus waits for the element to be actionable —
+        # the raw evaluate focus raced the drawer's mounting re-render (the
+        # focused node was replaced before Vue's @focus listener ran). The
+        # bound attribute is then awaited deterministically instead of a
+        # fixed sleep.
+        page.locator('[data-testid="inventory-panel__tile--healing_potion"]').focus()
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"inventory-panel__tile--healing_potion\"]')"
+            ".getAttribute('aria-describedby') === 'inventory-panel-inspector'",
+            timeout=10000,
         )
-        page.wait_for_timeout(120)
         describedby = page.evaluate(
             """() => document.querySelector('[data-testid="inventory-panel__tile--healing_potion"]').getAttribute("aria-describedby")"""
         )

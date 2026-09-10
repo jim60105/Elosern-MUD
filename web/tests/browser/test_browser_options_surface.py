@@ -171,9 +171,16 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         )
         return page.evaluate(
             """() => {
-                const line = document.querySelector(
-                    '#action-dock [data-item-key="suggestions-generating"] .option-card-label');
-                return line ? line.innerText : null;
+                // The generating row is a disabled local cell (actionId null):
+                // AppClient normalizes it to a navigation cell and DockMenu
+                // renders the label directly in the row button
+                // (.dock-menu__card-nav), not through OptionCard's
+                // .option-card-label span. The muted label text is unchanged
+                // (webclient-options-surface; action_dock.test.js pins the
+                // row text).
+                const row = document.querySelector(
+                    '#action-dock [data-item-key="suggestions-generating"]');
+                return row ? row.innerText : null;
             }"""
         )
 
@@ -528,7 +535,12 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self._wait_section(page)
         self._open_suggestions_pane(page)
         self.assertEqual(
-            page.locator('[data-testid="dock-menu"] [data-item-key="suggestions-empty"] .option-card-label').inner_text(),
+            # The empty-state row is a disabled local cell: DockMenu renders
+            # its label directly in the row button (no OptionCard
+            # .option-card-label span) — same shape as the generating row
+            # (webclient-options-surface; action_dock.test.js pins the row
+            # text).
+            page.locator('[data-testid="dock-menu"] [data-item-key="suggestions-empty"]').inner_text(),
             EMPTY_STATE_LINE,
         )
         self.assertEqual(

@@ -680,8 +680,14 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         else:
             raise AssertionError("the wait tab never reached focus")
         page.keyboard.press("Enter")  # Wait/休息
-        page.keyboard.press("ArrowDown")  # 等待至正午
-        page.keyboard.press("ArrowDown")  # 休息一段時間
+        # The shipped Wait surface is the three-operation frame (dawn /
+        # sleep / 休息 N 小時 cards; stores/elosern.js resolves the wait
+        # frame with gridCols: 3, one row + 返回). Dawn and sleep confirm
+        # their `explore.wait` dispatch directly — only 休息 N 小時
+        # (wait-rest) opens the custom-duration form — so the form is
+        # reached with two ArrowRight steps, not vertical arrows.
+        page.keyboard.press("ArrowRight")  # 睡眠至完全恢復
+        page.keyboard.press("ArrowRight")  # 休息 N 小時 (opens the rest form)
         page.keyboard.press("Enter")
         wait_for_store_state(
             page,
@@ -791,6 +797,21 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             # webclient-align-01-dock-chrome: the painted band (the draft's
             # `.dockwrap` chrome) lives on the full-width dock anchor — the
             # `--line` top border (`1px solid var(--ink-700)`) is drawn there.
+            # The obsidian-gold wave re-pointed the ink tokens (tokens.css:
+            # --ink-700 = #363638); assert against the resolved token instead
+            # of a pinned rgb literal so the pin follows the token, not a
+            # color value.
+            tokens = page.evaluate(
+                """() => {
+                  const rgb = (name) => {
+                    const raw = getComputedStyle(document.documentElement)
+                      .getPropertyValue(name).trim();
+                    const n = parseInt(raw.slice(1), 16);
+                    return 'rgb(' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].join(', ') + ')';
+                  };
+                  return { line: rgb('--ink-700'), ground: rgb('--ink-780') };
+                }"""
+            )
             frame = page.locator('[data-testid="anchor-dock"]').evaluate(
                 """el => {
                   const style = getComputedStyle(el);
@@ -798,7 +819,10 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                            backgroundImage: style.backgroundImage };
                 }"""
             )
-            self.assertEqual(frame["borderTop"], "rgb(44, 38, 52)")
+            self.assertEqual(
+                frame["borderTop"], tokens["line"],
+                "the dock band's top border is the shared --ink-700 token",
+            )
             self.assertIn(
                 "gradient",
                 frame["backgroundImage"],
@@ -929,7 +953,15 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             }"""
         )
         self.assertEqual(
-            kbd_style["background"], "rgb(34, 29, 41)",
+            kbd_style["background"],
+            page.evaluate(
+                """() => {
+                  const raw = getComputedStyle(document.documentElement)
+                    .getPropertyValue('--ink-780').trim();
+                  const n = parseInt(raw.slice(1), 16);
+                  return 'rgb(' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].join(', ') + ')';
+                }"""
+            ),
             "the kbd carries the --ink-780 ground",
         )
         self.assertEqual(

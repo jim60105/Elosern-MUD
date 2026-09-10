@@ -908,11 +908,23 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             self.assertIn("MP 28", detail, "the detail pane shows the 威力 scale options")
             # H3: the skill frame's focused row carries the gold border and
             # the `dock-menu__skill--on` class (not the legacy `dock-menu-item--focused`).
+            # The obsidian-gold wave (acd3790) re-pointed the gold family:
+            # the focused row's border is now --gold-500 (#b99a60, DockMenu
+            # .dock-menu__skill--on). Assert the resolved token so the pin
+            # follows the token, not a pinned rgb value.
+            gold500_rgb = page.evaluate(
+                """() => {
+                  const raw = getComputedStyle(document.documentElement)
+                    .getPropertyValue('--gold-500').trim();
+                  const n = parseInt(raw.slice(1), 16);
+                  return 'rgb(' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].join(', ') + ')';
+                }"""
+            )
             focused = page.locator(".dock-menu .dock-menu__skill--on").first
             self.assertEqual(focused.count(), 1, "the focused skill row is rendered")
             self.assertEqual(
                 focused.evaluate("el => getComputedStyle(el).borderColor"),
-                "rgb(203, 161, 53)",
+                gold500_rgb,
                 "the focused skill row uses the gold border",
             )
             # Disabled cells are dimmed (dimmer border + dimmer text) but

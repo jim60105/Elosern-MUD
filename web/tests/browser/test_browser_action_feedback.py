@@ -206,7 +206,10 @@ class ActionFeedbackBrowserTest(BrowserAcceptanceTest):
                      document.querySelectorAll(
                        '[data-testid^="feedback-toast-"]:not([data-testid="feedback-toast-queue"])'))
                    .map((el) => ({ id: el.getAttribute('data-testid').slice('feedback-toast-'.length),
-                                   text: el.innerText }))"""
+                                   // The acd3790 rework added a sibling dismiss
+                                   // control inside the toast root; the title
+                                   // text lives in the `.tt` element.
+                                   text: el.querySelector('.tt')?.innerText ?? el.innerText }))"""
             )
 
         pushed = page.evaluate(

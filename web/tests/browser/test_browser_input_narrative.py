@@ -887,7 +887,13 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
         self._open_root(page, 2)  # Interact
         _press(page, "ArrowRight")  # the bard (second grid column)
         _press(page, "Enter")
-        _press(page, "ArrowRight")  # 自由交談 (second grid column)
+        # The target affordances are the spec's single-column rows now
+        # (webclient-exploration-menu: "the selected target's heading and its
+        # single-column affordance rows hold the second column, keyboard
+        # target switching and vertical affordance navigation traverse the
+        # same frames the router owns" — synced with the interaction
+        # workspace), so 自由交談 is reached vertically.
+        _press(page, "ArrowDown")  # 自由交談 (second affordance row)
         _press(page, "Enter")
         _wait_field_focused(page)
         speech = "你好，詩人"
@@ -924,7 +930,10 @@ class InputEchoExplorationTest(BrowserAcceptanceTest):
         self._open_root(page, 2)  # Interact
         _press(page, "ArrowRight")  # the bard (second grid column)
         _press(page, "Enter")
-        _press(page, "ArrowRight")  # 自由交談
+        # Vertical affordance navigation (webclient-exploration-menu:
+        # "single-column affordance rows ... vertical affordance
+        # navigation").
+        _press(page, "ArrowDown")  # 自由交談 (second affordance row)
         _press(page, "Enter")
         _wait_field_focused(page)
         inp_before = page.locator('[data-testid="narrative-feed"] .inp').count()

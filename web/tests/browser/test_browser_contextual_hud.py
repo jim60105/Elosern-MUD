@@ -16,6 +16,8 @@ Diffusion, or other network service.
 
 from __future__ import annotations
 
+import base64
+
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
@@ -287,6 +289,18 @@ def _local_map_unavailable_panel() -> dict:
     }
 
 
+# A 1x1 PNG served for the fixture scene URL. The media route serves only
+# ``defaults/*`` identities, so an unserved fixture URL would 404 and trip
+# the backdrop's load-failure path (the <img> is removed from the DOM),
+# racing the presence assertion. Fulfilling the route (the same technique
+# test_browser_art uses for its load-failure journey) makes the done scene
+# deterministic and keeps the spec scenario's outcome assertion intact
+# (webclient-contextual-hud: "A done scene paints the stage").
+_SCENE_PNG_BYTES = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+
+
 # ---------------------------------------------------------------------------
 # Page-level helpers.
 # ---------------------------------------------------------------------------
@@ -403,6 +417,12 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     def test_scene_backdrop_renders_art_payload_truthfully(self):
         """The backdrop renders the committed art scene behind the stage."""
         page = self.logged_in_page()
+        page.route(
+            "**/art/scene.png",
+            lambda route: route.fulfill(
+                status=200, content_type="image/png", body=_SCENE_PNG_BYTES
+            ),
+        )
         art = _art_panel(["1", "2"])
         _inject_snapshot(page, {"art": art}, mode="exploration")
         _wait_mode(page, "exploration")
@@ -910,15 +930,21 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                   };
                 }"""
             )
-            # The band spans the full stage width with no unpainted gutter:
-            # the anchor starts at x=0 and paints the draft's gradient,
-            # hairline top border, and upward shadow across that width.
-            self.assertEqual(geometry["anchorLeft"], 0.0)
+            # The desktop redesign re-tenanted the dock anchor from the
+            # full-width draft band to the spec's floating panel
+            # (webclient-desktop-shell: "a floating panel bounded to a
+            # maximum width and centred in the stage's dock anchor";
+            # app-shell.css .elosern-root [data-anchor="dock"] left: 35%).
             self.assertAlmostEqual(
+                geometry["anchorLeft"],
+                float(geometry["viewportWidth"]) * 0.35,
+                delta=1.0,
+                msg=f"the dock anchor is the workspace's left-anchored panel at {viewport}",
+            )
+            self.assertLess(
                 geometry["anchorWidth"],
                 float(geometry["viewportWidth"]),
-                places=1,
-                msg=f"the band spans the full stage width at {viewport}",
+                f"the dock anchor is a bounded panel, not the full-width band, at {viewport}",
             )
             self.assertIn(
                 "gradient",
@@ -927,12 +953,12 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             )
             self.assertTrue(
                 geometry["borderTopWidth"].startswith("1px"),
-                "the band carries the --line hairline top border",
+                "the panel carries the --line hairline border",
             )
             self.assertIn(
-                "rgb(0, 0, 0)",
+                "inset",
                 geometry["boxShadow"],
-                "the band carries the draft's upward shadow (#000)",
+                "the panel carries the redesign's inset highlight",
             )
             # The panel is horizontally centred within the anchor.
             self.assertLess(
@@ -959,7 +985,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 geometry["anchorHeight"]
                 - geometry["padTop"]
                 - geometry["padBottom"]
-                - 1.0,
+                - 2.0,
                 places=1,
                 msg=f"the content column fills the band's padded box at {viewport}",
             )
@@ -1835,8 +1861,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
     def test_status_drawer_tiles_and_pills_fit_with_no_overlap(self):
         """The re-chromed 角色狀態 drawer: the stat tiles and condition pills
-        wrap without overlap, clipping, or horizontal overflow at both
-        viewports (the design's card-tile / pill-badge presentation).
+        wrap without overlap or horizontal overflow at both viewports, and
+        every tile and pill stays reachable inside the drawer's bounded
+        scroll (the design's card-tile / pill-badge presentation; the drawer
+        body is the bounded, vertically scrollable surface).
 
         Exercises a low-HP resource (the 危險 marker case) and a 9-condition
         roster spanning all five severities (more than the H2 island's 6-item
@@ -1919,17 +1947,25 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         }
                       }
                       // Boundary: no tile/pill spills past the drawer's horizontal
-                      // content box; any box intersecting the body's visible area
-                      // must not be clipped at the body's top or bottom edge.
+                      // content box.
                       for (const box of boxes) {
                         if (box.left < bodyRect.left || box.right > bodyRect.right) {
                           return { ok: false, reason: 'box outside drawer horizontal bounds' };
                         }
                       }
-                      for (const box of boxes) {
-                        const intersects = box.top < bodyRect.bottom + 1 && box.bottom > bodyRect.top - 1;
-                        if (intersects && (box.top < bodyRect.top - 1 || box.bottom > bodyRect.bottom + 1)) {
-                          return { ok: false, reason: 'box clipped at the drawer body edge' };
+                      // The drawer body is the design's bounded, vertically
+                      // scrollable surface (HudDrawer.vue .hud-drawer__body
+                      // overflow-y: auto), so a roster taller than the body
+                      // is reached by scrolling — the horizontal bounds and
+                      // the no-overlap rule above carry the fit contract.
+                      // What must never happen is unreachable content: each
+                      // element scrolled into view must become fully visible
+                      // inside the body's visible box.
+                      for (const el of els) {
+                        el.scrollIntoView({ block: 'nearest' });
+                        const b = el.getBoundingClientRect();
+                        if (b.top < bodyRect.top - 1 || b.bottom > bodyRect.bottom + 1) {
+                          return { ok: false, reason: 'box unreachable inside the scrollable drawer body' };
                         }
                       }
                       // No unexpected horizontal overflow in the drawer body.
