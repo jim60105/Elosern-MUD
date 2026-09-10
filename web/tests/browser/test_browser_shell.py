@@ -840,14 +840,30 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             cells = page.locator("#action-dock [data-item-key]")
             self.assertGreaterEqual(cells.count(), 5)
             self.assertLessEqual(cells.count(), 8)
-            # The open/focused tab carries the seal-red gradient fill (the
-            # `--on` class), and its leading glyph is an SVG icon.
+            # The open/focused tab carries the muted-gold fill (the `--on`
+            # class; webclient-desktop-shell: "the open entry marked by a
+            # muted-gold fill") — the obsidian-gold wave re-pointed the
+            # draft's seal-red gradient to the flat --gold-glow token
+            # (DockTabBar.vue .dock-tab-bar__tab--on). Assert the computed
+            # fill against the token resolved through a probe node inside
+            # the dock subtree (the token is declared on .elosern-root, not
+            # :root, so a documentElement read resolves to nothing; and the
+            # raw token text is not the computed color string).
             focused = page.locator("#action-dock .dock-tab-bar__tab--on").first
-            self.assertTrue(
-                "gradient" in focused.evaluate(
-                    "el => getComputedStyle(el).backgroundImage"
-                ),
-                "the focused tab carries the seal-red gradient fill",
+            gold_glow = page.evaluate(
+                """() => {
+                    const probe = document.createElement('span');
+                    probe.style.background = 'var(--gold-glow)';
+                    document.querySelector('#action-dock').appendChild(probe);
+                    const rgb = getComputedStyle(probe).backgroundColor;
+                    probe.remove();
+                    return rgb;
+                }"""
+            )
+            self.assertEqual(
+                focused.evaluate("el => getComputedStyle(el).backgroundColor"),
+                gold_glow,
+                "the focused tab carries the muted-gold --gold-glow fill",
             )
             self.assertEqual(
                 focused.locator("svg.dock-tab-bar__icon").count(),

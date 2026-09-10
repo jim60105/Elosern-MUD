@@ -27,6 +27,7 @@ from .browser_helpers import (
     sent_action_count,
     store_state,
     store_state_or_none,
+    wait_for_presentation_settled,
     wait_for_store_state,
 )
 from .test_browser_input_narrative import _wait_inp_line
@@ -46,18 +47,28 @@ class _ItemActionBase(ServicesBrowserTest):
     SERVICES_MODE = "inventory_actions"
 
     def _open_inventory_drawer(self, page):
-        focus_action_dock(page)
-        focused_key = None
-        for _ in range(12):
-            focused_key = (store_state_or_none(page) or {}).get("focus", {}).get("key")
-            if focused_key == "inventory":
-                break
-            _press(page, "ArrowRight")
-        self.assertEqual(focused_key, "inventory")
-        _press(page, "Enter")
+        # The base class's `_wait_services_available` opened the reference
+        # quest drawer as its journey's first step (H4 task 4.3). The drawer
+        # is the design's modal surface (HudDrawer.vue: the blurred scrim
+        # covers the whole stage while open), so the nav click must follow a
+        # close — the store's single close entry (the same entry the
+        # drawer's own close control, scrim, and Escape handler funnel
+        # through; the focus-trap makes raw key dispatch focus-dependent).
+        page.evaluate(
+            "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+            "if (s) s.closeHudDrawer({ popFrame: true }); }"
+        )
+        wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
+        # The desktop redesign re-homed the 背包 entry into the top
+        # navigation (webclient-desktop-shell, acd3790): the dock root is the
+        # capability-driven [move, look, interact, wait, suggestions], so the
+        # drawer opens from the DesktopNavigation 背包 click — the same
+        # client-local openHudDrawer('inventory') the old dock row submitted
+        # (make-inventory-drawer-frameless: no keyboard frame is pushed).
+        page.locator('.desktop-navigation button', has_text="背包").click()
         wait_for_store_state(
             page,
-            lambda s: ((s.get("panels") or {}).get("services") or {}).get("inventory") is not None,
+            lambda s: s.get("hudDrawer") == "inventory",
             dom_readiness={
                 # HudDrawer renders its key as `data-drawer-key` and its open
                 # state as `data-open`. The root is position:fixed, where
@@ -76,6 +87,14 @@ class _ItemActionBase(ServicesBrowserTest):
                 "description": "inventory drawer is open and visible",
             },
         )
+        # The post-login presentation burst must land before the first tile
+        # activation: every committed panel replacement retires an open
+        # item-use confirmation (stale-before-adapter guarantee), so a dialog
+        # opened mid-burst is retired by the burst's services re-emission.
+        # Two consecutive agreeing revision reads prove the burst landed —
+        # the same quiet-gap rule this settle helper applies before a
+        # ui_action submit.
+        wait_for_presentation_settled(page)
         return self._services_panel(page)
 
     def _services_rows(self, page):
@@ -94,7 +113,15 @@ class _ItemActionBase(ServicesBrowserTest):
         return page.locator(DIALOG).count()
 
     def _keyboard_activate_tile(self, page, item_key):
-        page.focus(f'[data-testid="{TILE.format(item_key)}"]')
+        # Playwright's locator focus waits for the element to be actionable —
+        # the raw page.focus raced the drawer's mounting re-render (the
+        # focused node was replaced before Vue's @focus listener ran; the
+        # same race the grid journey documents and fixes the same way).
+        page.locator(f'[data-testid="{TILE.format(item_key)}"]').focus()
+        page.wait_for_function(
+            "() => document.activeElement && document.activeElement.getAttribute('data-testid')"
+            f" === '{TILE.format(item_key)}'"
+        )
         _press(page, "Enter")
 
     def _keyboard_confirm_dialog(self, page):

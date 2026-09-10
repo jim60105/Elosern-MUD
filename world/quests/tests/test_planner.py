@@ -512,6 +512,18 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
     def test_no_battlefield_credit_request_fails_closed(self):
+        """A companion defeat request outside any battlefield fails closed.
+
+        Updated for the damaging-action gate (action-resolution-pipeline
+        scenario "A damaging skill permitted outside combat is still refused
+        without a battlefield" — commit 63d1d6e): STRIKE_SKILL is the exact
+        shape the gate refuses (usable_out_of_combat=True + a DamageEffect),
+        so the resolution is now rejected outright. The no-credit invariant
+        this test pins (party-system) holds a fortiori: no kill happens, so
+        the planner can never see a defeat event.
+        """
+        from world.rules.action import RejectReason
+
         accept(self.player, self.tier_hunt.key)
         companion = self._companion("striker")
         companion.db.skills = {"active": ["strike"], "passive": []}
@@ -522,8 +534,9 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         )
         with patch("world.rules.combat.roll_d100", return_value=100):
             result = ActionResolver.resolve(request)
-        self.assertEqual(result.outcome, "success")
-        self.assertEqual(prey.traits.hp.current, 0)
+        self.assertEqual(result.outcome, "rejected")
+        self.assertEqual(result.reason, RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET)
+        self.assertEqual(prey.traits.hp.current, 1)
         self.assertEqual(self._records()[0]["stage_progress"], 0)
 
     @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")

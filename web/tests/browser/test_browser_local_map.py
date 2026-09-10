@@ -1597,11 +1597,13 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
         island = self._surface(page, '[data-testid="local-map"]')
         overlay = self._surface(page, '[data-testid="map-overlay"]')
         # The island renders the radial at markerScale 1 (the prop default) and
-        # the overlay at its shipped 4.83 ladder; node groups translate by the
+        # the overlay at its shipped 2.2 ladder
+        # (MapOverlay.vue :marker-scale="2.2", re-pointed from the draft's 4.83
+        # by the desktop redesign 0522f09); node groups translate by the
         # scaled placement, and the viewBox spans the same scaled canvas, so
         # the comparison is exact per surface.
         placed = {node["id"]: node for node in radial["nodes"]}
-        for name, surface, scale in (("island", island, 1.0), ("overlay", overlay, 4.83)):
+        for name, surface, scale in (("island", island, 1.0), ("overlay", overlay, 2.2)):
             self.assertEqual(
                 set(placed), set(surface["nodes"]),
                 f"{name}: the surface draws exactly the radial-placed nodes",
@@ -1695,10 +1697,12 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
             )
             self.assertEqual(surface["markers"], [], f"{name}: the graph variant never marks")
         # The island renders the radial at markerScale 1 (the prop default) and
-        # the overlay at its shipped 4.83 ladder; the viewBox spans the same
+        # the overlay at its shipped 2.2 ladder
+        # (MapOverlay.vue :marker-scale="2.2", re-pointed from the draft's 4.83
+        # by the desktop redesign 0522f09); the viewBox spans the same
         # scaled canvas, so the translate comparison is exact per surface.
         placed = {node["id"]: node for node in model["radial"]["nodes"]}
-        for name, surface, scale in (("island", island, 1.0), ("overlay", overlay, 4.83)):
+        for name, surface, scale in (("island", island, 1.0), ("overlay", overlay, 2.2)):
             self.assertEqual(
                 set(placed), set(surface["nodes"]),
                 f"{name}: the surface draws exactly the radial-placed nodes",

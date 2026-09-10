@@ -369,6 +369,8 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `.dock-menu`, `.dock-menu__outlet`, `.dock-menu__outlet-tile`, `.dock-menu__nav-sub`, `.dock-menu__plain`, `.dock-menu .dock-menu__scale`, `.dock-menu .dock-menu__skill--on`, `.dock-menu .dock-menu__token--pressed` | REMAP-TO-TESTID |
 | `.dock-tab-bar__<suffix>` (prefix `dock-tab-bar`: `__badge`, `__tab--on`, `svg.dock-tab-bar__icon`) | REMAP-TO-TESTID |
 | `.hint` (the command-line hint cluster naming the history-recall keys; targeted by `test_browser_input_narrative.py`) | PRESERVE-SAME-HOOK |
+| `.desktop-navigation button` (the desktop redesign's top navigation control set: 角色狀態 / 任務 / 背包 surface re-homes; targeted by `test_browser_exploration.py` and `test_browser_inventory_grid.py` via `page.locator('.desktop-navigation button', has_text=...)`) | PRESERVE-SAME-HOOK |
+| `.waiting-screen`, `.waiting-card` (the dedicated wait surface's screen and its three-operation card row, re-homed out of the dock pane by the dock-workspace alignment; targeted by `test_browser_exploration.py`'s wait-surface assertions) | PRESERVE-SAME-HOOK |
 | `.qwc__chip-badge`, `.qwc__chip-label` (quick-word chip child nodes; targeted by `test_browser_input_narrative.py`) | PRESERVE-SAME-HOOK |
 | `.tt` (the toast-entry title hook — the verbatim server-authored title text node — targeted by `test_browser_action_feedback.py`; the pair hook `.ts` is never locator-targeted, and the queue container and per-entry hooks ride the `feedback-toast-*` testids in the re-mapped set above) | PRESERVE-SAME-HOOK |
 | `.drawer-entry`, `.header-mode`, `.meta-conn`, `.services-confirm`, `.skill-detail-pane__disabled`, `.narrative-divider` (preserved), `.inputfieldwrapper` (preserved wrapper for `inputfield`) | RETIRED-WITH-SHELL |

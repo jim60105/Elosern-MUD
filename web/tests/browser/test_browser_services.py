@@ -133,49 +133,73 @@ class ServicesBrowserTest(BrowserAcceptanceTest):
 
         The standalone Services root no longer exists: guild/shop are reached
         through Interact -> the local host -> its navigate-kind service entry,
-        and inventory through the exploration root's Inventory entry — which
-        opens the 背包 drawer frameless (make-inventory-drawer-frameless): no
-        keyboard frame is pushed and the router's stack is unchanged. The root
-        is a single seven-column row (grid geometry), so horizontal arrows
-        move across it; submenus are 2-column grids.
+        and inventory through the DesktopNavigation 背包 click (the desktop
+        redesign re-homed the entry into the top navigation,
+        webclient-desktop-shell acd3790) — which opens the 背包 drawer
+        frameless (make-inventory-drawer-frameless): no keyboard frame is
+        pushed and the router's stack is unchanged.
+
+        The target's affordance frame renders ONE `talk-scripted` row per
+        server talk affordance (exploration_menu.js: one row per authored
+        keyword — the guild staff's six keywords fill the grid rows before
+        the `service-<surface>` row), so the service entry is NOT reachable
+        by a fixed arrow walk. The dock-navigation row is focused by its
+        stable key through the store (focusItemByKey + focusConfirm: the
+        same keyboard-parity fallback tabToRootAndConfirm uses; the frozen
+        KeyboardRouter.confirm façade member, so no pointer path and no OOB
+        emission beyond the journey's own later steps).
         """
         focus_action_dock(page)
         if surface_key == "inventory":
-            # Navigate to the Inventory tab by the store's committed focus
-            # KEY: the declarative root's tab set is capability-driven (H3
-            # design D5 appends the 建議 tab when the suggestions envelope is
-            # not `unavailable`) and a drawer-close pop restores focus to the
-            # opener's key, so focus may start on any root tab). Step by
-            # computed index delta — the tab row wraps, so step toward the
-            # target in whichever direction is nearer and assert arrival.
-            layout = page.evaluate(
-                """() => ({
-                  keys: Array.from(document.querySelectorAll(
-                    '#action-dock [data-item-key]')).map(
-                      (el) => el.getAttribute('data-item-key')),
-                  focus: window.__elosernBridge.store.view.focus.key,
-                })"""
+            # The base class's `_wait_services_available` opened the quest
+            # drawer (H4 task 4.3); the scrim covers the stage while open, so
+            # the nav click must follow a close through the store's single
+            # close entry (the focus-trap makes raw key dispatch
+            # focus-dependent).
+            page.evaluate(
+                "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
+                "if (s) s.closeHudDrawer({ popFrame: true }); }"
             )
-            target = layout["keys"].index("inventory")
-            start = layout["keys"].index(layout["focus"])
-            step = "ArrowRight" if target >= start else "ArrowLeft"
-            for _ in range(abs(target - start)):
-                _press(page, step)
-            focused = page.evaluate(
-                "() => window.__elosernBridge.store.view.focus.key"
+            wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
+            # The desktop redesign re-homed the 背包 entry into the top
+            # navigation (webclient-desktop-shell, acd3790): the dock root is
+            # the capability-driven [move, look, interact, wait,
+            # suggestions], so the drawer opens from the DesktopNavigation
+            # 背包 click — the same client-local openHudDrawer('inventory')
+            # the old dock row submitted (no keyboard frame is pushed).
+            page.locator('.desktop-navigation button', has_text="背包").click()
+            wait_for_store_state(
+                page,
+                lambda s: s.get("hudDrawer") == "inventory",
+                dom_readiness={
+                    "selector": '[data-testid="inventory-panel"]',
+                    "predicate": (
+                        "() => !!document.querySelector('[data-testid=\"inventory-panel\"]')"
+                    ),
+                    "description": "frameless inventory drawer rendered",
+                },
             )
-            assert focused == "inventory", focused
-            _press(page, "Enter")
             return self._services_panel(page)
-        # guild/shop: Interact -> first target -> navigate service entry.
+        # guild/shop: Interact -> first target -> navigate service entry by
+        # its stable key (the service row's position depends on the host's
+        # keyword count; the key does not).
         _press(page, "ArrowRight")  # Look
         _press(page, "ArrowRight")  # Interact
         _press(page, "Enter")  # open Interact
         _press(page, "Enter")  # select the first present target
-        if surface_key == "guild":
-            # The guild staff carries scripted talk first; the navigate entry
-            # follows it in the second grid column.
-            _press(page, "ArrowRight")
+        item_key = "service-" + surface_key
+        focused = page.evaluate(
+            """(key) => {
+                const s = window.__elosernBridge && window.__elosernBridge.store;
+                return s && s.focusItemByKey(key);
+            }""",
+            item_key,
+        )
+        self.assertTrue(
+            focused,
+            f"the {surface_key} host's navigate row ({item_key}) is not in the "
+            "open target's affordance frame",
+        )
         _press(page, "Enter")  # open the service submenu
         return self._services_panel(page)
 
