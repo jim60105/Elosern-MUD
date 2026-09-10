@@ -3,6 +3,8 @@
 from unittest.mock import patch
 import unittest
 
+from dataclasses import replace
+
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_account, create_object
@@ -10,7 +12,6 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
-from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
     MAX_PERSONA_FIELD_LENGTH,
@@ -30,6 +31,38 @@ from world.rules.creation_wizard import (
     save_custom_draft,
     save_preset_draft,
 )
+from world.tests.synthetic_data import SYNTH_PRESETS, make_subrace, synthetic_registries
+
+# Kit rows: every draft/activation path resolves race, subrace, and preset
+# data through the scoped catalogs. A foreign-blood subrace (race key outside
+# the scoped race) supplies the incompatibility fixtures.
+_FOREIGN_BLOOD = make_subrace("t_misthollow", race_key="t_suncall")
+
+# Kit cards with a filled persona background: the wizard card blurb derives
+# from persona.background, and the read model pins every card's blurb
+# non-empty. The kit rows carry no background prose, so the scope merges
+# background-filled copies.
+_CARD_PRESETS = {
+    key: replace(
+        preset, persona=replace(preset.persona, background=f"合成卡 {key} 的背景。")
+    )
+    for key, preset in SYNTH_PRESETS.items()
+}
+
+_SCOPE = synthetic_registries(
+    "races",
+    "subraces",
+    "presets",
+    "skills",
+    "items",
+    "prices",
+    "elements",
+    "starting_kits",
+    extra={
+        "subraces": {_FOREIGN_BLOOD.key: _FOREIGN_BLOOD},
+        "presets": _CARD_PRESETS,
+    },
+)
 
 
 def balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int]:
@@ -45,6 +78,13 @@ def balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int
     return result
 
 
+# The affinity bound map is production state keyed by race (not a registry
+# target the kit can replace); the scoped race gets an entry so the custom
+# form descriptor renders against the synthetic registry.
+@patch.dict(
+    "world.rules.character_creation._AFFINITY_INPUT_BOUNDS", {"t_duskmari": 2}
+)
+@_SCOPE
 class CreationWizardTests(EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -60,9 +100,9 @@ class CreationWizardTests(EvenniaTest):
             "display_name": "  新角色  ",
             "age": 20,
             "apparent_age": 20,
-            "race": "human",
-            "subrace": "human_commoner",
-            "allocations": balanced_allocations("human", "human_commoner"),
+            "race": "t_duskmari",
+            "subrace": "t_duskmari_evensong",
+            "allocations": balanced_allocations("t_duskmari", "t_duskmari_evensong"),
         }
         values.update(overrides)
         return CharacterCreationRequest(**values)
@@ -72,23 +112,25 @@ class CreationWizardTests(EvenniaTest):
     def test_read_view_derives_presets_and_custom_descriptor_from_registries(self):
         view = read_creation_view(self.character)
         keys = {card.key for card in view.presets}
-        self.assertIn("elysa_snow", keys)
-        self.assertIn("sylwen_stillwater", keys)
+        self.assertEqual(keys, set(SYNTH_PRESETS))
         self.assertEqual(view.custom.name.max_length, 64)
         self.assertEqual(view.custom.age.age_minimum, 0)
         self.assertEqual(view.custom.age.apparent_age_minimum, 0)
         race_keys = {race.key for race in view.custom.races}
-        self.assertEqual(race_keys, {"human", "beastfolk", "elf"})
-        elf = next(race for race in view.custom.races if race.key == "elf")
-        self.assertEqual(set(elf.subraces), {"fionnen", "ciaran", "eolas"})
+        race_key = next(iter(race_keys))
+        race = next(r for r in view.custom.races if r.key == race_key)
+        subrace_key = race.subraces[0]
+        self.assertEqual({subrace_key}, {"t_duskmari_evensong"})
         elf_profile = next(
             profile
             for profile in view.custom.profiles
-            if profile.race == "elf" and profile.subrace == "fionnen"
+            if profile.race == race_key and profile.subrace == subrace_key
         )
         axes = {axis.axis for axis in elf_profile.axes}
         self.assertEqual(axes, set(ALLOCATABLE_AXES))
-        self.assertEqual(elf_profile.budget, resolve_starting_profile("elf", "fionnen").budget)
+        self.assertEqual(
+            elf_profile.budget, resolve_starting_profile(race_key, subrace_key).budget
+        )
         self.assertIsNone(view.draft)
 
     def test_side_effect_free_read_model_including_no_materialized_traits(self):
@@ -142,30 +184,30 @@ class CreationWizardTests(EvenniaTest):
                 self.assertEqual(set(vars(card)), card_fields)
                 self.assertEqual(
                     card.background,
-                    PLAYER_PRESET_REGISTRY[card.key].persona.background,
+                    _CARD_PRESETS[card.key].persona.background,
                 )
-                self.assertFalse(hasattr(PLAYER_PRESET_REGISTRY[card.key], "background"))
+                self.assertFalse(hasattr(_CARD_PRESETS[card.key], "background"))
 
     # -- preset draft --------------------------------------------------------
 
     def test_preset_draft_persists_and_survives_reload(self):
-        draft = save_preset_draft(self.account, self.character, "elysa_snow")
+        draft = save_preset_draft(self.account, self.character, "t_pale_wren")
         self.assertEqual(draft["mode"], "preset")
         self.assertEqual(draft["stage"], PRESET_STAGE)
-        self.assertEqual(draft["preset_key"], "elysa_snow")
+        self.assertEqual(draft["preset_key"], "t_pale_wren")
         self.assertTrue(self.character.creation_pending)
         # The draft is a stored attribute and survives a reload of the object.
         reloaded = PlayerCharacter.objects.get(id=self.character.id)
-        self.assertEqual(read_draft(reloaded)["preset_key"], "elysa_snow")
+        self.assertEqual(read_draft(reloaded)["preset_key"], "t_pale_wren")
         self.assertEqual(reloaded.creation_pending, True)
         self.assertEqual(reloaded.age, None)
 
     def test_invalid_preset_rejected_leaving_prior_draft_unchanged(self):
-        save_preset_draft(self.account, self.character, "elysa_snow")
+        save_preset_draft(self.account, self.character, "t_pale_wren")
         with self.assertRaises(CharacterCreationError) as ctx:
             save_preset_draft(self.account, self.character, "nope")
         self.assertEqual(rejection_code(ctx.exception), "unknown_preset")
-        self.assertEqual(read_draft(self.character)["preset_key"], "elysa_snow")
+        self.assertEqual(read_draft(self.character)["preset_key"], "t_pale_wren")
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(self.character.traits.all(), [])
 
@@ -180,7 +222,7 @@ class CreationWizardTests(EvenniaTest):
         self.assertEqual(draft["mode"], "custom")
         self.assertEqual(draft["stage"], CUSTOM_STAGE)
         self.assertEqual(draft["display_name"], "新角色")
-        self.assertEqual(draft["allocations"], balanced_allocations("human"))
+        self.assertEqual(draft["allocations"], balanced_allocations("t_duskmari"))
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(self.character.age, None)
         self.assertEqual(self.character.traits.all(), [])
@@ -192,7 +234,9 @@ class CreationWizardTests(EvenniaTest):
             "negative apparent age": dict(apparent_age=-1),
             "markup delimiter": dict(display_name="|rbad|n"),
             "unknown race": dict(race="dragon"),
-            "incompatible subrace": dict(race="human", subrace="foxkin"),
+            "incompatible subrace": dict(
+                race="t_duskmari", subrace=_FOREIGN_BLOOD.key
+            ),
             "off budget": dict(allocations={
                 key: 0 for key in ALLOCATABLE_AXES
             }),
@@ -301,10 +345,12 @@ class CreationWizardTests(EvenniaTest):
         self.assertEqual(self.character.traits.all(), [])
 
     def test_preset_activation_uses_the_stored_preset_key(self):
-        save_preset_draft(self.account, self.character, "sylwen_stillwater")
+        # The companion-free kit card: activation writes identity without a
+        # spawn location for companion bindings (t_ash_finch carries none).
+        save_preset_draft(self.account, self.character, "t_ash_finch")
         result = activate_draft(self.account, self.character)
-        self.assertEqual(result.race, "elf")
-        self.assertEqual(result.display_name, "希爾溫")
+        self.assertEqual(result.race, "t_duskmari")
+        self.assertEqual(result.display_name, "燼雀")
         self.assertFalse(self.character.creation_pending)
         self.assertIsNone(read_draft(self.character))
 
@@ -353,8 +399,8 @@ class CreationWizardTests(EvenniaTest):
                 "display_name": "角色",
                 "age": -1,
                 "apparent_age": 20,
-                "race": "human",
-                "subrace": "human_commoner",
+                "race": "t_duskmari",
+                "subrace": "t_duskmari_evensong",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
                 "persona": None,
                 "sex": "other",
@@ -367,7 +413,7 @@ class CreationWizardTests(EvenniaTest):
                 "age": 20,
                 "apparent_age": 20,
                 "race": "dragon",
-                "subrace": "human_commoner",
+                "subrace": "t_duskmari_evensong",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
                 "persona": None,
                 "sex": "other",
@@ -379,8 +425,8 @@ class CreationWizardTests(EvenniaTest):
                 "display_name": "角色",
                 "age": 20,
                 "apparent_age": 20,
-                "race": "human",
-                "subrace": "foxkin",
+                "race": "t_duskmari",
+                "subrace": _FOREIGN_BLOOD.key,
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
                 "persona": None,
                 "sex": "other",
@@ -392,8 +438,8 @@ class CreationWizardTests(EvenniaTest):
                 "display_name": "角色",
                 "age": 20,
                 "apparent_age": 20,
-                "race": "human",
-                "subrace": "human_commoner",
+                "race": "t_duskmari",
+                "subrace": "t_duskmari_evensong",
                 "allocations": {"hp": 0},
                 "persona": None,
             },
@@ -404,8 +450,8 @@ class CreationWizardTests(EvenniaTest):
                 "display_name": "角色",
                 "age": 20,
                 "apparent_age": 20,
-                "race": "human",
-                "subrace": "human_commoner",
+                "race": "t_duskmari",
+                "subrace": "t_duskmari_evensong",
                 "allocations": {**{axis: 0 for axis in ALLOCATABLE_AXES}, "hp": 20000},
                 "persona": None,
                 "sex": "other",
@@ -420,8 +466,8 @@ class CreationWizardTests(EvenniaTest):
                 "display_name": "角色",
                 "age": 20,
                 "apparent_age": 20,
-                "race": "human",
-                "subrace": "human_commoner",
+                "race": "t_duskmari",
+                "subrace": "t_duskmari_evensong",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
                 "sex": "other",
             },
@@ -435,8 +481,8 @@ class CreationWizardTests(EvenniaTest):
                 "display_name": "角色",
                 "age": 20,
                 "apparent_age": 20,
-                "race": "human",
-                "subrace": "human_commoner",
+                "race": "t_duskmari",
+                "subrace": "t_duskmari_evensong",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
                 "persona": None,
             },
@@ -447,8 +493,8 @@ class CreationWizardTests(EvenniaTest):
                 "display_name": "角色",
                 "age": 20,
                 "apparent_age": 20,
-                "race": "human",
-                "subrace": "human_commoner",
+                "race": "t_duskmari",
+                "subrace": "t_duskmari_evensong",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
                 "persona": None,
                 "sex": "nope",
@@ -460,8 +506,8 @@ class CreationWizardTests(EvenniaTest):
                 "display_name": "角色",
                 "age": 20,
                 "apparent_age": 20,
-                "race": "human",
-                "subrace": "human_commoner",
+                "race": "t_duskmari",
+                "subrace": "t_duskmari_evensong",
                 "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
                 "persona": {"personality": "沉穩"},
                 "sex": "other",
@@ -533,8 +579,8 @@ class CreationWizardTests(EvenniaTest):
             "display_name": "舊概念角色",
             "age": 20,
             "apparent_age": 20,
-            "race": "human",
-            "subrace": "human_commoner",
+            "race": "t_duskmari",
+            "subrace": "t_duskmari_evensong",
             "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
             "background": "舊背景",
             "persona": {
@@ -631,8 +677,8 @@ class CreationWizardTests(EvenniaTest):
             "display_name": "舊角色",
             "age": 20,
             "apparent_age": 20,
-            "race": "human",
-            "subrace": "human_commoner",
+            "race": "t_duskmari",
+            "subrace": "t_duskmari_evensong",
             "allocations": {axis: 0 for axis in ALLOCATABLE_AXES},
             "persona": None,
         }
