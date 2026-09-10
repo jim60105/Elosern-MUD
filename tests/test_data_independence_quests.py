@@ -12,6 +12,7 @@ from pathlib import Path
 import unittest
 
 from tools import test_data_lint
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -53,6 +54,9 @@ class QuestsMapsTestDataMigrationContractTests(unittest.TestCase):
         self.ledger, fatal = test_data_lint.load_ledger(test_data_lint.REPO_ROOT)
         self.assertEqual(fatal, [], "ledger must load cleanly")
 
+    @covers_requirement(
+        "test-data-independence::quests-and-maps-behavior-tests-resolve-game-data-through-synthetic-fixtures"
+    )
     def test_migrated_files_hold_no_ledger_exemption(self):
         debt = set(self.ledger["debt"])
         contract = {entry["path"] for entry in self.ledger["contract"]}
@@ -60,6 +64,9 @@ class QuestsMapsTestDataMigrationContractTests(unittest.TestCase):
             self.assertNotIn(path, debt, f"{path} reintroduced into debt")
             self.assertNotIn(path, contract, f"{path} registered as contract")
 
+    @covers_requirement(
+        "test-data-independence::quests-and-maps-behavior-tests-resolve-game-data-through-synthetic-fixtures"
+    )
     def test_migrated_files_carry_zero_findings(self):
         universe = test_data_lint.derive_universe(test_data_lint.REPO_ROOT)
         for path in MIGRATED_FILES:
@@ -70,6 +77,9 @@ class QuestsMapsTestDataMigrationContractTests(unittest.TestCase):
                     [],
                 )
 
+    @covers_requirement(
+        "test-data-independence::quests-and-maps-behavior-tests-resolve-game-data-through-synthetic-fixtures"
+    )
     def test_gate_is_green_and_reports_no_violation_for_migrated_files(self):
         report = test_data_lint.check_repo(test_data_lint.REPO_ROOT)
         self.assertTrue(
@@ -79,6 +89,9 @@ class QuestsMapsTestDataMigrationContractTests(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "test-data-independence::quests-and-maps-behavior-tests-resolve-game-data-through-synthetic-fixtures"
+    )
     def test_freeze_ledger_seed_array_untouched_by_the_migration(self):
         # The migration removed debt entries only; the carried classification
         # still lists every seeded debt path (shrink-only ratchet design).
