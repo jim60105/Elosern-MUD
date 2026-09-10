@@ -154,7 +154,26 @@ PREVIOUS_MANIFEST_KEYS = {
     # The client-local action-feedback toast queue joined the frozen set
     # when add-action-feedback-toasts refroze the manifest at 42.
     "Feedback/ToastQueue",
+    # The desktop-redesign and obsidian-gold waves refroze the manifest at
+    # 51: Core/DesktopNavigation and Core/ReferenceArtwork joined from the
+    # desktop redesign, World/TitleBallotMenu from the dock-workspace
+    # alignment, and the Overlays/LineagePanel + Overlays/TitleCodexPanel
+    # big windows from the obsidian-gold wave.
+    "Core/DesktopNavigation",
+    "Core/ReferenceArtwork",
+    "World/TitleBallotMenu",
+    "Overlays/LineagePanel",
+    "Overlays/TitleCodexPanel",
 }
+
+# The Overlays-directory story files that sit outside the B5 family: the
+# lineage and title-codex big windows joined the frozen manifest with the
+# obsidian-gold wave. The story-count partition below asserts the family
+# files plus exactly these.
+OVERLAYS_KEYS_JOINED_AFTER_B5 = (
+    "Overlays/LineagePanel",
+    "Overlays/TitleCodexPanel",
+)
 
 
 def run_npm(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
@@ -316,7 +335,16 @@ class VueShowcaseOverlaysEvidenceTest(unittest.TestCase):
         overlays_story_files = sorted(
             (APP_ROOT / "stories/Overlays").glob("*.stories.js")
         )
-        self.assertEqual(len(overlays_story_files), len(OVERLAYS_FAMILY_KEYS))
+        expected_files = sorted(
+            f"{key.split('/')[1]}.stories.js"
+            for key in (*OVERLAYS_FAMILY_KEYS, *OVERLAYS_KEYS_JOINED_AFTER_B5)
+        )
+        self.assertEqual(
+            [path.name for path in overlays_story_files],
+            expected_files,
+            "the Overlays story directory must partition exactly into the "
+            "family keys plus the keys that joined the manifest after B5",
+        )
         import_re = re.compile(
             r'(?:^|\n)\s*(?:import\s+(?:[\w${},*\s]+\s+from\s+)?|export\s+[\w{},*\s]+\s+from\s+)["\']([^"\']+)["\']'
         )

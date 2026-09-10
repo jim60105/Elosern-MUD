@@ -345,11 +345,11 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
         "webclient-component-showcase::storybook-stories-use-deterministic-offline-data-only"
     )
     def test_story_files_import_only_local_or_bundled_modules(self):
-        """Stories import only relative files or the locked, bundled Vue runtime.
+        """Stories import only relative files or the locked, bundled runtime.
 
-        ``vue`` is a devDependency pinned in the lockfile and inlined by the
-        Vite/Storybook build, so it is offline; anything else must be a
-        relative import of a sibling source or fixture.
+        ``vue`` and ``pinia`` are devDependencies pinned in the lockfile and
+        inlined by the Vite/Storybook build, so they are offline; anything
+        else must be a relative import of a sibling source or fixture.
         """
         story_files = sorted(APP_ROOT.glob("**/*.stories.js"))
         self.assertTrue(story_files, "no story files discovered")
@@ -367,7 +367,8 @@ class VueShowcaseEvidenceTest(unittest.TestCase):
                 continue
             for module in import_re.findall(source):
                 self.assertTrue(
-                    module.startswith(("./", "../")) or module == "vue",
+                    module.startswith(("./", "../"))
+                    or module in ("vue", "pinia"),
                     f"{path.name} imports a non-local module: {module}",
                 )
 

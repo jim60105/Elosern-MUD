@@ -161,7 +161,23 @@ PREVIOUS_MANIFEST_KEYS = {
     "Overlays/ObjectiveTracker",
     "Overlays/PartyDrawer",
     "Overlays/PartyStrip",
+    # The desktop-redesign and obsidian-gold waves refroze the manifest at
+    # 51: Core/DesktopNavigation and Core/ReferenceArtwork joined from the
+    # desktop redesign, World/TitleBallotMenu from the dock-workspace
+    # alignment, and the Overlays/LineagePanel + Overlays/TitleCodexPanel
+    # big windows from the obsidian-gold wave.
+    "Core/DesktopNavigation",
+    "Core/ReferenceArtwork",
+    "World/TitleBallotMenu",
+    "Overlays/LineagePanel",
+    "Overlays/TitleCodexPanel",
 }
+
+# The World-directory story files that sit outside the B4 family: the
+# title-ballot menu joined the frozen manifest with the dock-workspace
+# alignment (its stories render the committed title_ballot panel). The
+# story-count partition below asserts the family files plus exactly these.
+WORLD_KEYS_JOINED_AFTER_B4 = ("World/TitleBallotMenu",)
 
 
 def run_npm(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
@@ -329,7 +345,16 @@ class VueShowcaseWorldEvidenceTest(unittest.TestCase):
         world_story_files = sorted(
             (APP_ROOT / "stories/World").glob("*.stories.js")
         )
-        self.assertEqual(len(world_story_files), len(WORLD_FAMILY_KEYS))
+        expected_files = sorted(
+            f"{key.split('/')[1]}.stories.js"
+            for key in (*WORLD_FAMILY_KEYS, *WORLD_KEYS_JOINED_AFTER_B4)
+        )
+        self.assertEqual(
+            [path.name for path in world_story_files],
+            expected_files,
+            "the World story directory must partition exactly into the "
+            "family keys plus the keys that joined the manifest after B4",
+        )
         import_re = re.compile(
             r'(?:^|\n)\s*(?:import\s+(?:[\w${},*\s]+\s+from\s+)?|export\s+[\w{},*\s]+\s+from\s+)["\']([^"\']+)["\']'
         )

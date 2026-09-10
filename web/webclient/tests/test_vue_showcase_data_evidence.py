@@ -180,6 +180,17 @@ class VueShowcaseDataEvidenceTest(unittest.TestCase):
                 # frozen set when add-action-feedback-toasts refroze the
                 # manifest at 42.
                 "Feedback/ToastQueue",
+                # The desktop-redesign and obsidian-gold waves refroze the
+                # manifest at 51: Core/DesktopNavigation and
+                # Core/ReferenceArtwork joined from the desktop redesign,
+                # World/TitleBallotMenu from the dock-workspace alignment,
+                # and the Overlays/LineagePanel + Overlays/TitleCodexPanel
+                # big windows from the obsidian-gold wave.
+                "Core/DesktopNavigation",
+                "Core/ReferenceArtwork",
+                "World/TitleBallotMenu",
+                "Overlays/LineagePanel",
+                "Overlays/TitleCodexPanel",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)
