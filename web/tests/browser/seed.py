@@ -643,6 +643,15 @@ def main() -> None:
 
     evennia._init()
 
+    # Synthetic-catalog process install (kit design D2b): the kit imports
+    # Evennia contrib code that needs evennia._init() first, so the flag
+    # check lives here rather than in settings load. The server process
+    # installs through the AT_SERVER_STARTSTOP wrapper instead.
+    if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1":
+        from world.tests.synthetic_data import install_synthetic_catalogs
+
+        install_synthetic_catalogs()
+
     from evennia.utils.create import create_account, create_object
 
     from typeclasses.accounts import Account
