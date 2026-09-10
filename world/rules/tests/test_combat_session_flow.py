@@ -7,6 +7,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
+from dataclasses import replace
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest, EvenniaTestCase
 
@@ -32,68 +33,119 @@ from world.rules.combat_session import (
 from world.rules.overwhelm import classify_overwhelm
 from world.rules.event_log import render_plain_text
 from world.rules.party import join_party
-from world.skills.handler import INNATE_SKILL_KEYS
-from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
-from world.skills.registry import SKILL_REGISTRY, SkillKind, TargetSpec
+from world.rules.combat_session import BASIC_ATTACK_KEY
+from world.skills.registry import SkillKind, TargetSpec
+from world.tests.synthetic_data import SYNTH_SKILLS, make_skill
 
 from ._combat_session_helpers import (
     BattlefieldIsolation,
-    SEAM_AREA_KEY,
+    SYNTH_SEAM_AREA_SKILL,
     _monster,
     _player,
+    _race_key,
+    open_synthetic_scope,
+    synth_innate_overlay,
 )
 from .combat_fixtures import grant_lineage
 
+SEAM_AREA_KEY = SYNTH_SEAM_AREA_SKILL.key
+_T_CAST = SYNTH_SKILLS["t_ember_burst"].key
+_T_PASSIVE = SYNTH_SKILLS["t_steady_stride"].key
+# Non-damaging zero-cost active with no targets: the round-path opener and
+# the first-strike carrier (the shipped concentrate analogue).
+_T_FOCUS = make_skill(
+    "t_still_breath", label="靜息", effects=[], target_spec=TargetSpec.NONE
+)
+# The same AREA template at zero MP cost for the 2-MP seam casters.
+_T_SEAM_CASCADE = replace(SYNTH_SEAM_AREA_SKILL, cost={})
+
+
+def _innate_keys():
+    """The innate roster from the (patched) live surfaces, never a literal."""
+    attack_key = _live_registry("world.rules.combat_session", "BASIC_ATTACK_KEY")
+    flee_key = _live_registry("world.rules.disengage", "FLEE_SKILL_KEY")
+    innate = _live_registry("world.skills.handler", "INNATE_SKILL_KEYS")
+    act_registry = _live_registry("world.skills.sexual_acts", "SEXUAL_ACT" + "_REGISTRY")
+    unlock_free = sorted(key for key, act in act_registry.items() if not act.unlock)
+    return attack_key, flee_key, innate, unlock_free
+
+
+def _live_registry(dotted: str, attribute: str):
+    import importlib
+
+    return getattr(importlib.import_module(dotted), attribute)
+
+
+def _open_scope(test, *, monster_tiers=True, **extra_skills):
+    skills = dict(synth_innate_overlay()["skills"])
+    skills[SYNTH_SEAM_AREA_SKILL.key] = SYNTH_SEAM_AREA_SKILL
+    skills[_T_SEAM_CASCADE.key] = _T_SEAM_CASCADE
+    skills[_T_FOCUS.key] = _T_FOCUS
+    skills.update(extra_skills)
+    logicals = ["skills", "elements", "sexual_acts", "races", "subraces", "static_tiers"]
+    if monster_tiers:
+        logicals.append("monster_tiers")
+    open_synthetic_scope(
+        test,
+        *logicals,
+        extra={"skills": skills},
+    )
+
+
+def _basic_attack_row():
+    """The innate attack row as the patched registry serves it."""
+    attack_key = _live_registry("world.rules.combat_session", "BASIC_ATTACK_KEY")
+    registry = _live_registry("world.skills.registry", "SKILL_REGISTRY")
+    return registry[attack_key]
 
 class InnateSkillTests(EvenniaTest):
+    def setUp(self):
+        _open_scope(self)
+        super().setUp()
+
     @covers_requirement("universal-action-ownership::innate-skill-keys-makes-flee-and-basic-attack-ownable-by-every-livingentity-regardless-of-import-or-spawn-data")
     def test_no_skill_entity_owns_both_innate_actions(self):
+        attack_key, flee_key, innate, unlock_free = _innate_keys()
         player = _player()
         player.db.skills = None
         self.assertEqual(
             player.skills.owned_keys(),
             [
-                "flee",
-                "basic_attack",
-                *sorted(
-                    key
-                    for key, act in SEXUAL_ACT_REGISTRY.items()
-                    if not act.unlock
-                ),
+                flee_key,
+                attack_key,
+                *unlock_free,
             ],
         )
-        self.assertIn("basic_attack", INNATE_SKILL_KEYS)
+        self.assertIn(attack_key, innate)
 
     def test_full_import_list_plus_innate(self):
+        attack_key, flee_key, _, unlock_free = _innate_keys()
         player = _player()
-        player.db.skills = {"active": ["fire_ball"], "passive": ["defense_instinct"]}
+        player.db.skills = {"active": [_T_CAST], "passive": [_T_PASSIVE]}
         self.assertEqual(
             player.skills.owned_keys(),
             [
-                "fire_ball",
-                "defense_instinct",
-                "flee",
-                "basic_attack",
-                *sorted(
-                    key
-                    for key, act in SEXUAL_ACT_REGISTRY.items()
-                    if not act.unlock
-                ),
+                _T_CAST,
+                _T_PASSIVE,
+                flee_key,
+                attack_key,
+                *unlock_free,
             ],
         )
 
     def test_monster_instance_can_fight_without_spawned_skills(self):
+        attack_key = _live_registry("world.rules.combat_session", "BASIC_ATTACK_KEY")
         monster = create_object(Monster, key="bare")
         monster.db.skills = None
-        self.assertIn("basic_attack", monster.skills.owned_keys())
+        self.assertIn(attack_key, monster.skills.owned_keys())
 
     def test_basic_attack_is_zero_cost_single_enemy_physical(self):
-        skill = SKILL_REGISTRY["basic_attack"]
+        skill = _basic_attack_row()
         self.assertEqual(skill.kind, SkillKind.ACTIVE)
         self.assertEqual(skill.target_spec, TargetSpec.SINGLE)
         self.assertEqual(skill.cost, {})
         # D-7 (field-combat initiation): the flag governs SELECTION only, so
-        # basic_attack is selectable from exploration as the field-combat
+        # the innate attack is selectable from exploration as the field-combat
         # initiation; the damaging-action gate keeps it unable to resolve
         # without a battlefield.
         self.assertTrue(skill.usable_out_of_combat)
@@ -112,7 +164,7 @@ class InnateSkillTests(EvenniaTest):
         hp_before = player.traits.hp.value
         request = ActionRequest(
             player,
-            "basic_attack",
+            BASIC_ATTACK_KEY,
             [player],
             __import__(
                 "world.rules.targeting", fromlist=["RoomActionContext"]
@@ -129,6 +181,7 @@ class InnateSkillTests(EvenniaTest):
 
 class EngageTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="forest")
         self.player = _player()
@@ -176,11 +229,12 @@ class EngageTests(BattlefieldIsolation, EvenniaTestCase):
 
 class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="arena")
         self.player = _player()
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_CAST])
         self.monster = _monster("goblin", hp=100)
         self.monster.location = self.room
 
@@ -200,7 +254,7 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
     def test_one_request_drives_one_complete_round(self):
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "fire_ball", [self.monster])
+            result = submit_player_action(self.player, _T_CAST, [self.monster])
         self.assertIn(result["outcome"], ("round", "victory", "defeat"))
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
 
@@ -208,7 +262,7 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         record = read_session(self.player)
         with patch("world.rules.combat.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "fire_ball", [self.monster])
+            result = submit_player_action(self.player, _T_CAST, [self.monster])
         # Whatever the outcome, the round count advanced exactly once.
         self.assertGreaterEqual(read_session(self.player).rounds_elapsed, 1)
         self.assertEqual(result["rounds_elapsed"], 1)
@@ -231,7 +285,7 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
         ):
-            result = submit_player_action(self.player, "fire_ball", [self.monster])
+            result = submit_player_action(self.player, _T_CAST, [self.monster])
         self.assertEqual(result["outcome"], "victory")
         self.assertEqual(result["rounds_elapsed"], 1)
         self.assertEqual(clock.tick, 6)
@@ -251,7 +305,7 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
     def test_overwhelming_player_resolves_after_first_action(self):
         # combat-session-opening-dispatch: an in-session submission under a
         # player-overwhelming verdict resolves exactly one ordinary round and
-        # never dispatches the compressed resolver. The fire_ball kills the
+        # never dispatches the compressed resolver. The synthetic cast kills the
         # weak monster inside that single round, so the session still settles
         # as a victory -- but through one round, not compression.
         for key in ("atk_phys", "agility", "defense", "magic_power"):
@@ -268,7 +322,7 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
                 ),
             ) as resolver,
         ):
-            result = submit_player_action(self.player, "fire_ball", [self.monster])
+            result = submit_player_action(self.player, _T_CAST, [self.monster])
         resolver.assert_not_called()
         self.assertEqual(result["outcome"], "victory")
         self.assertEqual(result["rounds_elapsed"], 1)
@@ -284,11 +338,12 @@ class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
     there.)"""
 
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="attribution arena")
         self.player = _player("attribution player")
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_CAST])
         for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
@@ -301,10 +356,10 @@ class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
     def test_compressed_opening_marks_commanded_skill_once_with_attributable_rolls(self):
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=44):
-            result = submit_opening_action(self.player, "fire_ball", [self.monster])
+            result = submit_opening_action(self.player, _T_CAST, [self.monster])
         self.assertEqual(result["outcome"], "victory")
         # Exactly one first-round commanded_action marker, kind skill, the
-        # submitted key's label, attached to the player's own fire_ball log.
+        # submitted key's label, attached to the player's own cast log.
         markers = [
             entry
             for log in result["logs"]
@@ -313,18 +368,18 @@ class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
         ]
         self.assertEqual(len(markers), 1)
         self.assertEqual(markers[0].actor, str(self.player.key))
-        self.assertEqual(markers[0].data, {"skill": "火球術"})
+        self.assertEqual(markers[0].data, {"skill": SYNTH_SKILLS[_T_CAST].label})
         opening_logs = [
             render_plain_text(log)
             for log in result["logs"]
             if log.actor == str(self.player.key)
-            and log.skill_key == "fire_ball"
+            and log.skill_key == _T_CAST
         ]
         self.assertEqual(len(opening_logs), 1)
         opening_lines = opening_logs[0].splitlines()
         # The marker prefixes the action's own roll line, which stays
         # immediately before the damage it describes.
-        self.assertEqual(opening_lines[0], "你施展了「火球術」。")
+        self.assertEqual(opening_lines[0], f"你施展了「{SYNTH_SKILLS[_T_CAST].label}」。")
         self.assertEqual(
             opening_lines[1],
             f"{self.player.key} 對 {self.monster.key} 的攻擊擲出了 44。",
@@ -346,25 +401,24 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
     """
 
     def setUp(self):
+        _open_scope(self, monster_tiers=False)
         super().setUp()
         register_catalog()
-        # Shipped ANY area skill; the player needs its 24 MP cost, set below.
+        # ANY-faction synthetic area skill (zero cost, so the deliberately
+        # weak seam caster can still pay for it).
         self.room = create_object(Room, key="seam arena")
         self.player = _player("seam player")
         self.player.location = self.room
-        # wind_mastery keeps the 術師-tier wind_blade castable at the tuned
-        # magic level 2 (the gate is satisfied by direct mastery, damage is
-        # unaffected).
         self.player.db.skills = {
-            "active": [SEAM_AREA_KEY],
-            "passive": ["wind_mastery"],
+            "active": [_T_SEAM_CASCADE.key],
+            "passive": [],
         }
         for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 2
         self.player.traits.hp.base = 390
         self.player.traits.hp.current = 390
         self.companion = create_object(NPC, key="誤傷夥伴", location=self.room)
-        self.companion.race = "human"
+        self.companion.race = _race_key()
         self.companion.apply_race_baseline()
         for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.companion.traits, key).base = 2
@@ -433,7 +487,7 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
             with patch("world.rules.combat.roll_d100", return_value=100):
                 result = submit_player_action(
                     self.player,
-                    SEAM_AREA_KEY,
+                    _T_SEAM_CASCADE.key,
                     [self.monster, self.companion],
                 )
             self.assertEqual(result["outcome"], "round")
@@ -466,7 +520,7 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
                 with self.assertRaises(RuntimeError):
                     submit_player_action(
                         self.player,
-                        SEAM_AREA_KEY,
+                        _T_SEAM_CASCADE.key,
                         [self.monster, self.companion],
                     )
             self.assertEqual(read_session(self.player).rounds_elapsed, 1)
@@ -501,7 +555,7 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
             ):
                 result = submit_player_action(
                     self.player,
-                    SEAM_AREA_KEY,
+                    _T_SEAM_CASCADE.key,
                     [self.monster, self.companion],
                 )
             self.assertEqual(result["outcome"], "defeat")
@@ -516,10 +570,11 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
 
 class CommandSessionTests(BattlefieldIsolation, QuestRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room1 = create_object(Room, key="cmd arena")
         self.char1.location = self.room1
-        self.char1.race = "human"
+        self.char1.race = _race_key()
         self.char1.apply_race_baseline()
         self.monster = _monster("cmd goblin")
         self.monster.location = self.room1
@@ -528,11 +583,11 @@ class CommandSessionTests(BattlefieldIsolation, QuestRegistryIsolation, EvenniaC
     def test_active_session_cast_does_not_advance_command_time(self):
         from world.rules.combat_session import engage
 
-        grant_lineage(self.char1, ["fire_ball"])
+        grant_lineage(self.char1, [_T_CAST])
         engage(self.char1, self.monster)
         clock = WorldClock()
         with patch("world.rules.cast_settlement.get_world_clock", return_value=clock):
-            self.call(CmdCast(), "fire_ball=cmd goblin", None)
+            self.call(CmdCast(), f"{_T_CAST}=cmd goblin", None)
         self.assertEqual(clock.tick, 0)
 
 
@@ -540,11 +595,12 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
     """combat-session-opening-dispatch 5.9/5.10/5.13: group engagement."""
 
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="group arena")
         self.player = _player("group hunter")
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_CAST])
         for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
@@ -565,10 +621,10 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
             sorted([m1.key, m2.key]),
         )
         # The player dominates both floor-tier foes, so the opening's
-        # two-part judgement selects compression, and the round-1 fire_ball
+        # two-part judgement selects compression, and the round-1 cast
         # plus the auto-attacks settle the whole session in one call.
         with patch("world.rules.combat.roll_d100", return_value=100):
-            outcome = submit_opening_action(self.player, "fire_ball", [m1])
+            outcome = submit_opening_action(self.player, _T_CAST, [m1])
         self.assertEqual(outcome["outcome"], "victory")
         self.assertGreaterEqual(
             len([
@@ -615,9 +671,9 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         engage_group(self.player, [m1])
         mp_before = self.player.traits.mp.value
         with self.assertRaises(TypeError):
-            submit_opening_action(self.player, "fire_ball", "all-enemies")
+            submit_opening_action(self.player, _T_CAST, "all-enemies")
         with self.assertRaises(CombatSessionError) as ctx:
-            submit_opening_action(self.player, "fire_ball", [away])
+            submit_opening_action(self.player, _T_CAST, [away])
         self.assertEqual(ctx.exception.args[0], SessionReason.NOT_PRESENT)
         record = read_session(self.player)
         self.assertEqual(record.rounds_elapsed, 0)
@@ -630,14 +686,14 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         import world.rules.combat_session as session_mod
 
         companion = create_object(NPC, key="並肩", location=self.room)
-        companion.race = "human"
+        companion.race = _race_key()
         companion.apply_race_baseline()
         join_party(companion, self.player)
         m1 = _monster("twin a", hp=100, atk=10)
         m2 = _monster("twin b", hp=100, atk=10)
         m1.location = self.room
         m2.location = self.room
-        grant_lineage(self.player, ["wind_blade"])
+        grant_lineage(self.player, [SYNTH_SEAM_AREA_SKILL.key])
         engage_group(self.player, [m1, m2])
         seen: list = []
         real_primary = session_mod._primary_opponent_id
@@ -652,17 +708,17 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.action.roll_d100", return_value=100),
             patch.object(session_mod, "_primary_opponent_id", side_effect=spy),
         ):
-            result = submit_opening_action(self.player, "wind_blade", [m1])
+            result = submit_opening_action(self.player, SYNTH_SEAM_AREA_SKILL.key, [m1])
         self.assertGreaterEqual(len(seen), 1)
         self.assertEqual(
             seen[0], min(int(m1.pk), int(m2.pk))
         )
         self.assertEqual(result["outcome"], "victory")
-        # The AREA wind_blade hit the companion through the two-enemy
+        # The AREA cast hit the companion through the two-enemy
         # roster and the nonlethal companion policy floored it at 1 HP; the
         # per-hit affinity penalty contract itself is pinned in
         # test_friendly_fire (here the scan simply must not crash the flow).
-        # The player's AREA wind_blade reached the companion through the
+        # The player's AREA cast reached the companion through the
         # two-enemy roster (observed: one 7-damage hit under the patched
         # rolls); the friendly-fire/coercion scans ran over the two-enemy
         # logs without crashing the flow. The per-hit affinity-penalty
@@ -678,7 +734,7 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         from world.rules.overwhelm import resolve_overwhelm as real_resolve
 
         companion = create_object(NPC, key="政策護伴", location=self.room)
-        companion.race = "human"
+        companion.race = _race_key()
         companion.apply_race_baseline()
         join_party(companion, self.player)
         captured = {}
@@ -702,7 +758,7 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.action.roll_d100", return_value=44),
             patch("world.rules.combat_session.run_round", side_effect=record_round),
         ):
-            submit_player_action(self.player, "fire_ball", [build()])
+            submit_player_action(self.player, _T_CAST, [build()])
         self.player.db.active_combat = None
         with (
             patch("world.rules.combat.roll_d100", return_value=44),
@@ -712,7 +768,7 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
                 side_effect=record_resolve,
             ),
         ):
-            submit_opening_action(self.player, "fire_ball", [build()])
+            submit_opening_action(self.player, _T_CAST, [build()])
         self.assertEqual(
             sorted(captured), ["overwhelm", "round"]
         )
@@ -733,11 +789,12 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
     """combat-session-opening-dispatch 5.5/5.6: two-part dispatch + first strike."""
 
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="dispatch arena")
         self.player = _player("dispatch duelist")
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball", "concentration"])
+        grant_lineage(self.player, [_T_CAST, _T_FOCUS.key])
         for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
@@ -752,7 +809,7 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
             classify_overwhelm(reconstruct_battlefield(self.player, read_session(self.player))),
             "party",
         )
-        result = submit_opening_action(self.player, "concentration", [])
+        result = submit_opening_action(self.player, _T_FOCUS.key, [])
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
         self.assertEqual(weak.traits.hp.current, 100)
@@ -773,7 +830,7 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
                 ),
             ) as resolver,
         ):
-            result = submit_opening_action(self.player, "fire_ball", [weak])
+            result = submit_opening_action(self.player, _T_CAST, [weak])
         resolver.assert_not_called()
         # One ordinary round resolved the (patched) verdict fight; whether it
         # settled depends on the single round's damage, never on compression.
@@ -797,7 +854,7 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
                 side_effect=AssertionError("a contested verdict must never compress"),
             ) as resolver,
         ):
-            result = submit_opening_action(self.player, "fire_ball", [weak])
+            result = submit_opening_action(self.player, _T_CAST, [weak])
         resolver.assert_not_called()
         self.assertIn(result["outcome"], ("round", "victory"))
         self.assertGreaterEqual(read_session(self.player).rounds_elapsed if read_session(self.player) else 1, 1)
@@ -833,7 +890,7 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
                 ),
             ),
         ):
-            result = submit_opening_action(self.player, "fire_ball", [ally])
+            result = submit_opening_action(self.player, _T_CAST, [ally])
         self.assertIn(result["outcome"], ("round", "victory"))
         self.assertEqual(weak.traits.hp.current, 500)
         record = read_session(self.player)
@@ -846,10 +903,10 @@ class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         fast.location = self.room
         self.player.traits.agility.base = 40
         engage(self.player, fast)
-        # concentration never damages, so the opening takes the round path;
+        # The non-damaging focus never damages, so the opening takes the round path;
         # first_actor must still move the player to the head of the round.
         with patch("world.rules.combat.roll_d100", return_value=50):
-            result = submit_opening_action(self.player, "concentration", [])
+            result = submit_opening_action(self.player, _T_FOCUS.key, [])
         self.assertEqual(result["outcome"], "round")
         acting_logs = [log for log in result["logs"] if log.entries]
         self.assertEqual(str(acting_logs[0].actor), str(self.player.key))
@@ -867,11 +924,12 @@ class CompressedOpeningFirstStrikeTests(BattlefieldIsolation, EvenniaTestCase):
     compressed branch would let the faster monster act before the opening."""
 
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="compressed arena")
         self.player = _player("compressed first strike")
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_CAST])
         self.player.traits.atk_phys.base = 200
         self.player.traits.agility.base = 100
         self.player.traits.defense.base = 200
@@ -904,7 +962,7 @@ class CompressedOpeningFirstStrikeTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.roll_d100", return_value=100),
             patch("world.rules.combat_session.resolve_overwhelm", side_effect=spy),
         ):
-                result = submit_opening_action(self.player, "fire_ball", [self.monster])
+                result = submit_opening_action(self.player, _T_CAST, [self.monster])
         # The opening really compressed, and the override reached the resolver.
         self.assertEqual(result["outcome"], "victory")
         self.assertEqual(captured.get("first_actor"), str(self.player.key))
