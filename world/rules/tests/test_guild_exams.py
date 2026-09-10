@@ -14,12 +14,6 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.components import GuildExaminer, GuildStaff
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.lore.guild import GUILD_RANK_REGISTRY
-
-# Authored examiner identity for rank E (npc-title-authored-identities D8).
-EXAMINER_NAME = GUILD_RANK_REGISTRY["E"].examiner_name
-EXAMINER_TITLE = GUILD_RANK_REGISTRY["E"].examiner_title
-from world.lore.races import STATIC_TIER_REGISTRY
 from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.combat_session import (
@@ -41,14 +35,54 @@ from world.rules.guild_exams import (
 )
 from world.rules.guild_offers import register_guild_offer
 from world.rules.surfaces import read_counter_trait
+from world.rules.tests._combat_session_helpers import (
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
+from world.rules.tests._guild_service_probes import (
+    install_synthetic_catalog,
+    live_guild_rank_registry,
+    synth_catalog,
+    synthetic_branch_key,
+)
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+
+# Examination runs on synthetic rows: the examiner's branch is the kit guild
+# branch, the catalog's exam profiles/thresholds are the probes' invented
+# values, and combat exercises the kit's synthetic innate attack (the
+# runtime-derived BASIC_ATTACK_KEY, never a shipped skill literal).
+EXAM_BRANCH = synthetic_branch_key()
+_SCOPE_LOGICALS = ("guild_branches", "skills", "elements", "static_tiers")
+
+
+def _examiner_identity():
+    """Rank E's authored examiner name/title, read live from the rank registry.
+
+    Opponent-key mechanics (npc-title-authored-identities D8) assert against
+    whatever the live rank table authors -- never a copied display name.
+    """
+    rank = live_guild_rank_registry()["E"]
+    return rank.examiner_name, rank.examiner_title
+
+
+def _attack_key() -> str:
+    """The innate attack key the patched resolver forces (runtime probe)."""
+    import importlib
+
+    return getattr(
+        importlib.import_module("world.rules.combat_session"), "BASIC_ATTACK_KEY"
+    )
 
 
 class ExamRegistryIsolation(BattlefieldIsolation, QuestRegistryIsolation):
     def setUp(self):
+        # Scope before construction: exam spawns resolve their static tier and
+        # skill identities inside the synthetic registries.
+        open_synthetic_scope(self, *_SCOPE_LOGICALS, extra=synth_innate_overlay())
         super().setUp()
         register_catalog()
+        install_synthetic_catalog(self, synth_catalog())
         self._previous_catalog = __import__(
             "world.rules.guild_config", fromlist=["CATALOG"]
         ).CATALOG
@@ -158,14 +192,14 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         self.player.location = self.hall
         self.staff = create_object(NPC, key="guild staff", location=self.hall)
         self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(self.staff, service_id="staff", branch_key=EXAM_BRANCH)
         )
         self.examiner = create_object(NPC, key="examiner", location=self.hall)
         self.examiner.components.add(
             GuildExaminer.create(
                 self.examiner,
                 service_id="examiner",
-                branch_key="guild_branch_altoria",
+                branch_key=EXAM_BRANCH,
             )
         )
         register_adventurer(self.player, self.staff)
@@ -244,7 +278,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         other = create_object(Room, key="elsewhere")
         far = create_object(NPC, key="far examiner", location=other)
         far.components.add(
-            GuildExaminer.create(far, service_id="far", branch_key="guild_branch_altoria")
+            GuildExaminer.create(far, service_id="far", branch_key=EXAM_BRANCH)
         )
         self._give_merit(50)
         with self.assertRaises(GuildExamError) as ctx:
@@ -285,14 +319,14 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
 
     @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
     def test_same_named_player_can_take_the_exam(self):
-        self.player.key = EXAMINER_NAME
+        self.player.key = _examiner_identity()[0]
         self.player.save()
         self._give_merit(50)
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         self.assertIsNotNone(opponent)
         # Name occupied by the player -> conditional -{pk} disambiguator.
-        self.assertEqual(opponent.key, f"{EXAMINER_NAME}-{opponent.pk}")
+        self.assertEqual(opponent.key, f"{_examiner_identity()[0]}-{opponent.pk}")
         self.assertNotEqual(opponent.key, self.player.key)
         self.assertIsNotNone(read_session(self.player))
 
@@ -303,7 +337,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         self._give_merit(50)
         first = start_guild_exam(self.player, self.examiner, "E")
         first_opponent = ObjectDB.objects.filter(id=first.opponent_id).first()
-        self.assertEqual(first_opponent.key, EXAMINER_NAME)
+        self.assertEqual(first_opponent.key, _examiner_identity()[0])
         rival = create_object(PlayerCharacter, key="rival candidate")
         rival.race = "human"
         rival.apply_race_baseline()
@@ -315,7 +349,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         second = start_guild_exam(rival, self.examiner, "E")
         second_opponent = ObjectDB.objects.filter(id=second.opponent_id).first()
         self.assertIsNotNone(second_opponent)
-        self.assertEqual(second_opponent.key, f"{EXAMINER_NAME}-{second_opponent.pk}")
+        self.assertEqual(second_opponent.key, f"{_examiner_identity()[0]}-{second_opponent.pk}")
         self.assertNotEqual(first_opponent.key, second_opponent.key)
 
     @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
@@ -333,8 +367,8 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         second_opponent = ObjectDB.objects.filter(id=second.opponent_id).first()
         self.assertIsNotNone(first_opponent)
         self.assertIsNotNone(second_opponent)
-        self.assertEqual(first_opponent.key, EXAMINER_NAME)
-        self.assertEqual(second_opponent.key, EXAMINER_NAME)
+        self.assertEqual(first_opponent.key, _examiner_identity()[0])
+        self.assertEqual(second_opponent.key, _examiner_identity()[0])
         self.assertNotEqual(first_opponent.pk, second_opponent.pk)
 
     @covers_requirement("guild-rank-exams::examination-start-is-all-or-nothing-across-opponent-record-and-session")
@@ -352,7 +386,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         self.assertIsNone(read_session(self.player))
         self.assertEqual(_BATTLEFIELDS, {})
         orphans = ObjectDB.objects.filter(
-            db_key__startswith=EXAMINER_NAME,
+            db_key__startswith=_examiner_identity()[0],
             db_location=self.hall,
         )
         self.assertEqual(orphans.count(), 0)
@@ -373,7 +407,7 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         self.assertIsNone(read_session(self.player))
         self.assertEqual(_BATTLEFIELDS, {})
         orphans = ObjectDB.objects.filter(
-            db_key__startswith=EXAMINER_NAME,
+            db_key__startswith=_examiner_identity()[0],
             db_location=self.hall,
         )
         self.assertEqual(orphans.count(), 0)
@@ -388,15 +422,15 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         self.assertIsNotNone(opponent)
         # Free name -> no disambiguator: the authored name IS the key.
-        self.assertEqual(opponent.key, EXAMINER_NAME)
-        self.assertEqual(opponent.npc_title, EXAMINER_TITLE)
-        self.assertTrue(opponent.key.startswith(EXAMINER_NAME))
+        self.assertEqual(opponent.key, _examiner_identity()[0])
+        self.assertEqual(opponent.npc_title, _examiner_identity()[1])
+        self.assertTrue(opponent.key.startswith(_examiner_identity()[0]))
         events = [
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_exam_opponent_created"
         ]
         self.assertEqual(len(events), 1)
-        self.assertEqual(events[0].kwargs["context"]["char"], EXAMINER_NAME)
+        self.assertEqual(events[0].kwargs["context"]["char"], _examiner_identity()[0])
         self.assertEqual(events[0].kwargs["context"]["rank"], "E")
 
     @covers_requirement("npc-identity-titles::exam-examiners-carry-their-authored-identity")
@@ -404,13 +438,13 @@ class ExamStartTests(ExamRegistryIsolation, EvenniaTest):
         # A same-named entity that survives (a second candidate mid-exam whose
         # opponent holds the authored key) forces the new spawn into the
         # suffixed form so battlefield rosters keyed by str(key) stay distinct.
-        holder = create_object(NPC, key=EXAMINER_NAME, location=self.hall)
+        holder = create_object(NPC, key=_examiner_identity()[0], location=self.hall)
         self._give_merit(50)
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
-        self.assertEqual(opponent.key, f"{EXAMINER_NAME}-{opponent.pk}")
+        self.assertEqual(opponent.key, f"{_examiner_identity()[0]}-{opponent.pk}")
         self.assertNotEqual(opponent.key, holder.key)
-        self.assertEqual(opponent.npc_title, EXAMINER_TITLE)
+        self.assertEqual(opponent.npc_title, _examiner_identity()[1])
 
 
 class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
@@ -423,14 +457,14 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         self.player.location = self.hall
         self.staff = create_object(NPC, key="guild staff", location=self.hall)
         self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(self.staff, service_id="staff", branch_key=EXAM_BRANCH)
         )
         self.examiner = create_object(NPC, key="examiner", location=self.hall)
         self.examiner.components.add(
             GuildExaminer.create(
                 self.examiner,
                 service_id="examiner",
-                branch_key="guild_branch_altoria",
+                branch_key=EXAM_BRANCH,
             )
         )
         register_adventurer(self.player, self.staff)
@@ -447,7 +481,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         with patch("world.rules.combat.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "basic_attack", [opponent])
+            result = submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         self.assertEqual(self.player.guild_rank, "E")
         # Ordinary lethal semantics: the examiner's HP really crossed zero.
@@ -473,7 +507,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         with patch("world.rules.combat.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "basic_attack", [opponent])
+            result = submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         self.assertEqual(read_counter_trait(self.player, "guild_merit"), 50)
         self.assertEqual(self.player.guild_rank, "E")
@@ -514,7 +548,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys")
     def test_same_named_player_can_complete_the_exam(self):
-        self.player.key = EXAMINER_NAME
+        self.player.key = _examiner_identity()[0]
         self.player.save()
         for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
@@ -523,7 +557,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         with patch("world.rules.combat.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "basic_attack", [opponent])
+            result = submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         self.assertEqual(self.player.guild_rank, "E")
         self.assertIsNone(read_session(self.player))
@@ -540,7 +574,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         opponent.traits.hp.base = 2000
         opponent.traits.hp.current = 2000
         with patch("world.rules.combat.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "basic_attack", [opponent])
+            result = submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(result["outcome"], "exam_failed")
         self.assertEqual(self.player.guild_rank, "F")
         # The lethal crossing really reached zero (simulated, not floored).
@@ -601,7 +635,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         record = start_guild_exam(self.player, self.examiner, "E")
         opponent = ObjectDB.objects.filter(id=record.opponent_id).first()
         with patch("world.rules.combat.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "basic_attack", [opponent])
+            result = submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         defeated = [
             entry
@@ -631,7 +665,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         opponent.buffs.all["fire_scorch"].tick_elapsed_seconds = 10
         self.assertEqual(self.player.db.quest_log, [])
         with patch("world.rules.combat.roll_d100", return_value=1):
-            result = submit_player_action(self.player, "basic_attack", [opponent])
+            result = submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         upkeep_logs = [log for log in result["logs"] if log.skill_key == "combat_upkeep"]
         defeated = [
@@ -661,7 +695,7 @@ class ExamCombatTests(ExamRegistryIsolation, EvenniaTestCase):
         self.assertIsNone(self.player.db.active_combat)
         self.assertEqual(
             ObjectDB.objects.filter(
-                db_key__startswith=EXAMINER_NAME,
+                db_key__startswith=_examiner_identity()[0],
                 db_location=self.hall,
             ).count(),
             0,
@@ -686,14 +720,14 @@ class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTestCase):
         self.player.location = self.hall
         self.staff = create_object(NPC, key="guild staff", location=self.hall)
         self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(self.staff, service_id="staff", branch_key=EXAM_BRANCH)
         )
         self.examiner = create_object(NPC, key="examiner", location=self.hall)
         self.examiner.components.add(
             GuildExaminer.create(
                 self.examiner,
                 service_id="examiner",
-                branch_key="guild_branch_altoria",
+                branch_key=EXAM_BRANCH,
             )
         )
         register_adventurer(self.player, self.staff)
@@ -802,7 +836,7 @@ class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTestCase):
             ),
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_action(self.player, "basic_attack", [opponent])
+                submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(clock.tick, 0)
         self.assertEqual(_read_exams(self.player)[0].state, ExamState.ACTIVE)
         self.assertIsNotNone(ObjectDB.objects.filter(id=record.opponent_id).first())
@@ -811,7 +845,7 @@ class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTestCase):
             patch("world.rules.combat.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
         ):
-            result = submit_player_action(self.player, "basic_attack", [opponent])
+            result = submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(result["outcome"], "exam_passed")
         # The overwhelming candidate defeats the examiner in one lethal
         # round (exam defeats are not battlefield-tracked), settling 6 s once.
@@ -864,7 +898,7 @@ class ExamSettlementRecoveryTests(ExamRegistryIsolation, EvenniaTestCase):
             side_effect=RuntimeError("restore failed"),
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_action(self.player, "basic_attack", [opponent])
+                submit_player_action(self.player, _attack_key(), [opponent])
         self.assertEqual(_read_exams(self.player)[0].state, ExamState.ACTIVE)
         self.assertIsNotNone(read_session(self.player))
         self.assertEqual(self.player.guild_rank, "F")
@@ -878,31 +912,22 @@ class ExamProfileValidationTests(ExamRegistryIsolation, EvenniaTestCase):
         self.hall = create_object(Room, key="profile hall")
         self.staff = create_object(NPC, key="profile staff", location=self.hall)
         self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(self.staff, service_id="staff", branch_key=EXAM_BRANCH)
         )
         self.examiner = create_object(NPC, key="profile examiner", location=self.hall)
         self.examiner.components.add(
             GuildExaminer.create(
                 self.examiner,
                 service_id="examiner",
-                branch_key="guild_branch_altoria",
+                branch_key=EXAM_BRANCH,
             )
         )
 
+    # The shipped-content claim "every authored exam profile stays inside its
+    # lore band" lives in the registered data-contract suite
+    # (test_guild_config.ExamProfileTests); this suite keeps only the
+    # mechanism: the spawn applies the live catalog's validated profile.
     @covers_requirement("guild-rank-exams::exam-opponents-use-validated-true-stat-rank-profiles")
-    def test_every_rank_profile_stays_inside_its_lore_band(self):
-        from world.rules.guild_config import validate_exam_profiles
-
-        raw = __import__(
-            "world.rules.guild_config", fromlist=["load_config"]
-        ).load_config()["exam_profiles"]
-        profiles = validate_exam_profiles(raw)
-        for rank, profile in profiles.items():
-            tier = STATIC_TIER_REGISTRY[profile.static_tier_key]
-            band = tier.band
-            for axis in ("atk_phys", "agility", "defense"):
-                self.assertTrue(band[0] <= getattr(profile, axis) <= band[1])
-
     def test_spawned_opponent_uses_true_profile_stats(self):
         self.player = create_object(PlayerCharacter, key="profile player")
         self.player.race = "human"
