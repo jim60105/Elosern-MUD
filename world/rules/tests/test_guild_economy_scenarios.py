@@ -301,7 +301,7 @@ SCENARIO_TO_TEST = {
         "session_flow", "InnateSkillTests", "test_monster_instance_can_fight_without_spawned_skills"
     ),
     "Basic attack does not bypass ActionResolver": ref(
-        "session_flow", "InnateSkillTests", "test_basic_attack_rejects_out_of_combat"
+        "session_flow", "InnateSkillTests", "test_basic_attack_selectable_out_of_combat_but_damage_gated"
     ),
     # disguised-stats-boundary
     "Accessor documentation still names exactly three consumers": ref(

@@ -35,6 +35,10 @@ SKILL_REGISTRY[FLEE_SKILL_KEY] = SkillDef(
     target_spec=TargetSpec.SELF,
     faction_constraint=FactionConstraint.SELF_ONLY,
     cost={},
+    # False is deliberate: flee disengages an in-progress combat session, so
+    # outside combat there is nothing to disengage from and selecting it is
+    # meaningless (policy in skill-registry::every-skill-declares-usable-out-
+    # of-combat-deliberately-under-one-written-policy).
     usable_out_of_combat=False,
     element=None,
     effects=["disengage:self"],

@@ -6,8 +6,12 @@ Define universal skill ownership independent of imported or spawned skill data.
 `world/skills/handler.py` SHALL declare `INNATE_SKILL_KEYS: frozenset[str]`, seeded with exactly
 `{"flee", "basic_attack"}`, and `SkillHandler.owned_keys()` SHALL include every key in `INNATE_SKILL_KEYS` in its
 returned list, in addition to the entity's own imported `active`/`passive` keys.
-`basic_attack` SHALL be a zero-cost active SINGLE/ENEMY physical-damage skill, unusable outside
-combat, and SHALL resolve through the ordinary ActionResolver path.
+`basic_attack` SHALL be a zero-cost active SINGLE/ENEMY physical-damage skill that SHALL resolve
+through the ordinary ActionResolver path. It SHALL declare `usable_out_of_combat=True`, meaning it is
+*selectable* from exploration solely as a field-combat initiation; it SHALL remain unable to resolve
+without a battlefield, because `action-resolution-pipeline`'s damaging-action gate rejects a
+`DamageEffect`-carrying skill whose context has no battlefield. `flee` SHALL declare
+`usable_out_of_combat=False`.
 
 #### Scenario: An entity with no imported skill data still owns both innate actions
 - **WHEN** `SkillHandler.owned_keys()` is called for an entity whose `entity.db.skills` is unset
@@ -28,6 +32,11 @@ combat, and SHALL resolve through the ordinary ActionResolver path.
 - **WHEN** an entity invokes `basic_attack` in combat
 - **THEN** ownership, target, capability, damage, EventLog, planner, and commit behavior use the same
   ActionResolver pipeline as a registered imported damage skill
+
+#### Scenario: Basic attack is selectable from exploration but cannot resolve without a battlefield
+- **WHEN** `basic_attack` is resolved with a `RoomActionContext`
+- **THEN** the `usable_out_of_combat` gate does not reject it, and it rejects with
+  `RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET` instead — no damage is dealt and no resource is spent
 
 ### Requirement: Innate ownership is unconditional and not combat-gated
 `SkillHandler.owned_keys()`'s inclusion of `INNATE_SKILL_KEYS` SHALL NOT depend on whether the entity is

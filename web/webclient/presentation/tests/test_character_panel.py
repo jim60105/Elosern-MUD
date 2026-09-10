@@ -1142,7 +1142,10 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertEqual(row["cost"], {"mp": 14})
         self.assertEqual(row["target_spec"], "single")
-        self.assertIs(row["usable_out_of_combat"], False)
+        # fire_ball carries a DamageEffect: skill-field-availability flipped
+        # every damage-carrying skill to selectable-outside-combat (the
+        # damaging-action gate, not this flag, confines it to a battlefield).
+        self.assertIs(row["usable_out_of_combat"], True)
         self.assertNotIn("freeform_scales", row)
         # Passive rows stay bare {key, label}.
         for c in payload["passives"]:
