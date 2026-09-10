@@ -13,6 +13,8 @@ from pathlib import Path
 
 import tools.test_data_lint as lint
 
+from tools.spec_traceability import covers_requirement
+
 REPO = Path(__file__).resolve().parent.parent
 UNIVERSE = lint.derive_universe(REPO)
 
@@ -59,6 +61,7 @@ class ScannerTests(unittest.TestCase):
         finally:
             tmp.cleanup()
 
+    @covers_requirement("test-data-independence::the-test-data-lint-gate-blocks-shipped-content-references")
     def test_shipped_literal_flagged(self):
         findings = self._scan(f'"""x"""\nITEM = "{SHIPPED}"\n', universe=UNIVERSE)
         self.assertEqual([f.kind for f in findings], ["token"])
@@ -244,6 +247,7 @@ class LedgerTests(unittest.TestCase):
         report = self._run(files, ledger, ledger)
         self.assertEqual(report.violations, ())
 
+    @covers_requirement("test-data-independence::the-exemption-ledger-is-provably-shrink-only")
     def test_new_debt_rejected(self):
         files = {"tests/test_dirty.py": self._flagged("tests/test_dirty.py")}
         report = self._run(files, _ledger([], [], []), _ledger([], [], ["tests/test_dirty.py"]))
@@ -279,6 +283,7 @@ class LedgerTests(unittest.TestCase):
         report = self._run(files, seed, ledger)
         self.assertIn("untagged-contract", [v.rule for v in report.violations])
 
+    @covers_requirement("test-data-independence::data-contract-tests-are-explicitly-classified")
     def test_tagged_contract_passes(self):
         files = {"tests/test_c.py": '"""Data-contract test: reason"""\n' + self._flagged("tests/test_c.py")}
         contract = [{"path": "tests/test_c.py", "reason": "reason"}]
@@ -360,6 +365,7 @@ class RepoLedgerTests(unittest.TestCase):
 class WiringTests(unittest.TestCase):
     """Spec: the-gate-is-wired-into-ci-and-the-authoring-rules-are-documented."""
 
+    @covers_requirement("test-data-independence::the-gate-is-wired-into-ci-and-the-authoring-rules-are-documented")
     def test_workflow_runs_the_gate(self):
         text = (REPO / ".github/workflows/quality-gate.yml").read_text(encoding="utf-8")
         self.assertIn("python -m tools.test_data_lint check", text)
