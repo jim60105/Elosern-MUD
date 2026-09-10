@@ -23,6 +23,8 @@ from pathlib import Path
 
 import world.tests.synthetic_data as kit
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 MIRROR_JS = "web/static/webclient/js/tests/support/synthetic-data.js"
@@ -100,12 +102,18 @@ class SyntheticCatalogShapeTests(unittest.TestCase):
         cls.lint = test_data_lint
         cls.universe = test_data_lint.derive_universe(REPO_ROOT)
 
+    @covers_requirement(
+        "test-data-independence::the-synthetic-test-data-kit-provides-registry-compatible-catalogs"
+    )
     def test_kit_and_mirrors_are_gate_clean(self):
         for rel in (KIT_REL, SELF_REL, MIRROR_JS, MIRROR_MJS):
             with self.subTest(file=rel):
                 findings = self.lint.scan_file(REPO_ROOT, rel, self.universe)
                 self.assertEqual(findings, [], f"{rel} flagged: {findings}")
 
+    @covers_requirement(
+        "test-data-independence::the-synthetic-test-data-kit-provides-registry-compatible-catalogs"
+    )
     def test_every_kit_key_carries_the_reserved_prefix(self):
         seams = _borrowed_seams()
         for name, catalog in _catalog_maps().items():
@@ -120,6 +128,9 @@ class SyntheticCatalogShapeTests(unittest.TestCase):
                         f"{name} key {key!r} is neither t_-prefixed nor a seam",
                     )
 
+    @covers_requirement(
+        "test-data-independence::the-synthetic-test-data-kit-provides-registry-compatible-catalogs"
+    )
     def test_no_kit_key_or_label_collides_with_the_shipped_universe(self):
         seams = _borrowed_seams()
         universe = self.universe.tokens
@@ -135,6 +146,9 @@ class SyntheticCatalogShapeTests(unittest.TestCase):
                 ]
         self.assertEqual(collisions, [], "kit/shipped token collision")
 
+    @covers_requirement(
+        "test-data-independence::the-synthetic-test-data-kit-provides-registry-compatible-catalogs"
+    )
     def test_entries_are_real_definition_objects(self):
         checks = {
             "SYNTH_ITEMS": "world.lore.items",
@@ -162,6 +176,9 @@ class SyntheticCatalogShapeTests(unittest.TestCase):
                     self.assertTrue(dataclasses.is_dataclass(entry))
                     self.assertIs(type(entry), getattr(module, type(entry).__name__))
 
+    @covers_requirement(
+        "test-data-independence::the-synthetic-test-data-kit-provides-registry-compatible-catalogs"
+    )
     def test_factory_local_registration_is_scope_only(self):
         item = kit.make_item(key="t_local_probe", display_name_zh="地端探針")
         shared_before = dict(kit.SYNTH_ITEMS)
@@ -191,6 +208,9 @@ class PatchRestoreTests(unittest.TestCase):
         module_name, attribute = kit.REGISTRY_TARGETS[logical]
         return getattr(importlib.import_module(module_name), attribute)
 
+    @covers_requirement(
+        "test-data-independence::the-kit-patches-and-restores-registries-exactly"
+    )
     def test_context_manager_mutable_target_is_patched_in_place(self):
         original = self._original("items")
         with kit.synthetic_registries("items"):
@@ -200,6 +220,9 @@ class PatchRestoreTests(unittest.TestCase):
         self.assertIs(self._original("items"), original)
         self.assertFalse(any(k.startswith("t_") for k in original))
 
+    @covers_requirement(
+        "test-data-independence::the-kit-patches-and-restores-registries-exactly"
+    )
     def test_frozen_target_swaps_owner_and_every_discovered_binding(self):
         logical = "npc_tiers"
         original = self._original(logical)
@@ -229,6 +252,9 @@ class PatchRestoreTests(unittest.TestCase):
                     f"{consumer_name}.{binding} not restored",
                 )
 
+    @covers_requirement(
+        "test-data-independence::the-kit-patches-and-restores-registries-exactly"
+    )
     def test_decorator_and_class_decorator_get_fresh_scopes(self):
         @kit.synthetic_registries("monster_tiers")
         def decorated_check() -> bool:
@@ -275,6 +301,9 @@ class PatchRestoreTests(unittest.TestCase):
         with self.assertRaises(KeyError):
             kit.synthetic_registries("items", extra={"not_a_registry": {}})
 
+    @covers_requirement(
+        "test-data-independence::the-kit-patches-and-restores-registries-exactly"
+    )
     def test_discovery_inventory_matches_an_independent_ast_scan(self):
         table = kit.discover_consumer_bindings(REPO_ROOT, refresh=True)
         independent: dict[tuple[str, str], set[tuple[str, str]]] = {
@@ -326,6 +355,9 @@ class PatchRestoreTests(unittest.TestCase):
                 f"discovery table mismatch for {pair}",
             )
 
+    @covers_requirement(
+        "test-data-independence::the-kit-patches-and-restores-registries-exactly"
+    )
     def test_sync_capture_target_patches_the_import_time_capture(self):
         seams = _borrowed_seams()
         original = self._original("lore_sync")
@@ -366,6 +398,9 @@ class ProcessInstallTests(unittest.TestCase):
                 bad.append(str(key))
         return bad
 
+    @covers_requirement(
+        "test-data-independence::the-kit-installs-process-wide-for-separate-test-processes"
+    )
     def test_install_is_idempotent_and_restores_exactly(self):
         seams = _borrowed_seams()
         self.assertFalse(kit._INSTALL_STATE["installed"])
@@ -407,12 +442,18 @@ class JsMirrorTests(unittest.TestCase):
         assert matched is not None, f"{rel} must embed the canonical block"
         return matched.group(1)
 
+    @covers_requirement(
+        "test-data-independence::javascript-test-corpora-share-an-equivalent-synthetic-mirror"
+    )
     def test_mirrors_are_byte_identical_and_match_the_kit(self):
         js_block = self._canonical(MIRROR_JS)
         mjs_block = self._canonical(MIRROR_MJS)
         self.assertEqual(js_block, mjs_block, "mirror copies drifted")
         self.assertEqual(json.loads(js_block), kit.SYNTH_JS_PAYLOADS)
 
+    @covers_requirement(
+        "test-data-independence::javascript-test-corpora-share-an-equivalent-synthetic-mirror"
+    )
     def test_mirror_payloads_are_synthetic_and_id_backed_by_kit_catalogs(self):
         universe = self.universe_tokens()
         catalog_keys = {
