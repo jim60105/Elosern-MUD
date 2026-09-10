@@ -121,6 +121,12 @@
       "token": "flight"
     },
     {
+      "token": "freeform_cast_scales",
+      "rule": "schema-structural",
+      "reason": "schema key of the progression rulebook payload consumed by _load_freeform_cast_scales (world/rules/progression.py:72); loader tests must build dicts under this key — structural config vocabulary, not shipped content",
+      "evidence": "world/rules/progression.py:72"
+    },
+    {
       "evidence": "world/rules/action.py:1597",
       "reason": "proven present in non-test production corpus outside catalog modules (world/rules/action.py:1597); collides with generic test vocabulary, not shipped-content coupling",
       "rule": "production-independent",
@@ -263,6 +269,12 @@
       "reason": "clock.yaml schema field name",
       "rule": "schema-structural",
       "token": "seconds_per_hour"
+    },
+    {
+      "token": "self_heal",
+      "rule": "production-independent",
+      "reason": "proven present in non-test production corpus outside catalog modules (world/rules/combat.py:490 register_effect_handler); an effect-syntax keyword colliding with generic test vocabulary, not shipped-content coupling",
+      "evidence": "world/rules/combat.py:490"
     },
     {
       "evidence": "world/rules/guild_config.py:526",
