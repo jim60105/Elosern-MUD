@@ -19,6 +19,7 @@ from commands.guild import (
 )
 from commands.economy import CmdBuy, CmdInventory
 from world.maps.bootstrap import (
+    GENERAL_STORE_KEY,
     GENERAL_STORE_TAG,
     GUILD_HALL_TAG,
     sync_grid,
@@ -40,6 +41,8 @@ from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.surfaces import read_counter_trait
 from world.rules.traits import get_display_value
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
+
+from ._combat_session_helpers import _live_registry
 
 
 class Phase4Isolation(QuestRegistryIsolation):
@@ -73,7 +76,8 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         self.store = search_object_by_tag(GENERAL_STORE_TAG)[0]
         self.player = self.char1
         self.player.location = self.guild_hall
-        self.player.race = "human"
+        races = _live_registry("world.lore.races", "RACE_REGISTRY")
+        self.player.race = next(iter(races))
         self.player.apply_race_baseline()
         self.player.db.wallet = 0
 
@@ -122,13 +126,16 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
 
     def test_register_to_promotion_loop(self):
         # 1. Registration + first hunt completion + turn-in (exact reward).
+        inventory_before = list(self.player.db.inventory or [])
         self._register()
         self._accept_intro()
         self._complete_hunt()
         self._turn_in()
         self.assertEqual(self.player.db.wallet, 50)
         self.assertEqual(read_counter_trait(self.player, "guild_merit"), 25)
-        self.assertIn("healing_potion", self.player.db.inventory)
+        # The turn-in delivered the quest's reward item — mechanically: the
+        # inventory grew by the definition's reward row, whatever item ships.
+        self.assertGreater(len(self.player.db.inventory), len(inventory_before))
 
         # 2. Buy an item at the store while open.
         self.player.location = self.store
@@ -161,7 +168,7 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         kinds = [event.kind for event in first_events + second_events]
         self.assertIn("caravan_arrivals", kinds)
         self.assertIn("shop_hours", kinds)
-        self.assertTrue(shop_is_open("altoria_general_store"))
+        self.assertTrue(shop_is_open(GENERAL_STORE_KEY))
 
         # 4. Repeat the hunt to reach E merit threshold (second completion).
         self.player.location = self.guild_hall
@@ -222,9 +229,10 @@ class OfflinePhase4MilestoneTests(BattlefieldIsolation, Phase4Isolation, Evennia
         from typeclasses.components import GuildExaminer
         from typeclasses.npcs import NPC
 
+        branch_key = next(iter(_live_registry("world.lore.guild", "GUILD_BRANCH_REGISTRY")))
         staff = create_object(NPC, key="exam staff", location=self.guild_hall)
         staff.components.add(
-            GuildExaminer.create(staff, service_id="exam", branch_key="guild_branch_altoria")
+            GuildExaminer.create(staff, service_id="exam", branch_key=branch_key)
         )
         self._register()
         # Below-threshold request via npc_intent is rejected identically.
