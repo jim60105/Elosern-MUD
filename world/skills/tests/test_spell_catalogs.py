@@ -387,6 +387,57 @@ class EarthSpellCatalogTests(unittest.TestCase):
             {row[0] for row in EARTH_SPELL_CATALOG},
         )
 
+    @covers_requirement("skill-registry::skill-registry-contains-the-full-土-element-spell-set")
+    def test_every_earth_spell_effect_round_trips_through_typed_dispatch(self):
+        for key, _label, _target_spec, _mp, effects in EARTH_SPELL_CATALOG:
+            skill = SKILL_REGISTRY[key]
+            for effect_id in effects:
+                with self.subTest(spell=key, effect=effect_id):
+                    parsed = parse_effect(effect_id)
+                    if effect_id.startswith("damage:"):
+                        self.assertEqual(
+                            parsed,
+                            DamageEffect(element="earth", school="magic"),
+                        )
+                    elif effect_id.startswith("self_buff_apply:"):
+                        self.assertEqual(
+                            parsed,
+                            SelfBuffApplyEffect(
+                                buff_key=effect_id.partition(":")[2]
+                            ),
+                        )
+                    else:
+                        self.assertEqual(
+                            parsed,
+                            BuffApplyEffect(buff_key=effect_id.partition(":")[2]),
+                        )
+                    self.assertIn(parsed, skill.parsed_effects)
+
+
+class ClosedVocabularyParseTests(unittest.TestCase):
+    """Positive parses of the parser's closed production vocabularies.
+
+    The accepted values of these branches ARE shipped grammar (no synthetic
+    substitute exists), so their assertions live in this registered content
+    contract rather than in the synthetic data-independent behavior tests.
+    """
+
+    @covers_requirement(
+        "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
+    )
+    def test_movement_flash_step_parses_as_the_closed_mode(self):
+        self.assertEqual(
+            parse_effect("movement:flash_step"),
+            MovementEffect(mode="flash_step"),
+        )
+
+    @covers_requirement(
+        "skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass"
+    )
+    def test_self_heal_bare_prefix_parses_into_its_dataclass(self):
+        self.assertEqual(parse_effect("self_heal"), SelfHealEffect())
+
+
 class WindSpellCatalogTests(unittest.TestCase):
     @covers_requirement("skill-registry::skill-registry-contains-the-full-風-element-spell-set")
     def test_all_ten_wind_spells_declare_the_exact_catalog_fields(self):

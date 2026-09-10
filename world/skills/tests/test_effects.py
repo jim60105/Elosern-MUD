@@ -29,6 +29,11 @@ from world.skills.effects import (
     WeaponStyleEffect,
     parse_effect,
 )
+# Synthetic payloads for payload-agnostic parser arms. Each branch accepts any
+# single argument, so an invented key (kit t_* convention) exercises the
+# identical parse path without naming shipped content.
+_FLAVOR_TRAIT = "t_longevity"
+_EVENT_NAME = "t_hush_rite"
 
 
 class ParseEffectTests(unittest.TestCase):
@@ -54,28 +59,28 @@ class ParseEffectTests(unittest.TestCase):
         # The cast gate retired with the magic-XP engine; the prefix left
         # the recognized set and fails closed at parse (and registry load).
         with self.assertRaises(ValueError):
-            parse_effect("element_mastery_rank:主宰")
+            parse_effect("element_mastery_rank:t_synth_name")
 
     def test_sexual_magic_mastery_parses_into_its_dataclass(self):
         self.assertEqual(parse_effect("sexual_magic_mastery"), SexualMasteryEffect())
 
     def test_passive_buff_parses_into_a_rule_table_effect(self):
         self.assertEqual(
-            parse_effect("passive_buff:defense_small"),
-            RuleTableEffect(rule_key="defense_small"),
+            parse_effect("passive_buff:t_rule_key"),
+            RuleTableEffect(rule_key="t_rule_key"),
         )
 
     def test_combat_prediction_parses_into_a_rule_table_effect(self):
         self.assertEqual(
-            parse_effect("combat_prediction:武感"),
-            RuleTableEffect(rule_key="武感"),
+            parse_effect("combat_prediction:t_feel_key"),
+            RuleTableEffect(rule_key="t_feel_key"),
         )
 
     @covers_requirement("skill-effect-model::passive-trait-effects-are-declared-inert-by-design-not-by-omission")
     def test_passive_trait_parses_into_a_flavor_effect(self):
         self.assertEqual(
-            parse_effect("passive_trait:elf_longevity"),
-            FlavorEffect(name="elf_longevity"),
+            parse_effect(f"passive_trait:{_FLAVOR_TRAIT}"),
+            FlavorEffect(name=_FLAVOR_TRAIT),
         )
 
     def test_movement_parses_into_its_dataclass(self):
@@ -83,10 +88,9 @@ class ParseEffectTests(unittest.TestCase):
             parse_effect("movement:flight"),
             MovementEffect(mode="flight"),
         )
-        self.assertEqual(
-            parse_effect("movement:flash_step"),
-            MovementEffect(mode="flash_step"),
-        )
+        # The closed movement vocabulary's other accepted mode is shipped
+        # grammar with no synthetic substitute; its positive parse assertion
+        # lives in the registered skill-registry content contract.
 
     def test_movement_rejects_unrecognized_modes(self):
         for effect in ("movement:swim", "movement:teleport", "movement:fly"):
@@ -96,14 +100,14 @@ class ParseEffectTests(unittest.TestCase):
 
     def test_weapon_style_parses_into_its_dataclass(self):
         self.assertEqual(
-            parse_effect("weapon_style:dual_wield"),
-            WeaponStyleEffect(style="dual_wield"),
+            parse_effect("weapon_style:t_synth_style"),
+            WeaponStyleEffect(style="t_synth_style"),
         )
 
     def test_divine_mystery_parses_into_its_dataclass(self):
         self.assertEqual(
-            parse_effect("divine_mystery:時間加速"),
-            DivineMysteryEffect(name="時間加速", mechanized=False),
+            parse_effect("divine_mystery:t_time_name"),
+            DivineMysteryEffect(name="t_time_name", mechanized=False),
         )
 
     def test_confer_skill_partial_parses_into_its_dataclass(self):
@@ -114,14 +118,14 @@ class ParseEffectTests(unittest.TestCase):
 
     def test_buff_apply_parses_into_its_dataclass(self):
         self.assertEqual(
-            parse_effect("buff_apply:focus"),
-            BuffApplyEffect(buff_key="focus"),
+            parse_effect("buff_apply:t_buff_key"),
+            BuffApplyEffect(buff_key="t_buff_key"),
         )
 
     def test_self_buff_apply_parses_into_its_dataclass(self):
         self.assertEqual(
-            parse_effect("self_buff_apply:focus"),
-            SelfBuffApplyEffect(buff_key="focus"),
+            parse_effect("self_buff_apply:t_buff_key"),
+            SelfBuffApplyEffect(buff_key="t_buff_key"),
         )
 
     def test_confer_growth_rate_parses_into_its_dataclass(self):
@@ -129,14 +133,14 @@ class ParseEffectTests(unittest.TestCase):
 
     def test_sexual_event_parses_into_its_dataclass(self):
         self.assertEqual(
-            parse_effect("sexual_event:交合"),
-            SexualEventEffect(event_name="交合"),
+            parse_effect(f"sexual_event:{_EVENT_NAME}"),
+            SexualEventEffect(event_name=_EVENT_NAME),
         )
 
     def test_sexual_event_actor_parses_into_its_dataclass(self):
         self.assertEqual(
-            parse_effect("sexual_event_actor:self_exposure"),
-            ActorSexualEventEffect(event_name="self_exposure"),
+            parse_effect("sexual_event_actor:t_actor_event"),
+            ActorSexualEventEffect(event_name="t_actor_event"),
         )
 
     def test_sexual_event_actor_rejects_missing_or_double_payload(self):
@@ -185,7 +189,11 @@ class ParseEffectTests(unittest.TestCase):
 
     @covers_requirement("skill-effect-model::parse-effect-classifies-every-declared-prefix-into-a-typed-dataclass")
     def test_self_heal_parses_into_its_dataclass(self):
-        self.assertEqual(parse_effect("self_heal"), SelfHealEffect())
+        # The bare prefix IS the whole shipped effect ID (closed vocabulary);
+        # its positive parse assertion lives in the registered skill-registry
+        # content contract. What remains here is the arity boundary.
+        with self.assertRaises(ValueError):
+            parse_effect("self_heal:")
 
     def test_malformed_heal_payload_raises(self):
         for effect in ("heal", "heal:allies", "self_heal:single", "self_heal:area"):

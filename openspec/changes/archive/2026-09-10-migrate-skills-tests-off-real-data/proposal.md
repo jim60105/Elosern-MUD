@@ -13,7 +13,7 @@ area.
 
 - Migrate the 7 flagged test files under world/skills/ to the synthetic test-data kit
   (`world/tests/synthetic_data.py`) or file-local synthetic fixtures
-  (6 assertion-literal files, 1 setup-literal files).
+  (6 assertion-literal files, 1 setup-literal file).
 - Replace every shipped-identifier literal and shipped display-prose literal in the
   migrated files with kit constants or locally built synthetic definitions; replace
   pinned data quantities with values derived from the patched synthetic catalogs.
@@ -30,6 +30,15 @@ area.
   closure test in `tests/test_data_independence_skills.py`. Its `@covers_requirement` annotation is added in the
   archive step that syncs this delta into `openspec/specs/` — the traceability index only
   knows main-spec ids, so annotating earlier would fail with `unknown-requirement-id`.
+
+Two parser branches accept a closed production vocabulary with no synthetic
+substitute (`movement` mode `flash_step`; the bare `self_heal` prefix — the prefix
+itself is the shipped token, so no synthetic argument can reach either arm). Their
+positive shipped-value assertions move to the already-contract-registered content
+contract files (which the gate exempts and whose registration this change does not
+touch), keeping the production branch executed under the gate's contract allowance.
+Every other migrated assertion uses synthetic payloads; nothing smuggles a shipped
+value through runtime string construction.
 
 ### Migrated files (tier S = quantity-pinned, A = assertion literal, B = setup literal)
 
