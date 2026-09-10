@@ -30,14 +30,18 @@ from world.rules.service_gate import (
     service_available,
 )
 
-
+# Synthetic probe blueprint: the component type key is the vocabulary class's
+# own runtime name (never a shipped catalog token), and the profession key is
+# a synthetic probe identity — the patched table below is the only place it
+# lives. The authored shop identity is the kit's synthetic shop key.
 MERCHANT_PROBE = Profession(
-    key="merchant",
-    components=(ProfessionComponent("merchant", "place"),),
+    key="t_probe_merchant",
+    components=(ProfessionComponent(Merchant.name, "place"),),
     schedule_template=None,
     default_tier=None,
 )
-PROBE_TABLE = MappingProxyType({"merchant": MERCHANT_PROBE})
+PROBE_TABLE = MappingProxyType({Merchant.name: MERCHANT_PROBE})
+_PROBE_SHOP_KEY = "t_mossgate_stall"
 
 
 class ServiceBindingPersistenceTests(EvenniaTestCase):
@@ -53,7 +57,7 @@ class ServiceBindingPersistenceTests(EvenniaTestCase):
         assemble_profession_components(
             npc,
             MERCHANT_PROBE,
-            {"merchant": {"service_id": "s", "shop_key": "altoria_general_store"}},
+            {Merchant.name: {"service_id": "s", "shop_key": _PROBE_SHOP_KEY}},
             anchor_room=room,
         )
 
@@ -117,7 +121,7 @@ class ServiceBindingPersistenceTests(EvenniaTestCase):
             assemble_profession_components(
                 npc,
                 MERCHANT_PROBE,
-                {"merchant": {"service_id": "s", "shop_key": "altoria_general_store"}},
+                {Merchant.name: {"service_id": "s", "shop_key": _PROBE_SHOP_KEY}},
             )
         self.assertFalse(npc.components.has(Merchant.name))
 

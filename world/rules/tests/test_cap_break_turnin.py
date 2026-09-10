@@ -44,9 +44,39 @@ from world.rules.guild_offers import (
 )
 from world.rules.party import join_party
 from world.rules.npc_schedules import set_npc_schedule
+from world.rules.npc_schedules import (
+    ScheduleEntry,
+    ScheduleRulebook,
+    ScheduleTemplate,
+)
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY
 
-ALTORIA_BRANCH = "guild_branch_altoria"
-MATCHED_NPC_KEY = "葛里安·衛登"
+# Turn-in runs on kit rows: the issuing branch is the kit guild branch and
+# the reward item is a kit item (both registries scoped in setUp). The
+# cap-break rulebook entries exercised here are authored locally through
+# get_config patching, so the matching companion key and the role template
+# key are this file's own strings — no shipped identity is named.
+ALTORIA_BRANCH = SYNTH_GUILD_BRANCH_KEY
+_MATCHED_COMPANION_KEY = "cap matched companion"
+_ROLE_TEMPLATE_KEY = "t_sentry_shift"
+_T_ITEM = "t_ember_spray"
+_SCOPE_LOGICALS = ("guild_branches", "items")
+
+# A locally authored schedule rulebook so the role-selector test can assign a
+# synthetic template key (assignment validates the key against the rulebook)
+# without naming the shipped schedule table.
+_SYNTH_RULEBOOK = ScheduleRulebook(
+    schema_version=1,
+    states=("duty", "resting"),
+    templates=(
+        ScheduleTemplate(
+            key=_ROLE_TEMPLATE_KEY,
+            default_state="duty",
+            entries=(ScheduleEntry(21600, "state", state="resting"),),
+        ),
+    ),
+)
 
 
 def _attach_staff(npc) -> None:
@@ -59,8 +89,28 @@ class CapBreakTurnInBase(EvenniaTest):
     """Shared turn-in scaffold: staff, registered intro hunt offer, party."""
 
     def setUp(self):
+        # Scope before construction so branch validation and reward payout
+        # resolve inside the synthetic registries.
+        open_synthetic_scope(self, *_SCOPE_LOGICALS)
         super().setUp()
         register_catalog()
+        # The cap-break matcher runs against a locally authored table: the
+        # shipped rulebook's entries re-keyed onto this file's own companion
+        # key, so the mechanism is exercised without naming the shipped
+        # host identity.
+        _base_cfg = load_config()
+        _patcher = patch(
+            "world.rules.affinity_config.get_config",
+            return_value=replace(
+                _base_cfg,
+                cap_breaks=tuple(
+                    replace(entry, selector=_MATCHED_COMPANION_KEY)
+                    for entry in _base_cfg.cap_breaks
+                ),
+            ),
+        )
+        _patcher.start()
+        self.addCleanup(_patcher.stop)
         self.hall = create_object(Room, key="cap hall")
         self.staff = create_object(NPC, key="cap staff", location=self.hall)
         _attach_staff(self.staff)
@@ -74,7 +124,7 @@ class CapBreakTurnInBase(EvenniaTest):
             definition_key="introductory_hunt",
             issuer_branch_key=ALTORIA_BRANCH,
             reward=QuestReward(
-                copper=50, items=(ItemQuantity("healing_potion", 1),), merit=25
+                copper=50, items=(ItemQuantity(_T_ITEM, 1),), merit=25
             ),
         )
         register_guild_offer(self.offer)
@@ -122,7 +172,7 @@ class CapBreakTurnInTests(CapBreakTurnInBase):
 
     @covers_requirement("affinity-cap-break::the-cap-breaks-rulebook-table-drives-milestone-cap-raises-at-quest-turn-in")
     def test_matching_companion_cap_rises_with_the_reward(self):
-        matching = self._companion(MATCHED_NPC_KEY)
+        matching = self._companion(_MATCHED_COMPANION_KEY)
         self._companion("non-matching companion")
         quest_id = self._complete()
         result = turn_in_quest(self.player, self.staff, quest_id)
@@ -139,7 +189,7 @@ class CapBreakTurnInTests(CapBreakTurnInBase):
         self.assertEqual(companion.relations.affinity_for(self.player), 2)
 
     def test_cap_break_does_not_lose_the_turn_in_gain(self):
-        companion = self._companion(MATCHED_NPC_KEY)
+        companion = self._companion(_MATCHED_COMPANION_KEY)
         apply_affinity_change(
             companion, self.player, AffinitySource.QUEST_COMPLETION, 99
         )
@@ -153,7 +203,7 @@ class CapBreakTurnInTests(CapBreakTurnInBase):
         self.assertEqual(record.value, 101)
 
     def test_recordless_matching_companion_still_gets_its_cap_break(self):
-        companion = self._companion(MATCHED_NPC_KEY)
+        companion = self._companion(_MATCHED_COMPANION_KEY)
         self.assertFalse(companion.relations.has_record(self.player))
         quest_id = self._complete()
         turn_in_quest(self.player, self.staff, quest_id)
@@ -162,7 +212,7 @@ class CapBreakTurnInTests(CapBreakTurnInBase):
         self.assertEqual(record.value, 2)
 
     def test_re_completing_a_milestone_is_idempotent(self):
-        matching = self._companion(MATCHED_NPC_KEY)
+        matching = self._companion(_MATCHED_COMPANION_KEY)
         first = self._complete(1)
         turn_in_quest(self.player, self.staff, first)
         self.assertEqual(matching.relations._load(self.player).cap, 150)
@@ -176,10 +226,14 @@ class CapBreakTurnInTests(CapBreakTurnInBase):
         entry = base.cap_breaks[0]
         extra = replace(
             entry,
+            selector_kind="npc_key",
+            selector=_MATCHED_COMPANION_KEY,
             new_cap=200,
         )
-        with self._with_rulebook(replace(base, cap_breaks=(*base.cap_breaks, extra))):
-            matching = self._companion(MATCHED_NPC_KEY)
+        with self._with_rulebook(
+            replace(base, cap_breaks=(entry, replace(entry, selector=_MATCHED_COMPANION_KEY), extra))
+        ):
+            matching = self._companion(_MATCHED_COMPANION_KEY)
             quest_id = self._complete()
             turn_in_quest(self.player, self.staff, quest_id)
         self.assertEqual(matching.relations._load(self.player).cap, 200)
@@ -189,20 +243,26 @@ class CapBreakTurnInTests(CapBreakTurnInBase):
         guard = replace(
             base.cap_breaks[0],
             selector_kind="role",
-            selector="guard",
+            selector=_ROLE_TEMPLATE_KEY,
         )
         with self._with_rulebook(replace(base, cap_breaks=(guard,))):
             companion = self._companion("值班衛兵")
-            set_npc_schedule(companion, {"schema_version": 1, "template": "guard"})
-            self._companion("無排班路人")
-            quest_id = self._complete()
-            turn_in_quest(self.player, self.staff, quest_id)
+            with patch(
+                "world.rules.npc_schedules.get_rulebook",
+                return_value=_SYNTH_RULEBOOK,
+            ):
+                set_npc_schedule(
+                    companion, {"schema_version": 1, "template": _ROLE_TEMPLATE_KEY}
+                )
+                self._companion("無排班路人")
+                quest_id = self._complete()
+                turn_in_quest(self.player, self.staff, quest_id)
         self.assertEqual(companion.relations._load(self.player).cap, 150)
 
     @covers_requirement("quest-reward-settlement::reward-payout-is-one-atomic-copper-item-merit-acquisition-claim-and-affinity-transaction")
     @covers_requirement("affinity-cap-break::the-cap-breaks-rulebook-table-drives-milestone-cap-raises-at-quest-turn-in")
     def test_fault_injection_restores_caps_and_values(self):
-        matching = self._companion(MATCHED_NPC_KEY)
+        matching = self._companion(_MATCHED_COMPANION_KEY)
         apply_affinity_change(
             matching, self.player, AffinitySource.QUEST_COMPLETION, 30
         )
@@ -228,7 +288,7 @@ class OfferSyncIsolationRegressionTests(RegistryIsolationMixin, unittest.TestCas
     """Regression: catalog-offer registration must not leak from a failing setup.
 
     The pre-fix CI failure: ``OnboardingHuntIntegrationTests`` registered the
-    canonical ×2 healing-potion offer and left it behind, so the conflicting
+    canonical reward-item offer and left it behind, so the conflicting
     ×1 registration in ``CapBreakTurnInTests.setUp`` raised
     ``GuildOfferError``. The single test below proves the restoration contract
     directly, so it holds under any test ordering (serial, parallel, shuffled,
@@ -240,6 +300,9 @@ class OfferSyncIsolationRegressionTests(RegistryIsolationMixin, unittest.TestCas
     @covers_requirement("evennia-test-optimization::tests-restore-process-global-registry-state")
     def test_failing_setup_does_not_leak_the_canonical_offer(self):
         from world.quests.compile import SCENE_REQUIREMENT_REGISTRY
+
+        # Branch/item identity checks below run against the kit registries.
+        open_synthetic_scope(self, *_SCOPE_LOGICALS)
 
         class _FailingSetupProbe(RegistryIsolationMixin, unittest.TestCase):
             """A case whose setUp registers the catalog offers and then fails."""
@@ -274,7 +337,7 @@ class OfferSyncIsolationRegressionTests(RegistryIsolationMixin, unittest.TestCas
             definition_key="introductory_hunt",
             issuer_branch_key=ALTORIA_BRANCH,
             reward=QuestReward(
-                copper=50, items=(ItemQuantity("healing_potion", 1),), merit=25
+                copper=50, items=(ItemQuantity(_T_ITEM, 1),), merit=25
             ),
         )
         register_guild_offer(offer)

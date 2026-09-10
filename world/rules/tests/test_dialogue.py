@@ -24,6 +24,15 @@ from world.rules.dialogue import (
     resolve_dialogue_component,
     run_scripted_talk,
 )
+from world.rules.tests._guild_service_probes import (
+    live_dialogue_table,
+    synthetic_branch_key,
+)
+
+# The staff component carries an opaque synthetic branch identity; the
+# turnin path never resolves it against any registry, so the kit branch key
+# stands in for the former shipped branch token.
+SYNTH_BRANCH = synthetic_branch_key()
 
 
 class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
@@ -143,7 +152,7 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
         host = self._scripted_host()
         host.location = room
         host.components.add(
-            GuildStaff.create(host, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(host, service_id="staff", branch_key=SYNTH_BRANCH)
         )
         response = dialogue_response(host, player, GUILD_STAFF_TURNIN_KEYWORD)
         self.assertIn("guild register", response)
@@ -240,9 +249,7 @@ class ScriptedDialogueServiceTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement("guild-registration::guild-service-hosts-teach-their-service-commands-through-scripted-dialogue")
     def test_guild_staff_definition_teaches_the_guild_commands(self):
-        from world.rules.dialogue import DIALOGUE_TABLE
-
-        definition = DIALOGUE_TABLE[GUILD_STAFF_DIALOGUE_KEY]
+        definition = live_dialogue_table()[GUILD_STAFF_DIALOGUE_KEY]
         combined = definition.greeting + "".join(
             entry.response for entry in definition.responses
         )
@@ -281,20 +288,24 @@ class GuildStaffSyncDialogueTests(EvenniaCommandTestMixin, EvenniaTest):
         self._quest_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._offer_items = list(GUILD_OFFER_REGISTRY.items())
         register_catalog()
-        from world.rules.guild_config import CATALOG, load_catalog_into_cache
+        from world.rules.guild_config import load_catalog_into_cache
 
-        self._previous_catalog = CATALOG
         load_catalog_into_cache()
         from evennia.utils.search import search_object_by_tag
         from world.rules.guild_economy import sync_service_content
-        from world.lore.guild import GUILD_BRANCH_REGISTRY
 
         sync_service_content()
-        # The host's key is its authored registry name (service anchor reuse,
-        # npc-title-authored-identities D3).
-        self.guild_master = NPC.objects.filter(
-            db_key=GUILD_BRANCH_REGISTRY["guild_branch_altoria"].host_name
-        ).first()
+        # The roster is identity-agnostic: after syncing the shipped catalog
+        # roster, the guild host is exactly the one NPC carrying the
+        # scripted-dialogue component whose key the roster authored — no
+        # authored display name is ever named here.
+        self.guild_master = next(
+            npc
+            for npc in NPC.objects.all()
+            if npc.components.has(ScriptedDialogue.get_component_slot())
+            and npc.components.get(ScriptedDialogue.get_component_slot()).dialogue_key
+            == GUILD_STAFF_DIALOGUE_KEY
+        )
 
     def tearDown(self):
         from world.quests.definitions import QUEST_DEFINITION_REGISTRY

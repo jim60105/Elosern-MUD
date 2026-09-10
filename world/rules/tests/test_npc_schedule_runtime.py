@@ -19,6 +19,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
+from typeclasses.components import Merchant
 from typeclasses.characters import PlayerCharacter
 from typeclasses.exits import Exit
 from typeclasses.monsters import Monster
@@ -31,6 +32,9 @@ from world.rules.npc_schedules import (
     SCHEDULE_BLOCKED_REASON,
     ScheduleError,
     _INTERACTION_KINDS,
+    ScheduleEntry,
+    ScheduleRulebook,
+    ScheduleTemplate,
     interaction_reason,
     set_npc_schedule,
     settle_npc_schedules,
@@ -38,6 +42,26 @@ from world.rules.npc_schedules import (
 )
 
 DAY_SECONDS = 86400
+
+# A locally authored rulebook for the template-resolution settlement test:
+# the mechanism (a successful move writes the template's default_state) is
+# exercised against synthetic entries instead of the shipped template table,
+# so no shipped template key is ever named.
+_SYNTH_RULEBOOK = ScheduleRulebook(
+    schema_version=1,
+    states=("duty", "resting", "busy"),
+    templates=(
+        ScheduleTemplate(
+            key="t_sentry_round",
+            default_state="duty",
+            entries=(
+                ScheduleEntry(21600, "move", target="north_gate"),
+                ScheduleEntry(50400, "state", state="resting"),
+                ScheduleEntry(64800, "move", target="barracks"),
+            ),
+        ),
+    ),
+)
 
 
 class InteractionReasonTests(unittest.TestCase):
@@ -182,12 +206,17 @@ class SettlementMoveEntryTests(EvenniaTest):
 
     @covers_requirement("npc-schedule-runtime::the-npc-schedules-clock-source-settles-due-schedule-entries")
     def test_move_success_writes_the_templates_default_state(self):
-        set_npc_schedule(self.npc, {"schema_version": 1, "template": "guard"})
-        # The guard template's first move (21600, north_gate) is skipped: the
-        # NPC is already at north_gate. The 50400 state entry and the 64800
-        # move to barracks are due later the same day; the move must succeed
-        # and rewrite the template's default_state (duty).
-        events = settle_npc_schedules(0, DAY_SECONDS)
+        # The synthetic template's first move (21600, north_gate) is skipped:
+        # the NPC is already at north_gate. The 50400 state entry and the
+        # 64800 move to barracks are due later the same day; the move must
+        # succeed and rewrite the template's default_state (duty).
+        with patch(
+            "world.rules.npc_schedules.get_rulebook", return_value=_SYNTH_RULEBOOK
+        ):
+            set_npc_schedule(
+                self.npc, {"schema_version": 1, "template": "t_sentry_round"}
+            )
+            events = settle_npc_schedules(0, DAY_SECONDS)
         self.assertIs(self.npc.location, self.barracks)
         self.assertEqual(self.npc.db.schedule_state, "duty")
         self.assertEqual(
@@ -381,7 +410,9 @@ class SettlementSilenceTests(EvenniaTest):
         context = silenced[0].kwargs["context"]
         self.assertEqual(context["npc"], "店員")
         self.assertEqual(context["npc_id"], int(self.clerk.pk))
-        self.assertEqual(context["service"], "merchant")
+        # The trace names the stranding component's slot — production
+        # vocabulary derived from the component class, not a literal.
+        self.assertEqual(context["service"], Merchant.get_component_slot())
 
 
 class SettlementFailureIsolationTests(EvenniaTestCase):

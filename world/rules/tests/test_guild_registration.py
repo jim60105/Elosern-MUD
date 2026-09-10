@@ -25,9 +25,16 @@ from world.rules.guild import (
     resolve_local_service_host,
 )
 from world.rules.traits import get_display_value
+from world.rules.tests._guild_service_probes import synthetic_branch_key
+
+# The staff component carries an opaque synthetic branch identity; the
+# registration path never resolves it against any registry (the staff
+# component is the sole branch authority), so the kit branch key stands in
+# for every former shipped branch token.
+SYNTH_BRANCH = synthetic_branch_key()
 
 
-def _attach_staff(npc: NPC, branch_key: str = "guild_branch_altoria") -> NPC:
+def _attach_staff(npc: NPC, branch_key: str = SYNTH_BRANCH) -> NPC:
     npc.components.add(
         GuildStaff.create(npc, service_id="staff", branch_key=branch_key)
     )
@@ -57,7 +64,7 @@ class GuildRegistrationTests(EvenniaTestCase):
     def test_undisguised_character_registers_at_f_with_true_snapshot(self):
         record = self._register(staff=self.staff)
         self.assertEqual(self.player.guild_rank, "F")
-        self.assertEqual(record["branch_key"], "guild_branch_altoria")
+        self.assertEqual(record["branch_key"], SYNTH_BRANCH)
         for key in ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power", "guild_merit"):
             self.assertEqual(
                 record["displayed_stats"][key],
@@ -192,7 +199,7 @@ class GuildRegistrationTests(EvenniaTestCase):
     def test_at_anchor_place_bound_clerk_registers_as_before_the_gate(self):
         self._make_place_bound_staff()
         record = self._register(staff=self.staff)
-        self.assertEqual(record["branch_key"], "guild_branch_altoria")
+        self.assertEqual(record["branch_key"], SYNTH_BRANCH)
 
     def test_non_player_rejected(self):
         npc = create_object(NPC, key="npc actor", location=self.room)
@@ -204,7 +211,7 @@ class GuildRegistrationTests(EvenniaTestCase):
     def test_partial_membership_fails_closed(self):
         self.player.guild_rank = "F"
         self.player.db.guild_registration = {
-            "branch_key": "guild_branch_altoria",
+            "branch_key": SYNTH_BRANCH,
             "registered_tick": 0,
         }
         with self.assertRaises(GuildDataError):
@@ -214,7 +221,7 @@ class GuildRegistrationTests(EvenniaTestCase):
 
     def test_malformed_registration_parsing(self):
         self.player.db.guild_registration = {
-            "branch_key": "guild_branch_altoria",
+            "branch_key": SYNTH_BRANCH,
             "registered_tick": 0,
             "displayed_stats": {"atk_phys": 5},
         }
@@ -317,7 +324,7 @@ class GuildServicePCIntegrationTests(EvenniaTestCase):
 
     def test_pipeline_flow_registers_then_returns_record(self):
         record = register_adventurer(self.player)
-        self.assertEqual(record["branch_key"], "guild_branch_altoria")
+        self.assertEqual(record["branch_key"], SYNTH_BRANCH)
         resolved = resolve_local_service_host(self.player, GuildStaff)
         self.assertIs(resolved, self.staff)
 

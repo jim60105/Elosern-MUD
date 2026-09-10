@@ -51,8 +51,16 @@ from world.rules.guild_offers import (
 )
 from world.rules.quest_issuance import guild_issuer_key
 from world.rules.surfaces import read_counter_trait
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY, SYNTH_ITEMS
 
-ALTORIA_BRANCH = "guild_branch_altoria"
+# Turn-in runs entirely on kit rows: the issuing branch and the reward/acquire
+# items are synthetic. The scope is opened inside setUp bodies (the class
+# decorator wraps test methods only), so offer validation and reward payout
+# resolve against the synthetic registries.
+ALTORIA_BRANCH = SYNTH_GUILD_BRANCH_KEY
+_T_ITEM = SYNTH_ITEMS["t_ember_spray"].key
+_SCOPE_LOGICALS = ("guild_branches", "items")
 _NO_STAFF_LINE = "這裡沒有公會服務人員。"
 _NOTHING_LINE = "「目前沒有可以交回的任務。」"
 
@@ -64,7 +72,7 @@ def _attach_staff(npc, service_id: str = "staff") -> None:
 
 
 def _offer(
-    definition_key: str, copper: int = 50, merit: int = 25, items=("healing_potion",)
+    definition_key: str, copper: int = 50, merit: int = 25, items: tuple[str, ...] = ()
 ) -> GuildQuestOffer:
     return GuildQuestOffer(
         definition_key=definition_key,
@@ -81,6 +89,9 @@ class DialogueTurnInRegistryIsolation(QuestRegistryIsolation):
     """Snapshot the offer registry too, mirroring the guild-rewards pattern."""
 
     def setUp(self):
+        # Scope before construction: the isolation snapshots and every offer
+        # registered below resolve inside the synthetic registries.
+        open_synthetic_scope(self, *_SCOPE_LOGICALS)
         super().setUp()
         register_catalog()
         self._offer_items = list(GUILD_OFFER_REGISTRY.items())
@@ -102,12 +113,9 @@ class ReportableQuestSummaryTests(DialogueTurnInRegistryIsolation, EvenniaTestCa
         self.player.apply_race_baseline()
         self.player.location = self.hall
         register_adventurer(self.player, self.staff)
-        from world.rules.guild_config import load_guild_catalog
-
-        catalog_offer = load_guild_catalog(
-            QUEST_DEFINITION_REGISTRY
-        ).offer_by_definition["introductory_hunt"]
-        register_guild_offer(catalog_offer)
+        # No catalog offer rides this fixture: every listing assertion below
+        # registers its own local offers, and the staff's synthetic branch
+        # never lists shipped-branch rows anyway.
 
     def _complete(self, definition_key: str, *, npc_issued: bool = False) -> str:
         from world.quests.runtime import fulfill_record
@@ -233,12 +241,20 @@ class DialogueTurnInTests(DialogueTurnInRegistryIsolation, EvenniaTestCase):
         self.player.apply_race_baseline()
         self.player.location = self.hall
         register_adventurer(self.player, self.staff)
-        from world.rules.guild_config import load_guild_catalog
-
-        catalog_offer = load_guild_catalog(
-            QUEST_DEFINITION_REGISTRY
-        ).offer_by_definition["introductory_hunt"]
-        register_guild_offer(catalog_offer)
+        # The settlement fixture pays from a locally registered synthetic
+        # offer over the kit reward item instead of the shipped catalog row.
+        self._offer_items_for_turnin = GuildQuestOffer(
+            definition_key="introductory_hunt",
+            issuer_branch_key=ALTORIA_BRANCH,
+            reward=QuestReward(
+                copper=50,
+                # Two units: the acquire-quest fixture below needs the payout
+                # to complete a two-unit delivery on its own.
+                items=(ItemQuantity(_T_ITEM, 2),),
+                merit=25,
+            ),
+        )
+        register_guild_offer(self._offer_items_for_turnin)
 
     def _complete(self) -> str:
         from world.quests.runtime import fulfill_record
@@ -264,7 +280,7 @@ class DialogueTurnInTests(DialogueTurnInRegistryIsolation, EvenniaTestCase):
         self.assertEqual(result["quest_id"], quest_id)
         self.assertEqual(result["copper"], 50)
         self.assertEqual(result["merit"], 25)
-        self.assertIn("healing_potion", result["items"])
+        self.assertIn(_T_ITEM, result["items"])
         self.assertNotIn("onboarding_completed", result)
         self.assertEqual(self.player.db.wallet, 50)
         self.assertEqual(read_counter_trait(self.player, "guild_merit"), 25)
@@ -305,7 +321,7 @@ class DialogueTurnInTests(DialogueTurnInRegistryIsolation, EvenniaTestCase):
         acquire_def = register(
             quest(
                 "potions_please",
-                stages=(QuestStage(0, acquire("healing_potion", quantity=2)),),
+                stages=(QuestStage(0, acquire(_T_ITEM, quantity=2)),),
             )
         )
         accept(self.player, acquire_def.key)

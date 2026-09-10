@@ -15,7 +15,15 @@ from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
 
-from world.lore.items import ITEM_REGISTRY
+from typeclasses.components import GuildExaminer, GuildStaff, Merchant
+from world.lore.items import (
+    EquipmentModifierKey,
+    ItemDefinition,
+    ItemIconKey,
+    ItemKind,
+    ItemPresentation,
+    ItemRarity,
+)
 from world.quests.catalog import register_catalog
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
@@ -27,14 +35,80 @@ from world.quests.definitions import (
     register_quest_definition,
 )
 from world.quests.runtime import QuestRecord, QuestState, to_storage
-from world.quests.tests._fixtures import TEST_ISSUER_KEY
-from world.rules.guild_config import CATALOG, load_catalog_into_cache, register_catalog_offers
+from world.quests.tests._fixtures import TEST_ISSUER_KEY, register_catalog_once
 from world.rules.guild_offers import (
     GUILD_OFFER_REGISTRY,
     GuildQuestOffer,
+    ItemQuantity,
     QuestReward,
     register_guild_offer,
 )
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.rules.tests._guild_service_probes import (
+    a_live_monster_tier_key,
+    install_synthetic_catalog,
+    live_item_registry,
+    live_monster_tier_keys,
+    price_band,
+    rank_reward_band,
+    synth_catalog,
+    synth_offer_rule,
+    synth_shop_config,
+    synthetic_branch_key,
+)
+from world.tests.synthetic_data import (
+    SYNTH_ITEMS,
+    SYNTH_SHOPS,
+)
+
+# The shipped affinity rulebook cross-references one catalog quest by key, so
+# the affinity-config loader needs the catalog definitions present in-process.
+# Registered at import (no synthetic scope is open yet).
+register_catalog_once()
+
+# The services panel is exercised on kit rows only: the guild branch is the
+# kit synthetic branch, the store is one synthetic shop config over kit
+# items, and every asserted number below is authored by this file.
+BRANCH = synthetic_branch_key()
+T_SHOP = next(iter(SYNTH_SHOPS))
+T_SPRAY = SYNTH_ITEMS["t_ember_spray"].key
+T_FANG = SYNTH_ITEMS["t_iron_fang"].key
+T_APPLE = SYNTH_ITEMS["t_huskapple"].key
+# The unsellable kit row (exercises the sellable filter's negative path).
+T_PASS = SYNTH_ITEMS["t_wayfarer_pass"].key
+# The kit's slotted weapon: equip-toggle rows need real equipment slots.
+T_KNIFE = SYNTH_ITEMS["t_thorn_knife"].key
+# F/E ladder letters are production rank-ladder identifiers (never flagged
+# tokens); board quests ride them with rewards inside the live rank bands.
+BOARD_QUEST = "services_board_quest"
+BOARD_QUEST_DISPLAY = "測試看板委託"
+E_QUEST = "services_e_quest"
+
+
+def _buy_copper(item_key: str) -> int:
+    """The synthetic offer's buy price (mirrors synth_offer_rule derivation)."""
+    floor, ceiling = price_band(item_key)
+    buy = floor + 2
+    if ceiling is not None and buy > ceiling:
+        buy = ceiling
+    return buy
+
+
+def _sell_copper(item_key: str) -> int:
+    return price_band(item_key)[0]
+
+
+def _shop_config():
+    """Built inside the scope: offer rules read live price bands."""
+    return synth_shop_config(
+        T_SHOP,
+        (T_SPRAY, T_FANG, T_APPLE),
+        offer_rules=(
+            synth_offer_rule(T_SPRAY, max_stock=20),
+            synth_offer_rule(T_FANG, max_stock=3),
+            synth_offer_rule(T_APPLE, max_stock=20),
+        ),
+    )
 from world.rules.service_view import (
     ACTION_ACCEPT,
     ACTION_BUY,
@@ -104,20 +178,20 @@ class FakeAttributes:
 
 
 def guild_staff(**fields):
-    return FakeComponent("guild_staff", branch_key="guild_branch_altoria", **fields)
+    return FakeComponent(GuildStaff.name, branch_key=BRANCH, **fields)
 
 
 def guild_examiner(**fields):
-    return FakeComponent("guild_examiner", branch_key="guild_branch_altoria", **fields)
+    return FakeComponent(GuildExaminer.name, branch_key=BRANCH, **fields)
 
 
 def merchant(**fields):
-    fields.setdefault("shop_key", "altoria_general_store")
+    fields.setdefault("shop_key", T_SHOP)
     fields.setdefault(
         "merchant_stock",
-        {"meal": 20, "healing_potion": 3, "plain_sword": 1},
+        {T_APPLE: 20, T_SPRAY: 3, T_FANG: 1},
     )
-    return FakeComponent("merchant", **fields)
+    return FakeComponent(Merchant.name, **fields)
 
 
 def actor(
@@ -174,7 +248,7 @@ def actor(
 
 def registration(**overrides):
     record = {
-        "branch_key": "guild_branch_altoria",
+        "branch_key": BRANCH,
         "registered_tick": 0,
         "displayed_stats": {key: 0 for key in _REGISTRATION_TRAIT_KEYS},
     }
@@ -182,10 +256,10 @@ def registration(**overrides):
     return record
 
 
-def quest_record(quest_id="introductory_hunt:1", state=QuestState.IN_PROGRESS, progress=0):
+def quest_record(quest_id=None, state=QuestState.IN_PROGRESS, progress=0):
     record = QuestRecord(
-        quest_id=quest_id,
-        definition_key="introductory_hunt",
+        quest_id=quest_id or f"{BOARD_QUEST}:1",
+        definition_key=BOARD_QUEST,
         issuer_key=TEST_ISSUER_KEY,
         state=state,
         stage_index=0,
@@ -202,21 +276,56 @@ def quest_record(quest_id="introductory_hunt:1", state=QuestState.IN_PROGRESS, p
 
 class ServiceRegistryIsolation(unittest.TestCase):
     def setUp(self):
+        # Scope before construction: shop/item/tier identities resolve against
+        # kit rows. The rank ladder stays shipped so the F→E→S progression
+        # asserted below is the real production ladder.
+        open_synthetic_scope(
+            self, "items", "prices", "shops", "monster_tiers", "guild_branches"
+        )
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
-        self._catalog = CATALOG
         self._offers = list(GUILD_OFFER_REGISTRY.items())
-        register_catalog()
-        catalog = load_catalog_into_cache()
-        register_catalog_offers(catalog)
-        self._catalog_obj = catalog
+        install_synthetic_catalog(
+            self, synth_catalog(shop_configs={T_SHOP: _shop_config()})
+        )
+        # Two invented board quests (F and E ladder ranks) with rewards inside
+        # the live rank bands; the F quest is this suite's default log row.
+        self.board_reward = QuestReward(
+            copper=rank_reward_band("F")[0],
+            items=(ItemQuantity(T_SPRAY, 2),),
+            merit=25,
+        )
+        register_quest_definition(
+            QuestDefinition(
+                key=BOARD_QUEST,
+                display_name=BOARD_QUEST_DISPLAY,
+                quest_type=QuestType.DEFEAT,
+                rank="F",
+                stages=(
+                    QuestStage(
+                        index=0,
+                        objective=QuestObjective(
+                            kind=ObjectiveKind.DEFEAT,
+                            quantity=2,
+                            monster_tier=a_live_monster_tier_key(),
+                        ),
+                    ),
+                ),
+                deadline_hours=None,
+            )
+        )
+        register_guild_offer(
+            GuildQuestOffer(
+                definition_key=BOARD_QUEST,
+                issuer_branch_key=BRANCH,
+                reward=self.board_reward,
+            )
+        )
 
     def tearDown(self):
-        global CATALOG
         QUEST_DEFINITION_REGISTRY.clear()
         QUEST_DEFINITION_REGISTRY.update(self._registry_items)
         GUILD_OFFER_REGISTRY.clear()
         GUILD_OFFER_REGISTRY.update(self._offers)
-        CATALOG = self._catalog
         super().tearDown()
 
 
@@ -245,7 +354,7 @@ class HostResolutionTests(ServiceRegistryIsolation):
         self.assertIsNone(view.shop)
 
     def test_general_store_resolves_one_merchant_and_names_it(self):
-        store = FakeHost("商人", 11, merchant(), location=None)
+        store = FakeHost("合成行商", 11, merchant(), location=None)
         room = FakeRoom(store)
         store.location = room
         player = actor(location=room, wallet=1000)
@@ -278,7 +387,7 @@ class HostResolutionTests(ServiceRegistryIsolation):
         self.assertEqual(guild_view.host.display_name, "公會長")
         self.assertNotIn("\u3000", guild_view.host.display_name)
 
-        store = FakeHost("商人", 11, merchant(), location=None)
+        store = FakeHost("合成行商", 11, merchant(), location=None)
         store.npc_title = "南門行商"
         store_room = FakeRoom(store)
         store.location = store_room
@@ -290,7 +399,7 @@ class HostResolutionTests(ServiceRegistryIsolation):
                 actor(location=store_room, wallet=1000)
             )
         self.assertIsNotNone(shop_view.host)
-        self.assertEqual(shop_view.host.display_name, "商人")
+        self.assertEqual(shop_view.host.display_name, "合成行商")
         self.assertNotIn("\u3000", shop_view.host.display_name)
 
     @covers_requirement("webclient-service-menus::service-presentation-resolves-hosts-per-service-class-and-a-stable-player-summary")
@@ -422,7 +531,7 @@ class PlayerSummaryTests(ServiceRegistryIsolation):
 class BoardFilteringTests(ServiceRegistryIsolation):
     def _register_e_quest(self):
         definition = QuestDefinition(
-            key="test_e_quest",
+            key=E_QUEST,
             display_name="測試E級任務",
             quest_type=QuestType.DEFEAT,
             rank="E",
@@ -432,7 +541,7 @@ class BoardFilteringTests(ServiceRegistryIsolation):
                     objective=QuestObjective(
                         kind=ObjectiveKind.DEFEAT,
                         quantity=1,
-                        monster_tier="low",
+                        monster_tier=a_live_monster_tier_key(),
                     ),
                 ),
             ),
@@ -441,9 +550,11 @@ class BoardFilteringTests(ServiceRegistryIsolation):
         register_quest_definition(definition)
         register_guild_offer(
             GuildQuestOffer(
-                definition_key="test_e_quest",
-                issuer_branch_key="guild_branch_altoria",
-                reward=QuestReward(copper=200, items=(), merit=50),
+                definition_key=E_QUEST,
+                issuer_branch_key=BRANCH,
+                reward=QuestReward(
+                    copper=rank_reward_band("E")[0], items=(), merit=50
+                ),
             )
         )
 
@@ -458,9 +569,7 @@ class BoardFilteringTests(ServiceRegistryIsolation):
         ):
             view = build_services_view(player)
         keys = [row.definition_key for row in view.guild.board]
-        self.assertIn("introductory_hunt", keys)
-        self.assertNotIn("test_e_quest", keys)
-        self.assertEqual(keys, sorted(keys))
+        self.assertEqual(keys, [BOARD_QUEST])
 
     def test_e_member_sees_both_offers_in_rank_key_order(self):
         self._register_e_quest()
@@ -472,7 +581,7 @@ class BoardFilteringTests(ServiceRegistryIsolation):
         ):
             view = build_services_view(player)
         keys = [row.definition_key for row in view.guild.board]
-        self.assertEqual(keys, ["introductory_hunt", "test_e_quest"])
+        self.assertEqual(keys, [BOARD_QUEST, E_QUEST])
         accept = view.guild.board[0].accept
         self.assertEqual(accept.action_id, ACTION_ACCEPT)
         self.assertTrue(accept.enabled)
@@ -511,14 +620,20 @@ class QuestRenderingTests(ServiceRegistryIsolation):
         ):
             view = build_services_view(player)
         row = view.guild.quests[0]
-        self.assertEqual(row.quest_id, "introductory_hunt:1")
+        self.assertEqual(row.quest_id, f"{BOARD_QUEST}:1")
         self.assertEqual(row.state, "in_progress")
         self.assertEqual(row.stage_index, 0)
         self.assertEqual(row.stage_progress, 0)
         self.assertTrue(row.objective_summary)
         self.assertIsNone(row.deadline_line)
-        self.assertTrue(row.detail.startswith("討伐低階魔物"))
-        self.assertIn("獎勵：銅 50、功績 25、治療藥水 × 2", row.detail)
+        self.assertTrue(row.detail.startswith(f"{BOARD_QUEST_DISPLAY}\n狀態："))
+        self.assertIn("目標：討伐 2 隻", row.detail)
+        self.assertIn(
+            "獎勵：銅 "
+            f"{self.board_reward.copper}、功績 {self.board_reward.merit}、"
+            f"{SYNTH_ITEMS['t_ember_spray'].display_name_zh} × 2",
+            row.detail,
+        )
         self.assertTrue(row.abandon.enabled)
         self.assertFalse(row.turnin.enabled)
 
@@ -545,7 +660,7 @@ class QuestRenderingTests(ServiceRegistryIsolation):
             registration=registration(),
             guild_rank="F",
             quest_log=[completed],
-            claims=["introductory_hunt:1"],
+            claims=[f"{BOARD_QUEST}:1"],
         )
         with patch(
             "world.rules.service_view.read_world_clock",
@@ -559,7 +674,7 @@ class QuestRenderingTests(ServiceRegistryIsolation):
     def test_deadline_line_renders_when_set(self):
         record = QuestRecord(
             quest_id="deadline:1",
-            definition_key="introductory_hunt",
+            definition_key=BOARD_QUEST,
             issuer_key=TEST_ISSUER_KEY,
             state=QuestState.IN_PROGRESS,
             stage_index=0,
@@ -627,7 +742,7 @@ class QuestRenderingTests(ServiceRegistryIsolation):
 
 class ShopTests(ServiceRegistryIsolation):
     def _shop_room(self):
-        store = FakeHost("商人", 1, merchant(), location=None)
+        store = FakeHost("合成行商", 1, merchant(), location=None)
         room = FakeRoom(store)
         store.location = room
         return room
@@ -644,12 +759,12 @@ class ShopTests(ServiceRegistryIsolation):
         shop = view.shop
         self.assertTrue(shop.open)
         rows = {row.item_key: row for row in shop.stock}
-        self.assertEqual(rows["meal"].buy_copper, 10)
-        self.assertEqual(rows["meal"].sell_copper, 5)
-        self.assertEqual(rows["meal"].stock, 20)
-        self.assertEqual(rows["meal"].max_stock, 20)
-        self.assertEqual(rows["healing_potion"].stock, 3)
-        self.assertTrue(rows["meal"].buy.enabled)
+        self.assertEqual(rows[T_APPLE].buy_copper, _buy_copper(T_APPLE))
+        self.assertEqual(rows[T_APPLE].sell_copper, _sell_copper(T_APPLE))
+        self.assertEqual(rows[T_APPLE].stock, 20)
+        self.assertEqual(rows[T_APPLE].max_stock, 20)
+        self.assertEqual(rows[T_SPRAY].stock, 3)
+        self.assertTrue(rows[T_APPLE].buy.enabled)
 
     def test_closed_shop_disables_purchases_but_renders_stock(self):
         room = self._shop_room()
@@ -661,7 +776,7 @@ class ShopTests(ServiceRegistryIsolation):
             view = build_services_view(player)
         shop = view.shop
         self.assertFalse(shop.open)
-        self.assertEqual(len(shop.stock), 12)
+        self.assertEqual(len(shop.stock), 3)
         for row in shop.stock:
             self.assertFalse(row.buy.enabled)
             self.assertEqual(row.buy.reason_code, "closed")
@@ -675,8 +790,8 @@ class ShopTests(ServiceRegistryIsolation):
         ):
             view = build_services_view(player)
         rows = {row.item_key: row for row in view.shop.stock}
-        quantity_min = rows["healing_potion"].buy.quantity_min
-        quantity_max = rows["healing_potion"].buy.quantity_max
+        quantity_min = rows[T_SPRAY].buy.quantity_min
+        quantity_max = rows[T_SPRAY].buy.quantity_max
         self.assertEqual(quantity_min, 1)
         self.assertLessEqual(quantity_max, 3)
         self.assertLessEqual(quantity_max, 1000)
@@ -690,24 +805,29 @@ class ShopTests(ServiceRegistryIsolation):
         ):
             view = build_services_view(player)
         rows = {row.item_key: row for row in view.shop.stock}
-        self.assertFalse(rows["healing_potion"].buy.enabled)
-        self.assertEqual(rows["healing_potion"].buy.reason_code, "insufficient_funds")
+        self.assertFalse(rows[T_SPRAY].buy.enabled)
+        self.assertEqual(rows[T_SPRAY].buy.reason_code, "insufficient_funds")
 
     def test_sellable_rows_aggregate_held_items(self):
         room = FakeRoom(
-            FakeHost("商人", 1, merchant(merchant_stock={"meal": 10, "healing_potion": 3, "plain_sword": 1}), location=None)
+            FakeHost(
+                "合成行商",
+                1,
+                merchant(merchant_stock={T_APPLE: 10, T_SPRAY: 3, T_FANG: 1}),
+                location=None,
+            )
         )
-        player = actor(location=room, wallet=1000, inventory=["meal", "meal", "plain_sword"])
+        player = actor(location=room, wallet=1000, inventory=[T_APPLE, T_APPLE, T_FANG])
         with patch(
             "world.rules.service_view.read_world_clock",
             return_value=SimpleNamespace(tick=TICK_NOON),
         ):
             view = build_services_view(player)
         sellable = {row.item_key: row for row in view.shop.sellable}
-        self.assertEqual(sellable["meal"].held, 2)
-        self.assertEqual(sellable["meal"].sell_copper, 5)
-        self.assertTrue(sellable["meal"].sell.enabled)
-        self.assertEqual(sellable["plain_sword"].sell.enabled, True)
+        self.assertEqual(sellable[T_APPLE].held, 2)
+        self.assertEqual(sellable[T_APPLE].sell_copper, _sell_copper(T_APPLE))
+        self.assertTrue(sellable[T_APPLE].sell.enabled)
+        self.assertEqual(sellable[T_FANG].sell.enabled, True)
 
 
 class InventoryTests(ServiceRegistryIsolation):
@@ -715,7 +835,7 @@ class InventoryTests(ServiceRegistryIsolation):
     def test_repeated_key_inventory_aggregates_and_marks_equipped(self):
         room = FakeRoom()
         equipment = {
-            "weapon_main": "plain_sword",
+            "weapon_main": T_KNIFE,
             "weapon_off": None,
             "armor": None,
             "accessories": [],
@@ -723,7 +843,7 @@ class InventoryTests(ServiceRegistryIsolation):
         player = actor(
             location=room,
             wallet=42,
-            inventory=["healing_potion", "meal", "plain_sword", "healing_potion"],
+            inventory=[T_SPRAY, T_APPLE, T_KNIFE, T_SPRAY],
             equipment=equipment,
         )
         with patch(
@@ -732,10 +852,10 @@ class InventoryTests(ServiceRegistryIsolation):
         ):
             view = build_services_view(player)
         rows = {row.item_key: row for row in view.inventory.rows}
-        self.assertEqual(rows["healing_potion"].held, 2)
-        self.assertEqual(rows["healing_potion"].equipped, False)
-        self.assertEqual(rows["meal"].held, 1)
-        self.assertEqual(rows["plain_sword"].equipped, True)
+        self.assertEqual(rows[T_SPRAY].held, 2)
+        self.assertEqual(rows[T_SPRAY].equipped, False)
+        self.assertEqual(rows[T_APPLE].held, 1)
+        self.assertEqual(rows[T_KNIFE].equipped, True)
         self.assertEqual(view.inventory.wallet, 42)
         self.assertEqual(view.player.wallet, 42)
 
@@ -745,7 +865,7 @@ class InventoryTests(ServiceRegistryIsolation):
         player = actor(
             location=room,
             wallet=42,
-            inventory=["healing_potion", "healing_potion", "mystery_relic"],
+            inventory=[T_SPRAY, T_SPRAY, "mystery_relic"],
         )
         with patch(
             "world.rules.service_view.read_world_clock",
@@ -754,10 +874,10 @@ class InventoryTests(ServiceRegistryIsolation):
             view = build_services_view(player)
         rows = {row.item_key: row for row in view.inventory.rows}
         self.assertEqual(
-            rows["healing_potion"].presentation,
-            ITEM_REGISTRY["healing_potion"].presentation,
+            rows[T_SPRAY].presentation,
+            live_item_registry()[T_SPRAY].presentation,
         )
-        self.assertEqual(rows["healing_potion"].held, 2)
+        self.assertEqual(rows[T_SPRAY].held, 2)
         self.assertIsNone(rows["mystery_relic"].presentation)
         self.assertEqual(rows["mystery_relic"].display_name, "mystery_relic")
 
@@ -784,7 +904,7 @@ class SurfaceIsolationTests(ServiceRegistryIsolation):
         self.assertIsNotNone(view.shop)
         self.assertIsNotNone(view.inventory)
         self.assertEqual(view.pagination.board_total, 0)
-        self.assertEqual(view.pagination.stock_total, 12)
+        self.assertEqual(view.pagination.stock_total, 3)
 
     def test_malformed_merchant_stock_degrades_only_the_shop_surface(self):
         room = FakeRoom(
@@ -834,7 +954,7 @@ class SurfaceIsolationTests(ServiceRegistryIsolation):
             registration=registration(),
             guild_rank="F",
             quest_log=[quest_record()],
-            inventory=["meal", "meal"],
+            inventory=[T_APPLE, T_APPLE],
         )
         with patch(
             "world.rules.service_view.read_world_clock",
@@ -843,7 +963,7 @@ class SurfaceIsolationTests(ServiceRegistryIsolation):
             view = build_services_view(player)
         self.assertEqual(view.pagination.board_total, 1)
         self.assertEqual(view.pagination.quest_total, 1)
-        self.assertEqual(view.pagination.stock_total, 12)
+        self.assertEqual(view.pagination.stock_total, 3)
         self.assertEqual(view.pagination.sellable_total, 1)
         self.assertEqual(view.pagination.inventory_total, 1)
 
@@ -1003,7 +1123,7 @@ class ShopEdgeTests(ServiceRegistryIsolation):
         # advertised is treated as no merchant.
         class BrokenComponents(FakeComponents):
             def has(self, name):
-                return name == "merchant"
+                return name == Merchant.name
 
             def get(self, slot):
                 return None
@@ -1032,18 +1152,22 @@ class ShopEdgeTests(ServiceRegistryIsolation):
 
     def test_sellable_excludes_unsellable_and_unoffered_items(self):
         room = FakeRoom(
-            FakeHost("m", 1, merchant(merchant_stock={"meal": 10, "healing_potion": 3, "plain_sword": 1}), location=None)
+            FakeHost(
+                "m",
+                1,
+                merchant(merchant_stock={T_APPLE: 10, T_SPRAY: 3, T_FANG: 1}),
+                location=None,
+            )
         )
-        # "plain_sword" is sellable+offered; "healing_potion" is sellable and
-        # offered; "royal_signet_ring" is a held registry item that is both
-        # unsellable and unoffered; a made-up key is neither.
+        # T_APPLE/T_SPRAY are sellable and offered; T_PASS is a held registry
+        # item that is unsellable; a made-up key is neither.
         player = actor(
             location=room,
             wallet=5,
             inventory=[
-                "meal",
-                "healing_potion",
-                "royal_signet_ring",
+                T_APPLE,
+                T_SPRAY,
+                T_PASS,
                 "made_up_item",
                 "made_up_item",
             ],
@@ -1054,41 +1178,51 @@ class ShopEdgeTests(ServiceRegistryIsolation):
         ):
             view = build_services_view(player)
         keys = {row.item_key for row in view.shop.sellable}
-        self.assertEqual(keys, {"meal", "healing_potion"})
+        self.assertEqual(keys, {T_APPLE, T_SPRAY})
         self.assertNotIn("made_up_item", keys)
-        self.assertNotIn("royal_signet_ring", keys)
+        self.assertNotIn(T_PASS, keys)
 
     def test_closed_sell_and_insufficient_items_reasons(self):
         room = FakeRoom(
-            FakeHost("m", 1, merchant(merchant_stock={"meal": 10, "healing_potion": 3, "plain_sword": 1}), location=None)
+            FakeHost(
+                "m",
+                1,
+                merchant(merchant_stock={T_APPLE: 10, T_SPRAY: 3, T_FANG: 1}),
+                location=None,
+            )
         )
-        player = actor(location=room, wallet=5, inventory=["meal"])
+        player = actor(location=room, wallet=5, inventory=[T_APPLE])
         with patch(
             "world.rules.service_view.read_world_clock",
             return_value=SimpleNamespace(tick=TICK_NIGHT),
         ):
             view = build_services_view(player)
         sellable = {row.item_key: row for row in view.shop.sellable}
-        self.assertEqual(sellable["meal"].sell.reason_code, "closed")
+        self.assertEqual(sellable[T_APPLE].sell.reason_code, "closed")
 
         open_room = FakeRoom(
-            FakeHost("m", 1, merchant(merchant_stock={"meal": 10, "healing_potion": 3, "plain_sword": 1}), location=None)
+            FakeHost(
+                "m",
+                1,
+                merchant(merchant_stock={T_APPLE: 10, T_SPRAY: 3, T_FANG: 1}),
+                location=None,
+            )
         )
-        player2 = actor(location=open_room, wallet=5, inventory=["plain_sword", "plain_sword", "plain_sword"])
+        player2 = actor(location=open_room, wallet=5, inventory=[T_FANG, T_FANG, T_FANG])
         with patch(
             "world.rules.service_view.read_world_clock",
             return_value=SimpleNamespace(tick=TICK_NOON),
         ):
             view = build_services_view(player2)
-        # Stock cap 3 for plain_sword, stock 1, held 3: selling is capped at 2
-        # before overflow, so the enabled sell advertises min(held, cap)=2.
+        # The fang rule caps stock at 3 with 1 left; held 3 sells are capped at
+        # 2 before overflow, so the enabled sell advertises min(held, cap)=2.
         sellable = {row.item_key: row for row in view.shop.sellable}
-        self.assertTrue(sellable["plain_sword"].sell.enabled)
-        self.assertEqual(sellable["plain_sword"].sell.quantity_max, 2)
+        self.assertTrue(sellable[T_FANG].sell.enabled)
+        self.assertEqual(sellable[T_FANG].sell.quantity_max, 2)
 
     def test_malformed_equipment_degrades_inventory(self):
         room = FakeRoom()
-        player = actor(location=room, wallet=5, inventory=["meal"], equipment="corrupt")
+        player = actor(location=room, wallet=5, inventory=[T_APPLE], equipment="corrupt")
         with patch(
             "world.rules.service_view.read_world_clock",
             return_value=SimpleNamespace(tick=TICK_NOON),
@@ -1106,9 +1240,9 @@ class ShopEdgeTests(ServiceRegistryIsolation):
         player = actor(
             location=room,
             wallet=5,
-            inventory=["plain_sword"],
+            inventory=[T_KNIFE],
             equipment={
-                "weapon_main": "plain_sword",
+                "weapon_main": T_KNIFE,
                 "weapon_off": None,
                 "armor": None,
                 "accessories": "corrupt",
@@ -1129,12 +1263,12 @@ class ShopEdgeTests(ServiceRegistryIsolation):
         player = actor(
             location=room,
             wallet=5,
-            inventory=["plain_sword"],
+            inventory=[T_KNIFE],
             equipment={
-                "weapon_main": "plain_sword",
+                "weapon_main": T_KNIFE,
                 "weapon_off": None,
                 "armor": None,
-                "accessories": ["plain_sword"],
+                "accessories": [T_KNIFE],
             },
         )
         with patch(
@@ -1149,16 +1283,6 @@ class ShopEdgeTests(ServiceRegistryIsolation):
 class InventoryRowActionTests(ServiceRegistryIsolation):
     """Personal-item descriptors derived by the shared preflight APIs."""
 
-    def setUp(self):
-        super().setUp()
-        snapshot = dict(ITEM_REGISTRY)
-
-        def restore():
-            ITEM_REGISTRY.clear()
-            ITEM_REGISTRY.update(snapshot)
-
-        self.addCleanup(restore)
-
     def _build(self, player):
         with patch(
             "world.rules.service_view.read_world_clock",
@@ -1172,10 +1296,10 @@ class InventoryRowActionTests(ServiceRegistryIsolation):
     def test_injured_usable_row_carries_enabled_use_descriptor(self):
         player = actor(
             location=FakeRoom(),
-            inventory=["healing_potion"],
+            inventory=[T_SPRAY],
             hp_current=50,
         )
-        row = self._rows(self._build(player))["healing_potion"]
+        row = self._rows(self._build(player))[T_SPRAY]
         self.assertIsNotNone(row.action)
         self.assertEqual(row.action.action_id, "inventory.use")
         self.assertEqual(row.action.label, "使用")
@@ -1185,10 +1309,10 @@ class InventoryRowActionTests(ServiceRegistryIsolation):
     def test_full_hp_use_disabled_with_stable_reason(self):
         player = actor(
             location=FakeRoom(),
-            inventory=["healing_potion"],
+            inventory=[T_SPRAY],
             hp_current=100,
         )
-        row = self._rows(self._build(player))["healing_potion"]
+        row = self._rows(self._build(player))[T_SPRAY]
         self.assertFalse(row.action.enabled)
         self.assertEqual(row.action.reason_code, "hp_full")
         self.assertEqual(
@@ -1199,14 +1323,14 @@ class InventoryRowActionTests(ServiceRegistryIsolation):
     def test_unknown_and_inspect_only_rows_have_null_actions(self):
         player = actor(
             location=FakeRoom(),
-            inventory=["mystery_relic", "meal"],
+            inventory=["mystery_relic", T_APPLE],
             hp_current=50,
         )
         rows = self._rows(self._build(player))
         self.assertIsNone(rows["mystery_relic"].action)
         self.assertIsNone(rows["mystery_relic"].presentation)
-        self.assertIsNone(rows["meal"].action)
-        self.assertIsNotNone(rows["meal"].presentation)
+        self.assertIsNone(rows[T_APPLE].action)
+        self.assertIsNotNone(rows[T_APPLE].presentation)
 
     def test_equipment_toggle_descriptor_tracks_equipped_state(self):
         equipment = {
@@ -1217,34 +1341,27 @@ class InventoryRowActionTests(ServiceRegistryIsolation):
         }
         player = actor(
             location=FakeRoom(),
-            inventory=["plain_sword"],
+            inventory=[T_KNIFE],
             equipment=dict(equipment),
             hp_current=100,
         )
-        row = self._rows(self._build(player))["plain_sword"]
+        row = self._rows(self._build(player))[T_KNIFE]
         self.assertEqual(row.action.action_id, "inventory.toggle_equip")
         self.assertEqual(row.action.label, "裝備")
         self.assertTrue(row.action.enabled)
 
-        player.db.equipment = {**equipment, "weapon_main": "plain_sword"}
-        row = self._rows(self._build(player))["plain_sword"]
+        player.db.equipment = {**equipment, "weapon_main": T_KNIFE}
+        row = self._rows(self._build(player))[T_KNIFE]
         self.assertTrue(row.equipped)
         self.assertEqual(row.action.label, "卸下")
         self.assertTrue(row.action.enabled)
 
     def test_sixth_accessory_disabled_and_equipped_rows_stay_enabled(self):
-        from world.lore.items import (
-            EquipmentModifierKey,
-            ItemDefinition,
-            ItemIconKey,
-            ItemKind,
-            ItemPresentation,
-            ItemRarity,
-        )
         from world.skills.equipment import EquipmentSlot
 
+        registry = live_item_registry()
         for index in range(6):
-            ITEM_REGISTRY[f"ring_{index}"] = ItemDefinition(
+            registry[f"ring_{index}"] = ItemDefinition(
                 key=f"ring_{index}",
                 display_name_zh="測試戒指",
                 price_table_key="ring_0",
@@ -1283,7 +1400,7 @@ class InventoryRowActionTests(ServiceRegistryIsolation):
     def test_combat_view_keeps_personal_use_descriptor_available(self):
         player = actor(
             location=FakeRoom(),
-            inventory=["healing_potion"],
+            inventory=[T_SPRAY],
             hp_current=50,
         )
         player.db.active_combat = {
@@ -1299,7 +1416,7 @@ class InventoryRowActionTests(ServiceRegistryIsolation):
         }
         view = self._build(player)
         self.assertIsNone(view.guild)
-        row = self._rows(view)["healing_potion"]
+        row = self._rows(view)[T_SPRAY]
         self.assertTrue(row.action.enabled)
 
     def test_descriptor_derivation_mutates_nothing(self):
@@ -1307,9 +1424,9 @@ class InventoryRowActionTests(ServiceRegistryIsolation):
 
         player = actor(
             location=FakeRoom(),
-            inventory=["healing_potion", "plain_sword", "mystery_relic"],
+            inventory=[T_SPRAY, T_KNIFE, "mystery_relic"],
             equipment={
-                "weapon_main": "plain_sword",
+                "weapon_main": T_KNIFE,
                 "weapon_off": None,
                 "armor": None,
                 "accessories": [],
