@@ -2,6 +2,9 @@
 
 from tools.spec_traceability import covers_requirement
 
+import inspect
+from pathlib import Path
+import unittest
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -19,11 +22,14 @@ from world.rules.combat_session import (
     CombatSessionError,
     SessionReason,
     engage,
+    engage_group,
     is_in_active_session,
     read_session,
     reconstruct_battlefield,
     submit_player_action,
+    submit_opening_action,
 )
+from world.rules.overwhelm import classify_overwhelm
 from world.rules.event_log import render_plain_text
 from world.rules.party import join_party
 from world.skills.handler import INNATE_SKILL_KEYS
@@ -240,29 +246,49 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["record"].rounds_elapsed, 0)
         self.assertEqual(self.monster.traits.hp.current, 100)
 
+    @covers_requirement("player-combat-session::one-submission-inside-an-active-session-is-one-ordinary-round-by-default-and-structurally")
+    @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
     def test_overwhelming_player_resolves_after_first_action(self):
+        # combat-session-opening-dispatch: an in-session submission under a
+        # player-overwhelming verdict resolves exactly one ordinary round and
+        # never dispatches the compressed resolver. The fire_ball kills the
+        # weak monster inside that single round, so the session still settles
+        # as a victory -- but through one round, not compression.
         for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
         self.player.traits.hp.current = 2000
         engage(self.player, self.monster)
-        with patch("world.rules.combat.roll_d100", return_value=100):
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch(
+                "world.rules.combat_session.resolve_overwhelm",
+                side_effect=AssertionError(
+                    "an in-session submission must never dispatch compression"
+                ),
+            ) as resolver,
+        ):
             result = submit_player_action(self.player, "fire_ball", [self.monster])
+        resolver.assert_not_called()
         self.assertEqual(result["outcome"], "victory")
+        self.assertEqual(result["rounds_elapsed"], 1)
         self.assertIsNone(self.player.db.active_combat)
 
 class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
-    """overwhelm-log-attribution: the compressed log of a player-overwhelming
-    session marks the player's commanded action and keeps every attack's own
-    roll line, so a self-commanded basic attack can never be misread as the
-    attack that damaged the enemy. Self-targeting damage stays legal: the
-    commanded action resolves against the actor."""
+    """overwhelm-log-attribution under the opening seam: the compressed log of
+    a player-overwhelming session opened through ``submit_opening_action()``
+    marks the player's commanded skill exactly once and keeps that attack's
+    own roll line, so the marker can never be misread as a different action.
+    (combat-session-opening-dispatch 5.7/5.12: compression is now reachable
+    only through the opening seam, so the attribution contract is driven
+    there.)"""
 
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="attribution arena")
         self.player = _player("attribution player")
         self.player.location = self.room
+        grant_lineage(self.player, ["fire_ball"])
         for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000
@@ -271,49 +297,40 @@ class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
         self.monster.location = self.room
 
     @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
-    def test_commanded_self_attack_is_marked_and_rolls_stay_attributable(self):
+    @covers_requirement("player-combat-session::submit-opening-action-is-the-sole-compression-dispatcher-and-always-grants-the-player-first-strike")
+    def test_compressed_opening_marks_commanded_skill_once_with_attributable_rolls(self):
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=44):
-            result = submit_player_action(
-                self.player, "basic_attack", [self.player]
-            )
+            result = submit_opening_action(self.player, "fire_ball", [self.monster])
         self.assertEqual(result["outcome"], "victory")
-        self.assertEqual(result["rounds_elapsed"], 2)
-        # The self-commanded basic attack resolved against the actor (a miss
-        # against the player's own agility), leaving the player unharmed.
-        self.assertEqual(self.player.traits.hp.current, 2000)
-        marker = "你施展了「基本攻擊」。"
-        self_miss = (
-            f"{self.player.key} 對 {self.player.key} 的攻擊擲出了 44。"
-        )
-        self.assertIn(marker, "\n".join(render_plain_text(log) for log in result["logs"]))
-        commanded_logs = [
+        # Exactly one first-round commanded_action marker, kind skill, the
+        # submitted key's label, attached to the player's own fire_ball log.
+        markers = [
+            entry
+            for log in result["logs"]
+            for entry in log.entries
+            if entry.kind == "commanded_action"
+        ]
+        self.assertEqual(len(markers), 1)
+        self.assertEqual(markers[0].actor, str(self.player.key))
+        self.assertEqual(markers[0].data, {"skill": "火球術"})
+        opening_logs = [
             render_plain_text(log)
             for log in result["logs"]
             if log.actor == str(self.player.key)
-            and log.skill_key == "basic_attack"
-            and str(log.targets[0]) == str(self.player.key)
+            and log.skill_key == "fire_ball"
         ]
-        self.assertEqual(len(commanded_logs), 1)
-        self.assertTrue(commanded_logs[0].startswith(marker))
-        self.assertIn(self_miss, commanded_logs[0])
-        # The compression's auto basic attack against the enemy keeps its own
-        # roll line immediately before its damage line.
-        auto_logs = [
-            render_plain_text(log)
-            for log in result["logs"]
-            if log.actor == str(self.player.key)
-            and log.skill_key == "basic_attack"
-            and str(log.targets[0]) == str(self.monster.key)
-        ]
-        self.assertEqual(len(auto_logs), 1)
-        auto_lines = auto_logs[0].splitlines()
+        self.assertEqual(len(opening_logs), 1)
+        opening_lines = opening_logs[0].splitlines()
+        # The marker prefixes the action's own roll line, which stays
+        # immediately before the damage it describes.
+        self.assertEqual(opening_lines[0], "你施展了「火球術」。")
         self.assertEqual(
-            auto_lines[0],
+            opening_lines[1],
             f"{self.player.key} 對 {self.monster.key} 的攻擊擲出了 44。",
         )
         self.assertTrue(
-            auto_lines[1].startswith(
+            opening_lines[2].startswith(
                 f"{self.player.key} 對 {self.monster.key} 造成了 "
             )
         )
@@ -517,3 +534,429 @@ class CommandSessionTests(BattlefieldIsolation, QuestRegistryIsolation, EvenniaC
         with patch("world.rules.cast_settlement.get_world_clock", return_value=clock):
             self.call(CmdCast(), "fire_ball=cmd goblin", None)
         self.assertEqual(clock.tick, 0)
+
+
+class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
+    """combat-session-opening-dispatch 5.9/5.10/5.13: group engagement."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="group arena")
+        self.player = _player("group hunter")
+        self.player.location = self.room
+        grant_lineage(self.player, ["fire_ball"])
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
+            getattr(self.player.traits, key).base = 200
+        self.player.traits.hp.base = 2000
+        self.player.traits.hp.current = 2000
+
+    @covers_requirement("player-combat-session::engage-group-opens-one-session-against-several-co-located-hostile-targets")
+    def test_engage_group_opens_one_session_and_resolves_to_victory(self):
+        m1 = _monster("m1", hp=100, atk=10)
+        m2 = _monster("m2", hp=100, atk=10)
+        m1.location = self.room
+        m2.location = self.room
+        result = engage_group(self.player, [m2, m1])
+        record = result["record"]
+        self.assertEqual(record.enemy_ids, tuple(sorted([int(m1.pk), int(m2.pk)])))
+        battlefield = reconstruct_battlefield(self.player, record)
+        self.assertEqual(
+            sorted(str(k) for k in battlefield.teams["foes"]),
+            sorted([m1.key, m2.key]),
+        )
+        # The player dominates both floor-tier foes, so the opening's
+        # two-part judgement selects compression, and the round-1 fire_ball
+        # plus the auto-attacks settle the whole session in one call.
+        with patch("world.rules.combat.roll_d100", return_value=100):
+            outcome = submit_opening_action(self.player, "fire_ball", [m1])
+        self.assertEqual(outcome["outcome"], "victory")
+        self.assertGreaterEqual(
+            len([
+                entry
+                for log in outcome["logs"]
+                for entry in log.entries
+                if entry.kind == "commanded_action"
+            ]),
+            1,
+        )
+        self.assertIsNone(self.player.db.active_combat)
+
+    @covers_requirement("player-combat-session::engage-group-opens-one-session-against-several-co-located-hostile-targets")
+    def test_engage_group_rejections_leave_no_session(self):
+        from world.rules.clock import get_world_clock
+
+        good = _monster("good", hp=100, atk=10)
+        good.location = self.room
+        dead = _monster("dead", hp=0)
+        dead.location = self.room
+        remote = _monster("remote", hp=100)
+        remote.location = create_object(Room, key="elsewhere")
+        stranger = create_object(NPC, key="npc-stranger", location=self.room)
+        cases = [
+            ([good, dead], SessionReason.TARGET_DEAD),
+            ([good, remote], SessionReason.NOT_PRESENT),
+            ([good, stranger], SessionReason.NOT_HOSTILE),
+            ([good, good], SessionReason.DUPLICATE_PARTICIPANT),
+            ([], SessionReason.MALFORMED_SESSION),
+        ]
+        for targets, reason in cases:
+            with self.subTest(reason=reason), self.assertRaises(CombatSessionError) as ctx:
+                engage_group(self.player, targets)
+            self.assertEqual(ctx.exception.args[0], reason)
+            self.assertIsNone(read_session(self.player))
+        self.assertEqual(get_world_clock().tick, 0)
+
+    @covers_requirement("player-combat-session::submit-opening-action-is-the-sole-compression-dispatcher-and-always-grants-the-player-first-strike")
+    def test_opening_rejects_shorthand_and_off_roster_before_anything(self):
+        m1 = _monster("opening foe", hp=100, atk=10)
+        m1.location = self.room
+        away = _monster("away foe", hp=100)
+        away.location = create_object(Room, key="not here")
+        engage_group(self.player, [m1])
+        mp_before = self.player.traits.mp.value
+        with self.assertRaises(TypeError):
+            submit_opening_action(self.player, "fire_ball", "all-enemies")
+        with self.assertRaises(CombatSessionError) as ctx:
+            submit_opening_action(self.player, "fire_ball", [away])
+        self.assertEqual(ctx.exception.args[0], SessionReason.NOT_PRESENT)
+        record = read_session(self.player)
+        self.assertEqual(record.rounds_elapsed, 0)
+        self.assertEqual(self.player.traits.mp.value, mp_before)
+
+    @covers_requirement("player-combat-session::engage-group-opens-one-session-against-several-co-located-hostile-targets")
+    def test_two_enemy_session_exercises_scans_knockouts_and_settlement(self):
+        # 5.11: a two-enemy session through _primary_opponent_id(), the
+        # friendly-fire scan, nonlethal knockout, and terminal settlement.
+        import world.rules.combat_session as session_mod
+
+        companion = create_object(NPC, key="並肩", location=self.room)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        m1 = _monster("twin a", hp=100, atk=10)
+        m2 = _monster("twin b", hp=100, atk=10)
+        m1.location = self.room
+        m2.location = self.room
+        grant_lineage(self.player, ["wind_blade"])
+        engage_group(self.player, [m1, m2])
+        seen: list = []
+        real_primary = session_mod._primary_opponent_id
+
+        def spy(battlefield, record):
+            value = real_primary(battlefield, record)
+            seen.append(value)
+            return value
+
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.action.roll_d100", return_value=100),
+            patch.object(session_mod, "_primary_opponent_id", side_effect=spy),
+        ):
+            result = submit_opening_action(self.player, "wind_blade", [m1])
+        self.assertGreaterEqual(len(seen), 1)
+        self.assertEqual(
+            seen[0], min(int(m1.pk), int(m2.pk))
+        )
+        self.assertEqual(result["outcome"], "victory")
+        # The AREA wind_blade hit the companion through the two-enemy
+        # roster and the nonlethal companion policy floored it at 1 HP; the
+        # per-hit affinity penalty contract itself is pinned in
+        # test_friendly_fire (here the scan simply must not crash the flow).
+        # The player's AREA wind_blade reached the companion through the
+        # two-enemy roster (observed: one 7-damage hit under the patched
+        # rolls); the friendly-fire/coercion scans ran over the two-enemy
+        # logs without crashing the flow. The per-hit affinity-penalty
+        # contract itself is pinned in test_friendly_fire.
+        self.assertLess(companion.traits.hp.current, companion.traits.hp.max)
+        self.assertIsNone(self.player.db.active_combat)
+
+    @covers_requirement("player-combat-session::one-submission-inside-an-active-session-is-one-ordinary-round-by-default-and-structurally")
+    def test_both_openings_forward_the_same_policy_kwargs(self):
+        # 5.4: the round and overwhelm entries receive the identical
+        # simulated/nonlethal/journal/notification policy.
+        from world.rules.combat import run_round as real_run_round
+        from world.rules.overwhelm import resolve_overwhelm as real_resolve
+
+        companion = create_object(NPC, key="政策護伴", location=self.room)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        captured = {}
+
+        def record_round(field, provider, **kwargs):
+            captured.setdefault("round", kwargs)
+            return real_run_round(field, provider, **kwargs)
+
+        def record_resolve(field, provider, **kwargs):
+            captured.setdefault("overwhelm", kwargs)
+            return real_resolve(field, provider, **kwargs)
+
+        def build():
+            foe = _monster("政策敵", hp=300, atk=10)
+            foe.location = self.room
+            engage(self.player, foe)
+            return foe
+
+        with (
+            patch("world.rules.combat.roll_d100", return_value=44),
+            patch("world.rules.action.roll_d100", return_value=44),
+            patch("world.rules.combat_session.run_round", side_effect=record_round),
+        ):
+            submit_player_action(self.player, "fire_ball", [build()])
+        self.player.db.active_combat = None
+        with (
+            patch("world.rules.combat.roll_d100", return_value=44),
+            patch("world.rules.action.roll_d100", return_value=44),
+            patch(
+                "world.rules.combat_session.resolve_overwhelm",
+                side_effect=record_resolve,
+            ),
+        ):
+            submit_opening_action(self.player, "fire_ball", [build()])
+        self.assertEqual(
+            sorted(captured), ["overwhelm", "round"]
+        )
+        for key in ("simulated", "nonlethal_keys"):
+            self.assertEqual(
+                captured["round"][key], captured["overwhelm"][key], key
+            )
+        self.assertFalse(captured["round"]["simulated"])
+        self.assertEqual(
+            captured["round"]["nonlethal_keys"], {companion.key}
+        )
+        for key in ("journal_sink", "notifications_sink"):
+            self.assertIsInstance(captured["round"][key], list, key)
+            self.assertIsInstance(captured["overwhelm"][key], list, key)
+
+
+class OpeningDispatchSelectionTests(BattlefieldIsolation, EvenniaTestCase):
+    """combat-session-opening-dispatch 5.5/5.6: two-part dispatch + first strike."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="dispatch arena")
+        self.player = _player("dispatch duelist")
+        self.player.location = self.room
+        grant_lineage(self.player, ["fire_ball", "concentration"])
+        for key in ("atk_phys", "agility", "defense", "magic_power"):
+            getattr(self.player.traits, key).base = 200
+        self.player.traits.hp.base = 2000
+        self.player.traits.hp.current = 2000
+
+    @covers_requirement("player-combat-session::submit-opening-action-is-the-sole-compression-dispatcher-and-always-grants-the-player-first-strike")
+    def test_non_damaging_skill_under_player_verdict_takes_the_round_path(self):
+        weak = _monster("weak", hp=100, atk=10)
+        weak.location = self.room
+        engage(self.player, weak)
+        self.assertEqual(
+            classify_overwhelm(reconstruct_battlefield(self.player, read_session(self.player))),
+            "party",
+        )
+        result = submit_opening_action(self.player, "concentration", [])
+        self.assertEqual(result["outcome"], "round")
+        self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+        self.assertEqual(weak.traits.hp.current, 100)
+
+    @covers_requirement("player-combat-session::submit-opening-action-is-the-sole-compression-dispatcher-and-always-grants-the-player-first-strike")
+    def test_foe_verdict_opening_takes_the_round_path(self):
+        weak = _monster("weak", hp=100, atk=10)
+        weak.location = self.room
+        engage(self.player, weak)
+        with (
+            patch("world.rules.combat.roll_d100", return_value=1),
+            patch("world.rules.action.roll_d100", return_value=1),
+            patch("world.rules.combat_session.classify_overwhelm", return_value="foes"),
+            patch(
+                "world.rules.combat_session.resolve_overwhelm",
+                side_effect=AssertionError(
+                    "a foe-direction verdict must never compress"
+                ),
+            ) as resolver,
+        ):
+            result = submit_opening_action(self.player, "fire_ball", [weak])
+        resolver.assert_not_called()
+        # One ordinary round resolved the (patched) verdict fight; whether it
+        # settled depends on the single round's damage, never on compression.
+        self.assertIn(result["outcome"], ("round", "victory"))
+        if result["outcome"] == "round":
+            self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+
+    @covers_requirement("player-combat-session::submit-opening-action-is-the-sole-compression-dispatcher-and-always-grants-the-player-first-strike")
+    def test_contested_verdict_opening_takes_the_round_path(self):
+        # 5.5 / contested-verdict scenario: a None verdict is ineligible even
+        # for a damaging skill, and must not reach the resolver.
+        weak = _monster("weak", hp=500, atk=10)
+        weak.location = self.room
+        engage(self.player, weak)
+        with (
+            patch("world.rules.combat.roll_d100", return_value=50),
+            patch("world.rules.action.roll_d100", return_value=50),
+            patch("world.rules.combat_session.classify_overwhelm", return_value=None),
+            patch(
+                "world.rules.combat_session.resolve_overwhelm",
+                side_effect=AssertionError("a contested verdict must never compress"),
+            ) as resolver,
+        ):
+            result = submit_opening_action(self.player, "fire_ball", [weak])
+        resolver.assert_not_called()
+        self.assertIn(result["outcome"], ("round", "victory"))
+        self.assertGreaterEqual(read_session(self.player).rounds_elapsed if read_session(self.player) else 1, 1)
+
+    @covers_requirement("player-combat-session::submit-opening-action-is-the-sole-compression-dispatcher-and-always-grants-the-player-first-strike")
+    def test_damaging_skill_at_only_an_ally_does_not_compress(self):
+        # 5.5 / damaging-away-from-enemy gate: a DamageEffect skill whose
+        # submitted targets never name an enemy fails the predicate even under
+        # a player-direction verdict, resolving one ordinary round instead.
+        weak = _monster("untouched", hp=500, atk=10)
+        weak.location = self.room
+        ally = _player("ally-only-target")
+        ally.location = self.room
+        engage(self.player, weak)
+        from world.rules.combat_session import _persist, from_storage, to_storage
+
+        _persist(
+            self.player,
+            from_storage(
+                {
+                    **to_storage(read_session(self.player)),
+                    "player_ids": (self.player.pk, ally.pk),
+                }
+            ),
+        )
+        with (
+            patch("world.rules.combat.roll_d100", return_value=50),
+            patch("world.rules.action.roll_d100", return_value=50),
+            patch(
+                "world.rules.combat_session.resolve_overwhelm",
+                side_effect=AssertionError(
+                    "a skill aimed away from every enemy must never compress"
+                ),
+            ),
+        ):
+            result = submit_opening_action(self.player, "fire_ball", [ally])
+        self.assertIn(result["outcome"], ("round", "victory"))
+        self.assertEqual(weak.traits.hp.current, 500)
+        record = read_session(self.player)
+        self.assertEqual(record.rounds_elapsed if record else 1, 1)
+
+    @covers_requirement("player-combat-session::submit-opening-action-is-the-sole-compression-dispatcher-and-always-grants-the-player-first-strike")
+    def test_opening_grants_the_player_the_first_turn_regardless_of_initiative(self):
+        fast = _monster("fast foe", hp=400, atk=10)
+        fast.traits.agility.base = 100
+        fast.location = self.room
+        self.player.traits.agility.base = 40
+        engage(self.player, fast)
+        # concentration never damages, so the opening takes the round path;
+        # first_actor must still move the player to the head of the round.
+        with patch("world.rules.combat.roll_d100", return_value=50):
+            result = submit_opening_action(self.player, "concentration", [])
+        self.assertEqual(result["outcome"], "round")
+        acting_logs = [log for log in result["logs"] if log.entries]
+        self.assertEqual(str(acting_logs[0].actor), str(self.player.key))
+        actors = [str(log.actor) for log in acting_logs]
+        self.assertIn(str(fast.key), actors)
+        self.assertGreater(actors.index(str(fast.key)), actors.index(str(self.player.key)))
+        # The monster acted after the player and hit it (roll 50 lands).
+        self.assertLess(self.player.traits.hp.current, 2000)
+
+
+class CompressedOpeningFirstStrikeTests(BattlefieldIsolation, EvenniaTestCase):
+    """combat-session-opening-dispatch 5.6 under the compression selection:
+    ``first_actor`` must reach ``resolve_overwhelm()``'s first round, not just
+    ``run_round()``'s — a regression dropping the override only from the
+    compressed branch would let the faster monster act before the opening."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="compressed arena")
+        self.player = _player("compressed first strike")
+        self.player.location = self.room
+        grant_lineage(self.player, ["fire_ball"])
+        self.player.traits.atk_phys.base = 200
+        self.player.traits.agility.base = 100
+        self.player.traits.defense.base = 200
+        self.player.traits.magic_power.base = 50
+        self.player.traits.hp.base = 20000
+        self.player.traits.hp.current = 20000
+        # The monster out-agilities the player, so ordinary initiative would
+        # place it first; only the first_actor override can reorder it.
+        self.monster = _monster("quick goblin", hp=300)
+        self.monster.traits.agility.base = 110
+        self.monster.location = self.room
+
+    @covers_requirement("player-combat-session::submit-opening-action-is-the-sole-compression-dispatcher-and-always-grants-the-player-first-strike")
+    def test_compressed_opening_forwards_first_actor_and_acts_first(self):
+        import world.rules.overwhelm as overwhelm_mod
+
+        engage(self.player, self.monster)
+        self.assertEqual(
+            classify_overwhelm(reconstruct_battlefield(self.player, read_session(self.player))),
+            "party",
+        )
+        captured = {}
+        real_resolve = overwhelm_mod.resolve_overwhelm
+
+        def spy(field, provider, **kwargs):
+            captured.update(kwargs)
+            return real_resolve(field, provider, **kwargs)
+
+        with (
+            patch("world.rules.combat.roll_d100", return_value=100),
+            patch("world.rules.combat_session.resolve_overwhelm", side_effect=spy),
+        ):
+                result = submit_opening_action(self.player, "fire_ball", [self.monster])
+        # The opening really compressed, and the override reached the resolver.
+        self.assertEqual(result["outcome"], "victory")
+        self.assertEqual(captured.get("first_actor"), str(self.player.key))
+        # Ordinary initiative would have placed the quicker monster first; the
+        # player's is nonetheless the first combatant action of the encounter.
+        actors = [
+            str(log.actor)
+            for log in result["logs"]
+            if log.entries and str(log.actor) in (str(self.player.key), str(self.monster.key))
+        ]
+        self.assertEqual(actors[0], str(self.player.key))
+        self.assertIn(str(self.monster.key), actors)
+
+
+class SubmissionStructuralTests(unittest.TestCase):
+    """combat-session-opening-dispatch 5.3/5.8: structural tripwires."""
+
+    @covers_requirement("player-combat-session::one-submission-inside-an-active-session-is-one-ordinary-round-by-default-and-structurally")
+    def test_in_session_entries_never_request_or_judge_compression(self):
+        import ast as _ast
+
+        import world.rules.combat_session as session
+
+        for func in (session.submit_player_action, session.submit_player_item_use):
+            tree = _ast.parse(inspect.getsource(func))
+            for node in _ast.walk(tree):
+                if isinstance(node, _ast.Call):
+                    self.assertNotIn(
+                        "opening",
+                        [kw.arg for kw in node.keywords if kw.arg],
+                        func.__name__,
+                    )
+                    callee = node.func
+                    name = callee.id if isinstance(callee, _ast.Name) else getattr(callee, "attr", "")
+                    self.assertNotEqual(name, "classify_overwhelm", func.__name__)
+
+    @covers_requirement("player-combat-session::submit-opening-action-is-the-sole-compression-dispatcher-and-always-grants-the-player-first-strike")
+    def test_resolve_overwhelm_has_a_single_production_call_site(self):
+        import ast as _ast
+
+        root = Path(__file__).resolve().parents[3]
+        callers = []
+        for directory in ("commands", "typeclasses", "world"):
+            for path in (root / directory).rglob("*.py"):
+                if "tests" in path.parts:
+                    continue
+                tree = _ast.parse(path.read_text(encoding="utf-8"))
+                for node in _ast.walk(tree):
+                    if isinstance(node, _ast.Call):
+                        callee = node.func
+                        name = callee.id if isinstance(callee, _ast.Name) else getattr(callee, "attr", "")
+                        if name == "resolve_overwhelm":
+                            callers.append(path)
+        session_file = (root / "world" / "rules" / "combat_session.py").resolve()
+        self.assertEqual([p.resolve() for p in callers], [session_file])
