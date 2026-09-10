@@ -11,7 +11,6 @@ import unittest
 
 from tools.spec_traceability import covers_requirement
 
-from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.rules.art_view import (
     MAX_PORTRAIT_CATALOG,
     ROLE_ALLY,
@@ -25,6 +24,13 @@ from world.rules.art_view import (
     build_art_view,
     portrait_catalog_key,
 )
+from world.tests.synthetic_data import SYNTH_ARCHETYPES, synthetic_registries
+
+# Scene-archetype validation resolves against the kit's synthetic archetype
+# catalog (a class-scope swap): the view must echo exactly the archetype the
+# registry knows, whichever rows the shipped catalog happens to carry.
+A_BAZAAR = next(iter(SYNTH_ARCHETYPES))
+A_LODGE = tuple(SYNTH_ARCHETYPES)[1]
 
 
 def _entity(pk, name="entity", threat_tier=None, portrait_policy=None, dialogue=False):
@@ -70,9 +76,10 @@ def _resolver(entities_by_id):
     return lambda identity: entities_by_id.get(int(identity))
 
 
+@synthetic_registries("archetypes")
 class ArtViewSelectionTests(unittest.TestCase):
     def setUp(self):
-        self.room = _room([], scene_archetype="tavern_interior")
+        self.room = _room([], scene_archetype=A_BAZAAR)
         self.actor = _actor(self.room)
 
     def test_combat_mode_uses_shared_roster_order(self):
@@ -93,7 +100,7 @@ class ArtViewSelectionTests(unittest.TestCase):
         }
         actor = _actor(self.room, active_combat=record)
         view = build_art_view(actor, resolver=_resolver(entities))
-        self.assertEqual(view.scene_archetype, "tavern_interior")
+        self.assertEqual(view.scene_archetype, A_BAZAAR)
         self.assertEqual(
             [(entity.identity, entity.role) for entity in view.entities],
             [(1, ROLE_ALLY), (2, ROLE_FOE), (3, ROLE_FOE)],
@@ -105,11 +112,11 @@ class ArtViewSelectionTests(unittest.TestCase):
     def test_exploration_mode_filters_dialogue_hosts_and_named_policy(self):
         host = _entity(10, name="innkeeper", dialogue=True)
         named = _entity(
-            11, name="guard", portrait_policy={"mode": "named", "stable_key": "guard-1"}
+            11, name="sentry", portrait_policy={"mode": "named", "stable_key": "guard-1"}
         )
         policy_less = _entity(12, name="peasant")
         monster = _entity(13, name="rat", threat_tier="low")
-        room = _room([policy_less, host, named, monster], scene_archetype="forest_path")
+        room = _room([policy_less, host, named, monster], scene_archetype=A_LODGE)
         actor = _actor(room)
         view = build_art_view(actor)
         # Deterministic identity-sorted order; only the host and the named
@@ -120,7 +127,7 @@ class ArtViewSelectionTests(unittest.TestCase):
         )
         self.assertEqual(view.entities[0].subject_kind, SUBJECT_NONE)
         self.assertEqual(view.entities[1].subject_kind, SUBJECT_CHARACTER)
-        self.assertEqual(view.scene_archetype, "forest_path")
+        self.assertEqual(view.scene_archetype, A_LODGE)
 
     def test_actor_is_not_their_own_exploration_focusable_subject(self):
         # Even when the actor carries an explicit named portrait policy, they
@@ -129,7 +136,7 @@ class ArtViewSelectionTests(unittest.TestCase):
             60, name="hero", portrait_policy={"mode": "named", "stable_key": "hero-1"}
         )
         host = _entity(61, name="host", dialogue=True)
-        room = _room([actor_named, host], scene_archetype="tavern_interior")
+        room = _room([actor_named, host], scene_archetype=A_BAZAAR)
         view = build_art_view(_actor(room, pk=60))
         self.assertEqual([entity.identity for entity in view.entities], [61])
 
@@ -138,7 +145,7 @@ class ArtViewSelectionTests(unittest.TestCase):
         # order, so payloads are deterministic across database states.
         host_high = _entity(90, name="host-b", dialogue=True)
         host_low = _entity(70, name="host-a", dialogue=True)
-        room = _room([host_high, host_low], scene_archetype="forest_path")
+        room = _room([host_high, host_low], scene_archetype=A_LODGE)
         view = build_art_view(_actor(room))
         self.assertEqual([entity.identity for entity in view.entities], [70, 90])
 
@@ -149,7 +156,7 @@ class ArtViewSelectionTests(unittest.TestCase):
             dialogue=True,
             portrait_policy={"mode": "named", "stable_key": "head-1"},
         )
-        room = _room([host], scene_archetype="city_street")
+        room = _room([host], scene_archetype=A_BAZAAR)
         view = build_art_view(_actor(room))
         self.assertEqual(view.entities[0].role, ROLE_DIALOGUE)
         self.assertEqual(view.entities[0].subject_kind, SUBJECT_CHARACTER)
@@ -158,7 +165,7 @@ class ArtViewSelectionTests(unittest.TestCase):
         # Only the actor's location contents are considered; an entity in
         # another room is simply never enumerated.
         host = _entity(30, name="host", dialogue=True)
-        room = _room([host], scene_archetype="dungeon_interior")
+        room = _room([host], scene_archetype=A_LODGE)
         actor = _actor(room)
         other = _entity(31, name="elsewhere", dialogue=True)
         other.location = _room([], scene_archetype=None)
@@ -170,7 +177,7 @@ class ArtViewSelectionTests(unittest.TestCase):
             _entity(index, name=f"npc-{index}", dialogue=True)
             for index in range(1, MAX_PORTRAIT_CATALOG + 5)
         ]
-        room = _room(entities, scene_archetype="shrine_interior")
+        room = _room(entities, scene_archetype=A_BAZAAR)
         view = build_art_view(_actor(room))
         self.assertEqual(len(view.entities), MAX_PORTRAIT_CATALOG)
         self.assertEqual(
@@ -185,7 +192,7 @@ class ArtViewSelectionTests(unittest.TestCase):
         # not reach the portrait catalog entry.
         host = _entity(40, name="塞提斯", dialogue=True)
         host.npc_title = "南門守衛"
-        room = _room([host], scene_archetype="city_street")
+        room = _room([host], scene_archetype=A_LODGE)
         view = build_art_view(_actor(room))
         self.assertEqual(view.entities[0].display_name, "塞提斯")
         self.assertNotIn("\u3000", view.entities[0].display_name)
@@ -208,7 +215,7 @@ class ArtViewSelectionTests(unittest.TestCase):
             "rounds_elapsed": 0,
             "exam_id": None,
         }
-        actor = _actor(_room([], scene_archetype="cave_interior"), active_combat=record)
+        actor = _actor(_room([], scene_archetype=A_BAZAAR), active_combat=record)
         view = build_art_view(actor, resolver=_resolver(entities))
         self.assertEqual(len(view.entities), MAX_PORTRAIT_CATALOG)
         self.assertEqual(
@@ -230,14 +237,14 @@ class ArtViewSelectionTests(unittest.TestCase):
 
     def test_malformed_portrait_policy_is_treated_as_no_subject(self):
         bad = _entity(40, name="broken", portrait_policy="not-a-mapping")
-        room = _room([bad], scene_archetype="ruin_interior")
+        room = _room([bad], scene_archetype=A_LODGE)
         view = build_art_view(_actor(room))
         self.assertEqual(view.entities, ())
-        self.assertEqual(view.scene_archetype, "ruin_interior")
+        self.assertEqual(view.scene_archetype, A_LODGE)
 
     def test_overlong_display_name_raises_view_error(self):
         long_name = _entity(50, name="長" * 200, dialogue=True)
-        room = _room([long_name], scene_archetype="forest_path")
+        room = _room([long_name], scene_archetype=A_BAZAAR)
         with self.assertRaises(ArtViewError):
             build_art_view(_actor(room))
 
@@ -254,7 +261,7 @@ class ArtViewSelectionTests(unittest.TestCase):
             "rounds_elapsed": 0,
             "exam_id": None,
         }
-        actor = _actor(_room([], scene_archetype="forest_path"), active_combat=record)
+        actor = _actor(_room([], scene_archetype=A_LODGE), active_combat=record)
         view = build_art_view(actor, resolver=_resolver({1: player}))
         self.assertEqual([entity.identity for entity in view.entities], [1])
 
