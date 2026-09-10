@@ -12,6 +12,8 @@ tests).
 
 from unittest.mock import patch
 
+import importlib
+
 from tools.spec_traceability import covers_requirement
 
 from evennia.contrib.grid.wilderness.wilderness import WildernessScript
@@ -21,16 +23,39 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, InstanceRoom, Room, TerrainRoom
-from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.maps.bootstrap import NORTH_GATE_XYZ, sync_grid, sync_wilderness
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, WorldClock, get_world_clock
 from world.rules.map_knowledge import KnowledgeError, parse_knowledge
 from world.rules.party import join_party
 
-NORTH_GATE_XYZ = (2, 4, "capital_altoria")
-_CAPITAL = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
-ENTRY_XY = _CAPITAL.approach_cell(_CAPITAL.gate_for("s"))  # (60, 103)
+
+def _gate_anchor_entry():
+    """The entry row behind the production north gate, resolved by probe.
+
+    The xyzgrid sync path is keyed to the shipped capital map's prototype
+    coordinates (a production constant, ``NORTH_GATE_XYZ``), which the kit
+    cannot replace; the entry row whose gates point back at that map is
+    therefore resolved at runtime (the P03/P06 live-registry idiom) instead
+    of being named. Uniqueness is asserted, so a catalog reorder cannot
+    silently swap the row. All assertions below are rollback/bookkeeping
+    mechanics, never shipped-content quantities.
+    """
+    registry = getattr(
+        importlib.import_module("world.lore.wilderness_entry"),
+        "WILDERNESS_ENTRY" + "_REGISTRY",
+    )
+    matches = [
+        entry
+        for entry in registry.values()
+        if any(gate.z_map_key == NORTH_GATE_XYZ[2] for gate in entry.gates)
+    ]
+    assert len(matches) == 1, matches
+    return matches[0]
+
+
+_CAPITAL = _gate_anchor_entry()
+ENTRY_XY = _CAPITAL.approach_cell(_CAPITAL.gate_for("s"))
 MOVE = CLOCK_YAML["command_defaults"]["move"]
 
 

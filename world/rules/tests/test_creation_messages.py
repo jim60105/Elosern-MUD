@@ -17,6 +17,11 @@ from world.rules.creation_messages import (
     rejection_code,
     rejection_message,
 )
+from world.tests.synthetic_data import make_subrace, synthetic_registries
+
+# Kit race/subrace rows: profile resolution (budget, bounds) reads whatever
+# the scoped registries hold; the rejection mapping under test is race-agnostic.
+_FOREIGN_BLOOD = make_subrace("t_hollowborn_blooded", race_key="t_hollowborn")
 
 
 def balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int]:
@@ -38,9 +43,9 @@ def request(**overrides):
         "display_name": "測試角色",
         "age": 20,
         "apparent_age": 20,
-        "race": "human",
-        "subrace": "human_commoner",
-        "allocations": balanced_allocations("human", "human_commoner"),
+        "race": "t_duskmari",
+        "subrace": "t_duskmari_evensong",
+        "allocations": balanced_allocations("t_duskmari", "t_duskmari_evensong"),
     }
     values.update(overrides)
     return CharacterCreationRequest(**values)
@@ -52,6 +57,9 @@ class FakeCharacter:
     key = "pending-shell"
 
 
+@synthetic_registries(
+    "races", "subraces", extra={"subraces": {_FOREIGN_BLOOD.key: _FOREIGN_BLOOD}}
+)
 class CreationRejectionMappingTests(unittest.TestCase):
     """Every deterministic reason maps to a stable code and safe message."""
 
@@ -107,7 +115,11 @@ class CreationRejectionMappingTests(unittest.TestCase):
             ("over-bound apparent age", request(apparent_age=10001), "apparent_age_out_of_range"),
             ("markup name", request(display_name="|rbad|n"), "markup_delimiter"),
             ("separator name", request(display_name="角色/名"), "reserved_separator"),
-            ("incompatible subrace", request(race="human", subrace="foxkin"), "incompatible_subrace"),
+            (
+                "incompatible subrace",
+                request(race="t_duskmari", subrace=_FOREIGN_BLOOD.key),
+                "incompatible_subrace",
+            ),
         ]
         for label, req, expected in cases:
             with self.subTest(label=label):
