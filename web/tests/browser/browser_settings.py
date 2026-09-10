@@ -10,6 +10,12 @@ Evennia's launcher resolves ``--settings <name>`` only under ``server.conf``,
 so the thin re-export shim at ``server/conf/browser_settings.py`` imports this
 module. The seeding process imports it directly through
 ``DJANGO_SETTINGS_MODULE=web.tests.browser.browser_settings``.
+
+ With ``ELOSERN_BROWSER_SYNTH_CATALOGS=1`` the process installs the synthetic
+ test-data catalogs (``world/tests/synthetic_data.py``) before any startup
+ world mirroring, so both this module's processes — the one-off seed and the
+ managed Evennia server — mirror synthetic content into the private database.
+ Default-off leaves shipped behavior identical.
 """
 
 from evennia.settings_default import *  # noqa: F401, F403
@@ -421,3 +427,10 @@ def _browser_options_client():
 
 if os.environ.get("ELOSERN_BROWSER_OPTIONS_SURFACE") == "1":
     _options_service._build_action_options_client = _browser_options_client
+
+# Synthetic-catalog process install (kit design D2b): the wrapper installs at
+# at_server_init — the first hook Evennia calls, after evennia._init() and
+# before any startup mirroring — and delegates everything else unchanged.
+# Default-off: without the flag the shipped startstop module is used verbatim.
+if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1":
+    AT_SERVER_STARTSTOP_MODULE = "web.tests.browser.browser_startstop"

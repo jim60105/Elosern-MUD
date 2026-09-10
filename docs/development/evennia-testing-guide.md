@@ -1110,3 +1110,40 @@ uv run --locked python -m tools.test_data_lint check
 掃描所有版本控制的測試來源（Python AST 可靜態解析的字串運算式與 catalog 符號引用、
 JS/TS 字串／模板字面量），並比照 `tools/test_data_freeze.json` 的 `contract`／`debt`
 帳本放行既有例外。`debt` 帳本只減不增：遷移時在讓檔案變乾淨的同一個 commit 移除條目。
+
+### Synthetic test-data kit 使用指引
+
+`world/tests/synthetic_data.py` 是全庫共用的替身世界：每個 catalog 都是**真實
+definition dataclass** 組成的 `t_` 前綴字典（items、skills、races/subraces、presets、
+npc/monster tiers、anchors、regions、city gates、archetypes、shops/economy、quests、
+titles、dialogue、buffs、acts 等），display prose 全為自製正體中文，與 shipped token
+universe 經自我測試證明不碰撞。
+
+**何時用共享 catalog、何時用 `make_*` 本地 fixture**：一般的 lookup、驗證、規則行為
+測試直接用 `synthetic_registries("items", "npc_tiers", ...)`（context manager、函式
+decorator、class decorator 皆可，每個 test method 取得獨立 scope）。需要共享字典裡
+沒有的特殊形狀時，用 `make_item(...)`／`make_skill(...)` 等 factory 建一筆，經
+`extra={"items": {key: entry}}` 只在自己的 scope 註冊——**不要**把單筆測試專用的
+條目塞進共享 catalog（沒人斷言的 fixture 是債，不是覆蓋率）。
+
+**Frozen catalog seam**：`MappingProxyType` catalog（例如 `NPC_TIER_REGISTRY`）以
+attribute-swap 注入：kit 先解析所有 discovery pass 找到的 consumer 名稱綁定，再依序
+`patch.object` 換成合成 proxy，離開 scope 時逐一還原成原物件——還原語義與
+`evennia-test-optimization` 的 registry-restoration 契約相同。mutable catalog 則走
+`patch.dict(clear=True)` 原地替換，consumer 綁定本身就是同一個 dict。
+`world/lore/sync.py` 的 import-time capture 是具名目標：只有會呼叫 `sync_all()` 的
+scope 才需要 `include_sync_capture=True`。
+
+**行程程序安裝（browser harness）**：seed／server 是獨立程序、開機就鏡像 catalog 進
+私有 DB，in-process patch 到不了。設 `ELOSERN_BROWSER_SYNTH_CATALOGS=1` 後，
+`web/tests/browser/browser_settings.py` 走 `browser_startstop` wrapper 在
+`at_server_init`（`evennia._init()` 之後、任何開機鏡像之前）安裝合成 catalog，seed
+程序則在 `main()` 同等時點安裝。預設 off，shipped 行為不變。
+
+**JS mirror 規則**：Web 端測試載體（vitest 與 Node gate）共用
+`web/webclient-app/tests/support/synthetic-data.mjs` 與
+`web/static/webclient/js/tests/support/synthetic-data.js` 兩份**位元組相同**的
+payload 鏡像（檔名刻意落在 `*.test.js` 收集 glob 之外）。唯一事實來源是鏡像內的
+`SYNTH_CANONICAL_JSON` 區塊與 Python 端的 `SYNTH_JS_PAYLOADS`；Node 自我測試
+（`synthetic_data.test.js`）與 Python 自我測試雙向比對，任何一邊漂移都會變紅。
+JS 測試引用合成 payload 時只能 import 這兩份 mirror，不得在測試檔裡另刻字串。
