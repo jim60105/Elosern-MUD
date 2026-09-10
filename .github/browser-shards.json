@@ -258,8 +258,7 @@
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_combat_target_selection_uses_keyboard_path",
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_disabled_row_explains_without_submitting",
         "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_pointer_exploration_root_and_submenu_submission",
-        "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_rapid_double_activation_pushes_one_frame",
-        "web.tests.browser.test_browser_services.GuildDialogueTurninJourneys.test_turnin_keyword_reports_listing_without_state_change"
+        "web.tests.browser.test_browser_pointer.PointerAcceptanceTest.test_rapid_double_activation_pushes_one_frame"
       ],
       "files_b": [
         "web.tests.browser.test_browser_art.ArtPendingSceneTest.test_pending_generating_notice_clears_dock_and_command_line",
