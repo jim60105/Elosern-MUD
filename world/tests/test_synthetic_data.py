@@ -255,6 +255,35 @@ class PatchRestoreTests(unittest.TestCase):
     @covers_requirement(
         "test-data-independence::the-kit-patches-and-restores-registries-exactly"
     )
+    def test_frozen_scope_sweeps_consumer_imported_during_scope(self):
+        """A consumer that bound the replacement mid-scope must be swept on exit."""
+        logical = "npc_tiers"
+        module_name, attribute = kit.REGISTRY_TARGETS[logical]
+        original = getattr(importlib.import_module(module_name), attribute)
+        bindings = dict(kit._consumer_bindings(logical))
+        self.assertTrue(bindings, "discovery pass must find real consumers")
+        consumer_name = sorted(bindings)[0]
+        binding = bindings[consumer_name]
+        saved = sys.modules.pop(consumer_name, None)
+        try:
+            with kit.synthetic_registries(logical):
+                late = importlib.import_module(consumer_name)
+                replacement = getattr(
+                    importlib.import_module(module_name), attribute
+                )
+                self.assertIs(getattr(late, binding), replacement)
+            self.assertIs(
+                getattr(sys.modules[consumer_name], binding),
+                original,
+                "late-bound consumer kept the synthetic replacement after exit",
+            )
+        finally:
+            if saved is not None:
+                sys.modules[consumer_name] = saved
+
+    @covers_requirement(
+        "test-data-independence::the-kit-patches-and-restores-registries-exactly"
+    )
     def test_decorator_and_class_decorator_get_fresh_scopes(self):
         @kit.synthetic_registries("monster_tiers")
         def decorated_check() -> bool:
@@ -294,6 +323,62 @@ class PatchRestoreTests(unittest.TestCase):
         self.assertFalse(
             any(str(k).startswith("t_") for k in self._original("archetypes"))
         )
+
+    @covers_requirement(
+        "test-data-independence::the-kit-patches-and-restores-registries-exactly"
+    )
+    def test_class_decorator_wraps_inherited_and_override_test_methods(self):
+        holder = self
+
+        class Base(unittest.TestCase):
+            def test_inherited(self_inner):
+                self_inner.fail("decorated subclass must replace inherited body")
+
+            def test_shared(self_inner):
+                holder._assert_synthetic_scope(self_inner)
+
+        @kit.synthetic_registries("monster_tiers")
+        class Sub(Base):
+            def test_inherited(self_inner):
+                holder._assert_synthetic_scope(self_inner)
+
+        suite = unittest.TestLoader().loadTestsFromTestCase(Sub)
+        self.assertEqual(suite.countTestCases(), 2)
+        result = unittest.TestResult()
+        suite.run(result)
+        self.assertEqual(
+            result.errors + result.failures,
+            [],
+            "inherited/overridden tests ran without the synthetic scope",
+        )
+
+    def _assert_synthetic_scope(self, case: unittest.TestCase) -> None:
+        case.assertTrue(
+            all(
+                str(k).startswith("t_") for k in self._original("monster_tiers")
+            ),
+            "synthetic scope absent in a collected test method",
+        )
+
+    @covers_requirement(
+        "test-data-independence::the-kit-installs-process-wide-for-separate-test-processes"
+    )
+    def test_startstop_wrapper_covers_production_hook_surface(self):
+        wrapper = importlib.import_module("web.tests.browser.browser_startstop")
+        production = importlib.import_module("server.conf.at_server_startstop")
+        production_hooks = {
+            name
+            for name in dir(production)
+            if name.startswith("at_server_")
+            and callable(getattr(production, name))
+        }
+        self.assertTrue(production_hooks, "no production hooks found to cover")
+        missing = {
+            name
+            for name in production_hooks
+            if not callable(getattr(wrapper, name, None))
+        }
+        self.assertEqual(missing, set(), "wrapper drops production hooks")
 
     def test_unknown_logical_and_extra_target_are_rejected(self):
         with self.assertRaises(KeyError):
@@ -393,10 +478,18 @@ class ProcessInstallTests(unittest.TestCase):
         for key in container.keys():
             parts = (key,) if isinstance(key, str) else tuple(map(str, key))
             if not any(
-                kit.SYNTH_PREFIX in part or part in seams for part in parts
+                part.startswith(kit.SYNTH_PREFIX) or part in seams for part in parts
             ):
                 bad.append(str(key))
         return bad
+
+    def test_synthetic_keys_helper_rejects_midstring_prefix(self):
+        # A regression key that merely CONTAINS the prefix is not synthetic.
+        self.assertEqual(
+            self._synthetic_keys({"old_t_entry": object()}, set()),
+            ["old_t_entry"],
+        )
+        self.assertEqual(self._synthetic_keys({"t_ok": object()}, set()), [])
 
     @covers_requirement(
         "test-data-independence::the-kit-installs-process-wide-for-separate-test-processes"
@@ -430,6 +523,35 @@ class ProcessInstallTests(unittest.TestCase):
         self.assertFalse(kit.uninstall_synthetic_catalogs())
         for logical, original in originals.items():
             self.assertIs(self._resolved(logical), original, logical)
+
+    @covers_requirement(
+        "test-data-independence::the-kit-installs-process-wide-for-separate-test-processes"
+    )
+    def test_uninstall_sweeps_consumer_imported_after_install(self):
+        logical = "npc_tiers"
+        module_name, attribute = kit.REGISTRY_TARGETS[logical]
+        original = getattr(importlib.import_module(module_name), attribute)
+        bindings = dict(kit._consumer_bindings(logical))
+        consumer_name = sorted(bindings)[0]
+        binding = bindings[consumer_name]
+        saved = sys.modules.pop(consumer_name, None)
+        try:
+            self.assertTrue(kit.install_synthetic_catalogs())
+            self.addCleanup(kit.uninstall_synthetic_catalogs)
+            late = importlib.import_module(consumer_name)
+            replacement = getattr(
+                importlib.import_module(module_name), attribute
+            )
+            self.assertIs(getattr(late, binding), replacement)
+            self.assertTrue(kit.uninstall_synthetic_catalogs())
+            self.assertIs(
+                getattr(sys.modules[consumer_name], binding),
+                original,
+                "late-bound consumer kept the installed replacement",
+            )
+        finally:
+            if saved is not None:
+                sys.modules[consumer_name] = saved
 
 
 class JsMirrorTests(unittest.TestCase):

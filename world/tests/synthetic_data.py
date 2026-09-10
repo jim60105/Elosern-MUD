@@ -656,14 +656,17 @@ SYNTH_PRESETS: dict[str, PlayerPreset] = {
         apparent_age=20,
         race="t_duskmari",
         subrace="t_duskmari_evensong",
+        # Sums exactly to the t_duskmari_evensong profile budget (218) within
+        # the per-axis spans, so preset activation validates against the
+        # patched race registry (seed base-character path).
         allocations=(
-            ("hp", 5),
-            ("mp", 4),
-            ("sp", 5),
-            ("atk_phys", 6),
-            ("agility", 6),
-            ("defense", 5),
-            ("magic_power", 4),
+            ("hp", 45),
+            ("mp", 38),
+            ("sp", 40),
+            ("atk_phys", 20),
+            ("agility", 20),
+            ("defense", 15),
+            ("magic_power", 40),
         ),
         emphasis="Synthetic wanderer card.",
         active_skills=("t_ember_burst", "t_cinder_cleave"),
@@ -682,13 +685,13 @@ SYNTH_PRESETS: dict[str, PlayerPreset] = {
         race="t_duskmari",
         subrace="t_duskmari_evensong",
         allocations=(
-            ("hp", 6),
-            ("mp", 3),
-            ("sp", 6),
-            ("atk_phys", 7),
-            ("agility", 5),
-            ("defense", 6),
-            ("magic_power", 2),
+            ("hp", 35),
+            ("mp", 45),
+            ("sp", 45),
+            ("atk_phys", 22),
+            ("agility", 18),
+            ("defense", 18),
+            ("magic_power", 35),
         ),
         emphasis="Synthetic porter card.",
         active_skills=("t_cinder_cleave",),
@@ -1099,9 +1102,19 @@ class synthetic_registries(ContextDecorator):
         return super().__call__(target)
 
     def _decorate_class(self, cls):
-        for name in list(vars(cls)):
-            if name.startswith("test") and callable(getattr(cls, name)):
-                setattr(cls, name, self._wrap_method(getattr(cls, name)))
+        # The unittest loader collects test* through dir() — inherited
+        # methods included — so wrap every collected test (resolved through
+        # the MRO) and install the wrapper on THIS class. Wrapping vars(cls)
+        # only would silently run inherited tests against shipped catalogs.
+        for name in dir(cls):
+            if not name.startswith("test"):
+                continue
+            try:
+                method = getattr(cls, name)
+            except Exception:
+                continue  # observability: ignore R1: exotic attributes stay untouched
+            if callable(method):
+                setattr(cls, name, self._wrap_method(method))
         return cls
 
     def _wrap_method(self, method):
@@ -1151,6 +1164,21 @@ def _apply_target(
             unittest.mock.patch.object(consumer, binding_name, replacement)
         )
     stack.enter_context(unittest.mock.patch.object(module, attribute, replacement))
+    # patch.object only restores bindings that existed at entry. Sweep at
+    # teardown: a consumer imported DURING the scope bound the replacement at
+    # its own import, so rebind every still-synthetic discovered binding to
+    # the pre-scope shipped object — the scope leaks nothing.
+    stack.callback(_late_binder_sweep, logical, replacement, shipped)
+
+
+def _late_binder_sweep(logical: str, replacement: object, original: object) -> None:
+    """Rebind discovered consumer bindings that still point at a stale replacement."""
+    for consumer_module, binding_name in _consumer_bindings(logical):
+        module = _imported_modules().get(consumer_module)
+        if module is None:
+            continue
+        if getattr(module, binding_name, None) is replacement:
+            setattr(module, binding_name, original)
 
 
 def _consumer_bindings(logical: str) -> tuple[tuple[str, str], ...]:
@@ -1185,6 +1213,7 @@ def _dependency_order(logicals: tuple[str, ...]) -> tuple[str, ...]:
 
 _INSTALL_STATE = {"installed": False}
 _INSTALLED_ATTRS: list[tuple[object, str, object]] = []
+_INSTALL_REPLACEMENTS: dict[str, tuple[object, object]] = {}
 _INSTALLED_DICTS: list[tuple[dict, dict]] = []
 
 
@@ -1208,6 +1237,7 @@ def install_synthetic_catalogs(
     names = tuple(logicals) if logicals else tuple(
         name for name in REGISTRY_TARGETS if name != "lore_sync"
     ) + ("lore_sync",)
+    _INSTALL_REPLACEMENTS.clear()
     for logical in _dependency_order(names):
         module_name, attribute = REGISTRY_TARGETS[logical]
         module = importlib.import_module(module_name)
@@ -1219,6 +1249,7 @@ def install_synthetic_catalogs(
             shipped.update(content)
         else:
             replacement = MappingProxyType(content)
+            _INSTALL_REPLACEMENTS[logical] = (replacement, shipped)
             _INSTALLED_ATTRS.append((module, attribute, getattr(module, attribute)))
             setattr(module, attribute, replacement)
             for consumer_module, binding_name in _consumer_bindings(logical):
@@ -1250,6 +1281,12 @@ def uninstall_synthetic_catalogs() -> bool:
     for holder, attribute, original in reversed(_INSTALLED_ATTRS):
         setattr(holder, attribute, original)
     _INSTALLED_ATTRS.clear()
+    # Modules imported AFTER install bound the installed replacement at
+    # their own import; sweep every discovered binding still pointing at it
+    # back to the pre-install shipped object.
+    for logical, (replacement, shipped) in _INSTALL_REPLACEMENTS.items():
+        _late_binder_sweep(logical, replacement, shipped)
+    _INSTALL_REPLACEMENTS.clear()
     for target, original in reversed(_INSTALLED_DICTS):
         target.clear()
         target.update(original)

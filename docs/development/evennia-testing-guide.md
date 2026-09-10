@@ -1138,7 +1138,11 @@ scope 才需要 `include_sync_capture=True`。
 私有 DB，in-process patch 到不了。設 `ELOSERN_BROWSER_SYNTH_CATALOGS=1` 後，
 `web/tests/browser/browser_settings.py` 走 `browser_startstop` wrapper 在
 `at_server_init`（`evennia._init()` 之後、任何開機鏡像之前）安裝合成 catalog，seed
-程序則在 `main()` 同等時點安裝。預設 off，shipped 行為不變。
+程序則在 `main()` 同等時點安裝。flag 開啟時 seed 仍可跑完：基礎角色改由 kit 的
+ preset 卡（`t_pale_wren`）啟動，讀取 shipped key 的選配 fixture（combat 授權、
+ monster 生成等）自動略過，因此本 flag 的文件語義是「不與其他 fixture 開關併用」。
+完整 `t_` key 的端到端 browser journey proof 屬於 `migrate-browser-tests-off-real-data`。
+預設 off，shipped 行為不變。
 
 **JS mirror 規則**：Web 端測試載體（vitest 與 Node gate）共用
 `web/webclient-app/tests/support/synthetic-data.mjs` 與

@@ -725,11 +725,18 @@ def main() -> None:
         if os.environ.get("ELOSERN_BROWSER_CREATION_PRESET_DRAFT") == "1":
             from world.rules.creation_wizard import save_preset_draft
 
-            save_preset_draft(creator, pending, "elysa_snow")
+            save_preset_draft(
+                creator,
+                pending,
+                "t_pale_wren"
+                if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
+                else "elysa_snow",
+            )
             pending.save()
         elif os.environ.get("ELOSERN_BROWSER_CREATION_DRAFT") == "1":
             from world.rules.creation_wizard import save_custom_draft
 
+            _synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
             save_custom_draft(
                 creator,
                 pending,
@@ -738,9 +745,12 @@ def main() -> None:
                     display_name="草稿角色",
                     age=21,
                     apparent_age=21,
-                    race="beastfolk",
-                    subrace="foxkin",
-                    allocations=balanced_allocations("beastfolk", "foxkin"),
+                    race="t_duskmari" if _synth else "beastfolk",
+                    subrace="t_duskmari_evensong" if _synth else "foxkin",
+                    allocations=balanced_allocations(
+                        "t_duskmari" if _synth else "beastfolk",
+                        "t_duskmari_evensong" if _synth else "foxkin",
+                    ),
                 ),
             )
             pending.save()
@@ -759,19 +769,31 @@ def main() -> None:
     character.home = room
     character.save()
 
-    request = CharacterCreationRequest(
-        mode="custom",
-        display_name=BROWSER_CHARACTER_NAME,
-        age=20,
-        apparent_age=20,
-        race="human",
-        subrace="human_commoner",
-        allocations=balanced_allocations("human", "human_commoner"),
-        # The art fixture below settles classic records deterministically;
-        # the automatic gallery request (gallery-autogen-retrofit) must never
-        # race it, so the seeded activation carries the explicit skip flag.
-        skip_portrait=True,
-    )
+    if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1":
+        # Under the synthetic install every shipped catalog is t_-only, so the
+        # base character activates from the kit's own preset card (its race,
+        # subrace, skills, and starting items are all t_-keyed). The
+        # shipped-prose fixtures below are not synthetic-aware; the flag is
+        # documented as combinable with no other fixture flag.
+        request = CharacterCreationRequest(
+            mode="preset",
+            preset_key="t_pale_wren",
+            skip_portrait=True,
+        )
+    else:
+        request = CharacterCreationRequest(
+            mode="custom",
+            display_name=BROWSER_CHARACTER_NAME,
+            age=20,
+            apparent_age=20,
+            race="human",
+            subrace="human_commoner",
+            allocations=balanced_allocations("human", "human_commoner"),
+            # The art fixture below settles classic records deterministically;
+            # the automatic gallery request (gallery-autogen-retrofit) must never
+            # race it, so the seeded activation carries the explicit skip flag.
+            skip_portrait=True,
+        )
     result = activate_player_character(account, character, request)
 
     if os.environ.get("ELOSERN_BROWSER_MINIMAP") == "1":
@@ -796,29 +818,32 @@ def main() -> None:
     # (use-driven-skill-lineage DC5: the skill-anchored ladder unlocks
     # 0.25/0.5/1/2/4 at its own levels 0/1/3/6/10; wind_blade has no
     # consuming edges, so its derived tip cap is the full 10).
-    from world.rules.tests.combat_fixtures import grant_lineage
+    # Skipped under the synthetic install: these grant shipped skill/buff/
+    # monster-tier keys the t_-only catalogs do not carry.
+    if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") != "1":
+        from world.rules.tests.combat_fixtures import grant_lineage
 
-    grant_lineage(
-        character,
-        ["fire_ball", "wind_blade", "status_disguise", "concentration"],
-        ["defense_instinct", "wind_mastery"],
-        rungs={"wind_blade": 10},
-    )
-    # A persistent poisoned buff gives the status panel a deterministic
-    # applied-modifier condition (agility -10%) for viewport assertions.
-    from world.rules.buffs import _add_buff
+        grant_lineage(
+            character,
+            ["fire_ball", "wind_blade", "status_disguise", "concentration"],
+            ["defense_instinct", "wind_mastery"],
+            rungs={"wind_blade": 10},
+        )
+        # A persistent poisoned buff gives the status panel a deterministic
+        # applied-modifier condition (agility -10%) for viewport assertions.
+        from world.rules.buffs import _add_buff
 
-    _add_buff(character, "poisoned")
-    for index, (monster_key, hp) in enumerate(
-        (("goblin", 200), ("wolf", 200)), start=1
-    ):
-        monster = create_object(Monster, key=monster_key, nohome=True)
-        monster.threat_tier = "low"
-        monster.apply_monster_tier("floor")
-        monster.traits.hp.base = hp
-        monster.traits.hp.current = hp
-        monster.location = room
-        monster.save()
+        _add_buff(character, "poisoned")
+        for index, (monster_key, hp) in enumerate(
+            (("goblin", 200), ("wolf", 200)), start=1
+        ):
+            monster = create_object(Monster, key=monster_key, nohome=True)
+            monster.threat_tier = "low"
+            monster.apply_monster_tier("floor")
+            monster.traits.hp.base = hp
+            monster.traits.hp.current = hp
+            monster.location = room
+            monster.save()
     print(
         f"seeded account={account.key} character={result.display_name} "
         f"race={result.race} magic_power={result.magic_power}"
