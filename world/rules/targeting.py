@@ -9,6 +9,7 @@ from world.skills.registry import (
     SkillDef,
     TargetSpec,
 )
+from world.skills.effects import DamageEffect
 
 
 # The approved deterministic AREA shorthands accepted in combat.
@@ -93,6 +94,32 @@ def validate_faction(
     if constraint is FactionConstraint.SELF_ONLY:
         return relation is Relation.SELF
     return True
+
+
+def damage_requires_battlefield(skill: SkillDef, context: Any) -> bool:
+    """Return whether a damaging skill is being attempted without a battlefield.
+
+    The ONE shared expression of the damaging-action gate's condition
+    (sanctioned combat-state gate body, gate 2 of 2): true when the resolved
+    skill's typed ``parsed_effects`` carry at least one
+    ``world.skills.effects.DamageEffect`` **and** the caller's context carries
+    no battlefield. Consumed by ``ActionResolver``'s step 1 and by the shared
+    preview, so resolution, preview, and combat-session submission
+    revalidation can never disagree. Computed per request from the skill
+    definition's own effects — never from a registry-key enumeration.
+
+    Indirect hp movement is deliberately NOT damage for this gate: a
+    ``SexualDrainEffect`` moves the target's pleasure into the caster's own
+    pools, never subtracting hp, matching ``overwhelm-threshold``'s
+    ``commanded_damage_reaches_enemy()`` so both damage-shaped questions in
+    the codebase read the same definition.
+    """
+    # Sanctioned combat-state gate body (damaging-action gate): the reason at
+    # each call site names the player-facing rule; this condition tests for
+    # the battlefield's absence.
+    if context.battlefield is None:
+        return any(isinstance(effect, DamageEffect) for effect in skill.parsed_effects)
+    return False
 
 
 def _rejection(reason: str, detail: str):

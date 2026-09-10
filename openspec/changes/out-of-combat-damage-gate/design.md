@@ -107,9 +107,11 @@ requirement cannot drift.
 - **[The gate is inert on landing, so a green test suite proves little about
   the eventual behaviour.]** → Mitigated by asserting the gate directly with a
   synthetic skill definition that carries a `DamageEffect` and
-  `usable_out_of_combat=True`, plus an inventory assertion that no shipping
-  skill matches that shape today. The behaviour is tested even though no
-  content triggers it.
+  `usable_out_of_combat=True`. Inertness on landing is a change-local
+  inspection (tasks 5.8): no shipping skill matches that shape today, recorded
+  in the landing commit message rather than pinned in an assertion a later
+  change must delete. The behaviour is tested even though no content triggers
+  it.
 - **[Modifying an archived requirement's "exactly one gate" wording could look
   like weakening the no-combat-branching discipline.]** → The modified
   requirement enumerates both gates by name and keeps the token scan, so the

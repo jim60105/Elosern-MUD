@@ -45,6 +45,7 @@ from world.rules.targeting import (
     AREA_SHORTHANDS,
     _target_identity,
     candidate_rejection,
+    damage_requires_battlefield,
     expand_target_shorthand,
 )
 from world.skills.cost_tiers import is_freeform_eligible
@@ -140,6 +141,12 @@ def _skill_wide_failure(
         return RejectReason.SKILL_NOT_ACTIVE, skill_key
     if not skill.usable_out_of_combat and context.battlefield is None:
         return RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT, skill_key
+    # The preview-side mirror of the sanctioned damaging-action gate, in the
+    # resolver's exact order (usable gate first), so the shared preview, the
+    # combat-session submission revalidation, and ``preflight()`` report the
+    # same one of the two out-of-combat reasons.
+    if damage_requires_battlefield(skill, context):
+        return RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET, skill_key
     try:
         _step1_divine_arts_gate(actor, skill)
     except RejectedAction as rejection:
