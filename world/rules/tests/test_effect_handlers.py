@@ -32,12 +32,13 @@ from world.rules.action import (
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import (
     FactionConstraint,
-    SKILL_REGISTRY,
     SkillCategory,
     SkillDef,
     SkillKind,
     TargetSpec,
 )
+
+from ._combat_session_helpers import live_skill_registry
 
 # Test-only skill: no shipped skill declares `cleanse:status` yet (the
 # spell-catalog changes own that content), and the end-to-end scenario needs
@@ -201,13 +202,25 @@ class LandedEffectHandlerTests(EvenniaTest):
         class Actor:
             key = "actor"
 
+        skill = SkillDef(
+            key="t_made_malformed_cast",
+            label="測試異常效果",
+            description="測試用：回傳不合法效果物件。",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            cost={},
+            usable_out_of_combat=True,
+            element="light",
+            effects=["damage:light:magic"],
+            faction_constraint=FactionConstraint.ANY,
+            category=SkillCategory.UTILITY,
+        )
         request = ActionRequest(
             Actor(),
-            "fire_ball",
+            skill.key,
             [],
             RoomActionContext(None),
         )
-        skill = SKILL_REGISTRY["fire_ball"]
         with patch.dict(
             _EFFECT_HANDLERS,
             {"damage": lambda actor, targets, effect_id, context, scale: [object()]},
@@ -446,7 +459,7 @@ class CleanseHandlerTests(EvenniaTest):
         self.assertIn("poisoned", self.entity.buffs.all)
 
     def test_cleanse_resolves_end_to_end_through_the_action_resolver(self):
-        SKILL_REGISTRY[PURIFY_TEST_SKILL.key] = PURIFY_TEST_SKILL
+        live_skill_registry()[PURIFY_TEST_SKILL.key] = PURIFY_TEST_SKILL
         try:
             self.entity.db.skills = {
                 "active": [PURIFY_TEST_SKILL.key],
@@ -467,7 +480,7 @@ class CleanseHandlerTests(EvenniaTest):
                 [entry.kind for entry in result.event_log.entries],
             )
         finally:
-            SKILL_REGISTRY.pop(PURIFY_TEST_SKILL.key, None)
+            live_skill_registry().pop(PURIFY_TEST_SKILL.key, None)
 
     def test_cleanse_rejects_an_unknown_scope(self):
         with self.assertRaises(ValueError):
@@ -482,13 +495,26 @@ class CleanseHandlerTests(EvenniaTest):
         effects = self._stage_and_commit(
             _handle_cleanse(self.entity, [self.entity], "cleanse:status", {}, 1.0)
         )
+        skill = SkillDef(
+            key="t_made_cleanse_cast",
+            label="測試淨化",
+            description="測試用：淨化事件構建。",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            cost={},
+            usable_out_of_combat=True,
+            element="light",
+            effects=["cleanse:status"],
+            faction_constraint=FactionConstraint.ANY,
+            category=SkillCategory.UTILITY,
+        )
         request = ActionRequest(
             Actor(),
-            "fire_ball",
+            skill.key,
             [],
             RoomActionContext(None),
         )
-        log = _step7_build_event_log(request, SKILL_REGISTRY["fire_ball"], effects)
+        log = _step7_build_event_log(request, skill, effects)
         entry = log.entries[0]
         self.assertEqual(entry.kind, "buffs_cleansed")
         self.assertEqual(entry.data, {"count": 2})
