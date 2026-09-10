@@ -176,31 +176,31 @@ _sessions: dict[str, object] = {}
 class RembgCutoutBackend:
     """The real CPU-only backend wrapping the optional ``rembg`` stack.
 
-    Contract (design D7 / D8 / D10, pinned against the locked rembg 2.0.69):
+    Contract (design D7 / D8 / D10, pinned against the locked rembg 2.0.84):
 
     - ``rembg`` is imported lazily inside the first call, never at module
       import.
     - ``U2NET_HOME`` and ``REMBG_HOME`` are BOTH set to
       ``ART_REMBG_MODEL_DIR`` immediately before the lazy import. rembg
-      2.0.69's ``BaseSession.u2net_home()`` reads ``U2NET_HOME`` ONLY;
-      ``REMBG_HOME`` is the naming later releases read, so setting both keeps
-      the same volume across a lock bump (intentional belt-and-braces, noted
-      here against the pinned version).
+      2.0.84's home resolution reads ``REMBG_HOME`` and lets ``U2NET_HOME``
+      win when set, so setting both keeps the same volume across a lock bump
+      (intentional belt-and-braces, noted here against the pinned version).
     - ``ART_REMBG_THREADS`` (non-zero) reaches the session as
-      ``OMP_NUM_THREADS``: rembg 2.0.69's ``new_session()`` constructs its own
+      ``OMP_NUM_THREADS``: rembg 2.0.84's ``new_session()`` constructs its own
       ``ort.SessionOptions`` and applies ``OMP_NUM_THREADS`` to BOTH the
-      inter- and intra-op counts when present; no caller-supplied
-      ``SessionOptions`` parameter exists on that entry point, so the
-      environment path is the only mechanism. Zero leaves the variable
+      inter- and intra-op counts when present (a caller-supplied ``sess_opts``
+      parameter exists on that entry point, but the environment path stays the
+      mechanism used here). Zero leaves the variable
       untouched and ONNX Runtime's own default stands. Setting the variable is
       a deliberate PROCESS-GLOBAL mutation (it happens once, under the
       construction lock, with deployment settings restart-bound).
     - ``ART_REMBG_DOWNLOAD_ENABLED=false`` verifies the model artifact under
       the model directory BEFORE importing rembg: absent -> an immediate
       ``art_cutout_unavailable`` with no import, no network, and no unbounded
-      wait. The flat layout (``<home>/<model>.onnx``) is 2.0.69's; the
-      per-model layout (``<home>/models/<model>/<model>.onnx``) is what later
-      releases write, so both locations are accepted.
+      wait. 2.0.84 writes the per-model layout
+      (``<home>/models/<model>/<model>.onnx``); the flat layout
+      (``<home>/<model>.onnx``) of older releases is also accepted, so both
+      locations are checked.
     - The session requests exactly ``["CPUExecutionProvider"]``; no GPU
       execution provider is ever requested.
     """
