@@ -36,6 +36,33 @@ from tools.spec_traceability import covers_requirement
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULTS_DIR = REPO_ROOT / FALLBACK_DEFAULTS_DIRECTORY
 
+# Non-runtime images the repository deliberately tracks: the desktop-redesign
+# mockups under docs/design/ (player-facing documentation screenshots) and
+# the webclient fixture samples under web/webclient-app/assets/ (Storybook/
+# Vitest sample art). They are not part of the closed fallback vocabulary
+# and are never served through the /art/defaults/ route; each path joins
+# this exact set deliberately, in review, never by directory prefix.
+APPROVED_NON_RUNTIME_IMAGES = frozenset(
+    [
+        "docs/design/elosern-redesign2/任務公會.webp",
+        "docs/design/elosern-redesign2/戰鬥-技能清單.webp",
+        "docs/design/elosern-redesign2/戰鬥.webp",
+        "docs/design/elosern-redesign2/探索.webp",
+        "docs/design/elosern-redesign2/探索互動.webp",
+        "docs/design/elosern-redesign2/探索對話.webp",
+        "docs/design/elosern-redesign2/等待休息.webp",
+        "docs/design/elosern-redesign2/背包.webp",
+        "docs/design/elosern-redesign2/角色.webp",
+        "docs/design/elosern-redesign2/角色肖像圖庫管理頁-圖庫主畫面.webp",
+        "docs/design/elosern-redesign2/角色肖像圖庫管理頁-生成新圖.webp",
+        "docs/design/elosern-redesign2/角色肖像圖庫管理頁-臉部框選.webp",
+        "docs/design/elosern-redesign2/角色肖像圖庫管理頁-裝備綁定.webp",
+        "web/webclient-app/assets/redesign/sample-forest.webp",
+        "web/webclient-app/assets/redesign/sample-guild.webp",
+        "web/webclient-app/assets/redesign/sample-town.webp",
+    ]
+)
+
 
 
 def _character(key):
@@ -77,9 +104,13 @@ class ClosedVocabularyContractTests(unittest.TestCase):
     @covers_requirement("art-gallery-fallback::the-built-in-fallback-set-is-a-closed-vocabulary-committed-to-the-repository")
     def test_only_the_defaults_directory_carries_tracked_images(self):
         tracked = subprocess_git_ls_files_images()
+        # The closed runtime vocabulary is still exclusive: the defaults
+        # directory plus the explicitly reviewed documentation/fixture
+        # images. A new tracked image outside this exact set fails here.
         self.assertEqual(
             tracked,
-            {f"{FALLBACK_DEFAULTS_DIRECTORY}/{k}{FALLBACK_EXTENSION}" for k in FALLBACK_KEYS},
+            {f"{FALLBACK_DEFAULTS_DIRECTORY}/{k}{FALLBACK_EXTENSION}" for k in FALLBACK_KEYS}
+            | APPROVED_NON_RUNTIME_IMAGES,
         )
 
 
@@ -87,7 +118,18 @@ def subprocess_git_ls_files_images():
     import subprocess
 
     out = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "ls-files", "*.png", "*.webp", "*.jpg", "*.avif"],
+        [
+            "git",
+            "-c",
+            "core.quotepath=off",
+            "-C",
+            str(REPO_ROOT),
+            "ls-files",
+            "*.png",
+            "*.webp",
+            "*.jpg",
+            "*.avif",
+        ],
         capture_output=True,
         text=True,
         check=True,

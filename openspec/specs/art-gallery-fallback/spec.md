@@ -32,7 +32,11 @@ served. Each committed image SHALL be bounded in file size and SHALL depict no s
 
 #### Scenario: Runtime art is still absent from git
 - **WHEN** the repository is inspected for tracked art files
-- **THEN** only the defaults directory carries images, and the art store root and the seed directory remain untracked
+- **THEN** the defaults directory carries the only generated-art images: a
+  reviewed, exact allowlist of non-runtime images (the
+  `docs/design/elosern-redesign2/` documentation mockups and the
+  `web/webclient-app/assets/redesign/` webclient fixture samples) and the
+  art store root and the seed directory remain untracked
 
 ### Requirement: A fallback key resolves by declaration, then band, then deterministic hash
 `world/art/gallery_fallback.py` SHALL resolve a subject's fallback key by this ordered rule: (1) a
