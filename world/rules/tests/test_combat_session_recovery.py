@@ -2,6 +2,7 @@
 
 from tools.spec_traceability import covers_requirement
 
+from dataclasses import replace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -13,6 +14,7 @@ from world.rules.clock import WorldClock
 from world.rules.combat import BattlefieldActionContext
 from world.rules.overwhelm import classify_overwhelm
 from world.rules.combat_session import (
+    BASIC_ATTACK_KEY,
     CombatSessionError,
     SessionReason,
     engage,
@@ -25,9 +27,45 @@ from world.rules.combat_session import (
     submit_player_action,
     to_storage,
 )
+from world.tests.synthetic_data import SYNTH_SKILLS
 
 from ._combat_session_helpers import BattlefieldIsolation, _monster, _player
+from ._combat_session_helpers import open_synthetic_scope, synth_innate_overlay
 from .combat_fixtures import grant_lineage
+
+_T_CAST = SYNTH_SKILLS["t_ember_burst"].key
+# Handler-context probes: effects whose handlers declare requires_event_context,
+# used to prove preflight rejects a missing context before any round cost.
+_T_DISGUISE = replace(
+    SYNTH_SKILLS["t_moss_veil"],
+    key="t_disguise_probe",
+    label="偽裝試探",
+    effects=["set_disguise"],
+)
+_T_CONFER = replace(
+    SYNTH_SKILLS["t_hush_mend"],
+    key="t_confer_probe",
+    label="授予試探",
+    effects=["confer_skill_partial"],
+)
+
+
+def _open_scope(case):
+    open_synthetic_scope(
+        case,
+        "skills",
+        "elements",
+        "races",
+        "subraces",
+        "static_tiers",
+        extra={
+            "skills": {
+                **synth_innate_overlay()["skills"],
+                _T_DISGUISE.key: _T_DISGUISE,
+                _T_CONFER.key: _T_CONFER,
+            }
+        },
+    )
 
 
 
@@ -157,11 +195,12 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
     """fix-combat-settlement-recovery: settled marker and atomic round chain."""
 
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="recovery arena")
         self.player = _player()
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_CAST])
         self.monster = _monster("recovery goblin", hp=100)
         self.monster.location = self.room
 
@@ -180,7 +219,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
         ):
-            result = submit_player_action(self.player, "fire_ball", [self.monster])
+            result = submit_player_action(self.player, _T_CAST, [self.monster])
         self.assertEqual(result["outcome"], "victory")
         self.assertEqual(clock.tick, 6)
         self.assertIsNone(self.player.db.active_combat)
@@ -212,7 +251,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
             ),
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_action(self.player, "fire_ball", [self.monster])
+                submit_player_action(self.player, _T_CAST, [self.monster])
         # Round effects, session metadata, clock tick, and clearing all
         # rolled back together; the session survives for exactly one retry.
         self.assertEqual(self.monster.traits.hp.current, 1)
@@ -224,7 +263,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
         ):
-            result = submit_player_action(self.player, "fire_ball", [self.monster])
+            result = submit_player_action(self.player, _T_CAST, [self.monster])
         self.assertEqual(result["outcome"], "victory")
         self.assertEqual(clock.tick, 6)
         self.assertIsNone(self.player.db.active_combat)
@@ -244,7 +283,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
             ),
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_action(self.player, "fire_ball", [self.monster])
+                submit_player_action(self.player, _T_CAST, [self.monster])
         self.assertEqual(self.monster.traits.hp.current, 100)
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)
         self.assertEqual(clock.tick, 0)
@@ -276,14 +315,14 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         ):
             for expected_rounds in (1, 2):
                 result = submit_player_action(
-                    self.player, "fire_ball", [self.monster]
+                    self.player, _T_CAST, [self.monster]
                 )
                 self.assertEqual(result["outcome"], "round")
                 self.assertEqual(clock.tick, 0)
                 self.assertEqual(
                     read_session(self.player).rounds_elapsed, expected_rounds
                 )
-            result = submit_player_action(self.player, "fire_ball", [self.monster])
+            result = submit_player_action(self.player, _T_CAST, [self.monster])
         self.assertEqual(result["outcome"], "victory")
         self.assertEqual(clock.tick, 18)
         self.assertIsNone(self.player.db.active_combat)
@@ -340,7 +379,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
         ):
-            result = submit_player_action(self.player, "fire_ball", [self.monster])
+            result = submit_player_action(self.player, _T_CAST, [self.monster])
         self.assertEqual(result["outcome"], "defeat")
         self.assertEqual(self.player.traits.hp.current, 5)
         # Combat 6s + recovery 8s (scale 0.5 over the 1.0/s stored rate).
@@ -388,11 +427,12 @@ class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):
     """fix-dot-kill-credit: upkeep-settled tick kills commit with the round."""
 
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="upkeep tick arena")
         self.player = _player()
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_CAST])
         self.monster = _monster("upkeep tick goblin", hp=100)
         self.monster.location = self.room
         from world.rules.buffs import _add_buff
@@ -410,7 +450,7 @@ class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):
 
         engage(self.player, self.monster)
         with patch("world.rules.combat.roll_d100", return_value=1):
-            result = submit_player_action(self.player, "basic_attack", [self.monster])
+            result = submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
         self.assertEqual(result["outcome"], "victory")
         upkeep_logs = [log for log in result["logs"] if log.skill_key == "combat_upkeep"]
         self.assertTrue(upkeep_logs)
@@ -436,7 +476,7 @@ class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):
             patch.dict(_EVENT_EFFECT_PLANNERS, {"boom": boom}),
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_action(self.player, "basic_attack", [self.monster])
+                submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
         # Tick HP, round count, and session metadata all rolled back.
         self.assertEqual(self.monster.traits.hp.current, 3)
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)
@@ -444,7 +484,7 @@ class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(self.player.db.magic_xp)
         # The retry without the failing planner settles normally.
         with patch("world.rules.combat.roll_d100", return_value=1):
-            result = submit_player_action(self.player, "basic_attack", [self.monster])
+            result = submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
         self.assertEqual(result["outcome"], "victory")
         self.assertIsNone(self.player.db.active_combat)
 
@@ -460,11 +500,12 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
     """
 
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="overwhelm direction arena")
         self.player = _player("direction player")
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_CAST])
         # Foe team overwhelming by the power-ratio rule alone (>= 100x):
         # monster power = (20+50+100) x 3000 = 510000 vs the player's
         # (1+51+1) x 45 = 2385 (~214x), with a ~4.8-round estimate. The
@@ -483,6 +524,9 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.traits.hp.base = 45
         self.player.traits.hp.current = 45
         self.player.traits.agility.base = 51
+        # Pin the power-ratio operands so the verdict holds for any kit race.
+        self.player.traits.atk_phys.base = 1
+        self.player.traits.defense.base = 1
         engage(self.player, self.monster)
         self.assertEqual(
             classify_overwhelm(
@@ -506,7 +550,7 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
             ),
             patch("world.rules.clock.get_world_clock", return_value=clock),
         ):
-            result = submit_player_action(self.player, "fire_ball", [self.monster])
+            result = submit_player_action(self.player, _T_CAST, [self.monster])
             resolver.assert_not_called()
             self.assertEqual(result["outcome"], "round")
             self.assertEqual(result["overwhelming_team"], "foes")
@@ -528,7 +572,7 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
         # combat-session-opening-dispatch: with compression stripped from the
         # in-session entries, a player-overwhelming verdict no longer reaches
         # resolve_overwhelm() through submit_player_action(); the submission
-        # resolves exactly one ordinary round (the fire_ball kills the weak
+        # resolves exactly one ordinary round (the synthetic cast kills the weak
         # monster inside it, so the session settles as victory in one round).
         weak = _monster("weak goblin", hp=100, atk=10)
         weak.location = self.room
@@ -553,7 +597,7 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
             ) as resolver,
             patch("world.rules.clock.get_world_clock", return_value=WorldClock()),
         ):
-            result = submit_player_action(self.player, "fire_ball", [weak])
+            result = submit_player_action(self.player, _T_CAST, [weak])
         resolver.assert_not_called()
         self.assertEqual(result["outcome"], "victory")
         self.assertEqual(result["rounds_elapsed"], 1)
@@ -561,11 +605,12 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
 
 class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        _open_scope(self)
         super().setUp()
         self.room = create_object(Room, key="preflight room")
         self.player = _player()
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_CAST])
         self.monster = _monster("preflight goblin")
         self.monster.location = self.room
 
@@ -599,7 +644,7 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTestCase):
         battlefield = reconstruct_battlefield(self.player, read_session(self.player))
         request = ActionRequest(
             self.player,
-            "fire_ball",
+            _T_CAST,
             [self.monster],
             BattlefieldActionContext(battlefield),
         )
@@ -612,7 +657,7 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("action-resolution-pipeline::preflight-rejects-missing-handler-context-before-any-round-cost")
     def test_missing_effect_context_rejects_without_a_round_or_enemy_action(self):
         self.player.db.skills = {
-            "active": ["status_disguise", "dominion_art"],
+            "active": [_T_DISGUISE.key, _T_CONFER.key],
             "passive": [],
         }
         engage(self.player, self.monster)
@@ -621,7 +666,7 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTestCase):
 
         clock = WorldClock()
         with patch("world.rules.clock.get_world_clock", return_value=clock):
-            for skill_key in ("status_disguise", "dominion_art"):
+            for skill_key in (_T_DISGUISE.key, _T_CONFER.key):
                 with self.subTest(skill_key=skill_key):
                     result = submit_player_action(
                         self.player, skill_key, [self.monster]

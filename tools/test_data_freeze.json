@@ -380,7 +380,6 @@
     "world/rules/tests/test_combat_modifiers.py",
     "world/rules/tests/test_combat_party.py",
     "world/rules/tests/test_combat_session_flow.py",
-    "world/rules/tests/test_combat_session_recovery.py",
     "world/rules/tests/test_combat_session_sexual_coercion.py",
     "world/rules/tests/test_combat_view.py",
     "world/rules/tests/test_conferral_action.py",
