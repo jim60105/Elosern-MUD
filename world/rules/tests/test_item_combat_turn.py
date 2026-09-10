@@ -17,7 +17,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.rooms import Room
-from world.lore.items import ITEM_REGISTRY
+from world.lore.items import ItemEffectKey, ItemUseMechanics
 from world.rules.action import ActionRequest
 from world.rules.clock import WorldClock
 from world.rules.combat import (
@@ -39,7 +39,23 @@ from world.rules.items import ItemUseReason, ItemUseResult
 from world.rules.overwhelm import compress_event_logs, resolve_overwhelm
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, FakeEntity
 
-from ._combat_session_helpers import _monster, _player
+from world.tests.synthetic_data import SYNTH_ITEMS, make_item
+
+from ._combat_session_helpers import _monster, _player, live_item_registry, open_synthetic_scope
+
+_TONIC_KEY = "t_ember_spray"  # kit SELF_HEAL consumable, combat-allowed
+_FANG_KEY = "t_iron_fang"  # kit weapon: registered, not usable
+_MANA_KEY = "t_mist_vial"
+_ATTACK_SKILL_KEY = "t_ember_burst"  # flows through mocked resolvers only
+
+_MANA_VIAL = make_item(
+    _MANA_KEY,
+    display_name_zh="合成法力藥劑",
+    price_table_key="t_mossmeals",
+    use_mechanics=ItemUseMechanics(
+        effect_key=ItemEffectKey.MANA_RESTORE, consumable=True, combat_allowed=True
+    ),
+)
 
 
 def _item_used_log(actor_key: str, item_key: str) -> EventLog:
@@ -68,7 +84,7 @@ def _item_used_log(actor_key: str, item_key: str) -> EventLog:
 def _attack_log(actor_key: str, target_key: str, amount: int) -> EventLog:
     return EventLog(
         actor_key,
-        "basic_attack",
+        _ATTACK_SKILL_KEY,
         (target_key,),
         (
             EventEntry(
@@ -86,6 +102,7 @@ def _attack_log(actor_key: str, target_key: str, amount: int) -> EventLog:
 class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
+        open_synthetic_scope(self, "items", extra={"items": {_MANA_KEY: _MANA_VIAL}})
         self.room = create_object(Room, key="item arena")
         self.player = _player("item duelist")
         self.player.location = self.room
@@ -104,7 +121,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
     )
     def test_item_use_drives_one_ordinary_round(self):
         maximum = self._hurt(20)
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_TONIC_KEY, _TONIC_KEY]
         engage(self.player, self.monster)
         clock = WorldClock()
         with (
@@ -112,7 +129,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             patch("world.rules.action.roll_d100", return_value=1),
             patch("world.rules.combat_session.get_world_clock", return_value=clock),
         ):
-            result = submit_player_item_use(self.player, "healing_potion")
+            result = submit_player_item_use(self.player, _TONIC_KEY)
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
         item_entries = [
@@ -125,14 +142,14 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(
             item_entries[0].data,
             {
-                "item_key": "healing_potion",
+                "item_key": _TONIC_KEY,
                 "effect_key": "self_heal",
                 "consumable": True,
                 "amount": 20,
             },
         )
         self.assertEqual(
-            self.player.db.inventory.count("healing_potion"), 1
+            self.player.db.inventory.count(_TONIC_KEY), 1
         )
         self.assertEqual(int(self.player.traits.hp.current), maximum)
         self.assertEqual(clock.tick, 0)
@@ -150,13 +167,13 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         engage(self.player, self.monster)
         maximum = int(self.player.traits.hp.max)
         self.player.traits.hp.current = maximum
-        self.player.db.inventory = ["healing_potion", "mana_potion"]
+        self.player.db.inventory = [_TONIC_KEY, _MANA_KEY]
         clock = WorldClock()
         cases = (
-            ("healing_potion", "hp_full"),
-            ("mana_potion", "mp_full"),
+            (_TONIC_KEY, "hp_full"),
+            (_MANA_KEY, "mp_full"),
             ("mystery_key", "unknown_item"),
-            ("plain_sword", "not_usable"),
+            (_FANG_KEY, "not_usable"),
         )
         for item_key, reason in cases:
             with self.subTest(item_key=item_key):
@@ -169,7 +186,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
                 self.assertEqual(result["reason"], reason)
                 self.assertEqual(read_session(self.player).rounds_elapsed, 0)
                 self.assertEqual(
-                    self.player.db.inventory, ["healing_potion", "mana_potion"]
+                    self.player.db.inventory, [_TONIC_KEY, _MANA_KEY]
                 )
                 self.assertEqual(int(self.player.traits.hp.current), maximum)
         self.assertEqual(clock.tick, 0)
@@ -178,7 +195,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         engage(self.player, self.monster)
         self._hurt(20)
         self.player.db.inventory = ["meal"]
-        result = submit_player_item_use(self.player, "healing_potion")
+        result = submit_player_item_use(self.player, _TONIC_KEY)
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["reason"], "item_not_held")
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)
@@ -192,18 +209,18 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         from world.rules.combat_session import _persist
 
         self._hurt(20)
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_TONIC_KEY]
         engage(self.player, self.monster)
         _persist(
             self.player,
             replace(read_session(self.player), knocked_out_ids=(self.player.pk,)),
         )
-        result = submit_player_item_use(self.player, "healing_potion")
+        result = submit_player_item_use(self.player, _TONIC_KEY)
         # A player already knocked out settles as defeat; the skipped turn
         # must still leave the potion untouched and emit no item-use event.
         self.assertEqual(result["outcome"], "defeat")
         self.assertEqual(
-            self.player.db.inventory.count("healing_potion"), 1
+            self.player.db.inventory.count(_TONIC_KEY), 1
         )
         item_logs = [
             entry
@@ -218,7 +235,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
     )
     def test_mid_round_invalidation_consumes_the_round_without_consuming_the_item(self):
         self._hurt(20)
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_TONIC_KEY]
         engage(self.player, self.monster)
         rejected = ItemUseResult(
             outcome="rejected", reason=ItemUseReason.UNKNOWN_EFFECT
@@ -230,10 +247,10 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
                 "world.rules.combat.resolve_item_use", return_value=rejected
             ),
         ):
-            result = submit_player_item_use(self.player, "healing_potion")
+            result = submit_player_item_use(self.player, _TONIC_KEY)
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
-        self.assertEqual(self.player.db.inventory.count("healing_potion"), 1)
+        self.assertEqual(self.player.db.inventory.count(_TONIC_KEY), 1)
         self.assertEqual(
             int(self.player.traits.hp.current), int(self.player.traits.hp.max) - 20
         )
@@ -243,7 +260,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
     )
     def test_foe_overwhelming_verdict_keeps_per_round_item_agency(self):
         self._hurt(20)
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_TONIC_KEY, _TONIC_KEY]
         engage(self.player, self.monster)
         foe_team = "foes"
         with (
@@ -254,10 +271,10 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
                 return_value=foe_team,
             ),
         ):
-            result = submit_player_item_use(self.player, "healing_potion")
+            result = submit_player_item_use(self.player, _TONIC_KEY)
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
-        self.assertEqual(self.player.db.inventory.count("healing_potion"), 1)
+        self.assertEqual(self.player.db.inventory.count(_TONIC_KEY), 1)
         self.assertEqual(
             len(
                 [
@@ -279,7 +296,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         # items lost the compression branch outright (D-5), so the resolver
         # must never be reached.
         self._hurt(20)
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_TONIC_KEY, _TONIC_KEY]
         engage(self.player, self.monster)
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
@@ -295,23 +312,23 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
                 ),
             ) as resolver,
         ):
-            result = submit_player_item_use(self.player, "healing_potion")
+            result = submit_player_item_use(self.player, _TONIC_KEY)
         resolver.assert_not_called()
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
-        self.assertEqual(self.player.db.inventory.count("healing_potion"), 1)
+        self.assertEqual(self.player.db.inventory.count(_TONIC_KEY), 1)
 
     @covers_requirement(
         "item-use-resolution::combat-item-use-occupies-one-initiative-ordered-round"
     )
     def test_outer_rollback_restores_the_deleted_mirror_and_surfaces(self):
         self._hurt(20)
-        self.player.db.inventory = ["healing_potion"]
-        materialize_registry_object(self.player, "healing_potion")
+        self.player.db.inventory = [_TONIC_KEY]
+        materialize_registry_object(self.player, _TONIC_KEY)
         mirror_pk = next(
             obj.id
             for obj in self.player.contents
-            if registry_key_for_object(obj) == "healing_potion"
+            if registry_key_for_object(obj) == _TONIC_KEY
         )
         hp_before = int(self.player.traits.hp.current)
         engage(self.player, self.monster)
@@ -325,9 +342,9 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             patch("world.rules.combat_session._persist", side_effect=boom),
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_item_use(self.player, "healing_potion")
+                submit_player_item_use(self.player, _TONIC_KEY)
         self.assertEqual(
-            self.player.db.inventory.count("healing_potion"), 1
+            self.player.db.inventory.count(_TONIC_KEY), 1
         )
         self.assertEqual(int(self.player.traits.hp.current), hp_before)
         self.assertTrue(ObjectDB.objects.filter(pk=mirror_pk).exists())
@@ -336,7 +353,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             [
                 obj.id
                 for obj in self.player.contents
-                if registry_key_for_object(obj) == "healing_potion"
+                if registry_key_for_object(obj) == _TONIC_KEY
             ],
         )
         self.assertIsNotNone(read_session(self.player))
@@ -350,12 +367,12 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         # journals (fix-combat-settlement-recovery D1 extended by
         # add-inventory-item-actions D2).
         self._hurt(20)
-        self.player.db.inventory = ["healing_potion"]
-        materialize_registry_object(self.player, "healing_potion")
+        self.player.db.inventory = [_TONIC_KEY]
+        materialize_registry_object(self.player, _TONIC_KEY)
         mirror_pk = next(
             obj.id
             for obj in self.player.contents
-            if registry_key_for_object(obj) == "healing_potion"
+            if registry_key_for_object(obj) == _TONIC_KEY
         )
         hp_before = int(self.player.traits.hp.current)
         engage(self.player, self.monster)
@@ -369,8 +386,8 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             patch("world.rules.combat._end_of_round_upkeep", side_effect=boom),
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_item_use(self.player, "healing_potion")
-        self.assertEqual(self.player.db.inventory.count("healing_potion"), 1)
+                submit_player_item_use(self.player, _TONIC_KEY)
+        self.assertEqual(self.player.db.inventory.count(_TONIC_KEY), 1)
         self.assertEqual(int(self.player.traits.hp.current), hp_before)
         self.assertTrue(ObjectDB.objects.filter(pk=mirror_pk).exists())
         self.assertIn(
@@ -378,7 +395,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             [
                 obj.id
                 for obj in self.player.contents
-                if registry_key_for_object(obj) == "healing_potion"
+                if registry_key_for_object(obj) == _TONIC_KEY
             ],
         )
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)
@@ -388,12 +405,12 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
     )
     def test_terminal_settlement_failure_after_item_use_restores_everything(self):
         self._hurt(20)
-        self.player.db.inventory = ["healing_potion"]
-        materialize_registry_object(self.player, "healing_potion")
+        self.player.db.inventory = [_TONIC_KEY]
+        materialize_registry_object(self.player, _TONIC_KEY)
         mirror_pk = next(
             obj.id
             for obj in self.player.contents
-            if registry_key_for_object(obj) == "healing_potion"
+            if registry_key_for_object(obj) == _TONIC_KEY
         )
         hp_before = int(self.player.traits.hp.current)
         engage(self.player, self.monster)
@@ -407,8 +424,8 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             patch("world.rules.combat_session._continue_or_settle", side_effect=boom),
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_item_use(self.player, "healing_potion")
-        self.assertEqual(self.player.db.inventory.count("healing_potion"), 1)
+                submit_player_item_use(self.player, _TONIC_KEY)
+        self.assertEqual(self.player.db.inventory.count(_TONIC_KEY), 1)
         self.assertEqual(int(self.player.traits.hp.current), hp_before)
         self.assertTrue(ObjectDB.objects.filter(pk=mirror_pk).exists())
         self.assertIn(
@@ -416,7 +433,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             [
                 obj.id
                 for obj in self.player.contents
-                if registry_key_for_object(obj) == "healing_potion"
+                if registry_key_for_object(obj) == _TONIC_KEY
             ],
         )
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)
@@ -425,6 +442,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
 class CompressedItemTurnTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
+        open_synthetic_scope(self, "items")
         attacker = FakeEntity(
             "elf",
             hp=10000,
@@ -455,7 +473,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
             item_calls.append(request)
             return ItemUseResult(
                 outcome="success",
-                event_log=_item_used_log("elf", "healing_potion"),
+                event_log=_item_used_log("elf", _TONIC_KEY),
                 journal=sentinel,
             )
 
@@ -474,10 +492,10 @@ class CompressedItemTurnTests(EvenniaTestCase):
                 return None
             if not used_item["done"]:
                 used_item["done"] = True
-                return ItemUseRequest(actor=entity, item_key="healing_potion")
+                return ItemUseRequest(actor=entity, item_key=_TONIC_KEY)
             return ActionRequest(
                 actor=entity,
-                skill_key="basic_attack",
+                skill_key=_ATTACK_SKILL_KEY,
                 targets=[self.defender],
                 context=None,
             )
@@ -506,7 +524,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
                 max_rounds=12,
                 commanded_actor="elf",
                 commanded_action_kind="item",
-                commanded_action_key="healing_potion",
+                commanded_action_key=_TONIC_KEY,
                 journal_sink=journals,
             )
 
@@ -515,7 +533,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
         self.assertEqual(len(item_calls), 1)
         self.assertTrue(item_calls[0].actor.key, "elf")
         self.assertEqual(len(resolver_calls), 1)
-        self.assertEqual(resolver_calls[0].skill_key, "basic_attack")
+        self.assertEqual(resolver_calls[0].skill_key, _ATTACK_SKILL_KEY)
         self.assertEqual(journals, [sentinel])
         markers = [
             entry
@@ -526,7 +544,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
         self.assertEqual(len(markers), 1)
         self.assertEqual(
             markers[0].data,
-            {"item": ITEM_REGISTRY["healing_potion"].display_name_zh},
+            {"item": live_item_registry()[_TONIC_KEY].display_name_zh},
         )
         item_entries = [
             entry
@@ -539,7 +557,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
     def test_item_kind_marker_requires_an_item_used_entry(self):
         logs = (            EventLog(
                 "elf",
-                "healing_potion",
+                _TONIC_KEY,
                 ("elf",),
                 (
                     EventEntry(
@@ -561,7 +579,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
             1,
             commanded_actor="elf",
             commanded_action_kind="item",
-            commanded_action_key="healing_potion",
+            commanded_action_key=_TONIC_KEY,
             commanded_window=logs,
         )
         self.assertEqual(

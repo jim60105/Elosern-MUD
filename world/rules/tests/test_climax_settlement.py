@@ -26,6 +26,19 @@ from world.rules.combat import Battlefield, _end_of_round_upkeep
 from world.rules.sexual_state import climax_settlement_action, decay_tick
 from world.rules.sexual_transitions import apply_event
 from world.rules.tests.combat_fixtures import grant_lineage
+from world.skills.registry import TargetSpec
+from world.tests.synthetic_data import make_skill
+
+from ._combat_session_helpers import open_synthetic_scope
+
+# Synthetic cast rows: the two-event sexual caster (mid-round settlement)
+# and the kit damage spell (combat-session rollback carrier).
+_T_EVENT_CAST = make_skill(
+    "t_pulse_tap",
+    effects=["sexual_event:stimulus_applied", "sexual_event:stimulus_applied"],
+    target_spec=TargetSpec.SELF,
+    cost={},
+)
 
 class FixedRng:
     """RNG stub returning a chosen in-range value."""
@@ -172,44 +185,33 @@ class CombatClimaxSettlementTests(EvenniaTestCase):
 
     @covers_requirement("climax-settlement::an-entity-whose-climax-phase-reaches-進行中-always-resolves-within-finite-settlement-time")
     def test_mid_round_entry_into_in_progress_resolves_in_the_same_upkeep(self):
-        from dataclasses import replace
-
         from world.rules.action import ActionRequest
         from world.rules.combat import BattlefieldActionContext, run_round
-        from world.skills.registry import SKILL_REGISTRY
 
+        open_synthetic_scope(
+            self, "skills", extra={"skills": {_T_EVENT_CAST.key: _T_EVENT_CAST}}
+        )
         entity = _player("mid-round climaxer")
         entity.sexual.pleasure.base = 85
         entity.traits.sp.current = 100
-        entity.db.skills = {"active": ["status_disguise"], "passive": []}
-        original = SKILL_REGISTRY["status_disguise"]
-        SKILL_REGISTRY["status_disguise"] = replace(
-            original,
-            effects=[
-                "sexual_event:stimulus_applied",
-                "sexual_event:stimulus_applied",
-            ],
-        )
+        entity.db.skills = {"active": [_T_EVENT_CAST.key], "passive": []}
         field = self._field(entity)
-        try:
-            with (
-                patch(
-                    "world.rules.combat.roll_initiative",
-                    return_value=[entity.key],
+        with (
+            patch(
+                "world.rules.combat.roll_initiative",
+                return_value=[entity.key],
+            ),
+            patch("world.rules.combat.tick_buffs", return_value=()),
+        ):
+            run_round(
+                field,
+                lambda actor, battlefield: ActionRequest(
+                    actor,
+                    _T_EVENT_CAST.key,
+                    [],
+                    BattlefieldActionContext(battlefield),
                 ),
-                patch("world.rules.combat.tick_buffs", return_value=()),
-            ):
-                run_round(
-                    field,
-                    lambda actor, battlefield: ActionRequest(
-                        actor,
-                        "status_disguise",
-                        [],
-                        BattlefieldActionContext(battlefield),
-                    ),
-                )
-        finally:
-            SKILL_REGISTRY["status_disguise"] = original
+            )
         # The cast drove the phase to 進行中 mid-round; the same round's
         # upkeep then resolved it with no external climax_ends call.
         self.assertEqual(entity.sexual.climax_phase.level, "餘韻")
@@ -361,6 +363,9 @@ class ClimaxRollbackTests(EvenniaTest):
         from typeclasses.rooms import Room
         from world.rules.combat_session import engage, read_session, submit_player_action
 
+        from world.tests.synthetic_data import SYNTH_SKILLS
+
+        open_synthetic_scope(self, "skills")
         entity = self._staged_player()
         monster = create_object(Monster, key="rollback goblin")
         monster.threat_tier = "low"
@@ -370,7 +375,8 @@ class ClimaxRollbackTests(EvenniaTest):
         arena = create_object(Room, key="rollback arena")
         entity.location = arena
         monster.location = arena
-        grant_lineage(entity, ["fire_ball"])
+        _T_CAST = SYNTH_SKILLS["t_ember_burst"].key
+        grant_lineage(entity, [_T_CAST])
         engage(entity, monster)
         clock = WorldClock()
         with (
@@ -390,7 +396,7 @@ class ClimaxRollbackTests(EvenniaTest):
             ),
             self.assertRaises(RuntimeError),
         ):
-            submit_player_action(entity, "fire_ball", [monster])
+            submit_player_action(entity, _T_CAST, [monster])
         self.assertEqual(
             entity.attributes.get("climax_turns", category="sexual_state"), 2
         )

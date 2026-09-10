@@ -14,7 +14,6 @@ from unittest.mock import patch
 from evennia.utils.test_resources import EvenniaTest
 
 from world.lore.items import (
-    ITEM_REGISTRY,
     EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
@@ -29,6 +28,9 @@ from world.rules.equipment import (
     toggle_equipment,
 )
 from world.skills.equipment import ACCESSORY_MAX_SLOTS, EquipmentSlot, list_items
+from world.tests.synthetic_data import SYNTH_ITEMS
+
+from ._combat_session_helpers import live_item_registry, open_synthetic_scope
 
 _PRESENTATION = ItemPresentation(
     kind=ItemKind.ACCESSORY,
@@ -63,20 +65,16 @@ class _FakeAtomic:
 class _ToggleTestCase(EvenniaTest):
     def setUp(self):
         super().setUp()
-        registry_snapshot = dict(ITEM_REGISTRY)
-
-        def restore():
-            ITEM_REGISTRY.clear()
-            ITEM_REGISTRY.update(registry_snapshot)
-
-        self.addCleanup(restore)
+        # Kit scope: registry mutations below land on the scoped copy and the
+        # kit restores it on teardown.
+        open_synthetic_scope(self, "items")
         self.entity = self.char1
         self.entity.db.equipment = None
         self.entity.db.inventory = []
 
     def register(self, *keys_and_slots: tuple[str, EquipmentSlot]) -> None:
         for key, slot in keys_and_slots:
-            ITEM_REGISTRY[key] = _fixture_definition(key, slot)
+            live_item_registry()[key] = _fixture_definition(key, slot)
 
     def hold(self, *keys: str) -> None:
         self.entity.db.inventory = list(keys)
@@ -98,11 +96,13 @@ class TogglePreflightTests(_ToggleTestCase):
         self.assertEqual(preflight.plan.after["weapon_main"], "alpha_blade")
 
     def test_unknown_inspect_only_and_usable_items_reject(self):
-        self.hold("meal", "healing_potion", "mystery_key")
+        material = SYNTH_ITEMS["t_huskapple"].key  # slotted? no: MATERIAL, no slot
+        consumable = SYNTH_ITEMS["t_ember_spray"].key  # usable, no slot
+        self.hold(material, consumable, "mystery_key")
         for key, reason in (
             ("mystery_key", EquipmentToggleReason.UNKNOWN_ITEM),
-            ("meal", EquipmentToggleReason.NOT_EQUIPMENT),
-            ("healing_potion", EquipmentToggleReason.NOT_EQUIPMENT),
+            (material, EquipmentToggleReason.NOT_EQUIPMENT),
+            (consumable, EquipmentToggleReason.NOT_EQUIPMENT),
         ):
             with self.subTest(key=key):
                 preflight = preflight_equipment_toggle(self.entity, key)
@@ -114,7 +114,7 @@ class TogglePreflightTests(_ToggleTestCase):
     )
     def test_unheld_equipment_rejects_without_mutation(self):
         self.register(("alpha_blade", EquipmentSlot.WEAPON_MAIN))
-        self.hold("plain_sword")
+        self.hold(SYNTH_ITEMS["t_iron_fang"].key)
         before = self.state()
         result = toggle_equipment(self.entity, "alpha_blade")
         self.assertEqual(result.outcome, "rejected")
@@ -391,21 +391,22 @@ class CrossSlotNormalizationTests(_ToggleTestCase):
 
 
 class RegistryBackedAccessoryCapTests(_ToggleTestCase):
-    """The shipped registry alone satisfies and exhausts the five-slot cap."""
+    """A registered cast alone satisfies and exhausts the five-slot cap."""
 
-    _FIVE = (
-        "silver_hairpin",
-        "wolf_fang_necklace",
-        "pilgrim_medallion",
-        "protective_ring",
-        "storage_pouch",
-    )
+    _FIVE = tuple(f"cap_ring_{index}" for index in range(ACCESSORY_MAX_SLOTS))
+
+    def setUp(self):
+        super().setUp()
+        self.register(
+            *((key, EquipmentSlot.ACCESSORY) for key in self._FIVE),
+            ("cap_overflow", EquipmentSlot.ACCESSORY),
+        )
 
     @covers_requirement(
         "equipment-inventory::accessory-is-a-bounded-multi-item-slot"
     )
     def test_five_registry_accessories_equip_and_the_sixth_rejects(self):
-        self.hold(*self._FIVE, "gliding_cloak")
+        self.hold(*self._FIVE, "cap_overflow")
         for key in self._FIVE:
             result = toggle_equipment(self.entity, key)
             self.assertEqual(result.outcome, "success", key)
@@ -413,36 +414,48 @@ class RegistryBackedAccessoryCapTests(_ToggleTestCase):
             self.entity.db.equipment["accessories"], list(self._FIVE)
         )
         before = self.state()
-        overflow = toggle_equipment(self.entity, "gliding_cloak")
+        overflow = toggle_equipment(self.entity, "cap_overflow")
         self.assertEqual(overflow.outcome, "rejected")
         self.assertIs(overflow.reason, EquipmentToggleReason.ACCESSORY_SLOTS_FULL)
         self.assertEqual(self.state(), before)
 
 
 class RegistryBackedTwinWeaponTests(_ToggleTestCase):
-    """Real registry off-hand gear coexists with a main hand and replaces
+    """Registered off-hand gear coexists with a main hand and replaces
     atomically through its singleton slot."""
+
+    _MAIN = "twin_main"
+    _OFF = "twin_off"
+    _SHIELD = "twin_shield"
+
+    def setUp(self):
+        super().setUp()
+        self.register(
+            (self._MAIN, EquipmentSlot.WEAPON_MAIN),
+            (self._OFF, EquipmentSlot.WEAPON_OFF),
+            (self._SHIELD, EquipmentSlot.WEAPON_OFF),
+        )
 
     @covers_requirement(
         "equipment-inventory::singleton-equipment-toggles-and-replaces-atomically"
     )
     def test_twin_blades_occupy_both_hand_slots(self):
-        self.hold("shadow_blade", "shadow_blade_echo")
-        main = toggle_equipment(self.entity, "shadow_blade")
-        off = toggle_equipment(self.entity, "shadow_blade_echo")
+        self.hold(self._MAIN, self._OFF)
+        main = toggle_equipment(self.entity, self._MAIN)
+        off = toggle_equipment(self.entity, self._OFF)
         self.assertEqual(main.outcome, "success")
         self.assertEqual(off.outcome, "success")
-        self.assertEqual(self.entity.db.equipment["weapon_main"], "shadow_blade")
-        self.assertEqual(self.entity.db.equipment["weapon_off"], "shadow_blade_echo")
+        self.assertEqual(self.entity.db.equipment["weapon_main"], self._MAIN)
+        self.assertEqual(self.entity.db.equipment["weapon_off"], self._OFF)
 
     @covers_requirement(
         "equipment-inventory::singleton-equipment-toggles-and-replaces-atomically"
     )
     def test_shield_replaces_the_off_hand_blade_which_stays_held(self):
-        self.hold("shadow_blade_echo", "iron_shield")
-        toggle_equipment(self.entity, "shadow_blade_echo")
-        result = toggle_equipment(self.entity, "iron_shield")
+        self.hold(self._OFF, self._SHIELD)
+        toggle_equipment(self.entity, self._OFF)
+        result = toggle_equipment(self.entity, self._SHIELD)
         self.assertEqual(result.outcome, "success")
-        self.assertEqual(result.replaced_key, "shadow_blade_echo")
-        self.assertEqual(self.entity.db.equipment["weapon_off"], "iron_shield")
-        self.assertIn("shadow_blade_echo", list_items(self.entity))
+        self.assertEqual(result.replaced_key, self._OFF)
+        self.assertEqual(self.entity.db.equipment["weapon_off"], self._SHIELD)
+        self.assertIn(self._OFF, list_items(self.entity))

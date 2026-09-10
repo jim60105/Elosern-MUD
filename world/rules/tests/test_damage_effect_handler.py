@@ -24,8 +24,33 @@ from world.rules.combat import (
     _handle_damage,
     _stored_hp,
 )
+from world.skills.effects import RuleTableEffect
+from world.tests.synthetic_data import SYNTH_SKILLS, make_skill, synthetic_registries
 
 from .combat_fixtures import FakeEntity, grant_lineage
+
+# Synthetic cast fixture: the kit's elemental spell plus a rule-table-shaped
+# passive that stands in for the shipped guardian_instinct doctrine.
+_T_CAST = SYNTH_SKILLS["t_ember_burst"]
+_T_ELEMENT = _T_CAST.element.key
+_T_GUARDIAN = make_skill(
+    "t_tide_sentinel",
+    effects=[f"passive_buff:{_T_ELEMENT}"],
+)
+assert any(
+    isinstance(effect, RuleTableEffect) for effect in _T_GUARDIAN.parsed_effects
+), parse_effect.__doc__ or "rule-table shape"
+
+_SCOPE = synthetic_registries(
+    "skills",
+    "races",
+    "subraces",
+    "static_tiers",
+    "elements",
+    "items",
+    "sexual_acts",
+    extra={"skills": {_T_GUARDIAN.key: _T_GUARDIAN}},
+)
 
 
 class DamageEffectHandlerTests(unittest.TestCase):
@@ -210,6 +235,7 @@ class AdjustedStatDamageTests(unittest.TestCase):
         )
 
 
+@_SCOPE
 class DamageResolverIntegrationTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
@@ -218,10 +244,8 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         for entity in (self.actor, self.target):
             entity.race = "human"
             entity.apply_race_baseline()
-        # Human static magic_power at 術師 tier so the fire_ball cast passes
-        # the element-mastery cast gate.
         self.actor.traits.magic_power.base = 30
-        grant_lineage(self.actor, ["fire_ball"])
+        grant_lineage(self.actor, [_T_CAST.key])
         self.target.db.skills = {"active": [], "passive": []}
         battlefield = Battlefield(
             {
@@ -232,7 +256,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         )
         self.request = ActionRequest(
             self.actor,
-            "fire_ball",
+            _T_CAST.key,
             [self.target],
             BattlefieldActionContext(battlefield),
         )
@@ -252,12 +276,12 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
     @covers_requirement("action-resolution-pipeline::the-pipeline-executes-design-doc-6-1-s-eight-steps-in-order-each-rejecting-with-a")
     def test_late_rejection_leaves_hp_untouched_after_roll(self):
         before = self.target.traits.hp.value
-        SKILL_TIME_OVERRIDES["fire_ball"] = -1
+        SKILL_TIME_OVERRIDES[_T_CAST.key] = -1
         try:
             with patch("world.rules.combat.roll_d100", return_value=100) as roller:
                 result = ActionResolver.resolve(self.request)
         finally:
-            SKILL_TIME_OVERRIDES.pop("fire_ball", None)
+            SKILL_TIME_OVERRIDES.pop(_T_CAST.key, None)
         self.assertEqual(result.reason, RejectReason.TIME_COST_LOOKUP_FAILED)
         self.assertEqual(roller.call_count, 1)
         self.assertEqual(self.target.traits.hp.value, before)
@@ -283,15 +307,35 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         self.assertEqual(hp_data, before)
 
     def test_conferred_granted_defense_reduces_live_damage(self):
-        from world.skills.handler import ConferredSkillGrant
+        from unittest.mock import patch as _patch
 
+        from world.rules.rulebook.schema import Rule
+        from world.skills.handler import ConferredSkillGrant
+        import world.rules.combat_modifiers as combat_rules
+
+        # One rule-table row keyed to the synthetic guardian stand-in: the
+        # shipped doctrine rule (keyed to shipped gear) is irrelevant here.
+        spliced = _patch.object(
+            combat_rules,
+            "_RULES",
+            [
+                *combat_rules._RULES,
+                Rule(
+                    "t_sentinel_defense_bonus",
+                    {"skill_owned": _T_GUARDIAN.key},
+                    {"defense": 5},
+                ),
+            ],
+        )
+        spliced.start()
+        self.addCleanup(spliced.stop)
         self.target.traits.hp.current = 100
         with patch("world.rules.combat.roll_d100", return_value=100):
             ActionResolver.resolve(self.request)
         base_damage = 100 - self.target.traits.hp.value
         self.target.traits.hp.current = 100
         self.target.db.skill_grants = [
-            ConferredSkillGrant("elosia", "guardian_instinct", 0.5)
+            ConferredSkillGrant("elosia", _T_GUARDIAN.key, 0.5)
         ]
         with patch("world.rules.combat.roll_d100", return_value=100):
             ActionResolver.resolve(self.request)
@@ -307,6 +351,13 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
 
         record = example_record()
         record["key"] = "orc alpha"
+        # In-scope registries carry only synthetic rows: the record names the
+        # kit race/skill vocabulary (import validation resolves them).
+        record["race"] = "t_duskmari"
+        record["subrace"] = "t_duskmari_evensong"
+        record["skills"] = [_T_CAST.key]
+        record["passives"] = []
+        record["affinity_elements"] = [_T_ELEMENT]
         npc = instantiate_character(record)
         self.assertEqual(npc.key, "orc alpha")
         npc.db.skills = {"active": [], "passive": []}
@@ -321,7 +372,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         )
         request = ActionRequest(
             self.actor,
-            "fire_ball",
+            _T_CAST.key,
             [npc],
             BattlefieldActionContext(battlefield),
         )

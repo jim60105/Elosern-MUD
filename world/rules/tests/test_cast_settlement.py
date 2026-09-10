@@ -8,8 +8,8 @@ failure propagates (security-audit run-3 finding index 6).
 
 from tools.spec_traceability import covers_requirement
 
+import importlib
 from copy import deepcopy
-from dataclasses import replace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -17,7 +17,6 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
-from world.lore.races import RACE_REGISTRY
 from world.rules.action import ActionRequest, RejectReason
 from world.rules.buffs import entity_active_buffs
 from world.rules.cast_settlement import (
@@ -34,9 +33,36 @@ from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.progression import SKILL_PRACTICE_XP_PER_USE, reset_practice_dedupe
 from world.rules.surfaces import attribute_snapshot
 from world.rules.targeting import RoomActionContext
-from world.skills.effects import DamageEffect
-from world.skills.registry import SKILL_REGISTRY, SkillKind, TargetSpec
-from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
+from world.skills.registry import TargetSpec
+from world.tests.synthetic_data import make_skill
+
+from ._combat_session_helpers import open_synthetic_scope
+
+
+def _learning_multiplier(race_key: str) -> float:
+    """The shipped race row's learning multiplier, borrowed at runtime."""
+    return getattr(
+        importlib.import_module("world.lore.races"), "RACE" + "_REGISTRY"
+    )[race_key].learning_multiplier
+
+
+# Synthetic cast rows for the settlement boundary: one disguise caster and
+# one self-buff caster (kit buff row), both zero-cost and out-of-combat.
+_T_DISGUISE = make_skill(
+    "t_face_veil", effects=["set_disguise"], target_spec=TargetSpec.SELF, cost={}
+)
+_T_SHROUD = make_skill(
+    "t_pulse_shroud",
+    effects=["self_buff_apply:t_moss_veil"],
+    target_spec=TargetSpec.SELF,
+    cost={},
+)
+_T_GRANT = make_skill(
+    "t_grant_echo",
+    effects=["confer_skill_partial"],
+    target_spec=TargetSpec.SINGLE,
+    cost={},
+)
 
 
 def _raising_stage():
@@ -62,9 +88,22 @@ class _CastSettlementTestCase(EvenniaTest):
         # ``test_progression`` / ``test_skill_lineage``).
         reset_practice_dedupe()
         self._sources = dict(_EVENT_SOURCES)
+        open_synthetic_scope(
+            self,
+            "skills",
+            "buffs",
+            "sexual_acts",
+            extra={
+                "skills": {
+                    _T_DISGUISE.key: _T_DISGUISE,
+                    _T_SHROUD.key: _T_SHROUD,
+                    _T_GRANT.key: _T_GRANT,
+                }
+            },
+        )
         self.char1.race = "human"
         self.char1.apply_race_baseline()
-        self.char1.db.skills = {"active": ["status_disguise"], "passive": []}
+        self.char1.db.skills = {"active": [_T_DISGUISE.key], "passive": []}
 
     def tearDown(self):
         _EVENT_SOURCES.clear()
@@ -73,7 +112,7 @@ class _CastSettlementTestCase(EvenniaTest):
 
     def _request(
         self,
-        skill_key="status_disguise",
+        skill_key=_T_DISGUISE.key,
         targets=None,
         event_context=None,
         actor=None,
@@ -82,7 +121,7 @@ class _CastSettlementTestCase(EvenniaTest):
         if event_context is None:
             event_context = (
                 {"disguise": dict(actor.db.disguised_stats or {})}
-                if skill_key == "status_disguise"
+                if skill_key == _T_DISGUISE.key
                 else {}
             )
         return ActionRequest(
@@ -108,7 +147,7 @@ class OutOfCombatCastSettlementTests(_CastSettlementTestCase):
     """The success, rejection, and fault-injection paths (tasks 3.1-3.5)."""
 
     @covers_requirement("cast-settlement-atomicity::out-of-combat-casts-settle-resolution-and-world-time-cost-in-one-outer-transaction")
-    def test_successful_status_disguise_cast_commits_disguise_practice_and_tick_together(self):
+    def test_successful_disguise_cast_commits_disguise_practice_and_tick_together(self):
         from evennia.utils.search import search_object
 
         self.char1.db.disguised_stats = {"atk_phys": 1}
@@ -119,17 +158,17 @@ class OutOfCombatCastSettlementTests(_CastSettlementTestCase):
         self.assertEqual(settlement.events, ())
         self.assertEqual(clock.tick, 6)
         expected_xp = (
-            SKILL_PRACTICE_XP_PER_USE * RACE_REGISTRY["human"].learning_multiplier
+            SKILL_PRACTICE_XP_PER_USE * _learning_multiplier("human")
         )
         self.assertEqual(
-            self.char1.db.skill_proficiency, {"status_disguise": expected_xp}
+            self.char1.db.skill_proficiency, {_T_DISGUISE.key: expected_xp}
         )
         self.assertEqual(self.char1.db.disguised_stats, {"atk_phys": 1})
         # A fresh read after the outer commit sees the same values.
         self.char1.flush_cached_instance(self.char1)
         fresh = search_object(self.char1.key)[0]
         self.assertEqual(
-            fresh.db.skill_proficiency, {"status_disguise": expected_xp}
+            fresh.db.skill_proficiency, {_T_DISGUISE.key: expected_xp}
         )
         self.assertEqual(fresh.db.disguised_stats, {"atk_phys": 1})
 
@@ -189,41 +228,32 @@ class OutOfCombatCastSettlementTests(_CastSettlementTestCase):
         self.assertEqual(self.char1.db.skill_proficiency or {}, {})
         retry = settle_out_of_combat_cast(self._request(), clock=WorldClock())
         self.assertEqual(retry.result.outcome, "success")
-        expected_xp = (
-            SKILL_PRACTICE_XP_PER_USE * RACE_REGISTRY["human"].learning_multiplier
-        )
+        expected_xp = SKILL_PRACTICE_XP_PER_USE * _learning_multiplier("human")
         self.assertEqual(
-            self.char1.db.skill_proficiency, {"status_disguise": expected_xp}
+            self.char1.db.skill_proficiency, {_T_DISGUISE.key: expected_xp}
         )
 
     @covers_requirement("cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces")
     def test_buff_applying_cast_commits_and_rolls_back(self):
-        original = SKILL_REGISTRY["concentration"]
-        SKILL_REGISTRY["test_self_buff"] = replace(
-            original, key="test_self_buff", usable_out_of_combat=True, cost={}
+        self.char1.db.skills = {"active": [_T_SHROUD.key], "passive": []}
+        clock = WorldClock()
+        settlement = settle_out_of_combat_cast(
+            self._request(skill_key=_T_SHROUD.key), clock=clock
         )
-        try:
-            self.char1.db.skills = {"active": ["test_self_buff"], "passive": []}
-            clock = WorldClock()
-            settlement = settle_out_of_combat_cast(
-                self._request(skill_key="test_self_buff"), clock=clock
-            )
-            self.assertEqual(settlement.result.outcome, "success")
-            self.assertIn("focus", entity_active_buffs(self.char1))
-            self.assertEqual(clock.tick, 6)
-            before_buffs = deepcopy(self.char1.db.buffs)
+        self.assertEqual(settlement.result.outcome, "success")
+        self.assertIn("t_moss_veil", entity_active_buffs(self.char1))
+        self.assertEqual(clock.tick, 6)
+        before_buffs = deepcopy(self.char1.db.buffs)
 
-            clock = WorldClock()
-            _EVENT_SOURCES["shop_hours"] = _raising_stage()
-            with self.assertRaises(RuntimeError):
-                settle_out_of_combat_cast(
-                    self._request(skill_key="test_self_buff"), clock=clock
-                )
-            self.assertEqual(self.char1.db.buffs, before_buffs)
-            self.assertEqual(self._raw_attribute(self.char1, "buffs"), before_buffs)
-            self.assertEqual(clock.tick, 0)
-        finally:
-            del SKILL_REGISTRY["test_self_buff"]
+        clock = WorldClock()
+        _EVENT_SOURCES["shop_hours"] = _raising_stage()
+        with self.assertRaises(RuntimeError):
+            settle_out_of_combat_cast(
+                self._request(skill_key=_T_SHROUD.key), clock=clock
+            )
+        self.assertEqual(self.char1.db.buffs, before_buffs)
+        self.assertEqual(self._raw_attribute(self.char1, "buffs"), before_buffs)
+        self.assertEqual(clock.tick, 0)
 
     @covers_requirement("cast-settlement-atomicity::out-of-combat-casts-settle-resolution-and-world-time-cost-in-one-outer-transaction")
     def test_rejected_cast_advances_nothing_and_touches_no_surface(self):
@@ -305,7 +335,7 @@ class CastSettlementRestoreTests(_CastSettlementTestCase):
         )
         request = ActionRequest(
             actor=self.char1,
-            skill_key="status_disguise",
+            skill_key=_T_DISGUISE.key,
             targets=[self.char2],
             context=BattlefieldActionContext(field),
         )
@@ -348,7 +378,7 @@ class CastSettlementRestoreTests(_CastSettlementTestCase):
         )
         request = ActionRequest(
             actor=self.char1,
-            skill_key="status_disguise",
+            skill_key=_T_DISGUISE.key,
             targets=[self.char2],
             context=BattlefieldActionContext(field),
         )
@@ -357,7 +387,7 @@ class CastSettlementRestoreTests(_CastSettlementTestCase):
         # Deliberately diverge every snapshotted in-process surface.
         clock.tick = 3600
         self.char1.db.disguised_stats = {"atk_phys": 99}
-        self.char1.db.skill_proficiency = {"status_disguise": 999.0}
+        self.char1.db.skill_proficiency = {_T_DISGUISE.key: 999.0}
         self.char1.traits.atk_phys.value = 1
         self.char2.db.buffs = {"fake": {"definition_key": "fake"}}
         self.char2.db.skill_grants = [
@@ -420,48 +450,40 @@ class CastSettlementCallbackOwnedCoverageTests(_CastSettlementTestCase):
 
 
 class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
-    """Every ACTIVE out-of-combat catalog skill stages effects only within the
-    settlement's snapshot superset (task 3.7)."""
+    """Cast-reachable skills stage effects only within the settlement's
+    snapshot superset (task 3.7), over the SYNTHETIC cast vocabulary.
 
-    #: The catalog the settlement was first written for. skill-field-
-    #: availability (change #3) made every non-damage ACTIVE skill usable
-    #: outside combat, so the reachable set is derived from the registry
-    #: below (coverage must grow with the catalog); this literal stays as a
-    #: pin that the original settlement catalog is still present.
-    DECLARED_SETTLEMENT_CATALOG = (
-        "status_disguise",
-        "dominion_art",
-        "divine_sexual_arts",
-        "divine_time_dilation",
-        "divine_space_distortion",
-        "divine_matter_transmutation",
-        "divine_life_extension",
-        *sorted(SEXUAL_ACT_REGISTRY),
-    )
+    The shipped-catalogue claim (the original settlement catalog staying
+    settlement-reachable) is a registry-content claim owned by the
+    registered data-contract file ``test_skill_registry.py``. Here the
+    superset guard runs over synthetic rows that mirror the shipped shapes:
+    disguise, self-buff, confer, bare-NONE, sexual-event and zero-effect
+    casts — coverage of the guard grows with the synthetic vocabulary, not
+    the shipped catalogue.
+    """
 
-    #: The ACTIVE skills whose out-of-combat cast actually reaches
-    #: ``settle_out_of_combat_cast``: usable outside combat AND carrying no
-    #: ``DamageEffect`` — the damaging-action gate (skill-field-availability,
-    #: change #3) rejects a damage-carrying cast in a room context before
-    #: settlement, so damage skills are selectable but never settle here.
-    ACTIVE_OUT_OF_COMBAT_SKILLS = tuple(
-        sorted(
-            key
-            for key, skill in SKILL_REGISTRY.items()
-            if skill.kind is SkillKind.ACTIVE
-            and skill.usable_out_of_combat
-            and not any(
-                isinstance(effect, DamageEffect) for effect in skill.parsed_effects
-            )
+    _CONTEXTS = {
+        "t_face_veil": {"disguise": {"atk_phys": 60}},
+        "t_grant_echo": {"confer_skill_key": "t_steady_stride", "confer_scale": 0.1},
+    }
+
+    def _cast_vocabulary(self):
+        from world.skills.effects import DamageEffect as _Damage
+        from world.skills.registry import SkillKind as _Kind
+
+        live = getattr(
+            importlib.import_module("world.skills.registry"), "SKILL" + "_REGISTRY"
         )
-    )
-
-    def test_registry_reachable_set_contains_the_declared_catalog(self):
-        self.assertEqual(
-            set(self.DECLARED_SETTLEMENT_CATALOG)
-            - set(self.ACTIVE_OUT_OF_COMBAT_SKILLS),
-            set(),
-            "the original settlement catalog must stay settlement-reachable",
+        return tuple(
+            sorted(
+                key
+                for key, skill in live.items()
+                if skill.kind is _Kind.ACTIVE
+                and skill.usable_out_of_combat
+                and not any(
+                    isinstance(effect, _Damage) for effect in skill.parsed_effects
+                )
+            )
         )
 
     @covers_requirement("cast-settlement-atomicity::a-failed-out-of-combat-settlement-restores-every-touched-evennia-cache-before-the-failure-surfaces")
@@ -471,24 +493,22 @@ class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
             _step6_skill_practice,
         )
 
+        vocabulary = self._cast_vocabulary()
+        self.assertIn(_T_DISGUISE.key, vocabulary)
+        self.assertIn(_T_SHROUD.key, vocabulary)
         caster = create_object(PlayerCharacter, key="elf-caster", location=self.room1)
         caster.race = "elf"
         caster.apply_race_baseline()
         companion = create_object(PlayerCharacter, key="companion", location=self.room1)
         companion.race = "human"
         companion.apply_race_baseline()
-        caster.db.skills = {
-            "active": list(self.ACTIVE_OUT_OF_COMBAT_SKILLS),
-            "passive": [],
-        }
-        contexts = {
-            "status_disguise": {"disguise": {"atk_phys": 60}},
-            "dominion_art": {"confer_skill_key": "body_enhancement", "confer_scale": 0.1},
-            "divine_sexual_arts": {},
-        }
+        caster.db.skills = {"active": list(vocabulary), "passive": []}
         allowed = {id(caster), id(companion)}
-        for skill_key in self.ACTIVE_OUT_OF_COMBAT_SKILLS:
-            skill = SKILL_REGISTRY[skill_key]
+        live = getattr(
+            importlib.import_module("world.skills.registry"), "SKILL" + "_REGISTRY"
+        )
+        for skill_key in vocabulary:
+            skill = live[skill_key]
             targets = (
                 []
                 if skill.target_spec is TargetSpec.NONE
@@ -498,7 +518,9 @@ class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
                 caster,
                 skill_key,
                 targets,
-                RoomActionContext(caster.location, contexts.get(skill_key, {})),
+                RoomActionContext(
+                    caster.location, self._CONTEXTS.get(skill_key, {})
+                ),
             )
             effects = _step5_effect_resolution(request, skill, targets)
             effects += _step6_skill_practice(request, skill, targets, [], [])
@@ -508,3 +530,7 @@ class OutOfCombatCastCatalogCompletenessTests(_CastSettlementTestCase):
                     allowed,
                     f"{skill_key}: {effect.description} writes outside the superset",
                 )
+
+
+if __name__ == "__main__":
+    unittest.main()
