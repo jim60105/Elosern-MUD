@@ -48,40 +48,6 @@ from world.skills.registry import SKILL_REGISTRY
 from ._combat_session_helpers import SEAM_AREA_KEY, _monster, _player
 from .combat_fixtures import BattlefieldIsolation, grant_lineage
 
-_MONSTER_TARGET = (
-    "field-combat-initiation::a-skill-aimed-at-a-co-located-hostile-monster-from"
-    "-exploration-always-initiates-combat"
-)
-_DAMAGE_ROUTER = (
-    "field-combat-initiation::a-damaging-skill-aimed-at-anything-other-than-a"
-    "-co-located-hostile-monster-is-rejected-at-the-entry"
-)
-_AVAILABILITY = (
-    "field-combat-initiation::the-skill-s-out-of-combat-availability-is-checked"
-    "-explicitly-before-anything-else"
-)
-_CANDIDATE = (
-    "field-combat-initiation::validation-runs-against-a-candidate-battlefield-that"
-    "-is-never-persisted-under-a-combat-context"
-)
-_LINEUP = (
-    "field-combat-initiation::a-single-skill-opens-against-the-named-monster-and-an"
-    "-area-skill-opens-against-every-living-hostile-monster-in-the-room"
-)
-_BOUNDARY = (
-    "field-combat-initiation::session-creation-and-the-opening-action-share-one"
-    "-failure-boundary"
-)
-_TIME = (
-    "field-combat-initiation::the-opening-cast-charges-combat-time-never-command-time"
-)
-_EVENT = "field-combat-initiation::a-committed-field-initiation-emits-one-boundary-event"
-_COMMAND = (
-    "field-combat-initiation::the-command-routes-an-exploration-cast-by-target-and"
-    "-its-documentation-says-so"
-)
-
-
 def _dominant_player(key):
     """A player that dominates floor-tier monsters (compression fixture)."""
     player = _player(key)
@@ -99,13 +65,17 @@ class FieldCombatTargetTests(BattlefieldIsolation, EvenniaTestCase):
         self.player = _player("classifier")
         self.player.location = self.room
 
-    @covers_requirement(_MONSTER_TARGET)
+    @covers_requirement(
+    "field-combat-initiation::a-skill-aimed-at-a-co-located-hostile-monster-from-exploration-always-initiates-combat"
+)
     def test_positive_case_is_the_living_co_located_monster(self):
         monster = _monster("classified wolf")
         monster.location = self.room
         self.assertIs(field_combat_target(self.player, monster), monster)
 
-    @covers_requirement(_MONSTER_TARGET)
+    @covers_requirement(
+    "field-combat-initiation::a-skill-aimed-at-a-co-located-hostile-monster-from-exploration-always-initiates-combat"
+)
     def test_every_negative_case_returns_none(self):
         npc = create_object(NPC, key="classified npc", location=self.room)
         npc.race = "human"
@@ -137,7 +107,9 @@ class FieldCombatTargetTests(BattlefieldIsolation, EvenniaTestCase):
                 self.assertIsNone(field_combat_target(self.player, candidate))
         self.assertIsNotNone(stranger)
 
-    @covers_requirement(_MONSTER_TARGET)
+    @covers_requirement(
+    "field-combat-initiation::a-skill-aimed-at-a-co-located-hostile-monster-from-exploration-always-initiates-combat"
+)
     def test_two_unlocated_entities_are_not_co_located(self):
         player = _player("nowhere hunter")
         monster = _monster("nowhere wolf")
@@ -166,7 +138,9 @@ class InitiationRoutingTests(
         clear_session(self.player)
         super().tearDown()
 
-    @covers_requirement(_MONSTER_TARGET)
+    @covers_requirement(
+    "field-combat-initiation::a-skill-aimed-at-a-co-located-hostile-monster-from-exploration-always-initiates-combat"
+)
     def test_damage_skill_opens_and_resolves_as_the_opening_action(self):
         monster = _monster("opening wolf", hp=2000, atk=1)
         monster.location = self.room
@@ -185,7 +159,9 @@ class InitiationRoutingTests(
         )
         self.assertLess(int(monster.traits.hp.current), hp_before)
 
-    @covers_requirement(_MONSTER_TARGET)
+    @covers_requirement(
+    "field-combat-initiation::a-skill-aimed-at-a-co-located-hostile-monster-from-exploration-always-initiates-combat"
+)
     def test_non_damaging_skills_open_and_run_exactly_one_round(self):
         grant_lineage(self.player, ["water_shield", "heal", "purify", "weaken"])
         for skill_key in ("water_shield", "heal", "purify", "weaken", "combat_tease"):
@@ -206,7 +182,9 @@ class InitiationRoutingTests(
 
                 clear_session(self.player)
 
-    @covers_requirement(_MONSTER_TARGET)
+    @covers_requirement(
+    "field-combat-initiation::a-skill-aimed-at-a-co-located-hostile-monster-from-exploration-always-initiates-combat"
+)
     def test_healing_a_monster_starts_the_fight_and_heals_it(self):
         grant_lineage(self.player, ["heal"])
         monster = _monster("wounded wolf", hp=2000, atk=1)
@@ -224,7 +202,9 @@ class InitiationRoutingTests(
         self.assertIsNotNone(read_session(self.player))
         self.assertGreater(int(monster.traits.hp.current), 100)
 
-    @covers_requirement(_DAMAGE_ROUTER)
+    @covers_requirement(
+    "field-combat-initiation::a-damaging-skill-aimed-at-anything-other-than-a-co-located-hostile-monster-is-rejected-at-the-entry"
+)
     def test_the_entry_enforces_its_own_target_contract_even_for_area_skills(self):
         # An AREA skill picks its line-up from the room, so a direct caller
         # aiming at a non-target must not be able to open the room fight.
@@ -258,7 +238,9 @@ class InitiationRoutingTests(
         self.assertEqual(self.player.traits.mp.value, mp_before)
         self.assertIsNone(read_session(self.player))
 
-    @covers_requirement(_AVAILABILITY)
+    @covers_requirement(
+    "field-combat-initiation::the-skill-s-out-of-combat-availability-is-checked-explicitly-before-anything-else"
+)
     def test_flee_cannot_open_a_fight(self):
         monster = _monster("flee wolf", hp=2000, atk=1)
         monster.location = self.room
@@ -269,7 +251,9 @@ class InitiationRoutingTests(
         rebuild.assert_not_called()
         self.assertIsNone(read_session(self.player))
 
-    @covers_requirement(_AVAILABILITY)
+    @covers_requirement(
+    "field-combat-initiation::the-skill-s-out-of-combat-availability-is-checked-explicitly-before-anything-else"
+)
     def test_unusable_skill_is_refused_before_the_candidate_is_built(self):
         monster = _monster("locked wolf", hp=2000, atk=1)
         monster.location = self.room
@@ -303,7 +287,9 @@ class CandidateValidationTests(BattlefieldIsolation, EvenniaTestCase):
         self.player = _player("candidate opener")
         self.player.location = self.room
 
-    @covers_requirement(_CANDIDATE)
+    @covers_requirement(
+    "field-combat-initiation::validation-runs-against-a-candidate-battlefield-that-is-never-persisted-under-a-combat-context"
+)
     def test_candidate_validation_rejection_touches_nothing(self):
         # Unowned skill: revalidate_submission rejects inside the entry, so
         # the failure lands on the candidate path (not the availability gate).
@@ -324,7 +310,9 @@ class CandidateValidationTests(BattlefieldIsolation, EvenniaTestCase):
             [],
         )
 
-    @covers_requirement(_CANDIDATE)
+    @covers_requirement(
+    "field-combat-initiation::validation-runs-against-a-candidate-battlefield-that-is-never-persisted-under-a-combat-context"
+)
     def test_candidate_roster_matches_the_persisted_session(self):
         companion = create_object(NPC, key="candidate companion", location=self.room)
         companion.race = "human"
@@ -345,7 +333,9 @@ class CandidateValidationTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(candidate.roster.keys(), persisted.roster.keys())
         self.assertEqual(candidate.teams, persisted.teams)
 
-    @covers_requirement(_CANDIDATE)
+    @covers_requirement(
+    "field-combat-initiation::validation-runs-against-a-candidate-battlefield-that-is-never-persisted-under-a-combat-context"
+)
     def test_validation_context_reports_the_room_monster_as_an_enemy(self):
         monster = _monster("faction wolf", hp=2000, atk=1)
         monster.location = self.room
@@ -364,7 +354,9 @@ class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         self.player = _player("lineup opener")
         self.player.location = self.room
 
-    @covers_requirement(_LINEUP)
+    @covers_requirement(
+    "field-combat-initiation::a-single-skill-opens-against-the-named-monster-and-an-area-skill-opens-against-every-living-hostile-monster-in-the-room"
+)
     def test_area_opens_against_every_living_room_monster(self):
         grant_lineage(self.player, [SEAM_AREA_KEY])
         monsters = [
@@ -387,7 +379,9 @@ class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertNotIn(int(dead.pk), record.enemy_ids)
 
-    @covers_requirement(_LINEUP)
+    @covers_requirement(
+    "field-combat-initiation::a-single-skill-opens-against-the-named-monster-and-an-area-skill-opens-against-every-living-hostile-monster-in-the-room"
+)
     def test_single_opens_against_only_the_named_monster(self):
         monsters = [
             _monster(f"room {index}", hp=2000, atk=1) for index in range(3)
@@ -400,7 +394,9 @@ class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         record = read_session(self.player)
         self.assertEqual(record.enemy_ids, (int(monsters[1].pk),))
 
-    @covers_requirement(_LINEUP)
+    @covers_requirement(
+    "field-combat-initiation::a-single-skill-opens-against-the-named-monster-and-an-area-skill-opens-against-every-living-hostile-monster-in-the-room"
+)
     def test_area_in_a_one_monster_room_takes_the_same_path(self):
         grant_lineage(self.player, [SEAM_AREA_KEY])
         monster = _monster("lone pack wolf", hp=2000, atk=1)
@@ -431,7 +427,9 @@ class FailureBoundaryTests(BattlefieldIsolation, EvenniaTestCase):
         ):
             initiate_field_combat(self.player, "basic_attack", self.monster)
 
-    @covers_requirement(_BOUNDARY)
+    @covers_requirement(
+    "field-combat-initiation::session-creation-and-the-opening-action-share-one-failure-boundary"
+)
     def test_raising_opening_action_leaves_no_trace(self):
         mp_before = self.player.traits.mp.value
         hp_before = self.player.traits.hp.value
@@ -451,14 +449,18 @@ class FailureBoundaryTests(BattlefieldIsolation, EvenniaTestCase):
         singleton = read_world_clock()
         self.assertTrue(singleton is None or singleton.tick == 0)
 
-    @covers_requirement(_BOUNDARY)
+    @covers_requirement(
+    "field-combat-initiation::session-creation-and-the-opening-action-share-one-failure-boundary"
+)
     def test_read_session_is_none_in_process_after_the_rollback(self):
         self._force_opening_failure()
         # Same process, no reload: the idmapper cache must have been
         # restored, not left at the engaged value the rollback erased.
         self.assertIsNone(read_session(self.player))
 
-    @covers_requirement(_BOUNDARY)
+    @covers_requirement(
+    "field-combat-initiation::session-creation-and-the-opening-action-share-one-failure-boundary"
+)
     def test_dialogue_session_survives_a_rolled_back_initiation(self):
         npc = create_object(NPC, key="dialogue npc", location=self.room)
         npc.race = "human"
@@ -469,7 +471,9 @@ class FailureBoundaryTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNotNone(session)
         self.assertEqual(session["npc_id"], int(npc.pk))
 
-    @covers_requirement(_BOUNDARY)
+    @covers_requirement(
+    "field-combat-initiation::session-creation-and-the-opening-action-share-one-failure-boundary"
+)
     def test_committed_initiation_retires_the_dialogue_session(self):
         npc = create_object(NPC, key="retired dialogue npc", location=self.room)
         npc.race = "human"
@@ -492,7 +496,9 @@ class WorldTimeTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.location = self.room
         grant_lineage(self.player, ["fire_ball"])
 
-    @covers_requirement(_TIME)
+    @covers_requirement(
+    "field-combat-initiation::the-opening-cast-charges-combat-time-never-command-time"
+)
     def test_opening_round_charges_no_command_time(self):
         monster = _monster("patient wolf", hp=8000, atk=1)
         monster.location = self.room
@@ -507,7 +513,9 @@ class WorldTimeTests(BattlefieldIsolation, EvenniaTestCase):
         singleton = read_world_clock()
         self.assertTrue(singleton is None or singleton.tick == 0)
 
-    @covers_requirement(_TIME)
+    @covers_requirement(
+    "field-combat-initiation::the-opening-cast-charges-combat-time-never-command-time"
+)
     def test_field_initiation_that_ends_the_fight_settles_once(self):
         monster = _monster("doomed wolf", hp=100, atk=10)
         monster.location = self.room
@@ -538,7 +546,9 @@ class BoundaryEventTests(BattlefieldIsolation, EvenniaTestCase):
         return [call for call in info.call_args_list if call.args
                 and call.args[0] == "field_combat_initiated"]
 
-    @covers_requirement(_EVENT)
+    @covers_requirement(
+    "field-combat-initiation::a-committed-field-initiation-emits-one-boundary-event"
+)
     def test_committed_initiation_logs_one_matching_event(self):
         player = _dominant_player("event opener")
         player.location = self.room
@@ -562,7 +572,9 @@ class BoundaryEventTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(context["opening"], "overwhelm")
         self.assertIn("tick", context)
 
-    @covers_requirement(_EVENT)
+    @covers_requirement(
+    "field-combat-initiation::a-committed-field-initiation-emits-one-boundary-event"
+)
     def test_ordinary_opening_logs_the_round_dispatch(self):
         player = _player("round opener")
         player.location = self.room
@@ -580,7 +592,9 @@ class BoundaryEventTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(kwargs["context"]["opening"], "round")
         self.assertEqual(kwargs["context"]["enemy_count"], 1)
 
-    @covers_requirement(_EVENT)
+    @covers_requirement(
+    "field-combat-initiation::a-committed-field-initiation-emits-one-boundary-event"
+)
     def test_rejected_and_rolled_back_initiations_log_nothing(self):
         player = _player("silent opener")
         player.location = self.room
@@ -619,7 +633,9 @@ class FieldCombatCommandTests(
         self.monster = _monster("command wolf", hp=2000, atk=1)
         self.monster.location = self.room
 
-    @covers_requirement(_COMMAND)
+    @covers_requirement(
+    "field-combat-initiation::the-command-routes-an-exploration-cast-by-target-and-its-documentation-says-so"
+)
     def test_command_routes_a_monster_targeted_cast_into_combat(self):
         with patch("world.rules.combat.roll_d100", return_value=50):
             self.call(
@@ -633,7 +649,9 @@ class FieldCombatCommandTests(
         clock = read_world_clock()
         self.assertTrue(clock is None or clock.tick == 0)
 
-    @covers_requirement(_DAMAGE_ROUTER)
+    @covers_requirement(
+    "field-combat-initiation::a-damaging-skill-aimed-at-anything-other-than-a-co-located-hostile-monster-is-rejected-at-the-entry"
+)
     def test_damaging_skill_aimed_at_an_npc_is_refused_with_nothing_spent(self):
         npc = create_object(NPC, key="command npc", location=self.room)
         npc.race = "human"
@@ -652,7 +670,9 @@ class FieldCombatCommandTests(
         self.assertTrue(singleton is None or singleton.tick == 0)
         self.assertEqual(int(npc.traits.hp.current), 500)
 
-    @covers_requirement(_DAMAGE_ROUTER)
+    @covers_requirement(
+    "field-combat-initiation::a-damaging-skill-aimed-at-anything-other-than-a-co-located-hostile-monster-is-rejected-at-the-entry"
+)
     def test_resistible_sexual_act_aimed_at_an_npc_is_unchanged(self):
         npc = create_object(NPC, key="teased npc", location=self.room)
         npc.race = "human"
@@ -681,7 +701,9 @@ class FieldCombatCommandTests(
         self.assertIsNotNone(singleton)
         self.assertGreater(singleton.tick, 0)
 
-    @covers_requirement(_EVENT)
+    @covers_requirement(
+    "field-combat-initiation::a-committed-field-initiation-emits-one-boundary-event"
+)
     def test_sexual_act_aimed_at_a_monster_runs_the_in_combat_scan(self):
         with (
             patch("world.rules.combat.roll_d100", return_value=50),
@@ -708,7 +730,9 @@ class FieldCombatCommandTests(
         singleton = read_world_clock()
         self.assertTrue(singleton is None or singleton.tick == 0)
 
-    @covers_requirement(_COMMAND)
+    @covers_requirement(
+    "field-combat-initiation::the-command-routes-an-exploration-cast-by-target-and-its-documentation-says-so"
+)
     def test_non_damaging_self_cast_keeps_the_existing_route(self):
         self.char1.db.skills = {"active": ["status_disguise"], "passive": []}
         self.char1.db.disguised_stats = {"atk_phys": 1}

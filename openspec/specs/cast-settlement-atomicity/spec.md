@@ -9,12 +9,17 @@ surfaces.
 
 
 ### Requirement: Out-of-combat casts settle resolution and world-time cost in one outer transaction
-The out-of-combat cast command path SHALL route every cast through
+The out-of-combat cast command path SHALL route every cast that is not a field-combat initiation
+through
 `world/rules/cast_settlement.settle_out_of_combat_cast(request)`, which SHALL snapshot all action- and
 clock-touched objects before resolution, open one outer `transaction.atomic()`, run
 `ActionResolver.resolve(request)` and — only on success —
 `WorldClock.advance(result.time_cost_seconds, AdvanceSource.COMMAND, [request.actor])` as nested
-operations inside it, and return only after the outer transaction commits. The snapshot SHALL cover,
+operations inside it, and return only after the outer transaction commits. A cast aimed at a living
+co-located `Monster` is a field-combat initiation and SHALL instead route through
+`world/rules/combat_initiation.initiate_field_combat()`, whose time cost is accumulated by the combat
+session and charged as combat time by its terminal settlement rather than as `AdvanceSource.COMMAND`
+time here. The snapshot SHALL cover,
 merged by object identity before the transaction opens: the merged advance-snapshot registry (per the
 world-clock advance-surface seam), the actor's and every request target's entity surfaces and quest
 logs, the battlefield's fled/knocked-out sets when the request context carries one, and the clock tick.
@@ -44,6 +49,17 @@ rejected resolution SHALL advance nothing and SHALL leave every snapshotted surf
 - **WHEN** a player casts during an active persistent combat session
 - **THEN** `_cast_in_session` delegates to combat-session orchestration exactly as before and never
   calls `settle_out_of_combat_cast` or `WorldClock.advance`
+
+#### Scenario: A monster-targeted exploration cast does not use the settlement API
+- **WHEN** a player casts from exploration at a living co-located `Monster`
+- **THEN** the command routes to `initiate_field_combat()` and never calls
+  `settle_out_of_combat_cast` or charges `AdvanceSource.COMMAND` time for that cast
+
+#### Scenario: A non-monster-targeted exploration cast still uses the settlement API unchanged
+- **WHEN** a player casts a non-damaging skill from exploration at an NPC, at itself, or with no
+  target
+- **THEN** the cast routes through `settle_out_of_combat_cast` and every snapshot, transaction, and
+  command-time behaviour is identical to before this change
 
 ### Requirement: A failed out-of-combat settlement restores every touched Evennia cache before the failure surfaces
 When the clock callback, the final clock persistence, or the outer commit fails after a successful
