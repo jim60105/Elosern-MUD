@@ -16,6 +16,7 @@ from pathlib import Path
 import unittest
 
 from tools import test_data_lint
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -50,6 +51,11 @@ class RulesCreationProgressionTestDataMigrationContractTests(unittest.TestCase):
         self.ledger, fatal = test_data_lint.load_ledger(test_data_lint.REPO_ROOT)
         self.assertEqual(fatal, [], "ledger must load cleanly")
 
+    @covers_requirement(
+        "test-data-independence::"
+        "creation-progression-and-lineage-behavior-tests-resolve-game-data-"
+        "through-synthetic-fixtures"
+    )
     def test_migrated_files_hold_no_ledger_exemption(self):
         debt = set(self.ledger["debt"])
         contract = {entry["path"] for entry in self.ledger["contract"]}
