@@ -14,9 +14,18 @@ harness boots with ``ELOSERN_BROWSER_SYNTH_CATALOGS`` overridden to "0".
 
 from __future__ import annotations
 
+import os
 from types import MappingProxyType
 
-from world.lore.guild import GuildRank
+# NOTE: no world/evennia imports at module scope. The Playwright-side
+# process runs plain ``python -m unittest`` with no Django settings, and
+# migrated test modules import this one at module scope; every catalog
+# owner module is imported lazily inside the helpers below.
+
+
+def synth_mode_enabled() -> bool:
+    """Whether the harness boots with the synthetic catalogs (harness default)."""
+    return os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS", "1") == "1"
 
 # ---------------------------------------------------------------------------
 # Shipped-mode seed values (used only when the synthetic flag is OFF).
@@ -80,21 +89,6 @@ SHIPPED_COMBAT_MONSTERS = (("goblin", 200), ("wolf", 200))
 
 SYNTH_ENTRY_RANK_KEY = "F"
 
-SYNTH_ENTRY_RANK_ROW = GuildRank(
-    "F",
-    # Same order as the kit's entry rank: board eligibility needs the entry
-    # rank at or above the kit's lowest quest rank, while the next-rank
-    # derivation (exact order+1 match over the registry) still resolves the
-    # kit's second rank unambiguously.
-    1,
-    0,
-    99,
-    "Synthetic entry-rank tasks for the managed browser harness.",
-    "t_synth_first_hunt",
-    "霧鱗・灰秤",
-    "合成公會見習考官",
-)
-
 
 def graft_synth_entry_rank() -> None:
     """Ensure the production entry-rank row exists in the live registry.
@@ -104,9 +98,23 @@ def graft_synth_entry_rank() -> None:
     kit's t_-only rows, so guild registration keeps working on its hardcoded
     entry-rank seam while every referenced title stays synthetic.
     """
-    from world.lore.guild import GUILD_RANK_REGISTRY
+    from world.lore.guild import GUILD_RANK_REGISTRY, GuildRank
 
-    GUILD_RANK_REGISTRY.setdefault(SYNTH_ENTRY_RANK_KEY, SYNTH_ENTRY_RANK_ROW)
+    row = GuildRank(
+        SYNTH_ENTRY_RANK_KEY,
+        # Same order as the kit's entry rank: board eligibility needs the entry
+        # rank at or above the kit's lowest quest rank, while the next-rank
+        # derivation (exact order+1 match over the registry) still resolves the
+        # kit's second rank unambiguously.
+        1,
+        0,
+        99,
+        "Synthetic entry-rank tasks for the managed browser harness.",
+        "t_synth_first_hunt",
+        "霧鱗・灰秤",
+        "合成公會見習考官",
+    )
+    GUILD_RANK_REGISTRY.setdefault(SYNTH_ENTRY_RANK_KEY, row)
 
 
 #: Authored display bindings for the kit's condition rows, keyed by kit buff
@@ -321,6 +329,15 @@ SYNTH_BPLAZA_PARTNER_KEY = "廣場合成夥伴"
 
 #: Kit archetype the art fixture room carries; its settled scene output file.
 SYNTH_ART_ARCHETYPE = "t_synth_bazaar"
+
+#: Display label of the kit art archetype (mirrors the kit row's authored
+#: display; the Playwright-side process has no Django settings, so injected
+#: payloads mirror it here instead of querying the registry).
+SYNTH_ART_SCENE_LABEL = "苔徑市集"
+
+#: Display label of the shipped art archetype the shipped-mode art fixture
+#: rooms carry (used only when the synthetic flag is OFF).
+SHIPPED_ART_SCENE_LABEL = "酒館內部"
 
 #: Kit dialogue table the art/exploration fixture hosts carry.
 SYNTH_DIALOGUE_TABLE_KEY = "t_synth_lodgekeeper"

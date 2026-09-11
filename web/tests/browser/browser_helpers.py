@@ -615,19 +615,36 @@ def valid_art_panel() -> dict:
     Mirrors the exact available art form the server presenter emits
     (``web/webclient/presentation/art.py::art_presenter``): a done scene
     with a same-origin URL, 16:9 aspect ratio, and no placeholder.
+
+    The scene label and settled-output filename follow the boot mode's
+    scene-archetype row (kit ``t_`` archetype under the synthetic install,
+    shipped row otherwise) — resolved through the support module so this
+    test path names no shipped content.
     """
+    from web.browser_support.browser_fixtures_data import (
+        SHIPPED_ART_ARCHETYPE,
+        SHIPPED_ART_SCENE_LABEL,
+        SYNTH_ART_ARCHETYPE,
+        SYNTH_ART_SCENE_LABEL,
+        synth_mode_enabled,
+    )
+
+    if synth_mode_enabled():
+        archetype, label = SYNTH_ART_ARCHETYPE, SYNTH_ART_SCENE_LABEL
+    else:
+        archetype, label = SHIPPED_ART_ARCHETYPE, SHIPPED_ART_SCENE_LABEL
     return {
         "schema_version": 2,
         "available": True,
         "kind": "scene",
         "scene": {
             "archetype": None,
-            "label": "酒館內部",
+            "label": label,
             "subject_key": None,
             "status": "done",
-            "url": "/art/scene/tavern_interior.png",
+            "url": f"/art/scene/{archetype}.png",
             "aspect_ratio": "16:9",
-            "alt": "酒館內部",
+            "alt": label,
             "placeholder": None,
         },
         "portrait_catalog": {},
