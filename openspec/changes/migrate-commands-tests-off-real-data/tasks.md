@@ -18,7 +18,7 @@
 
 - [x] 4.1 Migrate `commands/tests/test_inventory_breakdown.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 4.2 Migrate `commands/tests/test_items.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.3 Migrate `commands/tests/test_lineage_command.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.3 Migrate `commands/tests/test_lineage_command.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 4.4 Migrate `commands/tests/test_localized.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 4.5 Migrate `commands/tests/test_lore_command.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 4.6 Migrate `commands/tests/test_party_commands.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
