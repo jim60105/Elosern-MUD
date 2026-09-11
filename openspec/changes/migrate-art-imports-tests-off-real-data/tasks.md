@@ -39,8 +39,8 @@ Baseline (task 1.1): 315 findings across the 22 flagged manifest files
 - [x] 5.2 Migrate `world/art/tests/test_worker.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 5.3 Migrate `world/imports/tests/test_degraded_banner.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 5.4 Migrate `world/imports/tests/test_loader_trait_values.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.5 Migrate `world/imports/tests/test_profession_assembly_loader.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.6 Migrate `world/imports/tests/test_profession_assembly_schema.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.5 Migrate `world/imports/tests/test_profession_assembly_loader.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.6 Migrate `world/imports/tests/test_profession_assembly_schema.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
 ## 6. Migrate group 4
 
