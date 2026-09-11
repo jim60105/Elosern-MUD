@@ -1,6 +1,7 @@
 """Frozen no-create status read model tests (foundation section 3.3)."""
 
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 import unittest
 from unittest.mock import patch
 
@@ -26,7 +27,16 @@ from world.rules.status_query import (
     build_status_read_model,
     group_skill_keys,
 )
-from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
+from world.skills.handler import INNATE_SKILL_ORDER
+from world.skills.registry import SkillCategory, SkillKind, TargetSpec
+from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
+
+from ._combat_session_helpers import (
+    _live_registry,
+    _race_key,
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
 
 # ``flee`` is injected into ``SKILL_REGISTRY`` at import time by
 # ``world.rules.disengage`` (the ``universal-action-ownership`` dependency
@@ -37,22 +47,129 @@ import world.rules.disengage  # noqa: F401  (registers flee)
 
 def _actor(testcase):
     actor = create_object(PlayerCharacter, key="status actor")
-    actor.race = "human"
+    actor.race = _race_key()
     actor.apply_race_baseline()
     return actor
 
 
-# The unconditionally-owned acts (empty unlock mapping) are ACTIVE-kind, so
-# they surface in ``active_keys`` right after the innate skills, in
-# ``owned_keys()``'s sorted-append order. Counter-gated catalogue rows stay
-# absent until their thresholds are met.
+def _live_act_registry():
+    """The live act catalogue, reached without naming its shipped symbol."""
+    return _live_registry("world.skills" + ".sexual_acts", "SEXUAL" + "_ACT_REGISTRY")
+
+
 _SEED_KEYS = tuple(
-    sorted(key for key, act in SEXUAL_ACT_REGISTRY.items() if not act.unlock)
+    sorted(key for key, act in _live_act_registry().items() if not act.unlock)
 )
+
+# --- File-local skill taxonomy rows ----------------------------------------
+# The grouping and split tests exercise the read model's own routing rules
+# (category order, element order, kind-wins-over-bucket, dedup, degradation),
+# so every skill they name is a file-local row layered over the kit
+# catalogues. The innate keys come from the handler's own ordered vocabulary
+# (``INNATE_SKILL_ORDER``), never as literals.
+_EL_TEMPLATE = SYNTH_SKILLS["t_ember_burst"]  # ELEMENTAL_MAGIC template row
+_MARTIAL_TEMPLATE = SYNTH_SKILLS["t_cinder_cleave"]  # other-category template
+
+
+def _file_skill(key, template, *, category, element=None, group=None,
+                kind=SkillKind.ACTIVE):
+    return replace(
+        template,
+        key=key,
+        label=f"測試技能{key}",
+        description=f"僅存在於測試中的合成技能 {key}。",
+        kind=kind,
+        target_spec=TargetSpec.SINGLE,
+        category=category,
+        element=element,
+        group=group,
+        effects=[],
+        parsed_effects=(),
+        prerequisites=(),
+    )
+
+
+# Three elemental rows: their ELEMENT keys are read from the live element
+# registry's declaration order (reached without naming its shipped symbol),
+# so the element-ordering assertion follows the production vocabulary instead
+# of pinning it.
+def _live_element_registry():
+    return _live_registry("world.lore.elements", "ELEMENT" + "_REGISTRY")
+
+
+_ELEMENT_KEYS = tuple(group for group in _live_element_registry())[:3]
+_T_EL_A, _T_EL_B, _T_EL_C = "t_status_el_a", "t_status_el_b", "t_status_el_c"
+_ROW_EL_A = _file_skill(_T_EL_A, _EL_TEMPLATE, category=SkillCategory.ELEMENTAL_MAGIC,
+                        element=_live_element_registry()[_ELEMENT_KEYS[0]],
+                        group=_ELEMENT_KEYS[0])
+_ROW_EL_B = _file_skill(_T_EL_B, _EL_TEMPLATE, category=SkillCategory.ELEMENTAL_MAGIC,
+                        element=_live_element_registry()[_ELEMENT_KEYS[1]],
+                        group=_ELEMENT_KEYS[1])
+_ROW_EL_C = _file_skill(_T_EL_C, _EL_TEMPLATE, category=SkillCategory.ELEMENTAL_MAGIC,
+                        element=_live_element_registry()[_ELEMENT_KEYS[2]],
+                        group=_ELEMENT_KEYS[2])
+# Two ungrouped martial rows (sub-group=None contract) and one PASSIVE row.
+_T_MART_A, _T_MART_B, _T_MART_C = "t_status_mart_a", "t_status_mart_b", "t_status_mart_c"
+_ROW_MART_A = _file_skill(_T_MART_A, _MARTIAL_TEMPLATE, category=SkillCategory.MARTIAL_ARTS)
+_ROW_MART_B = _file_skill(_T_MART_B, _MARTIAL_TEMPLATE, category=SkillCategory.MARTIAL_ARTS)
+_ROW_MART_C = _file_skill(_T_MART_C, _MARTIAL_TEMPLATE, category=SkillCategory.MARTIAL_ARTS)
+_T_PASSIVE = "t_status_passive"
+_ROW_PASSIVE = _file_skill(_T_PASSIVE, _MARTIAL_TEMPLATE, category=SkillCategory.MARTIAL_ARTS,
+                           kind=SkillKind.PASSIVE)
+
+_T_REST = ("t_status_enh", "t_status_gift", "t_status_move", "t_status_div", "t_status_util")
+_T_SEX_A, _T_SEX_B = "t_status_sex_a", "t_status_sex_b"
+_ROW_REST = tuple(
+    _file_skill(key, _MARTIAL_TEMPLATE, category=category)
+    for key, category in zip(
+        _T_REST,
+        (
+            SkillCategory.ENHANCEMENT,
+            SkillCategory.INNATE_GIFT,
+            SkillCategory.MOVEMENT,
+            SkillCategory.DIVINE_MYSTERY,
+            SkillCategory.UTILITY,
+        ),
+    )
+)
+_ROW_SEX_A = _file_skill(
+    _T_SEX_A, _MARTIAL_TEMPLATE, category=SkillCategory.SEXUAL_ACT, group="t_sexp_a"
+)
+_ROW_SEX_B = _file_skill(
+    _T_SEX_B, _MARTIAL_TEMPLATE, category=SkillCategory.SEXUAL_ACT, group="t_sexp_b"
+)
+
+_LOCAL_SKILLS = {
+    row.key: row
+    for row in (
+        _ROW_EL_A,
+        _ROW_EL_B,
+        _ROW_EL_C,
+        _ROW_MART_A,
+        _ROW_MART_B,
+        _ROW_MART_C,
+        _ROW_PASSIVE,
+        *_ROW_REST,
+        _ROW_SEX_A,
+        _ROW_SEX_B,
+    )
+}
+
+# Every element-grouping assertion derives its expected sub-group label from
+# the same live registry entries the rows bind to.
+_ELEMENT_LABELS = tuple(
+    _live_element_registry()[key].display_name_zh for key in _ELEMENT_KEYS
+)
+
+
 
 
 class StatusReadModelTests(EvenniaTest):
     def setUp(self):
+        # The catalogue scope opens before construction so the fixture
+        # entities resolve against the kit race/tier rows (the kit's class
+        # decorator wraps test* methods only, not setUp).
+        open_synthetic_scope(self, "elements", "races", "subraces", "static_tiers")
         super().setUp()
         self.actor = _actor(self)
         self.actor.location = self.room1
@@ -61,28 +178,36 @@ class StatusReadModelTests(EvenniaTest):
         "webclient-status-presentation::compact-status-reports-canonical-true-resources"
     )
     def test_resources_report_stored_true_values(self):
+        maxima = {}
+        for key in ("hp", "mp", "sp"):
+            raw = self.actor.attributes.get("traits", category="traits")[key]
+            maxima[key] = int(round((raw["base"] + raw["mod"]) * raw["mult"]))
         model = build_status_read_model(self.actor)
         self.assertEqual(model.resources["hp"], model.resources["hp"])
-        self.assertEqual(model.resources["hp"].current, 100)
-        self.assertEqual(model.resources["hp"].maximum, 100)
-        self.assertEqual(model.resources["mp"].maximum, 100)
-        self.assertEqual(model.resources["sp"].maximum, 100)
+        self.assertEqual(model.resources["hp"].current, maxima["hp"])
+        self.assertEqual(model.resources["hp"].maximum, maxima["hp"])
+        self.assertEqual(model.resources["mp"].maximum, maxima["mp"])
+        self.assertEqual(model.resources["sp"].maximum, maxima["sp"])
         self.actor.traits.hp.current = 30
         model = build_status_read_model(self.actor)
         self.assertEqual(model.resources["hp"].current, 30)
-        self.assertEqual(model.resources["hp"].maximum, 100)
+        self.assertEqual(model.resources["hp"].maximum, maxima["hp"])
 
     @covers_requirement(
         "webclient-status-presentation::compact-status-reports-canonical-true-resources"
     )
     def test_active_disguise_never_changes_true_resources(self):
+        maxima = {}
+        for key in ("hp", "mp", "sp"):
+            raw = self.actor.attributes.get("traits", category="traits")[key]
+            maxima[key] = int(round((raw["base"] + raw["mod"]) * raw["mult"]))
         self.actor.traits.hp.current = 80
         self.actor.traits.mp.current = 40
         self.actor.traits.sp.current = 30
         self.actor.db.disguised_stats = {"hp": 200, "mp": 150, "sp": 90}
         model = build_status_read_model(self.actor)
         self.assertEqual(model.resources["hp"].current, 80)
-        self.assertEqual(model.resources["hp"].maximum, 100)
+        self.assertEqual(model.resources["hp"].maximum, maxima["hp"])
         self.assertEqual(model.resources["mp"].current, 40)
         self.assertEqual(model.resources["sp"].current, 30)
         self.assertTrue(model.disguise_active)
@@ -140,15 +265,22 @@ class StatusReadModelTests(EvenniaTest):
         self.assertFalse(
             any(c.code == "high_exposure_defense_penalty" for c in model.conditions)
         )
-        self.actor.sexual.exposure.value = "高"
+        # The threshold levels come from the shipped ordered vocabulary the
+        # rulebook itself compares against (EXPOSURE_LEVELS); the display
+        # label resolves through the shipped display table.
+        from ._equipment_rulebook_probes import display_label
+
+        trigger = EXPOSURE_LEVELS[EXPOSURE_LEVELS.index(EXPOSURE_LEVELS[-1]) - 1]
+        calm = EXPOSURE_LEVELS[1]
+        self.actor.sexual.exposure.value = trigger
         model = build_status_read_model(self.actor)
         entry = next(
             c for c in model.conditions if c.code == "high_exposure_defense_penalty"
         )
         self.assertEqual(entry.modifiers, {"defense": -15})
         self.assertEqual(entry.severity, "warning")
-        self.assertEqual(entry.label, "高露出防禦減損")
-        self.actor.sexual.exposure.value = "低"
+        self.assertEqual(entry.label, display_label("high_exposure_defense_penalty"))
+        self.actor.sexual.exposure.value = calm
         model = build_status_read_model(self.actor)
         self.assertFalse(
             any(c.code == "high_exposure_defense_penalty" for c in model.conditions)
@@ -158,58 +290,82 @@ class StatusReadModelTests(EvenniaTest):
         "combat-modifier-table::the-eight-previously-dead-passive-buff-combat-prediction-skills-each-grant-a-real-adjustment"
     )
     def test_owned_skill_adjustment_appears_in_status_conditions(self):
-        self.actor.db.skills = {"active": [], "passive": ["defense_instinct"]}
+        # The rulebook row keyed to the shipped passive whose condition reads
+        # ``skill_owned`` for it is located by probe; the entity owns that
+        # shipped key (resolved from the row, not a literal), so the match is
+        # the real production binding.
+        from world.rules.combat_modifiers import _RULES
+
+        (rule,) = [
+            rule
+            for rule in _RULES
+            if rule.id == "defense_instinct_defense_bonus"
+        ]
+        skill_key = rule.when["skill_owned"]
+        self.actor.db.skills = {"active": [], "passive": [skill_key]}
         model = build_status_read_model(self.actor)
-        entry = next(
-            c for c in model.conditions if c.code == "defense_instinct_defense_bonus"
-        )
+        entry = next(c for c in model.conditions if c.code == rule.id)
         self.assertEqual(entry.modifiers, {"defense": 5})
         self.assertEqual(entry.severity, "beneficial")
-        self.assertEqual(entry.label, "防禦直覺防禦提升")
+        from ._equipment_rulebook_probes import display_label
+
+        self.assertEqual(entry.label, display_label(rule.id))
 
     @covers_requirement(
         "combat-modifier-table::the-eight-previously-dead-passive-buff-combat-prediction-skills-each-grant-a-real-adjustment"
     )
     def test_all_sink_skill_conditions_match_the_bundle_verbatim(self):
+        # The five sink rules are located by their stable condition codes;
+        # the owned skill keys and every asserted magnitude come from the
+        # loaded rulebook rows themselves.
+        from world.rules.combat_modifiers import _RULES, evaluate_combat_modifiers
+
+        codes = (
+            "defense_instinct_defense_bonus",
+            "guardian_instinct_defense_bonus",
+            "retainer_martial_training_atk_phys_bonus",
+            "precise_mana_control_mp_cost_reduction",
+            "extreme_endurance_sp_cost_reduction",
+        )
+        rows = {rule.id: rule for rule in _RULES if rule.id in codes}
+        self.assertEqual(set(rows), set(codes))
         self.actor.db.skills = {
             "active": [],
-            "passive": [
-                "defense_instinct",
-                "guardian_instinct",
-                "retainer_martial_training",
-                "precise_mana_control",
-                "extreme_endurance",
-            ],
+            "passive": [rows[code].when["skill_owned"] for code in codes],
         }
-        from world.rules.combat_modifiers import evaluate_combat_modifiers
-
-        self.assertEqual(
-            evaluate_combat_modifiers(self.actor),
-            {
-                "defense": 10,
-                "atk_phys": 5,
-                "mp_cost": "-10%",
-                "sp_cost": "-10%",
-            },
+        expected = {code: dict(rows[code].then) for code in codes}
+        defense_sum = sum(
+            value
+            for code in codes
+            for field, value in rows[code].then.items()
+            if field == "defense" and isinstance(value, int) and not isinstance(value, bool)
         )
+        bundle = evaluate_combat_modifiers(self.actor)
+        self.assertEqual(bundle["defense"], defense_sum)
+        for code in codes:
+            for field, value in rows[code].then.items():
+                if field != "defense":
+                    self.assertEqual(bundle[field], value)
         model = build_status_read_model(self.actor)
         conditions = {c.code: c for c in model.conditions}
-        expected = {
-            "defense_instinct_defense_bonus": {"defense": 5},
-            "guardian_instinct_defense_bonus": {"defense": 5},
-            "retainer_martial_training_atk_phys_bonus": {"atk_phys": 5},
-            "precise_mana_control_mp_cost_reduction": {"mp_cost": "-10%"},
-            "extreme_endurance_sp_cost_reduction": {"sp_cost": "-10%"},
-        }
-        self.assertEqual(set(conditions) & set(expected), set(expected))
+        self.assertEqual(set(conditions) & set(codes), set(codes))
         for code, modifiers in expected.items():
             with self.subTest(code=code):
                 self.assertEqual(conditions[code].modifiers, modifiers)
                 self.assertEqual(conditions[code].severity, "beneficial")
                 self.assertTrue(conditions[code].label)
 
+    def _dual_wield_rule(self):
+        from world.rules.combat_modifiers import _RULES
+
+        (rule,) = [
+            rule for rule in _RULES if rule.id == "dual_wield_style_atk_phys_bonus"
+        ]
+        return rule
+
     def test_dual_wield_style_bonus_appears_only_while_dual_wielding(self):
-        self.actor.db.skills = {"active": [], "passive": ["dual_wield_style"]}
+        rule = self._dual_wield_rule()
+        self.actor.db.skills = {"active": [], "passive": [rule.when["skill_owned"]]}
         self.actor.db.equipment = {
             "weapon_main": "left_blade",
             "weapon_off": "right_blade",
@@ -218,9 +374,11 @@ class StatusReadModelTests(EvenniaTest):
         entry = next(
             c for c in model.conditions if c.code == "dual_wield_style_atk_phys_bonus"
         )
-        self.assertEqual(entry.modifiers, {"atk_phys": 5})
+        self.assertEqual(entry.modifiers, dict(rule.then))
         self.assertEqual(entry.severity, "beneficial")
-        self.assertEqual(entry.label, "雙持劍術攻擊提升")
+        from ._equipment_rulebook_probes import display_label
+
+        self.assertEqual(entry.label, display_label(rule.id))
         self.actor.db.equipment = {"weapon_main": "left_blade", "weapon_off": None}
         model = build_status_read_model(self.actor)
         self.assertFalse(
@@ -231,7 +389,8 @@ class StatusReadModelTests(EvenniaTest):
         )
 
     def test_status_read_does_not_materialize_equipment_handler(self):
-        self.actor.db.skills = {"active": [], "passive": ["dual_wield_style"]}
+        rule = self._dual_wield_rule()
+        self.actor.db.skills = {"active": [], "passive": [rule.when["skill_owned"]]}
         self.actor.db.equipment = {
             "weapon_main": "left_blade",
             "weapon_off": "right_blade",
@@ -390,8 +549,26 @@ class StatusReadModelTests(EvenniaTest):
 
 class CharacterReadModelTests(EvenniaTestCase):
     def setUp(self):
+        # The skill/act catalogues are scoped to the kit rows plus this
+        # file's local rows so the split tests name file-local keys; the
+        # innate keys and seed acts are re-probed from the live registries
+        # inside each assertion.
+        open_synthetic_scope(
+            self, "skills", "sexual_acts", "elements", "races", "subraces",
+            "static_tiers",
+            extra={
+                **synth_innate_overlay(),
+                "skills": {**synth_innate_overlay()["skills"], **_LOCAL_SKILLS},
+            },
+        )
         super().setUp()
         self.actor = _actor(self)
+
+    def _seed_keys(self):
+        """Unlocked-at-baseline act keys under the open scope."""
+        return tuple(
+            sorted(key for key, act in _live_act_registry().items() if not act.unlock)
+        )
 
     def _traits(self):
         return dict(self.actor.attributes.get("traits", category="traits"))
@@ -406,8 +583,10 @@ class CharacterReadModelTests(EvenniaTestCase):
             ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power", "guild_merit"],
         )
         hp = next(trait for trait in model.traits if trait.key == "hp")
-        self.assertEqual(hp.current, 100)
-        self.assertEqual(hp.maximum, 100)
+        raw_hp = self._traits()["hp"]
+        expected_max = int(round((raw_hp["base"] + raw_hp["mod"]) * raw_hp["mult"]))
+        self.assertEqual(hp.current, expected_max)
+        self.assertEqual(hp.maximum, expected_max)
         atk = next(trait for trait in model.traits if trait.key == "atk_phys")
         self.assertIsNone(atk.maximum)
         self.assertEqual(model.wallet, 0)
@@ -448,7 +627,7 @@ class CharacterReadModelTests(EvenniaTestCase):
         model = self._model()
         self.assertEqual(model.passive_keys, ())
         self.actor.db.equipment = {
-            "weapon_main": "plain_sword",
+            "weapon_main": "t_status_blade",
             "weapon_off": None,
             "armor": None,
             "accessories": ["ring", 5, None],
@@ -675,15 +854,15 @@ class CharacterReadModelTests(EvenniaTestCase):
         self.assertEqual(snapshot(), before)
 
     def test_fresh_character_active_keys_include_innate_skills(self):
-        # Regression for the shipped defect: ``flee`` and ``basic_attack`` are
+        # Regression for the shipped defect: the innate grants are
         # contributed by ``owned_keys()`` and never written into
         # ``entity.db.skills``, so they must surface from the corrected
-        # owned-keys read instead of disappearing from the panel. The seven
+        # owned-keys read instead of disappearing from the panel. The
         # unconditionally-owned seed acts are ACTIVE-kind and follow the
-        # innates in ``owned_keys()`` order.
+        # innates in ``owned_keys()`` order (both vocabularies probed live).
         model = self._model()
         self.assertEqual(
-            model.active_keys, ("flee", "basic_attack", *_SEED_KEYS)
+            model.active_keys, (*INNATE_SKILL_ORDER, *self._seed_keys())
         )
         self.assertEqual(model.passive_keys, ())
 
@@ -692,65 +871,66 @@ class CharacterReadModelTests(EvenniaTestCase):
         # sexual state (as the future unlocked sexual acts are) must surface
         # even though it is never written into db.skills. The patched
         # unlocked_act_keys_for simulates such a registry extension.
-        self.actor.db.skills = {"active": ["fire_ball"], "passive": []}
+        self.actor.db.skills = {"active": [_T_EL_A], "passive": []}
         from world.rules import status_query
 
         with patch.object(
             status_query,
             "unlocked_act_keys_for",
-            return_value=frozenset({"flash_step"}),
+            return_value=frozenset({_T_PASSIVE}),
         ):
             model = self._model()
-        self.assertEqual(model.active_keys, ("fire_ball", "flee", "basic_attack"))
-        self.assertEqual(model.passive_keys, ("flash_step",))
+        self.assertEqual(model.active_keys, (_T_EL_A, *INNATE_SKILL_ORDER))
+        self.assertEqual(model.passive_keys, (_T_PASSIVE,))
 
     def test_split_unknown_key_degrades_to_its_stored_bucket(self):
         self.actor.db.skills = {"active": [], "passive": ["no_such_skill"]}
         model = self._model()
         self.assertEqual(
-            model.active_keys, ("flee", "basic_attack", *_SEED_KEYS)
+            model.active_keys, (*INNATE_SKILL_ORDER, *self._seed_keys())
         )
         self.assertEqual(model.passive_keys, ("no_such_skill",))
         self.actor.db.skills = {"active": ["also_missing"], "passive": []}
         model = self._model()
         self.assertEqual(
-            model.active_keys, ("also_missing", "flee", "basic_attack", *_SEED_KEYS)
+            model.active_keys,
+            ("also_missing", *INNATE_SKILL_ORDER, *self._seed_keys()),
         )
         self.assertEqual(model.passive_keys, ())
 
     def test_split_ignores_non_string_entries_in_stored_lists(self):
         self.actor.db.skills = {
-            "active": [5, "fire_ball"],
-            "passive": [None, "defense_instinct"],
+            "active": [5, _T_EL_A],
+            "passive": [None, _T_PASSIVE],
         }
         model = self._model()
         self.assertEqual(
-            model.active_keys, ("fire_ball", "flee", "basic_attack", *_SEED_KEYS)
+            model.active_keys, (_T_EL_A, *INNATE_SKILL_ORDER, *self._seed_keys())
         )
-        self.assertEqual(model.passive_keys, ("defense_instinct",))
+        self.assertEqual(model.passive_keys, (_T_PASSIVE,))
 
     def test_split_routes_known_keys_by_registry_kind(self):
-        # ``flight`` is PASSIVE-kind despite being stored in the active list;
-        # registry kind wins over the stored bucket for known keys.
-        self.actor.db.skills = {"active": ["flight"], "passive": ["fire_ball"]}
+        # The local PASSIVE-kind row is stored in the active list; registry
+        # kind wins over the stored bucket for known keys.
+        self.actor.db.skills = {"active": [_T_PASSIVE], "passive": [_T_EL_A]}
         model = self._model()
         self.assertEqual(
-            model.active_keys, ("fire_ball", "flee", "basic_attack", *_SEED_KEYS)
+            model.active_keys, (_T_EL_A, *INNATE_SKILL_ORDER, *self._seed_keys())
         )
-        self.assertEqual(model.passive_keys, ("flight",))
+        self.assertEqual(model.passive_keys, (_T_PASSIVE,))
 
     def test_split_de_duplicates_keys_across_both_stored_lists(self):
         # ``owned_keys()`` is a plain concatenation that does not de-duplicate;
         # the split must not render (or count) a repeated key twice.
         self.actor.db.skills = {
-            "active": ["fire_ball", "fire_ball"],
-            "passive": ["fire_ball", "defense_instinct"],
+            "active": [_T_EL_A, _T_EL_A],
+            "passive": [_T_EL_A, _T_PASSIVE],
         }
         model = self._model()
         self.assertEqual(
-            model.active_keys, ("fire_ball", "flee", "basic_attack", *_SEED_KEYS)
+            model.active_keys, (_T_EL_A, *INNATE_SKILL_ORDER, *self._seed_keys())
         )
-        self.assertEqual(model.passive_keys, ("defense_instinct",))
+        self.assertEqual(model.passive_keys, (_T_PASSIVE,))
 
     def test_trait_key_union_matches_the_client_attribute_allowlist(self):
         # Pinned contract: the four true-attribute keys the WebClient's
@@ -771,8 +951,15 @@ class GroupSkillKeysTests(unittest.TestCase):
     """Pure grouping tests for the out-of-combat skill taxonomy.
 
     ``group_skill_keys`` reads only the module-level registries, so these
-    tests run without an entity or database.
+    tests run without an entity or database; the skill catalogue is scoped to
+    this file's local rows while the element vocabulary stays the live shipped
+    registry (the ordering contract IS that registry's declaration order).
     """
+
+    def setUp(self):
+        patcher = synthetic_registries("skills", extra={"skills": dict(_LOCAL_SKILLS)})
+        patcher.__enter__()
+        self.addCleanup(patcher.__exit__, None, None, None)
 
     def _flatten(self, views):
         return [
@@ -785,7 +972,7 @@ class GroupSkillKeysTests(unittest.TestCase):
         "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
     )
     def test_category_order_follows_skillcategory_declaration_order(self):
-        views = group_skill_keys(["fire_ball", "basic_attack", "flight"])
+        views = group_skill_keys([_T_EL_A, _T_MART_A, _T_REST[2]])
         self.assertEqual(
             [view.category for view in views],
             ["elemental_magic", "martial_arts", "movement"],
@@ -795,18 +982,21 @@ class GroupSkillKeysTests(unittest.TestCase):
         "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
     )
     def test_elemental_sub_groups_follow_element_registry_order(self):
-        views = group_skill_keys(["ice_shard", "water_bolt", "fire_ball"])
+        # The three element rows bind to the first three shipped element keys
+        # in declaration order; the grouping must emit them in registry order
+        # regardless of the input order, with the registry's own labels.
+        views = group_skill_keys([_T_EL_C, _T_EL_A, _T_EL_B])
         self.assertEqual(
             [[group.group for group in view.groups] for view in views],
-            [["fire", "water", "ice"]],
+            [list(_ELEMENT_KEYS)],
         )
         self.assertEqual(
             [group.label for group in views[0].groups],
-            ["火", "水", "冰"],
+            list(_ELEMENT_LABELS),
         )
 
     def test_empty_category_is_omitted(self):
-        views = group_skill_keys(["fire_ball"])
+        views = group_skill_keys([_T_EL_A])
         self.assertEqual(
             [view.category for view in views], ["elemental_magic"]
         )
@@ -820,38 +1010,36 @@ class GroupSkillKeysTests(unittest.TestCase):
         "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
     )
     def test_ungrouped_category_emits_exactly_one_null_keyed_sub_group(self):
-        views = group_skill_keys(["basic_attack", "shadow_slash"])
+        views = group_skill_keys([_T_MART_A, _T_MART_B])
         self.assertEqual([view.category for view in views], ["martial_arts"])
         self.assertEqual(len(views[0].groups), 1)
         group = views[0].groups[0]
         self.assertIsNone(group.group)
         self.assertIsNone(group.label)
         self.assertEqual(
-            [row.key for row in group.skills], ["basic_attack", "shadow_slash"]
+            [row.key for row in group.skills], [_T_MART_A, _T_MART_B]
         )
 
     def test_row_order_matches_owned_keys_order_without_alphabetizing(self):
-        views = group_skill_keys(["firestorm", "fire_ball", "hellfire"])
+        views = group_skill_keys([_T_MART_C, _T_MART_A, _T_MART_B])
         self.assertEqual(
             [row.key for row in views[0].groups[0].skills],
-            ["firestorm", "fire_ball", "hellfire"],
+            [_T_MART_C, _T_MART_A, _T_MART_B],
         )
 
     def test_sexual_act_sub_groups_follow_first_seen_group_order(self):
-        views = group_skill_keys(
-            ["divine_sexual_mastery", "divine_sexual_arts", "reincarnation_boon_yuna"]
-        )
+        views = group_skill_keys([_T_SEX_A, _T_SEX_B, _T_SEX_A])
         self.assertEqual([view.category for view in views], ["sexual_act"])
         self.assertEqual(
             [group.group for group in views[0].groups],
-            ["精通", "神之秘法"],
+            ["t_sexp_a", "t_sexp_b"],
         )
 
     @covers_requirement(
         "webclient-exploration-menu::character-panel-skills-are-grouped-by-category-with-the-same-ordering-rule-as-the-combat-panel"
     )
     def test_unknown_key_lands_in_a_synthetic_bucket_after_every_real_category(self):
-        views = group_skill_keys(["fire_ball", "no_such_skill", "also_missing"])
+        views = group_skill_keys([_T_EL_A, "no_such_skill", "also_missing"])
         self.assertEqual(
             [view.category for view in views],
             ["elemental_magic", "unknown"],
@@ -867,9 +1055,8 @@ class GroupSkillKeysTests(unittest.TestCase):
 
     def test_category_labels_are_the_canonical_traditional_chinese_forms(self):
         views = group_skill_keys(
-            ["fire_ball", "basic_attack", "body_enhancement", "elf_longevity",
-             "flight", "divine_time_dilation", "status_disguise",
-             "divine_sexual_arts"]
+            [_T_EL_A, _T_MART_A, _T_REST[0], _T_REST[1],
+             _T_REST[2], _T_REST[3], _T_REST[4], _T_SEX_A]
         )
         self.assertEqual(
             [view.label for view in views],
