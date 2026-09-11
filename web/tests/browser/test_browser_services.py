@@ -21,6 +21,8 @@ import time
 
 from tools.spec_traceability import covers_requirement
 
+from web.browser_support.browser_fixtures_data import store_fixture_values
+
 from .browser_base import DEFAULT_VIEWPORT, BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
@@ -599,10 +601,16 @@ class ShopJourneys(ServicesBrowserTest):
         panel = self._wait_services_available(page)
         self.assertTrue(panel["shop"]["open"])
         self.assertEqual(panel["player"]["wallet"], 1000)
+        # Every number the journey asserts is derived from the committed
+        # panel: the first shelf row's identity and unit price.
+        shelf = panel["shop"]["stock"][0]
+        first_key, unit_buy = shelf["item_key"], shelf["buy_copper"]
+        self.assertGreater(unit_buy, 0)
+        expected_wallet = panel["player"]["wallet"] - 2 * unit_buy
 
         self._open_surface(page, "shop")
         _press(page, "Enter")  # 貨架
-        _press(page, "Enter")  # meal buy row
+        _press(page, "Enter")  # first shelf buy row
         # Quantity form: an oversized value is rejected before sending.
         _press(page, "3", wait_ms=40)
         _press(page, "0", wait_ms=40)
@@ -611,7 +619,7 @@ class ShopJourneys(ServicesBrowserTest):
         self.assertEqual(sent_action_count(page, "shop.buy"), 0)
         # Cancel the form and re-enter a valid bounded quantity.
         _press(page, "Escape", wait_ms=40)
-        _press(page, "Enter", wait_ms=40)  # meal buy row again
+        _press(page, "Enter", wait_ms=40)  # first shelf buy row again
         _press(page, "2", wait_ms=40)
         _press(page, "Enter", wait_ms=40)
         page.wait_for_timeout(500)
@@ -630,7 +638,7 @@ class ShopJourneys(ServicesBrowserTest):
         self.assertEqual(
             debug["quantityOpen"], False, "quantity form must close on submit: %r" % (debug,)
         )
-        self._wait_panel(page, lambda p: p["player"]["wallet"] == 980)
+        self._wait_panel(page, lambda p: p["player"]["wallet"] == expected_wallet)
         self.assertEqual(sent_action_count(page, "shop.buy"), 1)
         sent = page.evaluate("window.__elosernSent || []")
         payload = next(
@@ -638,8 +646,8 @@ class ShopJourneys(ServicesBrowserTest):
             for cmd, args, _kw in sent
             if cmd == "ui_action" and args[0]["action_id"] == "shop.buy"
         )
-        self.assertEqual(payload, {"item_key": "meal", "quantity": 2})
-        self.assertEqual(self._services_panel(page)["player"]["wallet"], 980)
+        self.assertEqual(payload, {"item_key": first_key, "quantity": 2})
+        self.assertEqual(self._services_panel(page)["player"]["wallet"], expected_wallet)
 
     @covers_requirement(
         "webclient-service-menus::service-browser-acceptance-is-keyboard-only-confirmation-protected-and-desktop-bounded",
@@ -650,25 +658,35 @@ class ShopJourneys(ServicesBrowserTest):
         install_outbound_recorder(page)
         panel = self._wait_services_available(page)
         rows = {row["item_key"]: row for row in panel["inventory"]["rows"]}
-        self.assertEqual(rows["meal"]["held"], 2)
+        STORE = store_fixture_values()
+        potion, staple = STORE["potion_key"], STORE["staple_key"]
+        self.assertEqual(rows[staple]["held"], 2)
         # services v3 ships a server-authored action on every inventory row;
         # the full-HP store fixture refuses the potion with the stable
         # hp_full reason.
-        self.assertEqual(rows["healing_potion"]["action"]["action_id"], "inventory.use")
-        self.assertFalse(rows["healing_potion"]["action"]["enabled"])
+        self.assertEqual(rows[potion]["action"]["action_id"], "inventory.use")
+        self.assertFalse(rows[potion]["action"]["enabled"])
         self.assertEqual(
-            rows["healing_potion"]["action"]["disabled_reason"]["code"], "hp_full"
+            rows[potion]["action"]["disabled_reason"]["code"], "hp_full"
         )
 
-        # The merchant is at its meal stock cap, so the sellable row is the
-        # held healing_potion (stock 3/5, sellable and offered).
+        # The merchant is at its staple stock cap, so the potion is the only
+        # sellable offer (its held unit fits under the stock ceiling).
+        sellable = {row["item_key"]: row for row in panel["shop"]["sellable"]}
+        potion_row = sellable[potion]
+        potion_index = list(sellable).index(potion)
+        self.assertEqual(potion_row["held"], 1)
+        wallet_before = panel["player"]["wallet"]
+        expected_wallet = wallet_before + potion_row["sell_copper"]
         self._open_surface(page, "shop")
         _press(page, "ArrowRight")  # 販賣 (second grid column)
         _press(page, "Enter")
-        _press(page, "Enter")  # healing_potion sell row
+        for _ in range(potion_index):
+            _press(page, "ArrowDown", wait_ms=40)
+        _press(page, "Enter")  # the potion sell row
         _press(page, "1", wait_ms=40)
         _press(page, "Enter", wait_ms=40)
-        self._wait_panel(page, lambda p: p["player"]["wallet"] == 1050)
+        self._wait_panel(page, lambda p: p["player"]["wallet"] == expected_wallet)
         self.assertEqual(sent_action_count(page, "shop.sell"), 1)
         sent = page.evaluate("window.__elosernSent || []")
         payload = next(
@@ -676,10 +694,10 @@ class ShopJourneys(ServicesBrowserTest):
             for cmd, args, _kw in sent
             if cmd == "ui_action" and args[0]["action_id"] == "shop.sell"
         )
-        self.assertEqual(payload, {"item_key": "healing_potion", "quantity": 1})
+        self.assertEqual(payload, {"item_key": potion, "quantity": 1})
         rows = {row["item_key"]: row for row in self._services_panel(page)["inventory"]["rows"]}
-        self.assertNotIn("healing_potion", rows)
-        self.assertEqual(rows["meal"]["held"], 2)
+        self.assertNotIn(potion, rows)
+        self.assertEqual(rows[staple]["held"], 2)
 
         # make-inventory-drawer-frameless: the 背包 entry opens the bag
         # drawer frameless. The drawer body is only its own three-section
@@ -836,9 +854,10 @@ class ServiceDispatchJourneys(ServicesBrowserTest):
         panel = self._wait_services_available(page)
         self.assertEqual(panel["player"]["wallet"], 1000)
         stale_revision = store_state(page)["revision"] - 1
+        first_key = panel["shop"]["stock"][0]["item_key"]
 
         self._raw_ui_action(
-            page, "shop.buy", {"item_key": "meal", "quantity": 1}, "stale-buy-1", stale_revision
+            page, "shop.buy", {"item_key": first_key, "quantity": 1}, "stale-buy-1", stale_revision
         )
         result = self._wait_result(page, lambda r: r["requestId"] == "stale-buy-1")
         self.assertEqual(result["outcome"], "stale")
@@ -855,22 +874,25 @@ class ServiceDispatchJourneys(ServicesBrowserTest):
         panel = self._wait_services_available(page)
         self.assertEqual(panel["player"]["wallet"], 1000)
         revision = store_state(page)["revision"]
+        shelf = panel["shop"]["stock"][0]
+        first_key, unit_buy = shelf["item_key"], shelf["buy_copper"]
+        one_buy_wallet = panel["player"]["wallet"] - unit_buy
 
         # First delivery executes the buy exactly once.
         self._raw_ui_action(
-            page, "shop.buy", {"item_key": "meal", "quantity": 1}, "dup-buy-1", revision
+            page, "shop.buy", {"item_key": first_key, "quantity": 1}, "dup-buy-1", revision
         )
         first = self._wait_result(
             page, lambda r: r["requestId"] == "dup-buy-1" and r["outcome"] == "success"
         )
-        self._wait_panel(page, lambda p: p["player"]["wallet"] == 990)
+        self._wait_panel(page, lambda p: p["player"]["wallet"] == one_buy_wallet)
         self.assertEqual(sent_action_count(page, "shop.buy"), 1)
 
         # A replayed live request ID returns the cached result and never
         # re-executes the trade: the same envelope is delivered again, the
         # second result arrives, and the wallet stays at exactly one purchase.
         self._raw_ui_action(
-            page, "shop.buy", {"item_key": "meal", "quantity": 1}, "dup-buy-1", revision
+            page, "shop.buy", {"item_key": first_key, "quantity": 1}, "dup-buy-1", revision
         )
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
@@ -879,7 +901,7 @@ class ServiceDispatchJourneys(ServicesBrowserTest):
             page.wait_for_timeout(250)
         self.assertEqual(sent_action_count(page, "shop.buy"), 2)
         page.wait_for_timeout(800)
-        self.assertEqual(self._services_panel(page)["player"]["wallet"], 990)
+        self.assertEqual(self._services_panel(page)["player"]["wallet"], one_buy_wallet)
 
 
 class ShopClosedJourneys(ServicesBrowserTest):
@@ -926,7 +948,7 @@ class ReconnectJourney(ServicesBrowserTest):
         # Enter the quantity form but do not submit; the value is local.
         self._open_surface(page, "shop")
         _press(page, "Enter")  # 貨架
-        _press(page, "Enter")  # meal buy row
+        _press(page, "Enter")  # first shelf buy row
         _press(page, "5", wait_ms=40)
         self.assertTrue(page.evaluate("document.querySelector('[data-testid=\"services-quantity\"]') !== null"))
 
