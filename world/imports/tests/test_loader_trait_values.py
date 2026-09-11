@@ -8,8 +8,9 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from world.imports.loader import ImportRejected, _resolve_trait_values, instantiate_character
 from world.imports.tests.helpers import example_record
-from world.rules.traits import race_floor
+from world.lore.races import StaticBand, Vitals
 from world.tests.synthetic_data import (
+    make_race,
     make_skill,
     make_subrace,
     synthetic_registries,
@@ -28,17 +29,6 @@ def open_synthetic_scope(case, *targets, extra=None):
     scope.__enter__()
     case.addCleanup(scope.__exit__, None, None, None)
     return scope
-
-
-def _live_registry(module_name, *name_parts):
-    """Runtime access to one catalog registry dict.
-
-    Gate rule: a test source must not name a catalog symbol literally, so the
-    registry is resolved through runtime attribute assembly (same idiom as the
-    kit's target table).
-    """
-    module = importlib.import_module(module_name)
-    return getattr(module, "_".join(name_parts) + "_REGISTRY")
 
 
 def _synth_lineage_skills():
@@ -84,16 +74,31 @@ def _elf_subrace_stand_in():
 class LoaderTraitTests(EvenniaTestCase):
     @covers_requirement("import-loader::loaded-trait-values-are-the-literal-imported-stats-merged-onto-the-race-floor-for-omitted-keys-never-re-derived-or-multiplied")
     def test_literal_values_win_and_omissions_use_race_floor(self):
-        record = example_record()
-        del record["stats"]["guild_merit"]
-        values = _resolve_trait_values(record)
-        self.assertEqual(values["atk_phys"], 12)
-        self.assertEqual(
-            values["guild_merit"],
-            race_floor(_live_registry("world.lore.races", "RACE")[record["race"]])[
-                "guild_merit"
-            ],
+        # A file-local race row carries INVENTED band floors, so the expected
+        # fallback values are controlled constants, not shipped data read back
+        # through the same registry production uses: literals from the record
+        # must win, and each omitted key must fall to the floor (the band's
+        # lower bound) of the record's own race row.
+        race = make_race(
+            "t_floorline_race",
+            vital_baseline=Vitals(hp=(41, 97), mp=(13, 46), sp=(17, 52)),
+            static_baseline=StaticBand(
+                atk_phys=(7, 31),
+                agility=(9, 33),
+                defense=(11, 35),
+                magic_power=(23, 61),
+            ),
         )
+        with synthetic_registries("races", extra={"races": {race.key: race}}):
+            record = example_record()
+            record["race"] = race.key
+            del record["stats"]["guild_merit"]
+            del record["stats"]["defense"]
+            values = _resolve_trait_values(record)
+        self.assertEqual(values["atk_phys"], 12)  # literal beats the floor
+        self.assertEqual(values["hp"], record["stats"]["hp"])  # literal verbatim
+        self.assertEqual(values["defense"], 11)  # omitted -> invented floor
+        self.assertEqual(values["guild_merit"], 0)  # omitted -> floor constant
 
     @covers_requirement("import-loader::non-trait-record-fields-are-stored-verbatim-into-the-seam-attributes-without-interpretation")
     @covers_requirement("persona-store::livingentity-persona-mounts-the-personastore-handler")

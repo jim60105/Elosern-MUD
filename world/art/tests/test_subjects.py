@@ -37,20 +37,6 @@ from world.tests.synthetic_data import (
 )
 
 
-def open_synthetic_scope(case, *targets, extra=None):
-    """Enter a synthetic-catalog scope bound to one test case's lifecycle.
-
-    The kit's class decorator wraps ``test*`` methods only, so anything a
-    ``setUp`` builds against the catalogs would escape its scope. Call this as
-    the FIRST statement of ``setUp`` (before ``super().setUp()``); the scope is
-    torn down with the test via ``case.addCleanup``.
-    """
-    scope = synthetic_registries(*targets, extra=extra)
-    scope.__enter__()
-    case.addCleanup(scope.__exit__, None, None, None)
-    return scope
-
-
 # Kit vocabulary used wherever a producer RESOLVES against a catalog; parsing
 # and key-validation tests keep plain t_-prefixed identity literals.
 _SYNTH_SCENE = sorted(SYNTH_ARCHETYPES)[0]
