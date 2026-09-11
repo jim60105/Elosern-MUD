@@ -251,8 +251,8 @@ def _proposal_state(owner_pk, **overrides):
     state = {
         "owner_actor_id": owner_pk,
         "revision": 1,
-        "race": "human",
-        "subrace": "human_commoner",
+        "race": "t_duskmari",
+        "subrace": "t_duskmari_evensong",
         "allocations": {
             "hp": 8, "mp": 8, "sp": 8,
             "atk_phys": 5, "agility": 5, "defense": 5, "magic_power": 5,

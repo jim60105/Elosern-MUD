@@ -36,6 +36,7 @@ from world.art.queue import ensure, settle
 from world.art.signals import asset_completed
 from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
 
 
 class FakeSession:
@@ -113,13 +114,13 @@ class ArtPushBoundaryTests(EvenniaTestCase):
             from world.art.subjects import ArtSubject, ArtSubjectKind
             from world.art.worker import _notify_completed_batch
 
-            _notify_completed_batch([ArtSubject(ArtSubjectKind.SCENE, "forest_path")])
+            _notify_completed_batch([ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")])
         finally:
             asset_completed.disconnect(receiver)
         self.assertEqual(len(received), 1)
         # Django injects ``signal`` and ``sender``; the payload adds exactly
         # one project-local field.
-        self.assertEqual(received[0]["subject_key"], "scene:forest_path")
+        self.assertEqual(received[0]["subject_key"], "scene:t_synth_bazaar")
         self.assertEqual(set(received[0]) - {"signal", "sender"}, {"subject_key"})
 
     def test_dispatch_uid_makes_connection_reentrant(self):
@@ -147,7 +148,7 @@ class ArtPushBoundaryTests(EvenniaTestCase):
             from world.art.subjects import ArtSubject, ArtSubjectKind
             from world.art.worker import _notify_completed_batch
 
-            _notify_completed_batch([ArtSubject(ArtSubjectKind.SCENE, "forest_path")])
+            _notify_completed_batch([ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")])
         finally:
             asset_completed.disconnect(receiver)
         self.assertEqual(received_thread_names, [main_thread])
@@ -155,6 +156,9 @@ class ArtPushBoundaryTests(EvenniaTestCase):
 
 class ArtPushPresenterTests(EvenniaTestCase):
     def setUp(self):
+        # Scene presentation re-validates the room's archetype against the
+        # live registry: run the surface on the kit archetype rows.
+        open_synthetic_scope(self, "archetypes")
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name)
@@ -163,15 +167,15 @@ class ArtPushPresenterTests(EvenniaTestCase):
         self.art_settings.enable()
         self.registry = build_production_registry()
         self.room = create_object(Room, key="push arena")
-        self.room.scene_archetype = "forest_path"
+        self.room.scene_archetype = "t_synth_bazaar"
         self.player = create_object(PlayerCharacter, key="push player")
         self.player.race = "human"
         self.player.apply_race_baseline()
         self.player.age = 22
         self.player.apparent_age = 22
         self.player.location = self.room
-        self.subject = ArtSubject(ArtSubjectKind.SCENE, "forest_path")
-        self._scene_key = "scene:forest_path"
+        self.subject = ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")
+        self._scene_key = "scene:t_synth_bazaar"
 
     def tearDown(self):
         self.art_settings.disable()
@@ -194,13 +198,13 @@ class ArtPushPresenterTests(EvenniaTestCase):
         from world.art.queue import claim
 
         claimed = claim(10)
-        target = self.root / "scene" / "forest_path.png"
+        target = self.root / "scene" / "t_synth_bazaar.png"
         target.write_bytes(b"asset")
         settle(
             self.subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/forest_path.png",
+            output_identity="scene/t_synth_bazaar.png",
             error=None,
         )
 
@@ -218,14 +222,14 @@ class ArtPushPresenterTests(EvenniaTestCase):
         self.assertEqual(len(updates), 1)
         envelope = updates[0]["ui_update"][0][0]
         self.assertEqual(envelope["panels"]["art"]["scene"]["status"], ArtAssetStatus.DONE)
-        self.assertEqual(envelope["panels"]["art"]["scene"]["url"], "/art/scene/forest_path.png")
+        self.assertEqual(envelope["panels"]["art"]["scene"]["url"], "/art/scene/t_synth_bazaar.png")
         self.assertEqual(envelope["revision"], 1)
         self.assertNotIn("context_actions", envelope["panels"])
 
     def test_non_referencing_session_receives_nothing(self):
         # The session is showing a different scene archetype.
         other_room = create_object(Room, key="other room")
-        other_room.scene_archetype = "tavern_interior"
+        other_room.scene_archetype = "t_synth_lodge"
         other_player = create_object(PlayerCharacter, key="other player")
         other_player.race = "human"
         other_player.apply_race_baseline()
@@ -251,7 +255,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
         session = self._make_session()
         # The actor has since moved to a room with a different archetype.
         other_room = create_object(Room, key="moved room")
-        other_room.scene_archetype = "tavern_interior"
+        other_room.scene_archetype = "t_synth_lodge"
         self.player.location = other_room
         with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
             self._complete_scene()

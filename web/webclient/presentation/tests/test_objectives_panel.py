@@ -61,6 +61,8 @@ from world.rules.guild_offers import (
     QuestReward,
     register_guild_offer,
 )
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY
 
 TICK = 1000
 UNAVAILABLE_PAYLOAD = {
@@ -73,7 +75,7 @@ UNAVAILABLE_PAYLOAD = {
 }
 
 
-def _registration(branch_key="guild_branch_altoria"):
+def _registration(branch_key=SYNTH_GUILD_BRANCH_KEY):
     return {
         "branch_key": branch_key,
         "registered_tick": 0,
@@ -83,6 +85,9 @@ def _registration(branch_key="guild_branch_altoria"):
 
 class ObjectivesPresenterTests(EvenniaTest):
     def setUp(self):
+        # Offer registration validates the issuer branch against the live
+        # branch registry: run the whole lifecycle on the kit branch row.
+        open_synthetic_scope(self, "guild_branches")
         super().setUp()
         self._def_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._offer_items = list(GUILD_OFFER_REGISTRY.items())
@@ -136,7 +141,7 @@ class ObjectivesPresenterTests(EvenniaTest):
         register_guild_offer(
             GuildQuestOffer(
                 definition_key=def_record.key,
-                issuer_branch_key="guild_branch_altoria",
+                issuer_branch_key=SYNTH_GUILD_BRANCH_KEY,
                 reward=QuestReward(copper=80, items=(), merit=10),
             )
         )

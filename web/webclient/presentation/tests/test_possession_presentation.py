@@ -80,13 +80,13 @@ class PossessionPresentationTests(EvenniaTest):
         self.player.race = "human"
         self.player.apply_race_baseline()
         self.player.db.wallet = 5000
-        self.player.db.inventory = ["plain_sword"]
+        self.player.db.inventory = ["t_possession_blade"]
         self.session.puppet = self.player
         self.player.sessions.add(self.session)
         self.npc = create_object(LLMNPC, key="同伴小艾", location=self.room1)
         self.npc.race = "human"
         self.npc.apply_race_baseline()
-        self.npc.db.inventory = ["healing_potion", "meal"]
+        self.npc.db.inventory = ["t_possession_draught", "t_possession_ration"]
         join_party(self.npc, self.player)
         self.registry = build_production_registry()
         self.action_registry = build_production_action_registry()
@@ -226,9 +226,9 @@ class PossessionPresentationTests(EvenniaTest):
         self.assertEqual(serv_panel["player"]["wallet"], 5000)
         self.assertEqual(serv_panel["inventory"]["wallet"], 5000)
         item_keys = [row["item_key"] for row in serv_panel["inventory"]["rows"]]
-        self.assertIn("healing_potion", item_keys)
-        self.assertIn("meal", item_keys)
-        self.assertNotIn("plain_sword", item_keys)
+        self.assertIn("t_possession_draught", item_keys)
+        self.assertIn("t_possession_ration", item_keys)
+        self.assertNotIn("t_possession_blade", item_keys)
 
         # 3. status_presenter: name and status belong to A
         stat_panel = status_presenter(ctx_npc)
@@ -249,7 +249,7 @@ class PossessionPresentationTests(EvenniaTest):
         inv_before = list(self.npc.db.inventory)
 
         # shop.buy refusal
-        buy_res = _buy_adapter(self.npc, {"item_key": "meal", "quantity": 1})
+        buy_res = _buy_adapter(self.npc, {"item_key": "t_possession_ration", "quantity": 1})
         self.assertEqual(buy_res["outcome"], "rejected")
         self.assertEqual(buy_res["code"], REASON_POSSESSED_SHOP)
         self.assertEqual(buy_res["message"], POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_SHOP])
@@ -257,7 +257,7 @@ class PossessionPresentationTests(EvenniaTest):
         self.assertEqual(list(self.npc.db.inventory), inv_before)
 
         # shop.sell refusal
-        sell_res = _sell_adapter(self.npc, {"item_key": "meal", "quantity": 1})
+        sell_res = _sell_adapter(self.npc, {"item_key": "t_possession_ration", "quantity": 1})
         self.assertEqual(sell_res["outcome"], "rejected")
         self.assertEqual(sell_res["code"], REASON_POSSESSED_SHOP)
         self.assertEqual(self.player.db.wallet, wallet_before)

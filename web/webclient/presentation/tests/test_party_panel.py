@@ -46,6 +46,10 @@ from world.rules.affinity_config import get_config
 from world.rules.combat_session import engage
 from world.rules.npc_identity import npc_display_name
 from world.rules.party import join_party
+from world.rules.tests._combat_session_helpers import (
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 
 UNAVAILABLE_PAYLOAD = {
@@ -495,12 +499,16 @@ class PartyCombatJoinTests(BattlefieldIsolation, EvenniaTest):
     """The join-by-identity contract and settlement push timing."""
 
     def setUp(self):
+        # Combat rounds run on kit skills with the production-forced innate
+        # rows re-seeded; the monster keeps its live threat tier so the
+        # rulebook-backed round path stays valid.
+        open_synthetic_scope(self, "skills", extra=synth_innate_overlay())
         super().setUp()
         register_catalog()
         self.room = create_object(Room, key="队伍演武场")
         self.player = _player()
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, ["t_cinder_cleave"])
         self.companion = _companion("薇拉", self.room, hp_current=90, hp_maximum=90)
         join_party(self.companion, self.player)
         self.monster = _monster()
@@ -548,7 +556,7 @@ class PartyCombatJoinTests(BattlefieldIsolation, EvenniaTest):
             "request_id": "r1",
             "base_revision": coordinator.revision,
             "action_id": "combat.cast",
-            "payload": {"skill_key": "fire_ball", "target_ids": [int(self.monster.pk)]},
+            "payload": {"skill_key": "t_cinder_cleave", "target_ids": [int(self.monster.pk)]},
         }
         with patch("world.rules.combat.roll_d100", return_value=100):
             handle_ui_action(

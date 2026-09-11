@@ -38,7 +38,9 @@ from web.webclient.presentation.title_codex import (
     title_codex_presenter,
     validate_title_codex,
 )
-from world.lore.titles import FIXED_TITLE_REGISTRY, TitleCategory
+from world.lore.titles import TitleCategory
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.tests.synthetic_data import make_title
 from world.rules.title_view import (
     TITLE_MAX_BASIS_CHARS,
     TITLE_MAX_DISPLAY_CHARS,
@@ -49,21 +51,25 @@ from world.rules.titles import (
     TITLE_COLLECTION_KEY,
     bank_epithet,
     bank_fixed,
-    grant_first_quest_epithet,
-    grant_rank_title,
 )
 
 # Distinguishes "no actor passed" from an explicit None actor.
 _UNSET = object()
 
+# File-local synthetic fixed-title row: the schema fixtures name a title
+# identity the shipped registry never carries.
+_T_GUILD_START = make_title(
+    "t_codex_guild_start", display_name_zh="銅階新血", hint_zh="完成公會註冊即可獲得。"
+)
+
 
 def _fixed_row(**overrides):
     value = {
-        "key": "g_f_rank",
-        "display": "F級冒險者",
+        "key": _T_GUILD_START.key,
+        "display": _T_GUILD_START.display_name_zh,
         "category": "guild",
         "hint": "",
-        "flavor": "公會註冊的起點。",
+        "flavor": "公會報到的第一天。",
         "unlocked": True,
         "granted_tick": 120,
     }
@@ -90,10 +96,10 @@ def _valid_panel(**overrides):
         "kind": "title_codex",
         "fixed_rows": [_fixed_row()],
         "epithet_rows": [_epithet_row()],
-        "equipped": {"fixed": "g_f_rank", "epithet": "南門新客"},
-        "full_title": "F級冒險者　南門新客",
+        "equipped": {"fixed": _T_GUILD_START.key, "epithet": "南門新客"},
+        "full_title": f"{_T_GUILD_START.display_name_zh}　南門新客",
         "unlocked": 1,
-        "total": len(FIXED_TITLE_REGISTRY),
+        "total": 2,
         "pending_ballot": [],
     }
     value.update(overrides)
@@ -358,6 +364,22 @@ class TitleCodexTrimTests(unittest.TestCase):
 
 class TitleCodexPresenterTests(EvenniaTestCase):
     def setUp(self):
+        # The codex enumerates the live fixed-title registry: run the whole
+        # lifecycle on a two-row synthetic catalog.
+        open_synthetic_scope(
+            self,
+            "titles",
+            extra={
+                "titles": {
+                    _T_GUILD_START.key: _T_GUILD_START,
+                    "t_codex_gatekeeper": make_title(
+                        "t_codex_gatekeeper",
+                        display_name_zh="守門之友",
+                        hint_zh="與合成守門人熟識即可獲得。",
+                    ),
+                }
+            },
+        )
         self.player = create_object(PlayerCharacter, key="codex presenter")
         self.player.race = "human"
         self.player.apply_race_baseline()
@@ -373,20 +395,25 @@ class TitleCodexPresenterTests(EvenniaTestCase):
     def test_fresh_character_renders_the_full_locked_registry(self):
         payload = self._render()
         self.assertTrue(payload["available"])
-        self.assertEqual(len(payload["fixed_rows"]), len(FIXED_TITLE_REGISTRY))
+        # The view enumerates every row of the scoped (synthetic) registry:
+        # the kit's two catalog rows plus this file's two extras.
+        self.assertEqual(len(payload["fixed_rows"]), 4)
         self.assertEqual(payload["epithet_rows"], [])
         self.assertEqual(payload["unlocked"], 0)
-        self.assertEqual(payload["total"], len(FIXED_TITLE_REGISTRY))
+        self.assertEqual(payload["total"], 4)
         self.assertEqual(payload["full_title"], "")
         self.assertEqual(payload["equipped"], {"fixed": None, "epithet": None})
 
     def test_granted_state_renders_verbatim_rows_and_flags(self):
-        grant_rank_title(self.player, "F")
-        grant_first_quest_epithet(self.player)
+        bank_fixed(self.player, _T_GUILD_START.key, 120)
+        bank_epithet(self.player, "南門新客", "初入南門。", 121)
         bank_epithet(self.player, "破城先鋒", "率先破門。", 500)
         payload = self._render()
-        self.assertEqual(payload["full_title"], "F級冒險者　南門新客")
-        self.assertEqual(payload["equipped"], {"fixed": "g_f_rank", "epithet": "南門新客"})
+        self.assertEqual(payload["full_title"], "銅階新血　南門新客")
+        self.assertEqual(
+            payload["equipped"],
+            {"fixed": _T_GUILD_START.key, "epithet": "南門新客"},
+        )
         self.assertEqual(payload["unlocked"], 1)
         by_display = {row["display"]: row for row in payload["epithet_rows"]}
         # Newest-first: 破城先鋒 (tick 500) precedes the starter (real tick).
@@ -447,6 +474,6 @@ class TitleCodexPresenterTests(EvenniaTestCase):
         )
 
     def test_presenter_directly_matches_the_registry_render(self):
-        grant_rank_title(self.player, "F")
-        grant_first_quest_epithet(self.player)
+        bank_fixed(self.player, _T_GUILD_START.key, 120)
+        bank_epithet(self.player, "南門新客", "初入南門。", 121)
         self.assertEqual(title_codex_presenter(self._context()), self._render())

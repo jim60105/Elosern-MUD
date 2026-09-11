@@ -38,19 +38,21 @@ from world.art.queue import claim, ensure, record_key, settle
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.tests.synthetic_data import SYNTH_ARCHETYPES
 from world.rules.combat_session import engage
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 
 def _valid_scene(**overrides):
     value = {
-        "archetype": "tavern_interior",
-        "label": "酒館內部",
-        "subject_key": "scene:tavern_interior",
+        "archetype": "t_synth_bazaar",
+        "label": T_BAZAAR_LABEL,
+        "subject_key": "scene:t_synth_bazaar",
         "status": "done",
-        "url": "/art/scene/tavern_interior.png",
+        "url": "/art/scene/t_synth_bazaar.png",
         "aspect_ratio": "16:9",
-        "alt": "酒館內部",
+        "alt": T_BAZAAR_LABEL,
         "placeholder": None,
     }
     value.update(overrides)
@@ -82,6 +84,10 @@ def _valid_payload(**overrides):
     }
     value.update(overrides)
     return value
+
+
+T_BAZAAR = "t_synth_bazaar"
+T_BAZAAR_LABEL = SYNTH_ARCHETYPES[T_BAZAAR].display_name_zh
 
 
 class ArtSchemaTests(unittest.TestCase):
@@ -272,6 +278,9 @@ def _monster(key="art goblin", hp=100):
 
 class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        # Scene presentation re-validates the room archetype against the live
+        # registry: run the surface on the kit archetype rows.
+        open_synthetic_scope(self, "archetypes")
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name)
@@ -280,7 +289,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.art_settings = override_settings(ART_STORE_ROOT=str(self.root))
         self.art_settings.enable()
         self.room = create_object(Room, key="art arena")
-        self.room.scene_archetype = "tavern_interior"
+        self.room.scene_archetype = "t_synth_bazaar"
         self.player = _player()
         self.player.location = self.room
         self.registry = build_production_registry()
@@ -318,17 +327,17 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
     def test_done_scene_renders_same_origin_url(self):
         self._settle_done(
-            ArtSubject(ArtSubjectKind.SCENE, "tavern_interior"),
-            "scene/tavern_interior.png",
+            ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"),
+            "scene/t_synth_bazaar.png",
         )
         payload = self._render()
         self.assertTrue(payload["available"])
         scene = payload["scene"]
-        self.assertEqual(scene["archetype"], "tavern_interior")
-        self.assertEqual(scene["label"], "酒館內部")
-        self.assertEqual(scene["subject_key"], "scene:tavern_interior")
+        self.assertEqual(scene["archetype"], "t_synth_bazaar")
+        self.assertEqual(scene["label"], SYNTH_ARCHETYPES[T_BAZAAR].display_name_zh)
+        self.assertEqual(scene["subject_key"], "scene:t_synth_bazaar")
         self.assertEqual(scene["status"], ArtAssetStatus.DONE)
-        self.assertEqual(scene["url"], "/art/scene/tavern_interior.png")
+        self.assertEqual(scene["url"], "/art/scene/t_synth_bazaar.png")
         self.assertEqual(scene["aspect_ratio"], "16:9")
         self.assertIsNone(scene["placeholder"])
         self.assertNotIn("out_path", repr(payload))
@@ -338,7 +347,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     def test_pending_missing_failed_states_render_placeholders(self):
         from world.art.queue import claim
 
-        pending = ArtSubject(ArtSubjectKind.SCENE, "tavern_interior")
+        pending = ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")
         ensure(pending, "desc")
         claim(10)
         pending_record = __import__("world.art.queue", fromlist=["record_key"]).record_key(
@@ -355,7 +364,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(scene["url"])
         self.assertEqual(scene["placeholder"]["kind"], "missing")
 
-        failed = ArtSubject(ArtSubjectKind.SCENE, "tavern_interior")
+        failed = ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")
         ensure(failed, "desc")
         claimed = claim(10)
         settle(
@@ -372,13 +381,13 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("webclient-art-panel::the-art-panel-accepts-the-normalized-in-flight-state")
     @covers_requirement("art-queue-worker::in-flight-generation-exposes-a-wire-stable-status")
     def test_claimed_record_renders_available_with_a_pending_placeholder(self):
-        subject = ArtSubject(ArtSubjectKind.SCENE, "tavern_interior")
+        subject = ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")
         ensure(subject, "desc")
         claim(10)
         payload = self._render()
         self.assertTrue(payload["available"])
         scene = payload["scene"]
-        self.assertEqual(scene["subject_key"], "scene:tavern_interior")
+        self.assertEqual(scene["subject_key"], "scene:t_synth_bazaar")
         self.assertEqual(scene["status"], "pending")
         self.assertIsNone(scene["url"])
         self.assertEqual(scene["placeholder"]["kind"], "missing")
@@ -396,15 +405,15 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(scene["subject_key"])
 
     def test_missing_file_for_done_record_renders_unavailable(self):
-        ensure(ArtSubject(ArtSubjectKind.SCENE, "tavern_interior"), "desc")
+        ensure(ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"), "desc")
         from world.art.queue import claim
 
         claimed = claim(10)
         settle(
-            ArtSubject(ArtSubjectKind.SCENE, "tavern_interior"),
+            ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"),
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/tavern_interior.png",
+            output_identity="scene/t_synth_bazaar.png",
             error=None,
         )
         # The file is never written, so the presenter treats it as unavailable.
@@ -505,8 +514,8 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("webclient-art-panel::the-art-panel-is-an-exact-read-only-panel-available-in-exploration-and-combat-modes")
     def test_presenter_is_read_only(self):
         self._settle_done(
-            ArtSubject(ArtSubjectKind.SCENE, "tavern_interior"),
-            "scene/tavern_interior.png",
+            ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"),
+            "scene/t_synth_bazaar.png",
         )
         before = {
             "hp": self.player.traits.hp.current,
@@ -535,6 +544,9 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
     character_typeclass = PlayerCharacter
 
     def setUp(self):
+        # Snapshot rooms carry kit archetype keys; the combat path stays on
+        # the live skill/monster data (no skills or monster-tier patching).
+        open_synthetic_scope(self, "archetypes")
         super().setUp()
         import evennia
         from server.conf.tests.test_inputfuncs import _make_session
@@ -571,7 +583,7 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
     @covers_requirement("webclient-art-panel::the-art-panel-is-an-exact-read-only-panel-available-in-exploration-and-combat-modes")
     def test_full_snapshot_includes_art_in_exploration_and_combat_modes(self):
         room = create_object(Room, key="snapshot arena")
-        room.scene_archetype = "tavern_interior"
+        room.scene_archetype = "t_synth_bazaar"
         self.char1.location = room
         envelope = self._sync()
         self.assertIn("art", envelope["panels"])
@@ -604,7 +616,7 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
         from web.webclient.presentation.registry import build_production_registry
 
         room = create_object(Room, key="atomic arena")
-        room.scene_archetype = "forest_path"
+        room.scene_archetype = "t_synth_lodge"
         self.char1.location = room
         monster = _monster()
         monster.location = room
@@ -658,7 +670,7 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
         from server.conf import inputfuncs
 
         room = create_object(Room, key="refresh arena")
-        room.scene_archetype = "tavern_interior"
+        room.scene_archetype = "t_synth_bazaar"
         self.char1.location = room
         deferred = __import__("twisted.internet.defer", fromlist=["Deferred"]).Deferred()
         with __import__("unittest.mock", fromlist=["patch"]).patch(
@@ -675,7 +687,7 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
         envelope = calls[-1].kwargs["ui_snapshot"][0][0]
         self.assertIn("art", envelope["panels"])
         self.assertEqual(envelope["panels"]["art"]["kind"], "scene")
-        self.assertEqual(envelope["panels"]["art"]["scene"]["archetype"], "tavern_interior")
+        self.assertEqual(envelope["panels"]["art"]["scene"]["archetype"], "t_synth_bazaar")
 
 
 if __name__ == "__main__":
