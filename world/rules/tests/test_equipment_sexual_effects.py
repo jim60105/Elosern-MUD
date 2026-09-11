@@ -22,6 +22,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
+from world.lore.items import EquipmentSlot
 from world.lore.sexual_vocab import EXPOSURE_LEVELS
 from world.rules.combat_modifiers import (
     _build_context,
@@ -40,9 +41,151 @@ from world.rules.sexual_act_effects import compute_pleasure_gain
 from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS
 from world.rules.status_query import build_character_read_model, build_status_read_model
 from world.rules.stored_sexual_reads import StoredLevel
+from world.skills.registry import TargetSpec
+
+from dataclasses import replace
+from world.tests.synthetic_data import SYNTH_ACT, SYNTH_ACT_SKILL, make_item
+
+from ._combat_session_helpers import _race_key, open_synthetic_scope
 
 _ROOT = Path(__file__).resolve().parents[3]
 _PRODUCTION_ROOTS = ("commands", "server", "typeclasses", "web", "world")
+
+
+# --- File-local synthetic gear/act rows ------------------------------------
+# Kit gear bound (per the P08 borrowed-key idiom) to modifier keys resolved
+# at import from the live rulebook's sorted key list: the rulebook itself is
+# patched with locally authored rows under those keys for the test lifecycle,
+# so every folded magnitude here is data the suite owns. No shipped item key
+# or authored value is ever named.
+# The closed shipped modifier enum cannot gain members, so the kit items
+# borrow members positionally at runtime (never named as literals or
+# attributes); the locally authored patched rows below are the only source
+# their gear resolves through while the scope is open.
+from world.lore.items import EquipmentModifierKey
+
+_LACE_KEY, _CHOKER_KEY, _ROBE_KEY, _SISTER_KEY = tuple(EquipmentModifierKey)[1:5]
+
+_LACE = make_item(
+    "t_equip_lace",
+    display_name_zh="合成誘絲內甲",
+    equipment_slot=EquipmentSlot.ARMOR,
+    modifier_key=_LACE_KEY,
+)
+_CHOKER = make_item(
+    "t_equip_choker",
+    display_name_zh="合成慾絲頸飾",
+    equipment_slot=EquipmentSlot.ACCESSORY,
+    modifier_key=_CHOKER_KEY,
+)
+_ROBE = make_item(
+    "t_equip_robe",
+    display_name_zh="合成聖袍",
+    equipment_slot=EquipmentSlot.ARMOR,
+    modifier_key=_ROBE_KEY,
+)
+_SISTER = make_item(
+    "t_equip_sister",
+    display_name_zh="合成修袍",
+    equipment_slot=EquipmentSlot.ARMOR,
+    modifier_key=_SISTER_KEY,
+)
+
+# (bias, adjustments) per borrowed modifier key, authored ONCE and mirrored
+# into both the patched rulebook and the assertions.
+_GEAR: dict[str, tuple[int, dict[str, int | str]]] = {
+    _LACE_KEY: (1, {"pleasure_gain": "+15%"}),
+    _CHOKER_KEY: (0, {"defense": -3, "pleasure_gain": "+25%"}),
+    _ROBE_KEY: (2, {"defense": -3, "pleasure_gain": "+25%", "heal_gain": "+25%"}),
+    _SISTER_KEY: (1, {"pleasure_gain": "+15%", "heal_gain": "+10%"}),
+}
+_ITEMS = {_LACE.key: _LACE, _CHOKER.key: _CHOKER, _ROBE.key: _ROBE, _SISTER.key: _SISTER}
+
+# The solo act the live-cast fixtures wear the gear under: pleasure comes
+# from the act's locally authored base value, no event.
+_SOLO = "t_equip_solo"
+_SOLO_DEF = replace(
+    SYNTH_ACT,
+    key=_SOLO,
+    base_pleasure=12,
+    actor_pleasure_ratio=1.0,
+    actor_counters=(),
+    participant_counters=(),
+    sexual_events=(),
+    resistible=False,
+)
+_SOLO_SKILL = replace(
+    SYNTH_ACT_SKILL,
+    key=_SOLO,
+    label="測試自撫",
+    description="僅存在於測試中的合成自撫行為。",
+    target_spec=TargetSpec.SELF,
+    effects=[f"pleasure:{_SOLO}", f"sexual_counter:{_SOLO}"],
+)
+# The progression act: same shape, carrying the kit row's own event so the
+# authored transition rules (exposure up, then the shame chain) fire exactly
+# as production event handling does.
+_SOLO_LIFT = "t_equip_solo_lift"
+_SOLO_LIFT_DEF = replace(
+    SYNTH_ACT,
+    key=_SOLO_LIFT,
+    base_pleasure=12,
+    actor_pleasure_ratio=1.0,
+    actor_counters=(),
+    participant_counters=(),
+    resistible=False,
+)
+_SOLO_LIFT_SKILL = replace(
+    SYNTH_ACT_SKILL,
+    key=_SOLO_LIFT,
+    label="測試暴露自撫",
+    description="僅存在於測試中的合成暴露自撫行為。",
+    target_spec=TargetSpec.SELF,
+    effects=[
+        f"pleasure:{_SOLO_LIFT}",
+        f"sexual_counter:{_SOLO_LIFT}",
+        "sexual_event_actor:self_exposure",
+    ],
+)
+_SKILLS = {_SOLO_SKILL.key: _SOLO_SKILL, _SOLO_LIFT_SKILL.key: _SOLO_LIFT_SKILL}
+_ACTS = {_SOLO_DEF.key: _SOLO_DEF, _SOLO_LIFT_DEF.key: _SOLO_LIFT_DEF}
+
+
+def _patched_rules():
+    """A file-local rulebook replacing the borrowed members' rows.
+
+    The shipped rows stay in place (unrelated consumers may resolve them);
+    the four borrowed keys carry the locally authored magnitudes the whole
+    file asserts on.
+    """
+    from world.rules.equipment_effects import (
+        EQUIPMENT_EFFECT_RULES as _live,
+        EquipmentEffectRule,
+    )
+
+    patched = dict(_live)
+    for key, (bias, adjustments) in _GEAR.items():
+        patched[key] = EquipmentEffectRule(
+            adjustments=adjustments,
+            gauge_caps={},
+            immune=(),
+            attached_buffs=(),
+            exposure_bias=bias,
+        )
+    return patched
+
+
+def _open(case, *, casts=False):
+    """Open the catalogue scope covering one test's full lifecycle.
+
+    ``casts`` adds the skill/act catalogues the live-cast fixtures need.
+    """
+    logicals = ["elements", "items", "races", "subraces", "static_tiers"]
+    extra = {"items": dict(_ITEMS)}
+    if casts:
+        logicals = ["skills", "sexual_acts"] + logicals
+        extra = {"items": dict(_ITEMS), "skills": dict(_SKILLS), "sexual_acts": dict(_ACTS)}
+    open_synthetic_scope(case, *logicals, extra=extra)
 
 
 def _worn(entity, *, armor=None, accessories=()) -> None:
@@ -57,7 +200,7 @@ def _worn(entity, *, armor=None, accessories=()) -> None:
 
 def _player(key: str):
     player = create_object(PlayerCharacter, key=key)
-    player.race = "human"
+    player.race = _race_key()
     player.apply_race_baseline()
     player.db.equipment = None
     player.db.inventory = []
@@ -116,18 +259,26 @@ class StoredLevelSemanticsTests(unittest.TestCase):
 class EffectiveExposureOverlayTests(EvenniaTestCase):
     """Task 4.1: the overlay accessor's contract."""
 
+    def setUp(self):
+        _open(self)
+        patcher = patch(
+            "world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", _patched_rules()
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     @covers_requirement(
         "equipment-effects::effective-exposure-is-a-pure-clamped-read-time-overlay"
     )
     def test_bias_shifts_and_clamps_to_vocabulary_bounds(self):
         entity = _player("overlay shifter")
         entity.sexual.exposure.value = "中等"
-        _worn(entity, armor="enticing_lace_set")
+        _worn(entity, armor=_LACE.key)
         shifted = effective_exposure(entity)
         self.assertIsInstance(shifted, StoredLevel)
         self.assertEqual(shifted.levels, EXPOSURE_LEVELS)
         self.assertEqual(shifted.levels[shifted.value], "高")
-        _worn(entity, armor="saintess_vestments")
+        _worn(entity, armor=_ROBE.key)
         self.assertEqual(equipment_exposure_bias(entity), 2)
         self.assertEqual(effective_exposure(entity).levels[2 + 2], "極高")
         # The vocabulary ceiling never overflows, whatever the bias.
@@ -177,7 +328,7 @@ class EffectiveExposureOverlayTests(EvenniaTestCase):
             "min": 0,
             "max": 3,
         }
-        _worn(entity, armor="saintess_vestments")  # bias +2
+        _worn(entity, armor=_ROBE.key)  # bias +2
         # The record passes through with its OWN vocabulary and ordinal —
         # never shifted, never relabeled into the canonical bands.
         resolved = effective_exposure(entity)
@@ -202,7 +353,7 @@ class EffectiveExposureOverlayTests(EvenniaTestCase):
             "exposure": "低",
             "climax_phase": "未達",
         }
-        _worn(entity, armor="sister_vestments")
+        _worn(entity, armor=_SISTER.key)
         before = repr(
             (
                 entity.attributes.get("sexual", default=None),
@@ -282,6 +433,12 @@ class ContextParityTests(EvenniaTest):
     """Task 4.2: both condition contexts match on the effective level."""
 
     def setUp(self):
+        _open(self)
+        patcher = patch(
+            "world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", _patched_rules()
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         super().setUp()
         self.actor = _player("parity wearer")
         self.actor.location = self.room1
@@ -291,7 +448,7 @@ class ContextParityTests(EvenniaTest):
     )
     def test_both_contexts_carry_the_effective_ordinal_and_view_type(self):
         self.actor.sexual.exposure.value = "中等"
-        _worn(self.actor, armor="saintess_vestments")
+        _worn(self.actor, armor=_ROBE.key)
         live = _build_context(self.actor)["exposure"]
         no_create = build_no_create_condition_context(self.actor)["exposure"]
         self.assertIs(type(live), StoredLevel)
@@ -311,7 +468,7 @@ class ContextParityTests(EvenniaTest):
         self.assertEqual(evaluate_combat_modifiers_no_create(self.actor), {})
         # Bias +1 makes it effective, and both paths agree, equipment fold
         # included (修女聖袍 contributes heal_gain only to the bundle).
-        _worn(self.actor, armor="sister_vestments")
+        _worn(self.actor, armor=_SISTER.key)
         live = evaluate_combat_modifiers(self.actor)
         no_create = evaluate_combat_modifiers_no_create(self.actor)
         self.assertEqual(live, no_create)
@@ -327,7 +484,7 @@ class ContextParityTests(EvenniaTest):
     )
     def test_status_chip_agrees_with_the_effective_level(self):
         self.actor.sexual.exposure.value = "低"
-        _worn(self.actor, armor="sister_vestments")
+        _worn(self.actor, armor=_SISTER.key)
         model = build_status_read_model(self.actor)
         self.assertFalse(
             any(c.code == "high_exposure_defense_penalty" for c in model.conditions)
@@ -343,6 +500,12 @@ class PleasureFunnelTests(EvenniaTest):
     """Task 4.3/4.4: the equipment percent in the funnel."""
 
     def setUp(self):
+        _open(self, casts=True)
+        patcher = patch(
+            "world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", _patched_rules()
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         super().setUp()
         self.actor = _player("funnel subject")
         self.actor.location = self.room1
@@ -413,17 +576,17 @@ class PleasureFunnelTests(EvenniaTest):
         bare.db.skills = {"active": [], "passive": []}
         before = bare.sexual.pleasure.base
         result = ActionResolver.resolve(
-            ActionRequest(bare, "solo_self_touch", [], RoomActionContext(None, {}))
+            ActionRequest(bare, _SOLO, [], RoomActionContext(None, {}))
         )
         self.assertEqual(result.outcome, "success")
         self.assertEqual(bare.sexual.pleasure.base - before, 12)
 
         geared = _player("funnel geared")
         geared.db.skills = {"active": [], "passive": []}
-        _wear(geared, "enticing_lace_set")
+        _wear(geared, _LACE.key)
         before = geared.sexual.pleasure.base
         result = ActionResolver.resolve(
-            ActionRequest(geared, "solo_self_touch", [], RoomActionContext(None, {}))
+            ActionRequest(geared, _SOLO, [], RoomActionContext(None, {}))
         )
         self.assertEqual(result.outcome, "success")
         # round(12 × 1.15) = 14 with the lace's +15% pleasure_gain.
@@ -434,13 +597,13 @@ class PleasureFunnelTests(EvenniaTest):
     )
     def test_combat_bundle_keysets_exclude_pleasure_gain(self):
         lace_only = _player("bundle lace only")
-        _worn(lace_only, armor="enticing_lace_set")
+        _worn(lace_only, armor=_LACE.key)
         self.assertEqual(dict(equipment_adjustments(lace_only)), {})
         self.assertEqual(equipment_pleasure_gain(lace_only), 15)
         self.assertEqual(evaluate_combat_modifiers_no_create(lace_only), {})
 
         choker = _player("bundle choker")
-        _worn(choker, accessories=["passion_silk_choker"])
+        _worn(choker, accessories=[_CHOKER.key])
         bundle = dict(evaluate_combat_modifiers_no_create(choker))
         self.assertEqual(bundle, {"defense": -3})
         self.assertNotIn("pleasure_gain", bundle)
@@ -451,6 +614,12 @@ class StoredStateImmunityTests(EvenniaTest):
     """Task 4.5: bias is an overlay; stored state never moves for it."""
 
     def setUp(self):
+        _open(self, casts=True)
+        patcher = patch(
+            "world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", _patched_rules()
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         super().setUp()
         self.actor = _player("immunity subject")
         self.actor.location = self.room1
@@ -461,7 +630,7 @@ class StoredStateImmunityTests(EvenniaTest):
         from world.rules.targeting import RoomActionContext
 
         result = ActionResolver.resolve(
-            ActionRequest(entity, "shame_hem_lift", [], RoomActionContext(entity.location, {}))
+            ActionRequest(entity, _SOLO_LIFT, [], RoomActionContext(entity.location, {}))
         )
         self.assertEqual(result.outcome, "success")
 
@@ -479,7 +648,7 @@ class StoredStateImmunityTests(EvenniaTest):
         geared.location = self.room1
         # Equipping writes nothing to sexual storage at all.
         self.assertIsNone(geared.attributes.get("sexual_traits", category="traits"))
-        _wear(geared, "saintess_vestments")
+        _wear(geared, _ROBE.key)
         self.assertIsNone(geared.attributes.get("sexual_traits", category="traits"))
         self._hem_lift(geared)
         # Stored progression is identical: the overlay never fed back.
@@ -491,7 +660,7 @@ class StoredStateImmunityTests(EvenniaTest):
         worn_view = effective_exposure(geared)
         self.assertEqual(worn_view.levels[worn_view.value], "高")
         # …and removal drops it straight back to the stored ordinal.
-        toggle_equipment(geared, "saintess_vestments")
+        toggle_equipment(geared, _ROBE.key)
         self.assertEqual(effective_exposure(geared).value, _stored_exposure_ordinal(geared))
 
     @covers_requirement(
@@ -499,7 +668,7 @@ class StoredStateImmunityTests(EvenniaTest):
     )
     def test_read_model_renders_the_effective_label(self):
         self.actor.sexual.exposure.value = "中等"
-        _wear(self.actor, "saintess_vestments")
+        _wear(self.actor, _ROBE.key)
         model = build_character_read_model(self.actor)
         self.assertEqual(model.intimate.exposure, "極高")
         # Every other intimate row keeps the stored value.
