@@ -109,6 +109,39 @@ def graft_synth_entry_rank() -> None:
     GUILD_RANK_REGISTRY.setdefault(SYNTH_ENTRY_RANK_KEY, SYNTH_ENTRY_RANK_ROW)
 
 
+#: Authored display bindings for the kit's condition rows, keyed by kit buff
+#: key. The status-display table validates its coverage against the catalogs
+#: at import (shipped data, via the pre-install import seam); the kit's own
+#: buffs are grafted afterwards so the status presenter can label them
+#: without the table ever learning shipped drift.
+SYNTH_STATUS_DISPLAY_ROWS: MappingProxyType = MappingProxyType(
+    {
+        "t_moss_veil": ("苔幕", "beneficial"),
+        "t_ash_burn": ("燼灼", "harmful"),
+    }
+)
+
+
+def graft_synth_status_display() -> None:
+    """Ensure every installed kit buff has one status-display row.
+
+    ``world.rules.status_display.STATUS_DISPLAY`` is built at import from
+    the shipped rulebook; under the process install the kit adds its own
+    buff keys, and the status presenter fails closed on an unlabeled code.
+    Graft one authored row per live kit buff that the shipped table cannot
+    know about (``setdefault``: a code the table already covers keeps its
+    shipped row).
+    """
+    from world.rules.status_display import ConditionDisplay, STATUS_DISPLAY
+    from world.tests.synthetic_data import SYNTH_BUFFS
+
+    for key in SYNTH_BUFFS:
+        if key in STATUS_DISPLAY:
+            continue
+        label, severity = SYNTH_STATUS_DISPLAY_ROWS[key]
+        STATUS_DISPLAY[key] = ConditionDisplay(key, label, severity)
+
+
 def synth_next_entry_rank_key() -> str:
     """The rank key exactly one order above the grafted entry rank.
 
@@ -207,13 +240,19 @@ def build_synth_services_catalog():
 
 
 def install_synth_services_catalog():
-    """Assign the shared catalog process-globally and register its offers."""
+    """Assign the shared catalog process-globally, register offers + clock sources."""
     from world.rules import guild_config
     from world.rules.guild_config import register_catalog_offers
 
     catalog = build_synth_services_catalog()
     guild_config.CATALOG = catalog
     register_catalog_offers(catalog)
+    # The skipped shipped sync normally registers these; both settlement
+    # functions resolve exclusively through get_catalog(), so they serve the
+    # synthetic shop identically (registration is idempotent).
+    from world.rules.guild_economy import _register_clock_sources
+
+    _register_clock_sources()
     return catalog
 
 

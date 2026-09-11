@@ -1,8 +1,8 @@
 ## 1. Baseline
 
-- [ ] 1.1 Capture the gate report and this area's freeze-list entries with `uv run --locked python -m tools.test_data_lint check --json`
-- [ ] 1.2 Confirm the synthetic kit catalogs cover this area's registries; extend only the kit module when an entry shape is genuinely missing
-- [ ] 1.3 Wire `install_synthetic_catalogs()` into `web/tests/browser/browser_settings.py` behind the kit flag and add a seed smoke test proving the seeded DB + server resolve one `t_` key end to end before migrating any journey file
+- [x] 1.1 Capture the gate report and this area's freeze-list entries with `uv run --locked python -m tools.test_data_lint check --json`
+- [x] 1.2 Confirm the synthetic kit catalogs cover this area's registries; extend only the kit module when an entry shape is genuinely missing
+- [x] 1.3 Wire `install_synthetic_catalogs()` into `web/tests/browser/browser_settings.py` behind the kit flag and add a seed smoke test proving the seeded DB + server resolve one `t_` key end to end before migrating any journey file
 
 ## 2. Migration
 

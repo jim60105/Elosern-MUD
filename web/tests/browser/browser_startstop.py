@@ -26,6 +26,11 @@ _PRODUCTION_MODULE = "server.conf.at_server_startstop"
 _IMPORT_BEFORE_INSTALL = (
     "world.rules.equipment_effects",
     "world.rules.combat_modifiers",
+    # The status-display coverage table validates buff/rule keys against the
+    # live catalogs at import; importing it against shipped data keeps the
+    # presentation registry buildable under the install (the kit's own
+    # condition rows are grafted in afterwards).
+    "world.rules.status_display",
     "world.quests.bootstrap",
 )
 # Module-level bootstrap content validated against catalog registries at
@@ -55,9 +60,16 @@ def _install_synthetic_catalogs_if_flagged() -> None:
     # Production's register_adventurer seam hardcodes the "F" entry rank; the
     # server registers/accepts guild offers at runtime, so graft the harness
     # row into the live registry right after the install too.
-    from web.browser_support.browser_fixtures_data import graft_synth_entry_rank
+    from web.browser_support.browser_fixtures_data import (
+        graft_synth_entry_rank,
+        graft_synth_status_display,
+    )
 
     graft_synth_entry_rank()
+    # The status presenter resolves every displayable condition code through
+    # the import-built coverage table (shipped rows, via the pre-install
+    # import seam); the kit's own buff rows get authored labels grafted in.
+    graft_synth_status_display()
 
     # The shipped guild-catalog YAML cannot resolve against t_-only
     # registries, so the server installs the shared harness catalog directly
@@ -102,18 +114,18 @@ def at_server_start():
         return None
     if not synth:
         return hook()
-    # Known shipped-content bootstrap step: the guild-catalog YAML and the
-    # production rank->tier map hardcode shipped lore keys, so
-    # sync_guild_economy cannot resolve against t_-only registries; a
-    # synthetic guild catalog is migrate-browser-tests-off-real-data's scope.
-    # Degrade it through production's own tolerated-step machinery (exactly
-    # one structured startup_step_degraded event) instead of aborting the
-    # boot that every other step completes under the install.
+    # The shipped guild-catalog YAML cannot resolve against t_-only
+    # registries, and its sync would reload the shipped YAML over the
+    # harness catalog installed above — so under the install the step is
+    # skipped outright (the harness catalog and its offers are already
+    # registered by _install_synthetic_catalogs_if_flagged; the seed process
+    # skips the same step in its own fixture). The world clock's shop-hours
+    # and caravan sources come from the installed catalog instead.
     original = module._startup_step
 
     def _synth_startup_step(name, run, **kwargs):
         if name == "sync_guild_economy":
-            return original(name, run, fail_loud=False, tolerant_on=(Exception,))
+            return None
         return original(name, run, **kwargs)
 
     module._startup_step = _synth_startup_step
