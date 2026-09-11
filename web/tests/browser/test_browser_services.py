@@ -21,7 +21,11 @@ import time
 
 from tools.spec_traceability import covers_requirement
 
-from web.browser_support.browser_fixtures_data import store_fixture_values
+from web.browser_support.browser_fixtures_data import (
+    guild_offer_quest_key,
+    guild_offer_reward_copper,
+    store_fixture_values,
+)
 
 from .browser_base import DEFAULT_VIEWPORT, BrowserAcceptanceTest
 from .browser_helpers import (
@@ -273,7 +277,7 @@ class GuildBoardJourneys(ServicesBrowserTest):
             for cmd, args, _kw in sent
             if cmd == "ui_action" and args[0]["action_id"] == "guild.quest_accept"
         )
-        self.assertEqual(payload, {"definition_key": "introductory_hunt"})
+        self.assertEqual(payload, {"definition_key": guild_offer_quest_key()})
 
     @covers_requirement("webclient-frame-resolution::the-resolver-table-completes-with-the-services-combat-and-creation-families")
     def test_board_frame_refreshes_on_committed_update(self):
@@ -310,7 +314,7 @@ class GuildBoardJourneys(ServicesBrowserTest):
         self.assertEqual(len(offer), 1, rows)
         self.assertEqual(offer[0]["label"], new_name)
         self.assertNotEqual(offer[0]["label"], old_name)
-        self.assertEqual(offer[0]["payload"], {"definition_key": "introductory_hunt"})
+        self.assertEqual(offer[0]["payload"], {"definition_key": guild_offer_quest_key()})
         # The frame stayed exactly where it was, and the injection dispatched
         # nothing.
         self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), before)
@@ -509,6 +513,9 @@ class GuildTurninJourneys(ServicesBrowserTest):
         panel = self._wait_services_available(page)
         self.assertEqual(panel["pagination"]["quest_total"], 1)
         self.assertEqual(panel["player"]["wallet"], 1000)
+        # The wallet delta is the registered offer's copper reward, which the
+        # boot mode's catalog authors (shipped rulebook row vs kit reward).
+        wallet_after = 1000 + guild_offer_reward_copper()
 
         self._open_guild_menu(page)
         _press(page, "ArrowRight")  # board (second grid column)
@@ -518,7 +525,7 @@ class GuildTurninJourneys(ServicesBrowserTest):
         _press(page, "Enter")  # the quest row
         _press(page, "ArrowDown")  # 回報 (first column, second row)
         _press(page, "Enter")
-        self._wait_panel(page, lambda p: p["player"]["wallet"] == 1050)
+        self._wait_panel(page, lambda p: p["player"]["wallet"] == wallet_after)
         self.assertEqual(sent_action_count(page, "guild.quest_turnin"), 1)
         sent = page.evaluate("window.__elosernSent || []")
         payload = next(
@@ -526,7 +533,7 @@ class GuildTurninJourneys(ServicesBrowserTest):
             for cmd, args, _kw in sent
             if cmd == "ui_action" and args[0]["action_id"] == "guild.quest_turnin"
         )
-        self.assertEqual(payload, {"quest_id": "introductory_hunt:1"})
+        self.assertEqual(payload, {"quest_id": f"{guild_offer_quest_key()}:1"})
 
 
 class GuildExamJourney(ServicesBrowserTest):
@@ -537,7 +544,12 @@ class GuildExamJourney(ServicesBrowserTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         panel = self._wait_services_available(page)
-        self.assertEqual(panel["guild"]["rank"]["next_rank"], "E")
+        # The promotion target is the registry-derived next rank the server
+        # presents (E in shipped mode, the kit's second rank under the
+        # synthetic install) — the journey pins its propagation into the
+        # submitted payload, not a rank literal.
+        next_rank = panel["guild"]["rank"]["next_rank"]
+        self.assertTrue(next_rank)
         self.assertTrue(panel["guild"]["rank"]["eligible"])
 
         self._open_guild_menu(page)
@@ -554,7 +566,7 @@ class GuildExamJourney(ServicesBrowserTest):
             for cmd, args, _kw in sent
             if cmd == "ui_action" and args[0]["action_id"] == "guild.exam_start"
         )
-        self.assertEqual(payload, {"target_rank": "E"})
+        self.assertEqual(payload, {"target_rank": next_rank})
         self.assertEqual(self._dock_mode(page), "combat")
         # services v3 keeps the personal surfaces available through combat
         # and forces host/guild/shop null: the exam's remote service dock is

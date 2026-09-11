@@ -675,6 +675,7 @@ def build_synth_services_catalog():
         synth_merit_thresholds,
         synth_offer_rule,
         synth_shop_config,
+        synth_quest_offers,
     )
 
     # The grafted F entry rank promotes to the kit's second rank; the exam
@@ -697,6 +698,14 @@ def build_synth_services_catalog():
                 SYNTH_SHOP_KEY, (), offer_rules=offers
             )
         },
+        # The board journeys pin a single-offer board (the fixture's quest),
+        # so the harness catalog carries exactly that offer — unlike the
+        # unit-probe default of every kit quest.
+        quest_offers=tuple(
+            offer
+            for offer in synth_quest_offers()
+            if offer.definition_key == SYNTH_GUILD_OFFER_QUEST_KEY
+        ),
         merit_thresholds={**synth_merit_thresholds(), next_rank: 40},
         exam_profiles={
             **synth_exam_profiles(),
@@ -849,6 +858,25 @@ SYNTH_DIALOGUE_TABLE_KEY = "t_synth_lodgekeeper"
 
 #: The kit quest the guild-board modes offer/accept.
 SYNTH_GUILD_OFFER_QUEST_KEY = "t_ember_cull"
+
+
+def guild_offer_quest_key() -> str:
+    """The quest definition key the guild-board modes' single offer names."""
+    return SYNTH_GUILD_OFFER_QUEST_KEY if synth_mode_enabled() else SHIPPED_GUILD_OFFER_KEY
+
+
+#: Registered offer copper for the board modes' quest (shipped guild-economy
+#: rulebook row vs the kit reward table — the turn-in journey's wallet delta).
+SHIPPED_GUILD_OFFER_REWARD_COPPER = 50
+
+
+def guild_offer_reward_copper() -> int:
+    """The registered offer's copper reward for the current boot mode."""
+    if synth_mode_enabled():
+        from world.tests.synthetic_data import SYNTH_QUEST_REWARDS
+
+        return SYNTH_QUEST_REWARDS[SYNTH_GUILD_OFFER_QUEST_KEY].copper
+    return SHIPPED_GUILD_OFFER_REWARD_COPPER
 
 #: Kit shop whose merchant host the store modes trade through.
 SYNTH_SHOP_KEY = "t_mossgate_stall"
