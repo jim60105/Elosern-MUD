@@ -329,9 +329,12 @@ class SceneFlavorCommandCompositionTests(RegistryIsolationMixin, EvenniaTestCase
         # AttributeProperty is not a Django field: match in Python over the
         # synced anchor rooms.
         self.anchor = next(
-            room
-            for room in AnchorRoom.objects.all()
-            if room.anchor_key == placed
+            (
+                room
+                for room in AnchorRoom.objects.all()
+                if room.anchor_key == placed
+            ),
+            None,
         )
         self.assertIsNotNone(self.anchor)
         self.player = create_object(PlayerCharacter, key="flavor-enter-player")

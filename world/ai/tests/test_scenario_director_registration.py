@@ -126,9 +126,13 @@ class ScenarioDirectorEntryPointTests(unittest.TestCase):
         # A higher rank with in-band copper: schema- and semantically valid,
         # but it does not fit the base-rank request, so the post-guardrail
         # fitness gate must treat it as a degrade trigger and draw a fitting
-        # template. Rank and band are resolved from the live rank registry.
+        # template. Everything — request context, base rank, issuer, and the
+        # foreign rank's band — is derived from the SAME template-pool context
+        # plus the live rank registry, so a catalog reorder cannot couple the
+        # foreign candidate to a different request than the one submitted.
+        context = _template_context()
+        base = context["allowed_rank"]
         ranks = _rank_rows()
-        base = _rank_key()
         higher = next(
             (
                 key
@@ -142,17 +146,19 @@ class ScenarioDirectorEntryPointTests(unittest.TestCase):
             self.skipTest("the rank ladder exposes no higher bounded rank")
         band = ranks[higher]
         foreign = _blueprint(
-            rank=higher, copper=(band.reward_min_copper + band.reward_max_copper) // 2
+            rank=higher,
+            issuer=context["issuer_branch"],
+            copper=(band.reward_min_copper + band.reward_max_copper) // 2,
         )
         client.add_response(lambda d: True, json.dumps(_payload(foreign), ensure_ascii=False))
         with override_settings(LLM_PROFILES=_raw()):
-            d = generate_quest_blueprint(client, context=_template_context())
+            d = generate_quest_blueprint(client, context=context)
             result = await_result(d)
         self.assertLessEqual(
             scenario_director._rank_order(result.rank),
             scenario_director._rank_order(base),
         )
-        self.assertEqual(result.issuer, _issuer_key())
+        self.assertEqual(result.issuer, context["issuer_branch"])
 
     @covers_requirement("scenario-director::generate-quest-blueprint-runs-the-guarded-pipeline-and-enforces-the-request-context")
     def test_disabled_profile_draws_a_template_with_zero_client_calls(self):
