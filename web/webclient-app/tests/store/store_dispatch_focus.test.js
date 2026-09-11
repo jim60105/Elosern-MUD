@@ -9,6 +9,13 @@ import { createPinia, setActivePinia } from "pinia";
 
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "./protocol_fixtures.js";
+import CombatMenu from "../../lib/combat_menu.js";
+import { SYNTH_SKILL } from "../support/synthetic-data.mjs";
+
+// File-local synthetic rows (test-data-independence): the attack key is wire
+// vocabulary owned by the combat model (BASIC_ATTACK_KEY — the root attack
+// opener resolves it); the AREA row is the kit skill with invented prose.
+const T_ATTACK_KEY = CombatMenu.BASIC_ATTACK_KEY;
 
 describe("store dispatch + focus", () => {
   let store;
@@ -461,7 +468,7 @@ describe("store dispatch + focus", () => {
                       label: null,
                       skills: [
                         {
-                          key: "basic_attack",
+                          key: T_ATTACK_KEY,
                           label: "攻擊",
                           description: "基本攻擊，對單一目標造成傷害。",
                           cost: {},
@@ -489,7 +496,7 @@ describe("store dispatch + focus", () => {
       expect(store.focusConfirm("keyboard")).toBe(true);
       expect(sender.sent.actions.length).toBe(1);
       expect(sender.sent.actions[0].action_id).toBe("combat.cast");
-      expect(sender.sent.actions[0].payload.skill_key).toBe("basic_attack");
+      expect(sender.sent.actions[0].payload.skill_key).toBe(T_ATTACK_KEY);
       expect(sender.sent.actions[0].payload.target_ids).toEqual([7]);
     });
 
@@ -513,7 +520,7 @@ describe("store dispatch + focus", () => {
                       label: null,
                       skills: [
                         {
-                          key: "basic_attack",
+                          key: T_ATTACK_KEY,
                           label: "攻擊",
                           description: "基本攻擊，對單一目標造成傷害。",
                           cost: {},
@@ -543,7 +550,7 @@ describe("store dispatch + focus", () => {
       expect(store.focusConfirm("pointer")).toBe(true);
       expect(sender.sent.actions.length).toBe(1);
       expect(sender.sent.actions[0].action_id).toBe("combat.cast");
-      expect(sender.sent.actions[0].payload.skill_key).toBe("basic_attack");
+      expect(sender.sent.actions[0].payload.skill_key).toBe(T_ATTACK_KEY);
       expect(sender.sent.actions[0].payload.target_ids).toEqual([7]);
       expect(store.view.lastTarget).toBe("7");
     });
@@ -568,8 +575,8 @@ describe("store dispatch + focus", () => {
                       label: null,
                       skills: [
                         {
-                          key: "fire_ball",
-                          label: "火球術",
+                          key: SYNTH_SKILL.id,
+                          label: SYNTH_SKILL.label,
                           description: "範圍火焰傷害。",
                           cost: { mp: 5 },
                           target_spec: "area",
@@ -594,7 +601,7 @@ describe("store dispatch + focus", () => {
       store.focusConfirm("keyboard");
       expect(store.focusItemByKey("skill-cat-0")).toBe(true);
       store.focusConfirm("keyboard");
-      expect(store.focusItemByKey("fire_ball")).toBe(true);
+      expect(store.focusItemByKey(SYNTH_SKILL.id)).toBe(true);
       store.focusConfirm("keyboard");
       // The AREA candidate row: deliberate activation (pointer or Enter)
       // toggles the client-local selection; no OOB action is ever invented.
