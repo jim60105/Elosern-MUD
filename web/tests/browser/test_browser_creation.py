@@ -20,6 +20,11 @@ import time
 
 from tools.spec_traceability import covers_requirement
 
+from web.browser_support.browser_fixtures_data import (
+    concept_placeholder_values,
+    custom_draft_form_values,
+)
+
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_creation_action_dock,
@@ -100,6 +105,42 @@ class CreationBrowserTest(BrowserAcceptanceTest):
     def _creation_panel(self, page):
         panels = store_state(page)["panels"]
         return panels.get("creation")
+
+    def _panel_driven_draft_values(self, page, **kwargs):
+        """(race, subrace, allocations) for a keyboard custom-form journey,
+        derived from the panel the server is currently presenting — the
+        advertised race/subrace the keyboard path lands on, with one exact
+        budget spend."""
+        return custom_draft_form_values(self._creation_panel(page), **kwargs)
+
+    def _panel_valid_custom_payload(self, page, *, display_name, age=20, apparent_age=20):
+        """A structurally valid custom payload for the CURRENT registry: the
+        first advertised race with its first profile and one exact greedy
+        budget spend — so protocol-level journeys (age gates, stale,
+        duplicate) never name a shipped race key or a shipped budget split,
+        and only the field under test deviates."""
+        custom = self._creation_panel(page)["custom"]
+        race_key = custom["races"][0]["key"]
+        profile = next(p for p in custom["profiles"] if p["race"] == race_key)
+        remaining = profile["budget"]
+        allocations: dict[str, int] = {}
+        for axis in profile["axes"]:
+            value = min(axis["maximum"] - axis["minimum"], remaining)
+            allocations[axis["axis"]] = value
+            remaining -= value
+        if remaining != 0:
+            raise AssertionError("profile budget exceeds allocatable axis spans")
+        return {
+            "display_name": display_name,
+            "age": age,
+            "apparent_age": apparent_age,
+            "race": race_key,
+            "subrace": profile["subrace"],
+            "background": None,
+            "affinity_elements": None,
+            "persona": None,
+            "allocations": allocations,
+        }
 
     def _dock_mode(self, page):
         return page.locator("#action-dock").get_attribute("data-mode", timeout=5000)
@@ -225,16 +266,22 @@ class PresetCreationJourneys(CreationBrowserTest):
         page = self._login_creation()
         install_outbound_recorder(page)
         panel = self._wait_creation_available(page)
-        self.assertEqual(len(panel["presets"]), 8)
+        # The preset list renders the registry's cards (the seed installs the
+        # boot mode's preset rows; card COUNT parity with the registry is the
+        # presenter's own unit contract). The browser journey proves the list
+        # is populated and the dock's first Enter selects the FIRST card.
+        self.assertGreaterEqual(len(panel["presets"]), 1)
         self.assertEqual(self._dock_mode(page), "creation")
 
         # Focus the action dock and open the preset list (keyboard only).
         self._focus_dock(page)
         _press(page, "Enter")  # 預設角色
-        _press(page, "Enter")  # elysa_snow card (first preset)
+        _press(page, "Enter")  # first preset card
         self.assertEqual(sent_action_count(page, "creation.preset"), 1)
         payloads = self._sent_payloads(page, "creation.preset")
-        self.assertEqual(payloads, [{"preset_key": "elysa_snow"}])
+        # The wire carries exactly the key of the first listed card — the
+        # dock's selection and the server payload stay tied through the UI.
+        self.assertEqual(payloads, [{"preset_key": panel["presets"][0]["key"]}])
 
         # The confirmation appears only after the preset save result arrives.
         self._wait_confirm_ready(page)
@@ -253,7 +300,7 @@ class PresetCreationJourneys(CreationBrowserTest):
         self._wait_creation_available(page)
         self._focus_dock(page)
         _press(page, "Enter")  # 預設角色
-        _press(page, "Enter")  # elysa_snow card -> confirmation screen
+        _press(page, "Enter")  # first preset card -> confirmation screen
         self._wait_confirm_ready(page)
         self.assertEqual(page.locator(".creation-confirm").count(), 1)
         _press(page, "Escape")  # pop exactly one level back to the preset list
@@ -351,46 +398,45 @@ class CustomCreationJourneys(CreationBrowserTest):
             "creation-field-apparentAge",
         )
 
-        # Select the beastfolk race with keyboard arrows (human -> beastfolk).
-        # The Vue CreationOverlay renders the race as a `<select data-testid="creation-race">`.
+        # Select a race with keyboard arrows. One ArrowRight advances the
+        # select from its first option to the next (and stays there when the
+        # registry carries a single race). The Vue CreationOverlay renders
+        # the race as a `<select data-testid="creation-race">`, and the
+        # expected landing key is derived from the panel's advertised race
+        # list, never a shipped key.
+        draft = self._panel_driven_draft_values(page, race_index=1, last_subrace=True)
         page.evaluate("document.querySelector('[data-testid=\"creation-race\"]').focus()")
         _press(page, "ArrowRight")
         self.assertEqual(
             page.evaluate("document.querySelector('[data-testid=\"creation-race\"]').value"),
-            "beastfolk",
-            "beastfolk race must be selected",
+            draft["race"],
+            "the derived race must be selected",
         )
-        # Select the foxkin subrace with keyboard arrows. The select starts
+        # Select the subrace with keyboard arrows. The select starts
         # unselected (the form opens fresh, without a draft), so Home anchors
-        # the journey at the first beastfolk subrace; beastfolk has seven
-        # subraces, foxkin is the last, so six ArrowDown presses reach it.
+        # the journey at the first subrace of the selected race; the journey
+        # walks to the LAST one, so (count - 1) ArrowDown presses reach it.
         # Anchoring with Home keeps the count independent of draft state.
         page.evaluate("document.querySelector('[data-testid=\"creation-subrace\"]').focus()")
         _press(page, "Home")
-        for _ in range(6):
+        for _ in range(draft["subrace_presses"]):
             _press(page, "ArrowDown")
         page.wait_for_timeout(150)
-        foxkin_selected = page.evaluate(
+        subrace_selected = page.evaluate(
             "() => document.querySelector('[data-testid=\"creation-subrace\"]').value"
         )
-        self.assertEqual(foxkin_selected, "foxkin", "foxkin subrace must be selected")
+        self.assertEqual(
+            subrace_selected, draft["subrace"], "the derived subrace must be selected"
+        )
 
-        # Fill the seven allocation inputs deterministically for
-        # beastfolk/foxkin: 25+10+25+15+15+15+14 == the 119-point budget.
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-hp\"]').focus()")
-        page.keyboard.type("25")
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-mp\"]').focus()")
-        page.keyboard.type("10")
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-sp\"]').focus()")
-        page.keyboard.type("25")
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-atk_phys\"]').focus()")
-        page.keyboard.type("15")
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-agility\"]').focus()")
-        page.keyboard.type("15")
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-defense\"]').focus()")
-        page.keyboard.type("15")
-        page.evaluate("document.querySelector('[data-testid=\"creation-field-magic_power\"]').focus()")
-        page.keyboard.type("14")
+        # Fill the seven allocation inputs deterministically from the
+        # advertised profile: one greedy span-fill that sums exactly to the
+        # derived race/subrace budget.
+        for axis, value in draft["allocations"].items():
+            page.evaluate(
+                "document.querySelector('[data-testid=\"creation-field-%s\"]').focus()" % axis
+            )
+            page.keyboard.type(value)
 
         # Submit the custom form (keyboard-only Enter on the submit button).
         page.evaluate("document.querySelector('[data-testid=\"creation-submit\"]').focus()")
@@ -398,9 +444,13 @@ class CustomCreationJourneys(CreationBrowserTest):
         self.assertEqual(sent_action_count(page, "creation.custom"), 1)
         payloads = self._sent_payloads(page, "creation.custom")
         self.assertEqual(len(payloads), 1)
-        self.assertEqual(payloads[0]["race"], "beastfolk")
-        self.assertEqual(payloads[0]["subrace"], "foxkin")
-        self.assertEqual(payloads[0]["allocations"]["hp"], 25)
+        self.assertEqual(payloads[0]["race"], draft["race"])
+        self.assertEqual(payloads[0]["subrace"], draft["subrace"])
+        self.assertEqual(
+            payloads[0]["allocations"],
+            {axis: int(value) for axis, value in draft["allocations"].items()},
+        )
+        self.assertEqual(sum(payloads[0]["allocations"].values()), draft["budget"])
 
         # The confirmation screen appears only after the save result arrives;
         # Enter confirms activation.
@@ -429,16 +479,14 @@ class CustomCreationJourneys(CreationBrowserTest):
         page.keyboard.type("24")
         _press(page, "Tab")
         page.keyboard.type("24")
-        # Select the default race's first subrace (human_commoner) so the
-        # allocation fields render; every race now requires a subrace.
+        # Select the default race's first subrace so the allocation fields
+        # render; every race now requires a subrace. One ArrowDown from the
+        # unselected select lands on the first advertised subrace.
+        draft = self._panel_driven_draft_values(page)
         page.evaluate("document.querySelector('[data-testid=\"creation-subrace\"]').focus()")
         _press(page, "ArrowDown")
         page.wait_for_timeout(150)
-        for axis, value in (
-            ("hp", "50"), ("mp", "50"), ("sp", "50"),
-            ("atk_phys", "10"), ("agility", "10"), ("defense", "11"),
-            ("magic_power", "43"),
-        ):
+        for axis, value in draft["allocations"].items():
             page.evaluate(
                 "document.querySelector('[data-testid=\"creation-field-%s\"]').focus()" % axis
             )
@@ -480,7 +528,7 @@ class CustomCreationJourneys(CreationBrowserTest):
             "f.min = ''; f.max = ''; }"
         )
         page.evaluate(
-            """() => {
+            """({payload}) => {
               const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null);
               Evennia.msg('ui_action', [{
                 protocol_version: 1,
@@ -488,19 +536,10 @@ class CustomCreationJourneys(CreationBrowserTest):
                 request_id: 'out-of-range-age-1',
                 base_revision: s.revision,
                 action_id: 'creation.custom',
-                payload: {
-                  display_name: '年輕冒險者',
-                  age: -1,
-                  apparent_age: 24,
-                  race: 'human',
-                  subrace: "human_commoner",
-                  background: null,
-                  affinity_elements: null,
-                  persona: null,
-                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
-                },
+                payload,
               }], {});
-            }"""
+            }""",
+            self._panel_valid_custom_payload(page, display_name="年輕冒險者", age=-1),
         )
         result = self._wait_result(
             page,
@@ -533,7 +572,7 @@ class CustomCreationJourneys(CreationBrowserTest):
             "f.min = ''; f.max = ''; }"
         )
         page.evaluate(
-            """() => {
+            """({payload}) => {
               const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null);
               Evennia.msg('ui_action', [{
                 protocol_version: 1,
@@ -541,19 +580,10 @@ class CustomCreationJourneys(CreationBrowserTest):
                 request_id: 'out-of-range-apparent-1',
                 base_revision: s.revision,
                 action_id: 'creation.custom',
-                payload: {
-                  display_name: '年輕冒險者',
-                  age: 24,
-                  apparent_age: -1,
-                  race: 'human',
-                  subrace: "human_commoner",
-                  background: null,
-                  affinity_elements: null,
-                  persona: null,
-                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
-                },
+                payload,
               }], {});
-            }"""
+            }""",
+            self._panel_valid_custom_payload(page, display_name="年輕冒險者", age=24, apparent_age=-1),
         )
         result = self._wait_result(
             page,
@@ -623,7 +653,13 @@ class ConceptCreationJourneys(CreationBrowserTest):
             ],
         )
         self.assertEqual(proposal["revision"], 1)
-        self.assertEqual(proposal["race"], "human")
+        # The expected pre-filled identity follows the placeholder resolver
+        # (shipped: the wizard snapshot; synthetic: the first live race pair
+        # with a greedy budget spend and empty affinity), re-derived here
+        # from the same panel — never a hardcoded shipped row.
+        placeholder = concept_placeholder_values(panel)
+        self.assertEqual(proposal["race"], placeholder["race"])
+        self.assertEqual(proposal["subrace"], placeholder["subrace"])
         # The form is only pre-filled, never auto-submitted.
         self.assertEqual(sent_action_count(page, "creation.custom"), 0)
         # retool-concept-fill-navigation: the loading state settled at the
@@ -643,16 +679,16 @@ class ConceptCreationJourneys(CreationBrowserTest):
         # The pre-filled race select and allocation fields come from the proposal.
         self.assertEqual(
             page.evaluate("document.querySelector('[data-testid=\"creation-race\"]').value"),
-            "human",
+            placeholder["race"],
             "the proposal race must be pre-selected",
         )
         self.assertEqual(
             page.evaluate("document.querySelector('[data-testid=\"creation-subrace\"]').value"),
-            "human_commoner",
+            placeholder["subrace"],
         )
         self.assertEqual(
             page.evaluate("document.querySelector('[data-testid=\"creation-field-hp\"]').value"),
-            "50",
+            str(placeholder["allocations"]["hp"]),
         )
         # The three persona textareas carry the proposal prose, editable.
         self.assertEqual(
@@ -682,7 +718,7 @@ class ConceptCreationJourneys(CreationBrowserTest):
                 "() => [...document.querySelectorAll('[data-testid^=\"creation-affinity-\"]')]"
                 ".filter((el) => el.checked).map((el) => el.getAttribute('data-testid'))"
             ),
-            ["creation-affinity-fire", "creation-affinity-wind"],
+            sorted(placeholder["affinity_checked"]),
         )
         # The retired generated indicator never renders.
         self.assertEqual(page.locator('[data-testid="creation-concept-indicator"]').count(), 0)
@@ -719,13 +755,13 @@ class ConceptCreationJourneys(CreationBrowserTest):
         self.assertEqual(sent_action_count(page, "creation.custom"), 1)
         payloads = self._sent_payloads(page, "creation.custom")
         self.assertEqual(len(payloads), 1)
-        self.assertEqual(payloads[0]["race"], "human")
+        self.assertEqual(payloads[0]["race"], placeholder["race"])
         # The pre-filled transient values ride the custom payload unchanged.
         self.assertEqual(payloads[0]["display_name"], "燈下學徒")
         self.assertEqual(payloads[0]["age"], 30)
         self.assertEqual(payloads[0]["apparent_age"], 27)
         self.assertEqual(payloads[0]["background"], "在燈下抄書長大的見習劍士。")
-        self.assertEqual(payloads[0]["affinity_elements"], ["fire", "wind"])
+        self.assertEqual(payloads[0]["affinity_elements"], placeholder["affinity_elements"])
         # The player-confirmed proposal prose rides the custom payload.
         self.assertEqual(
             payloads[0]["persona"],
@@ -922,7 +958,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
         stale_revision = store_state(page)["revision"] - 1
 
         page.evaluate(
-            """({stale_revision}) => {
+            """({stale_revision, payload}) => {
               const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null);
               Evennia.msg('ui_action', [{
                 protocol_version: 1,
@@ -930,20 +966,13 @@ class CreationDispatchJourneys(CreationBrowserTest):
                 request_id: 'stale-custom-1',
                 base_revision: stale_revision,
                 action_id: 'creation.custom',
-                payload: {
-                  display_name: '不應儲存',
-                  age: 20,
-                  apparent_age: 20,
-                  race: 'human',
-                  subrace: "human_commoner",
-                  background: null,
-                  affinity_elements: null,
-                  persona: null,
-                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
-                },
+                payload,
               }], {});
             }""",
-            {"stale_revision": stale_revision},
+            {
+                "stale_revision": stale_revision,
+                "payload": self._panel_valid_custom_payload(page, display_name="不應儲存"),
+            },
         )
         result = self._wait_result(page, lambda r: r["requestId"] == "stale-custom-1")
         self.assertEqual(result["outcome"], "stale")
@@ -959,7 +988,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
 
         def send_custom(request_id):
             page.evaluate(
-                """({revision, request_id}) => {
+                """({revision, request_id, payload}) => {
                   const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null);
                   Evennia.msg('ui_action', [{
                     protocol_version: 1,
@@ -967,20 +996,14 @@ class CreationDispatchJourneys(CreationBrowserTest):
                     request_id,
                     base_revision: revision,
                     action_id: 'creation.custom',
-                    payload: {
-                      display_name: '重複角色',
-                      age: 20,
-                      apparent_age: 20,
-                  race: 'human',
-                  subrace: 'human_commoner',
-                  background: null,
-                  affinity_elements: null,
-                  persona: null,
-                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
-                    },
+                    payload,
                   }], {});
                 }""",
-                {"revision": revision, "request_id": request_id},
+                {
+                    "revision": revision,
+                    "request_id": request_id,
+                    "payload": self._panel_valid_custom_payload(page, display_name="重複角色"),
+                },
             )
 
         send_custom("dup-custom-1")
@@ -1021,7 +1044,7 @@ class CreationDispatchJourneys(CreationBrowserTest):
         # stale and emits a fresh snapshot, so the dock keeps the typed value.
         stale_revision = store_state(page)["revision"] - 1
         page.evaluate(
-            """({stale_revision}) => {
+            """({stale_revision, payload}) => {
               const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null);
               Evennia.msg('ui_action', [{
                 protocol_version: 1,
@@ -1029,20 +1052,13 @@ class CreationDispatchJourneys(CreationBrowserTest):
                 request_id: 'stale-typed-1',
                 base_revision: stale_revision,
                 action_id: 'creation.custom',
-                payload: {
-                  display_name: '不應儲存',
-                  age: 20,
-                  apparent_age: 20,
-                  race: 'human',
-                  subrace: "human_commoner",
-                  background: null,
-                  affinity_elements: null,
-                  persona: null,
-                  allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
-                },
+                payload,
               }], {});
             }""",
-            {"stale_revision": stale_revision},
+            {
+                "stale_revision": stale_revision,
+                "payload": self._panel_valid_custom_payload(page, display_name="不應儲存"),
+            },
         )
         result = self._wait_result(page, lambda r: r["requestId"] == "stale-typed-1")
         self.assertEqual(result["outcome"], "stale")
