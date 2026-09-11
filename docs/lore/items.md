@@ -342,4 +342,4 @@
 - **神祇遺物的機制化**：三件神祇遺物目前只是劇情信物，它們是否該擁有神之秘法等級的機制效果，屬於主線劇情的決定權，不宜由物品清單單方面下定論。
 - **精靈體液煉金的上限**：〔世界觀總覽〕提到精靈體液是稀有魔法素材，但煉金能做到什麼程度、有沒有副作用，目前仍是留白，供未來的鍊金相關任務發揮。
 
-延伸閱讀：[世界觀總覽](/lore/overview)、[魔法技能體系](/lore/magic-system)、[新增物品指南](/development/adding-items)、[裝備效果指南](/game/equipment)。
+延伸閱讀：[世界觀總覽](/lore/overview)、[魔法技能體系](/lore/magic-system)、[聚落地點指南](/lore/settlement-locations)、[新增物品指南](/development/adding-items)、[裝備效果指南](/game/equipment)。
