@@ -357,6 +357,30 @@ SYNTH_HOSTILE_MONSTER_KEY = "燼殼爬行者"
 SYNTH_DEFEATED_MONSTER_KEY = "倒地的燼殼蟲"
 SYNTH_PLAZA_MONSTER_KEY = "廣場燼殼蟲"
 
+#: Values the injected combat-HUD fixture borrows from the boot mode's
+#: catalogs: the party-member display name rides an NPC-tier row display in
+#: shipped mode, and the featured skill row rides a real skill-registry key
+#: plus its label (kit skill row under the synthetic install).
+SHIPPED_HUD_PARTY_MEMBER_NAME = "法師"
+SHIPPED_HUD_SKILL = ("fire_ball", "火球術")
+SYNTH_HUD_PARTY_MEMBER_NAME = "合成夥伴"
+SYNTH_HUD_SKILL = ("t_ember_burst", "燼火爆發")
+
+
+def hud_combat_fixture_values() -> dict:
+    """(party-member name, skill key, skill label) for the current boot mode."""
+    if synth_mode_enabled():
+        return {
+            "party_name": SYNTH_HUD_PARTY_MEMBER_NAME,
+            "skill_key": SYNTH_HUD_SKILL[0],
+            "skill_label": SYNTH_HUD_SKILL[1],
+        }
+    return {
+        "party_name": SHIPPED_HUD_PARTY_MEMBER_NAME,
+        "skill_key": SHIPPED_HUD_SKILL[0],
+        "skill_label": SHIPPED_HUD_SKILL[1],
+    }
+
 #: Authored room keys unique to the options-surface fixture.
 SYNTH_PLAZA_ROOM_KEY = "合成測試廣場"
 SYNTH_EMPTY_GROUND_KEY = "合成測試空地"

@@ -152,10 +152,18 @@ def _combat_panel() -> dict:
     a multi-group ``elemental_magic`` (two sub-groups) and a single-group
     ``enhancement`` (one sub-group) — the two shapes the spec's single-vs-multi
     group scenario requires.
+
+    The knocked-out party member's display name and the featured elemental
+    skill row ride the boot mode's catalogs (kit skill row under the
+    synthetic install) via the support module's resolver, so this test path
+    names no shipped registry content.
     """
+    from web.browser_support.browser_fixtures_data import hud_combat_fixture_values
+
+    fixture_values = hud_combat_fixture_values()
     participants = [
         _participant(1, "a1", "勇者", "party", "active", 100, 100, "1"),
-        _participant(2, "a2", "法師", "party", "knocked_out", 40, 100, "2"),
+        _participant(2, "a2", fixture_values["party_name"], "party", "knocked_out", 40, 100, "2"),
         _participant(3, "e1", "哥布林", "foes", "active", 60, 60, None),
         _participant(4, "e2", "史萊姆", "foes", "active", 30, 30, None),
     ]
@@ -169,8 +177,8 @@ def _combat_panel() -> dict:
                     "火焰技",
                     [
                         _skill(
-                            "fire_ball",
-                            "火球術",
+                            fixture_values["skill_key"],
+                            fixture_values["skill_label"],
                             "凝聚火焰的攻擊技。",
                             {"mp": 20},
                             "single",
