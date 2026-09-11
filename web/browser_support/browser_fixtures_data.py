@@ -191,6 +191,41 @@ def first_live_monster_tier_key() -> str:
     return next(iter(MONSTER_TIER_REGISTRY))
 
 
+def synth_concept_proposal_values() -> dict:
+    """One valid concept-proposal identity derived from the live registries.
+
+    Resolves the first registered race, its first subrace, the exact
+    budget-conforming balanced allocation the rule layer demands (the same
+    greedy span-fill the seed's preset fixture uses), and the first
+    registered skill key — so the synthetic-mode concept placeholder names
+    no registry symbol or shipped key on any test path (the gate denies
+    registry symbol-refs there).
+    """
+    from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
+    from world.rules.character_creation import resolve_starting_profile
+    from world.skills.registry import SKILL_REGISTRY
+
+    race_key = next(iter(RACE_REGISTRY))
+    subrace_key = next(
+        key for key, sub in SUBRACE_REGISTRY.items() if sub.race_key == race_key
+    )
+    profile = resolve_starting_profile(race_key, subrace_key)
+    remaining = profile.budget
+    allocations: dict[str, int] = {}
+    for axis, (lower, upper) in profile.bounds:
+        value = min(upper - lower, remaining)
+        allocations[axis] = value
+        remaining -= value
+    if remaining != 0:
+        raise AssertionError("starting profile budget exceeds allocatable spans")
+    return {
+        "race_key": race_key,
+        "subrace_key": subrace_key,
+        "allocations": allocations,
+        "suggested_skills": (next(iter(SKILL_REGISTRY)),),
+    }
+
+
 def scene_archetype_registered(key: str) -> bool:
     """Whether one scene archetype resolves in the CURRENT live registry."""
     from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY

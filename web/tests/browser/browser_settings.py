@@ -201,16 +201,54 @@ def _browser_concept_proposal(client=None, *, concept):
 
     from world.ai.character_creation import CharacterProposal
 
+    from web.browser_support.browser_fixtures_data import (
+        SHIPPED_BASE_RACE,
+        SHIPPED_BASE_SUBRACE,
+        SHIPPED_COMBAT_ACTIVE_SKILLS,
+        synth_mode_enabled,
+    )
+
+    if synth_mode_enabled():
+        # Under the synthetic install the placeholder derives its identity
+        # from the live kit registries (race/subrace/budget-fill/skill) via
+        # the support module instead of naming any shipped row. Affinity
+        # stays empty: an empty set is always legal for every race.
+        from web.browser_support.browser_fixtures_data import (
+            synth_concept_proposal_values,
+        )
+
+        derived = synth_concept_proposal_values()
+        return defer.succeed(
+            CharacterProposal(
+                race_key=derived["race_key"],
+                subrace_key=derived["subrace_key"],
+                allocations=derived["allocations"],
+                suggested_skills=derived["suggested_skills"],
+                persona={
+                    "personality": "沉穩",
+                    "life_story": "來自邊境的小村，靠磨劍維生",
+                    "habit": "清晨練劍",
+                },
+                display_name="燈下學徒",
+                age=30,
+                apparent_age=27,
+                background="在燈下抄書長大的見習劍士。",
+                affinity_elements=(),
+            )
+        )
+
     return defer.succeed(
         CharacterProposal(
-            race_key="human",
-            subrace_key="human_commoner",
+            race_key=SHIPPED_BASE_RACE,
+            subrace_key=SHIPPED_BASE_SUBRACE,
             allocations={
                 "hp": 50, "mp": 50, "sp": 50,
                 "atk_phys": 10, "agility": 10, "defense": 11,
                 "magic_power": 43,
             },
-            suggested_skills=("flight",),
+            # Shipped-mode placeholder (flag OFF); the skill value rides the
+            # support module's shipped grant vocabulary.
+            suggested_skills=(SHIPPED_COMBAT_ACTIVE_SKILLS[0],),
             persona={
                 "personality": "沉穩",
                 "life_story": "來自邊境的小村，靠磨劍維生",
