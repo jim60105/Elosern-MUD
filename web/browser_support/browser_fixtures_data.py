@@ -504,6 +504,7 @@ def build_synth_services_catalog():
         synth_exam_profile,
         synth_exam_profiles,
         synth_merit_thresholds,
+        synth_offer_rule,
         synth_shop_config,
     )
 
@@ -511,10 +512,20 @@ def build_synth_services_catalog():
     # section needs a threshold + profile keyed by THAT rank key, derived
     # from the live registry (never a hardcoded rank key).
     next_rank = synth_next_entry_rank_key()
+    # The potion (first offered item) ships below its stock cap so selling
+    # the single held unit has headroom: the sell journey sells it out and
+    # the row disappears — the shipped story's exact shape.
+    potion_rule = synth_offer_rule(
+        SYNTH_SHOP_OFFERED_ITEM_KEYS[0], max_stock=20, initial_stock=18
+    )
+    offers = tuple(
+        potion_rule if rule.item_key == SYNTH_SHOP_OFFERED_ITEM_KEYS[0] else rule
+        for rule in (synth_offer_rule(key) for key in SYNTH_SHOP_OFFERED_ITEM_KEYS)
+    )
     return synth_catalog(
         shop_configs={
             SYNTH_SHOP_KEY: synth_shop_config(
-                SYNTH_SHOP_KEY, SYNTH_SHOP_OFFERED_ITEM_KEYS
+                SYNTH_SHOP_KEY, (), offer_rules=offers
             )
         },
         merit_thresholds={**synth_merit_thresholds(), next_rank: 40},
@@ -678,6 +689,34 @@ SYNTH_INVENTORY_BY_MODE = MappingProxyType(
     }
 )
 
+#: Item labels the harness-side journeys match against rendered rows (mirrors
+#: of the kit rows' authored display names — the Playwright-side process has
+#: no Django settings, same convention as the art scene label mirror).
+SYNTH_ITEM_DISPLAYS = MappingProxyType(
+    {
+        "t_ember_spray": "熾焰噴射劑",
+        "t_huskapple": "燼殼果",
+        "t_thorn_knife": "荊刺小刀",
+        "t_iron_fang": "鐵牙短刃",
+    }
+)
+
+
+
+def store_fixture_values() -> dict:
+    """The store fixture's two held-item roles for the current boot mode.
+
+    - ``potion``: the held SELF_HEAL use-deal. At full HP the server refuses
+      it with the stable ``hp_full`` reason, and the shop offers it below its
+      stock cap (stock headroom), so selling the single held unit is accepted
+      and its row disappears — the shipped shop's potion story mirrors here.
+    - ``staple``: the other held pair; the shop stocks it AT its cap, so it
+      never appears as sellable and its inventory row survives the sale.
+    """
+    if synth_mode_enabled():
+        return {"potion_key": "t_ember_spray", "staple_key": "t_huskapple"}
+    return {"potion_key": "healing_potion", "staple_key": "meal"}
+
 #: Kit combat grant set: actives, passives, and the freeform ladder. The
 #: ladder rides ``t_glowmire_bloom`` (its own element's mastery passive
 #: ``t_glowmire_mastery`` is granted alongside), mirroring the shipped
@@ -697,3 +736,34 @@ SYNTH_COMBAT_MONSTERS = (("燼殼工蟲", 200), ("燼殼兵蟲", 200))
 SYNTH_TITLE_BANKED_KEYS = ("t_synth_first_hunt", "t_synth_lodging_friend")
 #: A third kit title kept UNbanked so the codex renders a locked row.
 SYNTH_TITLE_LOCKED_KEY = "t_synth_deep_walker"
+
+
+def title_codex_values() -> dict:
+    """The codex fixture's fixed-title rows for the current boot mode.
+
+    (banked keys, banked displays in bank order, the display the freshly
+    registered character previews — the FIRST banked row auto-equips the
+    empty fixed slot — and the deliberately-locked row's key/display/hint).
+    The kit displays mirror the kit rows' authored text: the Playwright-side
+    process has no Django settings, so they are mirrored here exactly like
+    the art scene label.
+    """
+    if synth_mode_enabled():
+        return {
+            "banked_keys": tuple(SYNTH_TITLE_BANKED_KEYS),
+            "banked_displays": ("初獵合成者", "驛站常客"),
+            "banked_categories": ("combat", "romance"),
+            "locked_key": SYNTH_TITLE_LOCKED_KEY,
+            "locked_display": "深霧行者",
+            "locked_hint": "在合成荒野深處留下足夠多的到訪紀錄即可獲得。",
+            "locked_category": "explore",
+        }
+    return {
+        "banked_keys": (SHIPPED_TITLE_RANK_F_KEY, SHIPPED_TITLE_RANK_E_KEY),
+        "banked_displays": ("F級冒險者", "E級斥候"),
+        "banked_categories": ("guild", "guild"),
+        "locked_key": "g_s_rank",
+        "locked_display": "S級傳說",
+        "locked_hint": "通過 S 級公會考核即可獲得。",
+        "locked_category": "guild",
+    }
