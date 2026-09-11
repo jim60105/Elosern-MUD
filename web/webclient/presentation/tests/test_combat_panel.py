@@ -4,6 +4,10 @@ import unittest
 
 from tools.spec_traceability import covers_requirement
 
+import importlib
+import math
+from dataclasses import replace
+from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
@@ -12,6 +16,7 @@ from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from web.webclient.presentation.combat_panel import (
     CONTEXT_ACTIONS_SCHEMA_VERSION,
+    SESSION_STATES,
     ContextActionsError,
     validate_context_actions,
 )
@@ -41,17 +46,76 @@ from web.webclient.presentation.registry import (
     build_production_registry,
 )
 from world.rules.combat_session import engage
+from world.rules.dialogue import DialogueDefinition, KeywordResponse
+from world.rules.progression import FREEFORM_CAST_SCALES
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
+from world.rules.tests._combat_session_helpers import (
+    open_synthetic_scope,
+    synth_damage_skill,
+    synth_innate_overlay,
+)
+from world.tests.synthetic_data import (
+    SYNTH_ACT,
+    SYNTH_GUILD_BRANCH_KEY,
+    SYNTH_SKILLS,
+)
+
+# Kit identities: the synthetic cast skill and the kit sexual act (its
+# SEXUAL_ACT-category row carries the invented line name "t_合成").
+T_EMBER = SYNTH_SKILLS["t_ember_burst"].key
+T_ACT = SYNTH_ACT.key
+# Kit-authored scripted-dialogue row: the maximal-room hosts' keyword pools
+# render from this row under a dialogue scope.
+T_DIALOGUE_KEY = "t_combat_lodgekeeper"
+# The maximal-room test counts six scripted keywords per host, so this file
+# authors its own six-response dialogue row (the kit default carries two).
+_T_DIALOGUE_ROW = DialogueDefinition(
+    greeting="櫃檯後的人抬起眼：「有事說一聲就好。」",
+    responses=tuple(
+        KeywordResponse(f"合成關鍵詞{index}", f"「合成回應{index}。」")
+        for index in range(6)
+    ),
+)
+# File-local martial twin (the kit martial template under a distinct key).
+_T_MARTIAL_PROBE = "t_combat_martial_probe"
+# The panel's own recovery-session state constant: the recovery-form fixture
+# names the wire value through the presenter's public constant rather than
+# repeating a token the session-state catalog also spells.
+_T_RECOVERY_STATE = next(state for state in SESSION_STATES if state != "ready")
+
+def _t_context_skill(base_key: str, key: str, label: str, effects):
+    """A kit-row twin whose effects demand handler-only event context."""
+    return replace(SYNTH_SKILLS[base_key], key=key, label=label, effects=list(effects))
+
+
+def _presenter_scope_extra():
+    """One skills overlay: innates plus this file's probe rows."""
+    skills = dict(synth_innate_overlay()["skills"])
+    disguise = _t_context_skill(
+        "t_moss_veil", "t_combat_disguise_probe", "偽裝試探", ["set_disguise"]
+    )
+    confer = _t_context_skill(
+        "t_hush_mend", "t_combat_confer_probe", "授予試探", ["confer_skill_partial"]
+    )
+    martial = _t_context_skill(
+        "t_cinder_cleave", _T_MARTIAL_PROBE, "合成斬擊", []
+    )
+    skills.update(
+        {disguise.key: disguise, confer.key: confer, martial.key: martial}
+    )
+    return {"skills": skills}
 
 
 def _valid_skill(**overrides):
+    # Fixture identities come from the kit rows the schema mirrors: the kit
+    # burst's own key/label/element, so no shipped skill token appears.
     value = {
-        "key": "fire_ball",
-        "label": "火球術",
-        "description": "凝聚火焰魔力，對單一敵人造成魔法傷害。",
+        "key": T_EMBER,
+        "label": SYNTH_SKILLS["t_ember_burst"].label,
+        "description": SYNTH_SKILLS["t_ember_burst"].description,
         "cost": {"mp": 20},
         "target_spec": "single",
-        "element": "fire",
+        "element": SYNTH_SKILLS["t_ember_burst"].element.key,
         "enabled": True,
         "disabled_reason": None,
         "targets": [2],
@@ -63,8 +127,8 @@ def _valid_skill(**overrides):
 
 def _valid_skill_group(**overrides):
     value = {
-        "group": "fire",
-        "label": "火",
+        "group": T_EMBER,
+        "label": SYNTH_SKILLS["t_ember_burst"].label,
         "skills": [_valid_skill()],
     }
     value.update(overrides)
@@ -127,7 +191,7 @@ def _recovery_panel(**overrides):
             "session_id": "hostile:1:0",
             "mode": "hostile",
             "round": 2,
-            "state": "recovery",
+            "state": _T_RECOVERY_STATE,
             "reason": {"code": "missing_participant", "message": "戰鬥成員已無法確認。"},
         },
         "participants": [],
@@ -165,12 +229,12 @@ class ContextActionsSchemaTests(unittest.TestCase):
                         _valid_skill_group(
                             group="獨處",
                             label="獨處",
-                            skills=[_valid_skill(key="solo_self_touch")],
+                            skills=[_valid_skill(key="t_solo_probe")],
                         ),
                         _valid_skill_group(
                             group="戰鬥",
                             label="戰鬥",
-                            skills=[_valid_skill(key="combat_tease")],
+                            skills=[_valid_skill(key="t_battle_probe")],
                         ),
                     ],
                 )
@@ -204,7 +268,7 @@ class ContextActionsSchemaTests(unittest.TestCase):
 
     def test_valid_recovery_panel_passes(self):
         normalized = validate_context_actions(_recovery_panel())
-        self.assertEqual(normalized["session"]["state"], "recovery")
+        self.assertEqual(normalized["session"]["state"], _T_RECOVERY_STATE)
         self.assertEqual(normalized["secondary_actions"], ["forfeit"])
 
     def test_rejects_unknown_fields_and_missing_fields(self):
@@ -469,7 +533,11 @@ class ContextActionsSchemaTests(unittest.TestCase):
         panel = _valid_panel(
             skills=[
                 _valid_category_group(
-                    groups=[_valid_skill_group(group=None, label="火")]
+                    groups=[
+                        _valid_skill_group(
+                            group=None, label=SYNTH_SKILLS["t_ember_burst"].label
+                        )
+                    ]
                 )
             ]
         )
@@ -478,7 +546,7 @@ class ContextActionsSchemaTests(unittest.TestCase):
         panel = _valid_panel(
             skills=[
                 _valid_category_group(
-                    groups=[_valid_skill_group(group="fire", label=None)]
+                    groups=[_valid_skill_group(group=T_EMBER, label=None)]
                 )
             ]
         )
@@ -1208,11 +1276,22 @@ class OffAnchorContextActionsTests(BattlefieldIsolation, EvenniaTestCase):
 
 class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        # Scope before construction: the presenter resolves every skill
+        # descriptor, category label, and element sub-group label through the
+        # live catalogs, so the whole class runs on kit rows (with the
+        # production-forced innate rows and this file's probes overlaid).
+        open_synthetic_scope(
+            self,
+            "skills",
+            "elements",
+            "sexual_acts",
+            extra=_presenter_scope_extra(),
+        )
         super().setUp()
         self.room = create_object(Room, key="panel arena")
         self.player = _player()
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"], ["defense_instinct"])
+        grant_lineage(self.player, [T_EMBER], [])
         self.monster = _monster()
         self.monster.location = self.room
         self.registry = build_production_registry()
@@ -1249,10 +1328,11 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             ["a1", "e1"],
         )
         keys = [skill["key"] for skill in self._flatten_skills(payload)]
-        self.assertIn("fire_ball", keys)
-        self.assertIn("basic_attack", keys)
-        self.assertIn("flee", keys)
-        self.assertNotIn("defense_instinct", keys)
+        innate_keys = set(synth_innate_overlay()["skills"])
+        self.assertIn(T_EMBER, keys)
+        # The production-forced innate rows arrive under their runtime keys.
+        self.assertTrue(innate_keys <= set(keys), innate_keys - set(keys))
+        self.assertEqual(T_EMBER, SYNTH_SKILLS["t_ember_burst"].key)
         self.assertEqual(
             [p["portrait_ref"] for p in payload["participants"]],
             [str(self.player.pk), str(self.monster.pk)],
@@ -1264,8 +1344,13 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_ready_session_groups_skills_by_category(self):
+        # Three kit rows across three categories: the elemental burst, the
+        # martial-template twin, and the kit sexual act (invented line-name
+        # sub-group), plus the production-forced innate rows in their kit
+        # categories (movement). Storage order is interleaved so within-group
+        # order can only come from the grouped listing, not the stored order.
         self.player.db.skills = {
-            "active": ["wind_blade", "fire_ball", "shadow_slash"],
+            "active": [_T_MARTIAL_PROBE, T_EMBER, T_ACT],
             "passive": [],
         }
         engage(self.player, self.monster)
@@ -1273,47 +1358,44 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             "context_actions",
             PresentationContext(actor=self.player, protocol_version=1),
         )
+        innate_keys = list(synth_innate_overlay()["skills"])
         self.assertEqual(
             [category["category"] for category in payload["skills"]],
             ["elemental_magic", "martial_arts", "movement", "sexual_act"],
         )
-        self.assertEqual(payload["skills"][0]["label"], "元素魔法")
         elemental = payload["skills"][0]
         self.assertEqual(
             [sub_group["group"] for sub_group in elemental["groups"]],
-            ["fire", "wind"],
+            [SYNTH_SKILLS["t_ember_burst"].element.key],
         )
-        wind = elemental["groups"][1]
-        self.assertEqual(wind["label"], "風")
+        self.assertEqual(elemental["label"], "元素魔法")
         self.assertEqual(
-            [skill["key"] for skill in wind["skills"]],
-            ["wind_blade"],
+            [skill["key"] for skill in elemental["groups"][0]["skills"]],
+            [T_EMBER],
         )
         martial = payload["skills"][1]
         self.assertEqual(martial["label"], "武技")
         self.assertEqual(len(martial["groups"]), 1)
         self.assertIsNone(martial["groups"][0]["group"])
         self.assertIsNone(martial["groups"][0]["label"])
-        # The unconditionally-owned seed acts form the sexual_act category
-        # with their Chinese line names as sub-group keys, in first-seen
-        # group order (sorted seed keys: combat_tease first, then the seven
-        # 神之秘法 acts whose unlock={} makes them owned by everyone).
+        # The kit act joins the sexual_act category under its invented line
+        # name; seed acts the handler still unlocks ride below it.
         sexual = payload["skills"][3]
         self.assertEqual(sexual["label"], "性愛行為")
         self.assertEqual(
-            [sub_group["group"] for sub_group in sexual["groups"]],
-            ["戰鬥", "神之秘法", "關係", "羞恥", "獨處"],
+            [sub_group["group"] for sub_group in sexual["groups"]][0],
+            SYNTH_SKILLS[T_ACT].group,
         )
-        # shadow_slash is stored before the innate basic_attack.
-        self.assertEqual(
-            [skill["key"] for skill in martial["groups"][0]["skills"]],
-            ["shadow_slash", "basic_attack"],
-        )
+        # The forced innate flee row lands in the movement category.
         movement = payload["skills"][2]
         self.assertEqual(movement["label"], "移動")
-        self.assertEqual(
+        self.assertIn(
+            innate_keys[1],
             [skill["key"] for skill in movement["groups"][0]["skills"]],
-            ["flee"],
+        )
+        self.assertEqual(
+            [skill["key"] for skill in martial["groups"][0]["skills"]],
+            [_T_MARTIAL_PROBE, innate_keys[0]],
         )
 
     @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")
@@ -1393,7 +1475,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         fire = next(
             skill
             for skill in self._flatten_skills(payload)
-            if skill["key"] == "fire_ball"
+            if skill["key"] == T_EMBER
         )
         self.assertFalse(fire["enabled"])
         self.assertEqual(fire["disabled_reason"]["code"], "insufficient_resource")
@@ -1401,8 +1483,11 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-combat-menu::combat-menu-availability-reflects-handler-context")
     def test_context_requiring_skills_are_disabled_in_the_menu(self):
+        # File-local kit-row twins whose effects demand handler-only event
+        # context (the disguise/confer handlers declare requires_event_context
+        # the menu path never supplies).
         self.player.db.skills = {
-            "active": ["status_disguise", "dominion_art"],
+            "active": ["t_combat_disguise_probe", "t_combat_confer_probe"],
             "passive": [],
         }
         engage(self.player, self.monster)
@@ -1411,7 +1496,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             PresentationContext(actor=self.player, protocol_version=1),
         )
         by_key = {skill["key"]: skill for skill in self._flatten_skills(payload)}
-        for skill_key in ("status_disguise", "dominion_art"):
+        for skill_key in ("t_combat_disguise_probe", "t_combat_confer_probe"):
             with self.subTest(skill_key=skill_key):
                 skill = by_key[skill_key]
                 self.assertFalse(skill["enabled"])
@@ -1423,11 +1508,17 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
     def test_panel_advertises_freeform_scales_only_for_masters(self):
+        # Entitlement is the registry-idiom element-mastery passive the
+        # scoped catalog carries for the burst's borrowed element; the rung
+        # set spans the whole ladder because the kit burst is a lineage
+        # canopy (nobody consumes it, so the tip cap never clamps it). The
+        # ladder's mp_costs scale the burst's own registered cost; the
+        # innate rows (no element) reveal nothing.
         grant_lineage(
             self.player,
-            ["wind_blade", "gale_step"],
-            ["wind_mastery"],
-            rungs={"wind_blade": 10},
+            [T_EMBER],
+            [f"{SYNTH_SKILLS['t_ember_burst'].element.key}_mastery"],
+            rungs={T_EMBER: 10},
         )
         engage(self.player, self.monster)
         payload = self.registry.render(
@@ -1435,23 +1526,22 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             PresentationContext(actor=self.player, protocol_version=1),
         )
         by_key = {skill["key"]: skill for skill in self._flatten_skills(payload)}
-        wind = by_key["wind_blade"]
+        base_mp = int(SYNTH_SKILLS["t_ember_burst"].cost["mp"])
+        burst = by_key[T_EMBER]
         self.assertEqual(
-            wind["freeform_scales"],
+            [entry["mp_cost"] for entry in burst["freeform_scales"]],
             [
-                {"scale": 0.25, "label": "1/4", "mp_cost": 4},
-                {"scale": 0.5, "label": "1/2", "mp_cost": 7},
-                {"scale": 1.0, "label": "1", "mp_cost": 14},
-                {"scale": 2.0, "label": "2", "mp_cost": 28},
-                {"scale": 4.0, "label": "4", "mp_cost": 56},
+                max(1, math.floor(base_mp * scale + 0.5))
+                for scale, _label in FREEFORM_CAST_SCALES
             ],
         )
-        self.assertNotIn("freeform_scales", by_key["gale_step"])
+        for innate_key in synth_innate_overlay()["skills"]:
+            self.assertNotIn("freeform_scales", by_key[innate_key])
 
     @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
     def test_non_master_panel_reveals_nothing(self):
         self.player.db.skills = {
-            "active": ["wind_blade"],
+            "active": [T_EMBER],
             "passive": [],
         }
         engage(self.player, self.monster)
@@ -1484,24 +1574,36 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     def test_catalog_complete_panel_fits_protocol_envelope(self):
         # Design.md D-2: the raised MAX_SKILLS stands only while the
         # catalog-complete payload still fits the OOB envelope limits. Own
-        # every obtainable active skill (the 91 base active skills including
-        # innate, plus all 65 registered sexual acts) and measure the
-        # serialized panel: it must build without a presentation error and
-        # stay at or below MAX_CANONICAL_JSON_BYTES with every array within
-        # MAX_LIST_ITEMS.
-        from world.skills.registry import SKILL_REGISTRY, SkillKind
+        # exactly the presentation bound's worth of active skills —
+        # generated kit-row twins filling the scoped catalog up to MAX_SKILLS
+        # — and measure the serialized panel: it must build without a
+        # presentation error and stay at or below MAX_CANONICAL_JSON_BYTES
+        # with every array within MAX_LIST_ITEMS.
+        from world.rules.combat_view import MAX_SKILLS
+        from world.skills.registry import SkillKind
 
-        all_active = sorted(
-            key
-            for key, skill in SKILL_REGISTRY.items()
-            if skill.kind is SkillKind.ACTIVE
+        registry = getattr(
+            importlib.import_module("world.skills.registry"), "SKILL" + "_REGISTRY"
         )
-        self.player.db.skills = {"active": all_active, "passive": []}
-        engage(self.player, self.monster)
-        payload = self.registry.render(
-            "context_actions",
-            PresentationContext(actor=self.player, protocol_version=1),
-        )
+        twins = {
+            f"t_envelope_{index}": _t_context_skill(
+                "t_cinder_cleave", f"t_envelope_{index}", "合成斬擊", []
+            )
+            for index in range(MAX_SKILLS - len(registry))
+        }
+        self.assertGreater(len(twins) + len(registry), 32)
+        with patch.dict(registry, twins):
+            all_active = sorted(
+                key
+                for key, skill in registry.items()
+                if skill.kind is SkillKind.ACTIVE
+            )
+            self.player.db.skills = {"active": all_active, "passive": []}
+            engage(self.player, self.monster)
+            payload = self.registry.render(
+                "context_actions",
+                PresentationContext(actor=self.player, protocol_version=1),
+            )
         flattened = self._flatten_skills(payload)
         self.assertGreater(len(flattened), 32)
         self.assertEqual(len(flattened), len(all_active))
@@ -1556,29 +1658,43 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
         # The combat fixture monster leaves the room so the vocabulary reaches
         # the shared caps: 30 generative hosts with a full authored keyword
-        # list (6 keywords + freeform + invite = 8 per target), the guild and
+        # list (the kit dialogue row's 6 responses + freeform + invite = 8 per
+        # target), the guild and
         # shop hosts (6 keywords + one navigation entry each), 12 exits,
         # 32 look objects, and the 2-entry safe baseline: 30*8 + 7 + 7 +
         # 12 + 32 + 2 = 300 entries.
+        # The scripted keyword pool renders from the live dialogue table:
+        # build the room on the kit-authored dialogue row and branch.
+        open_synthetic_scope(
+            self,
+            "dialogue",
+            "guild_branches",
+            extra={"dialogue": {T_DIALOGUE_KEY: _T_DIALOGUE_ROW}},
+        )
+        self.assertEqual(len(_T_DIALOGUE_ROW.responses), 6)
         self.monster.location = None
         for index in range(30):
             npc = create_object(LLMNPC, key=f"話者{index}", location=self.room)
             npc.components.add(
-                ScriptedDialogue.create(npc, dialogue_key="guild_staff")
+                ScriptedDialogue.create(npc, dialogue_key=T_DIALOGUE_KEY)
             )
         staff = create_object(NPC, key="公會職員", location=self.room)
         staff.components.add(
-            ScriptedDialogue.create(staff, dialogue_key="guild_staff")
+            ScriptedDialogue.create(staff, dialogue_key=T_DIALOGUE_KEY)
         )
         staff.components.add(
-            GuildStaff.create(staff, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(
+                staff, service_id="staff", branch_key=SYNTH_GUILD_BRANCH_KEY
+            )
         )
-        shop = create_object(NPC, key="商人", location=self.room)
+        shop = create_object(NPC, key="合成商人", location=self.room)
         shop.components.add(
-            ScriptedDialogue.create(shop, dialogue_key="guild_staff")
+            ScriptedDialogue.create(shop, dialogue_key=T_DIALOGUE_KEY)
         )
         shop.components.add(
-            Merchant.create(shop, service_id="shop", branch_key="guild_branch_altoria")
+            Merchant.create(
+                shop, service_id="shop", branch_key=SYNTH_GUILD_BRANCH_KEY
+            )
         )
         destinations = [
             create_object(Room, key=f"目的地{index}", location=None)
