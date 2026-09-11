@@ -12,6 +12,17 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
 const CharacterMenu = require("../elosern/character_menu.js");
+const { SYNTH_SKILL } = require("./support/synthetic-data.js");
+
+// File-local synthetic rows (test-data-independence): invented t_-keyed skills,
+// passive, and equipment with invented prose. The group `group` fields keep
+// their wire taxonomy values; only shipped ids/prose are replaced.
+const T_WATER_SKILL = { key: "t_tide_prick", label: "潮針術" };
+const T_PASSIVE = { key: "t_bulwark_sense", label: "合成壁覺" };
+const T_FIRE_GROUP_LABEL = "焰系";
+const T_WATER_GROUP_LABEL = "潮系";
+const T_MOVE_SKILL = { key: "t_gale_hop", label: "颶風跳" };
+const T_SWORD = { item_key: "t_thorn_fang", display_name: "荊牙刃" };
 
 function validPanel(overrides) {
   return Object.assign(
@@ -28,8 +39,8 @@ function validPanel(overrides) {
           category: "elemental_magic",
           label: "元素魔法",
           groups: [
-            { group: "fire", label: "火", skills: [{ key: "fire_ball", label: "火球術" }] },
-            { group: "water", label: "水", skills: [{ key: "water_bolt", label: "水箭術" }] },
+            { group: "fire", label: T_FIRE_GROUP_LABEL, skills: [{ key: SYNTH_SKILL.id, label: SYNTH_SKILL.label }] },
+            { group: "water", label: T_WATER_GROUP_LABEL, skills: [T_WATER_SKILL] },
           ],
         },
       ],
@@ -41,13 +52,13 @@ function validPanel(overrides) {
             {
               group: null,
               label: null,
-              skills: [{ key: "defense_instinct", label: "防禦直覺" }],
+              skills: [T_PASSIVE],
             },
           ],
         },
       ],
       equipment: [
-        { slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍", adjustment: "攻擊 +2" },
+        { slot: "weapon_main", item_key: T_SWORD.item_key, display_name: T_SWORD.display_name, adjustment: "攻擊 +2" },
       ],
       disguise: { active: false, description: "", displayed: [] },
       guild: { rank: null, merit: 0 },
@@ -65,11 +76,11 @@ test("character menu lists true trait rows with gauges and statics", () => {
   assert.ok(labels.includes("生命：10 / 10"));
   assert.ok(labels.includes("攻擊：5"));
   assert.ok(labels.includes("主動技能"));
-  assert.ok(labels.includes("火球術"));
-  assert.ok(labels.includes("水箭術"));
+  assert.ok(labels.includes(SYNTH_SKILL.label));
+  assert.ok(labels.includes(T_WATER_SKILL.label));
   assert.ok(labels.includes("被動技能"));
-  assert.ok(labels.includes("防禦直覺"));
-  assert.ok(labels.includes("weapon_main：鐵劍"));
+  assert.ok(labels.includes(T_PASSIVE.label));
+  assert.ok(labels.includes(`weapon_main：${T_SWORD.display_name}`));
   assert.ok(labels.includes("階級：未加入公會"));
   assert.ok(labels.includes("功績：0"));
   assert.ok(labels.includes("錢包：100 銅"));
@@ -88,7 +99,7 @@ test("active and passive skill sections flatten the category-grouped payload", (
               label: null,
               skills: [
                 { key: "flee", label: "逃跑" },
-                { key: "flash_step", label: "瞬步" },
+                T_MOVE_SKILL,
               ],
             },
           ],
@@ -99,11 +110,11 @@ test("active and passive skill sections flatten the category-grouped payload", (
   const labels = menu.items.map((item) => item.label);
   assert.ok(labels.includes("主動技能"));
   assert.ok(labels.includes("逃跑"));
-  assert.ok(labels.includes("瞬步"));
+  assert.ok(labels.includes(T_MOVE_SKILL.label));
   // The category/group taxonomy stays wire-only; the menu flattens it.
   assert.ok(!labels.includes("移動"));
   assert.ok(!labels.includes("元素魔法"));
-  assert.ok(!labels.includes("火"));
+  assert.ok(!labels.includes(T_FIRE_GROUP_LABEL));
 });
 
 test("an empty actives or passives list renders no skill section", () => {
@@ -185,7 +196,7 @@ test("a version-5 payload renders totals and ignores the breakdown layers", () =
   const panel = validPanel({
     traits: validPanel().traits.map((row) =>
       Object.assign({}, row, {
-        layers: row.key === "hp" ? [] : [{ source: "equipment", name: "鐵劍", kind: "flat", amount: 2 }],
+        layers: row.key === "hp" ? [] : [{ source: "equipment", name: T_SWORD.display_name, kind: "flat", amount: 2 }],
       })
     ),
   });
@@ -199,7 +210,7 @@ test("a version-5 payload renders totals and ignores the breakdown layers", () =
     assert.ok(labels.includes("生命：10 / 10"));
     assert.ok(labels.includes("攻擊：5"), "static rows keep the total display");
     assert.ok(
-      !labels.some((label) => label.includes("鐵劍") && label.includes("+2")),
+      !labels.some((label) => label.includes(T_SWORD.display_name) && label.includes("+2")),
       "layer amounts never render"
     );
     assert.ok(!labels.some((label) => label.includes("攻擊 +2")), "adjustment text never renders");
