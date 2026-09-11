@@ -184,13 +184,21 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(edge_markers.count(), 1)
         # local-map-remembered-are-map-gateways: the remembered gate's marker
         # is named for the place its traversal reaches (the far-side
-        # wilderness region), not the gate room's own name.
-        north_gate_marker = page.locator(
-            '[data-testid="local-map__edge-marker--grid:capital_altoria:2:4"]'
+        # wilderness region), not the gate room's own name. Which gateway the
+        # fixture recorded is the boot mode's business — the journey reads the
+        # presented panel for the remembered gateway's identity and name.
+        remembered = [
+            node for node in self._local_map_nodes(page)
+            if node["visibility"] == "remembered"
+        ]
+        self.assertEqual(len(remembered), 1, "the fixture records exactly one gateway")
+        gateway = remembered[0]
+        gateway_marker = page.locator(
+            f'[data-testid="local-map__edge-marker--{gateway["id"]}"]'
         )
-        self.assertEqual(north_gate_marker.count(), 1)
-        marker_name = north_gate_marker.locator("title").evaluate("el => el.textContent")
-        self.assertIn("西部丘陵與谷地", marker_name)
+        self.assertEqual(gateway_marker.count(), 1)
+        marker_name = gateway_marker.locator("title").evaluate("el => el.textContent")
+        self.assertIn(gateway["label"], marker_name)
         # Assistive technology mirror is present
         mirror = page.locator('[data-testid="local-map-edge-markers-mirror"]')
         self.assertEqual(mirror.count(), 1)
