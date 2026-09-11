@@ -771,6 +771,29 @@ def kind_word(kind: str) -> str:
     return _ITEM_KIND_WORDS[kind]
 
 
+def bag_action_fixture_values() -> dict:
+    """The inventory-actions fixture's roles for the current boot mode.
+
+    The fixture seeds one INJURED holder of two potion units and one
+    slotted weapon; the combat-bag journey engages the start room's first
+    living combat monster. The kit rows differ from the shipped ones in
+    every identifier, so the journeys resolve all four through here.
+    """
+    if synth_mode_enabled():
+        return {
+            "potion_key": "t_ember_spray",
+            "potion_display": "熾焰噴射劑",
+            "weapon_key": "t_thorn_knife",
+            "engage_target": SYNTH_COMBAT_MONSTERS[0][0],
+        }
+    return {
+        "potion_key": "healing_potion",
+        "potion_display": "治療藥水",
+        "weapon_key": "plain_sword",
+        "engage_target": "goblin",
+    }
+
+
 def rarity_word(rarity: str) -> str:
     """The inspector's Traditional-Chinese word for a committed rarity."""
     return _ITEM_RARITY_WORDS[rarity]

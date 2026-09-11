@@ -740,9 +740,14 @@ SYNTH_BUFFS: dict[str, BuffDefinition] = {
     "t_ash_burn": BuffDefinition(
         key="t_ash_burn",
         duration=15,
-        tick_interval=5,
+        # Mirrors the shipped damaging-buff cadence (10s per tick): the
+        # inventory-actions fixture heals a 20-point gap with a 6-second
+        # item-use clock advance, and a sub-6s tick interval would drain the
+        # fresh heal inside the use's own settlement — the hp_full story
+        # would never commit.
+        tick_interval=10,
         stacking="unique_per_source",
-        modifiers={"rate": {"target": "hp", "amount": -4}},
+        modifiers={"rate": {"target": "hp", "delta": -4}},
         polarity="debuff",
     ),
 }
