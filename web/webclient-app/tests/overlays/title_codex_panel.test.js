@@ -14,10 +14,21 @@ import AppClient from "../../AppClient.vue";
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "../store/protocol_fixtures.js";
 
+// Synthetic fixed-title rows (test-data-independence): the kit title row plus
+// one invented t_-keyed row; the panel renders whatever the codex payload
+// authors, and every assertion follows the row constants.
+import { SYNTH_TITLE } from "../support/synthetic-data.mjs";
+const T_ROW = SYNTH_TITLE.id;
+const T_ROW_DISPLAY = SYNTH_TITLE.display;
+const T_ROW2 = "t_ember_gate";
+const T_ROW2_DISPLAY = "合格合成者";
+const T_EPITHET = "南門新客";
+const T_FULL_TITLE = T_ROW_DISPLAY + "\u3000" + T_EPITHET;
+
 function fixedRow(overrides = {}) {
   return {
-    key: "g_f_rank",
-    display: "F級冒險者",
+    key: T_ROW,
+    display: T_ROW_DISPLAY,
     category: "guild",
     hint: "",
     flavor: "公會註冊的起點。",
@@ -29,7 +40,7 @@ function fixedRow(overrides = {}) {
 
 function epithetRow(overrides = {}) {
   return {
-    display: "南門新客",
+    display: T_EPITHET,
     basis: "初入南門。",
     granted_tick: 121,
     equipped: true,
@@ -45,8 +56,8 @@ const AVAILABLE_SAMPLE = {
   fixed_rows: [
     fixedRow(),
     fixedRow({
-      key: "g_e_rank",
-      display: "E級冒險者",
+      key: T_ROW2,
+      display: T_ROW2_DISPLAY,
       unlocked: false,
       flavor: "",
       hint: "通過 E 級升級測驗。",
@@ -57,8 +68,8 @@ const AVAILABLE_SAMPLE = {
     epithetRow({ display: "破城先鋒", basis: "率先破門。", equipped: false, can_remove: true }),
     epithetRow(),
   ],
-  equipped: { fixed: "g_f_rank", epithet: "南門新客" },
-  full_title: "F級冒險者　南門新客",
+  equipped: { fixed: T_ROW, epithet: T_EPITHET },
+  full_title: T_FULL_TITLE,
   unlocked: 1,
   total: 7,
   pending_ballot: [],
@@ -86,7 +97,7 @@ describe("TitleCodexPanel (title-codex-removal)", () => {
   it("renders the live full-title preview and counters verbatim", () => {
     const w = mount(TitleCodexPanel, { props: { codex: AVAILABLE_SAMPLE } });
     expect(w.get('[data-testid="title-codex-preview"]').text()).toBe(
-      "F級冒險者　南門新客",
+      T_FULL_TITLE,
     );
     expect(w.text()).toContain("已收集 1 / 7");
   });
@@ -94,26 +105,26 @@ describe("TitleCodexPanel (title-codex-removal)", () => {
   it("unlocked fixed cards equip by key; locked cards offer no affordance", async () => {
     const w = mount(TitleCodexPanel, { props: { codex: AVAILABLE_SAMPLE } });
     // The locked card renders 🔒 + hint and is inert (no button, no emit).
-    expect(w.get('[data-testid="title-codex-fixed-locked-g_e_rank"]').text()).toContain(
+    expect(w.get(`[data-testid="title-codex-fixed-locked-${T_ROW2}"]`).text()).toContain(
       "🔒",
     );
-    expect(w.get('[data-testid="title-codex-fixed-locked-g_e_rank"]').text()).toContain(
+    expect(w.get(`[data-testid="title-codex-fixed-locked-${T_ROW2}"]`).text()).toContain(
       "通過 E 級升級測驗。",
     );
-    expect(w.find('[data-testid="title-codex-fixed-equip-g_e_rank"]').exists()).toBe(false);
-    await w.get('[data-testid="title-codex-fixed-equip-g_f_rank"]').trigger("click");
+    expect(w.find(`[data-testid="title-codex-fixed-equip-${T_ROW2}"]`).exists()).toBe(false);
+    await w.get(`[data-testid="title-codex-fixed-equip-${T_ROW}"]`).trigger("click");
     expect(w.emitted("action")).toEqual([
-      [{ action_id: "title.equip", payload: { kind: "fixed", identifier: "g_f_rank" } }],
+      [{ action_id: "title.equip", payload: { kind: "fixed", identifier: T_ROW } }],
     ]);
   });
 
   it("an unlocked card click updates nothing locally; the preview is payload-fed", async () => {
     const w = mount(TitleCodexPanel, { props: { codex: AVAILABLE_SAMPLE } });
-    await w.get('[data-testid="title-codex-fixed-equip-g_f_rank"]').trigger("click");
+    await w.get(`[data-testid="title-codex-fixed-equip-${T_ROW}"]`).trigger("click");
     // The preview still reads the committed payload (it updates when the
     // server re-commits the panel, not on click).
     expect(w.get('[data-testid="title-codex-preview"]').text()).toBe(
-      "F級冒險者　南門新客",
+      T_FULL_TITLE,
     );
   });
 
@@ -196,9 +207,9 @@ describe("TitleCodexPanel (title-codex-removal)", () => {
   it("category tabs filter the fixed rows by the payload category", async () => {
     const w = mount(TitleCodexPanel, { props: { codex: AVAILABLE_SAMPLE } });
     await w.get('[data-testid="title-codex-category-combat"]').trigger("click");
-    expect(w.find('[data-testid="title-codex-fixed-g_f_rank"]').exists()).toBe(false);
+    expect(w.find(`[data-testid="title-codex-fixed-${T_ROW}"]`).exists()).toBe(false);
     await w.get('[data-testid="title-codex-category-guild"]').trigger("click");
-    expect(w.find('[data-testid="title-codex-fixed-g_f_rank"]').exists()).toBe(true);
+    expect(w.find(`[data-testid="title-codex-fixed-${T_ROW}"]`).exists()).toBe(true);
   });
 });
 
@@ -277,7 +288,7 @@ describe("AppClient title codex overlay wiring (title-codex-removal)", () => {
       wrapper.vm.$el
         .querySelector('[data-testid="title-codex-preview"]')
         .textContent.trim(),
-    ).toBe("F級冒險者　南門新客");
+    ).toBe(T_FULL_TITLE);
     expect(
       wrapper.vm.$el
         .querySelector('[data-testid="overlay-host"]')
@@ -288,14 +299,14 @@ describe("AppClient title codex overlay wiring (title-codex-removal)", () => {
   it("a codex equip click dispatches exactly one title.equip ui_action", async () => {
     await openCodexWindow(AVAILABLE_SAMPLE);
     await wrapper
-      .get('[data-testid="title-codex-fixed-equip-g_f_rank"]')
+      .get(`[data-testid="title-codex-fixed-equip-${T_ROW}"]`)
       .trigger("click");
     const actions = sender.sent.actions.filter((e) => e.action_id === "title.equip");
     expect(actions).toHaveLength(1);
-    expect(actions[0].payload).toEqual({ kind: "fixed", identifier: "g_f_rank" });
+    expect(actions[0].payload).toEqual({ kind: "fixed", identifier: T_ROW });
     // The input echo replays the typed command (catalog resolves the payload).
     const echo = store.narrative.filter((line) => line.kind === "in").map((l) => l.text);
-    expect(echo).toContain("title equip fixed g_f_rank");
+    expect(echo).toContain(`title equip fixed ${T_ROW}`);
   });
 
   it("a confirmed removal dispatches exactly one title.remove ui_action", async () => {
