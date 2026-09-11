@@ -29,7 +29,13 @@ from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.art.worker import drain_synchronous
 
 
-def _subject(key="forest_path"):
+# File-local synthetic scene identity: the queue treats a scene key as opaque
+# identity (no registry validation on the worker path), so the event-cardinality
+# mechanics under test never depend on shipped archetype keys.
+_SCENE_KEY = "t_synth_scene"
+
+
+def _subject(key=_SCENE_KEY):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
@@ -394,7 +400,7 @@ class CutoutEventTests(EvenniaTest):
 
     @covers_requirement("art-portrait-cutout::the-background-removal-stage-emits-boundary-events")
     def test_no_cutout_event_for_a_skipped_or_disabled_run(self):
-        scene = ArtSubject(ArtSubjectKind.SCENE, "forest_path")
+        scene = ArtSubject(ArtSubjectKind.SCENE, _SCENE_KEY)
         ensure(scene, "desc")
         # Enabled stage, scene subject only: skipped, no cutout event.
         with self._cutout(FakeCutoutBackend()):

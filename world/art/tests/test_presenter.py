@@ -25,11 +25,34 @@ from world.art.presenter import (
 from world.art.queue import claim, ensure, record_key, settle
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.tests.synthetic_data import (
+    SYNTH_ARCHETYPES,
+    SYNTH_MONSTER_TIERS,
+    synthetic_registries,
+)
 
 from tools.spec_traceability import covers_requirement
 
 
-def _scene(key="forest_path"):
+_SYNTH_SCENE = sorted(SYNTH_ARCHETYPES)[0]
+_SYNTH_TIER = sorted(SYNTH_MONSTER_TIERS)[0]
+
+
+def open_synthetic_scope(case, *targets, extra=None):
+    """Enter a synthetic-catalog scope bound to one test case's lifecycle.
+
+    The kit's class decorator wraps ``test*`` methods only, so anything a
+    ``setUp`` builds against the catalogs would escape its scope. Call this as
+    the FIRST statement of ``setUp`` (before ``super().setUp()``); the scope is
+    torn down with the test via ``case.addCleanup``.
+    """
+    scope = synthetic_registries(*targets, extra=extra)
+    scope.__enter__()
+    case.addCleanup(scope.__exit__, None, None, None)
+    return scope
+
+
+def _scene(key="t_synth_forest"):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
@@ -37,6 +60,9 @@ class ArtPresenterTests(EvenniaTestCase):
     character_typeclass = PlayerCharacter
 
     def setUp(self):
+        # Scene-keyed records are opaque identities below; the one archetype
+        # resolution test resolves a kit archetype against the patched catalog.
+        open_synthetic_scope(self, "archetypes")
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name)
@@ -61,19 +87,19 @@ class ArtPresenterTests(EvenniaTestCase):
     def test_done_record_resolves_to_a_same_origin_url(self):
         subject = _scene()
         ensure(subject, "desc")
-        self._write_asset("scene/forest_path.png")
+        self._write_asset("scene/t_synth_forest.png")
         claimed = claim(10)
         settle(
             subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/forest_path.png",
+            output_identity="scene/t_synth_forest.png",
             error=None,
         )
         payload = resolve_subject(subject)
         self.assertEqual(payload["kind"], "asset")
         self.assertEqual(payload["status"], ArtAssetStatus.DONE)
-        self.assertEqual(payload["url"], "/art/scene/forest_path.png")
+        self.assertEqual(payload["url"], "/art/scene/t_synth_forest.png")
         self.assertEqual(payload["aspect_ratio"], "16:9")
         self.assertNotIn("out_path", payload)
 
@@ -86,7 +112,7 @@ class ArtPresenterTests(EvenniaTestCase):
             subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/forest_path.png",
+            output_identity="scene/t_synth_forest.png",
             error=None,
         )
         payload = resolve_subject(subject)
@@ -95,7 +121,7 @@ class ArtPresenterTests(EvenniaTestCase):
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_missing_pending_failed_and_disabled_states_resolve_to_placeholders(self):
-        pending = ArtSubject(ArtSubjectKind.SCENE, "tavern_interior")
+        pending = ArtSubject(ArtSubjectKind.SCENE, "t_synth_tavern")
         ensure(pending, "desc")
         for subject in (
             _scene("not_ensured"),
@@ -105,7 +131,7 @@ class ArtPresenterTests(EvenniaTestCase):
             self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
             self.assertIsNone(payload["url"])
 
-        failed = ArtSubject(ArtSubjectKind.SCENE, "dungeon_interior")
+        failed = ArtSubject(ArtSubjectKind.SCENE, "t_synth_dungeon")
         ensure(failed, "desc")
         claimed = claim(10)
         tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
@@ -156,7 +182,7 @@ class ArtPresenterTests(EvenniaTestCase):
 
     def test_resolve_scene_handles_valid_and_unresolvable_archetypes(self):
         self.assertEqual(resolve_scene("not_a_scene")["kind"], PLACEHOLDER_UNAVAILABLE)
-        payload = resolve_scene("forest_path")
+        payload = resolve_scene(_SYNTH_SCENE)
         self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
 
     @covers_requirement("art-queue-worker::in-flight-generation-exposes-a-wire-stable-status")
@@ -175,7 +201,7 @@ class ArtPresenterTests(EvenniaTestCase):
     def test_settled_statuses_pass_through_unchanged(self):
         for subject, expected in (
             (_scene("not_ensured"), ArtAssetStatus.MISSING),
-            (_scene("dungeon_interior"), ArtAssetStatus.FAILED),
+            (_scene("t_synth_dungeon"), ArtAssetStatus.FAILED),
         ):
             if expected == ArtAssetStatus.FAILED:
                 ensure(subject, "desc")
@@ -203,7 +229,7 @@ class ArtPresenterTests(EvenniaTestCase):
         )
 
     def test_media_url_never_leaks_the_store_root(self):
-        url = media_url_for("scene/forest_path.png")
+        url = media_url_for("scene/t_synth_forest.png")
         self.assertTrue(url.startswith("/art/"))
         self.assertNotIn(".art", url)
 
@@ -211,13 +237,13 @@ class ArtPresenterTests(EvenniaTestCase):
     def test_existing_png_asset_survives_a_switch_to_another_format(self):
         subject = _scene()
         ensure(subject, "desc")
-        self._write_asset("scene/forest_path.png")
+        self._write_asset("scene/t_synth_forest.png")
         claimed = claim(10)
         settle(
             subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/forest_path.png",
+            output_identity="scene/t_synth_forest.png",
             error=None,
         )
         # Store mid-way through a format switch: the configured format is
@@ -228,7 +254,7 @@ class ArtPresenterTests(EvenniaTestCase):
         ):
             payload = resolve_subject(subject)
         self.assertEqual(payload["kind"], "asset")
-        self.assertEqual(payload["url"], "/art/scene/forest_path.png")
+        self.assertEqual(payload["url"], "/art/scene/t_synth_forest.png")
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_foreign_directory_identity_resolves_to_unavailable(self):
@@ -277,6 +303,10 @@ class ResolveEntityTests(EvenniaTestCase):
     """Additive ``resolve_entity`` dispatch tests (task 1.3/1.4)."""
 
     def setUp(self):
+        # The monster dispatch arm validates threat_tier against the monster
+        # tier catalog and applies its traits, so the entity is built inside a
+        # synthetic tier scope and asserted against a kit tier key.
+        open_synthetic_scope(self, "monster_tiers")
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name)
@@ -291,7 +321,7 @@ class ResolveEntityTests(EvenniaTestCase):
             "stable_key": str(self.player.pk),
         }
         self.monster = create_object(Monster, key="entity-wolf")
-        self.monster.threat_tier = "low"
+        self.monster.threat_tier = _SYNTH_TIER
         self.monster.apply_monster_tier("floor")
 
     def tearDown(self):
@@ -342,7 +372,7 @@ class ResolveEntityTests(EvenniaTestCase):
     def test_generic_monster_resolves_its_archetype_subject(self):
         with patch("world.observability.log_info"):
             payload = resolve_entity(self.monster)
-        self.assertEqual(payload["subject_key"], "portrait:monster:low")
+        self.assertEqual(payload["subject_key"], f"portrait:monster:{_SYNTH_TIER}")
         # Filled seam: an artless monster resolves the monster_anon default.
         self.assertEqual(payload["kind"], "asset")
         self.assertTrue(payload["url"].startswith("/art/defaults/"))
@@ -510,7 +540,7 @@ class FaceRectPayloadTests(EvenniaTestCase):
         self.assertIsNone(payload["url"])
         self.assertIsNone(payload["face_rect"])
         # done record with a missing file -> unavailable
-        done = ArtSubject(ArtSubjectKind.SCENE, "tavern_interior")
+        done = ArtSubject(ArtSubjectKind.SCENE, "t_synth_tavern")
         from world.art.queue import claim as claim2, ensure as ensure2, settle as settle2
 
         ensure2(done, "desc")
@@ -519,7 +549,7 @@ class FaceRectPayloadTests(EvenniaTestCase):
             done,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/tavern_interior.png",
+            output_identity="scene/t_synth_tavern.png",
             error=None,
         )
         payload = resolve_subject(done)

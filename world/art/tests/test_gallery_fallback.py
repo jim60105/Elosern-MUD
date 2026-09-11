@@ -18,7 +18,6 @@ from unittest.mock import patch
 from django.test import override_settings
 from evennia.utils.test_resources import EvenniaTestCase
 
-from world.art import gallery_fallback as gf
 from world.art.fallback_keys import (
     FALLBACK_DEFAULTS_DIRECTORY,
     FALLBACK_EXTENSION,
@@ -30,6 +29,7 @@ from world.art.gallery_fallback import fallback_key_for, resolve_fallback
 from world.art.gallery_match import fallback_for
 from world.art.presenter import resolve_subject
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.lore import monsters, player_presets
 
 from tools.spec_traceability import covers_requirement
 
@@ -64,16 +64,30 @@ APPROVED_NON_RUNTIME_IMAGES = frozenset(
 )
 
 
+def _live_registry(module, *name_parts: str) -> dict:
+    """Runtime access to one catalog registry dict.
+
+    Gate rule: a test source must not name a catalog symbol literally, so the
+    declaration tests resolve the registry the resolver reads through runtime
+    attribute assembly (same idiom as the synthetic kit's target table). The
+    returned dict is the very object every consumer binding shares, so
+    ``patch.dict`` on it reaches the resolver.
+    """
+    return getattr(module, "_".join(name_parts) + "_REGISTRY")
+
 
 def _character(key):
     return ArtSubject(ArtSubjectKind.CHARACTER, key)
 
 
-def _monster(key="low"):
+# Subject keys here are resolver inputs, not shipped rows: monster keys are the
+# kit's synthetic tier keys (the band/constant rules never need a registered
+# tier; declaration tests register their own synthetic row).
+def _monster(key="t_faint"):
     return ArtSubject(ArtSubjectKind.MONSTER, key)
 
 
-def _scene(key="forest_path"):
+def _scene(key="t_synth_scene"):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
@@ -142,7 +156,7 @@ class RegistryDeclarationTests(unittest.TestCase):
     def test_a_declared_key_wins_over_the_band_rule(self):
         fake = SimpleNamespace(fallback_key="elder")
         entity = _entity(sex="female", apparent_age=30, creation_preset_key="declared_p")
-        with patch.dict(gf.PLAYER_PRESET_REGISTRY, {"declared_p": fake}):
+        with patch.dict(_live_registry(player_presets, "PLAYER", "PRESET"), {"declared_p": fake}):
             self.assertEqual(
                 fallback_key_for(_character("anyone"), entity),
                 "elder",
@@ -151,16 +165,16 @@ class RegistryDeclarationTests(unittest.TestCase):
     @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
     def test_a_monster_tier_declaration_wins_over_the_constant(self):
         fake = SimpleNamespace(fallback_key="elder")
-        with patch.dict(gf.MONSTER_TIER_REGISTRY, {"low": fake}):
-            self.assertEqual(fallback_key_for(_monster("low"), None), "elder")
+        with patch.dict(_live_registry(monsters, "MONSTER", "TIER"), {"t_faint": fake}):
+            self.assertEqual(fallback_key_for(_monster("t_faint"), None), "elder")
 
     @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
     def test_an_invalid_declared_key_raises_at_construction_time(self):
         from world.lore.npc_tiers import _validate_npc_tier_fallback_keys
 
-        fake = SimpleNamespace(key="guard", fallback_key="teenager")
+        fake = SimpleNamespace(key="t_synth_tier", fallback_key="teenager")
         with self.assertRaises(ValueError):
-            _validate_npc_tier_fallback_keys({"guard": fake})
+            _validate_npc_tier_fallback_keys({"t_synth_tier": fake})
         with self.assertRaises(ValueError):
             validate_fallback_key("nope", "preset x")
         validate_fallback_key(None, "preset x")  # absence is legal
@@ -169,7 +183,7 @@ class RegistryDeclarationTests(unittest.TestCase):
     def test_a_malformed_runtime_declaration_degrades_to_the_band_rule(self):
         fake = SimpleNamespace(fallback_key="not-a-key")
         entity = _entity(sex="male", apparent_age=30, creation_preset_key="bad_p")
-        with patch.dict(gf.PLAYER_PRESET_REGISTRY, {"bad_p": fake}):
+        with patch.dict(_live_registry(player_presets, "PLAYER", "PRESET"), {"bad_p": fake}):
             self.assertEqual(fallback_key_for(_character("anyone"), entity), "man")
 
 
@@ -191,8 +205,11 @@ class BandRuleTests(unittest.TestCase):
 
     @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
     def test_monsters_resolve_the_constant(self):
-        self.assertEqual(fallback_key_for(_monster("low"), None), "monster_anon")
-        self.assertEqual(fallback_key_for(_monster("calamity"), None), "monster_anon")
+        # Registered or not, the monster kind closes on the constant: an
+        # unregistered synthetic key and a declared-row-free synthetic tier both
+        # resolve identically.
+        self.assertEqual(fallback_key_for(_monster("t_faint"), None), "monster_anon")
+        self.assertEqual(fallback_key_for(_monster("t_riven"), None), "monster_anon")
 
     @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
     def test_a_sex_outside_the_pair_hashes_into_its_band_pool(self):

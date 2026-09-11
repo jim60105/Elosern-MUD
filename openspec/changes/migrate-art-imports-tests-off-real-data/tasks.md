@@ -5,23 +5,33 @@
 
 ## 2. Migration
 
+Shared idiom (learned from the commands/quests migrations): kit rows come from
+`world/tests/synthetic_data.py`; classes that construct against patched catalogs
+enter the scope through a helper called at the top of `setUp` (the kit's class
+decorator wraps `test*` only); identity-only subject keys become file-local
+`t_`-prefixed constants; registry iteration in startup-sync tests runs over the
+PATCHED kit registries inside `synthetic_registries("archetypes", "monster_tiers")`.
+
+Baseline (task 1.1): 315 findings across the 22 flagged manifest files
+(`test_gallery_seed.py` scans clean → migrates by ledger-entry removal alone).
+
 ## 3. Migrate group 1
 
-- [ ] 3.1 Migrate `world/art/tests/test_art_observability.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.2 Migrate `world/art/tests/test_connectivity.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.3 Migrate `world/art/tests/test_gallery.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.4 Migrate `world/art/tests/test_gallery_fallback.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.5 Migrate `world/art/tests/test_gallery_match.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.1 Migrate `world/art/tests/test_art_observability.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.2 Migrate `world/art/tests/test_connectivity.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.3 Migrate `world/art/tests/test_gallery.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.4 Migrate `world/art/tests/test_gallery_fallback.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.5 Migrate `world/art/tests/test_gallery_match.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 3.6 Migrate `world/art/tests/test_gallery_prompt.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
 ## 4. Migrate group 2
 
-- [ ] 4.1 Migrate `world/art/tests/test_gallery_seed.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.2 Migrate `world/art/tests/test_presenter.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.3 Migrate `world/art/tests/test_queue.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.4 Migrate `world/art/tests/test_scheduler.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.5 Migrate `world/art/tests/test_sd_worker.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.6 Migrate `world/art/tests/test_service.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.1 Migrate `world/art/tests/test_gallery_seed.py` (tier B): confirmed zero findings — migrates by ledger-entry removal alone (7.1); focused label green
+- [x] 4.2 Migrate `world/art/tests/test_presenter.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.3 Migrate `world/art/tests/test_queue.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.4 Migrate `world/art/tests/test_scheduler.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.5 Migrate `world/art/tests/test_sd_worker.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.6 Migrate `world/art/tests/test_service.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
 ## 5. Migrate group 3
 

@@ -27,7 +27,7 @@ from world.art.subjects import ArtSubject, ArtSubjectKind
 from tools.spec_traceability import covers_requirement
 
 
-def _scene(key="forest_path"):
+def _scene(key="t_synth_forest"):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
@@ -67,17 +67,17 @@ class ArtQueueTests(EvenniaTestCase):
             subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/forest_path.png",
+            output_identity="scene/t_synth_forest.png",
             error=None,
         )
         ensure(subject, "desc-d")
         done = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
         self.assertEqual(done.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(done.db.output_identity, "scene/forest_path.png")
+        self.assertEqual(done.db.output_identity, "scene/t_synth_forest.png")
 
     @covers_requirement("art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent")
     def test_missing_and_failed_records_become_pending(self):
-        subject = _scene("tavern_interior")
+        subject = _scene("t_synth_tavern")
         created = ensure(subject, "desc")
         self.assertEqual(created.db.status, ArtAssetStatus.PENDING)
 
@@ -99,20 +99,20 @@ class ArtQueueTests(EvenniaTestCase):
 
     @covers_requirement("art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent")
     def test_forced_regeneration_resets_and_preserves_the_prior_output(self):
-        subject = _scene("dungeon_interior")
+        subject = _scene("t_synth_dungeon")
         ensure(subject, "desc")
         claimed = claim(10)
         settle(
             subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/dungeon_interior.png",
+            output_identity="scene/t_synth_dungeon.png",
             error=None,
         )
         requeue(subject)
         record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
         self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
-        self.assertEqual(record.db.prior_output_identity, "scene/dungeon_interior.png")
+        self.assertEqual(record.db.prior_output_identity, "scene/t_synth_dungeon.png")
         claimed = claim(10)
         settle(
             subject,
@@ -122,11 +122,11 @@ class ArtQueueTests(EvenniaTestCase):
             error="boom",
         )
         self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
-        self.assertEqual(record.db.prior_output_identity, "scene/dungeon_interior.png")
+        self.assertEqual(record.db.prior_output_identity, "scene/t_synth_dungeon.png")
 
     @covers_requirement("art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent")
     def test_stale_settle_for_a_requeued_record_is_a_noop(self):
-        subject = _scene("dungeon_interior")
+        subject = _scene("t_synth_dungeon")
         ensure(subject, "desc")
         held = claim(10)
         requeue(subject)
@@ -134,7 +134,7 @@ class ArtQueueTests(EvenniaTestCase):
             subject,
             generation_token=str(held[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/dungeon_interior.png", error=None,
+            output_identity="scene/t_synth_dungeon.png", error=None,
         )
         self.assertIsNone(stale)
         record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
@@ -142,32 +142,32 @@ class ArtQueueTests(EvenniaTestCase):
 
     @covers_requirement("art-queue-worker::a-changed-source-description-hash-is-reported-never-silently-applied")
     def test_changed_hash_is_staff_noted_without_replacing_the_image(self):
-        subject = _scene("city_street")
+        subject = _scene("t_synth_city")
         ensure(subject, "original description")
         claimed = claim(10)
         settle(
             subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/city_street.png",
+            output_identity="scene/t_synth_city.png",
             error=None,
         )
         ensure(subject, "changed description")
         record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
         self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.output_identity, "scene/city_street.png")
+        self.assertEqual(record.db.output_identity, "scene/t_synth_city.png")
         self.assertTrue(record.db.hash_changed)
 
     @covers_requirement("art-queue-worker::a-changed-source-description-hash-is-reported-never-silently-applied")
     def test_changed_prompt_digest_is_staff_noted_without_replacing_the_image(self):
-        subject = _scene("city_street")
+        subject = _scene("t_synth_city")
         ensure(subject, "same description")
         claimed = claim(10)
         settle(
             subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/city_street.png",
+            output_identity="scene/t_synth_city.png",
             error=None,
         )
         # Simulate an admin edit of art.scene_prompt: the stored digest no
@@ -179,12 +179,12 @@ class ArtQueueTests(EvenniaTestCase):
         ensure(subject, "same description")
         record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
         self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.output_identity, "scene/city_street.png")
+        self.assertEqual(record.db.output_identity, "scene/t_synth_city.png")
         self.assertTrue(record.db.hash_changed)
         self.assertEqual(record.db.source_hash, source_hash("same description"))
 
     def test_ensure_stores_the_rendered_prompt_digest(self):
-        subject = _scene("forest_path")
+        subject = _scene("t_synth_forest")
         record = ensure(subject, "desc")
         self.assertTrue(record.db.prompt_digest)
         self.assertNotEqual(record.db.prompt_digest, source_hash("desc"))
@@ -193,14 +193,14 @@ class ArtQueueTests(EvenniaTestCase):
         self.assertEqual(again.db.status, ArtAssetStatus.PENDING)
 
     def test_requeue_recomputes_the_rendered_prompt_digest(self):
-        subject = _scene("dungeon_interior")
+        subject = _scene("t_synth_dungeon")
         ensure(subject, "desc")
         claimed = claim(10)
         settle(
             subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/dungeon_interior.png",
+            output_identity="scene/t_synth_dungeon.png",
             error=None,
         )
         record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
@@ -213,7 +213,7 @@ class ArtQueueTests(EvenniaTestCase):
 
     @covers_requirement("art-queue-worker::asset-records-carry-the-full-contract-and-never-a-live-object-reference")
     def test_claim_makes_in_progress_with_a_lease_and_increments_attempts(self):
-        subject = _scene("mountain_path")
+        subject = _scene("t_synth_mountain")
         ensure(subject, "desc")
         claimed = claim(10)
         self.assertEqual(len(claimed), 1)
@@ -225,7 +225,7 @@ class ArtQueueTests(EvenniaTestCase):
 
     @covers_requirement("art-queue-worker::asset-records-carry-the-full-contract-and-never-a-live-object-reference")
     def test_expired_lease_is_reclaimed_to_pending(self):
-        subject = _scene("coastal_path")
+        subject = _scene("t_synth_coast")
         ensure(subject, "desc")
         claim(10)
         record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
@@ -236,8 +236,8 @@ class ArtQueueTests(EvenniaTestCase):
         self.assertIsNone(record.db.claimed_at)
 
     def test_failed_keys_lists_failed_subjects(self):
-        good = _scene("forest_path")
-        bad = _scene("cave_interior")
+        good = _scene("t_synth_forest")
+        bad = _scene("t_synth_cave")
         ensure(good, "g")
         ensure(bad, "b")
         claimed = claim(10)
@@ -246,7 +246,7 @@ class ArtQueueTests(EvenniaTestCase):
             good,
             generation_token=tokens[record_key(good)],
             status=ArtAssetStatus.DONE,
-            output_identity="scene/forest_path.png",
+            output_identity="scene/t_synth_forest.png",
             error=None,
         )
         settle(
@@ -256,16 +256,16 @@ class ArtQueueTests(EvenniaTestCase):
             output_identity=None,
             error="boom",
         )
-        self.assertEqual(failed_keys(), ["scene:cave_interior"])
+        self.assertEqual(failed_keys(), ["scene:t_synth_cave"])
 
     def test_duplicate_records_are_consolidated_keeping_the_most_advanced(self):
-        subject = _scene("ruin_interior")
+        subject = _scene("t_synth_ruin")
         from world.art.queue import _create_record, record_key
 
         first = _create_record(subject)
         second = _create_record(subject)
         second.db.status = ArtAssetStatus.DONE
-        second.db.output_identity = "scene/ruin_interior.png"
+        second.db.output_identity = "scene/t_synth_ruin.png"
         ensure(subject, "desc")
         records = ArtAssetRecord.objects.filter(db_key=record_key(subject))
         self.assertEqual(records.count(), 1)
@@ -273,7 +273,7 @@ class ArtQueueTests(EvenniaTestCase):
 
     @covers_requirement("art-queue-worker::scenes-and-portraits-share-one-serialization-lock-and-one-worker-concurrency-slot")
     def test_concurrent_drains_serialize_and_never_hold_the_lock_across_a_worker_wait(self):
-        for key in ("forest_path", "tavern_interior", "city_street"):
+        for key in ("t_synth_forest", "t_synth_tavern", "t_synth_city"):
             ensure(_scene(key), f"desc-{key}")
         # A drain is claim -> worker run -> settle. The worker run must never
         # execute while the queue lock is held: after claim() returns the lock
@@ -295,7 +295,7 @@ class ArtQueueTests(EvenniaTestCase):
         lock_free_during_worker_wait.append(not queue_lock.locked())
         self.assertEqual(len(second_batch), 1)
         self.assertEqual(
-            {record.db.subject_key for record in second_batch}, {"city_street"}
+            {record.db.subject_key for record in second_batch}, {"t_synth_city"}
         )
         self.assertTrue(all(lock_free_during_worker_wait))
         pending = [
@@ -311,7 +311,7 @@ class ArtQueueTests(EvenniaTestCase):
         # A record claimed under token A, then re-claimed under a fresh token
         # B (lease expiry or forced requeue), can never be failed by the
         # obsolete worker's late terminal settle.
-        subject = _scene("dungeon_interior")
+        subject = _scene("t_synth_dungeon")
         ensure(subject, "desc")
         held = claim(10)[0]
         token_a = str(held.db.generation_token)
@@ -336,7 +336,7 @@ class ArtQueueTests(EvenniaTestCase):
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_the_current_token_failure_settle_still_applies(self):
-        subject = _scene("coastal_path")
+        subject = _scene("t_synth_coast")
         ensure(subject, "desc")
         claimed = claim(10)
         settled = settle(
@@ -427,22 +427,22 @@ class GalleryJobQueueTests(EvenniaTestCase):
     def test_failed_keys_excludes_gallery_job_records(self):
         subject = _character("42")
         job = _enqueue_gallery(subject, "55555555-5555-4555-8555-555555555555")
-        ensure(_scene("cave_interior"), "b")
+        ensure(_scene("t_synth_cave"), "b")
         claimed = claim(10)
         tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
         settle(
-            _scene("cave_interior"),
-            generation_token=tokens[record_key(_scene("cave_interior"))],
+            _scene("t_synth_cave"),
+            generation_token=tokens[record_key(_scene("t_synth_cave"))],
             status=ArtAssetStatus.FAILED,
             output_identity=None,
             error="boom",
         )
-        self.assertEqual(failed_keys(), ["scene:cave_interior"])
+        self.assertEqual(failed_keys(), ["scene:t_synth_cave"])
         self.assertNotIn(job.db_key.removeprefix("art:"), failed_keys())
 
     def test_a_scene_subject_has_no_gallery(self):
         with self.assertRaises(GalleryRecordError):
-            _enqueue_gallery(_scene("forest_path"))
+            _enqueue_gallery(_scene("t_synth_forest"))
         self.assertEqual(ArtAssetRecord.objects.all().count(), 0)
 
     @covers_requirement(
