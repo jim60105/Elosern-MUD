@@ -15,6 +15,16 @@ import {
   CREATION_PANEL_SAMPLE,
 } from "../../stories/fixtures.js";
 import * as fx from "./protocol_fixtures.js";
+import CombatMenu from "../../lib/combat_menu.js";
+import { SYNTH_ITEM, SYNTH_SKILL, SYNTH_TITLE } from "../support/synthetic-data.mjs";
+
+// File-local synthetic rows (test-data-independence): the kit skill/item/title
+// plus one invented t_-keyed scale-carrying row with invented prose. The
+// attack row's key is wire vocabulary owned by the combat model
+// (BASIC_ATTACK_KEY — the root attack opener resolves it), so it carries the
+// model constant rather than a catalog literal.
+const T_WIND = "t_gale_crescent";
+const T_WIND_LABEL = "巒風刃";
 
 const ENVELOPE_KEYS = [
   "action_id",
@@ -49,7 +59,7 @@ function nestedSkills(skills) {
 }
 
 const SKILL_ATTACK = {
-  key: "basic_attack",
+  key: CombatMenu.BASIC_ATTACK_KEY,
   label: "攻擊",
   description: "基本攻擊，對單一目標造成傷害。",
   cost: {},
@@ -62,8 +72,8 @@ const SKILL_ATTACK = {
 };
 
 const SKILL_WIND = {
-  key: "wind_blade",
-  label: "風刃術",
+  key: T_WIND,
+  label: T_WIND_LABEL,
   description: "以風刃襲擊單一目標。",
   cost: { mp: 14 },
   target_spec: "single",
@@ -76,8 +86,8 @@ const SKILL_WIND = {
 };
 
 const SKILL_FIRE = {
-  key: "fire_ball",
-  label: "火球術",
+  key: SYNTH_SKILL.id,
+  label: SYNTH_SKILL.label,
   description: "轟擊範圍內的所有敵人。",
   cost: { mp: 10 },
   target_spec: "area",
@@ -178,9 +188,9 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         openExploration();
         // The drawer row intent path (AppClient.onInventoryItemAction forwards
         // the panel's {action_id, payload}; the catalog resolves the key).
-        store.dispatchAction("inventory.use", { item_key: "healing_potion" });
+        store.dispatchAction("inventory.use", { item_key: SYNTH_ITEM.id });
       },
-      expected: "use healing_potion",
+      expected: "use " + SYNTH_ITEM.id,
     },
     {
       id: "backpack row: equipment toggle (both directions echo equip)",
@@ -234,10 +244,10 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         // The codex window intent (AppClient forwards {action_id, payload}).
         store.dispatchAction("title.equip", {
           kind: "fixed",
-          identifier: "g_f_rank",
+          identifier: SYNTH_TITLE.id,
         });
       },
-      expected: "title equip fixed g_f_rank",
+      expected: "title equip fixed " + SYNTH_TITLE.id,
     },
     {
       id: "codex window: confirmed epithet removal row (payload-only)",
@@ -318,14 +328,14 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         store.focusConfirm("pointer"); // the skills tab pushes the category frame
         expect(store.focusItemByKey("skill-cat-0")).toBe(true);
         store.focusConfirm("pointer"); // single-group category collapses to the group frame // single-group category collapses to the group frame
-        expect(store.focusItemByKey("fire_ball")).toBe(true);
+        expect(store.focusItemByKey(SYNTH_SKILL.id)).toBe(true);
         store.focusConfirm("pointer"); // opens the AREA target frame
         expect(store.focusItemByKey("shorthand-all-enemies")).toBe(true);
         store.focusConfirm("pointer"); // client-local shorthand choice
         expect(store.focusItemByKey("area-confirm")).toBe(true);
         store.focusConfirm("keyboard");
       },
-      expected: "cast 火球術=all-enemies",
+      expected: `cast ${SYNTH_SKILL.label}=all-enemies`,
     },
     {
       id: "combat: AREA cast on explicitly selected targets (D3b labels)",
@@ -337,7 +347,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         store.focusConfirm("pointer"); // the skills tab pushes the category frame
         expect(store.focusItemByKey("skill-cat-0")).toBe(true);
         store.focusConfirm("pointer"); // single-group category collapses to the group frame
-        expect(store.focusItemByKey("fire_ball")).toBe(true);
+        expect(store.focusItemByKey(SYNTH_SKILL.id)).toBe(true);
         store.focusConfirm("pointer"); // opens the AREA target frame
         expect(store.focusItemByKey("area-7")).toBe(true);
         store.focusPress(" ");
@@ -346,7 +356,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         expect(store.focusItemByKey("area-confirm")).toBe(true);
         store.focusConfirm("keyboard");
       },
-      expected: "cast 火球術=灰袍盜賊、同行劍士",
+      expected: `cast ${SYNTH_SKILL.label}=灰袍盜賊、同行劍士`,
     },
     {
       id: "combat: cast with a non-default freeform magnitude",
@@ -358,13 +368,13 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         store.focusConfirm("pointer"); // the skills tab pushes the category frame
         expect(store.focusItemByKey("skill-cat-0")).toBe(true);
         store.focusConfirm("pointer"); // single-group category collapses to the group frame
-        expect(store.focusItemByKey("wind_blade")).toBe(true);
+        expect(store.focusItemByKey(T_WIND)).toBe(true);
         store.focusConfirm("pointer"); // master skill stops at the 威力 step
         expect(store.focusItemByKey("scale-2")).toBe(true);
         store.focusConfirm("pointer"); // chosen scale applies, targets open
         store.focusConfirm("keyboard"); // first target, keyboard submit
       },
-      expected: "cast 風刃術（威力×2）=灰袍盜賊",
+      expected: `cast ${T_WIND_LABEL}（威力×2）=灰袍盜賊`,
     },
     {
       id: "combat: cast with the DEFAULT magnitude shows no 威力 suffix",
@@ -376,13 +386,13 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         store.focusConfirm("pointer"); // the skills tab pushes the category frame
         expect(store.focusItemByKey("skill-cat-0")).toBe(true);
         store.focusConfirm("pointer"); // single-group category collapses to the group frame
-        expect(store.focusItemByKey("wind_blade")).toBe(true);
+        expect(store.focusItemByKey(T_WIND)).toBe(true);
         store.focusConfirm("pointer"); // master skill stops at the 威力 step
         expect(store.focusItemByKey("scale-1")).toBe(true);
         store.focusConfirm("pointer");
         store.focusConfirm("keyboard");
       },
-      expected: "cast 風刃術=灰袍盜賊",
+      expected: `cast ${T_WIND_LABEL}=灰袍盜賊`,
     },
     {
       id: "combat: flee row (button label forwarded, form (b))",
@@ -472,7 +482,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         // (the server-authored affordance label); the store echoes it verbatim.
         store.dispatchAction(
           "explore.deliver",
-          { npc_id: 7, item_key: "healing_potion" },
+          { npc_id: 7, item_key: SYNTH_ITEM.id },
           { actionLabel: "交付 治療藥水 給 店長" },
         );
       },
@@ -642,7 +652,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         openExploration();
         enterCombat([SKILL_ATTACK]);
         // OptionCard intents carry only {action_id, payload}.
-        store.dispatchAction("combat.cast", { skill_key: "basic_attack", target_ids: [7] });
+        store.dispatchAction("combat.cast", { skill_key: SKILL_ATTACK.key, target_ids: [7] });
       },
       expected: "cast 攻擊=灰袍盜賊",
     },

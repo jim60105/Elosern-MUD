@@ -52,13 +52,13 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
   it("renders the 裝備描述 column with one entry per primary row grouped by slot label", () => {
     const w = mountDoll({ character: characterWith([
       { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺" },
-      { slot: "armor", item_key: "leather_armor", display_name: "皮甲" },
+      { slot: "armor", item_key: "t_hide_vest", display_name: "革製護身衣" },
       { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符" },
       { slot: "accessory", item_key: "speed_charm", display_name: "迅捷護符" },
     ]) });
     const description = w.get('[data-testid="equipment-doll__description"]');
     expect(description.get('[data-testid="equipment-doll__description-row--weapon_main"]').text()).toBe("主手 · 短劍 · 拾遺");
-    expect(description.get('[data-testid="equipment-doll__description-row--armor"]').text()).toBe("盔甲 · 皮甲");
+    expect(description.get('[data-testid="equipment-doll__description-row--armor"]').text()).toBe("盔甲 · 革製護身衣");
     // 副手 carries no committed row → no description entry is invented.
     expect(description.find('[data-testid="equipment-doll__description-row--weapon_off"]').exists()).toBe(false);
     // Every accessory row renders in the description column's accessory
@@ -156,7 +156,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
       character: characterWith([
         { slot: "weapon_main", item_key: "short_sword_lost", display_name: "短劍 · 拾遺", held: 1, equipped: true },
         { slot: "weapon_off", item_key: "dagger_moon", display_name: "月牙短匕", held: 1, equipped: true },
-        { slot: "armor", item_key: "leather_armor", display_name: "皮甲", held: 1, equipped: true },
+        { slot: "armor", item_key: "t_hide_vest", display_name: "革製護身衣", held: 1, equipped: true },
         { slot: "accessory", item_key: "fog_talisman", display_name: "霧隱護符", held: 1, equipped: true },
       ]),
     });
@@ -230,7 +230,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
         { slot: "weapon_main", item_key: "light_blade", display_name: "輕劍", held: 1, equipped: false },
         { slot: "weapon_off", item_key: "dagger_moon", display_name: "月牙短匕", held: 1, equipped: true },
         { slot: "weapon_off", item_key: "bone_knife", display_name: "骨刀", held: 1, equipped: false },
-        { slot: "armor", item_key: "leather_armor", display_name: "皮甲", held: 1, equipped: true },
+        { slot: "armor", item_key: "t_hide_vest", display_name: "革製護身衣", held: 1, equipped: true },
         { slot: "armor", item_key: "steel_plate", display_name: "鋼板甲", held: 1, equipped: false },
       ]),
     });
@@ -241,7 +241,7 @@ describe("EquipmentDoll (H4 equipment doll)", () => {
     const offSlot = w.get('[data-testid="equipment-doll__slot--weapon_off"]');
     expect(offSlot.find("svg").exists()).toBe(false);
     expect(w.get('[data-testid="equipment-doll__description-row--weapon_off"]').text()).toContain("月牙短匕");
-    expect(w.get('[data-testid="equipment-doll__description-row--armor"]').text()).toContain("皮甲");
+    expect(w.get('[data-testid="equipment-doll__description-row--armor"]').text()).toContain("革製護身衣");
     // The duplicate committed rows render as labelled overflow rows.
     const dupes = w.findAll('[data-testid^="equipment-doll__duplicate-row--"]');
     expect(dupes).toHaveLength(3);

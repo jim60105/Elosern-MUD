@@ -8,6 +8,18 @@ const test = require("node:test");
 const assert = require("node:assert");
 
 const Echo = require("../elosern/command_echo.js");
+const { SYNTH_ITEM, SYNTH_TITLE } = require("./support/synthetic-data.js");
+
+// File-local synthetic rows (test-data-independence): the echo surface forwards
+// payload identifiers and labels verbatim, so invented t_-keyed rows with
+// invented prose exercise the same resolvers as shipped content used to.
+const T_SKILL = "t_ember_burst_echo";
+const T_SKILL_LABEL = "燼爆試術";
+const T_AREA = "t_gale_crescent";
+const T_AREA_LABEL = "巒風刃";
+const T_MIN_LABEL = "巒";
+const T_SELF_SKILL = "t_iron_hide";
+const T_SELF_LABEL = "鐵膚合成";
 
 test("explore.look resolves the room to the bare look command", () => {
   assert.strictEqual(
@@ -171,8 +183,8 @@ test("explore.move has no typed command and emits the exit label", () => {
 
 test("combat.cast without a target resolves to cast <skill>", () => {
   assert.strictEqual(
-    Echo.commandLine("combat.cast", { skill_key: "body_strengthen" }, { skillLabel: "身體強化" }),
-    "cast 身體強化"
+    Echo.commandLine("combat.cast", { skill_key: T_SELF_SKILL }, { skillLabel: T_SELF_LABEL }),
+    `cast ${T_SELF_LABEL}`
   );
 });
 
@@ -180,10 +192,10 @@ test("combat.cast with a target token resolves to cast <skill>=<target>", () => 
   assert.strictEqual(
     Echo.commandLine(
       "combat.cast",
-      { skill_key: "fire_ball", target_ids: ["goblin_1"] },
-      { skillLabel: "火球術", targetLabel: "哥布林" }
+      { skill_key: T_SKILL, target_ids: ["goblin_1"] },
+      { skillLabel: T_SKILL_LABEL, targetLabel: "哥布林" }
     ),
-    "cast 火球術=哥布林"
+    `cast ${T_SKILL_LABEL}=哥布林`
   );
 });
 
@@ -191,10 +203,10 @@ test("combat.cast with an AREA shorthand resolves to cast <skill>=<shorthand>", 
   assert.strictEqual(
     Echo.commandLine(
       "combat.cast",
-      { skill_key: "fire_ball", target_shorthand: "all-enemies" },
-      { skillLabel: "火球術" }
+      { skill_key: T_SKILL, target_shorthand: "all-enemies" },
+      { skillLabel: T_SKILL_LABEL }
     ),
-    "cast 火球術=all-enemies"
+    `cast ${T_SKILL_LABEL}=all-enemies`
   );
 });
 
@@ -202,18 +214,18 @@ test("combat.cast echoes the chosen freeform magnitude label", () => {
   assert.strictEqual(
     Echo.commandLine(
       "combat.cast",
-      { skill_key: "wind_blade", scale: 2, target_ids: [2] },
-      { skillLabel: "風刃術", scaleLabel: "2", targetLabel: "哥布林" }
+      { skill_key: T_AREA, scale: 2, target_ids: [2] },
+      { skillLabel: T_AREA_LABEL, scaleLabel: "2", targetLabel: "哥布林" }
     ),
-    "cast 風刃術（威力×2）=哥布林"
+    `cast ${T_AREA_LABEL}（威力×2）=哥布林`
   );
   assert.strictEqual(
     Echo.commandLine(
       "combat.cast",
-      { skill_key: "wind_blade", scale: 0.5, target_shorthand: "all-enemies" },
-      { skillLabel: "風刃術", scaleLabel: "1/2" }
+      { skill_key: T_AREA, scale: 0.5, target_shorthand: "all-enemies" },
+      { skillLabel: T_AREA_LABEL, scaleLabel: "1/2" }
     ),
-    "cast 風刃術（威力×1/2）=all-enemies"
+    `cast ${T_AREA_LABEL}（威力×1/2）=all-enemies`
   );
 });
 
@@ -221,10 +233,10 @@ test("combat.cast without a scale label stays byte-identical", () => {
   assert.strictEqual(
     Echo.commandLine(
       "combat.cast",
-      { skill_key: "wind_blade", target_shorthand: "all-enemies" },
-      { skillLabel: "風刃術" }
+      { skill_key: T_AREA, target_shorthand: "all-enemies" },
+      { skillLabel: T_AREA_LABEL }
     ),
-    "cast 風刃術=all-enemies"
+    `cast ${T_AREA_LABEL}=all-enemies`
   );
 });
 
@@ -273,15 +285,15 @@ test("guild.exam_start resolves to guild exam <target_rank>", () => {
 
 test("shop.buy resolves to buy <item> <quantity>", () => {
   assert.strictEqual(
-    Echo.commandLine("shop.buy", { item_key: "healing_potion", quantity: 3 }, { itemLabel: "治療藥水" }),
-    "buy 治療藥水 3"
+    Echo.commandLine("shop.buy", { item_key: SYNTH_ITEM.id, quantity: 3 }, { itemLabel: SYNTH_ITEM.display }),
+    `buy ${SYNTH_ITEM.display} 3`
   );
 });
 
 test("shop.sell resolves to sell <item> <quantity>", () => {
   assert.strictEqual(
-    Echo.commandLine("shop.sell", { item_key: "healing_potion", quantity: 2 }, { itemLabel: "治療藥水" }),
-    "sell 治療藥水 2"
+    Echo.commandLine("shop.sell", { item_key: SYNTH_ITEM.id, quantity: 2 }, { itemLabel: SYNTH_ITEM.display }),
+    `sell ${SYNTH_ITEM.display} 2`
   );
 });
 
@@ -391,8 +403,8 @@ test("line separators in speech are collapsed, never echoed as raw newlines", ()
 
 test("inventory.use resolves to the typed use command", () => {
   assert.strictEqual(
-    Echo.commandLine("inventory.use", { item_key: "healing_potion" }, null),
-    "use healing_potion"
+    Echo.commandLine("inventory.use", { item_key: SYNTH_ITEM.id }, null),
+    `use ${SYNTH_ITEM.id}`
   );
 });
 
@@ -483,8 +495,8 @@ test("character.persona.update stays silent on an unknown field or bad text", ()
 
 test("title.equip resolves both kinds from the payload identifier", () => {
   assert.strictEqual(
-    Echo.commandLine("title.equip", { kind: "fixed", identifier: "g_f_rank" }, null),
-    "title equip fixed g_f_rank"
+    Echo.commandLine("title.equip", { kind: "fixed", identifier: SYNTH_TITLE.id }, null),
+    `title equip fixed ${SYNTH_TITLE.id}`
   );
   assert.strictEqual(
     Echo.commandLine(
@@ -551,37 +563,37 @@ test("title echoes keep the full 64-code-point contract cap, never 60", () => {
 test("combat.cast echoes explicit multi-target labels in payload order (D3b)", () => {
   const line = Echo.commandLine(
     "combat.cast",
-    { skill_key: "wind_blade", target_ids: ["goblin_1", "orc_2"] },
-    { skillLabel: "風刃術", targetLabels: ["哥布林", "獸人"] }
+    { skill_key: T_AREA, target_ids: ["goblin_1", "orc_2"] },
+    { skillLabel: T_AREA_LABEL, targetLabels: ["哥布林", "獸人"] }
   );
-  assert.strictEqual(line, "cast 風刃術=哥布林、獸人");
+  assert.strictEqual(line, `cast ${T_AREA_LABEL}=哥布林、獸人`);
 });
 
 test("combat.cast bounds multi-target labels and prefers shorthand over them", () => {
   const huge = "太".repeat(Echo.MAX_LABEL_LENGTH + 10);
   const line = Echo.commandLine(
     "combat.cast",
-    { skill_key: "wind_blade", target_ids: ["a", "b"] },
-    { skillLabel: "風", targetLabels: [huge, "乙"] }
+    { skill_key: T_AREA, target_ids: ["a", "b"] },
+    { skillLabel: T_MIN_LABEL, targetLabels: [huge, "乙"] }
   );
   assert.ok(line !== null);
   assert.ok(line.length <= Echo.MAX_LINE_LENGTH);
   const shorthand = Echo.commandLine(
     "combat.cast",
-    { skill_key: "wind_blade", target_shorthand: "all-enemies", target_ids: ["a"] },
-    { skillLabel: "風", targetLabels: ["甲", "乙"] }
+    { skill_key: T_AREA, target_shorthand: "all-enemies", target_ids: ["a"] },
+    { skillLabel: T_MIN_LABEL, targetLabels: ["甲", "乙"] }
   );
-  assert.strictEqual(shorthand, "cast 風=all-enemies");
+  assert.strictEqual(shorthand, `cast ${T_MIN_LABEL}=all-enemies`);
 });
 
 test("combat.cast with empty or non-array targetLabels falls back like before", () => {
   assert.strictEqual(
-    Echo.commandLine("combat.cast", { skill_key: "k" }, { skillLabel: "風", targetLabels: [] }),
-    "cast 風"
+    Echo.commandLine("combat.cast", { skill_key: "k" }, { skillLabel: T_MIN_LABEL, targetLabels: [] }),
+    `cast ${T_MIN_LABEL}`
   );
   assert.strictEqual(
-    Echo.commandLine("combat.cast", { skill_key: "k" }, { skillLabel: "風", targetLabels: "甲" }),
-    "cast 風"
+    Echo.commandLine("combat.cast", { skill_key: "k" }, { skillLabel: T_MIN_LABEL, targetLabels: "甲" }),
+    `cast ${T_MIN_LABEL}`
   );
 });
 
@@ -615,7 +627,7 @@ const COVERAGE_MANIFEST = require("./command_echo_coverage_manifest.json");
 const REGISTERED_MUTATION_ACTIONS = {
   "account.character.create": null,
   "account.character.switch": null,
-  "combat.cast": { payload: { skill_key: "wind_blade" }, display: { skillLabel: "風刃術" } },
+  "combat.cast": { payload: { skill_key: T_AREA }, display: { skillLabel: T_AREA_LABEL } },
   "character.persona.update": { payload: { field: "habit", text: "清晨練劍" }, display: {} },
   "combat.flee": { payload: {}, display: { actionLabel: "逃跑" } },
   "combat.forfeit": { payload: {}, display: {} },
@@ -627,8 +639,8 @@ const REGISTERED_MUTATION_ACTIONS = {
   "creation.roll_name": null,
   "explore.engage": { payload: {}, display: { targetLabel: "哥布林" } },
   "explore.deliver": {
-    payload: { npc_id: "granny", item_key: "healing_potion" },
-    display: { actionLabel: "交付 治療藥水 給 灰婆婆" },
+    payload: { npc_id: "granny", item_key: SYNTH_ITEM.id },
+    display: { actionLabel: `交付 ${SYNTH_ITEM.display} 給 灰婆婆` },
   },
   "explore.dialogue_leave": null,
   "explore.look": { payload: { room: true }, display: { room: true } },
@@ -648,13 +660,13 @@ const REGISTERED_MUTATION_ACTIONS = {
   "guild.quest_turnin": { payload: { quest_id: "quest_1" }, display: {} },
   "guild.register": { payload: {}, display: {} },
   "inventory.toggle_equip": { payload: { item_key: "leather_vest" }, display: {} },
-  "inventory.use": { payload: { item_key: "healing_potion" }, display: {} },
+  "inventory.use": { payload: { item_key: SYNTH_ITEM.id }, display: {} },
   "options.dismiss": null,
-  "shop.buy": { payload: { item_key: "healing_potion", quantity: 2 }, display: { itemLabel: "治療藥水" } },
-  "shop.sell": { payload: { item_key: "healing_potion", quantity: 1 }, display: { itemLabel: "治療藥水" } },
+  "shop.buy": { payload: { item_key: SYNTH_ITEM.id, quantity: 2 }, display: { itemLabel: SYNTH_ITEM.display } },
+  "shop.sell": { payload: { item_key: SYNTH_ITEM.id, quantity: 1 }, display: { itemLabel: SYNTH_ITEM.display } },
   "title.accept": { payload: { index: 2 }, display: {} },
   "title.decline": { payload: {}, display: {} },
-  "title.equip": { payload: { kind: "fixed", identifier: "g_f_rank" }, display: {} },
+  "title.equip": { payload: { kind: "fixed", identifier: SYNTH_TITLE.id }, display: {} },
   "title.remove": { payload: { display: "夜襲之人" }, display: {} },
 };
 

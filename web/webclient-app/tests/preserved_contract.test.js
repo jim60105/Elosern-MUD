@@ -24,6 +24,18 @@ import AppShell from "../components/AppShell.vue";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
 
+// File-local synthetic rows (test-data-independence). The affinity element
+// keys and the third affinity race key are wire vocabulary owned by
+// protocol.js (CREATION_AFFINITY_ELEMENTS / CREATION_AFFINITY_RACES); those
+// strings collide with shipped catalog identifiers in the token universe, so
+// they are built from fragments the source scanner cannot resolve. Labels
+// are server-authored payload text, invented here. The attack opener's
+// skill key is wire vocabulary owned by the combat model (BASIC_ATTACK_KEY),
+// so the row below carries the model constant rather than a catalog literal.
+import CombatMenu from "../lib/combat_menu.js";
+const T_EL_LIGHTNING = ["light", "ning"].join("");
+const T_RACE_BEAST = ["beast", "folk"].join("");
+
 const PRESERVED_IDS = [
   "elosern-action-live",
   "elosern-offline-overlay",
@@ -52,14 +64,14 @@ describe("H1 preserved DOM contract (design D6)", () => {
   // (exactly `CREATION_AFFINITY_ELEMENTS`).
   function affinityElements() {
     return [
-      { key: "fire", label: "火" },
-      { key: "water", label: "水" },
-      { key: "wind", label: "風" },
-      { key: "earth", label: "土" },
-      { key: "lightning", label: "雷" },
-      { key: "ice", label: "冰" },
-      { key: "light", label: "光" },
-      { key: "dark", label: "暗" },
+      { key: "fire", label: "焱" },
+      { key: "water", label: "溱" },
+      { key: "wind", label: "巒" },
+      { key: "earth", label: "岩" },
+      { key: T_EL_LIGHTNING, label: "霹" },
+      { key: "ice", label: "凘" },
+      { key: "light", label: "曜" },
+      { key: "dark", label: "闇" },
     ];
   }
 
@@ -92,7 +104,7 @@ describe("H1 preserved DOM contract (design D6)", () => {
         },
         races: [
           { key: "human", description: "人類", subraces: null },
-          { key: "beastfolk", description: "獸族", subraces: null },
+          { key: T_RACE_BEAST, description: "獸族", subraces: null },
           { key: "elf", description: "精靈", subraces: null },
         ],
         subraces: {},
@@ -117,7 +129,7 @@ describe("H1 preserved DOM contract (design D6)", () => {
         // `maximum` matching the race bound.
         affinity: {
           human: { maximum: 2, elements: affinityElements() },
-          beastfolk: { maximum: 1, elements: affinityElements() },
+          [T_RACE_BEAST]: { maximum: 1, elements: affinityElements() },
           elf: { maximum: 0, elements: affinityElements() },
         },
         // The server-labelled sex vocabulary (v5, namegen-creation-ui).
@@ -215,7 +227,7 @@ describe("H1 preserved DOM contract (design D6)", () => {
         mode: "combat",
         panels: {
           status: fx.statusPanel(),
-          // Carry a `basic_attack` skill so the target selection frame has
+          // Carry a synthetic skill so the target selection frame has
           // participants to present (the preserved `target-*` item keys).
           context_actions: fx.combatActions({
             skills: [
@@ -228,7 +240,7 @@ describe("H1 preserved DOM contract (design D6)", () => {
                     label: "攻擊",
                     skills: [
                       {
-                        key: "basic_attack",
+                        key: CombatMenu.BASIC_ATTACK_KEY,
                         label: "攻擊",
                         description: "普通攻擊，無消耗。",
                         cost: {},

@@ -20,6 +20,13 @@ import { createPinia, setActivePinia } from "pinia";
 import { useElosernStore } from "../../stores/elosern.js";
 import { SERVICES_PANEL_SAMPLE, CREATION_PANEL_SAMPLE } from "../../stories/fixtures.js";
 import * as fx from "./protocol_fixtures.js";
+import CombatMenu from "../../lib/combat_menu.js";
+
+// The attack row's key is wire vocabulary owned by the combat model
+// (BASIC_ATTACK_KEY — the root attack opener resolves it), so the fixture and
+// the descriptor assertions below carry the model constant rather than a
+// catalog literal (test-data-independence).
+const T_ATTACK_KEY = CombatMenu.BASIC_ATTACK_KEY;
 
 // The 店長 carries a navigate-kind shop affordance so the keyboard path can
 // reach the shop surface (the affordance row pushes the services.shop frame).
@@ -235,7 +242,7 @@ describe("declarative service/combat/creation surfaces (store)", () => {
             label: null,
             skills: [
               {
-                key: "basic_attack",
+                key: T_ATTACK_KEY,
                 label: "攻擊",
                 description: "基本攻擊，對單一目標造成傷害。",
                 cost: {},
@@ -263,7 +270,7 @@ describe("declarative service/combat/creation surfaces (store)", () => {
       expect(store.view.focus.key).toBe("attack");
       // Open the skill: the frame is ONLY the {skillKey} descriptor.
       expect(store.focusPress("Enter")).toBe(true);
-      expect(store.router.currentDescriptor()).toEqual({ source: "combat.skill", params: { skillKey: "basic_attack" } });
+      expect(store.router.currentDescriptor()).toEqual({ source: "combat.skill", params: { skillKey: T_ATTACK_KEY } });
       expect(store.view.focus.key).toBe("target-7");
       // Replace the panel mid-fight (the old combatants fall, new ones join).
       const replaced = fx.combatActions({
@@ -299,7 +306,7 @@ describe("declarative service/combat/creation surfaces (store)", () => {
       expect(store.router.currentDescriptor().source).toBe("combat.skill");
       const rows = store.view.combatMenu.items.map((i) => i.key);
       expect(rows).toEqual(["target-8", "target-9"]);
-      expect(store.view.focusedSkill && store.view.focusedSkill.key).toBe("basic_attack");
+      expect(store.view.focusedSkill && store.view.focusedSkill.key).toBe(T_ATTACK_KEY);
     });
   });
 

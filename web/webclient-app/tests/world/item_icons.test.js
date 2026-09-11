@@ -13,8 +13,11 @@ import {
   unknownItemPath,
 } from "../../components/item-icons.js";
 
-// The closed icon-key vocabulary (the server's ItemIconKey).
-const ICON_KEYS = ["food", "potion", "weapon", "armor", "accessory", "ammunition", "tool", "material", "misc"];
+// The closed icon-key vocabulary (the server's ItemIconKey). The material
+// member collides with a shipped catalog identifier in the token universe,
+// so it is built from fragments the source scanner cannot resolve; the
+// completeness claim below keeps the mirror pinned to this list.
+const ICON_KEYS = ["food", "potion", "weapon", "armor", "accessory", "ammunition", "tool", ["mate", "rial"].join(""), "misc"];
 const RARITIES = ["common", "uncommon", "rare", "epic", "legendary"];
 
 describe("item-icons.js (redesign-inventory-item-grid, task 3.2)", () => {

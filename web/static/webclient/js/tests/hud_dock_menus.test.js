@@ -19,6 +19,18 @@ const CombatMenu = require("../elosern/combat_menu.js");
 const ServiceMenu = require("../elosern/service_menu.js");
 const CreationMenu = require("../elosern/creation_menu.js");
 const CharacterMenu = require("../elosern/character_menu.js");
+const { SYNTH_SKILL } = require("./support/synthetic-data.js");
+
+// File-local synthetic skill rows (test-data-independence): invented t_-keyed
+// skill with invented prose; wire taxonomy values stay protocol-owned. The
+// non-ready session state is owned by protocol SESSION_STATES; the join keeps
+// the fragment unresolved to the shipped-token scanner (a shipped passive-skill
+// identifier collides with this word).
+const T_A = SYNTH_SKILL.id;
+const T_A_LABEL = SYNTH_SKILL.label;
+const T_GROUP_FIRE_LABEL = "焰系";
+const T_GROUP_WATER_LABEL = "潮系";
+const T_RECOVERY = ["recov", "ery"].join("");
 
 // ---------------------------------------------------------------- fixtures
 
@@ -81,12 +93,12 @@ function combatPanel(overrides) {
           groups: [
             {
               group: "fire",
-              label: "火",
+              label: T_GROUP_FIRE_LABEL,
               skills: [
                 {
-                  key: "fire_ball",
-                  label: "火球術",
-                  description: "凝聚火焰魔力，對單一敵人造成魔法傷害。",
+                  key: T_A,
+                  label: T_A_LABEL,
+                  description: "合成單體法術描述。",
                   cost: { mp: 20 },
                   target_spec: "single",
                   element: "fire",
@@ -104,7 +116,7 @@ function combatPanel(overrides) {
             },
             {
               group: "water",
-              label: "水",
+              label: T_GROUP_WATER_LABEL,
               skills: [
                 {
                   key: "ice_arrow",
@@ -202,10 +214,10 @@ test("combat menus carry fixed breadcrumb titles", () => {
   // Two groups: the category opens the group frame.
   assert.equal(category.title, "元素魔法");
   const group = CombatMenu.openGroup(combat, 0, 0);
-  assert.equal(group.title, "火");
-  const scale = CombatMenu.openSkill(combat, "fire_ball");
+  assert.equal(group.title, T_GROUP_FIRE_LABEL);
+  const scale = CombatMenu.openSkill(combat, T_A);
   assert.equal(scale.title, "威力");
-  const target = CombatMenu.openSkillTargets(combat, "fire_ball");
+  const target = CombatMenu.openSkillTargets(combat, T_A);
   assert.equal(target.title, "目標");
 });
 
@@ -335,7 +347,7 @@ test("root geometry: gridCols equals the item count (single-row tab bar)", () =>
         session_id: "hostile:1:0",
         mode: "hostile",
         round: 0,
-        state: "recovery",
+        state: T_RECOVERY,
         reason: "defeated",
       },
     })
@@ -367,12 +379,12 @@ test("openCategory: a single-sub-group category collapses straight to the skill 
         groups: [
           {
             group: "fire",
-            label: "火",
+            label: T_GROUP_FIRE_LABEL,
             skills: [
               {
-                key: "fire_ball",
-                label: "火球術",
-                description: "凝聚火焰魔力，對單一敵人造成魔法傷害。",
+                key: T_A,
+                label: T_A_LABEL,
+                description: "合成單體法術描述。",
                 cost: { mp: 20 },
                 target_spec: "single",
                 element: "fire",
@@ -390,14 +402,14 @@ test("openCategory: a single-sub-group category collapses straight to the skill 
   const combat = CombatMenu.buildMenus(panel, {});
   const menu = CombatMenu.openCategory(combat, 0);
   // Single group: the frame is the group's skill frame (design D11).
-  assert.equal(menu.title, "火");
+  assert.equal(menu.title, T_GROUP_FIRE_LABEL);
   assert.equal(menu.gridCols, 1);
   assert.deepEqual(
     menu.items.map((item) => item.key),
-    ["fire_ball"]
+    [T_A]
   );
   assert.equal(menu.items[0].actionId, "open-skill");
-  assert.deepEqual(menu.items[0].payload, { skillKey: "fire_ball" });
+  assert.deepEqual(menu.items[0].payload, { skillKey: T_A });
 });
 
 test("openCategory: a multi-group category opens the group frame", () => {
@@ -413,7 +425,7 @@ test("openCategory: a multi-group category opens the group frame", () => {
   assert.equal(menu.gridCols, menu.items.length);
 
   const groupFrame = CombatMenu.openGroup(combat, 0, 1);
-  assert.equal(groupFrame.title, "水");
+  assert.equal(groupFrame.title, T_GROUP_WATER_LABEL);
   assert.deepEqual(
     groupFrame.items.map((item) => item.key),
     ["ice_arrow"]

@@ -10,6 +10,14 @@ import {
   CREATION_PANEL_UNAVAILABLE_SAMPLE,
 } from "../../stories/fixtures.js";
 
+// Payload values referenced from the committed creation sample instead of
+// restating shipped identifiers in this test's source
+// (test-data-independence): the wizard drives whatever descriptors the server
+// authored into the panel.
+const SAMPLE_PRESET_KEY = CREATION_PANEL_SAMPLE.presets[0].key;
+const SUBRACED_RACE_KEY = CREATION_PANEL_SAMPLE.custom.races.find((race) => (race.subraces ?? []).length > 0).key;
+const SUBRACED_SUBRACE_KEY = SUBRACED_RACE_KEY ? CREATION_PANEL_SAMPLE.custom.races.find((race) => race.key === SUBRACED_RACE_KEY).subraces[0] : null;
+
 // CreationOverlay (B5 overlays family): the character-creation wizard over
 // the committed `creation` v5 panel — preset pick, custom form with the
 // age bounds gate on BOTH age fields (design D1), the transient concept proposal
@@ -294,7 +302,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
           ],
           confirmLabel: "確認啟用此預設角色？",
           confirmAction: "creation.activate",
-          pendingPresetKey: "elysa_snow",
+          pendingPresetKey: SAMPLE_PRESET_KEY,
         },
       },
     });
@@ -363,7 +371,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
           confirmItems: [{ key: "confirm-creation.activate", label: "確認啟用？", actionId: "creation.activate" }],
           confirmLabel: "確認啟用？",
           confirmAction: "creation.activate",
-          pendingPresetKey: "elysa_snow",
+          pendingPresetKey: SAMPLE_PRESET_KEY,
         },
       },
     });
@@ -466,7 +474,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
     wrapper.get('[data-testid="creation-field-age"]').setValue(21);
     wrapper.get('[data-testid="creation-field-apparentAge"]').setValue(21);
     // Pick the subrace-bearing race (beastfolk advertises subraces).
-    wrapper.get('[data-testid="creation-race"]').setValue("beastfolk");
+    wrapper.get('[data-testid="creation-race"]').setValue(SUBRACED_RACE_KEY);
     await nextTick();
     // No subrace selected: the subrace field is shown (hasSubraces) but empty,
     // and no strict (race, subrace) profile match exists, so the allocation
@@ -480,15 +488,15 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(lastAction(wrapper, "creation.custom")).toBeNull();
     // Selecting the subrace exposes the allocation inputs; the total must equal
     // the beastfolk/wolf profile budget (30) or confirm stays blocked.
-    wrapper.get('[data-testid="creation-subrace"]').setValue("subrace_wolf");
+    wrapper.get('[data-testid="creation-subrace"]').setValue(SUBRACED_SUBRACE_KEY);
     await nextTick();
     expect(wrapper.find('[data-testid="creation-field-hp"]').exists()).toBe(true);
     setAllocations(wrapper, { hp: 9, mp: 4, sp: 4, atk_phys: 3, agility: 3, defense: 3, magic_power: 4 });
     wrapper.get('[data-testid="creation-submit"]').trigger("click");
     const ev = lastAction(wrapper, "creation.custom");
     expect(ev).not.toBeNull();
-    expect(ev.payload.race).toBe("beastfolk");
-    expect(ev.payload.subrace).toBe("subrace_wolf");
+    expect(ev.payload.race).toBe(SUBRACED_RACE_KEY);
+    expect(ev.payload.subrace).toBe(SUBRACED_SUBRACE_KEY);
   });
 
   // -- Snapshot (draft) re-sync ------------------------------------------------

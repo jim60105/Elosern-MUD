@@ -20,13 +20,13 @@ const ArtFocus = require("../elosern/art_focus.js");
 function validScene(overrides) {
   return Object.assign(
     {
-      archetype: "tavern_interior",
-      label: "酒館內部",
-      subject_key: "scene:tavern_interior",
+      archetype: "t_hearth_hollow",
+      label: "爐火合成廳",
+      subject_key: "scene:t_hearth_hollow",
       status: "done",
-      url: "/art/scene/tavern_interior.png",
+      url: "/art/scene/t_hearth_hollow.png",
       aspect_ratio: "16:9",
-      alt: "酒館內部場景",
+      alt: "爐火合成廳場景",
       placeholder: null,
     },
     overrides
@@ -128,9 +128,9 @@ test("a done scene reduces to the asset state", () => {
   const model = ArtPanel.reducePanel(validPanel(), "exploration", {});
   assert.equal(model.available, true);
   assert.equal(model.scene.state, "asset");
-  assert.equal(model.scene.url, "/art/scene/tavern_interior.png");
-  assert.equal(model.scene.label, "酒館內部");
-  assert.equal(model.scene.alt, "酒館內部場景");
+  assert.equal(model.scene.url, "/art/scene/t_hearth_hollow.png");
+  assert.equal(model.scene.label, "爐火合成廳");
+  assert.equal(model.scene.alt, "爐火合成廳場景");
 });
 
 test("a missing or failed scene reduces to the placeholder state", () => {
@@ -173,7 +173,7 @@ test("a pending scene with a prior image retains it dimmed", () => {
   });
   const model = ArtPanel.reducePanel(pending, "exploration", prior);
   assert.equal(model.scene.state, "pending");
-  assert.equal(model.scene.url, "/art/scene/tavern_interior.png");
+  assert.equal(model.scene.url, "/art/scene/t_hearth_hollow.png");
 });
 
 test("catalog reduction keys entries by opaque catalog IDs", () => {

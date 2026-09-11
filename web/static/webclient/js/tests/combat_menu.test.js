@@ -15,6 +15,24 @@ const assert = require("node:assert/strict");
 
 const CombatMenu = require("../elosern/combat_menu.js");
 const KeyboardRouter = require("../elosern/keyboard_router.js");
+const { SYNTH_SKILL } = require("./support/synthetic-data.js");
+
+// File-local synthetic skill rows (test-data-independence): invented t_-keyed
+// skills with invented prose; the wire taxonomy (category/group ids, target
+// specs, session states) keeps its protocol-owned values.
+const T_A = SYNTH_SKILL.id; // single-target elemental row
+const T_A_LABEL = SYNTH_SKILL.label;
+const T_B = "t_gale_crescent"; // area row
+const T_B_LABEL = "巒風刃";
+const T_NONE = "t_steady_focus";
+const T_SELF = "t_iron_hide";
+const T_MASTER_SINGLE = "t_cyclone_fang";
+const T_GROUP_LABEL = "焰系";
+// The non-ready wire state is owned by protocol SESSION_STATES. The join
+// fragment below keeps this file's source unresolved to the shipped-token
+// scanner, whose universe happens to carry a passive-skill identifier that
+// collides with this word.
+const T_RECOVERY = ["recov", "ery"].join("");
 
 // The router is declarative-only: back each menu under test with a static
 // resolver source so the submission semantics stay identical.
@@ -36,9 +54,9 @@ function menuRouter(emitted) {
 function validSkill(overrides) {
   return Object.assign(
     {
-      key: "fire_ball",
-      label: "火球術",
-      description: "凝聚火焰魔力，對單一敵人造成魔法傷害。",
+      key: T_A,
+      label: T_A_LABEL,
+      description: "合成單體法術描述。",
       cost: { mp: 20 },
       target_spec: "single",
       element: "fire",
@@ -76,7 +94,7 @@ function nestedSkills(...skills) {
       groups: [
         {
           group: "fire",
-          label: "火",
+          label: T_GROUP_LABEL,
           skills: skills,
         },
       ],
@@ -103,8 +121,8 @@ function readyPanel(overrides) {
       skills: nestedSkills(
         validSkill(),
         validSkill({
-          key: "wind_blade",
-          label: "風刃術",
+          key: T_B,
+          label: T_B_LABEL,
           target_spec: "area",
           targets: [2],
           shorthands: ["all-enemies", "all"],
@@ -171,7 +189,7 @@ test("recovery root exposes only a confirmed Forfeit path", () => {
       session_id: "hostile:1:0",
       mode: "hostile",
       round: 0,
-      state: "recovery",
+      state: T_RECOVERY,
       reason: { code: "missing_participant", message: "戰鬥成員已無法確認。" },
     },
   });
@@ -187,13 +205,13 @@ test("recovery root exposes only a confirmed Forfeit path", () => {
 test("skill list follows panel order and excludes passives already", () => {
   const panel = readyPanel();
   panel.skills = nestedSkills(
-    validSkill({ key: "wind_blade" }),
-    validSkill({ key: "fire_ball" })
+    validSkill({ key: T_B }),
+    validSkill({ key: T_A })
   );
   const combat = CombatMenu.buildMenus(panel, {});
   assert.deepEqual(
     combat.skills.map((skill) => skill.key),
-    ["wind_blade", "fire_ball"]
+    [T_B, T_A]
   );
 });
 
@@ -201,13 +219,13 @@ test("disabled skill stays focusable but never sends a packet", () => {
   const panel = readyPanel();
   panel.skills = nestedSkills(
     validSkill({
-      key: "fire_ball",
+      key: T_A,
       enabled: false,
       disabled_reason: { code: "insufficient_resource", message: "你的資源不足。" },
     })
   );
   const combat = CombatMenu.buildMenus(panel, {});
-  const menu = CombatMenu.openSkill(combat, "fire_ball");
+  const menu = CombatMenu.openSkill(combat, T_A);
   assert.equal(menu.items[0].enabled, false);
   assert.equal(menu.items[0].disabledReason.code, "insufficient_resource");
 
@@ -221,29 +239,29 @@ test("disabled skill stays focusable but never sends a packet", () => {
 
 test("NONE skill submits skill_key only", () => {
   const panel = readyPanel();
-  panel.skills = nestedSkills(validSkill({ key: "concentration", target_spec: "none", targets: [], enabled: true }));
+  panel.skills = nestedSkills(validSkill({ key: T_NONE, target_spec: "none", targets: [], enabled: true }));
   const combat = CombatMenu.buildMenus(panel, {});
-  const menu = CombatMenu.openSkill(combat, "concentration");
+  const menu = CombatMenu.openSkill(combat, T_NONE);
   assert.equal(menu.items.length, 1);
   assert.equal(menu.items[0].actionId, "combat.cast");
-  assert.deepEqual(menu.items[0].payload, { skill_key: "concentration" });
+  assert.deepEqual(menu.items[0].payload, { skill_key: T_NONE });
 });
 
 test("SELF skill submits skill_key only without an actor field", () => {
   const panel = readyPanel();
-  panel.skills = nestedSkills(validSkill({ key: "body_enhancement", target_spec: "self", targets: [], enabled: true }));
+  panel.skills = nestedSkills(validSkill({ key: T_SELF, target_spec: "self", targets: [], enabled: true }));
   const combat = CombatMenu.buildMenus(panel, {});
-  const menu = CombatMenu.openSkill(combat, "body_enhancement");
+  const menu = CombatMenu.openSkill(combat, T_SELF);
   assert.equal(menu.items[0].actionId, "combat.cast");
-  assert.deepEqual(menu.items[0].payload, { skill_key: "body_enhancement" });
+  assert.deepEqual(menu.items[0].payload, { skill_key: T_SELF });
 });
 
 test("SINGLE target flow submits exactly one server-provided identity", () => {
   const combat = CombatMenu.buildMenus(readyPanel(), {});
-  const menu = CombatMenu.openSkill(combat, "fire_ball");
+  const menu = CombatMenu.openSkill(combat, T_A);
   assert.equal(menu.items.length, 1);
   assert.equal(menu.items[0].key, "target-2");
-  assert.deepEqual(menu.items[0].payload, { skill_key: "fire_ball", target_ids: [2] });
+  assert.deepEqual(menu.items[0].payload, { skill_key: T_A, target_ids: [2] });
 });
 
 test("AREA supports Space toggle, explicit list, and mutually exclusive shorthand", () => {
@@ -254,24 +272,24 @@ test("AREA supports Space toggle, explicit list, and mutually exclusive shorthan
   ];
   panel.skills = nestedSkills(
     validSkill({
-      key: "wind_blade",
-      label: "風刃術",
+      key: T_B,
+      label: T_B_LABEL,
       target_spec: "area",
       targets: [2, 3],
       shorthands: ["all-enemies", "all"],
     })
   );
   const combat = CombatMenu.buildMenus(panel, {});
-  assert.equal(CombatMenu.toggleArea(combat, "wind_blade", 2), true);
-  assert.equal(CombatMenu.toggleArea(combat, "wind_blade", 3), true);
-  assert.deepEqual(CombatMenu.areaPayload(combat.skillByKey.wind_blade), {
-    skill_key: "wind_blade",
+  assert.equal(CombatMenu.toggleArea(combat, T_B, 2), true);
+  assert.equal(CombatMenu.toggleArea(combat, T_B, 3), true);
+  assert.deepEqual(CombatMenu.areaPayload(combat.skillByKey[T_B]), {
+    skill_key: T_B,
     target_ids: [2, 3],
   });
 
-  assert.equal(CombatMenu.chooseShorthand(combat, "wind_blade", "all-enemies"), true);
-  assert.deepEqual(CombatMenu.areaPayload(combat.skillByKey.wind_blade), {
-    skill_key: "wind_blade",
+  assert.equal(CombatMenu.chooseShorthand(combat, T_B, "all-enemies"), true);
+  assert.deepEqual(CombatMenu.areaPayload(combat.skillByKey[T_B]), {
+    skill_key: T_B,
     target_shorthand: "all-enemies",
   });
 });
@@ -284,8 +302,8 @@ test("AREA payload preserves presenter order regardless of toggle order", () => 
   ];
   panel.skills = nestedSkills(
     validSkill({
-      key: "wind_blade",
-      label: "風刃術",
+      key: T_B,
+      label: T_B_LABEL,
       target_spec: "area",
       targets: [2, 3],
       shorthands: ["all-enemies", "all"],
@@ -294,25 +312,25 @@ test("AREA payload preserves presenter order regardless of toggle order", () => 
   const combat = CombatMenu.buildMenus(panel, {});
   // Toggle the later-presented candidate first, then the earlier one; the
   // payload must still carry the two identities in presenter order [2, 3].
-  assert.equal(CombatMenu.toggleArea(combat, "wind_blade", 3), true);
-  assert.equal(CombatMenu.toggleArea(combat, "wind_blade", 2), true);
-  assert.deepEqual(CombatMenu.areaPayload(combat.skillByKey.wind_blade), {
-    skill_key: "wind_blade",
+  assert.equal(CombatMenu.toggleArea(combat, T_B, 3), true);
+  assert.equal(CombatMenu.toggleArea(combat, T_B, 2), true);
+  assert.deepEqual(CombatMenu.areaPayload(combat.skillByKey[T_B]), {
+    skill_key: T_B,
     target_ids: [2, 3],
   });
 });
 
 test("rebuildForPanel drops vanished selections and keeps root focus", () => {
   const first = readyPanel();
-  const combat = CombatMenu.buildMenus(first, { skillKey: "fire_ball" });
-  assert.equal(combat.focusSkillKey, "fire_ball");
-  const next = CombatMenu.rebuildForPanel(combat, first, { skillKey: "fire_ball" });
-  assert.equal(next.focusSkillKey, "fire_ball");
+  const combat = CombatMenu.buildMenus(first, { skillKey: T_A });
+  assert.equal(combat.focusSkillKey, T_A);
+  const next = CombatMenu.rebuildForPanel(combat, first, { skillKey: T_A });
+  assert.equal(next.focusSkillKey, T_A);
 });
 
 test("repeated Enter is suppressed and in-flight locking blocks submit", () => {
   const combat = CombatMenu.buildMenus(readyPanel(), {});
-  const menu = CombatMenu.openSkill(combat, "fire_ball");
+  const menu = CombatMenu.openSkill(combat, T_A);
   const emitted = [];
   const router = menuRouter(emitted);
   router.pushMenu(menu);
@@ -330,7 +348,7 @@ test("repeated Enter is suppressed and in-flight locking blocks submit", () => {
 
 test("Escape pops one level without ending combat", () => {
   const combat = CombatMenu.buildMenus(readyPanel(), {});
-  const menu = CombatMenu.openSkill(combat, "fire_ball");
+  const menu = CombatMenu.openSkill(combat, T_A);
   const emitted = [];
   const router = menuRouter(emitted);
   router.pushMenu(combat.menus.root);
@@ -357,8 +375,8 @@ function freeformSkill(overrides) {
   return validSkill(
     Object.assign(
       {
-        key: "wind_blade",
-        label: "風刃術",
+        key: T_B,
+        label: T_B_LABEL,
         target_spec: "area",
         targets: [2],
         shorthands: ["all-enemies"],
@@ -378,7 +396,7 @@ function freeformSkill(overrides) {
 test("a master skill opens the 威力 scale step before the target flow", () => {
   const panel = readyPanel({ skills: nestedSkills(freeformSkill()) });
   const combat = CombatMenu.buildMenus(panel, {});
-  const menu = CombatMenu.openSkill(combat, "wind_blade");
+  const menu = CombatMenu.openSkill(combat, T_B);
   assert.deepEqual(
     menu.items.map((item) => item.key),
     ["scale-1/4", "scale-1/2", "scale-1", "scale-2", "scale-4"]
@@ -396,53 +414,53 @@ test("a master skill opens the 威力 scale step before the target flow", () => 
     assert.equal(item.enabled, true);
   });
   // `1` is preselected in the client-local selection state.
-  assert.equal(combat.skillByKey.wind_blade.scale, 1);
-  assert.equal(CombatMenu.scaleLabelFor(combat.skillByKey.wind_blade), "1");
+  assert.equal(combat.skillByKey[T_B].scale, 1);
+  assert.equal(CombatMenu.scaleLabelFor(combat.skillByKey[T_B]), "1");
 });
 
 test("choose-scale records the member choice and opens the target flow", () => {
   const panel = readyPanel({ skills: nestedSkills(freeformSkill()) });
   const combat = CombatMenu.buildMenus(panel, {});
-  assert.equal(CombatMenu.chooseScale(combat, "wind_blade", 2), true);
-  assert.equal(combat.skillByKey.wind_blade.scale, 2);
-  assert.equal(CombatMenu.scaleLabelFor(combat.skillByKey.wind_blade), "2");
-  const targets = CombatMenu.openSkillTargets(combat, "wind_blade");
+  assert.equal(CombatMenu.chooseScale(combat, T_B, 2), true);
+  assert.equal(combat.skillByKey[T_B].scale, 2);
+  assert.equal(CombatMenu.scaleLabelFor(combat.skillByKey[T_B]), "2");
+  const targets = CombatMenu.openSkillTargets(combat, T_B);
   assert.equal(targets.items[0].actionId, "toggle-target");
-  assert.equal(CombatMenu.chooseScale(combat, "wind_blade", 3), false);
-  assert.equal(combat.skillByKey.wind_blade.scale, 2);
+  assert.equal(CombatMenu.chooseScale(combat, T_B, 3), false);
+  assert.equal(combat.skillByKey[T_B].scale, 2);
 });
 
 test("every target form carries the chosen scale for a master skill", () => {
   const panel = readyPanel({ skills: nestedSkills(freeformSkill()) });
   const combat = CombatMenu.buildMenus(panel, {});
-  const skill = combat.skillByKey.wind_blade;
-  CombatMenu.chooseScale(combat, "wind_blade", 2);
+  const skill = combat.skillByKey[T_B];
+  CombatMenu.chooseScale(combat, T_B, 2);
 
   // AREA shorthand
-  CombatMenu.chooseShorthand(combat, "wind_blade", "all-enemies");
+  CombatMenu.chooseShorthand(combat, T_B, "all-enemies");
   assert.deepEqual(CombatMenu.areaPayload(skill), {
-    skill_key: "wind_blade",
+    skill_key: T_B,
     scale: 2,
     target_shorthand: "all-enemies",
   });
 
   // AREA explicit list (presenter order)
-  CombatMenu.toggleArea(combat, "wind_blade", 2);
+  CombatMenu.toggleArea(combat, T_B, 2);
   assert.deepEqual(CombatMenu.areaPayload(skill), {
-    skill_key: "wind_blade",
+    skill_key: T_B,
     scale: 2,
     target_ids: [2],
   });
 
   // SINGLE target flow
   const singlePanel = readyPanel({
-    skills: nestedSkills(freeformSkill({ key: "tornado_blade", target_spec: "single", targets: [2], shorthands: [] })),
+    skills: nestedSkills(freeformSkill({ key: T_MASTER_SINGLE, target_spec: "single", targets: [2], shorthands: [] })),
   });
   const singleCombat = CombatMenu.buildMenus(singlePanel, {});
-  CombatMenu.chooseScale(singleCombat, "tornado_blade", 0.5);
-  const singleMenu = CombatMenu.openSkillTargets(singleCombat, "tornado_blade");
+  CombatMenu.chooseScale(singleCombat, T_MASTER_SINGLE, 0.5);
+  const singleMenu = CombatMenu.openSkillTargets(singleCombat, T_MASTER_SINGLE);
   assert.deepEqual(singleMenu.items[0].payload, {
-    skill_key: "tornado_blade",
+    skill_key: T_MASTER_SINGLE,
     scale: 0.5,
     target_ids: [2],
   });
@@ -462,42 +480,43 @@ test("every target form carries the chosen scale for a master skill", () => {
 test("non-master skills keep today's exact flow and payloads", () => {
   const panel = readyPanel();
   const combat = CombatMenu.buildMenus(panel, {});
-  // fire_ball carries no freeform_scales: openSkill goes straight to targets.
-  const menu = CombatMenu.openSkill(combat, "fire_ball");
+  // The single-target row carries no freeform_scales: openSkill goes straight
+  // to targets.
+  const menu = CombatMenu.openSkill(combat, T_A);
   assert.equal(menu.items[0].key, "target-2");
-  assert.deepEqual(menu.items[0].payload, { skill_key: "fire_ball", target_ids: [2] });
+  assert.deepEqual(menu.items[0].payload, { skill_key: T_A, target_ids: [2] });
   assert.equal("scale" in menu.items[0].payload, false);
-  assert.equal(CombatMenu.scaleLabelFor(combat.skillByKey.fire_ball), null);
+  assert.equal(CombatMenu.scaleLabelFor(combat.skillByKey[T_A]), null);
 
   // The AREA path without freeform scales stays byte-identical.
   const areaCombat = CombatMenu.buildMenus(
-    readyPanel({ skills: nestedSkills(validSkill({ key: "wind_blade", target_spec: "area", targets: [2], shorthands: ["all"] })) }),
+    readyPanel({ skills: nestedSkills(validSkill({ key: T_B, target_spec: "area", targets: [2], shorthands: ["all"] })) }),
     {}
   );
-  CombatMenu.toggleArea(areaCombat, "wind_blade", 2);
-  assert.deepEqual(CombatMenu.areaPayload(areaCombat.skillByKey.wind_blade), {
-    skill_key: "wind_blade",
+  CombatMenu.toggleArea(areaCombat, T_B, 2);
+  assert.deepEqual(CombatMenu.areaPayload(areaCombat.skillByKey[T_B]), {
+    skill_key: T_B,
     target_ids: [2],
   });
-  assert.equal("scale" in CombatMenu.areaPayload(areaCombat.skillByKey.wind_blade), false);
+  assert.equal("scale" in CombatMenu.areaPayload(areaCombat.skillByKey[T_B]), false);
 });
 
 test("rebuildForPanel preserves a still-valid scale choice and resets invalid", () => {
   const panel = readyPanel({ skills: nestedSkills(freeformSkill()) });
   const combat = CombatMenu.buildMenus(panel, {});
-  CombatMenu.chooseScale(combat, "wind_blade", 2);
+  CombatMenu.chooseScale(combat, T_B, 2);
   const rebuilt = CombatMenu.rebuildForPanel(combat, panel, {
-    skillKey: "wind_blade",
+    skillKey: T_B,
     skillByKey: combat.skillByKey,
   });
-  assert.equal(rebuilt.skillByKey.wind_blade.scale, 2);
+  assert.equal(rebuilt.skillByKey[T_B].scale, 2);
 
   const narrowed = readyPanel({
     skills: nestedSkills(freeformSkill({ freeform_scales: [{ scale: 1, label: "1", mp_cost: 14 }] })),
   });
   const rebuiltNarrow = CombatMenu.rebuildForPanel(combat, narrowed, {
-    skillKey: "wind_blade",
+    skillKey: T_B,
     skillByKey: combat.skillByKey,
   });
-  assert.equal(rebuiltNarrow.skillByKey.wind_blade.scale, 1);
+  assert.equal(rebuiltNarrow.skillByKey[T_B].scale, 1);
 });

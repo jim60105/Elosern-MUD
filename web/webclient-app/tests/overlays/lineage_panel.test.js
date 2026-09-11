@@ -12,10 +12,24 @@ import AppClient from "../../AppClient.vue";
 import { useElosernStore } from "../../stores/elosern.js";
 import * as fx from "../store/protocol_fixtures.js";
 
+// File-local synthetic lineage rows (test-data-independence): invented
+// t_-keyed chains with invented element prose; every rendered value still
+// proves it comes from the payload.
+const T_ROOT = "t_ember_arrow";
+const T_ROOT_LABEL = "燼羽箭";
+const T_CHILD = "t_cinder_tide";
+const T_CHILD_LABEL = "燼潮波";
+const T_CHILD_PREREQ = "需「焰紋術 Lv.3」";
+const T_EL_FIRE = "焰流";
+const T_WIND = "t_gale_lance";
+const T_WIND_LABEL = "巒槍";
+const T_EL_WIND = "馜流";
+const T_ABSENT = "t_tide_spear";
+
 function node(overrides = {}) {
   return {
-    skill_key: "fire_arrow",
-    display_name_zh: "火焰箭",
+    skill_key: T_ROOT,
+    display_name_zh: T_ROOT_LABEL,
     owned: true,
     usable: true,
     level: 1,
@@ -35,30 +49,30 @@ const AVAILABLE_SAMPLE = {
   total_count: 2,
   chains: [
     {
-      root_skill_key: "fire_arrow",
-      element_or_style_zh: "火",
+      root_skill_key: T_ROOT,
+      element_or_style_zh: T_EL_FIRE,
       consumed: true,
       meter: 1,
       nodes: [
-        node({ skill_key: "fire_arrow", xp_into_level: 0, xp_to_next_level: 0, capped: true, level: 10 }),
+        node({ skill_key: T_ROOT, xp_into_level: 0, xp_to_next_level: 0, capped: true, level: 10 }),
         node({
-          skill_key: "scorching_wave",
-          display_name_zh: "灼熱波動",
+          skill_key: T_CHILD,
+          display_name_zh: T_CHILD_LABEL,
           owned: false,
           usable: false,
           level: 0,
           xp_into_level: 0,
           xp_to_next_level: 50,
-          prereq_text_zh: "需「火球術 Lv.3」",
+          prereq_text_zh: T_CHILD_PREREQ,
         }),
       ],
     },
     {
-      root_skill_key: "wind_lance",
-      element_or_style_zh: "風",
+      root_skill_key: T_WIND,
+      element_or_style_zh: T_EL_WIND,
       consumed: false,
       meter: 0.25,
-      nodes: [node({ skill_key: "wind_lance", display_name_zh: "風之槍" })],
+      nodes: [node({ skill_key: T_WIND, display_name_zh: T_WIND_LABEL })],
     },
   ],
 };
@@ -81,13 +95,13 @@ describe("LineagePanel (skill-lineage-panel task 2.3)", () => {
 
   it("renders chains collapsed with the chain meter; no node rows", () => {
     const w = mount(LineagePanel, { props: { lineage: AVAILABLE_SAMPLE } });
-    const toggle = w.get('[data-testid="lineage-chain-toggle-wind_lance"]');
+    const toggle = w.get(`[data-testid="lineage-chain-toggle-${T_WIND}"]`);
     expect(toggle.attributes("aria-expanded")).toBe("false");
-    expect(w.find('[data-testid="lineage-chain-nodes-wind_lance"]').exists()).toBe(false);
+    expect(w.find(`[data-testid="lineage-chain-nodes-${T_WIND}"]`).exists()).toBe(false);
     // Collapsed chain renders its aggregate meter (0.25 → 25%).
     expect(w.text()).toContain("25%");
     const fill = w
-      .get('[data-testid="lineage-chain-meter-wind_lance"]')
+      .get(`[data-testid="lineage-chain-meter-${T_WIND}"]`)
       .get(".lineage-chain__meter-fill");
     expect(fill.attributes("style")).toContain("width: 25%");
   });
@@ -99,26 +113,26 @@ describe("LineagePanel (skill-lineage-panel task 2.3)", () => {
 
   it("expanding renders per-node meters, the 見頂 mark, and prereq lines", async () => {
     const w = mount(LineagePanel, { props: { lineage: AVAILABLE_SAMPLE } });
-    await w.get('[data-testid="lineage-chain-toggle-fire_arrow"]').trigger("click");
-    expect(w.get('[data-testid="lineage-chain-toggle-fire_arrow"]').attributes("aria-expanded")).toBe("true");
-    const nodes = w.get('[data-testid="lineage-chain-nodes-fire_arrow"]');
+    await w.get(`[data-testid="lineage-chain-toggle-${T_ROOT}"]`).trigger("click");
+    expect(w.get(`[data-testid="lineage-chain-toggle-${T_ROOT}"]`).attributes("aria-expanded")).toBe("true");
+    const nodes = w.get(`[data-testid="lineage-chain-nodes-${T_ROOT}"]`);
     expect(nodes.findAll(".lineage-node")).toHaveLength(2);
     // The capped node carries the 見頂 mark, not a meter.
-    expect(w.get('[data-testid="lineage-node-fire_arrow"]').text()).toContain("（見頂）");
+    expect(w.get(`[data-testid="lineage-node-${T_ROOT}"]`).text()).toContain("（見頂）");
     // The locked node renders its payload prereq line verbatim.
-    expect(w.get('[data-testid="lineage-node-prereq-scorching_wave"]').text()).toBe("需「火球術 Lv.3」");
-    await w.get('[data-testid="lineage-chain-toggle-wind_lance"]').trigger("click");
+    expect(w.get(`[data-testid="lineage-node-prereq-${T_CHILD}"]`).text()).toBe(T_CHILD_PREREQ);
+    await w.get(`[data-testid="lineage-chain-toggle-${T_WIND}"]`).trigger("click");
     // The owned, uncapped node renders the payload meter pair 「23/50 → 下一階」.
-    expect(w.get('[data-testid="lineage-node-meter-wind_lance"]').text()).toBe("23/50 → 下一階");
+    expect(w.get(`[data-testid="lineage-node-meter-${T_WIND}"]`).text()).toBe("23/50 → 下一階");
   });
 
   it("collapsing again removes the node rows", async () => {
     const w = mount(LineagePanel, { props: { lineage: AVAILABLE_SAMPLE } });
-    const toggle = w.get('[data-testid="lineage-chain-toggle-wind_lance"]');
+    const toggle = w.get(`[data-testid="lineage-chain-toggle-${T_WIND}"]`);
     await toggle.trigger("click");
-    expect(w.find('[data-testid="lineage-chain-nodes-wind_lance"]').exists()).toBe(true);
+    expect(w.find(`[data-testid="lineage-chain-nodes-${T_WIND}"]`).exists()).toBe(true);
     await toggle.trigger("click");
-    expect(w.find('[data-testid="lineage-chain-nodes-wind_lance"]').exists()).toBe(false);
+    expect(w.find(`[data-testid="lineage-chain-nodes-${T_WIND}"]`).exists()).toBe(false);
   });
 
   it("an unavailable payload renders the registry reason and no ledger", () => {
@@ -144,7 +158,7 @@ describe("LineagePanel (skill-lineage-panel task 2.3)", () => {
   it("invents nothing: only payload chains render, nothing else", () => {
     const w = mount(LineagePanel, { props: { lineage: AVAILABLE_SAMPLE } });
     expect(w.findAll(".lineage-chain")).toHaveLength(2);
-    expect(w.find('[data-testid="lineage-chain-water_spear"]').exists()).toBe(false);
+    expect(w.find(`[data-testid="lineage-chain-${T_ABSENT}"]`).exists()).toBe(false);
   });
 });
 
