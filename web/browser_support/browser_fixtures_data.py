@@ -129,6 +129,63 @@ SYNTH_STATUS_DISPLAY_ROWS: MappingProxyType = MappingProxyType(
     }
 )
 
+#: Production-forced innate skill keys the resolver and player handler
+#: hardcode (``world.rules.combat_session.BASIC_ATTACK_KEY`` /
+#: ``world.rules.disengage.FLEE_SKILL_KEY`` — production seams; this change
+#: ships no production-code edits). The t_-only install leaves no rows under
+#: these keys, so combat flows cannot submit their universal attack/flee.
+SYNTH_INNATE_ATTACK_KEY = "basic_attack"
+SYNTH_INNATE_FLEE_KEY = "flee"
+
+
+def graft_synth_innate_skills() -> None:
+    """Ensure the production innate-attack/flee rows exist in the live registry.
+
+    Called by the flagged seed and server processes after
+    ``install_synthetic_catalogs()`` swapped the skill catalog to the kit's
+    t_-only rows. The rows are the kit's martial template under the
+    production seam keys (the ``synth_innate_overlay`` precedent — a
+    zero-cost ANY-faction physical strike and a zero-cost self disengage),
+    grafted with ``setdefault`` so no installed row is ever overwritten.
+    """
+    from dataclasses import replace
+
+    from world.skills.registry import (
+        SKILL_REGISTRY,
+        FactionConstraint,
+        SkillCategory,
+        TargetSpec,
+    )
+    from world.tests.synthetic_data import SYNTH_SKILLS
+
+    template = SYNTH_SKILLS["t_cinder_cleave"]
+    element_key = SYNTH_SKILLS["t_ember_burst"].element.key
+    SKILL_REGISTRY.setdefault(
+        SYNTH_INNATE_ATTACK_KEY,
+        replace(
+            template,
+            key=SYNTH_INNATE_ATTACK_KEY,
+            label="合成基本攻擊",
+            description="以合成武技對單一目標造成物理傷害。",
+            faction_constraint=FactionConstraint.ANY,
+            effects=[f"damage:{element_key}:physical"],
+        ),
+    )
+    SKILL_REGISTRY.setdefault(
+        SYNTH_INNATE_FLEE_KEY,
+        replace(
+            template,
+            key=SYNTH_INNATE_FLEE_KEY,
+            label="合成逃跑",
+            description="嘗試脫離當前戰鬥的合成身法。",
+            target_spec=TargetSpec.SELF,
+            faction_constraint=FactionConstraint.SELF_ONLY,
+            usable_out_of_combat=False,
+            effects=["disengage:self"],
+            category=SkillCategory.MOVEMENT,
+        ),
+    )
+
 
 def graft_synth_status_display() -> None:
     """Ensure every installed kit buff has one status-display row.

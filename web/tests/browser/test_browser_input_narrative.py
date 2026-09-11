@@ -696,16 +696,20 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         # while the wire envelope carries exactly the action payload. The clear
         # and the dispatch run in ONE evaluate (Pinia store: clear the unwrapped
         # array in place) so no server update interleaves.
-        payload = {"skill_key": "fire_ball", "target_ids": [1]}
+        # The staged payload and display descriptors are inert here: the
+        # journey proves the envelope passes through byte-identical and the
+        # echo renders from the descriptor only — nothing resolves these
+        # values against a catalog — so they are authored fixture data.
+        payload = {"skill_key": "t_ember_burst", "target_ids": [1]}
         page.evaluate(
             """(p) => {
               window.__elosernBridge.store.narrative.length = 0;
               return Elosern.actions.submit('combat.cast', p,
-                { skillLabel: '火球術', targetLabel: '哥布林' });
+                { skillLabel: '燼心爆', targetLabel: '燼殼工蟲' });
             }""",
             payload,
         )
-        _wait_inp_line(page, 1, "cast 火球術=哥布林")
+        _wait_inp_line(page, 1, "cast 燼心爆=燼殼工蟲")
         envelopes = [
             args[0]
             for cmd, args, _kw in page.evaluate("window.__elosernSent || []")
@@ -725,7 +729,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         self._wait_action_idle(page)
         page.evaluate(
             "() => Elosern.actions.submit('combat.cast', "
-            "{ skill_key: 'fire_ball', target_ids: [1] })"
+            "{ skill_key: 't_ember_burst', target_ids: [1] })"
         )
         self._wait_action_idle(page)
         envelopes = [

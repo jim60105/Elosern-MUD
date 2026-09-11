@@ -67,10 +67,15 @@ def _install_synthetic_catalogs_if_flagged() -> None:
     # row into the live registry right after the install too.
     from web.browser_support.browser_fixtures_data import (
         graft_synth_entry_rank,
+        graft_synth_innate_skills,
         graft_synth_status_display,
     )
 
     graft_synth_entry_rank()
+    # Production hardcodes the innate attack/flee skill keys the resolver
+    # accepts; the t_-only install leaves no rows under them, so graft the
+    # kit-template seam rows under the runtime seam constants.
+    graft_synth_innate_skills()
     # The creation descriptor derives one affinity picker per LIVE registry
     # race while the shipped race-bound mapping knows only the shipped races;
     # graft one borrowed bound per kit race so the custom form renders.

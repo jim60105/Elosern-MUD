@@ -13,6 +13,8 @@ import time
 from playwright.sync_api import Error
 from tools.spec_traceability import covers_requirement
 
+from web.browser_support.browser_fixtures_data import SYNTH_INNATE_ATTACK_KEY
+
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     evaluate_tolerating_navigation,
@@ -75,14 +77,17 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._engage(page)
         panel = self._combat_panel(page)
-        fire = next(
+        # Any enabled cast row serves the tampered-target probe; which skill
+        # the boot mode granted is the fixture's business, so the journey
+        # takes the panel's first enabled skill.
+        cast_skill = next(
             s
             for category in panel["skills"]
             for group in category["groups"]
             for s in group["skills"]
-            if s["key"] == "fire_ball"
+            if s["enabled"] and s["key"] != SYNTH_INNATE_ATTACK_KEY
         )
-        self.assertTrue(fire["enabled"])
+        self.assertTrue(cast_skill["enabled"])
 
         # A ui_action must name the server's newest revision exactly or the
         # dispatcher rejects it stale: submit only after the post-engage
@@ -92,8 +97,9 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
         # the adapter must reject before initiative with no round advance.
         prev_result = store_state(page)["lastActionResult"]
         page.evaluate(
-            "() => Elosern.actions.submit('combat.cast', "
-            "{ skill_key: 'fire_ball', target_ids: [999999] })"
+            "(k) => Elosern.actions.submit('combat.cast', "
+            "{ skill_key: k, target_ids: [999999] })",
+            cast_skill["key"],
         )
         def _fresh_rejected(state: dict) -> bool:
             result = state.get("lastActionResult")
