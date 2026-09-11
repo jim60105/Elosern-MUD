@@ -97,6 +97,22 @@ def _minimap_fixture(character) -> None:
         record_arrival(character)
         character.location = south_gate
 
+    # Synthetic install: the shipped bootstrap's 北門 gateway is not part of
+    # the kit; the presenter resolves gateway rooms from the live
+    # wilderness-entry registry, so record the kit gate's own grid room here.
+    # (Under the shipped install this resolves to 北門 again — idempotent.)
+    if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1":
+        from web.browser_support.browser_fixtures_data import (
+            first_live_wilderness_entry,
+        )
+
+        gate = first_live_wilderness_entry().gate_for("s")
+        kit_gate = grid(gate.grid_xy + (gate.z_map_key,)) if gate else None
+        if kit_gate is not None and kit_gate.id != north_gate.id:
+            character.location = kit_gate
+            record_arrival(character)
+            character.location = south_gate
+
     # Interior layer: the permanent guild hall.
     halls = search_object_by_tag(GUILD_HALL_TAG)
     if halls:

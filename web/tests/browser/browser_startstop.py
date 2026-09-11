@@ -76,6 +76,14 @@ def _install_synthetic_catalogs_if_flagged() -> None:
     # the import-built coverage table (shipped rows, via the pre-install
     # import seam); the kit's own buff rows get authored labels grafted in.
     graft_synth_status_display()
+    # Production's coordinate terrain partition returns shipped region keys
+    # that the t_-only registry cannot answer — every wilderness room
+    # activation KeyErrors at ``_region_display``/population planning. Graft
+    # one kit-authored row per partition key and point the population tables
+    # at a live threat tier.
+    from web.browser_support.browser_fixtures_data import graft_synth_wilderness_terrain
+
+    graft_synth_wilderness_terrain()
 
     # The shipped guild-catalog YAML cannot resolve against t_-only
     # registries, so the server installs the shared harness catalog directly
