@@ -75,9 +75,11 @@ class WebclientActionsTestDataMigrationContractTests(unittest.TestCase):
         )
 
     def test_freeze_ledger_seed_array_untouched_by_the_migration(self):
-        # The migration removed debt entries only; the carried classification
-        # still lists every seeded debt path in its exact committed order
-        # (shrink-only ratchet design; a reorder is a regression too).
+        # Manifest-membership check only: every migrated path must remain in
+        # the carried seed classification, and the live ledger's seed array
+        # must equal the live seed file (the authoritative ratchet against
+        # the committed history is the gate's own check_ledger, exercised via
+        # check_repo in the violation test above).
         seed = test_data_lint.load_seed(test_data_lint.REPO_ROOT)
         seed_debt = set(seed["seedDebtPaths"])
         for path in MIGRATED_FILES:

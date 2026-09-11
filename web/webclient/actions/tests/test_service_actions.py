@@ -40,6 +40,7 @@ from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.registry import build_production_registry
 from world.lore.guild import GuildRank
+from world.lore.titles import StarterEpithet
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.runtime import QuestState, read_records
 from world.quests.catalog import register_catalog
@@ -124,18 +125,10 @@ _T_OFFER_REWARD = QuestReward(copper=50, items=(), merit=25)
 _T_BOARD_DISPLAY = "合成看板委託"
 
 
-def _starter_epithet_display() -> str:
-    """The CURRENT starter-epithet display, read through its owner module.
-
-    The first-claim branch grants whatever the live lore constant carries;
-    the expectation derives from it instead of pinning shipped prose.
-    """
-    import importlib
-
-    starter = getattr(
-        importlib.import_module("world.lore.titles"), "STARTER_" + "EPITHET"
-    )
-    return starter.display
+#: The patched starter-epithet seam the first-claim branch banks and echoes
+#: (the world/rules/tests title-suite idiom: the grant path reads the owner
+#: module attribute at call time, so the scope swaps it for authored data).
+_T_STARTER_EPITHET = StarterEpithet("破曉新丁", "首次完成公會委託。")
 
 
 TICK_NOON = 12 * 3600
@@ -182,6 +175,9 @@ class ServiceActionBase(BattlefieldIsolation, EvenniaTestCase):
                 "skills": synth_innate_overlay()["skills"],
             },
         )
+        seam = patch("world.lore.titles.STARTER_EPITHET", _T_STARTER_EPITHET)
+        seam.start()
+        self.addCleanup(seam.stop)
         # Bootstrap only: the shipped affinity rulebook's cap_breaks entry is
         # keyed by a shipped quest definition key, so any path that loads the
         # affinity config (registration's affinity gain) needs the shipped
@@ -456,7 +452,9 @@ class ServiceAdapterTests(ServiceActionBase):
             self.assertEqual(result["code"], "claimed")
             # Ordered echo: reward summary first, then the grant line.
             self.assertIn("你回報了任務", messages[0])
-            self.assertEqual(messages[-1], f"獲得異名：{_starter_epithet_display()}")
+            self.assertEqual(
+                messages[-1], f"獲得異名：{_T_STARTER_EPITHET.display}"
+            )
             self.assertNotIn("你的第一個日子在這裡圓滿結束", "\n".join(messages))
             # A later distinct successful claim pays and stays title-silent.
             second = accept_quest(

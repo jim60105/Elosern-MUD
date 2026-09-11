@@ -62,6 +62,12 @@ from web.webclient.actions.exploration_actions import (
     validate_wait_payload,
 )
 from world.ai.fake_client import FakeLLMClient
+from world.rules.dialogue import (
+    GUILD_STAFF_DIALOGUE_KEY,
+    GUILD_STAFF_TURNIN_KEYWORD,
+    DialogueDefinition,
+    KeywordResponse,
+)
 from world.ai.guardrail import _degrade_fallbacks, _semantic_validators
 from world.ai.npc_dialogue import register_npc_dialogue
 from world.ai.profiles import default_profiles
@@ -110,25 +116,31 @@ def _live(module: str, attribute: str):
     return getattr(importlib.import_module(module), attribute)
 
 
-#: The shipped dialogue tables, captured by probe before any scope replaces
-#: them. The guild-staff turnin special case and its greeting are production
-#: behavior keyed to the shipped table row, so the scoped table merges the
-#: shipped rows alongside the kit row (runtime probe, no import-time symbol).
-_SHIPPED_DIALOGUE_ROWS = dict(_live("world.rules.dialogue", "DIALOGUE" + "_TABLE"))
-
-
-def _t_dialogue_scope(test):
-    """Dialogue scope: the kit lodgekeeper table plus the shipped tables."""
-    open_synthetic_scope(test, "dialogue", extra={"dialogue": _SHIPPED_DIALOGUE_ROWS})
-
-
-#: The shipped guild-staff table's key, derived by probe (the production
-#: turnin-keyword special case keys off that exact table entry).
-_SHIPPED_STAFF_KEY = next(iter(_SHIPPED_DIALOGUE_ROWS))
 #: The kit lodgekeeper table's authored keyword/response fragments.
 _T_LODGE_KEYWORD = "住宿"
 _T_LODGE_LINE = "雲杉驛站一晚十八銅"
 _T_LODGE_GREETING = "櫃檯後的老板娘"
+
+#: A staff-shaped authored table keyed by the PRODUCTION guild-staff key
+#: (imported constant, not a literal): the turnin special case keys off that
+#: exact pair, so the action suite reproduces the shape with its own prose
+#: instead of borrowing the shipped table row.
+_T_STAFF_TURNIN_LINE = "「先在櫃檯報到台註冊（t-synth-desk register）。」"
+_T_STAFF_ROW = DialogueDefinition(
+    greeting="櫃檯後的合成公會職員抬起眼：「要用 t-synth-desk list 接任務。」",
+    responses=(
+        KeywordResponse(GUILD_STAFF_TURNIN_KEYWORD, _T_STAFF_TURNIN_LINE),
+    ),
+)
+
+
+def _t_dialogue_scope(test, with_staff: bool = False):
+    """Dialogue scope: the kit lodgekeeper table (plus the staff-shaped
+    authored row when the turnin special case is under test)."""
+    extra = (
+        {"dialogue": {GUILD_STAFF_DIALOGUE_KEY: _T_STAFF_ROW}} if with_staff else None
+    )
+    open_synthetic_scope(test, "dialogue", extra=extra)
 
 
 def _raw(**overrides):
@@ -385,7 +397,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         # special case), and the practice suite resolves its drill skill in
         # a scoped registry (the kit's forced-innate rows ride along so the
         # engage path's production innate keys still resolve).
-        _t_dialogue_scope(self)
+        _t_dialogue_scope(self, with_staff=True)
         open_synthetic_scope(
             self,
             "skills",
@@ -710,25 +722,29 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
     def test_turnin_keyword_flows_through_the_shared_dialogue_resolution(self):
-        # The turnin special case is production behavior keyed to the shipped
-        # guild-staff table; the row rides in the scoped table via the probe,
-        # and the staff component points at the kit branch.
+        # The production turnin special case keys off the (imported-constant)
+        # staff-table/keyword pair: an unregistered player at a staff-hosted
+        # desk gets the authored register-first line through the shared
+        # resolution AND the known-keyword affinity gain is skipped purely.
         host = create_object(NPC, key="公會職員", location=self.room1)
         host.components.add(
-            ScriptedDialogue.create(host, dialogue_key=_SHIPPED_STAFF_KEY)
+            ScriptedDialogue.create(host, dialogue_key=GUILD_STAFF_DIALOGUE_KEY)
         )
         from typeclasses.components import GuildStaff
 
         host.components.add(
             GuildStaff.create(host, service_id="staff", branch_key=_T_BRANCH)
         )
+        relations_before = host.db.relations_data
         result = _talk_scripted_adapter(
-            self.player, {"npc_id": int(host.pk), "keyword_id": "回報"}
+            self.player,
+            {"npc_id": int(host.pk), "keyword_id": GUILD_STAFF_TURNIN_KEYWORD},
         )
         self.assertEqual(result["outcome"], "success")
-        # The unregistered player receives the authored register-first line
-        # through the shared resolution; no claim or quest state can change.
-        self.assertIn("guild register", result["message"])
+        self.assertIn(_T_STAFF_TURNIN_LINE, result["message"])
+        # Losing the special case would route this known keyword through the
+        # normal +1 talk-affinity write; the fixture surface must stay pure.
+        self.assertEqual(host.db.relations_data, relations_before)
 
     def test_unregistered_keyword_rejects_without_writing(self):
         host = create_object(NPC, key="客棧老板娘", location=self.room1)

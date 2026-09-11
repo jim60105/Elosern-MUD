@@ -64,6 +64,7 @@ from world.rules.character_creation import (
 from world.rules.clock import get_world_clock
 from world.rules.creation_wizard import draft_fingerprint, read_draft, save_custom_draft
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.lore.names import FrozenDict, NamePack, NamePart
 from world.tests.synthetic_data import (
     SYNTH_PRESETS,
     SYNTH_RACES,
@@ -71,6 +72,7 @@ from world.tests.synthetic_data import (
     _SYNTH_ELEMENT,
     make_race,
     make_subrace,
+    synthetic_registries,
 )
 
 # ---------------------------------------------------------------------------
@@ -121,6 +123,79 @@ def _element_keys(count: int):
     if len(keys) < count:
         raise AssertionError("element registry too small for the fixture")
     return keys[:count]
+
+
+# File-local synthetic name corpus (world/rules/tests/test_namegen idiom):
+# one pack bound to the kit race plus one unbound spare, each carrying the
+# full m/f/u given pools the roller indexes. The roller freezes its
+# bound-pack candidates at import, so the scope rebinds that tuple from the
+# patched mapping as well.
+def _t_part(text: str, zh: str) -> NamePart:
+    return NamePart(text=text, zh=zh, meaning_zh="合成語源")
+
+
+_T_PACK_BOUND = NamePack(
+    key="t_bound_roll_pack",
+    race_key=_T_RACE,
+    surnames=(_t_part("Tarnmere", "澤瀉"), _t_part("Velmara", "葦紋")),
+    given=FrozenDict(
+        {
+            "m": (_t_part("Besk", "貝斯克"), _t_part("Dorran", "多蘭")),
+            "f": (_t_part("Elyra", "艾雷菈"), _t_part("Nessa", "妮莎")),
+            "u": (_t_part("Uvin", "烏文"),),
+        }
+    ),
+    naming_note_zh="合成語料：bound pack。",
+)
+_T_PACK_SPARE = NamePack(
+    key="t_spare_roll_pack",
+    race_key=None,
+    surnames=(_t_part("Korrath", "棘窩"),),
+    given=FrozenDict(
+        {
+            "m": (_t_part("Helfor", "赫福"),),
+            "f": (_t_part("Missa", "蜜薩"),),
+            "u": (_t_part("Sable", "塞波"),),
+        }
+    ),
+    naming_note_zh="合成語料：未綁定的備用 pack。",
+)
+_T_NAME_MAP = {_T_RACE: _T_PACK_BOUND.key}
+
+
+def _pack_pool_zh(pack: NamePack) -> set[str]:
+    return {part.zh for part in pack.surnames} | {
+        part.zh for entries in pack.given.values() for part in entries
+    }
+
+
+_T_NAME_POOL = _pack_pool_zh(_T_PACK_BOUND)
+_T_NAME_POOL_UNBOUND_ONLY = _pack_pool_zh(_T_PACK_SPARE) - _T_NAME_POOL
+
+
+def _open_t_name_corpus(case):
+    """Enter the synthetic name corpus for one test's full lifecycle."""
+    scope = synthetic_registries(
+        "name_packs",
+        extra={
+            "name_packs": {
+                _T_PACK_BOUND.key: _T_PACK_BOUND,
+                _T_PACK_SPARE.key: _T_PACK_SPARE,
+            }
+        },
+    )
+    scope.__enter__()
+    case.addCleanup(scope.__exit__, None, None, None)
+    for target in ("world.lore.names", "world.rules.namegen"):
+        patcher = patch(f"{target}.NAME" + "_PACK_BY_RACE", _T_NAME_MAP)
+        patcher.start()
+        case.addCleanup(patcher.stop)
+    bound = patch(
+        "world.rules.namegen._BOUND" + "_PACK_KEYS",
+        tuple(sorted(set(_T_NAME_MAP.values()))),
+    )
+    bound.start()
+    case.addCleanup(bound.stop)
 
 
 def _open_t_creation_scope(case):
@@ -1223,25 +1298,9 @@ class NameRollActionTests(CreationActionBase):
             self.character, {"race": race, "subrace": subrace, "sex": sex}
         )
 
-    @staticmethod
-    def _bound_parts():
-        # Runtime probe (test-data gate): the name-pack corpus is not a kit
-        # target — this claim is about the roller's production binding, so it
-        # reads the live registry rather than naming the shipped symbol.
-        by_race = _live("world.lore.names", "NAME_PACK_BY_RACE")
-        registry = _live("world.lore.names", "NAME_PACK" + "_REGISTRY")
-        bound = set(by_race.values())
-        parts: set[str] = set()
-        unbound_only: set[str] = set()
-        for key, pack in registry.items():
-            pool = {part.zh for part in pack.surnames}
-            for entries in pack.given.values():
-                pool.update(part.zh for part in entries)
-            if key in bound:
-                parts |= pool
-            else:
-                unbound_only |= pool
-        return parts, unbound_only - parts
+    def setUp(self):
+        super().setUp()
+        _open_t_name_corpus(self)
 
     def _assert_result_only_frames(self, marker_index_start: int) -> None:
         for entry in self.fake_session.sent[marker_index_start:]:
@@ -1349,7 +1408,6 @@ class NameRollActionTests(CreationActionBase):
 
     @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
     def test_unselected_race_falls_back_only_to_bound_packs(self):
-        parts, unbound_only = self._bound_parts()
         from world.lore.names import NAME_SEPARATOR
 
         names = {
@@ -1360,10 +1418,10 @@ class NameRollActionTests(CreationActionBase):
         for name in names:
             given, separator, surname = name.partition(NAME_SEPARATOR)
             self.assertTrue(separator)
-            self.assertIn(given, parts, name)
-            self.assertIn(surname, parts, name)
-            self.assertNotIn(given, unbound_only, name)
-            self.assertNotIn(surname, unbound_only, name)
+            self.assertIn(given, _T_NAME_POOL, name)
+            self.assertIn(surname, _T_NAME_POOL, name)
+            self.assertNotIn(given, _T_NAME_POOL_UNBOUND_ONLY, name)
+            self.assertNotIn(surname, _T_NAME_POOL_UNBOUND_ONLY, name)
 
     @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
     def test_roller_receives_the_module_singleton_rng(self):
