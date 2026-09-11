@@ -52,6 +52,18 @@ from world.rules.lore_knowledge import (
     lore_card,
     record_lore_reveal,
 )
+from world.tests.synthetic_data import (
+    SYNTH_ANCHORS,
+    SYNTH_NATIONS,
+    SYNTH_RACES,
+    synthetic_registries,
+)
+
+# Kit-authored lore rows: every disclosed entry resolves through these.
+T_RACE = "t_duskmari"
+T_NATION = "t_miremoth"
+T_ANCHOR = "t_hollow_tarn"
+T_ANCHOR_TITLE = SYNTH_ANCHORS[T_ANCHOR].display_name_zh
 
 
 def _valid_category_group(key: str, label: str, entries: list[dict] | None = None) -> dict:
@@ -78,7 +90,7 @@ def _valid_entry(key: str = "elf", title: str = "精靈", card: list[dict] | Non
 
 def _valid_payload(**overrides) -> dict:
     categories = [
-        _valid_category_group("race", "種族", [_valid_entry("elf", "精靈")]),
+        _valid_category_group("race", "種族", [_valid_entry(T_RACE, "暮色族裔")]),
         _valid_category_group("nation", "國家", []),
         _valid_category_group("region", "地域", []),
         _valid_category_group("monster", "魔物", []),
@@ -89,10 +101,10 @@ def _valid_payload(**overrides) -> dict:
             "地點",
             [
                 _valid_entry(
-                    "capital_grandia",
-                    "輝煌帝都",
+                    T_ANCHOR,
+                    T_ANCHOR_TITLE,
                     [
-                        {"name": "display_name_zh", "value": "輝煌帝都"},
+                        {"name": "display_name_zh", "value": T_ANCHOR_TITLE},
                         {"name": "description", "value": "帝國首都"},
                     ],
                 )
@@ -127,7 +139,7 @@ class LoreCodexValidatorTests(unittest.TestCase):
         self.assertIs(validated["available"], True)
         self.assertEqual(validated["discovered_total"], 2)
         self.assertEqual(len(validated["categories"]), 8)
-        self.assertEqual(validated["categories"][0]["entries"][0]["key"], "elf")
+        self.assertEqual(validated["categories"][0]["entries"][0]["key"], T_RACE)
 
     def test_empty_codex_payload_is_valid(self):
         categories = [
@@ -348,6 +360,7 @@ class LoreCodexValidatorTests(unittest.TestCase):
             validate_lore_codex(payload)
 
 
+@synthetic_registries("races", "nations", "anchors")
 class LoreCodexPresenterTests(unittest.TestCase):
     """Presenter behavior, degradation, non-disclosure, and read-only tests."""
 
@@ -373,7 +386,7 @@ class LoreCodexPresenterTests(unittest.TestCase):
         "webclient-lore-codex-panel::the-lore-codex-panel-is-an-exact-read-only-version-1-presentation-panel"
     )
     def test_two_discoveries_serialize_exactly(self):
-        player = _mock_player(lore_discovered={"race:elf", "anchor:capital_grandia"})
+        player = _mock_player(lore_discovered={f"race:{T_RACE}", f"anchor:{T_ANCHOR}"})
         payload = lore_codex_presenter(self._context(player))
         self.assertTrue(payload["available"])
         self.assertEqual(payload["discovered_total"], 2)
@@ -389,15 +402,17 @@ class LoreCodexPresenterTests(unittest.TestCase):
         self.assertEqual(race_group["count"], 1)
         self.assertEqual(len(race_group["entries"]), 1)
         elf_entry = race_group["entries"][0]
-        self.assertEqual(elf_entry["key"], "elf")
-        self.assertEqual(elf_entry["title"], "elf")  # races card doesn't define display_name_zh, key fallback
+        self.assertEqual(elf_entry["key"], T_RACE)
+        # The races card defines no display_name_zh: the title falls back to
+        # the key, whatever the synthetic row is.
+        self.assertEqual(elf_entry["title"], T_RACE)
 
         # Anchor group has 1 entry
         anchor_group = next(c for c in payload["categories"] if c["key"] == "anchor")
         self.assertEqual(anchor_group["count"], 1)
         anchor_entry = anchor_group["entries"][0]
-        self.assertEqual(anchor_entry["key"], "capital_grandia")
-        self.assertEqual(anchor_entry["title"], "輝煌帝都")
+        self.assertEqual(anchor_entry["key"], T_ANCHOR)
+        self.assertEqual(anchor_entry["title"], T_ANCHOR_TITLE)
 
         # Every other group is empty
         for cat in payload["categories"]:
@@ -409,15 +424,20 @@ class LoreCodexPresenterTests(unittest.TestCase):
         "webclient-lore-codex-panel::the-panel-discloses-only-what-the-holder-discovered"
     )
     def test_non_disclosure_undiscovered_entries_absent_and_no_denominators(self):
-        player = _mock_player(lore_discovered={"race:elf"})
+        player = _mock_player(lore_discovered={f"race:{T_RACE}"})
         payload = lore_codex_presenter(self._context(player))
         race_entries = payload["categories"][0]["entries"]
         self.assertEqual(len(race_entries), 1)
-        self.assertEqual(race_entries[0]["key"], "elf")
+        self.assertEqual(race_entries[0]["key"], T_RACE)
 
         # Ensure no other race keys are disclosed
-        self.assertNotIn("human", [e["key"] for e in race_entries])
-        self.assertNotIn("dwarf", [e["key"] for e in race_entries])
+        disclosed = [e["key"] for e in race_entries]
+        # A single reveal discloses exactly that entry: no other kit row
+        # leaks into the group.
+        self.assertEqual(disclosed, [T_RACE])
+        for other in (*SYNTH_RACES, *SYNTH_NATIONS):
+            if other != T_RACE:
+                self.assertNotIn(other, disclosed)
 
         # Ensure no denominators, completion ratios, or capacity placeholders exist
         raw_repr = repr(payload)
@@ -428,12 +448,12 @@ class LoreCodexPresenterTests(unittest.TestCase):
         self.assertNotIn("placeholder", raw_repr)
 
     def test_card_fidelity_matches_lore_card_field_for_field(self):
-        player = _mock_player(lore_discovered={"nation:grandia"})
+        player = _mock_player(lore_discovered={f"nation:{T_NATION}"})
         payload = lore_codex_presenter(self._context(player))
         nation_group = next(c for c in payload["categories"] if c["key"] == "nation")
         entry = nation_group["entries"][0]
 
-        expected_card = lore_card("nation", "grandia")
+        expected_card = lore_card("nation", T_NATION)
         rendered_card = {f["name"]: f["value"] for f in entry["card"]}
         self.assertEqual(rendered_card, expected_card)
 
@@ -446,14 +466,14 @@ class LoreCodexPresenterTests(unittest.TestCase):
     )
     def test_vanished_registry_key_omitted_without_failing_or_rewriting_record(self):
         # A stored entry whose registry key no longer exists
-        initial_record = {"race:elf", "race:vanished_key_xyz"}
+        initial_record = {f"race:{T_RACE}", "race:vanished_key_xyz"}
         player = _mock_player(lore_discovered=set(initial_record))
 
         payload = lore_codex_presenter(self._context(player))
         self.assertTrue(payload["available"])
         race_group = payload["categories"][0]
         self.assertEqual(race_group["count"], 1)
-        self.assertEqual(race_group["entries"][0]["key"], "elf")
+        self.assertEqual(race_group["entries"][0]["key"], T_RACE)
         self.assertEqual(payload["discovered_total"], 1)
 
         # Stored record is byte-for-byte / value unchanged
@@ -463,7 +483,7 @@ class LoreCodexPresenterTests(unittest.TestCase):
         "webclient-lore-codex-panel::the-lore-codex-panel-is-an-exact-read-only-version-1-presentation-panel"
     )
     def test_read_only_isolation_building_twice_leaves_record_unchanged(self):
-        record = {"race:elf", "anchor:capital_grandia"}
+        record = {f"race:{T_RACE}", f"anchor:{T_ANCHOR}"}
         player = _mock_player(lore_discovered=set(record))
 
         first_payload = lore_codex_presenter(self._context(player))
@@ -482,11 +502,11 @@ class LoreCodexPresenterTests(unittest.TestCase):
     def test_corrupt_record_degrades_whole_panel_without_repairing_stored_record(self):
         for corrupt in (
             "not-a-set",
-            {"race:elf", 42},
+            {f"race:{T_RACE}", 42},
             {"elf_not_namespaced"},
-            {"bogus_category:elf"},
+            {"bogus_category:race"},
             {"race:"},
-            {"race:elf:extra"},
+            {"race:extra:extra"},
         ):
             with self.subTest(corrupt=corrupt):
                 corrupt_copy = deepcopy(corrupt)
@@ -511,6 +531,7 @@ class LoreCodexPresenterTests(unittest.TestCase):
         self.assertEqual(unavailable["reason"]["message"], "知識圖鑑目前無法顯示")
 
 
+@synthetic_registries("races", "nations", "anchors")
 class LoreCodexIntegrationTests(EvenniaTest):
     """Evennia integration tests: host independence, push triggers, and coordinator snapshots."""
 
@@ -531,16 +552,16 @@ class LoreCodexIntegrationTests(EvenniaTest):
         "webclient-lore-codex-panel::the-lore-codex-panel-is-host-independent"
     )
     def test_host_independence_codex_readable_in_empty_room(self):
-        # Room with no NPC or host present
+        # Room with no NPC or host present; the reveal targets a kit row.
         empty_room = create_object(Room, key="荒野孤地")
         self.char1.location = empty_room
-        record_lore_reveal(self.char1, "race", "elf")
+        record_lore_reveal(self.char1, "race", T_RACE)
 
         context = PresentationContext(actor=self.char1, protocol_version=1)
         payload = self.registry.render("lore_codex", context)
         self.assertTrue(payload["available"])
         self.assertEqual(payload["discovered_total"], 1)
-        self.assertEqual(payload["categories"][0]["entries"][0]["key"], "elf")
+        self.assertEqual(payload["categories"][0]["entries"][0]["key"], T_RACE)
 
     def _open_watched_session(self, recorded: list):
         """A live session with a coordinator, full snapshot, and watcher registration."""
@@ -574,19 +595,19 @@ class LoreCodexIntegrationTests(EvenniaTest):
             # 1. New reveal: must push update
             recorded.clear()
             with self.captureOnCommitCallbacks(execute=True):
-                record_lore_reveal(self.char1, "race", "elf")
+                record_lore_reveal(self.char1, "race", T_RACE)
 
             updates = [call["ui_update"][0][0] for call in recorded if "ui_update" in call]
             self.assertTrue(updates, "new lore reveal must push ui_update")
             pushed_panel = updates[-1]["panels"]["lore_codex"]
             self.assertTrue(pushed_panel["available"])
             self.assertEqual(pushed_panel["discovered_total"], 1)
-            self.assertEqual(pushed_panel["categories"][0]["entries"][0]["key"], "elf")
+            self.assertEqual(pushed_panel["categories"][0]["entries"][0]["key"], T_RACE)
 
             # 2. Repeat reveal: must NOT push
             recorded.clear()
             with self.captureOnCommitCallbacks(execute=True):
-                record_lore_reveal(self.char1, "race", "elf")
+                record_lore_reveal(self.char1, "race", T_RACE)
 
             updates_repeat = [call["ui_update"][0][0] for call in recorded if "ui_update" in call]
             self.assertFalse(updates_repeat, "repeat reveal of existing entry must NOT push")
@@ -604,7 +625,7 @@ class LoreCodexIntegrationTests(EvenniaTest):
         try:
             with self.captureOnCommitCallbacks(execute=True):
                 with self.assertRaises(RuntimeError), transaction.atomic():
-                    record_lore_reveal(self.char1, "race", "elf")
+                    record_lore_reveal(self.char1, "race", T_RACE)
                     raise RuntimeError("injected caller failure")
 
             updates = [call["ui_update"][0][0] for call in recorded if "ui_update" in call]

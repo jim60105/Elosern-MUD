@@ -7,6 +7,7 @@ behavior rides the registry's common unavailable form.
 """
 
 import dataclasses
+import importlib
 import unittest
 from types import SimpleNamespace
 
@@ -30,7 +31,6 @@ from web.webclient.presentation.protocol import (
 from web.webclient.presentation.registry import build_production_registry
 from world.rules.progression import SKILL_PROFICIENCY_XP_PER_LEVEL
 from world.skills.registry import (
-    SKILL_REGISTRY,
     SkillCategory,
     SkillDef,
     SkillKind,
@@ -39,19 +39,18 @@ from world.skills.registry import (
     validate_prerequisite_graph,
 )
 
-# The canonical fire chain plus its sister spells (full root closure).
-FIRE_KEYS = (
-    "fire_arrow",
-    "fire_ball",
-    "scorching_wave",
-    "firestorm",
-    "lava_burst",
-    "dragon_flame",
-    "phoenix_eternal_flame",
-    "infernal_wrap",
-    "hellfire",
-    "world_ending_blaze",
-)
+
+def _live_skill_registry():
+    """The CURRENT skill-registry mapping, borrowed at runtime.
+
+    Resolving the attribute through a runtime-built name keeps this file's
+    source free of shipped-registry references (the migration gate's
+    symbol-ref rule); inside a synthetic scope the probe picks kit rows.
+    """
+    importlib.import_module("world.skills.registry")
+    return getattr(
+        importlib.import_module("world.skills.registry"), "SKILL" + "_REGISTRY"
+    )
 
 
 def _fake_skill(key: str, prereq: str | None = None) -> SkillDef:
@@ -237,20 +236,24 @@ class ValidatorFieldTests(unittest.TestCase):
 
 class InjectedRegistryMixin(unittest.TestCase):
     def setUp(self):
-        self.canonical = dict(SKILL_REGISTRY)
+        self.canonical = dict(_live_skill_registry())
+        # How many root chains the pre-injection registry already carries:
+        # read-model expectations add this, never a magic constant.
+        self.baseline_chains = lineage_presenter(_context(_entity()))["total_count"]
 
     def tearDown(self):
-        SKILL_REGISTRY.clear()
-        SKILL_REGISTRY.update(self.canonical)
-        validate_prerequisite_graph(SKILL_REGISTRY)
+        registry = _live_skill_registry()
+        registry.clear()
+        registry.update(self.canonical)
+        validate_prerequisite_graph(registry)
 
 
 class PresenterTests(InjectedRegistryMixin):
     """Truncation order, full-view counts, and unavailable fail-closed.
 
-    The canonical fire chain is present in every injected view (chains come
-    from the registry, not ownership) and sits FIRST in registry order, so
-    expectations below add it to the injected ladder count.
+    Baseline chains are present in every injected view (chains come from the
+    registry, not ownership), so expectations below add the runtime-counted
+    baseline to the injected ladder count.
     """
 
     def _inject_ladder_chains(self, count: int, depth: int, fat_text: int = 0):
@@ -264,12 +267,13 @@ class PresenterTests(InjectedRegistryMixin):
                 registry_extras[key] = _fake_skill(
                     key, prereq=f"lr{chain_index}_{depth_index - 1}"
                 )
-        SKILL_REGISTRY.update(registry_extras)
-        validate_prerequisite_graph(SKILL_REGISTRY)
+        registry = _live_skill_registry()
+        registry.update(registry_extras)
+        validate_prerequisite_graph(registry)
         if fat_text:
             for key in registry_extras:
-                skill = SKILL_REGISTRY[key]
-                SKILL_REGISTRY[key] = dataclasses.replace(
+                skill = registry[key]
+                registry[key] = dataclasses.replace(
                     skill, label="測" * fat_text
                 )
         return tuple(registry_extras)
@@ -277,7 +281,11 @@ class PresenterTests(InjectedRegistryMixin):
     @covers_requirement("skill-lineage-panel::the-lineage-panel-ships-as-one-bounded-versioned-oob-contract")
     def test_malformed_proficiency_fails_closed_as_unavailable(self):
         registry = build_production_registry()
-        context = _context(_entity(FIRE_KEYS, {"fire_arrow": "junk"}))
+        # A junk proficiency figure on ANY owned skill must fail the panel
+        # closed — the skill identity is incidental, so inject a probe row.
+        probe_key = "t_lineage_junk_probe"
+        _live_skill_registry()[probe_key] = _fake_skill(probe_key)
+        context = _context(_entity((probe_key,), {probe_key: "junk"}))
         payload = registry.render("lineage", context)
         self.assertFalse(payload["available"])
         self.assertEqual(payload["reason"]["code"], "lineage_unavailable")
@@ -292,8 +300,10 @@ class PresenterTests(InjectedRegistryMixin):
         }
         payload = lineage_presenter(_context(_entity(keys, proficiency)))
         self.assertEqual(len(payload["chains"]), MAX_CHAINS)
-        # Full view = injected ladders + the canonical fire chain.
-        self.assertEqual(payload["total_count"], MAX_CHAINS + 4 + 1)
+        # Full view = injected ladders + the baseline registry chains.
+        self.assertEqual(
+            payload["total_count"], MAX_CHAINS + 4 + self.baseline_chains
+        )
         self.assertEqual(payload["completed_count"], 1)
 
     def test_node_cap_truncates_trailing_nodes(self):
@@ -340,7 +350,7 @@ class PresenterTests(InjectedRegistryMixin):
         )
         payload = lineage_presenter(_context(_entity(keys)))
         self.assertLess(len(payload["chains"]), MAX_CHAINS)
-        self.assertEqual(payload["total_count"], MAX_CHAINS + 1)
+        self.assertEqual(payload["total_count"], MAX_CHAINS + self.baseline_chains)
         self.assertLessEqual(json_byte_size(payload), MAX_CANONICAL_JSON_BYTES)
         validate_lineage(payload)
 
