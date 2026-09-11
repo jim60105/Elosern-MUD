@@ -49,14 +49,44 @@ from web.webclient.presentation.services import (
     ServicesPanelError,
     validate_services,
 )
-from world.quests.catalog import register_catalog
-from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+from world.quests.definitions import QUEST_DEFINITION_REGISTRY, QuestStage
+from world.quests.tests._fixtures import defeat, quest, register, register_catalog_once
 from world.rules.clock import get_world_clock
 from world.rules.guild import register_adventurer
-from world.rules.guild_config import CATALOG, load_catalog_into_cache, register_catalog_offers
-from world.rules.guild_offers import GUILD_OFFER_REGISTRY, accept_guild_offer
+from world.rules.guild_offers import (
+    GUILD_OFFER_REGISTRY,
+    GuildQuestOffer,
+    QuestReward,
+    accept_guild_offer,
+    register_guild_offer,
+)
 from world.rules.service_view import ServicesViewError
 from world.rules.surfaces import write_counter_trait
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.rules.tests._guild_service_probes import (
+    install_synthetic_catalog,
+    price_band,
+    synth_catalog,
+    synth_shop_config,
+    synthetic_branch_key,
+)
+from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SHOPS
+
+# The shipped affinity rulebook cross-references one catalog quest by key, so
+# the affinity-config loader needs the catalog definitions present in-process.
+# Registered at import (no synthetic scope is open yet).
+register_catalog_once()
+
+# Kit identities: the kit branch for the guild hosts, one synthetic shop
+# config over kit items for the store, and kit items in the actor's pockets.
+BRANCH = synthetic_branch_key()
+T_SHOP = next(iter(SYNTH_SHOPS))
+_T_SPRAY = SYNTH_ITEMS["t_ember_spray"].key
+_T_THORN = SYNTH_ITEMS["t_thorn_knife"].key
+# File-local synthetic inventory rows for the pure validator fixtures —
+# invented item keys and invented display prose, never shipped catalog data.
+_T_MEAL = "t_panel_meal"
+_T_MEAL_DISPLAY = "合成餐食"
 
 UNREGISTERED_PLAYER = {
     "wallet": 0,
@@ -92,8 +122,8 @@ def _valid_payload(**overrides):
         "inventory": {
             "rows": [
                 {
-                    "item_key": "meal",
-                    "display_name": "普通餐食",
+                    "item_key": _T_MEAL,
+                    "display_name": _T_MEAL_DISPLAY,
                     "held": 1,
                     "equipped": False,
                     "action": None,
@@ -144,8 +174,8 @@ def _valid_shop(**overrides):
         "open": True,
         "stock": [
             {
-                "item_key": "meal",
-                "display_name": "普通餐食",
+                "item_key": _T_MEAL,
+                "display_name": _T_MEAL_DISPLAY,
                 "buy_copper": 10,
                 "sell_copper": 5,
                 "stock": 20,
@@ -337,8 +367,8 @@ def _realistic_maximal_payload():
     ]
     stock = [
         {
-            "item_key": "meal",
-            "display_name": "普通餐食",
+            "item_key": _T_MEAL,
+            "display_name": _T_MEAL_DISPLAY,
             "buy_copper": 10,
             "sell_copper": 5,
             "stock": 20,
@@ -349,8 +379,8 @@ def _realistic_maximal_payload():
     ]
     sellable = [
         {
-            "item_key": "meal",
-            "display_name": "普通餐食",
+            "item_key": _T_MEAL,
+            "display_name": _T_MEAL_DISPLAY,
             "sell_copper": 5,
             "held": 20,
             "sell": _action("shop.sell", label="販賣", quantity={"min": 1, "max": 20}),
@@ -359,8 +389,8 @@ def _realistic_maximal_payload():
     ]
     inventory = [
         {
-            "item_key": "meal",
-            "display_name": "普通餐食",
+            "item_key": _T_MEAL,
+            "display_name": _T_MEAL_DISPLAY,
             "held": 2,
             "equipped": False,
             "action": None,
@@ -374,7 +404,7 @@ def _realistic_maximal_payload():
         for _ in range(MAX_INVENTORY_ROWS)
     ]
     return _valid_payload(
-        host={"identity": "12345", "display_name": "埃洛西恩冒險者公會 阿爾托利亞分會"},
+        host={"identity": "12345", "display_name": "合成公會測試分行"},
         player={
             "wallet": 1000000,
             "guild_registered": True,
@@ -473,8 +503,8 @@ class ServicesSchemaTests(unittest.TestCase):
 
     def test_sellable_row_cap_enforced(self):
         row = {
-            "item_key": "meal",
-            "display_name": "普通餐食",
+            "item_key": _T_MEAL,
+            "display_name": _T_MEAL_DISPLAY,
             "sell_copper": 5,
             "held": 1,
             "sell": _action("shop.sell"),
@@ -485,8 +515,8 @@ class ServicesSchemaTests(unittest.TestCase):
 
     def test_inventory_row_cap_enforced(self):
         row = {
-            "item_key": "meal",
-            "display_name": "普通餐食",
+            "item_key": _T_MEAL,
+            "display_name": _T_MEAL_DISPLAY,
             "held": 1,
             "equipped": False,
             "action": None,
@@ -634,8 +664,8 @@ class ServicesSchemaTests(unittest.TestCase):
             inventory={
                 "rows": [
                     {
-                        "item_key": "meal",
-                        "display_name": "普通餐食",
+                        "item_key": _T_MEAL,
+                        "display_name": _T_MEAL_DISPLAY,
                         "held": 1,
                         "equipped": False,
                         "action": None,
@@ -738,33 +768,32 @@ class ServicesSchemaTests(unittest.TestCase):
 
 class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        # Scope before construction: branch/shop/item identities resolve
+        # against kit rows inside the synthetic shop catalog.
+        open_synthetic_scope(self, "guild_branches", "items", "prices", "shops")
+        super().setUp()
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
-        self._catalog = CATALOG
         self._offers = list(GUILD_OFFER_REGISTRY.items())
-        register_catalog()
-        catalog = load_catalog_into_cache()
-        register_catalog_offers(catalog)
+        install_synthetic_catalog(
+            self, synth_catalog(shop_configs={T_SHOP: synth_shop_config(T_SHOP, (_T_SPRAY, _T_THORN))})
+        )
         get_world_clock()
         self.room1 = create_object(Room, key="guild hall")
 
         self.store = create_object(Room, key="general store")
         self.staff = create_object(NPC, key="guild master", location=self.room1)
         self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
         )
         self.staff.components.add(
-            GuildExaminer.create(self.staff, service_id="examiner", branch_key="guild_branch_altoria")
+            GuildExaminer.create(self.staff, service_id="examiner", branch_key=BRANCH)
         )
-        self.merchant_npc = create_object(NPC, key="merchant", location=self.store)
+        self.merchant_npc = create_object(NPC, key="shop keeper", location=self.store)
         self.merchant = Merchant.create(
-            self.merchant_npc, service_id="merchant", shop_key="altoria_general_store"
+            self.merchant_npc, service_id="store", shop_key=T_SHOP
         )
         self.merchant_npc.components.add(self.merchant)
-        self.merchant.merchant_stock = {
-            "meal": 20,
-            "healing_potion": 3,
-            "plain_sword": 1,
-        }
+        self.merchant.merchant_stock = {_T_SPRAY: 20, _T_THORN: 3}
 
         self.player = create_object(PlayerCharacter, key="service presenter")
         self.player.race = "human"
@@ -773,15 +802,24 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.db.wallet = 1000
         register_adventurer(self.player, staff=self.staff)
         write_counter_trait(self.player, "guild_merit", 60)
-        accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        # One invented branch-local offer stands in for any catalog row.
+        self.board_quest = register(
+            quest("services_panel_quest", stages=(QuestStage(0, defeat(tier="low")),))
+        )
+        register_guild_offer(
+            GuildQuestOffer(
+                definition_key=self.board_quest.key,
+                issuer_branch_key=BRANCH,
+                reward=QuestReward(copper=50, items=(), merit=25),
+            )
+        )
+        accept_guild_offer(self.player, self.staff, self.board_quest.key)
 
     def tearDown(self):
-        global CATALOG
         QUEST_DEFINITION_REGISTRY.clear()
         QUEST_DEFINITION_REGISTRY.update(self._registry_items)
         GUILD_OFFER_REGISTRY.clear()
         GUILD_OFFER_REGISTRY.update(self._offers)
-        CATALOG = self._catalog
         super().tearDown()
 
     def _context(self):
@@ -809,11 +847,12 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         payload = self._render()
         self.assertIsNotNone(payload["shop"])
         self.assertTrue(payload["shop"]["open"])
-        meal = next(row for row in payload["shop"]["stock"] if row["item_key"] == "meal")
-        self.assertEqual(meal["buy_copper"], 10)
-        self.assertEqual(meal["sell_copper"], 5)
-        self.assertEqual(meal["stock"], 20)
-        self.assertIsNotNone(meal["buy"]["quantity"])
+        spray = next(row for row in payload["shop"]["stock"] if row["item_key"] == _T_SPRAY)
+        floor, _ceiling = price_band(_T_SPRAY)
+        self.assertEqual(spray["buy_copper"], floor + 2)
+        self.assertEqual(spray["sell_copper"], floor)
+        self.assertEqual(spray["stock"], 20)
+        self.assertIsNotNone(spray["buy"]["quantity"])
         self.assertIsNone(payload["guild"])
 
     def test_registered_panels_publish_affected_panels(self):
@@ -831,7 +870,7 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         from evennia.utils.create import create_object as co
         from typeclasses.monsters import Monster
 
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_SPRAY]
         monster = co(Monster, key="goblin", location=self.room1)
         monster.threat_tier = "low"
         monster.apply_monster_tier("floor")
@@ -850,7 +889,7 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(payload["pagination"]["stock_total"], 0)
         self.assertEqual(payload["pagination"]["sellable_total"], 0)
         row = payload["inventory"]["rows"][0]
-        self.assertEqual(row["item_key"], "healing_potion")
+        self.assertEqual(row["item_key"], _T_SPRAY)
         self.assertEqual(row["action"]["action_id"], "inventory.use")
 
     def test_creation_pending_renders_unavailable_form(self):
@@ -878,35 +917,39 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-service-menus::the-shop-surface-covers-stock-quantity-buy-sell-and-sellable-inventory")
     def test_registered_inventory_projects_registry_presentation(self):
-        self.player.db.inventory = ["healing_potion", "healing_potion", "plain_sword"]
+        self.player.db.inventory = [_T_SPRAY, _T_SPRAY, _T_THORN]
         payload = self._render()
         rows = {row["item_key"]: row for row in payload["inventory"]["rows"]}
+        kit_row = SYNTH_ITEMS["t_ember_spray"]
         self.assertEqual(
-            rows["healing_potion"]["presentation"],
+            rows[_T_SPRAY]["presentation"],
             {
-                "kind": "potion",
-                "icon_key": "potion",
-                "rarity": "rare",
-                "summary": "盛裝於小瓶中的治療藥水。",
+                "kind": kit_row.presentation.kind.value,
+                "icon_key": kit_row.presentation.icon_key.value,
+                "rarity": kit_row.presentation.rarity.value,
+                "summary": kit_row.presentation.summary_zh,
             },
         )
-        self.assertEqual(rows["healing_potion"]["held"], 2)
-        self.assertEqual(rows["plain_sword"]["presentation"]["rarity"], "common")
+        self.assertEqual(rows[_T_SPRAY]["held"], 2)
+        self.assertEqual(
+            rows[_T_THORN]["presentation"]["rarity"],
+            SYNTH_ITEMS["t_thorn_knife"].presentation.rarity.value,
+        )
 
     @covers_requirement("webclient-service-menus::the-shop-surface-covers-stock-quantity-buy-sell-and-sellable-inventory")
     def test_unknown_inventory_key_projects_null_presentation(self):
-        self.player.db.inventory = ["mystery_relic", "mystery_relic", "healing_potion"]
+        self.player.db.inventory = ["mystery_relic", "mystery_relic", _T_SPRAY]
         payload = self._render()
         rows = {row["item_key"]: row for row in payload["inventory"]["rows"]}
         self.assertIsNone(rows["mystery_relic"]["presentation"])
         self.assertEqual(rows["mystery_relic"]["display_name"], "mystery_relic")
-        self.assertIsNotNone(rows["healing_potion"]["presentation"])
+        self.assertIsNotNone(rows[_T_SPRAY]["presentation"])
 
     @covers_requirement("webclient-service-menus::the-services-panel-is-an-exact-read-only-exploration-mode-panel")
     def test_rendering_inventory_never_mutates_canonical_state(self):
-        self.player.db.inventory = ["healing_potion", "healing_potion", "mystery_relic", "plain_sword"]
+        self.player.db.inventory = [_T_SPRAY, _T_SPRAY, "mystery_relic", _T_THORN]
         self.player.db.equipment = {
-            "weapon_main": "plain_sword",
+            "weapon_main": _T_THORN,
             "weapon_off": None,
             "armor": None,
             "accessories": [],
@@ -922,7 +965,7 @@ class ServicesPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(dict(self.player.db.equipment or {}), before["equipment"])
         self.assertEqual(self.player.db.wallet, before["wallet"])
         self.assertEqual(list(self.player.db.quest_log or []), before["quest_log"])
-        row = next(r for r in payload["inventory"]["rows"] if r["item_key"] == "plain_sword")
+        row = next(r for r in payload["inventory"]["rows"] if r["item_key"] == _T_THORN)
         self.assertTrue(row["equipped"])
 
     def test_unregistered_presenter_is_honest(self):
@@ -1151,7 +1194,7 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
         stock = [
             {
                 "item_key": "",
-                "display_name": "普通餐食",
+                "display_name": _T_MEAL_DISPLAY,
                 "buy_copper": 10,
                 "sell_copper": 5,
                 "stock": 20,
@@ -1168,8 +1211,8 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
             )
         stock = [
             {
-                "item_key": "meal",
-                "display_name": "普通餐食",
+                "item_key": _T_MEAL,
+                "display_name": _T_MEAL_DISPLAY,
                 "buy_copper": 10,
                 "sell_copper": 5,
                 "stock": 20,
@@ -1186,8 +1229,8 @@ class ServicesSchemaEdgeTests(unittest.TestCase):
             )
         sellable = [
             {
-                "item_key": "meal",
-                "display_name": "普通餐食",
+                "item_key": _T_MEAL,
+                "display_name": _T_MEAL_DISPLAY,
                 "sell_copper": 5,
                 "held": 1,
                 "sell": self._action("guild.register"),
