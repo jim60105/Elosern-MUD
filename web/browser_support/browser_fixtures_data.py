@@ -247,6 +247,55 @@ def graft_synth_wilderness_terrain() -> None:
         _monsters.MONSTER_TIER_REGISTRY.setdefault(key, replace(tier_template, key=key))
 
 
+def graft_synth_combat_modifier() -> None:
+    """Give the kit debuff one matched-condition agility-penalty rule.
+
+    The status panel's condition chips come from the combat-modifier rule
+    table's per-rule matches; the shipped damaging-buff row is keyed to a
+    shipped buff the synthetic install never mounts. Append one authored kit
+    rule (id derived from the kit debuff key, same percent the shipped
+    analogue carries) to the loaded rule list, so the seeded kit debuff
+    surfaces its own modifier-bearing condition row under the synthetic
+    install. The table module's ``_RULES`` list is the single match source
+    every consumer reads at query time, and the grafted rule names only the
+    kit debuff key — shipped rows never match it.
+    """
+    import world.rules.combat_modifiers as _modifiers
+    from world.rules.rulebook.schema import Rule
+
+    rule_id = f"{SYNTH_COMBAT_DEBUFF_KEY}_agility_penalty"
+    if any(rule.id == rule_id for rule in _modifiers._RULES):
+        return
+    _modifiers._RULES.append(
+        Rule(
+            rule_id,
+            {"buff_active": SYNTH_COMBAT_DEBUFF_KEY},
+            {"agility": "-10%"},
+        )
+    )
+    # The panel names every matched rule ID through the same coverage table
+    # as buff codes; graft the authored chip row alongside the rule.
+    from world.rules.status_display import ConditionDisplay, STATUS_DISPLAY
+
+    STATUS_DISPLAY.setdefault(
+        rule_id,
+        ConditionDisplay(rule_id, "燼灼敏捷減損", "harmful"),
+    )
+
+
+def combat_modifier_condition_rule_id() -> str:
+    """The condition code the status panel shows for the seeded debuff's
+    modifier rule in the current boot mode."""
+    if synth_mode_enabled():
+        return f"{SYNTH_COMBAT_DEBUFF_KEY}_agility_penalty"
+    return SHIPPED_COMBAT_MODIFIER_RULE_ID
+
+
+#: The shipped rule-table condition code the status fixture asserts with the
+#: shipped debuff (read only when the synthetic flag is OFF).
+SHIPPED_COMBAT_MODIFIER_RULE_ID = "poison_agility_penalty"
+
+
 def synth_next_entry_rank_key() -> str:
     """The rank key exactly one order above the grafted entry rank.
 
@@ -802,8 +851,21 @@ def rarity_word(rarity: str) -> str:
 #: Kit combat grant set: actives, passives, and the freeform ladder. The
 #: ladder rides ``t_glowmire_bloom`` (its own element's mastery passive
 #: ``t_glowmire_mastery`` is granted alongside), mirroring the shipped
-#: wind_blade/wind_mastery pairing without naming shipped skills.
-SYNTH_COMBAT_ACTIVE_SKILLS = ("t_ember_burst", "t_cinder_cleave", "t_moss_veil", "t_glowmire_bloom")
+#: wind-blade/mastery pairing without naming shipped skills. Ownership order
+#: is the panel's intra-group row order: the borrowed-element group carries
+#: the cast spell with its lineage canopy (``grant_lineage`` closes
+#: ``t_ember_lance`` in behind its own prerequisite edge on the spell), the
+#: utility group carries the context-less disabled row BEFORE the NONE-shape
+#: cast carrier so the disabled row is the frame's first focus in both modes.
+SYNTH_COMBAT_ACTIVE_SKILLS = (
+    "t_ember_burst",
+    "t_ember_lance",
+    "t_glowmire_bloom",
+    "t_cinder_cleave",
+    "t_moss_veil",
+    "t_rock_quietus",
+    "t_cinder_breath",
+)
 SYNTH_COMBAT_PASSIVE_SKILLS = ("t_steady_stride", "t_glowmire_mastery")
 SYNTH_COMBAT_LADDER_SKILL = "t_glowmire_bloom"
 SYNTH_COMBAT_LADDER_LEVEL = 10
@@ -818,6 +880,57 @@ SYNTH_COMBAT_MONSTERS = (("燼殼工蟲", 200), ("燼殼兵蟲", 200))
 SYNTH_TITLE_BANKED_KEYS = ("t_synth_first_hunt", "t_synth_lodging_friend")
 #: A third kit title kept UNbanked so the codex renders a locked row.
 SYNTH_TITLE_LOCKED_KEY = "t_synth_deep_walker"
+
+
+def combat_journey_values() -> dict:
+    """The combat-menu journeys' skill roles for the current boot mode.
+
+    Every role is a skill KEY plus the owned-order position that puts it at
+    the start of its group/category frame:
+
+    - ``attack_key``: the innate universal-attack seam row (identical key in
+      both modes — the production seam, grafted under the synthetic install).
+    - ``spell_key``: the first owned elemental spell, first skill of the
+      first element sub-group (SINGLE target, borrows the first registered
+      element so its sub-group shares the shipped first element's label).
+    - ``prereq_key``: the prereq row ``grant_lineage`` closes in behind the
+      spell, second in the same sub-group's ownership order.
+    - ``ladder_key``: the mastery-entitled second element sub-group's active
+      (the scale-step/AREA journey's cast target).
+    - ``none_key``: the owned NONE-shape active the NONE-payload journey
+      submits (enhancement in shipped mode; utility under the kit install).
+    - ``none_category``: the ``SkillCategory`` value ``none_key`` lives in.
+    - ``self_disabled_key``: the utility active whose effect handler
+      declares an event-context key the combat session never supplies, so
+      the menu exposes it disabled.
+    """
+    if synth_mode_enabled():
+        return {
+            "attack_key": SYNTH_INNATE_ATTACK_KEY,
+            "spell_key": "t_ember_burst",
+            "prereq_key": "t_ember_lance",
+            "ladder_key": "t_glowmire_bloom",
+            "none_key": "t_cinder_breath",
+            "none_category": "utility",
+            "self_disabled_key": "t_rock_quietus",
+        }
+    return {
+        "attack_key": SHIPPED_INNATE_ATTACK_KEY,
+        "spell_key": SHIPPED_COMBAT_SPELL_KEY,
+        "prereq_key": SHIPPED_COMBAT_SPELL_PREREQ_KEY,
+        "ladder_key": SHIPPED_COMBAT_LADDER_SKILL,
+        "none_key": SHIPPED_COMBAT_NONE_SKILL,
+        "none_category": "enhancement",
+        "self_disabled_key": SHIPPED_COMBAT_DISABLED_SKILL,
+    }
+
+
+#: Combat-menu shipped-mode roles (read only when the synthetic flag is OFF).
+SHIPPED_INNATE_ATTACK_KEY = "basic_attack"
+SHIPPED_COMBAT_SPELL_KEY = "fire_ball"
+SHIPPED_COMBAT_SPELL_PREREQ_KEY = "fire_arrow"
+SHIPPED_COMBAT_NONE_SKILL = "concentration"
+SHIPPED_COMBAT_DISABLED_SKILL = "status_disguise"
 
 
 def title_codex_values() -> dict:

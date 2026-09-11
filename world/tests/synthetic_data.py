@@ -104,6 +104,7 @@ from world.skills.registry import (
     SkillCategory,
     SkillDef,
     SkillKind,
+    SkillPrerequisite,
     TargetSpec,
 )
 from world.skills.sexual_acts._builder import SexualActDef
@@ -285,6 +286,25 @@ SYNTH_SKILLS: dict[str, SkillDef] = {
         category=SkillCategory.ELEMENTAL_MAGIC,
         group=_SYNTH_ELEMENT,
     ),
+    # Lineage-canopy spell consumed by the FIRST element group: its declared
+    # prerequisite edge gives the managed harness a second closed-in row
+    # behind the requested cast (the shipped fire tree's exact shape), and
+    # keeps t_ember_burst itself prereq-free for the many probes that grant
+    # only it.
+    "t_ember_lance": SkillDef(
+        key="t_ember_lance",
+        label="燼尖矛",
+        description="將壓縮的燼屑凝成尖矛，以低耗能刺穿單一目標。",
+        kind=SkillKind.ACTIVE,
+        target_spec=TargetSpec.SINGLE,
+        cost={"mp": 10},
+        usable_out_of_combat=True,
+        element=_SYNTH_ELEMENT,
+        effects=[f"damage:{_SYNTH_ELEMENT}:magic"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group=_SYNTH_ELEMENT,
+        prerequisites=(SkillPrerequisite("t_ember_burst", 3),),
+    ),
     "t_hush_mend": SkillDef(
         key="t_hush_mend",
         label="靜謐癒合",
@@ -363,15 +383,45 @@ SYNTH_SKILLS: dict[str, SkillDef] = {
     "t_glowmire_bloom": SkillDef(
         key="t_glowmire_bloom",
         label="光沼花綻",
-        description="讓光沼的魔力在目標身上綻放成魔法波濤。",
+        description="讓光沼的魔力在戰場上綻放成覆蓋的魔法波濤。",
         kind=SkillKind.ACTIVE,
-        target_spec=TargetSpec.SINGLE,
+        target_spec=TargetSpec.AREA,
         cost={"mp": 14},
         usable_out_of_combat=True,
         element=SYNTH_GLOWMIRE_ELEMENT,
         effects=["damage:t_glowmire:magic"],
         category=SkillCategory.ELEMENTAL_MAGIC,
         group=SYNTH_GLOWMIRE_ELEMENT.key,
+    ),
+    # Zero-cost NONE utility: the NONE-shape cast carrier (the shipped
+    # concentrate analogue) for the combat-menu acceptance journeys.
+    "t_cinder_breath": SkillDef(
+        key="t_cinder_breath",
+        label="燼息",
+        description="吐出一口溫熱的燼息，安撫自身的傷勢。",
+        kind=SkillKind.ACTIVE,
+        target_spec=TargetSpec.NONE,
+        cost={"mp": 5},
+        usable_out_of_combat=True,
+        element=None,
+        effects=["self_buff_apply:t_moss_veil"],
+        category=SkillCategory.UTILITY,
+    ),
+    # Context-less utility NONE row: mirrors the shipped utility skill whose
+    # effect handler declares a required event_context key the combat session
+    # never supplies, so the combat menu must expose it disabled with the
+    # missing-context explanation (effect-context-validation seam).
+    "t_rock_quietus": SkillDef(
+        key="t_rock_quietus",
+        label="岩中寂語",
+        description="以岩層深處的寂靜偽裝自身的狀態。",
+        kind=SkillKind.ACTIVE,
+        target_spec=TargetSpec.SELF,
+        cost={},
+        usable_out_of_combat=True,
+        element=None,
+        effects=["set_disguise"],
+        category=SkillCategory.UTILITY,
     ),
 }
 

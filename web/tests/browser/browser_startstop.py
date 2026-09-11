@@ -94,6 +94,13 @@ def _install_synthetic_catalogs_if_flagged() -> None:
     from web.browser_support.browser_fixtures_data import graft_synth_wilderness_terrain
 
     graft_synth_wilderness_terrain()
+    # The status panel's matched-condition rows come from the combat-modifier
+    # rule table; the shipped damaging-buff row is keyed to a shipped buff the
+    # synthetic install never mounts. Append one authored rule for the kit
+    # debuff so the seeded condition chip resolves under the synthetic boot.
+    from web.browser_support.browser_fixtures_data import graft_synth_combat_modifier
+
+    graft_synth_combat_modifier()
 
     # The shipped guild-catalog YAML cannot resolve against t_-only
     # registries, so the server installs the shared harness catalog directly
