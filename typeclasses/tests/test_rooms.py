@@ -25,9 +25,11 @@ class GridRoomTypeclassTests(EvenniaTestCase):
 
     def test_scene_archetype_set_without_registry_lookup_and_persists(self):
         room, _ = GridRoom.create(key="test", xyz=(9, 9, "test_map"))
-        room.scene_archetype = "tavern_interior"
+        # The seam is a pure string carrier — no registry lookup — so an
+        # invented value proves persistence without naming shipped data.
+        room.scene_archetype = "t_invented_scene_key"
         refetched = GridRoom.objects.get(id=room.id)
-        self.assertEqual(refetched.scene_archetype, "tavern_interior")
+        self.assertEqual(refetched.scene_archetype, "t_invented_scene_key")
 
     @covers_requirement("grid-room-typeclasses::anchorroom-is-a-gridroom-carrying-the-anchor-key-seam")
     def test_anchor_room_inherits_grid_room_behavior(self):
@@ -73,6 +75,6 @@ class SceneArchetypeTests(EvenniaTestCase):
         terrain = create_object(TerrainRoom, key="terrain_room_2")
         self.assertIsNone(grid.scene_archetype)
         self.assertIsNone(terrain.scene_archetype)
-        grid.scene_archetype = "western_hills_valleys_plains"
-        terrain.scene_archetype = "western_hills_valleys_plains"
+        grid.scene_archetype = "t_invented_scene_key"
+        terrain.scene_archetype = "t_invented_scene_key"
         self.assertEqual(grid.scene_archetype, terrain.scene_archetype)

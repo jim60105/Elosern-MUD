@@ -11,6 +11,23 @@ from world.rules.character_creation import (
     CharacterCreationRequest,
     activate_player_character,
 )
+from world.tests.synthetic_data import SYNTH_PRESETS, synthetic_registries
+
+# Kit preset used to exercise per-character activation against the patched
+# catalog chain (race/subrace/kit/skill/item rows all resolve in scope).
+_PRESET_KEY = "t_pale_wren"
+assert _PRESET_KEY in SYNTH_PRESETS
+_PRESET_SCOPE = (
+    "races",
+    "static_tiers",
+    "subraces",
+    "starting_kits",
+    "presets",
+    "skills",
+    "items",
+    "prices",
+    "elements",
+)
 
 
 class AccountCapacityTests(EvenniaTest):
@@ -108,11 +125,12 @@ class AccountCapacityTests(EvenniaTest):
         self.assertTrue(char1.creation_pending)
         self.assertTrue(char2.creation_pending)
 
-        activate_player_character(
-            account,
-            char1,
-            CharacterCreationRequest(mode="preset", preset_key="elysa_snow"),
-        )
+        with synthetic_registries(*_PRESET_SCOPE):
+            activate_player_character(
+                account,
+                char1,
+                CharacterCreationRequest(mode="preset", preset_key=_PRESET_KEY),
+            )
         self.assertFalse(char1.creation_pending)
         self.assertTrue(char2.creation_pending)
 
