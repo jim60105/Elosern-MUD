@@ -22,7 +22,7 @@ Baseline (task 1.1): 315 findings across the 22 flagged manifest files
 - [x] 3.3 Migrate `world/art/tests/test_gallery.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 3.4 Migrate `world/art/tests/test_gallery_fallback.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 3.5 Migrate `world/art/tests/test_gallery_match.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.6 Migrate `world/art/tests/test_gallery_prompt.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.6 Migrate `world/art/tests/test_gallery_prompt.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
 ## 4. Migrate group 2
 
@@ -35,8 +35,8 @@ Baseline (task 1.1): 315 findings across the 22 flagged manifest files
 
 ## 5. Migrate group 3
 
-- [ ] 5.1 Migrate `world/art/tests/test_subjects.py` (tier S, re-derive pinned quantities from the synthetic catalog): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.2 Migrate `world/art/tests/test_worker.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.1 Migrate `world/art/tests/test_subjects.py` (tier S, re-derive pinned quantities from the synthetic catalog): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.2 Migrate `world/art/tests/test_worker.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 5.3 Migrate `world/imports/tests/test_degraded_banner.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 5.4 Migrate `world/imports/tests/test_loader_trait_values.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 5.5 Migrate `world/imports/tests/test_profession_assembly_loader.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only

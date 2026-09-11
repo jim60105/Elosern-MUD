@@ -34,9 +34,27 @@ from world.art.subjects import (
     scene_description,
     scene_subject_for,
 )
-from world.lore.items import ITEM_REGISTRY
-
 from tools.spec_traceability import covers_requirement
+from world.tests.synthetic_data import (
+    SYNTH_ARCHETYPES,
+    SYNTH_ITEMS,
+    SYNTH_MONSTER_TIERS,
+    SYNTH_SUBRACES,
+    synthetic_registries,
+)
+
+# Kit vocabularies: the fragment/registry-lookup tests run inside synthetic
+# scopes and resolve presentation text through these patched rows; identity
+# literals elsewhere in the file are file-local t_ strings.
+_SYNTH_SCENE = sorted(SYNTH_ARCHETYPES)[0]
+_SYNTH_TIER = sorted(SYNTH_MONSTER_TIERS)[0]
+_SYNTH_SUBRACE = sorted(SYNTH_SUBRACES)[0]
+_SYNTH_RACE_LABEL = SYNTH_SUBRACES[_SYNTH_SUBRACE].display_name_zh
+_SYNTH_WEAPON = "t_thorn_knife"
+_SYNTH_OFFHAND = "t_iron_fang"
+_SYNTH_ARMOR = "t_wayfarer_pass"
+_SYNTH_TRINKET = "t_huskapple"
+_SYNTH_TRINKET_B = "t_ember_spray"
 
 
 _APPEARANCE_TEXT = {"feature": "a silver ear piercing", "height": "tall"}
@@ -46,8 +64,8 @@ def _entity(persona=None, equipment=None):
     """A DB-free stand-in character with fixed identity and stored state."""
     entity = Mock()
     entity.db.display_name = "艾琳"
-    entity.db.race = "beastfolk"
-    entity.db.subrace = "catkin"
+    entity.db.race = "t_duskmari"
+    entity.db.subrace = _SYNTH_SUBRACE
     entity.db.persona = persona
     entity.db.equipment = equipment
     entity.key = "艾琳"
@@ -174,8 +192,10 @@ class CustomPromptBoundTests(unittest.TestCase):
                     validate_custom_prompt(bad)
 
 
+@synthetic_registries("items", "subraces")
 class EquipmentFragmentTests(unittest.TestCase):
-    """Registry-owned visual text, slot order, tolerant reads, zero writes."""
+    """Registry-owned visual text, slot order, tolerant reads, zero writes
+    (all entities are built in test bodies, so the class scope covers)."""
 
     def _gear(self, **slots):
         return {
@@ -189,9 +209,11 @@ class EquipmentFragmentTests(unittest.TestCase):
         "art-gallery-prompt-fields::equipment-fields-contribute-registry-owned-visual-text-and-nothing-else"
     )
     def test_selected_slots_contribute_presentation_text_in_declared_order(self):
-        sword = ITEM_REGISTRY["plain_sword"].presentation.summary_zh
-        robe = ITEM_REGISTRY["mage_robe"].presentation.summary_zh
-        entity = _entity(equipment=self._gear(weapon_main="plain_sword", armor="mage_robe"))
+        sword = SYNTH_ITEMS[_SYNTH_WEAPON].presentation.summary_zh
+        robe = SYNTH_ITEMS[_SYNTH_ARMOR].presentation.summary_zh
+        entity = _entity(
+            equipment=self._gear(weapon_main=_SYNTH_WEAPON, armor=_SYNTH_ARMOR)
+        )
         fragment = equipment_fragment(entity, ("weapon_main", "armor"))
         self.assertEqual(fragment, "\n" + sword + "\n" + robe)
         # Selecting only armor says nothing about the sword.
@@ -201,13 +223,15 @@ class EquipmentFragmentTests(unittest.TestCase):
         "art-gallery-prompt-fields::equipment-fields-contribute-registry-owned-visual-text-and-nothing-else"
     )
     def test_accessories_contribute_in_sorted_key_order(self):
-        hairpin = ITEM_REGISTRY["silver_hairpin"].presentation.summary_zh
-        necklace = ITEM_REGISTRY["wolf_fang_necklace"].presentation.summary_zh
+        # Kit keys chosen so the alphabetical key order differs from storage
+        # order: t_ember_spray sorts before t_huskapple.
+        first = SYNTH_ITEMS[_SYNTH_TRINKET_B].presentation.summary_zh
+        second = SYNTH_ITEMS[_SYNTH_TRINKET].presentation.summary_zh
         entity = _entity(
-            equipment=self._gear(accessories=["wolf_fang_necklace", "silver_hairpin"])
+            equipment=self._gear(accessories=[_SYNTH_TRINKET_B, _SYNTH_TRINKET])
         )
         self.assertEqual(
-            equipment_fragment(entity, ("accessories",)), "\n" + hairpin + "\n" + necklace
+            equipment_fragment(entity, ("accessories",)), "\n" + first + "\n" + second
         )
 
     @covers_requirement(
@@ -219,7 +243,7 @@ class EquipmentFragmentTests(unittest.TestCase):
             "not-a-mapping",                         # malformed storage
             {},                                      # empty mapping
             self._gear(weapon_main="not_a_real_key"),  # unregistered key
-            self._gear(accessories=["silver_hairpin", 42]),  # malformed accessory list
+            self._gear(accessories=[_SYNTH_TRINKET, 42]),  # malformed accessory list
             {"weapon_main": 5},                      # malformed slot type
         ):
             with self.subTest(equipment=equipment):
@@ -231,14 +255,14 @@ class EquipmentFragmentTests(unittest.TestCase):
         "art-gallery-prompt-fields::equipment-fields-contribute-registry-owned-visual-text-and-nothing-else"
     )
     def test_composing_never_writes_equipment_state(self):
-        stored = self._gear(weapon_main="plain_sword", armor="leather_armor")
+        stored = self._gear(weapon_main=_SYNTH_WEAPON, armor=_SYNTH_ARMOR)
 
         class _WriteTrap:
             """Reads resolve; any equipment write fails the test."""
 
             display_name = "艾琳"
-            race = "beastfolk"
-            subrace = "catkin"
+            race = "t_duskmari"
+            subrace = _SYNTH_SUBRACE
             persona = None
 
             @property
@@ -253,14 +277,16 @@ class EquipmentFragmentTests(unittest.TestCase):
         entity.db = _WriteTrap()
         entity.key = "艾琳"
         text = character_description(entity, 30, fields=EQUIPMENT_FIELDS)
-        self.assertIn(ITEM_REGISTRY["plain_sword"].presentation.summary_zh, text)
-        self.assertEqual(stored["weapon_main"], "plain_sword")
+        self.assertIn(SYNTH_ITEMS[_SYNTH_WEAPON].presentation.summary_zh, text)
+        self.assertEqual(stored["weapon_main"], _SYNTH_WEAPON)
 
 
+@synthetic_registries("items", "subraces")
 class CompositionTests(PromptFixture):
-    """Selection-aware character_description over the shipped template."""
+    """Selection-aware character_description over the shipped template,
+    wearing patched kit gear."""
 
-    _BASE = "A 貓人族 character named 艾琳 ({age}) in the approved visual style."
+    _BASE = f"A {_SYNTH_RACE_LABEL} character named 艾琳 ({{age}}) in the approved visual style."
 
     @covers_requirement(
         "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth"
@@ -295,20 +321,20 @@ class CompositionTests(PromptFixture):
     def test_equipment_selection_carries_only_presentation_text(self):
         self.load()
         gear = {
-            "weapon_main": "plain_sword",
-            "weapon_off": "iron_shield",
-            "armor": "leather_armor",
-            "accessories": ["silver_hairpin"],
+            "weapon_main": _SYNTH_WEAPON,
+            "weapon_off": _SYNTH_OFFHAND,
+            "armor": _SYNTH_ARMOR,
+            "accessories": [_SYNTH_TRINKET],
         }
         entity = _entity(equipment=gear)
         text = character_description(entity, 24, fields=("armor", "weapon_main"))
-        self.assertIn(ITEM_REGISTRY["plain_sword"].presentation.summary_zh, text)
-        self.assertIn(ITEM_REGISTRY["leather_armor"].presentation.summary_zh, text)
+        self.assertIn(SYNTH_ITEMS[_SYNTH_WEAPON].presentation.summary_zh, text)
+        self.assertIn(SYNTH_ITEMS[_SYNTH_ARMOR].presentation.summary_zh, text)
         # Nothing from the unselected slots reaches the description.
-        self.assertNotIn(ITEM_REGISTRY["iron_shield"].presentation.summary_zh, text)
-        self.assertNotIn(ITEM_REGISTRY["silver_hairpin"].presentation.summary_zh, text)
+        self.assertNotIn(SYNTH_ITEMS[_SYNTH_OFFHAND].presentation.summary_zh, text)
+        self.assertNotIn(SYNTH_ITEMS[_SYNTH_TRINKET].presentation.summary_zh, text)
         # No registry field other than the presentation summary can reach it.
-        for forbidden in ("plain_sword", "leather_armor", "iron_shield", "silver_hairpin", "weapon", "rarity", "price"):
+        for forbidden in (_SYNTH_WEAPON, _SYNTH_ARMOR, _SYNTH_OFFHAND, _SYNTH_TRINKET, "weapon", "rarity", "price"):
             self.assertNotIn(forbidden, text)
 
     @covers_requirement(
@@ -318,7 +344,7 @@ class CompositionTests(PromptFixture):
         self.load()
         entity = _entity(
             {"appearance": _APPEARANCE_TEXT},
-            equipment={"armor": "leather_armor"},
+            equipment={"armor": _SYNTH_ARMOR},
         )
         custom = "逆光剪影，藍調色調"
         text = character_description(
@@ -326,7 +352,7 @@ class CompositionTests(PromptFixture):
         )
         self.assertTrue(text.endswith("\n" + custom))
         self.assertLess(text.index("外觀："), text.index(custom))
-        self.assertLess(text.index(ITEM_REGISTRY["leather_armor"].presentation.summary_zh), text.index(custom))
+        self.assertLess(text.index(SYNTH_ITEMS[_SYNTH_ARMOR].presentation.summary_zh), text.index(custom))
 
     @covers_requirement(
         "art-gallery-prompt-fields::free-form-prompt-text-is-bounded-sanitized-and-appended-verbatim"
@@ -351,7 +377,7 @@ class CompositionTests(PromptFixture):
         self.load()
         entity = _entity(
             {"appearance": _APPEARANCE_TEXT},
-            equipment={"weapon_main": "plain_sword", "accessories": ["wolf_fang_necklace", "silver_hairpin"]},
+            equipment={"weapon_main": _SYNTH_WEAPON, "accessories": [_SYNTH_TRINKET_B, _SYNTH_TRINKET]},
         )
         first = character_description(
             entity, 24, fields=("armor", "appearance", "accessories", "weapon_main"), custom_prompt="月夜"
@@ -378,10 +404,10 @@ class CompositionTests(PromptFixture):
         self.load()
         entity = _entity(
             {"appearance": {"feature": "quiet eyes"}},
-            equipment={"armor": "leather_armor"},
+            equipment={"armor": _SYNTH_ARMOR},
         )
         text = character_description(entity, 24, fields=("appearance", "armor"), custom_prompt="雨")
-        armor_line = ITEM_REGISTRY["leather_armor"].presentation.summary_zh
+        armor_line = SYNTH_ITEMS[_SYNTH_ARMOR].presentation.summary_zh
         self.assertTrue(text.startswith("A 艾琳 (24) [approved visual style]"))
         self.assertIn(f"|\n外觀：\nfeature：quiet eyes|\n{armor_line}|\n雨", text)
 
@@ -402,8 +428,8 @@ class CompositionTests(PromptFixture):
             """Identity fields resolve; any composition input fails the test."""
 
             display_name = "艾琳"
-            race = "beastfolk"
-            subrace = "catkin"
+            race = "t_duskmari"
+            subrace = _SYNTH_SUBRACE
 
             @property
             def persona(self):
@@ -420,7 +446,7 @@ class CompositionTests(PromptFixture):
             character_description(
                 entity, 24, fields=GALLERY_PROMPT_FIELDS, custom_prompt="任何自由文字"
             ),
-            "艾琳（貓人族，24 歲）",
+            f"艾琳（{_SYNTH_RACE_LABEL}，24 歲）",
         )
 
     @covers_requirement(
@@ -433,7 +459,7 @@ class CompositionTests(PromptFixture):
         entity = _entity(
             {"appearance": _APPEARANCE_TEXT},
             equipment={
-                "weapon_main": "plain_sword",
+                "weapon_main": _SYNTH_WEAPON,
                 "weapon_off": None,
                 "armor": None,
                 "accessories": [],
@@ -447,7 +473,7 @@ class CompositionTests(PromptFixture):
         )
         self.assertEqual(as_generator, as_tuple)
         self.assertIn(
-            ITEM_REGISTRY["plain_sword"].presentation.summary_zh, as_generator
+            SYNTH_ITEMS[_SYNTH_WEAPON].presentation.summary_zh, as_generator
         )
 
     @covers_requirement(
@@ -460,8 +486,8 @@ class CompositionTests(PromptFixture):
 
         class _Trap:
             display_name = "艾琳"
-            race = "beastfolk"
-            subrace = "catkin"
+            race = "t_duskmari"
+            subrace = _SYNTH_SUBRACE
 
             @property
             def persona(self):
@@ -496,6 +522,7 @@ class CompositionTests(PromptFixture):
                     )
 
 
+@synthetic_registries("archetypes", "monster_tiers", "subraces")
 class DescriptionDispatcherTests(PromptFixture):
     """The description_for boundary: explicit selection only for characters."""
 
@@ -513,8 +540,8 @@ class DescriptionDispatcherTests(PromptFixture):
     )
     def test_scene_and_monster_dispatch_ignore_the_selection(self):
         self.load()
-        scene = scene_subject_for("forest_path")
-        monster = monster_subject_for("low")
+        scene = scene_subject_for(_SYNTH_SCENE)
+        monster = monster_subject_for(_SYNTH_TIER)
         from world.art.subjects import monster_description, scene_description
 
         self.assertEqual(description_for(scene), scene_description(scene))
