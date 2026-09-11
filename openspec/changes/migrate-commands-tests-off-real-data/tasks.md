@@ -28,7 +28,7 @@
 - [x] 5.1 Migrate `commands/tests/test_persona_commands.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 5.2 Migrate `commands/tests/test_talk_turnin_branch.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 5.3 Migrate `commands/tests/test_talk_turnin_commands.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.4 Migrate `commands/tests/test_title_command.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.4 Migrate `commands/tests/test_title_command.py` (tier A): titles registry scoped with locally authored rows; grants replaced by direct bank_fixed/bank_epithet on invented vocabulary; focused label green
 - [x] 5.5 Migrate `typeclasses/tests/test_account_capacity.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 5.6 Migrate `typeclasses/tests/test_account_login.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
