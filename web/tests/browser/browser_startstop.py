@@ -66,6 +66,12 @@ def _install_synthetic_catalogs_if_flagged() -> None:
     )
 
     graft_synth_entry_rank()
+    # The creation descriptor derives one affinity picker per LIVE registry
+    # race while the shipped race-bound mapping knows only the shipped races;
+    # graft one borrowed bound per kit race so the custom form renders.
+    from web.browser_support.browser_fixtures_data import graft_synth_affinity_bounds
+
+    graft_synth_affinity_bounds()
     # The status presenter resolves every displayable condition code through
     # the import-built coverage table (shipped rows, via the pre-install
     # import seam); the kit's own buff rows get authored labels grafted in.

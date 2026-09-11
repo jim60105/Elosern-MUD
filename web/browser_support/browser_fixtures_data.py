@@ -167,6 +167,98 @@ def synth_next_entry_rank_key() -> str:
     )
 
 
+#: Borrowed affinity bound per kit race: the kit's subrace seeds borrow the
+#: shipped vocabulary's first element (closed combat-element enum cannot be
+#: widened), so every kit race may pick exactly ONE element without letting
+#: a seed exceed its own race bound at activation.
+SYNTH_RACE_AFFINITY_BOUND = 1
+
+
+def graft_synth_affinity_bounds() -> None:
+    """Extend the race-bound mapping with one row per live kit race.
+
+    ``world.rules.character_creation._AFFINITY_INPUT_BOUNDS`` is production
+    data keyed by the shipped races (production seam; this change ships no
+    production-code edits), while the creation descriptor derives one
+    affinity picker per LIVE registry race — under the synthetic install the
+    registry is t_-only and ``max_affinity_elements`` raises for every kit
+    race. Both flagged processes therefore graft one bound per live race
+    AFTER the kit install (``setdefault``: shipped rows keep their shipped
+    numbers). Every consumer (panel descriptor, draft normalizer, action
+    gate, creation service) resolves through the same live mapping, so the
+    custom-form picker, the concept placeholder's empty affinity, and the
+    activation seed validation all agree on the kit races.
+    """
+    from world.lore.races import RACE_REGISTRY
+    from world.rules.character_creation import _AFFINITY_INPUT_BOUNDS
+
+    for race_key in RACE_REGISTRY:
+        _AFFINITY_INPUT_BOUNDS.setdefault(race_key, SYNTH_RACE_AFFINITY_BOUND)
+
+
+def concept_affinity_checked_testids(expected: tuple[str, ...]) -> tuple[str, ...]:
+    """The affinity checkboxes the CONCEPT placeholder journey must find checked.
+
+    The shipped proposal names two shipped elements, so the journey pins
+    their exact checkbox testids (``creation-affinity-<element>``). The
+    synthetic placeholder deliberately carries an EMPTY affinity — the
+    closed element enum makes a shipped-name check meaningless, while the
+    journey still proves the placeholder prefills the picker region (the
+    checkboxes are rendered and nothing is checked) — so synthetic mode
+    expects no checked box.
+    """
+    return () if synth_mode_enabled() else tuple(
+        f"creation-affinity-{key}" for key in expected
+    )
+
+
+def concept_placeholder_values(panel: dict) -> dict:
+    """The identity the CONCEPT placeholder journey must observe pre-filled.
+
+    Re-derives, purely from the panel the server just presented (no Django
+    settings needed — safe in the Playwright-side process), exactly what the
+    browser-settings resolver proposes: shipped mode forwards the wizard's
+    own snapshot values verbatim; synthetic mode derives the FIRST advertised
+    race/subrace pair from the custom block and the greedy span-fill of the
+    matching advertised profile (the same rule the server applies against
+    the live profile), with the empty affinity the placeholder always carries.
+    """
+    proposal = panel["proposal"]
+    if not synth_mode_enabled():
+        return {
+            "race": proposal["race"],
+            "subrace": proposal["subrace"],
+            "allocations": dict(proposal["allocations"]),
+            "affinity_elements": list(proposal["affinity_elements"]),
+            "affinity_checked": concept_affinity_checked_testids(
+                proposal["affinity_elements"]
+            ),
+        }
+    custom = panel["custom"]
+    race = custom["races"][0]
+    race_key = race["key"]
+    subrace_key = (race["subraces"] or [None])[0]
+    profile = next(
+        p for p in custom["profiles"]
+        if p["race"] == race_key and p["subrace"] == subrace_key
+    )
+    remaining = profile["budget"]
+    allocations: dict[str, int] = {}
+    for axis in profile["axes"]:
+        value = min(axis["maximum"] - axis["minimum"], remaining)
+        allocations[axis["axis"]] = value
+        remaining -= value
+    if remaining != 0:
+        raise AssertionError("profile budget exceeds allocatable axis spans")
+    return {
+        "race": race_key,
+        "subrace": subrace_key,
+        "allocations": allocations,
+        "affinity_elements": [],
+        "affinity_checked": (),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Runtime catalog probes (shared by the synthetic-aware seed fixtures).
 #
@@ -223,6 +315,60 @@ def synth_concept_proposal_values() -> dict:
         "subrace_key": subrace_key,
         "allocations": allocations,
         "suggested_skills": (next(iter(SKILL_REGISTRY)),),
+    }
+
+
+def synth_first_preset_key() -> str:
+    """The first registered player-preset card key (server-side probe).
+
+    The creation fixture seeds its preset draft from the first registered
+    card in both boot modes, and the preset journeys open that same first
+    card — so journeys and the seed agree without naming a card key.
+    """
+    from world.lore.player_presets import PRESET_REGISTRY
+
+    return next(iter(PRESET_REGISTRY))
+
+
+def custom_draft_form_values(
+    panel: dict, *, race_index: int = 0, last_subrace: bool = False
+) -> dict:
+    """(race, subrace, subrace presses, budget, per-axis allocation strings)
+    for a keyboard-driven custom-form journey.
+
+    Mirrors the journey exactly: the race select's keyboard lands on the
+    ``race_index``-th advertised race (clamped, so one ArrowRight reaches
+    the second race or stays on a single-race registry), the subrace select
+    on the LAST (``last_subrace``, Home + n-1 ArrowDown) or FIRST (one
+    ArrowDown from the unopened select) subrace of that race, and the
+    allocation strings are one exact greedy budget spend of the MATCHING
+    advertised profile — the same span-fill rule the server validates — so
+    the journeys fill what the CURRENT registry offers without naming
+    shipped race keys or point totals.
+    """
+    custom = panel["custom"]
+    race = custom["races"][min(race_index, len(custom["races"]) - 1)]
+    race_key = race["key"]
+    subrace_keys = list(race["subraces"] or [])
+    subrace_key = subrace_keys[-1] if last_subrace else subrace_keys[0]
+    profile = next(
+        p for p in custom["profiles"]
+        if p["race"] == race_key and p["subrace"] == subrace_key
+    )
+    remaining = profile["budget"]
+    allocations: dict[str, str] = {}
+    for axis in profile["axes"]:
+        value = min(axis["maximum"] - axis["minimum"], remaining)
+        allocations[axis["axis"]] = str(value)
+        remaining -= value
+    if remaining != 0:
+        raise AssertionError("profile budget exceeds allocatable axis spans")
+    return {
+        "race": race_key,
+        "subrace": subrace_key,
+        "subrace_presses": max(len(subrace_keys) - 1, 0) if last_subrace else 1,
+        "budget": profile["budget"],
+        "allocations": allocations,
     }
 
 
