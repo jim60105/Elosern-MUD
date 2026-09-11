@@ -9,7 +9,7 @@ from evennia.contrib.grid.xyzgrid.xyzroom import XYZExit
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
-from typeclasses.exits import CostedXYZExit, Exit
+from typeclasses.exits import CostedXYZExit, Exit, MovementCostMixin
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, Room
 from world.rules.clock import CLOCK_YAML, get_world_clock
@@ -164,6 +164,9 @@ class FlightRequiredExitTests(EvenniaTest):
         self.room2.key = "Room2"
         self.room1.save()
         self.room2.save()
+        # Read the waiver grant set off the gate itself instead of restating
+        # shipped skill keys (test-data-independence).
+        self.waiver_keys = sorted(MovementCostMixin.movement_waiver_skill_keys)
 
     def _traverse_via_command(self, exit_obj, caller):
         from evennia.objects.objects import ExitCommand
@@ -196,7 +199,7 @@ class FlightRequiredExitTests(EvenniaTest):
             location=self.room1,
             destination=self.room2,
         )
-        self.char1.db.skills = {"active": [], "passive": ["flight"]}
+        self.char1.db.skills = {"active": [], "passive": [self.waiver_keys[0]]}
         self.assertTrue(exit_obj.access(self.char1, "traverse"))
         before = get_world_clock().tick
         self._traverse_via_command(exit_obj, self.char1)
@@ -211,7 +214,7 @@ class FlightRequiredExitTests(EvenniaTest):
             location=self.room1,
             destination=self.room2,
         )
-        self.char1.db.skills = {"active": [], "passive": ["flash_step"]}
+        self.char1.db.skills = {"active": [], "passive": [self.waiver_keys[1]]}
         self.assertTrue(exit_obj.access(self.char1, "traverse"))
         before = get_world_clock().tick
         self._traverse_via_command(exit_obj, self.char1)

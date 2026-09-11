@@ -118,6 +118,10 @@ class MovementCostMixin:
     # Opt-in per-exit flight gate (movement-skill-waiver). Off for every
     # shipped exit; future map content sets it True on its exit typeclass.
     requires_flight: bool = False
+    # Skill keys that waive the flight gate (movement-skill-waiver). Single
+    # definition so consumers (and tests) read the grant set from the gate
+    # itself instead of duplicating shipped skill keys.
+    movement_waiver_skill_keys = frozenset({"flight", "flash_step"})
 
     def access(
         self,
@@ -158,7 +162,7 @@ class MovementCostMixin:
         if skills is None:
             return False
         owned = set(skills.owned_keys())
-        return bool(owned & {"flight", "flash_step"})
+        return bool(owned & self.movement_waiver_skill_keys)
 
     def _has_lock_bypass(self, accessing_obj, no_superuser_bypass: bool) -> bool:
         """Mirror Evennia's stock lock-bypass (superuser) semantics.

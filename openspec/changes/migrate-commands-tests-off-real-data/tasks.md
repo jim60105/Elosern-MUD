@@ -43,7 +43,7 @@
 
 ## 7. Migrate group 5
 
-- [ ] 7.1 Migrate `typeclasses/tests/test_npc_dialogue.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 7.1 Migrate `typeclasses/tests/test_npc_dialogue.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 7.2 Migrate `typeclasses/tests/test_npcs.py` (tier B): zero gate findings — migrated by freeze-list entry removal alone (focused label green on the clean path)
 - [x] 7.3 Migrate `typeclasses/tests/test_rooms.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
