@@ -11,6 +11,7 @@ from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest, E
 
 from commands.action import CmdCast
 from commands.combat import CmdCombatActions
+from world.lore.elements import Element
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
@@ -22,12 +23,88 @@ from world.rules.combat_session import (
     resolve_target_token,
 )
 from world.rules.combat_view import build_combat_view
+from world.rules.tests._combat_session_helpers import (
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
+from world.skills.registry import SkillCategory, SkillKind, TargetSpec
+from world.tests.synthetic_data import SYNTH_SKILLS, make_skill
+
+# File-local synthetic spells carry invented element groups, so the
+# category/sub-heading ordering mechanics render fully synthetic rows. The
+# kit's own element row (t_glowmire) ships in the scoped element registry;
+# only the second group is added through the scope extra.
+_FEN = Element("t_fenlight", "沼光", "Synthetic element.")
+# Row objects, not string keys: SkillDef validates a raw string against the
+# LIVE registry at construction time, before any scope is open. The scoped
+# registry carries the same-key rows, so runtime resolution still lands.
+_GLOW = Element("t_glowmire", "光沼", "Synthetic element.")
+_TIDE_ARC = make_skill(
+    "t_tide_arc",
+    label="潮弧",
+    description="彎彎的合成水弧。",
+    kind=SkillKind.ACTIVE,
+    target_spec=TargetSpec.SINGLE,
+    cost={"mp": 10},
+    usable_out_of_combat=True,
+    element=_GLOW,
+    effects=["damage:t_glowmire:magic"],
+    category=SkillCategory.ELEMENTAL_MAGIC,
+    group="t_glowmire",
+)
+_GALE_JAB = make_skill(
+    "t_gale_jab",
+    label="風刺",
+    description="輕快的合成突刺。",
+    kind=SkillKind.ACTIVE,
+    # AREA spec: the multi-token cast exercises the multi-target path, which
+    # a SINGLE-target skill rejects as a target-spec mismatch.
+    target_spec=TargetSpec.AREA,
+    cost={"mp": 9},
+    usable_out_of_combat=True,
+    element=_FEN,
+    effects=["damage:t_fenlight:magic"],
+    category=SkillCategory.ELEMENTAL_MAGIC,
+    group="t_fenlight",
+)
+# The kit spell borrows the shipped first-element row (a closed vocabulary
+# the kit cannot widen); its key and display label arrive as runtime values
+# through the kit row, never as source literals.
+_SPELL = SYNTH_SKILLS["t_ember_burst"].key
+_SPELL_LABEL = SYNTH_SKILLS["t_ember_burst"].label
+_BORROWED_ELEMENT_LABEL = SYNTH_SKILLS["t_ember_burst"].element.display_name_zh
+
+_REED_CUT = make_skill("t_reed_cut", label="蘆斷", description="斷蘆的合成一斬。")
+
+_SCOPE_LOGICALS = (
+    "races",
+    "static_tiers",
+    "subraces",
+    "skills",
+    "elements",
+    "buffs",
+    "items",
+    "prices",
+)
+
+
+def _scope_extra() -> dict:
+    extra = synth_innate_overlay()
+    extra["skills"].update(
+        {
+            _TIDE_ARC.key: _TIDE_ARC,
+            _GALE_JAB.key: _GALE_JAB,
+            _REED_CUT.key: _REED_CUT,
+        }
+    )
+    extra["elements"] = {_FEN.key: _FEN}
+    return extra
 
 
 def _player(key="token player"):
     player = create_object(PlayerCharacter, key=key)
-    player.race = "human"
+    player.race = "t_duskmari"
     player.apply_race_baseline()
     return player
 
@@ -43,6 +120,7 @@ def _monster(key="token goblin", hp=100):
 
 class TokenParsingTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        open_synthetic_scope(self, "races", "static_tiers", "subraces")
         super().setUp()
         self.room = create_object(Room, key="token arena")
         self.player = _player()
@@ -116,12 +194,14 @@ class TokenParsingTests(BattlefieldIsolation, EvenniaTestCase):
 
 class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
+        open_synthetic_scope(self, *_SCOPE_LOGICALS, extra=_scope_extra())
         super().setUp()
         self.room = create_object(Room, key="combat actions room")
         self.char1.location = self.room
-        self.char1.race = "human"
+        self.char1.race = "t_duskmari"
         self.char1.apply_race_baseline()
-        grant_lineage(self.char1, ["fire_ball"])
+        self.char1.traits.magic_power.base = 30
+        grant_lineage(self.char1, [_SPELL])
         self.monster = _monster("actions goblin")
         self.monster.location = self.room
 
@@ -131,16 +211,16 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         messages = self._run(CmdCombatActions, "")
         joined = " ".join(messages)
         self.assertIn("可用技能與目標代號：", messages[0])
-        self.assertIn("fire_ball（火球術）", joined)
+        self.assertIn(f"{_SPELL}（{_SPELL_LABEL}）", joined)
         self.assertIn("e1＝actions goblin", joined)
         self.assertIn("a1＝", joined)
 
     @covers_requirement("webclient-combat-menu::telnet-combat-actions-renders-identical-category-and-group-structure")
     def test_combat_actions_renders_category_headings_and_element_sub_headings(self):
-        # Owning skills across two elements (fire before wind in
-        # ELEMENT_REGISTRY order) plus a no-group martial-arts skill.
+        # Owning skills across two element sub-groups plus a no-group
+        # martial-arts skill.
         self.char1.db.skills = {
-            "active": ["fire_ball", "wind_blade", "shadow_slash"],
+            "active": [_SPELL, _GALE_JAB.key, _REED_CUT.key],
             "passive": [],
         }
         engage(self.char1, self.monster)
@@ -154,23 +234,31 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         self.assertIn("◆ 移動", joined)
         self.assertLess(joined.index("◆ 元素魔法"), joined.index("◆ 武技"))
         self.assertLess(joined.index("◆ 武技"), joined.index("◆ 移動"))
-        # Element sub-headings in ELEMENT_REGISTRY order (fire before wind).
-        self.assertIn("  火", joined)
-        self.assertIn("  風", joined)
-        self.assertLess(joined.index("  火"), joined.index("  風"))
+        # Element sub-headings in ELEMENT_REGISTRY order (the borrowed row
+        # stays first in the scoped registry; the invented row follows).
+        self.assertIn(f"  {_BORROWED_ELEMENT_LABEL}", joined)
+        self.assertIn("  沼光", joined)
+        self.assertLess(
+            joined.index(f"  {_BORROWED_ELEMENT_LABEL}"), joined.index("  沼光")
+        )
         # Skills stay under their element sub-heading in owned_keys order.
-        self.assertLess(joined.index("  火"), joined.index("fire_ball（火球術）"))
-        self.assertLess(joined.index("  風"), joined.index("wind_blade（風刃術）"))
+        self.assertLess(
+            joined.index(f"  {_BORROWED_ELEMENT_LABEL}"),
+            joined.index(f"{_SPELL}（{_SPELL_LABEL}）"),
+        )
+        self.assertLess(joined.index("  沼光"), joined.index("t_gale_jab（風刺）"))
         # The no-group martial-arts category renders no sub-heading: the
         # skill lines follow the heading directly.
         martial = joined[joined.index("◆ 武技") + len("◆ 武技"):joined.index("◆ 移動")]
         self.assertNotIn("◆", martial)
-        self.assertIn("shadow_slash（影斬）", martial)
-        self.assertIn("basic_attack（基本攻擊）", martial)
+        self.assertIn("t_reed_cut（蘆斷）", martial)
+        # The innate overlay re-seeds the production-forced basic-attack key
+        # with a synthetic row whose label is authored in the helper.
+        self.assertIn("basic_attack（合成基本攻擊）", martial)
 
     @covers_requirement("webclient-combat-menu::telnet-combat-actions-renders-identical-category-and-group-structure")
     def test_combat_actions_no_group_category_renders_no_sub_heading(self):
-        self.char1.db.skills = {"active": ["shadow_slash"], "passive": []}
+        self.char1.db.skills = {"active": [_REED_CUT.key], "passive": []}
         engage(self.char1, self.monster)
         messages = self._run(CmdCombatActions, "")
         joined = "\n".join(messages)
@@ -178,7 +266,7 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         # The martial-arts heading is followed directly by skill lines; no
         # indented sub-heading line sits between them.
         self.assertIn("◆ 武技\n", joined)
-        self.assertIn("shadow_slash（影斬）", martial)
+        self.assertIn("t_reed_cut（蘆斷）", martial)
 
     def test_combat_actions_requires_active_session(self):
         self.call(CmdCombatActions(), "", "目前沒有進行中的戰鬥。")
@@ -203,7 +291,7 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         with patch("world.rules.clock.get_world_clock", return_value=WorldClock()), patch(
             "world.rules.combat.roll_d100", return_value=100
         ):
-            submit_player_action(self.char1, "fire_ball", [self.monster])
+            submit_player_action(self.char1, _SPELL, [self.monster])
         view_after = build_combat_view(self.char1)
         token_after = next(p.token for p in view_after.participants if p.identity == self.monster.pk)
         self.assertEqual(token_before, token_after)
@@ -213,7 +301,7 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         from world.rules.combat_session import read_session
 
         with patch("world.rules.combat.roll_d100", return_value=100):
-            messages = self._run(CmdCast, "fire_ball=e1")
+            messages = self._run(CmdCast, f"{_SPELL}=e1")
         self.assertTrue(
             any("繼續戰鬥。" in message for message in messages),
             messages,
@@ -230,16 +318,16 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
             {**to_storage(read_session(self.char1)), "enemy_ids": [self.monster.pk, second.pk]}
         )
         _persist(self.char1, record)
-        self.char1.db.skills = {"active": ["wind_blade"], "passive": []}
+        self.char1.db.skills = {"active": [_GALE_JAB.key], "passive": []}
         with patch("world.rules.combat.roll_d100", return_value=100):
-            messages = self._run(CmdCast, "wind_blade=e1,e2")
+            messages = self._run(CmdCast, f"{_GALE_JAB.key}=e1,e2")
         self.assertTrue(any("繼續戰鬥。" in m for m in messages), messages)
         self.assertEqual(read_session(self.char1).rounds_elapsed, 1)
 
     def test_cast_rejects_unknown_token_before_initiative(self):
         engage(self.char1, self.monster)
         with patch("world.rules.combat.roll_d100") as roll:
-            messages = self._run(CmdCast, "fire_ball=e9")
+            messages = self._run(CmdCast, f"{_SPELL}=e9")
         roll.assert_not_called()
         self.assertEqual(self.char1.db.active_combat["rounds_elapsed"], 0)
         self.assertTrue(

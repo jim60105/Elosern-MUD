@@ -10,7 +10,7 @@
 - [ ] 3.1 Migrate `commands/tests/test_art.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 3.2 Migrate `commands/tests/test_background.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 3.3 Migrate `commands/tests/test_character_creation.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.4 Migrate `commands/tests/test_combat_actions.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.4 Migrate `commands/tests/test_combat_actions.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 3.5 Migrate `commands/tests/test_command_branch_behaviour.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 3.6 Migrate `commands/tests/test_guild_economy_commands.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
