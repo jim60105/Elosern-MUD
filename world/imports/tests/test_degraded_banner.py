@@ -18,9 +18,11 @@ class DegradedBannerTests(TestCase):
         self.assertLess(text.index("skill-registry"), text.index("\nVALID "))
 
     def test_no_banner_or_degraded_check_when_registry_exists(self):
+        # The mechanic is presence-of-a-registry: only non-emptiness matters,
+        # so the fake carries file-local synthetic keys.
         with patch(
             "world.imports.validate._resolve_skill_registry",
-            return_value={"body_enhancement": 1, "elf_longevity": 1},
+            return_value={"t_synth_skill_a": 1, "t_synth_skill_b": 1},
         ):
             report = validate_batch([EXAMPLE_PATH])
         self.assertFalse(report.degraded_checks)
