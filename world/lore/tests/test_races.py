@@ -39,6 +39,17 @@ class RaceRegistryTests(unittest.TestCase):
         self.assertEqual(len(STATIC_TIER_REGISTRY), 11)
         self.assertEqual(len(SUBRACE_REGISTRY), 15)
 
+    def test_affinity_input_bounds_are_the_shipped_race_mapping(self):
+        # Relocated from the py<->js parity contract: the concrete per-race
+        # affinity maxima are shipped content; the parity tests only pin that
+        # every layer mirrors THIS mapping.
+        from world.rules.character_creation import _AFFINITY_INPUT_BOUNDS
+
+        self.assertEqual(
+            dict(_AFFINITY_INPUT_BOUNDS),
+            {"human": 2, "beastfolk": 1, "elf": 0},
+        )
+
     def test_magic_power_band_ordering_and_divine_arts(self):
         bands = {
             key: race.static_baseline.magic_power
