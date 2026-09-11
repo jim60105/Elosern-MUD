@@ -313,6 +313,14 @@ def graft_synth_defeat_rulebook() -> None:
     the kit's live threat tiers KeyError there on the first monster policy
     call. Add one archetype mapping per live kit tier key (existing keys,
     including the shipped ones, are untouched).
+
+    The same rulebook's violation table is keyed by lore monster species
+    names (the registry's ``example_monsters_zh``), so its fail-closed
+    validator rejects every shipped archetype once the install swaps the
+    bestiary to t_-only rows. Read the rulebook's own archetype keys and
+    union the missing species into one live tier row's example list, so the
+    frozen table validates against synthetic content (a shipped install
+    already names them and the graft is inert).
     """
     import world.rules.monster_behaviour as _behaviour
     from world.rules.buffs import BUFF_DEFINITIONS, BuffDefinition
@@ -362,6 +370,29 @@ def graft_synth_defeat_rulebook() -> None:
     ladder = ("instinctive", "pack_hunter")
     for index, tier_key in enumerate(sorted(SYNTH_MONSTER_TIERS)):
         archetype_defaults.setdefault(tier_key, ladder[min(index, len(ladder) - 1)])
+
+    import yaml
+    from dataclasses import replace
+    from pathlib import Path
+
+    import world.lore.monsters as _monster_lore
+    import world.rules as _rules
+
+    rulebook = yaml.safe_load(
+        (Path(_rules.__file__).parent / "rulebook" / "defeat_aftermath.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    needed = set(rulebook["violation"]["archetypes"])
+    registry = _monster_lore.MONSTER_TIER_REGISTRY
+    live = {name for tier in registry.values() for name in tier.example_monsters_zh}
+    missing = sorted(needed - live)
+    if missing:
+        key = next(iter(registry))
+        tier = registry[key]
+        registry[key] = replace(
+            tier, example_monsters_zh=tuple(tier.example_monsters_zh) + tuple(missing)
+        )
 
 
 def synth_next_entry_rank_key() -> str:
