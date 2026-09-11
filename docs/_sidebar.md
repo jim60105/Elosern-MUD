@@ -1,5 +1,26 @@
 - [文件首頁](/)
 
+- 世界觀設定
+  - [世界觀總覽](/lore/overview)
+  - [魔法技能體系](/lore/magic-system)
+  - 技能系譜設計
+    - [總覽與機械規則](/lore/skill-trees/index)
+    - [火屬性系譜樹](/lore/skill-trees/fire)
+    - [水屬性系譜樹](/lore/skill-trees/water)
+    - [風屬性系譜樹](/lore/skill-trees/wind)
+    - [土屬性系譜樹](/lore/skill-trees/earth)
+    - [雷屬性系譜樹](/lore/skill-trees/lightning)
+    - [冰屬性系譜樹](/lore/skill-trees/ice)
+    - [光屬性系譜樹](/lore/skill-trees/light)
+    - [暗屬性系譜樹](/lore/skill-trees/dark)
+    - [神之秘法系譜樹](/lore/skill-trees/divine-mystery)
+    - [武藝系譜樹](/lore/skill-trees/martial-arts)
+    - [身心強化取得條件](/lore/skill-trees/enhancement)
+    - [身法取得條件](/lore/skill-trees/movement)
+    - [天賦異能取得條件](/lore/skill-trees/innate-gift)
+    - [雜學秘術系譜樹](/lore/skill-trees/utility)
+    - [情慾秘術分類定位](/lore/skill-trees/sexual-act)
+
 - 遊戲指令
   - [指令總覽](/game/commands)
   - [指令參考](/game/command-reference)
