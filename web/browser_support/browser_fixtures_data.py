@@ -1,21 +1,22 @@
 """Shipped-mode fixture values for the managed browser harness.
 
 This module is NOT a test path (the lint gate only scans ``*/tests/`` and
-``test_*.py``), so it can name shipped catalog identifiers — and it is the
+``test_*.py``), so it can name shipped catalog identifiers - and it is the
 ONLY place the managed browser harness may name them. Test-path files
-(``web/tests/browser/*``) import synthetic values from the kit
-(``world/tests/synthetic_data.py``) and never name shipped keys or prose;
-the seed keeps its shipped-mode branch (the kit flag is default-off, so
-``ELOSERN_BROWSER_SYNTH_CATALOGS`` unset still mirrors shipped content) by
-importing the constants below.
+(``web/tests/browser/*.py``) import shipped values from here and resolve
+synthetic values from the kit (``world.tests.synthetic_data``), so the
+behavior suites themselves carry zero shipped content.
 
-Under ``ELOSERN_BROWSER_SYNTH_CATALOGS=1`` every value here is unused: the
-seed's synth branches resolve the kit's ``t_`` catalogs instead.
+The synth-mode block names only ``t_``-keyed kit rows and authored fixture
+identity (free-form object keys); the shipped block is read only when the
+harness boots with ``ELOSERN_BROWSER_SYNTH_CATALOGS`` overridden to "0".
 """
 
 from __future__ import annotations
 
 from types import MappingProxyType
+
+from world.lore.guild import GuildRank
 
 # ---------------------------------------------------------------------------
 # Shipped-mode seed values (used only when the synthetic flag is OFF).
@@ -66,9 +67,48 @@ SHIPPED_COMBAT_DEBUFF_KEY = "poisoned"
 SHIPPED_COMBAT_MONSTERS = (("goblin", 200), ("wolf", 200))
 
 # ---------------------------------------------------------------------------
+# Production entry-rank vocabulary under the synthetic install.
+#
+# ``world.rules.guild.register_adventurer`` hardcodes the entry rank "F"
+# (production seam; this change ships no production-code edits) while the
+# kit's guild-rank rows are t_-only. Both flagged processes therefore graft
+# one entry-rank row into the live registry AFTER the kit install, keyed by
+# the production seam constant and carrying only t_-keyed content (its title
+# is a kit row). The row lives solely in the private harness database and
+# process; shipped catalogs never see it.
+# ---------------------------------------------------------------------------
+
+SYNTH_ENTRY_RANK_KEY = "F"
+
+SYNTH_ENTRY_RANK_ROW = GuildRank(
+    "F",
+    1,
+    0,
+    99,
+    "Synthetic entry-rank tasks for the managed browser harness.",
+    "t_synth_first_hunt",
+    "霧鱗・灰秤",
+    "合成公會見習考官",
+)
+
+
+def graft_synth_entry_rank() -> None:
+    """Ensure the production entry-rank row exists in the live registry.
+
+    Called by the flagged seed and server processes after
+    ``install_synthetic_catalogs()`` swapped the guild-rank catalog to the
+    kit's t_-only rows, so guild registration keeps working on its hardcoded
+    entry-rank seam while every referenced title stays synthetic.
+    """
+    from world.lore.guild import GUILD_RANK_REGISTRY
+
+    GUILD_RANK_REGISTRY.setdefault(SYNTH_ENTRY_RANK_KEY, SYNTH_ENTRY_RANK_ROW)
+
+
+# ---------------------------------------------------------------------------
 # Synth-mode fixture values shared between the seed and the migrated tests.
-# These are authored fixture identity (room/NPC/monster object keys and the
-# kit keys each services mode deals out), NOT shipped catalog content.
+# These are kit keys and authored fixture identity (room/NPC/monster object
+# keys), NOT shipped catalog content.
 # ---------------------------------------------------------------------------
 
 #: Authored NPC/monster object keys the synth fixtures place (free-form
@@ -79,8 +119,27 @@ SYNTH_HOSTILE_MONSTER_KEY = "燼殼爬行者"
 SYNTH_DEFEATED_MONSTER_KEY = "倒地的燼殼蟲"
 SYNTH_PLAZA_MONSTER_KEY = "廣場燼殼蟲"
 
+#: Authored room keys unique to the options-surface fixture.
+SYNTH_PLAZA_ROOM_KEY = "合成測試廣場"
+SYNTH_EMPTY_GROUND_KEY = "合成測試空地"
+SYNTH_BPLAZA_PARTNER_KEY = "廣場合成夥伴"
+
+#: Kit archetype the art fixture room carries; its settled scene output file.
+SYNTH_ART_ARCHETYPE = "t_synth_bazaar"
+
+#: Kit dialogue table the art/exploration fixture hosts carry.
+SYNTH_DIALOGUE_TABLE_KEY = "t_synth_lodgekeeper"
+
 #: The kit quest the guild-board modes offer/accept.
 SYNTH_GUILD_OFFER_QUEST_KEY = "t_ember_cull"
+
+#: Kit shop whose merchant host the store modes trade through.
+SYNTH_SHOP_KEY = "t_mossgate_stall"
+
+#: Shop hours the store modes drive with the world clock (mirrors the
+#: catalog rulebook's day-window convention: 12h open, 3h closed).
+SYNTH_STORE_OPEN_SECONDS = 12 * 3600
+SYNTH_STORE_CLOSED_SECONDS = 3 * 3600
 
 #: Inventory deals per services mode (kit item keys).
 SYNTH_INVENTORY_BY_MODE = MappingProxyType(
@@ -106,7 +165,9 @@ SYNTH_COMBAT_DEBUFF_KEY = "t_ash_burn"
 #: (object key, hp) pairs for the two living synth combat monsters.
 SYNTH_COMBAT_MONSTERS = (("燼殼工蟲", 200), ("燼殼兵蟲", 200))
 
-#: Fixed-title rows the synth titles fixture banks; the codex journey asserts
-#: the first as the unlocked row and a third, UNbanked kit title as locked.
+#: Fixed-title rows the synth titles fixture banks; registration already
+#: banked the entry-rank title through the grafted F row, so the fixture
+#: banks it idempotently alongside the second kit row.
 SYNTH_TITLE_BANKED_KEYS = ("t_synth_first_hunt", "t_synth_lodging_friend")
+#: A third kit title kept UNbanked so the codex renders a locked row.
 SYNTH_TITLE_LOCKED_KEY = "t_synth_deep_walker"

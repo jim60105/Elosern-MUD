@@ -577,6 +577,17 @@ SYNTH_TITLES: MappingProxyType[str, FixedTitleDef] = MappingProxyType(
             "在合成驛站投宿滿一定次數即可獲得。",
             TitlePredicate(family=TitlePredicateFamily.COUNTER_THRESHOLD, counter="t_synthetic_counter", threshold=5),
         ),
+        # A deliberately hard row: the browser title-codex fixture banks the
+        # two easy rows and keeps this one unbanked, so the codex still
+        # renders a locked row under the synthetic install.
+        "t_synth_deep_walker": FixedTitleDef(
+            "t_synth_deep_walker",
+            "深霧行者",
+            TitleCategory.EXPLORE,
+            "苔徑深處的霧只為走得夠久的人讓路。",
+            "在合成荒野深處留下足夠多的到訪紀錄即可獲得。",
+            TitlePredicate(family=TitlePredicateFamily.COUNTER_THRESHOLD, counter="t_synthetic_counter", threshold=99),
+        ),
     }
 )
 
