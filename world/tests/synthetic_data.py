@@ -156,6 +156,13 @@ def _shipped_first_element_row() -> Element:
 _SYNTH_ELEMENT = _shipped_first_element_key()
 _SYNTH_ELEMENT_ROW = _shipped_first_element_row()
 
+# The kit's own invented element, as one shared row instance: skill rows
+# constructed at kit import (pre-patch) cannot name it as a string (the
+# SkillDef constructor resolves string elements through the live registry,
+# which still ships the closed vocabulary at that point), so they carry the
+# Element object directly.
+SYNTH_GLOWMIRE_ELEMENT = Element("t_glowmire", "光沼", "Synthetic element.")
+
 
 def _synth_elements() -> dict[str, Element]:
     """Synthetic element catalog: one invented row plus the borrowed row.
@@ -165,7 +172,7 @@ def _synth_elements() -> dict[str, Element]:
     registries must carry its row alongside the synthetic one.
     """
     return {
-        "t_glowmire": Element("t_glowmire", "光沼", "Synthetic element."),
+        SYNTH_GLOWMIRE_ELEMENT.key: SYNTH_GLOWMIRE_ELEMENT,
         _SYNTH_ELEMENT: _SYNTH_ELEMENT_ROW,
     }
 
@@ -329,6 +336,42 @@ SYNTH_SKILLS: dict[str, SkillDef] = {
         element=None,
         effects=["self_buff_apply:t_moss_veil"],
         category=SkillCategory.ENHANCEMENT,
+    ),
+    # Element-anchored pair for the freeform scale ladder
+    # (use-driven-skill-lineage DC5 / element-mastery-freeform-casting): the
+    # entitlement key is f"{element.key}_mastery", so the mastery passive is
+    # keyed off the kit's OWN invented element and the paired active spell
+    # scales with it. Fully t_-keyed: no shipped mastery row is borrowed (the
+    # borrowed seam is the closed element VOCABULARY, not the skill keys).
+    "t_glowmire_mastery": SkillDef(
+        key="t_glowmire_mastery",
+        label="光沼精通",
+        description="被動提昇光沼系魔法的掌握程度與威力。",
+        kind=SkillKind.PASSIVE,
+        target_spec=TargetSpec.NONE,
+        cost={},
+        usable_out_of_combat=True,
+        element=SYNTH_GLOWMIRE_ELEMENT,
+        # No shipped passive-trait effect string: the freeform entitlement
+        # reads DIRECT OWNERSHIP of the f"{element}_mastery" key, never an
+        # effect layer, and the shipped effect name would collide with the
+        # shipped token universe the kit must stay clear of.
+        effects=[],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group=SYNTH_GLOWMIRE_ELEMENT.key,
+    ),
+    "t_glowmire_bloom": SkillDef(
+        key="t_glowmire_bloom",
+        label="光沼花綻",
+        description="讓光沼的魔力在目標身上綻放成魔法波濤。",
+        kind=SkillKind.ACTIVE,
+        target_spec=TargetSpec.SINGLE,
+        cost={"mp": 14},
+        usable_out_of_combat=True,
+        element=SYNTH_GLOWMIRE_ELEMENT,
+        effects=["damage:t_glowmire:magic"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group=SYNTH_GLOWMIRE_ELEMENT.key,
     ),
 }
 
