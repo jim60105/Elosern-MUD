@@ -140,6 +140,13 @@ def create_runtime(prefix: str = "elosern-browser-") -> BrowserRuntime:
         "ELOSERN_BROWSER_AMP_PORT": str(ports[AMP_PORT]),
         # WebSocket port encoded into the webclient page matches the listener.
         "WEBSOCKET_CLIENT_PROXY_PORT": str(ports[WS_PORT]),
+        # Managed browser runtimes boot against the synthetic catalogs (kit
+        # ``world.tests.synthetic_data``): the seed process installs them
+        # before mirroring, and the server process installs them at
+        # at_server_init (``browser_startstop``), so the seeded DB carries
+        # t_-keyed catalog content only. Callers override to "0" per-runtime
+        # for the harness's own shipped-mode checks.
+        "ELOSERN_BROWSER_SYNTH_CATALOGS": "1",
     }
     return BrowserRuntime(
         root_dir=root_dir,
