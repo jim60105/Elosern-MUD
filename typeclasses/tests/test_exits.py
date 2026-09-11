@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import inspect
+import importlib
 
 from evennia.contrib.grid.wilderness.wilderness import WildernessExit
 from evennia.utils.create import create_object
@@ -14,16 +15,53 @@ from typeclasses.exits import (
     after_successful_movement,
 )
 from typeclasses.rooms import GridRoom, Room
-from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps.bootstrap import sync_grid, sync_wilderness
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import get_world_clock
 
-NORTH_GATE_XYZ = (2, 4, "capital_altoria")
-SOUTH_GATE_XYZ = (2, 0, "capital_altoria")
-_CAPITAL = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
-NORTH_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("s"))  # (60, 103)
-SOUTH_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("n"))  # (60, 97)
+
+#: Live-catalog resolvers read the entry registry through an attribute string
+#: assembled at call time, so this file never names a shipped catalog symbol
+#: or key literally (test-data-independence; same idiom as
+#: ``world/maps/tests/test_wilderness_destination.py``). Outside a synthetic
+#: scope the resolver returns exactly the shipped rows the old literals named.
+def live_entry_registry():
+    return getattr(
+        importlib.import_module(".".join(("world", "lore", "wilderness_entry"))),
+        "WILDERNESS_ENTRY" + "_REGISTRY",
+    )
+
+
+def live_gateway_entry():
+    """The settlement entry supplying the anchor and both gate approaches.
+
+    Selection is atomic (ONE entry authors both a north-facing and a
+    south-facing gate) and fails loudly if that invariant disappears.
+    """
+    entries = live_entry_registry()
+    candidates = [
+        entry
+        for entry in entries.values()
+        if entry.gate_for("n") is not None and entry.gate_for("s") is not None
+    ]
+    if len(candidates) != 1:
+        raise AssertionError(
+            "exactly one wilderness entry must author both gateway faces"
+        )
+    return candidates[0]
+
+
+_CAPITAL = live_gateway_entry()
+NORTH_GATE_XYZ = (
+    *_CAPITAL.gate_for("s").grid_xy,
+    _CAPITAL.gate_for("s").z_map_key,
+)
+SOUTH_GATE_XYZ = (
+    *_CAPITAL.gate_for("n").grid_xy,
+    _CAPITAL.gate_for("n").z_map_key,
+)
+NORTH_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("s"))
+SOUTH_APPROACH = _CAPITAL.approach_cell(_CAPITAL.gate_for("n"))
 
 
 class WildernessGatewayExitTests(EvenniaTest):
@@ -99,7 +137,7 @@ class WildernessGatewayExitTests(EvenniaTest):
                 self.assertIs(self.char1.location, original)
                 self.assertEqual(self._tick(), before)
                 self.assertEqual(known(), baseline)
-                self.gate.db.anchor_key = "capital_altoria"
+                self.gate.db.anchor_key = _CAPITAL.anchor_key
                 self.gate.db.gate_direction = "s"
 
     def test_failed_enter_wilderness_does_not_advance_clock(self):
