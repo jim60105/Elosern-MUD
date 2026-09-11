@@ -3,10 +3,16 @@
 Exercises the ``inventory.use`` and ``inventory.toggle_equip`` validators,
 adapters (out-of-combat settlement, combat round routing, free-action toggle),
 and dispatcher-level stale/duplicate handling with canonical surfaces only.
+
+Runs on the synthetic kit (test-data-independence): the scoped item registry
+carries a usable self-heal potion, a slotted blade, an inert pass, and six
+accessory rings — every expectation derives from those rows, never from a
+shipped catalog key or display name.
 """
 
 from tools.spec_traceability import covers_requirement
 
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -28,13 +34,44 @@ from web.webclient.actions.service_actions import (
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.registry import build_production_registry
+from world.lore.items import ItemDefinition
 from world.rules.clock import get_world_clock
 from world.rules.combat_session import engage, read_session
-from world.skills.equipment import list_items
+from world.skills.equipment import EquipmentSlot, list_items
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.tests.synthetic_data import SYNTH_ITEMS
+
+# Kit identities (items+prices scope; the price rows ride along so the kit
+# rows' price-table keys resolve):
+#   _T_POTION  usable consumable self-heal (the healing-potion role)
+#   _T_BLADE   slotted weapon (the equip-toggle role)
+#   _T_UNUSABLE inert item: neither usable nor equipment (the meal role)
+_T_POTION = SYNTH_ITEMS["t_ember_spray"]
+_T_BLADE = SYNTH_ITEMS["t_thorn_knife"]
+_T_UNUSABLE = SYNTH_ITEMS["t_wayfarer_pass"]
+
+
+def _ring_rows() -> dict[str, ItemDefinition]:
+    """Six accessory rows to probe the production accessory-slot cap."""
+    rows = {}
+    for index in range(6):
+        rows[f"t_ring_{index}"] = replace(
+            _T_BLADE,
+            key=f"t_ring_{index}",
+            display_name_zh=f"測試戒指{index}",
+            equipment_slot=EquipmentSlot.ACCESSORY,
+        )
+    return rows
+
+
+_SCOPE_EXTRA = {"items": {**SYNTH_ITEMS, **_ring_rows()}}
 
 
 class InventoryActionBase(EvenniaTestCase):
     def setUp(self):
+        # Every adapter path resolves item keys through the scoped registry,
+        # so the kit rows replace the shipped catalog for the whole lifecycle.
+        open_synthetic_scope(self, "items", "prices", extra=_SCOPE_EXTRA)
         get_world_clock()
         self.room = create_object(Room, key="item field")
         self.player = create_object(PlayerCharacter, key="inventory actor")
@@ -65,8 +102,8 @@ class InventoryPayloadValidatorTests(InventoryActionBase):
             validate_inventory_toggle_equip_payload,
         ):
             self.assertEqual(
-                validator({"item_key": "healing_potion"}),
-                {"item_key": "healing_potion"},
+                validator({"item_key": _T_POTION.key}),
+                {"item_key": _T_POTION.key},
             )
 
     @covers_requirement(
@@ -81,7 +118,7 @@ class InventoryPayloadValidatorTests(InventoryActionBase):
             validate_inventory_use_payload,
             validate_inventory_toggle_equip_payload,
         ):
-            for key in ("healing potion", "healing\tpotion", " healing_potion", "healing_potion "):
+            for key in ("t_ember spray", "t_ember\tspray", " t_ember_spray", "t_ember_spray "):
                 with self.subTest(validator=validator.__name__, key=key):
                     with self.assertRaises(ServiceActionError):
                         validator({"item_key": key})
@@ -94,12 +131,12 @@ class InventoryPayloadValidatorTests(InventoryActionBase):
             {},
             {"item_key": ""},
             {"item_key": "x" * 65},
-            {"item_key": "meal", "quantity": 1},
-            {"item_key": "meal", "slot": "weapon_main"},
-            {"item_key": "meal", "effect_key": "self_heal"},
-            {"item_key": "meal", "actor": 7},
-            {"item_key": "meal", "consumable": True},
-            "healing_potion",
+            {"item_key": _T_UNUSABLE.key, "quantity": 1},
+            {"item_key": _T_UNUSABLE.key, "slot": "weapon_main"},
+            {"item_key": _T_UNUSABLE.key, "effect_key": "self_heal"},
+            {"item_key": _T_UNUSABLE.key, "actor": 7},
+            {"item_key": _T_UNUSABLE.key, "consumable": True},
+            _T_POTION.key,
         )
         for payload in cases:
             with self.subTest(payload=payload):
@@ -115,29 +152,29 @@ class InventoryUseAdapterTests(InventoryActionBase):
     )
     def test_out_of_combat_success_consumes_heals_and_publishes_full_snapshot(self):
         maximum = self._hurt(20)
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_POTION.key, _T_POTION.key]
         clock = get_world_clock()
         tick_before = clock.tick
-        result = _inventory_use_adapter(self.player, {"item_key": "healing_potion"})
+        result = _inventory_use_adapter(self.player, {"item_key": _T_POTION.key})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "item_used")
         self.assertEqual(result["affected_panels"], ())
-        self.assertIn("治療藥水", result["message"])
+        self.assertIn(_T_POTION.display_name_zh, result["message"])
         self.assertEqual(int(self.player.traits.hp.current), maximum)
-        self.assertEqual(list_items(self.player), ["healing_potion"])
+        self.assertEqual(list_items(self.player), [_T_POTION.key])
         self.assertEqual(get_world_clock().tick - tick_before, 6)
 
     @covers_requirement(
         "webclient-service-menus::service-actions-reject-stale-duplicate-and-tampered-input-without-mutation"
     )
     def test_domain_rejections_are_stable_and_unmutating(self):
-        self.player.db.inventory = ["healing_potion", "meal"]
+        self.player.db.inventory = [_T_POTION.key, _T_UNUSABLE.key]
         cases = (
-            ({"item_key": "healing_potion"}, "hp_full"),
+            ({"item_key": _T_POTION.key}, "hp_full"),
             ({"item_key": "mystery_key"}, "unknown_item"),
-            ({"item_key": "plain_sword"}, "not_usable"),
-            ({"item_key": "meal"}, "not_usable"),
-            ({"item_key": "healing_potion"}, "hp_full"),
+            ({"item_key": _T_BLADE.key}, "not_usable"),
+            ({"item_key": _T_UNUSABLE.key}, "not_usable"),
+            ({"item_key": _T_POTION.key}, "hp_full"),
         )
         before = {
             "inventory": list(self.player.db.inventory),
@@ -159,14 +196,14 @@ class InventoryUseAdapterTests(InventoryActionBase):
     )
     def test_in_combat_use_occupies_the_round_and_publishes_full_snapshot(self):
         self._hurt(20)
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_POTION.key]
         engage(self.player, self._monster())
         with (
             patch("world.rules.combat.roll_d100", return_value=1),
             patch("world.rules.action.roll_d100", return_value=1),
         ):
             result = _inventory_use_adapter(
-                self.player, {"item_key": "healing_potion"}
+                self.player, {"item_key": _T_POTION.key}
             )
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "round")
@@ -177,10 +214,10 @@ class InventoryUseAdapterTests(InventoryActionBase):
         self.assertEqual(record.rounds_elapsed, 1)
 
     def test_in_combat_full_hp_rejection_carries_stable_code(self):
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_POTION.key]
         engage(self.player, self._monster())
         result = _inventory_use_adapter(
-            self.player, {"item_key": "healing_potion"}
+            self.player, {"item_key": _T_POTION.key}
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "hp_full")
@@ -192,29 +229,29 @@ class InventoryToggleAdapterTests(InventoryActionBase):
         "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative"
     )
     def test_toggle_equips_and_unequips_with_chinese_messages(self):
-        self.player.db.inventory = ["plain_sword"]
+        self.player.db.inventory = [_T_BLADE.key]
         equipped = _inventory_toggle_equip_adapter(
-            self.player, {"item_key": "plain_sword"}
+            self.player, {"item_key": _T_BLADE.key}
         )
         self.assertEqual(equipped["outcome"], "success")
         self.assertEqual(equipped["code"], "equipment_toggled")
         self.assertEqual(equipped["affected_panels"], ())
         self.assertIn("你裝備了", equipped["message"])
-        self.assertIn("plain_sword", list_items(self.player))
-        self.assertEqual(self.player.db.equipment["weapon_main"], "plain_sword")
+        self.assertIn(_T_BLADE.key, list_items(self.player))
+        self.assertEqual(self.player.db.equipment["weapon_main"], _T_BLADE.key)
         unequipped = _inventory_toggle_equip_adapter(
-            self.player, {"item_key": "plain_sword"}
+            self.player, {"item_key": _T_BLADE.key}
         )
         self.assertIn("你卸下了", unequipped["message"])
         self.assertIsNone(self.player.db.equipment["weapon_main"])
 
     def test_toggle_rejections_are_stable_and_unmutating(self):
-        self.player.db.inventory = ["meal"]
+        self.player.db.inventory = [_T_UNUSABLE.key]
         cases = (
             ("mystery_key", "unknown_item"),
-            ("meal", "not_equipment"),
-            ("healing_potion", "not_equipment"),
-            ("plain_sword", "item_not_held"),
+            (_T_UNUSABLE.key, "not_equipment"),
+            (_T_POTION.key, "not_equipment"),
+            (_T_BLADE.key, "item_not_held"),
         )
         for item_key, code in cases:
             with self.subTest(item_key=item_key):
@@ -226,61 +263,31 @@ class InventoryToggleAdapterTests(InventoryActionBase):
         self.assertIsNone(self.player.db.equipment)
 
     def test_sixth_accessory_refuses_with_cap_reason(self):
-        from world.lore.items import (
-            ITEM_REGISTRY,
-            EquipmentModifierKey,
-            ItemDefinition,
-            ItemIconKey,
-            ItemKind,
-            ItemPresentation,
-            ItemRarity,
-        )
-        from world.skills.equipment import EquipmentSlot
-
-        snapshot = dict(ITEM_REGISTRY)
-
-        def restore():
-            ITEM_REGISTRY.clear()
-            ITEM_REGISTRY.update(snapshot)
-
-        self.addCleanup(restore)
-        for index in range(6):
-            ITEM_REGISTRY[f"ring_{index}"] = ItemDefinition(
-                key=f"ring_{index}",
-                display_name_zh="測試戒指",
-                price_table_key="ring_0",
-                sellable=False,
-                presentation=ItemPresentation(
-                    kind=ItemKind.ACCESSORY,
-                    icon_key=ItemIconKey.ACCESSORY,
-                    rarity=ItemRarity.COMMON,
-                    summary_zh="測試用的飾品。",
-                ),
-                equipment_slot=EquipmentSlot.ACCESSORY,
-                modifier_key=EquipmentModifierKey.PROTECTIVE_RING,
-            )
-        self.player.db.inventory = [f"ring_{index}" for index in range(6)]
+        # The six ring rows ride inside the base class's scoped registry, so
+        # no manual registry mutation (and no shipped modifier enum member)
+        # is needed to reach the production accessory-slot cap.
+        self.player.db.inventory = [f"t_ring_{index}" for index in range(6)]
         for index in range(5):
             result = _inventory_toggle_equip_adapter(
-                self.player, {"item_key": f"ring_{index}"}
+                self.player, {"item_key": f"t_ring_{index}"}
             )
             self.assertEqual(result["outcome"], "success")
         overflow = _inventory_toggle_equip_adapter(
-            self.player, {"item_key": "ring_5"}
+            self.player, {"item_key": "t_ring_5"}
         )
         self.assertEqual(overflow["outcome"], "rejected")
         self.assertEqual(overflow["code"], "accessory_slots_full")
         self.assertEqual(
             self.player.db.equipment["accessories"],
-            [f"ring_{index}" for index in range(5)],
+            [f"t_ring_{index}" for index in range(5)],
         )
         removal = _inventory_toggle_equip_adapter(
-            self.player, {"item_key": "ring_2"}
+            self.player, {"item_key": "t_ring_2"}
         )
         self.assertEqual(removal["outcome"], "success")
         self.assertEqual(
             self.player.db.equipment["accessories"],
-            ["ring_0", "ring_1", "ring_3", "ring_4"],
+            ["t_ring_0", "t_ring_1", "t_ring_3", "t_ring_4"],
         )
 
 
@@ -325,10 +332,10 @@ class InventoryDispatchTests(InventoryActionBase):
     )
     def test_duplicate_item_request_settles_once(self):
         self._hurt(20)
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_POTION.key]
         coordinator = self._coordinator()
         envelope = self._envelope(
-            coordinator, "inventory.use", {"item_key": "healing_potion"},
+            coordinator, "inventory.use", {"item_key": _T_POTION.key},
             request_id="dup-item",
         )
         for _ in range(2):
@@ -350,25 +357,25 @@ class InventoryDispatchTests(InventoryActionBase):
     )
     def test_stale_revision_consumes_nothing(self):
         self._hurt(20)
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_POTION.key]
         coordinator = self._coordinator()
         handle_ui_action(
             self.session,
             self.player,
             self._envelope(
-                coordinator, "inventory.use", {"item_key": "healing_potion"},
+                coordinator, "inventory.use", {"item_key": _T_POTION.key},
                 request_id="fresh",
             ),
             self.action_registry,
             self.registry,
         )
         hp_after_first = int(self.player.traits.hp.current)
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_POTION.key, _T_POTION.key]
         handle_ui_action(
             self.session,
             self.player,
             self._envelope(
-                coordinator, "inventory.use", {"item_key": "healing_potion"},
+                coordinator, "inventory.use", {"item_key": _T_POTION.key},
                 request_id="stale",
                 base_revision=coordinator.revision - 1,
             ),
@@ -377,14 +384,14 @@ class InventoryDispatchTests(InventoryActionBase):
         )
         result = self._last_result()
         self.assertEqual(result["outcome"], "stale")
-        self.assertEqual(self.player.db.inventory.count("healing_potion"), 2)
+        self.assertEqual(self.player.db.inventory.count(_T_POTION.key), 2)
         self.assertEqual(int(self.player.traits.hp.current), hp_after_first)
 
     @covers_requirement(
         "webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative"
     )
     def test_tampered_payload_never_reaches_the_adapter(self):
-        self.player.db.inventory = ["healing_potion"]
+        self.player.db.inventory = [_T_POTION.key]
         coordinator = self._coordinator()
         handle_ui_action(
             self.session,
@@ -392,11 +399,11 @@ class InventoryDispatchTests(InventoryActionBase):
             self._envelope(
                 coordinator,
                 "inventory.use",
-                {"item_key": "healing_potion", "quantity": 5},
+                {"item_key": _T_POTION.key, "quantity": 5},
             ),
             self.action_registry,
             self.registry,
         )
         result = self._last_result()
         self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(self.player.db.inventory.count("healing_potion"), 1)
+        self.assertEqual(self.player.db.inventory.count(_T_POTION.key), 1)
