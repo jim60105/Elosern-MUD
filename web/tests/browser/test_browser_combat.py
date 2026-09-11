@@ -60,9 +60,11 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             finally:
                 self.server = None
 
-    def _engage(self, page, name="goblin"):
-        """Send the engage command through the ordinary text transport."""
-        page.evaluate("Evennia.msg('text', ['engage %s'], {})" % name)
+    def _engage(self, page):
+        """Engage the boot mode's first living combat monster through the
+        ordinary text transport."""
+        target = self._roles()["engage_target"]
+        page.evaluate("([t]) => Evennia.msg('text', [`engage ${t}`], {})", [target])
         self._wait_combat_mode(page)
 
     def _wait_combat_mode(self, page, timeout=30000):
@@ -111,6 +113,88 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             if participant["team"] == "foes":
                 return participant["identity"]
         raise AssertionError("no enemy participant")
+
+    def _foe_identities(self, page):
+        panel = self._combat_panel(page)
+        return [p["identity"] for p in panel["participants"] if p["team"] == "foes"]
+
+    def _focus_key(self, page):
+        return store_state(page).get("focus", {}).get("key")
+
+    def _cell_grid(self, page) -> dict:
+        """Map every listbox cell key to its (row, column) via the DOM rects.
+
+        The framed grid's column count is client-owned presentation
+        (mode/pane-dependent), so the journeys measure the mounted grid
+        instead of hardcoding it. The root tab bar is itself a listbox
+        carrying ``data-item-key`` tabs; the keyboard router walks the
+        committed FRAME's own grid, so the tab bar is excluded from the
+        measurement."""
+        cells = page.evaluate(
+            """() => Array.from(
+                 document.querySelectorAll(
+                   '#action-dock [role="listbox"] [data-item-key]'))
+               .filter((el) => !el.closest(".dock-tab-bar"))
+               .map((el) => {
+                 const r = el.getBoundingClientRect();
+                 return { key: el.getAttribute('data-item-key'),
+                          top: Math.round(r.top), left: Math.round(r.left) };
+               })"""
+        )
+        rows = sorted({c["top"] for c in cells})
+        cols = sorted({c["left"] for c in cells})
+        return {
+            c["key"]: (rows.index(c["top"]), cols.index(c["left"]))
+            for c in cells
+        }
+
+    _WALK_UNDO = {
+        "ArrowRight": "ArrowLeft",
+        "ArrowLeft": "ArrowRight",
+        "ArrowDown": "ArrowUp",
+        "ArrowUp": "ArrowDown",
+    }
+
+    def _walk_to(self, page, key: str, max_cells: int = 32) -> None:
+        """Arrow-walk the committed frame's keyboard grid onto ``key``.
+
+        Grid geometry is client-owned and mode-dependent (roster sizes and
+        frame column counts differ between the shipped and synthetic boots),
+        so the journey treats the four arrow keys as a small deterministic
+        state machine over the mounted cells and depth-first-searches it,
+        undoing each explored edge with its inverse arrow. The walk never
+        assumes a press count or a measured column layout."""
+        grid = self._cell_grid(page)
+        self.assertIn(key, grid, f"cell {key!r} not mounted in the frame")
+        start = self._focus_key(page)
+        if start == key:
+            return
+        visited = {start}
+        explored = [start]
+
+        def step(move):
+            self._press(page, move)
+            return self._focus_key(page)
+
+        def dfs(cell):
+            for move in ("ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"):
+                if len(explored) > max_cells:
+                    continue
+                nxt = step(move)
+                if nxt == key:
+                    return True
+                if nxt in visited or nxt not in grid:
+                    step(self._WALK_UNDO[move])
+                    continue
+                visited.add(nxt)
+                explored.append(nxt)
+                if dfs(nxt):
+                    return True
+                explored.pop()
+                step(self._WALK_UNDO[move])
+            return False
+
+        self.assertTrue(dfs(start), f"keyboard walk never reached cell {key!r}")
 
     # -- mode seams ----------------------------------------------------------
     #
@@ -375,12 +459,13 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         target = self._basic_attack_target_identity(page)
 
         # Root: first item is Attack. Open it, then its single-target menu
-        # lists the actor and the monster (both valid for ANY scope); move
-        # past the actor to select the monster.
+        # lists every participant valid for the skill's scope (the synth party
+        # can carry an extra member), so the journey walks the router to the
+        # enemy's row instead of assuming a fixed press count past the actor.
         self._press(page, "ArrowRight")  # skills
         self._press(page, "ArrowLeft")  # back to attack
         self._press(page, "Enter")  # open attack
-        self._press(page, "ArrowRight")  # past the actor to the monster
+        self._walk_to(page, f"target-{target}")  # the monster target row
         self._press(page, "Enter")  # select the monster target
 
         actions = self._ui_actions(page)
@@ -406,9 +491,9 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._open_category(page, "elemental_magic")
         self._focus_skill(page, "elemental_magic", spell)
         self._press(page, "Enter")  # open the spell -> target frame
-        # The single-target menu lists the actor and the monster (both valid
-        # for ANY scope); move past the actor to select the monster.
-        self._press(page, "ArrowRight")
+        # The single-target menu lists every valid participant; walk to the
+        # enemy's row (the synth party may add a companion candidate).
+        self._walk_to(page, f"target-{target}")
         self._press(page, "Enter")  # select the monster target
 
         actions = self._ui_actions(page)
@@ -546,13 +631,14 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._focus_skill(page, "elemental_magic", ladder)
         self._press(page, "Enter")  # open the ladder skill: 威力 scale step
         self._press(page, "Enter")  # choose the preselected 威力×1
-        # AREA grid: candidate targets (col 0) then shorthands, then confirm.
-        # The actor is a valid candidate for ANY scope, so the first grid row
-        # holds the two candidates; the shorthand rows follow.
-        self._press(page, "ArrowDown")  # first shorthand row (all-enemies)
+        # AREA grid: candidate targets, then the shorthand cells, then the
+        # confirm cell. The party roster is mode-dependent (the synth preset
+        # arrives with a companion), so the journey walks the router to the
+        # named cells instead of assuming fixed grid positions.
+        self._walk_to(page, "shorthand-all-enemies")
         self._press(page, "Enter")  # choose shorthand
-        self._press(page, "ArrowDown")  # shorthand row two
-        self._press(page, "ArrowRight")  # confirm (last grid cell)
+        # The chosen shorthand re-homes focus onto the confirm cell.
+        self._walk_to(page, "area-confirm")
         self._press(page, "Enter")  # confirm cast
 
         actions = self._ui_actions(page)
@@ -742,14 +828,12 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._focus_skill(page, "elemental_magic", ladder)
         self._press(page, "Enter")  # open the ladder skill: 威力 scale step
         self._press(page, "Enter")  # choose the preselected 威力×1
-        # AREA grid: candidate targets (col 0) then shorthands, then confirm.
-        # The actor is now a valid candidate, so the first grid row holds the
-        # two candidates; the confirm cell sits at the last grid row, second
-        # column. Move past the actor to the monster candidate and toggle it.
-        self._press(page, "ArrowRight")  # monster candidate
+        # AREA grid: candidate targets, then shorthand cells, then confirm.
+        # Walk the mounted grid to the enemy candidate (party/roster sizes
+        # are mode-dependent) and toggle it explicitly.
+        self._walk_to(page, f"area-{enemy_ids[0]}")
         self._press(page, "Space")  # toggle the explicit monster candidate
-        self._press(page, "ArrowDown")  # shorthand row two
-        self._press(page, "ArrowDown")  # confirm row
+        self._walk_to(page, "area-confirm")
         self._press(page, "Enter")  # confirm cast
 
         actions = self._ui_actions(page)
@@ -860,11 +944,17 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         # The seeded poisoned buff surfaces applied modifier text.
         # H2 re-map (task 9.3): the condition area is now icon chips; the
         # modifier text lives in the chip's aria-label. The agility penalty
-        # is its own condition row (``poison_agility_penalty``), which carries
-        # the ``modifiers`` field — the ``poisoned`` buff code alone only
-        # carries the label and remaining seconds.
+        # is its own condition row (the mode's modifier-rule seam), which
+        # carries the ``modifiers`` field — the debuff code alone only carries
+        # the label and remaining seconds.
+        from web.browser_support.browser_fixtures_data import (
+            combat_modifier_condition_rule_id,
+        )
+
         chip_label = page.locator(
-            '[data-testid="status-panel__condition--poison_agility_penalty"]'
+            '[data-testid="status-panel__condition--'
+            + combat_modifier_condition_rule_id()
+            + '"]'
         ).get_attribute("aria-label")
         self.assertIn("agility", chip_label)
         self.assertIn("-10%", chip_label)
@@ -1009,9 +1099,9 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._focus_skill(page, "elemental_magic", ladder)
         self._press(page, "Enter")  # open the ladder skill: 威力 scale step
         self._press(page, "Enter")  # choose the preselected 威力×1
-        # The actor is now a valid candidate, so the first grid row holds the
-        # two candidates; move to the monster candidate before toggling.
-        self._press(page, "ArrowRight")  # monster candidate
+        # Walk the mounted grid to the monster candidate (the party roster is
+        # mode-dependent) before toggling.
+        self._walk_to(page, f"area-{enemy_ids[0]}")
 
         # Space once toggles the candidate: the selection marker appears and
         # the client-local selection has exactly one identity.
@@ -1046,8 +1136,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         )
 
         # Confirm casts exactly the one selected target.
-        self._press(page, "ArrowDown")  # shorthand row two
-        self._press(page, "ArrowDown")  # confirm row
+        self._walk_to(page, "area-confirm")
         self._press(page, "Enter")
         actions = self._ui_actions(page)
         self.assertGreaterEqual(len(actions), 1, actions)
@@ -1069,7 +1158,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         # H3 (design D11): the ladder skill sits in the elemental_magic /
         # mastery-element group. Skills tab -> category frame -> group frame
         # -> ladder group -> skill frame -> 威力 scale step (mastery owned);
-        # 威力×2 is the fourth cell of the five-cell grid.
+        # the scale cells are walked by key, not by a fixed press count.
         ladder = self._roles()["ladder_key"]
         self._open_skills(page)
         self._open_category(page, "elemental_magic")
@@ -1083,12 +1172,11 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             scale_rows.first.inner_text(),
             "the scale step labels the power choice",
         )
-        self._press(page, "ArrowRight")  # 威力×2 (right of the preselected ×1)
+        self._walk_to(page, "scale-2")  # 威力×2
         self._press(page, "Enter")  # choose 威力×2 -> target flow
-        self._press(page, "ArrowRight")  # the monster candidate
+        self._walk_to(page, f"area-{target}")  # the monster candidate
         self._press(page, "Space")  # toggle the explicit monster candidate
-        self._press(page, "ArrowDown")  # shorthand row
-        self._press(page, "ArrowDown")  # confirm row
+        self._walk_to(page, "area-confirm")
         self._press(page, "Enter")  # cast at scale 2
 
         actions = self._ui_actions(page)

@@ -1141,15 +1141,31 @@ def main() -> None:
     active_skills = list(SYNTH_COMBAT_ACTIVE_SKILLS if synth else SHIPPED_COMBAT_ACTIVE_SKILLS)
     if synth:
         active_skills += [SYNTH_INNATE_ATTACK_KEY, SYNTH_INNATE_FLEE_KEY]
+    # ``seed_lineage_proficiency`` honours an already-stored proficiency even
+    # when it leaves an edge unmet, and the kit preset's activation writes a
+    # low explicit value for t_ember_burst — so under the synthetic install
+    # the prerequisite edges of the grant set are raised explicitly through
+    # ``rungs`` (the ladder's own rung wins: rungs is applied after the seed).
+    combat_rungs: dict[str, int] = {}
+    if synth:
+        from world.skills.registry import SKILL_REGISTRY
+
+        for _key in [*active_skills, *(SYNTH_COMBAT_PASSIVE_SKILLS)]:
+            _def = SKILL_REGISTRY.get(_key)
+            for _edge in getattr(_def, "prerequisites", ()):
+                combat_rungs[_edge.skill_key] = max(
+                    combat_rungs.get(_edge.skill_key, 0), _edge.min_proficiency
+                )
+    combat_rungs[SYNTH_COMBAT_LADDER_SKILL] = SYNTH_COMBAT_LADDER_LEVEL
     grant_lineage(
         character,
         active_skills,
         list(SYNTH_COMBAT_PASSIVE_SKILLS if synth else SHIPPED_COMBAT_PASSIVE_SKILLS),
-        rungs={
-            (SYNTH_COMBAT_LADDER_SKILL if synth else SHIPPED_COMBAT_LADDER_SKILL): (
-                SYNTH_COMBAT_LADDER_LEVEL if synth else SHIPPED_COMBAT_LADDER_LEVEL
-            )
-        },
+        rungs=(
+            combat_rungs
+            if synth
+            else {SHIPPED_COMBAT_LADDER_SKILL: SHIPPED_COMBAT_LADDER_LEVEL}
+        ),
     )
     # A persistent buff gives the status panel a deterministic
     # applied-modifier condition for viewport assertions.
