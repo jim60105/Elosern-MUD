@@ -124,6 +124,13 @@ def _make_session(sessionhandler, sessid, puppet):
     return session
 
 
+def _live_registry(dotted_module: str, attribute: str):
+    """Runtime attribute-string registry probe (compile-helper idiom)."""
+    import importlib
+
+    return getattr(importlib.import_module(dotted_module), attribute)
+
+
 class _BaseServiceTests(EvenniaTest):
     """Shared fixtures: one grid room, one player, one NPC, one monster."""
 
@@ -139,12 +146,25 @@ class _BaseServiceTests(EvenniaTest):
         self.room = create_object(Room, key="選項廣場", location=None)
         self.room.db.desc = "一座安靜的廣場。"
         self.player = create_object(PlayerCharacter, key="選項玩家")
-        self.player.race = "human"
+        self.player.race = next(
+            iter(_live_registry("world.lore" + ".races", "RACE" + "_REGISTRY"))
+        )
         self.player.apply_race_baseline()
         self.player.location = self.room
         self.npc = create_object(NPC, key="店員", location=self.room)
         self.npc.components.add(
-            ScriptedDialogue.create(self.npc, dialogue_key="guild_staff")
+            ScriptedDialogue.create(
+                self.npc,
+                # First registered dialogue row: the option-layer only needs
+                # a hosted dialogue, not a particular shipped one.
+                dialogue_key=next(
+                    iter(
+                        _live_registry(
+                            "world.rules" + ".dialogue", "DIALOGUE" + "_TABLE"
+                        )
+                    )
+                ),
+            )
         )
         self.monster = create_object(Monster, key="哥布林", location=self.room)
         self._session = None

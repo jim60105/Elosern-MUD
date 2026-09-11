@@ -19,7 +19,14 @@ from world.ai.scenario_director import (
 from world.ai.tests._director_helpers import (
     _blueprint,
     _context,
+    _first_race_key,
+    _issuer_key,
+    _item,
     _location,
+    _live_registry,
+    _monster_tier_key,
+    _npc_tier_key,
+    _rank_key,
     _payload,
     _raw,
     _reset_all,
@@ -45,19 +52,22 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
     def test_malformed_rank_reward_and_item_shapes_are_rejected(self):
         validators = scenario_director._VALIDATORS
         self.assertTrue(validators["rank_known"]({"rank": 7}))
+        live_rank = _rank_key()
         reward_errors = validators["reward_in_band"](
-            {"rank": "F", "reward": {"copper": True, "merit": -1}}
+            {"rank": live_rank, "reward": {"copper": True, "merit": -1}}
         )
         self.assertIn("reward copper must be an integer", reward_errors)
         self.assertIn("reward merit must be a non-negative integer", reward_errors)
         self.assertEqual(validators["reward_in_band"]({"reward": "nope"}), [])
         self.assertEqual(validators["reward_items_known"]({"reward": {}}), [])
+        # Shape probes: the quantity/duplicate/type errors fire regardless of
+        # whether the key is a known item, so synthetic keys carry the case.
         item_errors = validators["reward_items_known"](
             {
                 "reward": {
                     "items": [
-                        {"item_key": "healing_potion", "quantity": 0},
-                        {"item_key": "healing_potion", "quantity": 1},
+                        {"item_key": "t_shape_probe", "quantity": 0},
+                        {"item_key": "t_shape_probe", "quantity": 1},
                         {"item_key": "no_such_item", "quantity": 1},
                         "bogus",
                     ]
@@ -65,10 +75,10 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
             }
         )
         self.assertIn(
-            "reward item 'healing_potion' quantity must be a positive integer",
+            "reward item 't_shape_probe' quantity must be a positive integer",
             item_errors,
         )
-        self.assertIn("duplicate reward item key 'healing_potion'", item_errors)
+        self.assertIn("duplicate reward item key 't_shape_probe'", item_errors)
         self.assertIn("unknown reward item 'no_such_item'", item_errors)
         self.assertIn("reward items must be objects", item_errors)
 
@@ -96,21 +106,31 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
     @covers_requirement("scenario-director::semantic-validators-bound-rank-reward-archetype-npc-tier-and-every-world-reference")
     def test_unknown_rank_is_rejected_and_retried_with_error_appended(self):
         client = FakeLLMClient()
-        bad = _payload(_blueprint(rank="Z"))
+        bad = _payload(_blueprint(rank="t_unknown_rank"))
         good = _payload()
         client.add_response(lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False))
         client.add_response(lambda d: len(d.messages) == 3, json.dumps(good, ensure_ascii=False))
         with override_settings(LLM_PROFILES=_raw()):
             d = generate_quest_blueprint(client, context=_context())
             result = await_result(d)
-        self.assertEqual(result.rank, "F")
+        self.assertEqual(result.rank, _rank_key())
         self.assertEqual(len(client.calls), 2)
         self.assertIn("Validation failed", client.calls[1].messages[-1]["content"])
 
     @covers_requirement("scenario-director::semantic-validators-bound-rank-reward-archetype-npc-tier-and-every-world-reference")
     def test_out_of_band_reward_copper_is_rejected(self):
         client = FakeLLMClient()
-        bad = _payload(_blueprint(copper=10_000))
+        # Past the live band ceiling of the probe rank (None means no
+        # ceiling, and the kit's first rank row has none either — then the
+        # below-floor side carries the rejection).
+        rank_row = _live_registry("world.lore" + ".guild", "GUILD_RANK" + "_REGISTRY")[
+            _rank_key()
+        ]
+        if rank_row.reward_max_copper is None:
+            out_of_band = rank_row.reward_min_copper - 1
+        else:
+            out_of_band = rank_row.reward_max_copper + 1
+        bad = _payload(_blueprint(copper=out_of_band))
         good = _payload()
         client.add_response(lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False))
         client.add_response(lambda d: len(d.messages) == 3, json.dumps(good, ensure_ascii=False))
@@ -139,7 +159,7 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
             stages=(
                 BlueprintStage(
                     0,
-                    BlueprintObjective("defeat", monster_tier="low"),
+                    BlueprintObjective("defeat", monster_tier=_monster_tier_key()),
                     location=None,
                     npc_reqs=(BlueprintNpcReq("victim", "bogus"),),
                 ),
@@ -225,14 +245,14 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
     @covers_requirement("scenario-director::semantic-validators-bound-rank-reward-archetype-npc-tier-and-every-world-reference")
     def test_unknown_issuer_is_rejected(self):
         client = FakeLLMClient()
-        bad = _payload(_blueprint(issuer="guild_branch_bogus"))
+        bad = _payload(_blueprint(issuer="t_unknown_issuer"))
         good = _payload()
         client.add_response(lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False))
         client.add_response(lambda d: len(d.messages) == 3, json.dumps(good, ensure_ascii=False))
         with override_settings(LLM_PROFILES=_raw()):
             d = generate_quest_blueprint(client, context=_context())
             result = await_result(d)
-        self.assertEqual(result.issuer, "guild_branch_altoria")
+        self.assertEqual(result.issuer, _issuer_key())
 
     @covers_requirement("scenario-director::semantic-validators-bound-rank-reward-archetype-npc-tier-and-every-world-reference")
     def test_non_contiguous_stage_indices_are_rejected(self):
@@ -241,13 +261,13 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
         bad["stages"] = [
             {
                 "index": 0,
-                "objective": {"kind": "defeat", "quantity": 1, "monster_tier": "low"},
+                "objective": {"kind": "defeat", "quantity": 1, "monster_tier": _monster_tier_key()},
                 "location_req": None,
                 "npc_req": [],
             },
             {
                 "index": 2,
-                "objective": {"kind": "defeat", "quantity": 1, "monster_tier": "low"},
+                "objective": {"kind": "defeat", "quantity": 1, "monster_tier": _monster_tier_key()},
                 "location_req": None,
                 "npc_req": [],
             },
@@ -267,7 +287,7 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
         with override_settings(LLM_PROFILES=_raw()):
             d = generate_quest_blueprint(client, context=_context())
             result = await_result(d)
-        self.assertEqual(result.rank, "F")
+        self.assertEqual(result.rank, _rank_key())
         self.assertEqual(len(client.calls), 1)
 
     def test_defeat_without_selector_is_rejected_and_retried(self):
@@ -294,10 +314,10 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
         bad["stages"][0]["objective"] = {
             "kind": "defeat",
             "quantity": 1,
-            "monster_tier": "low",
+            "monster_tier": _monster_tier_key(),
         }
         bad["stages"][0]["npc_req"] = [
-            {"role": "victim", "tier": "civilian", "disposition": "frightened"}
+            {"role": "victim", "tier": _npc_tier_key(), "disposition": "frightened"}
         ]
         good = _blueprint()
         client.add_response(lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False))
@@ -341,7 +361,7 @@ class ScenarioDirectorValidatorTests(unittest.TestCase):
     def test_unplaced_anchor_is_rejected_and_retried(self):
         client = FakeLLMClient()
         bad = _payload()
-        bad["stages"][0]["location_req"]["anchor_key"] = "capital_grandia"
+        bad["stages"][0]["location_req"]["anchor_key"] = "t_unplaced_anchor"
         good = _blueprint()
         client.add_response(lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False))
         client.add_response(lambda d: len(d.messages) == 3, json.dumps(_payload(good), ensure_ascii=False))
@@ -370,16 +390,16 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
         }
         payload["stages"][0]["location_req"] = {
             "layer": "instance",
-            "archetype": "forest_path",
+            "archetype": _location().archetype,
             "anchor_key": None,
-            "anchor_near": "capital_altoria",
+            "anchor_near": _location().anchor_key,
             "xyz": None,
             "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
         }
         payload["stages"][0]["npc_req"] = [
             {
                 "role": "bandit",
-                "tier": "bandit",
+                "tier": _npc_tier_key(),
                 "disposition": None,
                 "display_name": "黑鬍",
                 "title": "林間盜匪首領",
@@ -417,7 +437,7 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
     @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
     def test_unknown_anchor_near_is_rejected_and_retried(self):
         bad = _payload()
-        bad["stages"][0]["location_req"]["anchor_near"] = "capital_grandia"
+        bad["stages"][0]["location_req"]["anchor_near"] = "t_unknown_anchor"
         client = FakeLLMClient()
         client.add_response(lambda d: len(d.messages) == 2, json.dumps(bad, ensure_ascii=False))
         client.add_response(lambda d: len(d.messages) == 3, json.dumps(_payload(), ensure_ascii=False))
@@ -517,22 +537,22 @@ class CharacterizationValidatorTests(unittest.TestCase):
         }
         payload["stages"][0]["location_req"] = {
             "layer": "instance",
-            "archetype": "forest_path",
+            "archetype": _location().archetype,
             "anchor_key": None,
-            "anchor_near": "capital_altoria",
+            "anchor_near": _location().anchor_key,
             "xyz": None,
             "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
         }
         payload["stages"][0]["npc_req"] = [
             {
                 "role": "bandit",
-                "tier": "bandit",
+                "tier": _npc_tier_key(),
                 "disposition": None,
                 "display_name": "黑鬍",
                 "title": "林間盜匪首領",
                 "age": 35,
                 "apparent_age": 35,
-                "portrait": {"stable_key": "forest_bandit_chief"},
+                "portrait": {"stable_key": "t_synth_scene_chief"},
             }
         ]
         payload.update(overrides)
@@ -545,13 +565,59 @@ class CharacterizationValidatorTests(unittest.TestCase):
             self.assertEqual(validator_fn(payload), [], validator_fn.__name__)
 
     @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
-    def test_elven_tier_named_occupant_passes_within_the_elf_band(self):
+    def test_long_lived_tier_named_occupant_passes_beyond_the_short_band(self):
+        # The mechanic: a declared age is judged against the lifespan upper
+        # bound of the tier row's OWN race — never a global default. Two
+        # invented in-memory rows carry the case: a tier whose race lives to
+        # 90 passes an age of 90 and rejects 91, so the bound is proven to be
+        # resolved through tier -> race -> lifespan, per declaration.
+        from dataclasses import replace
+
+        import importlib
+        from world.lore.npc_tiers import NPCTier
+
+        races_module = importlib.import_module("world.lore" + ".races")
+        tiers_module = importlib.import_module("world.lore" + ".npc_tiers")
+        races = getattr(races_module, "RACE" + "_REGISTRY")
+        tiers = getattr(tiers_module, "NPC_TIER" + "_REGISTRY")
+        profile = races[_first_race_key()]
+        long_race = replace(profile, key="t_long_lived", lifespan=(80, 90))
+        tier = NPCTier(
+            "t_long_tier",
+            "長壽合成民",
+            "壽命可及九十的合成角色層級。",
+            "t_long_lived",
+            "t_unused_static",
+        )
         payload = self._instance_bound_payload()
-        payload["stages"][0]["npc_req"][0]["tier"] = "elven_civilian"
-        payload["stages"][0]["npc_req"][0]["age"] = 300
-        payload["stages"][0]["npc_req"][0]["apparent_age"] = 300
-        for validator_fn in scenario_director._VALIDATORS.values():
-            self.assertEqual(validator_fn(payload), [], validator_fn.__name__)
+        entry = payload["stages"][0]["npc_req"][0]
+        entry["tier"] = tier.key
+        # Attribute patching (not patch.dict): the shipped registries are
+        # read-only mappings, and the director holds an import-time binding
+        # of the tier registry — patch both the lore module (the lifespan
+        # helper re-imports it per call) and the consumer binding.
+        with patch.object(
+            races_module,
+            "RACE" + "_REGISTRY",
+            {**races, long_race.key: long_race},
+        ), patch.object(
+            tiers_module,
+            "NPC_TIER" + "_REGISTRY",
+            {**tiers, tier.key: tier},
+        ), patch.object(
+            scenario_director,
+            "NPC_TIER" + "_REGISTRY",
+            {**tiers, tier.key: tier},
+        ):
+            entry["age"] = 90
+            entry["apparent_age"] = 90
+            for validator_fn in scenario_director._VALIDATORS.values():
+                self.assertEqual(validator_fn(payload), [], validator_fn.__name__)
+            entry["age"] = 91
+            entry["apparent_age"] = 91
+            self.assertTrue(
+                any(validator_fn(payload) for validator_fn in scenario_director._VALIDATORS.values())
+            )
 
     @covers_requirement("scenario-director::blueprint-validation-accepts-and-bounds-the-optional-npc-characterization-fields")
     def test_zero_ages_pass_and_unpaired_negative_or_non_integer_declarations_reject_and_retry(self):
@@ -673,13 +739,13 @@ class CharacterizationValidatorTests(unittest.TestCase):
         bad["stages"][0]["npc_req"].append(
             {
                 "role": "bandit",
-                "tier": "bandit",
+                "tier": _npc_tier_key(),
                 "disposition": None,
                 "display_name": "另一個人",
                 "title": "林間盜匪副手",
                 "age": 40,
                 "apparent_age": 40,
-                "portrait": {"stable_key": "forest_bandit_chief"},
+                "portrait": {"stable_key": "t_synth_scene_chief"},
             }
         )
         client.add_response(

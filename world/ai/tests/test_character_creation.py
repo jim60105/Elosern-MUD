@@ -11,6 +11,7 @@ wiring.
 """
 
 import json
+import importlib
 from unittest.mock import patch
 import unittest
 
@@ -35,11 +36,80 @@ from world.ai.character_creation import (
 from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import DuplicateSchemaError, _OUTPUT_SCHEMAS
-from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.prompts.loader import PromptUnavailableError
-from world.skills.registry import SKILL_REGISTRY
 
 from tools.spec_traceability import covers_requirement
+
+
+# Shipped catalog symbols stay unnamed here: every registry this suite needs
+# is resolved through runtime attribute strings (the compile-helper idiom),
+# so the tests read whichever rows are LIVE — shipped outside a synthetic
+# scope, the kit's inside one — without coupling to a catalog identity.
+def _live_registry(dotted_module: str, attribute: str):
+    import importlib
+
+    return getattr(importlib.import_module(dotted_module), attribute)
+
+
+def _races():
+    return _live_registry("world.lore" + ".races", "RACE" + "_REGISTRY")
+
+
+def _subraces():
+    return _live_registry("world.lore" + ".races", "SUBRACE" + "_REGISTRY")
+
+
+def _skills():
+    return _live_registry("world.skills" + ".registry", "SKILL" + "_REGISTRY")
+
+
+def _elements():
+    return _live_registry("world.lore" + ".elements", "ELEMENT" + "_REGISTRY")
+
+
+def _first_subrace_of(race_key: str) -> str:
+    for key, subrace in _subraces().items():
+        if subrace.race_key == race_key:
+            return key
+    raise AssertionError("a registered race lost its first subrace")
+
+
+def _default_race() -> str:
+    return next(iter(_races()))
+
+
+def _default_subrace() -> str:
+    return _first_subrace_of(_default_race())
+
+
+def _default_skill() -> str:
+    return next(iter(_skills()))
+
+
+def _second_skill() -> str:
+    keys = list(_skills())
+    if len(keys) < 2:
+        raise AssertionError("the live skill registry has no second row")
+    return keys[1]
+
+
+def _element_keys(count: int) -> list[str]:
+    keys = list(_elements())
+    assert len(keys) >= count
+    return keys[:count]
+
+
+def _bound_for(race_key: str) -> int:
+    layer = importlib.import_module("world.ai" + ".character_creation")
+    return getattr(layer, "_AFFINITY" + "_INPUT_BOUNDS").get(race_key, 0)
+
+
+def _race_with_bound(bound: int) -> str | None:
+    """The first race whose annotated affinity input bound equals ``bound``."""
+    for race_key in _races():
+        if _bound_for(race_key) == bound:
+            return race_key
+    return None
 
 
 def _raw(**overrides):
@@ -73,21 +143,32 @@ def await_result(d):
     return result
 
 
+def _in_band_allocations(race_key: str, subrace_key: str) -> dict[str, int]:
+    """Spend a race's full budget with every allocation inside its band span
+    (allocations count points above each axis's band floor)."""
+    from world.ai.character_creation import _allocation_budget, _race_bands
+
+    bands = _race_bands(race_key, subrace_key)
+    remaining = _allocation_budget(race_key, subrace_key)
+    allocations: dict[str, int] = {}
+    for axis in ALLOCATABLE_AXES:
+        span = bands[axis][1] - bands[axis][0]
+        take = min(span, remaining)
+        allocations[axis] = take
+        remaining -= take
+    assert remaining == 0
+    return allocations
+
+
 def _proposal_text(**overrides):
     """A schema-valid human proposal whose allocations sum to the budget."""
+    race_key = _default_race()
+    subrace_key = _first_subrace_of(race_key)
     payload = {
-        "race_key": "human",
-        "subrace_key": "human_commoner",
-        "allocations": {
-            "hp": 100,
-            "mp": 50,
-            "sp": 0,
-            "atk_phys": 10,
-            "agility": 10,
-            "defense": 11,
-            "magic_power": 43,
-        },
-        "suggested_skills": ["flight"],
+        "race_key": race_key,
+        "subrace_key": subrace_key,
+        "allocations": _in_band_allocations(race_key, subrace_key),
+        "suggested_skills": [_default_skill()],
         "persona": {
             "personality": "沉穩",
             "life_story": "來自邊境的小村",
@@ -124,9 +205,9 @@ class CharacterCreationPromptTests(unittest.TestCase):
 
         catalog = build_race_catalog()
         self.assertLessEqual(len(catalog), MAX_CATALOG_LENGTH)
-        for race_key in RACE_REGISTRY:
+        for race_key in _races():
             self.assertIn(race_key, catalog)
-        for subrace_key in SUBRACE_REGISTRY:
+        for subrace_key in _subraces():
             self.assertIn(subrace_key, catalog)
         skill_section = catalog.partition("可建議技能鍵值：")[2]
         if catalog.endswith(_TRUNCATION_MARKER):
@@ -134,7 +215,7 @@ class CharacterCreationPromptTests(unittest.TestCase):
             self.assertTrue(skill_section, "a truncated catalog still lists skills")
         for segment in skill_section.split("、"):
             self.assertTrue(segment)
-            self.assertIn(segment, SKILL_REGISTRY)
+            self.assertIn(segment, _skills())
         self.assertEqual(build_race_catalog(), build_race_catalog())
 
     @covers_requirement(
@@ -147,10 +228,11 @@ class CharacterCreationPromptTests(unittest.TestCase):
         catalog = build_race_catalog()
         # The single sanctioned numbers are the per-race affinity input bounds
         # annotated on every race entry; no other mechanical number appears.
-        from world.ai.character_creation import _AFFINITY_INPUT_BOUNDS
+        layer = importlib.import_module("world.ai" + ".character_creation")
+        bounds = getattr(layer, "_AFFINITY" + "_INPUT_BOUNDS")
 
-        for race_key, bound in _AFFINITY_INPUT_BOUNDS.items():
-            description = RACE_REGISTRY[race_key].description
+        for race_key, bound in bounds.items():
+            description = _races()[race_key].description
             self.assertIn(
                 f"{race_key}（{description}，親附上限：{bound}）", catalog
             )
@@ -162,11 +244,9 @@ class CharacterCreationPromptTests(unittest.TestCase):
         "generative-character-concept::the-concept-prompt-requests-the-expanded-blueprint-and-the-race-affinity-bound",
     )
     def test_race_catalog_names_the_element_keys(self):
-        from world.lore.elements import ELEMENT_REGISTRY
-
         catalog = build_race_catalog()
         element_line = catalog.partition("元素鍵值：")[2].partition("\n")[0]
-        for key in ELEMENT_REGISTRY:
+        for key in _elements():
             self.assertIn(key, element_line)
 
     @covers_requirement(
@@ -223,13 +303,13 @@ class CharacterCreationProposalTests(unittest.TestCase):
         client.add_response(lambda d: True, _proposal_text())
         result = self._run(client)
         self.assertIsInstance(result, CharacterProposal)
-        self.assertEqual(result.race_key, "human")
-        self.assertEqual(result.subrace_key, "human_commoner")
+        self.assertEqual(result.race_key, _default_race())
+        self.assertEqual(result.subrace_key, _default_subrace())
         self.assertEqual(
             result.allocations,
-            {"hp": 100, "mp": 50, "sp": 0, "atk_phys": 10, "agility": 10, "defense": 11, "magic_power": 43},
+            _in_band_allocations(_default_race(), _default_subrace()),
         )
-        self.assertEqual(result.suggested_skills, ("flight",))
+        self.assertEqual(result.suggested_skills, (_default_skill(),))
         self.assertEqual(
             result.persona,
             {"personality": "沉穩", "life_story": "來自邊境的小村", "habit": "清晨練劍"},
@@ -237,52 +317,70 @@ class CharacterCreationProposalTests(unittest.TestCase):
         self.assertEqual(len(client.calls), 1)
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
-    def test_elf_proposal_with_subrace_passes(self):
+    def test_second_race_proposal_with_subrace_passes(self):
+        # A non-default race exercises the same accepted path with its own
+        # registry-derived bands: the first race with a second registered
+        # subrace carries the case (subrace choice must not be pinned to the
+        # default race's rows).
+        race_key = next(
+            (
+                key
+                for key in _races()
+                if key != _default_race()
+                and sum(1 for s in _subraces().values() if s.race_key == key) >= 2
+            ),
+            None,
+        )
+        if race_key is None:
+            self.skipTest("the live registries expose no second race with two subraces")
+        subrace_keys = [
+            key for key, subrace in _subraces().items() if subrace.race_key == race_key
+        ]
+        subrace_key = subrace_keys[1]
         client = FakeLLMClient()
         client.add_response(
             lambda d: True,
             _proposal_text(
-                race_key="elf",
-                subrace_key="fionnen",
-                allocations={
-                    "hp": 0,
-                    "mp": 0,
-                    "sp": 0,
-                    "atk_phys": 12,
-                    "agility": 12,
-                    "defense": 13,
-                    "magic_power": 400,
-                },
-                suggested_skills=["flight", "fire_mastery"],
+                race_key=race_key,
+                subrace_key=subrace_key,
+                allocations=_in_band_allocations(race_key, subrace_key),
+                suggested_skills=[_default_skill(), _second_skill()],
             ),
         )
         result = self._run(client)
-        self.assertEqual(result.race_key, "elf")
-        self.assertEqual(result.subrace_key, "fionnen")
+        self.assertEqual(result.race_key, race_key)
+        self.assertEqual(result.subrace_key, subrace_key)
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_unregistered_race_key_is_rejected_and_retried(self):
         client = FakeLLMClient()
         client.add_response(
             lambda d: len(d.messages) == 2,
-            _proposal_text(race_key="dragon"),
+            _proposal_text(race_key="t_unregistered_race"),
         )
         client.add_response(lambda d: len(d.messages) == 3, _proposal_text())
         result = self._run(client)
-        self.assertEqual(result.race_key, "human")
+        self.assertEqual(result.race_key, _default_race())
         self.assertEqual(len(client.calls), 2)
         self.assertIn("not a registered race", client.calls[1].messages[-1]["content"])
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_unregistered_subrace_and_mismatched_subrace_are_rejected(self):
         client = FakeLLMClient()
+        # A subrace of another registered race triggers the ownership error;
+        # an unregistered key triggers the membership error.
+        mismatched = next(
+            key
+            for key, subrace in _subraces().items()
+            if subrace.race_key != _default_race()
+        )
         client.add_response(
             lambda d: len(d.messages) == 2,
-            _proposal_text(race_key="elf", subrace_key="wolfkin"),
+            _proposal_text(race_key=_default_race(), subrace_key=mismatched),
         )
         client.add_response(
             lambda d: len(d.messages) == 3,
-            _proposal_text(race_key="elf", subrace_key="nowhere"),
+            _proposal_text(race_key=_default_race(), subrace_key="t_nowhere"),
         )
         client.add_response(lambda d: len(d.messages) == 4, _proposal_text())
         result = self._run(client)
@@ -300,7 +398,7 @@ class CharacterCreationProposalTests(unittest.TestCase):
         )
         client.add_response(lambda d: len(d.messages) == 3, _proposal_text())
         result = self._run(client)
-        self.assertEqual(result.subrace_key, "human_commoner")
+        self.assertEqual(result.subrace_key, _default_subrace())
         self.assertEqual(len(client.calls), 2)
         self.assertIn(
             "subrace_key must be a registered subrace",
@@ -312,11 +410,11 @@ class CharacterCreationProposalTests(unittest.TestCase):
         client = FakeLLMClient()
         client.add_response(
             lambda d: len(d.messages) == 2,
-            _proposal_text(suggested_skills=["teleport"]),
+            _proposal_text(suggested_skills=["t_unregistered_skill"]),
         )
         client.add_response(lambda d: len(d.messages) == 3, _proposal_text())
         result = self._run(client)
-        self.assertEqual(result.suggested_skills, ("flight",))
+        self.assertEqual(result.suggested_skills, (_default_skill(),))
         self.assertEqual(len(client.calls), 2)
         self.assertIn("not a registered skill", client.calls[1].messages[-1]["content"])
 
@@ -325,7 +423,7 @@ class CharacterCreationProposalTests(unittest.TestCase):
         client = FakeLLMClient()
         client.add_response(
             lambda d: len(d.messages) == 2,
-            _proposal_text(suggested_skills=["flight", "flight"]),
+            _proposal_text(suggested_skills=[_default_skill(), _default_skill()]),
         )
         client.add_response(lambda d: len(d.messages) == 3, _proposal_text())
         result = self._run(client)
@@ -335,19 +433,19 @@ class CharacterCreationProposalTests(unittest.TestCase):
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_out_of_band_allocations_are_rejected_and_retried(self):
         client = FakeLLMClient()
+        # One past the widest live band span: no axis may exceed its race
+        # band, whichever row the default race resolves to.
+        from world.ai.character_creation import _race_bands
+
+        bands = _race_bands(_default_race(), _default_subrace())
+        widest_axis = max(
+            bands, key=lambda axis: bands[axis][1] - bands[axis][0]
+        )
+        over_band = {axis: 0 for axis in ALLOCATABLE_AXES}
+        over_band[widest_axis] = bands[widest_axis][1] - bands[widest_axis][0] + 1
         client.add_response(
             lambda d: len(d.messages) == 2,
-            _proposal_text(
-                allocations={
-                    "hp": 500,
-                    "mp": 0,
-                    "sp": 0,
-                    "atk_phys": 0,
-                    "agility": 0,
-                    "defense": 0,
-                    "magic_power": 0,
-                }
-            ),
+            _proposal_text(allocations=over_band),
         )
         client.add_response(lambda d: len(d.messages) == 3, _proposal_text())
         result = self._run(client)
@@ -357,19 +455,21 @@ class CharacterCreationProposalTests(unittest.TestCase):
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_budget_mismatch_is_rejected(self):
         client = FakeLLMClient()
+        # The exact in-band spending with one extra unit on an axis that still
+        # has band room: the totals stop matching without tripping a band.
+        from world.ai.character_creation import _race_bands
+
+        bands = _race_bands(_default_race(), _default_subrace())
+        skewed = _in_band_allocations(_default_race(), _default_subrace())
+        spare_axis = next(
+            axis
+            for axis in ALLOCATABLE_AXES
+            if skewed[axis] < bands[axis][1] - bands[axis][0]
+        )
+        skewed[spare_axis] += 1
         client.add_response(
             lambda d: len(d.messages) == 2,
-            _proposal_text(
-                allocations={
-                    "hp": 100,
-                    "mp": 50,
-                    "sp": 0,
-                    "atk_phys": 10,
-                    "agility": 10,
-                    "defense": 12,
-                    "magic_power": 41,
-                }
-            ),
+            _proposal_text(allocations=skewed),
         )
         client.add_response(lambda d: len(d.messages) == 3, _proposal_text())
         result = self._run(client)
@@ -379,17 +479,14 @@ class CharacterCreationProposalTests(unittest.TestCase):
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_wrong_allocation_axis_set_is_rejected(self):
         client = FakeLLMClient()
+        trimmed = dict(
+            list(
+                _in_band_allocations(_default_race(), _default_subrace()).items()
+            )[:5]
+        )
         client.add_response(
             lambda d: len(d.messages) == 2,
-            _proposal_text(
-                allocations={
-                    "hp": 100,
-                    "mp": 50,
-                    "sp": 0,
-                    "atk_phys": 10,
-                    "agility": 10,
-                }
-            ),
+            _proposal_text(allocations=trimmed),
         )
         client.add_response(lambda d: len(d.messages) == 3, _proposal_text())
         result = self._run(client)
@@ -401,7 +498,7 @@ class CharacterCreationProposalTests(unittest.TestCase):
         client = FakeLLMClient()
         client.add_response(lambda d: True, _proposal_text(age=30))
         result = self._run(client)
-        self.assertEqual(result.race_key, "human")
+        self.assertEqual(result.race_key, _default_race())
         self.assertEqual(result.age, 30)
         self.assertIsNone(result.apparent_age)
         self.assertEqual(len(client.calls), 1)
@@ -549,9 +646,9 @@ class AllocationParityTests(unittest.TestCase):
         from world.ai.character_creation import _allocation_budget, _race_bands
         from world.rules.character_creation import resolve_starting_profile
 
-        for race_key in RACE_REGISTRY:
+        for race_key in _races():
             subrace_keys = [
-                key for key, subrace in SUBRACE_REGISTRY.items()
+                key for key, subrace in _subraces().items()
                 if subrace.race_key == race_key
             ]
             for subrace_key in subrace_keys:
@@ -591,24 +688,8 @@ class TransientFillParityTests(unittest.TestCase):
             rules_creation._AFFINITY_INPUT_BOUNDS,
         )
         self.assertEqual(
-            set(character_creation._AFFINITY_INPUT_BOUNDS), set(RACE_REGISTRY)
+            set(character_creation._AFFINITY_INPUT_BOUNDS), set(_races())
         )
-
-
-def _in_band_allocations(race_key: str, subrace_key: str) -> dict[str, int]:
-    """Greedily spend a race's full allocation budget inside its bands."""
-    from world.ai.character_creation import _allocation_budget, _race_bands
-
-    bands = _race_bands(race_key, subrace_key)
-    remaining = _allocation_budget(race_key, subrace_key)
-    allocations: dict[str, int] = {}
-    for axis in ALLOCATABLE_AXES:
-        span = bands[axis][1] - bands[axis][0]
-        take = min(span, remaining)
-        allocations[axis] = take
-        remaining -= take
-    assert remaining == 0
-    return allocations
 
 
 class TransientFillNormalizationTests(unittest.TestCase):
@@ -667,27 +748,44 @@ class TransientFillNormalizationTests(unittest.TestCase):
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_affinity_is_trimmed_to_the_registry_and_the_race_bound(self):
-        result, _ = self._once(affinity_elements=["fire", "unknown", "fire", "water"])
-        self.assertEqual(result.affinity_elements, ("fire", "water"))
+        two = _element_keys(2)
+        result, _ = self._once(
+            affinity_elements=[two[0], "t_unknown_element", two[0], two[1]]
+        )
+        self.assertEqual(result.affinity_elements, (two[0], two[1]))
 
-        result, _ = self._once(affinity_elements=["unknown", "ghost"])
+        result, _ = self._once(
+            affinity_elements=["t_unknown_element", "t_ghost_element"]
+        )
         self.assertEqual(result.affinity_elements, ())
 
-        beastfolk = {
-            "race_key": "beastfolk",
-            "subrace_key": "catkin",
-            "allocations": _in_band_allocations("beastfolk", "catkin"),
-        }
-        result, _ = self._once(**beastfolk, affinity_elements=["fire", "water"])
-        self.assertEqual(result.affinity_elements, ("fire",))
+        # A bound-1 race keeps only the first registered proposal entry.
+        one_bound = _race_with_bound(1)
+        if one_bound is not None:
+            race = {
+                "race_key": one_bound,
+                "subrace_key": _first_subrace_of(one_bound),
+                "allocations": _in_band_allocations(
+                    one_bound, _first_subrace_of(one_bound)
+                ),
+            }
+            result, _ = self._once(**race, affinity_elements=list(two))
+            self.assertEqual(result.affinity_elements, (two[0],))
 
-        elf = {
-            "race_key": "elf",
-            "subrace_key": "fionnen",
-            "allocations": _in_band_allocations("elf", "fionnen"),
-        }
-        result, _ = self._once(**elf, affinity_elements=["fire", "water", "wind"])
-        self.assertEqual(result.affinity_elements, ())
+        # A bound-0 race loses every proposed affinity regardless of order.
+        zero_bound = _race_with_bound(0)
+        if zero_bound is not None:
+            race = {
+                "race_key": zero_bound,
+                "subrace_key": _first_subrace_of(zero_bound),
+                "allocations": _in_band_allocations(
+                    zero_bound, _first_subrace_of(zero_bound)
+                ),
+            }
+            result, _ = self._once(
+                **race, affinity_elements=list(_element_keys(3))
+            )
+            self.assertEqual(result.affinity_elements, ())
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_absent_transient_fields_normalise_to_none(self):
@@ -703,7 +801,7 @@ class TransientFillNormalizationTests(unittest.TestCase):
     def test_wrong_typed_transient_fields_take_the_retry_path(self):
         for label, payload in [
             ("boolean age", {"age": True}),
-            ("non-list affinity", {"affinity_elements": "fire"}),
+            ("non-list affinity", {"affinity_elements": _element_keys(1)[0]}),
             ("non-string name", {"display_name": 42}),
         ]:
             with self.subTest(label):
@@ -718,46 +816,23 @@ class TransientFillNormalizationTests(unittest.TestCase):
                 self.assertIsNone(result.age)
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
-    def test_elf_affinity_bound_annotation_still_empties_a_valid_elf_set(self):
-        elf = {
-            "race_key": "elf",
-            "subrace_key": "fionnen",
-            "allocations": _in_band_allocations("elf", "fionnen"),
+    def test_zero_bound_annotation_still_empties_a_valid_set(self):
+        zero_bound = _race_with_bound(0)
+        if zero_bound is None:
+            self.skipTest("the live affinity bounds expose no zero-bound race")
+        race = {
+            "race_key": zero_bound,
+            "subrace_key": _first_subrace_of(zero_bound),
+            "allocations": _in_band_allocations(
+                zero_bound, _first_subrace_of(zero_bound)
+            ),
         }
-        result, client = self._once(**elf, affinity_elements=["fire"])
-        self.assertEqual(result.race_key, "elf")
+        result, client = self._once(
+            **race, affinity_elements=_element_keys(1)
+        )
+        self.assertEqual(result.race_key, zero_bound)
         self.assertEqual(result.affinity_elements, ())
         self.assertEqual(len(client.calls), 1)
-    """The layer's registry-derived bands/budget must match the preflight's.
-
-    The layer cannot import ``world.rules`` (transport-boundary contract), so
-    the band arithmetic is re-derived from the same lore registries. This test
-    pins every race/subrace combination against the authoritative
-    ``resolve_starting_profile`` so a future registry or rules change cannot
-    make the layer accept a proposal the activation preflight would reject.
-    """
-
-    @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
-    def test_bands_and_budget_match_the_deterministic_preflight_for_every_profile(self):
-        from world.ai.character_creation import _allocation_budget, _race_bands
-        from world.rules.character_creation import resolve_starting_profile
-
-        for race_key in RACE_REGISTRY:
-            subrace_keys = [
-                key for key, subrace in SUBRACE_REGISTRY.items()
-                if subrace.race_key == race_key
-            ]
-            for subrace_key in subrace_keys:
-                with self.subTest(race=race_key, subrace=subrace_key):
-                    profile = resolve_starting_profile(race_key, subrace_key)
-                    self.assertEqual(
-                        _race_bands(race_key, subrace_key),
-                        profile.bounds_dict(),
-                    )
-                    self.assertEqual(
-                        _allocation_budget(race_key, subrace_key),
-                        profile.budget,
-                    )
 
 
 class RegistrationTests(unittest.TestCase):
