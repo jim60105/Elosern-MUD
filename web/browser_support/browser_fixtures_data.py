@@ -82,7 +82,9 @@ SYNTH_ENTRY_RANK_KEY = "F"
 
 SYNTH_ENTRY_RANK_ROW = GuildRank(
     "F",
-    1,
+    # One below the kit's lowest rank so the shared next-rank derivation
+    # (exact order+1 match) resolves the kit's first rank unambiguously.
+    0,
     0,
     99,
     "Synthetic entry-rank tasks for the managed browser harness.",
