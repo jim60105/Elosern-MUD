@@ -227,29 +227,32 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._press(page, "Enter")
 
     def _focus_skill(self, page, category: str, key: str) -> None:
-        """Walk to ``key``'s row from the frame ``_open_category`` left off
-        in, using the panel's category -> group -> skill geometry: the
-        multi-group path crosses the group frame first, the single-group
-        path is already on the skill frame."""
+        """Land focus on ``key``'s row from wherever ``_open_category``
+        left off, crossing the group frame first for a multi-group
+        category. Row positions are verified against the live router —
+        not press counts — because the mounted row order can differ from
+        the payload tree (a same-category row set may reflow), and the
+        single-column skill pane ignores the horizontal arrow between
+        rows whose index math was trusted here before."""
         panel = self._combat_panel(page)
         names = [item["category"] for item in panel["skills"]]
         self.assertIn(category, names)
+        category_index = names.index(category)
         groups = panel["skills"][names.index(category)]["groups"]
-        position = next(
+        carrier_index = next(
             (
-                (group_index, skill_index)
-                for group_index, group in enumerate(groups)
-                for skill_index, skill in enumerate(group["skills"])
-                if skill["key"] == key
+                index
+                for index, group in enumerate(groups)
+                if any(skill["key"] == key for skill in group["skills"])
             ),
             None,
         )
-        self.assertIsNotNone(position, f"{key} not in the {category} panel tree")
-        group_index, skill_index = position
+        self.assertIsNotNone(carrier_index, f"{key} not in the {category} panel tree")
         if len(groups) > 1:
-            self._press_to(page, "ArrowRight", group_index)
+            # The group frame's rows are keyed positionally by the client.
+            self._walk_to(page, f"skill-group-{category_index}-{carrier_index}")
             self._press(page, "Enter")  # -> skill frame
-        self._press_to(page, "ArrowRight", skill_index)
+        self._walk_to(page, key)
 
     def test_focus_stays_on_action_dock_in_combat(self):
         page = self.logged_in_page()
