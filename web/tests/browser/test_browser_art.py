@@ -27,6 +27,14 @@ from .browser_helpers import (
 )
 from .seed import FIXTURE_VALID_PNG
 
+# The art fixture's archetype/display pair for the CURRENT boot mode (kit
+# row under the synthetic install; the seed fixture places the character in
+# a room carrying exactly this archetype).
+from web.browser_support.browser_fixtures_data import art_scene_values
+
+SCENE_ARCHETYPE_KEY, SCENE_LABEL = art_scene_values()
+SCENE_URL = f"/art/scene/{SCENE_ARCHETYPE_KEY}.png"
+
 # A same-origin-free image URL (the seed fixture's minimal valid 4x4 PNG as a
 # data URL) so the pending-scene generating notice can be seeded without any
 # network request (the harness guards non-local requests).
@@ -190,7 +198,7 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         panel = state["panels"]["art"]
         self.assertTrue(panel["available"])
         self.assertEqual(panel["scene"]["status"], "done")
-        self.assertEqual(panel["scene"]["url"], "/art/scene/tavern_interior.png")
+        self.assertEqual(panel["scene"]["url"], SCENE_URL)
         self.assertEqual(panel["scene"]["aspect_ratio"], "16:9")
         self.assertIsNone(panel["scene"]["placeholder"])
         # The image element is present with a same-origin src.
@@ -210,7 +218,7 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         alt = page.locator('[data-testid="scene-backdrop-alt"]').inner_text()
         self.assertTrue(alt.strip(), "scene alternative text must be meaningful and non-empty")
         caption = page.locator('[data-testid="scene-backdrop-label"]').inner_text()
-        self.assertEqual(caption, "酒館內部")
+        self.assertEqual(caption, SCENE_LABEL)
 
     @covers_requirement("webclient-art-panel::art-panel-browser-acceptance-is-keyboard-first-accessible-and-desktop-bounded")
     def test_scene_caption_and_status_usable_at_1280x720(self):
@@ -220,7 +228,7 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         img = page.locator('[data-testid="scene-backdrop-image"]')
         self.assertEqual(img.count(), 1)
         self.assertTrue(img.is_visible())
-        self.assertEqual(page.locator('[data-testid="scene-backdrop-label"]').inner_text(), "酒館內部")
+        self.assertEqual(page.locator('[data-testid="scene-backdrop-label"]').inner_text(), SCENE_LABEL)
         self.assertTrue(page.locator('[data-testid="scene-backdrop-alt"]').inner_text().strip())
         self.assertTrue(page.locator('[data-testid="scene-backdrop"]').is_visible())
 
@@ -501,7 +509,7 @@ class ArtImageLoadFailureTest(ArtSceneBrowserTest):
         self._art_requests = []
 
         def _handler(route):
-            if route.request.url.endswith("/art/scene/tavern_interior.png"):
+            if route.request.url.endswith(SCENE_URL):
                 self._art_requests.append(route.request.url)
                 route.abort("failed")
             else:
