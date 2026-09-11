@@ -194,6 +194,7 @@ def _art_fixture(character, room) -> None:
         SYNTH_ART_ARCHETYPE,
         SYNTH_DIALOGUE_HOST_KEY,
         SYNTH_DIALOGUE_TABLE_KEY,
+        art_room_monster_key,
         first_live_monster_tier_key,
         scene_archetype_registered,
     )
@@ -241,7 +242,7 @@ def _art_fixture(character, room) -> None:
     host.save()
     monster = create_object(
         Monster,
-        key="合成燼殼蟲" if synth else "酒館灰狼",
+        key=art_room_monster_key(),
         location=art_room,
         nohome=True,
     )

@@ -30,7 +30,7 @@ from .seed import FIXTURE_VALID_PNG
 # The art fixture's archetype/display pair for the CURRENT boot mode (kit
 # row under the synthetic install; the seed fixture places the character in
 # a room carrying exactly this archetype).
-from web.browser_support.browser_fixtures_data import art_scene_values
+from web.browser_support.browser_fixtures_data import art_room_monster_key, art_scene_values
 
 SCENE_ARCHETYPE_KEY, SCENE_LABEL = art_scene_values()
 SCENE_URL = f"/art/scene/{SCENE_ARCHETYPE_KEY}.png"
@@ -569,7 +569,8 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         os.environ.pop("ELOSERN_BROWSER_ART", None)
 
     def _engage(self, page):
-        page.evaluate("Evennia.msg('text', ['engage 酒館灰狼'], {})")
+        target = art_room_monster_key()
+        page.evaluate("([t]) => Evennia.msg('text', [`engage ${t}`], {})", [target])
         wait_for_store_state(page, _in_combat_mode)
         return store_state(page)
 

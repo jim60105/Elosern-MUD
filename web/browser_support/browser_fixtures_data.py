@@ -833,6 +833,17 @@ def art_scene_values() -> "tuple[str, str]":
         return SYNTH_ART_ARCHETYPE, SYNTH_ART_SCENE_LABEL
     return SHIPPED_ART_ARCHETYPE, SHIPPED_ART_SCENE_LABEL
 
+#: Object key of the living monster the art fixture places in the scene room
+#: (the combat-portrait journeys' ``engage`` argument — distinct from the
+#: combat fixture's start-room monsters).
+SHIPPED_ART_ROOM_MONSTER_KEY = "酒館灰狼"
+SYNTH_ART_ROOM_MONSTER_KEY = "合成燼殼蟲"
+
+
+def art_room_monster_key() -> str:
+    """The object key of the monster the current boot mode's art fixture seeds."""
+    return SYNTH_ART_ROOM_MONSTER_KEY if synth_mode_enabled() else SHIPPED_ART_ROOM_MONSTER_KEY
+
 #: Kit dialogue table the art/exploration fixture hosts carry.
 SYNTH_DIALOGUE_TABLE_KEY = "t_synth_lodgekeeper"
 
