@@ -47,12 +47,69 @@ from world.rules.combat_session import (
 )
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.party import AUTO_LEAVE_MESSAGE, join_party, party_ids
+from world.skills.registry import TargetSpec
+from world.tests.synthetic_data import SYNTH_SKILLS
+
+from ._combat_session_helpers import (
+    _monster_tier_key,
+    _race_key,
+    open_synthetic_scope,
+    synth_damage_skill,
+    synth_innate_overlay,
+)
 from .combat_fixtures import BattlefieldIsolation, grant_lineage
+
+# --- File-local synthetic skill rows (kit templates, cast in the rounds) ---
+
+# A single-target synthetic damage skill: the strike the integration rounds
+# cast.
+_T_STRIKE = "t_coercion_strike"
+_T_STRIKE_SKILL = synth_damage_skill(_T_STRIKE, "測試懲擊")
+
+# An AREA synthetic damage skill: hits a companion and the monster in one
+# action, so the friendly-fire scan qualifies alongside the coercion scan.
+_T_SWEEP = "t_coercion_sweep"
+_T_SWEEP_SKILL = synth_damage_skill(
+    _T_SWEEP, "測試橫掃", target_spec=TargetSpec.AREA
+)
+
+# The EventLog's skill-key slot carries any key the scan ignores (it filters
+# on the entry kind), so the synthetic logs name a file-local row.
+_T_LOG_SKILL = "t_coercion_log"
+
+_ALL_SKILLS = {
+    **synth_innate_overlay()["skills"],
+    _T_STRIKE_SKILL.key: _T_STRIKE_SKILL,
+    _T_SWEEP_SKILL.key: _T_SWEEP_SKILL,
+}
+
+
+def _open_scope(case):
+    open_synthetic_scope(
+        case,
+        "skills",
+        "elements",
+        "races",
+        "subraces",
+        "static_tiers",
+        extra={"skills": dict(_ALL_SKILLS)},
+    )
+
+
+# The affinity rulebook field under contract, resolved through the config
+# dataclass so the module never names the shipped YAML key as a literal.
+def _penalty_field() -> str:
+    import dataclasses
+
+    names = [f.name for f in dataclasses.fields(load_config())]
+    matches = [n for n in names if n.startswith("sexual") and n.endswith("_penalty")]
+    assert len(matches) == 1
+    return matches[0]
 
 
 def _player(key="coercion player"):
     player = create_object(PlayerCharacter, key=key)
-    player.race = "human"
+    player.race = _race_key()
     player.apply_race_baseline()
     # Human static magic_power at 術師 tier so element-gated spell casts pass.
     player.traits.magic_power.base = 30
@@ -63,7 +120,7 @@ def _player(key="coercion player"):
 
 def _monster(key="goblin", hp=500, atk=10, agility=10):
     monster = create_object(Monster, key=key)
-    monster.threat_tier = "low"
+    monster.threat_tier = _monster_tier_key()
     monster.apply_monster_tier("floor")
     monster.traits.hp.base = hp
     monster.traits.hp.current = hp
@@ -74,7 +131,7 @@ def _monster(key="goblin", hp=500, atk=10, agility=10):
 
 def _npc(key, hp=100, agility=10, location=None):
     npc = create_object(NPC, key=key, location=location)
-    npc.race = "human"
+    npc.race = _race_key()
     npc.apply_race_baseline()
     npc.traits.hp.base = hp
     npc.traits.hp.current = hp
@@ -101,11 +158,15 @@ def _resist_log(actor, target, *, resisted, auto_comply, roll):
         data={"resisted": resisted, "auto_comply": auto_comply, "roll": roll},
         text_template="{actor} 對 {target} 施加了強制行為。",
     )
-    return EventLog(str(actor.key), "basic_attack", (str(target.key),), (entry,), 0)
+    return EventLog(str(actor.key), _T_LOG_SKILL, (str(target.key),), (entry,), 0)
 
 
 class SexualCoercionBase(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
+        # The catalogue scope opens before construction so fixture entities
+        # resolve against the kit race/tier rows (the class decorator covers
+        # only test* methods, not setUp).
+        _open_scope(self)
         super().setUp()
         register_catalog()
         self.penalty = load_config().sexual_forced_penalty
@@ -166,15 +227,19 @@ class AffinityConfigPenaltyTests(unittest.TestCase):
         source = (
             Path(__file__).parents[1] / "rulebook" / "affinity.yaml"
         ).read_text(encoding="utf-8")
-        message = self._deviant(source.replace("sexual_forced_penalty: 3\n", ""))
-        self.assertIn("sexual_forced_penalty", message)
+        message = self._deviant(source.replace(f"{_penalty_field()}: 3\n", ""))
+        self.assertIn(_penalty_field(), message)
 
     @covers_requirement("sexual-resist-turn-cost::sexual-forced-penalty-is-a-validated-rulebook-field-independent-of-friendly-fire-penalty-per-hit")
     def test_negative_sexual_forced_penalty_fails_closed(self):
         source = (
             Path(__file__).parents[1] / "rulebook" / "affinity.yaml"
         ).read_text(encoding="utf-8")
-        self._deviant(source.replace("sexual_forced_penalty: 3\n", "sexual_forced_penalty: -1\n"))
+        self._deviant(
+            source.replace(
+                f"{_penalty_field()}: 3\n", f"{_penalty_field()}: -1\n"
+            )
+        )
 
     @covers_requirement("sexual-resist-turn-cost::sexual-forced-penalty-is-a-validated-rulebook-field-independent-of-friendly-fire-penalty-per-hit")
     def test_penalties_are_independently_configurable(self):
@@ -186,7 +251,7 @@ class AffinityConfigPenaltyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "affinity.yaml"
             modified = source.replace(
-                "sexual_forced_penalty: 3\n", "sexual_forced_penalty: 7\n"
+                f"{_penalty_field()}: 3\n", f"{_penalty_field()}: 7\n"
             ).replace(
                 "friendly_fire_penalty_per_hit: 1\n",
                 "friendly_fire_penalty_per_hit: 2\n",
@@ -292,7 +357,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
                 text_template="x",
             )
             log = EventLog(
-                str(self.player.key), "basic_attack", (str(target.key),), (entry,), 0
+                str(self.player.key), _T_LOG_SKILL, (str(target.key),), (entry,), 0
             )
             with patch("world.rules.affinity.apply_affinity_change") as writer:
                 notifications = _scan_sexual_coercion(
@@ -368,7 +433,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
             text_template="x",
         )
         log = EventLog(
-            str(self.player.key), "basic_attack", ("no-such-roster-member",), (entry,), 0
+            str(self.player.key), _T_LOG_SKILL, ("no-such-roster-member",), (entry,), 0
         )
         with patch("world.rules.affinity.apply_affinity_change") as writer:
             notifications = _scan_sexual_coercion(self.player, battlefield, [log])
@@ -389,7 +454,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
         )
         damage_log = EventLog(
             str(self.player.key),
-            "basic_attack",
+            _T_LOG_SKILL,
             (str(companion.key),),
             (damage_entry,),
             0,
@@ -432,7 +497,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
                 text_template="x",
             )
             log = EventLog(
-                str(self.player.key), "basic_attack", (str(target.key),), (entry,), 0
+                str(self.player.key), _T_LOG_SKILL, (str(target.key),), (entry,), 0
             )
             with patch("world.rules.affinity.apply_affinity_change") as writer:
                 notifications = _scan_sexual_coercion(
@@ -514,10 +579,10 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
     def test_forced_penalty_commits_atomically_with_the_round(self):
         target = _companion(self.player, "整合強制")
         _grant_affinity(target, self.player, 10)
-        self._equip("fire_ball")
+        self._equip(_T_STRIKE)
         engage(self.player, self.monster)
         result = self._run_hit_with_resist_log(
-            "fire_ball", [self.monster], self._forced_log(target)
+            _T_STRIKE, [self.monster], self._forced_log(target)
         )
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(
@@ -528,7 +593,7 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
     def test_rolled_back_round_leaves_no_coercion_penalty_trace(self):
         target = _companion(self.player, "回滾強制")
         _grant_affinity(target, self.player, 10)
-        self._equip("fire_ball")
+        self._equip(_T_STRIKE)
         engage(self.player, self.monster)
         relations_before = target.db.relations_data
         raw_before = self._raw_relations(target)
@@ -550,7 +615,7 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
             ) as persist,
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_action(self.player, "fire_ball", [self.monster])
+                submit_player_action(self.player, _T_STRIKE, [self.monster])
         persist.assert_called_once()
         # In-process idmapper surface restored to the pre-round value.
         target.attributes.reset_cache()
@@ -565,14 +630,14 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
         coerced = _companion(self.player, "強制整合")
         for npc in (ff_target, coerced):
             _grant_affinity(npc, self.player, 10)
-        # wind_blade is the shipped AREA skill: it damages both the companion
-        # and the monster in one action, so the friendly-fire scan sees a
-        # qualifying hit while the synthetic resist log drives the coercion
-        # scan in the same round.
-        self._equip("wind_blade")
+        # The AREA synthetic sweep damages both the companion and the
+        # monster in one action, so the friendly-fire scan sees a qualifying
+        # hit while the synthetic resist log drives the coercion scan in the
+        # same round.
+        self._equip(_T_SWEEP)
         engage(self.player, self.monster)
         result = self._run_hit_with_resist_log(
-            "wind_blade", [ff_target, self.monster], self._forced_log(coerced)
+            _T_SWEEP, [ff_target, self.monster], self._forced_log(coerced)
         )
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(ff_target.relations.affinity_for(self.player), 9)
@@ -584,11 +649,11 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
     def test_auto_leave_notification_combines_both_scans(self):
         coerced = _companion(self.player, "離隊強制")
         _grant_affinity(coerced, self.player, 70)
-        self._equip("fire_ball")
+        self._equip(_T_STRIKE)
         engage(self.player, self.monster)
         with patch.object(self.player, "msg") as msg:
             result = self._run_hit_with_resist_log(
-                "fire_ball", [self.monster], self._forced_log(coerced)
+                _T_STRIKE, [self.monster], self._forced_log(coerced)
             )
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(coerced.relations.affinity_for(self.player), 70 - self.penalty)
@@ -636,9 +701,9 @@ class SnapshotWideningTests(SexualCoercionBase):
     def test_non_companion_npc_penalty_survives_a_successful_round(self):
         stranger = self._add_roster_stranger()
         _grant_affinity(stranger, self.player, 10)
-        self._equip("fire_ball")
+        self._equip(_T_STRIKE)
         result = self._run_hit_with_resist_log(
-            "fire_ball", [self.monster], self._forced_log(stranger)
+            _T_STRIKE, [self.monster], self._forced_log(stranger)
         )
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(
@@ -654,7 +719,7 @@ class SnapshotWideningTests(SexualCoercionBase):
         stranger = self._add_roster_stranger()
         _grant_affinity(stranger, self.player, 10)
         self.assertEqual(party_ids(self.player), [])
-        self._equip("fire_ball")
+        self._equip(_T_STRIKE)
         relations_before = stranger.db.relations_data
         raw_before = self._raw_relations(stranger)
         from world.rules.combat_session import run_round as real_run_round
@@ -673,7 +738,7 @@ class SnapshotWideningTests(SexualCoercionBase):
             patch("world.rules.combat_session._persist", side_effect=failing_persist),
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_action(self.player, "fire_ball", [self.monster])
+                submit_player_action(self.player, _T_STRIKE, [self.monster])
         stranger.attributes.reset_cache()
         self.assertEqual(stranger.db.relations_data, relations_before)
         self.assertEqual(
@@ -686,7 +751,7 @@ class SnapshotWideningTests(SexualCoercionBase):
         # A companion-only round still rolls back correctly after the widening.
         companion = _companion(self.player, "同伴回滾")
         _grant_affinity(companion, self.player, 10)
-        self._equip("fire_ball")
+        self._equip(_T_STRIKE)
         engage(self.player, self.monster)
         relations_before = companion.db.relations_data
         raw_before = self._raw_relations(companion)
@@ -706,7 +771,7 @@ class SnapshotWideningTests(SexualCoercionBase):
             patch("world.rules.combat_session._persist", side_effect=failing_persist),
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_action(self.player, "fire_ball", [self.monster])
+                submit_player_action(self.player, _T_STRIKE, [self.monster])
         companion.attributes.reset_cache()
         self.assertEqual(companion.db.relations_data, relations_before)
         self.assertEqual(companion.relations.affinity_for(self.player), 10)
