@@ -32,6 +32,11 @@ _IMPORT_BEFORE_INSTALL = (
     # condition rows are grafted in afterwards).
     "world.rules.status_display",
     "world.quests.bootstrap",
+    # The monster-population model binds the shipped capital entry and its
+    # immutable shipped-key region tables at import; importing it here keeps
+    # the module loadable under the install, and the terrain graft rebinds
+    # those tables to live kit rows afterwards.
+    "world.maps.wilderness_population",
 )
 # Module-level bootstrap content validated against catalog registries at
 # RUNTIME (sync_quest_runtime registers the hand-written intro quest, whose

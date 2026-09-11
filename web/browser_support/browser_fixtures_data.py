@@ -153,22 +153,21 @@ def graft_synth_status_display() -> None:
 def graft_synth_wilderness_terrain() -> None:
     """Make the coordinate-keyed wilderness terrain model resolve kit rows.
 
-    Production's terrain partition (``region_for_coordinates``) is closed-form
-    integer arithmetic returning the shipped region keys, and the monster
-    population tables are import-built immutable mappings over the same keys.
-    The synthetic install swaps the region registry to t_-only rows, so every
-    wilderness room activation (seed, server, or traversal) KeyErrors on a
-    shipped key no installed row answers. Graft one kit-authored row per
-    partition key (idempotent setdefault) and rebind the population tables so
-    every region answers with the live registry's first threat tier.
+    Production's terrain model is closed-form integer arithmetic keyed by the
+    shipped region and threat-tier vocabularies: ``region_for_coordinates``
+    returns shipped partition keys (and the hunting band hardcodes the
+    ``"low"`` tier), while the synthetic install swaps the region registry and
+    the threat-tier registry to t_-only rows — every wilderness room
+    activation would KeyError on a key no installed row answers (the same
+    seam class as the F-rank entry graft). Graft one kit-authored row per
+    shipped partition/tier key (idempotent ``setdefault``) derived from the
+    kit's own templates, so the arithmetic resolves against synthetic content
+    without the model ever learning shipped drift.
     """
-    from types import MappingProxyType
-
     from dataclasses import replace
 
     import world.lore.wilderness_regions as _regions
-    import world.maps.wilderness_population as _population
-    from world.lore.monsters import MONSTER_TIER_REGISTRY
+    import world.lore.monsters as _monsters
     from world.tests.synthetic_data import SYNTH_REGIONS
     from world.maps.wilderness_provider import region_for_coordinates
 
@@ -181,13 +180,14 @@ def graft_synth_wilderness_terrain() -> None:
     for key in sorted(partition_keys):
         _regions.WILDERNESS_REGION_REGISTRY.setdefault(key, replace(template, key=key))
 
-    tier_key = next(iter(MONSTER_TIER_REGISTRY))
-    _population._REGION_TIER = MappingProxyType(
-        {key: tier_key for key in _population._REGION_TIER}
-    )
-    _population._REGION_DENSITY = MappingProxyType(
-        {key: 3 for key in _population._REGION_DENSITY}
-    )
+    # Threat tiers: the population model hardcodes the shipped tier keys
+    # (hunting band "low", region tables low/mid/high). Graft one kit-authored
+    # tier row per key the closed-form model can name, derived from the kit's
+    # own first tier — the shipped-keyed tables and any shipped-keyed rulebook
+    # YAML then resolve without seeing t_ rows they would reject.
+    tier_template = next(iter(_monsters.MONSTER_TIER_REGISTRY.values()))
+    for key in ("low", "mid", "high", "calamity"):
+        _monsters.MONSTER_TIER_REGISTRY.setdefault(key, replace(tier_template, key=key))
 
 
 def synth_next_entry_rank_key() -> str:
@@ -583,20 +583,6 @@ SYNTH_ART_SCENE_LABEL = "苔徑市集"
 #: Display label of the shipped art archetype the shipped-mode art fixture
 #: rooms carry (used only when the synthetic flag is OFF).
 SHIPPED_ART_SCENE_LABEL = "酒館內部"
-
-#: Display name of the wilderness region the minimap fixture's remembered
-#: gateway opens onto (the marker's far-side name). Mirrors the boot mode's
-#: region-row display the same way the art label mirrors the archetype row —
-#: the Playwright-side process has no Django settings to probe.
-SYNTH_WILDERNESS_GATE_LABEL = "荊棘荒林"
-SHIPPED_WILDERNESS_GATE_LABEL = "西部丘陵與谷地"
-
-
-def wilderness_gate_marker_label() -> str:
-    """Far-side label the remembered minimap gateway must render with."""
-    if synth_mode_enabled():
-        return SYNTH_WILDERNESS_GATE_LABEL
-    return SHIPPED_WILDERNESS_GATE_LABEL
 
 
 def art_scene_values() -> "tuple[str, str]":
