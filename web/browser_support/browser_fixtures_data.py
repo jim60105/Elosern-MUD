@@ -82,9 +82,11 @@ SYNTH_ENTRY_RANK_KEY = "F"
 
 SYNTH_ENTRY_RANK_ROW = GuildRank(
     "F",
-    # One below the kit's lowest rank so the shared next-rank derivation
-    # (exact order+1 match) resolves the kit's first rank unambiguously.
-    0,
+    # Same order as the kit's entry rank: board eligibility needs the entry
+    # rank at or above the kit's lowest quest rank, while the next-rank
+    # derivation (exact order+1 match over the registry) still resolves the
+    # kit's second rank unambiguously.
+    1,
     0,
     99,
     "Synthetic entry-rank tasks for the managed browser harness.",
@@ -105,6 +107,30 @@ def graft_synth_entry_rank() -> None:
     from world.lore.guild import GUILD_RANK_REGISTRY
 
     GUILD_RANK_REGISTRY.setdefault(SYNTH_ENTRY_RANK_KEY, SYNTH_ENTRY_RANK_ROW)
+
+
+# ---------------------------------------------------------------------------
+# Runtime catalog probes (shared by the synthetic-aware seed fixtures).
+#
+# Reading the CURRENT owner-module registry attributes keeps every fixture
+# valid under either boot mode: the shipped registries when the kit flag is
+# overridden off, the kit's installed rows when it is on (the harness
+# default). The probes never name a registry key.
+# ---------------------------------------------------------------------------
+
+
+def first_live_wilderness_entry():
+    """The first registered wilderness entry (registry insertion order)."""
+    from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+
+    return next(iter(WILDERNESS_ENTRY_REGISTRY.values()))
+
+
+def first_live_monster_tier_key() -> str:
+    """The first registered monster threat tier key."""
+    from world.lore.monsters import MONSTER_TIER_REGISTRY
+
+    return next(iter(MONSTER_TIER_REGISTRY))
 
 
 # ---------------------------------------------------------------------------
