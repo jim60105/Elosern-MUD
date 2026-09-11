@@ -79,7 +79,7 @@ function validPanel(overrides) {
       stock: [
         {
           item_key: "meal",
-          display_name: "普通餐食",
+          display_name: "旅行乾糧包",
           buy_copper: 10,
           sell_copper: 5,
           stock: 20,
@@ -97,7 +97,7 @@ function validPanel(overrides) {
       rows: [
         {
           item_key: "meal",
-          display_name: "普通餐食",
+          display_name: "旅行乾糧包",
           held: 2,
           equipped: false,
           presentation: {

@@ -14,6 +14,7 @@ const assert = require("node:assert/strict");
 
 const ExplorationMenu = require("../elosern/exploration_menu.js");
 const Protocol = require("../elosern/protocol.js");
+const { SYNTH_ITEM } = require("./support/synthetic-data.js");
 
 function validPanel(overrides) {
   return Object.assign(
@@ -389,8 +390,8 @@ test("deliver forwards the server-normalized params and echoes the server label"
           {
             kind: "action",
             action_id: "explore.deliver",
-            label: "交付 治療藥水 給 灰婆婆",
-            params: { npc_id: 13, item_key: "healing_potion" },
+            label: `交付 ${SYNTH_ITEM.display} 給 灰婆婆`,
+            params: { npc_id: 13, item_key: SYNTH_ITEM.id },
             enabled: true,
             disabled_reason: null,
           },
@@ -408,9 +409,9 @@ test("deliver forwards the server-normalized params and echoes the server label"
   assert.ok(deliver);
   assert.equal(deliver.actionId, "explore.deliver");
   // The menu forwards the server-normalized payload, never a reconstruction.
-  assert.deepEqual(deliver.payload, { npc_id: 13, item_key: "healing_potion" });
+  assert.deepEqual(deliver.payload, { npc_id: 13, item_key: SYNTH_ITEM.id });
   assert.deepEqual(deliver.commandDisplay, {
-    actionLabel: "交付 治療藥水 給 灰婆婆",
+    actionLabel: `交付 ${SYNTH_ITEM.display} 給 灰婆婆`,
   });
 });
 
@@ -425,8 +426,8 @@ test("a disabled delivery keeps its reason and never submits", () => {
           {
             kind: "action",
             action_id: "explore.deliver",
-            label: "交付 治療藥水 給 灰婆婆",
-            params: { npc_id: 13, item_key: "healing_potion" },
+            label: `交付 ${SYNTH_ITEM.display} 給 灰婆婆`,
+            params: { npc_id: 13, item_key: SYNTH_ITEM.id },
             enabled: false,
             disabled_reason: {
               code: "item_not_held",
