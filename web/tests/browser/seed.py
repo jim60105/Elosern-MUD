@@ -1148,14 +1148,11 @@ def main() -> None:
     # ``rungs`` (the ladder's own rung wins: rungs is applied after the seed).
     combat_rungs: dict[str, int] = {}
     if synth:
-        from world.skills.registry import SKILL_REGISTRY
+        from web.browser_support.browser_fixtures_data import lineage_rungs_for
 
-        for _key in [*active_skills, *(SYNTH_COMBAT_PASSIVE_SKILLS)]:
-            _def = SKILL_REGISTRY.get(_key)
-            for _edge in getattr(_def, "prerequisites", ()):
-                combat_rungs[_edge.skill_key] = max(
-                    combat_rungs.get(_edge.skill_key, 0), _edge.min_proficiency
-                )
+        combat_rungs.update(
+            lineage_rungs_for([*active_skills, *SYNTH_COMBAT_PASSIVE_SKILLS])
+        )
     combat_rungs[SYNTH_COMBAT_LADDER_SKILL] = SYNTH_COMBAT_LADDER_LEVEL
     grant_lineage(
         character,

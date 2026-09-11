@@ -13,7 +13,10 @@ import time
 from playwright.sync_api import Error
 from tools.spec_traceability import covers_requirement
 
-from web.browser_support.browser_fixtures_data import SYNTH_INNATE_ATTACK_KEY
+from web.browser_support.browser_fixtures_data import (
+    SYNTH_INNATE_ATTACK_KEY,
+    combat_journey_values,
+)
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
@@ -53,8 +56,9 @@ class CombatRejectionBrowserTest(BrowserAcceptanceTest):
             finally:
                 self.server = None
 
-    def _engage(self, page, name="goblin"):
-        page.evaluate("Evennia.msg('text', ['engage %s'], {})" % name)
+    def _engage(self, page):
+        target = combat_journey_values()["engage_target"]
+        page.evaluate("([t]) => Evennia.msg('text', [`engage ${t}`], {})", [target])
         self._wait_combat_mode(page)
 
     def _wait_combat_mode(self, page, timeout=30000):
@@ -176,8 +180,9 @@ class CombatReconnectBrowserTest(BrowserAcceptanceTest):
     def _combat_panel(self, page):
         return store_state(page)["panels"]["context_actions"]
 
-    def _engage(self, page, name="goblin"):
-        page.evaluate("Evennia.msg('text', ['engage %s'], {})" % name)
+    def _engage(self, page):
+        target = combat_journey_values()["engage_target"]
+        page.evaluate("([t]) => Evennia.msg('text', [`engage ${t}`], {})", [target])
         self._wait_combat_mode(page)
 
     def _wait_combat_mode(self, page, timeout=30000):

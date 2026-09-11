@@ -387,11 +387,14 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
                 install_outbound_recorder(page)
                 self._engage(page)
 
-                # Navigate to the deepest combat frame (the fire_ball target
-                # frame): skills tab -> category -> group -> skill -> target.
+                # Navigate to the deepest combat frame (the spell's SINGLE
+                # target frame): skills tab -> category -> the spell's element
+                # group (mode-dependent position) -> skill -> target.
+                roles = self._roles()
                 self._press(page, "ArrowRight")  # skills tab
                 self._press(page, "Enter")  # category frame
-                self._press(page, "Enter")  # group frame
+                self._press_to(page, "ArrowRight", roles["spell_group_index"])
+                self._press(page, "Enter")  # the spell's element group
                 self._press(page, "Enter")  # skill frame
                 self._press(page, "Enter")  # target frame (deepest)
 
@@ -431,7 +434,17 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
                       const participantRaw = rectOf('[data-testid="participant-frame"]');
                       const participant = clampTo(participantRaw, hudLeft);
                       const caption = rectOf('[data-testid="narrative-feed"]');
-                      const confirm = rectOf('.dock-menu-item--focused');
+                      // The focused row of the committed frame: the pane-kind
+                      // variants mark focus with per-kind classes (the token
+                      // rows of the target frame carry only aria-selected).
+                      const confirmEl = document.querySelector(
+                        '.dock-menu [aria-selected="true"], ' +
+                        '.dock-menu .dock-menu-item--focused');
+                      const confirmRect = confirmEl && confirmEl.getBoundingClientRect();
+                      const confirm = confirmRect
+                        ? { x: confirmRect.left, y: confirmRect.top,
+                            w: confirmRect.width, h: confirmRect.height }
+                        : null;
                       return {
                         dockInsideAnchor: inside(dock, anchor),
                         confirmReachable: withinViewport(confirm),
@@ -888,7 +901,10 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             timeout=30000,
         )
         self._press(page, "Enter")  # attack (first root item) -> target menu
-        self._press(page, "Enter")  # select the first valid target
+        # The synth preset arrives with a companion, so the target menu's
+        # first row is not necessarily a foe — walk to the enemy row.
+        self._walk_to(page, f"target-{self._basic_attack_target_identity(page)}")
+        self._press(page, "Enter")  # select the monster target
         actions = self._ui_actions(page)
         self.assertEqual(len(actions), 1, actions)
         # The accepted panel advances the round; the keyboard model must be
@@ -916,7 +932,8 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             )
         # The rebuilt root lets another action submit from fresh data.
         self._press(page, "Enter")  # attack again
-        self._press(page, "Enter")  # select the first valid target
+        self._walk_to(page, f"target-{self._basic_attack_target_identity(page)}")
+        self._press(page, "Enter")  # select the monster target
         actions = self._ui_actions(page)
         self.assertGreaterEqual(len(actions), 2, actions)
 
@@ -999,12 +1016,14 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             # H3 (design D2/D11): the combat root is a single-row tab bar
             # (depth 1); the pane (DockMenu + SkillDetailPane) renders only at
             # depth >= 2. Navigate into the skill frame: skills tab -> category
-            # -> group -> skill (wind_blade).
+            # -> the mastered ladder's element group (mode-dependent position)
+            # -> its skill frame.
+            roles = self._roles()
             self._press(page, "ArrowRight")  # skills tab
             self._press(page, "Enter")  # open category frame (elemental_magic focused)
-            self._press(page, "Enter")  # open elemental_magic -> group frame (fire + wind)
-            self._press(page, "ArrowRight")  # focus the wind group (index 1)
-            self._press(page, "Enter")  # open the wind group -> skill frame (wind_blade)
+            self._press(page, "Enter")  # open elemental_magic -> element group frame
+            self._press_to(page, "ArrowRight", roles["ladder_group_index"])
+            self._press(page, "Enter")  # open the ladder's group -> its skill frame
             # The dock host carries the split: item list left, detail right —
             # as direct children of `.dock-pane-host`, with no anonymous layout
             # wrapper between the host and either child
@@ -1041,8 +1060,15 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             )
             self.assertIn("MP ", detail, "the detail pane names the skill cost")
             # H3: the detail pane's "next key action" is now the 威力 scale
-            # choice (not the legacy "Enter → 開啟" line). Assert a scale option.
-            self.assertIn("MP 28", detail, "the detail pane shows the 威力 scale options")
+            # choice (not the legacy "Enter → 開啟" line). Assert a scale option:
+            # the ladder's base cost doubled at 威力×2 (the seam's base cost is
+            # the same value in both modes today; read it from the seam so the
+            # pin follows the kit's skill row, not a magic number).
+            self.assertIn(
+                f"MP {roles['ladder_mp_cost'] * 2}",
+                detail,
+                "the detail pane shows the 威力 scale options",
+            )
             # H3: the skill frame's focused row carries the gold border and
             # the `dock-menu__skill--on` class (not the legacy `dock-menu-item--focused`).
             # The obsidian-gold wave (acd3790) re-pointed the gold family:
@@ -1159,7 +1185,8 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         # mastery-element group. Skills tab -> category frame -> group frame
         # -> ladder group -> skill frame -> 威力 scale step (mastery owned);
         # the scale cells are walked by key, not by a fixed press count.
-        ladder = self._roles()["ladder_key"]
+        roles = self._roles()
+        ladder = roles["ladder_key"]
         self._open_skills(page)
         self._open_category(page, "elemental_magic")
         self._focus_skill(page, "elemental_magic", ladder)
@@ -1186,8 +1213,8 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(envelope["payload"]["skill_key"], ladder)
         self.assertEqual(envelope["payload"]["scale"], 2)
         self.assertEqual(envelope["payload"]["target_ids"], [target])
-        # The scaled cast deducts 28 MP (the ladder skill costs 14 MP at 2×);
-        # the status panel reflects the true resource pool after the round.
+        # The scaled cast deducts the ladder's base cost doubled (the status
+        # panel reflects the true resource pool after the round).
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
             mp_after = page.locator(
@@ -1198,7 +1225,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             page.wait_for_timeout(250)
         mp_before_value = int(mp_before.split(" / ")[0])
         mp_after_value = int(mp_after.split(" / ")[0])
-        self.assertEqual(mp_before_value - mp_after_value, 28)
+        self.assertEqual(mp_before_value - mp_after_value, roles["ladder_mp_cost"] * 2)
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
     def test_panel_groups_skills_by_category_in_enum_order(self):
@@ -1223,18 +1250,20 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             ],
         )
         elemental = panel["skills"][0]
-        # Element sub-groups follow ELEMENT_REGISTRY declaration order
-        # (the spell's element before the ladder's), not ownership order.
+        # Element sub-groups follow the live ELEMENT_REGISTRY declaration
+        # order, not ownership order. The kit install registers its own
+        # element before the borrowed shipped row, so the seam names the
+        # mode's registry order (reversed under the synthetic install).
         self.assertEqual(
             [group["group"] for group in elemental["groups"]],
-            [roles["spell_element"], roles["ladder_element"]],
+            list(roles["element_group_order"]),
         )
-        first = elemental["groups"][0]
-        self.assertEqual(first["label"], roles["spell_element_label"])
+        spell_group = elemental["groups"][roles["spell_group_index"]]
+        self.assertEqual(spell_group["label"], roles["spell_element_label"])
         # The lineage closure adds the spell's prereq behind the requested
         # spell, so the group lists both in ownership order.
         self.assertEqual(
-            [skill["key"] for skill in first["skills"]],
+            [skill["key"] for skill in spell_group["skills"]],
             [roles["spell_key"], roles["prereq_key"]],
         )
         # A category without a group carries exactly one null-keyed sub-group.

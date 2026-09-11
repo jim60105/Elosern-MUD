@@ -296,6 +296,74 @@ def combat_modifier_condition_rule_id() -> str:
 SHIPPED_COMBAT_MODIFIER_RULE_ID = "poison_agility_penalty"
 
 
+def graft_synth_defeat_rulebook() -> None:
+    """Close the two rulebook seams the combat settlement paths read late.
+
+    ``world.rules.defeat_aftermath`` is imported lazily on the first round
+    submit and validates the frozen defeat-aftermath rulebook against the
+    live ``BUFF_DEFINITIONS``; under the t_-only install the three marker
+    buffs the shipped YAML names are unresolvable, so the import raises
+    mid-settlement and every submit answers ``internal_error``. Graft the
+    three authored marker buffs with the shipped bounds-only contract
+    (``setdefault``: a live install row is never overwritten).
+
+    ``world.rules.monster_behaviour`` resolves every monster without an
+    instance behaviour override through the frozen
+    ``tier_default_archetype`` table keyed by the shipped tier vocabulary;
+    the kit's live threat tiers KeyError there on the first monster policy
+    call. Add one archetype mapping per live kit tier key (existing keys,
+    including the shipped ones, are untouched).
+    """
+    import world.rules.monster_behaviour as _behaviour
+    from world.rules.buffs import BUFF_DEFINITIONS, BuffDefinition
+
+    BUFF_DEFINITIONS.setdefault(
+        "defeat_weak",
+        BuffDefinition(
+            key="defeat_weak",
+            duration=300,
+            tick_interval=None,
+            stacking="refresh",
+            modifiers={
+                "bounds": [
+                    {"target": "atk_phys", "ceiling": -5},
+                    {"target": "agility", "ceiling": -5},
+                    {"target": "defense", "ceiling": -5},
+                ]
+            },
+            polarity="debuff",
+        ),
+    )
+    BUFF_DEFINITIONS.setdefault(
+        "aftermath_residue",
+        BuffDefinition(
+            key="aftermath_residue",
+            duration=900,
+            tick_interval=None,
+            stacking="refresh",
+            modifiers={"bounds": [{"target": "agility", "ceiling": -2}]},
+            polarity="debuff",
+        ),
+    )
+    BUFF_DEFINITIONS.setdefault(
+        "aftermath_humiliated",
+        BuffDefinition(
+            key="aftermath_humiliated",
+            duration=600,
+            tick_interval=None,
+            stacking="refresh",
+            modifiers={"bounds": [{"target": "accuracy", "ceiling": -3}]},
+            polarity="debuff",
+        ),
+    )
+    from world.tests.synthetic_data import SYNTH_MONSTER_TIERS
+
+    archetype_defaults = _behaviour.MONSTER_BEHAVIOUR_YAML["tier_default_archetype"]
+    ladder = ("instinctive", "pack_hunter")
+    for index, tier_key in enumerate(sorted(SYNTH_MONSTER_TIERS)):
+        archetype_defaults.setdefault(tier_key, ladder[min(index, len(ladder) - 1)])
+
+
 def synth_next_entry_rank_key() -> str:
     """The rank key exactly one order above the grafted entry rank.
 
@@ -427,6 +495,27 @@ def first_live_monster_tier_key() -> str:
     from world.lore.monsters import MONSTER_TIER_REGISTRY
 
     return next(iter(MONSTER_TIER_REGISTRY))
+
+
+def lineage_rungs_for(keys) -> dict:
+    """Maximum prerequisite-edge level per edge-target over ``keys``.
+
+    ``seed_lineage_proficiency`` honours an already-stored proficiency even
+    when it leaves an edge unmet, so a grant set whose prerequisite row
+    carries a lower explicit value must raise that row through
+    ``grant_lineage``'s ``rungs``. Reads the live registry, so it works
+    under either catalog install.
+    """
+    from world.skills.registry import SKILL_REGISTRY
+
+    rungs: dict = {}
+    for key in keys:
+        definition = SKILL_REGISTRY.get(key)
+        for edge in getattr(definition, "prerequisites", ()):
+            rungs[edge.skill_key] = max(
+                rungs.get(edge.skill_key, 0), edge.min_proficiency
+            )
+    return rungs
 
 
 def synth_concept_proposal_values() -> dict:
@@ -906,9 +995,19 @@ def combat_journey_values() -> dict:
     - ``spell_element`` / ``ladder_element``: the ELEMENT_REGISTRY keys the
       sub-groups of the elemental category are named after (the spell borrows
       the shipped first element in both modes; the ladder's element differs).
-    - ``spell_element_label``: the display label the first sub-group renders.
+    - ``element_group_order``: the elemental sub-group keys in the live
+      ELEMENT_REGISTRY declaration order the panel sorts by (the borrowed
+      shipped element is grafted after the kit's own rows under the synthetic
+      install, so the pair is reversed relative to shipped mode).
+    - ``spell_group_index`` / ``ladder_group_index``: the positions of those
+      sub-groups inside the elemental category frame under that order.
+    - ``spell_element_label``: the display label the spell's sub-group renders.
+    - ``ladder_mp_cost``: the ladder's base MP cost (the detail pane's 威力
+      scale rows render the ascending multiples of this value).
     - ``enhancement_key``: the owned active of the enhancement category's
       null-keyed sub-group (NONE-shape in shipped mode).
+    - ``engage_target``: the first living combat monster in the start room
+      (the journeys' ``engage`` argument).
     """
     if synth_mode_enabled():
         return {
@@ -921,8 +1020,16 @@ def combat_journey_values() -> dict:
             "self_disabled_key": "t_rock_quietus",
             "spell_element": "fire",
             "ladder_element": "t_glowmire",
+            # The kit install registers t_glowmire first; the borrowed shipped
+            # ``fire`` row is grafted in afterwards, so the registry order is
+            # reversed relative to shipped mode.
+            "element_group_order": ("t_glowmire", "fire"),
+            "spell_group_index": 1,
+            "ladder_group_index": 0,
             "spell_element_label": "火",
+            "ladder_mp_cost": 14,
             "enhancement_key": "t_moss_veil",
+            "engage_target": SYNTH_COMBAT_MONSTERS[0][0],
         }
     return {
         "attack_key": SHIPPED_INNATE_ATTACK_KEY,
@@ -934,8 +1041,13 @@ def combat_journey_values() -> dict:
         "self_disabled_key": SHIPPED_COMBAT_DISABLED_SKILL,
         "spell_element": "fire",
         "ladder_element": "wind",
+        "element_group_order": ("fire", "wind"),
+        "spell_group_index": 0,
+        "ladder_group_index": 1,
         "spell_element_label": "火",
+        "ladder_mp_cost": 14,
         "enhancement_key": SHIPPED_COMBAT_NONE_SKILL,
+        "engage_target": SHIPPED_COMBAT_MONSTERS[0][0],
     }
 
 
