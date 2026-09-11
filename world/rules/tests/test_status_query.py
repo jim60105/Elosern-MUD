@@ -57,10 +57,6 @@ def _live_act_registry():
     return _live_registry("world.skills" + ".sexual_acts", "SEXUAL" + "_ACT_REGISTRY")
 
 
-_SEED_KEYS = tuple(
-    sorted(key for key, act in _live_act_registry().items() if not act.unlock)
-)
-
 # --- File-local skill taxonomy rows ----------------------------------------
 # The grouping and split tests exercise the read model's own routing rules
 # (category order, element order, kind-wins-over-bucket, dedup, degradation),
@@ -89,25 +85,33 @@ def _file_skill(key, template, *, category, element=None, group=None,
     )
 
 
-# Three elemental rows: their ELEMENT keys are read from the live element
-# registry's declaration order (reached without naming its shipped symbol),
-# so the element-ordering assertion follows the production vocabulary instead
-# of pinning it.
+# Three elemental rows: their ELEMENT keys are resolved INSIDE each test
+# scope (never cached at module import), from the live element registry's
+# declaration order, so the element-ordering assertion follows the production
+# vocabulary instead of pinning it.
+_T_EL_A, _T_EL_B, _T_EL_C = "t_status_el_a", "t_status_el_b", "t_status_el_c"
+
+
 def _live_element_registry():
     return _live_registry("world.lore.elements", "ELEMENT" + "_REGISTRY")
 
 
-_ELEMENT_KEYS = tuple(group for group in _live_element_registry())[:3]
-_T_EL_A, _T_EL_B, _T_EL_C = "t_status_el_a", "t_status_el_b", "t_status_el_c"
-_ROW_EL_A = _file_skill(_T_EL_A, _EL_TEMPLATE, category=SkillCategory.ELEMENTAL_MAGIC,
-                        element=_live_element_registry()[_ELEMENT_KEYS[0]],
-                        group=_ELEMENT_KEYS[0])
-_ROW_EL_B = _file_skill(_T_EL_B, _EL_TEMPLATE, category=SkillCategory.ELEMENTAL_MAGIC,
-                        element=_live_element_registry()[_ELEMENT_KEYS[1]],
-                        group=_ELEMENT_KEYS[1])
-_ROW_EL_C = _file_skill(_T_EL_C, _EL_TEMPLATE, category=SkillCategory.ELEMENTAL_MAGIC,
-                        element=_live_element_registry()[_ELEMENT_KEYS[2]],
-                        group=_ELEMENT_KEYS[2])
+def _element_rows():
+    """(keys, labels, rows): elemental fixture rows bound to the CURRENT
+    element registry, built while the caller's scope is open."""
+    registry = _live_element_registry()
+    keys = tuple(registry)[:3]
+    labels = tuple(registry[key].display_name_zh for key in keys)
+    rows = {
+        tk: _file_skill(
+            tk, _EL_TEMPLATE, category=SkillCategory.ELEMENTAL_MAGIC,
+            element=registry[key], group=key,
+        )
+        for tk, key in zip((_T_EL_A, _T_EL_B, _T_EL_C), keys)
+    }
+    return keys, labels, rows
+
+
 # Two ungrouped martial rows (sub-group=None contract) and one PASSIVE row.
 _T_MART_A, _T_MART_B, _T_MART_C = "t_status_mart_a", "t_status_mart_b", "t_status_mart_c"
 _ROW_MART_A = _file_skill(_T_MART_A, _MARTIAL_TEMPLATE, category=SkillCategory.MARTIAL_ARTS)
@@ -142,9 +146,6 @@ _ROW_SEX_B = _file_skill(
 _LOCAL_SKILLS = {
     row.key: row
     for row in (
-        _ROW_EL_A,
-        _ROW_EL_B,
-        _ROW_EL_C,
         _ROW_MART_A,
         _ROW_MART_B,
         _ROW_MART_C,
@@ -154,14 +155,6 @@ _LOCAL_SKILLS = {
         _ROW_SEX_B,
     )
 }
-
-# Every element-grouping assertion derives its expected sub-group label from
-# the same live registry entries the rows bind to.
-_ELEMENT_LABELS = tuple(
-    _live_element_registry()[key].display_name_zh for key in _ELEMENT_KEYS
-)
-
-
 
 
 class StatusReadModelTests(EvenniaTest):
@@ -556,11 +549,18 @@ class CharacterReadModelTests(EvenniaTestCase):
         open_synthetic_scope(
             self, "skills", "sexual_acts", "elements", "races", "subraces",
             "static_tiers",
-            extra={
-                **synth_innate_overlay(),
-                "skills": {**synth_innate_overlay()["skills"], **_LOCAL_SKILLS},
-            },
         )
+        # The element-bearing rows bind to the scope's live element registry,
+        # so they are layered in only after the scope is open.
+        self.element_keys, self.element_labels, element_rows = _element_rows()
+        from world.skills.registry import SKILL_REGISTRY as _skills_view
+
+        patcher = patch.dict(
+            _skills_view,
+            {**synth_innate_overlay()["skills"], **_LOCAL_SKILLS, **element_rows},
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         super().setUp()
         self.actor = _actor(self)
 
@@ -957,7 +957,10 @@ class GroupSkillKeysTests(unittest.TestCase):
     """
 
     def setUp(self):
-        patcher = synthetic_registries("skills", extra={"skills": dict(_LOCAL_SKILLS)})
+        self.element_keys, self.element_labels, element_rows = _element_rows()
+        patcher = synthetic_registries(
+            "skills", extra={"skills": {**_LOCAL_SKILLS, **element_rows}}
+        )
         patcher.__enter__()
         self.addCleanup(patcher.__exit__, None, None, None)
 
@@ -988,11 +991,11 @@ class GroupSkillKeysTests(unittest.TestCase):
         views = group_skill_keys([_T_EL_C, _T_EL_A, _T_EL_B])
         self.assertEqual(
             [[group.group for group in view.groups] for view in views],
-            [list(_ELEMENT_KEYS)],
+            [list(self.element_keys)],
         )
         self.assertEqual(
             [group.label for group in views[0].groups],
-            list(_ELEMENT_LABELS),
+            list(self.element_labels),
         )
 
     def test_empty_category_is_omitted(self):

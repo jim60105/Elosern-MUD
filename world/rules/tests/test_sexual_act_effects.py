@@ -61,7 +61,7 @@ from world.skills.sexual_acts._builder import (
     _act_family,
 )
 
-from ._combat_session_helpers import _live_registry
+from ._combat_session_helpers import _live_registry, _race_key
 
 
 def _live_act_registry():
@@ -187,7 +187,7 @@ class ResolvePartTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.humanoid = create_object(PlayerCharacter, key="resolve humanoid")
-        self.humanoid.race = "human"
+        self.humanoid.race = _race_key()
         self.humanoid.apply_race_baseline()
         self.monster = create_object(Monster, key="resolve monster")
 
@@ -397,7 +397,7 @@ class ApplyPleasureGainTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.entity = create_object(PlayerCharacter, key="pleasure gain")
-        self.entity.race = "human"
+        self.entity.race = _race_key()
         self.entity.apply_race_baseline()
 
     @covers_requirement("sexual-act-effects::the-pleasure-handler-replicates-wetness-follows-arousal-and-the-climax-phase-progression-directly-preserving-the-two-step-未達-接近-進行中-semantic")
@@ -456,7 +456,7 @@ class ClimaxExtensionTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         self.entity = create_object(PlayerCharacter, key="extension entity")
-        self.entity.race = "human"
+        self.entity.race = _race_key()
         self.entity.apply_race_baseline()
 
     @covers_requirement("sexual-act-effects::the-pleasure-effect-handler-resolves-each-participant-s-part-and-ratio-by-role-applies-gain-and-stages-a-climax-extension-when-a-進行中-participant-s-computed-gain-meets-threshold")
@@ -497,13 +497,13 @@ class _ActCastTestCase(EvenniaTest):
         self.actor = create_object(
             PlayerCharacter, key="act-actor", location=self.room1
         )
-        self.actor.race = "human"
+        self.actor.race = _race_key()
         self.actor.apply_race_baseline()
         self.actor.db.skills = {"active": [], "passive": []}
         self.target = create_object(
             PlayerCharacter, key="act-target", location=self.room1
         )
-        self.target.race = "human"
+        self.target.race = _race_key()
         self.target.apply_race_baseline()
 
     def _install(self, skill, act):
@@ -673,7 +673,7 @@ class SexualCounterHandlerTests(_ActCastTestCase):
                 key=f"act-ally-{index}",
                 location=self.room1,
             )
-            ally.race = "human"
+            ally.race = _race_key()
             ally.apply_race_baseline()
             allies.append(ally)
         (skill, act), = _act_family(

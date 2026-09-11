@@ -22,6 +22,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
+from ._combat_session_helpers import _monster_tier_key, _race_key
 from world.lore.sexual_vocab import CLIMAX_PHASE_LEVELS
 from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import RegistryIsolationMixin
@@ -348,14 +349,14 @@ class SexualResistAffinityTests(EvenniaTestCase):
         self.player = self._character("resist-player")
         self.npc = self._character("resist-npc", cls=NPC)
         self.monster = create_object(Monster, key="resist-monster")
-        self.monster.threat_tier = "low"
+        self.monster.threat_tier = _monster_tier_key()
         self.monster.apply_monster_tier()
         self.monster.db.skills = {"active": [], "passive": []}
 
     @staticmethod
     def _character(key: str, cls=PlayerCharacter):
         entity = create_object(cls, key=key)
-        entity.race = "human"
+        entity.race = _race_key()
         entity.apply_race_baseline()
         return entity
 
@@ -560,7 +561,7 @@ class SexualResistSubmissionTests(EvenniaTestCase):
     @staticmethod
     def _character(key: str, cls=PlayerCharacter):
         entity = create_object(cls, key=key)
-        entity.race = "human"
+        entity.race = _race_key()
         entity.apply_race_baseline()
         return entity
 

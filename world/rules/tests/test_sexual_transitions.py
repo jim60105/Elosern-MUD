@@ -11,6 +11,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
+from ._combat_session_helpers import _race_key
 from world.rules.rulebook.schema import Rule, load_rules
 from world.rules import sexual_transitions
 from world.rules.sexual_state import decay_tick
@@ -45,7 +46,7 @@ class FixedRng:
 class SexualTransitionTests(EvenniaTestCase):
     def _entity(self):
         entity = create_object(PlayerCharacter, key="transition target")
-        entity.race = "human"
+        entity.race = _race_key()
         entity.apply_race_baseline()
         return entity
 

@@ -54,7 +54,7 @@ from world.rules.targeting import RoomActionContext
 from world.skills.registry import TargetSpec
 from world.tests.synthetic_data import SYNTH_ACT, SYNTH_ACT_SKILL, synthetic_registries
 
-from ._combat_session_helpers import _race_key, open_synthetic_scope
+from ._combat_session_helpers import _monster_tier_key, _race_key, open_synthetic_scope
 
 # --- File-local synthetic act rows (kit act template, varied flags) -------
 
@@ -201,7 +201,7 @@ class OutOfCombatCoercionBase(EvenniaTest):
 
     def _monster(self, key="慾狼"):
         monster = create_object(Monster, key=key, location=self.room)
-        monster.threat_tier = "low"
+        monster.threat_tier = _monster_tier_key()
         monster.apply_monster_tier("floor")
         monster.traits.hp.base = 500
         monster.traits.hp.current = 500
