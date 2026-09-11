@@ -24,7 +24,12 @@ from world.lore.items import EquipmentSlot
 from world.rules import equipment_effects
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.tests._equipment_rulebook_probes import unique_rule
-from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY, SYNTH_ITEMS, make_item
+from world.tests.synthetic_data import (
+    SYNTH_GUILD_BRANCH_KEY,
+    SYNTH_ITEMS,
+    make_item,
+    synthetic_registries,
+)
 from world.quests.runtime import QuestNotFound, QuestState
 from world.rules.clock import AdvanceSource, DaypartError
 from world.rules.combat_session import CombatSessionError, SessionReason
@@ -421,14 +426,11 @@ class EconomyCommandBranchTests(TestCase):
         )
         command = _command(CmdInventory)
         command.caller.db.wallet = 0
+        scope = synthetic_registries("items", extra={"items": {gear.key: gear}})
         with patch(
             "commands.economy.list_items",
             return_value=[gear.key, "t_ember_spray"],
-        ), patch.dict(
-            equipment_effects.ITEM_REGISTRY,
-            {gear.key: gear, "t_ember_spray": SYNTH_ITEMS["t_ember_spray"]},
-            clear=True,
-        ), patch.dict(
+        ), scope, patch.dict(
             equipment_effects.EQUIPMENT_EFFECT_RULES, {modifier: authored}
         ):
             command.func()
@@ -741,33 +743,31 @@ class DeliveryCommandBranchTests(TestCase):
         deliver_rule.assert_not_called()
 
     def test_display_name_and_raw_key_both_delegate(self):
-        for raw in ("熾焰噴射劑", "t_ember_spray"):
+        spray = SYNTH_ITEMS["t_ember_spray"]
+        for raw in (spray.display_name_zh, spray.key):
             command = _command(CmdDeliver, f"灰婆婆 {raw}")
             recipient = object()
             command.caller.search.return_value = [recipient]
             outcome = DeliveryOutcome(False, "no_active_delivery", "這裡沒有需要交付的任務物品。")
+            scope = synthetic_registries("items")
             with patch(
                 "commands.quest_delivery.deliver_quest_item", return_value=outcome
-            ) as deliver_rule, patch(
-                "commands.quest_delivery.ITEM_REGISTRY",
-                {"t_ember_spray": SimpleNamespace(display_name_zh="熾焰噴射劑")},
-            ):
+            ) as deliver_rule, scope:
                 command.func()
             deliver_rule.assert_called_once_with(
-                command.caller, recipient, "t_ember_spray"
+                command.caller, recipient, spray.key
             )
             command.caller.msg.assert_called_with(outcome.message)
 
     def test_outcome_message_is_rendered_verbatim(self):
-        command = _command(CmdDeliver, "灰婆婆 熾焰噴射劑")
+        spray = SYNTH_ITEMS["t_ember_spray"]
+        command = _command(CmdDeliver, f"灰婆婆 {spray.display_name_zh}")
         command.caller.search.return_value = [object()]
         outcome = DeliveryOutcome(True, None, "你把熾焰噴射劑交給了灰婆婆。")
+        scope = synthetic_registries("items")
         with patch(
             "commands.quest_delivery.deliver_quest_item", return_value=outcome
-        ), patch(
-            "commands.quest_delivery.ITEM_REGISTRY",
-            {"t_ember_spray": SimpleNamespace(display_name_zh="熾焰噴射劑")},
-        ):
+        ), scope:
             command.func()
         command.caller.msg.assert_called_with("你把熾焰噴射劑交給了灰婆婆。")
 
