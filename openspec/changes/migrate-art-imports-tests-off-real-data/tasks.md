@@ -45,7 +45,7 @@ Baseline (task 1.1): 315 findings across the 22 flagged manifest files
 ## 6. Migrate group 4
 
 - [x] 6.1 Migrate `world/imports/tests/test_schema.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 6.2 Migrate `world/imports/tests/test_validation_semantics.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 6.2 Migrate `world/imports/tests/test_validation_semantics.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 6.3 Migrate `world/prompts/tests/test_degrade.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 6.4 Migrate `world/prompts/tests/test_loader.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 6.5 Migrate `world/prompts/tests/test_verbatim_shipment.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
