@@ -64,7 +64,7 @@ describe("CharacterStatusDrawer breakdown chips", () => {
           layers: [
             { source: "skill", name: "防衛本能（2/3）", kind: "mult", amount: 1.5 },
             { source: "condition", name: "護盾", kind: "flat", amount: 4 },
-            { source: "equipment", name: "騎士全套板甲", kind: "flat", amount: -2 },
+            { source: "equipment", name: "壁衛板甲", kind: "flat", amount: -2 },
           ],
         }),
       ]),
@@ -77,7 +77,7 @@ describe("CharacterStatusDrawer breakdown chips", () => {
     expect(chips[0].attributes("data-source")).toBe("skill");
     expect(chips[1].text()).toBe("護盾+4");
     expect(chips[1].attributes("data-source")).toBe("condition");
-    expect(chips[2].text()).toBe("騎士全套板甲−2");
+    expect(chips[2].text()).toBe("壁衛板甲−2");
     expect(chips[2].attributes("data-source")).toBe("equipment");
     // The value line keeps the existing static text (total-display field).
     expect(
@@ -156,13 +156,13 @@ describe("CharacterStatusDrawer breakdown chips", () => {
       current: 231,
       max: STATUS_PANEL_SAMPLE.resources.hp.maximum,
       effective: STATUS_PANEL_SAMPLE.resources.hp.maximum,
-      layers: [{ source: "equipment", name: "騎士全套板甲", kind: "flat", amount: 15 }],
+      layers: [{ source: "equipment", name: "壁衛板甲", kind: "flat", amount: 15 }],
     });
     wrapper = mountDrawer({
       character: characterWith(CHARACTER_PANEL_SAMPLE.traits.map((row) => (row.key === "hp" ? hpTrait : row))),
     });
     const chip = wrapper.get('[data-testid="character-status-drawer__layer--hp--0"]');
-    expect(chip.text()).toBe("騎士全套板甲+15");
+    expect(chip.text()).toBe("壁衛板甲+15");
     // The existing gauge text stays byte-identical (chips never replace it).
     expect(
       wrapper.get('[data-testid="character-status-drawer__vital-value--hp"]').text(),
@@ -267,7 +267,7 @@ describe("EquipmentDoll adjustment rendering", () => {
         character: {
           ...CHARACTER_PANEL_SAMPLE,
           equipment: [
-            { slot: "armor", item_key: "leather_armor", display_name: "皮甲", adjustment: "防禦 +3" },
+            { slot: "armor", item_key: "t_hide_vest", display_name: "革製護身衣", adjustment: "防禦 +3" },
             { slot: "armor", item_key: "spare_mail", display_name: "備用鏈甲", adjustment: "防禦 +5" },
             { slot: "mount", item_key: "mount_ash", display_name: "灰驛", adjustment: "敏捷 +10%" },
           ],
@@ -310,12 +310,30 @@ describe("InventoryPanel joined adjustment", () => {
       inventory: {
         ...SERVICES_PANEL_SAMPLE.inventory,
         rows: [
-          { item_key: "knight_platemail", display_name: "騎士全套板甲", held: 1, equipped: true, presentation: null, action: null },
+          { item_key: "t_bulwark_plate", display_name: "壁衛板甲", held: 1, equipped: true, presentation: null, action: null },
         ],
       },
     };
-    mountPanel({ services });
-    await hover("knight_platemail");
+    // The character equipment row shares the synthetic key so the join is
+    // exercised on test-owned rows (the shipped-name pair carried no behavior).
+    mountPanel({
+      services,
+      character: {
+        ...CHARACTER_PANEL_SAMPLE,
+        equipment: [
+          {
+            slot: "armor",
+            item_key: "t_bulwark_plate",
+            display_name: "壁衛板甲",
+            quantity: 1,
+            category_label: "鎧甲",
+            condition_label: "良好",
+            adjustment: "攻擊 −2｜防禦 +8｜敏捷 −10%｜生命上限 +15",
+          },
+        ],
+      },
+    });
+    await hover("t_bulwark_plate");
     expect(
       wrapper.get('[data-testid="inventory-panel__inspector-adjustment"]').text(),
     ).toBe("攻擊 −2｜防禦 +8｜敏捷 −10%｜生命上限 +15");
@@ -356,7 +374,7 @@ describe("InventoryPanel joined adjustment", () => {
       inventory: {
         ...SERVICES_PANEL_SAMPLE.inventory,
         rows: [
-          { item_key: "knight_platemail", display_name: "騎士全套板甲", held: 1, equipped: true, presentation: null, action: null },
+          { item_key: "t_bulwark_plate", display_name: "壁衛板甲", held: 1, equipped: true, presentation: null, action: null },
         ],
       },
     };
@@ -364,7 +382,7 @@ describe("InventoryPanel joined adjustment", () => {
       services,
       character: { schema_version: 5, available: false, kind: "character", reason: { code: "no_puppet", message: "你已離開角色" } },
     });
-    await hover("knight_platemail");
+    await hover("t_bulwark_plate");
     expect(wrapper.find('[data-testid="inventory-panel__inspector-adjustment"]').exists()).toBe(false);
   });
 
@@ -375,8 +393,8 @@ describe("InventoryPanel joined adjustment", () => {
       [
         {
           slot: "body",
-          item_key: "knight_platemail",
-          display_name: "騎士全套板甲",
+          item_key: "t_bulwark_plate",
+          display_name: "壁衛板甲",
           quantity: 1,
           category_label: "鎧甲",
           condition_label: "良好",
@@ -384,8 +402,8 @@ describe("InventoryPanel joined adjustment", () => {
         },
         {
           slot: "cloak",
-          item_key: "knight_platemail",
-          display_name: "騎士全套板甲",
+          item_key: "t_bulwark_plate",
+          display_name: "壁衛板甲",
           quantity: 1,
           category_label: "鎧甲",
           condition_label: "良好",
@@ -398,12 +416,12 @@ describe("InventoryPanel joined adjustment", () => {
       inventory: {
         ...SERVICES_PANEL_SAMPLE.inventory,
         rows: [
-          { item_key: "knight_platemail", display_name: "騎士全套板甲", held: 1, equipped: true, presentation: null, action: null },
+          { item_key: "t_bulwark_plate", display_name: "壁衛板甲", held: 1, equipped: true, presentation: null, action: null },
         ],
       },
     };
     mountPanel({ services, character: duplicate });
-    await hover("knight_platemail");
+    await hover("t_bulwark_plate");
     expect(
       wrapper.get('[data-testid="inventory-panel__inspector-adjustment"]').text(),
     ).toBe("第一條");

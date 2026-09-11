@@ -8,16 +8,16 @@
 ## 3. Migrate group 1
 
 - [x] 3.1 Migrate `web/static/webclient/js/tests/art_panel.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.2 Migrate `web/static/webclient/js/tests/character_menu.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.3 Migrate `web/static/webclient/js/tests/combat_menu.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.4 Migrate `web/static/webclient/js/tests/command_echo.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.5 Migrate `web/static/webclient/js/tests/creation_menu.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.2 Migrate `web/static/webclient/js/tests/character_menu.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.3 Migrate `web/static/webclient/js/tests/combat_menu.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.4 Migrate `web/static/webclient/js/tests/command_echo.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.5 Migrate `web/static/webclient/js/tests/creation_menu.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 3.6 Migrate `web/static/webclient/js/tests/exploration_menu.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
 ## 4. Migrate group 2
 
-- [ ] 4.1 Migrate `web/static/webclient/js/tests/hud_dock_menus.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.2 Migrate `web/static/webclient/js/tests/protocol.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.1 Migrate `web/static/webclient/js/tests/hud_dock_menus.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.2 Migrate `web/static/webclient/js/tests/protocol.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 4.3 Migrate `web/static/webclient/js/tests/service_menu.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 4.4 Migrate `web/webclient-app/tests/data/breakdown_rendering.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 4.5 Migrate `web/webclient-app/tests/data/equipment_doll.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only

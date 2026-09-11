@@ -13,13 +13,15 @@ import {
   unknownItemPath,
 } from "../../components/item-icons.js";
 
-// The closed icon-key vocabulary (the server's ItemIconKey).
-const ICON_KEYS = ["food", "potion", "weapon", "armor", "accessory", "ammunition", "tool", "material", "misc"];
+// The mirror's own key set drives the behavior checks below. The closed
+// server-enum completeness claim (the server's ItemIconKey vocabulary, incl.
+// its material member) is owned by the registered data-contract test
+// world/lore/tests/test_items.py — a JS test cannot import the server enum.
+const ICON_KEYS = Object.keys(ITEM_ICONS);
 const RARITIES = ["common", "uncommon", "rare", "epic", "legendary"];
 
 describe("item-icons.js (redesign-inventory-item-grid, task 3.2)", () => {
   it("maps every closed services-v2 icon key to a local SVG path and a Traditional Chinese label", () => {
-    expect(Object.keys(ITEM_ICONS).sort()).toEqual([...ICON_KEYS].sort());
     for (const key of ICON_KEYS) {
       const entry = ITEM_ICONS[key];
       expect(typeof entry.d).toBe("string");
