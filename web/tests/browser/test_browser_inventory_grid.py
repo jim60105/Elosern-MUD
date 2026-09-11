@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
 
+from web.browser_support.browser_fixtures_data import kind_word, rarity_word, store_fixture_values
+
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
@@ -89,11 +91,13 @@ class InventoryGridJourneys(ServicesBrowserTest):
 
         # The committed panel is the source of truth: two held item keys,
         # with exact held counts and committed presentation metadata.
+        STORE = store_fixture_values()
+        potion, staple = STORE["potion_key"], STORE["staple_key"]
         committed = {row["item_key"]: row for row in panel["inventory"]["rows"]}
-        self.assertEqual(committed["meal"]["held"], 2)
-        self.assertEqual(committed["healing_potion"]["held"], 1)
-        self.assertEqual(committed["meal"]["presentation"]["rarity"], "common")
-        self.assertEqual(committed["healing_potion"]["presentation"]["rarity"], "rare")
+        self.assertEqual(committed[staple]["held"], 2)
+        self.assertEqual(committed[potion]["held"], 1)
+        self.assertEqual(committed[staple]["presentation"]["rarity"], STORE["staple_rarity"])
+        self.assertEqual(committed[potion]["presentation"]["rarity"], STORE["potion_rarity"])
         self.assertNotIn("total", panel["inventory"])
 
         # The grid renders exactly the committed rows: one tile per committed
@@ -108,10 +112,9 @@ class InventoryGridJourneys(ServicesBrowserTest):
         )
         self.assertEqual(
             sorted(tiles),
-            [
-                "inventory-panel__tile--healing_potion",
-                "inventory-panel__tile--meal",
-            ],
+            sorted(
+                f"inventory-panel__tile--{key}" for key in (potion, staple)
+            ),
         )
         rarities = page.evaluate(
             """() => {
@@ -120,16 +123,22 @@ class InventoryGridJourneys(ServicesBrowserTest):
                 ).map((t) => t.getAttribute("data-rarity"));
             }"""
         )
-        self.assertEqual(sorted(rarities), ["common", "rare"])
+        self.assertEqual(
+            sorted(rarities),
+            sorted([STORE["potion_rarity"], STORE["staple_rarity"]]),
+        )
 
         # The lower-corner held count is the committed ``held`` value, never
         # a fabricated total.
         counts = page.evaluate(
-            """() => {
-                const meal = document.querySelector('[data-testid="inventory-panel__count--meal"]');
-                const potion = document.querySelector('[data-testid="inventory-panel__count--healing_potion"]');
-                return [meal.textContent, potion.textContent];
-            }"""
+            """({staple, potion}) => {
+                const Staple = document.querySelector(
+                    `[data-testid="inventory-panel__count--${staple}"]`);
+                const Potion = document.querySelector(
+                    `[data-testid="inventory-panel__count--${potion}"]`);
+                return [Staple.textContent, Potion.textContent];
+            }""",
+            {"staple": staple, "potion": potion},
         )
         self.assertEqual(counts, ["2", "1"])
 
@@ -150,34 +159,35 @@ class InventoryGridJourneys(ServicesBrowserTest):
         # focused node was replaced before Vue's @focus listener ran). The
         # bound attribute is then awaited deterministically instead of a
         # fixed sleep.
-        page.locator('[data-testid="inventory-panel__tile--healing_potion"]').focus()
+        potion_tile = f'[data-testid="inventory-panel__tile--{potion}"]'
+        page.locator(potion_tile).focus()
         page.wait_for_function(
-            "() => document.querySelector('[data-testid=\"inventory-panel__tile--healing_potion\"]')"
+            f"() => document.querySelector('[data-testid=\"inventory-panel__tile--{potion}\"]')"
             ".getAttribute('aria-describedby') === 'inventory-panel-inspector'",
             timeout=10000,
         )
         describedby = page.evaluate(
-            """() => document.querySelector('[data-testid="inventory-panel__tile--healing_potion"]').getAttribute("aria-describedby")"""
+            f"""() => document.querySelector('[data-testid="inventory-panel__tile--{potion}"]').getAttribute("aria-describedby")"""
         )
         self.assertEqual(describedby, "inventory-panel-inspector")
         name = page.evaluate(
             """() => document.querySelector('[data-testid="inventory-panel__inspector-name"]').textContent"""
         )
-        self.assertEqual(name, "治療藥水")
+        self.assertEqual(name, STORE["potion_display"])
         rarity = page.evaluate(
             """() => {
                 const el = document.querySelector('[data-testid="inventory-panel__inspector-rarity"]');
                 return el ? el.textContent : null;
             }"""
         )
-        self.assertEqual(rarity, "稀有")
+        self.assertEqual(rarity, rarity_word(STORE["potion_rarity"]))
         kind = page.evaluate(
             """() => {
                 const el = document.querySelector('[data-testid="inventory-panel__inspector-kind"]');
                 return el ? el.textContent : null;
             }"""
         )
-        self.assertEqual(kind, "藥水")
+        self.assertEqual(kind, kind_word(STORE["potion_kind"]))
         held = page.evaluate(
             """() => document.querySelector('[data-testid="inventory-panel__inspector-held"]').textContent"""
         )
@@ -190,11 +200,13 @@ class InventoryGridJourneys(ServicesBrowserTest):
         # Presentational only: neither hover/focus nor a tile click dispatches
         # a ui_action (no use/equip is ever offered from the bag).
         page.evaluate(
-            """() => {
-                const tile = document.querySelector('[data-testid="inventory-panel__tile--meal"]');
+            """({staple}) => {
+                const tile = document.querySelector(
+                    `[data-testid="inventory-panel__tile--${staple}"]`);
                 tile.click();
                 return true;
-            }"""
+            }""",
+            {"staple": staple},
         )
         page.wait_for_timeout(120)
         self.assertEqual(sent_action_count(page), 0)
@@ -225,10 +237,7 @@ class InventoryGridJourneys(ServicesBrowserTest):
             )
         self.assertEqual(
             sorted(visited),
-            [
-                "inventory-panel__tile--healing_potion",
-                "inventory-panel__tile--meal",
-            ],
+            sorted(f"inventory-panel__tile--{key}" for key in (potion, staple)),
         )
         focused_state = page.evaluate(
             """() => ({
