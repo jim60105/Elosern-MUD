@@ -151,20 +151,29 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         ).inner_text()
         self.assertIn("你目前所在的位置", legend_text)
 
-    def _repin_at_south_gate(self, page) -> None:
-        """Deterministically pin the shared character back at 南門 (2, 0).
+    def _repin_at_home(self, page) -> None:
+        """Deterministically pin the shared character back at the fixture's
+        home grid room (capital map, slot (2, 0) — the bootstrap anchor the
+        minimap fixture starts its knowledge walk from).
 
         Earlier journeys may have submitted one ``explore.move``, leaving the
         character on another grid node when this journey starts. The seeded
-        account is a superuser, so ``teleport`` re-pins the character without
-        traversing a costed exit; the panel refresh rides ``at_post_move``.
+        account is a superuser, so the XYZ-grid ``teleport`` re-pins the
+        character without traversing a costed exit; the panel refresh rides
+        ``at_post_move``. The coordinate form is used instead of a room name:
+        the map key comes from the boot mode's own grid catalog, and no ORM
+        or registry read happens in the journey process (the server owns
+        the boot-mode catalogs).
         """
-        self._send(page, "teleport 南門")
+        from world.quests.definitions import KNOWN_GRID_MAP_KEYS
+
+        z_map = sorted(KNOWN_GRID_MAP_KEYS)[0]
+        self._send(page, f"teleport (2, 0, {z_map})")
         wait_for_store_state(
             page,
             lambda s: (
                 ((s.get("panels") or {}).get("local_map") or {}).get("current_node")
-                == "grid:capital_altoria:2:0"
+                == f"grid:{z_map}:2:0"
             ),
             timeout=15000,
         )
@@ -172,6 +181,12 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
     @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
     def test_remembered_remote_node_presentation_and_accessibility(self):
         page = self.logged_in_page()
+        # Deterministic start: earlier journeys may have moved the shared
+        # character onto a node whose field of view covers the fixture's
+        # remembered gateway (which would present it as an in-range node,
+        # not an edge marker). Re-pin at the fixture's home room, whose
+        # view never covers the recorded gateway in either boot mode.
+        self._repin_at_home(page)
         self._wait_local_map_available(page)
         # On the lattice variant (grid/wilderness), remembered places render as
         # named edge markers and no remembered list is rendered beneath the map.
@@ -285,28 +300,60 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         "webclient-local-map::local-map-is-a-read-only-version-1-presentation-panel"
     )
     def test_gate_room_renders_its_own_approach_cell_and_no_footprint(self):
-        # Deterministic start: an earlier journey may have submitted one
-        # explore.move, so walk back to 南門 first. Its provisioned gate exit
-        # (key 荒野) is the registry gate whose face is "s", so the grid
-        # payload carries that gate's OWN approach cell (60, 97) -- never the
-        # 北門 gate's approach cell -- and the anchor footprint
-        # (x=58..62, y=98..102) never appears as a walkable wild node.
+        # Deterministic start: re-pin at the fixture's home room, then stand
+        # on the remembered gateway's own grid room — the boot mode's
+        # registry gate (kit gate room under synth, the shipped install's
+        # south-gate entry otherwise), whose identity is read from the
+        # presented payload rather than from shipped coordinates. There, the
+        # provisioned gate exit renders its OWN approach cell as a
+        # traversable wild node — never another registered gate's — and no
+        # anchor-footprint cell ever appears as a walkable wild node.
+        from world.maps.wilderness_provider import WILDERNESS_NAME
+
         page = self.logged_in_page()
-        self._repin_at_south_gate(page)
+        self._repin_at_home(page)
+        panel = self._wait_local_map_available(page)
+        remembered = [
+            node for node in panel["nodes"] if node["visibility"] == "remembered"
+        ]
+        self.assertEqual(len(remembered), 1, "the fixture records exactly one gateway")
+        gate_room = remembered[0]
+        self.assertTrue(gate_room["id"].startswith("grid:"))
+        z_map = gate_room["id"].split(":")[1]
+        self._send(page, f"teleport ({gate_room['x']}, {gate_room['y']}, {z_map})")
+        wait_for_store_state(
+            page,
+            lambda s: (
+                ((s.get("panels") or {}).get("local_map") or {}).get("current_node")
+                == gate_room["id"]
+            ),
+            timeout=20000,
+        )
         panel = self._wait_local_map_available(page)
         self.assertEqual(panel["layer"], "grid")
-        self.assertEqual(panel["current_node"], "grid:capital_altoria:2:0")
-        ids = {node["id"] for node in panel["nodes"]}
-        self.assertIn("wild:elosern:60:97", ids)
-        self.assertNotIn("wild:elosern:60:103", ids)
-        footprint = {
-            f"wild:elosern:{x}:{y}"
-            for x in range(58, 63)
-            for y in range(98, 103)
-        }
-        self.assertEqual(ids & footprint, set())
+        self.assertEqual(panel["current_node"], gate_room["id"])
+        # The gate's own approach cell is presented as a wild node whose
+        # traversal action targets it (the both-directions contract's grid
+        # side: the node the presented action lands on is the approach cell).
+        gate_nodes = [
+            node
+            for node in panel["nodes"]
+            if node["id"].startswith(f"wild:{WILDERNESS_NAME}:")
+        ]
+        self.assertEqual(len(gate_nodes), 1, "exactly this room's registered gate renders")
+        gate = gate_nodes[0]
+        self.assertIsNotNone(gate["action"], "the seeded character may traverse the gate")
+        self.assertEqual(gate["action"]["destination"], gate["id"])
+        # No anchor-footprint cell ever renders as a walkable wild node at
+        # the grid layer: the footprint is walkable wilderness ground, so it
+        # only ever appears once traversed (layer wilderness), never as a
+        # grid-layer candidate.
+        grid_layer_wild = [
+            node["id"] for node in panel["nodes"] if node["id"].startswith("wild:")
+        ]
+        self.assertEqual(grid_layer_wild, [gate["id"]])
         # DOM truth follows the payload: the gate node carries its own hook.
-        gate_node = page.locator('[data-testid="local-map__node--wild:elosern:60:97"]')
+        gate_node = page.locator(f'[data-testid="local-map__node--{gate["id"]}"]')
         self.assertEqual(gate_node.count(), 1)
 
     @covers_requirement("webclient-local-map::the-browser-minimap-renders-states-without-relying-on-color-alone")
@@ -353,6 +400,11 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 from .browser_helpers import login_and_open
 
                 login_and_open(page, self.webclient_url, self.base_url)
+                # Deterministic geometry: re-pin at the fixture's home room
+                # so the drawn extent (and its scaled cell budget) is the
+                # fixture's own view in either boot mode, whatever an
+                # earlier journey moved the shared character onto.
+                self._repin_at_home(page)
                 self._wait_local_map_available(page)
                 wait_for_store_state(
                     page,
@@ -593,7 +645,12 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 from .browser_helpers import login_and_open
 
                 login_and_open(page, self.webclient_url, self.base_url)
-                self._wait_local_map_available(page)
+                # Deterministic start: the island measures its edge markers
+                # from the fixture's home view — the remembered gateway only
+                # presents as a marker from a room whose field of view omits
+                # it (earlier journeys may have moved the shared character
+                # onto one that draws it in range).
+                self._repin_at_home(page)
                 page.wait_for_selector('[data-testid="local-map__lattice"]', timeout=30000)
                 # The seeded grid payload carries a remembered gateway, so the
                 # island draws at least one named edge marker to measure.
@@ -678,6 +735,10 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         boxes).
         """
         page = self.logged_in_page()
+        # The mirror mirrors the home view's remembered gateway marker (see
+        # the remembered-node journey): re-pin so the marker exists no
+        # matter where an earlier journey left the shared character.
+        self._repin_at_home(page)
         self._wait_local_map_available(page)
         page.wait_for_selector('[data-testid="local-map-edge-markers-mirror"]', timeout=30000)
 
