@@ -12,7 +12,7 @@
 - [x] 3.3 Migrate `commands/tests/test_character_creation.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 3.4 Migrate `commands/tests/test_combat_actions.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 3.5 Migrate `commands/tests/test_command_branch_behaviour.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.6 Migrate `commands/tests/test_guild_economy_commands.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.6 Migrate `commands/tests/test_guild_economy_commands.py` (tier A): kit synthetic branch/shop/board rows via the shared guild probe helpers; trade and claim amounts derive from live bands
 
 ## 4. Migrate group 2
 

@@ -1,6 +1,20 @@
-"""Command-level tests for guild, combat, and economy commands (tasks 11.1-11.4)."""
+"""Command-level tests for guild, combat, and economy commands (tasks 11.1-11.4).
+
+Data-independent (migrate-commands-tests-off-real-data): hosts carry the kit
+synthetic guild branch and the kit shop identity, the board offer under test
+is a locally registered row, and every trade price derives from the live
+price band through the shared guild/shop probe helpers — no shipped service
+identity or shipped price is named.
+"""
 
 from tools.spec_traceability import covers_requirement
+
+# Preimport the import-time-validated equipment rulebook BEFORE the synthetic
+# catalogs below can be scoped (world.rules.equipment_effects validates the
+# shipped item registry once at first import; importing it at module import —
+# the established idiom in world/rules/tests — keeps that validation on the
+# shipped rulebook instead of the scoped kit rows).
+import world.rules.equipment_effects  # noqa: F401
 
 from unittest.mock import patch
 
@@ -27,18 +41,68 @@ from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.runtime import fulfill_record, read_records
 from world.quests.tests._fixtures import QuestRegistryIsolation, quest, register
 from world.quests.transitions import apply_quest_log_replacement
-from world.rules.guild_config import CATALOG, load_catalog_into_cache
-from world.rules.guild_offers import GUILD_OFFER_REGISTRY, register_guild_offer
+from world.rules.guild_offers import (
+    GUILD_OFFER_REGISTRY,
+    GuildQuestOffer,
+    QuestReward,
+    register_guild_offer,
+)
 from world.rules.surfaces import write_counter_trait
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.rules.tests._guild_service_probes import (
+    install_synthetic_catalog,
+    price_band,
+    rank_reward_band,
+    synth_catalog,
+    synth_offer_rule,
+    synth_shop_config,
+    synthetic_branch_key,
+)
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.skills.equipment import list_items
+from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY, SYNTH_SHOPS
+
+# Board identity is the kit synthetic branch, the store is the kit synthetic
+# shop, and the traded goods are kit rows — no shipped identity is named.
+BRANCH = SYNTH_GUILD_BRANCH_KEY
+SHOP_KEY = SYNTH_SHOPS["t_mossgate_stall"].key
+_MEAL = "t_huskapple"
+_GOODS = ("t_ember_spray", "t_iron_fang", _MEAL)
+
+# The kit meal's trade numbers derive from the live price band the synthetic
+# offer rule builds on (buy = band floor + 2, sell = band floor). Read inside
+# an open items/prices scope (setUp), never at module import.
+
+
+# Locally authored board reward for the shared onboarding hunt: copper sits on
+# the live F-rank reward band's floor so offer validation passes while the
+# asserted claim amount is this file's own number.
+
+
+def _turnin_copper() -> int:
+    """The F-rank reward band's floor (live registry, read inside a scope)."""
+    return rank_reward_band("F")[0]
+
+
+def _register_board_offer(definition_key: str) -> None:
+    """Register one board offer for the kit branch (restored by isolation)."""
+    register_guild_offer(
+        GuildQuestOffer(
+            definition_key=definition_key,
+            issuer_branch_key=BRANCH,
+            reward=QuestReward(copper=_turnin_copper(), items=(), merit=25),
+        )
+    )
 
 
 class CommandIsolation(BattlefieldIsolation, QuestRegistryIsolation):
     def setUp(self):
         super().setUp()
+        # The shipped affinity rulebook validates its cap-break quest key
+        # against the live definition registry whenever it (re)loads, so the
+        # catalog definitions stay registered (no shipped literal in this
+        # file; the board rows below are locally registered either way).
         register_catalog()
-        load_catalog_into_cache()
         self._previous_offers = list(GUILD_OFFER_REGISTRY.items())
 
     def tearDown(self):
@@ -49,18 +113,17 @@ class CommandIsolation(BattlefieldIsolation, QuestRegistryIsolation):
 
 class GuildCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
+        open_synthetic_scope(self, "races", "static_tiers", "subraces", "starting_kits", "items", "prices", "elements", "guild_branches")
         super().setUp()
         self.hall = create_object(Room, key="guild hall")
         self.char1.location = self.hall
-        self.char1.race = "human"
+        self.char1.race = "t_duskmari"
         self.char1.apply_race_baseline()
         self.staff = create_object(NPC, key="staff", location=self.hall)
         self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
         )
-        from world.rules.guild_config import register_catalog_offers
-
-        register_catalog_offers(load_catalog_into_cache())
+        _register_board_offer("introductory_hunt")
 
     def test_register_list_accept_turnin_flow(self):
         self.call(CmdGuildRegister(), "", "你已註冊為冒險者")
@@ -78,12 +141,15 @@ class GuildCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("獲得異名：南門新客", output)
         # The retired onboarding welcome must never resurface on a claim.
         self.assertNotIn("你的第一個日子在這裡圓滿結束", output)
+        floor = _turnin_copper()
+        # The claim pays exactly the locally authored board reward.
+        self.assertEqual(self.char1.db.wallet, floor)
         # A later distinct successful claim pays normally and stays title-silent.
         from world.quests.runtime import accept_quest
         from world.rules.quest_issuance import guild_issuer_key
 
         second = accept_quest(
-            self.char1, "introductory_hunt", guild_issuer_key("guild_branch_altoria")
+            self.char1, "introductory_hunt", guild_issuer_key(BRANCH)
         )
         second_completed = fulfill_record(
             second, QUEST_DEFINITION_REGISTRY["introductory_hunt"]
@@ -100,6 +166,7 @@ class GuildCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
             CmdGuildTurnIn(), second_completed.quest_id, "你回報了任務"
         )
         self.assertNotIn("獲得異名", output)
+        self.assertEqual(self.char1.db.wallet, floor * 2)
 
     def test_absent_staff_rejects(self):
         self.char1.location = create_object(Room, key="empty")
@@ -123,32 +190,31 @@ class GuildCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def test_ambiguous_staff_rejects(self):
         second = create_object(NPC, key="staff2", location=self.hall)
         second.components.add(
-            GuildStaff.create(second, service_id="staff2", branch_key="guild_branch_altoria")
+            GuildStaff.create(second, service_id="staff2", branch_key=BRANCH)
         )
         self.call(CmdGuildRegister(), "", "這裡沒有公會服務人員")
 
 
 class QuestDetailCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
+        open_synthetic_scope(self, "races", "static_tiers", "subraces", "starting_kits", "items", "prices", "elements", "guild_branches")
         super().setUp()
         self.hall = create_object(Room, key="guild hall")
         self.char1.location = self.hall
-        self.char1.race = "human"
+        self.char1.race = "t_duskmari"
         self.char1.apply_race_baseline()
         self.staff = create_object(NPC, key="staff", location=self.hall)
         self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
         )
-        from world.rules.guild_config import register_catalog_offers
-
-        register_catalog_offers(load_catalog_into_cache())
+        _register_board_offer("introductory_hunt")
         from world.quests.runtime import accept_quest
         from world.rules.quest_issuance import guild_issuer_key
         from world.rules.guild import register_adventurer
 
         register_adventurer(self.char1, self.staff)
         self.record = accept_quest(
-            self.char1, "introductory_hunt", guild_issuer_key("guild_branch_altoria")
+            self.char1, "introductory_hunt", guild_issuer_key(BRANCH)
         )
 
     @covers_requirement(
@@ -162,7 +228,7 @@ class QuestDetailCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evennia
         self.assertIn("進行中", output)
         self.assertIn("討伐 1 隻低階魔物", output)
         self.assertIn("進度：0 / 1", output)
-        self.assertIn("獎勵：銅 50", output)
+        self.assertIn(f"獎勵：銅 {_turnin_copper()}", output)
 
     @covers_requirement("quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail")
     def test_show_unknown_id_is_rejected_without_state_change(self):
@@ -192,16 +258,14 @@ class QuestDetailCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evennia
         from world.quests.runtime import accept_quest
         from world.rules.quest_issuance import guild_issuer_key
 
-        record = accept_quest(
-            player, "introductory_hunt", guild_issuer_key("guild_branch_altoria")
-        )
+        record = accept_quest(player, "introductory_hunt", guild_issuer_key(BRANCH))
         output = self.call(CmdGuildShow(), record.quest_id, caller=player)
         self.assertIn("討伐低階魔物", output)
         self.assertNotIn("獎勵", output)
 
     @covers_requirement("quest-detail-view::a-player-can-inspect-one-own-quest-s-full-detail")
     def test_show_malformed_registration_errors(self):
-        self.char1.db.guild_registration = {"branch_key": "guild_branch_altoria"}
+        self.char1.db.guild_registration = {"branch_key": BRANCH}
         self.char1.location = create_object(Room, key="empty")
         output = self.call(CmdGuildShow(), self.record.quest_id, caller=self.char1)
         self.assertIn("無法顯示任務詳情", output)
@@ -252,10 +316,11 @@ class QuestDetailCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evennia
 
 class CombatCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
+        open_synthetic_scope(self, "races", "static_tiers", "subraces", "starting_kits", "items", "prices", "elements")
         super().setUp()
         self.arena = create_object(Room, key="arena")
         self.char1.location = self.arena
-        self.char1.race = "human"
+        self.char1.race = "t_duskmari"
         self.char1.apply_race_baseline()
         self.monster = create_object(Monster, key="goblin", location=self.arena)
         self.monster.threat_tier = "low"
@@ -268,33 +333,42 @@ class CombatCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest)
 
 class EconomyCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
+        open_synthetic_scope(self, "races", "static_tiers", "subraces", "starting_kits", "items", "prices", "elements", "shops")
         super().setUp()
+        # The kit shop trades the kit goods under band-derived offer rules.
+        install_synthetic_catalog(
+            self,
+            synth_catalog(
+                shop_configs={
+                    SHOP_KEY: synth_shop_config(SHOP_KEY, _GOODS),
+                }
+            ),
+        )
         self.store = create_object(Room, key="store")
         self.char1.location = self.store
-        self.char1.race = "human"
+        self.char1.race = "t_duskmari"
         self.char1.apply_race_baseline()
         self.char1.db.wallet = 500
-        self.merchant_npc = create_object(NPC, key="merchant", location=self.store)
+        self.merchant_npc = create_object(NPC, key="t_synth_courier", location=self.store)
         self.merchant = Merchant.create(
             self.merchant_npc,
-            service_id="merchant",
-            shop_key="altoria_general_store",
+            service_id="t_shop_service",
+            shop_key=SHOP_KEY,
         )
         self.merchant_npc.components.add(self.merchant)
-        self.merchant.merchant_stock = {
-            "meal": 20,
-            "healing_potion": 3,
-            "plain_sword": 1,
-        }
+        self.merchant.merchant_stock = {key: 20 for key in _GOODS}
 
     @covers_requirement("shop-economy::player-facing-shop-commands-use-only-a-local-unambiguous-merchant")
     def test_stock_buy_sell_flow(self):
+        floor, _ceiling = price_band(_MEAL)
         with patch("world.rules.economy.get_world_clock") as clock:
             clock.return_value.tick = 12 * 3600
             self.call(CmdShopStock(), "", "商店（營業中）")
-            self.call(CmdBuy(), "meal 2", "你買了 2 個")
-            self.call(CmdSell(), "meal 1", "你賣了 1 個")
-        self.assertEqual(self.char1.db.wallet, 500 - 20 + 5)
+            self.call(CmdBuy(), f"{_MEAL} 2", "你買了 2 個")
+            self.call(CmdSell(), f"{_MEAL} 1", "你賣了 1 個")
+        self.assertEqual(
+            self.char1.db.wallet, 500 - 2 * (floor + 2) + floor
+        )
 
 
 class ScheduleGateCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
@@ -308,43 +382,50 @@ class ScheduleGateCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evenni
     BLOCKED = "她現在正忙著，沒有理會你。"
 
     def setUp(self):
+        open_synthetic_scope(self, "races", "static_tiers", "subraces", "starting_kits", "items", "prices", "elements", "shops", "guild_branches")
         super().setUp()
+        install_synthetic_catalog(
+            self,
+            synth_catalog(
+                shop_configs={
+                    SHOP_KEY: synth_shop_config(SHOP_KEY, _GOODS),
+                }
+            ),
+        )
+        _register_board_offer("introductory_hunt")
         self.store = create_object(Room, key="store")
         self.char1.location = self.store
-        self.char1.race = "human"
+        self.char1.race = "t_duskmari"
         self.char1.apply_race_baseline()
         self.char1.db.wallet = 500
-        self.merchant_npc = create_object(NPC, key="merchant", location=self.store)
+        self.merchant_npc = create_object(NPC, key="t_synth_courier", location=self.store)
         self.merchant = Merchant.create(
             self.merchant_npc,
-            service_id="merchant",
-            shop_key="altoria_general_store",
+            service_id="t_shop_service",
+            shop_key=SHOP_KEY,
         )
         self.merchant_npc.components.add(self.merchant)
-        self.merchant.merchant_stock = {"meal": 20, "healing_potion": 3, "plain_sword": 1}
+        self.merchant.merchant_stock = {key: 20 for key in _GOODS}
         self.hall = create_object(Room, key="guild hall")
         self.staff = create_object(NPC, key="staff", location=self.hall)
         self.staff.components.add(
-            GuildStaff.create(self.staff, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
         )
-        from world.rules.guild_config import register_catalog_offers
-
-        register_catalog_offers(load_catalog_into_cache())
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_busy_merchant_blocks_buy_without_a_transaction(self):
         self.merchant_npc.db.schedule_state = "busy"
-        self.call(CmdBuy(), "meal 2", self.BLOCKED)
+        self.call(CmdBuy(), f"{_MEAL} 2", self.BLOCKED)
         self.assertEqual(self.char1.db.wallet, 500)
-        self.assertEqual(self.merchant.merchant_stock["meal"], 20)
+        self.assertEqual(self.merchant.merchant_stock[_MEAL], 20)
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_resting_merchant_blocks_sell_without_a_transaction(self):
         self.merchant_npc.db.schedule_state = "resting"
-        self.char1.db.inventory = ["meal"]
-        self.call(CmdSell(), "meal 1", self.BLOCKED)
+        self.char1.db.inventory = [_MEAL]
+        self.call(CmdSell(), f"{_MEAL} 1", self.BLOCKED)
         self.assertEqual(self.char1.db.wallet, 500)
-        self.assertEqual(list_items(self.char1), ["meal"])
+        self.assertEqual(list_items(self.char1), [_MEAL])
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_busy_guild_host_blocks_register_without_state_change(self):
@@ -380,7 +461,7 @@ class ScheduleGateCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evenni
         examiner = create_object(NPC, key="examiner", location=self.hall)
         examiner.components.add(
             GuildExaminer.create(
-                examiner, service_id="examiner", branch_key="guild_branch_altoria"
+                examiner, service_id="examiner", branch_key=BRANCH
             )
         )
         examiner.db.schedule_state = "busy"
@@ -389,11 +470,12 @@ class ScheduleGateCommandTests(CommandIsolation, EvenniaCommandTestMixin, Evenni
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_duty_state_does_not_block_shop_buy(self):
+        floor, _ceiling = price_band(_MEAL)
         self.merchant_npc.db.schedule_state = "duty"
         with patch("world.rules.economy.get_world_clock") as clock:
             clock.return_value.tick = 12 * 3600
-            self.call(CmdBuy(), "meal 2", "你買了 2 個")
-        self.assertEqual(self.char1.db.wallet, 480)
+            self.call(CmdBuy(), f"{_MEAL} 2", "你買了 2 個")
+        self.assertEqual(self.char1.db.wallet, 500 - 2 * (floor + 2))
 
 
 if __name__ == "__main__":
