@@ -296,6 +296,28 @@ class ResistGateTests(ResistCastWiringBase):
         ]
         self.assertEqual(len(resist_entries), 2)
 
+    @covers_requirement("sexual-resist-cast-wiring::a-resistible-area-target-act-resolves-one-independent-contest-per-resolved-target")
+    def test_area_act_event_effect_follows_the_withheld_branch(self):
+        # Each target's event effects ride its OWN contest outcome: the
+        # rulebook rule keyed to the act's event fires only for the target
+        # that did not resist.
+        from world.rules import sexual_transitions
+        from world.rules.rulebook.schema import Rule
+
+        rule = Rule(
+            id="t_area_event_rule",
+            when={"event": f"{_T_AREA}_event"},
+            then={"field": "experience_types", "add": "t_area_experience"},
+        )
+        second = self._npc("area second")
+        with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch.object(
+            sexual_transitions, "_RULES", [rule]
+        ), patch("world.rules.action.roll_d100", side_effect=[1, 100]):
+            result = self._cast(_T_AREA, [self.target, second])
+        self.assertEqual(result.outcome, "success")
+        self.assertIn("t_area_experience", self.target.sexual.experience_types)
+        self.assertNotIn("t_area_experience", second.sexual.experience_types)
+
 class ResistEffectWithholdingTests(ResistCastWiringBase):
     """A resisted target receives none of the act's effects; a complied one does."""
 
