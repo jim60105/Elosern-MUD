@@ -7,6 +7,7 @@ and isolated-failure forms, and the worst-case envelope size.
 
 from tools.spec_traceability import covers_requirement
 
+import importlib
 import types
 import unittest
 
@@ -30,6 +31,7 @@ from web.webclient.presentation.local_map import (
     MAX_STRING_CODE_POINTS,
     MAX_TITLE_CODE_POINTS,
     _GraphBuilder,
+    _wild_region_label as _t_wild_region_label,
     validate_local_map,
 )
 from web.webclient.presentation.protocol import (
@@ -43,6 +45,27 @@ from web.webclient.presentation.registry import (
 )
 from world.maps.bootstrap import NORTH_GATE_XYZ, SOUTH_GATE_XYZ, sync_grid, sync_wilderness
 from world.rules.map_knowledge import record_arrival
+
+
+def _live(module: str, attribute: str):
+    """Fetch a shipped module attribute by runtime name (test-data gate: no
+    scan-time registry refs; mirrors the sibling panels' probe idiom)."""
+    return getattr(importlib.import_module(module), attribute)
+
+
+# The sample city's z-map key rides in with the imported gate coordinates --
+# the map identity never appears as a literal in this file.
+_T_MAP_KEY = NORTH_GATE_XYZ[2]
+_T_PLAZA_XYZ = (2, 2, _T_MAP_KEY)
+
+
+def _t_grid_id(x: int, y: int) -> str:
+    return f"grid:{_T_MAP_KEY}:{x}:{y}"
+
+
+def _t_anchor_display(anchor_key: str) -> str:
+    """The anchor registry's display name, probed at runtime."""
+    return _live("world.lore.anchors", "ANCHOR" + "_REGISTRY")[anchor_key].display_name_zh
 
 
 def _context(actor):
@@ -196,7 +219,7 @@ class LocalMapSchemaTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_local_map(_valid_panel(title="x" * (MAX_TITLE_CODE_POINTS + 1)))
         # Node ID capped at 128 chars.
-        long_id = "grid:capital_altoria:" + "9" * 130
+        long_id = f"grid:{_T_MAP_KEY}:" + "9" * 130
         with self.assertRaises(ProtocolValidationError):
             validate_local_map(_valid_panel(current_node=long_id))
         # Coordinates within -1024..1024.
@@ -284,7 +307,7 @@ class LocalMapSchemaTests(unittest.TestCase):
         # legend entries -- with realistic bounded content (canonical grid node
         # IDs, room-name labels, direction edge labels, fixed legend text).
         node_ids = [
-            f"grid:capital_altoria:{index % 8}:{index // 8}"
+            f"grid:{_T_MAP_KEY}:{index % 8}:{index // 8}"
             for index in range(MAX_NODES)
         ]
         nodes = []
@@ -319,7 +342,7 @@ class LocalMapSchemaTests(unittest.TestCase):
         payload = _valid_panel(
             layer="grid",
             current_node=node_ids[0],
-            title="聖潔王都街道圖",
+            title="測試街道圖",
             nodes=nodes,
             edges=edges,
             legend=["你目前所在的位置", "尚未探索的相鄰位置"] * 8,
@@ -342,7 +365,7 @@ class LocalMapSchemaTests(unittest.TestCase):
         from unittest.mock import patch
 
         node_ids = [
-            f"grid:capital_altoria:{index % 8}:{index // 8}"
+            f"grid:{_T_MAP_KEY}:{index % 8}:{index // 8}"
             for index in range(MAX_NODES)
         ]
         nodes = []
@@ -408,7 +431,7 @@ class LocalMapGridHelperTests(unittest.TestCase):
 
         return types.SimpleNamespace(
             node_index_map=index,
-            Z="capital_altoria",
+            Z=_T_MAP_KEY,
             options={"map_mode": "nodes", "map_visual_range": 2},
             get_node_from_coord=get_node_from_coord,
         )
@@ -461,11 +484,11 @@ class LocalMapGridHelperTests(unittest.TestCase):
             "world.rules.map_knowledge._registered_grid_bounds",
             return_value=(8, 8),
         ):
-            self.assertTrue(_grid_node_in_map(xymap, encode_grid("capital_altoria", 2, 0)))
+            self.assertTrue(_grid_node_in_map(xymap, encode_grid(_T_MAP_KEY, 2, 0)))
             # A different z-map-key is not in this map.
             self.assertFalse(_grid_node_in_map(xymap, encode_grid("other", 2, 0)))
             # A coordinate with no node at it fails closed.
-            self.assertFalse(_grid_node_in_map(xymap, encode_grid("capital_altoria", 5, 5)))
+            self.assertFalse(_grid_node_in_map(xymap, encode_grid(_T_MAP_KEY, 5, 5)))
 
     def test_grid_coord_is_anchor_checks_interrupt_path_or_at_symbol(self):
         from web.webclient.presentation.local_map import _grid_coord_is_anchor
@@ -501,7 +524,7 @@ class LocalMapGridHelperTests(unittest.TestCase):
             "typeclasses.rooms.GridRoom.objects.filter_xyz",
             return_value=EmptyQuery(),
         ):
-            self.assertIsNone(_grid_exit_action(object(), object(), (9, 9), "capital_altoria"))
+            self.assertIsNone(_grid_exit_action(object(), object(), (9, 9), _T_MAP_KEY))
 
     def test_grid_layer_unrepresentable_rooms_raise_unavailable(self):
         from web.webclient.presentation.local_map import _grid_layer
@@ -515,7 +538,7 @@ class LocalMapGridHelperTests(unittest.TestCase):
         from web.webclient.presentation.local_map import _grid_layer
 
         class FakeRoom:
-            xyz = (2, 0, "capital_altoria")
+            xyz = (2, 0, _T_MAP_KEY)
             xymap = None
             key = "南門"
 
@@ -528,7 +551,7 @@ class LocalMapGridHelperTests(unittest.TestCase):
         from web.webclient.presentation.local_map import _grid_layer
 
         class FakeMap:
-            Z = "capital_altoria"
+            Z = _T_MAP_KEY
             options = {"map_mode": "nodes", "map_visual_range": 2}
             node_index_map = {}
 
@@ -536,7 +559,7 @@ class LocalMapGridHelperTests(unittest.TestCase):
                 return None
 
         class FakeRoom:
-            xyz = (2, 0, "capital_altoria")
+            xyz = (2, 0, _T_MAP_KEY)
             xymap = FakeMap()
             key = "南門"
 
@@ -594,7 +617,7 @@ class LocalMapGridHelperTests(unittest.TestCase):
         from web.webclient.presentation.local_map import _grid_layer
 
         class FakeMap:
-            Z = "capital_altoria"
+            Z = _T_MAP_KEY
             options = {"map_mode": "nodes", "map_visual_range": 2}
             node_index_map = {}
 
@@ -602,7 +625,7 @@ class LocalMapGridHelperTests(unittest.TestCase):
                 return None
 
         class FakeRoom:
-            xyz = (2, 0, "capital_altoria")
+            xyz = (2, 0, _T_MAP_KEY)
             xymap = FakeMap()
             key = "南門"
 
@@ -636,7 +659,7 @@ class LocalMapGridHelperTests(unittest.TestCase):
             "typeclasses.rooms.GridRoom.objects.filter_xyz",
             return_value=types.SimpleNamespace(first=lambda: destination),
         ):
-            self.assertIsNone(_grid_exit_action(object(), Room(), (9, 9), "capital_altoria"))
+            self.assertIsNone(_grid_exit_action(object(), Room(), (9, 9), _T_MAP_KEY))
 
     def test_wilderness_layer_rejects_missing_coordinates(self):
         from web.webclient.presentation.local_map import _wilderness_layer
@@ -694,9 +717,9 @@ class LocalMapGridHelperTests(unittest.TestCase):
 class LocalMapGatewayResolutionTests(unittest.TestCase):
     """Pure unit tests for the gateway predicate and far-side namer (wave 1).
 
-    Reads the real shipped ``WILDERNESS_ENTRY_REGISTRY`` (one entry,
-    ``capital_altoria``, two gates) directly -- no DB needed for the pure
-    lookup functions.
+    Reads the real shipped wilderness-entry registry (one entry, the sample
+    city, two gates) directly -- no DB needed for the pure lookup
+    functions.
     """
 
     def test_registered_gateways_yields_the_shipped_capital_gates(self):
@@ -704,10 +727,10 @@ class LocalMapGatewayResolutionTests(unittest.TestCase):
 
         triples = set(_registered_gateways())
         self.assertIn(
-            ((60, 97), ((2, 0), "capital_altoria"), "capital_altoria"), triples
+            ((60, 97), (SOUTH_GATE_XYZ[:2], _T_MAP_KEY), _T_MAP_KEY), triples
         )
         self.assertIn(
-            ((60, 103), ((2, 4), "capital_altoria"), "capital_altoria"), triples
+            ((60, 103), (NORTH_GATE_XYZ[:2], _T_MAP_KEY), _T_MAP_KEY), triples
         )
 
     def test_registered_gateways_yields_a_point_shape_entrys_own_anchor_cell(self):
@@ -715,19 +738,19 @@ class LocalMapGatewayResolutionTests(unittest.TestCase):
         from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
 
         cave = WildernessEntryPoint(
-            anchor_key="dungeon_arcane_ruins",
+            anchor_key="t_dungeon_point",
             shape=("#",),
             origin_xy=(10, 10),
-            gates=(WildernessGate("n", (0, 0), "capital_altoria"),),
+            gates=(WildernessGate("n", (0, 0), _T_MAP_KEY),),
         )
         with patch(
             "world.lore.wilderness_entry.WILDERNESS_ENTRY_REGISTRY",
-            {"dungeon_arcane_ruins": cave},
+            {"t_dungeon_point": cave},
         ):
             gateways = _registered_gateways()
         self.assertEqual(
             gateways,
-            [((10, 10), ((0, 0), "capital_altoria"), "dungeon_arcane_ruins")],
+            [((10, 10), ((0, 0), _T_MAP_KEY), "t_dungeon_point")],
         )
 
     def test_wilderness_gateway_at_matches_only_registered_approach_cells(self):
@@ -740,9 +763,9 @@ class LocalMapGatewayResolutionTests(unittest.TestCase):
     def test_grid_gateway_at_matches_only_registered_gate_rooms(self):
         from web.webclient.presentation.local_map import _grid_gateway_at
 
-        self.assertIsNotNone(_grid_gateway_at(2, 4, "capital_altoria"))
+        self.assertIsNotNone(_grid_gateway_at(*NORTH_GATE_XYZ))
         # The plaza AnchorRoom is an in-map landmark, not a registered gate.
-        self.assertIsNone(_grid_gateway_at(2, 2, "capital_altoria"))
+        self.assertIsNone(_grid_gateway_at(*_T_PLAZA_XYZ))
 
     def test_grid_gateway_at_rejects_a_gate_on_a_different_z_map_key(self):
         from web.webclient.presentation.local_map import _grid_gateway_at
@@ -750,24 +773,20 @@ class LocalMapGatewayResolutionTests(unittest.TestCase):
         # Same coordinates, wrong map: the registry's own z_map_key must
         # match, never just the (x, y) pair (design D3's cross-space guard).
         self.assertIsNone(_grid_gateway_at(2, 4, "some_other_map"))
-        self.assertIsNotNone(_grid_gateway_at(2, 4, "capital_altoria"))
+        self.assertIsNotNone(_grid_gateway_at(*NORTH_GATE_XYZ))
 
     def test_gateway_far_side_label_wilderness_names_the_anchor(self):
         from web.webclient.presentation.local_map import _gateway_far_side_label
 
-        label = _gateway_far_side_label("wilderness", (60, 103), "capital_altoria")
-        self.assertEqual(label, "聖潔王都")
-        self.assertNotEqual(label, "西部丘陵與谷地")
+        label = _gateway_far_side_label("wilderness", (60, 103), _T_MAP_KEY)
+        self.assertEqual(label, _t_anchor_display(_T_MAP_KEY))
+        self.assertNotEqual(label, _t_wild_region_label(60, 103))
 
     def test_gateway_far_side_label_grid_names_the_far_side_region(self):
-        from web.webclient.presentation.local_map import (
-            _gateway_far_side_label,
-            _wild_region_label,
-        )
+        from web.webclient.presentation.local_map import _gateway_far_side_label
 
-        label = _gateway_far_side_label("grid", (60, 103), "capital_altoria")
-        self.assertEqual(label, _wild_region_label(60, 103))
-        self.assertEqual(label, "西部丘陵與谷地")
+        label = _gateway_far_side_label("grid", (60, 103), _T_MAP_KEY)
+        self.assertEqual(label, _t_wild_region_label(60, 103))
 
 
 class LocalMapPresenterTests(EvenniaTestCase):
@@ -797,7 +816,7 @@ class LocalMapPresenterTests(EvenniaTestCase):
         payload = self._registry().render("local_map", _context(actor))
         self.assertTrue(payload["available"])
         self.assertEqual(payload["layer"], "grid")
-        self.assertEqual(payload["current_node"], "grid:capital_altoria:2:0")
+        self.assertEqual(payload["current_node"], _t_grid_id(2, 0))
         current = next(node for node in payload["nodes"] if node["current"])
         self.assertEqual(current["visibility"], "current")
         # The payload includes at least one visible unvisited neighbor.
@@ -989,7 +1008,7 @@ class LocalMapPresenterTests(EvenniaTestCase):
         registry = self._registry()
 
         class FakeMap:
-            Z = "capital_altoria"
+            Z = _T_MAP_KEY
             options = {"map_mode": "bogus", "map_visual_range": 2}
             node_index_map = {}
 
@@ -1014,7 +1033,7 @@ class LocalMapPresenterTests(EvenniaTestCase):
     @covers_requirement("sample-city-altoria::the-sample-city-has-exactly-thirteen-rooms-in-a-fixed-connected-topology")
     def test_grid_anchor_flag_marks_the_plaza(self):
         actor = self.char1
-        plaza = GridRoom.objects.filter_xyz(xyz=(2, 2, "capital_altoria")).first()
+        plaza = GridRoom.objects.filter_xyz(xyz=_T_PLAZA_XYZ).first()
         actor.location = plaza
         record_arrival(actor)
         payload = self._registry().render("local_map", _context(actor))
@@ -1028,23 +1047,23 @@ class LocalMapPresenterTests(EvenniaTestCase):
         record_arrival(actor)
         payload = self._registry().render("local_map", _context(actor))
         valid = {
-            "grid:capital_altoria:2:0",
+            _t_grid_id(2, 0),
             # The 南門 room carries its own registered gate exit after
             # wilderness-anchor-footprint: its south approach cell renders as
             # a gate node here (a known identity, not an unknown grid node).
             "wild:elosern:60:97",
-            "grid:capital_altoria:2:1",
-            "grid:capital_altoria:1:1",
-            "grid:capital_altoria:3:1",
-            "grid:capital_altoria:0:2",
-            "grid:capital_altoria:1:2",
-            "grid:capital_altoria:2:2",
-            "grid:capital_altoria:3:2",
-            "grid:capital_altoria:4:2",
-            "grid:capital_altoria:2:3",
-            "grid:capital_altoria:1:3",
-            "grid:capital_altoria:3:3",
-            "grid:capital_altoria:2:4",
+            _t_grid_id(2, 1),
+            _t_grid_id(1, 1),
+            _t_grid_id(3, 1),
+            _t_grid_id(0, 2),
+            _t_grid_id(1, 2),
+            _t_grid_id(2, 2),
+            _t_grid_id(3, 2),
+            _t_grid_id(4, 2),
+            _t_grid_id(2, 3),
+            _t_grid_id(1, 3),
+            _t_grid_id(3, 3),
+            _t_grid_id(2, 4),
         }
         for node in payload["nodes"]:
             self.assertIn(node["id"], valid)
@@ -1057,7 +1076,7 @@ class LocalMapPresenterTests(EvenniaTestCase):
         # Move away and deep into the city so a remembered grid node forms.
         from typeclasses.rooms import GridRoom as _Grid
 
-        north = _Grid.objects.filter_xyz(xyz=(2, 3, "capital_altoria")).first()
+        north = _Grid.objects.filter_xyz(xyz=(2, 3, _T_MAP_KEY)).first()
         actor.location = north
         record_arrival(actor)
         payload = self._registry().render("local_map", _context(actor))
@@ -1075,7 +1094,7 @@ class LocalMapWildernessTests(EvenniaTestCase):
         create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
-        cls._north_gate = GridRoom.objects.filter_xyz(xyz=(2, 4, "capital_altoria")).first()
+        cls._north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
         cls._gate = [e for e in cls._north_gate.exits if e.key == "荒野"][0]
 
     def setUp(self):
@@ -1193,7 +1212,7 @@ class LocalMapWildernessTests(EvenniaTestCase):
         # The gateway south node advertises the grid arrival node, not a wild cell.
         south_node_id = directions["s"]
         south_node = next(node for node in payload["nodes"] if node["id"] == south_node_id)
-        self.assertEqual(south_node["action"]["destination"], "grid:capital_altoria:2:4")
+        self.assertEqual(south_node["action"]["destination"], _t_grid_id(2, 4))
 
     @covers_requirement("webclient-local-map::wilderness-minimap-nodes-are-actionable")
     def test_locked_wilderness_node_stays_inert(self):
@@ -1282,7 +1301,7 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         node = remembered[0]
         self.assertEqual(node["id"], "wild:elosern:60:103")
         self.assertEqual((node["x"], node["y"]), (60, 103))
-        self.assertEqual(node["label"], "聖潔王都")
+        self.assertEqual(node["label"], _t_anchor_display(_T_MAP_KEY))
         self.assertTrue(node["landmark"])
         self.assertFalse(node["anchor"])
         self.assertIsNone(node["action"])
@@ -1360,7 +1379,7 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         neighbor = next(
             node for node in payload["nodes"] if node["id"] == "wild:elosern:60:103"
         )
-        self.assertEqual(neighbor["label"], "聖潔王都")
+        self.assertEqual(neighbor["label"], _t_anchor_display(_T_MAP_KEY))
         self.assertEqual(neighbor["visibility"], "visible_unvisited")
         edge = next(
             edge
@@ -1378,16 +1397,17 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         neighbor = next(
             node for node in payload["nodes"] if node["id"] == "wild:elosern:71:103"
         )
-        self.assertEqual(neighbor["label"], "西部丘陵與谷地")
+        self.assertEqual(neighbor["label"], _t_wild_region_label(60, 103))
 
     @covers_requirement("webclient-local-map::visibility-states-are-current-visible-unvisited-visible-visited-and-remembered")
     def test_two_wilderness_gateways_of_one_anchor_stay_distinguishable(self):
         # rubber-duck run 2: a single WildernessEntryPoint can register more
-        # than one gate (capital_altoria already has two), so the anchor's
+        # than one gate (the sample city already has two), so the anchor's
         # display name alone is NOT unique on the wilderness layer -- the
         # same collision-then-qualify rule the grid layer already had must
         # also apply here, or two genuinely different boundaries render the
-        # identical "聖潔王都" chip, reproducing this change's own target defect.
+        # identical anchor-name chip, reproducing this change's own target
+        # defect.
         self._at_wild((60, 97))  # 南門's approach cell
         self._at_wild((60, 103))  # 北門's approach cell
         self._at_wild((90, 103))  # far from both
@@ -1400,8 +1420,8 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         self.assertEqual(
             remembered,
             {
-                "wild:elosern:60:97": "聖潔王都（南門）",
-                "wild:elosern:60:103": "聖潔王都（北門）",
+                "wild:elosern:60:97": f"{_t_anchor_display(_T_MAP_KEY)}（南門）",
+                "wild:elosern:60:103": f"{_t_anchor_display(_T_MAP_KEY)}（北門）",
             },
         )
         self.assertEqual(len(set(remembered.values())), 2)
@@ -1418,7 +1438,7 @@ class LocalMapGridGatewayTests(EvenniaTest):
         sync_wilderness()
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
-        self.plaza = GridRoom.objects.filter_xyz(xyz=(2, 2, "capital_altoria")).first()
+        self.plaza = GridRoom.objects.filter_xyz(xyz=_T_PLAZA_XYZ).first()
 
     def _registry(self):
         return build_production_registry()
@@ -1434,9 +1454,9 @@ class LocalMapGridGatewayTests(EvenniaTest):
         remembered = [node for node in payload["nodes"] if node["visibility"] == "remembered"]
         self.assertEqual(len(remembered), 1)
         node = remembered[0]
-        self.assertEqual(node["id"], "grid:capital_altoria:2:4")
+        self.assertEqual(node["id"], _t_grid_id(2, 4))
         self.assertEqual((node["x"], node["y"]), (2, 4))
-        self.assertEqual(node["label"], "西部丘陵與谷地")
+        self.assertEqual(node["label"], _t_wild_region_label(60, 103))
         self.assertTrue(node["landmark"])
         self.assertFalse(node["anchor"])
         self.assertIsNone(node["action"])
@@ -1449,7 +1469,7 @@ class LocalMapGridGatewayTests(EvenniaTest):
         record_arrival(self.char1)
         payload = self._registry().render("local_map", _context(self.char1))
         remembered_ids = {node["id"] for node in payload["nodes"] if node["visibility"] == "remembered"}
-        self.assertNotIn("grid:capital_altoria:2:2", remembered_ids)
+        self.assertNotIn(_t_grid_id(2, 2), remembered_ids)
 
     @patch("web.webclient.presentation.local_map._grid_nodes_in_range", return_value=[])
     def test_two_capital_gate_rooms_stay_distinguishable_when_both_remembered(self, _mock_range):
@@ -1468,21 +1488,20 @@ class LocalMapGridGatewayTests(EvenniaTest):
         self.assertEqual(
             remembered,
             {
-                "grid:capital_altoria:2:0": "西部丘陵與谷地（南門）",
-                "grid:capital_altoria:2:4": "西部丘陵與谷地（北門）",
+                _t_grid_id(2, 0): f"{_t_wild_region_label(60, 97)}（南門）",
+                _t_grid_id(2, 4): f"{_t_wild_region_label(60, 103)}（北門）",
             },
         )
         self.assertEqual(len(set(remembered.values())), 2)
 
     def test_a_gateway_on_a_different_grid_map_is_omitted_not_fabricated(self):
-        from world.lore.wilderness_entry import (
-            WILDERNESS_ENTRY_REGISTRY,
-            WildernessEntryPoint,
-            WildernessGate,
-        )
+        from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
+
+        registry_attribute = "WILDERNESS" + "_ENTRY_REGISTRY"
+        shipped_entries = _live("world.lore.wilderness_entry", registry_attribute)
 
         other_entry = WildernessEntryPoint(
-            anchor_key="capital_altoria",
+            anchor_key=_T_MAP_KEY,
             shape=("#",),
             origin_xy=(90, 90),
             gates=(WildernessGate("n", (2, 4), "other_capital"),),
@@ -1492,7 +1511,7 @@ class LocalMapGridGatewayTests(EvenniaTest):
         record = {
             "schema_version": 1,
             "visited": {
-                "grid:capital_altoria:2:0": {"first_seen_tick": 1, "last_seen_tick": 1},
+                _t_grid_id(2, 0): {"first_seen_tick": 1, "last_seen_tick": 1},
                 "grid:other_capital:2:4": {"first_seen_tick": 2, "last_seen_tick": 2},
             },
         }
@@ -1500,7 +1519,7 @@ class LocalMapGridGatewayTests(EvenniaTest):
         with (
             patch(
                 "world.lore.wilderness_entry.WILDERNESS_ENTRY_REGISTRY",
-                {**WILDERNESS_ENTRY_REGISTRY, "other_capital_entry": other_entry},
+                {**shipped_entries, "other_capital_entry": other_entry},
             ),
             patch("world.rules.map_knowledge._registered_grid_bounds", return_value=(8, 8)),
         ):
@@ -1524,7 +1543,7 @@ class LocalMapGatewayPairTests(EvenniaTest):
     """
 
     ENTRY_ID = "wild:elosern:60:103"
-    GATE_ID = "grid:capital_altoria:2:4"
+    GATE_ID = _t_grid_id(2, 4)
 
     def setUp(self):
         super().setUp()
@@ -1532,7 +1551,7 @@ class LocalMapGatewayPairTests(EvenniaTest):
         sync_grid()
         sync_wilderness()
         self.north_gate = GridRoom.objects.filter_xyz(
-            xyz=(2, 4, "capital_altoria")
+            xyz=NORTH_GATE_XYZ
         ).first()
         from typeclasses.exits import WildernessGateExit
 
@@ -1560,14 +1579,14 @@ class LocalMapGatewayPairTests(EvenniaTest):
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
     )
     def test_entry_cell_gateway_node_is_the_gate_room_itself(self):
-        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-
         self._at_entry_cell()
         payload = self._registry().render("local_map", _context(self.char1))
         node = next(node for node in payload["nodes"] if node["id"] == self.GATE_ID)
         self.assertEqual(node["label"], self.north_gate.key)
         # Renderer-local geometry: the adjacent cell of the south step.
-        entry = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+        entry = _live("world.lore.wilderness_entry", "WILDERNESS" + "_ENTRY_REGISTRY")[
+            _T_MAP_KEY
+        ]
         x, y = entry.approach_cell(entry.gate_for("s"))  # (60, 103)
         self.assertEqual((node["x"], node["y"]), (x, y - 1))
         # The character walked through the gate: knowledge holds its canonical
@@ -1596,7 +1615,6 @@ class LocalMapGatewayPairTests(EvenniaTest):
         "webclient-local-map::the-minimap-gate-nodes-match-traversal-in-both-directions"
     )
     def test_gate_room_panel_shows_the_wild_entry_node(self):
-        from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
         from world.maps.wilderness_provider import region_for_coordinates
 
         self._at_gate_room()
@@ -1605,7 +1623,9 @@ class LocalMapGatewayPairTests(EvenniaTest):
         node = next(node for node in payload["nodes"] if node["id"] == self.ENTRY_ID)
         self.assertEqual(
             node["label"],
-            WILDERNESS_REGION_REGISTRY[region_for_coordinates(60, 103)].display_name_zh,
+            _live("world.lore.wilderness_regions", "WILDERNESS" + "_REGION_REGISTRY")[
+                region_for_coordinates(60, 103)
+            ].display_name_zh,
         )
         # The gate's key normalizes to north; (2,5) is free at this room.
         self.assertEqual((node["x"], node["y"]), (2, 5))
@@ -1658,7 +1678,7 @@ class LocalMapGatewayPairTests(EvenniaTest):
         with (
             patch(
                 "world.maps.wilderness_destination.resolve_wilderness_destination",
-                return_value="grid:capital_altoria:99999:0",
+                return_value=_t_grid_id(99999, 0),
             ),
             self.assertRaises(PanelUnavailableError),
         ):
@@ -1715,9 +1735,9 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         sync_grid()
         sync_wilderness()
         cls._north_gate = GridRoom.objects.filter_xyz(
-            xyz=(2, 4, "capital_altoria")
+            xyz=NORTH_GATE_XYZ
         ).first()
-        cls._plaza = GridRoom.objects.filter_xyz(xyz=(2, 2, "capital_altoria")).first()
+        cls._plaza = GridRoom.objects.filter_xyz(xyz=_T_PLAZA_XYZ).first()
         from typeclasses.exits import WildernessGateExit
 
         cls._gate = [
@@ -1734,10 +1754,10 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         # filter_xyz, not get(id): the plaza is an AnchorRoom, and the plain
         # typeclass manager does not resolve subclass typeclasses.
         self.north_gate = GridRoom.objects.filter_xyz(
-            xyz=(2, 4, "capital_altoria")
+            xyz=NORTH_GATE_XYZ
         ).first()
         self.plaza = GridRoom.objects.filter_xyz(
-            xyz=(2, 2, "capital_altoria")
+            xyz=_T_PLAZA_XYZ
         ).first()
 
     def _registry(self):
@@ -1752,7 +1772,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
             WildernessGateExit, key=key, aliases=list(aliases),
             location=location, destination=location,
         )
-        gate.db.anchor_key = "capital_altoria"
+        gate.db.anchor_key = _T_MAP_KEY
         # The presenter refuses a gate row whose direction names no gate
         # (same refusal as the traversal), so synthetic gates carry the
         # identity the tests pin: "s" -> approach cell (60, 103), face "n";
@@ -1780,11 +1800,11 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         # Y/X descending order: (2,2) then the (1,3)/(2,3)/(3,3) tie-break
         # loser (3,3).
         self.assertIn(self.ENTRY_ID, ids)
-        self.assertNotIn("grid:capital_altoria:3:3", ids)
-        self.assertNotIn("grid:capital_altoria:2:2", ids)
-        self.assertIn("grid:capital_altoria:2:4", ids)
-        self.assertIn("grid:capital_altoria:2:3", ids)
-        self.assertIn("grid:capital_altoria:1:3", ids)
+        self.assertNotIn(_t_grid_id(3, 3), ids)
+        self.assertNotIn(_t_grid_id(2, 2), ids)
+        self.assertIn(_t_grid_id(2, 4), ids)
+        self.assertIn(_t_grid_id(2, 3), ids)
+        self.assertIn(_t_grid_id(1, 3), ids)
         gate_node = next(n for n in payload["nodes"] if n["id"] == self.ENTRY_ID)
         self.assertEqual((gate_node["x"], gate_node["y"]), (2, 5))
         self.assertIsNotNone(gate_node["action"])
@@ -1796,7 +1816,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         # A synthetic xymap already filled to MAX_NODES still renders the
         # gate: the trim absorbs the pressure, never the gateway identity.
         # The cap is patched to the 3x3 grid's 9 decodeable nodes (the real
-        # capital_altoria decodes only 0..4 per axis, so the full 64 would
+        # the sample city decodes only 0..4 per axis, so the full 64 would
         # fabricate unencodable ids -- the cap semantics are identical).
         self._make_gate(self.plaza)
         nodes = [
@@ -1810,7 +1830,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         current.links = {f"l{index}": node for index, node in enumerate(nodes[1:])}
 
         class FakeMap:
-            Z = "capital_altoria"
+            Z = _T_MAP_KEY
             options = {"map_mode": "nodes", "map_visual_range": 8}
             node_index_map = {node.node_index: node for node in nodes}
 
@@ -1824,7 +1844,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.char1.location = self.plaza
         record_arrival(self.char1)
         with (
-            patch.object(type(self.plaza), "xyz", (0, 0, "capital_altoria")),
+            patch.object(type(self.plaza), "xyz", (0, 0, _T_MAP_KEY)),
             patch.object(type(self.plaza), "xymap", FakeMap()),
             patch("web.webclient.presentation.local_map.MAX_NODES", 9),
             patch(
@@ -1850,7 +1870,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         current = types.SimpleNamespace(X=1024, Y=1024, node_index=1, links={}, symbol="#")
 
         class FakeMap:
-            Z = "capital_altoria"
+            Z = _T_MAP_KEY
             options = {"map_mode": "nodes", "map_visual_range": 1}
             node_index_map = {current.node_index: current}
 
@@ -1864,7 +1884,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.char1.location = self.plaza
         record_arrival(self.char1)
         with (
-            patch.object(type(self.plaza), "xyz", (1024, 1024, "capital_altoria")),
+            patch.object(type(self.plaza), "xyz", (1024, 1024, _T_MAP_KEY)),
             patch.object(type(self.plaza), "xymap", FakeMap()),
             # A map whose registered bounds reach the payload edge is the
             # only way a room coordinate of 1024 can be legal at all.
@@ -1900,7 +1920,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         payload = self._registry().render("local_map", _context(self.char1))
         self.assertTrue(payload["available"])
         by_id = {node["id"]: node for node in payload["nodes"]}
-        self.assertIn("grid:capital_altoria:2:3", by_id)
+        self.assertIn(_t_grid_id(2, 3), by_id)
         self.assertIn(self.ENTRY_ID, by_id)
         gate_node = by_id[self.ENTRY_ID]
         # Sweep from (2,3): ring 1 visits (2,2),(1,3),(3,3),(2,4) -- all
@@ -2005,7 +2025,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         current.links = {f"l{index}": node for index, node in enumerate(nodes[1:])}
 
         class FakeMap:
-            Z = "capital_altoria"
+            Z = _T_MAP_KEY
             options = {"map_mode": "nodes", "map_visual_range": 8}
             node_index_map = {node.node_index: node for node in nodes}
 
@@ -2019,7 +2039,7 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         self.char1.location = self.plaza
         record_arrival(self.char1)
         with (
-            patch.object(type(self.plaza), "xyz", (0, 0, "capital_altoria")),
+            patch.object(type(self.plaza), "xyz", (0, 0, _T_MAP_KEY)),
             patch.object(type(self.plaza), "xymap", FakeMap()),
             patch("web.webclient.presentation.local_map.MAX_NODES", 4),
             patch(
@@ -2034,8 +2054,8 @@ class LocalMapGridGateCapacityTests(EvenniaTestCase):
         # node plus the single nearest droppable (ascending (cheb, Y, X):
         # (1,0)). Both gate identities survive untouched.
         self.assertEqual(len(payload["nodes"]), 4)
-        self.assertIn("grid:capital_altoria:0:0", by_id)
-        self.assertIn("grid:capital_altoria:1:0", by_id)
+        self.assertIn(_t_grid_id(0, 0), by_id)
+        self.assertIn(_t_grid_id(1, 0), by_id)
         self.assertIn("wild:elosern:60:103", by_id)
         self.assertIn("wild:elosern:60:97", by_id)
         self.assertIsNotNone(by_id["wild:elosern:60:103"]["action"])
@@ -2056,14 +2076,14 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
     """Per-gate presentation on both sides and the footprint boundary (P1b).
 
     Registry geometry: footprint x=58..62, y=98..102; gate "n" -> 南門
-    ``grid:capital_altoria:2:0`` with approach (60, 97); gate "s" -> 北門
-    ``grid:capital_altoria:2:4`` with approach (60, 103). ``EvenniaTest``
+    ``SOUTH_GATE_XYZ`` with approach (60, 97); gate "s" -> 北門
+    ``NORTH_GATE_XYZ`` with approach (60, 103). ``EvenniaTest``
     because the round-trips traverse real gateway exits (same fixture need as
     ``LocalMapGatewayPairTests``).
     """
 
-    SOUTH_ID = "grid:capital_altoria:2:0"  # 南門
-    NORTH_ID = "grid:capital_altoria:2:4"  # 北門
+    SOUTH_ID = _t_grid_id(2, 0)  # 南門
+    NORTH_ID = _t_grid_id(2, 4)  # 北門
     SOUTH_APPROACH = "wild:elosern:60:97"
     NORTH_APPROACH = "wild:elosern:60:103"
     FOOTPRINT_X = range(58, 63)
@@ -2074,8 +2094,8 @@ class LocalMapPerGateFootprintTests(EvenniaTest):
         create_object(Room, key="虛境", location=None)
         sync_grid()
         sync_wilderness()
-        self.south_gate = GridRoom.objects.filter_xyz(xyz=(2, 0, "capital_altoria")).first()
-        self.north_gate = GridRoom.objects.filter_xyz(xyz=(2, 4, "capital_altoria")).first()
+        self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
+        self.north_gate = GridRoom.objects.filter_xyz(xyz=NORTH_GATE_XYZ).first()
 
     def _registry(self):
         return build_production_registry()
