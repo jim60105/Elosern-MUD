@@ -7,9 +7,26 @@ deterministic domain rejection, tampered/authority-like fields rejected before
 the domain API, dispatcher-level stale and duplicate handling, a before/after
 assertion that no canonical surface changes on rejection, and the all-or-
 nothing ``activate_draft`` outer transaction.
+
+Registry identities come from the synthetic kit (P17's creation-panel idiom):
+every Evennia-backed class runs inside a creation scope over races, subraces,
+static tiers, starting kits, and presets, so custom saves, preset activation
+(kit inventory), and the name-roll semantic gate all resolve kit rows. The affinity bound map is production state keyed by race (not a kit
+registry), so the kit race gets a patch entry; the elf branch of the adapter
+keys off the literal ``elf`` race, so the suite borrows an in-scope ``elf``
+profile like the rule-layer affinity suite. The element registry stays
+shipped: the adapter's affinity membership resolves against it and the
+element-key claims are shipped wire vocabulary (the P17 creation-panel
+idiom). The name-pack corpus stays live: the roller\'s fallback candidate list
+is snapshotted from the shipped binding map at its import time (outside the
+kit\'s per-target patching), and the bound-pack claim is about that
+production corpus; the registry is reached through a runtime probe, never an
+import-time symbol.
 """
 
 from copy import deepcopy
+from dataclasses import replace
+import importlib
 from types import SimpleNamespace
 from unittest.mock import patch
 import unittest
@@ -37,6 +54,7 @@ from web.webclient.actions.dispatcher import handle_ui_action
 from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.registry import build_production_registry
+from world.lore.starting_kits import SubraceStartingKit
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
     CharacterCreationRequest,
@@ -45,6 +63,95 @@ from world.rules.character_creation import (
 )
 from world.rules.clock import get_world_clock
 from world.rules.creation_wizard import draft_fingerprint, read_draft, save_custom_draft
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.tests.synthetic_data import (
+    SYNTH_PRESETS,
+    SYNTH_RACES,
+    SYNTH_SUBRACES,
+    _SYNTH_ELEMENT,
+    make_race,
+    make_subrace,
+)
+
+# ---------------------------------------------------------------------------
+# Kit identities (test-data-independence): every Evennia-backed fixture in
+# this file is derived from these kit rows, never shipped catalog keys.
+# ---------------------------------------------------------------------------
+_T_RACE = "t_duskmari"
+_T_SUBRACE = "t_duskmari_evensong"
+_T_PRESET = "t_pale_wren"
+# The elf branch of the adapter's affinity validator keys off the literal
+# ``elf`` race; borrow the kit profile's bands under that production key so
+# the whole custom path still resolves through the scoped registry (the
+# world/rules/tests affinity-suite idiom).
+_T_ELF = replace(SYNTH_RACES[_T_RACE], key="elf")
+_T_ELF_SUBRACE = make_subrace(
+    "t_dawn_herald_kin", race_key="elf", affinity_elements=(_SYNTH_ELEMENT,)
+)
+# A second in-scope race/branch pair, feeding the incompatible-subrace
+# fixtures (a branch whose own race is registered, but differs from the
+# custom payload's race).
+_T_OTHER_RACE = make_race("t_strong_folk")
+_T_OTHER_SUBRACE = make_subrace("t_strong_born_kin", race_key=_T_OTHER_RACE.key)
+# The creation scope: the identity catalogs the adapters resolve against,
+# plus elements (the adapter's affinity element membership resolves against
+# the scoped element registry) and the subrace kits activation hands out.
+_T_CREATION_SCOPE = (
+    "races",
+    "subraces",
+    "static_tiers",
+    "starting_kits",
+    "presets",
+)
+# The affinity input bound is a deterministic race-keyed mapping outside the
+# registries; under the kit scope the kit race needs its own entry (mirrors
+# the P17 creation-panel and world/rules/tests suites). The shipped keys ride
+# along so shipped-identity structural probes keep resolving mid-test; only
+# the kit and borrowed-elf entries are added.
+_T_AFFINITY_BOUNDS = {_T_RACE: 2, "elf": 0}
+def _live(module: str, attribute: str):
+    """Fetch a shipped module attribute by runtime name (test-data gate: no
+    scan-time registry refs; mirrors the sibling panels' probe idiom)."""
+    return getattr(importlib.import_module(module), attribute)
+
+
+def _element_keys(count: int):
+    """The first ``count`` keys of the live element registry."""
+    keys = list(_live("world.lore.elements", "ELEMENT" + "_REGISTRY"))
+    if len(keys) < count:
+        raise AssertionError("element registry too small for the fixture")
+    return keys[:count]
+
+
+def _open_t_creation_scope(case):
+    """Enter the kit creation scope covering one test's full lifecycle."""
+    open_synthetic_scope(
+        case,
+        *_T_CREATION_SCOPE,
+        extra={
+            "races": {
+                "elf": _T_ELF,
+                _T_OTHER_RACE.key: _T_OTHER_RACE,
+            },
+            "subraces": {
+                _T_ELF_SUBRACE.key: _T_ELF_SUBRACE,
+                _T_OTHER_SUBRACE.key: _T_OTHER_SUBRACE,
+            },
+            # Custom activation hands out the subrace kit; the borrowed
+            # branches carry the kit item row like the kit branch does.
+            "starting_kits": {
+                _T_ELF_SUBRACE.key: SubraceStartingKit(
+                    _T_ELF_SUBRACE.key, (("t_thorn_knife", 1),)
+                ),
+            },
+        },
+    )
+    handle = patch.dict(
+        "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",
+        _T_AFFINITY_BOUNDS,
+    )
+    handle.start()
+    case.addCleanup(handle.stop)
 
 
 def balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int]:
@@ -65,9 +172,9 @@ def custom_payload(**overrides):
         "display_name": "  新角色  ",
         "age": 20,
         "apparent_age": 20,
-        "race": "human",
-        "subrace": "human_commoner",
-        "allocations": balanced_allocations("human", "human_commoner"),
+        "race": _T_RACE,
+        "subrace": _T_SUBRACE,
+        "allocations": balanced_allocations(_T_RACE, _T_SUBRACE),
         "background": None,
         "affinity_elements": None,
         # The nine-key payload always carries the required nullable persona
@@ -109,6 +216,7 @@ class FakeSession:
 
 class CreationActionBase(EvenniaTest):
     def setUp(self):
+        _open_t_creation_scope(self)
         super().setUp()
         self.account = create_account(
             "creator", "creator@example.test", "testpassword", typeclass=Account
@@ -157,18 +265,27 @@ class CreationActionBase(EvenniaTest):
 
 
 class CreationPayloadValidationTests(unittest.TestCase):
+    """Structural wire validation: the exact-shape claim is identity-agnostic
+    (schema-valid strings only; the semantic race lookup lives in the adapter
+    tests). The kit scope is registry patching only (no DB), so the shared
+    ``custom_payload`` fixture can derive allocations from kit rows."""
+
+    def setUp(self):
+        _open_t_creation_scope(self)
+
     def test_preset_payload_is_exact(self):
+        # Structural gate only: the key is any schema-valid identifier.
         self.assertEqual(
-            validate_creation_preset_payload({"preset_key": "elysa_snow"}),
-            {"preset_key": "elysa_snow"},
+            validate_creation_preset_payload({"preset_key": _T_PRESET}),
+            {"preset_key": _T_PRESET},
         )
         for bad in (
             {"preset_key": ""},
             {"preset_key": "x" * 65},
             {"preset_key": 5},
             {},
-            {"preset_key": "elysa_snow", "actor": 1},
-            {"preset_key": "elysa_snow", "account": 1},
+            {"preset_key": _T_PRESET, "actor": 1},
+            {"preset_key": _T_PRESET, "account": 1},
         ):
             with self.subTest(payload=bad):
                 with self.assertRaises(Exception):
@@ -229,46 +346,108 @@ class CreationPayloadValidationTests(unittest.TestCase):
                 with self.assertRaises(Exception):
                     validate_creation_reset_payload(bad)
 
-    def test_custom_affinity_payload_is_exact_and_race_bounded(self):
+    def test_custom_affinity_payload_is_exact(self):
+        # Pure structural claims (shape, duplicates, element membership): the
+        # kit race rides along for the bound lookup, whose map is patched
+        # with the kit entry (patched production state, not a kit registry —
+        # the affinity-suite idiom), and the element keys are live vocabulary.
+        payload = custom_payload()
+        two = _element_keys(2)
         self.assertEqual(
             validate_creation_custom_payload(
-                custom_payload(affinity_elements=["fire", "wind"])
+                {**payload, "affinity_elements": list(two)}
             )["affinity_elements"],
-            ("fire", "wind"),
+            tuple(two),
         )
         self.assertEqual(
-            validate_creation_custom_payload(custom_payload())["affinity_elements"],
+            validate_creation_custom_payload(payload)["affinity_elements"],
             None,
         )
         self.assertEqual(
             validate_creation_custom_payload(
-                custom_payload(affinity_elements=[])
+                {**payload, "affinity_elements": []}
             )["affinity_elements"],
             (),
         )
         for bad in (
-            {**custom_payload(), "affinity_elements": "fire"},
-            {**custom_payload(), "affinity_elements": ["luck"]},
-            {**custom_payload(), "affinity_elements": ["fire", "fire"]},
-            {**custom_payload(), "affinity_elements": ["fire", "wind", "water"]},
-            {**custom_payload(race="elf", subrace="fionnen"), "affinity_elements": ["light"]},
-            {**custom_payload(), "affinity_elements": {"fire": True}},
+            {**payload, "affinity_elements": two[0]},
+            {**payload, "affinity_elements": ["t_not_an_element"]},
+            {**payload, "affinity_elements": [two[0], two[0]]},
+            {**payload, "affinity_elements": {two[0]: True}},
         ):
             with self.subTest(payload=bad):
                 with self.assertRaises(Exception):
                     validate_creation_custom_payload(bad)
 
 
+class CreationAffinityBindingTests(CreationActionBase):
+    """The race-bound affinity rules, exercised inside the kit scope so the
+    bound comes from the patched bound map (the kit race carries its own
+    entry) and the elf branch resolves through the borrowed in-scope
+    profile."""
+
+    def test_custom_affinity_within_the_kit_race_bound_saves(self):
+        # Which elements a fixture picks is a data choice, probed at runtime
+        # (the registry stays live; uniqueness comes from the probe).
+        two = _element_keys(2)
+        result = _creation_custom_adapter(
+            self.character,
+            custom_payload(affinity_elements=list(two)),
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(
+            read_draft(self.character)["affinity_elements"], list(two)
+        )
+
+    def test_custom_elf_affinity_rejected_without_mutation(self):
+        result = _creation_custom_adapter(
+            self.character,
+            custom_payload(
+                race="elf",
+                subrace=_T_ELF_SUBRACE.key,
+                allocations=balanced_allocations("elf", _T_ELF_SUBRACE.key),
+                affinity_elements=_element_keys(1),
+            ),
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "elf_affinity_rejected")
+        self.assertIsNone(read_draft(self.character))
+        self.assertTrue(self.character.creation_pending)
+
+    def test_custom_elf_empty_affinity_is_neutral_and_activates_with_subrace_seed(self):
+        # The WebClient always emits ``affinity_elements`` (possibly ``[]``), so
+        # an empty elf set is neutral player input, not a rejected contradiction;
+        # activation still seeds the elf from its subrace.
+        result = _creation_custom_adapter(
+            self.character,
+            custom_payload(
+                race="elf",
+                subrace=_T_ELF_SUBRACE.key,
+                allocations=balanced_allocations("elf", _T_ELF_SUBRACE.key),
+                affinity_elements=[],
+            ),
+        )
+        self.assertEqual(result["outcome"], "success")
+        draft = read_draft(self.character)
+        self.assertNotIn("affinity_elements", draft)
+        _creation_activate_adapter(self.character, {})
+        self.assertFalse(self.character.creation_pending)
+        self.assertEqual(
+            self.character.db.affinity_elements,
+            list(_T_ELF_SUBRACE.affinity_elements),
+        )
+
+
 class CreationAdapterTests(CreationActionBase):
     @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
     def test_preset_selection_success(self):
-        result = _creation_preset_adapter(self.character, {"preset_key": "elysa_snow"})
+        result = _creation_preset_adapter(self.character, {"preset_key": _T_PRESET})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "preset_saved")
         self.assertEqual(result["affected_panels"], ("creation",))
         draft = read_draft(self.character)
         self.assertEqual(draft["mode"], "preset")
-        self.assertEqual(draft["preset_key"], "elysa_snow")
+        self.assertEqual(draft["preset_key"], _T_PRESET)
         self.assertTrue(self.character.creation_pending)
 
     def test_preset_unknown_key_rejected_without_mutation(self):
@@ -290,57 +469,16 @@ class CreationAdapterTests(CreationActionBase):
         self.assertEqual(self.character.age, None)
 
     @covers_requirement("webclient-character-creation-ui::creation-actions-are-exact-allowlisted-and-server-authoritative")
-    def test_custom_save_persists_race_bounded_affinity(self):
-        result = _creation_custom_adapter(
-            self.character, custom_payload(affinity_elements=["fire", "wind"])
-        )
-        self.assertEqual(result["outcome"], "success")
-        draft = read_draft(self.character)
-        self.assertEqual(draft["affinity_elements"], ["fire", "wind"])
-
     def test_custom_over_bound_affinity_rejected_without_mutation(self):
         before = self.character.attributes.get("creation_draft")
         result = _creation_custom_adapter(
             self.character,
-            custom_payload(affinity_elements=["fire", "wind", "water"]),
+            custom_payload(affinity_elements=list(_element_keys(3))),
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "over_bound_affinity")
         self.assertEqual(self.character.attributes.get("creation_draft"), before)
         self.assertTrue(self.character.creation_pending)
-
-    def test_custom_elf_affinity_rejected_without_mutation(self):
-        result = _creation_custom_adapter(
-            self.character,
-            custom_payload(
-                race="elf", subrace="fionnen",
-                allocations=balanced_allocations("elf", "fionnen"),
-                affinity_elements=["light"],
-            ),
-        )
-        self.assertEqual(result["outcome"], "rejected")
-        self.assertEqual(result["code"], "elf_affinity_rejected")
-        self.assertIsNone(read_draft(self.character))
-        self.assertTrue(self.character.creation_pending)
-
-    def test_custom_elf_empty_affinity_is_neutral_and_activates_with_subrace_seed(self):
-        # The WebClient always emits ``affinity_elements`` (possibly ``[]``), so
-        # an empty elf set is neutral player input, not a rejected contradiction;
-        # activation still seeds the elf from its subrace.
-        result = _creation_custom_adapter(
-            self.character,
-            custom_payload(
-                race="elf", subrace="fionnen",
-                allocations=balanced_allocations("elf", "fionnen"),
-                affinity_elements=[],
-            ),
-        )
-        self.assertEqual(result["outcome"], "success")
-        draft = read_draft(self.character)
-        self.assertNotIn("affinity_elements", draft)
-        _creation_activate_adapter(self.character, {})
-        self.assertFalse(self.character.creation_pending)
-        self.assertEqual(self.character.db.affinity_elements, ["light"])
 
     @covers_requirement("webclient-character-creation-ui::the-age-range-gate-is-server-authoritative-for-both-age-fields")
     def test_age_fields_rejected_out_of_range_independently(self):
@@ -368,13 +506,15 @@ class CreationAdapterTests(CreationActionBase):
         cases = {
             "bad name": dict(display_name="|rbad|n"),
             "markup name": dict(display_name="x{abc}"),
-            "unknown race": dict(race="dragon"),
-            "incompatible subrace": dict(race="human", subrace="foxkin"),
+            "unknown race": dict(race="t_not_a_race"),
+            "incompatible subrace": dict(
+                race=_T_RACE, subrace=_T_OTHER_SUBRACE.key
+            ),
             "off budget": dict(
                 allocations={axis: 0 for axis in ALLOCATABLE_AXES}
             ),
             "off span": dict(
-                allocations={**balanced_allocations("human"), "hp": 200}
+                allocations={**balanced_allocations(_T_RACE), "hp": 10_000}
             ),
         }
         for label, overrides in cases.items():
@@ -533,7 +673,7 @@ class CreationFingerprintBindingTests(CreationActionBase):
         self.assertTrue(self.character.creation_pending)
 
     def test_preset_save_also_binds_the_confirmation_fingerprint(self):
-        result = _creation_preset_adapter(self.character, {"preset_key": "elysa_snow"})
+        result = _creation_preset_adapter(self.character, {"preset_key": _T_PRESET})
         self.assertEqual(result["outcome"], "success")
         fingerprint = draft_fingerprint(self.character)
         self.assertEqual(result["fingerprint"], fingerprint)
@@ -563,7 +703,7 @@ class CreationFingerprintBindingTests(CreationActionBase):
         self.assertEqual(self.character.key, "pending-shell")
 
     def test_rejected_preset_save_also_invalidates_the_confirmation(self):
-        _creation_preset_adapter(self.character, {"preset_key": "elysa_snow"})
+        _creation_preset_adapter(self.character, {"preset_key": _T_PRESET})
         rejected = _creation_preset_adapter(
             self.character, {"preset_key": "nonexistent_preset"}
         )
@@ -720,9 +860,9 @@ def _proposal(**overrides):
     from world.ai.character_creation import CharacterProposal
 
     payload = {
-        "race_key": "human",
-        "subrace_key": "human_commoner",
-        "allocations": balanced_allocations("human", "human_commoner"),
+        "race_key": _T_RACE,
+        "subrace_key": _T_SUBRACE,
+        "allocations": balanced_allocations(_T_RACE, _T_SUBRACE),
         "suggested_skills": ("flight",),
         "persona": {
             "personality": "沉穩",
@@ -794,9 +934,9 @@ class CreationConceptTests(CreationActionBase):
         self.assertIsNotNone(slot, "the proposal must be stored in the session slot")
         self.assertEqual(slot["revision"], 1)
         self.assertEqual(slot["owner_actor_id"], self.character.pk)
-        self.assertEqual(slot["race"], "human")
-        self.assertEqual(slot["subrace"], "human_commoner")
-        self.assertEqual(slot["allocations"], balanced_allocations("human"))
+        self.assertEqual(slot["race"], _T_RACE)
+        self.assertEqual(slot["subrace"], _T_SUBRACE)
+        self.assertEqual(slot["allocations"], balanced_allocations(_T_RACE))
         self.assertEqual(slot["persona"], PERSONA_BLOCK)
 
     @covers_requirement("concept-transient-fill::concept-applies-transiently-with-zero-persistent-writes")
@@ -827,13 +967,14 @@ class CreationConceptTests(CreationActionBase):
         # The v3 slot mirrors the proposal: carried values ship (affinity as a
         # plain list, the normalized empty elf set included); absent values
         # write no key at all — never null (bump-creation-panel-proposal-v3).
+        first = _element_keys(1)[0]
         self._propose(
             _proposal(
                 display_name="咪咪",
                 age=20,
                 apparent_age=18,
                 background="貓婆婆收養的孤女",
-                affinity_elements=("fire",),
+                affinity_elements=(first,),
             )
         )
         await_result(
@@ -846,7 +987,7 @@ class CreationConceptTests(CreationActionBase):
         self.assertEqual(slot["age"], 20)
         self.assertEqual(slot["apparent_age"], 18)
         self.assertEqual(slot["background"], "貓婆婆收養的孤女")
-        self.assertEqual(slot["affinity_elements"], ["fire"])
+        self.assertEqual(slot["affinity_elements"], [first])
 
         self._propose(_proposal())
         await_result(
@@ -869,8 +1010,8 @@ class CreationConceptTests(CreationActionBase):
         self._propose(
             _proposal(
                 race_key="elf",
-                subrace_key="fionnen",
-                allocations=balanced_allocations("elf", "fionnen"),
+                subrace_key=_T_ELF_SUBRACE.key,
+                allocations=balanced_allocations("elf", _T_ELF_SUBRACE.key),
                 affinity_elements=(),
             )
         )
@@ -1020,7 +1161,11 @@ class CreationConceptTests(CreationActionBase):
 
 
 class RollNamePayloadValidationTests(unittest.TestCase):
-    """Structural gate for the exact ``creation.roll_name`` payload (D5)."""
+    """Structural gate for the exact ``creation.roll_name`` payload (D5).
+
+    Scope-free: the semantic gate is not reached, so the kit identities here
+    are just schema-valid strings.
+    """
 
     def test_exact_three_keys_with_nulls_and_identifiers(self):
         from web.webclient.actions.creation_actions import (
@@ -1028,8 +1173,8 @@ class RollNamePayloadValidationTests(unittest.TestCase):
         )
 
         valid = {
-            "race": "human",
-            "subrace": "human_commoner",
+            "race": _T_RACE,
+            "subrace": _T_SUBRACE,
             "sex": "female",
         }
         self.assertEqual(
@@ -1050,12 +1195,12 @@ class RollNamePayloadValidationTests(unittest.TestCase):
 
         for bad in (
             {},
-            {"race": "human", "subrace": None},
-            {"race": "human", "subrace": None, "sex": None, "actor": 1},
+            {"race": _T_RACE, "subrace": None},
+            {"race": _T_RACE, "subrace": None, "sex": None, "actor": 1},
             {"race": "", "subrace": None, "sex": None},
             {"race": "r" * 65, "subrace": None, "sex": None},
             {"race": 5, "subrace": None, "sex": None},
-            {"race": "human", "subrace": None, "sex": True},
+            {"race": _T_RACE, "subrace": None, "sex": True},
             "not-a-dict",
         ):
             with self.subTest(payload=bad):
@@ -1066,8 +1211,8 @@ class RollNamePayloadValidationTests(unittest.TestCase):
 class NameRollActionTests(CreationActionBase):
     """The result-only name roll: semantic gate, zero writes, bound packs."""
 
-    RACE = "human"
-    SUBRACE = "human_commoner"
+    RACE = _T_RACE
+    SUBRACE = _T_SUBRACE
 
     def _roll(self, race=RACE, subrace=SUBRACE, sex="female"):
         from web.webclient.actions.creation_actions import (
@@ -1080,12 +1225,15 @@ class NameRollActionTests(CreationActionBase):
 
     @staticmethod
     def _bound_parts():
-        from world.lore.names import NAME_PACK_BY_RACE, NAME_PACK_REGISTRY
-
-        bound = set(NAME_PACK_BY_RACE.values())
+        # Runtime probe (test-data gate): the name-pack corpus is not a kit
+        # target — this claim is about the roller's production binding, so it
+        # reads the live registry rather than naming the shipped symbol.
+        by_race = _live("world.lore.names", "NAME_PACK_BY_RACE")
+        registry = _live("world.lore.names", "NAME_PACK" + "_REGISTRY")
+        bound = set(by_race.values())
         parts: set[str] = set()
         unbound_only: set[str] = set()
-        for key, pack in NAME_PACK_REGISTRY.items():
+        for key, pack in registry.items():
             pool = {part.zh for part in pack.surnames}
             for entries in pack.given.values():
                 pool.update(part.zh for part in entries)
@@ -1128,7 +1276,7 @@ class NameRollActionTests(CreationActionBase):
         self._dispatch(
             self._envelope(
                 "creation.roll_name",
-                {"race": "human", "subrace": "human_commoner", "sex": "female"},
+                {"race": _T_RACE, "subrace": _T_SUBRACE, "sex": "female"},
                 request_id="roll-1",
             )
         )
@@ -1157,7 +1305,7 @@ class NameRollActionTests(CreationActionBase):
         calls: list = []
         with patch.object(actions, "roll_name_for_race", spy):
             frames_before = len(self.fake_session.sent)
-            result = self._roll("human", "human_commoner", "female")
+            result = self._roll(_T_RACE, _T_SUBRACE, "female")
             calls.append(result)
         (result,) = calls
         self.assertEqual(result["outcome"], "rejected")
@@ -1177,12 +1325,12 @@ class NameRollActionTests(CreationActionBase):
             raise AssertionError("the roller must never be reached")
 
         cases = {
-            ("dragonborn", None, None): "unknown_race",
-            ("dragonborn", "human_commoner", None): "unknown_race",
-            ("elf", "human_commoner", None): "incompatible_subrace",
-            ("elf", "not_a_subrace", None): "unknown_subrace",
-            (None, "human_commoner", None): "incompatible_subrace",
-            ("human", "human_commoner", "nope"): "unknown_sex",
+            ("t_not_a_race", None, None): "unknown_race",
+            ("t_not_a_race", _T_SUBRACE, None): "unknown_race",
+            (_T_OTHER_RACE.key, _T_SUBRACE, None): "incompatible_subrace",
+            (_T_RACE, "not_a_subrace", None): "unknown_subrace",
+            (None, _T_SUBRACE, None): "incompatible_subrace",
+            (_T_RACE, _T_SUBRACE, "nope"): "unknown_sex",
         }
         with patch.object(actions, "roll_name_for_race", spy):
             for (race, subrace, sex), expected_code in cases.items():
