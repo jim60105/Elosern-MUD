@@ -227,9 +227,14 @@ class SexualTransitionTests(EvenniaTestCase):
         self.assertTrue(entity.sexual.virgin)
 
     def test_rule_experience_titfuck_added(self):
+        # The added label is read from the firing rule's own ``add`` clause:
+        # the bridge must apply exactly what the table declares. The shipped
+        # label prose stays in the rulebook YAML (its data-contract home),
+        # never restated as a test literal.
+        added = RULES["experience_titfuck_added"].then["add"]
         entity = self._entity()
         apply_event(entity, "breast_sex_performed")
-        self.assertIn("乳交", entity.sexual.experience_types)
+        self.assertIn(added, entity.sexual.experience_types)
 
     def test_rule_experience_watched_added(self):
         entity = self._entity()

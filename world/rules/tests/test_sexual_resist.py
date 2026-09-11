@@ -502,15 +502,30 @@ class SexualResistAffinityTests(EvenniaTestCase):
 
     @covers_requirement("sexual-resist-contest::the-ordinary-contest-reuses-the-shipped-to-hit-formula-shape-with-blended-scores")
     def test_flat_atk_phys_bonus_applies_additively(self):
+        # The bonus carrier is the combat-modifier rulebook's own
+        # skill_owned→flat-atk_phys row, probed at runtime: the passive key
+        # and the bonus magnitude arrive as rule values, never as literals,
+        # so the blend arithmetic — flat atk_phys bonuses add into the
+        # strength term BEFORE the 0.4/0.6 weighting — stays the assertion.
+        from world.rules.combat_modifiers import _RULES
+
+        bonus_rule = next(
+            rule
+            for rule in _RULES
+            if set(rule.when) == {"skill_owned"}
+            and list(rule.then) == ["atk_phys"]
+            and isinstance(rule.then["atk_phys"], int)
+        )
+        bonus = bonus_rule.then["atk_phys"]
         self.player.db.skills = {
             "active": [],
-            "passive": ["retainer_martial_training"],
+            "passive": [bonus_rule.when["skill_owned"]],
         }
         agility = float(self.player.skills.effective_value("agility"))
         atk_phys = float(self.player.skills.effective_value("atk_phys"))
         self.assertAlmostEqual(
             _blended_score(self.player),
-            0.6 * agility + 0.4 * (atk_phys + 5),
+            0.6 * agility + 0.4 * (atk_phys + bonus),
         )
 
     @covers_requirement("sexual-resist-contest::a-resister-mid-climax-auto-complies-for-the-first-five-settlement-points-then-resists-normally")
