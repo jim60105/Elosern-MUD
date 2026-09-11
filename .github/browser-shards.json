@@ -248,7 +248,8 @@
       ],
       "files_b": [
         "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest",
-        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest"
+        "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest",
+        "web.tests.browser.test_browser_synth_journey.SynthJourneySmokeTest.test_shop_stock_rows_resolve_synthetic_keys_end_to_end"
       ]
     },
     {
