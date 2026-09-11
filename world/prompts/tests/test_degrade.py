@@ -32,6 +32,13 @@ from tools.spec_traceability import covers_requirement
 
 from world.prompts.tests.fixtures import PromptFixture
 
+from world.tests.synthetic_data import (
+    SYNTH_ARCHETYPES,
+    SYNTH_MONSTER_TIERS,
+    SYNTH_SUBRACES,
+    synthetic_registries,
+)
+
 
 
 def _raw(**overrides):
@@ -70,7 +77,7 @@ def await_result(d):
 def _log():
     return EventLog(
         actor="elosia",
-        skill_key="basic_attack",
+        skill_key="t_synth_strike",
         targets=("violet",),
         entries=(
             EventEntry(
@@ -178,11 +185,23 @@ class BoundedFailureDegradeTests(PromptFixture):
         _reset_all()
         register_scenario_director()
         client = FakeLLMClient()
+        from world.ai.scenario_director import get_template_pool
+
+        # The offline template pool is the degrade target; the request
+        # context is probed from the pool itself so the fitness gate is
+        # exercised against pool data instead of hardcoded shipped keys.
+        template = next(b for b in get_template_pool() if b.quest_type == "討伐")
+        anchor = next(
+            stage.location.anchor_key or stage.location.anchor_near
+            for stage in template.stages
+            if stage.location is not None
+            and (stage.location.anchor_key or stage.location.anchor_near)
+        )
         context = {
             "requested_type": "討伐",
-            "allowed_rank": "F",
-            "issuer_branch": "guild_branch_altoria",
-            "anchor": "capital_altoria",
+            "allowed_rank": template.rank,
+            "issuer_branch": template.issuer,
+            "anchor": anchor,
         }
         with override_settings(LLM_PROFILES=_raw()):
             d = generate_quest_blueprint(client, context=context)
@@ -203,6 +222,7 @@ class BoundedFailureDegradeTests(PromptFixture):
         )
         self.assertEqual(LLMNPC._thinking_text(npc), "")
 
+    @synthetic_registries("archetypes", "monster_tiers", "subraces")
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer", "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_broken_art_file_degrades_to_deterministic_fallback_descriptions(self):
         from unittest.mock import Mock
@@ -220,26 +240,34 @@ class BoundedFailureDegradeTests(PromptFixture):
         self.assertIn("art.character_description", library.errors)
         self.assertIn("art.style", library.errors)
 
-        scene = scene_subject_for("forest_path")
+        # The fallback producers resolve their subjects against the scene
+        # archetype / monster tier / subrace catalogs, so the kit rows stand
+        # in — the degrade claim is about the registry-driven fallback text,
+        # not the shipped archetype/bestiary/lore prose.
+        synth_scene = sorted(SYNTH_ARCHETYPES)[0]
+        synth_tier = sorted(SYNTH_MONSTER_TIERS)[0]
+        synth_subrace = sorted(SYNTH_SUBRACES)[0]
+
+        scene = scene_subject_for(synth_scene)
         self.assertEqual(
             description_for(scene),
-            "陽光穿過層疊的枝葉，灑在一條蜿蜒的林間小徑上，四周寂靜得只剩下風聲。",
+            SYNTH_ARCHETYPES[synth_scene].scene_sentence,
         )
 
         character = Mock()
         character.db.display_name = "艾琳"
-        character.db.race = "beastfolk"
-        character.db.subrace = "catkin"
+        character.db.race = "t_duskmari"
+        character.db.subrace = synth_subrace
         character.key = "艾琳"
         text = character_description(character, 24, fields=("appearance",))
         self.assertIn("艾琳", text)
-        self.assertIn("貓人族", text)
+        self.assertIn(SYNTH_SUBRACES[synth_subrace].display_name_zh, text)
         self.assertIn("24", text)
 
-        monster = monster_subject_for("low")
+        monster = monster_subject_for(synth_tier)
         self.assertEqual(
             monster_description(monster),
-            "Threats a beginning adventurer can handle alone.",
+            SYNTH_MONSTER_TIERS[synth_tier].description,
         )
 
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
