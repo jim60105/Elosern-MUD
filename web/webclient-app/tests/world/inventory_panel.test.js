@@ -13,11 +13,15 @@ import {
 } from "../../stories/fixtures.js";
 import { SYNTH_ITEM } from "../support/synthetic-data.mjs";
 
-// The inspected row is located in the committed presentation sample by
-// position, and the local action rows carry the kit item, so no shipped
-// catalog identifier is restated in this test's source
+// The inspected row is located in the committed presentation sample by a
+// discriminating predicate (its rarity is the property every inspector
+// assertion below pins), and the local action rows carry the kit item, so no
+// shipped catalog identifier is restated in this test's source
 // (test-data-independence).
-const POTION_KEY = SERVICES_PANEL_PRESENTATION_SAMPLE.inventory.rows[1].item_key;
+const RARE_ROW = SERVICES_PANEL_PRESENTATION_SAMPLE.inventory.rows.find(
+  (r) => r.presentation && r.presentation.rarity === "rare",
+);
+const POTION_KEY = RARE_ROW.item_key;
 
 const CHARACTER_UNAVAILABLE = {
   schema_version: 7,
@@ -115,7 +119,7 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
   it("shows the inspector with the identical committed content for hover and focus", async () => {
     const w = mountPanel({ services: SERVICES_PANEL_PRESENTATION_SAMPLE });
     const potionTile = w.get(`[data-testid="inventory-panel__tile--${POTION_KEY}"]`);
-    const row = SERVICES_PANEL_PRESENTATION_SAMPLE.inventory.rows.find((r) => r.item_key === POTION_KEY);
+    const row = RARE_ROW;
 
     // Pointer hover path.
     potionTile.trigger("pointerenter");

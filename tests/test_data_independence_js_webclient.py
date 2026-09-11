@@ -7,9 +7,11 @@ DEBT exemption for the twenty-two JavaScript files it migrated (nine
 over exactly those files: none may carry a ledger DEBT or CONTRACT exemption,
 and all must hold zero lint findings — so a future edit that reintroduces a
 shipped identifier cannot silently re-register debt. Every manifest file
-resolves shipped vocabulary through the JS synthetic mirror
+resolves shipped vocabulary in its SOURCE through the JS synthetic mirror
 (``support/synthetic-data``), file-local synthetic rows, model-owned wire
-constants, or values derived from the committed payload fixtures, so the whole
+constants, or values read from the committed payload fixture objects at
+runtime — the gate scans source text only, so a fixture module keeping its
+shipped rows cannot reintroduce a literal into a manifest file, so the whole
 manifest stays debt-free and finding-free.
 """
 
