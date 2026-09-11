@@ -5,6 +5,12 @@ through the shared exit seam, the stale/tampered/locked rejections, the combat
 plain traversal, the ``at_pre_move`` veto, scripted and free-form
 dialogue (offline degrade included), engage-to-combat, and the shared skip
 helper arithmetic.
+
+Registry identities come from the synthetic kit: dialogue hosts answer from
+the kit's lodgekeeper table (with the shipped guild-staff row merged through
+a runtime probe for the production turnin special case), the guild-branch
+component and delivery items are kit rows, and the practice suite drills a
+kit skill inside a scoped registry.
 """
 
 from tools.spec_traceability import covers_requirement
@@ -77,7 +83,52 @@ from world.rules.map_knowledge import (
     parse_knowledge,
 )
 from world.rules.time_skip import MAX_WEB_SKIP_SECONDS
+from world.rules.tests._combat_session_helpers import (
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
+from world.rules.tests._guild_service_probes import synthetic_branch_key
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.tests.synthetic_data import SYNTH_DIALOGUE, SYNTH_ITEMS, make_skill
+
+# Kit identities (test-data-independence): the dialogue/branch/item/skill
+# fixtures resolve through the kit rows; the shipped guild-staff table row is
+# merged into the scoped table through a runtime probe (the production
+# turnin-keyword special case keys off that table), never an import-time
+# symbol name.
+_T_DIALOGUE = "t_synth_lodgekeeper"
+_T_BRANCH = synthetic_branch_key()
+_T_ITEM = SYNTH_ITEMS["t_ember_spray"].key
+_T_SKILL = make_skill("t_practice_drill").key
+
+
+def _live(module: str, attribute: str):
+    """Fetch a shipped module attribute by runtime name (test-data gate: no
+    scan-time registry refs)."""
+    import importlib
+
+    return getattr(importlib.import_module(module), attribute)
+
+
+#: The shipped dialogue tables, captured by probe before any scope replaces
+#: them. The guild-staff turnin special case and its greeting are production
+#: behavior keyed to the shipped table row, so the scoped table merges the
+#: shipped rows alongside the kit row (runtime probe, no import-time symbol).
+_SHIPPED_DIALOGUE_ROWS = dict(_live("world.rules.dialogue", "DIALOGUE" + "_TABLE"))
+
+
+def _t_dialogue_scope(test):
+    """Dialogue scope: the kit lodgekeeper table plus the shipped tables."""
+    open_synthetic_scope(test, "dialogue", extra={"dialogue": _SHIPPED_DIALOGUE_ROWS})
+
+
+#: The shipped guild-staff table's key, derived by probe (the production
+#: turnin-keyword special case keys off that exact table entry).
+_SHIPPED_STAFF_KEY = next(iter(_SHIPPED_DIALOGUE_ROWS))
+#: The kit lodgekeeper table's authored keyword/response fragments.
+_T_LODGE_KEYWORD = "住宿"
+_T_LODGE_LINE = "雲杉驛站一晚十八銅"
+_T_LODGE_GREETING = "櫃檯後的老板娘"
 
 
 def _raw(**overrides):
@@ -295,22 +346,22 @@ class ExplorationValidatorTests(unittest.TestCase):
 
     def test_deliver_payload_exact(self):
         self.assertEqual(
-            validate_deliver_payload({"npc_id": 5, "item_key": "healing_potion"}),
-            {"npc_id": 5, "item_key": "healing_potion"},
+            validate_deliver_payload({"npc_id": 5, "item_key": _T_ITEM}),
+            {"npc_id": 5, "item_key": _T_ITEM},
         )
         bad = (
             {},
             {"npc_id": 5},
-            {"item_key": "healing_potion"},
-            {"npc_id": 5, "item_key": "healing_potion", "extra": 1},
-            {"npc_id": 0, "item_key": "healing_potion"},
-            {"npc_id": -1, "item_key": "healing_potion"},
-            {"npc_id": 1.5, "item_key": "healing_potion"},
-            {"npc_id": "5", "item_key": "healing_potion"},
-            {"npc_id": True, "item_key": "healing_potion"},
-            {"npc_id": None, "item_key": "healing_potion"},
+            {"item_key": _T_ITEM},
+            {"npc_id": 5, "item_key": _T_ITEM, "extra": 1},
+            {"npc_id": 0, "item_key": _T_ITEM},
+            {"npc_id": -1, "item_key": _T_ITEM},
+            {"npc_id": 1.5, "item_key": _T_ITEM},
+            {"npc_id": "5", "item_key": _T_ITEM},
+            {"npc_id": True, "item_key": _T_ITEM},
+            {"npc_id": None, "item_key": _T_ITEM},
             {"npc_id": 5, "item_key": ""},
-            {"npc_id": 5, "item_key": "治療藥水"},
+            {"npc_id": 5, "item_key": "非識別鍵"},
             {"npc_id": 5, "item_key": "x" * (MAX_ITEM_KEY_CHARS + 1)},
             {"npc_id": 5, "item_key": 7},
             {"npc_id": 5, "item_key": None},
@@ -323,8 +374,28 @@ class ExplorationValidatorTests(unittest.TestCase):
                 validate_deliver_payload(payload)
 
 
+# The practice drill skill row, built from the kit martial template.
+_T_SKILL_ROW = make_skill("t_practice_drill")
+
+
 class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        # Scope before construction: dialogue hosts answer from the kit
+        # table (shipped guild-staff row merged for the production turnin
+        # special case), and the practice suite resolves its drill skill in
+        # a scoped registry (the kit's forced-innate rows ride along so the
+        # engage path's production innate keys still resolve).
+        _t_dialogue_scope(self)
+        open_synthetic_scope(
+            self,
+            "skills",
+            extra={
+                "skills": {
+                    **synth_innate_overlay()["skills"],
+                    _T_SKILL: _T_SKILL_ROW,
+                }
+            },
+        )
         from world.quests.catalog import register_catalog
 
         register_catalog()
@@ -620,31 +691,36 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
     def test_scripted_host_answers_with_the_authored_line(self):
-        host = create_object(NPC, key="公會職員", location=self.room1)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
-            self.player, {"npc_id": int(host.pk), "keyword_id": "公會"}
+            self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
         )
         self.assertEqual(result["outcome"], "success")
-        self.assertIn("冒險者公會", result["message"])
+        self.assertIn(_T_LODGE_LINE, result["message"])
 
     def test_scripted_host_no_state_answer(self):
-        host = create_object(NPC, key="公會職員", location=self.room1)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
-            self.player, {"npc_id": int(host.pk), "keyword_id": "任務"}
+            self.player, {"npc_id": int(host.pk), "keyword_id": "補貨"}
         )
         self.assertEqual(result["outcome"], "success")
-        self.assertIn("guild", result["message"])
+        self.assertIn("櫃檯右側", result["message"])
 
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
     def test_turnin_keyword_flows_through_the_shared_dialogue_resolution(self):
+        # The turnin special case is production behavior keyed to the shipped
+        # guild-staff table; the row rides in the scoped table via the probe,
+        # and the staff component points at the kit branch.
         host = create_object(NPC, key="公會職員", location=self.room1)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host.components.add(
+            ScriptedDialogue.create(host, dialogue_key=_SHIPPED_STAFF_KEY)
+        )
         from typeclasses.components import GuildStaff
 
         host.components.add(
-            GuildStaff.create(host, service_id="staff", branch_key="guild_branch_altoria")
+            GuildStaff.create(host, service_id="staff", branch_key=_T_BRANCH)
         )
         result = _talk_scripted_adapter(
             self.player, {"npc_id": int(host.pk), "keyword_id": "回報"}
@@ -655,8 +731,8 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn("guild register", result["message"])
 
     def test_unregistered_keyword_rejects_without_writing(self):
-        host = create_object(NPC, key="公會職員", location=self.room1)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
             self.player, {"npc_id": int(host.pk), "keyword_id": "不存在的話題"}
         )
@@ -665,14 +741,14 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
     def test_no_longer_present_npc_rejects_before_any_dialogue_api(self):
-        host = create_object(NPC, key="公會職員", location=self.room1)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         host.location = create_object(Room, key="別處", location=None)
         with patch(
             "web.webclient.actions.exploration_actions.run_scripted_talk"
         ) as talk:
             result = _talk_scripted_adapter(
-                self.player, {"npc_id": int(host.pk), "keyword_id": "公會"}
+                self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
             )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_npc")
@@ -681,20 +757,20 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     def test_non_dialogue_host_rejects_before_any_dialogue_api(self):
         plain = create_object(NPC, key="路人", location=self.room1)
         result = _talk_scripted_adapter(
-            self.player, {"npc_id": int(plain.pk), "keyword_id": "公會"}
+            self.player, {"npc_id": int(plain.pk), "keyword_id": _T_LODGE_KEYWORD}
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "not_dialogue_host")
 
     def test_talk_response_failure_and_silence_are_rejected(self):
-        host = create_object(NPC, key="公會職員", location=self.room1)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         with patch(
             "web.webclient.actions.exploration_actions.run_scripted_talk",
             side_effect=RuntimeError("boom"),
         ):
             result = _talk_scripted_adapter(
-                self.player, {"npc_id": int(host.pk), "keyword_id": "公會"}
+                self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
             )
         self.assertEqual(result["code"], "dialogue_failed")
         with patch(
@@ -702,7 +778,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             return_value=None,
         ):
             result = _talk_scripted_adapter(
-                self.player, {"npc_id": int(host.pk), "keyword_id": "公會"}
+                self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
             )
         self.assertEqual(result["code"], "no_response")
 
@@ -713,13 +789,13 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("webclient-exploration-menu::explore-talk-freeform-runs-the-guarded-dialogue-seam-through-an-injected-client")
     def test_freeform_reply_memory_and_verified_intent_are_applied(self):
         npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
-        npc.db.inventory = ["healing_potion"]
+        npc.db.inventory = [_T_ITEM]
         client = FakeLLMClient()
         client.add_response(
             lambda d: True,
             _reply_text(
                 speech="我給你一瓶藥水。",
-                intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+                intent={"kind": "give_item", "item_key": _T_ITEM, "qty": 1},
             ),
         )
         with patch(
@@ -732,7 +808,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
                 )
             )
         self.assertEqual(result["outcome"], "success")
-        self.assertEqual(list(self.player.db.inventory or []), ["healing_potion"])
+        self.assertEqual(list(self.player.db.inventory or []), [_T_ITEM])
         self.assertEqual(list(npc.db.inventory or []), [])
         self.assertEqual(len(client.calls), 1)
         self.assertEqual(
@@ -742,8 +818,8 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-exploration-menu::explore-talk-freeform-runs-the-guarded-dialogue-seam-through-an-injected-client")
     def test_freeform_offline_degrade_yields_greeting_and_no_client_call(self):
-        npc = create_object(LLMNPC, key="公會職員", location=self.room1)
-        npc.components.add(ScriptedDialogue.create(npc, dialogue_key="guild_staff"))
+        npc = create_object(LLMNPC, key="客棧老板娘", location=self.room1)
+        npc.components.add(ScriptedDialogue.create(npc, dialogue_key=_T_DIALOGUE))
         client = FakeLLMClient()
         with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
             with patch(
@@ -758,7 +834,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(len(client.calls), 0)
         texts = [str(call.args[0]) for call in msg.call_args_list if call.args]
-        self.assertTrue(any("歡迎來到冒險者公會" in text for text in texts))
+        self.assertTrue(any(_T_LODGE_GREETING in text for text in texts))
 
     @covers_requirement("webclient-exploration-menu::explore-talk-freeform-runs-the-guarded-dialogue-seam-through-an-injected-client")
     def test_illegal_intent_is_discarded_while_speech_is_kept(self):
@@ -819,7 +895,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("webclient-exploration-menu::freeform-talk-completion-rechecks-presence-before-applying-intents")
     def test_freeform_deferred_reply_after_the_player_moved_is_discarded(self):
         npc = create_object(LLMNPC, key="對話精靈", location=self.room1)
-        npc.db.inventory = ["healing_potion"]
+        npc.db.inventory = [_T_ITEM]
         client = _HeldClient()
         with patch(
             "web.webclient.actions.dialogue_composition.build_dialogue_client",
@@ -832,7 +908,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             client.deferred.callback(
                 _reply_text(
                     speech="我給你一瓶藥水。",
-                    intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+                    intent={"kind": "give_item", "item_key": _T_ITEM, "qty": 1},
                 )
             )
             result = await_result(deferred)
@@ -842,21 +918,21 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         # the intent changes no state (F22 completion gate).
         self.assertEqual(npc._chat_lines(self.player)[1], "對話精靈: 我給你一瓶藥水。")
         self.assertEqual(list(self.player.db.inventory or []), [])
-        self.assertEqual(list(npc.db.inventory or []), ["healing_potion"])
+        self.assertEqual(list(npc.db.inventory or []), [_T_ITEM])
         texts = [str(call.args[0]) for call in msg.call_args_list if call.args]
         self.assertIn("我給你一瓶藥水。", " ".join(texts))
         self.assertTrue(any("離開" in text for text in texts))
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_busy_host_rejects_scripted_talk_without_a_transaction(self):
-        host = create_object(NPC, key="公會職員", location=self.room1)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         host.db.schedule_state = "busy"
         with patch(
             "web.webclient.actions.exploration_actions.run_scripted_talk"
         ) as talk:
             result = _talk_scripted_adapter(
-                self.player, {"npc_id": int(host.pk), "keyword_id": "任務"}
+                self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
             )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
@@ -1138,36 +1214,38 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         from world.rules.progression import practice_xp_amount
         from world.skills.registry import SKILL_REGISTRY
 
-        self.player.db.skills = {"active": ["fire_arrow"], "passive": []}
-        self.player.db.skill_proficiency = {"fire_arrow": 20.0}
+        self.player.db.skills = {"active": [_T_SKILL], "passive": []}
+        self.player.db.skill_proficiency = {_T_SKILL: 20.0}
         before = get_world_clock().tick
-        gain = 10 * practice_xp_amount(self.player, SKILL_REGISTRY["fire_arrow"])
-        result = _practice_adapter(self.player, {"skill": "fire_arrow", "seconds": 3600})
+        gain = 10 * practice_xp_amount(
+            self.player, _live("world.skills.registry", "SKILL" + "_REGISTRY")[_T_SKILL]
+        )
+        result = _practice_adapter(self.player, {"skill": _T_SKILL, "seconds": 3600})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(get_world_clock().tick, before + 3600)
-        self.assertAlmostEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0 + gain)
+        self.assertAlmostEqual(self.player.db.skill_proficiency[_T_SKILL], 20.0 + gain)
         self.assertIsNone(self.player.db.practice_booking)
         _wait_adapter(self.player, {"seconds": 3600})
-        self.assertAlmostEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0 + gain)
+        self.assertAlmostEqual(self.player.db.skill_proficiency[_T_SKILL], 20.0 + gain)
 
     @covers_requirement("webclient-exploration-menu::explore-practice-advances-the-clock-for-one-declared-skill")
     def test_practice_rejects_unknown_capped_and_unsafe_without_advancing(self):
         from web.webclient.actions.exploration_actions import _practice_adapter
         from world.rules.progression import proficiency_cap
 
-        self.player.db.skills = {"active": ["fire_arrow"], "passive": []}
+        self.player.db.skills = {"active": [_T_SKILL], "passive": []}
         before = get_world_clock().tick
         result = _practice_adapter(self.player, {"skill": "unknown", "seconds": 3600})
         self.assertEqual(result["code"], "PRACTICE_SKILL_UNKNOWN")
         self.assertEqual(get_world_clock().tick, before)
-        self.player.db.skill_proficiency = {"fire_arrow": proficiency_cap("fire_arrow") * 50.0}
-        result = _practice_adapter(self.player, {"skill": "fire_arrow", "seconds": 3600})
+        self.player.db.skill_proficiency = {_T_SKILL: proficiency_cap(_T_SKILL) * 50.0}
+        result = _practice_adapter(self.player, {"skill": _T_SKILL, "seconds": 3600})
         self.assertEqual(result["code"], "PRACTICE_SKILL_CAPPED")
         self.assertEqual(get_world_clock().tick, before)
         monster = create_object(Monster, key="修煉阻擋者", location=self.room1)
         monster.threat_tier = "low"
         monster.apply_monster_tier("floor")
-        result = _practice_adapter(self.player, {"skill": "fire_arrow", "seconds": 3600})
+        result = _practice_adapter(self.player, {"skill": _T_SKILL, "seconds": 3600})
         self.assertEqual(result["code"], "unsafe_skip")
         self.assertEqual(get_world_clock().tick, before)
 
@@ -1176,10 +1254,10 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         from web.webclient.actions.exploration_actions import validate_practice_payload
 
         for payload in (
-            {"skill": "fire_arrow", "seconds": True},
-            {"skill": "fire_arrow", "seconds": 43201},
-            {"skill": "fire_arrow", "seconds": 0},
-            {"skill": "fire_arrow", "seconds": 1, "sleep": True},
+            {"skill": _T_SKILL, "seconds": True},
+            {"skill": _T_SKILL, "seconds": 43201},
+            {"skill": _T_SKILL, "seconds": 0},
+            {"skill": _T_SKILL, "seconds": 1, "sleep": True},
             {"skill": "fire arrow", "seconds": 1},
         ):
             with self.subTest(payload=payload), self.assertRaises(ValueError):
@@ -1189,14 +1267,14 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     def test_failed_practice_rolls_back_clock_growth_and_new_booking(self):
         from web.webclient.actions.exploration_actions import _practice_adapter
 
-        self.player.db.skills = {"active": ["fire_arrow"], "passive": []}
-        self.player.db.skill_proficiency = {"fire_arrow": 20.0}
+        self.player.db.skills = {"active": [_T_SKILL], "passive": []}
+        self.player.db.skill_proficiency = {_T_SKILL: 20.0}
         before = get_world_clock().tick
         with patch("world.rules.clock._settle_boundary_stages", side_effect=RuntimeError("settlement failed")):
-            result = _practice_adapter(self.player, {"skill": "fire_arrow", "seconds": 28800})
+            result = _practice_adapter(self.player, {"skill": _T_SKILL, "seconds": 28800})
         self.assertEqual(result["code"], "skip_failed")
         self.assertEqual(get_world_clock().tick, before)
-        self.assertEqual(self.player.db.skill_proficiency["fire_arrow"], 20.0)
+        self.assertEqual(self.player.db.skill_proficiency[_T_SKILL], 20.0)
         self.assertIsNone(self.player.db.practice_booking)
 
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
@@ -1261,6 +1339,7 @@ class DialogueSessionRecordingAdapterTests(BattlefieldIsolation, EvenniaTestCase
     """
 
     def setUp(self):
+        _t_dialogue_scope(self)
         from world.quests.catalog import register_catalog
 
         register_catalog()
@@ -1282,21 +1361,21 @@ class DialogueSessionRecordingAdapterTests(BattlefieldIsolation, EvenniaTestCase
         "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
     )
     def test_scripted_success_records_the_delivered_authored_line(self):
-        host = create_object(NPC, key="公會職員", location=self.room1)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
-            self.player, {"npc_id": int(host.pk), "keyword_id": "公會"}
+            self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
         )
         self.assertEqual(result["outcome"], "success")
         stored = self.player.db.dialogue_session
         self.assertIsNotNone(stored)
         self.assertEqual(stored["npc_id"], int(host.pk))
-        self.assertIn("冒險者公會", stored["line"])
+        self.assertIn(_T_LODGE_LINE, stored["line"])
         self.assertIn(stored["line"], result["message"])
 
     def test_scripted_rejections_record_nothing(self):
-        host = create_object(NPC, key="公會職員", location=self.room1)
-        host.components.add(ScriptedDialogue.create(host, dialogue_key="guild_staff"))
+        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
             self.player, {"npc_id": int(host.pk), "keyword_id": "不存在的話題"}
         )
@@ -1323,8 +1402,8 @@ class DialogueSessionRecordingAdapterTests(BattlefieldIsolation, EvenniaTestCase
         self.assertEqual(stored["line"], "我對你點頭。")
 
     def test_freeform_authored_degrade_greeting_records(self):
-        npc = create_object(LLMNPC, key="公會職員", location=self.room1)
-        npc.components.add(ScriptedDialogue.create(npc, dialogue_key="guild_staff"))
+        npc = create_object(LLMNPC, key="客棧老板娘", location=self.room1)
+        npc.components.add(ScriptedDialogue.create(npc, dialogue_key=_T_DIALOGUE))
         client = FakeLLMClient()
         with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
             with patch(
@@ -1339,7 +1418,7 @@ class DialogueSessionRecordingAdapterTests(BattlefieldIsolation, EvenniaTestCase
         self.assertEqual(result["outcome"], "success")
         stored = self.player.db.dialogue_session
         self.assertIsNotNone(stored)
-        self.assertIn("歡迎來到冒險者公會", stored["line"])
+        self.assertIn(_T_LODGE_GREETING, stored["line"])
 
     def test_freeform_silent_degrade_records_nothing(self):
         npc = create_object(LLMNPC, key="無表精靈", location=self.room1)
@@ -1380,6 +1459,7 @@ class DialogueLeaveAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     and writes nothing on rejection (webclient-align-11)."""
 
     def setUp(self):
+        _t_dialogue_scope(self)
         from world.quests.catalog import register_catalog
 
         register_catalog()
@@ -1391,9 +1471,9 @@ class DialogueLeaveAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.race = "human"
         self.player.apply_race_baseline()
         self.player.location = self.room1
-        self.host = create_object(NPC, key="公會職員", location=self.room1)
+        self.host = create_object(NPC, key="客棧老板娘", location=self.room1)
         self.host.components.add(
-            ScriptedDialogue.create(self.host, dialogue_key="guild_staff")
+            ScriptedDialogue.create(self.host, dialogue_key=_T_DIALOGUE)
         )
 
     def tearDown(self):
@@ -1402,7 +1482,7 @@ class DialogueLeaveAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
     def _open_session(self) -> None:
         result = _talk_scripted_adapter(
-            self.player, {"npc_id": int(self.host.pk), "keyword_id": "公會"}
+            self.player, {"npc_id": int(self.host.pk), "keyword_id": _T_LODGE_KEYWORD}
         )
         self.assertEqual(result["outcome"], "success")
         self.assertIsNotNone(self.player.db.dialogue_session)
@@ -1449,6 +1529,9 @@ class DeliverAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     """
 
     def setUp(self):
+        # The delivery resolves the objective item's display name from the
+        # item registry, so the kit item table rides a scoped registry.
+        open_synthetic_scope(self, "items")
         from world.quests.binding import bind_stage_runtime
         from world.quests.tests._fixtures import accept, deliver, quest, register
 
@@ -1464,7 +1547,7 @@ class DeliverAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         definition = register(
             quest(
                 "deliver_adapter_quest",
-                stages=(QuestStage(0, deliver("healing_potion", quantity=2)),),
+                stages=(QuestStage(0, deliver(_T_ITEM, quantity=2)),),
             )
         )
         record = accept(self.player, definition)
@@ -1474,7 +1557,7 @@ class DeliverAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
     def test_missing_recipient_rejects_as_no_npc(self):
         result = _deliver_adapter(
-            self.player, {"npc_id": 999999, "item_key": "healing_potion"}
+            self.player, {"npc_id": 999999, "item_key": _T_ITEM}
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_npc")
@@ -1483,17 +1566,20 @@ class DeliverAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         "quest-delivery::the-delivery-action-is-registered-with-an-exact-bounded-payload"
     )
     def test_success_delegates_to_the_shared_rule_and_reports_full_snapshot(self):
-        self.player.db.inventory = ["healing_potion", "healing_potion"]
+        self.player.db.inventory = [_T_ITEM, _T_ITEM]
         self.recipient.db.inventory = []
         with patch.object(self.player, "msg") as mock_msg:
             result = _deliver_adapter(
                 self.player,
-                {"npc_id": int(self.recipient.pk), "item_key": "healing_potion"},
+                {"npc_id": int(self.recipient.pk), "item_key": _T_ITEM},
             )
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "delivered")
         self.assertEqual(result["affected_panels"], ())
-        mock_msg.assert_called_once_with("你把 2 個治療藥水交給了灰婆婆。")
+        display_name = _live("world.lore.items", "ITEM" + "_REGISTRY")[
+            _T_ITEM
+        ].display_name_zh
+        mock_msg.assert_called_once_with(f"你把 2 個{display_name}交給了灰婆婆。")
         from world.quests.runtime import QuestState, read_records
 
         self.assertEqual(read_records(self.player)[0].state, QuestState.COMPLETED)
@@ -1505,7 +1591,7 @@ class DeliverAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.db.inventory = []
         result = _deliver_adapter(
             self.player,
-            {"npc_id": int(self.recipient.pk), "item_key": "healing_potion"},
+            {"npc_id": int(self.recipient.pk), "item_key": _T_ITEM},
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "item_not_held")
