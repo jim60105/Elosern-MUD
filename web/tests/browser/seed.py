@@ -1129,13 +1129,21 @@ def main() -> None:
         SYNTH_COMBAT_LADDER_SKILL,
         SYNTH_COMBAT_MONSTERS,
         SYNTH_COMBAT_PASSIVE_SKILLS,
+        SYNTH_INNATE_ATTACK_KEY,
+        SYNTH_INNATE_FLEE_KEY,
         first_live_monster_tier_key,
     )
 
     synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
+    # The universal attack/flee seam: shipped ownership arrives through the
+    # human race baseline's innates; the kit race grants nothing, so the
+    # grafted seam rows are owned explicitly under the synthetic install.
+    active_skills = list(SYNTH_COMBAT_ACTIVE_SKILLS if synth else SHIPPED_COMBAT_ACTIVE_SKILLS)
+    if synth:
+        active_skills += [SYNTH_INNATE_ATTACK_KEY, SYNTH_INNATE_FLEE_KEY]
     grant_lineage(
         character,
-        list(SYNTH_COMBAT_ACTIVE_SKILLS if synth else SHIPPED_COMBAT_ACTIVE_SKILLS),
+        active_skills,
         list(SYNTH_COMBAT_PASSIVE_SKILLS if synth else SHIPPED_COMBAT_PASSIVE_SKILLS),
         rungs={
             (SYNTH_COMBAT_LADDER_SKILL if synth else SHIPPED_COMBAT_LADDER_SKILL): (

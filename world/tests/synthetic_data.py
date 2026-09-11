@@ -286,18 +286,19 @@ SYNTH_SKILLS: dict[str, SkillDef] = {
         category=SkillCategory.ELEMENTAL_MAGIC,
         group=_SYNTH_ELEMENT,
     ),
-    # Lineage-canopy spell consumed by the FIRST element group: its declared
-    # prerequisite edge gives the managed harness a second closed-in row
-    # behind the requested cast (the shipped fire tree's exact shape), and
-    # keeps t_ember_burst itself prereq-free for the many probes that grant
-    # only it.
-    "t_ember_lance": SkillDef(
-        key="t_ember_lance",
-        label="燼尖矛",
-        description="將壓縮的燼屑凝成尖矛，以低耗能刺穿單一目標。",
+    # Canopy spell consumed by the browser combat journey's first element
+    # group (the shipped fire tree's deep/shallow shape): the deep cast
+    # declares the shallow burst, so a fixture requesting only the deep
+    # spell gets ``t_ember_burst`` closed in BEHIND it in ownership order.
+    # Kept distinct from ``t_ember_burst`` itself, which the many kit probes
+    # grant prereq-free.
+    "t_ember_comet": SkillDef(
+        key="t_ember_comet",
+        label="燼流星",
+        description="引燃天穹墜落的燼屑，轟擊單一目標。",
         kind=SkillKind.ACTIVE,
         target_spec=TargetSpec.SINGLE,
-        cost={"mp": 10},
+        cost={"mp": 14},
         usable_out_of_combat=True,
         element=_SYNTH_ELEMENT,
         effects=[f"damage:{_SYNTH_ELEMENT}:magic"],

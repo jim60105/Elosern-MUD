@@ -853,13 +853,13 @@ def rarity_word(rarity: str) -> str:
 #: ``t_glowmire_mastery`` is granted alongside), mirroring the shipped
 #: wind-blade/mastery pairing without naming shipped skills. Ownership order
 #: is the panel's intra-group row order: the borrowed-element group carries
-#: the cast spell with its lineage canopy (``grant_lineage`` closes
-#: ``t_ember_lance`` in behind its own prerequisite edge on the spell), the
-#: utility group carries the context-less disabled row BEFORE the NONE-shape
-#: cast carrier so the disabled row is the frame's first focus in both modes.
+#: the deep canopy cast ``t_ember_comet`` first (``grant_lineage`` closes its
+#: prereq ``t_ember_burst`` in BEHIND it, the shipped fire tree's exact
+#: two-row shape), the utility group carries the context-less disabled row
+#: BEFORE the NONE-shape cast carrier so the disabled row is the frame's
+#: first focus in both modes.
 SYNTH_COMBAT_ACTIVE_SKILLS = (
-    "t_ember_burst",
-    "t_ember_lance",
+    "t_ember_comet",
     "t_glowmire_bloom",
     "t_cinder_cleave",
     "t_moss_veil",
@@ -903,16 +903,26 @@ def combat_journey_values() -> dict:
     - ``self_disabled_key``: the utility active whose effect handler
       declares an event-context key the combat session never supplies, so
       the menu exposes it disabled.
+    - ``spell_element`` / ``ladder_element``: the ELEMENT_REGISTRY keys the
+      sub-groups of the elemental category are named after (the spell borrows
+      the shipped first element in both modes; the ladder's element differs).
+    - ``spell_element_label``: the display label the first sub-group renders.
+    - ``enhancement_key``: the owned active of the enhancement category's
+      null-keyed sub-group (NONE-shape in shipped mode).
     """
     if synth_mode_enabled():
         return {
             "attack_key": SYNTH_INNATE_ATTACK_KEY,
-            "spell_key": "t_ember_burst",
-            "prereq_key": "t_ember_lance",
+            "spell_key": "t_ember_comet",
+            "prereq_key": "t_ember_burst",
             "ladder_key": "t_glowmire_bloom",
             "none_key": "t_cinder_breath",
             "none_category": "utility",
             "self_disabled_key": "t_rock_quietus",
+            "spell_element": "fire",
+            "ladder_element": "t_glowmire",
+            "spell_element_label": "火",
+            "enhancement_key": "t_moss_veil",
         }
     return {
         "attack_key": SHIPPED_INNATE_ATTACK_KEY,
@@ -922,6 +932,10 @@ def combat_journey_values() -> dict:
         "none_key": SHIPPED_COMBAT_NONE_SKILL,
         "none_category": "enhancement",
         "self_disabled_key": SHIPPED_COMBAT_DISABLED_SKILL,
+        "spell_element": "fire",
+        "ladder_element": "wind",
+        "spell_element_label": "火",
+        "enhancement_key": SHIPPED_COMBAT_NONE_SKILL,
     }
 
 

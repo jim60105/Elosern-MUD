@@ -1,9 +1,9 @@
 """Keyboard-only combat menu browser acceptance (webclient-combat-menu 5.2-5.5).
 
 These journeys drive the real Evennia server's combat sessions through the
-Vue action dock (ActionDock): the seeded character owns fire_ball (SINGLE),
-wind_blade (AREA), status_disguise (SELF), concentration (NONE), and the innate
-basic_attack (SINGLE) and flee (SELF). Each test starts combat by engaging a
+Vue action dock (ActionDock): the seeded character owns the mode's SINGLE
+spell, AREA ladder spell, SELF utility, NONE-shape active, and the innate
+attack (SINGLE) and flee (SELF) seams. Each test starts combat by engaging a
 fixture monster through the ordinary command line (H5, webclient-hud-05-
 overlays-and-command-line: the retired drawer's successor), then drives the
 combat dock with arrows and Enter, asserting the exact OOB payloads and
@@ -15,6 +15,8 @@ from __future__ import annotations
 import time
 
 from tools.spec_traceability import covers_requirement
+
+from web.browser_support.browser_fixtures_data import combat_journey_values
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
@@ -109,6 +111,61 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             if participant["team"] == "foes":
                 return participant["identity"]
         raise AssertionError("no enemy participant")
+
+    # -- mode seams ----------------------------------------------------------
+    #
+    # Every journey role (cast/prereq/ladder/NONE/disabled keys) resolves
+    # through ``combat_journey_values()``; frame positions derive from the
+    # committed panel instead of hardcoded press counts, so the same journeys
+    # drive the shipped and the synthetic skill tables.
+
+    def _roles(self) -> dict:
+        return combat_journey_values()
+
+    def _press(self, page, key):
+        page.keyboard.press(key)
+        page.wait_for_timeout(80)
+
+    def _press_to(self, page, key, count):
+        for _ in range(count):
+            self._press(page, key)
+
+    def _open_skills(self, page) -> None:
+        self._press(page, "ArrowRight")  # skills tab
+        self._press(page, "Enter")  # -> category frame
+
+    def _open_category(self, page, category: str) -> None:
+        """Arrow to ``category`` in the category frame and Enter into it (a
+        single-group category opens its skill frame directly)."""
+        names = [item["category"] for item in self._combat_panel(page)["skills"]]
+        self.assertIn(category, names)
+        self._press_to(page, "ArrowRight", names.index(category))
+        self._press(page, "Enter")
+
+    def _focus_skill(self, page, category: str, key: str) -> None:
+        """Walk to ``key``'s row from the frame ``_open_category`` left off
+        in, using the panel's category -> group -> skill geometry: the
+        multi-group path crosses the group frame first, the single-group
+        path is already on the skill frame."""
+        panel = self._combat_panel(page)
+        names = [item["category"] for item in panel["skills"]]
+        self.assertIn(category, names)
+        groups = panel["skills"][names.index(category)]["groups"]
+        position = next(
+            (
+                (group_index, skill_index)
+                for group_index, group in enumerate(groups)
+                for skill_index, skill in enumerate(group["skills"])
+                if skill["key"] == key
+            ),
+            None,
+        )
+        self.assertIsNotNone(position, f"{key} not in the {category} panel tree")
+        group_index, skill_index = position
+        if len(groups) > 1:
+            self._press_to(page, "ArrowRight", group_index)
+            self._press(page, "Enter")  # -> skill frame
+        self._press_to(page, "ArrowRight", skill_index)
 
     def test_focus_stays_on_action_dock_in_combat(self):
         page = self.logged_in_page()
@@ -330,7 +387,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
         self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], "basic_attack")
+        self.assertEqual(envelope["payload"]["skill_key"], self._roles()["attack_key"])
         self.assertEqual(envelope["payload"]["target_ids"], [target])
 
     @covers_requirement("webclient-combat-menu::combat-browser-acceptance-is-keyboard-only-and-desktop-bounded")
@@ -339,16 +396,16 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._engage(page)
         target = self._fire_ball_identity(page)
+        spell = self._roles()["spell_key"]
 
         # H3 skill master-detail (design D11): the skills tab opens the
         # category frame, then the group frame (elemental_magic has two
-        # sub-groups), then the skill frame. fire_ball is the first skill of
-        # the fire group.
-        self._press(page, "ArrowRight")  # skills tab
-        self._press(page, "Enter")  # open skills -> category frame
-        self._press(page, "Enter")  # open elemental_magic -> group frame (fire focused)
-        self._press(page, "Enter")  # open fire group -> skill frame (fire_ball focused)
-        self._press(page, "Enter")  # open fire_ball -> target frame
+        # sub-groups), then the skill frame. The mode's deep spell is the
+        # first skill of the first element sub-group.
+        self._open_skills(page)
+        self._open_category(page, "elemental_magic")
+        self._focus_skill(page, "elemental_magic", spell)
+        self._press(page, "Enter")  # open the spell -> target frame
         # The single-target menu lists the actor and the monster (both valid
         # for ANY scope); move past the actor to select the monster.
         self._press(page, "ArrowRight")
@@ -358,7 +415,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
         self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], "fire_ball")
+        self.assertEqual(envelope["payload"]["skill_key"], spell)
         self.assertEqual(envelope["payload"]["target_ids"], [target])
 
     @covers_requirement("webclient-frame-resolution::the-resolver-table-completes-with-the-services-combat-and-creation-families")
@@ -368,22 +425,22 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         client-local focus key survives — no re-push, no dispatch.
 
         A partial ``ui_update`` replaces only ``context_actions`` with the
-        same session and a renamed fire_ball label. The frame was never
+        same session and a renamed spell label. The frame was never
         rebuilt from a copy: its next read enumerates the new label, the
-        same-key geometry keeps the fire_ball row focused, the depth is
+        same-key geometry keeps the spell row focused, the depth is
         unchanged, and nothing crosses the wire.
         """
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
+        spell = self._roles()["spell_key"]
 
         # skills tab -> category frame -> group frame -> skill frame (the
-        # same geometry as test_single_skill_target_flow; fire_ball is the
-        # first skill of the fire group and holds focus).
-        self._press(page, "ArrowRight")  # skills tab
-        self._press(page, "Enter")  # open skills -> category frame
-        self._press(page, "Enter")  # elemental_magic -> group frame
-        self._press(page, "Enter")  # fire group -> skill frame (fire_ball focused)
+        # same geometry as test_single_skill_target_flow; the mode's deep
+        # spell is the first skill of the first element group and holds focus).
+        self._open_skills(page)
+        self._open_category(page, "elemental_magic")
+        self._focus_skill(page, "elemental_magic", spell)
         self.assertEqual(
             page.evaluate("() => window.__elosernBridge.router.currentDescriptor().source"),
             "combat.group",
@@ -391,33 +448,33 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         depth_before = page.evaluate("() => window.__elosernBridge.router.depth()")
         self.assertEqual(
             page.evaluate("() => window.__elosernBridge.router.currentItem().key"),
-            "fire_ball",
+            spell,
         )
         sent_before = len(self._ui_actions(page))
 
-        new_label = "烈焰彈（改標）"
+        new_label = "改標測試標籤"
         panel = self._combat_panel(page)
         mutated = False
         for category in panel["skills"]:
             for group in category["groups"]:
                 for skill in group["skills"]:
-                    if skill["key"] == "fire_ball":
+                    if skill["key"] == spell:
                         skill["label"] = new_label
                         mutated = True
-        self.assertTrue(mutated, "fixture must carry fire_ball")
+        self.assertTrue(mutated, "fixture must carry the mode's deep spell")
         inject_update(page, {"context_actions": panel}, mode="combat")
 
         rows = page.evaluate(
             "() => window.__elosernBridge.router.currentMenu().items.map("
             "(i) => ({ key: i.key, label: i.label }))"
         )
-        fired = [row for row in rows if row["key"] == "fire_ball"]
+        fired = [row for row in rows if row["key"] == spell]
         self.assertEqual(len(fired), 1, rows)
         self.assertEqual(fired[0]["label"], new_label)
         # Focus tracked by key across the panel replacement.
         self.assertEqual(
             page.evaluate("() => window.__elosernBridge.router.currentItem().key"),
-            "fire_ball",
+            spell,
         )
         self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), depth_before)
         # Resolution is read-side only: the injection dispatched nothing.
@@ -429,18 +486,13 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        # status_disguise (SELF) is now disabled in combat: the session context
-        # cannot supply its disguise key, so the menu exposes the disabled
-        # explanation instead of a cast. flee is the enabled SELF skill (third
-        # grid row, first column of the 2-column skills grid).
-        # H3 (design D11): skills tab -> category frame (a single row of
-        # category tabs). flee lives in the 移動 (movement) category, index 3,
-        # which is single-group and opens the skill frame directly.
-        self._press(page, "ArrowRight")  # skills tab
-        self._press(page, "Enter")  # open category frame (elemental_magic focused)
-        self._press(page, "ArrowRight")  # martial_arts (index 1)
-        self._press(page, "ArrowRight")  # enhancement (index 2)
-        self._press(page, "ArrowRight")  # movement (index 3)
+        # The utility SELF caster is disabled in combat: the session context
+        # cannot supply its handler's event-context key, so the menu exposes
+        # the disabled explanation instead of a cast. flee is the enabled SELF
+        # skill. H3 (design D11): skills tab -> category frame; movement is
+        # single-group and opens the skill frame directly.
+        self._open_skills(page)
+        self._open_category(page, "movement")
         self._press(page, "Enter")  # single-group -> skill frame (flee)
         self._press(page, "Enter")  # open-skill (flee) -> self-confirm
         self._press(page, "Enter")  # confirm self-cast
@@ -459,24 +511,22 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        # concentration is the fourth owned active skill (second grid row,
-        # second column).
-        # H3 (design D11): concentration lives in the 強化 (enhancement)
-        # category, index 2 (single-group), which opens the skill frame
-        # directly.
-        self._press(page, "ArrowRight")  # skills tab
-        self._press(page, "Enter")  # open category frame (elemental_magic focused)
-        self._press(page, "ArrowRight")  # martial_arts (index 1)
-        self._press(page, "ArrowRight")  # enhancement (index 2)
-        self._press(page, "Enter")  # single-group -> skill frame (concentration)
-        self._press(page, "Enter")  # open-skill (concentration) -> 施展 item
+        # The mode's NONE-shape active lives in a mode-dependent category
+        # (enhancement shipped, utility under the kit install). H3 (design
+        # D11): skills tab -> category frame; the category opens the skill
+        # frame (the carrier row is focused after the intra-frame walk).
+        roles = self._roles()
+        self._open_skills(page)
+        self._open_category(page, roles["none_category"])
+        self._focus_skill(page, roles["none_category"], roles["none_key"])
+        self._press(page, "Enter")  # open-skill -> 施展 item
         self._press(page, "Enter")  # confirm the single 施展 item
 
         actions = self._ui_actions(page)
         self.assertGreaterEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
         self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], "concentration")
+        self.assertEqual(envelope["payload"]["skill_key"], roles["none_key"])
         self.assertNotIn("target_ids", envelope["payload"])
         self.assertNotIn("target_shorthand", envelope["payload"])
         self.assertNotIn("actor", envelope["payload"])
@@ -488,14 +538,13 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self._engage(page)
         # H3 (design D11): wind_blade is the elemental_magic / wind group.
         # Skills tab -> category frame (elemental_magic focused) -> group frame
-        # (fire + wind) -> select the wind group -> skill frame (wind_blade) ->
-        # 威力 scale step (preselected ×1) -> all-enemies shorthand.
-        self._press(page, "ArrowRight")  # skills tab
-        self._press(page, "Enter")  # open skills -> category frame
-        self._press(page, "Enter")  # open elemental_magic -> group frame (fire + wind)
-        self._press(page, "ArrowRight")  # select the wind group (index 1)
-        self._press(page, "Enter")  # open the wind group -> skill frame (wind_blade)
-        self._press(page, "Enter")  # open wind_blade: 威力 scale step
+        # -> select the ladder's element group -> skill frame -> 威力 scale
+        # step (preselected ×1) -> all-enemies shorthand.
+        ladder = self._roles()["ladder_key"]
+        self._open_skills(page)
+        self._open_category(page, "elemental_magic")
+        self._focus_skill(page, "elemental_magic", ladder)
+        self._press(page, "Enter")  # open the ladder skill: 威力 scale step
         self._press(page, "Enter")  # choose the preselected 威力×1
         # AREA grid: candidate targets (col 0) then shorthands, then confirm.
         # The actor is a valid candidate for ANY scope, so the first grid row
@@ -510,7 +559,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
         self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], "wind_blade")
+        self.assertEqual(envelope["payload"]["skill_key"], ladder)
         self.assertEqual(envelope["payload"]["target_shorthand"], "all-enemies")
         self.assertNotIn("target_ids", envelope["payload"])
 
@@ -683,16 +732,15 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         ]
         self.assertEqual(len(enemy_ids), 1, "engage opens a single-enemy battle")
 
-        # H3 (design D11): wind_blade is the elemental_magic / wind group.
+        # H3 (design D11): the ladder skill is the mastery element's group.
         # Skills tab -> category frame (elemental_magic focused) -> group frame
-        # (fire + wind) -> wind group -> skill frame (wind_blade) -> 威力 scale
+        # -> ladder group -> skill frame -> 威力 scale
         # step (preselected ×1) -> target flow.
-        self._press(page, "ArrowRight")  # skills tab
-        self._press(page, "Enter")  # open category frame (elemental_magic focused)
-        self._press(page, "Enter")  # open elemental_magic -> group frame (fire + wind)
-        self._press(page, "ArrowRight")  # wind group (index 1)
-        self._press(page, "Enter")  # open the wind group -> skill frame (wind_blade)
-        self._press(page, "Enter")  # open-skill (wind_blade): 威力 scale step
+        ladder = self._roles()["ladder_key"]
+        self._open_skills(page)
+        self._open_category(page, "elemental_magic")
+        self._focus_skill(page, "elemental_magic", ladder)
+        self._press(page, "Enter")  # open the ladder skill: 威力 scale step
         self._press(page, "Enter")  # choose the preselected 威力×1
         # AREA grid: candidate targets (col 0) then shorthands, then confirm.
         # The actor is now a valid candidate, so the first grid row holds the
@@ -708,7 +756,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
         self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], "wind_blade")
+        self.assertEqual(envelope["payload"]["skill_key"], ladder)
         self.assertEqual(envelope["payload"]["target_ids"], enemy_ids)
         self.assertNotIn("target_shorthand", envelope["payload"])
 
@@ -717,19 +765,18 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
+        roles = self._roles()
         # H3 (design D2/D11): a disabled entry explains itself through the
         # detail pane (`SkillDetailPane`, `combat-detail`) in the skill frame.
-        # status_disguise (SELF) is disabled in combat (the session context
-        # cannot supply its disguise key), so the pane exposes its disabled
-        # explanation instead of a cast. Navigate: skills tab -> category frame
-        # -> 特殊 (utility, index 4, single-group) -> skill frame.
-        self._press(page, "ArrowRight")  # skills tab
-        self._press(page, "Enter")  # category frame (elemental_magic focused)
-        self._press(page, "ArrowRight")  # martial_arts (index 1)
-        self._press(page, "ArrowRight")  # enhancement (index 2)
-        self._press(page, "ArrowRight")  # movement (index 3)
-        self._press(page, "ArrowRight")  # utility (index 4)
-        self._press(page, "Enter")  # single-group -> skill frame (status_disguise focused)
+        # The mode's context-less utility SELF caster is disabled in combat
+        # (the session context cannot supply its handler's event-context
+        # key), so the pane exposes its disabled explanation instead of a
+        # cast. Navigate: skills tab -> category frame -> utility
+        # (single-group) -> skill frame (the disabled row is the group's
+        # first focus in both modes).
+        self._open_skills(page)
+        self._open_category(page, "utility")
+        self._focus_skill(page, "utility", roles["self_disabled_key"])
         # Focusing the disabled skill row sets the focused-skill model, so the
         # detail pane (SkillDetailPane, `combat-detail`) renders its reason.
         self.assertTrue(
@@ -952,15 +999,15 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         ]
         self.assertEqual(len(enemy_ids), 1, "engage opens a single-enemy battle")
 
-        # H3 (design D11): wind_blade is the elemental_magic / wind group.
-        # Skills tab -> category frame -> group frame (fire + wind) -> wind group
-        # -> skill frame (wind_blade) -> 威力 scale step (preselected ×1) -> target flow.
-        self._press(page, "ArrowRight")  # skills tab
-        self._press(page, "Enter")  # open skills -> category frame
-        self._press(page, "Enter")  # open elemental_magic -> group frame (fire + wind)
-        self._press(page, "ArrowRight")  # select the wind group (index 1)
-        self._press(page, "Enter")  # open the wind group -> skill frame (wind_blade)
-        self._press(page, "Enter")  # open wind_blade: 威力 scale step
+        # H3 (design D11): the ladder skill sits in the elemental_magic /
+        # mastery-element group. Skills tab -> category frame -> group frame
+        # -> ladder group -> skill frame -> 威力 scale step (preselected ×1)
+        # -> target flow.
+        ladder = self._roles()["ladder_key"]
+        self._open_skills(page)
+        self._open_category(page, "elemental_magic")
+        self._focus_skill(page, "elemental_magic", ladder)
+        self._press(page, "Enter")  # open the ladder skill: 威力 scale step
         self._press(page, "Enter")  # choose the preselected 威力×1
         # The actor is now a valid candidate, so the first grid row holds the
         # two candidates; move to the monster candidate before toggling.
@@ -1006,7 +1053,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertGreaterEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
         self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], "wind_blade")
+        self.assertEqual(envelope["payload"]["skill_key"], ladder)
         self.assertEqual(envelope["payload"]["target_ids"], enemy_ids)
 
     @covers_requirement("webclient-combat-menu::the-combat-dock-offers-a-scale-choice-step-only-for-masters")
@@ -1019,16 +1066,15 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             '[data-testid="status-panel__gauge-value--mp"]'
         ).inner_text()
 
-        # H3 (design D11): wind_blade is the elemental_magic / wind group.
-        # Skills tab -> category frame -> group frame (fire + wind) -> wind group
-        # -> skill frame (wind_blade) -> 威力 scale step (wind_mastery owned);
+        # H3 (design D11): the ladder skill sits in the elemental_magic /
+        # mastery-element group. Skills tab -> category frame -> group frame
+        # -> ladder group -> skill frame -> 威力 scale step (mastery owned);
         # 威力×2 is the fourth cell of the five-cell grid.
-        self._press(page, "ArrowRight")  # skills tab
-        self._press(page, "Enter")  # open skills -> category frame
-        self._press(page, "Enter")  # open elemental_magic -> group frame (fire + wind)
-        self._press(page, "ArrowRight")  # select the wind group (index 1)
-        self._press(page, "Enter")  # open the wind group -> skill frame (wind_blade)
-        self._press(page, "Enter")  # open wind_blade: 威力 scale step
+        ladder = self._roles()["ladder_key"]
+        self._open_skills(page)
+        self._open_category(page, "elemental_magic")
+        self._focus_skill(page, "elemental_magic", ladder)
+        self._press(page, "Enter")  # open the ladder skill: 威力 scale step
         # H3: the scale step's rows are the pane's `.dock-menu__scale` buttons.
         scale_rows = page.locator(".dock-menu .dock-menu__scale")
         self.assertGreaterEqual(scale_rows.count(), 5)
@@ -1049,11 +1095,11 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
         self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], "wind_blade")
+        self.assertEqual(envelope["payload"]["skill_key"], ladder)
         self.assertEqual(envelope["payload"]["scale"], 2)
         self.assertEqual(envelope["payload"]["target_ids"], [target])
-        # The scaled cast deducts 28 MP (wind_blade costs 14 at 2×); the
-        # status panel reflects the true resource pool after the round.
+        # The scaled cast deducts 28 MP (the ladder skill costs 14 MP at 2×);
+        # the status panel reflects the true resource pool after the round.
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
             mp_after = page.locator(
@@ -1071,10 +1117,12 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         page = self.logged_in_page()
         self._engage(page)
         panel = self._combat_panel(page)
+        roles = self._roles()
         # The seeded character owns elemental spells, martial-arts innates,
-        # enhancement, utility, movement, and the seven unconditionally-owned
-        # seed acts; the payload lists only the categories that have owned
-        # active skills, in SkillCategory declaration order.
+        # enhancement, utility, movement, and the unconditionally-owned seed
+        # act; the payload lists only the categories that have owned active
+        # skills, in SkillCategory declaration order (both modes own exactly
+        # this category set).
         self.assertEqual(
             [category["category"] for category in panel["skills"]],
             [
@@ -1087,20 +1135,19 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
             ],
         )
         elemental = panel["skills"][0]
-        self.assertEqual(elemental["label"], "元素魔法")
         # Element sub-groups follow ELEMENT_REGISTRY declaration order
-        # (fire before wind), not ownership order.
+        # (the spell's element before the ladder's), not ownership order.
         self.assertEqual(
             [group["group"] for group in elemental["groups"]],
-            ["fire", "wind"],
+            [roles["spell_element"], roles["ladder_element"]],
         )
-        fire = elemental["groups"][0]
-        self.assertEqual(fire["label"], "火")
-        # The lineage closure adds fire_arrow (fire_ball's prereq) behind the
-        # requested fire_ball, so the group lists both in ownership order.
+        first = elemental["groups"][0]
+        self.assertEqual(first["label"], roles["spell_element_label"])
+        # The lineage closure adds the spell's prereq behind the requested
+        # spell, so the group lists both in ownership order.
         self.assertEqual(
-            [skill["key"] for skill in fire["skills"]],
-            ["fire_ball", "fire_arrow"],
+            [skill["key"] for skill in first["skills"]],
+            [roles["spell_key"], roles["prereq_key"]],
         )
         # A category without a group carries exactly one null-keyed sub-group.
         enhancement = panel["skills"][2]
@@ -1110,7 +1157,7 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         self.assertIsNone(enhancement["groups"][0]["label"])
         self.assertEqual(
             [skill["key"] for skill in enhancement["groups"][0]["skills"]],
-            ["concentration"],
+            [roles["enhancement_key"]],
         )
 
     @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
@@ -1119,19 +1166,27 @@ class CombatMenuBrowserTest(BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._engage(page)
         panel = self._combat_panel(page)
+        roles = self._roles()
         by_key = {
             skill["key"]: skill
             for category in panel["skills"]
             for group in category["groups"]
             for skill in group["skills"]
         }
-        # The seeded wind_mastery entitles only wind_blade; every other skill
-        # omits the field entirely, so a non-master's panel would reveal
-        # nothing at all.
-        self.assertIn("freeform_scales", by_key["wind_blade"])
+        # The seeded mastery entitles only the ladder skill; every other
+        # skill omits the field entirely, so a non-master's panel would
+        # reveal nothing at all.
+        ladder = by_key[roles["ladder_key"]]
+        self.assertIn("freeform_scales", ladder)
         self.assertEqual(
-            [entry["scale"] for entry in by_key["wind_blade"]["freeform_scales"]],
+            [entry["scale"] for entry in ladder["freeform_scales"]],
             [0.25, 0.5, 1, 2, 4],
         )
-        for key in ("fire_ball", "concentration", "flee", "basic_attack"):
+        for key in (
+            roles["spell_key"],
+            roles["prereq_key"],
+            roles["none_key"],
+            "flee",
+            roles["attack_key"],
+        ):
             self.assertNotIn("freeform_scales", by_key[key])
