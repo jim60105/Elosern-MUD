@@ -21,22 +21,22 @@
 - [x] 4.3 Migrate `web/static/webclient/js/tests/service_menu.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 4.4 Migrate `web/webclient-app/tests/data/breakdown_rendering.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 4.5 Migrate `web/webclient-app/tests/data/equipment_doll.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.6 Migrate `web/webclient-app/tests/data/skill_book.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.6 Migrate `web/webclient-app/tests/data/skill_book.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
 ## 5. Migrate group 3
 
-- [ ] 5.1 Migrate `web/webclient-app/tests/frame-resolvers.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.2 Migrate `web/webclient-app/tests/overlays/creation_overlay.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.3 Migrate `web/webclient-app/tests/overlays/lineage_panel.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.4 Migrate `web/webclient-app/tests/overlays/title_codex_panel.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.5 Migrate `web/webclient-app/tests/preserved_contract.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 5.6 Migrate `web/webclient-app/tests/store/command_echo_surfaces.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.1 Migrate `web/webclient-app/tests/frame-resolvers.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.2 Migrate `web/webclient-app/tests/overlays/creation_overlay.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.3 Migrate `web/webclient-app/tests/overlays/lineage_panel.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.4 Migrate `web/webclient-app/tests/overlays/title_codex_panel.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.5 Migrate `web/webclient-app/tests/preserved_contract.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.6 Migrate `web/webclient-app/tests/store/command_echo_surfaces.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
 ## 6. Migrate group 4
 
-- [ ] 6.1 Migrate `web/webclient-app/tests/store/declarative_surfaces.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 6.2 Migrate `web/webclient-app/tests/store/store_dispatch_focus.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 6.3 Migrate `web/webclient-app/tests/world/inventory_panel.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 6.1 Migrate `web/webclient-app/tests/store/declarative_surfaces.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 6.2 Migrate `web/webclient-app/tests/store/store_dispatch_focus.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 6.3 Migrate `web/webclient-app/tests/world/inventory_panel.test.js` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 6.4 Migrate `web/webclient-app/tests/world/item_icons.test.js` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
 ## 7. Freeze-list and closure
