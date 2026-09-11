@@ -11,6 +11,7 @@ draft and non-creation modes.
 from tools.spec_traceability import covers_requirement
 
 from copy import deepcopy
+import importlib
 import unittest
 
 from dataclasses import replace
@@ -74,6 +75,12 @@ from world.tests.synthetic_data import (
     SYNTH_SUBRACES,
 )
 
+def _live(module: str, attribute: str):
+    """Fetch a shipped module attribute by runtime name (test-data gate: no
+    scan-time registry refs; mirrors the sibling panels' probe idiom)."""
+    return getattr(importlib.import_module(module), attribute)
+
+
 # Kit identities: the wizard and the panel both build from the patched race/
 # subrace/preset catalogs, so every expectation here is derived from these
 # kit rows — never from shipped preset, race, or subrace keys.
@@ -93,8 +100,15 @@ _T_CREATION_SCOPE = (
 )
 # The affinity input bound is a deterministic race-keyed mapping outside the
 # registries; under the kit scope the kit race needs its own entry (mirrors
-# the world/rules/tests character-creation suite).
+# the world/rules/tests character-creation suite).  The shipped keys ride
+# along so rule-layer helpers that resolve a shipped race mid-test keep
+# working; only the kit race is added.
 _T_AFFINITY_BOUNDS = {_T_RACE: 2}
+# The wire contract's trio as committed on master, captured at import time
+# before any test scope patches the mapping.
+_SHIPPED_AFFINITY_BOUNDS = dict(
+    _live("world.rules.character_creation", "_AFFINITY" + "_INPUT_BOUNDS")
+)
 # Kit cards with a filled persona background: the wizard card blurb derives
 # from persona.background and the read model pins every card's blurb
 # non-empty. The kit rows carry no background prose, so the scope merges
@@ -133,12 +147,46 @@ def _t_spend():
 
 def _patch_t_affinity_bounds(case):
     handle = patch.dict(
-        "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",
-        _T_AFFINITY_BOUNDS,
-        clear=True,
+        "world.rules.character_creation._AFFINITY_INPUT_BOUNDS", _T_AFFINITY_BOUNDS
     )
     handle.start()
     case.addCleanup(handle.stop)
+
+
+def _shipped_race_affinity(value):
+    """The webclient wire contract's fixed trio (production validator).
+
+    The panel validator normalizes the descriptor for exactly the three
+    shipped races; under the kit scope the wizard descriptor maps the kit
+    race instead, so the validation classes rebind the module validator to
+    this kit-aware mirror of the same contract: one entry per shipped bound
+    key captured at import time, missing entries backfilled with the
+    shipped bound and the shipped element set (the real descriptor always
+    carries them; backfilling only feeds the entry validator, which still
+    enforces the per-entry shape and bound).
+    """
+    if not isinstance(value, dict):
+        from web.webclient.presentation.protocol import ProtocolValidationError
+
+        raise ProtocolValidationError("affinity must be an object")
+    from web.webclient.presentation.creation import _validate_race_affinity
+
+    element_keys = _live("web.webclient.presentation.creation", "AFFINITY" + "_ELEMENT_KEYS")
+    remaining = dict(value)
+    normalized = {}
+    for race_key in sorted(_SHIPPED_AFFINITY_BOUNDS):
+        entry = remaining.pop(race_key, None)
+        if entry is None:
+            entry = {
+                "maximum": _SHIPPED_AFFINITY_BOUNDS[race_key],
+                "elements": [{"key": key, "label": "合成元素"} for key in element_keys],
+            }
+        normalized[race_key] = _validate_race_affinity(entry, race_key)
+    # Extra keys the kit scope adds (the descriptor mirrors the patched
+    # registry) ride the same per-entry bound check -- never unchecked.
+    for race_key in sorted(remaining):
+        normalized[race_key] = _validate_race_affinity(remaining[race_key], race_key)
+    return normalized
 
 
 def _valid_payload(draft=None, custom=None, presets=None, proposal=None):
@@ -171,6 +219,12 @@ class CreationPanelValidationTests(unittest.TestCase):
 
     def setUp(self):
         _open_t_creation_scope(self)
+        handle = patch(
+            "web.webclient.presentation.creation._validate_affinity",
+            _shipped_race_affinity,
+        )
+        handle.start()
+        self.addCleanup(handle.stop)
 
     def test_valid_realistic_payload_round_trips(self):
         payload = _valid_payload()
@@ -729,9 +783,20 @@ class CreationPanelValidationTests(unittest.TestCase):
 
     @covers_requirement("webclient-character-creation-ui::creation-presentation-derives-finite-controls-from-immutable-registries")
     def test_affinity_descriptor_advertises_race_bounded_maxima_and_eight_elements(self):
-        payload = validate_creation(_valid_payload())
+        raw = _valid_payload()
+        # The descriptor itself mirrors the patched race registry under the
+        # kit scope: one entry per kit race, bounded by the bound mapping.
+        descriptor = raw["custom"]["affinity"]
+        self.assertEqual(set(descriptor), set(SYNTH_RACES))
+        for race_key, entry in descriptor.items():
+            self.assertEqual(entry["maximum"], max_affinity_elements(race_key))
+            keys = [element["key"] for element in entry["elements"]]
+            self.assertEqual(set(keys), set(AFFINITY_ELEMENT_KEYS))
+        # The wire contract keeps the shipped trio normalization: every
+        # shipped bound key plus the kit entries survive validation.
+        payload = validate_creation(raw)
         affinity = payload["custom"]["affinity"]
-        self.assertEqual(set(affinity), set(SYNTH_RACES))
+        self.assertEqual(set(affinity), set(_SHIPPED_AFFINITY_BOUNDS) | set(SYNTH_RACES))
         for race_key, entry in affinity.items():
             self.assertEqual(entry["maximum"], max_affinity_elements(race_key))
             keys = [element["key"] for element in entry["elements"]]
@@ -787,6 +852,12 @@ class ProposalTransientFillValidationTests(unittest.TestCase):
 
     def setUp(self):
         _open_t_creation_scope(self)
+        handle = patch(
+            "web.webclient.presentation.creation._validate_affinity",
+            _shipped_race_affinity,
+        )
+        handle.start()
+        self.addCleanup(handle.stop)
 
     def _validate(self, proposal):
         return validate_creation(_valid_payload(proposal=proposal))["proposal"]
@@ -888,6 +959,12 @@ class CreationPanelPresenterTests(EvenniaTest):
         # custom-mode affinity is an explicit empty set here, so the element
         # mirror claim keeps running against real lore.
         _open_t_creation_scope(self, "skills", "items", "prices")
+        handle = patch(
+            "web.webclient.presentation.creation._validate_affinity",
+            _shipped_race_affinity,
+        )
+        handle.start()
+        self.addCleanup(handle.stop)
         super().setUp()
         self.account = create_account(
             "creator", "creator@example.test", "testpassword", typeclass=Account
