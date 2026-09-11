@@ -36,8 +36,8 @@
 
 - [ ] 6.1 Migrate `typeclasses/tests/test_appearance.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [x] 6.2 Migrate `typeclasses/tests/test_art_room_entry.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 6.3 Migrate `typeclasses/tests/test_components.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 6.4 Migrate `typeclasses/tests/test_entities.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 6.3 Migrate `typeclasses/tests/test_components.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 6.4 Migrate `typeclasses/tests/test_entities.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 6.5 Migrate `typeclasses/tests/test_exit_movement_cost.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 6.6 Migrate `typeclasses/tests/test_exits.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 

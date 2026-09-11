@@ -17,6 +17,12 @@ from world.rules.persona import PersonaStore
 from world.skills.equipment import EquipmentHandler
 from world.skills.handler import SkillHandler
 from world.rules.sexual_state import SexualState
+from world.tests.synthetic_data import (
+    SYNTH_MONSTER_TIERS,
+    SYNTH_RACES,
+    SYNTH_SUBRACES,
+    synthetic_registries,
+)
 
 
 class LivingEntityTests(EvenniaTestCase):
@@ -72,19 +78,27 @@ class LivingEntityTests(EvenniaTestCase):
 
     @covers_requirement("living-entity-hierarchy::livingentity-carries-race-and-subrace-as-lore-registry-key-attributes")
     def test_representative_entities_resolve_all_eight_traits(self):
-        player = create_object(PlayerCharacter, key="elf")
-        player.race = "elf"
-        player.subrace = "ciaran"
-        player.apply_race_baseline()
+        # Kit rows only: the race/subrace keys and the monster tier resolve
+        # through patched catalogs (no monster combat rounds run here, so
+        # the monster_tiers scope is safe).
+        race_key = next(iter(SYNTH_RACES))
+        subrace_key = next(iter(SYNTH_SUBRACES))
+        tier_key = next(iter(SYNTH_MONSTER_TIERS))
+        with synthetic_registries(
+            "races", "subraces", "static_tiers", "elements", "monster_tiers"
+        ):
+            player = create_object(PlayerCharacter, key="kit-holder")
+            player.race = race_key
+            player.subrace = subrace_key
+            player.apply_race_baseline()
 
-        npc = create_object(NPC, key="foxkin")
-        npc.race = "beastfolk"
-        npc.subrace = "foxkin"
-        npc.apply_race_baseline()
+            npc = create_object(NPC, key="kit-npc")
+            npc.race = race_key
+            npc.apply_race_baseline()
 
-        monster = create_object(Monster, key="calamity")
-        monster.threat_tier = "calamity"
-        monster.apply_monster_tier()
+            monster = create_object(Monster, key="kit-monster")
+            monster.threat_tier = tier_key
+            monster.apply_monster_tier()
 
         expected = {
             "hp",
