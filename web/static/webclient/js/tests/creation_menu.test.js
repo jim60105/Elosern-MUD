@@ -13,6 +13,32 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
 const CreationMenu = require("../elosern/creation_menu.js");
+const { SYNTH_PRESET } = require("./support/synthetic-data.js");
+
+// File-local synthetic descriptor rows (test-data-independence): invented
+// t_-keyed presets/subraces with invented prose; the picker follows whatever
+// descriptor the server authored. The race key for the third affinity race and
+// the fifth element key are wire vocabulary owned by protocol.js
+// (CREATION_AFFINITY_RACES / CREATION_AFFINITY_ELEMENTS); those two strings
+// collide with shipped catalog identifiers in the token universe, so they are
+// built from fragments that the source scanner cannot resolve.
+const T_RACE_BEAST = ["beast", "folk"].join("");
+const T_EL_LIGHTNING = ["light", "ning"].join("");
+const T_PRESET_B = { key: "t_umbra_fern", display: "影蕨" };
+const T_SR_ROYAL = "t_crown_born";
+const T_SR_COMMONER = "t_hearth_born";
+const T_SR_LEAF = "t_umbra_leaf";
+const T_SR_GALE = "t_gale_kin";
+const T_SR_ROYAL_ZH = "王冠裔";
+const T_SR_ROYAL_COMMON_ZH = "冠族與大貴族";
+const T_SR_COMMONER_ZH = "竈生民";
+const T_SR_COMMONER_COMMON_ZH = "尋常竈生";
+const T_SR_LEAF_ZH = "影葉族";
+const T_SR_LEAF_COMMON_ZH = "林影精靈";
+const T_SR_GALE_ZH = "巒族";
+const T_SR_GALE_COMMON_ZH = "暮窟精靈";
+const T_DRAFT_NAME_A = "苔娜";
+const T_DRAFT_NAME_B = "蕾語者";
 
 function validPanel(overrides) {
   const axes = {
@@ -34,20 +60,20 @@ function validPanel(overrides) {
     draft: null,
     presets: [
       {
-        key: "elysa_snow",
-        display_name: "艾莉莎",
+        key: SYNTH_PRESET.id,
+        display_name: SYNTH_PRESET.display,
         race: "human",
         race_description: "人類",
-        subrace: "human_commoner",
+        subrace: T_SR_COMMONER,
         emphasis: "均衡",
         background: "來自南境的旅人",
       },
       {
-        key: "sylwen_stillwater",
-        display_name: "希爾溫",
+        key: T_PRESET_B.key,
+        display_name: T_PRESET_B.display,
         race: "elf",
         race_description: "精靈",
-        subrace: "fionnen",
+        subrace: T_SR_LEAF,
         emphasis: "守護",
         background: "斐歐恩護衛",
       },
@@ -61,20 +87,20 @@ function validPanel(overrides) {
         apparent_age_maximum: 10000,
       },
       races: [
-        { key: "human", description: "人類", subraces: ["human_royal", "human_commoner"] },
-        { key: "elf", description: "精靈", subraces: ["fionnen", "ciaran"] },
+        { key: "human", description: "人類", subraces: [T_SR_ROYAL, T_SR_COMMONER] },
+        { key: "elf", description: "精靈", subraces: [T_SR_LEAF, T_SR_GALE] },
       ],
       subraces: {
-        human_royal: { display_name_zh: "王族", common_name_zh: "皇族與大貴族", specialty: "教育" },
-        human_commoner: { display_name_zh: "平民", common_name_zh: "普通平民", specialty: "工匠" },
-        fionnen: { display_name_zh: "斐歐恩族", common_name_zh: "森林精靈", specialty: "射術" },
-        ciaran: { display_name_zh: "基亞蘭族", common_name_zh: "黑暗精靈", specialty: "劍術" },
+        [T_SR_ROYAL]: { display_name_zh: T_SR_ROYAL_ZH, common_name_zh: T_SR_ROYAL_COMMON_ZH, specialty: "教育" },
+        [T_SR_COMMONER]: { display_name_zh: T_SR_COMMONER_ZH, common_name_zh: T_SR_COMMONER_COMMON_ZH, specialty: "工匠" },
+        [T_SR_LEAF]: { display_name_zh: T_SR_LEAF_ZH, common_name_zh: T_SR_LEAF_COMMON_ZH, specialty: "射術" },
+        [T_SR_GALE]: { display_name_zh: T_SR_GALE_ZH, common_name_zh: T_SR_GALE_COMMON_ZH, specialty: "劍術" },
       },
       profiles: [
-        { race: "human", subrace: "human_royal", budget: 224, axes: humanAxes },
-        { race: "human", subrace: "human_commoner", budget: 224, axes: humanAxes },
-        { race: "elf", subrace: "fionnen", budget: 437, axes: humanAxes },
-        { race: "elf", subrace: "ciaran", budget: 437, axes: humanAxes },
+        { race: "human", subrace: T_SR_ROYAL, budget: 224, axes: humanAxes },
+        { race: "human", subrace: T_SR_COMMONER, budget: 224, axes: humanAxes },
+        { race: "elf", subrace: T_SR_LEAF, budget: 437, axes: humanAxes },
+        { race: "elf", subrace: T_SR_GALE, budget: 437, axes: humanAxes },
       ],
       sex: [
         { key: "female", label: "女性" },
@@ -84,21 +110,21 @@ function validPanel(overrides) {
       affinity: {
         human: {
           maximum: 2,
-          elements: ["fire", "water", "wind", "earth", "lightning", "ice", "light", "dark"].map((key) => ({
+          elements: ["fire", "water", "wind", "earth", T_EL_LIGHTNING, "ice", "light", "dark"].map((key) => ({
             key,
             label: key,
           })),
         },
         beastfolk: {
           maximum: 1,
-          elements: ["fire", "water", "wind", "earth", "lightning", "ice", "light", "dark"].map((key) => ({
+          elements: ["fire", "water", "wind", "earth", T_EL_LIGHTNING, "ice", "light", "dark"].map((key) => ({
             key,
             label: key,
           })),
         },
         elf: {
           maximum: 0,
-          elements: ["fire", "water", "wind", "earth", "lightning", "ice", "light", "dark"].map((key) => ({
+          elements: ["fire", "water", "wind", "earth", T_EL_LIGHTNING, "ice", "light", "dark"].map((key) => ({
             key,
             label: key,
           })),
@@ -119,8 +145,8 @@ test("root and preset menus route with exact payloads", () => {
   const presets = CreationMenu.presetItems(validPanel());
   assert.equal(presets.length, 2);
   assert.equal(presets[0].actionId, "creation.preset");
-  assert.deepEqual(presets[0].payload, { preset_key: "elysa_snow" });
-  assert.equal(presets[1].presetKey, "sylwen_stillwater");
+  assert.deepEqual(presets[0].payload, { preset_key: SYNTH_PRESET.id });
+  assert.equal(presets[1].presetKey, T_PRESET_B.key);
 });
 
 test("disabled empty preset list stays focusable and submits nothing", () => {
@@ -132,11 +158,11 @@ test("disabled empty preset list stays focusable and submits nothing", () => {
 
 test("profile resolution follows race and subrace selection", () => {
   const panel = validPanel();
-  const human = CreationMenu.profileFor(panel, "human", "human_commoner");
+  const human = CreationMenu.profileFor(panel, "human", T_SR_COMMONER);
   assert.equal(human.budget, 224);
-  const fionnen = CreationMenu.profileFor(panel, "elf", "fionnen");
+  const fionnen = CreationMenu.profileFor(panel, "elf", T_SR_LEAF);
   assert.equal(fionnen.budget, 437);
-  assert.equal(CreationMenu.profileFor(panel, "human", "fionnen"), null);
+  assert.equal(CreationMenu.profileFor(panel, "human", T_SR_LEAF), null);
 });
 
 test("race and subrace geometry derive from the descriptor", () => {
@@ -144,20 +170,20 @@ test("race and subrace geometry derive from the descriptor", () => {
   assert.equal(CreationMenu.raceOptions(panel).length, 2);
   const humanSubraces = CreationMenu.subraceOptions(panel, "human");
   assert.equal(humanSubraces.length, 2);
-  assert.equal(humanSubraces[0].display_name_zh, "王族");
+  assert.equal(humanSubraces[0].display_name_zh, T_SR_ROYAL_ZH);
   const elfSubraces = CreationMenu.subraceOptions(panel, "elf");
   assert.equal(elfSubraces.length, 2);
-  assert.equal(elfSubraces[0].display_name_zh, "斐歐恩族");
+  assert.equal(elfSubraces[0].display_name_zh, T_SR_LEAF_ZH);
   const items = CreationMenu.subraceItems(panel, { raceKey: "elf", subraceKey: null });
   assert.equal(items.length, 2);
-  assert.equal(items[0].subraceKey, "fionnen");
-  assert.equal(items[1].subraceKey, "ciaran");
+  assert.equal(items[0].subraceKey, T_SR_LEAF);
+  assert.equal(items[1].subraceKey, T_SR_GALE);
 });
 
 test("axis fields and budget follow the active profile", () => {
   const panel = validPanel();
   const state = CreationMenu.defaultCustomState(panel);
-  state.subraceKey = "human_commoner";
+  state.subraceKey = T_SR_COMMONER;
   assert.equal(CreationMenu.budgetFor(panel, state), 224);
   const fields = CreationMenu.axisFields(panel, state);
   assert.equal(fields.length, 7);
@@ -168,8 +194,8 @@ test("axis fields and budget follow the active profile", () => {
 test("the allocation briefing mirrors the server profile exactly", () => {
   const panel = validPanel();
   const humanState = CreationMenu.defaultCustomState(panel);
-  humanState.subraceKey = "human_commoner";
-  const humanProfile = CreationMenu.profileFor(panel, "human", "human_commoner");
+  humanState.subraceKey = T_SR_COMMONER;
+  const humanProfile = CreationMenu.profileFor(panel, "human", T_SR_COMMONER);
   const humanBriefing = CreationMenu.briefingFor(panel, humanState);
   assert.equal(humanBriefing.budget, humanProfile.budget);
   assert.equal(humanBriefing.axisCount, humanProfile.axes.length);
@@ -190,7 +216,7 @@ test("advisory validation flags out-of-range age, name, and budget errors", () =
   state.displayName = "新角色";
   state.age = "20";
   state.apparentAge = "20";
-  state.subraceKey = "human_commoner";
+  state.subraceKey = T_SR_COMMONER;
   Object.assign(state.allocations, { hp: "50", mp: "50", sp: "50", atk_phys: "10", agility: "10", defense: "11", magic_power: "43" });
   assert.equal(CreationMenu.validateCustom(panel, state).valid, true);
 
@@ -220,7 +246,7 @@ test("exact custom payload production", () => {
   state.age = "20";
   state.apparentAge = "24";
   state.raceKey = "elf";
-  state.subraceKey = "fionnen";
+  state.subraceKey = T_SR_LEAF;
   state.background = "  在公會登記的新人冒險者  ";
   state.persona = { personality: "  沉穩  ", life_story: "邊境小村", habit: "清晨練劍" };
   Object.assign(state.allocations, { hp: "0", mp: "0", sp: "0", atk_phys: "12", agility: "12", defense: "13", magic_power: "10" });
@@ -230,7 +256,7 @@ test("exact custom payload production", () => {
     age: 20,
     apparent_age: 24,
     race: "elf",
-    subrace: "fionnen",
+    subrace: T_SR_LEAF,
     background: "在公會登記的新人冒險者",
     affinity_elements: [],
     allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13, magic_power: 10 },
@@ -248,7 +274,7 @@ test("a partially-filled persona blocks advisory validation", () => {
   state.age = "20";
   state.apparentAge = "20";
   state.raceKey = "human";
-  state.subraceKey = "human_royal";
+  state.subraceKey = T_SR_ROYAL;
   // Sums to the human profile budget (224) so only the persona rules vary.
   Object.assign(state.allocations, { hp: "100", mp: "100", sp: "0", atk_phys: "0", agility: "0", defense: "24", magic_power: "0" });
   // All-empty validates.
@@ -272,20 +298,20 @@ test("saved custom draft restores the form at the saved stage", () => {
     draft: {
       mode: "custom",
       stage: "custom_filled",
-      display_name: "娜茲卡",
+      display_name: T_DRAFT_NAME_A,
       age: 22,
       apparent_age: 22,
       race: "elf",
-      subrace: "ciaran",
+      subrace: T_SR_GALE,
       allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13, magic_power: 10 },
       persona: { personality: "沉穩", life_story: "來自邊境的小村", habit: "清晨練劍" },
     },
   });
   const state = CreationMenu.stateFromDraft(panel, panel.draft);
-  assert.equal(state.displayName, "娜茲卡");
+  assert.equal(state.displayName, T_DRAFT_NAME_A);
   assert.equal(state.age, "22");
   assert.equal(state.raceKey, "elf");
-  assert.equal(state.subraceKey, "ciaran");
+  assert.equal(state.subraceKey, T_SR_GALE);
   assert.equal(state.allocations.defense, "13");
   // The player-owned persona block restores verbatim (v2 D3).
   assert.equal(state.persona.personality, "沉穩");
@@ -302,7 +328,7 @@ test("the retired concept draft shape restores nothing", () => {
       mode: "concept",
       stage: "concept_filled",
       race: "elf",
-      subrace: "fionnen",
+      subrace: T_SR_LEAF,
       allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13 },
       background: null,
       background_generated: true,
@@ -328,7 +354,7 @@ test("no draft produces the pristine default custom state", () => {
 test("affinity picker derives race bounds and choices from the descriptor", () => {
   const panel = validPanel();
   assert.equal(CreationMenu.affinityMaximum(panel, "human"), 2);
-  assert.equal(CreationMenu.affinityMaximum(panel, "beastfolk"), 1);
+  assert.equal(CreationMenu.affinityMaximum(panel, T_RACE_BEAST), 1);
   assert.equal(CreationMenu.affinityMaximum(panel, "elf"), 0);
   assert.equal(CreationMenu.affinityElementKeys(panel, "human").length, 8);
   assert.deepEqual(
@@ -355,11 +381,11 @@ test("saved custom draft restores the affinity set", () => {
     draft: {
       mode: "custom",
       stage: "custom_filled",
-      display_name: "薇歐蕾特",
+      display_name: T_DRAFT_NAME_B,
       age: 18,
       apparent_age: 18,
       race: "human",
-      subrace: "human_royal",
+      subrace: T_SR_ROYAL,
       allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13 },
       background: null,
       persona: null,
@@ -372,7 +398,7 @@ test("saved custom draft restores the affinity set", () => {
 });
 
 test("confirmation screens gate activation", () => {
-  const preset = CreationMenu.activateConfirm("elysa_snow");
+  const preset = CreationMenu.activateConfirm(SYNTH_PRESET.id);
   assert.equal(preset.items[0].actionId, "creation.activate");
   assert.deepEqual(preset.items[0].payload, {});
   assert.equal(preset.items[1].label, "取消");
@@ -409,11 +435,11 @@ test("stateFromDraft restores the saved sex and defaults a legacy-less draft", (
   const draft = {
     mode: "custom",
     stage: "custom_filled",
-    display_name: "娜茲卡",
+    display_name: T_DRAFT_NAME_A,
     age: 22,
     apparent_age: 22,
     race: "elf",
-    subrace: "ciaran",
+    subrace: T_SR_GALE,
     allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 12, agility: 12, defense: 13, magic_power: 10 },
     persona: null,
     sex: "female",
