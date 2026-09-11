@@ -45,6 +45,7 @@ from world.rules.party import (
     is_companion,
     join_party,
 )
+from world.tests.synthetic_data import synthetic_registries
 
 
 def _raw(**overrides):
@@ -69,7 +70,19 @@ def _reply_text(speech="我會考慮看看。", intent=None):
 
 class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
+        # Race baselines resolve through the patched kit catalogs (the class
+        # decorator would only wrap test* methods, never setUp).
+        scope = synthetic_registries("races", "static_tiers", "subraces", "elements")
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
         super().setUp()
+        # Production bootstrap, not a shipped-content reference: the affinity
+        # rulebook validates its cap-break quest_key against the REGISTERED
+        # quest catalog (world/rules/affinity_config.py), so any dialogue
+        # exchange with affinity context needs the shipped catalog installed
+        # exactly as the server does at startup. The quest ships with the
+        # rulebook row that names it, so a game-data rework keeps this seam
+        # self-consistent; the test itself names no shipped identifier.
         from world.quests.catalog import register_catalog
 
         register_catalog()
@@ -77,7 +90,7 @@ class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         register_npc_dialogue()
         self.hall = create_object(Room, key="party hall")
         self.char1.location = self.hall
-        self.char1.race = "human"
+        self.char1.race = "t_duskmari"
         self.char1.apply_race_baseline()
         self.npc = create_object(LLMNPC, key="艾洛希雅", location=self.hall)
 
@@ -149,7 +162,7 @@ class PartyCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement("party-system::the-invite-command-proposes-a-party-through-the-ai-judged-dialogue-seam")
     def test_illegal_intent_keeps_the_speech_and_changes_nothing(self):
         client = self._client(
-            intent={"kind": "give_item", "item_key": "healing_potion", "qty": 1},
+            intent={"kind": "give_item", "item_key": "t_ember_spray", "qty": 1},
             speech="我想要一瓶藥水。",
         )
         with self._patch_client(client):

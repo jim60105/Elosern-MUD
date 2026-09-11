@@ -8,7 +8,7 @@
 ## 3. Migrate group 1
 
 - [ ] 3.1 Migrate `commands/tests/test_art.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 3.2 Migrate `commands/tests/test_background.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 3.2 Migrate `commands/tests/test_background.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 3.3 Migrate `commands/tests/test_character_creation.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 3.4 Migrate `commands/tests/test_combat_actions.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 3.5 Migrate `commands/tests/test_command_branch_behaviour.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
@@ -16,16 +16,16 @@
 
 ## 4. Migrate group 2
 
-- [ ] 4.1 Migrate `commands/tests/test_inventory_breakdown.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.1 Migrate `commands/tests/test_inventory_breakdown.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 4.2 Migrate `commands/tests/test_items.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 4.3 Migrate `commands/tests/test_lineage_command.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 4.4 Migrate `commands/tests/test_localized.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.5 Migrate `commands/tests/test_lore_command.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
-- [ ] 4.6 Migrate `commands/tests/test_party_commands.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.5 Migrate `commands/tests/test_lore_command.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 4.6 Migrate `commands/tests/test_party_commands.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 
 ## 5. Migrate group 3
 
-- [ ] 5.1 Migrate `commands/tests/test_persona_commands.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
+- [x] 5.1 Migrate `commands/tests/test_persona_commands.py` (tier B): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 5.2 Migrate `commands/tests/test_talk_turnin_branch.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 5.3 Migrate `commands/tests/test_talk_turnin_commands.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
 - [ ] 5.4 Migrate `commands/tests/test_title_command.py` (tier A): swap literals for kit constants/fixtures, restate assertions as behavior, run the focused label for this file only
