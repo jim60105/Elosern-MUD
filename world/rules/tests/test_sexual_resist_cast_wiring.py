@@ -6,6 +6,11 @@ emit the ``sexual_resist`` ``EventEntry`` contract ``_scan_sexual_coercion``
 consumes, and exclude a successfully-resisting target from the act's
 pleasure/counter/event effects while the actor's own effects and the cast's
 costs stay unconditional (design D-4/D-5/D-7).
+
+Every act the resolver sees is a file-local synthetic row registered through
+a scoped ``skills``/``sexual_acts`` overlay — the resistible gate, the
+non-resistible branch, the area act, and the costed act are all built here
+from the kit's act template, never from a shipped catalogue row.
 """
 
 from tools.spec_traceability import covers_requirement
@@ -24,14 +29,125 @@ from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.sexual_act_effects import compute_pleasure_gain
 from world.rules.targeting import RoomActionContext
 from world.skills.registry import (
-    SKILL_REGISTRY,
     SkillCategory,
+    SkillDef,
     SkillKind,
     TargetSpec,
     _skill,
 )
-from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
-from world.skills.sexual_acts._builder import _act_family
+from world.tests.synthetic_data import SYNTH_ACT, SYNTH_ACT_SKILL, synthetic_registries
+
+from ._combat_session_helpers import _race_key, open_synthetic_scope
+
+# --- File-local synthetic act rows (kit act template, varied flags) -------
+
+# The resistible single-target act: pleasure + duo counter + an event, all
+# authored locally.
+_T_ACT = "t_wire_caress"
+_T_ACT_DEF = replace(
+    SYNTH_ACT,
+    key=_T_ACT,
+    resistible=True,
+    actor_counters=("duo_act_count",),
+    participant_counters=("duo_act_count",),
+    sexual_events=(),
+)
+_T_ACT_SKILL = replace(
+    SYNTH_ACT_SKILL,
+    key=_T_ACT,
+    label="測試輕撫行為",
+    description="僅存在於測試中的合成可抵抗性行為。",
+    effects=[
+        f"pleasure:{_T_ACT}",
+        f"sexual_counter:{_T_ACT}",
+    ],
+)
+
+# The non-resistible self act: a cast with no non-actor target and the
+# resist flag off.
+_T_SOLO = "t_wire_solo"
+_T_SOLO_DEF = replace(SYNTH_ACT, key=_T_SOLO, resistible=False)
+_T_SOLO_SKILL = replace(
+    SYNTH_ACT_SKILL,
+    key=_T_SOLO,
+    label="測試自撫行為",
+    description="僅存在於測試中的合成不可抵抗性行為。",
+    target_spec=TargetSpec.SELF,
+    effects=[f"pleasure:{_T_SOLO}", f"sexual_counter:{_T_SOLO}"],
+)
+
+# The area act: one independent contest per resolved target.
+_T_AREA = "t_wire_area"
+_T_AREA_DEF = replace(
+    SYNTH_ACT,
+    key=_T_AREA,
+    resistible=True,
+    actor_counters=("duo_act_count",),
+    participant_counters=("duo_act_count",),
+    sexual_events=(),
+)
+_T_AREA_SKILL = replace(
+    SYNTH_ACT_SKILL,
+    key=_T_AREA,
+    label="測試範圍行為",
+    description="僅存在於測試中的合成範圍性行為。",
+    target_spec=TargetSpec.AREA,
+    effects=[
+        f"pleasure:{_T_AREA}",
+        f"sexual_counter:{_T_AREA}",
+        f"sexual_event:{_T_AREA}_event",
+    ],
+)
+
+# The costed act: an explicit mp cost, resisted cast still pays it.
+_T_COST = "t_wire_cost"
+_T_COST_DEF = replace(
+    SYNTH_ACT,
+    key=_T_COST,
+    resistible=True,
+    actor_counters=("duo_act_count",),
+    participant_counters=("duo_act_count",),
+    sexual_events=(),
+)
+_T_COST_SKILL = replace(
+    SYNTH_ACT_SKILL,
+    key=_T_COST,
+    label="測試收費行為",
+    description="僅存在於測試中的合成收費性行為。",
+    cost={"mp": 5},
+    effects=[f"pleasure:{_T_COST}", f"sexual_counter:{_T_COST}"],
+)
+
+# A plain non-sexual active skill: never a contest.
+_T_PLAIN = "t_wire_plain"
+_T_PLAIN_SKILL = _skill(
+    _T_PLAIN,
+    "測試技能",
+    "測試用的非性愛主動技能。",
+    SkillKind.ACTIVE,
+    TargetSpec.SELF,
+    usable_out_of_combat=True,
+    effects=["self_buff_apply:focus"],
+    category=SkillCategory.ENHANCEMENT,
+)
+
+_ALL_SKILLS = {
+    _T_ACT_SKILL.key: _T_ACT_SKILL,
+    _T_SOLO_SKILL.key: _T_SOLO_SKILL,
+    _T_AREA_SKILL.key: _T_AREA_SKILL,
+    _T_COST_SKILL.key: _T_COST_SKILL,
+    _T_PLAIN_SKILL.key: _T_PLAIN_SKILL,
+}
+_ALL_ACTS = {
+    _T_ACT_DEF.key: _T_ACT_DEF,
+    _T_SOLO_DEF.key: _T_SOLO_DEF,
+    _T_AREA_DEF.key: _T_AREA_DEF,
+    _T_COST_DEF.key: _T_COST_DEF,
+}
+
+
+def _scope_extra(skills: dict, acts: dict) -> dict:
+    return {"skills": skills, "sexual_acts": acts}
 
 
 class ResistCastWiringBase(EvenniaTest):
@@ -40,21 +156,46 @@ class ResistCastWiringBase(EvenniaTest):
     def setUp(self):
         super().setUp()
         register_catalog()
+        # setUp builds the participants against the scoped race row, so the
+        # catalogue scope opens here (the kit's class decorator covers only
+        # test* methods).
+        open_synthetic_scope(
+            self, "skills", "elements", "races", "subraces", "static_tiers"
+        )
         self.actor = create_object(
             PlayerCharacter, key="resist caster", location=self.room1
         )
-        self.actor.race = "human"
+        self.actor.race = _race_key()
         self.actor.apply_race_baseline()
-        self.actor.db.skills = {"active": [], "passive": []}
+        # The synthetic catalogue is empty except for the file-local rows, so
+        # the caster must own exactly the acts the suite casts.
+        self.actor.db.skills = {"active": list(_ALL_SKILLS), "passive": []}
         self.target = create_object(
             PlayerCharacter, key="resist target", location=self.room1
         )
-        self.target.race = "human"
+        self.target.race = _race_key()
         self.target.apply_race_baseline()
+
+    def _catalogue(self, skills: dict[str, SkillDef], acts: dict):
+        """Open a nested scope whose catalogues carry the passed rows.
+
+        Used as a plain ``with``: the outer setUp scope keeps the fixture
+        scoped for construction; this one adds the act sidecar catalogue and
+        narrows the skill catalogue to the file-local rows for the cast.
+        """
+        return synthetic_registries(
+            "skills",
+            "sexual_acts",
+            "elements",
+            "races",
+            "subraces",
+            "static_tiers",
+            extra=_scope_extra(skills, acts),
+        )
 
     def _npc(self, key="resist npc", affinity: int | None = None):
         npc = create_object(NPC, key=key, location=self.room1)
-        npc.race = "human"
+        npc.race = _race_key()
         npc.apply_race_baseline()
         if affinity is not None:
             apply_affinity_change(
@@ -83,11 +224,11 @@ class ResistGateTests(ResistCastWiringBase):
     def test_resistible_single_act_rolls_exactly_one_contest(self):
         from world.rules.sexual_resist import resist_verdict
 
-        with patch(
+        with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
             "world.rules.sexual_resist.resist_verdict",
             wraps=resist_verdict,
         ) as spy, patch("world.rules.action.roll_d100", return_value=100):
-            result = self._cast("combat_tease", [self.target])
+            result = self._cast(_T_ACT, [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(spy.call_count, 1)
         actor, resister = spy.call_args.args[:2]
@@ -98,8 +239,10 @@ class ResistGateTests(ResistCastWiringBase):
     def test_non_resistible_sexual_act_never_rolls(self):
         from world.rules.sexual_resist import resist_verdict
 
-        with patch("world.rules.sexual_resist.resist_verdict") as spy:
-            result = self._cast("solo_self_touch", [])
+        with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
+            "world.rules.sexual_resist.resist_verdict"
+        ) as spy:
+            result = self._cast(_T_SOLO, [])
         self.assertEqual(result.outcome, "success")
         spy.assert_not_called()
 
@@ -107,64 +250,34 @@ class ResistGateTests(ResistCastWiringBase):
     def test_non_sexual_skill_never_rolls(self):
         from world.rules.sexual_resist import resist_verdict
 
-        skill = _skill(
-            "test_plain_skill",
-            "測試技能",
-            "測試用的非性愛主動技能。",
-            SkillKind.ACTIVE,
-            TargetSpec.SELF,
-            usable_out_of_combat=True,
-            effects=["self_buff_apply:focus"],
-            category=SkillCategory.ENHANCEMENT,
-        )
         self.actor.db.skills = {
-            "active": ["test_plain_skill"],
+            "active": [_T_PLAIN],
             "passive": [],
         }
-        with patch.dict(SKILL_REGISTRY, {skill.key: skill}), patch(
+        with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
             "world.rules.sexual_resist.resist_verdict"
         ) as spy:
-            result = self._cast("test_plain_skill", [])
+            result = self._cast(_T_PLAIN, [])
         self.assertEqual(result.outcome, "success")
         spy.assert_not_called()
 
     @covers_requirement("sexual-resist-cast-wiring::a-resistible-area-target-act-resolves-one-independent-contest-per-resolved-target")
     def test_area_act_rolls_one_independent_contest_per_target(self):
-        (skill, act), = _act_family(
-            "關係",
-            (
-                "test_area_resist",
-                "測試範圍行為",
-                "僅存在於測試中的合成範圍性行為。",
-                TargetSpec.AREA,
-                {},
-                10,
-                "腰腹",
-                "腰腹",
-                0.5,
-                ("duo_act_count",),
-                ("duo_act_count",),
-                ("masturbation_climax",),
-                True,
-            ),
-        )
         second = create_object(
             PlayerCharacter, key="resist target two", location=self.room1
         )
-        second.race = "human"
+        second.race = _race_key()
         second.apply_race_baseline()
         from world.rules.sexual_resist import resist_verdict
 
-        with patch.dict(SEXUAL_ACT_REGISTRY, {act.key: act}), patch.dict(
-            SKILL_REGISTRY, {skill.key: skill}
-        ), patch(
+        with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
             "world.rules.sexual_resist.resist_verdict",
             wraps=resist_verdict,
         ) as spy, patch(
             "world.rules.action.roll_d100",
             side_effect=[1, 100],
         ):
-            result = self._cast("test_area_resist", [self.target, second])
+            result = self._cast(_T_AREA, [self.target, second])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(spy.call_count, 2)
         resisters = [call.args[1] for call in spy.call_args_list]
@@ -176,15 +289,41 @@ class ResistGateTests(ResistCastWiringBase):
         self.assertGreater(self._pleasure(self.target), 0)
         self.assertEqual(self._pleasure(second), 0)
         self.assertGreater(self._pleasure(self.actor), 0)
-        # The act's sexual_event fired only for the complying target.
-        self.assertIn("自慰", self.target.sexual.experience_types)
-        self.assertNotIn("自慰", second.sexual.experience_types)
         resist_entries = [
             entry
             for entry in result.event_log.entries
             if entry.kind == "sexual_resist"
         ]
         self.assertEqual(len(resist_entries), 2)
+
+    @covers_requirement("sexual-resist-cast-wiring::casting-a-resistible-act-resolves-one-resist-contest-per-non-actor-target-before-its-effects-apply")
+    def test_area_act_event_effect_follows_the_withheld_branch(self):
+        # The resisting target must receive NONE of the event effect: with a
+        # file-local bridge rule translating the act's invented event into a
+        # counter delta, only the complying participant moves.
+        from world.rules import sexual_transitions
+        from world.rules.rulebook.schema import Rule
+
+        rule = Rule(
+            id="t_area_event_rule",
+            when={"event": f"{_T_AREA}_event"},
+            then={"add": "t_area_experience"},
+        )
+        second = create_object(
+            PlayerCharacter, key="resist target two", location=self.room1
+        )
+        second.race = _race_key()
+        second.apply_race_baseline()
+        with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch.object(
+            sexual_transitions, "_RULES", [rule]
+        ), patch(
+            "world.rules.action.roll_d100", side_effect=[1, 100]
+        ):
+            result = self._cast(_T_AREA, [self.target, second])
+        self.assertEqual(result.outcome, "success")
+        # The event effect applied to the complying target only.
+        self.assertIn("t_area_experience", self.target.sexual.experience_types)
+        self.assertNotIn("t_area_experience", second.sexual.experience_types)
 
 
 class ResistEffectWithholdingTests(ResistCastWiringBase):
@@ -193,8 +332,10 @@ class ResistEffectWithholdingTests(ResistCastWiringBase):
     @covers_requirement("sexual-resist-cast-wiring::a-successfully-resisting-target-receives-none-of-the-act-s-pleasure-counter-or-sexual-event-effects")
     def test_resisted_target_keeps_pleasure_and_participant_counter(self):
         before = self._pleasure(self.target)
-        with patch("world.rules.action.roll_d100", return_value=100):
-            result = self._cast("partner_caress", [self.target])
+        with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
+            "world.rules.action.roll_d100", return_value=100
+        ):
+            result = self._cast(_T_ACT, [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self._pleasure(self.target), before)
         self.assertEqual(self.target.sexual.duo_act_count, 0)
@@ -204,10 +345,12 @@ class ResistEffectWithholdingTests(ResistCastWiringBase):
     @covers_requirement("sexual-resist-cast-wiring::a-successfully-resisting-target-receives-none-of-the-act-s-pleasure-counter-or-sexual-event-effects")
     def test_complied_target_receives_effects_as_before(self):
         expected = compute_pleasure_gain(
-            self.target, "腰腹", 10, 1.0, 2
+            self.target, None, _T_ACT_DEF.base_pleasure, 1.0, 2
         )
-        with patch("world.rules.action.roll_d100", return_value=1):
-            result = self._cast("partner_caress", [self.target])
+        with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
+            "world.rules.action.roll_d100", return_value=1
+        ):
+            result = self._cast(_T_ACT, [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.target.sexual.duo_act_count, 1)
         self.assertEqual(self._pleasure(self.target), expected)
@@ -218,54 +361,38 @@ class ResistEffectWithholdingTests(ResistCastWiringBase):
         # A fully-resisted cast leaves the actor alone in the participant set
         # (count 1); a complied cast counts two (design D-7's crowd note).
         resisted_actor_gain = compute_pleasure_gain(
-            self.actor, "腰腹", 7, 0.4, 1
+            self.actor, None, _T_ACT_DEF.base_pleasure, _T_ACT_DEF.actor_pleasure_ratio, 1
         )
         complied_actor_gain = compute_pleasure_gain(
-            self.actor, "腰腹", 7, 0.4, 2
+            self.actor, None, _T_ACT_DEF.base_pleasure, _T_ACT_DEF.actor_pleasure_ratio, 2
         )
         actor_before = self._pleasure(self.actor)
-        with patch("world.rules.action.roll_d100", return_value=100):
-            self._cast("combat_tease", [self.target])
-        after_resisted = self._pleasure(self.actor)
-        self.assertEqual(after_resisted - actor_before, resisted_actor_gain)
-        self.assertEqual(self.actor.sexual.hostile_act_count, 1)
+        with self._catalogue(_ALL_SKILLS, _ALL_ACTS):
+            with patch("world.rules.action.roll_d100", return_value=100):
+                self._cast(_T_ACT, [self.target])
+            after_resisted = self._pleasure(self.actor)
+            self.assertEqual(after_resisted - actor_before, resisted_actor_gain)
+            self.assertEqual(self.actor.sexual.duo_act_count, 1)
 
-        second = create_object(
-            PlayerCharacter, key="resist target two", location=self.room1
-        )
-        second.race = "human"
-        second.apply_race_baseline()
-        with patch("world.rules.action.roll_d100", return_value=1):
-            self._cast("combat_tease", [second])
-        self.assertEqual(self._pleasure(self.actor) - after_resisted, complied_actor_gain)
-        self.assertEqual(self.actor.sexual.hostile_act_count, 2)
+            second = create_object(
+                PlayerCharacter, key="resist target two", location=self.room1
+            )
+            second.race = _race_key()
+            second.apply_race_baseline()
+            with patch("world.rules.action.roll_d100", return_value=1):
+                self._cast(_T_ACT, [second])
+            self.assertEqual(
+                self._pleasure(self.actor) - after_resisted, complied_actor_gain
+            )
+            self.assertEqual(self.actor.sexual.duo_act_count, 2)
 
     @covers_requirement("sexual-resist-cast-wiring::the-actor-s-own-effects-and-the-cast-s-resource-time-and-practice-cost-are-never-gated-by-a-target-s-resist-outcome")
     def test_fully_resisted_cast_still_deducts_resource_cost(self):
-        (skill, act), = _act_family(
-            "關係",
-            (
-                "test_cost_resist",
-                "測試收費行為",
-                "僅存在於測試中的合成收費性行為。",
-                TargetSpec.SINGLE,
-                {},
-                10,
-                "腰腹",
-                "腰腹",
-                0.5,
-                ("duo_act_count",),
-                (),
-                (),
-                True,
-            ),
-        )
-        skill = replace(skill, cost={"mp": 5})
         mp_before = self.actor.traits.mp.current
-        with patch.dict(SEXUAL_ACT_REGISTRY, {act.key: act}), patch.dict(
-            SKILL_REGISTRY, {skill.key: skill}
-        ), patch("world.rules.action.roll_d100", return_value=100):
-            result = self._cast("test_cost_resist", [self.target])
+        with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
+            "world.rules.action.roll_d100", return_value=100
+        ):
+            result = self._cast(_T_COST, [self.target])
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.traits.mp.current, mp_before - 5)
         self.assertEqual(self.actor.sexual.duo_act_count, 1)
@@ -291,8 +418,10 @@ class ResistEventLogTests(ResistCastWiringBase):
 
     @covers_requirement("sexual-resist-cast-wiring::every-resist-contest-emits-a-sexual-resist-eventlog-entry-matching-the-sexual-resist-turn-cost-contract")
     def test_rolled_contest_logs_exactly_one_entry_with_numeric_roll(self):
-        with patch("world.rules.action.roll_d100", return_value=42):
-            result = self._cast("combat_tease", [self.target])
+        with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
+            "world.rules.action.roll_d100", return_value=42
+        ):
+            result = self._cast(_T_ACT, [self.target])
         entries = self._resist_entries(result)
         self.assertEqual(len(entries), 1)
         entry = entries[0]
@@ -308,8 +437,10 @@ class ResistEventLogTests(ResistCastWiringBase):
 
     @covers_requirement("sexual-resist-cast-wiring::every-resist-contest-emits-a-sexual-resist-eventlog-entry-matching-the-sexual-resist-turn-cost-contract")
     def test_resisted_verdict_logs_resisted_true(self):
-        with patch("world.rules.action.roll_d100", return_value=100):
-            result = self._cast("combat_tease", [self.target])
+        with self._catalogue(_ALL_SKILLS, _ALL_ACTS), patch(
+            "world.rules.action.roll_d100", return_value=100
+        ):
+            result = self._cast(_T_ACT, [self.target])
         (entry,) = self._resist_entries(result)
         self.assertTrue(entry.data["resisted"])
         self.assertFalse(entry.data["auto_comply"])
@@ -318,7 +449,8 @@ class ResistEventLogTests(ResistCastWiringBase):
     @covers_requirement("sexual-resist-cast-wiring::every-resist-contest-emits-a-sexual-resist-eventlog-entry-matching-the-sexual-resist-turn-cost-contract")
     def test_auto_complied_contest_logs_none_roll(self):
         npc = self._npc(affinity=90)
-        result = self._cast("combat_tease", [npc])
+        with self._catalogue(_ALL_SKILLS, _ALL_ACTS):
+            result = self._cast(_T_ACT, [npc])
         (entry,) = self._resist_entries(result)
         self.assertEqual(entry.target, str(npc.key))
         self.assertIs(entry.data["roll"], None)
