@@ -3,6 +3,7 @@
 - 世界觀設定
   - [世界觀總覽](/lore/overview)
   - [魔法技能體系](/lore/magic-system)
+  - [物品圖鑑](/lore/items)
   - 技能系譜設計
     - [總覽與機械規則](/lore/skill-trees/index)
     - [火屬性系譜樹](/lore/skill-trees/fire)
