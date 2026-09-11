@@ -2,8 +2,10 @@
 
 ### Requirement: Webclient javascript tests resolve game data through synthetic fixtures
 Behavior tests in the 22 test files enumerated in this change's migration
-manifest SHALL exercise game mechanics through the synthetic test-data kit or file-local
-synthetic fixtures instead of shipped catalog identifiers or shipped display prose, and
+manifest SHALL exercise game mechanics through the synthetic test-data kit, file-local
+synthetic fixtures, production-owned wire constants, or values read from the committed
+payload fixture objects at runtime, instead of restating shipped catalog identifiers or
+shipped display prose in test source, and
 SHALL NOT pin quantities derived from shipped content. After the migration, none of the
 manifest files is flagged by the test-data lint gate, and every freeze-list debt entry
 naming a manifest file is removed. Exemptions owned by other changes under the same
@@ -19,8 +21,9 @@ echoes synthetic-fixture content is not a passing conversion.
 #### Scenario: Suite is green on synthetic data
 - **WHEN** the focused suites for the migrated files run on the retained-database Evennia
   profile (or the Node/Vitest/managed-browser profile for JS-owned files)
-- **THEN** every test passes while skills, items, quests, regions, presets, titles, and
-  prose resolve exclusively from synthetic catalogs
+- **THEN** every test passes while the payload catalogs the tests author resolve from
+  synthetic content, and any shipped content a test still renders arrives only through a
+  committed fixture object the test reads (never a literal in test source)
 
 #### Scenario: Data rework cannot break the area again
 - **WHEN** shipped identifiers, display prose, or catalog sizes change in the game-data
