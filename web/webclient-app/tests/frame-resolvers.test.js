@@ -16,6 +16,15 @@ import {
   localMapPanel,
   statusPanel,
 } from "./store/protocol_fixtures.js";
+import { SYNTH_SKILL, SYNTH_ITEM } from "./support/synthetic-data.mjs";
+
+// File-local synthetic skill rows (test-data-independence): invented t_-keyed
+// combat rows with invented prose; wire taxonomy values stay protocol-owned.
+const T_A = SYNTH_SKILL.id;
+const T_A_LABEL = SYNTH_SKILL.label;
+const T_B = "t_gale_crescent";
+const T_B_LABEL = "巒風刃";
+const T_GROUP_FIRE_LABEL = "焰系";
 
 // A committed-state object exactly as the protocol reducer surfaces it.
 function committedState(overrides = {}) {
@@ -487,7 +496,7 @@ function shopSurface() {
     stock: [
       {
         item_key: "potion",
-        display_name: "治療藥水",
+        display_name: SYNTH_ITEM.display,
         buy_copper: 50,
         stock: 4,
         buy: { enabled: true, action_id: "shop.buy", quantity: { min: 1, max: 9 }, disabled_reason: null },
@@ -596,8 +605,8 @@ function combatFixturePanel(overrides = {}) {
   const skill = (extra) =>
     Object.assign(
       {
-        key: "fire_ball",
-        label: "火球術",
+        key: T_A,
+        label: T_A_LABEL,
         description: "凝聚火焰魔力。",
         cost: { mp: 20 },
         target_spec: "single",
@@ -629,7 +638,7 @@ function combatFixturePanel(overrides = {}) {
       {
         category: "elemental_magic",
         label: "元素魔法",
-        groups: [{ group: "fire", label: "火", skills: [skill({}), skill({ key: "wind_blade", label: "風刃術", target_spec: "area", targets: [7], shorthands: ["all"] })] }],
+        groups: [{ group: "fire", label: T_GROUP_FIRE_LABEL, skills: [skill({}), skill({ key: T_B, label: T_B_LABEL, target_spec: "area", targets: [7], shorthands: ["all"] })] }],
       },
     ],
     suggestions: { status: "unavailable" },
@@ -655,20 +664,20 @@ describe("frame resolver — the combat family (declared model-state exception)"
     expect(resolver.resolve({ source: "combat.group", params: { categoryIndex: 0, groupIndex: 0 } })).toEqual(
       CombatMenu.openGroup(model, 0, 0)
     );
-    expect(resolver.resolve({ source: "combat.skill", params: { skillKey: "fire_ball" } })).toEqual(
-      CombatMenu.openSkill(model, "fire_ball")
+    expect(resolver.resolve({ source: "combat.skill", params: { skillKey: T_A } })).toEqual(
+      CombatMenu.openSkill(model, T_A)
     );
-    expect(resolver.resolve({ source: "combat.target", params: { skillKey: "fire_ball" } })).toEqual(
-      CombatMenu.openSkillTargets(model, "fire_ball")
+    expect(resolver.resolve({ source: "combat.target", params: { skillKey: T_A } })).toEqual(
+      CombatMenu.openSkillTargets(model, T_A)
     );
   });
 
   it("repeat resolution against one committed state is idempotent", () => {
     const resolver = resolverFor(combatState());
-    const first = resolver.resolve({ source: "combat.skill", params: { skillKey: "wind_blade" } });
+    const first = resolver.resolve({ source: "combat.skill", params: { skillKey: T_B } });
     const model = resolver.combatModel();
     const before = JSON.stringify({ focus: model.focusSkillKey, skills: model.skills });
-    const second = resolver.resolve({ source: "combat.skill", params: { skillKey: "wind_blade" } });
+    const second = resolver.resolve({ source: "combat.skill", params: { skillKey: T_B } });
     expect(second).toEqual(first);
     expect(JSON.stringify({ focus: model.focusSkillKey, skills: model.skills })).toBe(before);
   });
@@ -680,28 +689,28 @@ describe("frame resolver — the combat family (declared model-state exception)"
     resolver.resolve({ source: "combat.root" });
     const model = resolver.combatModel();
     // Client-local selections (the store's combat interactions).
-    model.focusSkillKey = "fire_ball";
-    CombatMenu.chooseScale(model, "fire_ball", 2);
-    CombatMenu.toggleArea(model, "wind_blade", 7);
+    model.focusSkillKey = T_A;
+    CombatMenu.chooseScale(model, T_A, 2);
+    CombatMenu.toggleArea(model, T_B, 7);
     // A panel replacement (round advances) preserves the still-valid scale.
     const replaced = combatFixturePanel();
     replaced.session.round = 2;
     state.panels.context_actions = replaced;
-    const target = resolver.resolve({ source: "combat.target", params: { skillKey: "fire_ball" } });
+    const target = resolver.resolve({ source: "combat.target", params: { skillKey: T_A } });
     expect(target.items[0].payload.scale).toBe(2);
     // Shipped rebuildForPanel semantics (its own docstring): a panel
     // replacement keeps the still-valid scale and DETERMINISTICALLY resets
     // the AREA candidates to their default (no selection = all candidates).
-    expect(resolver.combatModel().skillByKey.wind_blade.selected).toEqual([]);
+    expect(resolver.combatModel().skillByKey[T_B].selected).toEqual([]);
     // Second resolution: idempotent, no further model change.
-    expect(resolver.resolve({ source: "combat.target", params: { skillKey: "fire_ball" } })).toEqual(target);
+    expect(resolver.resolve({ source: "combat.target", params: { skillKey: T_A } })).toEqual(target);
   });
 
   it("a non-combat committed state clears the model — re-adoption starts fresh", () => {
     const state = combatState();
     const resolver = resolverFor(state);
     resolver.resolve({ source: "combat.root" });
-    CombatMenu.chooseScale(resolver.combatModel(), "fire_ball", 2);
+    CombatMenu.chooseScale(resolver.combatModel(), T_A, 2);
     // Leaving combat (an exploration-form panel commits).
     state.mode = "exploration";
     state.panels.context_actions = explorationPanel();
@@ -711,7 +720,7 @@ describe("frame resolver — the combat family (declared model-state exception)"
     delete state.panels.context_actions;
     const fresh = combatFixturePanel();
     state.panels.context_actions = fresh;
-    const target = resolver.resolve({ source: "combat.target", params: { skillKey: "fire_ball" } });
+    const target = resolver.resolve({ source: "combat.target", params: { skillKey: T_A } });
     // Fresh adoption starts at the default scale 1 — NOT the previous ×2.
     expect(target.items[0].payload.scale).toBe(1);
     expect(resolver.combatModel().focusSkillKey).toBe(null);
