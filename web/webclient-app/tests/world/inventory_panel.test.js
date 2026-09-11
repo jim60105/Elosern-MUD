@@ -11,6 +11,13 @@ import {
   SERVICES_PANEL_PRESENTATION_SAMPLE,
   CHARACTER_PANEL_SAMPLE,
 } from "../../stories/fixtures.js";
+import { SYNTH_ITEM } from "../support/synthetic-data.mjs";
+
+// The inspected row is located in the committed presentation sample by
+// position, and the local action rows carry the kit item, so no shipped
+// catalog identifier is restated in this test's source
+// (test-data-independence).
+const POTION_KEY = SERVICES_PANEL_PRESENTATION_SAMPLE.inventory.rows[1].item_key;
 
 const CHARACTER_UNAVAILABLE = {
   schema_version: 7,
@@ -81,14 +88,14 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
     expect(w.get('[data-testid="inventory-panel__equipped--plain_sword"]').exists()).toBe(true);
     expect(w.get('[data-testid="inventory-panel__equipped--leather_armor"]').exists()).toBe(true);
     expect(w.get('[data-testid="inventory-panel__equipped--mist_amulet"]').exists()).toBe(true);
-    expect(w.find('[data-testid="inventory-panel__equipped--healing_potion"]').exists()).toBe(false);
+    expect(w.find(`[data-testid="inventory-panel__equipped--${POTION_KEY}"]`).exists()).toBe(false);
   });
 
   it("drives the per-rarity border treatment from committed row metadata", () => {
     const w = mountPanel({ services: SERVICES_PANEL_PRESENTATION_SAMPLE });
     expect(w.get('[data-testid="inventory-panel__tile--meal"]').attributes("data-rarity")).toBe("common");
     expect(w.get('[data-testid="inventory-panel__tile--leather_armor"]').attributes("data-rarity")).toBe("uncommon");
-    expect(w.get('[data-testid="inventory-panel__tile--healing_potion"]').attributes("data-rarity")).toBe("rare");
+    expect(w.get(`[data-testid="inventory-panel__tile--${POTION_KEY}"]`).attributes("data-rarity")).toBe("rare");
     expect(w.get('[data-testid="inventory-panel__tile--mist_amulet"]').attributes("data-rarity")).toBe("epic");
     expect(w.get('[data-testid="inventory-panel__tile--travel_pack"]').attributes("data-rarity")).toBe("legendary");
   });
@@ -107,8 +114,8 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
 
   it("shows the inspector with the identical committed content for hover and focus", async () => {
     const w = mountPanel({ services: SERVICES_PANEL_PRESENTATION_SAMPLE });
-    const potionTile = w.get('[data-testid="inventory-panel__tile--healing_potion"]');
-    const row = SERVICES_PANEL_PRESENTATION_SAMPLE.inventory.rows.find((r) => r.item_key === "healing_potion");
+    const potionTile = w.get(`[data-testid="inventory-panel__tile--${POTION_KEY}"]`);
+    const row = SERVICES_PANEL_PRESENTATION_SAMPLE.inventory.rows.find((r) => r.item_key === POTION_KEY);
 
     // Pointer hover path.
     potionTile.trigger("pointerenter");
@@ -152,7 +159,7 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
 
   it("links the selected tile to the inspector via aria-describedby and clears it when absent", async () => {
     const w = mountPanel({ services: SERVICES_PANEL_PRESENTATION_SAMPLE });
-    const potionTile = w.get('[data-testid="inventory-panel__tile--healing_potion"]');
+    const potionTile = w.get(`[data-testid="inventory-panel__tile--${POTION_KEY}"]`);
     expect(potionTile.attributes("aria-describedby")).toBeUndefined();
     potionTile.element.focus();
     await nextTick();
@@ -174,7 +181,7 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
     expect(w.find("input").exists()).toBe(false);
     expect(w.find("select").exists()).toBe(false);
     // The inspector is non-interactive: no control lives inside it.
-    w.get('[data-testid="inventory-panel__tile--healing_potion"]').element.focus();
+    w.get(`[data-testid="inventory-panel__tile--${POTION_KEY}"]`).element.focus();
     await nextTick();
     const inspector = w.get('[data-testid="inventory-panel__inspector"]');
     expect(inspector.find("button").exists()).toBe(false);
@@ -184,7 +191,7 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
 
   it("resets the local selection when the committed panel data is replaced", async () => {
     const w = mountPanel({ services: SERVICES_PANEL_PRESENTATION_SAMPLE });
-    const potionTile = w.get('[data-testid="inventory-panel__tile--healing_potion"]');
+    const potionTile = w.get(`[data-testid="inventory-panel__tile--${POTION_KEY}"]`);
     potionTile.element.focus();
     await nextTick();
     expect(w.find('[data-testid="inventory-panel__inspector"]').exists()).toBe(true);
@@ -192,7 +199,7 @@ describe("InventoryPanel (redesign-inventory-item-grid: the held-item tile grid)
     await w.setProps({ services: SERVICES_PANEL_SAMPLE });
     await nextTick();
     expect(w.find('[data-testid="inventory-panel__inspector"]').exists()).toBe(false);
-    expect(w.find('[data-testid="inventory-panel__tile--healing_potion"]').exists()).toBe(true);
+    expect(w.find(`[data-testid="inventory-panel__tile--${POTION_KEY}"]`).exists()).toBe(true);
     expect(w.find('[data-testid="inventory-panel__tile--item_heal_potion"]').exists()).toBe(true);
   });
 
@@ -346,7 +353,7 @@ function servicesWithActions() {
     ...SERVICES_PANEL_SAMPLE,
     inventory: {
       rows: [
-        row("potion_use", "治療藥水", useAction(true)),
+        row("potion_use", SYNTH_ITEM.display, useAction(true)),
         row("potion_full", "過剩藥水", useAction(false, { code: "hp_full", message: "你的體力已滿。" })),
         row("sword_toggle", "鐵劍", toggleAction("裝備"), true),
         row("mystery", "未知物品", null),
@@ -392,8 +399,8 @@ describe("InventoryPanel row actions (add-inventory-item-actions)", () => {
     expect(dialog).not.toBeNull();
     expect(dialog.getAttribute("role")).toBe("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(dialog.getAttribute("aria-label")).toContain("治療藥水");
-    expect(bodyByTestId("inventory-panel__confirm-text").textContent).toContain("治療藥水");
+    expect(dialog.getAttribute("aria-label")).toContain(SYNTH_ITEM.display);
+    expect(bodyByTestId("inventory-panel__confirm-text").textContent).toContain(SYNTH_ITEM.display);
     // Focus enters the dialog on the confirm control.
     expect(document.activeElement).toBe(bodyByTestId("inventory-panel__confirm-ok"));
     bodyByTestId("inventory-panel__confirm-ok").click();
