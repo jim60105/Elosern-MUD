@@ -11,6 +11,13 @@ from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
 
+from typeclasses.components import (
+    GuildExaminer,
+    GuildStaff,
+    Merchant,
+    QuestIssuer,
+    ScriptedDialogue,
+)
 from world.imports import assembly
 from world.imports.tests.helpers import example_record
 from world.imports.validate import validate_character
@@ -19,14 +26,23 @@ from world.rules import profession_config
 from world.rules.profession_config import Profession, ProfessionComponent
 
 
+# Component type keys are the closed code vocabulary (class-declared names),
+# resolved through the classes themselves — never renamed, never literal.
+_MERCHANT = Merchant.name
+_GUILD_STAFF = GuildStaff.name
+_GUILD_EXAMINER = GuildExaminer.name
+_SCRIPTED_DIALOGUE = ScriptedDialogue.name
+_QUEST_ISSUER = QuestIssuer.name
+
 
 def _table(**rows: Profession) -> MappingProxyType:
     return MappingProxyType({row.key: row for row in rows.values()})
 
 
+# The probe row rides a swapped-in table: its profession key is invented.
 PROBE = Profession(
-    key="merchant",
-    components=(ProfessionComponent(type_key="merchant", default_binding="place"),),
+    key="t_shopholder",
+    components=(ProfessionComponent(type_key=_MERCHANT, default_binding="place"),),
     schedule_template=None,
     default_tier=None,
 )
@@ -36,7 +52,7 @@ class ProfessionSchemaHarness(TestCase):
     def setUp(self):
         super().setUp()
         self.addPatch(
-            patch.object(profession_config, "TABLE", _table(merchant=PROBE))
+            patch.object(profession_config, "TABLE", _table(probe=PROBE))
         )
 
     def addPatch(self, patcher):
@@ -74,7 +90,7 @@ class ProfessionSemanticTests(ProfessionSchemaHarness):
     @covers_requirement("import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field")
     def test_component_type_outside_the_vocabulary_is_a_named_issue(self):
         record = example_record()
-        record["profession"] = "merchant"
+        record["profession"] = PROBE.key
         record["components"] = [{"type": "tinker", "kwargs": {}}]
         self.assert_rejected(record, "components.0.type", "tinker", "vocabulary")
 
@@ -82,7 +98,7 @@ class ProfessionSemanticTests(ProfessionSchemaHarness):
     def test_components_without_a_profession_is_a_named_issue(self):
         record = example_record()
         record["components"] = [
-            {"type": "merchant", "kwargs": {"service_id": "s", "shop_key": "b"}}
+            {"type": _MERCHANT, "kwargs": {"service_id": "s", "shop_key": "b"}}
         ]
         self.assert_rejected(
             record, "components", "profession", "blueprint"
@@ -102,9 +118,9 @@ class ProfessionSemanticTests(ProfessionSchemaHarness):
     @covers_requirement("import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field")
     def test_kwarg_outside_the_component_fields_is_a_named_issue(self):
         record = example_record()
-        record["profession"] = "merchant"
+        record["profession"] = PROBE.key
         record["components"] = [
-            {"type": "merchant", "kwargs": {"bogus_key": "x"}}
+            {"type": _MERCHANT, "kwargs": {"bogus_key": "x"}}
         ]
         self.assert_rejected(
             record, "components.0.kwargs", "bogus_key", "shop_key"
@@ -113,20 +129,20 @@ class ProfessionSemanticTests(ProfessionSchemaHarness):
     @covers_requirement("import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field")
     def test_duplicate_component_types_are_rejected(self):
         record = example_record()
-        record["profession"] = "merchant"
-        entry = {"type": "merchant", "kwargs": {"service_id": "s", "shop_key": "b"}}
+        record["profession"] = PROBE.key
+        entry = {"type": _MERCHANT, "kwargs": {"service_id": "s", "shop_key": "b"}}
         record["components"] = [dict(entry), dict(entry)]
         self.assert_rejected(
-            record, "components.1.type", "duplicate", "merchant"
+            record, "components.1.type", "duplicate", _MERCHANT
         )
 
     @covers_requirement("import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field")
     def test_missing_identity_kwargs_are_rejected_on_the_resolved_plan(self):
         record = example_record()
-        record["profession"] = "merchant"
-        record["components"] = [{"type": "merchant", "kwargs": {"shop_key": "b"}}]
+        record["profession"] = PROBE.key
+        record["components"] = [{"type": _MERCHANT, "kwargs": {"shop_key": "b"}}]
         self.assert_rejected(
-            record, "components", "merchant", "identity", "service_id"
+            record, "components", _MERCHANT, "identity", "service_id"
         )
         # A blank string counts as missing identity, never as authored.
         record["components"][0]["kwargs"]["service_id"] = ""
@@ -135,10 +151,10 @@ class ProfessionSemanticTests(ProfessionSchemaHarness):
     @covers_requirement("import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field")
     def test_a_fully_authored_plan_validates_clean(self):
         record = example_record()
-        record["profession"] = "merchant"
+        record["profession"] = PROBE.key
         record["components"] = [
             {
-                "type": "merchant",
+                "type": _MERCHANT,
                 "kwargs": {"service_id": "silver_scales", "shop_key": "plaza"},
             }
         ]
@@ -151,10 +167,10 @@ class ProfessionSemanticTests(ProfessionSchemaHarness):
         from typeclasses.characters import PlayerCharacter
 
         record = example_record()
-        record["profession"] = "merchant"
+        record["profession"] = PROBE.key
         record["components"] = [
             {
-                "type": "merchant",
+                "type": _MERCHANT,
                 "kwargs": {"service_id": "s", "shop_key": "b"},
             }
         ]
@@ -171,19 +187,19 @@ class ProfessionSchemaShapeTests(ProfessionSchemaHarness):
     @covers_requirement("import-schema::the-character-record-schema-defines-an-optional-profession-field-and-an-optional-components-field")
     def test_shape_violations_are_structural_rejections(self):
         cases = [
-            ("non-list components", lambda r: r.update(components="merchant")),
-            ("non-dict entry", lambda r: r.update(components=["merchant"])),
-            ("missing kwargs key", lambda r: r.update(components=[{"type": "merchant"}])),
+            ("non-list components", lambda r: r.update(components=PROBE.key)),
+            ("non-dict entry", lambda r: r.update(components=[PROBE.key])),
+            ("missing kwargs key", lambda r: r.update(components=[{"type": _MERCHANT}])),
             ("extra entry property", lambda r: r.update(
-                components=[{"type": "merchant", "kwargs": {}, "extra": 1}]
+                components=[{"type": _MERCHANT, "kwargs": {}, "extra": 1}]
             )),
             ("non-string type", lambda r: r.update(components=[{"type": 7, "kwargs": {}}])),
-            ("non-object kwargs", lambda r: r.update(components=[{"type": "merchant", "kwargs": "x"}])),
+            ("non-object kwargs", lambda r: r.update(components=[{"type": _MERCHANT, "kwargs": "x"}])),
         ]
         for label, mutate in cases:
             with self.subTest(label):
                 record = example_record()
-                record["profession"] = "merchant"
+                record["profession"] = PROBE.key
                 mutate(record)
                 self.assertTrue(
                     self.rejections(record),
@@ -196,11 +212,11 @@ class AssemblyPlanTests(TestCase):
 
     def setUp(self):
         self.profession = Profession(
-            key="guild_staff",
+            key="t_guildcrew",
             components=(
-                ProfessionComponent("guild_staff", "place"),
-                ProfessionComponent("guild_examiner", "place"),
-                ProfessionComponent("scripted_dialogue", "place"),
+                ProfessionComponent(_GUILD_STAFF, "place"),
+                ProfessionComponent(_GUILD_EXAMINER, "place"),
+                ProfessionComponent(_SCRIPTED_DIALOGUE, "place"),
             ),
             schedule_template=None,
             default_tier=None,
@@ -209,55 +225,55 @@ class AssemblyPlanTests(TestCase):
     def test_explicit_entry_replaces_the_blueprint_entry(self):
         record = {
             "components": [
-                {"type": "guild_staff", "kwargs": {"service_id": "s", "branch_key": "b"}}
+                {"type": _GUILD_STAFF, "kwargs": {"service_id": "s", "branch_key": "b"}}
             ]
         }
         plan = assembly.resolve_plan(self.profession, record)
         self.assertEqual(
             plan,
             [
-                ("guild_staff", {"service_id": "s", "branch_key": "b"}),
-                ("guild_examiner", {}),
-                ("scripted_dialogue", {}),
+                (_GUILD_STAFF, {"service_id": "s", "branch_key": "b"}),
+                (_GUILD_EXAMINER, {}),
+                (_SCRIPTED_DIALOGUE, {}),
             ],
         )
 
     def test_extra_vocabulary_entries_append_in_record_order(self):
         record = {
             "components": [
-                {"type": "merchant", "kwargs": {"service_id": "s", "shop_key": "k"}},
+                {"type": _MERCHANT, "kwargs": {"service_id": "s", "shop_key": "k"}},
                 {
-                    "type": "scripted_dialogue",
+                    "type": _SCRIPTED_DIALOGUE,
                     "kwargs": {"dialogue_key": "dock"},
                 },
             ]
         }
         plan = assembly.resolve_plan(self.profession, record)
-        self.assertEqual([type_key for type_key, _ in plan][-1], "merchant")
+        self.assertEqual([type_key for type_key, _ in plan][-1], _MERCHANT)
         self.assertIn(
-            ("scripted_dialogue", {"dialogue_key": "dock"}), plan
+            (_SCRIPTED_DIALOGUE, {"dialogue_key": "dock"}), plan
         )
         self.assertEqual(
-            sum(1 for type_key, _ in plan if type_key == "scripted_dialogue"), 1
+            sum(1 for type_key, _ in plan if type_key == _SCRIPTED_DIALOGUE), 1
         )
 
     def test_identity_fields_are_the_class_intersection(self):
         self.assertEqual(
-            profession_assembly.identity_fields("merchant"),
+            profession_assembly.identity_fields(_MERCHANT),
             frozenset({"service_id", "shop_key"}),
         )
         self.assertEqual(
-            profession_assembly.identity_fields("scripted_dialogue"),
+            profession_assembly.identity_fields(_SCRIPTED_DIALOGUE),
             frozenset({"dialogue_key"}),
         )
         self.assertEqual(
             profession_assembly.missing_identity_kwargs(
-                "merchant", {"service_id": "s", "shop_key": "b"}
+                _MERCHANT, {"service_id": "s", "shop_key": "b"}
             ),
             [],
         )
         self.assertEqual(
-            profession_assembly.missing_identity_kwargs("merchant", {}),
+            profession_assembly.missing_identity_kwargs(_MERCHANT, {}),
             ["service_id", "shop_key"],
         )
 
@@ -269,22 +285,22 @@ class AssemblyPlanTests(TestCase):
         # an absent value is the valid identity form, so the only required
         # authored identity for a commissioner entry is service_id.
         self.assertEqual(
-            profession_assembly.identity_fields("quest_issuer"),
+            profession_assembly.identity_fields(_QUEST_ISSUER),
             frozenset({"service_id"}),
         )
         self.assertEqual(
-            profession_assembly.component_field_names("quest_issuer"),
+            profession_assembly.component_field_names(_QUEST_ISSUER),
             frozenset({"service_id", "issuer_key"}),
         )
         self.assertEqual(
             profession_assembly.missing_identity_kwargs(
-                "quest_issuer", {"issuer_key": "grey_granny"}
+                _QUEST_ISSUER, {"issuer_key": "grey_granny"}
             ),
             ["service_id"],
         )
 
     def test_component_field_names_are_the_class_db_fields(self):
         self.assertEqual(
-            profession_assembly.component_field_names("merchant"),
+            profession_assembly.component_field_names(_MERCHANT),
             frozenset({"service_id", "shop_key", "merchant_stock", "last_restock_day"}),
         )

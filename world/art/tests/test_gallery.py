@@ -55,7 +55,10 @@ def _monster(key="goblin"):
     return ArtSubject(ArtSubjectKind.MONSTER, key)
 
 
-def _scene(key="forest_path"):
+# Gallery records key identity-only scene subjects; the shipped archetype
+# vocabulary is irrelevant to card/record mechanics, so the default is a
+# file-local synthetic scene identity.
+def _scene(key="t_synth_scene"):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 

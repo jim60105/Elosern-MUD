@@ -44,7 +44,9 @@ def _monster(key="chaingoblin"):
     return ArtSubject(ArtSubjectKind.MONSTER, key)
 
 
-def _scene(key="forest_path"):
+# Fallback matching is subject-key mechanics; a file-local synthetic scene
+# identity keeps the suite independent of the shipped archetype vocabulary.
+def _scene(key="t_synth_scene"):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 

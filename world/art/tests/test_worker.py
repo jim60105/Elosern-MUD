@@ -113,7 +113,7 @@ class WorkerStoreIsolation(EvenniaTest):
         with patch("world.art.worker.resolve_sd_client", return_value=client):
             yield
 
-    def _subject(self, key="forest_path", kind=ArtSubjectKind.SCENE):
+    def _subject(self, key="t_synth_forest", kind=ArtSubjectKind.SCENE):
         return ArtSubject(kind, key)
 
     def _record(self, subject, description="desc"):
@@ -146,8 +146,8 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         self.assertEqual(dispatched, 1)
         record = self._record_for(subject)
         self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.output_identity, "scene/forest_path.png")
-        target = self.root / "scene" / "forest_path.png"
+        self.assertEqual(record.db.output_identity, "scene/t_synth_forest.png")
+        target = self.root / "scene" / "t_synth_forest.png"
         self.assertTrue(target.is_file())
         # The png path re-encodes through the local converter: the container
         # bytes may differ, the decoded pixels must not.
@@ -173,7 +173,7 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         with self._client(FakeSDWebUIClient()):
             drain_synchronous(10)
         leftovers = [
-            path for path in (self.root / "scene").iterdir() if path.name != "forest_path.png"
+            path for path in (self.root / "scene").iterdir() if path.name != "t_synth_forest.png"
         ]
         self.assertEqual(leftovers, [])
 
@@ -224,7 +224,7 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             drain_synchronous(10)
         record = self._record_for(subject)
         self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
-        self.assertEqual(record.db.output_identity, "scene/forest_path.png")
+        self.assertEqual(record.db.output_identity, "scene/t_synth_forest.png")
         self.assertEqual(record.db.seed, 7)
 
     @covers_requirement(
@@ -331,7 +331,7 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_out_of_root_store_directory_is_rejected(self):
-        subject = self._subject("mountain_path")
+        subject = self._subject("t_synth_mountain")
         self._record(subject)
         with tempfile.TemporaryDirectory() as outside:
             (self.root / "scene").symlink_to(outside, target_is_directory=True)
@@ -340,23 +340,23 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             record = self._record_for(subject)
             self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
             self.assertEqual(record.db.last_error_code, "worker_output_out_of_root")
-            self.assertFalse((Path(outside) / "mountain_path.png").exists())
+            self.assertFalse((Path(outside) / "t_synth_mountain.png").exists())
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_atomic_write_removes_the_temp_file_when_publish_fails(self):
         subject = self._subject()
         self._record(subject)
         claimed = claim(10)
-        target = self.root / "scene" / "forest_path.png"
+        target = self.root / "scene" / "t_synth_forest.png"
         target.parent.mkdir(parents=True)
         target.write_bytes(b"prior")
-        tmp_path = _write_temp("scene/forest_path.png", DEFAULT_PNG)
+        tmp_path = _write_temp("scene/t_synth_forest.png", DEFAULT_PNG)
         with patch("world.art.queue.os.replace", side_effect=OSError("disk full")):
             with self.assertRaises(OSError):
                 settle_generated(
                     subject,
                     generation_token=claimed[0].db.generation_token,
-                    output_identity="scene/forest_path.png",
+                    output_identity="scene/t_synth_forest.png",
                     tmp_path=tmp_path,
                 )
         self.assertEqual(target.read_bytes(), b"prior")
@@ -364,19 +364,19 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_stale_claim_never_publishes_its_output_after_a_requeue(self):
-        subject = self._subject("forest_path")
+        subject = self._subject("t_synth_forest")
         self._record(subject)
         claimed = claim(10)
         # A staff requeue lands while the generation is still in flight.
         requeue(subject)
-        target = self.root / "scene" / "forest_path.png"
+        target = self.root / "scene" / "t_synth_forest.png"
         target.parent.mkdir(parents=True)
         target.write_bytes(b"prior")
-        tmp_path = _write_temp("scene/forest_path.png", DEFAULT_PNG)
+        tmp_path = _write_temp("scene/t_synth_forest.png", DEFAULT_PNG)
         committed = settle_generated(
             subject,
             generation_token=claimed[0].db.generation_token,
-            output_identity="scene/forest_path.png",
+            output_identity="scene/t_synth_forest.png",
             tmp_path=tmp_path,
         )
         self.assertIsNone(committed)
@@ -388,7 +388,7 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_stale_claimed_record_is_skipped_by_the_batch_settler(self):
-        subject = self._subject("tavern_interior")
+        subject = self._subject("t_synth_tavern")
         self._record(subject)
         claimed = claim(10)
         requeue(subject)
@@ -399,21 +399,21 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         self.assertEqual(settled, [])
         record = self._record_for(subject)
         self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
-        self.assertFalse((self.root / "scene" / "tavern_interior.png").exists())
+        self.assertFalse((self.root / "scene" / "t_synth_tavern.png").exists())
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_failed_regeneration_never_corrupts_the_prior_output(self):
-        subject = self._subject("dungeon_interior")
+        subject = self._subject("t_synth_dungeon")
         self._record(subject)
         claimed = claim(10)
         settle(
             subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/dungeon_interior.png",
+            output_identity="scene/t_synth_dungeon.png",
             error=None,
         )
-        target = self.root / "scene" / "dungeon_interior.png"
+        target = self.root / "scene" / "t_synth_dungeon.png"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(b"prior-image")
         requeue(subject)
@@ -424,13 +424,13 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         record = self._record_for(subject)
         self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
         self.assertEqual(record.db.last_error_code, "sd_timeout")
-        self.assertEqual(record.db.prior_output_identity, "scene/dungeon_interior.png")
+        self.assertEqual(record.db.prior_output_identity, "scene/t_synth_dungeon.png")
         self.assertEqual(target.read_bytes(), b"prior-image")
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_slow_batch_is_not_reclaimed_before_n_times_timeout_plus_margin(self):
         with override_settings(ART_SD_TIMEOUT_SECONDS=1, ART_SCHEDULER_LIMIT=2):
-            subjects = [self._subject("forest_path"), self._subject("tavern_interior")]
+            subjects = [self._subject("t_synth_forest"), self._subject("t_synth_tavern")]
             for subject in subjects:
                 self._record(subject)
             claimed = claim(2)
@@ -461,9 +461,9 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         client.outcomes["boom"] = SDError("sd_http_error", "scripted")
         client.outcomes["crash"] = RuntimeError("unexpected")
         subjects = [
-            self._subject("forest_path"),
-            self._subject("tavern_interior", ArtSubjectKind.MONSTER),
-            self._subject("city_street"),
+            self._subject("t_synth_forest"),
+            self._subject("t_synth_tavern", ArtSubjectKind.MONSTER),
+            self._subject("t_synth_city"),
         ]
         for subject, description in zip(subjects, ("ok", "boom", "crash")):
             self._record(subject, description)
@@ -473,12 +473,12 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         for subject in subjects:
             record = self._record_for(subject)
             statuses[subject.key] = (record.db.status, record.db.last_error_code)
-        self.assertEqual(statuses["forest_path"], (ArtAssetStatus.DONE, None))
+        self.assertEqual(statuses["t_synth_forest"], (ArtAssetStatus.DONE, None))
         self.assertEqual(
-            statuses["tavern_interior"], (ArtAssetStatus.FAILED, "sd_http_error")
+            statuses["t_synth_tavern"], (ArtAssetStatus.FAILED, "sd_http_error")
         )
         self.assertEqual(
-            statuses["city_street"], (ArtAssetStatus.FAILED, "sd_internal_error")
+            statuses["t_synth_city"], (ArtAssetStatus.FAILED, "sd_internal_error")
         )
         in_progress = [
             record
@@ -489,7 +489,7 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
 
     @covers_requirement("art-queue-worker::scenes-and-portraits-share-one-serialization-lock-and-one-worker-concurrency-slot")
     def test_only_one_worker_runs_at_a_time(self):
-        subject = self._subject("forest_path")
+        subject = self._subject("t_synth_forest")
         self._record(subject)
         from world.art.worker import _try_acquire_worker_slot, _release_worker_slot
 
@@ -505,7 +505,7 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
 
     @covers_requirement("art-queue-worker::scenes-and-portraits-share-one-serialization-lock-and-one-worker-concurrency-slot")
     def test_slot_is_released_after_a_synchronous_drain(self):
-        subject = self._subject("tavern_interior")
+        subject = self._subject("t_synth_tavern")
         self._record(subject)
         from world.art.worker import _try_acquire_worker_slot, _release_worker_slot
 
@@ -517,7 +517,7 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
 
     @covers_requirement("internal-art-worker::the-internal-sd-webui-client-generates-images-through-txt2img-with-bounded-validation")
     def test_drain_dispatches_generation_through_the_background_thread_seam(self):
-        subject = self._subject("forest_path")
+        subject = self._subject("t_synth_forest")
         self._record(subject)
         from twisted.internet import defer
 
@@ -574,18 +574,18 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
                 drain_synchronous(10)
         record = self._record_for(subject)
         self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.output_identity, "scene/forest_path.webp")
-        target = self.root / "scene" / "forest_path.webp"
+        self.assertEqual(record.db.output_identity, "scene/t_synth_forest.webp")
+        target = self.root / "scene" / "t_synth_forest.webp"
         self.assertTrue(target.is_file())
         self.assertEqual(Image.open(target.open("rb")).format, "WEBP")
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_format_change_replaces_file_and_deletes_prior_after_commit(self):
-        subject = self._subject("dungeon_interior")
+        subject = self._subject("t_synth_dungeon")
         self._record(subject)
         with self._client(FakeSDWebUIClient()):
             drain_synchronous(10)
-        png_path = self.root / "scene" / "dungeon_interior.png"
+        png_path = self.root / "scene" / "t_synth_dungeon.png"
         self.assertTrue(png_path.is_file())
         requeue(subject)
         with self._formats("webp", ".webp"):
@@ -593,15 +593,15 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
                 drain_synchronous(10)
         record = self._record_for(subject)
         self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.output_identity, "scene/dungeon_interior.webp")
-        self.assertTrue((self.root / "scene" / "dungeon_interior.webp").is_file())
+        self.assertEqual(record.db.output_identity, "scene/t_synth_dungeon.webp")
+        self.assertTrue((self.root / "scene" / "t_synth_dungeon.webp").is_file())
         # The stale png is deleted only after the transition committed; the
         # record never points at the deleted file at any point.
         self.assertFalse(png_path.exists())
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_same_extension_regeneration_deletes_nothing_extra(self):
-        subject = self._subject("dungeon_interior")
+        subject = self._subject("t_synth_dungeon")
         self._record(subject)
         with self._client(FakeSDWebUIClient()):
             drain_synchronous(10)
@@ -613,15 +613,15 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
         # Same extension: the atomic replace overwrote in place; no cleanup
         # candidate existed, so the directory holds exactly the one file.
         listing = sorted(p.name for p in (self.root / "scene").iterdir())
-        self.assertEqual(listing, ["dungeon_interior.png"])
+        self.assertEqual(listing, ["t_synth_dungeon.png"])
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_encode_failure_sets_sd_format_error_and_keeps_prior(self):
-        subject = self._subject("dungeon_interior")
+        subject = self._subject("t_synth_dungeon")
         self._record(subject)
         with self._client(FakeSDWebUIClient()):
             drain_synchronous(10)
-        png_path = self.root / "scene" / "dungeon_interior.png"
+        png_path = self.root / "scene" / "t_synth_dungeon.png"
         prior_bytes = png_path.read_bytes()
         requeue(subject)
 
@@ -636,13 +636,13 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
         self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
         self.assertEqual(record.db.last_error_code, "sd_format_error")
         # Prior output retained: record still references it and bytes intact.
-        self.assertEqual(record.db.output_identity, "scene/dungeon_interior.png")
+        self.assertEqual(record.db.output_identity, "scene/t_synth_dungeon.png")
         self.assertEqual(png_path.read_bytes(), prior_bytes)
-        self.assertFalse((self.root / "scene" / "dungeon_interior.webp").exists())
+        self.assertFalse((self.root / "scene" / "t_synth_dungeon.webp").exists())
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_reclaimed_record_never_lets_the_stale_claim_publish(self):
-        subject = self._subject("dungeon_interior")
+        subject = self._subject("t_synth_dungeon")
         self._record(subject)
         held = claim(10)[0]
         token_a = str(held.db.generation_token)
@@ -671,15 +671,15 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
         self.assertEqual(record.db.generation_token, racing.token_b)
         self.assertNotEqual(racing.token_b, token_a)
         self.assertIsNone(record.db.output_identity)
-        self.assertFalse((self.root / "scene" / "dungeon_interior.png").exists())
+        self.assertFalse((self.root / "scene" / "t_synth_dungeon.png").exists())
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_settle_failure_before_commit_keeps_prior_file_on_disk(self):
-        subject = self._subject("dungeon_interior")
+        subject = self._subject("t_synth_dungeon")
         self._record(subject)
         with self._client(FakeSDWebUIClient()):
             drain_synchronous(10)
-        png_path = self.root / "scene" / "dungeon_interior.png"
+        png_path = self.root / "scene" / "t_synth_dungeon.png"
         prior_bytes = png_path.read_bytes()
         requeue(subject)
         with self._formats("webp", ".webp"):
@@ -702,17 +702,17 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
             self.assertIsNone(outcome)
         record = self._record_for(subject)
         self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
-        self.assertEqual(record.db.output_identity, "scene/dungeon_interior.png")
+        self.assertEqual(record.db.output_identity, "scene/t_synth_dungeon.png")
         self.assertEqual(png_path.read_bytes(), prior_bytes)
-        self.assertFalse((self.root / "scene" / "dungeon_interior.webp").exists())
+        self.assertFalse((self.root / "scene" / "t_synth_dungeon.webp").exists())
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_cleanup_deletion_error_logs_and_never_reverts(self):
-        subject = self._subject("dungeon_interior")
+        subject = self._subject("t_synth_dungeon")
         self._record(subject)
         with self._client(FakeSDWebUIClient()):
             drain_synchronous(10)
-        png_path = self.root / "scene" / "dungeon_interior.png"
+        png_path = self.root / "scene" / "t_synth_dungeon.png"
         requeue(subject)
         with self._formats("webp", ".webp"):
             with patch("pathlib.Path.unlink", side_effect=OSError("read-only")):
@@ -722,7 +722,7 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
         record = self._record_for(subject)
         # The DONE transition stays committed; the orphan remains; bounded log.
         self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.output_identity, "scene/dungeon_interior.webp")
+        self.assertEqual(record.db.output_identity, "scene/t_synth_dungeon.webp")
         self.assertTrue(png_path.exists())
         messages = [call.args[0] for call in warned.call_args_list]
         self.assertTrue(any("cleanup_failed" in message for message in messages), messages)
@@ -819,8 +819,8 @@ class GalleryWorkerTests(WorkerStoreIsolation):
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_output_identity_for_is_per_image_for_gallery_and_exact_for_classic(self):
-        classic = self._record(self._subject("forest_path"))
-        self.assertEqual(output_identity_for(classic), "scene/forest_path.png")
+        classic = self._record(self._subject("t_synth_forest"))
+        self.assertEqual(output_identity_for(classic), "scene/t_synth_forest.png")
         job = self._gallery_job()
         self.assertEqual(
             output_identity_for(job),
@@ -996,7 +996,7 @@ class GalleryWorkerTests(WorkerStoreIsolation):
         # batch settles through the config-failure path: the gallery job must
         # settle failed on the GALLERY record (never the classic one) and its
         # spent record must be deleted; the classic record settles failed once.
-        scene = self._subject("forest_path")
+        scene = self._subject("t_synth_forest")
         self._record(scene)
         self._gallery_job()
         with patch(
@@ -1168,7 +1168,7 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
         self._record(subject)
         with self._client(self.client):
             drain_synchronous(10)
-        target = self.root / "scene" / "forest_path.png"
+        target = self.root / "scene" / "t_synth_forest.png"
         disabled_bytes = target.read_bytes()
         requeue(subject)
         fake = FakeCutoutBackend()

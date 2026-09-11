@@ -25,7 +25,7 @@ class ArtSchedulerTests(EvenniaTestCase):
 
     @covers_requirement("art-queue-worker::the-scheduler-is-settings-configurable-and-disableable")
     def test_disabled_scheduler_never_drains(self):
-        self._seed("forest_path", "tavern_interior")
+        self._seed("t_synth_forest", "t_synth_tavern")
         with (
             override_settings(ART_SCHEDULER_ENABLED=False),
             patch("world.art.worker.drain") as drain,
@@ -43,7 +43,7 @@ class ArtSchedulerTests(EvenniaTestCase):
 
     @covers_requirement("art-queue-worker::the-scheduler-is-settings-configurable-and-disableable")
     def test_enabled_scheduler_drains_up_to_its_limit(self):
-        self._seed("forest_path", "tavern_interior", "city_street")
+        self._seed("t_synth_forest", "t_synth_tavern", "t_synth_city")
         with (
             override_settings(ART_SCHEDULER_ENABLED=True, ART_SCHEDULER_LIMIT=2),
             patch("world.art.worker.drain") as drain,

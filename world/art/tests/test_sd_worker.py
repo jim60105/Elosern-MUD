@@ -43,7 +43,7 @@ VALID_PNG = base64.b64decode(
 _MISSING = object()
 
 
-def _scene(key="forest_path"):
+def _scene(key="t_synth_forest"):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
@@ -81,7 +81,7 @@ class FakeResponse:
 class RequestBuildingTests(unittest.TestCase):
     @covers_requirement("internal-art-worker::art-generation-prompts-are-stored-in-the-prompt-library")
     def test_scene_request_renders_the_scene_prompt_with_16_9_dimensions(self):
-        request = build_txt2img_request(_scene("tavern_interior"), "a description")
+        request = build_txt2img_request(_scene("t_synth_tavern"), "a description")
         self.assertIn("a description", request["prompt"])
         self.assertNotIn("{description}", request["prompt"])
         self.assertEqual(request["width"], 1344)
@@ -125,19 +125,19 @@ class RequestBuildingTests(unittest.TestCase):
 
     @covers_requirement("internal-art-worker::art-generation-prompts-are-stored-in-the-prompt-library")
     def test_prompt_pair_and_digest_are_deterministic(self):
-        first = render_prompt_pair(_scene("city_street"), "desc")
-        second = render_prompt_pair(_scene("city_street"), "desc")
+        first = render_prompt_pair(_scene("t_synth_city"), "desc")
+        second = render_prompt_pair(_scene("t_synth_city"), "desc")
         self.assertEqual(first, second)
         self.assertEqual(
-            prompt_digest(_scene("city_street"), "desc"),
-            prompt_digest(_scene("city_street"), "desc"),
+            prompt_digest(_scene("t_synth_city"), "desc"),
+            prompt_digest(_scene("t_synth_city"), "desc"),
         )
         self.assertNotEqual(
-            prompt_digest(_scene("city_street"), "desc"),
-            prompt_digest(_scene("city_street"), "other"),
+            prompt_digest(_scene("t_synth_city"), "desc"),
+            prompt_digest(_scene("t_synth_city"), "other"),
         )
         self.assertNotEqual(
-            prompt_digest(_scene("city_street"), "desc"),
+            prompt_digest(_scene("t_synth_city"), "desc"),
             prompt_digest(_monster("low"), "desc"),
         )
         positive, negative = first
@@ -262,7 +262,7 @@ class GenerateValidationTests(unittest.TestCase):
             return self._ok_response()
 
         client = self._client(transport)
-        client.generate(_scene("tavern_interior"), "scene text")
+        client.generate(_scene("t_synth_tavern"), "scene text")
         self.assertEqual(captured["request"]["width"], 1344)
         self.assertIn("scene text", captured["request"]["prompt"])
         self.assertIn("override_settings_restore_afterwards", captured["request"])

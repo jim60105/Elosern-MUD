@@ -29,13 +29,29 @@ from world.art.subjects import (
 from world.prompts.loader import PromptUnavailableError
 
 from tools.spec_traceability import covers_requirement
+from world.tests.synthetic_data import (
+    SYNTH_ARCHETYPES,
+    SYNTH_MONSTER_TIERS,
+    SYNTH_SUBRACES,
+    synthetic_registries,
+)
+
+
+# Kit vocabulary used wherever a producer RESOLVES against a catalog; parsing
+# and key-validation tests keep plain t_-prefixed identity literals.
+_SYNTH_SCENE = sorted(SYNTH_ARCHETYPES)[0]
+_SYNTH_TIER = sorted(SYNTH_MONSTER_TIERS)[0]
+_SYNTH_SUBRACE = sorted(SYNTH_SUBRACES)[0]
+_SYNTH_RACE_LABEL = SYNTH_SUBRACES[_SYNTH_SUBRACE].display_name_zh
 
 
 class SubjectParsingTests(unittest.TestCase):
     @covers_requirement("art-subject-model::art-subject-keys-are-typed-namespaced-and-validated-before-queue-access")
     def test_known_kinds_parse_into_typed_subjects(self):
+        # Parsing is pure syntax: keys are identity strings, never registry
+        # lookups, so invented synthetic keys exercise the full wire shape.
         cases = (
-            ("scene:forest_path", ArtSubjectKind.SCENE, "forest_path"),
+            ("scene:t_synth_scene", ArtSubjectKind.SCENE, "t_synth_scene"),
             ("portrait:character:42", ArtSubjectKind.CHARACTER, "42"),
             ("portrait:monster:gray_wolf", ArtSubjectKind.MONSTER, "gray_wolf"),
         )
@@ -149,13 +165,16 @@ class StableKeyContractTests(unittest.TestCase):
         return character
 
 
+@synthetic_registries("archetypes", "monster_tiers")
 class RegistryResolutionTests(unittest.TestCase):
+    """Resolution runs against the kit catalogs (built in test bodies only)."""
+
     @covers_requirement("art-subject-model::scene-and-generic-monster-subjects-resolve-from-immutable-registries")
     def test_registered_archetypes_resolve(self):
-        subject = scene_subject_for("tavern_interior")
-        self.assertEqual(subject.full(), "scene:tavern_interior")
-        monster = monster_subject_for("low")
-        self.assertEqual(monster.full(), "portrait:monster:low")
+        subject = scene_subject_for(_SYNTH_SCENE)
+        self.assertEqual(subject.full(), f"scene:{_SYNTH_SCENE}")
+        monster = monster_subject_for(_SYNTH_TIER)
+        self.assertEqual(monster.full(), f"portrait:monster:{_SYNTH_TIER}")
 
     @covers_requirement("art-subject-model::scene-and-generic-monster-subjects-resolve-from-immutable-registries")
     def test_unknown_archetypes_are_rejected(self):
@@ -245,33 +264,40 @@ class PortraitPolicyTests(EvenniaTestCase):
                     character_subject_for(self._character(bad))
 
 
+@synthetic_registries("archetypes", "monster_tiers", "subraces")
 class DescriptionTests(EvenniaTestCase):
+    """Description composition resolves the archetype sentence, tier text and
+    subrace label through the catalogs; every entity is built in the test
+    bodies, so the class scope wraps each test independently."""
+
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_character_description_contains_only_allowed_stable_data(self):
         character = Mock()
         character.db.display_name = "艾琳"
-        character.db.race = "beastfolk"
-        character.db.subrace = "catkin"
+        character.db.race = "t_duskmari"
+        character.db.subrace = _SYNTH_SUBRACE
         character.db.persona = "secret tragic past"
         character.db.disguised_stats = {"atk_phys": 99}
         character.key = "艾琳"
         text = character_description(character, 24, fields=("appearance",))
         self.assertIn("艾琳", text)
-        self.assertIn("貓人族", text)
+        self.assertIn(_SYNTH_RACE_LABEL, text)
         self.assertIn("24", text)
         self.assertNotIn("secret tragic past", text)
         self.assertNotIn("99", text)
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_scene_and_monster_descriptions_are_registry_text(self):
-        scene = scene_subject_for("forest_path")
-        monster = monster_subject_for("low")
+        scene = scene_subject_for(_SYNTH_SCENE)
+        monster = monster_subject_for(_SYNTH_TIER)
         first = description_for(scene)
         second = description_for(scene)
         self.assertEqual(first, second)
-        self.assertIn("林間小徑", first)
+        # The scene description IS the archetype's registry sentence — assert
+        # against the kit row the scope patched in, never shipped prose.
+        self.assertIn(SYNTH_ARCHETYPES[_SYNTH_SCENE].scene_sentence, first)
         monster_text = description_for(monster)
-        self.assertIn("Threats a beginning adventurer", monster_text)
+        self.assertIn(SYNTH_MONSTER_TIERS[_SYNTH_TIER].description, monster_text)
         self.assertEqual(monster_text, monster_description(monster))
 
 
@@ -279,8 +305,8 @@ def _persona_entity(persona):
     """A DB-free stand-in character with a fixed identity and the given persona."""
     entity = Mock()
     entity.db.display_name = "艾琳"
-    entity.db.race = "beastfolk"
-    entity.db.subrace = "catkin"
+    entity.db.race = "t_duskmari"
+    entity.db.subrace = _SYNTH_SUBRACE
     entity.db.persona = persona
     entity.key = "艾琳"
     return entity
@@ -297,6 +323,7 @@ _APPEARANCE = {
 }
 
 
+@synthetic_registries("subraces")
 class AppearanceDescriptionTests(PromptFixture):
     """The admitted persona ``appearance`` block in character descriptions
     (portrait-prompt-appearance): ordering, exclusion, determinism, emptiness.
@@ -337,7 +364,7 @@ class AppearanceDescriptionTests(PromptFixture):
         self.load()
         text = character_description(_persona_entity(self._full_persona()), 31, fields=self._APPEARANCE_ONLY)
         self.assertIn("艾琳", text)
-        self.assertIn("貓人族", text)
+        self.assertIn(_SYNTH_RACE_LABEL, text)
         self.assertIn("31", text)
         for value in _APPEARANCE.values():
             self.assertIn(value, text)
@@ -375,7 +402,7 @@ class AppearanceDescriptionTests(PromptFixture):
         # insertion order).
         self.assertEqual(
             first,
-            "A 貓人族 character named 艾琳 (31) in the approved visual style.\n"
+            f"A {_SYNTH_RACE_LABEL} character named 艾琳 (31) in the approved visual style.\n"
             "外觀：\n"
             "height：tall\n"
             "weight：slender\n"
@@ -394,7 +421,7 @@ class AppearanceDescriptionTests(PromptFixture):
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_empty_appearance_renders_the_pre_change_description(self):
         self.load()
-        expected = "A 貓人族 character named 艾琳 (24) in the approved visual style."
+        expected = f"A {_SYNTH_RACE_LABEL} character named 艾琳 (24) in the approved visual style."
         for persona in (
             {},
             {"appearance": {}, "personality": "guarded"},
@@ -432,7 +459,7 @@ class AppearanceDescriptionTests(PromptFixture):
         persona = {"appearance": {"overview": "長" * 900}}
         text = character_description(_persona_entity(persona), 31, fields=self._APPEARANCE_ONLY)
         section = text.removeprefix(
-            "A 貓人族 character named 艾琳 (31) in the approved visual style.\n"
+            f"A {_SYNTH_RACE_LABEL} character named 艾琳 (31) in the approved visual style.\n"
         )
         self.assertEqual(len(section), 600)
         self.assertTrue(section.endswith("…"))
@@ -454,8 +481,8 @@ class AppearanceDescriptionTests(PromptFixture):
             """Identity fields resolve; touching persona fails the test."""
 
             display_name = "艾琳"
-            race = "beastfolk"
-            subrace = "catkin"
+            race = "t_duskmari"
+            subrace = _SYNTH_SUBRACE
 
             @property
             def persona(self):
@@ -466,7 +493,7 @@ class AppearanceDescriptionTests(PromptFixture):
         entity.key = "艾琳"
         self.assertEqual(
             character_description(entity, 24, fields=self._APPEARANCE_ONLY),
-            "艾琳（貓人族，24 歲）",
+            f"艾琳（{_SYNTH_RACE_LABEL}，24 歲）",
         )
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
@@ -490,7 +517,7 @@ class AppearanceDescriptionTests(PromptFixture):
             text = character_description(entity, 31, fields=self._APPEARANCE_ONLY)
         self.assertEqual(calls, ["", "\n外觀：\nfeature：a silver ear piercing"])
         self.assertEqual(
-            text, "A 貓人族 character named 艾琳 (31) in the approved visual style."
+            text, f"A {_SYNTH_RACE_LABEL} character named 艾琳 (31) in the approved visual style."
         )
 
 

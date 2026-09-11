@@ -531,7 +531,9 @@ class NeverGatingIntegrationTests(EvenniaTest):
     def test_failed_verdict_never_blocks_a_recovered_generation(self):
         fake = FakeSDWebUIClient()
         fake.fail_probe()
-        subject = ArtSubject(ArtSubjectKind.SCENE, "forest_path")
+        # File-local synthetic scene identity: never-gating is queue mechanics,
+        # independent of which scene key names the record.
+        subject = ArtSubject(ArtSubjectKind.SCENE, "t_synth_scene")
         ensure(subject, "desc")
         with (
             patch("world.art.connectivity.resolve_sd_client", return_value=fake),
@@ -545,7 +547,7 @@ class NeverGatingIntegrationTests(EvenniaTest):
         self.assertEqual(dispatched, 1)
         record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
         self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.output_identity, "scene/forest_path.png")
+        self.assertEqual(record.db.output_identity, "scene/t_synth_scene.png")
 
 
 if __name__ == "__main__":

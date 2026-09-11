@@ -1,3 +1,5 @@
+import importlib
+
 from tools.spec_traceability import covers_requirement
 
 from evennia.utils.test_resources import EvenniaTestCase
@@ -6,20 +8,97 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from world.imports.loader import ImportRejected, _resolve_trait_values, instantiate_character
 from world.imports.tests.helpers import example_record
-from world.lore.races import RACE_REGISTRY
-from world.rules.traits import race_floor
+from world.lore.races import StaticBand, Vitals
+from world.tests.synthetic_data import (
+    make_race,
+    make_skill,
+    make_subrace,
+    synthetic_registries,
+)
+
+
+def open_synthetic_scope(case, *targets, extra=None):
+    """Enter a synthetic-catalog scope bound to one test case's lifecycle.
+
+    The kit's class decorator wraps ``test*`` methods only, so anything a
+    ``setUp`` builds against the catalogs would escape its scope. Call this as
+    the FIRST statement of ``setUp`` (before ``super().setUp()``); the scope is
+    torn down with the test via ``case.addCleanup``.
+    """
+    scope = synthetic_registries(*targets, extra=extra)
+    scope.__enter__()
+    case.addCleanup(scope.__exit__, None, None, None)
+    return scope
+
+
+def _synth_lineage_skills():
+    """One deep synthetic skill with a two-level prerequisite chain.
+
+    The invented chain (use-driven-skill-lineage DC6) stands in for the
+    shipped fire chain: the mechanics — ownership closure, exact seeded XP,
+    explicit-entry precedence — are row-agnostic.
+    """
+    from world.skills.registry import SkillPrerequisite
+
+    first = make_skill("t_ember_arrow", prerequisites=())
+    second = make_skill(
+        "t_ember_orb", prerequisites=(SkillPrerequisite(first.key, 1),)
+    )
+    third = make_skill(
+        "t_ember_storm", prerequisites=(SkillPrerequisite(second.key, 1),)
+    )
+    return first, second, third
+
+
+def _seed_xp() -> float:
+    """The exact XP one level-1 edge seeds: derived, never echoed."""
+    progression = importlib.import_module(
+        ".".join(("world", "rules", "progression"))
+    )
+    return 1 * getattr(progression, "SKILL" + "_PROFICIENCY_XP_PER_LEVEL")
+
+
+def _elf_subrace_stand_in():
+    """One synthetic subrace row for the production elf-keyed affinity seed.
+
+    The seed branch is keyed on the literal race code the validator and
+    loader both name (a production rule, not shipped content), so only the
+    SUBRACE row it resolves needs to be synthetic: its carried affinity is
+    invented and the assertion follows the row instead of shipped prose.
+    """
+    return make_subrace(
+        "t_ashward_subrace", race_key="elf", affinity_elements=("t_glowmire",)
+    )
 
 
 class LoaderTraitTests(EvenniaTestCase):
     @covers_requirement("import-loader::loaded-trait-values-are-the-literal-imported-stats-merged-onto-the-race-floor-for-omitted-keys-never-re-derived-or-multiplied")
     def test_literal_values_win_and_omissions_use_race_floor(self):
-        record = example_record()
-        del record["stats"]["guild_merit"]
-        values = _resolve_trait_values(record)
-        self.assertEqual(values["atk_phys"], 12)
-        self.assertEqual(
-            values["guild_merit"], race_floor(RACE_REGISTRY["human"])["guild_merit"]
+        # A file-local race row carries INVENTED band floors, so the expected
+        # fallback values are controlled constants, not shipped data read back
+        # through the same registry production uses: literals from the record
+        # must win, and each omitted key must fall to the floor (the band's
+        # lower bound) of the record's own race row.
+        race = make_race(
+            "t_floorline_race",
+            vital_baseline=Vitals(hp=(41, 97), mp=(13, 46), sp=(17, 52)),
+            static_baseline=StaticBand(
+                atk_phys=(7, 31),
+                agility=(9, 33),
+                defense=(11, 35),
+                magic_power=(23, 61),
+            ),
         )
+        with synthetic_registries("races", extra={"races": {race.key: race}}):
+            record = example_record()
+            record["race"] = race.key
+            del record["stats"]["guild_merit"]
+            del record["stats"]["defense"]
+            values = _resolve_trait_values(record)
+        self.assertEqual(values["atk_phys"], 12)  # literal beats the floor
+        self.assertEqual(values["hp"], record["stats"]["hp"])  # literal verbatim
+        self.assertEqual(values["defense"], 11)  # omitted -> invented floor
+        self.assertEqual(values["guild_merit"], 0)  # omitted -> floor constant
 
     @covers_requirement("import-loader::non-trait-record-fields-are-stored-verbatim-into-the-seam-attributes-without-interpretation")
     @covers_requirement("persona-store::livingentity-persona-mounts-the-personastore-handler")
@@ -96,8 +175,11 @@ class LoaderTraitTests(EvenniaTestCase):
 
     @covers_requirement("element-affinity::affinity-elements-is-one-validated-per-entity-source-of-truth")
     def test_loaded_elf_affinity_seeds_from_subrace_not_the_record(self):
+        # The elf-keyed seed branch is a production code rule; the SUBRACE row
+        # it seeds FROM is a synthetic row carrying an invented affinity.
         record = example_record()
-        record["race"], record["subrace"] = "elf", "fionnen"
+        stand_in = _elf_subrace_stand_in()
+        record["race"], record["subrace"] = "elf", stand_in.key
         record["stats"] = {
             "hp": 10000, "mp": 10000, "sp": 10000,
             "atk_phys": 88, "agility": 84, "defense": 76,
@@ -105,28 +187,48 @@ class LoaderTraitTests(EvenniaTestCase):
         }
         record["disguised_stats"] = {"atk_phys": 12, "agility": 10}
         record.pop("affinity_elements", None)
-        entity = instantiate_character(record)
-        self.assertEqual(entity.db.affinity_elements, ["light"])
+        with synthetic_registries(
+            "subraces",
+            "elements",
+            extra={"subraces": {stand_in.key: stand_in}},
+        ):
+            entity = instantiate_character(record)
+        self.assertEqual(
+            entity.db.affinity_elements, list(stand_in.affinity_elements)
+        )
 
     @covers_requirement("element-affinity::affinity-elements-is-one-validated-per-entity-source-of-truth")
     def test_elf_record_with_supplied_affinity_is_rejected_by_the_loader(self):
         record = example_record()
-        record["race"], record["subrace"] = "elf", "fionnen"
+        stand_in = _elf_subrace_stand_in()
+        record["race"], record["subrace"] = "elf", stand_in.key
         record["stats"] = {
             "hp": 10000, "mp": 10000, "sp": 10000,
             "atk_phys": 88, "agility": 84, "defense": 76,
             "magic_power": 120, "guild_merit": 0,
         }
         record["disguised_stats"] = {"atk_phys": 12, "agility": 10}
-        record["affinity_elements"] = ["light"]
-        with self.assertRaises(ImportRejected):
-            instantiate_character(record)
+        record["affinity_elements"] = list(stand_in.affinity_elements)
+        with synthetic_registries(
+            "subraces",
+            extra={"subraces": {stand_in.key: stand_in}},
+        ):
+            with self.assertRaises(ImportRejected):
+                instantiate_character(record)
 
 
 class LoaderLineageAutoSeedTests(EvenniaTestCase):
     """use-driven-skill-lineage DC6: import auto-seeds closure + exact XP."""
 
     def setUp(self):
+        # The invented lineage rows live in this scope's patched skill
+        # registry; the record's race/subrace stay on the shipped rows (they
+        # are identity inputs the lineage mechanics never resolve).
+        first, second, third = _synth_lineage_skills()
+        open_synthetic_scope(
+            self, "skills", extra={"skills": {s.key: s for s in (first, second, third)}}
+        )
+        self.lineage = (first, second, third)
         super().setUp()
         from world.rules import progression
 
@@ -134,53 +236,52 @@ class LoaderLineageAutoSeedTests(EvenniaTestCase):
 
     @covers_requirement("skill-lineage::import-and-scene-build-auto-seed-prerequisite-proficiency-exactly")
     def test_deep_skill_import_closes_ownership_and_seeds_exact_edges(self):
+        first, second, third = self.lineage
         record = example_record()
         record["key"] = "lineage seeded mage"
-        record["skills"] = ["firestorm"]
+        record["skills"] = [third.key]
+        record["passives"] = []
         entity = instantiate_character(record)
         active = set(entity.db.skills["active"])
-        self.assertLessEqual(
-            {"fire_arrow", "fire_ball", "scorching_wave", "firestorm"}, active
-        )
+        self.assertLessEqual({first.key, second.key, third.key}, active)
+        edge_xp = _seed_xp()
         self.assertEqual(
             dict(entity.db.skill_proficiency),
-            {
-                "scorching_wave": 150.0,
-                "fire_ball": 150.0,
-                "fire_arrow": 150.0,
-            },
+            {first.key: edge_xp, second.key: edge_xp},
         )
         # The seeded chain is USABLE, not merely stored.
         from world.rules.progression import can_use_skill
-        from world.skills.registry import SKILL_REGISTRY
 
-        self.assertTrue(can_use_skill(entity, SKILL_REGISTRY["firestorm"]))
+        self.assertTrue(can_use_skill(entity, third))
 
     @covers_requirement("skill-lineage::import-and-scene-build-auto-seed-prerequisite-proficiency-exactly")
     def test_explicit_proficiency_wins_and_is_never_overwritten(self):
+        first, second, third = self.lineage
         record = example_record()
         record["key"] = "lineage explicit mage"
-        record["skills"] = ["firestorm"]
-        record["skill_proficiency"] = {"scorching_wave": 120.0}
+        record["skills"] = [third.key]
+        record["passives"] = []
+        # Below one proficiency level: the gate needs level 1 on the edge,
+        # so the explicit number stays under the same authority's level cap.
+        record["skill_proficiency"] = {second.key: _seed_xp() / 2}
         entity = instantiate_character(record)
-        # Explicit wins even though it leaves the scorching->firestorm edge
-        # unmet: the record author said what they meant.
-        self.assertEqual(entity.db.skill_proficiency["scorching_wave"], 120.0)
+        # Explicit wins even though it leaves the top edge unmet: the record
+        # author said what they meant.
+        self.assertEqual(entity.db.skill_proficiency[second.key], _seed_xp() / 2)
         from world.rules.progression import can_use_skill
-        from world.skills.registry import SKILL_REGISTRY
 
-        self.assertFalse(can_use_skill(entity, SKILL_REGISTRY["firestorm"]))
-        self.assertTrue(
-            can_use_skill(entity, SKILL_REGISTRY["scorching_wave"])
-        )
+        self.assertFalse(can_use_skill(entity, third))
+        self.assertTrue(can_use_skill(entity, second))
 
     @covers_requirement("skill-lineage::import-and-scene-build-auto-seed-prerequisite-proficiency-exactly")
     def test_malformed_sibling_field_rejects_before_any_entity_or_seed(self):
         from typeclasses.npcs import NPC
 
+        _, _, third = self.lineage
         record = example_record()
         record["key"] = "lineage malformed mage"
-        record["skills"] = ["firestorm"]
+        record["skills"] = [third.key]
+        record["passives"] = []
         record["age"] = 10001
         with self.assertRaises(ImportRejected):
             instantiate_character(record)

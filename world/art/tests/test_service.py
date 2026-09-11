@@ -38,11 +38,42 @@ from world.art.service import (
 )
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
-from world.lore.monsters import MONSTER_TIER_REGISTRY
-from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
-from world.lore.items import ITEM_REGISTRY
 
 from tools.spec_traceability import covers_requirement
+from world.tests.synthetic_data import (
+    SYNTH_ARCHETYPES,
+    SYNTH_ITEMS,
+    SYNTH_MONSTER_TIERS,
+    synthetic_registries,
+)
+
+
+def open_synthetic_scope(case, *targets, extra=None):
+    """Enter a synthetic-catalog scope bound to one test case's lifecycle.
+
+    The kit's class decorator wraps ``test*`` methods only, so anything a
+    ``setUp`` builds against the catalogs would escape its scope. Call this as
+    the FIRST statement of ``setUp`` (before ``super().setUp()``); the scope is
+    torn down with the test via ``case.addCleanup``.
+    """
+    scope = synthetic_registries(*targets, extra=extra)
+    scope.__enter__()
+    case.addCleanup(scope.__exit__, None, None, None)
+    return scope
+
+
+# The kit's archetype/tier vocabularies replace the shipped catalogs for every
+# startup-sync loop below: the tests own the SYNCHRONIZATION MECHANICS (one
+# record per registered subject, idempotency, bounded failure), never the
+# shipped content, so the loops iterate the patched kit catalogs instead.
+_SYNTH_SCENES = sorted(SYNTH_ARCHETYPES)
+_SYNTH_TIERS = sorted(SYNTH_MONSTER_TIERS)
+_SYNTH_SCENE = _SYNTH_SCENES[0]
+# Synthetic gear identities for the equipment-binding/selection mechanics.
+_SYNTH_WEAPON = "t_thorn_knife"
+_SYNTH_OFFHAND = "t_iron_fang"
+_SYNTH_ARMOR = "t_wayfarer_pass"
+_SYNTH_TRINKET = "t_huskapple"
 
 
 def _scene(key):
@@ -50,11 +81,16 @@ def _scene(key):
 
 
 def _valid_binding():
-    return {"mask": ["armor"], "snapshot": {"armor": "leather_armor"}}
+    return {"mask": ["armor"], "snapshot": {"armor": _SYNTH_ARMOR}}
 
 
 class ArtServiceTests(EvenniaTestCase):
     def setUp(self):
+        # The startup-sync coverage tests below assert over the REGISTERED
+        # subject set, which is exactly what startup synchronization reads:
+        # run the whole class against the kit catalogs so the loops iterate
+        # SYNTH_* rows instead of shipped content.
+        open_synthetic_scope(self, "archetypes", "monster_tiers")
         super().setUp()
         self.player = create_object(PlayerCharacter, key="service-player")
         self.player.age = 22
@@ -67,7 +103,7 @@ class ArtServiceTests(EvenniaTestCase):
     def test_startup_sync_ensures_every_registered_subject_on_a_fresh_db(self):
         art_sync_all()
         records = self._records()
-        for archetype in SCENE_ARCHETYPE_REGISTRY:
+        for archetype in SYNTH_ARCHETYPES:
             self.assertIn(f"art:scene:{archetype}", records)
             self.assertIn(
                 records[f"art:scene:{archetype}"].db.status,
@@ -75,7 +111,7 @@ class ArtServiceTests(EvenniaTestCase):
             )
         # ``gallery-monster-autogen``: a monster tier gets a gallery request,
         # never a classic fixed-identity record.
-        for tier in MONSTER_TIER_REGISTRY:
+        for tier in SYNTH_MONSTER_TIERS:
             self.assertNotIn(f"art:portrait:monster:{tier}", records)
         classic = {
             key: record
@@ -84,7 +120,7 @@ class ArtServiceTests(EvenniaTestCase):
         }
         self.assertEqual(
             sorted(classic),
-            sorted(f"art:scene:{archetype}" for archetype in SCENE_ARCHETYPE_REGISTRY),
+            sorted(f"art:scene:{archetype}" for archetype in SYNTH_ARCHETYPES),
         )
         monster_jobs = [
             record
@@ -92,11 +128,11 @@ class ArtServiceTests(EvenniaTestCase):
             if str(record.db.gallery_image_id or "")
             and record.db_key.startswith("art:portrait:monster:")
         ]
-        self.assertEqual(len(monster_jobs), len(MONSTER_TIER_REGISTRY))
+        self.assertEqual(len(monster_jobs), len(SYNTH_MONSTER_TIERS))
 
     @covers_requirement("art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records")
     def test_startup_sync_leaves_pending_in_progress_and_done_records_untouched(self):
-        subject = _scene("forest_path")
+        subject = _scene(_SYNTH_SCENE)
         ensure(subject, "desc")
         art_sync_all()
         # Only classic records remain counted: monster tiers hold gallery jobs
@@ -106,17 +142,17 @@ class ArtServiceTests(EvenniaTestCase):
             for key, record in self._records().items()
             if not str(record.db.gallery_image_id or "")
         ]
-        self.assertEqual(len(classic), len(SCENE_ARCHETYPE_REGISTRY))
+        self.assertEqual(len(classic), len(SYNTH_ARCHETYPES))
 
     @covers_requirement("art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records")
     def test_startup_sync_consolidates_duplicate_records(self):
         from world.art.queue import _create_record
 
-        subject = _scene("forest_path")
+        subject = _scene(_SYNTH_SCENE)
         first = _create_record(subject)
         second = _create_record(subject)
         second.db.status = ArtAssetStatus.DONE
-        second.db.output_identity = "scene/forest_path.png"
+        second.db.output_identity = f"scene/{_SYNTH_SCENE}.png"
         art_sync_all()
         records = ArtAssetRecord.objects.filter(db_key=record_key(subject))
         self.assertEqual(records.count(), 1)
@@ -207,11 +243,11 @@ class ArtServiceTests(EvenniaTestCase):
 
     @covers_requirement("art-asset-lifecycle::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype")
     def test_ensure_scene_asset_creates_or_leaves_a_record_for_a_validated_archetype(self):
-        ensure_scene_asset("forest_path")
-        self.assertIn("art:scene:forest_path", self._records())
-        ensure_scene_asset("forest_path")
+        ensure_scene_asset(_SYNTH_SCENE)
+        self.assertIn(f"art:scene:{_SYNTH_SCENE}", self._records())
+        ensure_scene_asset(_SYNTH_SCENE)
         self.assertEqual(
-            ArtAssetRecord.objects.filter(db_key="art:scene:forest_path").count(), 1
+            ArtAssetRecord.objects.filter(db_key=f"art:scene:{_SYNTH_SCENE}").count(), 1
         )
 
     @covers_requirement("art-asset-lifecycle::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype")
@@ -226,7 +262,7 @@ class ArtServiceTests(EvenniaTestCase):
             "world.art.service.queue_ensure",
             side_effect=RuntimeError("art boom"),
         ):
-            ensure_scene_asset("forest_path")
+            ensure_scene_asset(_SYNTH_SCENE)
         self.assertEqual(self._records(), {})
 
 
@@ -595,6 +631,10 @@ class GalleryPromptCompositionTests(EvenniaTestCase):
     """The seam's field selection: provenance on the card, validation first."""
 
     def setUp(self):
+        # Equipment-field composition reads the item catalog: the player wears
+        # synthetic gear inside an items scope, and every summary assertion
+        # resolves through the patched kit rows.
+        open_synthetic_scope(self, "items")
         super().setUp()
         self.player = create_object(PlayerCharacter, key="composition-player")
         self.player.age = 30
@@ -604,10 +644,10 @@ class GalleryPromptCompositionTests(EvenniaTestCase):
             "stable_key": str(self.player.pk),
         }
         self.player.db.equipment = {
-            "weapon_main": "plain_sword",
-            "weapon_off": None,
-            "armor": "leather_armor",
-            "accessories": ["silver_hairpin"],
+            "weapon_main": _SYNTH_WEAPON,
+            "weapon_off": _SYNTH_OFFHAND,
+            "armor": _SYNTH_ARMOR,
+            "accessories": [_SYNTH_TRINKET],
         }
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
@@ -652,11 +692,13 @@ class GalleryPromptCompositionTests(EvenniaTestCase):
             list(job.db.gallery_requested_fields),
             ["appearance", "armor", "accessories"],
         )
-        summary = ITEM_REGISTRY["leather_armor"].presentation.summary_zh
+        summary = SYNTH_ITEMS[_SYNTH_ARMOR].presentation.summary_zh
         self.assertIn(summary, job.db.source_description)
         self.assertIn("月下持杖，藍袍拖地", job.db.source_description)
-        self.assertNotIn(ITEM_REGISTRY["plain_sword"].presentation.summary_zh,
-                         job.db.source_description)
+        self.assertNotIn(
+            SYNTH_ITEMS[_SYNTH_WEAPON].presentation.summary_zh,
+            job.db.source_description,
+        )
         self._drain()
         cards = gallery_api.cards_for(self.subject)
         self.assertEqual(len(cards), 1)
@@ -672,8 +714,8 @@ class GalleryPromptCompositionTests(EvenniaTestCase):
         self.assertEqual(list(jobs[0].db.gallery_requested_fields), [])
         # Nothing selected means neither persona appearance nor equipment.
         for summary in (
-            ITEM_REGISTRY["leather_armor"].presentation.summary_zh,
-            ITEM_REGISTRY["plain_sword"].presentation.summary_zh,
+            SYNTH_ITEMS[_SYNTH_ARMOR].presentation.summary_zh,
+            SYNTH_ITEMS[_SYNTH_WEAPON].presentation.summary_zh,
         ):
             self.assertNotIn(summary, jobs[0].db.source_description)
 
@@ -729,8 +771,8 @@ class GalleryPromptCompositionTests(EvenniaTestCase):
         self.assertEqual(list(jobs[0].db.gallery_requested_fields), ["appearance"])
         # Appearance-only reads no equipment even with items worn.
         for summary in (
-            ITEM_REGISTRY["leather_armor"].presentation.summary_zh,
-            ITEM_REGISTRY["plain_sword"].presentation.summary_zh,
+            SYNTH_ITEMS[_SYNTH_ARMOR].presentation.summary_zh,
+            SYNTH_ITEMS[_SYNTH_WEAPON].presentation.summary_zh,
         ):
             self.assertNotIn(summary, jobs[0].db.source_description)
 
@@ -758,6 +800,9 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
     """
 
     def setUp(self):
+        # The seam resolves the monster kind through the tier catalog and
+        # composes its registry-driven description; run against kit tiers.
+        open_synthetic_scope(self, "monster_tiers")
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
@@ -768,7 +813,7 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
         )
         self.art_settings.enable()
         self.addCleanup(self.art_settings.disable)
-        self.tier = next(iter(MONSTER_TIER_REGISTRY))
+        self.tier = _SYNTH_TIERS[0]
         self.subject = monster_subject_for(self.tier)
 
     def _gallery_jobs(self):
@@ -810,7 +855,9 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
         "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
     )
     def test_a_scene_subject_is_refused_at_the_seam(self):
-        scene = scene_subject_for("forest_path")
+        # Any well-formed scene subject is refused by kind; the key needs no
+        # registration for the seam's kind-declaration check.
+        scene = ArtSubject(ArtSubjectKind.SCENE, "t_synth_scene")
         with self.assertRaises(ArtSubjectError):
             request_gallery_image(scene)
         self.assertEqual(self._gallery_jobs(), [])
@@ -821,10 +868,15 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
     def test_an_undeclared_capability_is_rejected_never_ignored(self):
         # Each argument naming a capability the monster declaration lacks is
         # a typed error naming that capability — before any render or write.
+        # The binding snapshot key is arbitrary: the capability is refused by
+        # the kind's declaration before any snapshot validation runs.
         cases = (
             ({"fields": ("appearance",)}, "field selection"),
             ({"custom_prompt": "月光下的低階怪物"}, "free-text"),
-            ({"binding": {"mask": ["armor"], "snapshot": {"armor": "leather_armor"}}}, "binding"),
+            (
+                {"binding": {"mask": ["armor"], "snapshot": {"armor": _SYNTH_ARMOR}}},
+                "binding",
+            ),
         )
         for kwargs, capability_name in cases:
             with self.subTest(**kwargs):
@@ -879,17 +931,17 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
         "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
     )
     def test_a_character_key_colliding_with_a_monster_tier_never_crosses_kinds(self):
-        # A named character may LEGALLY carry stable_key "low", the same text
-        # as a registered monster tier. Resolution is through the subject's
-        # own kind producer, so re-driving either subject can only ever touch
-        # its own kind's job — never the identically-named other subject.
+        # A named character may LEGALLY carry the same stable key text as a
+        # registered monster tier. Resolution is through the subject's own
+        # kind producer, so re-driving either subject can only ever touch its
+        # own kind's job — never the identically-named other subject.
         from evennia.utils.create import create_object
 
         from typeclasses.characters import PlayerCharacter
 
         from world.art.service import retry_gallery_subject
 
-        collision = self.tier  # e.g. "low"
+        collision = self.tier
         character = create_object(PlayerCharacter, key="collision-host")
         character.db.age = 30
         character.db.apparent_age = 30
@@ -975,6 +1027,9 @@ class MonsterStartupSyncTests(EvenniaTestCase):
     """
 
     def setUp(self):
+        # Startup synchronization loops the registered tier/scene sets; run
+        # against the kit catalogs so the tier loop iterates SYNTH rows.
+        open_synthetic_scope(self, "archetypes", "monster_tiers")
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
@@ -989,7 +1044,7 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         )
         self.art_settings.enable()
         self.addCleanup(self.art_settings.disable)
-        self.tiers = sorted(MONSTER_TIER_REGISTRY)
+        self.tiers = _SYNTH_TIERS
 
     def _job_keys(self):
         return sorted(
@@ -1038,7 +1093,7 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         # No classic monster record was ever written; scenes keep theirs.
         classic = self._classic_keys()
         self.assertEqual(
-            classic, sorted(f"art:scene:{archetype}" for archetype in SCENE_ARCHETYPE_REGISTRY)
+            classic, sorted(f"art:scene:{archetype}" for archetype in _SYNTH_SCENES)
         )
         self._drain()
         for tier in self.tiers:
@@ -1052,7 +1107,7 @@ class MonsterStartupSyncTests(EvenniaTestCase):
             )
             self.assertTrue((self.root / cards[0]["stored_identity"]).exists())
         # The drained per-image jobs are spent and gone; still zero classic monster keys.
-        self.assertEqual(self._classic_keys(), sorted(f"art:scene:{a}" for a in SCENE_ARCHETYPE_REGISTRY))
+        self.assertEqual(self._classic_keys(), sorted(f"art:scene:{a}" for a in _SYNTH_SCENES))
 
     @covers_requirement(
         "art-gallery-autogen::automatic-generation-is-idempotent-against-the-subject-s-gallery"
@@ -1179,7 +1234,7 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         # Scenes were unaffected by the failing tier.
         self.assertEqual(
             self._classic_keys(),
-            sorted(f"art:scene:{a}" for a in SCENE_ARCHETYPE_REGISTRY),
+            sorted(f"art:scene:{a}" for a in _SYNTH_SCENES),
         )
 
     @covers_requirement(

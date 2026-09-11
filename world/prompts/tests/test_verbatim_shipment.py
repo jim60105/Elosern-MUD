@@ -17,6 +17,13 @@ from world.prompts.tests.fixtures import REPO_PROMPTS
 
 from tools.spec_traceability import covers_requirement
 
+from world.tests.synthetic_data import (
+    SYNTH_ARCHETYPES,
+    SYNTH_MONSTER_TIERS,
+    SYNTH_SUBRACES,
+    synthetic_registries,
+)
+
 
 # The exact text of the removed Python constants (verbatim from git history).
 _NARRATOR_SYSTEM = (
@@ -164,7 +171,7 @@ class VerbatimShipmentTests(unittest.TestCase):
         self.assertEqual(
             render_prompt(
                 "art.character_description",
-                race="貓人族",
+                race="t_ashfolk",
                 name="艾琳",
                 age="24",
                 style=style,
@@ -173,7 +180,7 @@ class VerbatimShipmentTests(unittest.TestCase):
                 custom="",
             ),
             _ART_CHARACTER_TEMPLATE.format(
-                race="貓人族",
+                race="t_ashfolk",
                 name="艾琳",
                 age="24",
                 style=style,
@@ -185,7 +192,7 @@ class VerbatimShipmentTests(unittest.TestCase):
         self.assertEqual(
             render_prompt(
                 "art.character_description",
-                race="貓人族",
+                race="t_ashfolk",
                 name="艾琳",
                 age="24",
                 style=style,
@@ -193,7 +200,7 @@ class VerbatimShipmentTests(unittest.TestCase):
                 equipment="",
                 custom="",
             ),
-            "A 貓人族 character named 艾琳 (24) in the approved visual style.",
+            "A t_ashfolk character named 艾琳 (24) in the approved visual style.",
         )
 
     @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
@@ -287,7 +294,7 @@ class LibrarySourceTests(unittest.TestCase):
 
         log = EventLog(
             actor="elosia",
-            skill_key="basic_attack",
+            skill_key="t_synth_strike",
             targets=("violet",),
             entries=(
                 EventEntry(
@@ -311,8 +318,8 @@ class LibrarySourceTests(unittest.TestCase):
             {
                 "requested_type": "討伐",
                 "allowed_rank": "F",
-                "issuer_branch": "guild_branch_altoria",
-                "anchor": "capital_altoria",
+                "issuer_branch": "t_branch_north",
+                "anchor": "t_anchor_cross",
             }
         )
         # The full equality against the library text with the independently
@@ -373,6 +380,7 @@ class LibrarySourceTests(unittest.TestCase):
             ),
         )
 
+    @synthetic_registries("archetypes", "monster_tiers", "subraces")
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_art_descriptions_render_from_the_library_solely(self):
         from unittest.mock import Mock
@@ -385,33 +393,42 @@ class LibrarySourceTests(unittest.TestCase):
             scene_subject_for,
         )
 
-        scene = scene_subject_for("forest_path")
+        # The description producers resolve their subjects against the scene
+        # archetype / monster tier / subrace catalogs, so the kit rows stand in:
+        # the byte-fidelity claim is about the library render path, not the
+        # shipped archetype/bestiary/lore text.
+        synth_scene = sorted(SYNTH_ARCHETYPES)[0]
+        synth_tier = sorted(SYNTH_MONSTER_TIERS)[0]
+        synth_subrace = sorted(SYNTH_SUBRACES)[0]
+        tier = SYNTH_MONSTER_TIERS[synth_tier]
+
+        scene = scene_subject_for(synth_scene)
         self.assertEqual(
             description_for(scene),
-            "陽光穿過層疊的枝葉，灑在一條蜿蜒的林間小徑上，四周寂靜得只剩下風聲。",
+            SYNTH_ARCHETYPES[synth_scene].scene_sentence,
         )
 
         character = Mock()
         character.db.display_name = "艾琳"
-        character.db.race = "beastfolk"
-        character.db.subrace = "catkin"
+        character.db.race = "t_duskmari"
+        character.db.subrace = synth_subrace
         character.key = "艾琳"
+        label = SYNTH_SUBRACES[synth_subrace].display_name_zh
         self.assertEqual(
             character_description(character, 24, fields=("appearance",)),
-            "A 貓人族 character named 艾琳 (24) in the approved visual style.",
+            f"A {label} character named 艾琳 (24) in the approved visual style.",
         )
 
-        monster = monster_subject_for("low")
+        monster = monster_subject_for(synth_tier)
         self.assertEqual(
             monster_description(monster),
             render_prompt(
                 "art.monster_description",
-                description="Threats a beginning adventurer can handle alone.",
-                display_name="低階",
-                examples="史萊姆、哥布林、巨鼠",
+                description=tier.description,
+                display_name=tier.display_name_zh,
+                examples="、".join(tier.example_monsters_zh),
             ),
         )
-
 
 if __name__ == "__main__":
     unittest.main()
