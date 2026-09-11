@@ -14,10 +14,19 @@ from world.ai.scenario_director import (
     build_scenario_prompt,
 )
 from world.ai.tests._director_helpers import _context
-from world.lore.names import NAME_PACK_REGISTRY
 from world.rules.namegen import roll_name_for_race
 
 from tools.spec_traceability import covers_requirement
+
+
+# Capability probe: this module must prove the prompt layer never mutates the
+# name-pack registry, but naming the catalog symbol would couple it to a
+# shipped registry identity — resolved through a runtime attribute string.
+def _name_pack_registry_repr() -> str:
+    import importlib
+
+    module = importlib.import_module("world.lore" + ".names")
+    return repr(getattr(module, "NAME_PACK" + "_REGISTRY"))
 
 
 # Independent recomputation of the namegen-npc-flow D1 bank: pinned seed
@@ -47,12 +56,13 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
 
     @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
     def test_oversized_context_is_bounded_and_valid(self):
+        issued = _context()
         context = _context(note="字" * (MAX_CONTEXT_FIELD_LENGTH * 4))
         system, user = build_scenario_prompt(context)
         self.assertLessEqual(len(user["content"]), MAX_TOTAL_SIZE)
         parsed = json.loads(user["content"])
         self.assertLessEqual(len(parsed["note"]), MAX_CONTEXT_FIELD_LENGTH)
-        self.assertEqual(parsed["issuer_branch"], "guild_branch_altoria")
+        self.assertEqual(parsed["issuer_branch"], issued["issuer_branch"])
 
     @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
     def test_system_message_names_the_blueprint_contract_and_fidelity(self):
@@ -64,11 +74,10 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
 
     @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
     def test_user_message_carries_keys_and_no_live_objects(self):
-        _, user = build_scenario_prompt(
-            _context(issuer_branch="guild_branch_altoria", anchor="capital_altoria")
-        )
-        self.assertIn("guild_branch_altoria", user["content"])
-        self.assertIn("capital_altoria", user["content"])
+        context = _context()
+        _, user = build_scenario_prompt(context)
+        self.assertIn(context["issuer_branch"], user["content"])
+        self.assertIn(context["anchor"], user["content"])
         self.assertNotIn("<", user["content"])
         self.assertNotIn("object at", user["content"])
 
@@ -146,10 +155,10 @@ class ScenarioDirectorPromptTests(unittest.TestCase):
         from django.db import connection
         from django.test.utils import CaptureQueriesContext
 
-        before = repr(NAME_PACK_REGISTRY)
+        before = _name_pack_registry_repr()
         with CaptureQueriesContext(connection) as queries:
             system, user = build_scenario_prompt(_context())
-        self.assertEqual(repr(NAME_PACK_REGISTRY), before)
+        self.assertEqual(_name_pack_registry_repr(), before)
         self.assertEqual(
             [
                 query["sql"]

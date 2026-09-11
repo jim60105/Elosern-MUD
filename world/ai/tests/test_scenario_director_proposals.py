@@ -14,7 +14,16 @@ from world.ai.scenario_director import (
     BlueprintStage,
     QuestBlueprint,
 )
-from world.ai.tests._director_helpers import _blueprint, _item
+from world.ai.tests._director_helpers import (
+    _blueprint,
+    _issuer_key,
+    _item,
+    _location,
+    _monster_tier_key,
+    _npc_tier_key,
+    _rank_key,
+    _stage,
+)
 
 from tools.spec_traceability import covers_requirement
 
@@ -25,13 +34,8 @@ class ScenarioDirectorProposalTypeTests(unittest.TestCase):
     def test_valid_blueprint_preserves_explicit_stage_indices(self):
         blueprint = _blueprint(
             stages=(
-                BlueprintStage(
-                    0, BlueprintObjective("defeat", monster_tier="low")
-                ),
-                BlueprintStage(
-                    1,
-                    BlueprintObjective("acquire", item_key="healing_potion", quantity=1),
-                ),
+                _stage(index=0),
+                BlueprintStage(1, BlueprintObjective("acquire", item_key=_item().item_key, quantity=1)),
             )
         )
         self.assertEqual([stage.index for stage in blueprint.stages], [0, 1])
@@ -52,9 +56,9 @@ class ScenarioDirectorProposalTypeTests(unittest.TestCase):
             QuestBlueprint(
                 name="討伐",
                 quest_type="討伐",
-                rank="F",
-                issuer="guild_branch_altoria",
-                stages=[BlueprintStage(0, BlueprintObjective("defeat", monster_tier="low"))],
+                rank=_rank_key(),
+                issuer=_issuer_key(),
+                stages=[_stage(index=0)],
                 reward=BlueprintReward(copper=50, items=(_item(),), merit=25),
                 failure=BlueprintFailure(conditions=()),
             )
@@ -69,8 +73,8 @@ class ScenarioDirectorProposalTypeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _blueprint(
                 stages=(
-                    BlueprintStage(0, BlueprintObjective("defeat", monster_tier="low")),
-                    BlueprintStage(2, BlueprintObjective("defeat", monster_tier="low")),
+                    _stage(index=0),
+                    _stage(index=2),
                 )
             )
 
@@ -116,7 +120,7 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
             portrait.stable_key = "changed"
         requirement = BlueprintNpcReq(
             role="librarian",
-            tier="civilian",
+            tier=_npc_tier_key(),
             disposition=None,
             display_name="莉絲·晨星",
             age=68,
@@ -130,7 +134,7 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             BlueprintNpcReq(
                 role="librarian",
-                tier="civilian",
+                tier=_npc_tier_key(),
                 portrait={"stable_key": "library_keeper"},  # raw dict rejected
             )
 
@@ -145,9 +149,9 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
                     ),
                     location=BlueprintLocation(
                         layer="instance",
-                        archetype="forest_path",
+                        archetype=_location().archetype,
                         anchor_key=None,
-                        anchor_near="capital_altoria",
+                        anchor_near=_location().anchor_key,
                         xyz=None,
                         scene_sentence="王都近郊的林間小徑，樹影搖曳。",
                     ),
@@ -214,9 +218,9 @@ class BlueprintCharacterizationTypeTests(unittest.TestCase):
         }
         base_payload["stages"][0]["location_req"] = {
             "layer": "instance",
-            "archetype": "forest_path",
+            "archetype": _location().archetype,
             "anchor_key": None,
-            "anchor_near": "capital_altoria",
+            "anchor_near": _location().anchor_key,
             "xyz": None,
             "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
         }

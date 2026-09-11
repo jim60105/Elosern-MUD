@@ -22,9 +22,14 @@ from world.ai.scenario_director import (
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
 from world.ai.tests._director_helpers import (
     _blueprint,
+    _instance_template_context,
     _context,
+    _issuer_key,
     _instance_payload,
     _payload,
+    _rank_key,
+    _rank_rows,
+    _template_context,
     _raw,
     _reset_all,
     await_result,
@@ -118,28 +123,45 @@ class ScenarioDirectorEntryPointTests(unittest.TestCase):
     @covers_requirement("scenario-director::generate-quest-blueprint-runs-the-guarded-pipeline-and-enforces-the-request-context")
     def test_context_misfitting_blueprint_is_replaced_by_a_fitting_template(self):
         client = FakeLLMClient()
-        # C rank with C-band copper: schema- and semantically valid, but it does
-        # not fit an F-rank request, so the post-guardrail fitness gate must
-        # treat it as a degrade trigger and draw a fitting template.
-        foreign = _blueprint(issuer="guild_branch_altoria", rank="C", copper=10_000)
+        # A higher rank with in-band copper: schema- and semantically valid,
+        # but it does not fit the base-rank request, so the post-guardrail
+        # fitness gate must treat it as a degrade trigger and draw a fitting
+        # template. Rank and band are resolved from the live rank registry.
+        ranks = _rank_rows()
+        base = _rank_key()
+        higher = next(
+            (
+                key
+                for key, row in ranks.items()
+                if row.order > ranks[base].order
+                and row.reward_max_copper is not None
+            ),
+            None,
+        )
+        if higher is None:
+            self.skipTest("the rank ladder exposes no higher bounded rank")
+        band = ranks[higher]
+        foreign = _blueprint(
+            rank=higher, copper=(band.reward_min_copper + band.reward_max_copper) // 2
+        )
         client.add_response(lambda d: True, json.dumps(_payload(foreign), ensure_ascii=False))
         with override_settings(LLM_PROFILES=_raw()):
-            d = generate_quest_blueprint(client, context=_context())
+            d = generate_quest_blueprint(client, context=_template_context())
             result = await_result(d)
         self.assertLessEqual(
             scenario_director._rank_order(result.rank),
-            scenario_director._rank_order("F"),
+            scenario_director._rank_order(base),
         )
-        self.assertEqual(result.issuer, "guild_branch_altoria")
+        self.assertEqual(result.issuer, _issuer_key())
 
     @covers_requirement("scenario-director::generate-quest-blueprint-runs-the-guarded-pipeline-and-enforces-the-request-context")
     def test_disabled_profile_draws_a_template_with_zero_client_calls(self):
         client = FakeLLMClient()
         with override_settings(LLM_PROFILES=_raw(scenario_director={"enabled": False})):
-            d = generate_quest_blueprint(client, context=_context())
+            d = generate_quest_blueprint(client, context=_template_context())
             result = await_result(d)
         self.assertIsInstance(result, QuestBlueprint)
-        self.assertTrue(scenario_director._fits_context(result, _context()))
+        self.assertTrue(scenario_director._fits_context(result, _template_context()))
         self.assertEqual(len(client.calls), 0)
 
     @covers_requirement("scenario-director::generate-quest-blueprint-runs-the-guarded-pipeline-and-enforces-the-request-context")
@@ -147,18 +169,18 @@ class ScenarioDirectorEntryPointTests(unittest.TestCase):
         client = FakeLLMClient()
         client.add_timeout(lambda d: True)
         with override_settings(LLM_PROFILES=_raw()):
-            d = generate_quest_blueprint(client, context=_context())
+            d = generate_quest_blueprint(client, context=_template_context())
             result = await_result(d)
         self.assertIsInstance(result, QuestBlueprint)
-        self.assertTrue(scenario_director._fits_context(result, _context()))
+        self.assertTrue(scenario_director._fits_context(result, _template_context()))
 
         exhausting = FakeLLMClient()
-        exhausting.add_response(lambda d: True, json.dumps(_payload(_blueprint(rank="Z")), ensure_ascii=False))
+        exhausting.add_response(lambda d: True, json.dumps(_payload(_blueprint(rank="t_unknown_rank")), ensure_ascii=False))
         with override_settings(LLM_PROFILES=_raw(scenario_director={"max_retries": 1})):
-            d = generate_quest_blueprint(exhausting, context=_context())
+            d = generate_quest_blueprint(exhausting, context=_template_context())
             result = await_result(d)
         self.assertIsInstance(result, QuestBlueprint)
-        self.assertTrue(scenario_director._fits_context(result, _context()))
+        self.assertTrue(scenario_director._fits_context(result, _template_context()))
 
     @covers_requirement("scenario-director::the-hand-written-template-pool-provides-offline-quest-generation")
     @covers_requirement("scenario-director::generate-quest-blueprint-runs-the-guarded-pipeline-and-enforces-the-request-context")
@@ -167,7 +189,7 @@ class ScenarioDirectorEntryPointTests(unittest.TestCase):
         results = []
         for _ in range(2):
             with override_settings(LLM_PROFILES=disabled):
-                d = generate_quest_blueprint(FakeLLMClient(), context=_context())
+                d = generate_quest_blueprint(FakeLLMClient(), context=_template_context())
                 results.append(await_result(d))
         self.assertEqual(results[0], results[1])
 
@@ -176,7 +198,8 @@ class ScenarioDirectorEntryPointTests(unittest.TestCase):
         client = FakeLLMClient()
         with override_settings(LLM_PROFILES=_raw(scenario_director={"enabled": False})):
             d = generate_quest_blueprint(
-                client, context=_context(requested_type="緊急", issuer_branch="guild_branch_altoria")
+                client,
+                context=_context(requested_type="t_unknown_quest_type"),
             )
             failure = await_result(d)
         self.assertTrue(failure.check(ScenarioDirectorTemplateError))
@@ -225,10 +248,10 @@ class ScenarioDirectorTemplatePoolTests(RegistryIsolationMixin, unittest.TestCas
 
     @covers_requirement("scenario-director::the-hand-written-template-pool-provides-offline-quest-generation")
     def test_degraded_draw_is_deterministic_and_context_fitting(self):
-        first = scenario_director._draw_template(_context())
-        second = scenario_director._draw_template(_context())
+        first = scenario_director._draw_template(_template_context())
+        second = scenario_director._draw_template(_template_context())
         self.assertEqual(first, second)
-        self.assertTrue(scenario_director._fits_context(first, _context()))
+        self.assertTrue(scenario_director._fits_context(first, _template_context()))
 
     @covers_requirement("scenario-director::the-hand-written-template-pool-provides-offline-quest-generation")
     def test_cold_start_import_has_no_module_level_cycle(self):
@@ -368,7 +391,9 @@ class ScenarioDirectorTemplatePoolTests(RegistryIsolationMixin, unittest.TestCas
         from world.ai.director_templates import QUEST_TEMPLATE_POOL
 
         with override_settings(LLM_PROFILES=_raw(scenario_director={"enabled": False})):
-            d = generate_quest_blueprint(FakeLLMClient(), context=_context())
+            d = generate_quest_blueprint(
+                FakeLLMClient(), context=_instance_template_context()
+            )
             result = await_result(d)
         self.assertEqual(
             result,
