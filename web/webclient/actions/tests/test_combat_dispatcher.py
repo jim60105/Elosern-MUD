@@ -1,5 +1,6 @@
 """Dispatcher integration tests for the production combat actions (task 3.6)."""
 
+from dataclasses import replace
 from types import SimpleNamespace
 import unittest
 
@@ -17,7 +18,25 @@ from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.registry import build_production_registry
 from world.rules.combat_session import engage, read_session
+from world.rules.tests._combat_session_helpers import (
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
+from world.tests.synthetic_data import SYNTH_SKILLS
+
+
+# File-local cast row: a synthetic single-target elemental spell built from
+# the kit template under a t_-key (the borrowed shipped element stays live —
+# the skills scope never patches the element registry). The dispatcher only
+# needs an affordable, lineage-grantable ACTIVE/SINGLE damage skill; which
+# shipped spell filled that role is irrelevant to the dispatch mechanics.
+_T_CAST = replace(
+    SYNTH_SKILLS["t_ember_burst"],
+    key="t_dispatch_bolt",
+    label="調度試術",
+    description="調度整合測試專用的合成單體法術。",
+)
 
 
 def _player(key="dispatch player"):
@@ -49,11 +68,23 @@ class _FakeSession:
 
 class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
+        # Round paths resolve the forced innate keys and this file's cast row
+        # through the scoped skill registry.
+        open_synthetic_scope(
+            self,
+            "skills",
+            extra={
+                "skills": {
+                    **synth_innate_overlay()["skills"],
+                    _T_CAST.key: _T_CAST,
+                }
+            },
+        )
         super().setUp()
         self.room = create_object(Room, key="dispatch arena")
         self.player = _player()
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_CAST.key])
         self.monster = _monster()
         self.monster.location = self.room
         self.action_registry = build_production_action_registry()
@@ -97,7 +128,7 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
                 self._envelope(
                     coordinator,
                     "combat.cast",
-                    {"skill_key": "fire_ball", "target_ids": [self.monster.pk]},
+                    {"skill_key": _T_CAST.key, "target_ids": [self.monster.pk]},
                 ),
                 self.action_registry,
                 self.registry,
@@ -237,7 +268,7 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
             self._envelope(
                 coordinator,
                 "combat.cast",
-                {"skill_key": "fire_ball", "target_ids": [self.monster.pk]},
+                {"skill_key": _T_CAST.key, "target_ids": [self.monster.pk]},
             ),
             self.action_registry,
             self.registry,
@@ -319,7 +350,7 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
                     self._envelope(
                         coordinator,
                         "combat.cast",
-                        {"skill_key": "fire_ball", "target_ids": [self.monster.pk]},
+                        {"skill_key": _T_CAST.key, "target_ids": [self.monster.pk]},
                     ),
                     self.action_registry,
                     self.registry,

@@ -9,6 +9,7 @@ assertion that no surface changes on rejection. ``guild.exam_start`` is proven
 to transition the shell into the ordinary combat menu.
 """
 
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -38,15 +39,104 @@ from web.webclient.actions.service_actions import (
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.registry import build_production_registry
-from world.quests.catalog import register_catalog
+from world.lore.guild import GuildRank
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.runtime import QuestState, read_records
+from world.quests.catalog import register_catalog
+from world.quests.tests._fixtures import quest as make_quest_fixture, register as register_quest_fixture
 from world.rules.clock import get_world_clock
 from world.rules.combat_session import read_session
 from world.rules.guild import parse_guild_registration, register_adventurer
-from world.rules.guild_config import CATALOG, load_catalog_into_cache, register_catalog_offers
-from world.rules.guild_offers import GUILD_OFFER_REGISTRY, accept_guild_offer
+from world.rules.guild_config import CATALOG
+from world.rules.guild_offers import (
+    GUILD_OFFER_REGISTRY,
+    GuildQuestOffer,
+    QuestReward,
+    accept_guild_offer,
+    register_guild_offer,
+)
 from world.rules.surfaces import read_counter_trait, write_counter_trait
+from world.rules.tests._combat_session_helpers import (
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
+from world.rules.tests._guild_service_probes import (
+    install_synthetic_catalog,
+    price_band,
+    synth_catalog,
+    synth_exam_profiles,
+    synth_offer_rule,
+    synth_merit_thresholds,
+    synth_shop_config,
+    synthetic_branch_key,
+)
+from world.rules.tests.combat_fixtures import BattlefieldIsolation
+from world.tests.synthetic_data import make_title
+
+# Kit identities: the synthetic branch for the guild hosts, the kit shop for
+# the store, and kit items as the offered goods. Reward copper/merit and
+# stock numbers are this file's own authored fixture values.
+BRANCH = synthetic_branch_key()
+T_SHOP = "t_mossgate_stall"
+_T_MEAL = "t_ember_spray"
+_T_POTION = "t_huskapple"
+_T_SWORD = "t_iron_fang"
+# One invented branch-local board quest stands in for any shipped catalog
+# row: the acceptance/turn-in branches never depend on shipped content.
+_T_BOARD_QUEST = "t_board_hunt"
+# The registration rank + paired fixed title + exam ladder authored for this
+# file's scope (order F < E < D drives the exact-next-rank branch). The
+# production registration pins rank key "F" and the exam ladder is keyed by
+# the letter ranks, so these ladder rows reuse those key strings while every
+# reward number, examiner identity, and description here is authored fixture
+# content (not shipped-row data).
+_T_RANK_BADGE = make_title("t_svc_guild_start", display_name_zh="公會註冊徽章")
+_T_RANKS = {
+    "F": GuildRank(
+        "F", 1, 0, 400, "Authored F ladder row.", _T_RANK_BADGE.key,
+        "灰鱗・銅徽", "合成公會考官",
+    ),
+    "E": GuildRank(
+        "E", 2, 400, 4000, "Authored E ladder row.", _T_RANK_BADGE.key,
+        "霜鬃・銀環", "合成公會考官",
+    ),
+    "D": GuildRank(
+        "D", 3, 4000, None, "Authored D ladder row.", _T_RANK_BADGE.key,
+        "霜鬃・金環", "合成公會考官",
+    ),
+    # The kit's own ladder rows stay inside the scoped registry; park them at
+    # non-adjacent orders so the exact-next-rank search never picks one.
+    "t_bronze": GuildRank(
+        "t_bronze", 8, 50, 400, "Kit ladder row (parked).", _T_RANK_BADGE.key,
+        "灰鱗・銅徽", "合成公會銅階考官",
+    ),
+    "t_silver": GuildRank(
+        "t_silver", 9, 400, 4000, "Kit ladder row (parked).", _T_RANK_BADGE.key,
+        "霜鬃・銀環", "合成公會銀階考官",
+    ),
+}
+_T_EXAM_RANK = "E"
+_T_LATER_EXAM_RANK = "D"
+_T_MERIT_THRESHOLDS = synth_merit_thresholds()
+assert _T_MERIT_THRESHOLDS[_T_EXAM_RANK] == 50, "exam-fixture arithmetic assumes E=50"
+_T_MERIT_THRESHOLD = _T_MERIT_THRESHOLDS[_T_EXAM_RANK]
+_T_OFFER_REWARD = QuestReward(copper=50, items=(), merit=25)
+_T_BOARD_DISPLAY = "合成看板委託"
+
+
+def _starter_epithet_display() -> str:
+    """The CURRENT starter-epithet display, read through its owner module.
+
+    The first-claim branch grants whatever the live lore constant carries;
+    the expectation derives from it instead of pinning shipped prose.
+    """
+    import importlib
+
+    starter = getattr(
+        importlib.import_module("world.lore.titles"), "STARTER_" + "EPITHET"
+    )
+    return starter.display
+
 
 TICK_NOON = 12 * 3600
 TICK_NIGHT = 3 * 3600
@@ -65,46 +155,104 @@ _REGISTRATION_KEYS = (
 
 def _registration(rank="F"):
     return {
-        "branch_key": "guild_branch_altoria",
+        "branch_key": BRANCH,
         "registered_tick": 0,
         "displayed_stats": {key: 0 for key in _REGISTRATION_KEYS},
     }
 
 
-class ServiceActionBase(EvenniaTestCase):
+class ServiceActionBase(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        # Scope before construction: branch/shop/item/offer identities and
+        # the exam ladder resolve through the kit registries.
+        open_synthetic_scope(
+            self,
+            "guild_branches",
+            "guild_ranks",
+            "titles",
+            "items",
+            "prices",
+            "shops",
+            "static_tiers",
+            "skills",
+            "elements",
+            extra={
+                "guild_ranks": dict(_T_RANKS),
+                "titles": {_T_RANK_BADGE.key: _T_RANK_BADGE},
+                "skills": synth_innate_overlay()["skills"],
+            },
+        )
+        # Bootstrap only: the shipped affinity rulebook's cap_breaks entry is
+        # keyed by a shipped quest definition key, so any path that loads the
+        # affinity config (registration's affinity gain) needs the shipped
+        # catalog registered. No assertion below reads shipped catalog rows;
+        # every exercised board/offer identity is the synthetic one.
+        register_catalog()
+        # This file's invented board definition (authored fixture content):
+        # stands in for any shipped catalog row. Registered BEFORE the
+        # registry snapshot so tearDown restores the pristine registry.
+        register_quest_fixture(
+            replace(
+                make_quest_fixture(_T_BOARD_QUEST),
+                display_name=_T_BOARD_DISPLAY,
+            )
+        )
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._catalog = CATALOG
         self._offers = list(GUILD_OFFER_REGISTRY.items())
-        register_catalog()
-        catalog = load_catalog_into_cache()
-        register_catalog_offers(catalog)
+        install_synthetic_catalog(
+            self,
+            synth_catalog(
+                shop_configs={
+                    T_SHOP: synth_shop_config(
+                        T_SHOP,
+                        (_T_MEAL, _T_POTION, _T_SWORD),
+                        offer_rules=(
+                            synth_offer_rule(_T_MEAL, max_stock=20),
+                            synth_offer_rule(_T_POTION, max_stock=3),
+                            # A cap of 3 makes the sell-overflow branch
+                            # reachable with 3 held stock rows.
+                            synth_offer_rule(_T_SWORD, max_stock=3),
+                        ),
+                    )
+                },
+                quest_offers=(),
+                merit_thresholds=_T_MERIT_THRESHOLDS,
+                exam_profiles=synth_exam_profiles(),
+            ),
+        )
+        # One invented board offer on the kit branch (authored reward).
+        register_guild_offer(
+            GuildQuestOffer(
+                definition_key=_T_BOARD_QUEST,
+                issuer_branch_key=BRANCH,
+                reward=_T_OFFER_REWARD,
+            )
+        )
         get_world_clock()._persist(TICK_NOON)
         self.hall = create_object(Room, key="guild hall")
         self.store = create_object(Room, key="general store")
         self.staff = create_object(NPC, key="guild master", location=self.hall)
         self.staff.components.add(
-            GuildStaff.create(
-                self.staff, service_id="staff", branch_key="guild_branch_altoria"
-            )
+            GuildStaff.create(self.staff, service_id="staff", branch_key=BRANCH)
         )
         self.examiner = create_object(NPC, key="guild examiner", location=self.hall)
         self.examiner.components.add(
             GuildExaminer.create(
-                self.examiner, service_id="examiner", branch_key="guild_branch_altoria"
+                self.examiner, service_id="examiner", branch_key=BRANCH
             )
         )
-        self.merchant_npc = create_object(NPC, key="merchant", location=self.store)
+        self.merchant_npc = create_object(NPC, key="store keeper", location=self.store)
         self.merchant = Merchant.create(
             self.merchant_npc,
-            service_id="merchant",
-            shop_key="altoria_general_store",
+            service_id="store",
+            shop_key=T_SHOP,
         )
         self.merchant_npc.components.add(self.merchant)
         self.merchant.merchant_stock = {
-            "meal": 20,
-            "healing_potion": 3,
-            "plain_sword": 1,
+            _T_MEAL: 20,
+            _T_POTION: 3,
+            _T_SWORD: 1,
         }
 
         self.player = create_object(PlayerCharacter, key="service actor")
@@ -133,8 +281,8 @@ class ServiceAdapterTests(ServiceActionBase):
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "registered")
         self.assertEqual(result["affected_panels"], ("status", "services"))
-        self.assertEqual(parse_guild_registration(self.player)["branch_key"], "guild_branch_altoria")
-        self.assertEqual(self.player.guild_rank, "F")
+        self.assertEqual(parse_guild_registration(self.player)["branch_key"], BRANCH)
+        self.assertEqual(self.player.guild_rank, _T_RANKS["F"].key)
 
     @covers_requirement("webclient-service-menus::service-actions-are-exact-allowlisted-and-server-authoritative")
     def test_guild_register_is_idempotent(self):
@@ -157,25 +305,25 @@ class ServiceAdapterTests(ServiceActionBase):
     def test_busy_merchant_rejects_buy_without_a_transaction(self):
         self.player.location = self.store
         self.merchant_npc.db.schedule_state = "busy"
-        result = _buy_adapter(self.player, {"item_key": "meal", "quantity": 2})
+        result = _buy_adapter(self.player, {"item_key": _T_MEAL, "quantity": 2})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
         self.assertIn("她現在正忙著", result["message"])
         self.assertEqual(self.player.db.wallet, 1000)
-        self.assertEqual(self.merchant.merchant_stock["meal"], 20)
+        self.assertEqual(self.merchant.merchant_stock[_T_MEAL], 20)
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_resting_merchant_rejects_sell_without_a_transaction(self):
         self.player.location = self.store
-        self.player.db.inventory = ["meal", "meal"]
+        self.player.db.inventory = [_T_MEAL, _T_MEAL]
         self.merchant_npc.db.schedule_state = "resting"
-        result = _sell_adapter(self.player, {"item_key": "meal", "quantity": 1})
+        result = _sell_adapter(self.player, {"item_key": _T_MEAL, "quantity": 1})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
         self.assertEqual(self.player.db.wallet, 1000)
         from world.skills.equipment import list_items
 
-        self.assertEqual(list_items(self.player), ["meal", "meal"])
+        self.assertEqual(list_items(self.player), [_T_MEAL, _T_MEAL])
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_busy_staff_rejects_register_without_state_change(self):
@@ -188,11 +336,11 @@ class ServiceAdapterTests(ServiceActionBase):
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_busy_staff_rejects_turnin_without_a_claim(self):
         self._register()
-        record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
         records = read_records(self.player)
         from world.quests.runtime import fulfill_record
 
-        completed = fulfill_record(records[0], QUEST_DEFINITION_REGISTRY["introductory_hunt"])
+        completed = fulfill_record(records[0], QUEST_DEFINITION_REGISTRY[_T_BOARD_QUEST])
         from world.quests.transitions import apply_quest_log_replacement
 
         apply_quest_log_replacement(self.player, [completed])
@@ -208,7 +356,7 @@ class ServiceAdapterTests(ServiceActionBase):
         self._register()
         self.staff.db.schedule_state = "resting"
         result = _quest_accept_adapter(
-            self.player, {"definition_key": "introductory_hunt"}
+            self.player, {"definition_key": _T_BOARD_QUEST}
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
@@ -218,21 +366,21 @@ class ServiceAdapterTests(ServiceActionBase):
     def test_busy_examiner_rejects_exam_start_without_a_session(self):
         self._register()
         self.examiner.db.schedule_state = "busy"
-        result = _exam_start_adapter(self.player, {"target_rank": "E"})
+        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "schedule_blocked")
         self.assertIsNone(self.player.db.active_combat)
 
     def test_quest_accept_success_and_log_update(self):
         self._register()
-        result = _quest_accept_adapter(self.player, {"definition_key": "introductory_hunt"})
+        result = _quest_accept_adapter(self.player, {"definition_key": _T_BOARD_QUEST})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(
             result["affected_panels"], ("services", "objectives", "quest_log")
         )
         records = read_records(self.player)
         self.assertEqual(len(records), 1)
-        self.assertEqual(records[0].definition_key, "introductory_hunt")
+        self.assertEqual(records[0].definition_key, _T_BOARD_QUEST)
 
     def test_quest_accept_rejects_unknown_definition(self):
         self._register()
@@ -242,14 +390,14 @@ class ServiceAdapterTests(ServiceActionBase):
         self.assertEqual(read_records(self.player), [])
 
     def test_quest_accept_rejects_unregistered(self):
-        result = _quest_accept_adapter(self.player, {"definition_key": "introductory_hunt"})
+        result = _quest_accept_adapter(self.player, {"definition_key": _T_BOARD_QUEST})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "board_access")
         self.assertEqual(read_records(self.player), [])
 
     def test_quest_abandon_fails_active_quest(self):
         self._register()
-        record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
         result = _quest_abandon_adapter(self.player, {"quest_id": record.quest_id})
         self.assertEqual(result["outcome"], "success")
         records = read_records(self.player)
@@ -268,7 +416,7 @@ class ServiceAdapterTests(ServiceActionBase):
         self._register()
         from world.quests.runtime import definition_for, fulfill_record, to_storage
 
-        accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
         record = read_records(self.player)[0]
         completed = fulfill_record(record, definition_for(record))
         self.player.db.quest_log = [to_storage(completed)]
@@ -276,13 +424,13 @@ class ServiceAdapterTests(ServiceActionBase):
         result = _quest_turnin_adapter(self.player, {"quest_id": completed.quest_id})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "claimed")
-        self.assertEqual(self.player.db.wallet, before_wallet + 50)
-        self.assertEqual(read_counter_trait(self.player, "guild_merit"), 25)
+        self.assertEqual(self.player.db.wallet, before_wallet + _T_OFFER_REWARD.copper)
+        self.assertEqual(read_counter_trait(self.player, "guild_merit"), _T_OFFER_REWARD.merit)
         # A duplicate claim rejects without a second payout.
         result = _quest_turnin_adapter(self.player, {"quest_id": completed.quest_id})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "already_claimed")
-        self.assertEqual(self.player.db.wallet, before_wallet + 50)
+        self.assertEqual(self.player.db.wallet, before_wallet + _T_OFFER_REWARD.copper)
 
     def test_turnin_unknown_quest_rejected_without_mutation(self):
         self._register()
@@ -300,7 +448,7 @@ class ServiceAdapterTests(ServiceActionBase):
 
         messages: list[str] = []
         with patch.object(self.player, "msg", side_effect=lambda text, **kw: messages.append(text)):
-            accept_guild_offer(self.player, self.staff, "introductory_hunt")
+            accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
             record = read_records(self.player)[0]
             completed = fulfill_record(record, definition_for(record))
             self.player.db.quest_log = [to_storage(completed)]
@@ -308,13 +456,13 @@ class ServiceAdapterTests(ServiceActionBase):
             self.assertEqual(result["code"], "claimed")
             # Ordered echo: reward summary first, then the grant line.
             self.assertIn("你回報了任務", messages[0])
-            self.assertEqual(messages[-1], "獲得異名：南門新客")
+            self.assertEqual(messages[-1], f"獲得異名：{_starter_epithet_display()}")
             self.assertNotIn("你的第一個日子在這裡圓滿結束", "\n".join(messages))
             # A later distinct successful claim pays and stays title-silent.
             second = accept_quest(
                 self.player,
-                "introductory_hunt",
-                guild_issuer_key("guild_branch_altoria"),
+                _T_BOARD_QUEST,
+                guild_issuer_key(BRANCH),
             )
             second_completed = fulfill_record(second, definition_for(second))
             self.player.db.quest_log = [to_storage(second_completed)]
@@ -328,19 +476,22 @@ class ServiceAdapterTests(ServiceActionBase):
         self._register()
         self.player.location = self.store
         self.player.db.wallet = 1000
-        result = _buy_adapter(self.player, {"item_key": "meal", "quantity": 2})
+        result = _buy_adapter(self.player, {"item_key": _T_MEAL, "quantity": 2})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "bought")
-        self.assertEqual(self.player.db.wallet, 980)
+        floor, _ceiling = price_band(_T_MEAL)
+        self.assertEqual(
+            self.player.db.wallet, 1000 - 2 * (floor + 2)
+        )
         from world.skills.equipment import list_items
 
-        self.assertEqual(list_items(self.player), ["meal", "meal"])
+        self.assertEqual(list_items(self.player), [_T_MEAL, _T_MEAL])
 
     def test_buy_rejects_insufficient_funds_without_mutation(self):
         self.player.location = self.store
         self.player.db.wallet = 5
         before = list(self.player.db.inventory or [])
-        result = _buy_adapter(self.player, {"item_key": "meal", "quantity": 1})
+        result = _buy_adapter(self.player, {"item_key": _T_MEAL, "quantity": 1})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "insufficient_funds")
         self.assertEqual(self.player.db.wallet, 5)
@@ -349,48 +500,49 @@ class ServiceAdapterTests(ServiceActionBase):
     def test_buy_rejects_insufficient_stock(self):
         self.player.location = self.store
         self.player.db.wallet = 10000
-        result = _buy_adapter(self.player, {"item_key": "healing_potion", "quantity": 4})
+        result = _buy_adapter(self.player, {"item_key": _T_POTION, "quantity": 4})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "insufficient_stock")
 
     def test_buy_rejects_closed_shop(self):
         self.player.location = self.store
         get_world_clock()._persist(TICK_NIGHT)
-        result = _buy_adapter(self.player, {"item_key": "meal", "quantity": 1})
+        result = _buy_adapter(self.player, {"item_key": _T_MEAL, "quantity": 1})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "closed")
 
     def test_sell_success_exact_copper(self):
         self.player.location = self.store
-        self.merchant.merchant_stock = {"meal": 10, "healing_potion": 3, "plain_sword": 1}
-        self.player.db.inventory = ["meal", "meal"]
-        result = _sell_adapter(self.player, {"item_key": "meal", "quantity": 1})
+        self.merchant.merchant_stock = {_T_MEAL: 10, _T_POTION: 3, _T_SWORD: 1}
+        self.player.db.inventory = [_T_MEAL, _T_MEAL]
+        result = _sell_adapter(self.player, {"item_key": _T_MEAL, "quantity": 1})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "sold")
-        self.assertEqual(self.player.db.wallet, 1005)
+        floor, _ceiling = price_band(_T_MEAL)
+        self.assertEqual(self.player.db.wallet, 1000 + floor)
         from world.skills.equipment import list_items
 
-        self.assertEqual(list_items(self.player), ["meal"])
+        self.assertEqual(list_items(self.player), [_T_MEAL])
 
     def test_sell_rejects_insufficient_items(self):
         self.player.location = self.store
-        self.player.db.inventory = ["meal"]
-        result = _sell_adapter(self.player, {"item_key": "meal", "quantity": 2})
+        self.player.db.inventory = [_T_MEAL]
+        result = _sell_adapter(self.player, {"item_key": _T_MEAL, "quantity": 2})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "insufficient_items")
 
     def test_sell_rejects_stock_overflow(self):
         self.player.location = self.store
-        self.merchant.merchant_stock = {"meal": 20, "healing_potion": 3, "plain_sword": 3}
-        self.player.db.inventory = ["plain_sword", "plain_sword"]
-        result = _sell_adapter(self.player, {"item_key": "plain_sword", "quantity": 1})
+        self.merchant.merchant_stock = {_T_MEAL: 20, _T_POTION: 3, _T_SWORD: 3}
+        self.player.db.inventory = [_T_SWORD, _T_SWORD]
+        result = _sell_adapter(self.player, {"item_key": _T_SWORD, "quantity": 1})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "stock_overflow")
 
     def test_buy_rejects_without_local_merchant(self):
         self._register()
         self.player.location = self.hall
-        result = _buy_adapter(self.player, {"item_key": "meal", "quantity": 1})
+        result = _buy_adapter(self.player, {"item_key": _T_MEAL, "quantity": 1})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_merchant")
 
@@ -409,7 +561,7 @@ class ServiceAdapterTests(ServiceActionBase):
 
     def test_quest_track_success_anywhere(self):
         self._register()
-        record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
         # Stand in the store (no GuildStaff host) — tracking is host-independent.
         self.player.location = self.store
         result = _quest_track_adapter(
@@ -432,7 +584,7 @@ class ServiceAdapterTests(ServiceActionBase):
 
     def test_quest_track_rejects_terminal_quest(self):
         self._register()
-        record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
         _quest_abandon_adapter(self.player, {"quest_id": record.quest_id})
         result = _quest_track_adapter(
             self.player, {"quest_id": record.quest_id, "tracked": True}
@@ -442,7 +594,7 @@ class ServiceAdapterTests(ServiceActionBase):
 
     def test_quest_track_rejects_beyond_cap(self):
         from world.quests.tests._fixtures import accept, quest, register
-        defs = [register(quest(f"cap_test_{i}")) for i in range(4)]
+        defs = [register(quest(f"t_cap_test_{i}")) for i in range(4)]
         records = [accept(self.player, d.key) for d in defs]
         for r in records[:3]:
             res = _quest_track_adapter(self.player, {"quest_id": r.quest_id, "tracked": True})
@@ -458,15 +610,15 @@ class ServiceAdapterTests(ServiceActionBase):
         from web.webclient.actions.service_actions import ServiceActionError
 
         for bad in (
-            {"item_key": "meal", "quantity": 1, "host": "1234"},
-            {"item_key": "meal", "quantity": 1, "branch": "guild_branch_altoria"},
-            {"item_key": "meal", "quantity": 1, "price": 5},
-            {"item_key": "meal", "quantity": 1, "actor": "player"},
-            {"item_key": "meal"},
-            {"item_key": "meal", "quantity": 0},
-            {"item_key": "meal", "quantity": 1001},
-            {"item_key": "meal", "quantity": True},
-            {"item_key": "meal", "quantity": "3"},
+            {"item_key": _T_MEAL, "quantity": 1, "host": "1234"},
+            {"item_key": _T_MEAL, "quantity": 1, "branch": BRANCH},
+            {"item_key": _T_MEAL, "quantity": 1, "price": 5},
+            {"item_key": _T_MEAL, "quantity": 1, "actor": "player"},
+            {"item_key": _T_MEAL},
+            {"item_key": _T_MEAL, "quantity": 0},
+            {"item_key": _T_MEAL, "quantity": 1001},
+            {"item_key": _T_MEAL, "quantity": True},
+            {"item_key": _T_MEAL, "quantity": "3"},
         ):
             with self.assertRaises(ServiceActionError, msg=bad):
                 validate_buy_payload(bad)
@@ -476,37 +628,37 @@ class ExamStartTests(ServiceActionBase):
     def test_exam_start_rejects_non_next_rank_before_domain(self):
         self._register()
         write_counter_trait(self.player, "guild_merit", 50)
-        result = _exam_start_adapter(self.player, {"target_rank": "D"})
+        result = _exam_start_adapter(self.player, {"target_rank": _T_LATER_EXAM_RANK})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "not_next_rank")
         self.assertIsNone(self.player.db.active_combat)
 
     def test_exam_start_rejects_below_threshold(self):
         self._register()
-        result = _exam_start_adapter(self.player, {"target_rank": "E"})
+        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "below_threshold")
         self.assertIsNone(self.player.db.active_combat)
 
     def test_exam_start_rejects_unregistered(self):
-        result = _exam_start_adapter(self.player, {"target_rank": "E"})
+        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "unregistered")
         self.assertIsNone(self.player.db.active_combat)
 
     def test_exam_start_rejects_without_local_examiner(self):
         self._register()
-        write_counter_trait(self.player, "guild_merit", 50)
+        write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
         self.player.location = self.store
-        result = _exam_start_adapter(self.player, {"target_rank": "E"})
+        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "no_examiner")
 
     @covers_requirement("webclient-service-menus::service-action-completion-updates-canonical-panels-and-preserves-narrative")
     def test_exam_start_transitions_to_guild_exam_combat_session(self):
         self._register()
-        write_counter_trait(self.player, "guild_merit", 50)
-        result = _exam_start_adapter(self.player, {"target_rank": "E"})
+        write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
+        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "exam_started")
         self.assertEqual(result["affected_panels"], ("status", "services", "context_actions"))
@@ -517,9 +669,9 @@ class ExamStartTests(ServiceActionBase):
 
     def test_exam_start_rejects_while_active_session(self):
         self._register()
-        write_counter_trait(self.player, "guild_merit", 50)
-        _exam_start_adapter(self.player, {"target_rank": "E"})
-        result = _exam_start_adapter(self.player, {"target_rank": "E"})
+        write_counter_trait(self.player, "guild_merit", _T_MERIT_THRESHOLD)
+        _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
+        result = _exam_start_adapter(self.player, {"target_rank": _T_EXAM_RANK})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "active_combat")
 
@@ -621,7 +773,7 @@ class ServiceDispatchTests(ServiceActionBase):
         handle_ui_action(
             self.session,
             self.player,
-            self._envelope(coordinator, "shop.buy", {"item_key": "meal", "quantity": 1}),
+            self._envelope(coordinator, "shop.buy", {"item_key": _T_MEAL, "quantity": 1}),
             self.action_registry,
             self.registry,
         )
@@ -636,17 +788,17 @@ class ServiceDispatchTests(ServiceActionBase):
         self._register()
         self.player.location = self.store
         coordinator = self._coordinator()
-        # Stock was 3 for healing_potion at render; another buyer depletes it.
+        # Stock was 3 for the potion at render; another buyer depletes it.
         self.merchant.merchant_stock = {
-            "meal": 20,
-            "healing_potion": 0,
-            "plain_sword": 1,
+            _T_MEAL: 20,
+            _T_POTION: 0,
+            _T_SWORD: 1,
         }
         handle_ui_action(
             self.session,
             self.player,
             self._envelope(
-                coordinator, "shop.buy", {"item_key": "healing_potion", "quantity": 1}
+                coordinator, "shop.buy", {"item_key": _T_POTION, "quantity": 1}
             ),
             self.action_registry,
             self.registry,
@@ -667,7 +819,7 @@ class ServiceDispatchTests(ServiceActionBase):
         handle_ui_action(
             self.session,
             self.player,
-            self._envelope(coordinator, "shop.buy", {"item_key": "meal", "quantity": 1}),
+            self._envelope(coordinator, "shop.buy", {"item_key": _T_MEAL, "quantity": 1}),
             self.action_registry,
             self.registry,
         )
@@ -684,7 +836,7 @@ class ServiceDispatchTests(ServiceActionBase):
     )
     def test_track_action_publishes_services_and_objectives_together(self):
         self._register()
-        record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
         coordinator = self._coordinator()
 
         handle_ui_action(
@@ -725,7 +877,7 @@ class ServiceDispatchTests(ServiceActionBase):
     )
     def test_track_action_publishes_the_quest_log_panel(self):
         self._register()
-        record = accept_guild_offer(self.player, self.staff, "introductory_hunt")
+        record = accept_guild_offer(self.player, self.staff, _T_BOARD_QUEST)
         coordinator = self._coordinator()
 
         handle_ui_action(
@@ -751,4 +903,4 @@ class ServiceDispatchTests(ServiceActionBase):
         self.assertEqual(rows[0]["quest_id"], record.quest_id)
         self.assertTrue(rows[0]["tracked"])
         self.assertEqual(rows[0]["issuer"]["kind"], "guild")
-        self.assertEqual(rows[0]["issuer"]["key"], "guild:guild_branch_altoria")
+        self.assertEqual(rows[0]["issuer"]["key"], f"guild:{BRANCH}")

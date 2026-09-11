@@ -19,7 +19,7 @@ from world.art.subjects import ArtSubject, ArtSubjectKind
 from tools.spec_traceability import covers_requirement
 
 
-def _scene(key="forest_path"):
+def _scene(key="t_synth_bazaar"):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
@@ -34,7 +34,7 @@ class ArtMediaViewTests(EvenniaTestCase):
         self.tempdir.cleanup()
         super().tearDown()
 
-    def _done_identity(self, identity, key="forest_path"):
+    def _done_identity(self, identity, key="t_synth_bazaar"):
         subject = _scene(key)
         ensure(subject, "desc")
         target = self.root / identity
@@ -60,8 +60,8 @@ class ArtMediaViewTests(EvenniaTestCase):
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_valid_done_record_identity_is_served_same_origin(self):
-        self._done_identity("scene/forest_path.png")
-        response = self._get("scene/forest_path.png")
+        self._done_identity("scene/t_synth_bazaar.png")
+        response = self._get("scene/t_synth_bazaar.png")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "image/png")
 
@@ -85,22 +85,22 @@ class ArtMediaViewTests(EvenniaTestCase):
         # The route never consults the configured format: a done record with
         # a .png identity is served even when the store's active format is
         # avif (a store mid-way through a format switch).
-        self._done_identity("scene/forest_path.png")
+        self._done_identity("scene/t_synth_bazaar.png")
         with override_settings(ART_SD_OUTPUT_FORMAT="avif", ART_SD_OUTPUT_EXTENSION=".avif"):
-            response = self._get("scene/forest_path.png")
+            response = self._get("scene/t_synth_bazaar.png")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "image/png")
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_unlisted_extension_and_extensionless_identity_return_404(self):
-        for identity in ("scene/forest_path.jxl", "scene/forest_path"):
+        for identity in ("scene/t_synth_bazaar.jxl", "scene/t_synth_bazaar"):
             with self.subTest(identity=identity):
                 response = self._get(identity)
                 self.assertEqual(response.status_code, 404)
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_out_of_root_traversal_and_symlink_identities_return_404(self):
-        self._done_identity("scene/forest_path.png")
+        self._done_identity("scene/t_synth_bazaar.png")
         (self.root / "scene" / "inner.png").write_text("inner", encoding="utf-8")
         (self.root / "scene" / "inroot_symlink.png").symlink_to(
             self.root / "scene" / "inner.png"
@@ -118,7 +118,7 @@ class ArtMediaViewTests(EvenniaTestCase):
             "scene/wrong.txt",
             "scene/inroot_symlink.png",
             "scene/outroot_symlink.png",
-            "portrait/character/../scene/forest_path.png",
+            "portrait/character/../scene/t_synth_bazaar.png",
         ):
             with self.subTest(identity=identity):
                 response = self._get(identity)
