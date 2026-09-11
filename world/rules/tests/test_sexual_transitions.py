@@ -11,6 +11,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
+from ._combat_session_helpers import _race_key
 from world.rules.rulebook.schema import Rule, load_rules
 from world.rules import sexual_transitions
 from world.rules.sexual_state import decay_tick
@@ -45,7 +46,7 @@ class FixedRng:
 class SexualTransitionTests(EvenniaTestCase):
     def _entity(self):
         entity = create_object(PlayerCharacter, key="transition target")
-        entity.race = "human"
+        entity.race = _race_key()
         entity.apply_race_baseline()
         return entity
 
@@ -227,9 +228,14 @@ class SexualTransitionTests(EvenniaTestCase):
         self.assertTrue(entity.sexual.virgin)
 
     def test_rule_experience_titfuck_added(self):
+        # The added label is read from the firing rule's own ``add`` clause:
+        # the bridge must apply exactly what the table declares. The shipped
+        # label prose stays in the rulebook YAML (its data-contract home),
+        # never restated as a test literal.
+        added = RULES["experience_titfuck_added"].then["add"]
         entity = self._entity()
         apply_event(entity, "breast_sex_performed")
-        self.assertIn("乳交", entity.sexual.experience_types)
+        self.assertIn(added, entity.sexual.experience_types)
 
     def test_rule_experience_watched_added(self):
         entity = self._entity()

@@ -22,6 +22,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
+from ._combat_session_helpers import _monster_tier_key, _race_key
 from world.lore.sexual_vocab import CLIMAX_PHASE_LEVELS
 from world.quests.catalog import register_catalog
 from world.quests.tests._fixtures import RegistryIsolationMixin
@@ -348,14 +349,14 @@ class SexualResistAffinityTests(EvenniaTestCase):
         self.player = self._character("resist-player")
         self.npc = self._character("resist-npc", cls=NPC)
         self.monster = create_object(Monster, key="resist-monster")
-        self.monster.threat_tier = "low"
+        self.monster.threat_tier = _monster_tier_key()
         self.monster.apply_monster_tier()
         self.monster.db.skills = {"active": [], "passive": []}
 
     @staticmethod
     def _character(key: str, cls=PlayerCharacter):
         entity = create_object(cls, key=key)
-        entity.race = "human"
+        entity.race = _race_key()
         entity.apply_race_baseline()
         return entity
 
@@ -502,15 +503,30 @@ class SexualResistAffinityTests(EvenniaTestCase):
 
     @covers_requirement("sexual-resist-contest::the-ordinary-contest-reuses-the-shipped-to-hit-formula-shape-with-blended-scores")
     def test_flat_atk_phys_bonus_applies_additively(self):
+        # The bonus carrier is the combat-modifier rulebook's own
+        # skill_owned→flat-atk_phys row, probed at runtime: the passive key
+        # and the bonus magnitude arrive as rule values, never as literals,
+        # so the blend arithmetic — flat atk_phys bonuses add into the
+        # strength term BEFORE the 0.4/0.6 weighting — stays the assertion.
+        from world.rules.combat_modifiers import _RULES
+
+        bonus_rule = next(
+            rule
+            for rule in _RULES
+            if set(rule.when) == {"skill_owned"}
+            and list(rule.then) == ["atk_phys"]
+            and isinstance(rule.then["atk_phys"], int)
+        )
+        bonus = bonus_rule.then["atk_phys"]
         self.player.db.skills = {
             "active": [],
-            "passive": ["retainer_martial_training"],
+            "passive": [bonus_rule.when["skill_owned"]],
         }
         agility = float(self.player.skills.effective_value("agility"))
         atk_phys = float(self.player.skills.effective_value("atk_phys"))
         self.assertAlmostEqual(
             _blended_score(self.player),
-            0.6 * agility + 0.4 * (atk_phys + 5),
+            0.6 * agility + 0.4 * (atk_phys + bonus),
         )
 
     @covers_requirement("sexual-resist-contest::a-resister-mid-climax-auto-complies-for-the-first-five-settlement-points-then-resists-normally")
@@ -545,7 +561,7 @@ class SexualResistSubmissionTests(EvenniaTestCase):
     @staticmethod
     def _character(key: str, cls=PlayerCharacter):
         entity = create_object(cls, key=key)
-        entity.race = "human"
+        entity.race = _race_key()
         entity.apply_race_baseline()
         return entity
 

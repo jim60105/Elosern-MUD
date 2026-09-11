@@ -16,7 +16,7 @@ bool, "roll": int | None})``, documented in ``sexual-act-resolution-design.md``
 resistible act cast). Direct-scan tests drive the function with synthetic
 logs carrying the documented shape, mirroring
 ``test_combat_session_sexual_coercion``; settlement tests drive the real
-``settle_out_of_combat_cast`` with the shipped ``combat_tease`` act and a
+``settle_out_of_combat_cast`` with a file-local synthetic resistible act and a
 patched resist roll.
 """
 
@@ -51,9 +51,62 @@ from world.rules.combat_session import (
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.party import AUTO_LEAVE_MESSAGE, join_party, party_ids
 from world.rules.targeting import RoomActionContext
-from world.skills.registry import SKILL_REGISTRY, TargetSpec
-from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
-from world.skills.sexual_acts._builder import _act_family
+from world.skills.registry import TargetSpec
+from world.tests.synthetic_data import SYNTH_ACT, SYNTH_ACT_SKILL, synthetic_registries
+
+from ._combat_session_helpers import _monster_tier_key, _race_key, open_synthetic_scope
+
+# --- File-local synthetic act rows (kit act template, varied flags) -------
+
+# The resistible single-target act every settlement test casts.
+_T_COERCE = "t_coerce_tease"
+_T_COERCE_DEF = replace(
+    SYNTH_ACT,
+    key=_T_COERCE,
+    resistible=True,
+    actor_counters=("duo_act_count",),
+    participant_counters=("duo_act_count",),
+    sexual_events=(),
+)
+_T_COERCE_SKILL = replace(
+    SYNTH_ACT_SKILL,
+    key=_T_COERCE,
+    label="測試強制行為",
+    description="僅存在於測試中的合成可抵抗性行為。",
+    effects=[
+        f"pleasure:{_T_COERCE}",
+        f"sexual_counter:{_T_COERCE}",
+    ],
+)
+
+# The non-resistible AREA act for the duplicate-key guard's scope test.
+_T_AREA = "t_coerce_area"
+_T_AREA_DEF = replace(
+    SYNTH_ACT,
+    key=_T_AREA,
+    resistible=False,
+    actor_counters=("duo_act_count",),
+    participant_counters=("duo_act_count",),
+    sexual_events=(),
+)
+_T_AREA_SKILL = replace(
+    SYNTH_ACT_SKILL,
+    key=_T_AREA,
+    label="測試非抵抗範圍行為",
+    description="僅存在於測試中的合成非抵抗範圍行為。",
+    target_spec=TargetSpec.AREA,
+    effects=[
+        f"pleasure:{_T_AREA}",
+        f"sexual_counter:{_T_AREA}",
+    ],
+)
+
+_ALL_SKILLS = {_T_COERCE_SKILL.key: _T_COERCE_SKILL, _T_AREA_SKILL.key: _T_AREA_SKILL}
+_ALL_ACTS = {_T_COERCE_DEF.key: _T_COERCE_DEF, _T_AREA_DEF.key: _T_AREA_DEF}
+
+
+def _scope_extra(skills: dict, acts: dict) -> dict:
+    return {"skills": skills, "sexual_acts": acts}
 
 
 def _resist_log(actor, target, *, resisted, auto_comply, roll):
@@ -65,7 +118,7 @@ def _resist_log(actor, target, *, resisted, auto_comply, roll):
         data={"resisted": resisted, "auto_comply": auto_comply, "roll": roll},
         text_template="{actor} 對 {target} 施加了強制行為。",
     )
-    return EventLog(str(actor.key), "combat_tease", (str(target.key),), (entry,), 0)
+    return EventLog(str(actor.key), _T_COERCE, (str(target.key),), (entry,), 0)
 
 
 def _raising_stage():
@@ -84,6 +137,19 @@ class OutOfCombatCoercionBase(EvenniaTest):
     """Shared fixture: a caster player, one room, and clock/source hygiene."""
 
     def setUp(self):
+        # The catalogue scope opens before construction so the fixture
+        # entities resolve against the kit race row (the kit's class decorator
+        # covers only test* methods, not setUp).
+        open_synthetic_scope(
+            self,
+            "skills",
+            "sexual_acts",
+            "elements",
+            "races",
+            "subraces",
+            "static_tiers",
+            extra=_scope_extra(_ALL_SKILLS, _ALL_ACTS),
+        )
         super().setUp()
         register_catalog()
         self._sources = dict(_EVENT_SOURCES)
@@ -92,10 +158,24 @@ class OutOfCombatCoercionBase(EvenniaTest):
         self.player = create_object(
             PlayerCharacter, key="coercion caster", location=self.room
         )
-        self.player.race = "human"
+        self.player.race = _race_key()
         self.player.apply_race_baseline()
-        self.player.db.skills = {"active": [], "passive": []}
+        # The scoped catalogue is empty except for the file-local rows, so
+        # the caster must own exactly the acts the suite casts.
+        self.player.db.skills = {"active": list(_ALL_SKILLS), "passive": []}
         self.clock = WorldClock()
+
+    def _catalogue(self, skills: dict, acts: dict):
+        """Nested ``with`` scope carrying the passed act/skill rows."""
+        return synthetic_registries(
+            "skills",
+            "sexual_acts",
+            "elements",
+            "races",
+            "subraces",
+            "static_tiers",
+            extra=_scope_extra(skills, acts),
+        )
 
     def tearDown(self):
         _EVENT_SOURCES.clear()
@@ -104,7 +184,7 @@ class OutOfCombatCoercionBase(EvenniaTest):
 
     def _npc(self, key, affinity: int | None = None):
         npc = create_object(NPC, key=key, location=self.room)
-        npc.race = "human"
+        npc.race = _race_key()
         npc.apply_race_baseline()
         npc.traits.hp.base = 100
         npc.traits.hp.current = 100
@@ -121,7 +201,7 @@ class OutOfCombatCoercionBase(EvenniaTest):
 
     def _monster(self, key="慾狼"):
         monster = create_object(Monster, key=key, location=self.room)
-        monster.threat_tier = "low"
+        monster.threat_tier = _monster_tier_key()
         monster.apply_monster_tier("floor")
         monster.traits.hp.base = 500
         monster.traits.hp.current = 500
@@ -135,7 +215,7 @@ class OutOfCombatCoercionBase(EvenniaTest):
             RoomActionContext(self.room, {}),
         )
 
-    def _settle(self, skill_key="combat_tease", targets=None):
+    def _settle(self, skill_key=_T_COERCE, targets=None):
         return settle_out_of_combat_cast(
             self._request(skill_key, targets or []), clock=self.clock
         )
@@ -279,7 +359,7 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
                 text_template="x",
             )
             log = EventLog(
-                str(self.player.key), "combat_tease", (str(target.key),), (entry,), 0
+                str(self.player.key), _T_COERCE, (str(target.key),), (entry,), 0
             )
             with patch("world.rules.cast_settlement.apply_affinity_change") as writer:
                 notifications, restore_state = self._scan([target], log)
@@ -300,7 +380,7 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             ).entries[0],
         )
         log = EventLog(
-            str(self.player.key), "combat_tease", (str(first.key), str(second.key)), entries, 0
+            str(self.player.key), _T_COERCE, (str(first.key), str(second.key)), entries, 0
         )
         original = affinity_module.apply_affinity_change
         calls = []
@@ -335,7 +415,7 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             ).entries[0],
         )
         log = EventLog(
-            str(self.player.key), "combat_tease", (str(forced.key), str(complied.key)), entries, 0
+            str(self.player.key), _T_COERCE, (str(forced.key), str(complied.key)), entries, 0
         )
         original = affinity_module.apply_affinity_change
         calls = []
@@ -359,7 +439,7 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
         other = create_object(
             PlayerCharacter, key="被強制者", location=self.room
         )
-        other.race = "human"
+        other.race = _race_key()
         other.apply_race_baseline()
         log = _resist_log(
             self.player, other, resisted=False, auto_comply=False, roll=55
@@ -392,7 +472,7 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             text_template="x",
         )
         log = EventLog(
-            str(self.player.key), "combat_tease", ("no-such-target",), (entry,), 0
+            str(self.player.key), _T_COERCE, ("no-such-target",), (entry,), 0
         )
         with patch("world.rules.cast_settlement.apply_affinity_change") as writer:
             notifications, restore_state = self._scan([target], log)
@@ -414,12 +494,12 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             kind="skill_practice",
             actor=str(self.player.key),
             target=None,
-            data={"skill": "combat_tease"},
+            data={"skill": _T_COERCE},
             text_template="x",
         )
         log = EventLog(
             str(self.player.key),
-            "combat_tease",
+            _T_COERCE,
             (str(target.key),),
             (damage_entry, practice_entry),
             0,
@@ -455,7 +535,7 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
                 text_template="x",
             )
             log = EventLog(
-                str(self.player.key), "combat_tease", (str(target.key),), (entry,), 0
+                str(self.player.key), _T_COERCE, (str(target.key),), (entry,), 0
             )
             with patch("world.rules.affinity.apply_affinity_change") as writer:
                 notifications, restore_state = self._scan([target], log)
@@ -481,7 +561,7 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             text_template="x",
         )
         log = EventLog(
-            str(self.player.key), "combat_tease", (str(target.key),), (entry,), 0
+            str(self.player.key), _T_COERCE, (str(target.key),), (entry,), 0
         )
         notifications, restore_state = self._scan([target], log)
         self.assertEqual(notifications, ())
@@ -506,7 +586,7 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             ).entries[0],
         )
         log = EventLog(
-            str(self.player.key), "combat_tease", (str(first.key), str(second.key)), entries, 0
+            str(self.player.key), _T_COERCE, (str(first.key), str(second.key)), entries, 0
         )
         original = affinity_module.apply_affinity_change
         calls = {"count": 0}
@@ -541,7 +621,7 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
     @covers_requirement("sexual-resist-out-of-combat::the-coercion-scan-runs-inside-the-out-of-combat-settlement-s-outer-transaction-and-rolls-back-on-failure")
     def test_forced_out_of_combat_cast_commits_the_penalty_durably(self):
         target = self._companion("整合強制", affinity=73)
-        settlement = self._forced_cast("combat_tease", [target])
+        settlement = self._forced_cast(_T_COERCE, [target])
         self.assertEqual(settlement.result.outcome, "success")
         self.assertEqual(settlement.notifications, ())
         self.assertEqual(
@@ -576,7 +656,7 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
             side_effect=failing_scan,
         ):
             with self.assertRaises(RuntimeError):
-                self._forced_cast("combat_tease", [target])
+                self._forced_cast(_T_COERCE, [target])
         # No partial resolution, practice award, or clock advance persists.
         self.assertEqual(self.clock.tick, 0)
         self.assertEqual(self.player.db.skill_proficiency or {}, {})
@@ -598,7 +678,7 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
         raw_before = self._raw_relations(target)
         _EVENT_SOURCES["shop_hours"] = _raising_stage()
         with self.assertRaises(RuntimeError):
-            self._forced_cast("combat_tease", [target])
+            self._forced_cast(_T_COERCE, [target])
         self.assertEqual(self.clock.tick, 0)
         self.assertEqual(self.player.db.skill_proficiency or {}, {})
         target.attributes.reset_cache()
@@ -632,7 +712,7 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
         ):
             with self.assertRaises(RuntimeError):
                 settle_out_of_combat_cast(
-                    self._request("combat_tease", [target])
+                    self._request(_T_COERCE, [target])
                 )
         self.assertEqual(self.player.db.skill_proficiency or {}, {})
         target.attributes.reset_cache()
@@ -649,7 +729,7 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
         first = self._companion("同名目標", affinity=73)
         second = self._npc("同名目標", affinity=73)
         with self.assertRaises(ValueError):
-            self._forced_cast("combat_tease", [first, second])
+            self._forced_cast(_T_COERCE, [first, second])
         self.assertEqual(self.clock.tick, 0)
         self.assertEqual(first.relations.affinity_for(self.player), 73)
         self.assertEqual(second.relations.affinity_for(self.player), 73)
@@ -660,30 +740,10 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
         # non-resistible AREA act whose candidates repeat an entity key never
         # feeds the key-indexed scan (no ``sexual_resist`` entries are
         # emitted), so the guard must not reject the cast.
-        (skill, act), = _act_family(
-            "關係",
-            (
-                "test_non_resist_area",
-                "測試非抵抗行為",
-                "僅存在於測試中的合成非抵抗範圍行為。",
-                TargetSpec.AREA,
-                {},
-                10,
-                "腰腹",
-                "腰腹",
-                0.5,
-                ("duo_act_count",),
-                ("duo_act_count",),
-                (),
-                False,
-            ),
-        )
         first = self._companion("同名非抵抗", affinity=10)
         second = self._npc("同名非抵抗", affinity=10)
-        with patch.dict(SEXUAL_ACT_REGISTRY, {act.key: act}), patch.dict(
-            SKILL_REGISTRY, {skill.key: skill}
-        ):
-            settlement = self._settle("test_non_resist_area", [first, second])
+        with self._catalogue({ _T_AREA_SKILL.key: _T_AREA_SKILL}, _ALL_ACTS):
+            settlement = self._settle(_T_AREA, [first, second])
         self.assertEqual(settlement.result.outcome, "success")
         self.assertEqual(first.relations.affinity_for(self.player), 10)
         self.assertEqual(second.relations.affinity_for(self.player), 10)
@@ -691,7 +751,7 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
     @covers_requirement("sexual-resist-out-of-combat::an-out-of-combat-forced-act-s-party-auto-leave-notification-reaches-the-player")
     def test_auto_leave_notification_returns_through_cast_settlement(self):
         coerced = self._companion("離隊強制", affinity=70)
-        settlement = self._forced_cast("combat_tease", [coerced])
+        settlement = self._forced_cast(_T_COERCE, [coerced])
         self.assertEqual(settlement.result.outcome, "success")
         self.assertEqual(settlement.notifications, (AUTO_LEAVE_MESSAGE,))
         self.assertEqual(
@@ -703,13 +763,13 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
     @covers_requirement("sexual-resist-out-of-combat::an-out-of-combat-forced-act-s-party-auto-leave-notification-reaches-the-player")
     def test_forced_act_without_auto_leave_sends_no_notification(self):
         companion = self._companion("留在隊上", affinity=73)
-        settlement = self._forced_cast("combat_tease", [companion])
+        settlement = self._forced_cast(_T_COERCE, [companion])
         self.assertEqual(settlement.result.outcome, "success")
         self.assertEqual(settlement.notifications, ())
         self.assertIn(int(companion.pk), party_ids(self.player))
 
         stranger = self._npc("路人", affinity=73)
-        settlement = self._forced_cast("combat_tease", [stranger])
+        settlement = self._forced_cast(_T_COERCE, [stranger])
         self.assertEqual(settlement.result.outcome, "success")
         self.assertEqual(settlement.notifications, ())
 
@@ -718,7 +778,7 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
         # An auto-complied target (至愛 stage, no roll) cast out of combat.
         target = self._npc("自動服從", affinity=90)
         with patch("world.rules.action.roll_d100") as roll:
-            settlement = self._settle("combat_tease", [target])
+            settlement = self._settle(_T_COERCE, [target])
         roll.assert_not_called()
         self.assertEqual(settlement.result.outcome, "success")
         self.assertEqual(settlement.notifications, ())
@@ -728,7 +788,7 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
     def test_resisted_out_of_combat_cast_applies_no_penalty(self):
         target = self._npc("成功拒絕", affinity=10)
         with patch("world.rules.action.roll_d100", return_value=100):
-            settlement = self._settle("combat_tease", [target])
+            settlement = self._settle(_T_COERCE, [target])
         self.assertEqual(settlement.result.outcome, "success")
         self.assertEqual(settlement.notifications, ())
         self.assertEqual(target.relations.affinity_for(self.player), 10)
@@ -737,6 +797,6 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
         target = self._companion("規則書目標", affinity=73)
         patched = replace(load_config(), sexual_forced_penalty=5)
         with patch("world.rules.cast_settlement.get_config", return_value=patched):
-            settlement = self._forced_cast("combat_tease", [target])
+            settlement = self._forced_cast(_T_COERCE, [target])
         self.assertEqual(settlement.result.outcome, "success")
         self.assertEqual(target.relations.affinity_for(self.player), 68)
