@@ -38,6 +38,8 @@ from web.webclient.actions.title_actions import (
     validate_title_remove_payload,
 )
 from world.rules.clock import get_world_clock
+from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.tests.synthetic_data import make_guild_rank, make_title
 from world.rules.titles import (
     PENDING_BALLOT_KEY,
     TITLE_COLLECTION_KEY,
@@ -46,7 +48,6 @@ from world.rules.titles import (
     bank_epithet,
     decline_records,
     declined_digest,
-    grant_first_quest_epithet,
     grant_rank_title,
     persist_nomination_ballot,
     read_pending_ballot,
@@ -58,6 +59,16 @@ _BALLOT = [
     {"display": "夜襲之人", "basis": "夜半三度出入敵陣。"},
     {"display": "不屈之壁", "basis": "重傷仍守住隘口。"},
 ]
+
+# File-local synthetic fixed titles + the rank row that grants one of them:
+# the codex lifecycle banks/equips these rows through the scoped registries,
+# so no shipped rank or fixed-title identity is ever named.
+_T_TITLE_A = make_title("t_act_alpha_badge", display_name_zh="甲階學徒")
+_T_TITLE_B = make_title("t_act_beta_badge", display_name_zh="乙階見習")
+_T_TITLE_UNBANKED = make_title("t_act_gamma_badge", display_name_zh="丙階見習")
+_T_RANK = make_guild_rank("t_act_rank", title_key=_T_TITLE_A.key)
+_T_STARTER_EPITHET = "破曉新丁"
+_T_STARTER_BASIS = "首次完成公會委託。"
 
 
 class TitleBallotValidatorTests(unittest.TestCase):
@@ -218,8 +229,8 @@ class TitleBallotAdapterTests(EvenniaTestCase):
 class TitleCodexValidatorTests(unittest.TestCase):
     def test_equip_accepts_both_kinds_within_bounds(self):
         self.assertEqual(
-            validate_title_equip_payload({"kind": "fixed", "identifier": "g_f_rank"}),
-            {"kind": "fixed", "identifier": "g_f_rank"},
+            validate_title_equip_payload({"kind": "fixed", "identifier": _T_TITLE_A.key}),
+            {"kind": "fixed", "identifier": _T_TITLE_A.key},
         )
         self.assertEqual(
             validate_title_equip_payload({"kind": "epithet", "identifier": "夜襲之人"}),
@@ -235,13 +246,13 @@ class TitleCodexValidatorTests(unittest.TestCase):
         for payload in (
             {},
             {"kind": "fixed"},
-            {"identifier": "g_f_rank"},
-            {"kind": "widget", "identifier": "g_f_rank"},
-            {"kind": "Fixed", "identifier": "g_f_rank"},
+            {"identifier": _T_TITLE_A.key},
+            {"kind": "widget", "identifier": _T_TITLE_A.key},
+            {"kind": "Fixed", "identifier": _T_TITLE_A.key},
             {"kind": "fixed", "identifier": ""},
             {"kind": "fixed", "identifier": "長" * 65},
             {"kind": "fixed", "identifier": 7},
-            {"kind": "fixed", "identifier": "g_f_rank", "display": "x"},
+            {"kind": "fixed", "identifier": _T_TITLE_A.key, "display": "x"},
             "not-a-dict",
             None,
         ):
@@ -283,6 +294,21 @@ class TitleCodexValidatorTests(unittest.TestCase):
 
 class TitleCodexAdapterTests(EvenniaTestCase):
     def setUp(self):
+        # The codex lifecycle banks/equips through the live fixed-title and
+        # guild-rank registries: run the whole lifecycle on the scoped rows.
+        open_synthetic_scope(
+            self,
+            "titles",
+            "guild_ranks",
+            extra={
+                "titles": {
+                    _T_TITLE_A.key: _T_TITLE_A,
+                    _T_TITLE_B.key: _T_TITLE_B,
+                    _T_TITLE_UNBANKED.key: _T_TITLE_UNBANKED,
+                },
+                "guild_ranks": {_T_RANK.key: _T_RANK},
+            },
+        )
         get_world_clock()
         self.player = create_object(PlayerCharacter, key="codex actor")
         self.player.race = "human"
@@ -291,22 +317,24 @@ class TitleCodexAdapterTests(EvenniaTestCase):
         self.player.msg = lambda text, **kwargs: self.messages.append(text)
 
     def _bank_pair(self):
-        grant_rank_title(self.player, "F")
-        grant_first_quest_epithet(self.player)
+        grant_rank_title(self.player, _T_RANK.key)
+        bank_epithet(self.player, _T_STARTER_EPITHET, _T_STARTER_BASIS, 1)
         bank_epithet(self.player, "破城先鋒", "率先破門。", 500)
 
     def test_equip_fixed_banks_then_swaps_with_the_equip_affected_pair(self):
-        bank_fixed(self.player, "g_f_rank", 1)
-        bank_fixed(self.player, "g_e_rank", 2)
+        bank_fixed(self.player, _T_TITLE_A.key, 1)
+        bank_fixed(self.player, _T_TITLE_B.key, 2)
         result = _title_equip_adapter(
-            self.player, {"kind": "fixed", "identifier": "g_e_rank"}
+            self.player, {"kind": "fixed", "identifier": _T_TITLE_B.key}
         )
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "equipped")
-        self.assertEqual(result["message"], "你掛上稱號：E級斥候")
+        self.assertEqual(
+            result["message"], f"你掛上稱號：{_T_TITLE_B.display_name_zh}"
+        )
         self.assertEqual(result["affected_panels"], AFFECTED_EQUIP)
-        self.assertEqual(read_title_state(self.player)[1]["fixed"], "g_e_rank")
-        self.assertEqual(self.messages, ["你掛上稱號：E級斥候"])
+        self.assertEqual(read_title_state(self.player)[1]["fixed"], _T_TITLE_B.key)
+        self.assertEqual(self.messages, [f"你掛上稱號：{_T_TITLE_B.display_name_zh}"])
 
     def test_equip_epithet_swaps_between_banked_rows(self):
         self._bank_pair()
@@ -319,9 +347,9 @@ class TitleCodexAdapterTests(EvenniaTestCase):
     def test_unbanked_or_wrong_kind_targets_share_one_stable_rejection(self):
         self._bank_pair()
         for payload in (
-            {"kind": "fixed", "identifier": "g_s_rank"},
+            {"kind": "fixed", "identifier": _T_TITLE_UNBANKED.key},
             {"kind": "fixed", "identifier": "不存在"},
-            {"kind": "epithet", "identifier": "g_f_rank"},
+            {"kind": "epithet", "identifier": _T_TITLE_A.key},
             {"kind": "epithet", "identifier": "未擁有"},
         ):
             with self.subTest(payload=str(payload)[:60]):
@@ -336,7 +364,7 @@ class TitleCodexAdapterTests(EvenniaTestCase):
     def test_equip_maps_malformed_state_to_the_unavailable_rejection(self):
         self.player.attributes.add(TITLE_COLLECTION_KEY, "not-a-list")
         result = _title_equip_adapter(
-            self.player, {"kind": "fixed", "identifier": "g_f_rank"}
+            self.player, {"kind": "fixed", "identifier": _T_TITLE_A.key}
         )
         self.assertEqual(result["code"], BALLOT_UNAVAILABLE_CODE)
 
@@ -349,7 +377,7 @@ class TitleCodexAdapterTests(EvenniaTestCase):
         self.assertEqual(result["affected_panels"], AFFECTED_CODEX)
         self.assertEqual(
             [entry["display"] for entry in banked_epithets(self.player)],
-            ["南門新客"],
+            [_T_STARTER_EPITHET],
         )
         self.assertEqual(self.messages, [result["message"]])
 
@@ -357,8 +385,8 @@ class TitleCodexAdapterTests(EvenniaTestCase):
         self._bank_pair()
         for display, code in (
             ("不存在", REMOVAL_UNKNOWN_CODE),
-            ("g_f_rank", REMOVAL_UNKNOWN_CODE),
-            ("南門新客", REMOVAL_EQUIPPED_CODE),
+            (_T_TITLE_A.key, REMOVAL_UNKNOWN_CODE),
+            (_T_STARTER_EPITHET, REMOVAL_EQUIPPED_CODE),
         ):
             with self.subTest(display=display):
                 before = read_title_state(self.player)
@@ -370,8 +398,8 @@ class TitleCodexAdapterTests(EvenniaTestCase):
         sole.race = "human"
         sole.apply_race_baseline()
         sole.msg = lambda text, **kwargs: None
-        grant_first_quest_epithet(sole)
-        result = _title_remove_adapter(sole, {"display": "南門新客"})
+        bank_epithet(sole, _T_STARTER_EPITHET, _T_STARTER_BASIS, 1)
+        result = _title_remove_adapter(sole, {"display": _T_STARTER_EPITHET})
         self.assertEqual(result["code"], REMOVAL_LAST_CODE)
         self.assertEqual(self.messages, [])
 

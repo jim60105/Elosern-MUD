@@ -4,6 +4,7 @@ import unittest
 
 from tools.spec_traceability import covers_requirement
 
+from dataclasses import replace
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
@@ -18,9 +19,73 @@ from web.webclient.actions.combat_actions import (
     _flee_adapter,
     _forfeit_adapter,
 )
-from world.rules.action import RejectReason
 from world.rules.combat_session import engage, read_session
+from world.rules.progression import (
+    FREEFORM_SCALE_LADDER,
+    scaled_mp_cost,
+)
+from world.rules.tests._combat_session_helpers import (
+    SYNTH_SEAM_AREA_SKILL,
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
+from world.skills.registry import SkillCategory
+from world.tests.synthetic_data import SYNTH_SKILLS
+
+# File-local cast rows built from the kit templates (skills scope; the borrowed
+# shipped element stays live because the scope never patches the element
+# registry): a single elemental spell fills every old shipped-spell role —
+# _T_SINGLE the affordable SINGLE cast, _T_AREA the AREA/shorthand cast.
+# Which shipped spell those roles once used is irrelevant to the adapters.
+_T_SINGLE = SYNTH_SKILLS["t_ember_burst"]
+_T_AREA = SYNTH_SEAM_AREA_SKILL
+_T_ELEMENT = _T_SINGLE.element.key
+
+
+def _mastery_key() -> str:
+    """The element-mastery passive key the production entitlement derives.
+
+    ``progression.freeform_mastery_entitled`` hardcodes ``f"{element}_mastery"``
+    — a production vocabulary (the ``synth_innate_overlay`` precedent), so the
+    row lives under the runtime-derived key and no shipped identifier is named.
+    """
+    return f"{_T_ELEMENT}_mastery"
+
+
+def _mastery_row():
+    return replace(
+        SYNTH_SKILLS["t_steady_stride"],
+        key=_mastery_key(),
+        label="合成元素精通",
+        description="對該元素達到最高造詣的合成被動。",
+        effects=["passive_trait:element_mastery"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group=_T_ELEMENT,
+    )
+
+
+# The scale rung this file exercises is a production-vocabulary member of the
+# closed freeform table; its proficiency gate is looked up in the ladder table
+# at runtime, never hardcoded.
+_T_SCALE = 2.0
+_T_SCALE_LEVEL = next(
+    min_level for scale, min_level in FREEFORM_SCALE_LADDER if scale == _T_SCALE
+)
+
+_SCOPE_EXTRA = {
+    "skills": {
+        **synth_innate_overlay()["skills"],
+        _T_SINGLE.key: _T_SINGLE,
+        _T_AREA.key: _T_AREA,
+        _mastery_row().key: _mastery_row(),
+    }
+}
+
+# A zero-cost SELF passive: the "skill-only payload" fixture (the old
+# body-enhancement/concentration role — the validator checks target shape
+# against the TargetSpec, not the effects).
+_T_SELF = SYNTH_SKILLS["t_steady_stride"]
 
 
 def _player(key="adapter player"):
@@ -40,33 +105,43 @@ def _monster(key="adapter goblin", hp=100):
 
 
 class CastPayloadValidationTests(unittest.TestCase):
+    def setUp(self):
+        open_synthetic_scope(self, "skills", extra=_SCOPE_EXTRA)
+        super().setUp()
+
     def test_none_and_self_accept_skill_only(self):
-        validated = validate_cast_payload({"skill_key": "body_enhancement"})
+        validated = validate_cast_payload({"skill_key": _T_SELF.key})
         self.assertEqual(validated["target_ids"], ())
         self.assertIsNone(validated["target_shorthand"])
-        self.assertEqual(validated["skill_key"], "body_enhancement")
+        self.assertEqual(validated["skill_key"], _T_SELF.key)
 
     def test_single_requires_exactly_one_target(self):
         validated = validate_cast_payload(
-            {"skill_key": "fire_ball", "target_ids": [3]}
+            {"skill_key": _T_SINGLE.key, "target_ids": [3]}
         )
         self.assertEqual(validated["target_ids"], (3,))
         for ids in ([], [1, 2]):
             with self.assertRaises(Exception):
-                validate_cast_payload({"skill_key": "fire_ball", "target_ids": ids})
+                validate_cast_payload(
+                    {"skill_key": _T_SINGLE.key, "target_ids": ids}
+                )
 
     def test_area_accepts_list_or_shorthand_never_both(self):
         validated = validate_cast_payload(
-            {"skill_key": "wind_blade", "target_ids": [3, 4]}
+            {"skill_key": _T_AREA.key, "target_ids": [3, 4]}
         )
         self.assertEqual(validated["target_ids"], (3, 4))
         validated = validate_cast_payload(
-            {"skill_key": "wind_blade", "target_shorthand": "all-enemies"}
+            {"skill_key": _T_AREA.key, "target_shorthand": "all-enemies"}
         )
         self.assertEqual(validated["target_shorthand"], "all-enemies")
         with self.assertRaises(Exception):
             validate_cast_payload(
-                {"skill_key": "wind_blade", "target_ids": [3], "target_shorthand": "all"}
+                {
+                    "skill_key": _T_AREA.key,
+                    "target_ids": [3],
+                    "target_shorthand": "all",
+                }
             )
 
     def test_rejects_reserved_flee_key(self):
@@ -76,17 +151,21 @@ class CastPayloadValidationTests(unittest.TestCase):
 
     def test_rejects_unknown_fields_and_bad_values(self):
         with self.assertRaises(Exception):
-            validate_cast_payload({"skill_key": "fire_ball", "target_ids": [True]})
-        with self.assertRaises(Exception):
-            validate_cast_payload({"skill_key": "fire_ball", "target_ids": [0]})
-        with self.assertRaises(Exception):
             validate_cast_payload(
-                {"skill_key": "fire_ball", "target_ids": [1, 1]}
+                {"skill_key": _T_SINGLE.key, "target_ids": [True]}
             )
         with self.assertRaises(Exception):
-            validate_cast_payload({"skill_key": "fire_ball", "bogus": 1})
+            validate_cast_payload({"skill_key": _T_SINGLE.key, "target_ids": [0]})
         with self.assertRaises(Exception):
-            validate_cast_payload({"skill_key": "fire_ball", "target_shorthand": "all"})
+            validate_cast_payload(
+                {"skill_key": _T_SINGLE.key, "target_ids": [1, 1]}
+            )
+        with self.assertRaises(Exception):
+            validate_cast_payload({"skill_key": _T_SINGLE.key, "bogus": 1})
+        with self.assertRaises(Exception):
+            validate_cast_payload(
+                {"skill_key": _T_SINGLE.key, "target_shorthand": "all"}
+            )
 
     def test_flee_and_forfeit_exact_payloads(self):
         self.assertEqual(validate_flee_payload({}), {})
@@ -102,18 +181,20 @@ class CastPayloadValidationTests(unittest.TestCase):
     @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
     def test_member_scale_is_accepted_on_every_target_form(self):
         validated = validate_cast_payload(
-            {"skill_key": "wind_blade", "target_ids": [3, 4], "scale": 2.0}
+            {"skill_key": _T_AREA.key, "target_ids": [3, 4], "scale": _T_SCALE}
         )
-        self.assertEqual(validated["scale"], 2.0)
+        self.assertEqual(validated["scale"], _T_SCALE)
         validated = validate_cast_payload(
-            {"skill_key": "wind_blade", "target_shorthand": "all-enemies", "scale": 0.5}
+            {
+                "skill_key": _T_AREA.key,
+                "target_shorthand": "all-enemies",
+                "scale": 0.5,
+            }
         )
         self.assertEqual(validated["scale"], 0.5)
-        validated = validate_cast_payload({"skill_key": "concentration", "scale": 4.0})
+        validated = validate_cast_payload({"skill_key": _T_SELF.key, "scale": 4.0})
         self.assertEqual(validated["scale"], 4.0)
-        validated = validate_cast_payload(
-            {"skill_key": "hardened_skin", "scale": 1.0}
-        )
+        validated = validate_cast_payload({"skill_key": _T_SELF.key, "scale": 1.0})
         self.assertEqual(validated["scale"], 1.0)
 
     @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
@@ -123,7 +204,7 @@ class CastPayloadValidationTests(unittest.TestCase):
                 with self.assertRaises(Exception):
                     validate_cast_payload(
                         {
-                            "skill_key": "wind_blade",
+                            "skill_key": _T_AREA.key,
                             "target_ids": [3],
                             "scale": bad_scale,
                         }
@@ -132,18 +213,21 @@ class CastPayloadValidationTests(unittest.TestCase):
     @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
     def test_absent_scale_defaults_to_one(self):
         validated = validate_cast_payload(
-            {"skill_key": "wind_blade", "target_shorthand": "all-enemies"}
+            {"skill_key": _T_AREA.key, "target_shorthand": "all-enemies"}
         )
         self.assertEqual(validated["scale"], 1.0)
 
 
 class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
+        # Round paths resolve the forced innate keys and this file's cast rows
+        # through the scoped skill registry.
+        open_synthetic_scope(self, "skills", extra=_SCOPE_EXTRA)
         super().setUp()
         self.room = create_object(Room, key="adapter arena")
         self.player = _player()
         self.player.location = self.room
-        grant_lineage(self.player, ["fire_ball"])
+        grant_lineage(self.player, [_T_SINGLE.key])
         self.monster = _monster()
         self.monster.location = self.room
 
@@ -152,7 +236,7 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         result = _cast_adapter(
             self.player,
             validate_cast_payload(
-                {"skill_key": "fire_ball", "target_ids": [self.monster.pk]}
+                {"skill_key": _T_SINGLE.key, "target_ids": [self.monster.pk]}
             ),
         )
         self.assertEqual(result["outcome"], "rejected")
@@ -167,7 +251,7 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         result = _cast_adapter(
             self.player,
             validate_cast_payload(
-                {"skill_key": "fire_ball", "target_ids": [other.pk]}
+                {"skill_key": _T_SINGLE.key, "target_ids": [other.pk]}
             ),
         )
         self.assertEqual(result["outcome"], "rejected")
@@ -184,7 +268,7 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             result = _cast_adapter(
                 self.player,
                 validate_cast_payload(
-                    {"skill_key": "fire_ball", "target_ids": [self.monster.pk]}
+                    {"skill_key": _T_SINGLE.key, "target_ids": [self.monster.pk]}
                 ),
             )
         self.assertIn(result["outcome"], ("success", "rejected"))
@@ -253,14 +337,14 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
     def test_area_shorthand_adapter_path(self):
         engage(self.player, self.monster)
-        self.player.db.skills = {"active": ["wind_blade"], "passive": []}
+        self.player.db.skills = {"active": [_T_AREA.key], "passive": []}
         from unittest.mock import patch
 
         with patch("world.rules.combat.roll_d100", return_value=100):
             result = _cast_adapter(
                 self.player,
                 validate_cast_payload(
-                    {"skill_key": "wind_blade", "target_shorthand": "all-enemies"}
+                    {"skill_key": _T_AREA.key, "target_shorthand": "all-enemies"}
                 ),
             )
         self.assertIn(result["outcome"], ("success", "rejected"))
@@ -270,7 +354,10 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     def test_scaled_cast_adapter_path_deducts_scaled_mp(self):
         engage(self.player, self.monster)
         grant_lineage(
-            self.player, ["wind_blade"], ["wind_mastery"], rungs={"wind_blade": 6}
+            self.player,
+            [_T_AREA.key],
+            [_mastery_key()],
+            rungs={_T_AREA.key: _T_SCALE_LEVEL},
         )
         self.player.traits.mp.base = 500
         self.player.traits.mp.current = 500
@@ -279,6 +366,7 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.monster.traits.hp.base = 500
         self.monster.traits.hp.current = 500
         mp_before = self.player.traits.mp.value
+        expected_cost = scaled_mp_cost(int(_T_AREA.cost["mp"]), _T_SCALE)
         from unittest.mock import patch
 
         with patch("world.rules.combat.roll_d100", return_value=100):
@@ -286,27 +374,27 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
                 self.player,
                 validate_cast_payload(
                     {
-                        "skill_key": "wind_blade",
+                        "skill_key": _T_AREA.key,
                         "target_ids": [self.monster.pk],
-                        "scale": 2.0,
+                        "scale": _T_SCALE,
                     }
                 ),
             )
         self.assertIn(result["outcome"], ("success", "rejected"))
-        self.assertEqual(self.player.traits.mp.value, mp_before - 28)
+        self.assertEqual(self.player.traits.mp.value, mp_before - expected_cost)
         self.assertLess(self.monster.traits.hp.current, 500)
 
     @covers_requirement("webclient-action-dispatch::combat-cast-payload-carries-an-optional-bounded-scale")
     def test_scaled_cast_without_mastery_rejects_before_initiative(self):
         engage(self.player, self.monster)
-        self.player.db.skills = {"active": ["wind_blade"], "passive": []}
+        self.player.db.skills = {"active": [_T_AREA.key], "passive": []}
         result = _cast_adapter(
             self.player,
             validate_cast_payload(
                 {
-                    "skill_key": "wind_blade",
+                    "skill_key": _T_AREA.key,
                     "target_ids": [self.monster.pk],
-                    "scale": 2.0,
+                    "scale": _T_SCALE,
                 }
             ),
         )
@@ -338,7 +426,9 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.traits.mp.current = 0
         result = _cast_adapter(
             self.player,
-            validate_cast_payload({"skill_key": "fire_ball", "target_ids": [self.monster.pk]}),
+            validate_cast_payload(
+                {"skill_key": _T_SINGLE.key, "target_ids": [self.monster.pk]}
+            ),
         )
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "insufficient_resource")
