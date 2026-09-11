@@ -63,7 +63,7 @@ def _entry(kind="damage", actor="elosia", target="violet", data=None, template=N
     )
 
 
-def _log(actor="elosia", skill_key="basic_attack", targets=("violet",), entries=None):
+def _log(actor="elosia", skill_key="t_synth_slash", targets=("violet",), entries=None):
     return EventLog(
         actor=actor,
         skill_key=skill_key,
@@ -97,7 +97,7 @@ class NarratorPromptTests(unittest.TestCase):
         self.assertEqual(len(parsed["event_logs"]), 1)
         payload = parsed["event_logs"][0]
         self.assertEqual(payload["actor"], "elosia")
-        self.assertEqual(payload["skill_key"], "basic_attack")
+        self.assertEqual(payload["skill_key"], "t_synth_slash")
         self.assertEqual(payload["targets"], ["violet"])
         self.assertEqual(payload["time_cost_seconds"], 5)
         self.assertEqual(payload["entries"][0]["kind"], "damage")
@@ -220,7 +220,7 @@ class NarrateEntryPointTests(unittest.TestCase):
     @covers_requirement("narrator::narrator-maps-eventlogs-to-traditional-chinese-prose-through-the-guarded-pipeline")
     def test_multiple_event_logs_narrate_as_one_coherent_passage(self):
         first = _log(actor="elosia")
-        second = _log(actor="violet", skill_key="basic_attack", targets=("elosia",))
+        second = _log(actor="violet", skill_key="t_synth_slash", targets=("elosia",))
         client = FakeLLMClient()
         client.add_response(lambda d: True, "兩段紀錄合而為一。")
         with override_settings(LLM_PROFILES=_raw()):
@@ -274,7 +274,7 @@ class NarrateEntryPointTests(unittest.TestCase):
         entries = [_entry() for _ in range(MAX_ENTRIES + 1)]
         log = EventLog(
             actor="elosia",
-            skill_key="basic_attack",
+            skill_key="t_synth_slash",
             targets=("violet",),
             entries=tuple(entries),
             time_cost_seconds=5,

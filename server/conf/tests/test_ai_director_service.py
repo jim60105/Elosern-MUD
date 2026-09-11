@@ -16,6 +16,10 @@ from django.test import override_settings
 
 from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles
+from world.ai.tests._director_helpers import (
+    _instance_template_context,
+    _template_context,
+)
 from world.quests.compile import (
     SCENE_REQUIREMENT_REGISTRY,
     compile_quest_blueprint,
@@ -59,15 +63,11 @@ def _install_scenario_director():
     scenario_director.register_scenario_director()
 
 
-def _context(**overrides):
-    context = {
-        "requested_type": "討伐",
-        "allowed_rank": "F",
-        "issuer_branch": "guild_branch_altoria",
-        "anchor": "capital_altoria",
-    }
-    context.update(overrides)
-    return context
+# Every request here is exercised against the hand-written template pool
+# (the fixture payload is ``QUEST_TEMPLATE_POOL[0]``, and the degrade paths
+# draw from the same pool), so the context is derived FROM the pool at
+# runtime — no shipped identifier is named in this file.
+_context = _template_context
 
 
 def await_result(d):
@@ -139,7 +139,11 @@ class AiDirectorServiceTests(AiDirectorServiceIsolation, unittest.TestCase):
                 ),
             ),
         ):
-            compiled = await_result(request_generated_quest(context=_context()))
+            # The context is derived FROM the pool's instance-layer entry, so
+            # the only fitting draw is the bound-target instance template.
+            compiled = await_result(
+                request_generated_quest(context=_instance_template_context())
+            )
         self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
         self.assertTrue(
             compiled.definition.stages[0].objective.requires_bound_targets,
@@ -152,7 +156,7 @@ class AiDirectorServiceTests(AiDirectorServiceIsolation, unittest.TestCase):
         disabled = _raw(scenario_director={"enabled": False})
         with override_settings(LLM_PROFILES=disabled):
             d = request_generated_quest(
-                context=_context(requested_type="緊急", issuer_branch="guild_branch_altoria")
+                context=_context(requested_type="緊急")
             )
             failure = await_result(d)
         self.assertTrue(failure.check(NoSuitableTemplateError))
@@ -164,7 +168,7 @@ class AiDirectorServiceTests(AiDirectorServiceIsolation, unittest.TestCase):
         disabled = _raw(scenario_director={"enabled": False})
         with override_settings(LLM_PROFILES=disabled):
             d = request_generated_quest(
-                context=_context(requested_type="護衛", issuer_branch="guild_branch_altoria")
+                context=_context(requested_type="護衛")
             )
             failure = await_result(d)
         self.assertTrue(failure.check(EscortUnavailableError))
@@ -174,7 +178,7 @@ class AiDirectorServiceTests(AiDirectorServiceIsolation, unittest.TestCase):
     def test_escort_request_refuses_before_any_transport_work(self):
         client = FakeLLMClient()
         d = request_generated_quest(
-            client, context=_context(requested_type="護衛", issuer_branch="guild_branch_altoria")
+            client, context=_context(requested_type="護衛")
         )
         failure = await_result(d)
         self.assertTrue(failure.check(EscortUnavailableError))

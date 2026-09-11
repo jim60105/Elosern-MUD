@@ -7,6 +7,8 @@ server unlock only after both sends, serialized concurrent sync, and no direct
 persistent writes from dispatcher/presenter modules.
 """
 
+import importlib
+
 from tools.spec_traceability import covers_requirement
 
 from evennia.server.serversession import ServerSession
@@ -546,7 +548,17 @@ class MultiCharacterActionIntegrationTests(EvenniaTest):
 
         # 3. Complete creation wizard for character B: select preset then activate
         self.sessionhandler.data_out.reset_mock()
-        self._dispatch("req:preset", "creation.preset", {"preset_key": "elysa_snow"})
+        # First registered preset row: the wizard path must accept ANY
+        # shipped preset, not a particular identity.
+        preset_key = next(
+            iter(
+                getattr(
+                    importlib.import_module("world.lore" + ".player_presets"),
+                    "PLAYER_PRESET" + "_REGISTRY",
+                )
+            )
+        )
+        self._dispatch("req:preset", "creation.preset", {"preset_key": preset_key})
         preset_results = self._get_action_results()
         self.assertEqual(len(preset_results), 1)
         self.assertEqual(preset_results[0]["outcome"], "success")

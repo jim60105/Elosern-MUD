@@ -60,14 +60,17 @@ def await_result(d):
 
 
 PLAYER = "艾洛希雅"
-FIXED = frozenset({"F級冒險者", "受矚者"})
+# The fixed/collection displays are fixture content: the collision filter
+# compares candidates against whatever displays the context feeds it, so the
+# suite names invented prose instead of shipped title text.
+FIXED = frozenset({"苔徑守誓者", "受矚者"})
 OWNED = frozenset({"南門新客"})
 
 
 def _context(**overrides):
     base = {
         "player_name": PLAYER,
-        "full_title": "F級冒險者　南門新客",
+        "full_title": "苔徑守誓者　南門新客",
         "declined": (),
         "owned_epithet_displays": OWNED,
         "fixed_displays": FIXED,
@@ -131,7 +134,7 @@ class FilterMatrixTests(unittest.TestCase):
     @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_form_gate_rejects_bad_shape(self):
         for bad in (
-            "火",                   # too short
+            "燼",                   # too short
             "一二三四五六七八九",   # 9 characters
             "火 心",                # whitespace
             "火　心",               # full-width space
@@ -152,7 +155,7 @@ class FilterMatrixTests(unittest.TestCase):
 
     @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_fixed_registry_collision_rejected(self):
-        survivors = self._filter([_candidate(1, "F級冒險者"), _candidate(2, "新月")])
+        survivors = self._filter([_candidate(1, "苔徑守誓者"), _candidate(2, "新月")])
         self.assertEqual([c.display for c in survivors], ["新月"])
 
     @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
@@ -200,8 +203,8 @@ class FilterMatrixTests(unittest.TestCase):
             [
                 _candidate(1),
                 _candidate(2),
-                _candidate(3, "F級冒險者"),
-                _candidate(4, "火"),
+                _candidate(3, "苔徑守誓者"),
+                _candidate(4, "燼"),
             ]
         )
         self.assertEqual(len(two), 2)
@@ -311,7 +314,7 @@ class SchemaBoundaryTests(unittest.TestCase):
     def test_display_over_wire_bound_voids_round(self):
         text = _reply(
             [
-                _candidate(1, "火" * (DISPLAY_WIRE_MAX_CHARS + 1)),
+                _candidate(1, "燼" * (DISPLAY_WIRE_MAX_CHARS + 1)),
                 _candidate(2),
                 _candidate(3),
                 _candidate(4),
@@ -445,7 +448,7 @@ class EventSummaryTests(unittest.TestCase):
             )
         return SimpleNamespace(
             actor="elosia",
-            skill_key="basic_attack",
+            skill_key="t_synth_slash",
             targets=("monster",),
             entries=entries,
         )

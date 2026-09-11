@@ -393,7 +393,9 @@ class ValidatorRetryTests(unittest.TestCase):
         client = FakeLLMClient()
         client.add_response(
             lambda d: len(d.messages) == 2,
-            _reply_text(intent={"kind": "give_item", "item_key": "healing_potion"}),
+            # The rejection is shape-based (missing qty), so the key itself is
+            # arbitrary: a synthetic key carries the case without naming data.
+            _reply_text(intent={"kind": "give_item", "item_key": "t_shape_probe_item"}),
         )
         client.add_response(
             lambda d: len(d.messages) == 3, _reply_text()

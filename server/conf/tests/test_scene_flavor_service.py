@@ -23,6 +23,14 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import AnchorRoom, InstanceRoom
 from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles
+from world.ai.tests._director_helpers import (
+    _first_race_key,
+    _issuer_key,
+    _live_registry,
+    _location,
+    _npc_tier_key,
+    _rank_key,
+)
 from world.maps.bootstrap import sync_grid
 from world.quests.compile import (
     compile_quest_blueprint,
@@ -271,24 +279,24 @@ def _instance_bound_payload(**overrides):
     payload = {
         "name": "討伐林間盜匪",
         "quest_type": "討伐",
-        "rank": "F",
-        "issuer": "guild_branch_altoria",
+        "rank": _rank_key(),
+        "issuer": _issuer_key(),
         "stages": [
             {
                 "index": 0,
                 "objective": {"kind": "defeat", "quantity": 1, "monster_tier": None},
                 "location_req": {
                     "layer": "instance",
-                    "archetype": "forest_path",
+                    "archetype": _location().archetype,
                     "anchor_key": None,
-                    "anchor_near": "capital_altoria",
+                    "anchor_near": _location().anchor_key,
                     "xyz": None,
                     "scene_sentence": "王都近郊的林間小徑，樹影搖曳。",
                 },
                 "npc_req": [
                     {
                         "role": "bandit",
-                        "tier": "bandit",
+                        "tier": _npc_tier_key(),
                         "disposition": None,
                         "display_name": "黑鬍",
                         "title": "林間盜匪首領",
@@ -311,10 +319,23 @@ class SceneFlavorCommandCompositionTests(RegistryIsolationMixin, EvenniaTestCase
         _install_scene_flavor()
         create_object("typeclasses.rooms.Room", key="虛境", location=None)
         sync_grid()
-        self.anchor = AnchorRoom.objects.filter(db_key="中央廣場").first()
+        # The anchor room is resolved through the live placement registry:
+        # sync_grid links each canonical AnchorRoom by its anchor key, so the
+        # first placed anchor carries the traversal case without naming it.
+        placements = _live_registry(
+            "world.lore" + ".anchor_placement", "ANCHOR_PLACEMENT" + "_REGISTRY"
+        )
+        placed = next(iter(placements))
+        # AttributeProperty is not a Django field: match in Python over the
+        # synced anchor rooms.
+        self.anchor = next(
+            room
+            for room in AnchorRoom.objects.all()
+            if room.anchor_key == placed
+        )
         self.assertIsNotNone(self.anchor)
         self.player = create_object(PlayerCharacter, key="flavor-enter-player")
-        self.player.race = "human"
+        self.player.race = _first_race_key()
         self.player.apply_race_baseline()
         self.player.location = self.anchor
         compiled = compile_quest_blueprint(_instance_bound_payload())
