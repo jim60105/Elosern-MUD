@@ -6,6 +6,7 @@ from tools.spec_traceability import covers_requirement
 import unittest
 
 from world.lore.elements import ELEMENT_REGISTRY
+from world.imports.schema import CHARACTER_SCHEMA_V1
 
 
 class ElementRegistryTests(unittest.TestCase):
@@ -18,5 +19,16 @@ class ElementRegistryTests(unittest.TestCase):
         )
         self.assertEqual(
             {element.key for element in ELEMENT_REGISTRY.values()},
+            set(ELEMENT_REGISTRY),
+        )
+
+    def test_import_affinity_enum_mirrors_the_element_vocabulary(self):
+        # Data-contract half (migrated off the behavior-suite gate): the
+        # character schema's affinity enum must list EXACTLY the shipped
+        # element keys — a content claim about shipped data, so it lives
+        # here, not in the mechanics-only import-schema tests.
+        affinity = CHARACTER_SCHEMA_V1["properties"]["affinity_elements"]
+        self.assertEqual(
+            set(affinity["items"]["enum"]),
             set(ELEMENT_REGISTRY),
         )

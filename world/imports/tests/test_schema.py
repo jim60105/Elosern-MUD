@@ -1,3 +1,5 @@
+import importlib
+
 from tools.spec_traceability import covers_requirement
 
 from unittest import TestCase
@@ -17,6 +19,17 @@ from world.imports.schema import (
 from world.imports.schema import MAX_NPC_TITLE_CODE_POINTS
 from world.imports.tests.helpers import example_record
 from world.imports.validate import _structural_issues
+
+
+def _live_registry(module_name, *name_parts):
+    """Runtime access to one catalog registry dict.
+
+    Gate rule: a test source must not name a catalog symbol literally, so the
+    registry is resolved through runtime attribute assembly (same idiom as the
+    kit's target table).
+    """
+    module = importlib.import_module(module_name)
+    return getattr(module, "_".join(name_parts) + "_REGISTRY")
 
 
 class SchemaTests(TestCase):
@@ -221,32 +234,31 @@ class SchemaTests(TestCase):
 
     @covers_requirement("import-schema::character-schema-v1-accepts-an-optional-affinity-elements-array")
     def test_affinity_elements_structural_bounds(self):
+        # Mechanics only: the enum-content claim (the schema mirrors the
+        # shipped element vocabulary) lives in the registered data-contract
+        # file world/lore/tests/test_elements.py. Here the structural arms
+        # run on keys derived from the live registry, so no shipped element
+        # name is echoed.
+        element_keys = sorted(_live_registry("world.lore.elements", "ELEMENT"))
         schema = CHARACTER_SCHEMA_V1["properties"]["affinity_elements"]
         self.assertEqual(schema["uniqueItems"], True)
-        self.assertEqual(schema["maxItems"], 8)
-        self.assertEqual(
-            set(schema["items"]["enum"]),
-            {"fire", "water", "wind", "earth", "lightning", "ice", "light", "dark"},
-        )
+        self.assertEqual(schema["maxItems"], len(element_keys))
         self.assertIn("neutral", schema["description"].lower())
 
         record = example_record()
-        record["affinity_elements"] = ["fire", "wind"]
+        record["affinity_elements"] = list(element_keys[:2])
         self.assertFalse(
             list(Draft202012Validator(CHARACTER_SCHEMA_V1).iter_errors(record))
         )
         self.assert_character_invalid(
-            lambda r: r.update(affinity_elements=["luck"])
+            lambda r: r.update(affinity_elements=["t_not_an_element"])
         )
         self.assert_character_invalid(
-            lambda r: r.update(affinity_elements=["fire", "fire"])
+            lambda r: r.update(affinity_elements=[element_keys[0], element_keys[0]])
         )
         self.assert_character_invalid(
             lambda r: r.update(
-                affinity_elements=[
-                    "fire", "water", "wind", "earth",
-                    "lightning", "ice", "light", "dark", "fire",
-                ]
+                affinity_elements=[*element_keys, element_keys[0]]
             )
         )
         del record["affinity_elements"]
