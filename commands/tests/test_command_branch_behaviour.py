@@ -735,9 +735,9 @@ class DeliveryCommandBranchTests(TestCase):
     def test_unknown_item_never_delegates(self):
         command = _command(CmdDeliver, "灰婆婆 不存在的物品")
         command.caller.search.return_value = [object()]
-        with patch("commands.quest_delivery.deliver_quest_item") as deliver_rule, patch(
-            "commands.quest_delivery.ITEM_REGISTRY", {}
-        ):
+        with patch(
+            "commands.quest_delivery.deliver_quest_item"
+        ) as deliver_rule, synthetic_registries("items"):
             command.func()
         command.caller.msg.assert_called_with("你沒有帶著這種物品。")
         deliver_rule.assert_not_called()

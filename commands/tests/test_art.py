@@ -821,10 +821,10 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             output_identity=f"scene/{_SCENE_KEY}.png",
             error=None,
         )
-        ensure(_scene("old_ruins"), "desc")
+        ensure(_scene(_ALT_SCENE_KEY), "desc")
         claimed = claim(10)
         settle(
-            _scene("old_ruins"),
+            _scene(_ALT_SCENE_KEY),
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.FAILED,
             output_identity=None,
