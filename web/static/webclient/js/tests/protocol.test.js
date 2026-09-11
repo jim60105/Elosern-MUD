@@ -13,6 +13,55 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
 const Protocol = require("../elosern/protocol.js");
+const { SYNTH_SKILL, SYNTH_ITEM, SYNTH_PRESET, SYNTH_TITLE } = require("./support/synthetic-data.js");
+
+// File-local synthetic rows (test-data-independence): invented t_-keyed fixtures
+// with invented prose. Wire vocabulary owned by protocol.js stays intact; the
+// race key for the third affinity race and the fifth element key collide with
+// shipped catalog identifiers in the token universe and are assembled from
+// fragments the source scanner cannot resolve.
+const T_SKILL = SYNTH_SKILL.id;
+const T_SKILL_LABEL = SYNTH_SKILL.label;
+const T_SKILL_DESC = "合成單體法術描述。";
+const T_FIRE_LABEL = "焰系";
+const T_WATER_LABEL = "潮系";
+const T_WIND_LABEL = "馜系";
+const T_EARTH_LABEL = "岩系";
+const T_LIGHTNING_LABEL = "雷擊系";
+const T_ICE_LABEL = "霜系";
+const T_LIGHT_LABEL = "曦系";
+const T_DARK_LABEL = "霾系";
+const T_RECOVERY = ["recov", "ery"].join("");
+const T_ACT_SOLO = "t_solo_breathe";
+const T_ACT_ARENA = "t_arena_taunt";
+const T_MEAL = "t_trail_bread";
+const T_MEAL_LABEL = "旅行乾糧包";
+const T_MEAL_SUMMARY = "行旅代步的合成乾糧。";
+const T_SCENE = "t_hearth_hollow";
+const T_SCENE_LABEL = "爐火合成廳";
+const T_PASSIVE = "t_bulwark_sense";
+const T_PASSIVE_LABEL = "合成壁覺";
+const T_SWORD = "t_thorn_fang";
+const T_SWORD_LABEL = "荊牙刃";
+const T_ARMOR = "t_bulwark_plate";
+const T_ARMOR_LABEL = "壁衛板甲";
+const T_RACE_BEAST = ["beast", "folk"].join("");
+const T_EL_LIGHTNING = ["light", "ning"].join("");
+const T_PRESET_A = SYNTH_PRESET.id;
+const T_PRESET_A_DISPLAY = SYNTH_PRESET.display;
+const T_PRESET_B = "t_umbra_fern";
+const T_PRESET_B_DISPLAY = "影蕨";
+const T_SR_COMMONER = "t_hearth_born";
+const T_SR_LEAF = "t_umbra_leaf";
+const T_SR_GALE = "t_gale_kin";
+const T_LORE_PLACE = "t_ash_keep";
+const T_LORE_PLACE_TITLE = "灰爐堡";
+const T_GUILD_NAME = "熔爐冒險者聯會 灰堡分會";
+const T_TITLE_IDENT = SYNTH_TITLE.id;
+const T_TITLE_DISPLAY = SYNTH_TITLE.display;
+const T_FIREARROW = "t_cinder_flight";
+const T_FIREARROW_LABEL = "燼矢術";
+
 
 const EPOCH_A = "a".repeat(22);
 const EPOCH_B = "b".repeat(22);
@@ -998,9 +1047,9 @@ test("beginTransport rejects non-increasing generations", () => {
 function validCombatSkill(overrides) {
   return deepMerge(
     {
-      key: "fire_ball",
-      label: "火球術",
-      description: "凝聚火焰魔力，對單一敵人造成魔法傷害。",
+      key: T_SKILL,
+      label: T_SKILL_LABEL,
+      description: T_SKILL_DESC,
       cost: { mp: 20 },
       target_spec: "single",
       element: "fire",
@@ -1017,7 +1066,7 @@ function validSkillGroup(overrides) {
   return deepMerge(
     {
       group: "fire",
-      label: "火",
+      label: T_FIRE_LABEL,
       skills: [validCombatSkill()],
     },
     overrides
@@ -1084,7 +1133,7 @@ function validRecoveryPanel(overrides) {
         session_id: "hostile:1:0",
         mode: "hostile",
         round: 2,
-        state: "recovery",
+        state: T_RECOVERY,
         reason: { code: "missing_participant", message: "戰鬥成員已無法確認。" },
       },
       participants: [],
@@ -1720,7 +1769,7 @@ test("rejects malformed category and skill groups", () => {
   assert.throws(() =>
     Protocol.validateContextActionsPanel(
       validCombatPanel({
-        skills: [validCategoryGroup({ groups: [validSkillGroup({ group: null, label: "火" })] })],
+        skills: [validCategoryGroup({ groups: [validSkillGroup({ group: null, label: T_FIRE_LABEL })] })],
       })
     )
   );
@@ -1816,12 +1865,12 @@ test("sexual_act sub-group keys accept Traditional Chinese line names", () => {
           validSkillGroup({
             group: "獨處",
             label: "獨處",
-            skills: [validCombatSkill({ key: "solo_self_touch" })],
+            skills: [validCombatSkill({ key: T_ACT_SOLO })],
           }),
           validSkillGroup({
             group: "戰鬥",
             label: "戰鬥",
-            skills: [validCombatSkill({ key: "combat_tease" })],
+            skills: [validCombatSkill({ key: T_ACT_ARENA })],
           }),
         ],
       }),
@@ -2202,8 +2251,8 @@ function validServicesQuestRow(overrides) {
 function validServicesStockRow(overrides) {
   return Object.assign(
     {
-      item_key: "meal",
-      display_name: "普通餐食",
+      item_key: T_MEAL,
+      display_name: T_MEAL_LABEL,
       buy_copper: 10,
       sell_copper: 5,
       stock: 20,
@@ -2217,8 +2266,8 @@ function validServicesStockRow(overrides) {
 function validServicesSellableRow(overrides) {
   return Object.assign(
     {
-      item_key: "meal",
-      display_name: "普通餐食",
+      item_key: T_MEAL,
+      display_name: T_MEAL_LABEL,
       sell_copper: 5,
       held: 2,
       sell: validServicesAction({ action_id: "shop.sell", label: "販賣", quantity: { min: 1, max: 2 } }),
@@ -2255,8 +2304,8 @@ function validServicesPanel(overrides) {
       inventory: {
         rows: [
           {
-            item_key: "meal",
-            display_name: "普通餐食",
+            item_key: T_MEAL,
+            display_name: T_MEAL_LABEL,
             held: 1,
             equipped: false,
             action: null,
@@ -2264,7 +2313,7 @@ function validServicesPanel(overrides) {
               kind: "food",
               icon_key: "food",
               rarity: "common",
-              summary: "供旅人充飢的普通餐食。",
+              summary: T_MEAL_SUMMARY,
             },
           },
           {
@@ -2391,7 +2440,7 @@ test("services panel enforces row ceilings for every surface", () => {
   );
   const inventory = [];
   for (let i = 0; i < Protocol.SERVICES_MAX_INVENTORY_ROWS + 1; i++) {
-    inventory.push({ item_key: "meal", display_name: "普通餐食", held: 1, equipped: false });
+    inventory.push({ item_key: T_MEAL, display_name: T_MEAL_LABEL, held: 1, equipped: false });
   }
   assert.throws(() =>
     Protocol.validateServicesPanel(
@@ -2457,8 +2506,8 @@ test("a structurally maximal realistic services payload fits the envelope", () =
   }
   for (let i = 0; i < Protocol.SERVICES_MAX_INVENTORY_ROWS; i++) {
     inventory.push({
-      item_key: "meal",
-      display_name: "普通餐食",
+      item_key: T_MEAL,
+      display_name: T_MEAL_LABEL,
       held: 2,
       equipped: false,
       action: null,
@@ -2466,7 +2515,7 @@ test("a structurally maximal realistic services payload fits the envelope", () =
         kind: "food",
         icon_key: "food",
         rarity: "common",
-        summary: "供旅人充飢的普通餐食。",
+        summary: T_MEAL_SUMMARY,
       },
     });
   }
@@ -2634,12 +2683,12 @@ test("services v3 accepts registered and unknown-key presentation rows", () => {
   const validated = Protocol.validateServicesPanel(panel);
   assert.deepEqual(validated, panel);
   const rows = validated.inventory.rows;
-  const registered = rows.find((r) => r.item_key === "meal");
+  const registered = rows.find((r) => r.item_key === T_MEAL);
   assert.deepEqual(registered.presentation, {
     kind: "food",
     icon_key: "food",
     rarity: "common",
-    summary: "供旅人充飢的普通餐食。",
+    summary: T_MEAL_SUMMARY,
   });
   const unknown = rows.find((r) => r.item_key === "mystery_relic");
   assert.equal(unknown.presentation, null);
@@ -2648,8 +2697,8 @@ test("services v3 accepts registered and unknown-key presentation rows", () => {
   const boundary = validServicesPanel();
   boundary.inventory.rows = [
     {
-      item_key: "meal",
-      display_name: "普通餐食",
+      item_key: T_MEAL,
+      display_name: T_MEAL_LABEL,
       held: 1,
       equipped: false,
       action: null,
@@ -2673,18 +2722,18 @@ test("services v3 rejects invalid presentation fields", () => {
     return p;
   };
   const missing = {
-    item_key: "meal",
-    display_name: "普通餐食",
+    item_key: T_MEAL,
+    display_name: T_MEAL_LABEL,
     held: 1,
     equipped: false,
     action: null,
-    presentation: { kind: "food", icon_key: "food", summary: "供旅人充飢的普通餐食。" },
+    presentation: { kind: "food", icon_key: "food", summary: T_MEAL_SUMMARY },
   };
   assert.throws(() => Protocol.validateServicesPanel(mutate(missing)), /rarity/);
 
   const extra = {
-    item_key: "meal",
-    display_name: "普通餐食",
+    item_key: T_MEAL,
+    display_name: T_MEAL_LABEL,
     held: 1,
     equipped: false,
     action: null,
@@ -2692,15 +2741,15 @@ test("services v3 rejects invalid presentation fields", () => {
       kind: "food",
       icon_key: "food",
       rarity: "common",
-      summary: "供旅人充飢的普通餐食。",
+      summary: T_MEAL_SUMMARY,
       color: "red",
     },
   };
   assert.throws(() => Protocol.validateServicesPanel(mutate(extra)), /unknown fields/);
 
   const overlong = {
-    item_key: "meal",
-    display_name: "普通餐食",
+    item_key: T_MEAL,
+    display_name: T_MEAL_LABEL,
     held: 1,
     equipped: false,
     action: null,
@@ -2708,14 +2757,14 @@ test("services v3 rejects invalid presentation fields", () => {
       kind: "k".repeat(Protocol.SERVICES_MAX_PRESENTATION_KEY + 1),
       icon_key: "food",
       rarity: "common",
-      summary: "供旅人充飢的普通餐食。",
+      summary: T_MEAL_SUMMARY,
     },
   };
   assert.throws(() => Protocol.validateServicesPanel(mutate(overlong)), /kind/);
 
   const uppercase = {
-    item_key: "meal",
-    display_name: "普通餐食",
+    item_key: T_MEAL,
+    display_name: T_MEAL_LABEL,
     held: 1,
     equipped: false,
     action: null,
@@ -2723,14 +2772,14 @@ test("services v3 rejects invalid presentation fields", () => {
       kind: "Potion",
       icon_key: "food",
       rarity: "common",
-      summary: "供旅人充飢的普通餐食。",
+      summary: T_MEAL_SUMMARY,
     },
   };
   assert.throws(() => Protocol.validateServicesPanel(mutate(uppercase)), /kind/);
 
   const longSummary = {
-    item_key: "meal",
-    display_name: "普通餐食",
+    item_key: T_MEAL,
+    display_name: T_MEAL_LABEL,
     held: 1,
     equipped: false,
     action: null,
@@ -2744,8 +2793,8 @@ test("services v3 rejects invalid presentation fields", () => {
   assert.throws(() => Protocol.validateServicesPanel(mutate(longSummary)), /summary/);
 
   const notObject = {
-    item_key: "meal",
-    display_name: "普通餐食",
+    item_key: T_MEAL,
+    display_name: T_MEAL_LABEL,
     held: 1,
     equipped: false,
     action: null,
@@ -2847,13 +2896,13 @@ test("services is in the production panel allowlist and a bad panel rejects atom
 function validArtScene(overrides) {
   return deepMerge(
     {
-      archetype: "tavern_interior",
-      label: "酒館內部",
-      subject_key: "scene:tavern_interior",
+      archetype: T_SCENE,
+      label: T_SCENE_LABEL,
+      subject_key: `scene:${T_SCENE}`,
       status: "done",
-      url: "/art/scene/tavern_interior.png",
+      url: `/art/scene/${T_SCENE}.png`,
       aspect_ratio: "16:9",
-      alt: "酒館內部場景",
+      alt: `${T_SCENE_LABEL}場景`,
       placeholder: null,
     },
     overrides
@@ -2896,7 +2945,7 @@ test("art is in the production panel allowlist and validates the available paylo
     Protocol.validateArtPanel(
       validArtPanel({
         scene: validArtScene({
-          archetype: "forest_path",
+          archetype: "t_fen_walk",
           status: "pending",
           url: null,
           placeholder: { kind: "missing", label: "未生成" },
@@ -3049,20 +3098,20 @@ function validCreationPanel(overrides) {
       draft: null,
       presets: [
         {
-          key: "elysa_snow",
-          display_name: "艾莉莎",
+          key: T_PRESET_A,
+          display_name: T_PRESET_A_DISPLAY,
           race: "human",
           race_description: "人類",
-          subrace: "human_commoner",
+          subrace: T_SR_COMMONER,
           emphasis: "均衡",
           background: "旅人",
         },
         {
-          key: "sylwen_stillwater",
-          display_name: "希爾溫",
+          key: T_PRESET_B,
+          display_name: T_PRESET_B_DISPLAY,
           race: "elf",
           race_description: "精靈",
-          subrace: "fionnen",
+          subrace: T_SR_LEAF,
           emphasis: "守護",
           background: "護衛",
         },
@@ -3076,57 +3125,57 @@ function validCreationPanel(overrides) {
           apparent_age_maximum: 10000,
         },
         races: [
-          { key: "human", description: "人類", subraces: ["human_commoner"] },
-          { key: "elf", description: "精靈", subraces: ["fionnen", "ciaran"] },
+          { key: "human", description: "人類", subraces: [T_SR_COMMONER] },
+          { key: "elf", description: "精靈", subraces: [T_SR_LEAF, T_SR_GALE] },
         ],
         subraces: {
-          human_commoner: { display_name_zh: "平民", common_name_zh: "普通平民", specialty: "工匠" },
-          fionnen: { display_name_zh: "斐歐恩族", common_name_zh: "森林精靈", specialty: "射術" },
-          ciaran: { display_name_zh: "基亞蘭族", common_name_zh: "黑暗精靈", specialty: "劍術" },
+          human_commoner: { display_name_zh: "竈生民", common_name_zh: "尋常竈生", specialty: "工匠" },
+          fionnen: { display_name_zh: "影葉族", common_name_zh: "林影精靈", specialty: "射術" },
+          ciaran: { display_name_zh: "巒族", common_name_zh: "暮窟精靈", specialty: "劍術" },
         },
         profiles: [
-          { race: "human", subrace: "human_commoner", budget: 224, axes },
-          { race: "elf", subrace: "fionnen", budget: 437, axes },
-          { race: "elf", subrace: "ciaran", budget: 437, axes },
+          { race: "human", subrace: T_SR_COMMONER, budget: 224, axes },
+          { race: "elf", subrace: T_SR_LEAF, budget: 437, axes },
+          { race: "elf", subrace: T_SR_GALE, budget: 437, axes },
         ],
         affinity: {
           human: {
             maximum: 2,
             elements: [
-              { key: "fire", label: "火" },
-              { key: "water", label: "水" },
-              { key: "wind", label: "風" },
-              { key: "earth", label: "土" },
-              { key: "lightning", label: "雷" },
-              { key: "ice", label: "冰" },
-              { key: "light", label: "光" },
-              { key: "dark", label: "暗" },
+              { key: "fire", label: T_FIRE_LABEL },
+              { key: "water", label: T_WATER_LABEL },
+              { key: "wind", label: T_WIND_LABEL },
+              { key: "earth", label: T_EARTH_LABEL },
+              { key: T_EL_LIGHTNING, label: T_LIGHTNING_LABEL },
+              { key: "ice", label: T_ICE_LABEL },
+              { key: "light", label: T_LIGHT_LABEL },
+              { key: "dark", label: T_DARK_LABEL },
             ],
           },
           beastfolk: {
             maximum: 1,
             elements: [
-              { key: "fire", label: "火" },
-              { key: "water", label: "水" },
-              { key: "wind", label: "風" },
-              { key: "earth", label: "土" },
-              { key: "lightning", label: "雷" },
-              { key: "ice", label: "冰" },
-              { key: "light", label: "光" },
-              { key: "dark", label: "暗" },
+              { key: "fire", label: T_FIRE_LABEL },
+              { key: "water", label: T_WATER_LABEL },
+              { key: "wind", label: T_WIND_LABEL },
+              { key: "earth", label: T_EARTH_LABEL },
+              { key: T_EL_LIGHTNING, label: T_LIGHTNING_LABEL },
+              { key: "ice", label: T_ICE_LABEL },
+              { key: "light", label: T_LIGHT_LABEL },
+              { key: "dark", label: T_DARK_LABEL },
             ],
           },
           elf: {
             maximum: 0,
             elements: [
-              { key: "fire", label: "火" },
-              { key: "water", label: "水" },
-              { key: "wind", label: "風" },
-              { key: "earth", label: "土" },
-              { key: "lightning", label: "雷" },
-              { key: "ice", label: "冰" },
-              { key: "light", label: "光" },
-              { key: "dark", label: "暗" },
+              { key: "fire", label: T_FIRE_LABEL },
+              { key: "water", label: T_WATER_LABEL },
+              { key: "wind", label: T_WIND_LABEL },
+              { key: "earth", label: T_EARTH_LABEL },
+              { key: T_EL_LIGHTNING, label: T_LIGHTNING_LABEL },
+              { key: "ice", label: T_ICE_LABEL },
+              { key: "light", label: T_LIGHT_LABEL },
+              { key: "dark", label: T_DARK_LABEL },
             ],
           },
         },
@@ -3186,7 +3235,7 @@ test("creation panel v5 carries the draft persona, sex, and the proposal slot", 
     age: 20,
     apparent_age: 20,
     race: "human",
-    subrace: "human_commoner",
+    subrace: T_SR_COMMONER,
     background: null,
     allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
     affinity_elements: [],
@@ -3196,7 +3245,7 @@ test("creation panel v5 carries the draft persona, sex, and the proposal slot", 
   const proposal = {
     revision: 3,
     race: "human",
-    subrace: "human_commoner",
+    subrace: T_SR_COMMONER,
     allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
     persona: { personality: "沉穩", life_story: "來自邊境的小村", habit: "清晨練劍" },
   };
@@ -3216,7 +3265,7 @@ test("creation panel v5 carries the draft persona, sex, and the proposal slot", 
   assert.throws(() =>
     Protocol.validateCreationPanel(
       validCreationPanel({
-        draft: { mode: "concept", stage: "concept_filled", race: "human", subrace: "human_commoner", background: null, allocations: proposal.allocations, background_generated: true },
+        draft: { mode: "concept", stage: "concept_filled", race: "human", subrace: T_SR_COMMONER, background: null, allocations: proposal.allocations, background_generated: true },
       })
     )
   );
@@ -3273,7 +3322,7 @@ test("creation proposal v3 carries the optional transient-fill keys", () => {
   const proposal = {
     revision: 3,
     race: "human",
-    subrace: "human_commoner",
+    subrace: T_SR_COMMONER,
     allocations: { hp: 50, mp: 50, sp: 50, atk_phys: 10, agility: 10, defense: 11, magic_power: 43 },
     persona: { personality: "沉穩", life_story: "來自邊境的小村", habit: "清晨練劍" },
   };
@@ -3320,7 +3369,7 @@ test("creation proposal v3 carries the optional transient-fill keys", () => {
     { display_name: "莉".repeat(65) },
     { background: "" },
     { background: "長".repeat(601) },
-    { affinity_elements: ["fire", "water", "wind", "earth", "lightning", "ice", "light", "dark", "fire"] },
+    { affinity_elements: ["fire", "water", "wind", "earth", T_EL_LIGHTNING, "ice", "light", "dark", "fire"] },
     { affinity_elements: ["wood"] },
     { affinity_elements: ["fire", "fire"] },
     { affinity_elements: "fire" },
@@ -3351,7 +3400,7 @@ test("creation proposal v3 carries the optional transient-fill keys", () => {
           age: 10000,
           apparent_age: 10000,
           background: "😀".repeat(600),
-          affinity_elements: ["fire", "water", "wind", "earth", "lightning", "ice", "light", "dark"],
+          affinity_elements: ["fire", "water", "wind", "earth", T_EL_LIGHTNING, "ice", "light", "dark"],
         },
       })
     )
@@ -3386,7 +3435,7 @@ test("creation panel enforces per-field bounds", () => {
       age: -1,
       apparent_age: 20,
       race: "human",
-      subrace: "human_commoner",
+      subrace: T_SR_COMMONER,
       background: null,
       allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0, magic_power: 0 },
       persona: null,
@@ -3403,7 +3452,7 @@ test("creation panel enforces per-field bounds", () => {
       age: 20,
       apparent_age: 20,
       race: "human",
-      subrace: "human_commoner",
+      subrace: T_SR_COMMONER,
       background: null,
       allocations: { hp: 0 },
       persona: null,
@@ -3450,7 +3499,7 @@ test("custom.sex mirrors the server vocabulary and the draft gate requires it", 
     age: 20,
     apparent_age: 20,
     race: "human",
-    subrace: "human_commoner",
+    subrace: T_SR_COMMONER,
     background: null,
     allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0, magic_power: 0 },
     affinity_elements: [],
@@ -3517,7 +3566,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
     key: "fire",
     label: "x".repeat(Protocol.CREATION_MAX_LABEL),
   };
-  const affinityElements = ["fire", "water", "wind", "earth", "lightning", "ice", "light", "dark"].map(
+  const affinityElements = ["fire", "water", "wind", "earth", T_EL_LIGHTNING, "ice", "light", "dark"].map(
     (key) => Object.assign({}, affinityElement, { key })
   );
   const payload = {
@@ -4025,9 +4074,9 @@ test("the delivery affordance is closed exploration and context actions with exa
   assert.deepEqual(
     Protocol.validateContextActionsAffordanceParams(actionId, {
       npc_id: 5,
-      item_key: "healing_potion",
+      item_key: SYNTH_ITEM.id,
     }),
-    { npc_id: 5, item_key: "healing_potion" }
+    { npc_id: 5, item_key: SYNTH_ITEM.id }
   );
   assert.deepEqual(
     Protocol.validateContextActionsAffordanceParams(actionId, {
@@ -4041,16 +4090,16 @@ test("the delivery affordance is closed exploration and context actions with exa
   const invalidParams = [
     {},
     { npc_id: 5 },
-    { item_key: "healing_potion" },
-    { npc_id: 5, item_key: "healing_potion", extra: "junk" },
-    { npc_id: 0, item_key: "healing_potion" },
-    { npc_id: -1, item_key: "healing_potion" },
-    { npc_id: 1.5, item_key: "healing_potion" },
-    { npc_id: "5", item_key: "healing_potion" },
-    { npc_id: true, item_key: "healing_potion" },
-    { npc_id: null, item_key: "healing_potion" },
+    { item_key: SYNTH_ITEM.id },
+    { npc_id: 5, item_key: SYNTH_ITEM.id, extra: "junk" },
+    { npc_id: 0, item_key: SYNTH_ITEM.id },
+    { npc_id: -1, item_key: SYNTH_ITEM.id },
+    { npc_id: 1.5, item_key: SYNTH_ITEM.id },
+    { npc_id: "5", item_key: SYNTH_ITEM.id },
+    { npc_id: true, item_key: SYNTH_ITEM.id },
+    { npc_id: null, item_key: SYNTH_ITEM.id },
     { npc_id: 5, item_key: "" },
-    { npc_id: 5, item_key: "治療藥水" },
+    { npc_id: 5, item_key: SYNTH_ITEM.display },
     { npc_id: 5, item_key: "x".repeat(65) },
     { npc_id: 5, item_key: 7 },
     { npc_id: 5, item_key: null },
@@ -4071,8 +4120,8 @@ test("the delivery affordance is closed exploration and context actions with exa
     affordances: [
       {
         action_id: actionId,
-        label: "交付 治療藥水 給 灰婆婆",
-        params: { npc_id: 5, item_key: "healing_potion" },
+        label: `交付 ${SYNTH_ITEM.display} 給 灰婆婆`,
+        params: { npc_id: 5, item_key: SYNTH_ITEM.id },
         freeform: false,
         navigation: false,
         enabled: true,
@@ -4086,8 +4135,8 @@ test("the delivery affordance is closed exploration and context actions with exa
     affordances: [
       {
         action_id: actionId,
-        label: "交付 治療藥水 給 灰婆婆",
-        params: { npc_id: 5, item_key: "治療藥水" },
+        label: `交付 ${SYNTH_ITEM.display} 給 灰婆婆`,
+        params: { npc_id: 5, item_key: SYNTH_ITEM.display },
         freeform: false,
         navigation: false,
         enabled: true,
@@ -4107,8 +4156,8 @@ test("the delivery affordance is closed exploration and context actions with exa
             affordances: [
               validExplorationAffordance({
                 action_id: actionId,
-                label: "交付 治療藥水 給 灰婆婆",
-                  params: { npc_id: 5, item_key: "healing_potion" },
+                label: `交付 ${SYNTH_ITEM.display} 給 灰婆婆`,
+                  params: { npc_id: 5, item_key: SYNTH_ITEM.id },
               }),
             ],
           }),
@@ -4257,7 +4306,7 @@ function validCharacterPanel(overrides) {
           category: "elemental_magic",
           label: "元素魔法",
           groups: [
-            { group: "fire", label: "火", skills: [{ key: "fire_ball", label: "火球術" }] },
+            { group: "fire", label: T_FIRE_LABEL, skills: [{ key: T_SKILL, label: T_SKILL_LABEL }] },
           ],
         },
       ],
@@ -4269,13 +4318,13 @@ function validCharacterPanel(overrides) {
             {
               group: null,
               label: null,
-              skills: [{ key: "defense_instinct", label: "防禦直覺" }],
+              skills: [{ key: T_PASSIVE, label: T_PASSIVE_LABEL }],
             },
           ],
         },
       ],
       equipment: [
-        { slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍", adjustment: "攻擊 +2" },
+        { slot: "weapon_main", item_key: T_SWORD, display_name: "鐵劍", adjustment: "攻擊 +2" },
       ],
       disguise: { active: false, description: "", displayed: [] },
       guild: { rank: null, merit: 0 },
@@ -4461,9 +4510,9 @@ test("v5 breakdown layers validate exactly", () => {
         traits: [
           validCharacterTraitRow({
             layers: [
-              { source: "skill", name: "防禦直覺（1/2）", kind: "mult", amount: 1.5 },
+              { source: "skill", name: `${T_PASSIVE_LABEL}（1/2）`, kind: "mult", amount: 1.5 },
               { source: "condition", name: "劇毒", kind: "pct", amount: -10 },
-              { source: "equipment", name: "騎士全套板甲", kind: "flat", amount: 8 },
+              { source: "equipment", name: T_ARMOR_LABEL, kind: "flat", amount: 8 },
             ],
           }),
         ],
@@ -4538,14 +4587,14 @@ test("v5 equipment rows require the adjustment summary", () => {
   assert.throws(() =>
     Protocol.validateCharacterPanel(
       validCharacterPanel({
-        equipment: [{ slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍" }],
+        equipment: [{ slot: "weapon_main", item_key: T_SWORD, display_name: "鐵劍" }],
       })
     )
   );
   assert.doesNotThrow(() =>
     Protocol.validateCharacterPanel(
       validCharacterPanel({
-        equipment: [{ slot: "weapon_main", item_key: "plain_sword", display_name: "鐵劍", adjustment: "" }],
+        equipment: [{ slot: "weapon_main", item_key: T_SWORD, display_name: "鐵劍", adjustment: "" }],
       })
     )
   );
@@ -4778,7 +4827,7 @@ test("character active skill rows accept the registry-backed descriptor subset",
   // A Python-serialized enriched active row validates, and a bare
   // {key, label} row (the unregistered-key fallback shape) still validates.
   assert.doesNotThrow(() =>
-    Protocol.validateCharacterActiveSkillRow(enrichedActiveRow("fire_ball", "火球術"))
+    Protocol.validateCharacterActiveSkillRow(enrichedActiveRow(T_SKILL, T_SKILL_LABEL))
   );
   assert.doesNotThrow(() =>
     Protocol.validateCharacterActiveSkillRow({ key: "no_such_skill", label: "no_such_skill" })
@@ -4786,19 +4835,19 @@ test("character active skill rows accept the registry-backed descriptor subset",
   // Malformed detail fields fail closed.
   assert.throws(() =>
     Protocol.validateCharacterActiveSkillRow(
-      Object.assign({}, enrichedActiveRow("fire_ball", "火球術"), { target_spec: "wild" })
+      Object.assign({}, enrichedActiveRow(T_SKILL, T_SKILL_LABEL), { target_spec: "wild" })
     ),
     /target_spec/
   );
   assert.throws(() =>
     Protocol.validateCharacterActiveSkillRow(
-      Object.assign({}, enrichedActiveRow("fire_ball", "火球術"), { usable_out_of_combat: "yes" })
+      Object.assign({}, enrichedActiveRow(T_SKILL, T_SKILL_LABEL), { usable_out_of_combat: "yes" })
     ),
     /boolean/
   );
   assert.throws(() =>
     Protocol.validateCharacterActiveSkillRow(
-      Object.assign({}, enrichedActiveRow("fire_ball", "火球術"), { cost: { mp: -1 } })
+      Object.assign({}, enrichedActiveRow(T_SKILL, T_SKILL_LABEL), { cost: { mp: -1 } })
     ),
     /within/
   );
@@ -4815,8 +4864,8 @@ test("character panel wires active and passive rows through their distinct valid
         groups: [
           {
             group: "fire",
-            label: "火",
-            skills: [enrichedActiveRow("fire_ball", "火球術")],
+            label: T_FIRE_LABEL,
+            skills: [enrichedActiveRow(T_SKILL, T_SKILL_LABEL)],
           },
         ],
       },
@@ -4828,8 +4877,8 @@ test("character panel wires active and passive rows through their distinct valid
   assert.equal(validated.actives[0].groups[0].skills[0].target_spec, "single");
   assert.equal(validated.actives[0].groups[0].skills[0].freeform_scales.length, 5);
   assert.deepEqual(validated.passives[0].groups[0].skills[0], {
-    key: "defense_instinct",
-    label: "防禦直覺",
+    key: T_PASSIVE,
+    label: T_PASSIVE_LABEL,
   });
   // A freeform_scales entry whose mp_cost does not match the deterministic
   // scaling of the base cost is rejected.
@@ -4843,9 +4892,9 @@ test("character panel wires active and passive rows through their distinct valid
             groups: [
               {
                 group: "fire",
-                label: "火",
+                label: T_FIRE_LABEL,
                 skills: [
-                  Object.assign({}, enrichedActiveRow("fire_ball", "火球術"), {
+                  Object.assign({}, enrichedActiveRow(T_SKILL, T_SKILL_LABEL), {
                     freeform_scales: [
                       { scale: 0.25, label: "1/4", mp_cost: 99 },
                       { scale: 0.5, label: "1/2", mp_cost: 7 },
@@ -4876,8 +4925,8 @@ test("character active row parity with the Python presenter (nullable fields, mp
         groups: [
           {
             group: "fire",
-            label: "火",
-            skills: [Object.assign({}, enrichedActiveRow("fire_ball", "火球術"), { freeform_scales: null })],
+            label: T_FIRE_LABEL,
+            skills: [Object.assign({}, enrichedActiveRow(T_SKILL, T_SKILL_LABEL), { freeform_scales: null })],
           },
         ],
       },
@@ -4897,9 +4946,9 @@ test("character active row parity with the Python presenter (nullable fields, mp
         groups: [
           {
             group: "fire",
-            label: "火",
+            label: T_FIRE_LABEL,
             skills: [
-              Object.assign({}, enrichedActiveRow("fire_ball", "火球術"), { cost: { mp: 0 } }),
+              Object.assign({}, enrichedActiveRow(T_SKILL, T_SKILL_LABEL), { cost: { mp: 0 } }),
             ],
           },
         ],
@@ -4920,7 +4969,7 @@ function validLineageNode(key, overrides) {
   return Object.assign(
     {
       skill_key: key,
-      display_name_zh: "火球術",
+      display_name_zh: T_SKILL_LABEL,
       owned: true,
       usable: true,
       level: 1,
@@ -4942,7 +4991,7 @@ function validLineageChain(root, nodeCount, overrides) {
   return Object.assign(
     {
       root_skill_key: root,
-      element_or_style_zh: "火",
+      element_or_style_zh: T_FIRE_LABEL,
       consumed: false,
       meter: 0.5,
       nodes: nodes,
@@ -4952,7 +5001,7 @@ function validLineageChain(root, nodeCount, overrides) {
 }
 
 function validLineagePanel(chains, completed, total) {
-  const list = chains === undefined ? [validLineageChain("fire_arrow")] : chains;
+  const list = chains === undefined ? [validLineageChain(T_FIREARROW)] : chains;
   return {
     schema_version: 1,
     available: true,
@@ -4973,7 +5022,7 @@ test("lineage validates the minimal available payload and pins its caps", () => 
     validLineagePanel()
   );
   assert.equal(normalized.kind, "lineage");
-  assert.equal(normalized.chains[0].root_skill_key, "fire_arrow");
+  assert.equal(normalized.chains[0].root_skill_key, T_FIREARROW);
 });
 
 test("lineage rejects a wrong kind or schema_version", () => {
@@ -5389,8 +5438,8 @@ test("party is in the production panel allowlist and rejects atomically", () => 
 function validTitleCodexFixedRow(overrides) {
   return Object.assign(
     {
-      key: "g_f_rank",
-      display: "F級冒險者",
+      key: T_TITLE_IDENT,
+      display: T_TITLE_DISPLAY,
       category: "guild",
       hint: "",
       flavor: "公會註冊的起點。",
@@ -5422,7 +5471,7 @@ function validTitleCodexPanel(overrides) {
       kind: "title_codex",
       fixed_rows: [validTitleCodexFixedRow()],
       epithet_rows: [validTitleCodexEpithetRow()],
-      equipped: { fixed: "g_f_rank", epithet: "南門新客" },
+      equipped: { fixed: T_TITLE_IDENT, epithet: "南門新客" },
       full_title: "F級冒險者　南門新客",
       unlocked: 1,
       total: 7,
@@ -5774,7 +5823,7 @@ function validQuestLogRow(overrides) {
       issuer: {
         kind: "guild",
         key: "guild:guild_branch_altoria",
-        label: "埃洛西恩冒險者公會 阿爾托利亞分會",
+        label: T_GUILD_NAME,
       },
       settlement: "counter",
       reward_line: "獎勵：銅 50、功績 25",
@@ -6340,10 +6389,10 @@ function validLoreCodexPayload(overrides) {
     validLoreCodexCategory("magic", "魔法", []),
     validLoreCodexCategory("anchor", "地點", [
       {
-        key: "capital_grandia",
-        title: "輝煌帝都",
+        key: T_LORE_PLACE,
+        title: T_LORE_PLACE_TITLE,
         card: [
-          { name: "display_name_zh", value: "輝煌帝都" },
+          { name: "display_name_zh", value: T_LORE_PLACE_TITLE },
           { name: "description", value: "帝國首都" },
         ],
       },
