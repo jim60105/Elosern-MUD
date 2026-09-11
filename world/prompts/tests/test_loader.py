@@ -463,10 +463,10 @@ class RenderContractTests(PromptFixture):
     @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
     def test_render_is_byte_identical_for_identical_input(self):
         self.load()
-        first = render_prompt("art.character_description", race="貓人族", name="艾琳", age="24", style="approved visual style", appearance="", equipment="", custom="")
-        second = render_prompt("art.character_description", race="貓人族", name="艾琳", age="24", style="approved visual style", appearance="", equipment="", custom="")
+        first = render_prompt("art.character_description", race="t_ashfolk", name="艾琳", age="24", style="approved visual style", appearance="", equipment="", custom="")
+        second = render_prompt("art.character_description", race="t_ashfolk", name="艾琳", age="24", style="approved visual style", appearance="", equipment="", custom="")
         self.assertEqual(first, second)
-        self.assertEqual(first, "A 貓人族 character named 艾琳 (24) in the approved visual style.")
+        self.assertEqual(first, "A t_ashfolk character named 艾琳 (24) in the approved visual style.")
 
 
 class ArtGenerationPromptTests(PromptFixture):
