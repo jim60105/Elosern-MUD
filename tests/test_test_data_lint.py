@@ -350,14 +350,23 @@ class RepoLedgerTests(unittest.TestCase):
     def test_check_green(self):
         report = lint.check_repo(REPO)
         self.assertEqual([v.rule for v in report.violations], [])
-        self.assertGreater(report.flagged_files, 300)
+        # flagged_files shrinks with the ratchet; corpus soundness is owned by
+        # the scan volume, registration by violations == [] above.
+        self.assertGreater(report.flagged_files, 0)
         self.assertGreater(report.scanned_files, 500)
 
     def test_seed_subcommand_matches_committed_ledger(self):
         committed = json.loads((REPO / lint.LEDGER_PATH).read_text(encoding="utf-8"))
         seed = json.loads((REPO / lint.SEED_PATH).read_text(encoding="utf-8"))
-        # the ledger's frozen fields must equal the seed classification it was seeded from
-        self.assertEqual(sorted(committed["contract"], key=lambda c: c["path"]), sorted(seed["contract"], key=lambda c: c["path"]))
+        # seed contract entries survive verbatim; legal atomic debt->contract
+        # conversions (seeded debt paths only) may add further contract entries
+        seed_contract = {c["path"]: c["reason"] for c in seed["contract"]}
+        committed_contract = {c["path"]: c["reason"] for c in committed["contract"]}
+        for path, reason in seed_contract.items():
+            self.assertEqual(committed_contract.get(path), reason)
+        seed_debt = set(seed["seedDebtPaths"])
+        for path in set(committed_contract) - set(seed_contract):
+            self.assertIn(path, seed_debt)
         self.assertEqual(committed["seedDebtPaths"], sorted(seed["seedDebtPaths"]))
         self.assertTrue(set(committed["debt"]) <= set(committed["seedDebtPaths"]))
 
