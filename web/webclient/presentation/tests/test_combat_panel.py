@@ -1657,23 +1657,44 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         from web.webclient.presentation.affordances import exploration_affordances
 
         # The combat fixture monster leaves the room so the vocabulary reaches
-        # the shared caps: 30 generative hosts with a full authored keyword
-        # list (the kit dialogue row's 6 responses + freeform + invite = 8 per
-        # target), the guild and
-        # shop hosts (6 keywords + one navigation entry each), 12 exits,
-        # 32 look objects, and the 2-entry safe baseline: 30*8 + 7 + 7 +
-        # 12 + 32 + 2 = 300 entries.
+        # the shared caps: generative hosts capped at MAX_INTERACT_TARGETS
+        # minus the two surface hosts, each emitting min(MAX_AFFORDANCES,
+        # authored responses + freeform + invite) entries; the guild and shop
+        # hosts (min(MAX_AFFORDANCES, keyword pool) + one navigation entry
+        # each); one entry per exit; one per look object; plus the safe-room
+        # baseline. Every expectation is DERIVED from the production caps and
+        # the fixture's own declared inputs (tier S: no vocabulary-size pin).
         # The scripted keyword pool renders from the live dialogue table:
         # build the room on the kit-authored dialogue row and branch.
+        from web.webclient.presentation.affordances import (
+            MAX_AFFORDANCES,
+            MAX_INTERACT_TARGETS,
+            MAX_LOOK_OBJECTS,
+            MAX_SCRIPTED_KEYWORDS,
+        )
+
         open_synthetic_scope(
             self,
             "dialogue",
             "guild_branches",
             extra={"dialogue": {T_DIALOGUE_KEY: _T_DIALOGUE_ROW}},
         )
-        self.assertEqual(len(_T_DIALOGUE_ROW.responses), 6)
+        t_responses = min(len(_T_DIALOGUE_ROW.responses), MAX_SCRIPTED_KEYWORDS)
+        t_generative_hosts = MAX_INTERACT_TARGETS - 2
+        t_host_entries = min(MAX_AFFORDANCES, t_responses + 2)
+        t_surface_entries = min(MAX_AFFORDANCES, t_responses) + 1
+        t_exit_entries = 12
+        t_look_entries = MAX_LOOK_OBJECTS
+        t_baseline_entries = 2
+        expected_vocabulary = (
+            t_generative_hosts * t_host_entries
+            + 2 * t_surface_entries
+            + t_exit_entries
+            + t_look_entries
+            + t_baseline_entries
+        )
         self.monster.location = None
-        for index in range(30):
+        for index in range(t_generative_hosts):
             npc = create_object(LLMNPC, key=f"話者{index}", location=self.room)
             npc.components.add(
                 ScriptedDialogue.create(npc, dialogue_key=T_DIALOGUE_KEY)
@@ -1698,7 +1719,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         destinations = [
             create_object(Room, key=f"目的地{index}", location=None)
-            for index in range(12)
+            for index in range(t_exit_entries)
         ]
         for index, destination in enumerate(destinations):
             create_object(
@@ -1707,10 +1728,10 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                 location=self.room,
                 destination=destination,
             )
-        for index in range(32):
+        for index in range(t_look_entries):
             create_object(DefaultObject, key=f"木箱{index}", location=self.room)
         vocabulary = exploration_affordances(self.player)
-        self.assertEqual(len(vocabulary), 300)
+        self.assertEqual(len(vocabulary), expected_vocabulary)
         self.assertLessEqual(len(vocabulary), MAX_CONTEXT_AFFORDANCES)
         # Every target slot and every navigation surface is present; only the
         # monster-bound engage code and the companion-bound leave code are

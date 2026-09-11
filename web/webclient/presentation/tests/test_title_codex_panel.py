@@ -40,7 +40,7 @@ from web.webclient.presentation.title_codex import (
 )
 from world.lore.titles import TitleCategory
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
-from world.tests.synthetic_data import make_title
+from world.tests.synthetic_data import SYNTH_TITLES, make_title
 from world.rules.title_view import (
     TITLE_MAX_BASIS_CHARS,
     TITLE_MAX_DISPLAY_CHARS,
@@ -56,11 +56,19 @@ from world.rules.titles import (
 # Distinguishes "no actor passed" from an explicit None actor.
 _UNSET = object()
 
-# File-local synthetic fixed-title row: the schema fixtures name a title
-# identity the shipped registry never carries.
+# File-local synthetic fixed-title rows: the schema fixtures name title
+# identities the shipped registry never carries.
 _T_GUILD_START = make_title(
     "t_codex_guild_start", display_name_zh="銅階新血", hint_zh="完成公會註冊即可獲得。"
 )
+_T_GATEKEEPER = make_title(
+    "t_codex_gatekeeper",
+    display_name_zh="守門之友",
+    hint_zh="與合成守門人熟識即可獲得。",
+)
+# The presenter scope's effective catalog: the kit's rows plus these extras.
+_T_VIEW_TITLES = {_T_GUILD_START.key: _T_GUILD_START, _T_GATEKEEPER.key: _T_GATEKEEPER}
+_T_VIEW_ROW_COUNT = len(SYNTH_TITLES) + len(_T_VIEW_TITLES)
 
 
 def _fixed_row(**overrides):
@@ -367,18 +375,7 @@ class TitleCodexPresenterTests(EvenniaTestCase):
         # The codex enumerates the live fixed-title registry: run the whole
         # lifecycle on a two-row synthetic catalog.
         open_synthetic_scope(
-            self,
-            "titles",
-            extra={
-                "titles": {
-                    _T_GUILD_START.key: _T_GUILD_START,
-                    "t_codex_gatekeeper": make_title(
-                        "t_codex_gatekeeper",
-                        display_name_zh="守門之友",
-                        hint_zh="與合成守門人熟識即可獲得。",
-                    ),
-                }
-            },
+            self, "titles", extra={"titles": dict(_T_VIEW_TITLES)}
         )
         self.player = create_object(PlayerCharacter, key="codex presenter")
         self.player.race = "human"
@@ -396,11 +393,11 @@ class TitleCodexPresenterTests(EvenniaTestCase):
         payload = self._render()
         self.assertTrue(payload["available"])
         # The view enumerates every row of the scoped (synthetic) registry:
-        # the kit's two catalog rows plus this file's two extras.
-        self.assertEqual(len(payload["fixed_rows"]), 4)
+        # the kit's catalog rows plus this file's extras (derived, not pinned).
+        self.assertEqual(len(payload["fixed_rows"]), _T_VIEW_ROW_COUNT)
         self.assertEqual(payload["epithet_rows"], [])
         self.assertEqual(payload["unlocked"], 0)
-        self.assertEqual(payload["total"], 4)
+        self.assertEqual(payload["total"], _T_VIEW_ROW_COUNT)
         self.assertEqual(payload["full_title"], "")
         self.assertEqual(payload["equipped"], {"fixed": None, "epithet": None})
 

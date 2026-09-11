@@ -138,7 +138,7 @@ class LoreCodexValidatorTests(unittest.TestCase):
         self.assertEqual(validated["schema_version"], 1)
         self.assertIs(validated["available"], True)
         self.assertEqual(validated["discovered_total"], 2)
-        self.assertEqual(len(validated["categories"]), 8)
+        self.assertEqual(len(validated["categories"]), len(LORE_CODEX_CATEGORIES))
         self.assertEqual(validated["categories"][0]["entries"][0]["key"], T_RACE)
 
     def test_empty_codex_payload_is_valid(self):
@@ -377,7 +377,7 @@ class LoreCodexPresenterTests(unittest.TestCase):
         payload = lore_codex_presenter(self._context(player))
         self.assertTrue(payload["available"])
         self.assertEqual(payload["discovered_total"], 0)
-        self.assertEqual(len(payload["categories"]), 8)
+        self.assertEqual(len(payload["categories"]), len(LORE_CODEX_CATEGORIES))
         for cat in payload["categories"]:
             self.assertEqual(cat["count"], 0)
             self.assertEqual(cat["entries"], [])

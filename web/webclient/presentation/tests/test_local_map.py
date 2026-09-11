@@ -31,7 +31,6 @@ from web.webclient.presentation.local_map import (
     MAX_STRING_CODE_POINTS,
     MAX_TITLE_CODE_POINTS,
     _GraphBuilder,
-    _wild_region_label as _t_wild_region_label,
     validate_local_map,
 )
 from web.webclient.presentation.protocol import (
@@ -66,6 +65,17 @@ def _t_grid_id(x: int, y: int) -> str:
 def _t_anchor_display(anchor_key: str) -> str:
     """The anchor registry's display name, probed at runtime."""
     return _live("world.lore.anchors", "ANCHOR" + "_REGISTRY")[anchor_key].display_name_zh
+
+
+def _t_region_display_for(x: int, y: int) -> str:
+    """The region display name covering one coordinate, derived independently
+    of the presenter's own labelling helper (probe + coordinate resolver)."""
+    from world.maps.wilderness_provider import region_for_coordinates
+
+    regions = _live(
+        "world.lore.wilderness_regions", "WILDERNESS" + "_REGION_REGISTRY"
+    )
+    return regions[region_for_coordinates(x, y)].display_name_zh
 
 
 def _context(actor):
@@ -780,13 +790,13 @@ class LocalMapGatewayResolutionTests(unittest.TestCase):
 
         label = _gateway_far_side_label("wilderness", (60, 103), _T_MAP_KEY)
         self.assertEqual(label, _t_anchor_display(_T_MAP_KEY))
-        self.assertNotEqual(label, _t_wild_region_label(60, 103))
+        self.assertNotEqual(label, _t_region_display_for(60, 103))
 
     def test_gateway_far_side_label_grid_names_the_far_side_region(self):
         from web.webclient.presentation.local_map import _gateway_far_side_label
 
         label = _gateway_far_side_label("grid", (60, 103), _T_MAP_KEY)
-        self.assertEqual(label, _t_wild_region_label(60, 103))
+        self.assertEqual(label, _t_region_display_for(60, 103))
 
 
 class LocalMapPresenterTests(EvenniaTestCase):
@@ -1397,7 +1407,7 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         neighbor = next(
             node for node in payload["nodes"] if node["id"] == "wild:elosern:71:103"
         )
-        self.assertEqual(neighbor["label"], _t_wild_region_label(60, 103))
+        self.assertEqual(neighbor["label"], _t_region_display_for(60, 103))
 
     @covers_requirement("webclient-local-map::visibility-states-are-current-visible-unvisited-visible-visited-and-remembered")
     def test_two_wilderness_gateways_of_one_anchor_stay_distinguishable(self):
@@ -1456,7 +1466,7 @@ class LocalMapGridGatewayTests(EvenniaTest):
         node = remembered[0]
         self.assertEqual(node["id"], _t_grid_id(2, 4))
         self.assertEqual((node["x"], node["y"]), (2, 4))
-        self.assertEqual(node["label"], _t_wild_region_label(60, 103))
+        self.assertEqual(node["label"], _t_region_display_for(60, 103))
         self.assertTrue(node["landmark"])
         self.assertFalse(node["anchor"])
         self.assertIsNone(node["action"])
@@ -1488,8 +1498,8 @@ class LocalMapGridGatewayTests(EvenniaTest):
         self.assertEqual(
             remembered,
             {
-                _t_grid_id(2, 0): f"{_t_wild_region_label(60, 97)}（南門）",
-                _t_grid_id(2, 4): f"{_t_wild_region_label(60, 103)}（北門）",
+                _t_grid_id(2, 0): f"{_t_region_display_for(60, 97)}（南門）",
+                _t_grid_id(2, 4): f"{_t_region_display_for(60, 103)}（北門）",
             },
         )
         self.assertEqual(len(set(remembered.values())), 2)

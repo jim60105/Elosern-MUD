@@ -80,7 +80,9 @@ register_catalog_once()
 # Kit identities: the kit branch for the guild hosts, one synthetic shop
 # config over kit items for the store, and kit items in the actor's pockets.
 BRANCH = synthetic_branch_key()
-T_SHOP = next(iter(SYNTH_SHOPS))
+# The kit's one shop identity, named explicitly (never first-row-order).
+T_SHOP = "t_mossgate_stall"
+assert T_SHOP in SYNTH_SHOPS, "kit shop identity moved"
 _T_SPRAY = SYNTH_ITEMS["t_ember_spray"].key
 _T_THORN = SYNTH_ITEMS["t_thorn_knife"].key
 # File-local synthetic inventory rows for the pure validator fixtures —
